@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- *
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -238,6 +239,8 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
     
     MediaPlayer.OnPreparedListener mPreparedListener = new MediaPlayer.OnPreparedListener() {
         public void onPrepared(MediaPlayer mp) {
+          final int QVGA_WIDTH=320;
+          final int QVGA_HEIGHT=240;
             // briefly show the mediacontroller
             mIsPrepared = true;
             if (mOnPreparedListener != null) {
@@ -251,7 +254,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
             if (mVideoWidth != 0 && mVideoHeight != 0) {
                 //Log.i("@@@@", "video size: " + mVideoWidth +"/"+ mVideoHeight);
                 getHolder().setFixedSize(mVideoWidth, mVideoHeight);
-                if (mSurfaceWidth == mVideoWidth && mSurfaceHeight == mVideoHeight) {
+                if ((mSurfaceWidth == mVideoWidth && mSurfaceHeight == mVideoHeight) || (mSurfaceWidth == QVGA_WIDTH && mSurfaceHeight==QVGA_HEIGHT)) {
                     // We didn't actually change the size (it was already at the size
                     // we need), so we won't get a "surface changed" callback, so
                     // start the video here instead of in the callback.
@@ -261,7 +264,14 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                     }
                     if (mStartWhenPrepared) {
                         mMediaPlayer.start();
-                        mStartWhenPrepared = false;
+                        /*After the start of the Mediaplayer,setting 'mstartWhenPrepared' to false
+                     will not allow the replay of the video after an MT call.( as 'mstartWhenPrepared'
+                     made true in VideoView.start() which is not called again because the VideoView is
+                     already present). Hence commenting it out.*/
+//                        #if 0
+//                        mStartWhenPrepared = false;
+//                        #endif
+
                         if (mMediaController != null) {
                             mMediaController.show();
                         }

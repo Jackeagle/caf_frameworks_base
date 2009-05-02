@@ -31,6 +31,7 @@ public interface SimConstants {
     public static final int EF_MWIS = 0x6FCA;
     public static final int EF_MBDN = 0x6fc7;
     public static final int EF_PNN = 0x6fc5;
+    public static final int EF_OPL = 0x6fc6;
     public static final int EF_SPN = 0x6F46;
     public static final int EF_SMS = 0x6F3C;
     public static final int EF_ICCID = 0x2fe2;

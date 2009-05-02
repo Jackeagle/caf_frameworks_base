@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License"); 
 ** you may not use this file except in compliance with the License. 
@@ -221,7 +222,7 @@ size_t AudioHardwareBase::getInputBufferSize(uint32_t sampleRate, int format, in
         return 0;
     }
 
-    return 320;
+    return 2048;
 }
 
 status_t AudioHardwareBase::dumpState(int fd, const Vector<String16>& args)

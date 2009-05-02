@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +46,7 @@ class CommandParamsFactory extends Handler {
     static final int LOAD_NO_ICON           = 0;
     static final int LOAD_SINGLE_ICON       = 1;
     static final int LOAD_MULTI_ICONS       = 2;
+    private boolean loadOptionalIcon = false;
 
     // Command Qualifier values for refresh command
     static final int REFRESH_NAA_INIT_AND_FULL_FILE_CHANGE  = 0x00;
@@ -185,6 +187,11 @@ class CommandParamsFactory extends Handler {
         int iconIndex = 0;
 
         if (data == null) {
+            if(loadOptionalIcon){
+        	mCmdParams.loadOptionalIconFailed=true;
+        	loadOptionalIcon=false;
+        	return ResultCode.OK;
+            }
             return ResultCode.PRFRMD_ICON_NOT_DISPLAYED;
         }
         switch(mIconLoadState) {
@@ -196,6 +203,9 @@ class CommandParamsFactory extends Handler {
             // set each item icon.
             for (Bitmap icon : icons) {
                 mCmdParams.setIcon(icon);
+                if(icon==null && loadOptionalIcon){
+            		mCmdParams.loadOptionalIconFailed=true;
+            	}
             }
             break;
         }
@@ -298,6 +308,7 @@ class CommandParamsFactory extends Handler {
         mCmdParams = new DisplayTextParams(cmdDet, textMsg);
 
         if (iconId != null) {
+            loadOptionalIcon=true;
             mIconLoadState = LOAD_SINGLE_ICON;
             mIconLoader.loadIcon(iconId.recordNumber, this
                     .obtainMessage(MSG_ID_LOAD_ICON_DONE));
@@ -342,6 +353,7 @@ class CommandParamsFactory extends Handler {
 
         if (iconId != null) {
             mIconLoadState = LOAD_SINGLE_ICON;
+            loadOptionalIcon=true;
             mIconLoader.loadIcon(iconId.recordNumber, this
                     .obtainMessage(MSG_ID_LOAD_ICON_DONE));
             return true;
@@ -391,6 +403,7 @@ class CommandParamsFactory extends Handler {
         mCmdParams = new GetInputParams(cmdDet, input);
 
         if (iconId != null) {
+            loadOptionalIcon=true;
             mIconLoadState = LOAD_SINGLE_ICON;
             mIconLoader.loadIcon(iconId.recordNumber, this
                     .obtainMessage(MSG_ID_LOAD_ICON_DONE));
@@ -458,6 +471,7 @@ class CommandParamsFactory extends Handler {
         mCmdParams = new GetInputParams(cmdDet, input);
 
         if (iconId != null) {
+            loadOptionalIcon=true;
             mIconLoadState = LOAD_SINGLE_ICON;
             mIconLoader.loadIcon(iconId.recordNumber, this
                     .obtainMessage(MSG_ID_LOAD_ICON_DONE));
@@ -583,6 +597,7 @@ class CommandParamsFactory extends Handler {
                 System.arraycopy(itemsIconId.recordNumbers, 0, recordNumbers,
                         1, itemsIconId.recordNumbers.length);
             }
+            loadOptionalIcon=true;
             mIconLoader.loadIcons(recordNumbers, this
                     .obtainMessage(MSG_ID_LOAD_ICON_DONE));
             break;
@@ -625,6 +640,7 @@ class CommandParamsFactory extends Handler {
         mCmdParams = new DisplayTextParams(cmdDet, textMsg);
 
         if (iconId != null) {
+            loadOptionalIcon=true;
             mIconLoadState = LOAD_SINGLE_ICON;
             mIconLoader.loadIcon(iconId.recordNumber, this
                     .obtainMessage(MSG_ID_LOAD_ICON_DONE));

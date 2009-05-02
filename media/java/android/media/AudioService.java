@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,6 +87,7 @@ public class AudioService extends IAudioService.Stub {
     private static final int MSG_MEDIA_SERVER_DIED = 5;
     private static final int MSG_MEDIA_SERVER_STARTED = 6;
     private static final int MSG_PLAY_SOUND_EFFECT = 7;
+    private static final int MSG_PERSIST_AUDIO_ROUTING = 8;
 
     /** @see AudioSystemThread */
     private AudioSystemThread mAudioSystemThread;
@@ -185,10 +187,13 @@ public class AudioService extends IAudioService.Stub {
         createAudioSystemThread();
         createStreamStates();
         readPersistedSettings();
+        initializeAudioRoutings();
         readAudioSettings();
         mMediaServerOk = true;
         AudioSystem.setErrorCallback(mAudioSystemCallback);
+        if (Settings.System.getInt(mContentResolver, Settings.System.SOUND_EFFECTS_ENABLED, 0) == 1) {
         loadSoundEffects();
+    }
     }
 
     private void createAudioSystemThread() {
@@ -290,6 +295,29 @@ public class AudioService extends IAudioService.Stub {
         // Broadcast vibrate settings
         broadcastVibrateSetting(AudioManager.VIBRATE_TYPE_RINGER);
         broadcastVibrateSetting(AudioManager.VIBRATE_TYPE_NOTIFICATION);
+    }
+    
+
+    private void initializeAudioRoutings(){
+        synchronized (mSettingsLock) {
+        /*Making the settings to earpiece for surf.Change to speaker for ffa for
+       * speaker mode*/
+            mRoutes[AudioManager.MODE_NORMAL] = System.getInt(mContentResolver, System.MODE_NORMAL, AudioManager.ROUTE_EARPIECE);
+            mRoutes[AudioManager.MODE_RINGTONE] = System.getInt(mContentResolver, System.MODE_RINGTONE, AudioManager.ROUTE_EARPIECE);
+            mRoutes[AudioManager.MODE_IN_CALL] = System.getInt(mContentResolver, System.MODE_IN_CALL, AudioManager.ROUTE_EARPIECE);
+
+            for (int mode = 0; mode < AudioSystem.NUM_MODES; mode++) {
+                AudioSystem.setRouting(mode, mRoutes[mode], AudioSystem.ROUTE_ALL);
+            }
+        }
+}
+
+    private void storeAudioRoutings(){
+        synchronized (mSettingsLock) {
+            System.putInt(mContentResolver, System.MODE_NORMAL, mRoutes[AudioManager.MODE_NORMAL]);
+            System.putInt(mContentResolver, System.MODE_RINGTONE, mRoutes[AudioManager.MODE_RINGTONE]);
+            System.putInt(mContentResolver, System.MODE_IN_CALL, mRoutes[AudioManager.MODE_IN_CALL]);
+        }
     }
 
     private void readAudioSettings() {
@@ -630,7 +658,9 @@ public class AudioService extends IAudioService.Stub {
             if ((mRoutes[mode] & mask) != (routes & mask)) {
                 AudioSystem.setRouting(mode, routes, mask);
                 mRoutes[mode] = (mRoutes[mode] & ~mask) | (routes & mask);
-            }
+                sendMsg(mAudioHandler, MSG_PERSIST_AUDIO_ROUTING, SHARED_MSG,
+                    SENDMSG_QUEUE , mode, 0, null, PERSIST_DELAY);
+            } 
             int streamType = getActiveStreamType(AudioManager.USE_DEFAULT_STREAM_TYPE);
             int index = mStreamStates[streamType].mIndex;
             syncRingerAndNotificationStreamVolume(streamType, index, true);
@@ -1169,6 +1199,20 @@ public class AudioService extends IAudioService.Stub {
             }
         }
 
+        private void persistAudioRouting(int mode) {
+            switch (mode){
+                case AudioSystem.MODE_NORMAL:
+                    System.putInt(mContentResolver, System.MODE_NORMAL, mRoutes[mode]);
+                    break;
+                case AudioSystem.MODE_RINGTONE:
+                    System.putInt(mContentResolver, System.MODE_RINGTONE, mRoutes[mode]);
+                    break;
+                case AudioSystem.MODE_IN_CALL:
+                    System.putInt(mContentResolver, System.MODE_IN_CALL, mRoutes[mode]);
+                    break;
+            }
+        }
+
         private void cleanupPlayer(MediaPlayer mp) {
             if (mp != null) {
                 try {
@@ -1213,6 +1257,7 @@ public class AudioService extends IAudioService.Stub {
                     Log.e(TAG, "Media server started.");
                     // Restore audio routing and stream volumes
                     applyAudioSettings();
+                    storeAudioRoutings();
                     int numStreamTypes = AudioSystem.getNumStreamTypes();
                     for (int streamType = numStreamTypes - 1; streamType >= 0; streamType--) {
                         int volume;
@@ -1230,6 +1275,10 @@ public class AudioService extends IAudioService.Stub {
 
                 case MSG_PLAY_SOUND_EFFECT:
                     playSoundEffect(msg.arg1, msg.arg2);
+                    break;
+
+                case MSG_PERSIST_AUDIO_ROUTING:
+                    persistAudioRouting(msg.arg1);
                     break;
             }
         }

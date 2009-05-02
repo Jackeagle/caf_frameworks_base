@@ -585,7 +585,7 @@ public final class Sync {
              * @return true of the provider should be synced when a network tickle is received
              */
             public boolean getSyncProviderAutomatically(String providerName) {
-                return getBoolean(SETTING_SYNC_PROVIDER_PREFIX + providerName, true);
+                return getBoolean(SETTING_SYNC_PROVIDER_PREFIX + providerName, false);
             }
 
             /**
@@ -613,7 +613,7 @@ public final class Sync {
              * @return true if it should
              */
             public boolean getListenForNetworkTickles() {
-                return getBoolean(SETTING_LISTEN_FOR_TICKLES, true);
+                return getBoolean(SETTING_LISTEN_FOR_TICKLES, false);
             }
 
             /**

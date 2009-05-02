@@ -161,9 +161,9 @@ AudioFlinger::AudioFlinger()
 #endif
  
         // FIXME - this should come from settings
-        setRouting(AudioSystem::MODE_NORMAL, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
-        setRouting(AudioSystem::MODE_RINGTONE, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
-        setRouting(AudioSystem::MODE_IN_CALL, AudioSystem::ROUTE_EARPIECE, AudioSystem::ROUTE_ALL);
+        //setRouting(AudioSystem::MODE_NORMAL, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
+        //setRouting(AudioSystem::MODE_RINGTONE, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
+        //setRouting(AudioSystem::MODE_IN_CALL, AudioSystem::ROUTE_EARPIECE, AudioSystem::ROUTE_ALL);
         setMode(AudioSystem::MODE_NORMAL);
 
         setMasterVolume(1.0f);
@@ -2438,8 +2438,10 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
         } else if (mRecordTrack != 0) {
 
             buffer.frameCount = inFrameCount;
-            if (LIKELY(mRecordTrack->getNextBuffer(&buffer) == NO_ERROR &&
-                       (int)buffer.frameCount == inFrameCount)) {
+            if (LIKELY(mRecordTrack->getNextBuffer(&buffer) == NO_ERROR))
+            {
+//  &&
+//  (int)buffer.frameCount == inFrameCount)) {
                 LOGV("AudioRecordThread read: %d frames", buffer.frameCount);
                 ssize_t bytesRead = input->read(buffer.raw, inBufferSize);
                 if (bytesRead < 0) {

@@ -1,10 +1,11 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -65,6 +66,24 @@ public:
 
     int getOrientation() const;
     void setOrientation(int orientation);
+    /* Special Effect */
+    const char *getEffect() const;
+
+    /* White Balance Lighting Conditions */
+    const char *getWBLighting() const;
+
+    /* Anti Banding */
+    const char *getAntiBanding() const;
+    /* Main image quality */
+    int getJpegMainimageQuality() const;
+    /* Brightness control */
+    int getBrightness() const;
+
+    /* Digital Zoom control */
+    float getZoomValue() const;
+
+    /* Check if Camera is Enabled */
+    int getCameraEnabledVal() const;
 
     void dump() const;
     status_t dump(int fd, const Vector<String16>& args) const;

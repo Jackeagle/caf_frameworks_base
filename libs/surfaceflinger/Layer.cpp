@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- *
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -181,6 +182,14 @@ void Layer::onDraw(const Region& clip) const
 
         copybit_image_t src;
         front.getBitmapSurface(&src);
+#ifdef HAVE_QCOM_GFX
+        ISurfaceFlingerClient::surface_data_t params;
+        mSurface->getSurfaceData(&params);
+        if(lcblk->surface[mFrontBufferIndex].magic == 0xBEEF) {
+            lcblk->surface[mFrontBufferIndex].magic = 0xBAD;   // probably not required
+            src.offset = lcblk->surface[mFrontBufferIndex].offset;
+        }
+#endif
         copybit_rect_t srect = { 0, 0, t.width, t.height };
 
         copybit_device_t* copybit = mFlinger->getBlitEngine();

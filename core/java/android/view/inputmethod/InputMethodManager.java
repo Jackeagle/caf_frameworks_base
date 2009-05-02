@@ -344,12 +344,12 @@ public final class InputMethodManager {
                                 }
                             }
                             clearBindingLocked();
+                        }
                             
-                            // If we were actively using the last input method, then
-                            // we would like to re-connect to the next input method.
-                            if (mServedView != null && mServedView.isFocused()) {
-                                mServedConnecting = true;
-                            }
+                        // If we were actively using the last input method, then
+                        // we would like to re-connect to the next input method.
+                        if (mServedView != null && mServedView.isFocused()) {
+                            mServedConnecting = true;
                         }
                         startInputInner();
                     }

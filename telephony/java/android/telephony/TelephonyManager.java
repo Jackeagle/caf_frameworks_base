@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- *
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,7 +28,7 @@ import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemProperties;
-
+import android.util.Log;
 
 /**
  * Provides access to information about the telephony services on
@@ -164,6 +164,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getDeviceSvn();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }
@@ -179,6 +183,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getDeviceId();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }
@@ -462,6 +470,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getSimSerialNumber();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }
@@ -482,6 +494,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getSubscriberId();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }
@@ -497,6 +513,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getLine1Number();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }
@@ -513,6 +533,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getLine1AlphaTag();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }
@@ -527,6 +551,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getVoiceMailNumber();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }
@@ -542,6 +570,10 @@ public class TelephonyManager {
         try {
             return getSubscriberInfo().getVoiceMailAlphaTag();
         } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        //Added the Catch for the NullPointerException as iphonesubinfo
+        //service can be crashed in between. In that case getSubscriberInfo
+        //method will return Null.
         }
         return null;
     }

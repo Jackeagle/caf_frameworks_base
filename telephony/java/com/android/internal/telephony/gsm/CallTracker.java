@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -796,6 +797,9 @@ public final class CallTracker extends Handler
                 }
                 hangup((GSMConnection)(call.getConnections().get(0)));
             } else {
+                if(backgroundCall.getConnections().size()>0) {
+                    hangupWaitingOrBackground();
+                }
                 hangupForegroundResumeBackground();
             }
         } else if (call == backgroundCall) {

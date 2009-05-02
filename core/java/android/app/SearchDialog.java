@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -859,6 +860,11 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
             // but don't replace the user's query
             mLeaveJammedQueryOnRefocus = true;
             if (mSearchTextField.requestFocus()) {
+         //Clear the Selection of dropdown and start typing fresh text by dispatching key event to EditText.
+         //Otherwise the focus stays of the drop down list and
+         //finally leads to stack overflow and the application crashes
+                mSearchTextField.clearListSelection();
+                mSearchTextField.setText(null);
                 handled = mSearchTextField.dispatchKeyEvent(event);
             }
             mLeaveJammedQueryOnRefocus = false;
@@ -1008,17 +1014,21 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
                         if (actionMsg != null && (actionMsg.length() > 0)) {
                             // shut down search bar and launch the activity
                             // cache everything we need because dismiss releases mems
-                            setupSuggestionIntent(c, mSearchable);
-                            final String query = mSearchTextField.getText().toString();
-                            final Bundle appData =  mAppSearchData;
-                            SearchableInfo si = mSearchable;
-                            String suggestionAction = mSuggestionAction;
-                            Uri suggestionData = mSuggestionData;
-                            String suggestionQuery = mSuggestionQuery;
-                            dismiss();
-                            sendLaunchIntent(suggestionAction, suggestionData,
+                            // To avoid the Race condition. when dismiss fn
+                            // called before calling this function
+                            if (mSearchable !=null) {
+                               setupSuggestionIntent(c, mSearchable);
+                               final String query = mSearchTextField.getText().toString();
+                               final Bundle appData =  mAppSearchData;
+                               SearchableInfo si = mSearchable;
+                               String suggestionAction = mSuggestionAction;
+                               Uri suggestionData = mSuggestionData;
+                               String suggestionQuery = mSuggestionQuery;
+                               dismiss();
+                               sendLaunchIntent(suggestionAction, suggestionData,
                                     suggestionQuery, appData,
                                              keyCode, actionMsg, si);
+                            }
                             return true;
                         }
                     }
@@ -1124,7 +1134,11 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
         }
 
         // attempt to enforce security requirement (no 3rd-party intents)
-        launcher.setComponent(si.mSearchActivity);
+        // To avoid the Race condition. when dismiss fn
+        // called before calling this function
+        if (si != null) {
+            launcher.setComponent(si.mSearchActivity);
+        }
 
         getContext().startActivity(launcher);
     }
@@ -1137,7 +1151,9 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
      */
     private boolean launchSuggestion(CursorAdapter ca, int position) {
         Cursor c = ca.getCursor();
-        if ((c != null) && c.moveToPosition(position)) {
+        // To avoid the Race condition. when dismiss fn
+        // called before calling this function
+        if ((c != null) && c.moveToPosition(position) && (mSearchable != null)) {
             setupSuggestionIntent(c, mSearchable);
             
             final Bundle appData =  mAppSearchData;
@@ -1368,7 +1384,8 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
                     mNonUserQuery = false;
                 }
             }
-            if (c == null) {
+            // guard against possible race conditions
+            if ((c == null) && (mSearchable !=null)) {
                 c = getSuggestions(mSearchable, query);
                 synchronized (this) {
                     mRecentCursor = new WeakReference<Cursor>(c);
@@ -1383,7 +1400,11 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
          */
         @Override
         public void changeCursor(Cursor c) {
-            
+            // check if the cursor is closed 
+            if((c != null) && (c.isClosed())) {
+                return;
+            }
+
             // first, check for various conditions that disqualify this cursor
             if ((c == null) || (c.getCount() == 0)) {
                 // no cursor, or cursor with no data
@@ -1456,7 +1477,7 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
         @Override
         public CharSequence convertToString(Cursor cursor) {
             CharSequence result = null;
-            if (cursor != null) {
+            if (cursor != null && !cursor.isBeforeFirst() ) {
                 int column = cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_QUERY);
                 if (column >= 0) {
                     final String query = cursor.getString(column);
