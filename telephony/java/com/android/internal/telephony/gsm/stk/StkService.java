@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -234,8 +235,14 @@ public class StkService extends Handler implements AppInterface {
             } else {
                 mMenuCmd = cmdMsg;
             }
+            if(cmdParams.loadOptionalIconFailed){
+            	sendTerminalResponse(cmdParams.cmdDet, ResultCode.PRFRMD_ICON_NOT_DISPLAYED, false, 0,
+            			null);
+            }
+            else{
             sendTerminalResponse(cmdParams.cmdDet, ResultCode.OK, false, 0,
                     null);
+            }
             break;
         case DISPLAY_TEXT:
             // when application is not required to respond, send an immediate
@@ -252,8 +259,14 @@ public class StkService extends Handler implements AppInterface {
                     .value();
             break;
         case SET_UP_IDLE_MODE_TEXT:
-            sendTerminalResponse(cmdParams.cmdDet, ResultCode.OK, false,
+            if(cmdParams.loadOptionalIconFailed){
+               sendTerminalResponse(cmdParams.cmdDet,
+                    ResultCode.PRFRMD_ICON_NOT_DISPLAYED, false, 0, null);
+            }
+            else{
+               sendTerminalResponse(cmdParams.cmdDet, ResultCode.OK, false,
                     0, null);
+            }
             break;
         case LAUNCH_BROWSER:
         case SELECT_ITEM:

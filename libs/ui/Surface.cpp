@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +57,9 @@ Surface::Surface(const sp<SurfaceComposerClient>& client,
     mSurfaceHeapBase[1] = 0;
     mHeap[0] = data.heap[0]; 
     mHeap[1] = data.heap[1];
+#ifdef HAVE_QCOM_GFX
+    mSharedTypeGPU = false;
+#endif
 }
 
 Surface::Surface(Surface const* rhs)
@@ -72,6 +76,9 @@ Surface::Surface(Surface const* rhs)
     mSurfaceHeapBase[0] = rhs->mSurfaceHeapBase[0];
     mSurfaceHeapBase[1] = rhs->mSurfaceHeapBase[1];
     mSwapRectangle.makeInvalid();
+#ifdef HAVE_QCOM_GFX
+    mSharedTypeGPU = rhs->mSharedTypeGPU;
+#endif
 }
 
 Surface::~Surface()

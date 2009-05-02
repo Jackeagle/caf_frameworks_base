@@ -19,7 +19,11 @@
 
 namespace android {
 #define GL_ENTRY(r, api, ...) r log_##api(__VA_ARGS__);
+#ifdef HAVE_QCOM_GFX
+#include "gl2_entries.in"
+#else
 #include "gl_entries.in"
+#endif
 #undef GL_ENTRY
 }; // namespace android
 

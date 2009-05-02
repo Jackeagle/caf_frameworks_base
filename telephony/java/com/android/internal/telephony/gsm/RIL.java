@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -690,16 +691,18 @@ public final class RIL extends BaseCommands implements CommandsInterface
     }
 
     public void
-    changeBarringPassword(String facility, String oldPwd, String newPwd, Message result)
+    changeBarringPassword(String facility, String oldPwd, String newPwd,
+                          String pwdChk, Message result)
     {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_CHANGE_BARRING_PASSWORD, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(3);
+        rr.mp.writeInt(4);
         rr.mp.writeString(facility);
         rr.mp.writeString(oldPwd);
         rr.mp.writeString(newPwd);
+        rr.mp.writeString(pwdChk);
 
         send(rr);
     }

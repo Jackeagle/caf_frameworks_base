@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -424,7 +425,8 @@ public interface CommandsInterface
     void changeSimPin(String oldPin, String newPin, Message result);
     void changeSimPin2(String oldPin2, String newPin2, Message result);
 
-    void changeBarringPassword(String facility, String oldPwd, String newPwd, Message result);
+    void changeBarringPassword(String facility, String oldPwd, String newPwd,
+                               String pwdChk, Message result);
 
     void supplyNetworkDepersonalization(String netpin, Message result);
 

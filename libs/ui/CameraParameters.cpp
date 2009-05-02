@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2008, The Android Open Source Project
+** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License"); 
 ** you may not use this file except in compliance with the License. 
@@ -270,4 +271,59 @@ status_t CameraParameters::dump(int fd, const Vector<String16>& args) const
     return NO_ERROR;
 }
 
+const char *CameraParameters::getEffect() const
+{
+    return get("effect");
+}
+const char *CameraParameters::getWBLighting() const
+{
+    return get("whitebalance");
+}
+
+const char *CameraParameters::getAntiBanding() const
+{
+     return get("antibanding");
+}
+int CameraParameters::getJpegMainimageQuality() const
+{
+     return atoi(get("jpeg-quality"));
+}
+int CameraParameters::getBrightness() const
+{
+     LOGD("in CameraParameters.cpp getbrightness str = %s ", get("luma-adaptation"));
+     if( get("luma-adaptation") )
+     {
+        LOGD("in CameraParameters.cpp getbrightness not null int = %d ", atoi(get("luma-adaptation")));
+        return atoi(get("luma-adaptation"));
+     }
+     else
+     {
+       LOGD("in CameraParameters.cpp getbrightness null ");
+       return 0;
+     }
+}
+
+float CameraParameters::getZoomValue() const
+{
+    LOGD(" CameraParameters.cpp :: ZOOM = %s ", get("zoom"));
+    if( get("zoom") )
+    {
+        LOGD("CameraParameters.cpp :: ZOOM Value not null int = %2.2f ", atof(get("zoom")));
+        return atof(get("zoom"));
+    }
+    else
+    {
+         LOGD("CameraParameters.cpp :: ZOOM Value null ");
+         return 0;
+    }
+}
+
+int CameraParameters::getCameraEnabledVal() const
+{
+    LOGD(" Camera_Enabled value is  %s ", get("camera_enabled"));
+    if( (NULL == get("camera_enabled") ) )
+        return 0;
+    else
+       return atoi(get("camera_enabled"));
+}
 }; // namespace android

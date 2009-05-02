@@ -137,8 +137,16 @@ status_t BootAnimation::readyToRun() {
     session()->closeTransaction();
 
     // initialize opengl and egl
-    const EGLint attribs[] = { EGL_RED_SIZE, 5, EGL_GREEN_SIZE, 6,
-            EGL_BLUE_SIZE, 5, EGL_DEPTH_SIZE, 0, EGL_NONE };
+    const EGLint attribs[] = {
+            EGL_RED_SIZE,       5,
+            EGL_GREEN_SIZE,     6,
+            EGL_BLUE_SIZE,      5,
+            EGL_DEPTH_SIZE,     0,
+#ifdef HAVE_QCOM_GFX
+	    EGL_CONFIG_CAVEAT,  EGL_SLOW_CONFIG,
+#endif
+            EGL_NONE
+    };
     EGLint w, h, dummy;
     EGLint numConfigs;
     EGLConfig config;

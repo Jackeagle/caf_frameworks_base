@@ -108,7 +108,7 @@ public class SntpClient
             if (Config.LOGD) Log.d(TAG, "clock offset: " + clockOffset + " ms");
 
             // save our results
-            mNtpTime = requestTime + clockOffset;
+            mNtpTime = transmitTime ;//requestTime + clockOffset;
             mNtpTimeReference = requestTicks;
             mRoundTripTime = roundTripTime;
         } catch (Exception e) {

@@ -54,7 +54,7 @@
     <!-- For GsmMmiCode.java --> <skip />
     <!-- Displayed when the user dialed an MMI code whose function
          could not be performed. This will be displayed in a toast. -->
-    <string name="mmiError">Connection problem or invalid MMI code.</string>
+    <string name="mmiError">Rejected.</string>
     <!-- Displayed when a phone feature such as call barring was activated. -->
     <string name="serviceEnabled">Service was enabled.</string>
     <!-- Displayed in front of the list of a set of service classes
@@ -2311,6 +2311,11 @@
     
     <!-- Long label for a button on a full-screen input method for an unknown action. -->
     <string name="ime_action_default">Execute</string>
+
+    <!-- GSM limited service strings for "Managed Roaming" dialog -->
+    <string name="managed_roaming_dialog_content">Network with Limited Service found. Do you want to initiate a Network Search?</string>
+    <string name="managed_roaming_dialog_ok_button">Yes</string>
+    <string name="managed_roaming_dialog_cancel_button">No</string>
     
     <!-- Strings for search suggestions. These are going here because they are referenced by both 
          ContactsProvider and GoogleContactsProvider -->

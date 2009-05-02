@@ -1,5 +1,6 @@
 /* 
  ** Copyright 2007, The Android Open Source Project
+ ** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  **
  ** Licensed under the Apache License, Version 2.0 (the "License"); 
  ** you may not use this file except in compliance with the License. 
@@ -142,7 +143,11 @@ static void gl_unimplemented() {
 #define EGL_ENTRY(_r, _api, ...) #_api,
 
 static char const * const gl_names[] = {
+#ifdef HAVE_QCOM_GFX
+    #include "gl2_entries.in"
+#else
     #include "gl_entries.in"
+#endif
     NULL
 };
 
@@ -269,6 +274,84 @@ const sp<ISurfaceComposer>& getSurfaceFlinger();
 request_gpu_t* gpu_acquire(void* user);
 int gpu_release(void*, request_gpu_t* gpu);
 
+#ifdef HAVE_QCOM_GFX
+static __attribute__((noinline))
+void *load_egl_driver(const char* driver, gl_hooks_t* hooks)
+{
+    void* dso = dlopen(driver, RTLD_NOW | RTLD_LOCAL);
+    LOGE_IF(!dso,
+            "couldn't load <%s> library (%s)",
+            driver, dlerror());
+
+    if (dso) {
+        void** curr;
+        char const * const * api;
+        gl_hooks_t::egl_t* egl = &hooks->egl;
+        curr = (void**)egl;
+        api = egl_names;
+        while (*api) {
+            void* f = dlsym(dso, *api);
+            //LOGD("<%s> @ 0x%p", *api, f);
+            if (f == NULL) {
+                //LOGW("<%s> not found in %s", *api, driver);
+                f = (void*)0;
+            }
+            *curr++ = f;
+            api++;
+        }
+
+        void *dso_gsl = NULL;
+        if(strcmp(driver, "libegl13.so") == 0)
+        {
+            // This is libegl13.so, so load additional gsl library
+            dso_gsl = dlopen("libgsl.so", RTLD_NOW | RTLD_LOCAL);
+            LOGE_IF(!dso_gsl,
+                    "couldn't load <%s> library (%s)",
+                    "libgsl.so", dlerror());
+        }
+
+        // hook this driver up with surfaceflinger if needed
+        register_gpu_t register_gpu = 
+            (register_gpu_t)dlsym(dso_gsl ? dso_gsl : dso, "oem_register_gpu");
+
+        if (register_gpu != NULL) {
+            if (getSurfaceFlinger() != 0) {
+                register_gpu(dso, gpu_acquire, gpu_release);
+            }
+        }
+    }
+    return dso;
+}
+
+static __attribute__((noinline))
+void *load_gl_driver(const char* driver, gl_hooks_t* hooks)
+{
+    void* dso = dlopen(driver, RTLD_NOW | RTLD_LOCAL);
+    LOGE_IF(!dso,
+            "couldn't load <%s> library (%s)",
+            driver, dlerror());
+
+    if (dso) {
+        void** curr;
+        char const * const * api;
+        gl_hooks_t::gl_t* gl = &hooks->gl;
+        curr = (void**)gl;
+        api = gl_names;
+        while (*api) {
+            void* f = dlsym(dso, *api);
+            //LOGD("<%s> @ 0x%p", *api, f);
+            if (f == NULL) {
+                //LOGW("<%s> not found in %s", *api, driver);
+                f = (void*)gl_unimplemented;
+            }
+            *curr++ = f;
+            api++;
+        }
+    }
+
+    return dso;
+}
+#else
 static __attribute__((noinline))
 void *load_driver(const char* driver, gl_hooks_t* hooks)
 {
@@ -318,6 +401,7 @@ void *load_driver(const char* driver, gl_hooks_t* hooks)
     }
     return dso;
 }
+#endif
 
 template<typename T>
 static __attribute__((noinline))
@@ -516,7 +600,12 @@ EGLDisplay eglGetDisplay(NativeDisplayType display)
     egl_connection_t* cnx = &gEGLImpl[IMPL_SOFTWARE];
     if (cnx->dso == 0) {
         cnx->hooks = &gHooks[IMPL_SOFTWARE];
+#ifdef HAVE_QCOM_GFX
+        cnx->dso = load_egl_driver("libagl.so", cnx->hooks);
+        cnx->dso = load_gl_driver("libagl.so", cnx->hooks);
+#else
         cnx->dso = load_driver("libagl.so", cnx->hooks);
+#endif
     }
     if (cnx->dso && d->dpys[IMPL_SOFTWARE]==EGL_NO_DISPLAY) {
         d->dpys[IMPL_SOFTWARE] = cnx->hooks->egl.eglGetDisplay(display);
@@ -530,7 +619,12 @@ EGLDisplay eglGetDisplay(NativeDisplayType display)
         property_get("debug.egl.hw", value, "1");
         if (atoi(value) != 0) {
             cnx->hooks = &gHooks[IMPL_HARDWARE];
+#ifdef HAVE_QCOM_GFX
+            cnx->dso = load_egl_driver("libegl13.so", cnx->hooks);
+            // GL symbols are loaded later when the API version is known
+#else
             cnx->dso = load_driver("libhgl.so", cnx->hooks);
+#endif
         } else {
             LOGD("3D hardware acceleration is disabled");
         }
@@ -950,6 +1044,20 @@ EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
     int i=0, index=0;
     egl_connection_t* cnx = validate_display_config(dpy, config, dp, i, index);
     if (cnx) {
+#ifdef HAVE_QCOM_GFX
+        // We deferred the loading of HW GLES symbols till now because we
+        // didn't know the API version until this point
+        if(i == IMPL_HARDWARE) {
+            if(attrib_list && (attrib_list[0] == EGL_CONTEXT_CLIENT_VERSION) && (attrib_list[1] == 2)) {
+                // Requested OpenGL ES 2.0
+                cnx->dso = load_gl_driver("libgles20.so", cnx->hooks);
+            }
+            else {
+                // Requested OpenGL ES 1.x
+                cnx->dso = load_gl_driver("libgles11.so", cnx->hooks);
+            }
+        }
+#endif
         EGLContext context = cnx->hooks->egl.eglCreateContext(
                 dp->dpys[i], dp->configs[i][index], share_list, attrib_list);
         if (context != EGL_NO_CONTEXT) {
