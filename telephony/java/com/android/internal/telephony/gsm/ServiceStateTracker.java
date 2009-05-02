@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,11 +31,15 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.gsm.DataConnectionTracker.State;
 
 import android.app.AlarmManager;
+import android.app.Dialog;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.res.Resources;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.ContentObserver;
 import android.os.AsyncResult;
@@ -56,6 +61,9 @@ import android.util.Config;
 import android.util.Log;
 import android.util.TimeUtils;
 import android.util.EventLog;
+import android.view.WindowManager;
+
+import com.android.internal.R;
 
 import java.util.Arrays;
 import java.util.Calendar;
@@ -209,6 +217,9 @@ final class ServiceStateTracker extends Handler
     static final int EVENT_RESET_PREFERRED_NETWORK_TYPE = 21;
     static final int EVENT_CHECK_REPORT_GPRS = 22;
     static final int EVENT_RESTRICTED_STATE_CHANGED = 23;
+
+    // Registration denied - Managed Roaming dialog
+    private static boolean display_managed_roaming_dialog = false;
 
   //***** Time Zones
 
@@ -802,6 +813,13 @@ final class ServiceStateTracker extends Handler
                 case EVENT_POLL_STATE_NETWORK_SELECTION_MODE:
                     ints = (int[])ar.result;
                     newSS.setIsManualSelection(ints[0] == 1);
+                    if (ints[0] == 1) {
+                        Settings.System.putString(phone.getContext().getContentResolver(),
+                                Settings.System.NETWORK_SELECTION_MODE, "Manual");
+                    } else {
+                        Settings.System.putString(phone.getContext().getContentResolver(),
+                                Settings.System.NETWORK_SELECTION_MODE, "Automatic");
+                    }
                 break;
             }
 
@@ -1278,6 +1296,40 @@ final class ServiceStateTracker extends Handler
         Log.d(LOG_TAG, "[DSAC DEB] " + "current rs at return "+ rs);
     }
 
+    DialogInterface.OnClickListener onManagedRoamingDialogClick =
+        new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+                switch (which){
+                    case DialogInterface.BUTTON_POSITIVE:
+                         Intent networkSettingIntent = new Intent(Intent.ACTION_MAIN);
+                         networkSettingIntent.setClassName("com.android.phone","com.android.phone.NetworkSetting");
+                         networkSettingIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                         phone.getContext().startActivity(networkSettingIntent);
+                         break;
+                    case DialogInterface.BUTTON_NEGATIVE:
+                         break;
+                }
+                display_managed_roaming_dialog = false;
+           }
+    };
+
+    private void createManagedRoamingDialog() {
+        Resources r = Resources.getSystem();
+
+        AlertDialog managed_roaming_dialog = new AlertDialog.Builder(phone.getContext())
+                 .setMessage(r.getString(R.string.managed_roaming_dialog_content))
+                 .setPositiveButton(r.getString(R.string.managed_roaming_dialog_ok_button),
+                                    onManagedRoamingDialogClick)
+                 .setNegativeButton(r.getString(R.string.managed_roaming_dialog_cancel_button),
+                                    onManagedRoamingDialogClick)
+                 .create();
+
+       display_managed_roaming_dialog = true;
+       managed_roaming_dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+       managed_roaming_dialog.show();
+    }
+
     /** code is registration state 0-5 from TS 27.007 7.2 */
     private int
     regCodeToServiceState(int code)
@@ -1285,7 +1337,21 @@ final class ServiceStateTracker extends Handler
         switch (code) {
             case 0:
             case 2: // 2 is "searching"
+                return ServiceState.STATE_OUT_OF_SERVICE;
+
             case 3: // 3 is "registration denied"
+                /* This indicates limited service. Show the "Managed Roaming"
+                 * dialog if user preferred network selection mode is 'Manual'
+                 */
+                String user_selected_network_mode = Settings.System.getString(
+                    phone.getContext().getContentResolver(), Settings.System.NETWORK_SELECTION_MODE);
+                if (user_selected_network_mode.equals("Manual")) {
+                    if (!display_managed_roaming_dialog) {
+                        createManagedRoamingDialog();
+                    }
+                }
+                return ServiceState.STATE_OUT_OF_SERVICE;
+
             case 4: // 4 is "unknown" no vaild in current baseband
                 return ServiceState.STATE_OUT_OF_SERVICE;
 

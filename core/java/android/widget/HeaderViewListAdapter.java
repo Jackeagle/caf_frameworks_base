@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -184,7 +185,10 @@ public class HeaderViewListAdapter implements WrapperListAdapter, Filterable {
             int adjPosition = position - numHeaders;
             int adapterCount = mAdapter.getCount();
             if (adjPosition >= adapterCount) {
-                if (mFooterViewInfos != null) {
+               //When adjPosition >= adapterCount get the footer view at that postion
+               //but ensure that the total footers count is greater than adjPosition - adapterCount.
+               //Adding this check, fixes monkey crash
+                if (mFooterViewInfos != null && getFootersCount() > (adjPosition - adapterCount)) {
                     return mFooterViewInfos.get(adjPosition - adapterCount).view;
                 }
             } else {

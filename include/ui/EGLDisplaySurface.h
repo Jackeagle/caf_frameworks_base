@@ -76,6 +76,7 @@ private:
     nsecs_t             mSleep;
     uint32_t            mFeatureFlags;
     copybit_device_t*   mBlitEngine;
+    uint32_t mOldYres;
 };
 
 // ---------------------------------------------------------------------------

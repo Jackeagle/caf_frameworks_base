@@ -1,7 +1,8 @@
 /* 
 **
 ** Copyright 2007 The Android Open Source Project
-**
+** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+** 
 ** Licensed under the Apache License Version 2.0(the "License"); 
 ** you may not use this file except in compliance with the License. 
 ** You may obtain a copy of the License at 
@@ -107,6 +108,9 @@ uint32_t EGLNativeWindowSurface::swapBuffers()
     const int h = egl_native_window_t::height;
     const sp<Surface>& surface(mSurface);
     Surface::SurfaceInfo info;
+#ifdef HAVE_QCOM_GFX
+    surface->setSharedOffset(egl_native_window_t::offset);
+#endif
     surface->unlockAndPost();
     surface->lock(&info);
     // update the address of the buffer to draw to next

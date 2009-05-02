@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -663,12 +664,20 @@ public class AudioManager {
     public void setBluetoothScoOn(boolean on){
         // Don't disable A2DP when turning off SCO.
         // A2DP does not affect in-call routing.
-        setRouting(MODE_RINGTONE,
-               on ? ROUTE_BLUETOOTH_SCO: ROUTE_SPEAKER, ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
+
         setRouting(MODE_NORMAL,
-                on ? ROUTE_BLUETOOTH_SCO: ROUTE_SPEAKER, ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
+                on ? ROUTE_BLUETOOTH_SCO:
+                        ((getRouting(MODE_NORMAL) & ROUTE_BLUETOOTH_SCO) ==  0 ? getRouting(MODE_NORMAL) : ROUTE_EARPIECE)
+                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
+        setRouting(MODE_RINGTONE,
+                on ? ROUTE_BLUETOOTH_SCO:
+                        ((getRouting(MODE_RINGTONE) & ROUTE_BLUETOOTH_SCO) == 0 ? getRouting(MODE_RINGTONE) : ROUTE_EARPIECE)
+                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
         setRouting(MODE_IN_CALL,
-                on ? ROUTE_BLUETOOTH_SCO: ROUTE_EARPIECE, ROUTE_ALL);
+                on ? ROUTE_BLUETOOTH_SCO:
+                        ((getRouting(MODE_IN_CALL) & ROUTE_BLUETOOTH_SCO) == 0 ? getRouting(MODE_IN_CALL) : ROUTE_EARPIECE)
+                                , ROUTE_ALL);
+
     }
 
     /**
@@ -717,11 +726,18 @@ public class AudioManager {
         // A2DP has higher priority than wired headset, so headset connect/disconnect events
         // should not affect A2DP routing
         setRouting(MODE_NORMAL,
-                on ? ROUTE_HEADSET : ROUTE_SPEAKER, ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
+                on ? ROUTE_HEADSET :
+                        ((getRouting(MODE_NORMAL) & ROUTE_HEADSET) == 0) ? getRouting(MODE_NORMAL) : ROUTE_EARPIECE
+                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
         setRouting(MODE_RINGTONE,
-                on ? ROUTE_HEADSET | ROUTE_SPEAKER : ROUTE_SPEAKER, ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
+                on ? ROUTE_HEADSET :
+                        ((getRouting(MODE_RINGTONE) & ROUTE_HEADSET) == 0) ? getRouting(MODE_RINGTONE) : ROUTE_EARPIECE
+                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
         setRouting(MODE_IN_CALL,
-                on ? ROUTE_HEADSET : ROUTE_EARPIECE, ROUTE_ALL);
+                on ? ROUTE_HEADSET :
+                        ((getRouting(MODE_IN_CALL) & ROUTE_HEADSET) == 0) ? getRouting(MODE_IN_CALL) : ROUTE_EARPIECE
+                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
+
     }
 
     /**
@@ -847,6 +863,14 @@ public class AudioManager {
      * Routing audio output to bluetooth A2DP
      */
     public static final int ROUTE_BLUETOOTH_A2DP    = AudioSystem.ROUTE_BLUETOOTH_A2DP;
+    /**
+     * Routing audio output to dual mike and Handset
+     */
+    public static final int ROUTE_DUALMIC_HANDSET    = AudioSystem.ROUTE_DUALMIC_HANDSET;
+    /**
+     * Routing audio output to Dual mike and speaker
+     */
+    public static final int ROUTE_DUALMIC_SPEAKER    = AudioSystem.ROUTE_DUALMIC_SPEAKER;
     /**
      * Used for mask parameter of {@link #setRouting(int,int,int)}.
      */

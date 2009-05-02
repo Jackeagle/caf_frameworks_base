@@ -1,6 +1,6 @@
 //
 // Copyright 2005 The Android Open Source Project
-//
+// Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 // Handle events, like key input and vsync.
 //
 // The goal is to provide an optimized solution for Linux, not an
@@ -43,6 +43,10 @@
 #ifdef HAVE_ANDROID_OS
 # include <sys/limits.h>        /* not part of Linux */
 #endif
+#ifdef QCOM_TEST_ONLY
+#include <linux/fb.h>
+#include <linux/input.h>
+#endif
 #include <sys/poll.h>
 #include <sys/ioctl.h>
 
@@ -62,7 +66,9 @@ namespace android {
 
 static const char *WAKE_LOCK_ID = "KeyEvents";
 static const char *device_path = "/dev/input";
-
+#ifdef QCOM_TEST_ONLY
+static const char *fb_devicename = "/dev/graphics/fb0";
+#endif
 /* return the larger integer */
 static inline int max(int v1, int v2)
 {
@@ -273,6 +279,10 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
     int res;
     int pollres;
     struct input_event iev;
+#ifdef QCOM_TEST_ONLY
+    static int fb_status = 1;
+    int fb_dev,ret;
+#endif
 
     // Note that we only allow one caller to getEvent(), so don't need
     // to do locking here...  only when adding/removing devices.
@@ -337,6 +347,29 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
                             err = mDevices[i]->layoutMap->map(iev.code, outKeycode, outFlags);
                             LOGV("iev.code=%d outKeycode=%d outFlags=0x%08x err=%d\n",
                                 iev.code, *outKeycode, *outFlags, err);
+#ifdef QCOM_TEST_ONLY
+                            if((iev.code == KEY_SOFT2) && (iev.value == 0)) {
+                                fb_dev = open(fb_devicename, O_RDWR);
+                                LOGV("open fb_dev=%d\n",fb_dev);
+                                if(fb_status) {
+                                    ret = ioctl(fb_dev,FBIOBLANK, FB_BLANK_POWERDOWN);
+                                    if(ret < 0)
+                                        LOGE("FB blank IOCTL Failed return value=%d\n",ret);
+                                    fb_status = 0;
+                                    LOGV("return value of ioctl=%d\n",ret);
+                                }
+                                else {
+                                    LOGV("turn on LCD\n");
+                                    ret = ioctl(fb_dev,FBIOBLANK, FB_BLANK_UNBLANK);
+                                    if(ret < 0)
+                                        LOGE("FB blank IOCTL Failed return value=%d\n",ret);
+                                    fb_status = 1;
+                                    LOGV("fb_status=%d\n",fb_status);
+                               }
+                               ret = close(fb_dev);
+                               LOGV("close device called ret=%d\n",ret);
+                            }
+#endif
                             if (err != 0) {
                                 *outKeycode = 0;
                                 *outFlags = 0;

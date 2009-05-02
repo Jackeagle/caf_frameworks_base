@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,6 +85,11 @@ public:
     status_t    setFreezeTint(uint32_t tint);
 
     uint32_t    getIdentity() const { return mIdentity; }
+#ifdef HAVE_QCOM_GFX
+    void setSharedOffset(size_t offset) { mSharedTypeGPU = true; mSharedOffset = offset; }
+    size_t getSharedOffset() { return mSharedOffset; }
+    bool getSharedTypeGPU() { return mSharedTypeGPU; }
+#endif
 private:
     friend class SurfaceComposerClient;
 
@@ -129,6 +135,10 @@ private:
     mutable Rect                mSwapRectangle;
     mutable uint8_t             mBackbufferIndex;
     mutable Mutex               mSurfaceLock;
+#ifdef HAVE_QCOM_GFX
+    size_t  mSharedOffset;
+    bool mSharedTypeGPU;
+#endif
 };
 
 }; // namespace android

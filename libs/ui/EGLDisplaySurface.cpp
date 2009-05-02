@@ -73,7 +73,7 @@ EGLDisplaySurface::EGLDisplaySurface()
     egl_native_window_t::swapBuffers = &EGLDisplaySurface::hook_swapBuffers;
     egl_native_window_t::connect = 0;
     egl_native_window_t::disconnect = 0;
-
+    mOldYres = 0;
     mFb[0].data = 0;
     mFb[1].data = 0;
     mBlitEngine = 0;
@@ -174,7 +174,7 @@ uint32_t EGLDisplaySurface::swapBuffers()
     // do the actual flip
     mIndex = 1 - mIndex;
     mInfo.activate = FB_ACTIVATE_VBL;
-    mInfo.yoffset = mIndex ? mInfo.yres : 0;
+    mInfo.yoffset = mIndex ? mOldYres : 0;
     if (ioctl(egl_native_window_t::fd, FBIOPUT_VSCREENINFO, &mInfo) == -1) {
         LOGE("FBIOPUT_VSCREENINFO failed");
         return 0;
@@ -376,12 +376,19 @@ status_t EGLDisplaySurface::mapFrameBuffer()
     if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
         return -errno;
 
+    mOldYres = info.yres;
+#ifdef SURF7201A
+    // Changing the display resolution to hvga portrait for MSM7201A target 
+    info.xres = 320;
+    info.yres = 480;
+#endif
+
     info.reserved[0] = 0;
     info.reserved[1] = 0;
     info.reserved[2] = 0;
     info.xoffset = 0;
     info.yoffset = 0;
-    info.yres_virtual = info.yres * 2;
+    info.yres_virtual = mOldYres * 2 ;
     info.bits_per_pixel = 16;
     /* Explicitly request 5/6/5 */
     info.red.offset = 11;
@@ -489,7 +496,7 @@ status_t EGLDisplaySurface::mapFrameBuffer()
     uint8_t* offscreen[2];
     offscreen[0] = (uint8_t*)buffer;
     if (flags & PAGE_FLIP) {
-        offscreen[1] = (uint8_t*)buffer + finfo.line_length*info.yres;
+        offscreen[1] = (uint8_t*)buffer + finfo.line_length*mOldYres;
     } else {
         offscreen[1] = (uint8_t*)malloc(finfo.smem_len);
         if (offscreen[1] == 0) {

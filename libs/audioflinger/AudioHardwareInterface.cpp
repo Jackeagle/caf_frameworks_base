@@ -221,7 +221,7 @@ size_t AudioHardwareBase::getInputBufferSize(uint32_t sampleRate, int format, in
         return 0;
     }
 
-    return 320;
+    return 2048;
 }
 
 status_t AudioHardwareBase::dumpState(int fd, const Vector<String16>& args)

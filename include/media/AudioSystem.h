@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,12 +67,14 @@ public:
     };
 
     enum audio_routes {
-        ROUTE_EARPIECE       = (1 << 0),
-        ROUTE_SPEAKER        = (1 << 1),
-        ROUTE_BLUETOOTH_SCO  = (1 << 2),
-        ROUTE_HEADSET        = (1 << 3),
-        ROUTE_BLUETOOTH_A2DP = (1 << 4),
-        ROUTE_ALL            = -1UL,
+        ROUTE_EARPIECE          = (1 << 0),
+        ROUTE_SPEAKER           = (1 << 1),
+        ROUTE_BLUETOOTH_SCO     = (1 << 2),
+        ROUTE_HEADSET           = (1 << 3),
+        ROUTE_BLUETOOTH_A2DP    = (1 << 4),
+        ROUTE_DUALMIC_HANDSET   = (1 << 5),
+        ROUTE_DUALMIC_SPEAKER   = (1 << 6),
+        ROUTE_ALL               = -1UL,
     };
 
     enum audio_in_acoustics {
