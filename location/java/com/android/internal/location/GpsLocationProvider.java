@@ -53,7 +53,7 @@ import java.util.Properties;
 public class GpsLocationProvider extends LocationProviderImpl {
 
     private static final String TAG = "GpsLocationProvider";
-    
+
     /**
      * Broadcast intent action indicating that the GPS has either been
      * enabled or disabled. An intent extra provides this state as a boolean,
@@ -702,7 +702,7 @@ public class GpsLocationProvider extends LocationProviderImpl {
         if (Config.LOGV) Log.v(TAG, "reportStatus status: " + status);
 
         boolean wasNavigating = mNavigating;
-        mNavigating = (status == GPS_STATUS_SESSION_BEGIN);
+        mNavigating = (status == GPS_STATUS_SESSION_BEGIN || status == GPS_STATUS_ENGINE_ON);
 
         if (wasNavigating != mNavigating) {
             synchronized(mListeners) {
