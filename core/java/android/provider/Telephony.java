@@ -1115,6 +1115,8 @@ public final class Telephony {
                 try {
                     if (cursor.moveToFirst()) {
                         return cursor.getLong(0);
+                    } else if (cursor.getCount() == 0) {
+                        return 0;
                     } else {
                         Log.e(TAG, "getOrCreateThreadId returned no rows!");
                     }
