@@ -1658,7 +1658,8 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                     }
                     if (handled) {
                         setPressed(false);
-                        v.setPressed(false);
+                        // Check if the child at the given index is present in the view group
+                        if (v != null) v.setPressed(false);
                     }
                 } else {
                     setPressed(false);
@@ -1722,9 +1723,12 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
             if (isPressed() && mSelectedPosition >= 0 && mAdapter != null &&
                     mSelectedPosition < mAdapter.getCount()) {
                 final View view = getChildAt(mSelectedPosition - mFirstPosition);
-                performItemClick(view, mSelectedPosition, mSelectedRowId);
-                setPressed(false);
-                if (view != null) view.setPressed(false);
+                // Check if the child at the selected position is present in the view group
+                if (view != null) {
+                    performItemClick(view, mSelectedPosition, mSelectedRowId);
+                    setPressed(false);
+                    view.setPressed(false);
+                }
                 return true;
             }
         }
