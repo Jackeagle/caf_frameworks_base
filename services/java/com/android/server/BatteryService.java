@@ -31,6 +31,7 @@ import android.os.DropBoxManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UEventObserver;
 import android.provider.Settings;
 import android.util.EventLog;
@@ -119,6 +120,8 @@ class BatteryService extends Binder {
 
     private boolean mSentLowBatteryBroadcast = false;
 
+    private boolean hwNoBattery;
+    
     public BatteryService(Context context) {
         mContext = context;
         mBatteryStats = BatteryStatsService.getService();
@@ -128,7 +131,11 @@ class BatteryService extends Binder {
         mLowBatteryCloseWarningLevel = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_lowBatteryCloseWarningLevel);
 
-        mUEventObserver.startObserving("SUBSYSTEM=power_supply");
+        String hwNoBatteryStr = SystemProperties.get("hw.nobattery");
+        hwNoBattery = Boolean.parseBoolean(hwNoBatteryStr);
+
+	if (!hwNoBattery)
+            mUEventObserver.startObserving("SUBSYSTEM=power_supply");
 
         // set initial status
         update();
@@ -204,8 +211,23 @@ class BatteryService extends Binder {
 
     private native void native_update();
 
-    private synchronized final void update() {
-        native_update();
+    private void stubUpdate() {
+        // Hardcode values. We could read them from properties
+        mAcOnline = true;
+	mUsbOnline = false;
+	mBatteryPresent = true;
+	mBatteryLevel = 100;
+	mBatteryVoltage = 4700;
+	mBatteryTemperature = 80;
+	mBatteryStatus = BatteryManager.BATTERY_STATUS_FULL;
+        mPlugType = BatteryManager.BATTERY_PLUGGED_AC;
+    }
+
+     private synchronized final void update() {
+	if (hwNoBattery)
+            stubUpdate();
+	else
+            native_update();
 
         boolean logOutlier = false;
         long dischargeDuration = 0;
