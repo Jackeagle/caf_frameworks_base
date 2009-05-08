@@ -286,7 +286,7 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
 
     // Note that we only allow one caller to getEvent(), so don't need
     // to do locking here...  only when adding/removing devices.
-    
+
     while(1) {
 
         // First, report any devices that had last been added/removed.
@@ -345,10 +345,12 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
                         *outScancode = iev.code;
                         if (iev.type == EV_KEY) {
                             err = mDevices[i]->layoutMap->map(iev.code, outKeycode, outFlags);
-                            LOGV("iev.code=%d outKeycode=%d outFlags=0x%08x err=%d\n",
+                            LOGI("iev.code=%d outKeycode=%d outFlags=0x%08x err=%d\n",
                                 iev.code, *outKeycode, *outFlags, err);
 #ifdef QCOM_TEST_ONLY
-                            if((iev.code == KEY_SOFT2) && (iev.value == 0)) {
+                            /*the LCD/BL will be turned off on pressing KEY_HOME for testing purposes  */
+                            if(iev.code == KEY_HOME) {
+                                if(iev.value == 0) {
                                 fb_dev = open(fb_devicename, O_RDWR);
                                 LOGV("open fb_dev=%d\n",fb_dev);
                                 if(fb_status) {
@@ -356,18 +358,21 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
                                     if(ret < 0)
                                         LOGE("FB blank IOCTL Failed return value=%d\n",ret);
                                     fb_status = 0;
-                                    LOGV("return value of ioctl=%d\n",ret);
+                                    LOGI("return value of ioctl=%d\n",ret);
                                 }
                                 else {
-                                    LOGV("turn on LCD\n");
+                                    LOGI("turn on LCD\n");
                                     ret = ioctl(fb_dev,FBIOBLANK, FB_BLANK_UNBLANK);
                                     if(ret < 0)
                                         LOGE("FB blank IOCTL Failed return value=%d\n",ret);
                                     fb_status = 1;
-                                    LOGV("fb_status=%d\n",fb_status);
-                               }
-                               ret = close(fb_dev);
-                               LOGV("close device called ret=%d\n",ret);
+                                    LOGI("fb_status=%d\n",fb_status);
+                                }
+                                ret = close(fb_dev);
+                                LOGV("close device called ret=%d\n",ret);
+                              }
+                              /* Avoids the event propagate to the applications */
+                              err=-1;
                             }
 #endif
                             if (err != 0) {
