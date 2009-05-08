@@ -38,6 +38,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
@@ -423,18 +424,27 @@ public class StatusBarPolicy {
         mBatteryData = IconData.makeIcon("battery",
                 null, com.android.internal.R.drawable.stat_sys_battery_unknown, 0, 0);
         mBatteryIcon = service.addIcon(mBatteryData, null);
+	String hwNoBatteryStr = SystemProperties.get("hw.nobattery");
+	Boolean hwNoBattery = Boolean.parseBoolean(hwNoBatteryStr);
+        service.setIconVisibility(mBatteryIcon, !hwNoBattery);
+
+	// phone present?
+       	String hwNoPhoneStr = SystemProperties.get("hw.nophone");
+        Boolean hwNoPhone = Boolean.parseBoolean(hwNoPhoneStr);
 
         // phone_signal
         mPhone = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
         mPhoneData = IconData.makeIcon("phone_signal",
                 null, com.android.internal.R.drawable.stat_sys_signal_null, 0, 0);
         mPhoneIcon = service.addIcon(mPhoneData, null);
+        service.setIconVisibility(mPhoneIcon, !hwNoPhone);
 
         // phone_evdo_signal
         mPhoneEvdoData = IconData.makeIcon("phone_evdo_signal",
                 null, com.android.internal.R.drawable.stat_sys_signal_evdo_0, 0, 0);
         mPhoneEvdoIcon = service.addIcon(mPhoneEvdoData, null);
         service.setIconVisibility(mPhoneEvdoIcon, false);
+        service.setIconVisibility(mPhoneEvdoIcon, !hwNoPhone);
 
         // register for phone state notifications.
         ((TelephonyManager)mContext.getSystemService(Context.TELEPHONY_SERVICE))
