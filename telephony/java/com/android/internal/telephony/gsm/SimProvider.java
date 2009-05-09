@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- *
+ * Copyright (C) 2009, Code Aurora Forum. All rights reserved
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -142,32 +142,37 @@ public class SimProvider extends ContentProvider {
     }
 
     @Override
-    public Uri insert(Uri url, ContentValues initialValues) {
-        Uri resultUri;
-        int efType;
-        String pin2 = null;
+       public Uri insert(Uri url, ContentValues initialValues) {
+          Uri resultUri;
+          int efType;
+          String pin2 = null;
 
-        if (DBG) log("insert");
+          ArrayList<ArrayList> results;
+          if (DBG) log("insert");
 
-        int match = URL_MATCHER.match(url);
-        switch (match) {
-            case ADN:
+          int match = URL_MATCHER.match(url);
+          switch (match) {
+             case ADN:
                 efType = SimConstants.EF_ADN;
+                /* Before writing to SIM contacts need to be brought from Sim
+                 * memory to adn cache.Otherwise first time writing will
+                 * generate error ADN list is Null */
+                results = loadFromEf(SimConstants.EF_ADN);
                 break;
 
-            case FDN:
+             case FDN:
                 efType = SimConstants.EF_FDN;
                 pin2 = initialValues.getAsString("pin2");
                 break;
 
-            default:
+             default:
                 throw new UnsupportedOperationException(
-                        "Cannot insert into URL: " + url);
-        }
+                      "Cannot insert into URL: " + url);
+          }
 
-        String tag = initialValues.getAsString("tag");
-        String number = initialValues.getAsString("number");
-        boolean success = addSimRecordToEf(efType, tag, number, pin2);
+          String tag = initialValues.getAsString("tag");
+          String number = initialValues.getAsString("number");
+          boolean success = addSimRecordToEf(efType, tag, number, pin2);
 
         if (!success) {
             return null;
