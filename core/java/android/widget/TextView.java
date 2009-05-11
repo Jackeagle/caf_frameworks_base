@@ -6275,7 +6275,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         
         protected void onReceiveResult(int resultCode, Bundle resultData) {
             if (resultCode != InputMethodManager.RESULT_SHOWN) {
-                Selection.setSelection((Spannable)mText, mNewStart, mNewEnd);
+                // Check if the selection bounds does not exceed the length.
+                // check the posible race condition which could happen in monkey.
+                if((mNewStart <= mText.length()) && (mNewEnd <= mText.length())) {
+                    Selection.setSelection((Spannable)mText, mNewStart, mNewEnd);
+                }
             }
         }
     }
