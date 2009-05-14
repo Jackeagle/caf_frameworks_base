@@ -51,6 +51,9 @@
 namespace android {
 // ----------------------------------------------------------------------------
 
+#define DRIVER_TYPE_GL 1
+#define DRIVER_TYPE_EGL 2
+
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 4
 static char const * const gVendorString     = "Android";
@@ -143,11 +146,7 @@ static void gl_unimplemented() {
 #define EGL_ENTRY(_r, _api, ...) #_api,
 
 static char const * const gl_names[] = {
-#ifdef HAVE_QCOM_GFX
-    #include "gl2_entries.in"
-#else
     #include "gl_entries.in"
-#endif
     NULL
 };
 
@@ -274,9 +273,8 @@ const sp<ISurfaceComposer>& getSurfaceFlinger();
 request_gpu_t* gpu_acquire(void* user);
 int gpu_release(void*, request_gpu_t* gpu);
 
-#ifdef HAVE_QCOM_GFX
 static __attribute__((noinline))
-void *load_egl_driver(const char* driver, gl_hooks_t* hooks)
+void *load_driver(const char* driver, gl_hooks_t* hooks, int type)
 {
     void* dso = dlopen(driver, RTLD_NOW | RTLD_LOCAL);
     LOGE_IF(!dso,
@@ -286,122 +284,65 @@ void *load_egl_driver(const char* driver, gl_hooks_t* hooks)
     if (dso) {
         void** curr;
         char const * const * api;
-        gl_hooks_t::egl_t* egl = &hooks->egl;
-        curr = (void**)egl;
-        api = egl_names;
-        while (*api) {
-            void* f = dlsym(dso, *api);
-            //LOGD("<%s> @ 0x%p", *api, f);
-            if (f == NULL) {
-                //LOGW("<%s> not found in %s", *api, driver);
-                f = (void*)0;
-            }
-            *curr++ = f;
-            api++;
-        }
 
-        void *dso_gsl = NULL;
-        if(strcmp(driver, "libegl13.so") == 0)
-        {
-            // This is libegl13.so, so load additional gsl library
-            dso_gsl = dlopen("libgsl.so", RTLD_NOW | RTLD_LOCAL);
-            LOGE_IF(!dso_gsl,
-                    "couldn't load <%s> library (%s)",
-                    "libgsl.so", dlerror());
-        }
-
-        // hook this driver up with surfaceflinger if needed
-        register_gpu_t register_gpu = 
-            (register_gpu_t)dlsym(dso_gsl ? dso_gsl : dso, "oem_register_gpu");
-
-        if (register_gpu != NULL) {
-            if (getSurfaceFlinger() != 0) {
-                register_gpu(dso, gpu_acquire, gpu_release);
+        if(type & DRIVER_TYPE_GL) {
+            gl_hooks_t::gl_t* gl = &hooks->gl;
+            curr = (void**)gl;
+            api = gl_names;
+            while (*api) {
+                void* f = dlsym(dso, *api);
+                //LOGD("<%s> @ 0x%p", *api, f);
+                if (f == NULL) {
+                    //LOGW("<%s> not found in %s", *api, driver);
+                    f = (void*)gl_unimplemented;
+                }
+                *curr++ = f;
+                api++;
             }
         }
-    }
-    return dso;
-}
-
-static __attribute__((noinline))
-void *load_gl_driver(const char* driver, gl_hooks_t* hooks)
-{
-    void* dso = dlopen(driver, RTLD_NOW | RTLD_LOCAL);
-    LOGE_IF(!dso,
-            "couldn't load <%s> library (%s)",
-            driver, dlerror());
-
-    if (dso) {
-        void** curr;
-        char const * const * api;
-        gl_hooks_t::gl_t* gl = &hooks->gl;
-        curr = (void**)gl;
-        api = gl_names;
-        while (*api) {
-            void* f = dlsym(dso, *api);
-            //LOGD("<%s> @ 0x%p", *api, f);
-            if (f == NULL) {
-                //LOGW("<%s> not found in %s", *api, driver);
-                f = (void*)gl_unimplemented;
+        if(type & DRIVER_TYPE_EGL) {
+            gl_hooks_t::egl_t* egl = &hooks->egl;
+            curr = (void**)egl;
+            api = egl_names;
+            while (*api) {
+                void* f = dlsym(dso, *api);
+                if (f == NULL) {
+                    //LOGW("<%s> not found in %s", *api, driver);
+                    f = (void*)0;
+                }
+                *curr++ = f;
+                api++;
             }
-            *curr++ = f;
-            api++;
-        }
-    }
 
-    return dso;
-}
-#else
-static __attribute__((noinline))
-void *load_driver(const char* driver, gl_hooks_t* hooks)
-{
-    void* dso = dlopen(driver, RTLD_NOW | RTLD_LOCAL);
-    LOGE_IF(!dso,
-            "couldn't load <%s> library (%s)",
-            driver, dlerror());
+            // hook this driver up with surfaceflinger if needed
+            register_gpu_t register_gpu =
+                (register_gpu_t)dlsym(dso, "oem_register_gpu");
 
-    if (dso) {
-        void** curr;
-        char const * const * api;
-        gl_hooks_t::gl_t* gl = &hooks->gl;
-        curr = (void**)gl;
-        api = gl_names;
-        while (*api) {
-            void* f = dlsym(dso, *api);
-            //LOGD("<%s> @ 0x%p", *api, f);
-            if (f == NULL) {
-                //LOGW("<%s> not found in %s", *api, driver);
-                f = (void*)gl_unimplemented;
+#ifdef ADRENO200
+            // Android's dl library won't load symbols from dependencies,
+            // so when we try to load the oem_register_gpu symbol from
+            // libhEGL.so in the Yamato driver, it won't be found because
+            // it lives in libgsl.so. This hack is used till there's a
+            // real fix. Note that this library won't be dlclose()d.
+            if(register_gpu == NULL) {
+                void *dso_gsl = dlopen("libgsl.so", RTLD_NOW | RTLD_LOCAL);
+                if(dso_gsl != NULL) {
+                    register_gpu =
+                        (register_gpu_t)dlsym(dso_gsl, "oem_register_gpu");
+                }
             }
-            *curr++ = f;
-            api++;
-        }
-        gl_hooks_t::egl_t* egl = &hooks->egl;
-        curr = (void**)egl;
-        api = egl_names;
-        while (*api) {
-            void* f = dlsym(dso, *api);
-            if (f == NULL) {
-                //LOGW("<%s> not found in %s", *api, driver);
-                f = (void*)0;
-            }
-            *curr++ = f;
-            api++;
-        }
-
-        // hook this driver up with surfaceflinger if needed
-        register_gpu_t register_gpu = 
-            (register_gpu_t)dlsym(dso, "oem_register_gpu");
-
-        if (register_gpu != NULL) {
-            if (getSurfaceFlinger() != 0) {
-                register_gpu(dso, gpu_acquire, gpu_release);
-            }
-        }
-    }
-    return dso;
-}
 #endif
+
+            if (register_gpu != NULL) {
+                if (getSurfaceFlinger() != 0) {
+                    LOGE("calling register_gpu at %p", register_gpu);
+                    register_gpu(dso, gpu_acquire, gpu_release);
+                }
+            }
+        }
+    }
+    return dso;
+}
 
 template<typename T>
 static __attribute__((noinline))
@@ -543,7 +484,7 @@ static egl_connection_t* validate_display_config(
         return setError(EGL_BAD_CONFIG, (egl_connection_t*)NULL);
     }
     egl_connection_t* const cnx = &gEGLImpl[impl];
-    if (cnx->dso == 0) {
+    if (cnx->dso_egl == 0) {
         return setError(EGL_BAD_CONFIG, (egl_connection_t*)NULL);
     }
     return cnx;
@@ -598,38 +539,33 @@ EGLDisplay eglGetDisplay(NativeDisplayType display)
     // dynamically load all our EGL implementations for that display
     // and call into the real eglGetGisplay()
     egl_connection_t* cnx = &gEGLImpl[IMPL_SOFTWARE];
-    if (cnx->dso == 0) {
+    if (cnx->dso_egl == 0) {
         cnx->hooks = &gHooks[IMPL_SOFTWARE];
-#ifdef HAVE_QCOM_GFX
-        cnx->dso = load_egl_driver("libagl.so", cnx->hooks);
-        cnx->dso = load_gl_driver("libagl.so", cnx->hooks);
-#else
-        cnx->dso = load_driver("libagl.so", cnx->hooks);
-#endif
+        cnx->dso_egl = load_driver("libagl.so", cnx->hooks, DRIVER_TYPE_GL | DRIVER_TYPE_EGL);
     }
-    if (cnx->dso && d->dpys[IMPL_SOFTWARE]==EGL_NO_DISPLAY) {
+    if (cnx->dso_egl && d->dpys[IMPL_SOFTWARE]==EGL_NO_DISPLAY) {
         d->dpys[IMPL_SOFTWARE] = cnx->hooks->egl.eglGetDisplay(display);
         LOGE_IF(d->dpys[IMPL_SOFTWARE]==EGL_NO_DISPLAY,
                 "No EGLDisplay for software EGL!");
     }
 
     cnx = &gEGLImpl[IMPL_HARDWARE];
-    if (cnx->dso == 0 && cnx->unavailable == 0) {
+    if (cnx->dso_egl == 0 && cnx->unavailable == 0) {
         char value[PROPERTY_VALUE_MAX];
         property_get("debug.egl.hw", value, "1");
         if (atoi(value) != 0) {
             cnx->hooks = &gHooks[IMPL_HARDWARE];
-#ifdef HAVE_QCOM_GFX
-            cnx->dso = load_egl_driver("libegl13.so", cnx->hooks);
-            // GL symbols are loaded later when the API version is known
+#ifdef ADRENO200
+            cnx->dso_egl = load_driver("libhEGL.so", cnx->hooks, DRIVER_TYPE_EGL);
 #else
-            cnx->dso = load_driver("libhgl.so", cnx->hooks);
+            // Load Adreno 130 library (EGL and GL inside same object)
+            cnx->dso_egl = load_driver("libhgl.so", cnx->hooks, DRIVER_TYPE_GL | DRIVER_TYPE_EGL);
 #endif
         } else {
             LOGD("3D hardware acceleration is disabled");
         }
     }
-    if (cnx->dso && d->dpys[IMPL_HARDWARE]==EGL_NO_DISPLAY) {
+    if (cnx->dso_egl && d->dpys[IMPL_HARDWARE]==EGL_NO_DISPLAY) {
         android_memset32(
                 (uint32_t*)(void*)&gHooks[IMPL_CONTEXT_LOST].gl,
                 (uint32_t)((void*)gl_context_lost),
@@ -656,8 +592,8 @@ EGLDisplay eglGetDisplay(NativeDisplayType display)
         if (d->dpys[IMPL_HARDWARE] == EGL_NO_DISPLAY) {
             LOGE("h/w accelerated eglGetDisplay() failed (%s)",
                     egl_strerror(cnx->hooks->egl.eglGetError()));
-            dlclose((void*)cnx->dso);
-            cnx->dso = 0;
+            dlclose((void*)cnx->dso_egl);
+            cnx->dso_egl = 0;
             // in case of failure, we want to make sure we don't try again
             // as it's expensive.
             cnx->unavailable = 1;
@@ -692,7 +628,7 @@ EGLBoolean eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor)
         egl_connection_t* const cnx = &gEGLImpl[i];
         cnx->major = -1;
         cnx->minor = -1;
-        if (!cnx->dso) 
+        if (!cnx->dso_egl)
             continue;
 
         if (cnx->hooks->egl.eglInitialize(
@@ -720,7 +656,7 @@ EGLBoolean eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor)
     EGLBoolean res = EGL_FALSE;
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso && cnx->major>=0 && cnx->minor>=0) {
+        if (cnx->dso_egl && cnx->major>=0 && cnx->minor>=0) {
             EGLint n;
             if (cnx->hooks->egl.eglGetConfigs(dp->dpys[i], 0, 0, &n)) {
                 dp->configs[i] = (EGLConfig*)malloc(sizeof(EGLConfig)*n);
@@ -759,7 +695,7 @@ EGLBoolean eglTerminate(EGLDisplay dpy)
     EGLBoolean res = EGL_FALSE;
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             cnx->hooks->egl.eglTerminate(dp->dpys[i]);
             
             /* REVISIT: it's unclear what to do if eglTerminate() fails,
@@ -771,8 +707,12 @@ EGLBoolean eglTerminate(EGLDisplay dpy)
             free((void*)dp->queryString[i].extensions);
             dp->numConfigs[i] = 0;
             dp->dpys[i] = EGL_NO_DISPLAY;
-            dlclose((void*)cnx->dso);
-            cnx->dso = 0;
+            dlclose((void*)cnx->dso_egl);
+            cnx->dso_egl = 0;
+            if(cnx->dso_gl) {
+                dlclose((void*)cnx->dso_gl);
+                cnx->dso_gl = 0;
+            }
             res = EGL_TRUE;
         }
     }
@@ -856,7 +796,7 @@ EGLBoolean eglChooseConfig( EGLDisplay dpy, const EGLint *attrib_list,
         uniqueIdToConfig(dp, configId, i, index);
         
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             cnx->hooks->egl.eglGetConfigAttrib(
                     dp->dpys[i], dp->configs[i][index], 
                     EGL_CONFIG_ID, &configId);
@@ -890,7 +830,7 @@ EGLBoolean eglChooseConfig( EGLDisplay dpy, const EGLint *attrib_list,
 
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             if (cnx->hooks->egl.eglChooseConfig(
                     dp->dpys[i], attrib_list, configs, config_size, &n)) {
                 if (configs) {
@@ -1044,17 +984,17 @@ EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
     int i=0, index=0;
     egl_connection_t* cnx = validate_display_config(dpy, config, dp, i, index);
     if (cnx) {
-#ifdef HAVE_QCOM_GFX
+#ifdef ADRENO200
         // We deferred the loading of HW GLES symbols till now because we
         // didn't know the API version until this point
         if(i == IMPL_HARDWARE) {
             if(attrib_list && (attrib_list[0] == EGL_CONTEXT_CLIENT_VERSION) && (attrib_list[1] == 2)) {
                 // Requested OpenGL ES 2.0
-                cnx->dso = load_gl_driver("libgles20.so", cnx->hooks);
+                cnx->dso_gl = load_driver("libhGLESv2.so", cnx->hooks, DRIVER_TYPE_GL);
             }
             else {
                 // Requested OpenGL ES 1.x
-                cnx->dso = load_gl_driver("libgles11.so", cnx->hooks);
+                cnx->dso_gl = load_driver("libhGLESv1_CM.so", cnx->hooks, DRIVER_TYPE_GL);
             }
         }
 #endif
@@ -1083,6 +1023,13 @@ EGLBoolean eglDestroyContext(EGLDisplay dpy, EGLContext ctx)
 EGLBoolean eglMakeCurrent(  EGLDisplay dpy, EGLSurface draw,
                             EGLSurface read, EGLContext ctx)
 {
+    // Hack to only allow the first eglMakeCurrent
+    /*static EGLContext currentCtx = NULL;
+    if(currentCtx == ctx) {
+        return EGL_TRUE;
+    }
+    currentCtx = ctx;*/
+
     egl_display_t const * const dp = get_display(dpy);
     if (!dp) return setError(EGL_BAD_DISPLAY, EGL_FALSE);
 
@@ -1188,7 +1135,7 @@ EGLBoolean eglWaitGL(void)
         if (uint32_t(c->impl)>=2)
             return setError(EGL_BAD_CONTEXT, EGL_FALSE);
         egl_connection_t* const cnx = &gEGLImpl[c->impl];
-        if (!cnx->dso) 
+        if (!cnx->dso_egl)
             return setError(EGL_BAD_CONTEXT, EGL_FALSE);
         res = cnx->hooks->egl.eglWaitGL();
     }
@@ -1205,7 +1152,7 @@ EGLBoolean eglWaitNative(EGLint engine)
         if (uint32_t(c->impl)>=2)
             return setError(EGL_BAD_CONTEXT, EGL_FALSE);
         egl_connection_t* const cnx = &gEGLImpl[c->impl];
-        if (!cnx->dso) 
+        if (!cnx->dso_egl)
             return setError(EGL_BAD_CONTEXT, EGL_FALSE);
         res = cnx->hooks->egl.eglWaitNative(engine);
     }
@@ -1218,7 +1165,7 @@ EGLint eglGetError(void)
     for (int i=0 ; i<2 ; i++) {
         EGLint err = EGL_SUCCESS;
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso)
+        if (cnx->dso_egl)
             err = cnx->hooks->egl.eglGetError();
         if (err!=EGL_SUCCESS && result==EGL_SUCCESS)
             result = err;
@@ -1243,7 +1190,7 @@ void (*eglGetProcAddress(const char *procname))()
     int slot = -1;
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             if (cnx->hooks->egl.eglGetProcAddress) {
                 addr = cnx->hooks->egl.eglGetProcAddress(procname);
                 if (addr) {
@@ -1376,7 +1323,7 @@ EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval)
     EGLBoolean res = EGL_TRUE;
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             if (cnx->hooks->egl.eglSwapInterval) {
                 if (cnx->hooks->egl.eglSwapInterval(dp->dpys[i], interval) == EGL_FALSE) {
                     res = EGL_FALSE;
@@ -1402,7 +1349,7 @@ EGLBoolean eglWaitClient(void)
         if (uint32_t(c->impl)>=2)
             return setError(EGL_BAD_CONTEXT, EGL_FALSE);
         egl_connection_t* const cnx = &gEGLImpl[c->impl];
-        if (!cnx->dso) 
+        if (!cnx->dso_egl)
             return setError(EGL_BAD_CONTEXT, EGL_FALSE);
         if (cnx->hooks->egl.eglWaitClient) {
             res = cnx->hooks->egl.eglWaitClient();
@@ -1419,7 +1366,7 @@ EGLBoolean eglBindAPI(EGLenum api)
     EGLBoolean res = EGL_TRUE;
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             if (cnx->hooks->egl.eglBindAPI) {
                 if (cnx->hooks->egl.eglBindAPI(api) == EGL_FALSE) {
                     res = EGL_FALSE;
@@ -1434,7 +1381,7 @@ EGLenum eglQueryAPI(void)
 {
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             if (cnx->hooks->egl.eglQueryAPI) {
                 // the first one we find is okay, because they all
                 // should be the same
@@ -1450,7 +1397,7 @@ EGLBoolean eglReleaseThread(void)
 {
     for (int i=0 ; i<2 ; i++) {
         egl_connection_t* const cnx = &gEGLImpl[i];
-        if (cnx->dso) {
+        if (cnx->dso_egl) {
             if (cnx->hooks->egl.eglReleaseThread) {
                 cnx->hooks->egl.eglReleaseThread();
             }
