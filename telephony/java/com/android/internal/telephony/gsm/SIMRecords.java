@@ -27,7 +27,10 @@ import android.os.SystemProperties;
 import android.telephony.gsm.SmsMessage;
 import android.util.Log;
 import java.util.ArrayList;
-
+import android.telephony.gsm.GsmCellLocation;
+import android.os.SystemProperties;
+import android.telephony.gsm.SmsManager;
+import java.util.PriorityQueue;
 import static com.android.internal.telephony.TelephonyProperties.*;
 import com.android.internal.telephony.SimCard;
 
@@ -37,10 +40,13 @@ import com.android.internal.telephony.SimCard;
 public final class SIMRecords extends Handler implements SimConstants
 {
     static final String LOG_TAG = "GSM";
-
+    static final String EONS_TAG = "EONS";
+    static final String CSP_TAG = "CSP SIM Records";
+    static final String SIMSMS_TAG = "SIM SMS";
     private static final boolean CRASH_RIL = false;
 
     private static final boolean DBG = true;
+    private final PriorityQueue<Integer> indexQueue = new PriorityQueue<Integer>();
 
     //***** Instance Variables
 
@@ -930,12 +936,19 @@ public final class SIMRecords extends Handler implements SimConstants
                     Log.e(LOG_TAG, "[SIMRecords] Error on SMS_ON_SIM with exp "
                             + ar.exception + " length " + index.length);
                 } else {
+                    try {
+                      indexQueue.add(index[0]);
+                      Log.i(SIMSMS_TAG, "Saved index=" + index[0]+" in Queue");
+                    } catch(Exception e) {
+                      Log.e(SIMSMS_TAG, "Eception in adding element to QUEUE "+e);
+                    }
                     Log.d(LOG_TAG, "READ EF_SMS RECORD index=" + index[0]);
                     phone.mSIMFileHandler.loadEFLinearFixed(EF_SMS,index[0],obtainMessage(EVENT_GET_SMS_DONE));
                 }
                 break;
 
             case EVENT_GET_SMS_DONE:
+                int pInd = 0;
                 isRecordLoadResponse = false;
                 ar = (AsyncResult)msg.obj;
                 if (ar.exception == null) {
@@ -943,6 +956,12 @@ public final class SIMRecords extends Handler implements SimConstants
                 } else {
                     Log.e(LOG_TAG, "[SIMRecords] Error on GET_SMS with exp "
                             + ar.exception);
+                }
+                try {
+                  pInd = indexQueue.remove();
+                  Log.i(SIMSMS_TAG, "Removed index "+pInd);
+                } catch (Exception e) {
+                  Log.e(SIMSMS_TAG, "Eception in removing element from QUEUE "+e);
                 }
                 break;
             case EVENT_GET_SST_DONE:
@@ -1151,9 +1170,33 @@ public final class SIMRecords extends Handler implements SimConstants
                                 new String[] { "", pdu });
 
             phone.mSMS.dispatchMessage(message);
+            //GCF Test case AssGCF USIM SMS 8.2.2 checks for
+            //status byte(first byte in EF_SMS record)
+            //to be 0x01 after the SMS is read from the SIM.
+            //So setting the status byte to 0x01 after reading it from SIM.
+            markSmsAsRead(SmsManager.STATUS_ON_SIM_READ,nba);
         }
     }
 
+    private void markSmsAsRead(int status,byte[] pdu) {
+        byte[] data = new byte[SimConstants.SMS_RECORD_LENGTH];
+        int ind = 0;
+        if(!indexQueue.isEmpty()) {
+           ind = indexQueue.peek();
+           Log.i(SIMSMS_TAG, "markSmsAsRead:Updating Record "+ind);
+           //Status bits for this record.  See TS 51.011 10.5.3
+           data[0] = (byte)(status & 7);
+
+           System.arraycopy(pdu, 0, data, 1, pdu.length);
+
+           // Pad out with 0xFF's.
+           for (int j = pdu.length+1; j < SimConstants.SMS_RECORD_LENGTH; j++) {
+              data[j] = -1;
+           }
+           phone.mSIMFileHandler.updateEFLinearFixed( SimConstants.EF_SMS,
+                 ind, data, null, null);
+        }
+    }
 
     private void handleSmses(ArrayList messages) {
         int count = messages.size();
