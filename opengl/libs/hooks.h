@@ -72,11 +72,7 @@ enum {
 
 struct gl_hooks_t {
     struct gl_t {
-#ifdef HAVE_QCOM_GFX
-        #include "gl2_entries.in"
-#else
         #include "gl_entries.in"
-#endif
     } gl;
     struct egl_t {
         #include "egl_entries.in"

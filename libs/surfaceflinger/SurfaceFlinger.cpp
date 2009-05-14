@@ -1689,20 +1689,8 @@ void Client::free(int32_t id)
 sp<MemoryDealer> Client::createAllocator(uint32_t flags)
 {
     sp<MemoryDealer> allocator;
-
-    if (flags & ISurfaceComposer::eGPU) {
-        allocator = mFlinger->getGPU()->request(getClientPid());
-        return allocator;
-    }
-
-    allocator = mPMemAllocator;
-
-    if (allocator == 0) {
-        allocator = getSurfaceHeapManager()->createHeap(
-                flags, getClientPid(), mSharedHeapAllocator);
-        mPMemAllocator = allocator;
-    }
-
+    allocator = getSurfaceHeapManager()->createHeap(
+            flags, getClientPid(), mSharedHeapAllocator);
     return allocator;
 }
 
