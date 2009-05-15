@@ -182,8 +182,11 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
     mCameraClient = cameraClient;
     mClientPid = clientPid;
     mHardware = openCameraHardware();
-    mUseOverlay = mHardware->useOverlay();
-
+    if(mHardware != NULL){
+       mUseOverlay = mHardware->useOverlay();
+    } else {
+       mUseOverlay = false;
+    }
     mMediaPlayerClick = newMediaPlayer("/system/media/audio/ui/camera_click.ogg");
     mMediaPlayerBeep = newMediaPlayer("/system/media/audio/ui/VideoRecord.ogg");
 
