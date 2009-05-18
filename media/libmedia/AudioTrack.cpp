@@ -666,7 +666,8 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     audioBuffer->format      = AudioSystem::PCM_16_BIT;
     audioBuffer->frameCount  = framesReq;
     audioBuffer->size = framesReq*mChannelCount*sizeof(int16_t);
-    audioBuffer->raw         = (int8_t *)cblk->buffer(u);
+    // Codec type to allocate buffer.
+    audioBuffer->raw         = (int8_t *)cblk->buffer(u, AudioSystem::PCM_16_BIT);
     active = mActive;
     return active ? status_t(NO_ERROR) : status_t(STOPPED);
 }
@@ -987,9 +988,27 @@ bool audio_track_cblk_t::stepServer(uint32_t frameCount)
     return true;
 }
 
-void* audio_track_cblk_t::buffer(uint32_t offset) const
+void* audio_track_cblk_t::buffer(uint32_t offset, int nStreamType) const
 {
-    return (int16_t *)this->buffers + (offset-userBase)*this->channels;
+    LOGE("THe Buffer address is %x, offset is %d, userbase is %d", this->buffers, offset, userBase);
+    // Jagan Change for Codec type
+    if ( (nStreamType == AudioSystem::PCM_16_BIT) ||
+         (nStreamType == AudioSystem::PCM_8_BIT))
+    {
+      return (int16_t *)this->buffers + (offset-userBase)*this->channels;
+    }
+    else if (nStreamType == AudioSystem::FORMAT_AMR_IETF)
+    {
+      return (int8_t*)this->buffers + (offset-userBase)*this->channels*32;
+    }
+    else if (nStreamType == AudioSystem::FORMAT_EVRC)
+    {
+      return (int8_t*)this->buffers + (offset-userBase)*this->channels*23;
+    }
+    else if (nStreamType == AudioSystem::FORMAT_QCELP)
+    {
+      return (int8_t*)this->buffers + (offset-userBase)*this->channels*35;
+    }
 }
 
 uint32_t audio_track_cblk_t::framesAvailable()

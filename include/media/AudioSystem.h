@@ -43,6 +43,16 @@ public:
         NUM_STREAM_TYPES
     };
 
+    /** Please make sure you also update stream_type in /frameworks/base/include/media/AudioRecord.h !
+            to ensure that the device type updation is consistent when accessed from libaudio */
+    enum audiosource_type {
+        DEFAULT_INPUT   = 0, // standard mapping from MediaRecord to PVAuthorEngine
+        MIC_INPUT       = 1,
+        VOICE_Rx        = 2,
+        VOICE_Tx_Rx     = 3,
+        NUM_AUDIO_SRC_TYPES
+    };
+
     enum audio_output_type {
         AUDIO_OUTPUT_DEFAULT      =-1,
         AUDIO_OUTPUT_HARDWARE     = 0,
@@ -54,6 +64,9 @@ public:
         FORMAT_DEFAULT = 0,
         PCM_16_BIT,
         PCM_8_BIT,
+        FORMAT_AMR_IETF, // Support for AMR, QCELP and EVRC
+        FORMAT_EVRC,
+        FORMAT_QCELP,
         INVALID_FORMAT
     };
 

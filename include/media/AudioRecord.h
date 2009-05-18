@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,9 +40,13 @@ class AudioRecord
 {
 public:
 
+    /** Please make sure you also update audiosource_type in /frameworks/base/include/media/AudioSystem.h !
+        to ensure that the device type updation is consistent when accessed from libaudio */
     enum stream_type {
-        DEFAULT_INPUT   =-1,
-        MIC_INPUT       = 0,
+        DEFAULT_INPUT   = 0, // Changed these value. Changed from -1 to 0 to have a standard mapping from MediaRecord to PV to MIO
+        MIC_INPUT       = 1,
+        VOICE_Rx        = 2,
+        VOICE_Tx_Rx     = 3,
         NUM_STREAM_TYPES
     };
 
