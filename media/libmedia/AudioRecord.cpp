@@ -96,7 +96,8 @@ status_t AudioRecord::set(
         bool threadCanCallJava)
 {
 
-    LOGV("set(): sampleRate %d, channelCount %d, frameCount %d",sampleRate, channelCount, frameCount);
+    LOGD("AudioRecord:set(): streamtype %d, sampleRate %d, channelCount %d, frameCount %d",streamType, sampleRate, channelCount, frameCount);
+    
     if (mAudioFlinger != 0) {
         return INVALID_OPERATION;
     }
@@ -121,10 +122,6 @@ status_t AudioRecord::set(
         channelCount = 1;
     }
 
-    // validate parameters
-    if (format != AudioSystem::PCM_16_BIT) {
-        return BAD_VALUE;
-    }
     if (channelCount != 1 && channelCount != 2) {
         return BAD_VALUE;
     }
@@ -141,7 +138,26 @@ status_t AudioRecord::set(
             sampleRate, channelCount, format);
         return BAD_VALUE;
     }
-    int frameSizeInBytes = channelCount * (format == AudioSystem::PCM_16_BIT ? 2 : 1);
+
+    // Change for Codec type
+    int frameSizeInBytes = 0;
+
+    if (format == AudioSystem::PCM_16_BIT)
+    {
+      frameSizeInBytes = channelCount * (format == AudioSystem::PCM_16_BIT ? 2 : 1);
+    }
+    else if (format == AudioSystem::FORMAT_AMR_IETF)
+    {
+      frameSizeInBytes = channelCount * 32; // Full rate framesize
+    }
+    else if (format == AudioSystem::FORMAT_EVRC)
+    {
+      frameSizeInBytes = channelCount * 23; // Full rate framesize
+    }
+    else if (format == AudioSystem::FORMAT_QCELP)
+    {
+      frameSizeInBytes = channelCount * 35; // Full rate framesize
+    }
 
     // We use 2* size of input buffer for ping pong use of record buffer.
     int minFrameCount = 2 * inputBuffSizeInBytes / frameSizeInBytes;
@@ -242,7 +258,24 @@ uint32_t AudioRecord::frameCount() const
 
 int AudioRecord::frameSize() const
 {
-    return channelCount()*((format() == AudioSystem::PCM_8_BIT) ? sizeof(uint8_t) : sizeof(int16_t));
+    // Jagan Change for Codec type
+    if ( (format() == AudioSystem::PCM_8_BIT) ||
+         (format() == AudioSystem::PCM_16_BIT))
+    {
+      return channelCount()*((format() == AudioSystem::PCM_8_BIT) ? sizeof(uint8_t) : sizeof(int16_t));
+    }
+    else if (format() == AudioSystem::FORMAT_AMR_IETF)
+    {
+      return channelCount() * 32; // Jagan Change for Codec type. Full rate frame size
+    }
+    else if (format() == AudioSystem::FORMAT_EVRC)
+    {
+      return channelCount() * 23;
+    }
+    else if (format() == AudioSystem::FORMAT_QCELP)
+    {
+      return channelCount() * 35;
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -433,8 +466,36 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     audioBuffer->channelCount= mChannelCount;
     audioBuffer->format      = mFormat;
     audioBuffer->frameCount  = framesReq;
-    audioBuffer->size        = framesReq*mChannelCount*sizeof(int16_t);
-    audioBuffer->raw         = (int8_t*)cblk->buffer(u);
+    // Change for Codec type
+    if (mFormat == AudioSystem::PCM_16_BIT)
+    {
+      audioBuffer->size        = framesReq*mChannelCount*sizeof(int16_t);
+    }
+    else
+    {
+      if (framesReq >= 10)
+      {
+        if (mFormat == AudioSystem::FORMAT_AMR_IETF)
+        {
+          audioBuffer->size = framesReq*mChannelCount*32;
+        }
+        else if (mFormat == AudioSystem::FORMAT_EVRC)
+        {
+          audioBuffer->size = framesReq*mChannelCount*23;
+        }
+        else if (mFormat == AudioSystem::FORMAT_QCELP)
+        {
+          audioBuffer->size = framesReq*mChannelCount*35;
+        }
+      }
+      else
+      {
+         LOGE("The buffer ready count less than the minimum. SO dont expect any data");
+         audioBuffer->size = 0;
+      }
+    }
+
+    audioBuffer->raw         = (int8_t*)cblk->buffer(u, mFormat);
     active = mActive;
     return active ? status_t(NO_ERROR) : status_t(STOPPED);
 }
@@ -463,8 +524,23 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
     LOGV("read size: %d", userSize);
 
     do {
-
-        audioBuffer.frameCount = userSize/mChannelCount/sizeof(int16_t);
+        // Change for Codec type
+        if (mFormat == AudioSystem::PCM_16_BIT)
+        {
+          audioBuffer.frameCount = userSize/mChannelCount/sizeof(int16_t);
+        }
+        else if (mFormat == AudioSystem::FORMAT_AMR_IETF)
+        {
+          audioBuffer.frameCount = userSize/mChannelCount/32; // Full rate frame size
+        }
+        else if (mFormat == AudioSystem::FORMAT_EVRC)
+        {
+          audioBuffer.frameCount = userSize/mChannelCount/23;
+        }
+        else if (mFormat == AudioSystem::FORMAT_QCELP)
+        {
+          audioBuffer.frameCount = userSize/mChannelCount/35;
+        }
 
         // Calling obtainBuffer() with a negative wait count causes
         // an (almost) infinite wait time.
@@ -484,6 +560,26 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
         read += bytesRead;
 
         releaseBuffer(&audioBuffer);
+
+        // Voicememo driver (Minimum buffer size = Full rate frame size * 10)
+        if ( (mFormat == AudioSystem::FORMAT_AMR_IETF) &&
+             (userSize < 320)) // if the read is less than the required minimum buffer size
+        {
+          LOGE("Breaking out of the read loop, since the minimum buffer count for read is missed %d", userSize);
+          break;
+        }
+        else if ((mFormat == AudioSystem::FORMAT_EVRC) &&
+             (userSize < 230))
+        {
+          LOGE("Breaking out of the read loop, since the minimum buffer count for read is missed %d", userSize);
+          break;
+        }
+        else if ((mFormat == AudioSystem::FORMAT_QCELP) &&
+             (userSize < 350))
+        {
+          LOGE("Breaking out of the read loop, since the minimum buffer count for read is missed %d", userSize);
+          break;
+        }
     } while (userSize);
 
     return read;
@@ -544,14 +640,29 @@ bool AudioRecord::processAudioBuffer(const sp<ClientRecordThread>& thread)
         if (readSize > reqSize) readSize = reqSize;
 
         audioBuffer.size = readSize;
-        audioBuffer.frameCount = readSize/mChannelCount/sizeof(int16_t);
+
+        // Change for Codec type
+        if (mFormat == AudioSystem::PCM_16_BIT)
+        {
+          audioBuffer.frameCount = readSize/mChannelCount/sizeof(int16_t);
+        }
+        else if (mFormat == AudioSystem::FORMAT_AMR_IETF)
+        {
+          audioBuffer.frameCount = readSize/mChannelCount/32;
+        }
+        else if (mFormat == AudioSystem::FORMAT_EVRC)
+        {
+          audioBuffer.frameCount = readSize/mChannelCount/23;
+        }
+        else if (mFormat == AudioSystem::FORMAT_QCELP)
+        {
+          audioBuffer.frameCount = readSize/mChannelCount/35;
+        }
+
         frames -= audioBuffer.frameCount;
-
         releaseBuffer(&audioBuffer);
-
     } while (frames);
 
-    
     // Manage overrun callback
     if (mActive && (mCblk->framesAvailable_l() == 0)) {
         LOGV("Overrun user: %x, server: %x, flowControlFlag %d", mCblk->user, mCblk->server, mCblk->flowControlFlag);

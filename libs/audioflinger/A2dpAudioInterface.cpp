@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,9 +71,10 @@ AudioStreamOut* A2dpAudioInterface::openOutputStream(
     return mOutput;
 }
 
+// Updating the API with audiosource information.
 AudioStreamIn* A2dpAudioInterface::openInputStream(
         int format, int channelCount, uint32_t sampleRate, status_t *status,
-        AudioSystem::audio_in_acoustics acoustics)
+        AudioSystem::audio_in_acoustics acoustics, int audiosourcetype)
 {
     if (status)
         *status = -1;
