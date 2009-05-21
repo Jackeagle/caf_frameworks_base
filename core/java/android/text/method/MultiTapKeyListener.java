@@ -40,7 +40,7 @@ public class MultiTapKeyListener extends BaseKeyListener
     private boolean mAutoText;
 
     static {
-        sRecs.put(KeyEvent.KEYCODE_1,     ".,1!@:/?&_#$%^*'=()");
+        sRecs.put(KeyEvent.KEYCODE_1,     ".,1!@:/?&_#$%^*'=()-");
         sRecs.put(KeyEvent.KEYCODE_2,     "abc2ABC");
         sRecs.put(KeyEvent.KEYCODE_3,     "def3DEF");
         sRecs.put(KeyEvent.KEYCODE_4,     "ghi4GHI");
