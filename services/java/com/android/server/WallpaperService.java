@@ -155,6 +155,8 @@ class WallpaperService extends IWallpaperService.Stub {
     public ParcelFileDescriptor setWallpaper() {
         checkPermission(android.Manifest.permission.SET_WALLPAPER);
         try {
+            /* Creating the wallpaper directory, in case it gets deleted */
+            createFilesDir();
             return ParcelFileDescriptor.open(WALLPAPER_FILE, MODE_CREATE|MODE_READ_WRITE);
         } catch (FileNotFoundException e) {
             if (Config.LOGD) Log.d(TAG, "Error setting wallpaper", e);
