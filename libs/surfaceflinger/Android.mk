@@ -40,9 +40,10 @@ ifeq ($(TARGET_PRODUCT),msm7201a_surf msm7201a_ffa)
     LOCAL_CFLAGS += -DFEATURE_7K_PMEM
 endif
 
-ifeq ($(BOARD_USES_ADRENO_200),true)
-  LOCAL_CFLAGS += -DHAVE_QCOM_GFX
+ifeq ($(strip $(BOARD_USES_ADRENO_200)), true)
+  LOCAL_CFLAGS += -DADRENO_200
 endif
+
 LOCAL_SHARED_LIBRARIES := \
 	libhardware \
 	libutils \

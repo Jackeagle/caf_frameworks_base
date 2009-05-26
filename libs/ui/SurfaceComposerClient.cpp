@@ -726,17 +726,7 @@ status_t SurfaceComposerClient::unlockAndPostSurface(Surface* surface)
     }
 
     // transmit the dirty region
-#ifdef HAVE_QCOM_GFX
-    layer_cblk_t* lcblk = &(cblk->layers[index]);   // No longer const
-    if(surface->getSharedTypeGPU()) {
-        lcblk->surface[0].offset = surface->getSharedOffset();
-        lcblk->surface[1].offset = surface->getSharedOffset();
-        lcblk->surface[0].magic = 0xBEEF;
-        lcblk->surface[1].magic = 0xBEEF;
-    }
-#else
     layer_cblk_t* const lcblk = &(cblk->layers[index]);
-#endif
     _send_dirty_region(lcblk, dirty);
     uint32_t newstate = cblk->unlock_layer_and_post(size_t(index));
     if (!(newstate & eNextFlipPending))

@@ -43,10 +43,6 @@ struct surface_info_t { // 4 longs, 16 bytes
     uint8_t     format;
     uint8_t     flags;
     ssize_t     bits_offset;
-#ifdef HAVE_QCOM_GFX
-    size_t      offset;
-    size_t      magic;
-#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -159,14 +155,12 @@ template<> struct CTA<true> { };
 
 // compile-time assertions. just to avoid catastrophes.
 inline void compile_time_asserts() {
-#ifndef HAVE_QCOM_GFX
     CTA<sizeof(layer_cblk_t) == 128> sizeof__layer_cblk_t__eq_128;
     (void)sizeof__layer_cblk_t__eq_128; // we don't want a warning
     CTA<sizeof(per_client_cblk_t) <= 4096> sizeof__per_client_cblk_t__le_4096;
     (void)sizeof__per_client_cblk_t__le_4096;  // we don't want a warning
     CTA<sizeof(surface_flinger_cblk_t) <= 4096> sizeof__surface_flinger_cblk_t__le_4096;
     (void)sizeof__surface_flinger_cblk_t__le_4096;  // we don't want a warning
-#endif
 }
 
 }; // namespace android

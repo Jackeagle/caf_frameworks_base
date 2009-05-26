@@ -359,7 +359,12 @@ status_t GPUHardware::requestLocked(int pid)
                 mEBIHeap = new GPUAreaHeap(this, 
                         "/dev/pmem_gpu1", 0, GPU_RESERVED_SIZE);
             mREGHeap = new GPURegisterHeap(this);
+#ifdef ADRENO_200
+            // For Adreno 200, put memory in SMI so graphics won't run out
+            mAllocator = mSMIHeap->getAllocator();
+#else
             mAllocator = mEBIHeap->getAllocator();
+#endif
             if (mAllocator == NULL) {
                 // something went terribly wrong.
                 mSMIHeap.clear();

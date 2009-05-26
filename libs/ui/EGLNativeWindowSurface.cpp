@@ -108,9 +108,6 @@ uint32_t EGLNativeWindowSurface::swapBuffers()
     const int h = egl_native_window_t::height;
     const sp<Surface>& surface(mSurface);
     Surface::SurfaceInfo info;
-#ifdef HAVE_QCOM_GFX
-    surface->setSharedOffset(egl_native_window_t::offset);
-#endif
     surface->unlockAndPost();
     surface->lock(&info);
     // update the address of the buffer to draw to next

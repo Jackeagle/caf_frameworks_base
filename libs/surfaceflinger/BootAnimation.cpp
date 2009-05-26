@@ -142,7 +142,7 @@ status_t BootAnimation::readyToRun() {
             EGL_GREEN_SIZE,     6,
             EGL_BLUE_SIZE,      5,
             EGL_DEPTH_SIZE,     0,
-#ifdef HAVE_QCOM_GFX
+#ifdef ADRENO_200
 	    EGL_CONFIG_CAVEAT,  EGL_SLOW_CONFIG,
 #endif
             EGL_NONE

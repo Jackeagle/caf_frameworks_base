@@ -182,14 +182,6 @@ void Layer::onDraw(const Region& clip) const
 
         copybit_image_t src;
         front.getBitmapSurface(&src);
-#ifdef HAVE_QCOM_GFX
-        ISurfaceFlingerClient::surface_data_t params;
-        mSurface->getSurfaceData(&params);
-        if(lcblk->surface[mFrontBufferIndex].magic == 0xBEEF) {
-            lcblk->surface[mFrontBufferIndex].magic = 0xBAD;   // probably not required
-            src.offset = lcblk->surface[mFrontBufferIndex].offset;
-        }
-#endif
         copybit_rect_t srect = { 0, 0, t.width, t.height };
 
         copybit_device_t* copybit = mFlinger->getBlitEngine();

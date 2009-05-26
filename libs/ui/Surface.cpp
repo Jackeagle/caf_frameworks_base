@@ -57,9 +57,6 @@ Surface::Surface(const sp<SurfaceComposerClient>& client,
     mSurfaceHeapBase[1] = 0;
     mHeap[0] = data.heap[0]; 
     mHeap[1] = data.heap[1];
-#ifdef HAVE_QCOM_GFX
-    mSharedTypeGPU = false;
-#endif
 }
 
 Surface::Surface(Surface const* rhs)
@@ -76,9 +73,6 @@ Surface::Surface(Surface const* rhs)
     mSurfaceHeapBase[0] = rhs->mSurfaceHeapBase[0];
     mSurfaceHeapBase[1] = rhs->mSurfaceHeapBase[1];
     mSwapRectangle.makeInvalid();
-#ifdef HAVE_QCOM_GFX
-    mSharedTypeGPU = rhs->mSharedTypeGPU;
-#endif
 }
 
 Surface::~Surface()

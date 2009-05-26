@@ -319,24 +319,8 @@ void *load_driver(const char* driver, gl_hooks_t* hooks, int type)
             register_gpu_t register_gpu =
                 (register_gpu_t)dlsym(dso, "oem_register_gpu");
 
-#ifdef ADRENO200
-            // Android's dl library won't load symbols from dependencies,
-            // so when we try to load the oem_register_gpu symbol from
-            // libhEGL.so in the Yamato driver, it won't be found because
-            // it lives in libgsl.so. This hack is used till there's a
-            // real fix. Note that this library won't be dlclose()d.
-            if(register_gpu == NULL) {
-                void *dso_gsl = dlopen("libgsl.so", RTLD_NOW | RTLD_LOCAL);
-                if(dso_gsl != NULL) {
-                    register_gpu =
-                        (register_gpu_t)dlsym(dso_gsl, "oem_register_gpu");
-                }
-            }
-#endif
-
             if (register_gpu != NULL) {
                 if (getSurfaceFlinger() != 0) {
-                    LOGE("calling register_gpu at %p", register_gpu);
                     register_gpu(dso, gpu_acquire, gpu_release);
                 }
             }
@@ -552,7 +536,7 @@ EGLDisplay egl_init_displays(NativeDisplayType display)
         property_get("debug.egl.hw", value, "1");
         if (atoi(value) != 0) {
             cnx->hooks = &gHooks[IMPL_HARDWARE];
-#ifdef ADRENO200
+#ifdef ADRENO_200
             cnx->dso_egl = load_driver("libhEGL.so", cnx->hooks, DRIVER_TYPE_EGL);
 #else
             // Load Adreno 130 library (EGL and GL inside same object)
@@ -993,7 +977,7 @@ EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
     int i=0, index=0;
     egl_connection_t* cnx = validate_display_config(dpy, config, dp, i, index);
     if (cnx) {
-#ifdef ADRENO200
+#ifdef ADRENO_200
         // We deferred the loading of HW GLES symbols till now because we
         // didn't know the API version until this point
         if(i == IMPL_HARDWARE) {
@@ -1032,13 +1016,6 @@ EGLBoolean eglDestroyContext(EGLDisplay dpy, EGLContext ctx)
 EGLBoolean eglMakeCurrent(  EGLDisplay dpy, EGLSurface draw,
                             EGLSurface read, EGLContext ctx)
 {
-    // Hack to only allow the first eglMakeCurrent
-    /*static EGLContext currentCtx = NULL;
-    if(currentCtx == ctx) {
-        return EGL_TRUE;
-    }
-    currentCtx = ctx;*/
-
     egl_display_t const * const dp = get_display(dpy);
     if (!dp) return setError(EGL_BAD_DISPLAY, EGL_FALSE);
 
