@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2009 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2213,13 +2214,16 @@ public class LocationManagerService extends ILocationManager.Stub
         if (mGpsLocationProvider == null) {
             return;
         }
-        
+
         final String name = mGpsLocationProvider.getName();
         final int curSeq = mReportedGpsSeq;
         final int nextSeq = (curSeq+1) >= 0 ? (curSeq+1) : 0;
         mReportedGpsSeq = nextSeq;
-        
+
         ArrayList<UpdateRecord> urs = mRecordsByProvider.get(name);
+        if(urs == null) {
+          return;
+        }
         int num = 0;
         final int N = urs.size();
         for (int i=0; i<N; i++) {
@@ -2232,7 +2236,7 @@ public class LocationManagerService extends ILocationManager.Stub
                 num++;
             }
         }
-        
+
         for (ProximityAlert pe : mProximityAlerts.values()) {
             if (reportGpsUidLocked(curSeq, nextSeq, pe.mUid)) {
                 num++;
