@@ -186,7 +186,7 @@ public class MediaRecorder
         //public static final AAC = 2;  currently unsupported
         /** EVRC audio codec */
         public static final int EVRC = 2;
-        /** QCELP audio codec */ // Jagan QCP
+        /** QCELP audio codec */
         public static final int QCELP =3;
     }
 

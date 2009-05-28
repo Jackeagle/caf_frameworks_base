@@ -258,7 +258,6 @@ uint32_t AudioRecord::frameCount() const
 
 int AudioRecord::frameSize() const
 {
-    // Jagan Change for Codec type
     if ( (format() == AudioSystem::PCM_8_BIT) ||
          (format() == AudioSystem::PCM_16_BIT))
     {
@@ -266,7 +265,7 @@ int AudioRecord::frameSize() const
     }
     else if (format() == AudioSystem::FORMAT_AMR_IETF)
     {
-      return channelCount() * 32; // Jagan Change for Codec type. Full rate frame size
+      return channelCount() * 32;
     }
     else if (format() == AudioSystem::FORMAT_EVRC)
     {

@@ -990,8 +990,7 @@ bool audio_track_cblk_t::stepServer(uint32_t frameCount)
 
 void* audio_track_cblk_t::buffer(uint32_t offset, int nStreamType) const
 {
-    LOGE("THe Buffer address is %x, offset is %d, userbase is %d", this->buffers, offset, userBase);
-    // Jagan Change for Codec type
+    LOGV("THe Buffer address is %x, offset is %d, userbase is %d", this->buffers, offset, userBase);
     if ( (nStreamType == AudioSystem::PCM_16_BIT) ||
          (nStreamType == AudioSystem::PCM_8_BIT))
     {

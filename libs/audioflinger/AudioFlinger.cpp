@@ -1744,7 +1744,6 @@ void* AudioFlinger::MixerThread::TrackBase::getBuffer(uint32_t offset, uint32_t 
     if ( (mFormat == AudioSystem::PCM_16_BIT) ||
          (mFormat == AudioSystem::PCM_8_BIT))
     {
-      LOGE("We are inside PCM_16");
       int16_t *bufferStart = (int16_t *)mBuffer + (offset-cblk->serverBase)*cblk->channels;
       int16_t *bufferEnd = bufferStart + frames * cblk->channels;
 
@@ -2556,19 +2555,19 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
                 {
                   if ( mRecordTrack->format() == AudioSystem::FORMAT_AMR_IETF)
                   {
-                    LOGE("AudioRecordThread read: %d frames and size is %d", buffer.frameCount,
+                    LOGV("AudioRecordThread read: %d frames and size is %d", buffer.frameCount,
                                                                        buffer.frameCount * 32);
                     bytesRead = input->read(buffer.raw, buffer.frameCount * 32);
                   }
                   else if ( mRecordTrack->format() == AudioSystem::FORMAT_EVRC)
                   {
-                    LOGE("AudioRecordThread read: %d frames and size is %d", buffer.frameCount,
+                    LOGV("AudioRecordThread read: %d frames and size is %d", buffer.frameCount,
                                                                       buffer.frameCount * 23);
                     bytesRead = input->read(buffer.raw, buffer.frameCount * 23);
                   }
                   else if ( mRecordTrack->format() == AudioSystem::FORMAT_QCELP)
                   {
-                    LOGE("AudioRecordThread read: %d frames and size is %d", buffer.frameCount,
+                    LOGV("AudioRecordThread read: %d frames and size is %d", buffer.frameCount,
                                                                        buffer.frameCount * 35);
                     bytesRead = input->read(buffer.raw, buffer.frameCount * 35);
                   }
@@ -2579,7 +2578,7 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
                   bytesRead = input->read(buffer.raw, inBufferSize);
                 }
 
-                LOGE("AudioRecordThread read: read %d bytes ", bytesRead);
+                LOGV("AudioRecordThread read: read %d bytes ", bytesRead);
                 if (bytesRead < 0) {
                     LOGE("Error reading audio input");
                     sleep(1);
@@ -2605,7 +2604,7 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
                    buffer.frameCount = bytesRead / 35;
                  }
 
-                 LOGE("Updated the framecount, and the value is %d", buffer.frameCount);
+                 LOGV("Updated the framecount, and the value is %d", buffer.frameCount);
                }
 
                mRecordTrack->releaseBuffer(&buffer);
