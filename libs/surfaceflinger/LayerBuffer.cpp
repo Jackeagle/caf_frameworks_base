@@ -101,6 +101,7 @@ void LayerBuffer::unregisterBuffers()
     sp<Source> source(clearSource());
     if (source != 0)
         source->unregisterBuffers();
+    mSource.clear();
 }
 
 uint32_t LayerBuffer::doTransaction(uint32_t flags)
@@ -146,10 +147,16 @@ bool LayerBuffer::transformed() const
 status_t LayerBuffer::registerBuffers(const ISurface::BufferHeap& buffers)
 {
     Mutex::Autolock _l(mLock);
-    if (mSource != 0)
+    if (mSource != 0) {
+        LOGE("The surface is not null");
         return INVALID_OPERATION;
-
+    }
     sp<BufferSource> source = new BufferSource(*this, buffers);
+
+    /*  
+    sp<BufferSource> source = new BufferSource(*this, w, h,
+            hstride, vstride, format, memoryHeap);
+    */
 
     status_t result = source->getStatus();
     if (result == NO_ERROR) {

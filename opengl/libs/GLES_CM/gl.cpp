@@ -1,5 +1,6 @@
 /* 
  ** Copyright 2007, The Android Open Source Project
+ ** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  **
  ** Licensed under the Apache License, Version 2.0 (the "License"); 
  ** you may not use this file except in compliance with the License. 
@@ -73,7 +74,7 @@ void glVertexPointerBounds(GLint size, GLenum type,
 #undef CALL_GL_API
 #undef CALL_GL_API_RETURN
 
-#if USE_FAST_TLS_KEY
+#if USE_FAST_TLS_KEY && !COPROC_TLS
 
     #define API_ENTRY(_api) __attribute__((naked)) _api
 
@@ -111,8 +112,12 @@ void glVertexPointerBounds(GLint size, GLenum type,
 
 
 extern "C" {
+#ifdef HAVE_QCOM_GFX
+#include "gl2_api.in"
+#else
 #include "gl_api.in"
 #include "glext_api.in"
+#endif
 }
 
 #undef API_ENTRY

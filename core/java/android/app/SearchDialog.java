@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -916,21 +917,21 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
             if (DBG_LOG_TIMING) dbgLogTiming("doTextKey()");
             if (DBG) { 
                 Log.d(LOG_TAG, "mTextListener.onKey(" + keyCode + "," + event 
-                        + "), selection: " + mSearchAutoComplete.getListSelection());
+                      + "), selection: " + mSearchAutoComplete.getListSelection());
             }
-            
+                
             // If a suggestion is selected, handle enter, search key, and action keys 
             // as presses on the selected suggestion
             if (mSearchAutoComplete.isPopupShowing() && 
-                    mSearchAutoComplete.getListSelection() != ListView.INVALID_POSITION) {
+                mSearchAutoComplete.getListSelection() != ListView.INVALID_POSITION) {
                 return onSuggestionsKey(v, keyCode, event);
             }
-
+            
             // If there is text in the query box, handle enter, and action keys
             // The search key is handled by the dialog's onKeyDown(). 
             if (!mSearchAutoComplete.isEmpty()) {
                 if (keyCode == KeyEvent.KEYCODE_ENTER 
-                        && event.getAction() == KeyEvent.ACTION_UP) {
+                    && event.getAction() == KeyEvent.ACTION_UP) {
                     v.cancelLongPress();
                     launchQuerySearch();                    
                     return true;
@@ -945,8 +946,8 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
             }
             return false;
         }
-    };
-        
+     };
+    
     /**
      * When the ACTION_CLOSE_SYSTEM_DIALOGS intent is received, we should close ourselves 
      * immediately, in order to allow a higher-priority UI to take over
@@ -1173,7 +1174,7 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
             c.respond(intent.getExtras());
         }
     }
-    
+
     /**
      * Saves the previous component that was searched, so that we can go
      * back to it.

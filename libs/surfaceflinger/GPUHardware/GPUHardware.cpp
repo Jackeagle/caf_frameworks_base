@@ -147,7 +147,9 @@ private:
 //  - two 320*480 16-bits double-buffered surfaces
 //  - one 320*480 32-bits double-buffered surface
 //  - one 320*240 16-bits double-buffered, 4x anti-aliased surface
-const int GPUHardware::GPU_RESERVED_SIZE  = 1200 * 1024;
+// Modified to support WVGA (800*480)
+//  - two 800*480 16-bits double-buffered surfaces (3000 * 1024)
+const int GPUHardware::GPU_RESERVED_SIZE  = 3000 * 1024;
 const int GPUHardware::GPUR_SIZE          = 1 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------

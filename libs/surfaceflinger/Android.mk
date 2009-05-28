@@ -31,6 +31,18 @@ ifeq ($(TARGET_SIMULATOR),true)
 	endif
 endif
 
+
+ifneq (, $(filter qsd8250_surf qsd8250_ffa, $(TARGET_PRODUCT)))
+  LOCAL_CFLAGS += -DQCOM_SCORPION -DSURF8K
+endif
+
+ifeq ($(TARGET_PRODUCT),msm7201a_surf msm7201a_ffa)
+    LOCAL_CFLAGS += -DFEATURE_7K_PMEM
+endif
+
+ifeq ($(BOARD_USES_ADRENO_200),true)
+  LOCAL_CFLAGS += -DHAVE_QCOM_GFX
+endif
 LOCAL_SHARED_LIBRARIES := \
 	libhardware \
 	libutils \

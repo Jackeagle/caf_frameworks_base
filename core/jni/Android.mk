@@ -169,8 +169,11 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(BOARD_HAVE_BLUETOOTH),true)
 LOCAL_C_INCLUDES += \
-	external/dbus \
-	system/bluetooth/bluez-clean-headers
+    external/dbus \
+    external/bluez/libs/include \
+    system/bluetooth/bluedroid/include \
+    system/bluetooth/bluez-clean-headers	
+
 LOCAL_CFLAGS += -DHAVE_BLUETOOTH
 LOCAL_SHARED_LIBRARIES += libbluedroid libdbus
 endif

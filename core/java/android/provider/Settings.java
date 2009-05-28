@@ -840,6 +840,11 @@ public final class Settings {
         public static final String STAY_ON_WHILE_PLUGGED_IN = "stay_on_while_plugged_in";
 
         /**
+         * Whether Dun Mode is on.
+         */
+        public static final String DUN_ENABLE = "dun_enable";
+
+        /**
          * What happens when the user presses the end call button if they're not
          * on a call.<br/>
          * <b>Values:</b><br/>
@@ -1041,6 +1046,24 @@ public final class Settings {
          */
         public static final String ALWAYS_FINISH_ACTIVITIES =
                 "always_finish_activities";
+
+        /**
+         * Ringer mode. This is used internally, changing this value will not
+         * change the mode_normal mode. See AudioManager.
+         */
+        public static final String MODE_NORMAL = "mode_normal";
+
+        /**
+         * Rington mode. This is used internally, changing this value will not
+         * change the rington mode. See AudioManager.
+         */
+        public static final String MODE_RINGTONE = "mode_ringtone";
+
+        /**
+         * Incall mode. This is used internally, changing this value will not
+         * change the incall mode. See AudioManager.
+         */
+        public static final String MODE_IN_CALL = "mode_in_call";
 
 
         /**
@@ -1266,10 +1289,22 @@ public final class Settings {
         public static final String DTMF_TONE_WHEN_DIALING = "dtmf_tone";
 
         /**
+         * Auto Answer timeout value. The supported timeout values are 5 sec, 10 sec, 15 sec and
+         * -1 (for disabling).
+         */
+        public static final String AUTO_ANSWER_TIMEOUT = "auto_answer";
+
+        /**
          * Whether the sounds effects (key clicks, lid open ...) are enabled. The value is
          * boolean (1 or 0).
          */
         public static final String SOUND_EFFECTS_ENABLED = "sound_effects_enabled";
+
+        /**
+         * The user preferred network selection mode - Manual or Automatic
+         * @hide pending API council
+         */
+        public static final String NETWORK_SELECTION_MODE = "network_selection_mode"; 
         
         /**
          * Whether the haptic feedback (long presses, ...) are enabled. The value is

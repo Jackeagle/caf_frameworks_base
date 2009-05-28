@@ -558,7 +558,8 @@ class NotificationManagerService extends INotificationManager.Stub
                 
                 // TODO: make this restriction do something smarter like never fill
                 // more than two screens.  "Why would anyone need more than 80 characters." :-/
-                final int maxTickerLen = 80;
+                //The size has been increased to 8 lines based on SIM test cases requirements.
+                final int maxTickerLen = 320;
                 if (truncatedTicker != null && truncatedTicker.length() > maxTickerLen) {
                     truncatedTicker = truncatedTicker.subSequence(0, maxTickerLen);
                 }

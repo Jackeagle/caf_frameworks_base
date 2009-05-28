@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -630,7 +631,7 @@ public class ListView extends AbsListView {
             // is this the selected item?
             boolean selected = pos == mSelectedPosition;
             View child = makeAndAddView(pos, nextTop, true, mListPadding.left, selected);
-
+           if(child != null)
             nextTop = child.getBottom() + mDividerHeight;
             if (selected) {
                 selectedView = child;
@@ -1653,6 +1654,7 @@ public class ListView extends AbsListView {
         child = obtainView(position);
 
         // This needs to be positioned and measured
+       if(child != null)
         setupChild(child, position, y, flow, childrenLeft, selected, false);
 
         return child;
@@ -2490,7 +2492,7 @@ public class ListView extends AbsListView {
             int startPos = (mSelectedPosition != INVALID_POSITION) ?
                     mSelectedPosition - 1 :
                     firstPosition + getChildCount() - 1;
-            if (startPos < 0) {
+            if (startPos < 0 || startPos >= mAdapter.getCount()) {
                 return INVALID_POSITION;
             }
             if (startPos > last) {

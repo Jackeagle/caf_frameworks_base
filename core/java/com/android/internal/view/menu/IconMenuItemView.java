@@ -150,6 +150,9 @@ public final class IconMenuItemView extends TextView implements MenuView.ItemVie
         if (mItemData == null) {
             return;
         }
+       //When the mItemData is NULL and trying to get mShortcutCaptionMode,
+       //it gives NULL pointer exception. So moved the below line here inorder
+       //to ensure that it gets mShortcutCaptionMode only when mItemData is not NULL
         
         mShortcutCaptionMode = shortcut && (mItemData.shouldShowShortcut());
         

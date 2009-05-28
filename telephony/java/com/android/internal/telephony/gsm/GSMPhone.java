@@ -579,8 +579,8 @@ public class GSMPhone extends PhoneBase {
                 if (call.getState() != GsmCall.State.IDLE) {
                     if (LOCAL_DEBUG) Log.d(LOG_TAG,
                             "MmiCode 1: hangup foreground");
-                    //mCT.hangupForegroundResumeBackground();
-                    mCT.hangup(call);
+                    mCT.hangupForegroundResumeBackground();
+                    //mCT.hangup(call);
                 } else {
                     if (LOCAL_DEBUG) Log.d(LOG_TAG,
                             "MmiCode 1: switchWaitingOrHoldingAndActive");

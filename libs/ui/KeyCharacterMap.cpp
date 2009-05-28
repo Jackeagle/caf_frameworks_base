@@ -182,7 +182,8 @@ KeyCharacterMap::load(int id)
         LOGW("No keyboard for id %d", id);
     }
 
-    snprintf(path, sizeof(path), "%s/usr/keychars/qwerty.kcm.bin", root);
+    //snprintf(path, sizeof(path), "%s/usr/keychars/qwerty.kcm.bin", root);
+    snprintf(path, sizeof(path), "%s/usr/keychars/surf_keypad.kcm.bin", root);
     rv = try_file(path);
     if (rv == NULL) {
         LOGE("Can't find any keycharmaps (also tried %s)", path);

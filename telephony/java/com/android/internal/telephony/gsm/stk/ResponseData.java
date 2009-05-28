@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2006-2007 Google Inc.
- * 
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
@@ -117,6 +118,11 @@ class GetInkeyInputResponseData extends ResponseData {
             }
         } else {
             data = new byte[0];
+        }
+        // For length field, if the value is greater than 0x7F, it has
+        // to be coded into two bytes and the first byte has to be 0x81.
+        if(data.length + 1 > 0x7F ){
+            buf.write(0x81);
         }
 
         // length - one more for data coding scheme.

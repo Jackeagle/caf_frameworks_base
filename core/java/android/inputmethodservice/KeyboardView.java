@@ -809,6 +809,12 @@ public class KeyboardView extends View implements View.OnClickListener {
                             mHandler.obtainMessage(MSG_SHOW_PREVIEW, keyIndex, 0), 
                             DELAY_BEFORE_PREVIEW);
                 }
+		   //Calling PreviewPopup.update() with 4 params places the preview popup 
+		   //at correct position on screen. Also prevents softKeyboard from crashing 
+		   //Calling update() with 5 params leads to SoftKeyboard crash
+                    //previewPopup.update(mPopupParent, mPopupPreviewX + mOffsetInWindow[0],
+                      //      mPopupPreviewY + mOffsetInWindow[1], 
+                        //    popupWidth, popupHeight);
             }
         }
     }

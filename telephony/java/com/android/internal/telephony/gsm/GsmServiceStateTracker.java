@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +19,15 @@ package com.android.internal.telephony.gsm;
 
 import com.android.internal.telephony.Phone;
 import android.app.AlarmManager;
+import android.app.Dialog;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.res.Resources;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.ContentObserver;
 import android.os.AsyncResult;
@@ -44,6 +49,9 @@ import android.util.Config;
 import android.util.EventLog;
 import android.util.Log;
 import android.util.TimeUtils;
+import android.util.EventLog;
+import android.view.WindowManager;
+
 
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.CommandsInterface;
@@ -63,6 +71,8 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_OPERAT
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_OPERATOR_ISROAMING;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_OPERATOR_NUMERIC;
+
+import com.android.internal.R;
 
 import java.util.Arrays;
 import java.util.Calendar;
@@ -135,11 +145,15 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     private String curSpn = null;
     private String curPlmn = null;
     private int curSpnRule = 0;
-
+    boolean registeredFirstTime = false;
     //***** Constants
 
     static final boolean DBG = true;
     static final String LOG_TAG = "GSM";
+    static final String EONS_TAG = "EONS";
+    static final int EONS_ALG = 0x01;
+    // signal strength poll rate
+    static final int POLL_PERIOD_MILLIS = 20 * 1000;
 
     // waiting period before recheck gprs and voice registration
     static final int DEFAULT_GPRS_CHECK_PERIOD_MILLIS = 60 * 1000;
@@ -155,6 +169,62 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     // notification id
     static final int PS_NOTIFICATION = 888; //id to update and cancel PS restricted 
     static final int CS_NOTIFICATION = 999; //id to update and cancel CS restricted
+    
+    //***** Events
+    static final int EVENT_RADIO_STATE_CHANGED       = 1;
+    static final int EVENT_NETWORK_STATE_CHANGED        = 2;
+    static final int EVENT_GET_SIGNAL_STRENGTH  = 3;
+    static final int EVENT_POLL_STATE_REGISTRATION = 4;
+    static final int EVENT_POLL_STATE_GPRS = 5;
+    static final int EVENT_POLL_STATE_OPERATOR         = 6;
+    static final int EVENT_POLL_SIGNAL_STRENGTH = 10;
+    static final int EVENT_NITZ_TIME = 11;
+    static final int EVENT_SIGNAL_STRENGTH_UPDATE = 12;
+    static final int EVENT_RADIO_AVAILABLE = 13;
+    static final int EVENT_POLL_STATE_NETWORK_SELECTION_MODE = 14;
+    static final int EVENT_GET_LOC_DONE = 15;
+    static final int EVENT_SIM_RECORDS_LOADED = 16;
+    static final int EVENT_SIM_READY = 17;
+    static final int EVENT_LOCATION_UPDATES_ENABLED = 18;
+    static final int EVENT_GET_PREFERRED_NETWORK_TYPE = 19;
+    static final int EVENT_SET_PREFERRED_NETWORK_TYPE = 20;
+    static final int EVENT_RESET_PREFERRED_NETWORK_TYPE = 21;
+    static final int EVENT_CHECK_REPORT_GPRS = 22;
+    static final int EVENT_RESTRICTED_STATE_CHANGED = 23;
+
+    // Registration denied - Managed Roaming dialog
+    private static boolean display_managed_roaming_dialog = false;
+
+  //***** Time Zones
+
+    private static final String TIMEZONE_PROPERTY = "persist.sys.timezone";
+
+    // List of ISO codes for countries that can have an offset of GMT+0
+    // when not in daylight savings time.  This ignores some small places
+    // such as the Canary Islands (Spain) and Danmarkshavn (Denmark).
+    // The list must be sorted by code.
+    private static final String[] GMT_COUNTRY_CODES = {
+        "bf", // Burkina Faso
+        "ci", // Cote d'Ivoire
+        "eh", // Western Sahara
+        "fo", // Faroe Islands, Denmark
+        "gh", // Ghana
+        "gm", // Gambia
+        "gn", // Guinea
+        "gw", // Guinea Bissau
+        "ie", // Ireland
+        "lr", // Liberia
+        "is", // Iceland
+        "ma", // Morocco
+        "ml", // Mali
+        "mr", // Mauritania
+        "pt", // Portugal
+        "sl", // Sierra Leone
+        "sn", // Senegal
+        "st", // Sao Tome and Principe
+        "tg", // Togo
+        "uk", // U.K
+    };
 
     private ContentObserver mAutoTimeObserver = new ContentObserver(new Handler()) {
         @Override
@@ -524,8 +594,6 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         }
     }
 
-    //***** Private Instance Methods
-
     protected void setPowerStateToDesired()
     {
         // If we want it on and it's off, turn it on
@@ -556,6 +624,12 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             // If it's on and available and we want it off..
             cm.setRadioPower(false, null);
         } // Otherwise, we're in the desired state
+    }
+
+    /*Need to call updateSpnDisplay after processing EF files.
+     *Since it is a private function, writing a wrapper for it*/
+    public void updateSpnDisplayWrapper() {
+       updateSpnDisplay();
     }
     
     protected void updateSpnDisplay() {
@@ -676,12 +750,29 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     if (opNames != null && opNames.length >= 3) {
                         newSS.setOperatorName (
                                 opNames[0], opNames[1], opNames[2]);
+                        if((phone.mSIMRecords.getOnsAlg() == EONS_ALG)
+                            && (opNames[2] != null)
+                            && (opNames[2].trim().length() != 0)
+                            && !registeredFirstTime){
+                           if(phone.mSIMRecords.updateSimRecords()){
+                              registeredFirstTime = true;
+                              Log.d(EONS_TAG,opNames[2] +
+                              "After First reg updateSimRecords() once");
+                            }
+                        }
                     }
                 break;
 
                 case EVENT_POLL_STATE_NETWORK_SELECTION_MODE:
                     ints = (int[])ar.result;
                     newSS.setIsManualSelection(ints[0] == 1);
+                    if (ints[0] == 1) {
+                        Settings.System.putString(phone.getContext().getContentResolver(),
+                                Settings.System.NETWORK_SELECTION_MODE, "Manual");
+                    } else {
+                        Settings.System.putString(phone.getContext().getContentResolver(),
+                                Settings.System.NETWORK_SELECTION_MODE, "Automatic");
+                    }
                 break;
             }
 
@@ -845,6 +936,16 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         newSS.setStateOutOfService();
 
         GsmCellLocation tcl = cellLoc;
+        /*
+         *Update all cached sim records when LAC has changed
+         */
+        if (cellLoc.getLac() != newCellLoc.getLac()) {
+            if(phone.mSIMRecords.getOnsAlg() == EONS_ALG) {
+               Log.d(EONS_TAG,
+                     "LOC updated calling updateSimRecords()");
+               phone.mSIMRecords.updateSimRecords();
+            }
+        }
         cellLoc = newCellLoc;
         newCellLoc = tcl;
 
@@ -1174,13 +1275,61 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         Log.d(LOG_TAG, "[DSAC DEB] " + "current rs at return "+ rs);
     }
 
+    DialogInterface.OnClickListener onManagedRoamingDialogClick =
+        new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+                switch (which){
+                    case DialogInterface.BUTTON_POSITIVE:
+                         Intent networkSettingIntent = new Intent(Intent.ACTION_MAIN);
+                         networkSettingIntent.setClassName("com.android.phone","com.android.phone.NetworkSetting");
+                         networkSettingIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                         phone.getContext().startActivity(networkSettingIntent);
+                         break;
+                    case DialogInterface.BUTTON_NEGATIVE:
+                         break;
+                }
+                display_managed_roaming_dialog = false;
+           }
+    };
+
+    private void createManagedRoamingDialog() {
+        Resources r = Resources.getSystem();
+
+        AlertDialog managed_roaming_dialog = new AlertDialog.Builder(phone.getContext())
+                 .setMessage(r.getString(R.string.managed_roaming_dialog_content))
+                 .setPositiveButton(r.getString(R.string.managed_roaming_dialog_ok_button),
+                                    onManagedRoamingDialogClick)
+                 .setNegativeButton(r.getString(R.string.managed_roaming_dialog_cancel_button),
+                                    onManagedRoamingDialogClick)
+                 .create();
+
+       display_managed_roaming_dialog = true;
+       managed_roaming_dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+       managed_roaming_dialog.show();
+    }
+
     /** code is registration state 0-5 from TS 27.007 7.2 */
     private int
     regCodeToServiceState(int code) {
         switch (code) {
             case 0:
             case 2: // 2 is "searching"
+                return ServiceState.STATE_OUT_OF_SERVICE;
+
             case 3: // 3 is "registration denied"
+                /* This indicates limited service. Show the "Managed Roaming"
+                 * dialog if user preferred network selection mode is 'Manual'
+                 */
+                String user_selected_network_mode = Settings.System.getString(
+                    phone.getContext().getContentResolver(), Settings.System.NETWORK_SELECTION_MODE);
+                if (user_selected_network_mode.equals("Manual")) {
+                    if (!display_managed_roaming_dialog) {
+                        createManagedRoamingDialog();
+                    }
+                }
+                return ServiceState.STATE_OUT_OF_SERVICE;
+
             case 4: // 4 is "unknown" no vaild in current baseband
                 return ServiceState.STATE_OUT_OF_SERVICE;
 

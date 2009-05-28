@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -6392,9 +6393,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     int newSelEnd = Selection.getSelectionEnd(mText);
                     CommitSelectionReceiver csr = null;
                     if (newSelStart != oldSelStart || newSelEnd != oldSelEnd) {
-                        csr = new CommitSelectionReceiver();
-                        csr.mNewStart = newSelStart;
-                        csr.mNewEnd = newSelEnd;
+                        // Check if the selection bounds does not exceed the length.
+                        // check the posible race condition which could happen in monkey.
+                        if((newSelStart <= mText.length()) && (newSelEnd <= mText.length())) {
+                            csr = new CommitSelectionReceiver();
+                            csr.mNewStart = newSelStart;
+                            csr.mNewEnd = newSelEnd;
+                        }
                     }
                     
                     if (imm.showSoftInput(this, 0, csr) && csr != null) {

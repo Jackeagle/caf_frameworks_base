@@ -22,7 +22,7 @@
 #include "AudioResampler.h"
 #include "AudioResamplerCubic.h"
 
-#define LOG_TAG "AudioSRC"
+//#define LOG_TAG "AudioSRC"
 
 namespace android {
 // ----------------------------------------------------------------------------

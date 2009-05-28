@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -646,13 +647,8 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                     } else {
                         facility = scToBarringFacility(sia);
                     }
-                    if (newPwd.equals(pwd)) {
-                        phone.mCM.changeBarringPassword(facility, oldPwd,
-                                newPwd, obtainMessage(EVENT_SET_COMPLETE, this));
-                    } else {
-                        // password mismatch; return error
-                        handlePasswordError(com.android.internal.R.string.passwordIncorrect);
-                    }
+                    //phone.mCM.changeBarringPassword(facility, oldPwd, newPwd, pwd,
+                    //    obtainMessage(EVENT_SET_COMPLETE, this));
                 } else {
                     throw new RuntimeException ("Invalid or Unsupported MMI Code");
                 }

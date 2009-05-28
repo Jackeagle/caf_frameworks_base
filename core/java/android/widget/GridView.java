@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -298,6 +299,11 @@ public class GridView extends AbsListView {
         while (nextBottom > end && pos >= 0) {
 
             View temp = makeRow(pos, nextBottom, false);
+            // Added the check to Avoid the Race condition.
+            if (mReferenceView == null) {
+               return selectedView;
+            }
+
             if (temp != null) {
                 selectedView = temp;
             }

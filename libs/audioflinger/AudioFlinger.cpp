@@ -136,6 +136,21 @@ AudioFlinger::AudioFlinger()
         mHardwareStatus = AUDIO_HW_IDLE;
         if (hwOutput) {
             mHardwareMixerThread = new MixerThread(this, hwOutput, AudioSystem::AUDIO_OUTPUT_HARDWARE);
+
+/* in donut 
+        if (mHardwareOutput) {
+            mHardwareAudioMixer = new AudioMixer(getOutputFrameCount(mHardwareOutput), mHardwareOutput->sampleRate());
+            mRequestedOutput = mHardwareOutput;
+            doSetOutput(mHardwareOutput);
+
+            // FIXME - this should come from settings
+            setMasterVolume(1.0f);
+            setRouting(AudioSystem::MODE_NORMAL, AudioSystem::ROUTE_EARPIECE, AudioSystem::ROUTE_ALL);
+            setRouting(AudioSystem::MODE_RINGTONE, AudioSystem::ROUTE_EARPIECE, AudioSystem::ROUTE_ALL);
+            setRouting(AudioSystem::MODE_IN_CALL, AudioSystem::ROUTE_EARPIECE, AudioSystem::ROUTE_ALL);
+            setMode(AudioSystem::MODE_NORMAL);
+            mMasterMute = false;
+*/
         } else {
             LOGE("Failed to initialize hardware output stream, status: %d", status);
         }
@@ -161,9 +176,9 @@ AudioFlinger::AudioFlinger()
 #endif
  
         // FIXME - this should come from settings
-        setRouting(AudioSystem::MODE_NORMAL, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
-        setRouting(AudioSystem::MODE_RINGTONE, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
-        setRouting(AudioSystem::MODE_IN_CALL, AudioSystem::ROUTE_EARPIECE, AudioSystem::ROUTE_ALL);
+        //setRouting(AudioSystem::MODE_NORMAL, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
+        //setRouting(AudioSystem::MODE_RINGTONE, AudioSystem::ROUTE_SPEAKER, AudioSystem::ROUTE_ALL);
+        //setRouting(AudioSystem::MODE_IN_CALL, AudioSystem::ROUTE_EARPIECE, AudioSystem::ROUTE_ALL);
         setMode(AudioSystem::MODE_NORMAL);
 
         setMasterVolume(1.0f);
@@ -2430,8 +2445,10 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
         } else if (mRecordTrack != 0) {
 
             buffer.frameCount = inFrameCount;
-            if (LIKELY(mRecordTrack->getNextBuffer(&buffer) == NO_ERROR &&
-                       (int)buffer.frameCount == inFrameCount)) {
+            if (LIKELY(mRecordTrack->getNextBuffer(&buffer) == NO_ERROR))
+            {
+//  &&
+//  (int)buffer.frameCount == inFrameCount)) {
                 LOGV("AudioRecordThread read: %d frames", buffer.frameCount);
                 ssize_t bytesRead = input->read(buffer.raw, inBufferSize);
                 if (bytesRead < 0) {

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -205,7 +206,7 @@ void SurfaceFlinger::init()
     mDebugCpu = atoi(value);
     property_get("debug.sf.showbackground", value, "0");
     mDebugBackground = atoi(value);
-    property_get("debug.sf.showfps", value, "0");
+    property_get("persist.debug.sf.showfps", value, "0");
     mDebugFps = atoi(value);
     property_get("debug.sf.nobootanimation", value, "0");
     mDebugNoBootAnimation = atoi(value);
@@ -1051,6 +1052,7 @@ void SurfaceFlinger::debugShowFPS() const
     nsecs_t diff = now - mLastFpsTime;
     if (diff > ms2ns(250)) {
         mFps =  ((mFrameCount - mLastFrameCount) * float(s2ns(1))) / diff;
+	LOGD("Frames Per Second: %.4f", mFps);
         mLastFpsTime = now;
         mLastFrameCount = mFrameCount;
     }
@@ -1697,8 +1699,20 @@ void Client::free(int32_t id)
 sp<MemoryDealer> Client::createAllocator(uint32_t flags)
 {
     sp<MemoryDealer> allocator;
-    allocator = getSurfaceHeapManager()->createHeap(
-            flags, getClientPid(), mSharedHeapAllocator);
+
+    if (flags & ISurfaceComposer::eGPU) {
+        allocator = mFlinger->getGPU()->request(getClientPid());
+        return allocator;
+    }
+
+    allocator = mPMemAllocator;
+
+    if (allocator == 0) {
+        allocator = getSurfaceHeapManager()->createHeap(
+                flags, getClientPid(), mSharedHeapAllocator);
+        mPMemAllocator = allocator;
+    }
+
     return allocator;
 }
 

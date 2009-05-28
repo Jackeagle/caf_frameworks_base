@@ -588,6 +588,7 @@ class DatabaseHelper extends SQLiteOpenHelper {
                 RILConstants.CDMA_PHONE);
         loadBooleanSetting(stmt, Settings.System.DIM_SCREEN,
                 R.bool.def_dim_screen);
+        loadSetting(stmt, Settings.System.DUN_ENABLE, 0);
         loadSetting(stmt, Settings.System.STAY_ON_WHILE_PLUGGED_IN, 
                 "1".equals(SystemProperties.get("ro.kernel.qemu")) ? 1 : 0);
         loadIntegerSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT,
@@ -595,6 +596,11 @@ class DatabaseHelper extends SQLiteOpenHelper {
         
         loadBooleanSetting(stmt, Settings.System.AIRPLANE_MODE_ON,
                 R.bool.def_airplane_mode_on);
+        loadSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT, -1);
+        // Allow airplane mode to turn off cell radio
+        loadSetting(stmt, Settings.System.AIRPLANE_MODE_RADIOS, 
+                Settings.System.RADIO_CELL + ","
+                + Settings.System.RADIO_BLUETOOTH + "," + Settings.System.RADIO_WIFI);
         
         loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_RADIOS,
                 R.string.def_airplane_mode_radios);

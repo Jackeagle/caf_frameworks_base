@@ -53,7 +53,8 @@ namespace android {
  * (PMEM is used for 2D acceleration)
  * 8 MB of address space per client should be enough.
  */
-static const int PMEM_SIZE = int(8 * 1024 * 1024);
+
+static const int PMEM_SIZE = int(10 * 1024 * 1024);
 
 int SurfaceHeapManager::global_pmem_heap = 0;
 
@@ -73,7 +74,11 @@ SurfaceHeapManager::~SurfaceHeapManager()
 void SurfaceHeapManager::onFirstRef()
 {
     if (global_pmem_heap) {
-        const char* device = "/dev/pmem";
+       //#ifdef FEATURE_7K_PMEM
+        const char* device = "/dev/pmem_camera";
+       //#else
+        ///const char* device = "/dev/pmem";
+       //#endif
         mPMemHeap = new PMemHeap(device, PMEM_SIZE);
         if (mPMemHeap->base() == MAP_FAILED) {
             mPMemHeap.clear();
