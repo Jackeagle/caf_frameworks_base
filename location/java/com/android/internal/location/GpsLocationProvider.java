@@ -812,7 +812,7 @@ public class GpsLocationProvider extends ILocationProvider.Stub {
         if (VERBOSE) Log.v(TAG, "reportStatus status: " + status);
 
         boolean wasNavigating = mNavigating;
-        mNavigating = (status == GPS_STATUS_SESSION_BEGIN);
+        mNavigating = (status == GPS_STATUS_SESSION_BEGIN || status == GPS_STATUS_ENGINE_ON);
 
         if (wasNavigating != mNavigating) {
             if (mNavigating) {
