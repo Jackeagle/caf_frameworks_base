@@ -902,6 +902,10 @@ public class GSMPhone extends PhoneBase {
         return mSIMRecords.getMsisdnNumber();
     }
 
+    public int getCspPlmnStatus() {
+        return mSIMRecords.getCspPlmn();
+    }
+
     public String getLine1AlphaTag() {
         String ret;
 

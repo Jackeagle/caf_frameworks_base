@@ -1859,7 +1859,14 @@ public final class Settings {
          * Whether the device has been provisioned (0 = false, 1 = true)
          */
         public static final String DEVICE_PROVISIONED = "device_provisioned";
-    
+
+        /**
+         *This variable is used to specify whether to use the EF_CSP or not
+         *(0=dont consider EF_CSP,1=consider EF_CSP)
+         * @hide
+         */
+        public static final String USE_CSP_PLMN = "use_csp_plmn";
+
         /**
          * List of input methods that are currently enabled.  This is a string
          * containing the IDs of all enabled input methods, each ID separated
