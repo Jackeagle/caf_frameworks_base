@@ -850,7 +850,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
-        if (state == State.CONNECTED) {
+        if (state != State.CONNECTED) {
             Log.i(LOG_TAG, "Data connection has changed.");
 
             int cid = -1;
