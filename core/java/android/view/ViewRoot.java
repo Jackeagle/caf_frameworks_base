@@ -87,6 +87,10 @@ public final class ViewRoot extends Handler implements ViewParent,
      * a key event, before resetting the counters.
      */
     static final int MAX_TRACKBALL_DELAY = 250;
+    /**
+     * Allocating the Region object for all the objects of ViewRoot untill
+     * it really need them.
+     */
 
     static long sInstanceCount = 0;
 
@@ -96,6 +100,9 @@ public final class ViewRoot extends Handler implements ViewParent,
     static boolean mInitialized = false;
 
     static final ThreadLocal<RunQueue> sRunQueues = new ThreadLocal<RunQueue>();
+    /**
+     * Allocating the Rect object once untill viewRoot object really needs it.
+     */
 
     long mLastTrackballTime = 0;
     final TrackballAxis mTrackballAxisX = new TrackballAxis();
@@ -121,18 +128,18 @@ public final class ViewRoot extends Handler implements ViewParent,
     int mViewVisibility;
     boolean mAppVisible = true;
 
-    final Region mTransparentRegion;
-    final Region mPreviousTransparentRegion;
+    Region mTransparentRegion = null;
+    Region mPreviousTransparentRegion = null;
 
     int mWidth;
     int mHeight;
-    Rect mDirty; // will be a graphics.Region soon
+    Rect mDirty = null;; // will be a graphics.Region soon
     boolean mIsAnimating;
 
     final View.AttachInfo mAttachInfo;
 
     final Rect mTempRect; // used in the transaction to not thrash the heap.
-    final Rect mVisRect; // used to retrieve visible rect of focused view.
+    Rect mVisRect = null; // used to retrieve visible rect of focused view.
     final Point mVisPoint; // used to retrieve global offset of focused view.
 
     boolean mTraversalScheduled;
@@ -158,8 +165,8 @@ public final class ViewRoot extends Handler implements ViewParent,
     // These are accessed by multiple threads.
     final Rect mWinFrame; // frame given by window manager.
 
-    final Rect mPendingVisibleInsets = new Rect();
-    final Rect mPendingContentInsets = new Rect();
+    Rect mPendingVisibleInsets = null;
+    Rect mPendingContentInsets = null;
     final ViewTreeObserver.InternalInsetsInfo mLastGivenInsets
             = new ViewTreeObserver.InternalInsetsInfo();
 
@@ -214,16 +221,12 @@ public final class ViewRoot extends Handler implements ViewParent,
         mLocation.fillInStackTrace();
         mWidth = -1;
         mHeight = -1;
-        mDirty = new Rect();
         mTempRect = new Rect();
-        mVisRect = new Rect();
         mVisPoint = new Point();
         mWinFrame = new Rect();
         mWindow = new W(this, context);
         mInputMethodCallback = new InputMethodCallback(this);
         mViewVisibility = View.GONE;
-        mTransparentRegion = new Region();
-        mPreviousTransparentRegion = new Region();
         mFirst = true; // true for the first time the view is added
         mSurface = new Surface();
         mAdded = false;
@@ -411,6 +414,12 @@ public final class ViewRoot extends Handler implements ViewParent,
                     unscheduleTraversals();
                     throw new RuntimeException("Adding window failed", e);
                 }
+                if (mPendingContentInsets == null) {
+                    mPendingContentInsets = new Rect();
+                }
+                if (mPendingVisibleInsets == null) {
+                    mPendingVisibleInsets = new Rect();
+                }
                 mPendingContentInsets.set(mAttachInfo.mContentInsets);
                 mPendingVisibleInsets.set(0, 0, 0, 0);
                 if (Config.LOGV) Log.v("ViewRoot", "Added window " + mWindow);
@@ -525,6 +534,9 @@ public final class ViewRoot extends Handler implements ViewParent,
             mTempRect.set(dirty);
             mTempRect.offset(0, -mCurScrollY);
             dirty = mTempRect;
+        }
+        if (mDirty == null) {
+            mDirty = new Rect();
         }
         mDirty.union(dirty);
         if (!mWillDrawSoon) {
@@ -938,6 +950,13 @@ public final class ViewRoot extends Handler implements ViewParent,
             if ((host.mPrivateFlags & View.REQUEST_TRANSPARENT_REGIONS) != 0) {
                 // start out transparent
                 // TODO: AVOID THAT CALL BY CACHING THE RESULT?
+                if (mTransparentRegion == null) {
+                    mTransparentRegion = new Region();
+                }
+                if (mPreviousTransparentRegion == null) {
+                    mPreviousTransparentRegion = new Region();
+                }
+
                 host.getLocationInWindow(mTmpLocation);
                 mTransparentRegion.set(mTmpLocation[0], mTmpLocation[1],
                         mTmpLocation[0] + host.mRight - host.mLeft,
@@ -1123,6 +1142,9 @@ public final class ViewRoot extends Handler implements ViewParent,
             mCurScrollY = yoff;
             fullRedrawNeeded = true;
         }
+        if (mDirty == null) {
+            mDirty = new Rect();
+        }
 
         Rect dirty = mDirty;
         if (mUseGL) {
@@ -1288,6 +1310,9 @@ public final class ViewRoot extends Handler implements ViewParent,
                 mLastScrolledFocus = focus;
                 mScrollMayChange = false;
                 if (DEBUG_INPUT_RESIZE) Log.v(TAG, "Need to scroll?");
+                if (mVisRect == null) {
+                    mVisRect = new Rect();
+                }
                 // Try to find the rectangle from the focus view.
                 if (focus.getGlobalVisibleRect(mVisRect, null)) {
                     if (DEBUG_INPUT_RESIZE) Log.v(TAG, "Root w="
@@ -1602,6 +1627,12 @@ public final class ViewRoot extends Handler implements ViewParent,
             // fall through...
         case RESIZED_REPORT:
             if (mAdded) {
+                if (mPendingContentInsets == null) {
+                    mPendingContentInsets = new Rect();
+                }
+                if (mPendingVisibleInsets == null) {
+                    mPendingVisibleInsets = new Rect();
+                }
                 mWinFrame.left = 0;
                 mWinFrame.right = msg.arg1;
                 mWinFrame.top = 0;
