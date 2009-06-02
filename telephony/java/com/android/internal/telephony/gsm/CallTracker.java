@@ -820,6 +820,31 @@ public final class CallTracker extends Handler
     }
 
     /* package */
+    void hangupActiveMenu (GSMCall call) throws CallStateException
+    {
+        if (call.getConnections().size() == 0) {
+            throw new CallStateException("no connections in call");
+        }
+
+        if (call == foregroundCall) {
+            if (call.isDialingOrAlerting()) {
+                if (Phone.DEBUG_PHONE) {
+                    log("(foregnd) hangup dialing or alerting...");
+                }
+                hangup((GSMConnection)(call.getConnections().get(0)));
+            } else {
+                hangupForegroundResumeBackground();
+            }
+        }
+        else {
+            throw new RuntimeException ("Call " + call +
+                    "does not belong to CallTracker " + this);
+        }
+
+        call.onHangupLocal();
+    }
+
+    /* package */
     void hangupWaitingOrBackground() {
         if (Phone.DEBUG_PHONE) log("hangupWaitingOrBackground");
         cm.hangupWaitingOrBackground(obtainCompleteMessage());

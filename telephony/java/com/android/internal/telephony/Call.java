@@ -164,6 +164,8 @@ public abstract class Call {
 
     public abstract void hangup() throws CallStateException;
 
+    public abstract void hangupActiveMenu() throws CallStateException;
+
     public boolean
     isDialingOrAlerting() {
         return getState().isDialing();

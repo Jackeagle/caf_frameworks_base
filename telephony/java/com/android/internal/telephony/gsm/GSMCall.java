@@ -92,6 +92,12 @@ class GSMCall extends Call
         owner.hangup(this);
     }
 
+    public void
+    hangupActiveMenu() throws CallStateException
+    {
+        owner.hangupActiveMenu(this);
+    }
+
     public String
     toString()
     {
