@@ -112,12 +112,8 @@ void glVertexPointerBounds(GLint size, GLenum type,
 
 
 extern "C" {
-#ifdef HAVE_QCOM_GFX
-#include "gl2_api.in"
-#else
 #include "gl_api.in"
 #include "glext_api.in"
-#endif
 }
 
 #undef API_ENTRY

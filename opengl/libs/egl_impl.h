@@ -31,7 +31,8 @@ struct gl_hooks_t;
 
 struct egl_connection_t
 {
-    void volatile *     dso;
+    void volatile *     dso_gl;
+    void volatile *     dso_egl;
     gl_hooks_t *        hooks;
     EGLint              major;
     EGLint              minor;

@@ -24,8 +24,8 @@ else
 endif
 
 LOCAL_CFLAGS += -fvisibility=hidden
-ifeq ($(BOARD_USES_ADRENO_200),true)
-    LOCAL_CFLAGS += -DHAVE_QCOM_GFX
+ifneq (, $(filter msm7630_surf msm7630_ffa qsd8250_surf qsd8250_ffa, $(TARGET_PRODUCT)))
+  LOCAL_CFLAGS += -DCOPROC_TLS=1 -DADRENO200
 endif
 
 include $(BUILD_SHARED_LIBRARY)
@@ -58,9 +58,6 @@ LOCAL_CFLAGS += -fvisibility=hidden
 
 ifneq (, $(filter msm7630_surf msm7630_ffa qsd8250_surf qsd8250_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DCOPROC_TLS=1
-  endif
-ifeq ($(BOARD_USES_ADRENO_200),true)
-    LOCAL_CFLAGS += -DHAVE_QCOM_GFX
 endif
   
 include $(BUILD_SHARED_LIBRARY)
