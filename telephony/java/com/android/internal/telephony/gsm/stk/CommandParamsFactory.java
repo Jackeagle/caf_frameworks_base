@@ -157,6 +157,9 @@ class CommandParamsFactory extends Handler {
              case PLAY_TONE:
                 cmdPending = processPlayTone(cmdDet, ctlvs);
                 break;
+             case SET_UP_EVENT_LIST:
+                cmdPending = processSetUpEventList(cmdDet, ctlvs);
+                break;
             default:
                 // unsupported proactive commands
                 mCmdParams = new CommandParams(cmdDet);
@@ -668,18 +671,26 @@ class CommandParamsFactory extends Handler {
             List<ComprehensionTlv> ctlvs) {
 
         StkLog.d(this, "process SetUpEventList");
-        //
-        // ComprehensionTlv ctlv = searchForTag(ComprehensionTlvTag.EVENT_LIST,
-        // ctlvs);
-        // if (ctlv != null) {
-        // try {
-        // byte[] rawValue = ctlv.getRawValue();
-        // int valueIndex = ctlv.getValueIndex();
-        // int valueLen = ctlv.getLength();
-        //
-        // } catch (IndexOutOfBoundsException e) {}
-        // }
-        return true;
+        
+         ComprehensionTlv ctlv = searchForTag(ComprehensionTlvTag.EVENT_LIST,
+         ctlvs);
+         if (ctlv != null) {
+         try {
+         byte[] rawValue = ctlv.getRawValue();
+         int valueIndex = ctlv.getValueIndex();
+         int valueLen = ctlv.getLength();
+         int eventValue = rawValue[valueIndex] & 0xff;
+         SetEventList event;
+         switch(eventValue) {
+            case 0x08:
+            default:
+               event = SetEventList.BROWSER_TERMINATION_EVENT;
+               break;
+         }
+         mCmdParams = new SetEventListParams(cmdDet,event);
+         } catch (IndexOutOfBoundsException e) {}
+    }
+        return false;
     }
 
     /**

@@ -35,6 +35,7 @@ public class StkCmdMessage implements Parcelable {
     private ToneSettings mToneSettings = null;
     private CallSettings mCallSettings = null;
     private boolean loadOptionalIconFailed=false;
+    private EventSettings mEventSettings = null;
 
     /*
      * Container for Launch Browser command settings.
@@ -42,6 +43,10 @@ public class StkCmdMessage implements Parcelable {
     public class BrowserSettings {
         public String url;
         public LaunchBrowserMode mode;
+    }
+
+    public class EventSettings {
+       public SetEventList event;
     }
 
     /*
@@ -88,6 +93,10 @@ public class StkCmdMessage implements Parcelable {
             mCallSettings.confirmMsg = ((CallSetupParams) cmdParams).confirmMsg;
             mCallSettings.callMsg = ((CallSetupParams) cmdParams).callMsg;
             break;
+        case SET_UP_EVENT_LIST:
+            mEventSettings = new EventSettings();
+            mEventSettings.event = ((SetEventListParams) cmdParams).eventInfo;
+            break;
         }
     }
 
@@ -111,6 +120,10 @@ public class StkCmdMessage implements Parcelable {
             mCallSettings.confirmMsg = in.readParcelable(null);
             mCallSettings.callMsg = in.readParcelable(null);
             break;
+        case SET_UP_EVENT_LIST:
+            mEventSettings = new EventSettings();
+            mEventSettings.event = SetEventList.values()[in.readInt()];
+            break;
         }
     }
 
@@ -131,6 +144,9 @@ public class StkCmdMessage implements Parcelable {
         case SET_UP_CALL:
             dest.writeParcelable(mCallSettings.confirmMsg, 0);
             dest.writeParcelable(mCallSettings.callMsg, 0);
+            break;
+        case SET_UP_EVENT_LIST:
+            dest.writeInt(mEventSettings.event.ordinal());
             break;
         }
     }
@@ -180,5 +196,9 @@ public class StkCmdMessage implements Parcelable {
 
     public boolean getLoadOptionalIconFailed() {
         return loadOptionalIconFailed;
+    }
+
+    public EventSettings getSetEventList() {
+       return mEventSettings;
     }
 }

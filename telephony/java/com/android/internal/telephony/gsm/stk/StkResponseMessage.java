@@ -23,6 +23,8 @@ public class StkResponseMessage {
         String usersInput  = null;
         boolean usersYesNoSelection = false;
         boolean usersConfirm = false;
+        int eventValue;
+        int addedInfo;
 
         public StkResponseMessage(StkCmdMessage cmdMsg) {
             this.cmdDet = cmdMsg.mCmdDet;
@@ -38,6 +40,11 @@ public class StkResponseMessage {
 
         public void setInput(String input) {
             this.usersInput = input;
+        }
+
+        public void setEvent(int event,int addedInfo) {
+           this.eventValue = event;
+           this.addedInfo = addedInfo;
         }
 
         public void setYesNo(boolean yesNo) {

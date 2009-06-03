@@ -31,6 +31,9 @@ public interface AppInterface {
                                     "android.intent.action.stk.command";
     public static final String STK_SESSION_END_ACTION = 
                                     "android.intent.action.stk.session_end";
+    public static final String STK_TERMINATE_ACTION =
+                                    "android.intent.action.stk.terminate";
+
     
     /* 
      * Callback function from app to telephony to pass a result code and user's
