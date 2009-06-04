@@ -46,6 +46,11 @@ import java.lang.reflect.Array;
                     st = start;
                 if (en > end)
                     en = end;
+                if (en < st) {
+                    st ^= en;
+                    en ^= st;
+                    st ^= en;
+                }
 
                 setSpan(spans[i], st - start, en - start, fl);
             }
