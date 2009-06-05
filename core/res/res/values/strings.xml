@@ -1674,7 +1674,7 @@
     <string name="sendText">Select an action for text</string>
 
     <!-- Title of the dialog where the user is adjusting the phone ringer volume -->
-    <string name="volume_ringtone">Ringer volume</string>
+    <string name="volume_ringtone">Notification volume</string>
     <!-- Title of the dialog where the user is adjusting the music volume -->
     <string name="volume_music">Media volume</string>
     <!-- Hint shown in the volume toast to inform the user that the media audio is playing through Bluetooth. -->
