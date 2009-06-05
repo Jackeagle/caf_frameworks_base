@@ -163,9 +163,6 @@ public class VolumePanel extends Handler
                     + ", flags: " + flags + "), index: " + index);
         }
 
-		if (streamType == AudioManager.STREAM_RING)
-			streamType = AudioManager.STREAM_MUSIC;
-
         // get max volume for progress bar
         int max = mAudioService.getStreamMaxVolume(streamType);
 
