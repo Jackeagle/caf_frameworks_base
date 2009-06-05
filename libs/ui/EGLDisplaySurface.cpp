@@ -1,6 +1,7 @@
 /*
  **
  ** Copyright 2007 The Android Open Source Project
+ ** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  **
  ** Licensed under the Apache License Version 2.0(the "License");
  ** you may not use this file except in compliance with the License.
@@ -206,7 +207,12 @@ uint32_t EGLDisplaySurface::swapBuffers()
                 egl_native_window_t::width,
                 egl_native_window_t::height,
                 egl_native_window_t::format, // XXX: use proper format
+#ifdef ADRENO_200
+                // Adreno 200 requires page-aligned surfaces
+                (egl_native_window_t::offset + 0xfff) & ~0xfff,
+#else
                 egl_native_window_t::offset,
+#endif
                 (void*)egl_native_window_t::base,  // XXX: use proper base
                 egl_native_window_t::oem[0]
         };

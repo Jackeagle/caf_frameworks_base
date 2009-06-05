@@ -35,6 +35,10 @@ ifeq ($(BOARD_USE_QCOM_TESTONLY),true)
   LOCAL_CFLAGS += -DQCOM_TEST_ONLY
 endif
 
+ifeq ($(strip $(BOARD_USES_ADRENO_200)), true)
+  LOCAL_CFLAGS += -DADRENO_200
+endif
+
 LOCAL_SHARED_LIBRARIES := \
 	libcorecg \
 	libcutils \

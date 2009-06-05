@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -356,15 +357,17 @@ status_t GPUHardware::requestLocked(int pid)
             if (mSMIHeap == 0)
                 mSMIHeap = new GPUAreaHeap(this, "/dev/pmem_gpu0");
             if (mEBIHeap == 0)
+#ifdef ADRENO_200
+                // For Adreno 200, only allocate GPU_RESERVED_SIZE bytes and not
+                // the total pmem region size.
+                mEBIHeap = new GPUAreaHeap(this,
+                        "/dev/pmem_gpu1", GPU_RESERVED_SIZE, GPU_RESERVED_SIZE);
+#else
                 mEBIHeap = new GPUAreaHeap(this, 
                         "/dev/pmem_gpu1", 0, GPU_RESERVED_SIZE);
-            mREGHeap = new GPURegisterHeap(this);
-#ifdef ADRENO_200
-            // For Adreno 200, put memory in SMI so graphics won't run out
-            mAllocator = mSMIHeap->getAllocator();
-#else
-            mAllocator = mEBIHeap->getAllocator();
 #endif
+            mREGHeap = new GPURegisterHeap(this);
+            mAllocator = mEBIHeap->getAllocator();
             if (mAllocator == NULL) {
                 // something went terribly wrong.
                 mSMIHeap.clear();
