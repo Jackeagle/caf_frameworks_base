@@ -114,9 +114,6 @@ void DisplayHardware::init(uint32_t dpy)
             EGL_GREEN_SIZE,     6,
             EGL_BLUE_SIZE,      5,
             EGL_DEPTH_SIZE,     0,
-#ifdef ADRENO_200
-	    EGL_CONFIG_CAVEAT,  EGL_SLOW_CONFIG,
-#endif
             EGL_NONE
     };
     EGLint w, h, dummy;
