@@ -39,9 +39,14 @@ class AudioRecord
 {
 public:
 
+    /** Please make sure you also update audiosource_type in /frameworks/base/include/media/AudioSystem.h !  
+            to ensure that the device type updation is consistent when accessed from libaudio */
     enum stream_type {
-        DEFAULT_INPUT   =-1,
-        MIC_INPUT       = 0,
+        DEFAULT_INPUT   = 0, // Changed these value. Changed from -1 to 0 to have a standard mapping from MediaRecord to PV to MIO
+        MIC_INPUT       = 1,
+        VOICE_Tx        = 2,
+        VOICE_Rx        = 3,
+        VOICE_Tx_Rx     = 4,
         NUM_STREAM_TYPES
     };
 

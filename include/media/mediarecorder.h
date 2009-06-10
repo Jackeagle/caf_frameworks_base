@@ -35,6 +35,13 @@ typedef void (*media_completion_f)(status_t status, void *cookie);
 enum audio_source {
     AUDIO_SOURCE_DEFAULT = 0,
     AUDIO_SOURCE_MIC = 1,
+    /** Voice call Sources */
+    /** Voice Tx only */
+    AUDIO_SOURCE_VOICE_Tx = 2,
+    /** Voice Rx only */
+    AUDIO_SOURCE_VOICE_Rx = 3,
+    /** Voice Tx+Rx */
+    AUDIO_SOURCE_VOICE_Tx_Rx = 4,
 };
 
 enum video_source {

@@ -59,7 +59,8 @@ public:
                                 int channelCount,
                                 uint32_t sampleRate,
                                 status_t *status,
-                                AudioSystem::audio_in_acoustics acoustics);
+                                AudioSystem::audio_in_acoustics acoustics,
+                                int audiosourcetype); // Updated with proper defn.
 
 protected:
     virtual status_t    doRouting();

@@ -79,8 +79,8 @@ public:
                             {return mFinalInterface->setParameter(key, value);}
 
     virtual AudioStreamIn* openInputStream( int format, int channelCount, uint32_t sampleRate, status_t *status,
-                                            AudioSystem::audio_in_acoustics acoustics)
-                            {return mFinalInterface->openInputStream( format, channelCount, sampleRate, status, acoustics);}
+                                            AudioSystem::audio_in_acoustics acoustics, int audiosourcetype) // Updated Defn
+                            {return mFinalInterface->openInputStream( format, channelCount, sampleRate, status, acoustics, audiosourcetype);}
 
     virtual status_t    dump(int fd, const Vector<String16>& args) { return mFinalInterface->dumpState(fd, args); }
 

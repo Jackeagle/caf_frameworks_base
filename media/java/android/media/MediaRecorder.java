@@ -121,10 +121,21 @@ public class MediaRecorder
       /* Do not change these values without updating their counterparts
        * in include/media/mediarecorder.h!
        */
+	/** These AudioSources are also referenced wrto the enums in the
+	 pvauthorengine.cpp (extenal/opencore/engines/author/src). 
+	 Please update those if you add or remove any audio source from here*/
+	          
         private AudioSource() {}
         public static final int DEFAULT = 0;
         /** Microphone audio source */
         public static final int MIC = 1;
+	/** Voice call Sources */
+	/** Voice Tx only */
+	public static final int VOICE_Tx = 2;
+	/** Voice Rx only */
+	public static final int VOICE_Rx = 3;
+	/** Voice Tx+Rx */
+	public static final int VOICE_Tx_Rx = 4;
     }
 
     /**

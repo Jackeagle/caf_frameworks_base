@@ -70,7 +70,7 @@ struct audio_track_cblk_t
                             audio_track_cblk_t();
                 uint32_t    stepUser(uint32_t frameCount);
                 bool        stepServer(uint32_t frameCount);
-                void*       buffer(uint32_t offset) const;
+                void*       buffer(uint32_t offset, int nStreamType) const; // Change for Codec type
                 uint32_t    framesAvailable();
                 uint32_t    framesAvailable_l();
                 uint32_t    framesReady();

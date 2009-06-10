@@ -212,10 +212,13 @@ size_t AudioHardwareBase::getInputBufferSize(uint32_t sampleRate, int format, in
         LOGW("getInputBufferSize bad sampling rate: %d", sampleRate);
         return 0;
     }
-    if (format != AudioSystem::PCM_16_BIT) {
+	
+    /*if (format != AudioSystem::PCM_16_BIT) {
         LOGW("getInputBufferSize bad format: %d", format);
         return 0;
     }
+    */
+	
     if (channelCount != 1) {
         LOGW("getInputBufferSize bad channel count: %d", channelCount);
         return 0;

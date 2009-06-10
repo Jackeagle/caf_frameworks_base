@@ -16,7 +16,7 @@
 */
 
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "AudioTrack"
 
 #include <stdint.h>
@@ -665,7 +665,7 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     audioBuffer->format      = AudioSystem::PCM_16_BIT;
     audioBuffer->frameCount  = framesReq;
     audioBuffer->size = framesReq*mChannelCount*sizeof(int16_t);
-    audioBuffer->raw         = (int8_t *)cblk->buffer(u);
+    audioBuffer->raw         = (int8_t *)cblk->buffer(u, AudioSystem::PCM_16_BIT); // Change for Codec type
     active = mActive;
     return active ? status_t(NO_ERROR) : status_t(STOPPED);
 }
@@ -907,6 +907,8 @@ uint32_t audio_track_cblk_t::stepUser(uint32_t frameCount)
 {
     uint32_t u = this->user;
 
+	LOGE("audio_track_cblk_t::stepUser the framecount is %d", frameCount);
+
     u += frameCount;
     // Ensure that user is never ahead of server for AudioRecord
     if (out) {
@@ -919,11 +921,15 @@ uint32_t audio_track_cblk_t::stepUser(uint32_t frameCount)
         u = this->server;
     }
 
+	LOGE("The user framecount is %d and the userbase is %d, this framecount is %d", u, userBase, this->frameCount);
+
     if (u >= userBase + this->frameCount) {
         userBase += this->frameCount;
     }
 
     this->user = u;
+
+	LOGE("Before leaving user framecount is %d and the userbase is %d, this framecount is %d", u, userBase, this->frameCount);
 
     // Clear flow control error condition as new data has been written/read to/from buffer.
     flowControlFlag = 0;
@@ -937,6 +943,8 @@ bool audio_track_cblk_t::stepServer(uint32_t frameCount)
     // we MUST do this to protect the AudioFlinger server
     // as this lock is shared with the client.
     status_t err;
+
+	LOGE("audio_track_cblk_t::stepServer the framecount is %d", frameCount);
 
     err = lock.tryLock();
     if (err == -EBUSY) { // just wait a bit
@@ -967,17 +975,24 @@ bool audio_track_cblk_t::stepServer(uint32_t frameCount)
         }
     }
 
+	LOGE("stepServer: The server framecount is %d and loopEnd is %d, the loopstart is %d", s, loopEnd, loopStart);
+
     if (s >= loopEnd) {
         LOGW_IF(s > loopEnd, "stepServer: s %u > loopEnd %u", s, loopEnd);
+		LOGE("stepServer: The server framecount is %d and loopEnd is %d, the loopstart is %d", s, loopEnd, loopStart);
         s = loopStart;
         if (--loopCount == 0) {
             loopEnd = UINT_MAX;
             loopStart = UINT_MAX;
         }
     }
+
+	LOGE("stepServer: The THis framecount is %d and loopcount is %d", this->frameCount, loopCount);
     if (s >= serverBase + this->frameCount) {
         serverBase += this->frameCount;
     }
+
+	LOGE("stepServer: server framecount is %d, server base is %d", s, serverBase);
 
     this->server = s;
 
@@ -986,9 +1001,19 @@ bool audio_track_cblk_t::stepServer(uint32_t frameCount)
     return true;
 }
 
-void* audio_track_cblk_t::buffer(uint32_t offset) const
+void* audio_track_cblk_t::buffer(uint32_t offset, int nStreamType) const // Change for Codec type
+{
+    LOGE("THe Buffer address is %x, offset is %d, userbase is %d", this->buffers, offset, userBase);
+    // Change for Codec type
+    if ( (nStreamType == AudioSystem::PCM_16_BIT) ||
+	 (nStreamType == AudioSystem::PCM_8_BIT))
 {
     return (int16_t *)this->buffers + (offset-userBase)*this->channels;
+}
+    else if (nStreamType == AudioSystem::FORMAT_AMR_IETF)
+    {
+      return (int8_t*)this->buffers + (offset-userBase)*this->channels*32; // Change for Codec type. Full rate Frame size
+    }
 }
 
 uint32_t audio_track_cblk_t::framesAvailable()
@@ -1006,6 +1031,7 @@ uint32_t audio_track_cblk_t::framesAvailable_l()
         uint32_t limit = (s < loopStart) ? s : loopStart;
         return limit + frameCount - u;
     } else {
+        LOGE("audio_track_cblk_t::framesAvailable_l the framecount is %d, user is %d, server is %d", frameCount + u - s, u, s);
         return frameCount + u - s;
     }
 }

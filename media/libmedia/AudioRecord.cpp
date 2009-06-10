@@ -15,7 +15,7 @@
 ** limitations under the License.
 */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "AudioRecord"
 
 #include <stdint.h>
@@ -95,7 +95,8 @@ status_t AudioRecord::set(
         bool threadCanCallJava)
 {
 
-    LOGV("set(): sampleRate %d, channelCount %d, frameCount %d",sampleRate, channelCount, frameCount);
+    LOGE("AudioRecord:set(): streamtype %d, sampleRate %d, channelCount %d, frameCount %d",streamType, sampleRate, channelCount, frameCount);
+    
     if (mAudioFlinger != 0) {
         return INVALID_OPERATION;
     }
@@ -121,9 +122,10 @@ status_t AudioRecord::set(
     }
 
     // validate parameters
-    if (format != AudioSystem::PCM_16_BIT) {
+    /*if (format != AudioSystem::PCM_16_BIT) {
         return BAD_VALUE;
     }
+    */
     if (channelCount != 1 && channelCount != 2) {
         return BAD_VALUE;
     }
@@ -140,11 +142,23 @@ status_t AudioRecord::set(
             sampleRate, channelCount, format);
         return BAD_VALUE;
     }
-    int frameSizeInBytes = channelCount * (format == AudioSystem::PCM_16_BIT ? 2 : 1);
+
+    // Change for Codec type
+    int frameSizeInBytes = 0;
+
+    if (format == AudioSystem::PCM_16_BIT)
+    {
+      frameSizeInBytes = channelCount * (format == AudioSystem::PCM_16_BIT ? 2 : 1); // // Check Buffer Mech.
+    }
+    else if (format == AudioSystem::FORMAT_AMR_IETF)
+    {
+      frameSizeInBytes = channelCount * 32; // Change for Codec type, since the full rate framecount is 32 bytes
+    }
 
     // We use 2* size of input buffer for ping pong use of record buffer.
     int minFrameCount = 2 * inputBuffSizeInBytes / frameSizeInBytes;
-    LOGV("AudioRecord::set() minFrameCount = %d", minFrameCount);
+    LOGE("AudioRecord:set(): inputBuffSizeInBytes %d, frameSizeInBytes %d, minFrameCount %d",inputBuffSizeInBytes, frameSizeInBytes, minFrameCount);
+	
 
     if (frameCount == 0) {
         frameCount = minFrameCount;
@@ -155,6 +169,9 @@ status_t AudioRecord::set(
     if (notificationFrames == 0) {
         notificationFrames = frameCount/2;
     }
+
+    LOGE("AudioRecord:set(): notificationFrames %d",notificationFrames);
+    LOGE("AudioRecord:set(): Calling audioflinger->openRecord");
 
     // open record channel
     status_t status;
@@ -204,6 +221,8 @@ status_t AudioRecord::set(
     mNewPosition = 0;
     mUpdatePeriod = 0;
 
+    LOGE("AudioRecord:set(): mCblk->frameCount %d, mLatency %d",mCblk->frameCount, mLatency);
+
     return NO_ERROR;
 }
 
@@ -239,9 +258,18 @@ uint32_t AudioRecord::frameCount() const
     return mFrameCount;
 }
 
-int AudioRecord::frameSize() const
+int AudioRecord::frameSize() const // Check Buffer Mech.
+{
+    // Change for Codec type
+    if ( (format() == AudioSystem::PCM_8_BIT) ||
+	 (format() == AudioSystem::PCM_16_BIT))
 {
     return channelCount()*((format() == AudioSystem::PCM_8_BIT) ? sizeof(uint8_t) : sizeof(int16_t));
+}
+    else if (format() == AudioSystem::FORMAT_AMR_IETF)
+    {
+      return channelCount() * 32; // Change for Codec type. Full rate frame size
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -376,10 +404,13 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     audio_track_cblk_t* cblk = mCblk;
     uint32_t framesReq = audioBuffer->frameCount;
 
+    LOGE("AudioRecord::obtainBuffer framesReq %d", framesReq);
+
     audioBuffer->frameCount  = 0;
     audioBuffer->size        = 0;
 
     uint32_t framesReady = cblk->framesReady();
+    LOGE("AudioRecord::obtainBuffer framesReady %d", cblk->framesReady());
 
     if (framesReady == 0) {
         Mutex::Autolock _l(cblk->lock);
@@ -417,12 +448,18 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
 
     cblk->waitTimeMs = 0;
     
+    LOGE("AudioRecord::obtainBuffer framesReq %d and framesReady %d", framesReq, framesReady);
+    
     if (framesReq > framesReady) {
         framesReq = framesReady;
     }
 
+	LOGE("AudioRecord::obtainBuffer framesReq %d and framesReady %d", framesReq, framesReady);
+
     uint32_t u = cblk->user;
     uint32_t bufferEnd = cblk->userBase + cblk->frameCount;
+
+	LOGE("AudioRecord::obtainBuffer user %d, userbase %d, framecount %d and bufferEnd %d", u, cblk->userBase, cblk->frameCount, bufferEnd);
 
     if (u + framesReq > bufferEnd) {
         framesReq = bufferEnd - u;
@@ -432,8 +469,25 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     audioBuffer->channelCount= mChannelCount;
     audioBuffer->format      = mFormat;
     audioBuffer->frameCount  = framesReq;
+    // Change for Codec type
+    if (mFormat == AudioSystem::PCM_16_BIT)
+    {
     audioBuffer->size        = framesReq*mChannelCount*sizeof(int16_t);
-    audioBuffer->raw         = (int8_t*)cblk->buffer(u);
+    }
+    else if (mFormat == AudioSystem::FORMAT_AMR_IETF)
+    {
+      if (framesReq >= 10)
+      {
+        audioBuffer->size        = framesReq*mChannelCount*32; // Change for Codec type. Full rate frame size
+      }
+	  else
+	  {
+	    LOGE("The buffer ready count less than the minimum. SO dont expect any data");
+	    audioBuffer->size = 0;	    
+	  }
+    }
+		
+    audioBuffer->raw         = (int8_t*)cblk->buffer(u, mFormat); // Change for Codec type
     active = mActive;
     return active ? status_t(NO_ERROR) : status_t(STOPPED);
 }
@@ -441,6 +495,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
 void AudioRecord::releaseBuffer(Buffer* audioBuffer)
 {
     audio_track_cblk_t* cblk = mCblk;
+	LOGE("AudioRecord::releaseBuffer calling stepuser %d", audioBuffer->frameCount);
     cblk->stepUser(audioBuffer->frameCount);
 }
 
@@ -459,11 +514,22 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
         return BAD_VALUE;
     }
 
-    LOGV("read size: %d", userSize);
-
     do {
 
-        audioBuffer.frameCount = userSize/mChannelCount/sizeof(int16_t);
+	LOGE("AudioRecord::read(buffer=%p, size%d",
+					buffer, userSize);
+
+	// Change for Codec type
+	if (mFormat == AudioSystem::PCM_16_BIT)
+	{
+          audioBuffer.frameCount = userSize/mChannelCount/sizeof(int16_t); // Check Buffer Mech.
+	}
+	else if (mFormat == AudioSystem::FORMAT_AMR_IETF)
+	{
+	  audioBuffer.frameCount = userSize/mChannelCount/32; // Change for Codec type. Full rate frame size
+	}
+
+	LOGE("AudioRecord::read frameCount: %d", audioBuffer.frameCount);
 
         // Calling obtainBuffer() with a negative wait count causes
         // an (almost) infinite wait time.
@@ -478,11 +544,29 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
         size_t bytesRead = audioBuffer.size;
         memcpy(dst, audioBuffer.i8, bytesRead);
 
+		LOGE("AudioRecord::read buffer size read size%d",
+					bytesRead);
+
+		LOGE("AudioRecord::read buffer dst is %d, userSize is %d, read %d",
+							dst, userSize, read);
+
         dst += bytesRead;
         userSize -= bytesRead;
         read += bytesRead;
 
+		LOGE("AudioRecord::read buffer dst is %d, userSize is %d, read %d",
+							dst, userSize, read);
+
         releaseBuffer(&audioBuffer);
+
+	// for Voice Memo driver
+	if ( (mFormat == AudioSystem::FORMAT_AMR_IETF) &&
+	     (userSize < 320)) // if the read is less than the required minimum buffer size
+	{
+	  LOGE("Breaking out of the read loop, since the minimum buffer count for read is missed %d", read);
+	  break;
+	}
+	
     } while (userSize);
 
     return read;
@@ -543,7 +627,16 @@ bool AudioRecord::processAudioBuffer(const sp<ClientRecordThread>& thread)
         if (readSize > reqSize) readSize = reqSize;
 
         audioBuffer.size = readSize;
+	
+        // Change for Codec type
+	if (mFormat == AudioSystem::PCM_16_BIT)
+	{
         audioBuffer.frameCount = readSize/mChannelCount/sizeof(int16_t);
+	}
+	else if (mFormat == AudioSystem::FORMAT_AMR_IETF)
+	{
+	  audioBuffer.frameCount = readSize/mChannelCount/32; 	// Change for Codec type. Full rate frame size
+   	}
         frames -= audioBuffer.frameCount;
 
         releaseBuffer(&audioBuffer);

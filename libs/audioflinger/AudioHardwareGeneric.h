@@ -70,7 +70,8 @@ public:
             int format,
             int channelCount,
             uint32_t sampleRate,
-            AudioSystem::audio_in_acoustics acoustics);
+            AudioSystem::audio_in_acoustics acoustics,
+            int audiosourcetype); // Added source defn.
 
     uint32_t    sampleRate() const { return 8000; }
     virtual size_t      bufferSize() const { return 320; }
@@ -116,7 +117,8 @@ public:
             int channelCount,
             uint32_t sampleRate,
             status_t *status,
-            AudioSystem::audio_in_acoustics acoustics);
+            AudioSystem::audio_in_acoustics acoustics,
+            int audiosourcetype);
 
             void            closeOutputStream(AudioStreamOutGeneric* out);
             void            closeInputStream(AudioStreamInGeneric* in);
