@@ -289,6 +289,10 @@ public class StkService extends Handler implements AppInterface {
                     0, null);
             }
             break;
+        case SET_UP_EVENT_LIST:
+            sendTerminalResponse(cmdParams.cmdDet, ResultCode.OK, false,
+                                      0, null);
+            break;
         case LAUNCH_BROWSER:
         case SELECT_ITEM:
         case GET_INPUT:
@@ -440,7 +444,7 @@ public class StkService extends Handler implements AppInterface {
     }
 
     private void eventDownload(int event, int sourceId, int destinationId,
-            byte[] additionalInfo, boolean oneShot) {
+            int additionalInfo,boolean addedInfo, boolean oneShot) {
 
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
 
@@ -464,11 +468,20 @@ public class StkService extends Handler implements AppInterface {
         buf.write(sourceId); // source device id
         buf.write(destinationId); // destination device id
 
+        if (event == SetEventList.BROWSER_TERMINATION_EVENT.value()) {
+        tag = 0x80 | ComprehensionTlvTag.BROWSER_TERMINATION_CAUSE.value();
+        buf.write(tag);
+        buf.write(0x01);
+        //For Browser Termination it expects 1 byte
         // additional information
-        if (additionalInfo != null) {
-            for (byte b : additionalInfo) {
-                buf.write(b);
-            }
+        //  if (additionalInfo != null) {
+        //  This is a place holder for other set_event_list events.
+        //   for (byte b : additionalInfo) {
+        //     buf.write(b);
+        // }
+        // }
+        if (addedInfo)
+         buf.write(additionalInfo);
         }
 
         byte[] rawData = buf.toByteArray();
@@ -657,6 +670,9 @@ public class StkService extends Handler implements AppInterface {
                 // invoked by the CommandInterface call above. 
                 mCurrntCmd = null;
                 return;
+            case SET_UP_EVENT_LIST:
+                 eventDownload(resMsg.eventValue,DEV_ID_TERMINAL,DEV_ID_UICC,resMsg.addedInfo,true,false);
+                break;
             }
             break;
         case NO_RESPONSE_FROM_USER:
