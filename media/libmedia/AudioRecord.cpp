@@ -95,7 +95,7 @@ status_t AudioRecord::set(
         bool threadCanCallJava)
 {
 
-    LOGE("AudioRecord:set(): streamtype %d, sampleRate %d, channelCount %d, frameCount %d",streamType, sampleRate, channelCount, frameCount);
+    LOGV("AudioRecord:set(): streamtype %d, sampleRate %d, channelCount %d, frameCount %d",streamType, sampleRate, channelCount, frameCount);
     
     if (mAudioFlinger != 0) {
         return INVALID_OPERATION;
@@ -157,8 +157,6 @@ status_t AudioRecord::set(
 
     // We use 2* size of input buffer for ping pong use of record buffer.
     int minFrameCount = 2 * inputBuffSizeInBytes / frameSizeInBytes;
-    LOGE("AudioRecord:set(): inputBuffSizeInBytes %d, frameSizeInBytes %d, minFrameCount %d",inputBuffSizeInBytes, frameSizeInBytes, minFrameCount);
-	
 
     if (frameCount == 0) {
         frameCount = minFrameCount;
@@ -169,9 +167,6 @@ status_t AudioRecord::set(
     if (notificationFrames == 0) {
         notificationFrames = frameCount/2;
     }
-
-    LOGE("AudioRecord:set(): notificationFrames %d",notificationFrames);
-    LOGE("AudioRecord:set(): Calling audioflinger->openRecord");
 
     // open record channel
     status_t status;
@@ -220,8 +215,6 @@ status_t AudioRecord::set(
     mMarkerReached = false;
     mNewPosition = 0;
     mUpdatePeriod = 0;
-
-    LOGE("AudioRecord:set(): mCblk->frameCount %d, mLatency %d",mCblk->frameCount, mLatency);
 
     return NO_ERROR;
 }
@@ -404,13 +397,10 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     audio_track_cblk_t* cblk = mCblk;
     uint32_t framesReq = audioBuffer->frameCount;
 
-    LOGE("AudioRecord::obtainBuffer framesReq %d", framesReq);
-
     audioBuffer->frameCount  = 0;
     audioBuffer->size        = 0;
 
     uint32_t framesReady = cblk->framesReady();
-    LOGE("AudioRecord::obtainBuffer framesReady %d", cblk->framesReady());
 
     if (framesReady == 0) {
         Mutex::Autolock _l(cblk->lock);
@@ -448,18 +438,12 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
 
     cblk->waitTimeMs = 0;
     
-    LOGE("AudioRecord::obtainBuffer framesReq %d and framesReady %d", framesReq, framesReady);
-    
     if (framesReq > framesReady) {
         framesReq = framesReady;
     }
 
-	LOGE("AudioRecord::obtainBuffer framesReq %d and framesReady %d", framesReq, framesReady);
-
     uint32_t u = cblk->user;
     uint32_t bufferEnd = cblk->userBase + cblk->frameCount;
-
-	LOGE("AudioRecord::obtainBuffer user %d, userbase %d, framecount %d and bufferEnd %d", u, cblk->userBase, cblk->frameCount, bufferEnd);
 
     if (u + framesReq > bufferEnd) {
         framesReq = bufferEnd - u;
@@ -482,7 +466,6 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
       }
 	  else
 	  {
-	    LOGE("The buffer ready count less than the minimum. SO dont expect any data");
 	    audioBuffer->size = 0;	    
 	  }
     }
@@ -495,7 +478,6 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
 void AudioRecord::releaseBuffer(Buffer* audioBuffer)
 {
     audio_track_cblk_t* cblk = mCblk;
-	LOGE("AudioRecord::releaseBuffer calling stepuser %d", audioBuffer->frameCount);
     cblk->stepUser(audioBuffer->frameCount);
 }
 
@@ -516,9 +498,6 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
 
     do {
 
-	LOGE("AudioRecord::read(buffer=%p, size%d",
-					buffer, userSize);
-
 	// Change for Codec type
 	if (mFormat == AudioSystem::PCM_16_BIT)
 	{
@@ -528,8 +507,6 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
 	{
 	  audioBuffer.frameCount = userSize/mChannelCount/32; // Change for Codec type. Full rate frame size
 	}
-
-	LOGE("AudioRecord::read frameCount: %d", audioBuffer.frameCount);
 
         // Calling obtainBuffer() with a negative wait count causes
         // an (almost) infinite wait time.
@@ -544,18 +521,9 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
         size_t bytesRead = audioBuffer.size;
         memcpy(dst, audioBuffer.i8, bytesRead);
 
-		LOGE("AudioRecord::read buffer size read size%d",
-					bytesRead);
-
-		LOGE("AudioRecord::read buffer dst is %d, userSize is %d, read %d",
-							dst, userSize, read);
-
         dst += bytesRead;
         userSize -= bytesRead;
         read += bytesRead;
-
-		LOGE("AudioRecord::read buffer dst is %d, userSize is %d, read %d",
-							dst, userSize, read);
 
         releaseBuffer(&audioBuffer);
 

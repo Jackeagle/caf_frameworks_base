@@ -1614,8 +1614,6 @@ AudioFlinger::MixerThread::TrackBase::TrackBase(
        size += bufferSize;
    }
 
-   LOGE("MixerThread::TrackBase::TrackBase bufferSize is %d bytes with Framecount %d", bufferSize, frameCount);
-
    if (client != NULL) {
         mCblkMemory = client->heap()->allocate(size);
         if (mCblkMemory != 0) {
@@ -1646,7 +1644,6 @@ AudioFlinger::MixerThread::TrackBase::TrackBase(
                     mBuffer = sharedBuffer->pointer();
                 }
                 mBufferEnd = (uint8_t *)mBuffer + bufferSize;
-		LOGE("The Buffer start is %x and end is %x", mBuffer, mBufferEnd);
             }
         } else {
             LOGE("not enough memory for AudioTrack size=%u", size);
@@ -1682,7 +1679,6 @@ AudioFlinger::MixerThread::TrackBase::~TrackBase()
 
 void AudioFlinger::MixerThread::TrackBase::releaseBuffer(AudioBufferProvider::Buffer* buffer)
 {
-    LOGE("AudioFlinger::MixerThread::TrackBase::releaseBuffer with buffer framecount %d", buffer->frameCount);
     buffer->raw = 0;
     mFrameCount = buffer->frameCount;
     step();
@@ -1692,8 +1688,6 @@ void AudioFlinger::MixerThread::TrackBase::releaseBuffer(AudioBufferProvider::Bu
 bool AudioFlinger::MixerThread::TrackBase::step() {
     bool result;
     audio_track_cblk_t* cblk = this->cblk();
-
-    LOGE("AudioFlinger::MixerThread::TrackBase::step stepping the server with buffer framecount %d", mFrameCount);
 
     result = cblk->stepServer(mFrameCount);
     if (!result) {
@@ -1728,14 +1722,12 @@ int AudioFlinger::MixerThread::TrackBase::channelCount() const {
 }
 
 void* AudioFlinger::MixerThread::TrackBase::getBuffer(uint32_t offset, uint32_t frames) const {
-    LOGE("AudioFlinger::MixerThread::TrackBase::getBuffer with offset %d, frames %d", offset, frames);
     audio_track_cblk_t* cblk = this->cblk();
 
     // Calculate Buffer size according to Codec type
     if ( (mFormat == AudioSystem::PCM_16_BIT) ||
  		     (mFormat == AudioSystem::PCM_8_BIT))
     {
-      LOGE("We are inside PCM_16");
     int16_t *bufferStart = (int16_t *)mBuffer + (offset-cblk->serverBase)*cblk->channels;
     int16_t *bufferEnd = bufferStart + frames * cblk->channels;
 
@@ -1762,11 +1754,6 @@ void* AudioFlinger::MixerThread::TrackBase::getBuffer(uint32_t offset, uint32_t 
       
       bufferStart = (int8_t *)mBuffer + (offset-cblk->serverBase)*cblk->channels*32; // Change for Codec type (Full Rate FRame size)
       bufferEnd = bufferStart + frames * cblk->channels * 32;
-
-      LOGW("TrackBase::getBuffer buffer start: %p, end %p , mBuffer %p mBufferEnd %p\n    \
-                server %d, serverBase %d, user %d, userBase %d",
-                bufferStart, bufferEnd, mBuffer, mBufferEnd,
-                cblk->server, cblk->serverBase, cblk->user, cblk->userBase);
 
       // Check validity of returned pointer in case the track control block would have been corrupted.
       if (bufferStart < mBuffer || bufferStart > bufferEnd || bufferEnd > mBufferEnd || 
@@ -1859,13 +1846,10 @@ status_t AudioFlinger::MixerThread::Track::getNextBuffer(AudioBufferProvider::Bu
      }
 
      framesReady = cblk->framesReady();
-     LOGE("AudioFlinger::MixerThread::Track::getNextBuffer framesReady %d", framesReady);
 
      if (LIKELY(framesReady)) {
         uint32_t s = cblk->server;
         uint32_t bufferEnd = cblk->serverBase + cblk->frameCount;
-
-	LOGE("AudioFlinger::MixerThread::Track::getNextBuffer server %d, serverbase %d, framecount %d", s, cblk->serverBase, cblk->frameCount);
 
         bufferEnd = (cblk->loopEnd < bufferEnd) ? cblk->loopEnd : bufferEnd;
         if (framesReq > framesReady) {
@@ -2010,8 +1994,6 @@ status_t AudioFlinger::MixerThread::RecordTrack::getNextBuffer(AudioBufferProvid
     uint32_t framesAvail;
     uint32_t framesReq = buffer->frameCount;
 
-    LOGE("AudioFlinger::MixerThread::Track::getNextBuffer framesReq %d", framesReq);
-
      // Check if last stepServer failed, try to step now
     if (mFlags & TrackBase::STEPSERVER_FAILED) {
         if (!step()) goto getNextBuffer_exit;
@@ -2020,14 +2002,10 @@ status_t AudioFlinger::MixerThread::RecordTrack::getNextBuffer(AudioBufferProvid
     }
 
     framesAvail = cblk->framesAvailable_l();
-    LOGE("AudioFlinger::MixerThread::RecordTrack::getNextBuffer framesAvail %d", framesAvail);
 
     if (LIKELY(framesAvail)) {
         uint32_t s = cblk->server;
         uint32_t bufferEnd = cblk->serverBase + cblk->frameCount;
-
-	LOGE("AudioFlinger::MixerThread::Track::getNextBuffer server %d, serverbase %d, framecount %d", s, cblk->serverBase, cblk->frameCount);
-
 
         if (framesReq > framesAvail) {
             framesReq = framesAvail;
@@ -2343,7 +2321,7 @@ sp<IAudioRecord> AudioFlinger::openRecord(
     status_t lStatus;
 
     // check calling permissions
-    LOGE("AudioFlinger::openRecord -> StreamType %d, samplerate %d, framecount %d",streamType, sampleRate, frameCount);
+    LOGI("AudioFlinger::openRecord -> StreamType %d, samplerate %d, framecount %d",streamType, sampleRate, frameCount);
     if (!recordingAllowed()) {
         lStatus = PERMISSION_DENIED;
         goto Exit;
@@ -2376,7 +2354,6 @@ sp<IAudioRecord> AudioFlinger::openRecord(
         goto Exit;
     }
 
-    LOGE("AudioFlinger::openRecord -> inputbuffersize %d",inputBufferSize);
 
     // add client to list
     { // scope for mLock
@@ -2404,7 +2381,6 @@ sp<IAudioRecord> AudioFlinger::openRecord(
 
         frameCount = ((frameCount - 1)/inFrameCount + 1) * inFrameCount;
     
-        LOGE("AudioFlinger::openRecord -> framecount %d",frameCount);
         // create new record track. The record track uses one track in mHardwareMixerThread by convention.
         recordTrack = new MixerThread::RecordTrack(mHardwareMixerThread, client, streamType, sampleRate,
                                                    format, channelCount, frameCount, flags);
@@ -2521,7 +2497,6 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
                     if (input != 0) {
                         inBufferSize = input->bufferSize();
                         inFrameCount = inBufferSize/input->frameSize();                        
-			                  LOGE("AudioRecordThread  Opened the stream: InputBuffersize %d, input->frameSize %d", inBufferSize, input->frameSize());
                     }
                 } else {
                     mStartStatus = NO_INIT;
@@ -2536,7 +2511,6 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
             mLock.unlock();
         } else if (mRecordTrack != 0) {
 
-            LOGE("Calling GetNextBuffer framecount is %d", inFrameCount);
             buffer.frameCount = inFrameCount;
             if (LIKELY(mRecordTrack->getNextBuffer(&buffer) == NO_ERROR))
             {
@@ -2547,17 +2521,13 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
                 if (((int) buffer.frameCount != inFrameCount) &&
 					  (mRecordTrack->format() == AudioSystem::FORMAT_AMR_IETF))
                 {
-                  LOGE("AudioRecordThread read: %d frames and size is %d", buffer.frameCount, 
-				  	                                                     buffer.frameCount * 32);
                   bytesRead = input->read(buffer.raw, buffer.frameCount * 32);                
                 }
 				else
 				{
-                  LOGE("AudioRecordThread read: %d frames and size is %d", buffer.frameCount, inBufferSize);
                   bytesRead = input->read(buffer.raw, inBufferSize);
 				}
 				
-                LOGE("AudioRecordThread read: read %d bytes ", bytesRead); 
                 if (bytesRead < 0) {
                     LOGE("Error reading audio input");
                     sleep(1);
@@ -2568,9 +2538,7 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
 			(bytesRead < inBufferSize) &&
 		     (mRecordTrack->format() == AudioSystem::FORMAT_AMR_IETF))
 		{
-		  LOGE("Updating the framecount, so that it reflects the actual frames read from the HAL");
 		  buffer.frameCount = bytesRead / 32; // frame size of the FULL rate AMRNB
-		  LOGE("Updating the framecount, and the value is %d", buffer.frameCount);
 		}
 
                 mRecordTrack->releaseBuffer(&buffer);
