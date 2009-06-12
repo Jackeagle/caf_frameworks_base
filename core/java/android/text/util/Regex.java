@@ -85,7 +85,7 @@ public class Regex {
             + "|(?:mil|mobi|museum|m[acdghklmnopqrstuvwxyz])"
             + "|(?:name|net|n[acefgilopruz])"
             + "|(?:org|om)"
-            + "|(?:zzz)"
+            + "|(?:zzz|ccc)"
             + "|(?:pro|p[aefghklmnrstwy])"
             + "|qa"
             + "|r[eouw]"
