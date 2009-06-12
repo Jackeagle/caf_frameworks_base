@@ -1731,7 +1731,7 @@ void* AudioFlinger::MixerThread::TrackBase::getBuffer(uint32_t offset, uint32_t 
     int16_t *bufferStart = (int16_t *)mBuffer + (offset-cblk->serverBase)*cblk->channels;
     int16_t *bufferEnd = bufferStart + frames * cblk->channels;
 
-      LOGW("TrackBase::getBuffer buffer start: %p, end %p , mBuffer %p mBufferEnd %p\n    \
+    LOGV("TrackBase::getBuffer buffer start: %p, end %p , mBuffer %p mBufferEnd %p\n    \
                 server %d, serverBase %d, user %d, userBase %d",
                 bufferStart, bufferEnd, mBuffer, mBufferEnd,
                 cblk->server, cblk->serverBase, cblk->user, cblk->userBase);
