@@ -172,11 +172,14 @@ final class ServiceStateTracker extends Handler
     private String curSpn = null;
     private String curPlmn = null;
     private int curSpnRule = 0;
+    boolean registeredFirstTime = false; 
 
     //***** Constants
 
     static final boolean DBG = true;
     static final String LOG_TAG = "GSM";
+    static final String EONS_TAG = "EONS"; 
+    static final int EONS_ALG = 0x01; 
 
     // signal strength poll rate
     static final int POLL_PERIOD_MILLIS = 20 * 1000;
@@ -644,16 +647,32 @@ final class ServiceStateTracker extends Handler
         }
     }
 
+    /*Need to call updateSpnDisplay after processing EF files.  
+     *Since it is a private function, writing a wrapper for it*/  
+    public void updateSpnDisplayWrapper() {  
+        updateSpnDisplay();
+    }  
+
     //***** Private Instance Methods
+
 
     private void updateSpnDisplay() {
         int rule = phone.mSIMRecords.getDisplayRule(ss.getOperatorNumeric());
+        /*Added for EONS alg*/  
+        String pnn = phone.mSIMRecords.getPnnLongName();  
+
         String spn = phone.mSIMRecords.getServiceProviderName();
         String plmn = ss.getOperatorAlphaLong();
+        if ((phone.mSIMRecords.getOnsAlg() == EONS_ALG) && (pnn != null)) {  
+            plmn = pnn;  
+        }  
 
         if (rule != curSpnRule
                 || !TextUtils.equals(spn, curSpn)
                 || !TextUtils.equals(plmn, curPlmn)) {
+            Log.d(EONS_TAG,  
+            "updateSpnDisplay:" + " spn=" + spn + " plmn=" + plmn);  
+
             boolean showSpn =
                 (rule & SIMRecords.SPN_RULE_SHOW_SPN) == SIMRecords.SPN_RULE_SHOW_SPN;
             boolean showPlmn =
@@ -969,6 +988,17 @@ final class ServiceStateTracker extends Handler
         newSS.setStateOutOfService();
 
         GsmCellLocation tcl = cellLoc;
+        /* 
+        *Update all cached sim records when LAC has changed  
+        */  
+        if (cellLoc.getLac() != newCellLoc.getLac()) {  
+        if(phone.mSIMRecords.getOnsAlg() == EONS_ALG) {  
+        Log.d(EONS_TAG,  
+        "LOC updated calling updateSimRecords()");  
+        phone.mSIMRecords.updateSimRecords();  
+        }  
+        }  
+
         cellLoc = newCellLoc;
         newCellLoc = tcl;
 
