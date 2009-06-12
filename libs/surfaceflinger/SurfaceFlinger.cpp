@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#define LOG_NIDEBUG 0
+
 #define LOG_TAG "SurfaceFlinger"
 
 #include <stdlib.h>
@@ -1052,7 +1054,7 @@ void SurfaceFlinger::debugShowFPS() const
     nsecs_t diff = now - mLastFpsTime;
     if (diff > ms2ns(250)) {
         mFps =  ((mFrameCount - mLastFrameCount) * float(s2ns(1))) / diff;
-	LOGD("Frames Per Second: %.4f", mFps);
+        LOGI("Frames Per Second: %.4f", mFps);
         mLastFpsTime = now;
         mLastFrameCount = mFrameCount;
     }
