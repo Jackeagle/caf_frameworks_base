@@ -36,6 +36,10 @@ ifneq (, $(filter qsd8250_surf qsd8250_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DQCOM_SCORPION -DSURF8K
 endif
 
+ifneq (, $(filter msm7627_surf msm7627_ffa, $(TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DSURF7X2X
+endif
+
 ifeq ($(TARGET_PRODUCT),msm7201a_surf msm7201a_ffa)
     LOCAL_CFLAGS += -DFEATURE_7K_PMEM
 endif
