@@ -58,8 +58,6 @@ else
     LOCAL_CFLAGS += -I$(LOCAL_PATH)/../../../../bionic/libc/private
 endif
 
-LOCAL_CFLAGS += -fvisibility=hidden
-
 ifneq (, $(filter msm7630_surf msm7630_ffa qsd8250_surf qsd8250_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DCOPROC_TLS=1
 endif
