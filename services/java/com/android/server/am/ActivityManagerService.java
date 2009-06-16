@@ -16,6 +16,8 @@
 
 package com.android.server.am;
 
+import com.android.internal.telephony.gsm.stk.AppInterface;
+
 import com.android.internal.os.BatteryStatsImpl;
 import com.android.internal.os.RuntimeInit;
 import com.android.server.IntentResolver;
@@ -3170,6 +3172,15 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         if (intent != null && intent.hasFileDescriptors()) {
             throw new IllegalArgumentException("File descriptors passed in Intent");
         }
+        /* When an activity starts send the screen busy signal to Stk app */
+        int top = mHistory.size() - 1;
+        if (top >= 0) {
+           HistoryRecord p = (HistoryRecord)mHistory.get(top);
+           if (p.intent.hasCategory(Intent.CATEGORY_HOME)) {
+              Intent StkIntent = new Intent(AppInterface.STK_BUSY_SCREEN_ACTION);
+              mContext.sendBroadcast(StkIntent);
+           }
+        }
 
         final boolean componentSpecified = intent.getComponent() != null;
         
@@ -3633,6 +3644,18 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         return r;
     }
 
+    /* Checks for the last activity.If it was home then send an intent to stk */
+    private void checkScreenIdle() {
+       int top = mHistory.size() - 1;
+       if (top >= 0) {
+          HistoryRecord p = (HistoryRecord)mHistory.get(top - 1);
+          if (p.intent.hasCategory(Intent.CATEGORY_HOME)) {
+             Intent StkIntent = new Intent(AppInterface.STK_IDLE_SCREEN_ACTION);
+             mContext.sendBroadcast(StkIntent);
+          }
+       }
+    }
+
     /**
      * This is the internal entry point for handling Activity.finish().
      * 
@@ -3644,6 +3667,9 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
      */
     public final boolean finishActivity(IBinder token, int resultCode, Intent resultData) {
         // Refuse possible leaked file descriptors
+        // When an activity ends check if the top is home activity.
+        checkScreenIdle();
+
         if (resultData != null && resultData.hasFileDescriptors() == true) {
             throw new IllegalArgumentException("File descriptors passed in Intent");
         }
@@ -6375,6 +6401,8 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
      */
     private final boolean moveTaskToBackLocked(int task) {
         Log.i(TAG, "moveTaskToBack: " + task);
+        // When an activity is moved to back check if the top is home activity.
+        checkScreenIdle();
         
         // If we have a watcher, preflight the move before committing to it.  First check
         // for *other* available tasks, but if none are available, then try again allowing the

@@ -31,10 +31,19 @@ public interface AppInterface {
                                     "android.intent.action.stk.command";
     public static final String STK_SESSION_END_ACTION = 
                                     "android.intent.action.stk.session_end";
+
+    // This is broadcasted from the BrowserActivity when the browser exits
     public static final String STK_TERMINATE_ACTION =
                                     "android.intent.action.stk.terminate";
 
-    
+    //These are broadcasted from the ActivityManagerService when the screen
+    // switches to idle or busy state
+    public static final String STK_IDLE_SCREEN_ACTION =
+                                    "android.intent.action.stk.idle_screen";
+    public static final String STK_BUSY_SCREEN_ACTION =
+                                    "android.intent.action.stk.busy_screen";
+
+
     /* 
      * Callback function from app to telephony to pass a result code and user's
      * input back to the SIM.
