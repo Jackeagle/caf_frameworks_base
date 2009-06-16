@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -94,7 +95,7 @@ void AudioHardwareGeneric::closeOutputStream(AudioStreamOutGeneric* out) {
 
 AudioStreamIn* AudioHardwareGeneric::openInputStream(
         int format, int channelCount, uint32_t sampleRate, status_t *status,
-        AudioSystem::audio_in_acoustics acoustics)
+        AudioSystem::audio_in_acoustics acoustics, int audiosourcetype)
 {
     AutoMutex lock(mLock);
 
@@ -108,7 +109,7 @@ AudioStreamIn* AudioHardwareGeneric::openInputStream(
 
     // create new output stream
     AudioStreamInGeneric* in = new AudioStreamInGeneric();
-    status_t lStatus = in->set(this, mFd, format, channelCount, sampleRate, acoustics);
+    status_t lStatus = in->set(this, mFd, format, channelCount, sampleRate, acoustics, audiosourcetype);
     if (status) {
         *status = lStatus;
     }
@@ -248,10 +249,11 @@ status_t AudioStreamInGeneric::set(
         int format,
         int channels,
         uint32_t rate,
-        AudioSystem::audio_in_acoustics acoustics)
+        AudioSystem::audio_in_acoustics acoustics,
+        int audiosourcetype)  // Added audiosource type
 {
     // FIXME: remove logging
-    LOGD("AudioStreamInGeneric::set(%p, %d, %d, %d, %u)", hw, fd, format, channels, rate);
+    LOGD("AudioStreamInGeneric::set(%p, %d, %d, %d, %u, %d)", hw, fd, format, channels, rate, audiosourcetype);
     // check values
     if ((format != AudioSystem::PCM_16_BIT) ||
             (channels != channelCount()) ||

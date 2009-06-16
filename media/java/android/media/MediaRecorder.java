@@ -122,10 +122,19 @@ public class MediaRecorder
       /* Do not change these values without updating their counterparts
        * in include/media/mediarecorder.h!
        */
+     /** These AudioSources are also referenced wrto the enums in the
+         pvauthorengine.cpp (extenal/opencore/engines/author/src). 
+         Please update those if you add or remove any audio source from here*/
+          
         private AudioSource() {}
         public static final int DEFAULT = 0;
         /** Microphone audio source */
         public static final int MIC = 1;
+        /** Voice call Sources */
+        /** Voice Rx only */
+        public static final int VOICE_Rx = 2;
+        /** Voice Tx+Rx */
+        public static final int VOICE_Tx_Rx = 3;
     }
 
     /**
@@ -158,6 +167,8 @@ public class MediaRecorder
         public static final int MPEG_4 = 2;
         /** Raw AMR file format */
         public static final int RAW_AMR = 3;
+        /** QCP file format */
+        public static final int QCP = 4;
     };
 
     /**
@@ -173,6 +184,10 @@ public class MediaRecorder
         /** AMR (Narrowband) audio codec */
         public static final int AMR_NB = 1;
         //public static final AAC = 2;  currently unsupported
+        /** EVRC audio codec */
+        public static final int EVRC = 2;
+        /** QCELP audio codec */
+        public static final int QCELP =3;
     }
 
     /**

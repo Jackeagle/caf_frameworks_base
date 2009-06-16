@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +60,8 @@ public:
                                 int channelCount,
                                 uint32_t sampleRate,
                                 status_t *status,
-                                AudioSystem::audio_in_acoustics acoustics);
+                                AudioSystem::audio_in_acoustics acoustics,
+                                int audiosourcetype); // updated with proper defn.
 
 protected:
     virtual status_t    doRouting();

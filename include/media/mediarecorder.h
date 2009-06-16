@@ -1,5 +1,6 @@
 /*
  ** Copyright (C) 2008 The Android Open Source Project
+ ** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  **
  ** Licensed under the Apache License, Version 2.0 (the "License");
  ** you may not use this file except in compliance with the License.
@@ -35,6 +36,11 @@ typedef void (*media_completion_f)(status_t status, void *cookie);
 enum audio_source {
     AUDIO_SOURCE_DEFAULT = 0,
     AUDIO_SOURCE_MIC = 1,
+    /** Voice call Sources */
+    /** Voice Rx only */
+    AUDIO_SOURCE_VOICE_Rx = 2,
+    /** Voice Tx+Rx */
+    AUDIO_SOURCE_VOICE_Tx_Rx = 3,
 };
 
 enum video_source {
@@ -48,12 +54,15 @@ enum output_format {
     OUTPUT_FORMAT_THREE_GPP,
     OUTPUT_FORMAT_MPEG_4,
     OUTPUT_FORMAT_RAW_AMR,
+    OUTPUT_FOMRAT_QCP, // QCP file format
     OUTPUT_FORMAT_LIST_END // must be last - used to validate format type
 };
 
 enum audio_encoder {
     AUDIO_ENCODER_DEFAULT = 0,
     AUDIO_ENCODER_AMR_NB = 1,
+    AUDIO_ENCODER_EVRC = 2, // QCELP / EVRC support
+    AUDIO_ENCODER_QCELP = 3,
 };
 
 enum video_encoder {

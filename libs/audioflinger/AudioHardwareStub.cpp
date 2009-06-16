@@ -58,10 +58,10 @@ AudioStreamOut* AudioHardwareStub::openOutputStream(
 
 AudioStreamIn* AudioHardwareStub::openInputStream(
         int format, int channelCount, uint32_t sampleRate,
-        status_t *status, AudioSystem::audio_in_acoustics acoustics)
+        status_t *status, AudioSystem::audio_in_acoustics acoustics, int audiosourcetype)
 {
     AudioStreamInStub* in = new AudioStreamInStub();
-    status_t lStatus = in->set(format, channelCount, sampleRate, acoustics);
+    status_t lStatus = in->set(format, channelCount, sampleRate, acoustics, audiosourcetype);
     if (status) {
         *status = lStatus;
     }
@@ -145,7 +145,8 @@ status_t AudioStreamOutStub::dump(int fd, const Vector<String16>& args)
 // ----------------------------------------------------------------------------
 
 status_t AudioStreamInStub::set(int format, int channels, uint32_t rate,
-				AudioSystem::audio_in_acoustics acoustics)
+                                AudioSystem::audio_in_acoustics acoustics,
+                                int audiosourcetype)
 {
     if ((format == AudioSystem::PCM_16_BIT) &&
             (channels == channelCount()) &&
