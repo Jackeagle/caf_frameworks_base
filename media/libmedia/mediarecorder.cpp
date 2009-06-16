@@ -34,7 +34,8 @@ status_t MediaRecorder::setCamera(const sp<ICamera>& camera)
         LOGE("media recorder is not initialized yet");
         return INVALID_OPERATION;
     }
-    if (!(mCurrentState & MEDIA_RECORDER_IDLE)) {
+    if (!( (mCurrentState & MEDIA_RECORDER_IDLE) || 
+           (mCurrentState & MEDIA_RECORDER_INITIALIZED) )) {
         LOGE("setCamera called in an invalid state(%d)", mCurrentState);
         return INVALID_OPERATION;
     }
