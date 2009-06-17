@@ -662,21 +662,9 @@ public class AudioManager {
         // Don't disable A2DP when turning off SCO.
         // A2DP does not affect in-call routing.
 
-        setRouting(MODE_NORMAL,
-                on ? ROUTE_BLUETOOTH_SCO:
-                        ((getRouting(MODE_NORMAL) & ROUTE_BLUETOOTH_SCO) ==  0 ? getRouting(MODE_NORMAL) : ROUTE_EARPIECE)
-                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
-        setRouting(MODE_RINGTONE,
-                on ? ROUTE_BLUETOOTH_SCO:
-                        ((getRouting(MODE_RINGTONE) & ROUTE_BLUETOOTH_SCO) == 0 ? getRouting(MODE_RINGTONE) : ROUTE_EARPIECE)
-                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
-        setRouting(MODE_IN_CALL,
-                on ? ROUTE_BLUETOOTH_SCO:
-                        ((getRouting(MODE_IN_CALL) & ROUTE_BLUETOOTH_SCO) == 0 ? getRouting(MODE_IN_CALL) : ROUTE_EARPIECE)
-                                , ROUTE_ALL);
         // Temporary fix for issue #1713090 until audio routing is refactored in eclair release.
         // MODE_INVALID indicates to AudioService that setRouting() was initiated by AudioManager
-        //setRoutingP(MODE_INVALID, on ? ROUTE_BLUETOOTH_SCO: 0, ROUTE_BLUETOOTH_SCO);
+        setRoutingP(MODE_INVALID, on ? ROUTE_BLUETOOTH_SCO: 0, ROUTE_BLUETOOTH_SCO);
     }
 
     /**
@@ -721,22 +709,10 @@ public class AudioManager {
     public void setWiredHeadsetOn(boolean on){
         // A2DP has higher priority than wired headset, so headset connect/disconnect events
         // should not affect A2DP routing
-        setRouting(MODE_NORMAL,
-                on ? ROUTE_HEADSET :
-                        ((getRouting(MODE_NORMAL) & ROUTE_HEADSET) == 0) ? getRouting(MODE_NORMAL) : ROUTE_EARPIECE
-                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
-        setRouting(MODE_RINGTONE,
-                on ? ROUTE_HEADSET :
-                        ((getRouting(MODE_RINGTONE) & ROUTE_HEADSET) == 0) ? getRouting(MODE_RINGTONE) : ROUTE_EARPIECE
-                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
-        setRouting(MODE_IN_CALL,
-                on ? ROUTE_HEADSET :
-                        ((getRouting(MODE_IN_CALL) & ROUTE_HEADSET) == 0) ? getRouting(MODE_IN_CALL) : ROUTE_EARPIECE
-                                , ROUTE_ALL & ~ROUTE_BLUETOOTH_A2DP);
 
         // Temporary fix for issue #1713090 until audio routing is refactored in eclair release.
         // MODE_INVALID indicates to AudioService that setRouting() was initiated by AudioManager
-        //setRoutingP(MODE_INVALID, on ? ROUTE_HEADSET: 0, ROUTE_HEADSET);
+        setRoutingP(MODE_INVALID, on ? ROUTE_HEADSET: 0, ROUTE_HEADSET);
     }
 
     /**
