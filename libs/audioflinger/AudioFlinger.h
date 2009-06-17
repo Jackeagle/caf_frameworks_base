@@ -1,6 +1,7 @@
 /* //device/include/server/AudioFlinger/AudioFlinger.h
 **
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -270,6 +271,11 @@ private:
 
             int channelCount() const ;
 
+            int AudioSourceType() const // Returning proper stream type
+            {
+              return mStreamType;
+            }
+
             int sampleRate() const;
 
             void* getBuffer(uint32_t offset, uint32_t frames) const;
@@ -444,6 +450,7 @@ private:
 
         virtual     uint32_t    sampleRate() const;
         virtual     int         channelCount() const;
+        virtual     int         AudioSourceType() const;
         virtual     int         format() const;
         virtual     size_t      frameCount() const;
         virtual     uint32_t    latency() const;
@@ -522,6 +529,7 @@ private:
         size_t                          mFrameCount;
         int                             mChannelCount;
         int                             mFormat;
+        int                             mAudioSourceType;
         int16_t*                        mMixBuffer;
         float                           mMasterVolume;
         bool                            mMasterMute;

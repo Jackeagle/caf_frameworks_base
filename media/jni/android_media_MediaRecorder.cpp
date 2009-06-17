@@ -178,7 +178,7 @@ static void
 android_media_MediaRecorder_setAudioSource(JNIEnv *env, jobject thiz, jint as)
 {
     LOGV("setAudioSource(%d)", as);
-    if (as < AUDIO_SOURCE_DEFAULT || as > AUDIO_SOURCE_MIC) {
+    if (as < AUDIO_SOURCE_DEFAULT || as > AUDIO_SOURCE_VOICE_Tx_Rx) {
         jniThrowException(env, "java/lang/IllegalArgumentException", "Invalid audio source");
         return;
     }
@@ -214,7 +214,7 @@ static void
 android_media_MediaRecorder_setAudioEncoder(JNIEnv *env, jobject thiz, jint ae)
 {
     LOGV("setAudioEncoder(%d)", ae);
-    if (ae < AUDIO_ENCODER_DEFAULT || ae > AUDIO_ENCODER_AMR_NB) {
+    if (ae < AUDIO_ENCODER_DEFAULT || ae > AUDIO_ENCODER_QCELP) {
         jniThrowException(env, "java/lang/IllegalArgumentException", "Invalid audio encoder");
         return;
     }
