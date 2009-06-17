@@ -29,6 +29,8 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import com.android.internal.telephony.IccConstants;
@@ -69,6 +71,15 @@ public class IccProvider extends ContentProvider {
 
     private boolean mSimulator;
 
+    public static class AdnComparator implements Comparator<AdnRecord> {
+       public final int compare(AdnRecord a, AdnRecord b) {
+          String alabel = a.getAlphaTag();
+          String blabel = b.getAlphaTag();
+          return alabel.compareToIgnoreCase(blabel);
+       }
+    }
+
+    private AdnComparator mAdnComparator;
     @Override
     public boolean onCreate() {
         String device = SystemProperties.get("ro.product.device");
@@ -328,6 +339,7 @@ public class IccProvider extends ContentProvider {
     private ArrayList<ArrayList> loadFromEf(int efType) {
         ArrayList<ArrayList> results = new ArrayList<ArrayList>();
         List<AdnRecord> adnRecords = null;
+        mAdnComparator = new AdnComparator();
 
         if (DBG) log("loadFromEf: efType=" + efType);
 
@@ -347,6 +359,10 @@ public class IccProvider extends ContentProvider {
 
             int N = adnRecords.size();
             if (DBG) log("adnRecords.size=" + N);
+            List newAdn = new ArrayList(adnRecords);
+            newAdn = adnRecords;
+            //Sort the list in ascending order of names.
+            Collections.sort(newAdn,mAdnComparator);
             for (int i = 0; i < N ; i++) {
                 loadRecord(adnRecords.get(i), results);
             }
