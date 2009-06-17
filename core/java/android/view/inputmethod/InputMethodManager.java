@@ -951,18 +951,19 @@ public final class InputMethodManager {
             // Hook 'em up and let 'er rip.
             mCurrentTextBoxAttribute = tba;
             mServedConnecting = false;
-            mServedInputConnection = ic;
-            IInputContext servedContext;
-            if (ic != null) {
-                mCursorSelStart = tba.initialSelStart;
-                mCursorSelEnd = tba.initialSelEnd;
-                mCursorCandStart = -1;
-                mCursorCandEnd = -1;
-                mCursorRect.setEmpty();
-                servedContext = new ControlledInputConnectionWrapper(vh.getLooper(), ic);
-            } else {
-                servedContext = null;
+            if (ic == null) {
+                // During the restart of LatinIME, previous InputConnection object is
+                // null and due to this we would not be able to initialize servedContext.
+                ic = new BaseInputConnection(this, false);
             }
+            IInputContext servedContext;
+            mServedInputConnection = ic;
+            mCursorSelStart = tba.initialSelStart;
+            mCursorSelEnd = tba.initialSelEnd;
+            mCursorCandStart = -1;
+            mCursorCandEnd = -1;
+            mCursorRect.setEmpty();
+            servedContext = new ControlledInputConnectionWrapper(vh.getLooper(), ic);
             
             try {
                 if (DEBUG) Log.v(TAG, "START INPUT: " + view + " ic="
