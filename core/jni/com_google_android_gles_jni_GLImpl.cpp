@@ -304,13 +304,7 @@ android_glColorPointerBounds__IIILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
-    if (pointer_buf) {
-        pointer = (GLvoid *) _env->GetDirectBufferAddress(pointer_buf);
-        if ( ! pointer ) {
-            _env->ThrowNew(IAEClass, "Must use a native order direct Buffer");
-            return;
-        }
-    }
+    pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
     glColorPointerBounds(
         (GLint)size,
         (GLenum)type,
@@ -318,6 +312,9 @@ android_glColorPointerBounds__IIILjava_nio_Buffer_2I
         (GLvoid *)pointer,
         (GLsizei)remaining
     );
+    if (_array) {
+        releasePointer(_env, _array, pointer, JNI_FALSE);
+    }
 }
 
 /* void glCompressedTexImage2D ( GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const GLvoid *data ) */
@@ -2778,19 +2775,16 @@ android_glNormalPointerBounds__IILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
-    if (pointer_buf) {
-        pointer = (GLvoid *) _env->GetDirectBufferAddress(pointer_buf);
-        if ( ! pointer ) {
-            _env->ThrowNew(IAEClass, "Must use a native order direct Buffer");
-            return;
-        }
-    }
+    pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
     glNormalPointerBounds(
         (GLenum)type,
         (GLsizei)stride,
         (GLvoid *)pointer,
         (GLsizei)remaining
     );
+    if (_array) {
+        releasePointer(_env, _array, pointer, JNI_FALSE);
+    }
 }
 
 /* void glOrthof ( GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLfloat zNear, GLfloat zFar ) */
@@ -3033,13 +3027,7 @@ android_glTexCoordPointerBounds__IIILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
-    if (pointer_buf) {
-        pointer = (GLvoid *) _env->GetDirectBufferAddress(pointer_buf);
-        if ( ! pointer ) {
-            _env->ThrowNew(IAEClass, "Must use a native order direct Buffer");
-            return;
-        }
-    }
+    pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
     glTexCoordPointerBounds(
         (GLint)size,
         (GLenum)type,
@@ -3047,6 +3035,9 @@ android_glTexCoordPointerBounds__IIILjava_nio_Buffer_2I
         (GLvoid *)pointer,
         (GLsizei)remaining
     );
+    if (_array) {
+        releasePointer(_env, _array, pointer, JNI_FALSE);
+    }
 }
 
 /* void glTexEnvf ( GLenum target, GLenum pname, GLfloat param ) */
@@ -3391,13 +3382,7 @@ android_glVertexPointerBounds__IIILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
-    if (pointer_buf) {
-        pointer = (GLvoid *) _env->GetDirectBufferAddress(pointer_buf);
-        if ( ! pointer ) {
-            _env->ThrowNew(IAEClass, "Must use a native order direct Buffer");
-            return;
-        }
-    }
+    pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
     glVertexPointerBounds(
         (GLint)size,
         (GLenum)type,
@@ -3405,6 +3390,9 @@ android_glVertexPointerBounds__IIILjava_nio_Buffer_2I
         (GLvoid *)pointer,
         (GLsizei)remaining
     );
+    if (_array) {
+        releasePointer(_env, _array, pointer, JNI_FALSE);
+    }
 }
 
 /* void glViewport ( GLint x, GLint y, GLsizei width, GLsizei height ) */
