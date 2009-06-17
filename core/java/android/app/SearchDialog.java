@@ -63,6 +63,8 @@ import android.widget.TextView;
 import android.widget.WrapperListAdapter;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.AdapterView.OnItemSelectedListener;
+import android.os.Message;
+import android.os.Handler;
 
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicLong;
@@ -96,6 +98,9 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
     private static final int INSTANCE_SELECTED_BUTTON = -2;
     private static final int INSTANCE_SELECTED_QUERY = -1;
 
+    
+    private static final int FINISH_TOKEN = 0xDEADBEEF;
+    
     // views & widgets
     private TextView mBadgeLabel;
     private AutoCompleteTextView mSearchTextField;
@@ -938,6 +943,14 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
         if (imm != null) {
             imm.hideSoftInputFromWindow(
                     getWindow().getDecorView().getWindowToken(), 0);
+        }
+        // Stop the filtering operation happening in background thread
+        if ((mSuggestionsAdapter != null) && (mSuggestionsAdapter.getFilter() != null)) {
+            Handler handler = mSuggestionsAdapter.getFilter().getHandler();
+            if (handler != null) {
+                Message message = handler.obtainMessage(FINISH_TOKEN);
+                handler.sendMessage(message);
+            }
         }
         
         super.cancel();
