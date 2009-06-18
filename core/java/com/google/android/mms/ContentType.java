@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007-2008 Esmertec AG.
  * Copyright (C) 2007-2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +47,7 @@ public class ContentType {
     public static final String AUDIO_MID         = "audio/mid";
     public static final String AUDIO_MIDI        = "audio/midi";
     public static final String AUDIO_MP3         = "audio/mp3";
+    public static final String AUDIO_QCP         = "audio/qcp";
     public static final String AUDIO_MPEG3       = "audio/mpeg3";
     public static final String AUDIO_MPEG        = "audio/mpeg";
     public static final String AUDIO_MPG         = "audio/mpg";
@@ -96,6 +98,7 @@ public class ContentType {
         sSupportedContentTypes.add(AUDIO_MID);
         sSupportedContentTypes.add(AUDIO_MIDI);
         sSupportedContentTypes.add(AUDIO_MP3);
+        sSupportedContentTypes.add(AUDIO_QCP);
         sSupportedContentTypes.add(AUDIO_MPEG3);
         sSupportedContentTypes.add(AUDIO_MPEG);
         sSupportedContentTypes.add(AUDIO_MPG);
@@ -134,6 +137,7 @@ public class ContentType {
         sSupportedAudioTypes.add(AUDIO_MID);
         sSupportedAudioTypes.add(AUDIO_MIDI);
         sSupportedAudioTypes.add(AUDIO_MP3);
+        sSupportedAudioTypes.add(AUDIO_QCP);
         sSupportedAudioTypes.add(AUDIO_MPEG3);
         sSupportedAudioTypes.add(AUDIO_MPEG);
         sSupportedAudioTypes.add(AUDIO_MPG);
