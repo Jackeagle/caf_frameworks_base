@@ -172,13 +172,6 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
         int stride,
         java.nio.Buffer pointer
     ) {
-        glColorPointerBounds(
-            size,
-            type,
-            stride,
-            pointer,
-            pointer.remaining()
-        );
         if ((size == 4) &&
             ((type == GL_FLOAT) ||
              (type == GL_UNSIGNED_BYTE) ||
@@ -186,6 +179,13 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
             (stride >= 0)) {
             _colorPointer = pointer;
         }
+        glColorPointerBounds(
+            size,
+            type,
+            stride,
+            pointer,
+            pointer.remaining()
+        );
     }
 
     // C function void glCompressedTexImage2D ( GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const GLvoid *data )
@@ -744,12 +744,6 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
         int stride,
         java.nio.Buffer pointer
     ) {
-        glNormalPointerBounds(
-            type,
-            stride,
-            pointer,
-            pointer.remaining()
-        );
         if (((type == GL_FLOAT) ||
              (type == GL_BYTE) ||
              (type == GL_SHORT) ||
@@ -757,6 +751,12 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
             (stride >= 0)) {
             _normalPointer = pointer;
         }
+        glNormalPointerBounds(
+            type,
+            stride,
+            pointer,
+            pointer.remaining()
+        );
     }
 
     // C function void glOrthof ( GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLfloat zNear, GLfloat zFar )
@@ -937,13 +937,6 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
         int stride,
         java.nio.Buffer pointer
     ) {
-        glTexCoordPointerBounds(
-            size,
-            type,
-            stride,
-            pointer,
-            pointer.remaining()
-        );
         if (((size == 2) ||
              (size == 3) ||
              (size == 4)) &&
@@ -954,6 +947,13 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
             (stride >= 0)) {
             _texCoordPointer = pointer;
         }
+        glTexCoordPointerBounds(
+            size,
+            type,
+            stride,
+            pointer,
+            pointer.remaining()
+        );
     }
 
     // C function void glTexEnvf ( GLenum target, GLenum pname, GLfloat param )
@@ -1082,13 +1082,6 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
         int stride,
         java.nio.Buffer pointer
     ) {
-        glVertexPointerBounds(
-            size,
-            type,
-            stride,
-            pointer,
-            pointer.remaining()
-        );
         if (((size == 2) ||
              (size == 3) ||
              (size == 4)) &&
@@ -1099,6 +1092,13 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
             (stride >= 0)) {
             _vertexPointer = pointer;
         }
+        glVertexPointerBounds(
+            size,
+            type,
+            stride,
+            pointer,
+            pointer.remaining()
+        );
     }
 
     // C function void glViewport ( GLint x, GLint y, GLsizei width, GLsizei height )
