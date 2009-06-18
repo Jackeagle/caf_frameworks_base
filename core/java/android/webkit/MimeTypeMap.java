@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -366,6 +367,7 @@ public /* package */ class MimeTypeMap {
             sMimeTypeMap.loadEntry("audio/mpeg", "mpega", false);
             sMimeTypeMap.loadEntry("audio/mpeg", "mp2", false);
             sMimeTypeMap.loadEntry("audio/mpeg", "mp3", false);
+            sMimeTypeMap.loadEntry("audio/qcp", "qcp", false);
             sMimeTypeMap.loadEntry("audio/mpeg", "m4a", false);
             sMimeTypeMap.loadEntry("audio/mpegurl", "m3u", false);
             sMimeTypeMap.loadEntry("audio/prs.sid", "sid", false);

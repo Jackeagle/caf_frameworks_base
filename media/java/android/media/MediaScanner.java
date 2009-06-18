@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -468,7 +469,8 @@ public class MediaScanner
                             mFileType == MediaFile.FILE_TYPE_3GPP2 ||
                             mFileType == MediaFile.FILE_TYPE_OGG ||
                             mFileType == MediaFile.FILE_TYPE_MID ||
-                            mFileType == MediaFile.FILE_TYPE_WMA) {
+                            mFileType == MediaFile.FILE_TYPE_WMA ||
+                            mFileType == MediaFile.FILE_TYPE_QCP) {
                         // we only extract metadata from MP3, M4A, OGG, MID and WMA files.
                         // check MP4 files, to determine if they contain only audio.
                         processFile(path, mimeType, this);
