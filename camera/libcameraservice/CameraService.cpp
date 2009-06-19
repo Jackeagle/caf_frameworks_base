@@ -491,7 +491,10 @@ status_t CameraService::Client::startPreviewMode()
                                          PIXEL_FORMAT_YCbCr_420_SP,
                                          transform,
                                          0,
-                                         mHardware->getPreviewHeap());
+                                         mHardware->getPreviewHeapnew(0),
+                                         mHardware->getPreviewHeapnew(1),
+                                         mHardware->getPreviewHeapnew(2),
+                                         mHardware->getPreviewHeapnew(3));
 
             mSurface->registerBuffers(buffers);
         } else {
@@ -646,7 +649,7 @@ static void dump_to_file(const char *fname,
 #endif
 
 // preview callback - frame buffer update
-void CameraService::Client::previewCallback(const sp<IMemory>& mem, void* user)
+void CameraService::Client::previewCallback(const sp<IMemory>& mem, int index, void* user)
 {
     LOGV("previewCallback()");
     sp<Client> client = getClientFromCookie(user);
@@ -680,7 +683,7 @@ void CameraService::Client::previewCallback(const sp<IMemory>& mem, void* user)
 #endif
 
     // The strong pointer guarantees the client will exist, but no lock is held.
-    client->postPreviewFrame(mem);
+    client->postPreviewFrame(mem, index);
 
 #if DEBUG_CLIENT_REFERENCES
     //**** if the client's refcount is 1, then we are about to destroy it here,
@@ -976,7 +979,7 @@ void CameraService::Client::postRecordingFrame(const sp<IMemory>& frame)
     mCameraClient->dataCallback(CAMERA_MSG_VIDEO_FRAME, frame);
 }
 
-void CameraService::Client::postPreviewFrame(const sp<IMemory>& mem)
+void CameraService::Client::postPreviewFrame(const sp<IMemory>& mem, int index)
 {
     LOGV("postPreviewFrame");
     if (mem == 0) {
@@ -990,7 +993,7 @@ void CameraService::Client::postPreviewFrame(const sp<IMemory>& mem)
     {
         Mutex::Autolock surfaceLock(mSurfaceLock);
         if (mSurface != NULL) {
-            mSurface->postBuffer(offset);
+            mSurface->postBuffer(index);
         }
     }
 
