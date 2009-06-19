@@ -107,6 +107,11 @@ sp<IMemoryHeap> CameraHardwareStub::getPreviewHeap() const
     return mPreviewHeap;
 }
 
+sp<IMemoryHeap> CameraHardwareStub::getPreviewHeapnew(int i) const
+{
+    return mPreviewHeap;
+}
+
 sp<IMemoryHeap> CameraHardwareStub::getRawHeap() const
 {
     return mRawHeap;
@@ -150,7 +155,7 @@ int CameraHardwareStub::previewThread()
         //LOGV("previewThread: generated frame to buffer %d", mCurrentPreviewFrame);
         
         // Notify the client of a new frame.
-        mPreviewCallback(buffer, mPreviewCallbackCookie);
+        mPreviewCallback(buffer, mCurrentPreviewFrame, mPreviewCallbackCookie);
     
         // Advance the buffer pointer.
         mCurrentPreviewFrame = (mCurrentPreviewFrame + 1) % kBufferCount;
