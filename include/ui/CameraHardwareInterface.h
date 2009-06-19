@@ -25,7 +25,7 @@
 namespace android {
 
 /** Callback for startPreview() */
-typedef void (*preview_callback)(const sp<IMemory>& mem, void* user);
+typedef void (*preview_callback)(const sp<IMemory>& mem, int index, void* user);
 
 /** Callback for startRecord() */
 typedef void (*recording_callback)(const sp<IMemory>& mem, void* user);
@@ -86,6 +86,7 @@ public:
 
     /** Return the IMemoryHeap for the preview image heap */
     virtual sp<IMemoryHeap>         getPreviewHeap() const = 0;
+    virtual sp<IMemoryHeap>         getPreviewHeapnew(int i) const = 0;
 
     /** Return the IMemoryHeap for the raw image heap */
     virtual sp<IMemoryHeap>         getRawHeap() const = 0;
