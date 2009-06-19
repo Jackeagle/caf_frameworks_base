@@ -62,6 +62,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.AdapterView.OnItemSelectedListener;
+import android.os.Message;
+import android.os.Handler;
 
 import java.util.ArrayList;
 import java.util.WeakHashMap;
@@ -92,6 +94,8 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
     
     private static final int SEARCH_PLATE_LEFT_PADDING_GLOBAL = 12;
     private static final int SEARCH_PLATE_LEFT_PADDING_NON_GLOBAL = 7;
+
+    private static final int FINISH_TOKEN = 0xDEADBEEF;
     
     // interaction with runtime
     private IntentFilter mCloseDialogsFilter;
@@ -983,6 +987,14 @@ public class SearchDialog extends Dialog implements OnItemClickListener, OnItemS
         if (imm != null) {
             imm.hideSoftInputFromWindow(
                     getWindow().getDecorView().getWindowToken(), 0);
+        }
+        // Stop the filtering operation happening in background thread
+        if ((mSuggestionsAdapter != null) && (mSuggestionsAdapter.getFilter() != null)) {
+            Handler handler = mSuggestionsAdapter.getFilter().getHandler();
+            if (handler != null) {
+                Message message = handler.obtainMessage(FINISH_TOKEN);
+                handler.sendMessage(message);
+            }
         }
         
         super.cancel();
