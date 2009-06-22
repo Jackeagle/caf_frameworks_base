@@ -568,6 +568,11 @@ EGLDisplay egl_init_displays(NativeDisplayType display)
 
         gHooks[IMPL_CONTEXT_LOST].egl.eglTerminate =
                 gHooks[IMPL_HARDWARE].egl.eglTerminate;
+
+#ifdef ADRENO_200
+        gHooks[IMPL_CONTEXT_LOST].egl.eglMakeCurrent =
+                gHooks[IMPL_HARDWARE].egl.eglMakeCurrent;
+#endif
         
         d->dpys[IMPL_HARDWARE] = cnx->hooks->egl.eglGetDisplay(display);
         if (d->dpys[IMPL_HARDWARE] == EGL_NO_DISPLAY) {
