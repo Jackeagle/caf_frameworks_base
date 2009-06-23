@@ -974,7 +974,7 @@ public final class SIMRecords extends Handler implements SimConstants
                           length = data[1];
                           Log.d(EONS_TAG,"PNN longname length : " + length );
                           pnnDataLongName =
-                             SimUtils.adnStringFieldToString(data, 2, length);
+                             SimUtils.networkNameToString(data, 2, length);
                           Log.d(EONS_TAG,"PNN longname : " +
                                 pnnDataLongName );
                           if((data[length + 2] != -1) &&
@@ -982,7 +982,7 @@ public final class SIMRecords extends Handler implements SimConstants
                              Log.d(EONS_TAG,"PNN shortname length : " +
                                    data[length+3] );
                              pnnDataShortName =
-                                SimUtils.adnStringFieldToString(data,
+                                SimUtils.networkNameToString(data,
                                       length+4,data[length + 3]);
                              Log.d(EONS_TAG,"PNN shortname : " +
                                    pnnDataShortName );
@@ -1718,9 +1718,9 @@ public final class SIMRecords extends Handler implements SimConstants
              hLac = -1;
              GsmCellLocation loc = ((GsmCellLocation)phone.getCellLocation());
              if (loc != null) hLac = loc.getLac();
-             plmnData[0] = data[0];
-             plmnData[1] = data[1];
-             plmnData[2] = data[2];
+             plmnData[0] = (byte)(((data[0]<<4)&0xf0) | ((data[0]>>4)&0x0f));/*mcc1+mmc2*/
+             plmnData[1] = (byte)(((data[1]<<4)&0xf0) | (data[2]&0x0f));     /*mcc3+mnc1*/
+             plmnData[2] = (byte)((data[2]&0xf0)      | ((data[1]>>4)&0x0f)); /*mnc2+mnc3*/
              oplDataMccMnc  = SimUtils.bytesToHexString(plmnData);
              /*MSB 0f LAC comes first and then LSB according to TS 24.008[47]*/
              oplDataLac1 = ((data[3]&0xff)<<8) | (data[4]&0xff);
