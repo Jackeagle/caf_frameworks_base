@@ -87,7 +87,6 @@ public final class SIMRecords extends IccRecords {
     String newVoiceMailTag = null;
     boolean isVoiceMailFixed = false;
     int countVoiceMessages = 0;
-    int onsDispAlg = 0;
     boolean oplDataPresent;
     String  oplDataMccMnc;
     int     oplDataLac1;
@@ -209,16 +208,6 @@ public final class SIMRecords extends IccRecords {
         p.mCM.setOnSmsOnSim(this, EVENT_SMS_ON_SIM, null);
         p.mCM.setOnIccRefresh(this, EVENT_SIM_REFRESH, null);
 
-        Log.d(EONS_TAG,"EONS_ALG_TYPE  " + SystemProperties.get("ro.EONS_ALG_TYPE"));
-        try{
-           if (Integer.valueOf(SystemProperties.get("ro.EONS_ALG_TYPE")) == 1) {
-               onsDispAlg = EONS_ALG;
-           } else if (Integer.valueOf(SystemProperties.get("ro.EONS_ALG_TYPE")) == 0) {
-               onsDispAlg = 0;
-           }
-        } catch(Exception e){
-          Log.e(EONS_TAG,"Exception while reading value of EONS_ALG_TYPE " + e);
-        }
         // Start off by setting empty state
         onRadioOffOrNotAvailable();
 
@@ -329,12 +318,80 @@ public final class SIMRecords extends IccRecords {
     }
 
     /**
+     * Checks if adapt property is set.
+     * @return true = set, flase = not set.
+     */
+    boolean adaptPropSet()
+    {
+        boolean adapt_set = false;
+        String adapt_prop = SystemProperties.get("persist.cust.tel.adapt");
+        if((adapt_prop != null) && (adapt_prop.length() != 0)) {
+           try{
+               if (Integer.valueOf(adapt_prop) == 1) {
+                   adapt_set = true;
+               }
+           } catch(Exception e){
+               Log.e(EONS_TAG,"Exception on reading persist.cust.tel.adapt " + e);
+           }
+        }
+        return adapt_set;
+    }
+
+    /**
      * Return which ONS Display Algorithm to be used
      * @return default alg if SIM is not yet ready
      */
     int getOnsAlg()
     {
-        return onsDispAlg;
+        int ons_alg = 0;
+        String eons_prop   = SystemProperties.get("persist.cust.tel.eons");
+
+        //persist.cust.tel.adapt is super flag, if this is set then EONS
+        //should be enabled irrespective of the value of
+        //persist.cust.tel.eons prop. Otherwise EONS should be enabled if
+        //persist.cust.tel.eons is set.
+        if(adaptPropSet()) {
+           ons_alg = EONS_ALG;
+        }
+        else if((eons_prop != null) && (eons_prop.length() != 0)) {
+           try{
+               if (Integer.valueOf(eons_prop) == 1) {
+                   ons_alg = EONS_ALG;
+               }
+           } catch(Exception e){
+               Log.e(EONS_TAG,"Exception on reading persist.cust.tel.eons " + e);
+           }
+        }
+        return ons_alg;
+    }
+
+    /**
+     * Controls manual plmn selection option.
+     * @return true = use EF_CSP, false = dont use EF_CSP.
+     */
+    boolean useEfCspPlmn()
+    {
+        boolean use_csp = false;
+        String adapt_prop = SystemProperties.get("persist.cust.tel.adapt");
+        String csp_prop   = SystemProperties.get("persist.cust.tel.efcsp.plmn");
+
+        //persist.cust.tel.adapt is super flag, if this is set then EF_CSP
+        //will be used irrespective of the value of
+        //persist.cust.tel.efcsp.plmn.Otherwise EF_CSP will be used if
+        //persist.cust.tel.efcsp.plmn is set.
+        if(adaptPropSet()) {
+           use_csp = true;
+        }
+        else if((csp_prop != null) && (csp_prop.length() != 0)) {
+           try{
+               if (Integer.valueOf(csp_prop) == 1) {
+                   use_csp = true;
+               }
+           } catch(Exception e){
+               Log.e(EONS_TAG,"Exception on reading persist.cust.tel.efcsp.plmn " + e);
+           }
+        }
+        return use_csp;
     }
 
     /**
@@ -933,7 +990,7 @@ public final class SIMRecords extends IccRecords {
                 ar = (AsyncResult)msg.obj;
                 data = (byte[])ar.result;
 
-                if(onsDispAlg == EONS_ALG) {
+                if(getOnsAlg() == EONS_ALG) {
                    if (ar.exception != null) {
                        pnnDataPresent = false;
                        Log.e(EONS_TAG, "EF_PNN exception :" + ar.exception);
@@ -1465,7 +1522,7 @@ public final class SIMRecords extends IccRecords {
 
         /*In EONS Algorithm, EF_PNN
          *data will be parsed afer parsing EF_OPL data*/
-        if(onsDispAlg != EONS_ALG){
+        if(getOnsAlg() != EONS_ALG){
            iccFh.loadEFLinearFixed(EF_PNN, 1,
               obtainMessage(EVENT_GET_PNN_DONE));
            recordsToLoad++;
@@ -1477,20 +1534,17 @@ public final class SIMRecords extends IccRecords {
         iccFh.loadEFTransparent(EF_INFO_CPHS, obtainMessage(EVENT_GET_INFO_CPHS_DONE));
         recordsToLoad++;
 
-        if(onsDispAlg == EONS_ALG){
+        if(getOnsAlg() == EONS_ALG){
            oplCurRecordNum = 1;
            iccFh.loadEFLinearFixed(EF_OPL, oplCurRecordNum,
                  obtainMessage(EVENT_GET_OPL_DONE));
            recordsToLoad++;
         }
-        try {
-           if (Integer.valueOf(SystemProperties.get("use_csp_plmn")) == 1) {
-               iccFh.loadEFTransparent(EF_CSP_CPHS,
-                  obtainMessage(EVENT_GET_CSP_CPHS_DONE));
-               recordsToLoad++;
-           }
-        }catch(Exception e) {
-          Log.e(CSP_TAG,"Exception while reading value of use_csp_plmn " + e);
+
+        if(useEfCspPlmn()) {
+           iccFh.loadEFTransparent(EF_CSP_CPHS,
+                 obtainMessage(EVENT_GET_CSP_CPHS_DONE));
+           recordsToLoad++;
         }
         // XXX should seek instead of examining them all
         if (false) { // XXX
