@@ -72,8 +72,8 @@ enum video_encoder {
     VIDEO_ENCODER_MPEG_4_SP = 3,
 };
 
-// Maximum frames per second is 24
-#define MEDIA_RECORDER_MAX_FRAME_RATE         24
+// Maximum frames per second is 30
+#define MEDIA_RECORDER_MAX_FRAME_RATE         30
 
 /*
  * The state machine of the media_recorder uses a set of different state names.
