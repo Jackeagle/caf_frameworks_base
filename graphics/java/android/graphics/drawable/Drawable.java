@@ -100,7 +100,7 @@ public abstract class Drawable {
     private int[] mStateSet = StateSet.WILD_CARD;
     private int mLevel = 0;
     private int mChangingConfigurations = 0;
-    private Rect mBounds = null;
+    private Rect mBounds = new Rect();
     /*package*/ Callback mCallback = null;
     private boolean mVisible = true;
 
@@ -118,9 +118,6 @@ public abstract class Drawable {
      */
     public void setBounds(int left, int top, int right, int bottom) {
         Rect oldBounds = mBounds;
-        if (mBounds == null) {
-            oldBounds = mBounds = new Rect();
-        }
         
         if (oldBounds.left != left || oldBounds.top != top ||
                 oldBounds.right != right || oldBounds.bottom != bottom) {
@@ -171,9 +168,6 @@ public abstract class Drawable {
      *         beware).
      */
     public final Rect getBounds() {
-        if (mBounds == null) {
-            mBounds = new Rect();
-        }
         return mBounds;
     }
 

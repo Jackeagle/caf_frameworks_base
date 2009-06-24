@@ -123,19 +123,13 @@ public class Surface implements Parcelable {
      * {@hide} 
      */
     public static final int FLAGS_ORIENTATION_ANIMATION_DISABLE = 0x000000001;
-    /**
-     * All the surface object will use this Canvas object untill they really
-     * need it. New Canvas object will be created in function lockCanvas().
-     * This will reduce the number of Canvas object hence reduce the
-     * memory requirement.
-     */
 
     @SuppressWarnings("unused")
     private int mSurface;
     @SuppressWarnings("unused")
     private int mSaveCount;
     @SuppressWarnings("unused")
-    private Canvas mCanvas = null;
+    private Canvas mCanvas;
 
     /**
      * Exception thrown when a surface couldn't be created or resized
@@ -163,6 +157,7 @@ public class Surface implements Parcelable {
     public Surface(SurfaceSession s,
             int pid, int display, int w, int h, int format, int flags)
         throws OutOfResourcesException {
+        mCanvas = new Canvas();
         init(s,pid,display,w,h,format,flags);
     }
 
@@ -172,6 +167,7 @@ public class Surface implements Parcelable {
      * {@hide}
      */
     public Surface() {
+        mCanvas = new Canvas();
     }
     
     /**
@@ -197,11 +193,6 @@ public class Surface implements Parcelable {
          * for instance it has been resized or if the bits were lost, since
          * the last call.
          */
-        if (mCanvas == null) {
-            /* Allocating the Canvas object only when it is required
-             */
-            mCanvas = new Canvas();
-        }
         return lockCanvasNative(dirty);
     }
 

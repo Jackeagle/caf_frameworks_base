@@ -30,7 +30,6 @@ import android.graphics.BitmapShader;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
-import android.util.Log;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -58,13 +57,9 @@ import java.io.IOException;
 public class BitmapDrawable extends Drawable {
 
     private static final int DEFAULT_PAINT_FLAGS = Paint.FILTER_BITMAP_FLAG;
-    /**
-     * Allocating Rect for all the BitmapDrawable objects as not all will be
-     * going to use them.
-     */
     private BitmapState mBitmapState;
     private Bitmap mBitmap;
-    private Rect mDstRect = null;   // Gravity.apply() sets this
+    private final Rect mDstRect = new Rect();   // Gravity.apply() sets this
 
     private boolean mApplyGravity;
     private boolean mRebuildShader;
@@ -228,9 +223,6 @@ public class BitmapDrawable extends Drawable {
     public void draw(Canvas canvas) {
         Bitmap bitmap = mBitmap;
         if (bitmap != null) {
-            if(mDstRect == null) {
-               mDstRect = new Rect();
-            }
             final BitmapState state = mBitmapState;
             if (mRebuildShader) {
                 Shader.TileMode tmx = state.mTileModeX;
