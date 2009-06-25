@@ -721,6 +721,9 @@ public final class GsmCallTracker extends CallTracker {
                 }
                 hangup((GsmConnection)(call.getConnections().get(0)));
             } else {
+                if(backgroundCall.getConnections().size() > 0) {
+                    hangupWaitingOrBackground();
+                }
                 hangupForegroundResumeBackground();
             }
         } else if (call == backgroundCall) {
