@@ -88,7 +88,6 @@ public final class SIMRecords extends IccRecords {
     boolean isVoiceMailFixed = false;
     int countVoiceMessages = 0;
     boolean oplDataPresent;
-    String  oplDataMccMnc;
     int     oplDataLac1;
     int     oplDataLac2;
     short   oplDataPnnNum;
@@ -1722,8 +1721,10 @@ public final class SIMRecords extends IccRecords {
      */
     private void getMatchingOplRecord(AsyncResult ar) {
         byte[] data;
-        byte   plmnData[]={00,00,00};
         int    hLac;
+        int    simPlmn[]  = {0,0,0,0,0,0};
+        int    bcchPlmn[] = {0,0,0,0,0,0};
+        int    bcchPlmnLength = 0;
         String regOperator = ((GSMPhone) phone).mSST.ss.getOperatorNumeric();
         data = (byte[])ar.result;
 
@@ -1761,20 +1762,29 @@ public final class SIMRecords extends IccRecords {
              hLac = -1;
              GsmCellLocation loc = ((GsmCellLocation)phone.getCellLocation());
              if (loc != null) hLac = loc.getLac();
-             plmnData[0] = (byte)(((data[0]<<4)&0xf0) | ((data[0]>>4)&0x0f));/*mcc1+mmc2*/
-             plmnData[1] = (byte)(((data[1]<<4)&0xf0) | (data[2]&0x0f));     /*mcc3+mnc1*/
-             plmnData[2] = (byte)((data[2]&0xf0)      | ((data[1]>>4)&0x0f)); /*mnc2+mnc3*/
-             oplDataMccMnc  = IccUtils.bytesToHexString(plmnData);
+
+             /*Convert EF_OPL PLMN data into digits*/
+             simPlmn[0] = data[0]&0x0f;     /*mcc1*/
+             simPlmn[1] = (data[0]>>4)&0x0f;/*mcc2*/
+             simPlmn[2] = data[1]&0x0f;     /*mcc3*/
+             simPlmn[3] = data[2]&0x0f;     /*mnc1*/
+             simPlmn[4] = (data[2]>>4)&0x0f;/*mnc2*/
+             simPlmn[5] = (data[1]>>4)&0x0f;/*mnc3*/
+
+             /*Convert bcch plmn from ASCII to bcd*/
+             bcchPlmnLength = regOperator.length();
+             for (int i = 0;i < bcchPlmnLength;i++) {
+                  bcchPlmn[i] = regOperator.charAt(i) - '0';
+             }
+
              /*MSB 0f LAC comes first and then LSB according to TS 24.008[47]*/
              oplDataLac1 = ((data[3]&0xff)<<8) | (data[4]&0xff);
              oplDataLac2 = ((data[5]&0xff)<<8) | (data[6]&0xff);
              oplDataPnnNum  = (short)(data[7]&0xff);
-             Log.d(EONS_TAG,"mccmnc= " + oplDataMccMnc +
-                   " RegPLMN = " + regOperator);
              Log.d(EONS_TAG,"lac1=" + oplDataLac1 + " lac2=" + oplDataLac2 +
              " hLac=" + hLac + " pnn rec=" + oplDataPnnNum);
-             /*Check EF_OPL's mccmnc is same as registeredregistered  PLMN*/
-             if((oplDataMccMnc != null) && oplDataMccMnc.equals(regOperator)){
+             /*Check EF_OPL's mccmnc is same as registered PLMN*/
+             if(matchSimPlmn(simPlmn,bcchPlmn,bcchPlmnLength)){
                 /*Check if HLAC is with in range of EF_OPL LACs*/
                 if((oplDataLac1 <= hLac) && (hLac <= oplDataLac2)){
                    if((oplDataPnnNum > 0x00) && (oplDataPnnNum < 0xFF) ){
@@ -1796,7 +1806,7 @@ public final class SIMRecords extends IccRecords {
                 else{
                    oplDataPresent = false;
                    Log.w(EONS_TAG,
-                         "HLAC is not with in range of EF_OPL's LACs pnn data");
+                         "HLAC is not with in range of EF_OPL's LACs, ignoring pnn data");
                 }
              }
              else{
@@ -1814,6 +1824,51 @@ public final class SIMRecords extends IccRecords {
              }
         }
     }
+
+    /**
+     * Function to match EF_OPL plmn with the registered plmn.
+     * @param simPlmn, plmn read from EF_OPL
+     * @param bcchPlmn, registered plmn
+     * @param length, length of registered plmn
+     * @return true if plmns match, otherwise false.
+     */
+    boolean matchSimPlmn (int simPlmn[],int bcchPlmn[],int length) {
+       int wildCardDigit = 0x0D;
+       boolean match = false;
+
+       /*Apply '0' suffix rule*/
+       if (simPlmn[5] == 0x0f) {
+           simPlmn[5] = 0;
+       }
+
+       /*Check for wildcard digits in simPlmn and overwite them with the
+        *corresponding digits in bcchPlmn.*/
+       for (int i = 0;i < length;i++) {
+            if (simPlmn[i] == wildCardDigit) {
+                simPlmn[i] = bcchPlmn[i];
+            }
+       }
+
+       /*Match MCC*/
+       if((simPlmn[0] == bcchPlmn[0]) &&
+          (simPlmn[1] == bcchPlmn[1]) &&
+          (simPlmn[2] == bcchPlmn[2])) {
+           if(length == 5) {
+              /*If the length of registered plmn is 5, then this is 2 digit MNC
+               *case. Compare only first two digits of mnc*/
+              match = ((simPlmn[3] == bcchPlmn[3]) &&
+                       (simPlmn[4] == bcchPlmn[4]));
+           }
+           else {
+              /*Otherwise Compare all digits of MNC*/
+              match = ((simPlmn[3] == bcchPlmn[3]) &&
+                       (simPlmn[4] == bcchPlmn[4]) &&
+                       (simPlmn[5] == bcchPlmn[5]));
+           }
+       }
+       return match;
+    }
+
     /**
      * Parse TS 51.011 EF[SPDI] record
      * This record contains the list of numeric network IDs that
