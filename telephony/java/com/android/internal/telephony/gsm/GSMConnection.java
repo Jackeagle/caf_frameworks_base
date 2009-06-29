@@ -25,6 +25,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.AsyncResult;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.util.Config;
 import android.telephony.PhoneNumberUtils;
@@ -341,7 +342,26 @@ public class GSMConnection extends Connection {
         setPostDialState(PostDialState.CANCELLED);
     }
 
-    /** 
+   /**
+    * Called to check whether Adapt feature flag is enabled
+    */
+    private boolean featureAdapt() {
+       String adaptProp = SystemProperties.get("persist.cust.tel.adapt") ;
+
+       if (adaptProp != null && adaptProp.length() != 0) {
+          try {
+             if (Integer.valueOf(adaptProp) == 1) {
+                return true;
+             }
+          }
+          catch(Exception e){
+             Log.e(LOG_TAG,"Exception while reading value of Adapt Feature flag" + e);
+          }
+       }
+       return false;
+    }
+
+    /**
      * Called when this Connection is being hung up locally (eg, user pressed "end")
      * Note that at this point, the hangup request has been dispatched to the radio
      * but no response has yet been received so update() has not yet been called 
@@ -380,6 +400,14 @@ public class GSMConnection extends Connection {
 
             case CallFailCause.FDN_BLOCKED:
                 return DisconnectCause.FDN_BLOCKED;
+
+            case CallFailCause.IMSI_UNKNOWN_IN_VLR:
+                if (featureAdapt())
+                   return DisconnectCause.IMSI_UNKNOWN_IN_VLR;
+
+            case CallFailCause.IMEI_NOT_ACCEPTED:
+                if (featureAdapt())
+                   return DisconnectCause.IMEI_NOT_ACCEPTED;
 
             case CallFailCause.ERROR_UNSPECIFIED:
             case CallFailCause.NORMAL_CLEARING: 
