@@ -47,7 +47,9 @@ public abstract class Connection {
         FDN_BLOCKED,        /* call was blocked by fixed dial number */
         CS_RESTRICTED,      /* call was blocked by restricted all voice access */
         CS_RESTRICTED_NORMAL,/* call was blocked by restricted normal voice access */
-        CS_RESTRICTED_EMERGENCY/* call was blocked by restricted emergency voice access */
+        CS_RESTRICTED_EMERGENCY,/* call was blocked by restricted emergency voice access */
+        IMSI_UNKNOWN_IN_VLR,/* IMSI is not known at the VLR */
+        IMEI_NOT_ACCEPTED /* network does not accept emergency call establishment using an IMEI */
     }
 
     Object userData;
