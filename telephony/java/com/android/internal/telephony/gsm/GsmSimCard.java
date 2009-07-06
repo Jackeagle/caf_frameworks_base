@@ -117,6 +117,7 @@ public final class GsmSimCard extends Handler implements SimCard {
                 case SIM_PIN:               return State.PIN_REQUIRED;
                 case SIM_PUK:               return State.PUK_REQUIRED;
                 case SIM_NETWORK_PERSONALIZATION: return State.NETWORK_LOCKED;
+                case SIM_CARD_IO_ERROR:            return State.CARD_IO_ERROR;
             }
         }
 
@@ -295,7 +296,6 @@ public final class GsmSimCard extends Handler implements SimCard {
                 break;
             case EVENT_GET_SIM_STATUS_DONE:
                 ar = (AsyncResult)msg.obj;
-
                 getSimStatusDone(ar);
                 break;
             case EVENT_PINPUK_DONE:
@@ -431,6 +431,7 @@ public final class GsmSimCard extends Handler implements SimCard {
     handleSimStatus(CommandsInterface.SimStatus newStatus) {
         boolean transitionedIntoPinLocked;
         boolean transitionedIntoAbsent;
+        boolean transitionedIntoCardIOError;
         boolean transitionedIntoNetworkLocked;
         
         SimCard.State oldState, newState;
@@ -445,6 +446,7 @@ public final class GsmSimCard extends Handler implements SimCard {
                  (oldState != State.PIN_REQUIRED && newState == State.PIN_REQUIRED)
               || (oldState != State.PUK_REQUIRED && newState == State.PUK_REQUIRED));
         transitionedIntoAbsent = (oldState != State.ABSENT && newState == State.ABSENT);
+        transitionedIntoCardIOError = (oldState != State.CARD_IO_ERROR && newState == State.CARD_IO_ERROR);
         transitionedIntoNetworkLocked = (oldState != State.NETWORK_LOCKED
                 && newState == State.NETWORK_LOCKED);
 
@@ -458,6 +460,9 @@ public final class GsmSimCard extends Handler implements SimCard {
             if(DBG) log("Notify SIM missing.");
             absentRegistrants.notifyRegistrants();
             broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_SIM_ABSENT, null);
+        } else if (transitionedIntoCardIOError) {
+            if(DBG) log("Notify SIM Error.");
+            broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_SIM_CARD_IO_ERROR, null);
         } else if (transitionedIntoNetworkLocked) {
             if(DBG) log("Notify SIM network locked.");
             networkLockedRegistrants.notifyRegistrants();

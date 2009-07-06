@@ -32,6 +32,7 @@ import android.os.Message;
 import android.os.Parcel;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
+import android.os.SystemProperties;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.gsm.SmsManager;
 import android.telephony.gsm.SmsMessage;
@@ -2321,6 +2322,15 @@ public final class RIL extends BaseCommands implements CommandsInterface
             case RIL_SIM_PUK:       return SimStatus.SIM_PUK;
             case RIL_SIM_NETWORK_PERSONALIZATION:   
                                     return SimStatus.SIM_NETWORK_PERSONALIZATION;
+            case RIL_SIM_CARD_IO_ERROR:
+                     //If ADAPT property is set, handle SIM ERROR, otherwise
+                     //treat this as SIM ABSENT.
+                     if (SystemProperties.getBoolean("persist.cust.tel.adapt",false)) {
+                         return SimStatus.SIM_CARD_IO_ERROR;
+                     }
+                     else {
+                         return SimStatus.SIM_ABSENT;
+                     }
             default:
                 // Unrecognized SIM status.  Treat it like a missing SIM.
                 Log.e(LOG_TAG, "Unrecognized RIL_REQUEST_GET_SIM_STATUS result: " + status);

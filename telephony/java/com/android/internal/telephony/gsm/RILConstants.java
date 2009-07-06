@@ -51,6 +51,7 @@ cat include/telephony/ril.h | \
     int RIL_SIM_PIN = 3;
     int RIL_SIM_PUK = 4;
     int RIL_SIM_NETWORK_PERSONALIZATION = 5;
+    int RIL_SIM_CARD_IO_ERROR = 6;
     
     /** 
      * No restriction at all including voice/SMS/USSD/SS/AV64 

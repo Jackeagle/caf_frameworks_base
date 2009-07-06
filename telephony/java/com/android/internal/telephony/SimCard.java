@@ -30,6 +30,8 @@ public interface SimCard
     static public final String INTENT_VALUE_SIM_NOT_READY = "NOT_READY";
     /* ABSENT means SIM is missing */
     static public final String INTENT_VALUE_SIM_ABSENT = "ABSENT";
+    /* CARD_IO_ERROR means SIM IO error */
+    static public final String INTENT_VALUE_SIM_CARD_IO_ERROR = "CARD_IO_ERROR";
     /* LOCKED means SIM is locked by pin or by network */
     static public final String INTENT_VALUE_SIM_LOCKED = "LOCKED";
     /* READY means SIM is ready to access */
@@ -59,7 +61,8 @@ public interface SimCard
         PIN_REQUIRED,
         PUK_REQUIRED,
         NETWORK_LOCKED,
-        READY;
+        READY,
+        CARD_IO_ERROR;
 
         public boolean isPinLocked() {
             return ((this == PIN_REQUIRED) || (this == PUK_REQUIRED));
