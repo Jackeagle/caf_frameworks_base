@@ -646,6 +646,9 @@ public class StatusBarPolicy {
         if (SimCard.INTENT_VALUE_SIM_ABSENT.equals(stateExtra)) {
             mSimState = SimCard.State.ABSENT;
         }
+        else if (SimCard.INTENT_VALUE_SIM_CARD_IO_ERROR.equals(stateExtra)) {
+            mSimState = SimCard.State.CARD_IO_ERROR;
+        }
         else if (SimCard.INTENT_VALUE_SIM_READY.equals(stateExtra)) {
             mSimState = SimCard.State.READY;
         }
