@@ -31,6 +31,7 @@ import android.os.Message;
 import android.os.Parcel;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
+import android.os.SystemProperties;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.SmsManager;
@@ -2583,7 +2584,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         }
 
         // this is common for all radio technologies
+        // Presently all SIM card statuses except card present are treated as
+        // ABSENT. Handling Card IO error case seperately.
         if (!status.card_state.isCardPresent()) {
+            if (status.card_state.isCardFaulty() &&
+                SystemProperties.getBoolean("persist.cust.tel.adapt",false)) {
+                return IccStatus.ICC_CARD_IO_ERROR;
+            }
             return IccStatus.ICC_ABSENT;
         }
 

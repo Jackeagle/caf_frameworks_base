@@ -131,6 +131,7 @@ public final class SimCard extends Handler implements IccCard {
                 case ICC_PIN:               return State.PIN_REQUIRED;
                 case ICC_PUK:               return State.PUK_REQUIRED;
                 case ICC_NETWORK_PERSONALIZATION: return State.NETWORK_LOCKED;
+                case ICC_CARD_IO_ERROR:            return State.CARD_IO_ERROR;
             }
         }
 
@@ -437,6 +438,7 @@ public final class SimCard extends Handler implements IccCard {
     handleSimStatus(CommandsInterface.IccStatus newStatus) {
         boolean transitionedIntoPinLocked;
         boolean transitionedIntoAbsent;
+        boolean transitionedIntoCardIOError;
         boolean transitionedIntoNetworkLocked;
 
         SimCard.State oldState, newState;
@@ -451,6 +453,7 @@ public final class SimCard extends Handler implements IccCard {
                  (oldState != State.PIN_REQUIRED && newState == State.PIN_REQUIRED)
               || (oldState != State.PUK_REQUIRED && newState == State.PUK_REQUIRED));
         transitionedIntoAbsent = (oldState != State.ABSENT && newState == State.ABSENT);
+        transitionedIntoCardIOError = (oldState != State.CARD_IO_ERROR && newState == State.CARD_IO_ERROR);
         transitionedIntoNetworkLocked = (oldState != State.NETWORK_LOCKED
                 && newState == State.NETWORK_LOCKED);
 
@@ -464,6 +467,9 @@ public final class SimCard extends Handler implements IccCard {
             if(DBG) log("Notify SIM missing.");
             absentRegistrants.notifyRegistrants();
             broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_ICC_ABSENT, null);
+        } else if (transitionedIntoCardIOError) {
+            if(DBG) log("Notify SIM Card Error.");
+            broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_ICC_CARD_IO_ERROR, null);
         } else if (transitionedIntoNetworkLocked) {
             if(DBG) log("Notify SIM network locked.");
             networkLockedRegistrants.notifyRegistrants();
