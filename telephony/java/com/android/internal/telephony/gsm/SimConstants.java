@@ -50,6 +50,7 @@ public interface SimConstants {
     public static final int EF_SPN_CPHS = 0x6f14;
     public static final int EF_SPN_SHORT_CPHS = 0x6f18;
     public static final int EF_INFO_CPHS = 0x6f16;
+    public static final int EF_CSP_CPHS = 0x6f15;
 
     // SMS record length from TS 51.011 10.5.3
     static public final int SMS_RECORD_LENGTH = 176;
