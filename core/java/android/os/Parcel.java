@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,12 +52,12 @@ import java.util.Set;
  * appropriate to place any Parcel data in to persistent storage: changes
  * in the underlying implementation of any of the data in the Parcel can
  * render older data unreadable.</p>
- *
+ * 
  * <p>The bulk of the Parcel API revolves around reading and writing data
  * of various types.  There are six major classes of such functions available.</p>
- *
+ * 
  * <h3>Primitives</h3>
- *
+ * 
  * <p>The most basic data functions are for writing and reading primitive
  * data types: {@link #writeByte}, {@link #readByte}, {@link #writeDouble},
  * {@link #readDouble}, {@link #writeFloat}, {@link #readFloat}, {@link #writeInt},
@@ -66,15 +65,15 @@ import java.util.Set;
  * {@link #writeString}, {@link #readString}.  Most other
  * data operations are built on top of these.  The given data is written and
  * read using the endianess of the host CPU.</p>
- *
+ * 
  * <h3>Primitive Arrays</h3>
- *
+ * 
  * <p>There are a variety of methods for reading and writing raw arrays
  * of primitive objects, which generally result in writing a 4-byte length
  * followed by the primitive data items.  The methods for reading can either
  * read the data into an existing array, or create and return a new array.
  * These available types are:</p>
- *
+ * 
  * <ul>
  * <li> {@link #writeBooleanArray(boolean[])},
  * {@link #readBooleanArray(boolean[])}, {@link #createBooleanArray()}
@@ -96,9 +95,9 @@ import java.util.Set;
  * <li> {@link #writeSparseBooleanArray(SparseBooleanArray)},
  * {@link #readSparseBooleanArray()}.
  * </ul>
- *
+ * 
  * <h3>Parcelables</h3>
- *
+ * 
  * <p>The {@link Parcelable} protocol provides an extremely efficient (but
  * low-level) protocol for objects to write and read themselves from Parcels.
  * You can use the direct methods {@link #writeParcelable(Parcelable, int)}
@@ -108,7 +107,7 @@ import java.util.Set;
  * methods write both the class type and its data to the Parcel, allowing
  * that class to be reconstructed from the appropriate class loader when
  * later reading.</p>
- *
+ * 
  * <p>There are also some methods that provide a more efficient way to work
  * with Parcelables: {@link #writeTypedArray},
  * {@link #writeTypedList(List)},
@@ -121,9 +120,9 @@ import java.util.Set;
  * {@link Parcelable#writeToParcel Parcelable.writeToParcel} and
  * {@link Parcelable.Creator#createFromParcel Parcelable.Creator.createFromParcel}
  * yourself.)</p>
- *
+ * 
  * <h3>Bundles</h3>
- *
+ * 
  * <p>A special type-safe container, called {@link Bundle}, is available
  * for key/value maps of heterogeneous values.  This has many optimizations
  * for improved performance when reading and writing data, and its type-safe
@@ -131,16 +130,16 @@ import java.util.Set;
  * data contents into a Parcel.  The methods to use are
  * {@link #writeBundle(Bundle)}, {@link #readBundle()}, and
  * {@link #readBundle(ClassLoader)}.
- *
+ * 
  * <h3>Active Objects</h3>
- *
+ * 
  * <p>An unusual feature of Parcel is the ability to read and write active
  * objects.  For these objects the actual contents of the object is not
  * written, rather a special token referencing the object is written.  When
  * reading the object back from the Parcel, you do not get a new instance of
  * the object, but rather a handle that operates on the exact same object that
  * was originally written.  There are two forms of active objects available.</p>
- *
+ * 
  * <p>{@link Binder} objects are a core facility of Android's general cross-process
  * communication system.  The {@link IBinder} interface describes an abstract
  * protocol with a Binder object.  Any such interface can be written in to
@@ -153,7 +152,7 @@ import java.util.Set;
  * {@link #createBinderArray()},
  * {@link #writeBinderList(List)}, {@link #readBinderList(List)},
  * {@link #createBinderArrayList()}.</p>
- *
+ * 
  * <p>FileDescriptor objects, representing raw Linux file descriptor identifiers,
  * can be written and {@link ParcelFileDescriptor} objects returned to operate
  * on the original file descriptor.  The returned file descriptor is a dup
@@ -161,9 +160,9 @@ import java.util.Set;
  * operating on the same underlying file stream, with the same position, etc.
  * The methods to use are {@link #writeFileDescriptor(FileDescriptor)},
  * {@link #readFileDescriptor()}.
- *
+ * 
  * <h3>Untyped Containers</h3>
- *
+ * 
  * <p>A final class of methods are for writing and reading standard Java
  * containers of arbitrary types.  These all revolve around the
  * {@link #writeValue(Object)} and {@link #readValue(ClassLoader)} methods
@@ -219,7 +218,7 @@ public final class Parcel {
     private static final int EX_ILLEGAL_ARGUMENT = -3;
     private static final int EX_NULL_POINTER = -4;
     private static final int EX_ILLEGAL_STATE = -5;
-
+    
     public final static Parcelable.Creator<String> STRING_CREATOR
              = new Parcelable.Creator<String>() {
         public String createFromParcel(Parcel source) {
@@ -445,7 +444,7 @@ public final class Parcel {
      * growing dataCapacity() if needed.  The Map keys must be String objects.
      * The Map values are written using {@link #writeValue} and must follow
      * the specification there.
-     *
+     * 
      * <p>It is strongly recommended to use {@link #writeBundle} instead of
      * this method, since the Bundle class provides a type-safe API that
      * allows you to avoid mysterious type errors at the point of marshalling.
@@ -928,33 +927,6 @@ public final class Parcel {
     }
 
     /**
-     * Flatten a List containing Map objects into the parcel, at
-     * the current dataPosition() and growing dataCapacity() if needed.  They
-     * can later be retrieved with {@link #createMapArrayList} or
-     * {@link #readMapList}.
-     *
-     * @param val The list of maps to be written.
-     *
-     * @see #createMapArrayList
-     * @see #readMapList
-     *
-     * @hide
-     */
-    public final void writeMapList(List<Map> val) {
-        if (val == null) {
-            writeInt(-1);
-            return;
-        }
-        int N = val.size();
-        int i=0;
-        writeInt(N);
-        while (i < N) {
-            writeMap(val.get(i));
-            i++;
-        }
-    }
-
-    /**
      * Flatten a List containing IBinder objects into the parcel, at
      * the current dataPosition() and growing dataCapacity() if needed.  They
      * can later be retrieved with {@link #createBinderArrayList} or
@@ -1019,7 +991,7 @@ public final class Parcel {
     /**
      * Flatten a generic object in to a parcel.  The given Object value may
      * currently be one of the following types:
-     *
+     * 
      * <ul>
      * <li> null
      * <li> String
@@ -1135,7 +1107,7 @@ public final class Parcel {
     /**
      * Flatten the name of the class of the Parcelable and its contents
      * into the parcel.
-     *
+     * 
      * @param p The Parcelable object to be written.
      * @param parcelableFlags Contextual flags as per
      * {@link Parcelable#writeToParcel(Parcel, int) Parcelable.writeToParcel()}.
@@ -1185,7 +1157,7 @@ public final class Parcel {
      * exception will be re-thrown by this function as a RuntimeException
      * (to be caught by the system's last-resort exception handling when
      * dispatching a transaction).
-     *
+     * 
      * <p>The supported exception types are:
      * <ul>
      * <li>{@link BadParcelableException}
@@ -1194,7 +1166,7 @@ public final class Parcel {
      * <li>{@link NullPointerException}
      * <li>{@link SecurityException}
      * </ul>
-     *
+     * 
      * @param e The Exception to be written.
      *
      * @see #writeNoException
@@ -1627,34 +1599,6 @@ public final class Parcel {
     }
 
     /**
-     * Read and return a new ArrayList containing Map objects from
-     * the parcel that was written with {@link #writeMapList} at the
-     * current dataPosition().  Returns null if the
-     * previously written list object was null.
-     *
-     * @return A newly created ArrayList containing maps with the same data
-     *         as those that were previously written.
-     *
-     * @see #writeMapList
-     *
-     * @hide
-     */
-    public final ArrayList<Map> createMapArrayList() {
-        int N = readInt();
-        if (N < 0) {
-            return null;
-        }
-        ArrayList<Map> l = new ArrayList<Map>(N);
-        while (N > 0) {
-            Map t = new HashMap();
-            readMap(t, null);
-            l.add(t);
-            N--;
-        }
-        return l;
-    }
-
-    /**
      * Read and return a new ArrayList containing IBinder objects from
      * the parcel that was written with {@link #writeBinderList} at the
      * current dataPosition().  Returns null if the
@@ -1696,38 +1640,6 @@ public final class Parcel {
         }
         for (; i<N; i++) {
             list.add(readString());
-        }
-        for (; i<M; i++) {
-            list.remove(N);
-        }
-    }
-
-    /**
-     * Read into the given List items Map objects that were written with
-     * {@link #writeMapList} at the current dataPosition().
-     *
-     * @return A newly created ArrayList containing maps with the same data
-     *         as those that were previously written.
-     *
-     * @see #writeMapList
-     *
-     * @hide
-     */
-    public final void readMapList(List<Map> list) {
-        int M = list.size();
-        int N = readInt();
-        int i = 0;
-        for (; i < M && i < N; i++) {
-            Map t = new HashMap();
-            readMap(t, null);
-
-            list.set(i, t);
-        }
-        for (; i<N; i++) {
-            Map t = new HashMap();
-            readMap(t, null);
-
-            list.add(t);
         }
         for (; i<M; i++) {
             list.remove(N);
@@ -1880,7 +1792,7 @@ public final class Parcel {
             return readArrayList(loader);
 
         case VAL_BOOLEANARRAY:
-            return createBooleanArray();
+            return createBooleanArray();        
 
         case VAL_BYTEARRAY:
             return createByteArray();
