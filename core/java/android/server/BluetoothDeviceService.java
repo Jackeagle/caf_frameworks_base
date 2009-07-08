@@ -42,7 +42,6 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.os.SystemProperties;
 import android.os.SystemService;
 import android.provider.Settings;
 import android.util.Log;
@@ -271,7 +270,7 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
         if (!disable(false)) {
             mRestart = false;
         }
-    }
+    }   
 
     private synchronized void setBluetoothState(int state) {
         if (state == mBluetoothState) {
@@ -299,10 +298,6 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
                 if (isEnabled()) {
                     SystemService.start("hsag");
                     SystemService.start("hfag");
-                    if (SystemProperties.getBoolean("ro.qualcomm.proprietary_obex", false)) {
-                        SystemService.start("bm3OPP");
-                        SystemService.start("bm3FTP");
-                    }
                 }
                 break;
             case MESSAGE_FINISH_DISABLE:

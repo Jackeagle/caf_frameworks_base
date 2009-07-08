@@ -1,17 +1,16 @@
 /*
 ** Copyright 2006, The Android Open Source Project
-** Copyright (c) 2009, Code Aurora Forum, Inc. All rights reserved.
 **
-** Licensed under the Apache License, Version 2.0 (the "License");
-** you may not use this file except in compliance with the License.
-** You may obtain a copy of the License at
+** Licensed under the Apache License, Version 2.0 (the "License"); 
+** you may not use this file except in compliance with the License. 
+** You may obtain a copy of the License at 
 **
-**     http://www.apache.org/licenses/LICENSE-2.0
+**     http://www.apache.org/licenses/LICENSE-2.0 
 **
-** Unless required by applicable law or agreed to in writing, software
-** distributed under the License is distributed on an "AS IS" BASIS,
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-** See the License for the specific language governing permissions and
+** Unless required by applicable law or agreed to in writing, software 
+** distributed under the License is distributed on an "AS IS" BASIS, 
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+** See the License for the specific language governing permissions and 
 ** limitations under the License.
 */
 
@@ -42,10 +41,6 @@
 #endif
 
 #include <cutils/properties.h>
-
-#define DBUS_SVC_NAME   BLUEZ_DBUS_BASE_SVC
-#define DBUS_CLASS_NAME BLUEZ_DBUS_BASE_IFC ".Adapter"
-#define LOG_TAG "BluetoothDeviceService.cpp"
 
 namespace android {
 
@@ -137,9 +132,9 @@ static jstring getNameNative(JNIEnv *env, jobject object){
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
-        DBusMessage *reply = dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                                            nat->adapter, DBUS_CLASS_NAME,
-                                            "GetName", DBUS_TYPE_INVALID);
+        DBusMessage *reply = dbus_func_args(env, nat->conn, nat->adapter,
+                                            DBUS_CLASS_NAME, "GetName",
+                                            DBUS_TYPE_INVALID);
         return reply ? dbus_returns_string(env, reply) : NULL;
     }
 #endif
@@ -352,9 +347,9 @@ static jboolean isPeriodicDiscoveryNative(JNIEnv *env, jobject object) {
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn,DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME,
-                           "IsPeriodicDiscovery", DBUS_TYPE_INVALID);
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "IsPeriodicDiscovery",
+                           DBUS_TYPE_INVALID);
         return reply ? dbus_returns_boolean(env, reply) : JNI_FALSE;
     }
 #endif
@@ -372,9 +367,8 @@ static jboolean setDiscoverableTimeoutNative(JNIEnv *env, jobject object, jint t
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME,
-                           "SetDiscoverableTimeout",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "SetDiscoverableTimeout",
                            DBUS_TYPE_UINT32, &timeout_s,
                            DBUS_TYPE_INVALID);
         if (reply != NULL) {
@@ -392,9 +386,9 @@ static jint getDiscoverableTimeoutNative(JNIEnv *env, jobject object) {
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME,
-                           "GetDiscoverableTimeout", DBUS_TYPE_INVALID);
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "GetDiscoverableTimeout",
+                           DBUS_TYPE_INVALID);
         return reply ? dbus_returns_uint32(env, reply) : -1;
     }
 #endif
@@ -408,8 +402,8 @@ static jboolean isConnectedNative(JNIEnv *env, jobject object, jstring address) 
     if (nat) {
         const char *c_address = env->GetStringUTFChars(address, NULL);
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "IsConnected",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "IsConnected",
                            DBUS_TYPE_STRING, &c_address,
                            DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
@@ -431,9 +425,8 @@ static void disconnectRemoteDeviceNative(JNIEnv *env, jobject object, jstring ad
         // delay of 2 seconds, after which the actual disconnect takes
         // place.
         DBusMessage *reply =
-            dbus_func_args_timeout(env, nat->conn, 60000, DBUS_SVC_NAME,
-                                   nat->adapter, DBUS_CLASS_NAME,
-                                   "DisconnectRemoteDevice",
+            dbus_func_args_timeout(env, nat->conn, 60000, nat->adapter,
+                                   DBUS_CLASS_NAME, "DisconnectRemoteDevice",
                                    DBUS_TYPE_STRING, &c_address,
                                    DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
@@ -448,8 +441,8 @@ static jstring getModeNative(JNIEnv *env, jobject object) {
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "GetMode",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "GetMode",
                            DBUS_TYPE_INVALID);
         return reply ? dbus_returns_string(env, reply) : NULL;
     }
@@ -464,8 +457,8 @@ static jboolean setModeNative(JNIEnv *env, jobject object, jstring mode) {
     if (nat) {
         const char *c_mode = env->GetStringUTFChars(mode, NULL);
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "SetMode",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "SetMode",
                            DBUS_TYPE_STRING, &c_mode,
                            DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(mode, c_mode);
@@ -495,9 +488,8 @@ static jboolean createBondingNative(JNIEnv *env, jobject object,
         strlcpy(context_address, c_address, BTADDR_SIZE);  // for callback
         bool ret = dbus_func_args_async(env, nat->conn, (int)timeout_ms,
                                         onCreateBondingResult, // callback
-                                        context_address, // user data
+                                        context_address,
                                         eventLoopNat,
-                                        DBUS_SVC_NAME,
                                         nat->adapter,
                                         DBUS_CLASS_NAME, "CreateBonding",
                                         DBUS_TYPE_STRING, &c_address,
@@ -519,7 +511,7 @@ static jboolean cancelBondingProcessNative(JNIEnv *env, jobject object,
         const char *c_address = env->GetStringUTFChars(address, NULL);
         LOGV("... address = %s", c_address);
         DBusMessage *reply =
-            dbus_func_args_timeout(env, nat->conn, -1, DBUS_SVC_NAME, nat->adapter,
+            dbus_func_args_timeout(env, nat->conn, -1, nat->adapter,
                                    DBUS_CLASS_NAME, "CancelBondingProcess",
                                    DBUS_TYPE_STRING, &c_address,
                                    DBUS_TYPE_INVALID);
@@ -544,7 +536,7 @@ static jboolean removeBondingNative(JNIEnv *env, jobject object, jstring address
         DBusError err;
         dbus_error_init(&err);
         DBusMessage *reply =
-            dbus_func_args_error(env, nat->conn, &err, DBUS_SVC_NAME, nat->adapter,
+            dbus_func_args_error(env, nat->conn, &err, nat->adapter,
                                  DBUS_CLASS_NAME, "RemoveBonding",
                                  DBUS_TYPE_STRING, &c_address,
                                  DBUS_TYPE_INVALID);
@@ -576,8 +568,8 @@ static jobjectArray listBondingsNative(JNIEnv *env, jobject object) {
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "ListBondings",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "ListBondings",
                            DBUS_TYPE_INVALID);
         // return String[]
         return reply ? dbus_returns_array_of_strings(env, reply) : NULL;
@@ -592,8 +584,8 @@ static jobjectArray listConnectionsNative(JNIEnv *env, jobject object) {
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "ListConnections",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "ListConnections",
                            DBUS_TYPE_INVALID);
         // return String[]
         return reply ? dbus_returns_array_of_strings(env, reply) : NULL;
@@ -608,8 +600,8 @@ static jobjectArray listRemoteDevicesNative(JNIEnv *env, jobject object) {
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "ListRemoteDevices",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "ListRemoteDevices",
                            DBUS_TYPE_INVALID);
         return reply ? dbus_returns_array_of_strings(env, reply) : NULL;
     }
@@ -625,8 +617,8 @@ static jstring common_Get(JNIEnv *env, jobject object, const char *func) {
         DBusError err;
         dbus_error_init(&err);
         DBusMessage *reply =
-            dbus_func_args_error(env, nat->conn, &err, DBUS_SVC_NAME,
-                                 nat->adapter, DBUS_CLASS_NAME, func,
+            dbus_func_args_error(env, nat->conn, &err, nat->adapter,
+                                 DBUS_CLASS_NAME, func,
                                  DBUS_TYPE_INVALID);
         if (reply) {
             return dbus_returns_string(env, reply);
@@ -665,9 +657,8 @@ static jboolean setNameNative(JNIEnv *env, jobject obj, jstring name) {
     native_data_t *nat = get_native_data(env, obj);
     if (nat) {
         const char *c_name = env->GetStringUTFChars(name, NULL);
-        DBusMessage *reply = dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                                            nat->adapter, DBUS_CLASS_NAME,
-                                            "SetName",
+        DBusMessage *reply = dbus_func_args(env, nat->conn, nat->adapter,
+                                            DBUS_CLASS_NAME, "SetName",
                                             DBUS_TYPE_STRING, &c_name,
                                             DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(name, c_name);
@@ -693,8 +684,8 @@ static jstring common_getRemote(JNIEnv *env, jobject object, const char *func,
         LOGV("... address = %s", c_address);
 
         DBusMessage *reply =
-            dbus_func_args_error(env, nat->conn, &err, DBUS_SVC_NAME,
-                                 nat->adapter, DBUS_CLASS_NAME, func,
+            dbus_func_args_error(env, nat->conn, &err, nat->adapter,
+                                 DBUS_CLASS_NAME, func,
                                  DBUS_TYPE_STRING, &c_address,
                                  DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
@@ -755,8 +746,8 @@ static jint getRemoteClassNative(JNIEnv *env, jobject object, jstring address) {
         LOGV("... address = %s", c_address);
 
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "GetRemoteClass",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "GetRemoteClass",
                            DBUS_TYPE_STRING, &c_address,
                            DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
@@ -787,8 +778,8 @@ static jbyteArray getRemoteFeaturesNative(JNIEnv *env, jobject object,
         LOGV("... address = %s", c_address);
 
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME, "GetRemoteFeatures",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "GetRemoteFeatures",
                            DBUS_TYPE_STRING, &c_address,
                            DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
@@ -812,9 +803,8 @@ static jintArray getRemoteServiceHandlesNative(JNIEnv *env, jobject object,
         LOGV("... address = %s match = %s", c_address, c_match);
 
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME,
-                           "GetRemoteServiceHandles",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "GetRemoteServiceHandles",
                            DBUS_TYPE_STRING, &c_address,
                            DBUS_TYPE_STRING, &c_match,
                            DBUS_TYPE_INVALID);
@@ -859,9 +849,8 @@ static jbyteArray getRemoteServiceRecordNative(JNIEnv *env, jobject object,
         LOGV("... address = %s", c_address);
 
         DBusMessage *reply =
-            dbus_func_args(env, nat->conn, DBUS_SVC_NAME,
-                           nat->adapter, DBUS_CLASS_NAME,
-                           "GetRemoteServiceRecord",
+            dbus_func_args(env, nat->conn, nat->adapter,
+                           DBUS_CLASS_NAME, "GetRemoteServiceRecord",
                            DBUS_TYPE_STRING, &c_address,
                            DBUS_TYPE_UINT32, &handle,
                            DBUS_TYPE_INVALID);
@@ -891,7 +880,6 @@ static jboolean getRemoteServiceChannelNative(JNIEnv *env, jobject object,
         bool ret = dbus_func_args_async(env, nat->conn, 20000,  // ms
                            onGetRemoteServiceChannelResult, context_address,
                            eventLoopNat,
-                           DBUS_SVC_NAME,
                            nat->adapter,
                            DBUS_CLASS_NAME, "GetRemoteServiceChannel",
                            DBUS_TYPE_STRING, &c_address,
