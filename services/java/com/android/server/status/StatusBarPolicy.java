@@ -57,6 +57,7 @@ import com.android.internal.R;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.location.GpsLocationProvider;
 import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.telephony.cdma.TtyIntent;
@@ -885,6 +886,14 @@ public class StatusBarPolicy {
     }
 
     private final void updateSignalStrength() {
+            //Get the networkMode from Settings.System
+        int settingsNetworkMode = android.provider.Settings.Secure.getInt(mContext.
+                getContentResolver(),android.provider.Settings.Secure.PREFERRED_NETWORK_MODE, 
+                Phone.PREFERRED_NT_MODE);
+
+        boolean isSetToCdma = false;
+        boolean isSetToEvdo = false;
+    
         int iconLevel = -1;
         int evdoIconLevel = -1;
         int[] iconList;
@@ -898,12 +907,27 @@ public class StatusBarPolicy {
             } else {
                 mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_null;
             }
+            mService.setIconVisibility(mPhoneIcon,true);
             mService.updateIcon(mPhoneIcon, mPhoneData, null);
             mService.setIconVisibility(mPhoneEvdoIcon,false);
             return;
         }
 
-        if (!isCdma()) {
+        if (settingsNetworkMode == Phone.NT_MODE_EVDO_NO_CDMA) {
+            isSetToCdma = false;
+            mService.setIconVisibility(mPhoneIcon,false);
+        } else {
+            isSetToCdma = true;
+            mService.setIconVisibility(mPhoneIcon,true);
+        }
+
+        if (settingsNetworkMode == Phone.NT_MODE_CDMA_NO_EVDO) {
+            isSetToEvdo = false;
+        } else {
+            isSetToEvdo = true;
+        }
+
+        if (!isCdma() && !isSetToCdma && !isSetToEvdo ) {
             int asu = mSignalStrength.getGsmSignalStrength();
 
             // ASU ranges from 0 to 31 - TS 27.007 Sec 8.5
@@ -929,7 +953,8 @@ public class StatusBarPolicy {
             int levelDbm = 0;
             int levelEcio = 0;
 
-            if (cdmaDbm >= -75) levelDbm = 4;
+            if (cdmaDbm == -1) levelDbm = 0;
+            else if (cdmaDbm >= -75) levelDbm = 4;
             else if (cdmaDbm >= -85) levelDbm = 3;
             else if (cdmaDbm >= -95) levelDbm = 2;
             else if (cdmaDbm >= -100) levelDbm = 1;
@@ -943,6 +968,8 @@ public class StatusBarPolicy {
             else levelEcio = 0;
 
             iconLevel = (levelDbm < levelEcio) ? levelDbm : levelEcio;
+            mPhoneData.iconId = iconList[iconLevel];
+            mService.updateIcon(mPhoneIcon, mPhoneData, null);
         }
 
         if ((mServiceState.getRadioTechnology() == ServiceState.RADIO_TECHNOLOGY_EVDO_0)
@@ -956,11 +983,11 @@ public class StatusBarPolicy {
             int levelEvdoSnr = 0;
 
             // Ec/Io are in dB*10
-            if (evdoEcio >= -650) levelEvdoEcio = 4;
-            else if (evdoEcio >= -750) levelEvdoEcio = 3;
-            else if (evdoEcio >= -900) levelEvdoEcio = 2;
-            else if (evdoEcio >= -1050) levelEvdoEcio = 1;
-            else levelEvdoEcio = 0;
+            if (evdoEcio >= -50) levelEvdoEcio = 0;
+            else if (evdoEcio >= -650) levelEvdoEcio = 1;
+            else if (evdoEcio >= -750) levelEvdoEcio = 2;
+            else if (evdoEcio >= -900) levelEvdoEcio = 3;
+            else levelEvdoEcio = 4;
 
             if (evdoSnr > 7) levelEvdoSnr = 4;
             else if (evdoSnr > 5) levelEvdoSnr = 3;
@@ -976,9 +1003,6 @@ public class StatusBarPolicy {
         } else {
             mService.setIconVisibility(mPhoneEvdoIcon,false);
         }
-
-        mPhoneData.iconId = iconList[iconLevel];
-        mService.updateIcon(mPhoneIcon, mPhoneData, null);
     }
 
     private final void updateDataNetType() {
