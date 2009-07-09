@@ -21,8 +21,8 @@ import com.android.internal.telephony.TelephonyTests;
 import junit.framework.TestSuite;
 
 import android.graphics.ColorStateListTest;
-import android.location.LocationManagerProximityTest;
-import android.location.LocationTest;
+//import android.location.LocationManagerProximityTest;
+//import android.location.LocationTest;
 import android.test.AndroidTestRunnerTest;
 import android.test.InstrumentationTestRunnerTest;
 import android.util.*;
@@ -55,8 +55,8 @@ public class CoreTests extends TestSuite {
         suite.addTest(TelephonyTests.suite());
         suite.addTestSuite(FloatMathTest.class);
         suite.addTest(JavaTests.suite());
-        suite.addTestSuite(LocationTest.class);
-        suite.addTestSuite(LocationManagerProximityTest.class);
+        //suite.addTestSuite(LocationTest.class);
+        //suite.addTestSuite(LocationManagerProximityTest.class);
         suite.addTestSuite(AndroidTestRunnerTest.class);
         suite.addTestSuite(InstrumentationTestRunnerTest.class);
         suite.addTestSuite(CookieTest.class);
