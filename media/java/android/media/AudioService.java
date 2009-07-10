@@ -729,9 +729,9 @@ public class AudioService extends IAudioService.Stub {
                                 mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_EARPIECE;
                             }
                             mRoutes[AudioSystem.MODE_RINGTONE] = (mRoutes[AudioSystem.MODE_RINGTONE] & AudioSystem.ROUTE_BLUETOOTH_A2DP) |
-                                                                 AudioSystem.ROUTE_SPEAKER;
+                                                                 AudioSystem.ROUTE_EARPIECE;
                             mRoutes[AudioSystem.MODE_NORMAL] = (mRoutes[AudioSystem.MODE_NORMAL] & AudioSystem.ROUTE_BLUETOOTH_A2DP) |
-                                                               AudioSystem.ROUTE_SPEAKER;
+                                                               AudioSystem.ROUTE_EARPIECE;
                         }
                         incallMask = AudioSystem.ROUTE_ALL;
                         // A2DP has higher priority than SCO headset, so headset connect/disconnect events
@@ -768,9 +768,9 @@ public class AudioService extends IAudioService.Stub {
                                 mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_EARPIECE;
                             }
                             mRoutes[AudioSystem.MODE_RINGTONE] = (mRoutes[AudioSystem.MODE_RINGTONE] & AudioSystem.ROUTE_BLUETOOTH_A2DP) |
-                                                                 AudioSystem.ROUTE_SPEAKER;
+                                                                 AudioSystem.ROUTE_EARPIECE;
                             mRoutes[AudioSystem.MODE_NORMAL] = (mRoutes[AudioSystem.MODE_NORMAL] & AudioSystem.ROUTE_BLUETOOTH_A2DP) |
-                                                               AudioSystem.ROUTE_SPEAKER;
+                                                               AudioSystem.ROUTE_EARPIECE;
 
                             incallMask = AudioSystem.ROUTE_ALL;
                             // A2DP has higher priority than wired headset, so headset connect/disconnect events
