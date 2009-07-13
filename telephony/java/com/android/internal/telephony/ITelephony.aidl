@@ -220,6 +220,13 @@ interface ITelephony {
      * and TelephonyManager.PHONE_TYPE_GSM if RILConstants.GSM_PHONE
      */
     int getActivePhoneType();
+    
+    /**
+     * Sends a OEM request to the RIL and returns the response back to the
+     * Caller. The return value is null if there is no response or if sending the
+     * request failed.
+     */
+    byte[] sendOemRilRequestRaw(in byte []requestBytes);
 
 }
 
