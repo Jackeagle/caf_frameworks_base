@@ -163,6 +163,9 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
             mMediaPlayer.stop();
             mMediaPlayer.release();
             mMediaPlayer = null;
+
+            mVideoWidth = 0;
+            mVideoHeight = 0;
         }
     }
 
