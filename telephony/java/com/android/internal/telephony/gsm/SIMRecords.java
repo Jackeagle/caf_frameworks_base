@@ -1278,6 +1278,15 @@ public final class SIMRecords extends IccRecords {
                 new AdnRecordLoader(phone).loadFromEF(EF_MAILBOX_CPHS, EF_EXT1,
                         1, obtainMessage(EVENT_GET_CPHS_MAILBOX_DONE));
                 break;
+            case EF_OPL:
+            case EF_PNN:
+                 if (getOnsAlg() == EONS_ALG) {
+                     //Update EONS data from EF_OPL/EF_PNN files when there is a sim
+                     //refresh indication for these files.
+                     Log.i(EONS_TAG,"SIM Refresh called for EF_OPL/EF_PNN");
+                     fetchOplRecords();
+                 }
+                 break;
             default:
                 // For now, fetch all records if this is not a
                 // voicemail number.
