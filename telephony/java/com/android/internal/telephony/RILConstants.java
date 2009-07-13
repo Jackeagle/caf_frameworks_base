@@ -38,6 +38,8 @@ public interface RILConstants {
     int OP_NOT_ALLOWED_BEFORE_REG_NW = 9;     /* request is not allowed before device registers to
                                                  network */
     int SMS_SEND_FAIL_RETRY = 10;             /* send sms fail and need retry */
+    int FDN_CHECK_FAILURE = 14;              /* send operation barred error when FDN is enabled and the user
+                                                sends sms or call or sends USSD string to non FDN number. */
 
     /* NETWORK_MODE_* See ril.h RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE */
     int NETWORK_MODE_WCDMA_PREF     = 0; /* GSM/WCDMA (WCDMA preferred) */

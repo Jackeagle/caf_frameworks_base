@@ -438,4 +438,9 @@ public final class SmsManager {
     static public final int RESULT_ERROR_NULL_PDU           = 3;
     /** Failed because service is currently unavailable */
     static public final int RESULT_ERROR_NO_SERVICE         = 4;
+    /*
+     * Failed because FDN is enabled.
+     * @hide
+     */
+    static public final int RESULT_ERROR_FDN_FAILURE        = 5;
 }

@@ -37,6 +37,7 @@ public class CommandException extends RuntimeException {
         OP_NOT_ALLOWED_DURING_VOICE_CALL,
         OP_NOT_ALLOWED_BEFORE_REG_NW,
         SMS_FAIL_RETRY,
+        FDN_FAILURE,
     }
 
     public CommandException(Error e) {
@@ -68,6 +69,8 @@ public class CommandException extends RuntimeException {
                 return new CommandException(Error.OP_NOT_ALLOWED_BEFORE_REG_NW);
             case RILConstants.SMS_SEND_FAIL_RETRY:
                 return new CommandException(Error.SMS_FAIL_RETRY);
+            case RILConstants.FDN_CHECK_FAILURE:
+                return new CommandException(Error.FDN_FAILURE);
             default:
                 Log.e("GSM", "Unrecognized RIL errno " + ril_errno);
                 return new CommandException(Error.INVALID_RESPONSE);
