@@ -1432,7 +1432,11 @@ public class Preference implements Comparable<Preference>, OnDependencyChangeLis
     
     @Override
     public String toString() {
-        return getFilterableStringBuilder().toString();
+        StringBuilder sb = getFilterableStringBuilder();
+        if (sb != null)
+            return sb.toString();
+        else
+            return "";
     }
         
     /**
@@ -1457,8 +1461,12 @@ public class Preference implements Comparable<Preference>, OnDependencyChangeLis
             sb.append(summary).append(' ');
         }
         // Drop the last space
-        sb.setLength(sb.length() - 1);
-        return sb;
+        if (sb.length() != 0) {
+            sb.setLength(sb.length() - 1);
+            return sb;
+        }
+        else
+            return null;
     }
 
     /**
