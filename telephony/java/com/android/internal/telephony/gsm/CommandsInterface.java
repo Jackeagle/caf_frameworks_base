@@ -58,7 +58,8 @@ public interface CommandsInterface
         SIM_READY,
         SIM_PIN,
         SIM_PUK,
-        SIM_NETWORK_PERSONALIZATION
+        SIM_NETWORK_PERSONALIZATION,
+        SIM_CARD_IO_ERROR
     }
 
     //***** Constants

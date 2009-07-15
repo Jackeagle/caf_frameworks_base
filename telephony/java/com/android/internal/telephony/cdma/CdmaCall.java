@@ -91,6 +91,12 @@ public final class CdmaCall extends Call {
         owner.hangup(this);
     }
 
+    public void
+    hangupActiveMenu() throws CallStateException
+    {
+        owner.hangup(this);
+    }
+
     public String
     toString() {
         return state.toString();

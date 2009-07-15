@@ -183,7 +183,14 @@ KeyCharacterMap::load(int id)
     }
 
     //snprintf(path, sizeof(path), "%s/usr/keychars/qwerty.kcm.bin", root);
+    #ifdef FFA7K
+    snprintf(path, sizeof(path), "%s/usr/keychars/7k_ffa_keypad.kcm.bin", root);
+    #elif FFA8K
+    snprintf(path, sizeof(path), "%s/usr/keychars/8k_ffa_keypad.kcm.bin", root);
+    #else
     snprintf(path, sizeof(path), "%s/usr/keychars/surf_keypad.kcm.bin", root);
+    #endif
+
     rv = try_file(path);
     if (rv == NULL) {
         LOGE("Can't find any keycharmaps (also tried %s)", path);

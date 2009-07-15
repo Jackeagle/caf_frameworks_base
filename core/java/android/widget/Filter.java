@@ -106,6 +106,14 @@ public abstract class Filter {
     }
 
     /**
+     * @return Handler
+     * @hide
+     */
+    public final Handler getHandler() {
+        return mThreadHandler;
+    }
+
+    /**
      * <p>Invoked in a worker thread to filter the data according to the
      * constraint. Subclasses must implement this method to perform the
      * filtering operation. Results computed by the filtering operation

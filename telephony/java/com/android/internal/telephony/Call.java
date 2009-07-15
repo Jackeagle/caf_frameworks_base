@@ -57,6 +57,7 @@ public abstract class Call {
     public abstract Phone getPhone();
     public abstract boolean isMultiparty();
     public abstract void hangup() throws CallStateException;
+    public abstract void hangupActiveMenu() throws CallStateException;
 
 
     /**

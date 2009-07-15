@@ -55,6 +55,9 @@
     <!-- Displayed when the user dialed an MMI code whose function
          could not be performed. This will be displayed in a toast. -->
     <string name="mmiError">Rejected.</string>
+    <!-- Displayed when the user dialed an MMI code whose function
+    could not be performed because FDN is enabled. This will be displayed in a toast. -->
+    <string name="mmiFdnError">Operation barred,Fixed dialing numbers only.</string>
     <!-- Displayed when a phone feature such as call barring was activated. -->
     <string name="serviceEnabled">Service was enabled.</string>
     <!-- Displayed in front of the list of a set of service classes
@@ -1189,6 +1192,11 @@
     <!-- Shown in the lock screen to ask the user to insert a SIM card. -->
     <string name="lockscreen_missing_sim_instructions">Please insert a SIM card.</string>
 
+
+    <!-- Shown in the lock screen when there is SIM card IO error. -->
+    <string name="lockscreen_sim_error_message_short">Card Error.</string>
+    <!-- Shown in the lock screen when there is SIM card error. -->
+    <string name="lockscreen_sim_error_message">SIM card is faulty.</string>
 
     <!-- When the user inserts a sim card from an unsupported network, it becomes network
          locked -->
@@ -2357,7 +2365,14 @@
     <string name="managed_roaming_dialog_content">Network with Limited Service found. Do you want to initiate a Network Search?</string>
     <string name="managed_roaming_dialog_ok_button">Yes</string>
     <string name="managed_roaming_dialog_cancel_button">No</string>
-    
+
+    <!-- GSM limited service strings for "Network rejection" dialog -->
+    <string name="limited_service">Emergency Calls Only</string>
+    <string name="authentication_reject">SIM not allowed</string>
+    <string name="imsi_unknown_hlr">SIM not provisioned MM #2</string>
+    <string name="illegal_ms">SIM not allowed MM #3</string>
+    <string name="illegal_me">Phone not allowed MM #6</string>
+
     <!-- Strings for search suggestions. These are going here because they are referenced by both 
          ContactsProvider and GoogleContactsProvider -->
     <skip />

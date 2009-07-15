@@ -72,6 +72,10 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_OPERAT
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_OPERATOR_ISROAMING;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_OPERATOR_NUMERIC;
 
+import android.media.ToneGenerator;
+import android.media.AudioManager;
+import android.view.KeyEvent;
+
 import com.android.internal.R;
 
 import java.util.Arrays;
@@ -83,6 +87,11 @@ import java.util.TimeZone;
  * {@hide}
  */
 final class GsmServiceStateTracker extends ServiceStateTracker {
+
+   private static final int FOCUS_BEEP_VOLUME = 100;
+   private static final int MSG_ID_TIMEOUT = 1;
+   private final static int DIALOG_TIMEOUT =  2 * 60 * 1000;
+
     //***** Instance Variables
     GSMPhone phone;
     GsmCellLocation cellLoc;
@@ -194,6 +203,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
 
     // Registration denied - Managed Roaming dialog
     private static boolean display_managed_roaming_dialog = false;
+    private ToneGenerator mToneGenerator;
+    private AlertDialog networkDialog;
 
   //***** Time Zones
 
@@ -634,16 +645,26 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     
     protected void updateSpnDisplay() {
         int rule = phone.mSIMRecords.getDisplayRule(ss.getOperatorNumeric());
+        String pnn = phone.mSIMRecords.getPnnLongName();
         String spn = phone.mSIMRecords.getServiceProviderName();
         String plmn = ss.getOperatorAlphaLong();
 
+        if ((phone.mSIMRecords.getOnsAlg() == EONS_ALG) && pnn != null) {
+            plmn = pnn;
+        }
         if (rule != curSpnRule
                 || !TextUtils.equals(spn, curSpn)
                 || !TextUtils.equals(plmn, curPlmn)) {
             boolean showSpn =
                 (rule & SIMRecords.SPN_RULE_SHOW_SPN) == SIMRecords.SPN_RULE_SHOW_SPN;
-            boolean showPlmn =
-                (rule & SIMRecords.SPN_RULE_SHOW_PLMN) == SIMRecords.SPN_RULE_SHOW_PLMN;
+            boolean showPlmn;
+            if (phone.mSIMRecords.getOnsAlg() == EONS_ALG) {
+                showPlmn = true;
+            }
+            else {
+                showPlmn =
+                   (rule & SIMRecords.SPN_RULE_SHOW_PLMN) == SIMRecords.SPN_RULE_SHOW_PLMN;
+            }
             Intent intent = new Intent(Intents.SPN_STRINGS_UPDATED_ACTION);
             intent.putExtra(Intents.EXTRA_SHOW_SPN, showSpn);
             intent.putExtra(Intents.EXTRA_SPN, spn);
@@ -717,6 +738,42 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     }
 
                     mGsmRoaming = regCodeIsRoaming(regState);
+
+                    if (regState == 3) {
+                       String adaptProp = SystemProperties.get("persist.cust.tel.adapt") ;
+                       String roamProp = SystemProperties.get("persist.cust.tel.managed.roam") ;
+                       int rejCode = Integer.parseInt(states[13]);
+                       //Chcek if registration denied and whether the option to display the cause of
+                       //network reject is enabled.
+                       if (adaptProp != null && adaptProp.length() != 0) {
+                          try {
+                             if (Integer.valueOf(adaptProp) == 1) {
+                                handleNetworkRejection(rejCode);
+                             }
+                          }
+                          catch(Exception e){
+                             Log.e(LOG_TAG,"Exception while reading value of Adapt Feature flag" + e);
+                          }
+                       }
+                       //Check if Managed Roaming is enabled
+                       if (roamProp != null && roamProp.length() != 0) {
+                          try {
+                             if ((Integer.valueOf(roamProp) == 1) && (rejCode == 10)) {
+                                String user_selected_network_mode = Settings.System.getString(
+                                   phone.getContext().getContentResolver(), Settings.System.NETWORK_SELECTION_MODE);
+                                if (user_selected_network_mode.equals("Manual")) {
+                                   if (!display_managed_roaming_dialog) {
+                                      createManagedRoamingDialog();
+                                   }
+                                }
+                             }
+                          }
+                          catch(Exception e){
+                             Log.e(LOG_TAG,"Exception while reading value of Adapt Feature flag" + e);
+                          }
+                       }
+                    }
+
                     newSS.setState (regCodeToServiceState(regState));
 
                     // LAC and CID are -1 if not avail
@@ -1309,6 +1366,142 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
        managed_roaming_dialog.show();
     }
 
+    Handler mTimeoutHandler = new Handler() {
+       @Override
+          public void handleMessage(Message msg) {
+             switch(msg.what) {
+                case MSG_ID_TIMEOUT:
+                   if (networkDialog != null) {
+                      networkDialog.dismiss();
+                      networkDialog = null;
+                      postDismissDialog();
+                   }
+                   break;
+             }
+          }
+    };
+
+    private void handleLimitedService(String plmn,String spn,Boolean showSpn,Boolean showPlmn) {
+       Intent intent = new Intent(Intents.SPN_STRINGS_UPDATED_ACTION);
+       intent.putExtra(Intents.EXTRA_SHOW_SPN, showSpn);
+       intent.putExtra(Intents.EXTRA_SPN, spn);
+       intent.putExtra(Intents.EXTRA_SHOW_PLMN, showPlmn);
+       intent.putExtra(Intents.EXTRA_PLMN, plmn);
+       phone.getContext().sendStickyBroadcast(intent);
+    }
+
+    private void postDismissDialog()
+    {
+       Resources r = Resources.getSystem();
+       if (mToneGenerator != null)
+          mToneGenerator = null;
+       String plmn = r.getString(R.string.limited_service);
+       String spn = phone.mSIMRecords.getServiceProviderName();
+       handleLimitedService(plmn,spn,false,true);
+    }
+
+    DialogInterface.OnKeyListener mDialogOnKeyListener =
+       new DialogInterface.OnKeyListener() {
+          public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
+             if (keyCode != KeyEvent.KEYCODE_MENU) {
+                  if (dialog != null) {
+                   dialog.dismiss();
+                   postDismissDialog();
+                   return true;
+                  }
+                  return false;
+             }
+             return false;
+          }
+       };
+
+    private void showDialog(String msg)
+    {
+       networkDialog = new AlertDialog.Builder(phone.getContext())
+          .setMessage(msg)
+          .setCancelable(true)
+          .create();
+       networkDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_DIALOG);
+       networkDialog.setOnKeyListener(mDialogOnKeyListener);
+          networkDialog.show();
+       mTimeoutHandler.sendMessageDelayed(mTimeoutHandler
+             .obtainMessage(MSG_ID_TIMEOUT), DIALOG_TIMEOUT);
+       try {
+          mToneGenerator = new ToneGenerator(AudioManager.STREAM_SYSTEM, FOCUS_BEEP_VOLUME);
+       } catch (RuntimeException e) {
+          Log.w(LOG_TAG, "Exception caught while creating local tone generator: " + e);
+          mToneGenerator = null;
+       }
+       if (mToneGenerator != null) {
+          mToneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2);
+       }
+    }
+
+    private void handleNetworkRejection(int rejCode)
+    {
+       Resources r = Resources.getSystem();
+       String spn = phone.mSIMRecords.getServiceProviderName();
+       String plmn = ss.getOperatorAlphaLong();
+       boolean showSpn = true;
+       boolean showPlmn = true;
+       String msg = null;
+
+       switch (rejCode) {
+          /* For cases 1 to 4 the rejection message should be displayed on the UI and the
+           * message "EMERGENCY CALLS ONLY" displayed in the alpha tag area
+           */
+          case 1: /* Authentication failure */
+             msg = r.getString(R.string.authentication_reject);
+             showDialog(msg);
+             break;
+          case 2: /* IMSI unknown in HLR CDR-NWS-2400 */
+             msg = r.getString(R.string.imsi_unknown_hlr);
+             showDialog(msg);
+             break;
+          case 3: /* Illegal MS CDR-NWS-2401 */
+             msg = r.getString(R.string.illegal_ms);
+             showDialog(msg);
+             break;
+          case 4: /* Illegal ME CDR-NWS-2404 */
+             msg = r.getString(R.string.illegal_me);
+             showDialog(msg);
+             break;
+
+             /* For cases 5 to 8 the message "EMERGENCY CALLS ONLY" displayed in the
+              * alpha area
+              */
+          case 5: /* PLMN not allowed CDR-NWS-2405 */
+          case 6: /* Location area not allowed CDR-NWS-2406 */
+          case 7: /* Roaming not allowed in this location area CDR-NWS-2407 */
+          case 8: /* No Suitable Cells in this Location Area CDR-NWS-2408 */
+             plmn = r.getString(R.string.limited_service);
+             handleLimitedService(plmn,spn,false,true);
+             break;
+
+             /* Here the alpha area should be blank */
+          case 9: /*Network failure*/
+             plmn = null;
+             handleLimitedService(plmn,spn,false,false);
+             break;
+
+             /* Show the "Managed Roaming dialog if user preferred
+              * network selection mode is 'Manual'
+              */
+          case 10: /*Managed Roaming Specific Cause*/
+             String user_selected_network_mode = Settings.System.getString(
+                   phone.getContext().getContentResolver(), Settings.System.NETWORK_SELECTION_MODE);
+             if (user_selected_network_mode.equals("Manual")) {
+                if (!display_managed_roaming_dialog) {
+                   createManagedRoamingDialog();
+                }
+             }
+             break;
+
+          default:
+             break;
+       }
+    }
+
     /** code is registration state 0-5 from TS 27.007 7.2 */
     private int
     regCodeToServiceState(int code) {
@@ -1318,17 +1511,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 return ServiceState.STATE_OUT_OF_SERVICE;
 
             case 3: // 3 is "registration denied"
-                /* This indicates limited service. Show the "Managed Roaming"
-                 * dialog if user preferred network selection mode is 'Manual'
-                 */
-                String user_selected_network_mode = Settings.System.getString(
-                    phone.getContext().getContentResolver(), Settings.System.NETWORK_SELECTION_MODE);
-                if (user_selected_network_mode.equals("Manual")) {
-                    if (!display_managed_roaming_dialog) {
-                        createManagedRoamingDialog();
-                    }
-                }
-                return ServiceState.STATE_OUT_OF_SERVICE;
+                /* This indicates limited service.*/
+               return ServiceState.STATE_OUT_OF_SERVICE;
 
             case 4: // 4 is "unknown" no vaild in current baseband
                 return ServiceState.STATE_OUT_OF_SERVICE;

@@ -488,6 +488,13 @@ public class BaseInputConnection implements InputConnection {
         } else {
             a = Selection.getSelectionStart(content);
             b = Selection.getSelectionEnd(content);
+            // Add a check when start or end index is less than zero to prevent
+            // IndexOutOfBoundsException with negative indices. Also applies to
+            // scenario when both start and end index are negative.
+            if (a < 0)
+                a = 0;
+            if (b < 0)
+                b = 0;
             if (a >=0 && b>= 0 && a != b) {
                 if (b < a) {
                     int tmp = a;

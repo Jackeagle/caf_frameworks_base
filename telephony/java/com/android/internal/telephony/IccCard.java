@@ -29,6 +29,8 @@ public interface IccCard {
     static public final String INTENT_VALUE_ICC_NOT_READY = "NOT_READY";
     /* ABSENT means ICC is missing */
     static public final String INTENT_VALUE_ICC_ABSENT = "ABSENT";
+    /* CARD_IO_ERROR means for three consecutive times there was SIM IO error */
+    static public final String INTENT_VALUE_ICC_CARD_IO_ERROR = "CARD_IO_ERROR";
     /* LOCKED means ICC is locked by pin or by network */
     static public final String INTENT_VALUE_ICC_LOCKED = "LOCKED";
     /* READY means ICC is ready to access */
@@ -58,7 +60,8 @@ public interface IccCard {
         PIN_REQUIRED,
         PUK_REQUIRED,
         NETWORK_LOCKED,
-        READY;
+        READY,
+        CARD_IO_ERROR;
 
         public boolean isPinLocked() {
             return ((this == PIN_REQUIRED) || (this == PUK_REQUIRED));

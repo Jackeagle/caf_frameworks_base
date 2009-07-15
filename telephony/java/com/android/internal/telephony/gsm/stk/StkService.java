@@ -622,6 +622,8 @@ public class StkService extends Handler implements AppInterface {
         ResponseData resp = null;
         boolean helpRequired = false;
         CommandDetails cmdDet = resMsg.getCmdDetails();
+        boolean includeAdditionalInfo = false;
+        int additionalInfo = 0;
 
         switch (resMsg.resCode) {
         case HELP_INFO_REQUIRED:
@@ -675,6 +677,11 @@ public class StkService extends Handler implements AppInterface {
                 break;
             }
             break;
+        case TERMINAL_CRNTLY_UNABLE_TO_PROCESS:
+             //For screenbusy case there will be addtional information in the terminal
+             //response. And the value of the additional information byte is 0x01.
+             includeAdditionalInfo = true;
+             additionalInfo = 0x01;
         case NO_RESPONSE_FROM_USER:
         case UICC_SESSION_TERM_BY_USER:
         case BACKWARD_MOVE_BY_USER:
@@ -683,7 +690,7 @@ public class StkService extends Handler implements AppInterface {
         default:
             return;
         }
-        sendTerminalResponse(cmdDet, resMsg.resCode, false, 0, resp);
+        sendTerminalResponse(cmdDet, resMsg.resCode, includeAdditionalInfo, additionalInfo, resp);
         mCurrntCmd = null;
     }
 }

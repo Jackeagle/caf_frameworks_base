@@ -86,7 +86,8 @@ public interface CommandsInterface {
         ICC_READY,
         ICC_PIN,
         ICC_PUK,
-        ICC_NETWORK_PERSONALIZATION
+        ICC_NETWORK_PERSONALIZATION,
+        ICC_CARD_IO_ERROR
     }
 
     //***** Constants

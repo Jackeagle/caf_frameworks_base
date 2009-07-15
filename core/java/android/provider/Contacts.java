@@ -475,8 +475,11 @@ public class Contacts {
                     return null;
                 }
                 return new ByteArrayInputStream(data);
+            } catch (Exception e) {
+                return null;
             } finally {
-                cursor.close();
+                if (cursor != null)
+                    cursor.close();
             }
         }
 

@@ -31,6 +31,15 @@ LOCAL_SRC_FILES:= \
 ifneq (, $(filter msm7201a_surf msm7201a_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DSURF7201A
 endif
+
+ifneq (, $(filter msm7201a_ffa msm7627_ffa, $(TARGET_PRODUCT)))
+  LOCAL_CFLAGS += -DFFA7K
+endif
+
+ifneq (, $(filter qsd8650_ffa, $(TARGET_PRODUCT)))
+  LOCAL_CFLAGS += -DFFA8K
+endif
+
 ifeq ($(BOARD_USE_QCOM_TESTONLY),true)
   LOCAL_CFLAGS += -DQCOM_TEST_ONLY
 endif
