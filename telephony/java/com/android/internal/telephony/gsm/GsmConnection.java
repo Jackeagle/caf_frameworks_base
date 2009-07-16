@@ -74,6 +74,8 @@ public class GsmConnection extends Connection {
     DisconnectCause cause = DisconnectCause.NOT_DISCONNECTED;
     PostDialState postDialState = PostDialState.NOT_STARTED;
     int numberPresentation = Connection.PRESENTATION_ALLOWED;
+    int namePresentation = Connection.PRESENTATION_ALLOWED;
+    String name;
 
     Handler h;
 
@@ -127,6 +129,8 @@ public class GsmConnection extends Connection {
         isIncoming = dc.isMT;
         createTime = System.currentTimeMillis();
         numberPresentation = dc.numberPresentation;
+        namePresentation   = dc.namePresentation;
+        name               = dc.name;
 
         this.index = index;
 
@@ -756,5 +760,15 @@ public class GsmConnection extends Connection {
     @Override
     public int getNumberPresentation() {
         return numberPresentation;
+    }
+
+    @Override
+    public int getNamePresentation() {
+        return namePresentation;
+    }
+
+    @Override
+    public String getOtaName() {
+        return name;
     }
 }
