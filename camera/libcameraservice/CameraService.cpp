@@ -818,7 +818,17 @@ void CameraService::Client::yuvPictureCallback(const sp<IMemory>& mem,
         client->mSurface->postBuffer(offset);
     }
 
-    client->postRaw(mem);
+    /* The yuv image is stored in the pmem_adsp memory. Hence it
+     * should not be sent to the upper layers through postRaw().
+     * The upper layers are not using the yuv image sent in the postRaw()
+     * callback anyway. Hence we are passing NULL in the callback to the
+     * upper layers. If for some reason, the upper layer needs to use this,
+     * it has to be 'memcpy'ed into a different memory region in this layer
+     * and sent. This will add to the latency of snapshot, especially for
+     * higher resolutions.
+     */
+
+    client->postRaw(NULL);
 
 #if DEBUG_CLIENT_REFERENCES
     //**** if the client's refcount is 1, then we are about to destroy it here,
