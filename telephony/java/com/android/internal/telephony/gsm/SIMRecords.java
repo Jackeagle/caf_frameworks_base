@@ -684,11 +684,12 @@ public final class SIMRecords extends IccRecords {
                     break;
                 }
 
-                imsi = (String) ar.result;
-
                 // IMSI (MCC+MNC+MSIN) is at least 6 digits, but not more
                 // than 15 (and usually 15).
-                if (imsi != null && (imsi.length() < 6 || imsi.length() > 15)) {
+                imsi = (String) ar.result;
+                if(imsi.length()> 15)
+                    imsi = imsi.substring(0,15);
+                if (imsi != null && (imsi.length() < 6 )) {
                     Log.e(LOG_TAG, "invalid IMSI " + imsi);
                     imsi = null;
                 }
