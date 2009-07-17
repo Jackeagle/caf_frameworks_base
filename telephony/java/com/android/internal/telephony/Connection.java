@@ -230,4 +230,15 @@ public abstract class Connection {
      */
     public abstract int getNumberPresentation();
 
+    /**
+     * Returns the name presentation type for incoming and waiting calls
+     * @return one of PRESENTATION_*
+     */
+    public abstract int getNamePresentation();
+
+    /**
+     * Returns the name string for incoming and waiting calls
+     * @return Name Sting if present else NULL
+     */
+    public abstract String getOtaName();
 }

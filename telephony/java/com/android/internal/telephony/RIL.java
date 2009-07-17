@@ -2674,7 +2674,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             int np = p.readInt();
             dc.numberPresentation = DriverCall.presentationFromCLIP(np);
             dc.name = p.readString();
-            dc.namePresentation = p.readInt();
+            np = p.readInt();
+            dc.namePresentation = DriverCall.presentationFromCLIP(np);
 
             // Make sure there's a leading + on addresses with a TOA
             // of 145
