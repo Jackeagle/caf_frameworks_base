@@ -47,6 +47,8 @@ import java.util.ArrayList;
 
 public abstract class KeyInputQueue {
     static final String TAG = "KeyInputQueue";
+    static final int UPKEY_KEYWORD = 19;
+    static final int DOWNKEY_KEYWORD = 20;
 
     static final boolean DEBUG = false;
     static final boolean DEBUG_VIRTUAL_KEYS = false;
@@ -713,6 +715,35 @@ public abstract class KeyInputQueue {
                                     mCy += (int)ev.value;
                                     mCy = ((mCy < 0) ? 0 : (mCy >= mDisplayHeight ? mDisplayHeight - 1 : mCy));
                                     di.mAbs.mNextData[di.mAbs.mAddingPointerOffset + MotionEvent.SAMPLE_Y] = mCy;
+                                } else if (ev.scancode == RawInputEvent.REL_WHEEL &&
+                                               (classes&RawInputEvent.CLASS_MOUSE) != 0) {
+                                    boolean down;
+                                    int keycode;
+                                    if (ev.value != 0) {
+                                        down = true;
+                                        di.mKeyDownTime = curTime;
+                                    } else {
+                                        down = false;
+                                    }
+                                    if (ev.value < 0){
+                                        keycode = rotateKeyCodeLocked(DOWNKEY_KEYWORD);
+                                    } else if(ev.value > 0){
+                                        keycode = rotateKeyCodeLocked(UPKEY_KEYWORD);
+                                    } else {
+                                        keycode = rotateKeyCodeLocked(ev.keycode);
+                                    }
+                                    addLocked(di, curTime, ev.flags,
+                                            RawInputEvent.CLASS_KEYBOARD,
+                                            newKeyEvent(di, di.mKeyDownTime, curTime, down,
+                                                    keycode, 0, scancode,
+                                                    ((ev.flags & WindowManagerPolicy.FLAG_WOKE_HERE) != 0)
+                                                    ? KeyEvent.FLAG_WOKE_HERE : 0));
+                                    addLocked(di, curTime, ev.flags,
+                                            RawInputEvent.CLASS_KEYBOARD,
+                                            newKeyEvent(di, di.mKeyDownTime, curTime, !down,
+                                                    keycode, 0, scancode,
+                                                    ((ev.flags & WindowManagerPolicy.FLAG_WOKE_HERE) != 0)
+                                                    ? KeyEvent.FLAG_WOKE_HERE : 0));
                                 }
                             }
                         }
