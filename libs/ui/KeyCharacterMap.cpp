@@ -182,14 +182,20 @@ KeyCharacterMap::load(int id)
         LOGW("No keyboard for id %d", id);
     }
 
-    //snprintf(path, sizeof(path), "%s/usr/keychars/qwerty.kcm.bin", root);
-    #ifdef FFA7K
-    snprintf(path, sizeof(path), "%s/usr/keychars/7k_ffa_keypad.kcm.bin", root);
-    #elif FFA8K
-    snprintf(path, sizeof(path), "%s/usr/keychars/8k_ffa_keypad.kcm.bin", root);
-    #else
-    snprintf(path, sizeof(path), "%s/usr/keychars/surf_keypad.kcm.bin", root);
-    #endif
+    char dut[PROPERTY_VALUE_MAX];
+    property_get("ro.kernel.qemu", dut, "0");
+    if(atoi(dut)==1) {
+      snprintf(path, sizeof(path), "%s/usr/keychars/qwerty.kcm.bin", root);
+    }
+    else {
+#ifdef FFA7K
+      snprintf(path, sizeof(path), "%s/usr/keychars/7k_ffa_keypad.kcm.bin", root);
+#elif FFA8K
+      snprintf(path, sizeof(path), "%s/usr/keychars/8k_ffa_keypad.kcm.bin", root);
+#else
+      snprintf(path, sizeof(path), "%s/usr/keychars/surf_keypad.kcm.bin", root);
+#endif
+    }
 
     rv = try_file(path);
     if (rv == NULL) {
