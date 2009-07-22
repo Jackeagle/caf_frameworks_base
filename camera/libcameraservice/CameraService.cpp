@@ -62,7 +62,7 @@ extern "C" {
 #if DEBUG_DUMP_PREVIEW_FRAME_TO_FILE
 static int debug_frame_cnt;
 #endif
-
+static Mutex connlock;
 // ----------------------------------------------------------------------------
 
 void CameraService::instantiate() {
@@ -89,6 +89,7 @@ sp<ICamera> CameraService::connect(const sp<ICameraClient>& cameraClient)
 {
     LOGD("Connect E from ICameraClient %p", cameraClient->asBinder().get());
 
+    Mutex::Autolock l(connlock);
     Mutex::Autolock lock(mLock);
     sp<Client> client;
     if (mClient != 0) {
@@ -320,6 +321,7 @@ void CameraService::Client::disconnect()
     LOGD("Client (%p) E disconnect from (%d)",
             getCameraClient()->asBinder().get(),
             IPCThreadState::self()->getCallingPid());
+    Mutex::Autolock l(connlock);
     Mutex::Autolock lock(mLock);
     if (mClientPid <= 0) {
         LOGV("camera is unlocked, don't tear down hardware");
