@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -223,10 +224,9 @@ interface ITelephony {
     
     /**
      * Sends a OEM request to the RIL and returns the response back to the
-     * Caller. The return value is null if there is no response or if sending the
-     * request failed.
+     * Caller. The returnValue is negative on failure. 0 or length of response on SUCCESS
      */
-    byte[] sendOemRilRequestRaw(in byte []requestBytes);
+    int sendOemRilRequestRaw(in byte[] request, out byte[] response);
 
 }
 
