@@ -38,8 +38,6 @@ import java.util.List;
 
 public class PhoneProxy extends Handler implements Phone {
     public final static Object lockForRadioTechnologyChange = new Object();
-//    private static boolean radioTechnologyChangeGsmToCdma = false;
-//    private static boolean radioTechnologyChangeCdmaToGsm = false;
 
     private Phone mActivePhone;
     private String mOutgoingPhone;
@@ -72,12 +70,6 @@ public class PhoneProxy extends Handler implements Phone {
             mOutgoingPhone = ((PhoneBase)mActivePhone).getPhoneName();
             logd("Switching phone from " + mOutgoingPhone + "Phone to " +
                     (mOutgoingPhone.equals("GSM") ? "CDMAPhone" : "GSMPhone") );
-            boolean oldPowerState = false; //old power state to off
-            if (mCommandsInterface.getRadioState().isOn()) {
-                oldPowerState = true;
-                logd("Setting Radio Power to Off");
-                mCommandsInterface.setRadioPower(false, null);
-            }
             if(mOutgoingPhone.equals("GSM")) {
                 logd("Make a new CDMAPhone and destroy the old GSMPhone.");
 
@@ -92,7 +84,6 @@ public class PhoneProxy extends Handler implements Phone {
 
                 mActivePhone = PhoneFactory.getCdmaPhone();
                 logd("Resetting Radio");
-                mCommandsInterface.setRadioPower(oldPowerState, null);
                 ((GSMPhone)oldPhone).removeReferences();
                 oldPhone = null;
             } else {
@@ -110,7 +101,6 @@ public class PhoneProxy extends Handler implements Phone {
 
                 mActivePhone = PhoneFactory.getGsmPhone();
                 logd("Resetting Radio:");
-                mCommandsInterface.setRadioPower(oldPowerState, null);
                 ((CDMAPhone)oldPhone).removeReferences();
                 oldPhone = null;
             }
