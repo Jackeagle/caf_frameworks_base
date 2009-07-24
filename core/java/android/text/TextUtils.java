@@ -845,6 +845,10 @@ public class TextUtils {
             return 0;
         if (offset == 1)
             return 0;
+        if (offset < 0) { // Handle the -ve offset here
+           if (text.length() >= 0)
+                return text.length();
+        }
 
         char c = text.charAt(offset - 1);
 
@@ -882,6 +886,12 @@ public class TextUtils {
             return len;
         if (offset == len - 1)
             return len;
+        if (offset < 0) { // Handle the -ve offset here.
+            if (len > 0)
+                return len - 1;
+            if (len == 0)
+                return 0;
+        }
 
         char c = text.charAt(offset);
 
