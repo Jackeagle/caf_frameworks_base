@@ -675,8 +675,14 @@ final class ServiceStateTracker extends Handler
 
             boolean showSpn =
                 (rule & SIMRecords.SPN_RULE_SHOW_SPN) == SIMRecords.SPN_RULE_SHOW_SPN;
-            boolean showPlmn =
-                (rule & SIMRecords.SPN_RULE_SHOW_PLMN) == SIMRecords.SPN_RULE_SHOW_PLMN;
+            boolean showPlmn;
+            if (phone.mSIMRecords.getOnsAlg() == EONS_ALG) {
+                showPlmn = true;
+            }
+            else {
+                showPlmn =
+                   (rule & SIMRecords.SPN_RULE_SHOW_PLMN) == SIMRecords.SPN_RULE_SHOW_PLMN;
+            }
             Intent intent = new Intent(Intents.SPN_STRINGS_UPDATED_ACTION);
             intent.putExtra(Intents.EXTRA_SHOW_SPN, showSpn);
             intent.putExtra(Intents.EXTRA_SPN, spn);
@@ -826,6 +832,15 @@ final class ServiceStateTracker extends Handler
                     if (opNames != null && opNames.length >= 3) {
                         newSS.setOperatorName (
                                 opNames[0], opNames[1], opNames[2]);
+                        if((phone.mSIMRecords.getOnsAlg() == EONS_ALG)
+                                 && (opNames[2] != null)
+                                 && (opNames[2].trim().length() != 0)
+                                 && !registeredFirstTime){
+                           if(phone.mSIMRecords.updateSimRecords()){
+                              registeredFirstTime = true;
+                              Log.d(EONS_TAG,opNames[2] + "After First reg updateSimRecords() once");
+                           }
+                        }
                     }
                 break;
 

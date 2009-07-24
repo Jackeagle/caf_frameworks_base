@@ -1006,7 +1006,7 @@ public final class SIMRecords extends Handler implements SimConstants
                           length = data[1];
                           Log.d(EONS_TAG,"PNN longname length : " + length );
                           pnnDataLongName =
-                             SimUtils.adnStringFieldToString(data, 2, length);
+                             SimUtils.networkNameToString(data, 2, length);
                           Log.d(EONS_TAG,"PNN longname : " +
                                 pnnDataLongName );
                           if((data[length + 2] != -1) &&
@@ -1014,7 +1014,7 @@ public final class SIMRecords extends Handler implements SimConstants
                              Log.d(EONS_TAG,"PNN shortname length : " +
                                    data[length+3] );
                              pnnDataShortName =
-                                SimUtils.adnStringFieldToString(data,
+                                SimUtils.networkNameToString(data,
                                       length+4,data[length + 3]);
                              Log.d(EONS_TAG,"PNN shortname : " +
                                    pnnDataShortName );
