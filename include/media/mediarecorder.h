@@ -55,6 +55,7 @@ enum output_format {
     OUTPUT_FORMAT_MPEG_4,
     OUTPUT_FORMAT_RAW_AMR,
     OUTPUT_FOMRAT_QCP, // QCP file format
+    OUTPUT_FORMAT_THREE_GPP2, /*3GPP2*/
     OUTPUT_FORMAT_LIST_END // must be last - used to validate format type
 };
 
