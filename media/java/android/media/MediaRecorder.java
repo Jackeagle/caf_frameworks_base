@@ -169,6 +169,8 @@ public class MediaRecorder
         public static final int RAW_AMR = 3;
         /** QCP file format */
         public static final int QCP = 4;
+        /** 3GPP2 media file format*/
+        public static final int THREE_GPP2 = 5;
     };
 
     /**
