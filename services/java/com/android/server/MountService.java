@@ -31,6 +31,7 @@ import android.os.Environment;
 import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.os.UEventObserver;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -45,6 +46,7 @@ class MountService extends IMountService.Stub {
     
     private static final String TAG = "MountService";
 
+    private final String usbMountPath = "/data/";
     /**
      * Binder context for this service
      */
@@ -84,6 +86,8 @@ class MountService extends IMountService.Stub {
 
     private boolean mAutoStartUms;
 
+    private String mountPointList;
+
     /**
      * Constructs a new MountService instance
      * 
@@ -114,6 +118,32 @@ class MountService extends IMountService.Stub {
             }
         }
     };
+
+    /**
+     * @return list of mount points.
+     */
+    public String getMountPointList() {
+        return mountPointList;
+    }
+    /**
+     * Adds or removes a mount point from the mount point list
+     *
+     */
+    private void modifyMountPointList(String path, Boolean remove) {
+        String mount_point_value = path + ":";
+        if (remove && mountPointList != null) {
+            if (mountPointList.equals(mount_point_value))
+                mountPointList=null;
+            else
+                mountPointList = mountPointList.replaceFirst(mount_point_value,"");
+         } else if (!remove) {
+            /* Add path to the mount point list */
+            if (mountPointList == null)
+                mountPointList = mount_point_value;
+            else
+                mountPointList = mountPointList +  mount_point_value;
+        }
+    }
 
     /**
      * @return true if USB mass storage support is enabled.
@@ -265,6 +295,13 @@ class MountService extends IMountService.Stub {
 
             if (mAutoStartUms) {
                 try {
+                   Intent intent = new Intent();
+                   intent.setClass(mContext, com.android.internal.app.UsbStorageStopActivity.class);
+                   PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
+                   setUsbStorageNotification(com.android.internal.R.string.usb_storage_connect_title,
+                                             com.android.internal.R.string.usb_storage_connect_message,
+                                             com.android.internal.R.drawable.stat_sys_warning,
+                                             false, true, pi);
                     setMassStorageEnabled(true);
                 } catch (RemoteException e) {
                 }
@@ -291,12 +328,21 @@ class MountService extends IMountService.Stub {
      */
     void notifyMediaRemoved(String path) {
         updateUsbMassStorageNotification(true, false);
-
-        setMediaStorageNotification(
-                com.android.internal.R.string.ext_media_nomedia_notification_title,
-                com.android.internal.R.string.ext_media_nomedia_notification_message,
-                com.android.internal.R.drawable.stat_sys_no_sim,
-                true, false, null);
+        if (path.regionMatches(0, usbMountPath, 0, 6)) {
+            Intent intent = new Intent();
+            intent.setClass(mContext, com.android.internal.app.UsbStorageStopActivity.class);
+            PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
+            setUsbStorageNotification(com.android.internal.R.string.usb_storage_disconnect_title,
+                                       com.android.internal.R.string.usb_storage_disconnect_message,
+                                       com.android.internal.R.drawable.stat_sys_warning,
+                                       false, true, pi);
+        } else {
+            setMediaStorageNotification(
+                     com.android.internal.R.string.ext_media_nomedia_notification_title,
+                     com.android.internal.R.string.ext_media_nomedia_notification_message,
+                     com.android.internal.R.drawable.stat_sys_no_sim,
+                     true, false, null);
+        }
         handlePossibleExplicitUnmountBroadcast(path);
 
         Intent intent = new Intent(Intent.ACTION_MEDIA_REMOVED, 
@@ -308,17 +354,27 @@ class MountService extends IMountService.Stub {
      * Broadcasts the media unmounted event to all clients.
      */
     void notifyMediaUnmounted(String path) {
-        if (mShowSafeUnmountNotificationWhenUnmounted) {
-            setMediaStorageNotification(
-                    com.android.internal.R.string.ext_media_safe_unmount_notification_title,
-                    com.android.internal.R.string.ext_media_safe_unmount_notification_message,
-                    com.android.internal.R.drawable.stat_notify_sim_toolkit,
-                    true, true, null);
+       modifyMountPointList(path, true);
+       if (mShowSafeUnmountNotificationWhenUnmounted) {
+            if (path.regionMatches(0, usbMountPath, 0, 6)) {
+                Intent intent = new Intent();
+                intent.setClass(mContext, com.android.internal.app.UsbStorageStopActivity.class);
+                PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
+                setUsbStorageNotification(com.android.internal.R.string.usb_storage_safe_unmount_notification_title,
+                                           com.android.internal.R.string.usb_storage_safe_unmount_notification_message,
+                                           com.android.internal.R.drawable.stat_sys_warning,
+                                           false, true, pi);
+            } else {
+                setMediaStorageNotification(
+                         com.android.internal.R.string.ext_media_safe_unmount_notification_title,
+                         com.android.internal.R.string.ext_media_safe_unmount_notification_message,
+                         com.android.internal.R.drawable.stat_notify_sim_toolkit,
+                         true, true, null);
+            }
             mShowSafeUnmountNotificationWhenUnmounted = false;
         } else {
             setMediaStorageNotification(0, 0, 0, false, false, null);
         }
-        updateUsbMassStorageNotification(false, false);
 
         Intent intent = new Intent(Intent.ACTION_MEDIA_UNMOUNTED, 
                 Uri.parse("file://" + path));
@@ -329,16 +385,26 @@ class MountService extends IMountService.Stub {
      * Broadcasts the media checking event to all clients.
      */
     void notifyMediaChecking(String path) {
-        setMediaStorageNotification(
-                com.android.internal.R.string.ext_media_checking_notification_title,
-                com.android.internal.R.string.ext_media_checking_notification_message,
-                com.android.internal.R.drawable.stat_notify_sim_toolkit,
-                true, false, null);
 
-        updateUsbMassStorageNotification(true, false);
-        Intent intent = new Intent(Intent.ACTION_MEDIA_CHECKING, 
-                Uri.parse("file://" + path));
-        mContext.sendBroadcast(intent);
+      if (path.regionMatches(0, usbMountPath, 0, 6)) {
+          Intent intent = new Intent();
+          intent.setClass(mContext, com.android.internal.app.UsbStorageStopActivity.class);
+          PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
+          setUsbStorageNotification(com.android.internal.R.string.usb_storage_connect_title,
+                                     com.android.internal.R.string.usb_storage_connect_message,
+                                     com.android.internal.R.drawable.stat_sys_warning,
+                                     false, true, pi);
+       } else {
+           setMediaStorageNotification(
+                   com.android.internal.R.string.ext_media_checking_notification_title,
+                   com.android.internal.R.string.ext_media_checking_notification_message,
+                   com.android.internal.R.drawable.stat_notify_sim_toolkit,
+                   true, false, null);
+       }
+
+       Intent intent = new Intent(Intent.ACTION_MEDIA_CHECKING,
+                   Uri.parse("file://" + path));
+       mContext.sendBroadcast(intent);
     }
 
     /**
@@ -364,6 +430,7 @@ class MountService extends IMountService.Stub {
      * Broadcasts the media mounted event to all clients.
      */
     void notifyMediaMounted(String path, boolean readOnly) {
+        modifyMountPointList(path, false);
         setMediaStorageNotification(0, 0, 0, false, false, null);
         updateUsbMassStorageNotification(false, false);
         Intent intent = new Intent(Intent.ACTION_MEDIA_MOUNTED, 
@@ -394,13 +461,25 @@ class MountService extends IMountService.Stub {
      * Broadcasts the media bad removal event to all clients.
      */
     void notifyMediaBadRemoval(String path) {
-        updateUsbMassStorageNotification(true, false);
-        setMediaStorageNotification(com.android.internal.R.string.ext_media_badremoval_notification_title,
+        modifyMountPointList(path, true);
+
+        if (path.regionMatches(0, usbMountPath, 0, 6)) {
+            Intent intent = new Intent();
+            intent.setClass(mContext, com.android.internal.app.UsbStorageStopActivity.class);
+            PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
+            setUsbStorageNotification(com.android.internal.R.string.usb_storage_badremoval_notification_title,
+                                    com.android.internal.R.string.usb_storage_badremoval_notification_message,
+                                    com.android.internal.R.drawable.stat_sys_warning,
+                                    false, true, pi);
+         } else {
+             setMediaStorageNotification(com.android.internal.R.string.ext_media_badremoval_notification_title,
                                     com.android.internal.R.string.ext_media_badremoval_notification_message,
                                     com.android.internal.R.drawable.stat_sys_warning,
                                     true, true, null);
+        }
 
         handlePossibleExplicitUnmountBroadcast(path);
+
         Intent intent = new Intent(Intent.ACTION_MEDIA_BAD_REMOVAL, 
                 Uri.parse("file://" + path));
         mContext.sendBroadcast(intent);
@@ -414,19 +493,28 @@ class MountService extends IMountService.Stub {
      * Broadcasts the media unmountable event to all clients.
      */
     void notifyMediaUnmountable(String path) {
-        Intent intent = new Intent();
-        intent.setClass(mContext, com.android.internal.app.ExternalMediaFormatActivity.class);
-        PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
-
-        setMediaStorageNotification(com.android.internal.R.string.ext_media_unmountable_notification_title,
-                                    com.android.internal.R.string.ext_media_unmountable_notification_message,
-                                    com.android.internal.R.drawable.stat_sys_no_sim,
-                                    true, false, pi); 
+        if (path.regionMatches(0, usbMountPath, 0, 6)) {
+            Intent intent = new Intent();
+            intent.setClass(mContext, com.android.internal.app.UsbStorageStopActivity.class);
+            PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
+            setUsbStorageNotification(com.android.internal.R.string.usb_srorage_unmountable_title,
+                                       com.android.internal.R.string.usb_srorage_unmountable_title,
+                                       com.android.internal.R.drawable.stat_sys_warning,
+                                       false, true, pi);
+        } else {
+            Intent intent = new Intent();
+            intent.setClass(mContext, com.android.internal.app.ExternalMediaFormatActivity.class);
+            PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
+            setMediaStorageNotification(com.android.internal.R.string.ext_media_unmountable_notification_title,
+                                         com.android.internal.R.string.ext_media_unmountable_notification_message,
+                                         com.android.internal.R.drawable.stat_sys_no_sim,
+                                         true, false, pi);
+        }
         updateUsbMassStorageNotification(false, false);
 
         handlePossibleExplicitUnmountBroadcast(path);
 
-        intent = new Intent(Intent.ACTION_MEDIA_UNMOUNTABLE, 
+        Intent intent = new Intent(Intent.ACTION_MEDIA_UNMOUNTABLE,
                 Uri.parse("file://" + path));
         mContext.sendBroadcast(intent);
     }
