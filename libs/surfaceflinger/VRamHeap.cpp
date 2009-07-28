@@ -58,7 +58,7 @@ namespace android {
 /* Using 10 MB for Qualcomm non-7x27 targets */
 static const int PMEM_SIZE = int(10 * 1024 * 1024);
 #else
-static const int PMEM_SIZE = int(8 * 1024 * 1024);
+static const int PMEM_SIZE = int(16 * 1024 * 1024);
 #endif
 
 int SurfaceHeapManager::global_pmem_heap = 0;
