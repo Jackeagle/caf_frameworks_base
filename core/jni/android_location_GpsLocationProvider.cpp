@@ -54,7 +54,7 @@ enum CallbackType {
     kSvStatus = 4,
     kXtraDownloadRequest = 8,
     kDisableRequest = 16,
-}; 
+};
 static int sPendingCallbacks;
 
 namespace android {
@@ -145,7 +145,7 @@ static void android_location_GpsLocationProvider_cleanup(JNIEnv* env, jobject ob
     sGpsInterface->cleanup();
 }
 
-static jboolean android_location_GpsLocationProvider_start(JNIEnv* env, jobject obj, jint positionMode, 
+static jboolean android_location_GpsLocationProvider_start(JNIEnv* env, jobject obj, jint positionMode,
         jboolean singleFix, jint fixFrequency)
 {
     int result = sGpsInterface->set_position_mode(positionMode, (singleFix ? 0 : fixFrequency));
@@ -176,32 +176,32 @@ static void android_location_GpsLocationProvider_wait_for_event(JNIEnv* env, job
 {
     pthread_mutex_lock(&sEventMutex);
     pthread_cond_wait(&sEventCond, &sEventMutex);
-    
+
     // copy and clear the callback flags
     int pendingCallbacks = sPendingCallbacks;
     sPendingCallbacks = 0;
-    
+
     // copy everything and unlock the mutex before calling into Java code to avoid the possibility
     // of timeouts in the GPS engine.
     memcpy(&sGpsLocationCopy, &sGpsLocation, sizeof(sGpsLocationCopy));
     memcpy(&sGpsStatusCopy, &sGpsStatus, sizeof(sGpsStatusCopy));
     memcpy(&sGpsSvStatusCopy, &sGpsSvStatus, sizeof(sGpsSvStatusCopy));
-    pthread_mutex_unlock(&sEventMutex);   
+    pthread_mutex_unlock(&sEventMutex);
 
-    if (pendingCallbacks & kLocation) { 
+    if (pendingCallbacks & kLocation) {
         env->CallVoidMethod(obj, method_reportLocation, sGpsLocationCopy.flags,
                 (jdouble)sGpsLocationCopy.latitude, (jdouble)sGpsLocationCopy.longitude,
-                (jdouble)sGpsLocationCopy.altitude, 
-                (jfloat)sGpsLocationCopy.speed, (jfloat)sGpsLocationCopy.bearing, 
+                (jdouble)sGpsLocationCopy.altitude,
+                (jfloat)sGpsLocationCopy.speed, (jfloat)sGpsLocationCopy.bearing,
                 (jfloat)sGpsLocationCopy.accuracy, (jlong)sGpsLocationCopy.timestamp);
     }
     if (pendingCallbacks & kStatus) {
         env->CallVoidMethod(obj, method_reportStatus, sGpsStatusCopy.status);
-    }  
+    }
     if (pendingCallbacks & kSvStatus) {
         env->CallVoidMethod(obj, method_reportSvStatus);
     }
-    if (pendingCallbacks & kXtraDownloadRequest) {    
+    if (pendingCallbacks & kXtraDownloadRequest) {
         env->CallVoidMethod(obj, method_xtraDownloadRequest);
     }
     if (pendingCallbacks & kDisableRequest) {
@@ -209,8 +209,8 @@ static void android_location_GpsLocationProvider_wait_for_event(JNIEnv* env, job
     }
 }
 
-static jint android_location_GpsLocationProvider_read_sv_status(JNIEnv* env, jobject obj, 
-        jintArray prnArray, jfloatArray snrArray, jfloatArray elevArray, jfloatArray azumArray, 
+static jint android_location_GpsLocationProvider_read_sv_status(JNIEnv* env, jobject obj,
+        jintArray prnArray, jfloatArray snrArray, jfloatArray elevArray, jfloatArray azumArray,
         jintArray maskArray)
 {
     // this should only be called from within a call to reportStatus, so we don't need to lock here
@@ -240,7 +240,7 @@ static jint android_location_GpsLocationProvider_read_sv_status(JNIEnv* env, job
     return num_svs;
 }
 
-static void android_location_GpsLocationProvider_inject_time(JNIEnv* env, jobject obj, jlong time, 
+static void android_location_GpsLocationProvider_inject_time(JNIEnv* env, jobject obj, jlong time,
         jlong timeReference, jint uncertainty)
 {
     sGpsInterface->inject_time(time, timeReference, uncertainty);
@@ -261,7 +261,7 @@ static jboolean android_location_GpsLocationProvider_supports_xtra(JNIEnv* env, 
     return (sGpsXtraInterface != NULL);
 }
 
-static void android_location_GpsLocationProvider_inject_xtra_data(JNIEnv* env, jobject obj, 
+static void android_location_GpsLocationProvider_inject_xtra_data(JNIEnv* env, jobject obj,
         jbyteArray data, jint length)
 {
     jbyte* bytes = env->GetByteArrayElements(data, 0);
@@ -270,13 +270,15 @@ static void android_location_GpsLocationProvider_inject_xtra_data(JNIEnv* env, j
 }
 
 static void android_location_GpsLocationProvider_set_supl_server(JNIEnv* env, jobject obj,
-        jint addr, jint port)
+      jstring hostname, jint port)
 {
     if (!sGpsSuplInterface) {
         sGpsSuplInterface = (const GpsSuplInterface*)sGpsInterface->get_extension(GPS_SUPL_INTERFACE);
     }
     if (sGpsSuplInterface) {
-        sGpsSuplInterface->set_server(addr, port);
+       const char *hostnameStr = env->GetStringUTFChars(hostname, NULL);
+       sGpsSuplInterface->set_server(hostnameStr, port);
+       env->ReleaseStringUTFChars(hostname, hostnameStr);
     }
 }
 
@@ -312,7 +314,7 @@ static JNINativeMethod sMethods[] = {
 	{"native_inject_time", "(JJI)V", (void*)android_location_GpsLocationProvider_inject_time},
 	{"native_supports_xtra", "()Z", (void*)android_location_GpsLocationProvider_supports_xtra},
 	{"native_inject_xtra_data", "([BI)V", (void*)android_location_GpsLocationProvider_inject_xtra_data},
- 	{"native_set_supl_server", "(II)V", (void*)android_location_GpsLocationProvider_set_supl_server},
+ 	{"native_set_supl_server", "(Ljava/lang/String;I)V", (void*)android_location_GpsLocationProvider_set_supl_server},
  	{"native_set_supl_apn", "(Ljava/lang/String;)V", (void*)android_location_GpsLocationProvider_set_supl_apn},
 };
 
