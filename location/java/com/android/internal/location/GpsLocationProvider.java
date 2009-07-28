@@ -889,25 +889,12 @@ public class GpsLocationProvider extends LocationProviderImpl {
 
                     // Set the SUPL server address if we have not yet
                     if (mSetSuplServer) {
-                        try {
-                            InetAddress inetAddress = InetAddress.getByName(mSuplHost);
-                            if (inetAddress != null) {
-                                byte[] addrBytes = inetAddress.getAddress();
-                                long addr = 0;
-                                for (int i = 0; i < addrBytes.length; i++) {
-                                    int temp = addrBytes[i];
-                                    // signed -> unsigned
-                                    if (temp < 0) temp = 256 + temp;
-                                    addr = addr * 256 + temp;
-                                }
-                                // use MS-Based position mode if SUPL support is enabled
-                                mPositionMode = GPS_POSITION_MODE_MS_BASED;
-                                native_set_supl_server((int)addr, mSuplPort);
-                                mSetSuplServer = false; 
-                            }
-                        } catch (UnknownHostException e) {
-                            Log.e(TAG, "unknown host for SUPL server " + mSuplHost);
-                        }
+                    	if (mSuplHost != null) {
+                    		// use MS-Based position mode if SUPL support is enabled
+                    		mPositionMode = GPS_POSITION_MODE_MS_BASED; 
+                    		native_set_supl_server(mSuplHost, mSuplPort);
+                    		mSetSuplServer = false; 
+                    	}
                     }
 
                     if ((mXtraDownloadRequested || 
@@ -1001,6 +988,6 @@ public class GpsLocationProvider extends LocationProviderImpl {
     private native void native_inject_xtra_data(byte[] data, int length);
 
     // SUPL Support    
-    private native void native_set_supl_server(int addr, int port);
+    private native void native_set_supl_server(String hostname, int port);
     private native void native_set_supl_apn(String apn);
 }
