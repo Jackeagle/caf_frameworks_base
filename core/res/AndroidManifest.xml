@@ -1029,6 +1029,13 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name="com.android.server.FileManagerLauncher" >
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_MOUNTED" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </receiver>
+
         <receiver android:name="com.android.server.MasterClearReceiver"
             android:permission="android.permission.MASTER_CLEAR" >
             <intent-filter>
