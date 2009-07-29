@@ -748,6 +748,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                        if (adaptProp != null && adaptProp.length() != 0) {
                           try {
                              if (Integer.valueOf(adaptProp) == 1) {
+                                Log.i(LOG_TAG,"Adapt, Registration denied rejcode : " + rejCode);
                                 handleNetworkRejection(rejCode);
                              }
                           }
@@ -759,6 +760,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                        if (roamProp != null && roamProp.length() != 0) {
                           try {
                              if ((Integer.valueOf(roamProp) == 1) && (rejCode == 10)) {
+                                Log.i(LOG_TAG,"Managed Roaming, Registration denied rejcode : " + rejCode);
                                 String user_selected_network_mode = Settings.System.getString(
                                    phone.getContext().getContentResolver(), Settings.System.NETWORK_SELECTION_MODE);
                                 if (user_selected_network_mode.equals("Manual")) {
@@ -1382,6 +1384,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     };
 
     private void handleLimitedService(String plmn,String spn,Boolean showSpn,Boolean showPlmn) {
+       Log.i(LOG_TAG,"handleLimitedService : Limited Service state");
        Intent intent = new Intent(Intents.SPN_STRINGS_UPDATED_ACTION);
        intent.putExtra(Intents.EXTRA_SHOW_SPN, showSpn);
        intent.putExtra(Intents.EXTRA_SPN, spn);
@@ -1445,7 +1448,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
        boolean showSpn = true;
        boolean showPlmn = true;
        String msg = null;
-
+       Log.i(LOG_TAG,"handleNetworkRejection : Rejection code :" + rejCode);
        switch (rejCode) {
           /* For cases 1 to 4 the rejection message should be displayed on the UI and the
            * message "EMERGENCY CALLS ONLY" displayed in the alpha tag area
