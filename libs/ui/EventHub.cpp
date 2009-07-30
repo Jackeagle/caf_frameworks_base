@@ -90,6 +90,9 @@ EventHub::EventHub(void)
     , mDevicesById(0), mNumDevicesById(0)
     , mOpeningDevices(0), mClosingDevices(0)
     , mDevices(0), mFDs(0), mFDCount(0)
+#ifdef HAVE_TSLIB
+    , mTS()
+#endif
 {
     acquire_wake_lock(PARTIAL_WAKE_LOCK, WAKE_LOCK_ID);
 #ifdef EV_SW
@@ -333,8 +336,61 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
             if(mFDs[i].revents) {
                 LOGV("revents for %d = 0x%08x", i, mFDs[i].revents);
                 if(mFDs[i].revents & POLLIN) {
-                    res = read(mFDs[i].fd, &iev, sizeof(iev));
-                    if (res == sizeof(iev)) {
+#ifdef HAVE_TSLIB
+                   LOGV("Inside EventHub.cpp with mFDs[i].fd=%d \n", mFDs[i].fd);
+                   if (mTS != NULL) {
+                       if (mFDs[i].fd != mTS->fd ) {
+                          LOGV("mFDs[%d].fd = %d and mTS->fd = %d", i, mFDs[i].fd, mTS->fd);
+#endif
+                          res = read(mFDs[i].fd, &iev, sizeof(iev));
+#ifdef HAVE_TSLIB
+                          }
+                          else{
+                              LOGE("mTS->fd = %d", mTS->fd);
+                              struct ts_sample samp;
+                              LOGE("tslib: calling ts_read from eventhub\n");
+                              res = ts_read(mTS, &samp, 1);
+
+                              if (res < 0) {
+                                            LOGE("[EventHub.cpp:: After Poll] Error in ts_read()\n");
+                              }
+                              else {
+                                    //*NOTE* --- TSLIB ---
+                                    //Hardcoding via if down then 255 up then 0, in KeyInputQueue.java
+                                    // Using ev.flag to store the y coord. TS does not use the flags
+                                    *outFlags = samp.y;
+                                    iev.value = samp.x;
+                                    LOGE("samp.x = %d and samp.y = %d samp.pressure = %d\n",samp.x,samp.y,samp.pressure);
+
+                                    if (samp.pressure > 0) {
+                                        //Setting this New TSLIB type from RawInput
+                                        iev.code = 0x1d;
+                                    }
+                                    else {
+                                          //Setting this New TSLIB type from RawInput
+                                          iev.code = 0x1e;
+                                    }
+                                    //Setting this to default to a SYN event which tslib is sending us
+                                    iev.type = 0x00;
+                               }
+                         }
+                }
+                else {
+                      LOGE("ERROR in setup of mTS: mTS is NULL!\n");
+                }
+#endif
+
+                   // ************** For TSLIB *******************************
+                   // Adding 2nd part of the conditional if for TSLIB read
+                   // TS_READ does not return res = return value of linux read()
+                   // TS_READ res = total number of samples.
+                   // *********************************************************
+
+                   if (res == sizeof(iev)
+#ifdef HAVE_TSLIB
+                       || ((iev.code == 0x1d || iev.code == 0x1e) && res >= 0)
+#endif
+                      ) {
                         LOGV("%s got: t0=%d, t1=%d, type=%d, code=%d, v=%d",
                              mDevices[i]->path.string(),
                              (int) iev.time.tv_sec, (int) iev.time.tv_usec,
@@ -410,6 +466,17 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
  */
 bool EventHub::openPlatformInput(void)
 {
+//Init mTS: Done in tslib_open()
+#ifdef HAVE_TSLIB
+    mTS = (tsdev*)malloc(sizeof(struct tsdev));
+    if(mTS == NULL)
+    {
+          LOGE("No Memory");
+          return(false);
+    }
+    memset(mTS, 0, sizeof(struct tsdev));
+#endif
+
     /*
      * Open platform-specific input device(s).
      */
@@ -637,6 +704,16 @@ int EventHub::open_device(const char *deviceName)
         {
             if (test_bit(ABS_X, abs_bitmask) && test_bit(ABS_Y, abs_bitmask)) {
                 device->classes |= CLASS_TOUCHSCREEN;
+#ifdef HAVE_TSLIB
+                mTS->fd = fd;
+
+                //Configure here
+                LOGV("Device name = %s, fd = %d", deviceName,fd);
+                LOGV("tslib: calling ts_config from eventhub\n");
+                if(ts_config(mTS)) {
+                    LOGE("Error in Configuring tslib. Device Name = %s \n", deviceName);
+                }
+#endif
             }
         }
     }

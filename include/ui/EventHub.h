@@ -24,6 +24,10 @@
 
 #include <linux/input.h>
 
+#ifdef HAVE_TSLIB
+    #include "tslib-private.h"
+#endif
+
 struct pollfd;
 
 namespace android {
@@ -133,7 +137,12 @@ private:
     device_t        **mDevices;
     struct pollfd   *mFDs;
     int             mFDCount;
-    
+
+    //tslib
+#ifdef HAVE_TSLIB
+    struct tsdev *mTS;
+#endif
+
     // device ids that report particular switches.
 #ifdef EV_SW
     int32_t         mSwitches[SW_MAX+1];

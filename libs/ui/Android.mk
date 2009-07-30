@@ -54,6 +54,12 @@ LOCAL_SHARED_LIBRARIES := \
 	libhardware \
 	libhardware_legacy
 
+ifeq ($(TARGET_HAVE_TSLIB),true)
+	LOCAL_CFLAGS += -DHAVE_TSLIB
+	LOCAL_SHARED_LIBRARIES += libtslib
+	LOCAL_C_INCLUDES += external/tslib/src
+endif
+
 LOCAL_MODULE:= libui
 
 include $(BUILD_SHARED_LIBRARY)
