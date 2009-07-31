@@ -54,12 +54,7 @@ namespace android {
  * 8 MB of address space per client should be enough.
  */
 
-#ifndef SURF7X2X
-/* Using 10 MB for Qualcomm non-7x27 targets */
-static const int PMEM_SIZE = int(10 * 1024 * 1024);
-#else
 static const int PMEM_SIZE = int(16 * 1024 * 1024);
-#endif
 
 int SurfaceHeapManager::global_pmem_heap = 0;
 
@@ -79,11 +74,7 @@ SurfaceHeapManager::~SurfaceHeapManager()
 void SurfaceHeapManager::onFirstRef()
 {
     if (global_pmem_heap) {
-#ifndef SURF7X2X
-        const char* device = "/dev/pmem_camera";
-#else
         const char* device = "/dev/pmem";
-#endif
         mPMemHeap = new PMemHeap(device, PMEM_SIZE);
         if (mPMemHeap->base() == MAP_FAILED) {
             mPMemHeap.clear();
