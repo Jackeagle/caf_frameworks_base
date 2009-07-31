@@ -5021,8 +5021,10 @@ public class WebView extends AbsoluteLayout
                 listView.setOnItemClickListener(new OnItemClickListener() {
                     public void onItemClick(AdapterView parent, View v,
                             int position, long id) {
-                        mWebViewCore.sendMessage(
-                                EventHub.SINGLE_LISTBOX_CHOICE, (int)id, 0);
+                        if (mWebViewCore != null) {
+                            mWebViewCore.sendMessage(
+                                    EventHub.SINGLE_LISTBOX_CHOICE, (int)id, 0);
+                        }
                         dialog.dismiss();
                     }
                 });
@@ -5037,8 +5039,10 @@ public class WebView extends AbsoluteLayout
             }
             dialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
                 public void onCancel(DialogInterface dialog) {
-                    mWebViewCore.sendMessage(
+                    if (mWebViewCore != null) {
+                        mWebViewCore.sendMessage(
                                 EventHub.SINGLE_LISTBOX_CHOICE, -2, 0);
+                    }
                 }
             });
             dialog.show();
