@@ -228,5 +228,27 @@ interface ITelephony {
      */
     int sendOemRilRequestRaw(in byte[] request, out byte[] response);
 
+    /**
+     * Returns the CDMA ERI icon index to display
+     */
+    int getCdmaEriIconIndex();
+
+    /**
+     * Returns the CDMA ERI icon mode,
+     * 0 - ON
+     * 1 - FLASHING
+     */
+    int getCdmaEriIconMode();
+
+    /**
+     * Returns the CDMA ERI text,
+     */
+    String getCdmaEriText();
+
+    /**
+      * Returns the unread count of voicemails
+      */
+    int getVoiceMessageCount();
+
 }
 

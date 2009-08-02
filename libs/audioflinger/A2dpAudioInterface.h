@@ -56,12 +56,12 @@ public:
                                 status_t *status=0);
 
     virtual AudioStreamIn* openInputStream(
+                                int inputSource,
                                 int format,
                                 int channelCount,
                                 uint32_t sampleRate,
                                 status_t *status,
-                                AudioSystem::audio_in_acoustics acoustics,
-                                int audiosourcetype); // updated with proper defn.
+                                AudioSystem::audio_in_acoustics acoustics);
 
 protected:
     virtual status_t    doRouting();

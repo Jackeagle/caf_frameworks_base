@@ -26,8 +26,6 @@ import android.os.Message;
 
 import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.CommandsInterface;
-import com.android.internal.telephony.EncodeException;
-import com.android.internal.telephony.GsmAlphabet;
 import com.android.internal.telephony.gsm.SimCard;
 import com.android.internal.telephony.gsm.SIMFileHandler;
 import com.android.internal.telephony.gsm.SIMRecords;
@@ -35,8 +33,6 @@ import com.android.internal.telephony.gsm.SIMRecords;
 import android.util.Config;
 
 import java.io.ByteArrayOutputStream;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Enumeration for representing the tag value of COMPREHENSION-TLV objects. If
@@ -120,7 +116,7 @@ public class StkService extends Handler implements AppInterface {
 
     // Class members
     private static SIMRecords mSimRecords;
-    
+
     // Service members.
     private static StkService sInstance;
     private CommandsInterface mCmdIf;
@@ -175,6 +171,9 @@ public class StkService extends Handler implements AppInterface {
 
         // Register for SIM ready event.
         mSimRecords.registerForRecordsLoaded(this, MSG_ID_SIM_LOADED, null);
+
+        mCmdIf.reportStkServiceIsRunning(null);
+        StkLog.d(this, "StkService: is running");
     }
 
     public void dispose() {
@@ -185,9 +184,6 @@ public class StkService extends Handler implements AppInterface {
         mCmdIf.unSetOnStkCallSetUp(this);
 
         this.removeCallbacksAndMessages(null);
-
-        //removing instance
-        sInstance = null;
     }
 
     protected void finalize() {
@@ -496,7 +492,7 @@ public class StkService extends Handler implements AppInterface {
     }
 
     /**
-     * Used for instantiating the Service from the GsmPhone constructor.
+     * Used for instantiating/updating the Service from the GsmPhone constructor.
      *
      * @param ci CommandsInterface object
      * @param sr SIMRecords object
@@ -606,15 +602,15 @@ public class StkService extends Handler implements AppInterface {
     }
 
     private void handleCmdResponse(StkResponseMessage resMsg) {
-        // Make sure the response details match the last valid command. An invalid 
+        // Make sure the response details match the last valid command. An invalid
         // response is a one that doesn't have a corresponding proactive command
-        // and sending it can "confuse" the baseband/ril. 
-        // One reason for out of order responses can be UI glitches. For example, 
-        // if the application launch an activity, and that activity is stored  
+        // and sending it can "confuse" the baseband/ril.
+        // One reason for out of order responses can be UI glitches. For example,
+        // if the application launch an activity, and that activity is stored
         // by the framework inside the history stack. That activity will be
-        // available for relaunch using the latest application dialog 
-        // (long press on the home button). Relaunching that activity can send 
-        // the same command's result again to the StkService and can cause it to  
+        // available for relaunch using the latest application dialog
+        // (long press on the home button). Relaunching that activity can send
+        // the same command's result again to the StkService and can cause it to
         // get out of sync with the SIM.
         if (!validateResponse(resMsg)) {
             return;
@@ -669,7 +665,7 @@ public class StkService extends Handler implements AppInterface {
                 mCmdIf.handleCallSetupRequestFromSim(resMsg.usersConfirm, null);
                 // No need to send terminal response for SET UP CALL. The user's
                 // confirmation result is send back using a dedicated ril message
-                // invoked by the CommandInterface call above. 
+                // invoked by the CommandInterface call above.
                 mCurrntCmd = null;
                 return;
             case SET_UP_EVENT_LIST:

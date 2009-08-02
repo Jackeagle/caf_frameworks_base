@@ -118,6 +118,13 @@ request_gpu_t* gpu_acquire(void* user)
         return 0;
     }
 
+#ifndef ADRENO_200
+    if (info.regs == 0) {
+        LOGD("requestGPU() failed");
+        return 0;
+    }
+#endif
+
     bool failed = false;
     request_gpu_t* gpu = &gRegions;
     memset(gpu, 0, sizeof(*gpu));

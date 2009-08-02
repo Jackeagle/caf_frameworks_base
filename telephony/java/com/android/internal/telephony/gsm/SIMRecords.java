@@ -74,7 +74,7 @@ public final class SIMRecords extends IccRecords {
 
 
     SpnOverride mSpnOverride;
-    
+
     //***** Cached SIM State; cleared on channel close
 
     String imsi;
@@ -117,7 +117,6 @@ public final class SIMRecords extends IccRecords {
     byte[] mEfCfis = null;
 
 
-    String spn;
     int spnDisplayCondition;
     // Numeric network codes listed in TS 51.011 EF[SPDI]
     ArrayList<String> spdiNetworks = null;
@@ -232,7 +231,7 @@ public final class SIMRecords extends IccRecords {
         // -1 means no EF_SPN found; treat accordingly.
         spnDisplayCondition = -1;
         efMWIS = null;
-        efCPHS_MWI = null; 
+        efCPHS_MWI = null;
         spdiNetworks = null;
         pnnHomeName = null;
         oplDataPresent = false;
@@ -624,7 +623,7 @@ public final class SIMRecords extends IccRecords {
 
         return imsi.substring(0, 3 + MccTable.smallestDigitsMccForMnc(mcc));
     }
-    
+
      /**
      * If the timezone is not already set, set it based on the MCC of the SIM.
      * @param mcc Mobile Country Code of the SIM
@@ -633,7 +632,7 @@ public final class SIMRecords extends IccRecords {
         String timezone = SystemProperties.get(TIMEZONE_PROPERTY);
         if (timezone == null || timezone.length() == 0) {
             String zoneId = MccTable.defaultTimeZoneForMcc(mcc);
-            
+
             if (zoneId != null && zoneId.length() > 0) {
                 // Set time zone based on MCC
                 AlarmManager alarm =
@@ -1234,7 +1233,7 @@ public final class SIMRecords extends IccRecords {
                    IccUtils.bytesToHexString(data));
 
                 mEfCfis = data;
-                
+
                 // Refer TS 51.011 Section 10.3.46 for the content description
                 callForwardingEnabled = ((data[1] & 0x01) != 0);
 

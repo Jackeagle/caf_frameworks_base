@@ -133,6 +133,19 @@ releasePointer(JNIEnv *_env, jarray array, void *data, jboolean commit)
 					   commit ? 0 : JNI_ABORT);
 }
 
+static void *
+getDirectBufferPointer(JNIEnv *_env, jobject buffer) {
+    char* buf = (char*) _env->GetDirectBufferAddress(buffer);
+    if (buf) {
+        jint position = _env->GetIntField(buffer, positionID);
+        jint elementSizeShift = _env->GetIntField(buffer, elementSizeShiftID);
+        buf += position << elementSizeShift;
+    } else {
+        _env->ThrowNew(IAEClass, "Must use a native order direct Buffer");
+    }
+    return (void*) buf;
+}
+
 static int
 getNumCompressedTextureFormats() {
     int numCompressedTextureFormats = 0;
@@ -304,7 +317,15 @@ android_glColorPointerBounds__IIILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
+    if (pointer_buf) {
+        pointer = (GLvoid *) getDirectBufferPointer(_env, pointer_buf);
+        if ( ! pointer ) {
+            return;
+        }
+    }
+
     pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
+
     glColorPointerBounds(
         (GLint)size,
         (GLenum)type,
@@ -2775,7 +2796,15 @@ android_glNormalPointerBounds__IILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
+    if (pointer_buf) {
+        pointer = (GLvoid *) getDirectBufferPointer(_env, pointer_buf);
+        if ( ! pointer ) {
+            return;
+        }
+    }
+
     pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
+
     glNormalPointerBounds(
         (GLenum)type,
         (GLsizei)stride,
@@ -3027,7 +3056,15 @@ android_glTexCoordPointerBounds__IIILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
+    if (pointer_buf) {
+        pointer = (GLvoid *) getDirectBufferPointer(_env, pointer_buf);
+        if ( ! pointer ) {
+            return;
+        }
+    }
+
     pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
+
     glTexCoordPointerBounds(
         (GLint)size,
         (GLenum)type,
@@ -3382,7 +3419,15 @@ android_glVertexPointerBounds__IIILjava_nio_Buffer_2I
     jint _remaining;
     GLvoid *pointer = (GLvoid *) 0;
 
+    if (pointer_buf) {
+        pointer = (GLvoid *) getDirectBufferPointer(_env, pointer_buf);
+        if ( ! pointer ) {
+            return;
+        }
+    }
+
     pointer = (GLvoid *)getPointer(_env, pointer_buf, &_array, &_remaining);
+
     glVertexPointerBounds(
         (GLint)size,
         (GLenum)type,

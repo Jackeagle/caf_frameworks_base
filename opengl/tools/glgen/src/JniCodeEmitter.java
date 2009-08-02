@@ -883,9 +883,22 @@ public class JniCodeEmitter {
                                 cname +
                                 " = (" +
                                 cfunc.getArgType(cIndex).getDeclaration() +
-                                ")getPointer(_env, " +
-                                cname +
-                                "_buf, &" + array + ", &" + remaining + ");");
+                                ") getDirectBufferPointer(_env, " +
+                                cname + "_buf);");
+                        String iii = "    ";
+                        out.println(iii + indent + "if ( ! " + cname + " ) {");	
+                        out.println(iii + iii + indent + "return;");
+                        out.println(iii + indent + "}");
+                    } else {
+                        out.println(indent +
+                                    cname +
+                                    " = (" +
+                                    cfunc.getArgType(cIndex).getDeclaration() +
+                                    ")getPointer(_env, " +
+                                    cname +
+                                    "_buf, &" + array + ", &" + remaining +
+                                    ");");
+                    }
 
                     if (nullAllowed) {
                         out.println(indent + "}");

@@ -44,7 +44,7 @@ public:
 
 class AudioStreamInStub : public AudioStreamIn {
 public:
-    virtual status_t    set(int format, int channelCount, uint32_t sampleRate, AudioSystem::audio_in_acoustics acoustics, int audiosourcetype);
+    virtual status_t    set(int format, int channelCount, uint32_t sampleRate, AudioSystem::audio_in_acoustics acoustics);
     virtual uint32_t    sampleRate() const { return 8000; }
     virtual size_t      bufferSize() const { return 320; }
     virtual int         channelCount() const { return 1; }
@@ -79,12 +79,12 @@ public:
                                 status_t *status=0);
 
     virtual AudioStreamIn* openInputStream(
+                                int inputSource,
                                 int format,
                                 int channelCount,
                                 uint32_t sampleRate,
                                 status_t *status,
-                                AudioSystem::audio_in_acoustics acoustics,
-                                int audiosourcetype);
+                                AudioSystem::audio_in_acoustics acoustics);
 
 protected:
     virtual status_t    doRouting() { return NO_ERROR; }

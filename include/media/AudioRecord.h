@@ -24,7 +24,6 @@
 #include <media/IAudioFlinger.h>
 #include <media/IAudioRecord.h>
 #include <media/AudioTrack.h>
-
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <utils/IInterface.h>
@@ -40,14 +39,15 @@ class AudioRecord
 {
 public:
 
-    /** Please make sure you also update audiosource_type in /frameworks/base/include/media/AudioSystem.h !
-        to ensure that the device type updation is consistent when accessed from libaudio */
-    enum stream_type {
-        DEFAULT_INPUT   = 0, // Changed these value. Changed from -1 to 0 to have a standard mapping from MediaRecord to PV to MIO
+    // input sources values must always be defined in the range
+    // [AudioRecord::DEFAULT_INPUT, AudioRecord::NUM_INPUT_SOURCES[
+    enum input_source {
+        DEFAULT_INPUT   = 0, // This has to map the value in the MediaRecorder.java.
         MIC_INPUT       = 1,
-        VOICE_Rx        = 2,
-        VOICE_Tx_Rx     = 3,
-        NUM_STREAM_TYPES
+        VOICE_UPLINK_INPUT = 2,
+        VOICE_DOWNLINK_INPUT = 3,
+        VOICE_CALL_INPUT = 4,
+        NUM_INPUT_SOURCES
     };
 
     static const int DEFAULT_SAMPLE_RATE = 8000;
@@ -123,7 +123,7 @@ public:
      *
      * Parameters:
      *
-     * streamType:         Select the audio input to record to (e.g. AudioRecord::MIC_INPUT).
+     * inputSource:        Select the audio input to record to (e.g. AudioRecord::MIC_INPUT).
      * sampleRate:         Track sampling rate in Hz.
      * format:             PCM sample format (e.g AudioSystem::PCM_16_BIT for signed
      *                     16 bits per sample).
@@ -145,7 +145,7 @@ public:
          RECORD_IIR_ENABLE = AudioSystem::TX_IIR_ENABLE
      };
 
-                        AudioRecord(int streamType,
+                        AudioRecord(int inputSource,
                                     uint32_t sampleRate = 0,
                                     int format          = 0,
                                     int channelCount    = 0,
@@ -170,7 +170,7 @@ public:
      *  - NO_INIT: audio server or audio hardware not initialized
      *  - PERMISSION_DENIED: recording is not allowed for the requesting process
      * */
-            status_t    set(int streamType      = 0,
+            status_t    set(int inputSource     = 0,
                             uint32_t sampleRate = 0,
                             int format          = 0,
                             int channelCount    = 0,
@@ -197,11 +197,11 @@ public:
 
    /* getters, see constructor */
 
-            uint32_t    sampleRate() const;
             int         format() const;
             int         channelCount() const;
             uint32_t    frameCount() const;
             int         frameSize() const;
+            int         inputSource() const;
 
 
     /* After it's created the track is not active. Call start() to
@@ -216,7 +216,7 @@ public:
             status_t    stop();
             bool        stopped() const;
 
-    /* get sample rate for this track
+    /* get sample rate for this record track
      */
             uint32_t    getSampleRate();
 
@@ -322,13 +322,13 @@ private:
     sp<ClientRecordThread>  mClientRecordThread;
     Mutex                   mRecordThreadLock;
 
-    uint32_t                mSampleRate;
     uint32_t                mFrameCount;
 
     audio_track_cblk_t*     mCblk;
     uint8_t                 mFormat;
     uint8_t                 mChannelCount;
-    uint8_t                 mReserved[2];
+    uint8_t                 mInputSource;
+    uint8_t                 mReserved;
     status_t                mStatus;
     uint32_t                mLatency;
 

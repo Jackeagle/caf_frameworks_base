@@ -21,9 +21,9 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 /**
- * Class used to pass STK messages from telephony to application. Application 
+ * Class used to pass STK messages from telephony to application. Application
  * should call getXXX() to get commands's specific values.
- * 
+ *
  */
 public class StkCmdMessage implements Parcelable {
     // members

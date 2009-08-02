@@ -140,7 +140,7 @@ public:
     // record interface
     virtual sp<IAudioRecord> openRecord(
                                 pid_t pid,
-                                int streamType,
+                                int inputSource,
                                 uint32_t sampleRate,
                                 int format,
                                 int channelCount,
@@ -233,7 +233,6 @@ private:
 
                                 TrackBase(const sp<MixerThread>& mixerThread,
                                         const sp<Client>& client,
-                                        int streamType,
                                         uint32_t sampleRate,
                                         int format,
                                         int channelCount,
@@ -261,20 +260,11 @@ private:
                 return mCblk;
             }
 
-            int type() const {
-                return mStreamType;
-            }
-
             int format() const {
                 return mFormat;
             }
 
             int channelCount() const ;
-
-            int AudioSourceType() const // Returning proper stream type
-            {
-              return mStreamType;
-            }
 
             int sampleRate() const;
 
@@ -299,7 +289,6 @@ private:
             sp<Client>          mClient;
             sp<IMemory>         mCblkMemory;
             audio_track_cblk_t* mCblk;
-            int                 mStreamType;
             void*               mBuffer;
             void*               mBufferEnd;
             uint32_t            mFrameCount;
@@ -333,6 +322,11 @@ private:
                     void        destroy();
                     void        mute(bool);
                     void        setVolume(float left, float right);
+
+                    int type() const {
+                        return mStreamType;
+                    }
+
 
         protected:
             friend class MixerThread;
@@ -370,6 +364,7 @@ private:
             int8_t              mRetryCount;
             sp<IMemory>         mSharedBuffer;
             bool                mResetDone;
+            int                 mStreamType;
         };  // end of Track
 
         // record track
@@ -377,7 +372,7 @@ private:
         public:
                                 RecordTrack(const sp<MixerThread>& mixerThread,
                                         const sp<Client>& client,
-                                        int streamType,
+                                        int inputSource,
                                         uint32_t sampleRate,
                                         int format,
                                         int channelCount,
@@ -391,6 +386,8 @@ private:
                     bool        overflow() { bool tmp = mOverflow; mOverflow = false; return tmp; }
                     bool        setOverflow() { bool tmp = mOverflow; mOverflow = true; return tmp; }
 
+                    int         inputSource() const { return mInputSource; }
+
         private:
             friend class AudioFlinger;
             friend class AudioFlinger::RecordHandle;
@@ -403,6 +400,7 @@ private:
             virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
 
             bool                mOverflow;
+            int                 mInputSource;
         };
 
         // playback track
@@ -450,7 +448,6 @@ private:
 
         virtual     uint32_t    sampleRate() const;
         virtual     int         channelCount() const;
-        virtual     int         AudioSourceType() const;
         virtual     int         format() const;
         virtual     size_t      frameCount() const;
         virtual     uint32_t    latency() const;
@@ -529,7 +526,6 @@ private:
         size_t                          mFrameCount;
         int                             mChannelCount;
         int                             mFormat;
-        int                             mAudioSourceType;
         int16_t*                        mMixBuffer;
         float                           mMasterVolume;
         bool                            mMasterMute;

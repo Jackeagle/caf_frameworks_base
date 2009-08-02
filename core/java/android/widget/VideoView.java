@@ -56,6 +56,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
     private SurfaceHolder mSurfaceHolder = null;
     private MediaPlayer mMediaPlayer = null;
     private boolean     mIsPrepared;
+    private boolean     mIsPlaybackCompleted;
     private int         mVideoWidth;
     private int         mVideoHeight;
     private int         mSurfaceWidth;
@@ -266,15 +267,8 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                         mSeekWhenPrepared = 0;
                     }
                     if (mStartWhenPrepared) {
-                        mMediaPlayer.start();
-                        /*After the start of the Mediaplayer,setting 'mstartWhenPrepared' to false
-                     will not allow the replay of the video after an MT call.( as 'mstartWhenPrepared'
-                     made true in VideoView.start() which is not called again because the VideoView is
-                     already present). Hence commenting it out.*/
-//                        #if 0
-//                        mStartWhenPrepared = false;
-//                        #endif
-
+                        start();
+                        mStartWhenPrepared = false;
                         if (mMediaController != null) {
                             mMediaController.show();
                         }
@@ -294,7 +288,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                     mSeekWhenPrepared = 0;
                 }
                 if (mStartWhenPrepared) {
-                    mMediaPlayer.start();
+                    start();
                     mStartWhenPrepared = false;
                 }
             }
@@ -304,6 +298,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
     private MediaPlayer.OnCompletionListener mCompletionListener =
         new MediaPlayer.OnCompletionListener() {
         public void onCompletion(MediaPlayer mp) {
+            mIsPlaybackCompleted = true;
             if (mMediaController != null) {
                 mMediaController.hide();
             }
@@ -418,7 +413,9 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                     mMediaPlayer.seekTo(mSeekWhenPrepared);
                     mSeekWhenPrepared = 0;
                 }
-                mMediaPlayer.start();
+                if (!mIsPlaybackCompleted) {
+                    start();
+                } 
                 if (mMediaController != null) {
                     mMediaController.show();
                 }
@@ -503,6 +500,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
     }
     
     public void start() {
+        mIsPlaybackCompleted = false;
         if (mMediaPlayer != null && mIsPrepared) {
                 mMediaPlayer.start();
                 mStartWhenPrepared = false;
