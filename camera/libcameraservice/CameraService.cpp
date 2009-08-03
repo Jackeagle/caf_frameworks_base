@@ -562,7 +562,10 @@ status_t CameraService::Client::registerPreviewBuffers()
                                  PIXEL_FORMAT_YCbCr_420_SP,
                                  transform,
                                  0,
-                                 mHardware->getPreviewHeap());
+                                 mHardware->getPreviewHeapnew(0),
+                                 mHardware->getPreviewHeapnew(1),
+                                 mHardware->getPreviewHeapnew(2),
+                                 mHardware->getPreviewHeapnew(3));
 
     status_t ret = mSurface->registerBuffers(buffers);
     if (ret != NO_ERROR) {
