@@ -651,8 +651,34 @@ public class AudioManager {
      * @return true if speakerphone is on, false if it's off
      */
     public boolean isSpeakerphoneOn() {
-        return (getRoutingP(MODE_IN_CALL) & ROUTE_SPEAKER) == 0 ? false : true;
+        return (getRoutingP(MODE_IN_CALL) & (ROUTE_SPEAKER | ROUTE_DUALMIC_SPEAKER)) == 0 ? false : true;
      }
+
+    /**
+     * Sets the dual mic on or off
+     *
+     * @param on set <var>true</var> to turn on dual mic;
+     *           <var>false</var> to turn it off
+     * @param speaker set <var>true</var> if it's dual mic with speaker;
+     *           <var>false</var> if it's with handset
+     */
+    public void setDualMicrophoneOn(boolean on, boolean speaker) {
+        // MODE_INVALID indicates to AudioService that setRouting() was initiated by AudioManager
+        if (speaker) {
+            setRoutingP(MODE_INVALID, on ? ROUTE_DUALMIC_SPEAKER : 0, ROUTE_DUALMIC_SPEAKER);
+        } else {
+            setRoutingP(MODE_INVALID, on ? ROUTE_DUALMIC_HANDSET : 0, ROUTE_DUALMIC_HANDSET);
+        }
+    }
+
+    /**
+     * Checks whether the dual mic is on or off.
+     *
+     * @return true if dual mic is on, false if it's off
+     */
+    public boolean isDualMicrophoneOn() {
+        return (getRoutingP(MODE_IN_CALL) & (ROUTE_DUALMIC_HANDSET | ROUTE_DUALMIC_SPEAKER)) != 0;
+    }
 
     /**
      * Sets audio routing to the Bluetooth headset on or off.
