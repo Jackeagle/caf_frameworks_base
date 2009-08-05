@@ -180,6 +180,7 @@ public final class SIMRecords extends IccRecords {
     private static final int EVENT_GET_CFIS_DONE = 32;
     private static final int EVENT_GET_ALL_OPL_RECORDS_DONE = 33;
     private static final int EVENT_GET_CSP_CPHS_DONE = 34;
+    private static final int EVENT_AUTO_SELECT_DONE = 300;
 
     private static final String TIMEZONE_PROPERTY = "persist.sys.timezone";
 
@@ -1152,6 +1153,19 @@ public final class SIMRecords extends IccRecords {
                 processEFCspData();
             break;
 
+            case EVENT_AUTO_SELECT_DONE:
+                Log.i(CSP_TAG,"Got Response for Automatic network selection");
+                isRecordLoadResponse = false;
+
+                ar = (AsyncResult) msg.obj;
+
+                if (ar.exception != null) {
+                    Log.e(CSP_TAG,"Automatic network selection: failed!");
+                } else {
+                    Log.i(CSP_TAG,"Automatic network selection: succeeded!");
+                }
+            break;
+
             case EVENT_SET_MBDN_DONE:
                 isRecordLoadResponse = false;
                 ar = (AsyncResult)msg.obj;
@@ -1284,6 +1298,16 @@ public final class SIMRecords extends IccRecords {
                      //refresh indication for these files.
                      Log.i(EONS_TAG,"SIM Refresh called for EF_OPL/EF_PNN");
                      fetchOplRecords();
+                 }
+                 break;
+            case EF_CSP_CPHS:
+                 if (useEfCspPlmn()) {
+                     //Update EF_CSP data when there is a sim refresh
+                     //indication for EF_CSP_CPHS file.
+                     Log.i(CSP_TAG,"SIM Refresh called for EF_CSP_CPHS");
+                     phone.getIccFileHandler().loadEFTransparent(EF_CSP_CPHS,
+                           obtainMessage(EVENT_GET_CSP_CPHS_DONE));
+                     recordsToLoad++;
                  }
                  break;
             default:
@@ -1834,6 +1858,8 @@ public final class SIMRecords extends IccRecords {
        * This represents value added services group.
        * */
        byte value_added_services_group = (byte)0xC0;
+       Message msg = obtainMessage(EVENT_AUTO_SELECT_DONE);
+
        for (i=0;i<used_csp_groups;i++) {
            if(cspCphsInfo[2*i] == value_added_services_group) {
               Log.i(CSP_TAG, "sevice group 0xC0,value " + cspCphsInfo[(2*i) +1]);
@@ -1849,6 +1875,9 @@ public final class SIMRecords extends IccRecords {
               }
               else {
                  cspPlmn = 0;
+                 // Manual Network Selection option is disabled, so enable
+                 // Automatic Network Selection mode.
+                 phone.setNetworkSelectionModeAutomatic(msg);
               }
               return;
            }

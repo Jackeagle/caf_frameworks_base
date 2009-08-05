@@ -1244,4 +1244,8 @@ public class CDMAPhone extends PhoneBase {
         editor.commit();
     }
 
+    public int getCspPlmnStatus() {
+       Log.e(LOG_TAG, "Error! This functionality is not implemented for CDMA.");
+       return 0;
+    }
 }

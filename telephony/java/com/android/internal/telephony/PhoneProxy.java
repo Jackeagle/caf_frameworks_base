@@ -786,4 +786,8 @@ public class PhoneProxy extends Handler implements Phone {
     public void unsetOnEcbModeExitResponse(Handler h){
         mActivePhone.unsetOnEcbModeExitResponse(h);
     }
+
+    public int getCspPlmnStatus() {
+        return mActivePhone.getCspPlmnStatus();
+    }
 }

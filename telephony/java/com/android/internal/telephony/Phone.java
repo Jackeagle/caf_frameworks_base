@@ -1636,5 +1636,10 @@ public interface Phone {
      */
     void unsetOnEcbModeExitResponse(Handler h);
 
+    /**
+    * Get CspPlmnStatus from EF_CSP
+    * @return 1 if CspPlmn bit is set, 0 if it is not set
+    */
+    public int getCspPlmnStatus();
 
 }
