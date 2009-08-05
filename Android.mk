@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2008 The Android Open Source Project
+# Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,12 +66,12 @@ endif
 ## READ ME: ########################################################
 LOCAL_SRC_FILES += \
 	core/java/android/accessibilityservice/IAccessibilityServiceConnection.aidl \
-  core/java/android/accessibilityservice/IEventListener.aidl \
+	core/java/android/accessibilityservice/IEventListener.aidl \
 	core/java/android/accounts/IAccountsService.aidl \
 	core/java/android/app/IActivityPendingResult.aidl \
 	core/java/android/app/IActivityWatcher.aidl \
 	core/java/android/app/IAlarmManager.aidl \
-        core/java/android/app/IBackupAgent.aidl \
+	core/java/android/app/IBackupAgent.aidl \
 	core/java/android/app/IInstrumentationWatcher.aidl \
 	core/java/android/app/INotificationManager.aidl \
 	core/java/android/app/ISearchManager.aidl \
@@ -88,12 +89,15 @@ LOCAL_SRC_FILES += \
 	core/java/android/bluetooth/IBluetoothDevice.aidl \
 	core/java/android/bluetooth/IBluetoothDeviceCallback.aidl \
 	core/java/android/bluetooth/IBluetoothHeadset.aidl \
-        core/java/android/content/IContentService.aidl \
+	core/java/android/bluetooth/obex/IBluetoothOpp.aidl \
+	core/java/android/bluetooth/obex/IBluetoothFtp.aidl \
+	core/java/android/bluetooth/obex/IBluetoothFtpCallback.aidl \
+	core/java/android/content/IContentService.aidl \
 	core/java/android/content/IIntentReceiver.aidl \
 	core/java/android/content/IIntentSender.aidl \
 	core/java/android/content/ISyncAdapter.aidl \
 	core/java/android/content/ISyncContext.aidl \
-        core/java/android/content/ISyncStatusObserver.aidl \
+	core/java/android/content/ISyncStatusObserver.aidl \
 	core/java/android/content/pm/IPackageDataObserver.aidl \
 	core/java/android/content/pm/IPackageDeleteObserver.aidl \
 	core/java/android/content/pm/IPackageInstallObserver.aidl \
@@ -342,10 +346,10 @@ web_docs_sample_code_flags := \
 		-samplecode $(sample_dir)/NotePad \
 		            guide/samples/NotePad "Note Pad"
 
-# SDK version identifiers used in the published docs. 
+# SDK version identifiers used in the published docs.
 
-# major[.minor] version for SDK. Typically identical to the 
-# most current Android platform version included in the SDK package. 
+# major[.minor] version for SDK. Typically identical to the
+# most current Android platform version included in the SDK package.
 framework_docs_SDK_VERSION :=  1.5
 # release version for SDK (ie "Release x")
 framework_docs_SDK_REL_ID :=   2

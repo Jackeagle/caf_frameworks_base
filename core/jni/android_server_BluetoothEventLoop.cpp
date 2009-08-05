@@ -1,5 +1,6 @@
 /*
 ** Copyright 2008, The Android Open Source Project
+** Copyright (c) 2009, Code Aurora Forum, Inc. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@
 
 #include "android_bluetooth_common.h"
 #include "android_runtime/AndroidRuntime.h"
+#include "cutils/properties.h"
 #include "cutils/sockets.h"
 #include "JNIHelp.h"
 #include "jni.h"
@@ -158,8 +160,24 @@ static DBusHandlerResult agent_event_filter(DBusConnection *conn,
                                             DBusMessage *msg,
                                             void *data);
 
+extern DBusHandlerResult oppclient_agent(DBusConnection *conn,
+                                         DBusMessage *msg,
+                                         void *data);
+
+extern DBusHandlerResult oppserver_agent(DBusConnection *conn,
+                                         DBusMessage *msg,
+                                         void *data);
+
 static const DBusObjectPathVTable agent_vtable = {
     NULL, agent_event_filter, NULL, NULL, NULL, NULL
+};
+
+static const DBusObjectPathVTable oppclient_agent_vtable = {
+    NULL, oppclient_agent, NULL, NULL, NULL, NULL
+};
+
+static const DBusObjectPathVTable oppserver_agent_vtable = {
+    NULL, oppserver_agent, NULL, NULL, NULL, NULL
 };
 
 static unsigned int unix_events_to_dbus_flags(short events) {
@@ -196,6 +214,7 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             LOG_AND_FREE_DBUS_ERROR(&err);
             return JNI_FALSE;
         }
+
         dbus_bus_add_match(nat->conn,
                 "type='signal',interface='"BLUEZ_DBUS_BASE_IFC".Adapter'",
                 &err);
@@ -203,6 +222,7 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             LOG_AND_FREE_DBUS_ERROR(&err);
             return JNI_FALSE;
         }
+
         dbus_bus_add_match(nat->conn,
                 "type='signal',interface='org.bluez.audio.Manager'",
                 &err);
@@ -210,6 +230,7 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             LOG_AND_FREE_DBUS_ERROR(&err);
             return JNI_FALSE;
         }
+
         dbus_bus_add_match(nat->conn,
                 "type='signal',interface='org.bluez.audio.Device'",
                 &err);
@@ -217,6 +238,7 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             LOG_AND_FREE_DBUS_ERROR(&err);
             return JNI_FALSE;
         }
+
         dbus_bus_add_match(nat->conn,
                 "type='signal',interface='org.bluez.audio.Sink'",
                 &err);
@@ -225,8 +247,25 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             return JNI_FALSE;
         }
 
+        dbus_bus_add_match(nat->conn,
+                "type='signal',interface='"OBEXD_DBUS_SRV_MGR_IFC"'",
+                &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR(&err);
+            return JNI_FALSE;
+        }
+
+        dbus_bus_add_match(nat->conn,
+                "type='signal',interface='"OBEXD_DBUS_SRV_TRANS_IFC"'",
+                &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR(&err);
+            return JNI_FALSE;
+        }
+
+        const char *path = ANDROID_PASSKEY_AGENT_PATH;
+
         // Add an object handler for passkey agent method calls
-        const char *path = "/android/bluetooth/Agent";
         if (!dbus_connection_register_object_path(nat->conn, path,
                 &agent_vtable, nat)) {
             LOGE("%s: Can't register object path %s for agent!",
@@ -234,15 +273,19 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             return JNI_FALSE;
         }
 
+        LOGV("Added Object Path %s", path);
+
         // RegisterDefaultPasskeyAgent() will fail until hcid is up, so keep
         // trying for 10 seconds.
         int attempt;
+        DBusMessage *reply = NULL;
+
         for (attempt = 0; attempt < 1000; attempt++) {
-            DBusMessage *reply = dbus_func_args_error(NULL, nat->conn, &err,
-                    BLUEZ_DBUS_BASE_PATH,
+            reply = dbus_func_args_error(NULL, nat->conn, &err,
+                    BLUEZ_DBUS_BASE_SVC, BLUEZ_DBUS_BASE_PATH,
                     "org.bluez.Security", "RegisterDefaultPasskeyAgent",
-                    DBUS_TYPE_STRING, &path,
-                    DBUS_TYPE_INVALID);
+                    DBUS_TYPE_STRING, &path, DBUS_TYPE_INVALID);
+
             if (reply) {
                 // Success
                 dbus_message_unref(reply);
@@ -259,15 +302,18 @@ static jboolean setUpEventLoop(native_data_t *nat) {
                 return JNI_FALSE;
             }
         }
+
         if (attempt == 1000) {
             LOGE("Time-out trying to call RegisterDefaultPasskeyAgent(), "
                  "is hcid running?");
             return JNI_FALSE;
         }
 
+        LOGV("Registered Passkey Agent Path %s", path);
+
         // Now register the Auth agent
-        DBusMessage *reply = dbus_func_args_error(NULL, nat->conn, &err,
-                BLUEZ_DBUS_BASE_PATH,
+        reply = dbus_func_args_error(NULL, nat->conn, &err,
+                BLUEZ_DBUS_BASE_SVC, BLUEZ_DBUS_BASE_PATH,
                 "org.bluez.Security", "RegisterDefaultAuthorizationAgent",
                 DBUS_TYPE_STRING, &path,
                 DBUS_TYPE_INVALID);
@@ -276,7 +322,77 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             return JNI_FALSE;
         }
 
+        LOGV("Registered Authorization Agent Path %s", path);
+
         dbus_message_unref(reply);
+
+        char proprietary_obex_enabled_str[PROPERTY_VALUE_MAX] = "";
+        property_get("ro.qualcomm.proprietary_obex", proprietary_obex_enabled_str, "");
+        if (!strncmp("true", proprietary_obex_enabled_str, PROPERTY_VALUE_MAX) ||
+            !strncmp("1", proprietary_obex_enabled_str, PROPERTY_VALUE_MAX)) {
+            LOGD("Qualcomm proprietary Bluetooth OBEX: enabled.");
+
+            path = ANDROID_OPPCLIENT_AGENT_PATH;
+
+            // Add an object handler for OPP client agent method calls
+            if (!dbus_connection_register_object_path(nat->conn, path,
+                                                      &oppclient_agent_vtable,
+                                                      NULL)) {
+                LOGE("%s: Can't register object path %s for agent!",
+                     __FUNCTION__, path);
+                return JNI_FALSE;
+            }
+
+            LOGV("Added Object Path %s", path);
+
+            path = ANDROID_OPPSRV_AGENT_PATH;
+
+            // Add an object handler for OPP server agent method calls
+            if (!dbus_connection_register_object_path(nat->conn, path,
+                                                      &oppserver_agent_vtable,
+                                                      NULL)) {
+                LOGE("%s: Can't register object path %s for agent!",
+                     __FUNCTION__, path);
+                return JNI_FALSE;
+            }
+
+            LOGV("Added Object Path %s", path);
+
+            for (attempt = 0; attempt < 1000; attempt++) {
+                // Register OPP Server Agent
+                reply = dbus_func_args_error(NULL, nat->conn, &err,
+                        OBEXD_DBUS_SRV_SVC, OBEXD_DBUS_SRV_MGR_PATH,
+                        OBEXD_DBUS_SRV_MGR_IFC, OBEXD_DBUS_SRV_MGR_REG_AGENT,
+                        DBUS_TYPE_OBJECT_PATH, &path, DBUS_TYPE_INVALID);
+
+                if (reply) {
+                    // Success
+                    dbus_message_unref(reply);
+                    LOGV("Registered agent on attempt %d of 1000\n", attempt);
+                    break;
+                } else if (dbus_error_has_name(&err,
+                        "org.freedesktop.DBus.Error.ServiceUnknown")) {
+                    // dbus_bt is still down, retry
+                    dbus_error_free(&err);
+                    usleep(10000);  // 10 ms
+                } else {
+                    // Some other error we weren't expecting
+                    LOG_AND_FREE_DBUS_ERROR(&err);
+                    return JNI_FALSE;
+                }
+            }
+
+            if (attempt == 1000) {
+                LOGE("Time-out trying to call"OBEXD_DBUS_SRV_MGR_REG_AGENT", "
+                     "is dbus_bt running?");
+                return JNI_FALSE;
+            }
+
+            LOGV("Registered OPP Server Agent Path %s", path);
+        } else {
+            LOGD("Qualcomm proprietary Bluetooth OBEX: disabled.");
+        }
+
         return JNI_TRUE;
     }
 
@@ -290,22 +406,39 @@ static void tearDownEventLoop(native_data_t *nat) {
         DBusError err;
         dbus_error_init(&err);
 
-        const char *path = "/android/bluetooth/Agent";
+        const char *path = ANDROID_PASSKEY_AGENT_PATH;
+
         DBusMessage *reply =
-            dbus_func_args(NULL, nat->conn, BLUEZ_DBUS_BASE_PATH,
-                    "org.bluez.Security", "UnregisterDefaultPasskeyAgent",
+            dbus_func_args(NULL, nat->conn, BLUEZ_DBUS_BASE_SVC,
+                           BLUEZ_DBUS_BASE_PATH, "org.bluez.Security",
+                           "UnregisterDefaultPasskeyAgent",
                     DBUS_TYPE_STRING, &path,
                     DBUS_TYPE_INVALID);
         if (reply) dbus_message_unref(reply);
 
-        reply =
-            dbus_func_args(NULL, nat->conn, BLUEZ_DBUS_BASE_PATH,
-                    "org.bluez.Security", "UnregisterDefaultAuthorizationAgent",
+        reply = dbus_func_args(NULL, nat->conn, BLUEZ_DBUS_BASE_SVC,
+                               BLUEZ_DBUS_BASE_PATH, "org.bluez.Security",
+                               "UnregisterDefaultAuthorizationAgent",
                     DBUS_TYPE_STRING, &path,
                     DBUS_TYPE_INVALID);
         if (reply) dbus_message_unref(reply);
 
         dbus_connection_unregister_object_path(nat->conn, path);
+
+        path = ANDROID_OPPSRV_AGENT_PATH;
+
+        reply = dbus_func_args(NULL, nat->conn, OBEXD_DBUS_SRV_SVC,
+                               OBEXD_DBUS_SRV_MGR_PATH,
+                               OBEXD_DBUS_SRV_MGR_IFC,
+                               OBEXD_DBUS_SRV_MGR_UNREG_AGENT,
+                               DBUS_TYPE_STRING, &path,
+                               DBUS_TYPE_INVALID);
+
+        if (reply) dbus_message_unref(reply);
+
+        dbus_connection_unregister_object_path(nat->conn, path);
+
+        dbus_connection_unregister_object_path(nat->conn, ANDROID_OPPCLIENT_AGENT_PATH);
 
         dbus_bus_remove_match(nat->conn,
                 "type='signal',interface='org.bluez.audio.Sink'",
@@ -327,6 +460,18 @@ static void tearDownEventLoop(native_data_t *nat) {
         }
         dbus_bus_remove_match(nat->conn,
                 "type='signal',interface='"BLUEZ_DBUS_BASE_IFC".Adapter'",
+                &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR(&err);
+        }
+        dbus_bus_remove_match(nat->conn,
+                "type='signal',interface='"OBEXD_DBUS_SRV_MGR_IFC"'",
+                &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR(&err);
+        }
+        dbus_bus_remove_match(nat->conn,
+                "type='signal',interface='"OBEXD_DBUS_SRV_TRANS_IFC"'",
                 &err);
         if (dbus_error_is_set(&err)) {
             LOG_AND_FREE_DBUS_ERROR(&err);
@@ -643,6 +788,8 @@ static jboolean isEventLoopRunningNative(JNIEnv *env, jobject object) {
 
 #ifdef HAVE_BLUETOOTH
 extern DBusHandlerResult a2dp_event_filter(DBusMessage *msg, JNIEnv *env);
+extern DBusHandlerResult opp_event_filter(DBusMessage *msg, JNIEnv *env);
+extern DBusHandlerResult ftp_event_filter(DBusMessage *msg, JNIEnv *env);
 
 // Called by dbus during WaitForAndDispatchEventNative()
 static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
@@ -864,9 +1011,13 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
             }
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
+    } else if (a2dp_event_filter(msg, env) == DBUS_HANDLER_RESULT_HANDLED) {
+        return DBUS_HANDLER_RESULT_HANDLED;
+    } else if (opp_event_filter(msg, env) == DBUS_HANDLER_RESULT_HANDLED) {
+        return DBUS_HANDLER_RESULT_HANDLED;
+    } else {
+        return ftp_event_filter (msg, env);
     }
-
-    return a2dp_event_filter(msg, env);
 }
 
 // Called by dbus during WaitForAndDispatchEventNative()
@@ -1158,6 +1309,8 @@ static JNINativeMethod sMethods[] = {
 };
 
 int register_android_server_BluetoothEventLoop(JNIEnv *env) {
+    LOGV(__FUNCTION__);
+
     return AndroidRuntime::registerNativeMethods(env,
             "android/server/BluetoothEventLoop", sMethods, NELEM(sMethods));
 }
