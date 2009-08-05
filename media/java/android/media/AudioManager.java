@@ -20,6 +20,7 @@ package android.media;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.content.Context;
+import android.content.ContentResolver;
 import android.database.ContentObserver;
 import android.os.Binder;
 import android.os.Handler;
@@ -28,6 +29,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.provider.Settings;
 import android.util.Log;
+import com.android.internal.telephony.Phone;
 
 /**
  * AudioManager provides access to volume and ringer mode control.
@@ -710,9 +712,26 @@ public class AudioManager {
         // A2DP has higher priority than wired headset, so headset connect/disconnect events
         // should not affect A2DP routing
 
+        int route = ROUTE_HEADSET; //Default: Set Audio route to wired headset
+        if(on) {
+            int tty_settings = android.provider.Settings.Secure.getInt(mContext.getContentResolver(),
+                                      android.provider.Settings.Secure.PREFERRED_TTY_MODE, Phone.TTY_MODE_OFF);
+            switch(tty_settings) {
+            case Phone.TTY_MODE_OFF:
+                route = ROUTE_HEADSET;          break;
+            case Phone.TTY_MODE_FULL:
+                route = ROUTE_TTY_DEVICE_FULL;  break;
+            case Phone.TTY_MODE_HCO:
+                route = ROUTE_TTY_DEVICE_HCO;   break;
+            case Phone.TTY_MODE_VCO:
+                route = ROUTE_TTY_DEVICE_VCO;   break;
+            default:
+                route = ROUTE_HEADSET;
+            }
+        }
         // Temporary fix for issue #1713090 until audio routing is refactored in eclair release.
         // MODE_INVALID indicates to AudioService that setRouting() was initiated by AudioManager
-        setRoutingP(MODE_INVALID, on ? ROUTE_HEADSET: 0, ROUTE_HEADSET);
+        setRoutingP(MODE_INVALID, on ? route : 0, route);
     }
 
     /**
@@ -841,11 +860,23 @@ public class AudioManager {
     /**
      * Routing audio output to dual mike and Handset
      */
-    public static final int ROUTE_DUALMIC_HANDSET    = AudioSystem.ROUTE_DUALMIC_HANDSET;
+    public static final int ROUTE_DUALMIC_HANDSET   = AudioSystem.ROUTE_DUALMIC_HANDSET;
     /**
      * Routing audio output to Dual mike and speaker
      */
-    public static final int ROUTE_DUALMIC_SPEAKER    = AudioSystem.ROUTE_DUALMIC_SPEAKER;
+    public static final int ROUTE_DUALMIC_SPEAKER   = AudioSystem.ROUTE_DUALMIC_SPEAKER;
+    /**
+     * Routing audio output to TTY device in FULL mode
+     */
+    public static final int ROUTE_TTY_DEVICE_FULL   = AudioSystem.ROUTE_TTY_DEVICE_FULL;
+    /**
+     * Routing audio output to TTY device in HCO mode
+     */
+    public static final int ROUTE_TTY_DEVICE_HCO    = AudioSystem.ROUTE_TTY_DEVICE_HCO;
+    /**
+     * Routing audio output to TTY device in VCO mode
+     */
+    public static final int ROUTE_TTY_DEVICE_VCO    = AudioSystem.ROUTE_TTY_DEVICE_VCO;
     /**
      * Used for mask parameter of {@link #setRouting(int,int,int)}.
      */

@@ -757,16 +757,19 @@ public class AudioService extends IAudioService.Stub {
                     break;
 
                 case AudioSystem.ROUTE_HEADSET:
+                case AudioSystem.ROUTE_TTY_DEVICE_FULL:
+                case AudioSystem.ROUTE_TTY_DEVICE_HCO:
+                case AudioSystem.ROUTE_TTY_DEVICE_VCO:
                     // handle setWiredHeadsetOn()
                     if (routes != 0 && !mHeadsetIsConnected) {
                         mHeadsetIsConnected = true;
                         // do not act upon headset connection if bluetooth SCO is connected to match phone app behavior
                         if (!mBluetoothScoIsConnected) {
-                            mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_HEADSET;
+                            mRoutes[AudioSystem.MODE_IN_CALL] = mask;
                             mRoutes[AudioSystem.MODE_RINGTONE] = (mRoutes[AudioSystem.MODE_RINGTONE] & AudioSystem.ROUTE_BLUETOOTH_A2DP) |
-                                                                 (AudioSystem.ROUTE_HEADSET|AudioSystem.ROUTE_SPEAKER);
+                                                                 (mask|AudioSystem.ROUTE_SPEAKER);
                             mRoutes[AudioSystem.MODE_NORMAL] = (mRoutes[AudioSystem.MODE_NORMAL] & AudioSystem.ROUTE_BLUETOOTH_A2DP) |
-                                                               AudioSystem.ROUTE_HEADSET;
+                                                               mask;
                             incallMask = AudioSystem.ROUTE_ALL;
                             // A2DP has higher priority than wired headset, so headset connect/disconnect events
                             // should not affect A2DP routing

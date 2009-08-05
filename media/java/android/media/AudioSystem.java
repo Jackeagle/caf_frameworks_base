@@ -132,6 +132,9 @@ public class AudioSystem
     public static final int ROUTE_BLUETOOTH_A2DP    = (1 << 4);
     public static final int ROUTE_DUALMIC_HANDSET   = (1 << 5);
     public static final int ROUTE_DUALMIC_SPEAKER   = (1 << 6);
+    public static final int ROUTE_TTY_DEVICE_FULL   = (1 << 7);
+    public static final int ROUTE_TTY_DEVICE_HCO    = (1 << 8);
+    public static final int ROUTE_TTY_DEVICE_VCO    = (1 << 9);
     public static final int ROUTE_ALL               = 0xFFFFFFFF;
 
     /*
