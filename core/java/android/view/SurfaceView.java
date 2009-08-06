@@ -269,7 +269,7 @@ public class SurfaceView extends View {
         if (myWidth <= 0) myWidth = getWidth();
         int myHeight = mRequestedHeight;
         if (myHeight <= 0) myHeight = getHeight();
-        
+
         getLocationInWindow(mLocation);
         final boolean creating = mWindow == null;
         final boolean formatChanged = mFormat != mRequestedFormat;
@@ -277,8 +277,9 @@ public class SurfaceView extends View {
         final boolean visibleChanged = mVisible != mRequestedVisible
                 || mNewSurfaceNeeded;
         final boolean typeChanged = mType != mRequestedType;
+        final boolean locationChanged = mLeft != mLocation[0] || mTop != mLocation[1];
         if (force || creating || formatChanged || sizeChanged || visibleChanged
-            || typeChanged || mLeft != mLocation[0] || mTop != mLocation[1]) {
+            || typeChanged || locationChanged) {
 
             if (localLOGV) Log.i(TAG, "Changes: creating=" + creating
                     + " format=" + formatChanged + " size=" + sizeChanged
@@ -321,6 +322,11 @@ public class SurfaceView extends View {
                 }
                 
                 mNewSurfaceNeeded = false;
+
+                if (locationChanged && mParent != null) {
+                    View p = (View)mParent;
+                    invalidate(0, 0, p.getWidth(), p.getHeight());
+                }
                 
                 mSurfaceLock.lock();
                 mDrawingStopped = !visible;
