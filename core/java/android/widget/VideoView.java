@@ -167,6 +167,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
 
             mVideoWidth = 0;
             mVideoHeight = 0;
+            getHolder().setFixedSize(mVideoWidth, mVideoHeight);
         }
     }
 
