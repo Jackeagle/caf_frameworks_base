@@ -55,6 +55,7 @@ public class InputDevice {
         int y = 0;
         int pressure = 1;
         int size = 0;
+        int scanCode = 0;
         
         MotionState(int mx, int my) {
             xPrecision = mx;
@@ -169,7 +170,7 @@ public class InputDevice {
                 }
                 return MotionEvent.obtain(downTime, curTime, action,
                         scaledX, scaledY, scaledPressure, scaledSize, metaState,
-                        xPrecision, yPrecision, device.id, edgeFlags);
+                        xPrecision, yPrecision, device.id, edgeFlags, scanCode);
             } else {
                 if (currentMove != null) {
                     if (false) Log.i("InputDevice", "Adding batch x=" + scaledX
@@ -184,7 +185,7 @@ public class InputDevice {
                 MotionEvent me = MotionEvent.obtain(downTime, curTime,
                         MotionEvent.ACTION_MOVE, scaledX, scaledY,
                         scaledPressure, scaledSize, metaState,
-                        xPrecision, yPrecision, device.id, edgeFlags);
+                        xPrecision, yPrecision, device.id, edgeFlags, scanCode);
                 currentMove = me;
                 return me;
             }

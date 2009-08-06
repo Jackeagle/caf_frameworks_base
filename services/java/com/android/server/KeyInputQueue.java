@@ -288,10 +288,18 @@ public abstract class KeyInputQueue {
                                 di.mAbs.changed = true;
                                 di.mAbs.down = ev.value != 0;
                             }
-                            if (ev.scancode == RawInputEvent.BTN_MOUSE &&
+                           /*
+                            * Handle Trackball/Mouse left and right buttons
+                            * Populate scan code to Windows manager
+                            * Check scan code in View and display Context Menu
+                            * for Mouse right button
+                            */
+                            if ((ev.scancode == RawInputEvent.BTN_MOUSE ||
+                                    ev.scancode == RawInputEvent.BTN_RIGHT) &&
                                     (classes&RawInputEvent.CLASS_TRACKBALL) != 0) {
                                 di.mRel.changed = true;
                                 di.mRel.down = ev.value != 0;
+                                di.mRel.scanCode = ev.scancode;
                                 send = true;
                             }
     

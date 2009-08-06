@@ -62,6 +62,8 @@ import android.view.animation.Animation;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+
+import android.view.RawInputEvent;
 import android.widget.ScrollBarDrawable;
 
 import java.lang.ref.SoftReference;
@@ -3937,6 +3939,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
      */
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         boolean result = false;
+        final int scancode = event.getScanCode();
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
@@ -3953,7 +3956,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
                             removeCallbacks(mPendingCheckForLongPress);
                         }
 
-                        result = performClick();
+                        if (scancode == RawInputEvent.BTN_RIGHT) {
+                            if (isLongClickable()) {
+                                result = performLongClick();
+                            }
+                        } else {
+                            result = performClick();
+                        }
                     }
                 }
                 break;

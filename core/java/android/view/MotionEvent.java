@@ -102,6 +102,7 @@ public final class MotionEvent implements Parcelable {
     private float mYPrecision;
     private int mDeviceId;
     private int mEdgeFlags;
+    private int mScanCode;
 
     private MotionEvent mNext;
     private RuntimeException mRecycledLocation;
@@ -171,7 +172,36 @@ public final class MotionEvent implements Parcelable {
         ev.mMetaState = metaState;
         ev.mXPrecision = xPrecision;
         ev.mYPrecision = yPrecision;
+        ev.mScanCode= 0;
 
+        return ev;
+    }
+
+    /**
+     * Create a new MotionEvent, filling in all of the basic values that
+     * define the motion.
+     *
+     * @param scanCode The scancode of a trackball button
+     * @hide
+     */
+    static public MotionEvent obtain(long downTime, long eventTime, int action,
+            float x, float y, float pressure, float size, int metaState,
+            float xPrecision, float yPrecision, int deviceId, int edgeFlags,
+            int scanCode) {
+        MotionEvent ev = obtain();
+        ev.mDeviceId = deviceId;
+        ev.mEdgeFlags = edgeFlags;
+        ev.mDownTime = downTime;
+        ev.mEventTime = eventTime;
+        ev.mAction = action;
+        ev.mX = ev.mRawX = x;
+        ev.mY = ev.mRawY = y;
+        ev.mPressure = pressure;
+        ev.mSize = size;
+        ev.mMetaState = metaState;
+        ev.mXPrecision = xPrecision;
+        ev.mYPrecision = yPrecision;
+        ev.mScanCode = scanCode;
         return ev;
     }
 
@@ -207,6 +237,7 @@ public final class MotionEvent implements Parcelable {
         ev.mMetaState = metaState;
         ev.mXPrecision = 1.0f;
         ev.mYPrecision = 1.0f;
+        ev.mScanCode = 0;
 
         return ev;
     }
@@ -276,6 +307,7 @@ public final class MotionEvent implements Parcelable {
         ev.mMetaState = o.mMetaState;
         ev.mXPrecision = o.mXPrecision;
         ev.mYPrecision = o.mYPrecision;
+        ev.mScanCode = o.mScanCode;
         final int N = o.mNumHistory;
         ev.mNumHistory = N;
         if (N > 0) {
@@ -519,6 +551,14 @@ public final class MotionEvent implements Parcelable {
     }
 
     /**
+     * Return the scan code of the tarckball buttons
+     * @hide
+     */
+    public final int getScanCode() {
+        return mScanCode;
+    }
+
+    /**
      * Returns a bitfield indicating which edges, if any, where touched by this
      * MotionEvent. For touch events, clients can use this to determine if the
      * user's finger was touching the edge of the display.
@@ -641,7 +681,8 @@ public final class MotionEvent implements Parcelable {
     public String toString() {
         return "MotionEvent{" + Integer.toHexString(System.identityHashCode(this))
             + " action=" + mAction + " x=" + mX
-            + " y=" + mY + " pressure=" + mPressure + " size=" + mSize + "}";
+            + " y=" + mY + " pressure=" + mPressure + " size=" + mSize
+            + "scancode" + mScanCode + "}";
     }
 
     public static final Parcelable.Creator<MotionEvent> CREATOR
@@ -690,6 +731,7 @@ public final class MotionEvent implements Parcelable {
         out.writeFloat(mYPrecision);
         out.writeInt(mDeviceId);
         out.writeInt(mEdgeFlags);
+        out.writeInt(mScanCode);
     }
 
     private void readFromParcel(Parcel in) {
@@ -725,6 +767,7 @@ public final class MotionEvent implements Parcelable {
         mYPrecision = in.readFloat();
         mDeviceId = in.readInt();
         mEdgeFlags = in.readInt();
+        mScanCode = in.readInt();
     }
 
 }
