@@ -69,6 +69,18 @@ public:
     /* Special Effect */
     const char *getEffect() const;
 
+    /* ISO value */
+    const char *getISOValue() const;
+
+    /* Auto exposure value */
+    const char *getAutoexposureValue() const;
+
+    /* Lensshading value */
+    const char *getLensshadingValue() const;
+
+    /* Auto focus value */
+    const char *getAutoFocusValue() const;
+
     /* White Balance Lighting Conditions */
     const char *getWBLighting() const;
 

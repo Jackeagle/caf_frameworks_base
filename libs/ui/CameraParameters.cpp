@@ -275,6 +275,27 @@ const char *CameraParameters::getEffect() const
 {
     return get("effect");
 }
+
+const char* CameraParameters::getISOValue() const
+{
+    return get("iso");
+}
+
+const char* CameraParameters::getAutoexposureValue() const
+{
+    return get("exposure");
+}
+
+const char* CameraParameters::getLensshadingValue() const
+{
+    return get("lensshading");
+}
+
+const char* CameraParameters::getAutoFocusValue() const
+{
+    return get("autofocus");
+}
+
 const char *CameraParameters::getWBLighting() const
 {
     return get("whitebalance");
