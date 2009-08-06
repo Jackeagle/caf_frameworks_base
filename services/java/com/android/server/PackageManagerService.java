@@ -4034,6 +4034,7 @@ class PackageManagerService extends IPackageManager.Stub {
             return false;
         }
         synchronized (mPackages) {
+            grantPermissionsLP(newPkg, true);
             mSettings.writeLP();
         }
         return true;
@@ -5543,6 +5544,7 @@ class PackageManagerService extends IPackageManager.Stub {
                 }
                 p = new PackageSetting(name, codePath, resourcePath, pkgFlags);
                 p.setTimeStamp(codePath.lastModified());
+                p.sharedUser = sharedUser;
                 if (sharedUser != null) {
                     p.userId = sharedUser.userId;
                 } else if (MULTIPLE_APPLICATION_UIDS) {
