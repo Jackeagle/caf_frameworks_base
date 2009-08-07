@@ -39,6 +39,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+import android.view.RawInputEvent;
 import android.widget.Scroller;
 import android.content.pm.PackageManager;
 import android.content.res.CompatibilityInfo;
@@ -1987,20 +1988,22 @@ public final class ViewRoot extends Handler implements ViewParent,
         try {
             final int action = event.getAction();
             final int metastate = event.getMetaState();
+            final int deviceid = event.getDeviceId();
+            final int scancode = event.getScanCode();
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
                     x.reset(2);
                     y.reset(2);
                     deliverKeyEvent(new KeyEvent(curTime, curTime,
                             KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER,
-                            0, metastate), false);
+                            0, metastate, deviceid, scancode), false);
                     break;
                 case MotionEvent.ACTION_UP:
                     x.reset(2);
                     y.reset(2);
                     deliverKeyEvent(new KeyEvent(curTime, curTime,
                             KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_CENTER,
-                            0, metastate), false);
+                            0, metastate, deviceid, scancode), false);
                     break;
             }
 
