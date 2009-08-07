@@ -447,14 +447,10 @@ public final class CdmaCallTracker extends CallTracker {
             DriverCall dc = null;
 
             // polledCall list is sparse
+            // Since CDMA allows maximum 1 connection
+            // There is no need of checking dc.index value
             if (curDC < dcSize) {
                 dc = (DriverCall) polledCalls.get(curDC);
-
-                if (dc.index == i+1) {
-                    curDC++;
-                } else {
-                    dc = null;
-                }
             }
 
             if (DBG_POLL) log("poll: conn[i=" + i + "]=" +
