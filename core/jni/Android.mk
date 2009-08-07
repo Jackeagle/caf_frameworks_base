@@ -113,6 +113,8 @@ LOCAL_SRC_FILES:= \
 	android_server_BluetoothDeviceService.cpp \
 	android_server_BluetoothEventLoop.cpp \
 	android_server_BluetoothA2dpService.cpp \
+	android_server_BluetoothFtpService.cpp \
+	android_server_BluetoothOppService.cpp \
 	android_message_digest_sha1.cpp \
 	android_ddm_DdmHandleNativeHeap.cpp \
 	android_location_GpsLocationProvider.cpp \

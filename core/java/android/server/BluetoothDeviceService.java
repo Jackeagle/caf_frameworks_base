@@ -270,7 +270,7 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
         if (!disable(false)) {
             mRestart = false;
         }
-    }   
+    }
 
     private synchronized void setBluetoothState(int state) {
         if (state == mBluetoothState) {
@@ -298,6 +298,8 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
                 if (isEnabled()) {
                     SystemService.start("hsag");
                     SystemService.start("hfag");
+                    SystemService.start("opp");
+                    SystemService.start("ftp");
                 }
                 break;
             case MESSAGE_FINISH_DISABLE:

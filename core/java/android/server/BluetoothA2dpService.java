@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,10 +158,11 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             switch (msg.what) {
             case MESSAGE_CONNECT_TO:
                 String address = (String)msg.obj;
-                // check bluetooth is still on, device is still preferred, and
-                // nothing is currently connected
+                // check bluetooth is still on, device is still preferred, a Bluetooth connection
+                // still exists and nothing is currently connected to A2DP
                 if (mBluetooth.isEnabled() &&
                         getSinkPriority(address) > BluetoothA2dp.PRIORITY_OFF &&
+                        mBluetooth.isAclConnected(address) &&
                         lookupSinksMatchingStates(new int[] {
                             BluetoothA2dp.STATE_CONNECTING,
                             BluetoothA2dp.STATE_CONNECTED,
