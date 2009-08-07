@@ -288,6 +288,10 @@ int CameraParameters::getJpegMainimageQuality() const
 {
      return atoi(get("jpeg-quality"));
 }
+int CameraParameters::getFlip() const
+{
+     return atoi(get("flip"));
+}
 int CameraParameters::getBrightness() const
 {
      LOGD("in CameraParameters.cpp getbrightness str = %s ", get("luma-adaptation"));

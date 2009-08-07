@@ -78,7 +78,8 @@ public:
     int getJpegMainimageQuality() const;
     /* Brightness control */
     int getBrightness() const;
-
+    /* Flip/Rotate mode */
+    int getFlip() const;
     /* Digital Zoom control */
     float getZoomValue() const;
 
