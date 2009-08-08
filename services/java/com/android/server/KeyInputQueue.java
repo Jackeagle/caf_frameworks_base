@@ -336,7 +336,34 @@ public abstract class KeyInputQueue {
                                 if (!mHaveGlobalMetaState) {
                                     computeGlobalMetaStateLocked();
                                 }
-                                
+
+                                if (ev.scancode == RawInputEvent.ABS_TSLIB_DOWN
+                                        || ev.scancode == RawInputEvent.ABS_TSLIB_UP){
+                                     Log.v(TAG,"Entering rawinput event EV_SYN");
+                                     di.mAbs.changed = true;
+                                     if (ev.scancode == RawInputEvent.ABS_TSLIB_DOWN){
+                                         di.mAbs.down = true;
+                                         di.mAbs.pressure = 255;
+                                      } else {
+                                          di.mAbs.down = false;
+                                          di.mAbs.pressure = 0;
+                                          //This is used to detect a EV_KEY state from tslib as
+                                          //opposed to EV_SYN event by default
+                                          if (ev.value == 0 && ev.flags == 0){
+                                             di.mAbs.changed = false;
+                                          } else {
+                                            di.mAbs.changed = true;
+                                          }
+                                      }
+                                      //ev.flags only for keypad so setting back to 0
+                                      //which is for touchscreen
+                                      di.mAbs.x = ev.value;
+                                      di.mAbs.y = ev.flags;
+                                      Log.v(TAG,"ev.value = " + ev.value + "ev.flags = " + ev.flags);
+                                      // Defaulting back the flags value
+                                      ev.flags = 0;
+                                 }
+
                                 MotionEvent me;
                                 me = di.mAbs.generateMotion(di, curTime, true,
                                         mDisplay, mOrientation, mGlobalMetaState);

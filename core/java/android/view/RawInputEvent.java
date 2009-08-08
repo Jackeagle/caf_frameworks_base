@@ -160,6 +160,9 @@ public class RawInputEvent {
     public static final int ABS_MISC = 0x28;
     public static final int ABS_MAX = 0x3f;
 
+    public static final int ABS_TSLIB_DOWN = 0x1d;
+    public static final int ABS_TSLIB_UP = 0x1e;
+
     public int deviceId;
     public int type;
     public int scancode;
