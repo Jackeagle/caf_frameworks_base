@@ -229,6 +229,14 @@ public final class ShutdownThread extends Thread {
             }
             if (radioOff && bluetoothOff) {
                 Log.i(TAG, "Radio and Bluetooth shutdown complete.");
+
+                try {
+                    Log.w(TAG, "ril Power-off ...");
+                    phone.setRilPowerOff();
+                    Log.w(TAG, "ril Power-off completed");
+                } catch (RemoteException ex) {
+                    Log.e(TAG, "RemoteException during Phone Power-off", ex);
+                }
                 break;
             }
             SystemClock.sleep(PHONE_STATE_POLL_SLEEP_MSEC);

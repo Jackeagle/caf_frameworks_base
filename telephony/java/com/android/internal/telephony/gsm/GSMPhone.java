@@ -830,6 +830,11 @@ public class GSMPhone extends PhoneBase {
         mSST.setRadioPower(power);
     }
 
+    public void
+    setRilPowerOff() {
+        return;
+    }
+
     private void storeVoiceMailNumber(String number) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         SharedPreferences.Editor editor = sp.edit();
