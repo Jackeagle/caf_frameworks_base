@@ -103,6 +103,7 @@ public class AudioService extends IAudioService.Stub {
     private Object mSettingsLock = new Object();
     private boolean mMediaServerOk;
     private boolean mSpeakerIsOn;
+    private boolean mDualMicIsOn;
     private boolean mBluetoothScoIsConnected;
     private boolean mHeadsetIsConnected;
     private boolean mBluetoothA2dpIsConnected;
@@ -715,6 +716,28 @@ public class AudioService extends IAudioService.Stub {
                     }
                     break;
 
+                case AudioSystem.ROUTE_DUALMIC_SPEAKER:
+                case AudioSystem.ROUTE_DUALMIC_HANDSET:
+                    if (routes != 0) {
+                        mDualMicIsOn = true;
+                        mSpeakerIsOn = (mask == AudioSystem.ROUTE_DUALMIC_SPEAKER);
+                        mRoutes[AudioSystem.MODE_IN_CALL] = routes;
+                        incallMask = AudioSystem.ROUTE_ALL;
+                    } else if (mDualMicIsOn) {
+                        mDualMicIsOn = false;
+                        if (mBluetoothScoIsConnected) {
+                            mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_BLUETOOTH_SCO;
+                        } else if (mHeadsetIsConnected) {
+                            mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_HEADSET;
+                        } else if (mSpeakerIsOn) {
+                            mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_SPEAKER;
+                        } else {
+                            mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_EARPIECE;
+                        }
+                        incallMask = AudioSystem.ROUTE_ALL;
+                    }
+                    break;
+
                 case AudioSystem.ROUTE_BLUETOOTH_SCO:
                     // handle setBluetoothScoOn()
                     if (routes != 0 && !mBluetoothScoIsConnected) {
@@ -738,7 +761,13 @@ public class AudioService extends IAudioService.Stub {
                             mRoutes[AudioSystem.MODE_NORMAL] = (mRoutes[AudioSystem.MODE_NORMAL] & AudioSystem.ROUTE_BLUETOOTH_A2DP) |
                                                                AudioSystem.ROUTE_HEADSET;
                         } else {
-                            if (mSpeakerIsOn) {
+                            if (mDualMicIsOn) {
+                                if (mSpeakerIsOn) {
+                                    mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_DUALMIC_SPEAKER;
+                                } else {
+                                    mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_DUALMIC_HANDSET;
+                                }
+                            } else if (mSpeakerIsOn) {
                                 mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_SPEAKER;
                             } else {
                                 mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_EARPIECE;
@@ -780,7 +809,13 @@ public class AudioService extends IAudioService.Stub {
                         mHeadsetIsConnected = false;
                         // do not act upon headset disconnection if bluetooth SCO is connected to match phone app behavior
                         if (!mBluetoothScoIsConnected) {
-                            if (mSpeakerIsOn) {
+                            if (mDualMicIsOn) {
+                                if (mSpeakerIsOn) {
+                                    mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_DUALMIC_SPEAKER;
+                                } else {
+                                    mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_DUALMIC_HANDSET;
+                                }
+                            } else if (mSpeakerIsOn) {
                                 mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_SPEAKER;
                             } else {
                                 mRoutes[AudioSystem.MODE_IN_CALL] = AudioSystem.ROUTE_EARPIECE;
