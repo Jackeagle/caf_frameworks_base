@@ -32,6 +32,7 @@ import android.app.ActivityThread;
 import android.app.AlertDialog;
 import android.app.ApplicationErrorReport;
 import android.app.Dialog;
+import android.app.IActivityController;
 import android.app.IActivityWatcher;
 import android.app.IApplicationThread;
 import android.app.IInstrumentationWatcher;
@@ -56,6 +57,7 @@ import android.content.pm.IPackageDataObserver;
 import android.content.pm.IPackageManager;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.PathPermission;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
@@ -75,6 +77,7 @@ import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
 import android.os.Process;
+import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
@@ -181,8 +184,7 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
     static final int LOG_BOOT_PROGRESS_ENABLE_SCREEN = 3050;
 
     // The flags that are set for all calls we make to the package manager.
-    static final int STOCK_PM_FLAGS = PackageManager.GET_SHARED_LIBRARY_FILES
-            | PackageManager.GET_SUPPORTS_DENSITIES;
+    static final int STOCK_PM_FLAGS = PackageManager.GET_SHARED_LIBRARY_FILES;
     
     private static final String SYSTEM_SECURE = "ro.secure";
 
@@ -721,6 +723,11 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
     Configuration mConfiguration = new Configuration();
 
     /**
+     * Hardware-reported OpenGLES version.
+     */
+    final int GL_ES_VERSION;
+
+    /**
      * List of initialization arguments to pass to all processes when binding applications to them.
      * For example, references to the commonly used services.
      */
@@ -824,8 +831,11 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
     String mOrigDebugApp = null;
     boolean mOrigWaitForDebugger = false;
     boolean mAlwaysFinishActivities = false;
-    IActivityWatcher mWatcher = null;
+    IActivityController mController = null;
 
+    final RemoteCallbackList<IActivityWatcher> mWatchers
+            = new RemoteCallbackList<IActivityWatcher>();
+    
     /**
      * Callback of last caller to {@link #requestPss}.
      */
@@ -1390,6 +1400,9 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         mUsageStatsService = new UsageStatsService( new File(
                 systemDir, "usagestats").toString());
 
+        GL_ES_VERSION = SystemProperties.getInt("ro.opengles.version",
+            ConfigurationInfo.GL_ES_VERSION_UNDEFINED);
+
         mConfiguration.makeDefault();
         mProcessStats.init();
         
@@ -1622,7 +1635,7 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
 
     /**
      * This is a simplified version of topRunningActivityLocked that provides a number of
-     * optional skip-over modes.  It is intended for use with the ActivityWatcher hook only.
+     * optional skip-over modes.  It is intended for use with the ActivityController hook only.
      * 
      * @param token If non-null, any history records matching this token will be skipped.
      * @param taskId If non-zero, we'll attempt to skip over records with the same task ID.
@@ -1727,10 +1740,9 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
             }
             ensurePackageDexOpt(r.intent.getComponent().getPackageName());
             app.thread.scheduleLaunchActivity(new Intent(r.intent), r,
+                    System.identityHashCode(r),
                     r.info, r.icicle, results, newIntents, !andResume,
                     isNextTransitionForward());
-            // Update usage stats for launched activity
-            updateUsageStats(r, true);
         } catch (RemoteException e) {
             if (r.launchFailed) {
                 // This is the second time we failed -- finish activity
@@ -2183,6 +2195,8 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
             mHandler.sendMessage(msg);
         }
 
+        reportResumedActivity(next);
+        
         next.thumbnail = null;
         setFocusedActivityLocked(next);
         next.resumeKeyDispatchingLocked();
@@ -2453,6 +2467,26 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         }
     }
     
+    private void reportResumedActivity(HistoryRecord r) {
+        //Log.i(TAG, "**** REPORT RESUME: " + r);
+        
+        final int identHash = System.identityHashCode(r);
+        updateUsageStats(r, true);
+        
+        int i = mWatchers.beginBroadcast();
+        while (i > 0) {
+            i--;
+            IActivityWatcher w = mWatchers.getBroadcastItem(i);
+            if (w != null) {
+                try {
+                    w.activityResuming(identHash);
+                } catch (RemoteException e) {
+                }
+            }
+        }
+        mWatchers.finishBroadcast();
+    }
+    
     /**
      * Ensure that the top activity in the stack is resumed.
      *
@@ -2641,10 +2675,10 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
                 EventLog.writeEvent(LOG_AM_RESUME_ACTIVITY,
                         System.identityHashCode(next),
                         next.task.taskId, next.shortComponentName);
-                updateUsageStats(next, true);
                 
                 next.app.thread.scheduleResumeActivity(next,
                         isNextTransitionForward());
+                
                 pauseIfSleepingLocked();
 
             } catch (Exception e) {
@@ -3061,16 +3095,16 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
             throw new SecurityException(msg);
         }
 
-        if (mWatcher != null) {
+        if (mController != null) {
             boolean abort = false;
             try {
                 // The Intent we give to the watcher has the extra data
                 // stripped off, since it can contain private information.
                 Intent watchIntent = intent.cloneFilter();
-                abort = !mWatcher.activityStarting(watchIntent,
+                abort = !mController.activityStarting(watchIntent,
                         aInfo.applicationInfo.packageName);
             } catch (RemoteException e) {
-                mWatcher = null;
+                mController = null;
             }
 
             if (abort) {
@@ -3495,8 +3529,6 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         intent = new Intent(intent);
 
         // Collect information about the target of the Intent.
-        // Must do this before locking, because resolving the intent
-        // may require launching a process to run its content provider.
         ActivityInfo aInfo;
         try {
             ResolveInfo rInfo =
@@ -3630,17 +3662,24 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         }
     }
 
-    final int startActivityInPackage(int uid,
+    public final int startActivityInPackage(int uid,
             Intent intent, String resolvedType, IBinder resultTo,
             String resultWho, int requestCode, boolean onlyIfNeeded) {
+        
+        // This is so super not safe, that only the system (or okay root)
+        // can do it.
+        final int callingUid = Binder.getCallingUid();
+        if (callingUid != 0 && callingUid != Process.myUid()) {
+            throw new SecurityException(
+                    "startActivityInPackage only available to the system");
+        }
+        
         final boolean componentSpecified = intent.getComponent() != null;
         
         // Don't modify the client's object!
         intent = new Intent(intent);
 
         // Collect information about the target of the Intent.
-        // Must do this before locking, because resolving the intent
-        // may require launching a process to run its content provider.
         ActivityInfo aInfo;
         try {
             ResolveInfo rInfo =
@@ -3967,16 +4006,16 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         }
 
         synchronized(this) {
-            if (mWatcher != null) {
+            if (mController != null) {
                 // Find the first activity that is not finishing.
                 HistoryRecord next = topRunningActivityLocked(token, 0);
                 if (next != null) {
                     // ask watcher if this is allowed
                     boolean resumeOK = true;
                     try {
-                        resumeOK = mWatcher.activityResuming(next.packageName);
+                        resumeOK = mController.activityResuming(next.packageName);
                     } catch (RemoteException e) {
-                        mWatcher = null;
+                        mController = null;
                     }
     
                     if (!resumeOK) {
@@ -4468,9 +4507,9 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
             }
         }
 
-        if (mWatcher != null) {
+        if (mController != null) {
             try {
-                int res = mWatcher.appNotResponding(app.processName,
+                int res = mController.appNotResponding(app.processName,
                         app.pid, info.toString());
                 if (res != 0) {
                     if (res < 0) {
@@ -4486,7 +4525,7 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
                     }
                 }
             } catch (RemoteException e) {
-                mWatcher = null;
+                mController = null;
             }
         }
 
@@ -4696,6 +4735,57 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         } finally {
             Binder.restoreCallingIdentity(callingId);
         }
+    }
+
+    /*
+     * The pkg name and uid have to be specified.
+     * @see android.app.IActivityManager#killApplicationWithUid(java.lang.String, int)
+     */
+    public void killApplicationWithUid(String pkg, int uid) {
+        if (pkg == null) {
+            return;
+        }
+        // Make sure the uid is valid.
+        if (uid < 0) {
+            Log.w(TAG, "Invalid uid specified for pkg : " + pkg);
+            return;
+        }
+        int callerUid = Binder.getCallingUid();
+        // Only the system server can kill an application
+        if (callerUid == Process.SYSTEM_UID) {
+            uninstallPackageLocked(pkg, uid, false);
+        } else {
+            throw new SecurityException(callerUid + " cannot kill pkg: " +
+                    pkg);
+        }
+    }
+
+    public void closeSystemDialogs(String reason) {
+        Intent intent = new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
+        if (reason != null) {
+            intent.putExtra("reason", reason);
+        }
+        
+        final int uid = Binder.getCallingUid();
+        final long origId = Binder.clearCallingIdentity();
+        synchronized (this) {
+            int i = mWatchers.beginBroadcast();
+            while (i > 0) {
+                i--;
+                IActivityWatcher w = mWatchers.getBroadcastItem(i);
+                if (w != null) {
+                    try {
+                        w.closingSystemDialogs(reason);
+                    } catch (RemoteException e) {
+                    }
+                }
+            }
+            mWatchers.finishBroadcast();
+            
+            broadcastIntentLocked(null, null, intent, null,
+                    null, 0, null, null, null, false, false, -1, uid);
+        }
+        Binder.restoreCallingIdentity(origId);
     }
     
     private void restartPackageLocked(final String packageName, int uid) {
@@ -6611,7 +6701,7 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
     }
     
     /**
-     * TODO: Add mWatcher hook
+     * TODO: Add mController hook
      */
     public void moveTaskToFront(int task) {
         enforceCallingPermission(android.Manifest.permission.REORDER_TASKS,
@@ -6756,7 +6846,7 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         // If we have a watcher, preflight the move before committing to it.  First check
         // for *other* available tasks, but if none are available, then try again allowing the
         // current task to be selected.
-        if (mWatcher != null) {
+        if (mController != null) {
             HistoryRecord next = topRunningActivityLocked(null, task);
             if (next == null) {
                 next = topRunningActivityLocked(null, 0);
@@ -6765,9 +6855,9 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
                 // ask watcher if this is allowed
                 boolean moveOK = true;
                 try {
-                    moveOK = mWatcher.activityResuming(next.packageName);
+                    moveOK = mController.activityResuming(next.packageName);
                 } catch (RemoteException e) {
-                    mWatcher = null;
+                    mController = null;
                 }
                 if (!moveOK) {
                     return false;
@@ -7072,6 +7162,27 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
                 == PackageManager.PERMISSION_GRANTED) {
             return null;
         }
+        
+        PathPermission[] pps = cpi.pathPermissions;
+        if (pps != null) {
+            int i = pps.length;
+            while (i > 0) {
+                i--;
+                PathPermission pp = pps[i];
+                if (checkComponentPermission(pp.getReadPermission(), callingPid, callingUid,
+                        cpi.exported ? -1 : cpi.applicationInfo.uid)
+                        == PackageManager.PERMISSION_GRANTED
+                        && mode == ParcelFileDescriptor.MODE_READ_ONLY || mode == -1) {
+                    return null;
+                }
+                if (checkComponentPermission(pp.getWritePermission(), callingPid, callingUid,
+                        cpi.exported ? -1 : cpi.applicationInfo.uid)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    return null;
+                }
+            }
+        }
+        
         String msg = "Permission Denial: opening provider " + cpi.name
                 + " from " + (r != null ? r : "(null)") + " (pid=" + callingPid
                 + ", uid=" + callingUid + ") requires "
@@ -7657,12 +7768,20 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         }
     }
 
-    public void setActivityWatcher(IActivityWatcher watcher) {
+    public void setActivityController(IActivityController controller) {
         enforceCallingPermission(android.Manifest.permission.SET_ACTIVITY_WATCHER,
-                "setActivityWatcher()");
+                "setActivityController()");
         synchronized (this) {
-            mWatcher = watcher;
+            mController = controller;
         }
+    }
+
+    public void registerActivityWatcher(IActivityWatcher watcher) {
+        mWatchers.register(watcher);
+    }
+
+    public void unregisterActivityWatcher(IActivityWatcher watcher) {
+        mWatchers.unregister(watcher);
     }
 
     public final void enterSafeMode() {
@@ -8225,11 +8344,11 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
                 //Process.sendSignal(MY_PID, Process.SIGNAL_QUIT);
             }
 
-            if (mWatcher != null) {
+            if (mController != null) {
                 try {
                     String name = r != null ? r.processName : null;
                     int pid = r != null ? r.pid : Binder.getCallingPid();
-                    if (!mWatcher.appCrashed(name, pid,
+                    if (!mController.appCrashed(name, pid,
                             shortMsg, longMsg, crashData)) {
                         Log.w(TAG, "Force-killing crashed app " + name
                                 + " at watcher's request");
@@ -8237,7 +8356,7 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
                         return 0;
                     }
                 } catch (RemoteException e) {
-                    mWatcher = null;
+                    mController = null;
                 }
             }
 
@@ -8663,7 +8782,7 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
                     + " mDebugTransient=" + mDebugTransient
                     + " mOrigWaitForDebugger=" + mOrigWaitForDebugger);
             pw.println("  mAlwaysFinishActivities=" + mAlwaysFinishActivities
-                    + " mWatcher=" + mWatcher);
+                    + " mController=" + mController);
         }
     }
 
@@ -10810,6 +10929,29 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
             mHandler.sendEmptyMessage(UPDATE_TIME_ZONE);
         }
 
+        /*
+         * Prevent non-system code (defined here to be non-persistent
+         * processes) from sending protected broadcasts.
+         */
+        if (callingUid == Process.SYSTEM_UID || callingUid == Process.PHONE_UID
+                || callingUid == Process.SHELL_UID || callingUid == 0) {
+            // Always okay.
+        } else if (callerApp == null || !callerApp.persistent) {
+            try {
+                if (ActivityThread.getPackageManager().isProtectedBroadcast(
+                        intent.getAction())) {
+                    String msg = "Permission Denial: not allowed to send broadcast "
+                            + intent.getAction() + " from pid="
+                            + callingPid + ", uid=" + callingUid;
+                    Log.w(TAG, msg);
+                    throw new SecurityException(msg);
+                }
+            } catch (RemoteException e) {
+                Log.w(TAG, "Remote exception", e);
+                return BROADCAST_SUCCESS;
+            }
+        }
+        
         // Add to the sticky list if requested.
         if (sticky) {
             if (checkPermission(android.Manifest.permission.BROADCAST_STICKY,
@@ -11755,12 +11897,15 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
             config.reqTouchScreen = mConfiguration.touchscreen;
             config.reqKeyboardType = mConfiguration.keyboard;
             config.reqNavigation = mConfiguration.navigation;
-            if (mConfiguration.navigation != Configuration.NAVIGATION_NONAV) {
+            if (mConfiguration.navigation == Configuration.NAVIGATION_DPAD
+                    || mConfiguration.navigation == Configuration.NAVIGATION_TRACKBALL) {
                 config.reqInputFeatures |= ConfigurationInfo.INPUT_FEATURE_FIVE_WAY_NAV;
             }
-            if (mConfiguration.keyboard != Configuration.KEYBOARD_UNDEFINED) {
+            if (mConfiguration.keyboard != Configuration.KEYBOARD_UNDEFINED
+                    && mConfiguration.keyboard != Configuration.KEYBOARD_NOKEYS) {
                 config.reqInputFeatures |= ConfigurationInfo.INPUT_FEATURE_HARD_KEYBOARD;
             }
+            config.reqGlEsVersion = GL_ES_VERSION;
         }
         return config;
     }

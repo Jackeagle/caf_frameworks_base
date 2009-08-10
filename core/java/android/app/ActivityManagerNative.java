@@ -881,11 +881,11 @@ public abstract class ActivityManagerNative extends Binder implements IActivityM
             return true;
         }
 
-        case SET_ACTIVITY_WATCHER_TRANSACTION: {
+        case SET_ACTIVITY_CONTROLLER_TRANSACTION: {
             data.enforceInterface(IActivityManager.descriptor);
-            IActivityWatcher watcher = IActivityWatcher.Stub.asInterface(
+            IActivityController watcher = IActivityController.Stub.asInterface(
                     data.readStrongBinder());
-            setActivityWatcher(watcher);
+            setActivityController(watcher);
             return true;
         }
 
@@ -1049,6 +1049,56 @@ public abstract class ActivityManagerNative extends Binder implements IActivityM
             data.enforceInterface(IActivityManager.descriptor);
             ApplicationInfo info = ApplicationInfo.CREATOR.createFromParcel(data);
             unbindBackupAgent(info);
+            reply.writeNoException();
+            return true;
+        }
+        
+        case REGISTER_ACTIVITY_WATCHER_TRANSACTION: {
+            data.enforceInterface(IActivityManager.descriptor);
+            IActivityWatcher watcher = IActivityWatcher.Stub.asInterface(
+                    data.readStrongBinder());
+            registerActivityWatcher(watcher);
+            return true;
+        }
+        
+        case UNREGISTER_ACTIVITY_WATCHER_TRANSACTION: {
+            data.enforceInterface(IActivityManager.descriptor);
+            IActivityWatcher watcher = IActivityWatcher.Stub.asInterface(
+                    data.readStrongBinder());
+            unregisterActivityWatcher(watcher);
+            return true;
+        }
+        
+        case START_ACTIVITY_IN_PACKAGE_TRANSACTION:
+        {
+            data.enforceInterface(IActivityManager.descriptor);
+            int uid = data.readInt();
+            Intent intent = Intent.CREATOR.createFromParcel(data);
+            String resolvedType = data.readString();
+            IBinder resultTo = data.readStrongBinder();
+            String resultWho = data.readString();    
+            int requestCode = data.readInt();
+            boolean onlyIfNeeded = data.readInt() != 0;
+            int result = startActivityInPackage(uid, intent, resolvedType,
+                    resultTo, resultWho, requestCode, onlyIfNeeded);
+            reply.writeNoException();
+            reply.writeInt(result);
+            return true;
+        }
+        
+        case KILL_APPLICATION_WITH_UID_TRANSACTION: {
+            data.enforceInterface(IActivityManager.descriptor);
+            String pkg = data.readString();
+            int uid = data.readInt();
+            killApplicationWithUid(pkg, uid);
+            reply.writeNoException();
+            return true;
+        }
+        
+        case CLOSE_SYSTEM_DIALOGS_TRANSACTION: {
+            data.enforceInterface(IActivityManager.descriptor);
+            String reason = data.readString();
+            closeSystemDialogs(reason);
             reply.writeNoException();
             return true;
         }
@@ -2105,13 +2155,13 @@ class ActivityManagerProxy implements IActivityManager
         data.recycle();
         reply.recycle();
     }
-    public void setActivityWatcher(IActivityWatcher watcher) throws RemoteException
+    public void setActivityController(IActivityController watcher) throws RemoteException
     {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         data.writeInterfaceToken(IActivityManager.descriptor);
         data.writeStrongBinder(watcher != null ? watcher.asBinder() : null);
-        mRemote.transact(SET_ACTIVITY_WATCHER_TRANSACTION, data, reply, 0);
+        mRemote.transact(SET_ACTIVITY_CONTROLLER_TRANSACTION, data, reply, 0);
         reply.readException();
         data.recycle();
         reply.recycle();
@@ -2290,5 +2340,74 @@ class ActivityManagerProxy implements IActivityManager
         data.recycle();
     }
     
+    public void registerActivityWatcher(IActivityWatcher watcher)
+            throws RemoteException {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        data.writeInterfaceToken(IActivityManager.descriptor);
+        data.writeStrongBinder(watcher != null ? watcher.asBinder() : null);
+        mRemote.transact(REGISTER_ACTIVITY_WATCHER_TRANSACTION, data, reply, 0);
+        reply.readException();
+        data.recycle();
+        reply.recycle();
+    }
+    
+    public void unregisterActivityWatcher(IActivityWatcher watcher)
+            throws RemoteException {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        data.writeInterfaceToken(IActivityManager.descriptor);
+        data.writeStrongBinder(watcher != null ? watcher.asBinder() : null);
+        mRemote.transact(UNREGISTER_ACTIVITY_WATCHER_TRANSACTION, data, reply, 0);
+        reply.readException();
+        data.recycle();
+        reply.recycle();
+    }
+    
+    public int startActivityInPackage(int uid,
+            Intent intent, String resolvedType, IBinder resultTo,
+            String resultWho, int requestCode, boolean onlyIfNeeded)
+            throws RemoteException {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        data.writeInterfaceToken(IActivityManager.descriptor);
+        data.writeInt(uid);
+        intent.writeToParcel(data, 0);
+        data.writeString(resolvedType);
+        data.writeStrongBinder(resultTo);
+        data.writeString(resultWho);
+        data.writeInt(requestCode);
+        data.writeInt(onlyIfNeeded ? 1 : 0);
+        mRemote.transact(START_ACTIVITY_IN_PACKAGE_TRANSACTION, data, reply, 0);
+        reply.readException();
+        int result = reply.readInt();
+        reply.recycle();
+        data.recycle();
+        return result;
+    }
+    
+    public void killApplicationWithUid(String pkg, int uid) throws RemoteException {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        data.writeInterfaceToken(IActivityManager.descriptor);
+        data.writeString(pkg);
+        data.writeInt(uid);
+        mRemote.transact(KILL_APPLICATION_WITH_UID_TRANSACTION, data, reply, 0);
+        reply.readException();
+        data.recycle();
+        reply.recycle();
+    }
+    
+    public void closeSystemDialogs(String reason) throws RemoteException {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        data.writeInterfaceToken(IActivityManager.descriptor);
+        data.writeString(reason);
+        mRemote.transact(CLOSE_SYSTEM_DIALOGS_TRANSACTION, data, reply, 0);
+        reply.readException();
+        data.recycle();
+        reply.recycle();
+    }
+        
     private IBinder mRemote;
 }

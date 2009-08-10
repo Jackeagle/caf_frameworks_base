@@ -49,6 +49,7 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.Power;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.os.Vibrator;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -88,6 +89,7 @@ class NotificationManagerService extends INotificationManager.Stub
 
     private NotificationRecord mSoundNotification;
     private AsyncPlayer mSound;
+    private boolean mSystemReady;
     private int mDisabledNotifications;
 
     private NotificationRecord mVibrateNotification;
@@ -366,6 +368,15 @@ class NotificationManagerService extends INotificationManager.Stub
         mStatusBarService = statusBar;
         statusBar.setNotificationCallbacks(mNotificationCallbacks);
 
+        // Don't start allowing notifications until the setup wizard has run once.
+        // After that, including subsequent boots, init with notifications turned on.
+        // This works on the first boot because the setup wizard will toggle this
+        // flag at least once and we'll go back to 0 after that.
+        if (0 == Settings.Secure.getInt(mContext.getContentResolver(),
+                    Settings.Secure.DEVICE_PROVISIONED, 0)) {
+            mDisabledNotifications = StatusBarManager.DISABLE_NOTIFICATION_ALERTS;
+        }
+
         // register for battery changed notifications
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
@@ -375,6 +386,11 @@ class NotificationManagerService extends INotificationManager.Stub
         
         mSettingsObserver = new SettingsObserver(mHandler);
         mSettingsObserver.observe();
+    }
+
+    void systemReady() {
+        // no beeping until we're basically done booting
+        mSystemReady = true;
     }
 
     // Toasts
@@ -637,7 +653,7 @@ class NotificationManagerService extends INotificationManager.Stub
                     }
                 }
 
-                sendAccessibilityEventTypeNotificationChangedDoCheck(notification, pkg);
+                sendAccessibilityEvent(notification, pkg);
 
             } else {
                 if (old != null && old.statusBarKey != null) {
@@ -654,7 +670,8 @@ class NotificationManagerService extends INotificationManager.Stub
             // If we're not supposed to beep, vibrate, etc. then don't.
             if (((mDisabledNotifications & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) == 0)
                     && (!(old != null
-                        && (notification.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0 ))) {
+                        && (notification.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0 ))
+                    && mSystemReady) {
                 // sound
                 final boolean useDefaultSound =
                     (notification.defaults & Notification.DEFAULT_SOUND) != 0; 
@@ -721,8 +738,7 @@ class NotificationManagerService extends INotificationManager.Stub
         idOut[0] = id;
     }
 
-    private void sendAccessibilityEventTypeNotificationChangedDoCheck(Notification notification,
-            CharSequence packageName) {
+    private void sendAccessibilityEvent(Notification notification, CharSequence packageName) {
         AccessibilityManager manager = AccessibilityManager.getInstance(mContext);
         if (!manager.isEnabled()) {
             return;
@@ -939,6 +955,9 @@ class NotificationManagerService extends INotificationManager.Stub
     // to accidentally lose.
     private void updateAdbNotification() {
         if (mAdbEnabled && mBatteryPlugged == BatteryManager.BATTERY_PLUGGED_USB) {
+            if ("0".equals(SystemProperties.get("persist.adb.notify"))) {
+                return;
+            }
             if (!mAdbNotificationShown) {
                 NotificationManager notificationManager = (NotificationManager) mContext
                         .getSystemService(Context.NOTIFICATION_SERVICE);
@@ -1039,6 +1058,8 @@ class NotificationManagerService extends INotificationManager.Stub
             pw.println("  mSoundNotification=" + mSoundNotification);
             pw.println("  mSound=" + mSound);
             pw.println("  mVibrateNotification=" + mVibrateNotification);
+            pw.println("  mDisabledNotifications=0x" + Integer.toHexString(mDisabledNotifications));
+            pw.println("  mSystemReady=" + mSystemReady);
         }
     }
 }

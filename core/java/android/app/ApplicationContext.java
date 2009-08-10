@@ -541,7 +541,10 @@ class ApplicationContext extends Context {
             if (fd != null) {
                 Bitmap bm = BitmapFactory.decodeFileDescriptor(fd.getFileDescriptor());
                 if (bm != null) {
-                    return new BitmapDrawable(bm);
+                    // For now clear the density until we figure out how
+                    // to deal with it for wallpapers.
+                    bm.setDensity(0);
+                    return new BitmapDrawable(getResources(), bm);
                 }
             }
         } catch (RemoteException e) {
@@ -1341,21 +1344,8 @@ class ApplicationContext extends Context {
         if (pi != null) {
             ApplicationContext c = new ApplicationContext();
             c.mRestricted = (flags & CONTEXT_RESTRICTED) == CONTEXT_RESTRICTED;
-            c.init(pi, null, mMainThread);
+            c.init(pi, null, mMainThread, mResources);
             if (c.mResources != null) {
-                Resources newRes = c.mResources;
-                if (mResources.getCompatibilityInfo().applicationScale !=
-                    newRes.getCompatibilityInfo().applicationScale) {
-                    DisplayMetrics dm = mMainThread.getDisplayMetricsLocked(false);
-                    c.mResources = new Resources(newRes.getAssets(), dm,
-                            newRes.getConfiguration(),
-                            mResources.getCompatibilityInfo().copy());
-                    if (DEBUG) {
-                        Log.d(TAG, "loaded context has different scaling. Using container's" +
-                                " compatiblity info:" + mResources.getDisplayMetrics());
-                    }
-
-                }
                 return c;
             }
         }
@@ -1417,8 +1407,24 @@ class ApplicationContext extends Context {
 
     final void init(ActivityThread.PackageInfo packageInfo,
             IBinder activityToken, ActivityThread mainThread) {
+        init(packageInfo, activityToken, mainThread, null);
+    }
+
+    final void init(ActivityThread.PackageInfo packageInfo,
+                IBinder activityToken, ActivityThread mainThread,
+                Resources container) {
         mPackageInfo = packageInfo;
         mResources = mPackageInfo.getResources(mainThread);
+
+        if (container != null && container.getCompatibilityInfo().applicationScale !=
+            mResources.getCompatibilityInfo().applicationScale) {
+            if (DEBUG) {
+                Log.d(TAG, "loaded context has different scaling. Using container's" +
+                        " compatiblity info:" + container.getDisplayMetrics());
+            }
+            mResources = mainThread.getTopLevelResources(
+                    mPackageInfo.getResDir(), container.getCompatibilityInfo().copy());
+        }
         mMainThread = mainThread;
         mContentResolver = new ApplicationContentResolver(this, mainThread);
 
@@ -1946,6 +1952,15 @@ class ApplicationContext extends Context {
             try {
                 Resources r = getResourcesForApplication(appInfo);
                 dr = r.getDrawable(resid);
+                if (false) {
+                    RuntimeException e = new RuntimeException("here");
+                    e.fillInStackTrace();
+                    Log.w(TAG, "Getting drawable 0x" + Integer.toHexString(resid)
+                            + " from package " + packageName
+                            + ": app scale=" + r.getCompatibilityInfo().applicationScale
+                            + ", caller scale=" + mContext.getResources().getCompatibilityInfo().applicationScale,
+                            e);
+                }
                 if (DEBUG_ICONS) Log.v(TAG, "Getting drawable 0x"
                         + Integer.toHexString(resid) + " from " + r
                         + ": " + dr);
@@ -2033,10 +2048,9 @@ class ApplicationContext extends Context {
             if (app.packageName.equals("system")) {
                 return mContext.mMainThread.getSystemContext().getResources();
             }
-            ActivityThread.PackageInfo pi = mContext.mMainThread.getPackageInfoNoCheck(app);
             Resources r = mContext.mMainThread.getTopLevelResources(
                     app.uid == Process.myUid() ? app.sourceDir
-                    : app.publicSourceDir, pi);
+                    : app.publicSourceDir, mContext.mPackageInfo);
             if (r != null) {
                 return r;
             }

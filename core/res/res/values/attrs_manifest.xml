@@ -827,28 +827,6 @@
         <attr name="name" />
     </declare-styleable>
     
-    <!-- The <code>supports-density</code> specifies a screen density that this
-         package supports. Application can specify multiple densities it supports.
-         <p>This appears as a child tag of the
-         {@link #AndroidManifest manifest} tag. -->
-    <declare-styleable name="AndroidManifestSupportsDensity" parent="AndroidManifest">
-        <!-- Required value of the density in dip (device independent pixel).
-             You should use one of the pre-defined constants for the standard
-             screen densities defined here.
-        -->
-        <attr name="density" format="integer">
-            <!-- A low density screen, such as a QVGA or WQVGA screen in a
-                 typical hand-held phone.  The constant for this is 120. -->
-            <enum name="low" value="120" />
-            <!-- A medium density screen, such as an HVGA screen in a
-                 typical hand-held phone.  The constant for this is 160. -->
-            <enum name="medium" value="160" />
-            <!-- A high density screen, such as a VGA or WVGA screen in a
-                 typical hand-held phone.  The constant for this is 240. -->
-            <enum name="high" value="240" />
-        </attr>
-    </declare-styleable>
-
     <!-- The <code>supports-screens</code> specifies the screen dimensions an
          application supports.  By default a modern application supports all
          screen sizes and must explicitly disable certain screen sizes here;
@@ -885,13 +863,26 @@
              screen, so that it retains the dimensions it was originally
              designed for. -->
         <attr name="largeScreens" format="boolean" />
+        <!-- Indicates whether the application can resize itself to newer
+             screen sizes.  This is mostly used to distinguish between old
+             applications that may not be compatible with newly introduced
+             screen sizes and newer applications that should be; it will be
+             set for you automatically based on whether you are targeting
+             a newer platform that supports more screens. -->
+        <attr name="resizeable" format="boolean" />
+        <!-- Indicates whether the application can accommodate any screen
+             density.  Older applications are assumed to not be able to,
+             new ones able to.  You can explicitly supply your abilities
+             here. -->
+        <attr name="anyDensity" format="boolean" />
     </declare-styleable>
 
-    <!-- The <code>expandable</code> specifies if this package supports screen metrics
-         other than 320x480 dip.
-         <p>This appears as a child tag of the
+    <!-- Private tag to declare system protected broadcast actions.
+
+         <p>This appears as a child tag of the root
          {@link #AndroidManifest manifest} tag. -->
-    <declare-styleable name="AndroidManifestExpandable" parent="AndroidManifest">
+    <declare-styleable name="AndroidManifestProtectedBroadcast" parent="AndroidManifest">
+        <attr name="name" />
     </declare-styleable>
 
     <!-- The <code>provider</code> tag declares a
@@ -951,6 +942,20 @@
              "\\\\".  This is basically the same as what you would need to
              write if constructing the string in Java code. -->
         <attr name="pathPattern" format="string" />
+    </declare-styleable>
+    
+    <!-- Attributes that can be supplied in an AndroidManifest.xml
+         <code>path-permission</code> tag, a child of the
+         {@link #AndroidManifestProvider provider} tag, describing a permission
+         that allows access to a specific path in the provider.  This tag can be
+         specified multiple time to supply multiple paths. -->
+    <declare-styleable name="AndroidManifestPathPermission"  parent="AndroidManifestProvider">
+        <attr name="path" />
+        <attr name="pathPrefix" />
+        <attr name="pathPattern" />
+        <attr name="permission" />
+        <attr name="readPermission" />
+        <attr name="writePermission" />
     </declare-styleable>
     
     <!-- The <code>service</code> tag declares a

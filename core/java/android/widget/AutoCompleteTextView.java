@@ -31,6 +31,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.EditorInfo;
@@ -103,6 +104,7 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
     private View mDropDownAnchorView;  // view is retrieved lazily from id once needed
     private int mDropDownWidth;
     private int mDropDownHeight;
+    private final Rect mTempRect = new Rect();
 
     private Drawable mDropDownListHighlight;
 
@@ -115,6 +117,8 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
     private boolean mDropDownAlwaysVisible = false;
 
     private boolean mDropDownDismissedOnCompletion = true;
+    
+    private boolean mForceIgnoreOutsideTouch = false;
 
     private int mLastKeyCode = KeyEvent.KEYCODE_UNKNOWN;
     private boolean mOpenBefore;
@@ -141,6 +145,7 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
 
         mPopup = new PopupWindow(context, attrs,
                 com.android.internal.R.attr.autoCompleteTextViewStyle);
+        mPopup.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
 
         TypedArray a =
             context.obtainStyledAttributes(
@@ -203,13 +208,10 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
      * Private hook into the on click event, dispatched from {@link PassThroughClickListener}
      */
     private void onClickImpl() {
-        // if drop down should always visible, bring it back in front of the soft
-        // keyboard when the user touches the text field
-        if (mDropDownAlwaysVisible
-                && mPopup.isShowing()
-                && mPopup.getInputMethodMode() == PopupWindow.INPUT_METHOD_NOT_NEEDED) {
-            mPopup.setInputMethodMode(PopupWindow.INPUT_METHOD_NEEDED);
-            showDropDown();
+        // If the dropdown is showing, bring it back in front of the soft
+        // keyboard when the user touches the text field.
+        if (mPopup.isShowing() && isInputMethodNotNeeded()) {
+            ensureImeVisible();
         }
     }
 
@@ -1084,10 +1086,27 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
     /**
      * Issues a runnable to show the dropdown as soon as possible.
      *
-     * @hide internal used only by Search Dialog
+     * @hide internal used only by SearchDialog
      */
     public void showDropDownAfterLayout() {
         post(mShowDropDownRunnable);
+    }
+    
+    /**
+     * Ensures that the drop down is not obscuring the IME.
+     * 
+     * @hide internal used only here and SearchDialog
+     */
+    public void ensureImeVisible() {
+        mPopup.setInputMethodMode(PopupWindow.INPUT_METHOD_NEEDED);
+        showDropDown();
+    }
+
+    /**
+     * @hide internal used only here and SearchDialog
+     */
+    public boolean isInputMethodNotNeeded() {
+        return mPopup.getInputMethodMode() == PopupWindow.INPUT_METHOD_NOT_NEEDED;
     }
 
     /**
@@ -1099,7 +1118,7 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
         int widthSpec = 0;
         int heightSpec = 0;
 
-        boolean noInputMethod = mPopup.getInputMethodMode() == PopupWindow.INPUT_METHOD_NOT_NEEDED;
+        boolean noInputMethod = isInputMethodNotNeeded();
 
         if (mPopup.isShowing()) {
             if (mDropDownWidth == ViewGroup.LayoutParams.FILL_PARENT) {
@@ -1132,6 +1151,8 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
                 heightSpec = mDropDownHeight;
             }
 
+            mPopup.setOutsideTouchable(mForceIgnoreOutsideTouch ? false : !mDropDownAlwaysVisible);
+
             mPopup.update(getDropDownAnchorView(), mDropDownHorizontalOffset,
                     mDropDownVerticalOffset, widthSpec, heightSpec);
         } else {
@@ -1160,7 +1181,7 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
             
             // use outside touchable to dismiss drop down when touching outside of it, so
             // only set this if the dropdown is not always visible
-            mPopup.setOutsideTouchable(!mDropDownAlwaysVisible);
+            mPopup.setOutsideTouchable(mForceIgnoreOutsideTouch ? false : !mDropDownAlwaysVisible);
             mPopup.setTouchInterceptor(new PopupTouchIntercepter());
             mPopup.showAsDropDown(getDropDownAnchorView(),
                     mDropDownHorizontalOffset, mDropDownVerticalOffset);
@@ -1168,6 +1189,17 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
             clearListSelection();
             post(mHideSelector);
         }
+    }
+    
+    /**
+     * Forces outside touches to be ignored. Normally if {@link #isDropDownAlwaysVisible()} is
+     * false, we allow outside touch to dismiss the dropdown. If this is set to true, then we
+     * ignore outside touch even when the drop down is not set to always visible.
+     * 
+     * @hide used only by SearchDialog
+     */
+    public void setForceIgnoreOutsideTouch(boolean forceIgnoreOutsideTouch) {
+        mForceIgnoreOutsideTouch = forceIgnoreOutsideTouch;
     }
 
     /**
@@ -1285,17 +1317,22 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
             }
         }
 
-        // Max height available on the screen for a popup. If this AutoCompleteTextView has
-        // the dropDownAlwaysVisible attribute, and the input method is not currently required,
-        // we then we ask for the height ignoring any bottom decorations like the input method.
-        // Otherwise we respect the input method.
-        boolean ignoreBottomDecorations = mDropDownAlwaysVisible &&
+        // Max height available on the screen for a popup.
+        boolean ignoreBottomDecorations =
                 mPopup.getInputMethodMode() == PopupWindow.INPUT_METHOD_NOT_NEEDED;
         final int maxHeight = mPopup.getMaxAvailableHeight(
                 getDropDownAnchorView(), mDropDownVerticalOffset, ignoreBottomDecorations);
 
         if (mDropDownAlwaysVisible) {
-            return maxHeight;
+            // getMaxAvailableHeight() subtracts the padding, so we put it back,
+            // to get the available height for the whole window
+            int padding = 0;
+            Drawable background = mPopup.getBackground();
+            if (background != null) {
+                background.getPadding(mTempRect);
+                padding = mTempRect.top + mTempRect.bottom;
+            }
+            return maxHeight + padding;
         }
 
         return mDropDownList.measureHeightOfChildren(MeasureSpec.UNSPECIFIED,

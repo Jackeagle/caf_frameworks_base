@@ -38,7 +38,6 @@ public:
     static SkBitmap* getNativeBitmap(JNIEnv*, jobject bitmap);
     static SkPicture* getNativePicture(JNIEnv*, jobject picture);
     static SkRegion* getNativeRegion(JNIEnv*, jobject region);
-    static SkScalar getCanvasDensityScale(JNIEnv*, jobject canvas);
     
     /** Return the corresponding native config from the java Config enum,
         or kNo_Config if the java object is null.
@@ -59,7 +58,8 @@ public:
         Returns true on success. If it returns false, then it failed, and the
         appropriate exception will have been raised.
     */
-    static bool setJavaPixelRef(JNIEnv*, SkBitmap*, SkColorTable* ctable);
+    static bool setJavaPixelRef(JNIEnv*, SkBitmap*, SkColorTable* ctable,
+                                bool reportSizeToVM);
 
     /** Copy the colors in colors[] to the bitmap, convert to the correct
         format along the way.
@@ -71,12 +71,13 @@ public:
 
 class JavaPixelAllocator : public SkBitmap::Allocator {
 public:
-    JavaPixelAllocator(JNIEnv* env);
+    JavaPixelAllocator(JNIEnv* env, bool reportSizeToVM);
     // overrides
     virtual bool allocPixelRef(SkBitmap* bitmap, SkColorTable* ctable);
     
 private:
     JNIEnv* fEnv;
+    bool fReportSizeToVM;
 };
 
 class AutoJavaFloatArray {

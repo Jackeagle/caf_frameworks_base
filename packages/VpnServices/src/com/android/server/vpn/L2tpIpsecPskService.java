@@ -25,18 +25,17 @@ import java.io.IOException;
  * connection.
  */
 class L2tpIpsecPskService extends VpnService<L2tpIpsecPskProfile> {
-    private static final String IPSEC_DAEMON = "racoon";
+    private static final String IPSEC = "racoon";
 
     @Override
     protected void connect(String serverIp, String username, String password)
             throws IOException {
-        String hostIp = getHostIp();
         L2tpIpsecPskProfile p = getProfile();
 
         // IPSEC
-        AndroidServiceProxy ipsecService = startService(IPSEC_DAEMON);
-        ipsecService.sendCommand(hostIp, serverIp, L2tpService.L2TP_PORT,
-                p.getPresharedKey());
+        DaemonProxy ipsec = startDaemon(IPSEC);
+        ipsec.sendCommand(serverIp, L2tpService.L2TP_PORT, p.getPresharedKey());
+        ipsec.closeControlSocket();
 
         sleep(2000); // 2 seconds
 
@@ -45,5 +44,11 @@ class L2tpIpsecPskService extends VpnService<L2tpIpsecPskProfile> {
                 L2tpService.L2TP_PORT,
                 (p.isSecretEnabled() ? p.getSecretString() : null),
                 username, password);
+    }
+
+    @Override
+    protected void stopPreviouslyRunDaemons() {
+        stopDaemon(IPSEC);
+        stopDaemon(MtpdHelper.MTPD);
     }
 }

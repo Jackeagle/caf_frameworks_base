@@ -432,7 +432,7 @@ public class RelativeLayout extends ViewGroup {
             width = resolveSize(width, widthMeasureSpec);
 
             if (offsetHorizontalAxis) {
-                    for (int i = 0; i < count; i++) {
+                for (int i = 0; i < count; i++) {
                     View child = getChildAt(i);
                     if (child.getVisibility() != GONE) {
                         LayoutParams params = (LayoutParams) child.getLayoutParams();
@@ -486,10 +486,14 @@ public class RelativeLayout extends ViewGroup {
                     View child = getChildAt(i);
                     if (child.getVisibility() != GONE && child != ignore) {
                         LayoutParams params = (LayoutParams) child.getLayoutParams();
-                        params.mLeft += horizontalOffset;
-                        params.mRight += horizontalOffset;
-                        params.mTop += verticalOffset;
-                        params.mBottom += verticalOffset;
+                        if (horizontalGravity) {
+                            params.mLeft += horizontalOffset;
+                            params.mRight += horizontalOffset;
+                        }
+                        if (verticalGravity) {
+                            params.mTop += verticalOffset;
+                            params.mBottom += verticalOffset;
+                        }
                     }
                 }
             }
@@ -1295,11 +1299,8 @@ public class RelativeLayout extends ViewGroup {
                     if (rule > 0) {
                         // The node this node depends on
                         final Node dependency = keyNodes.get(rule);
-                        if (dependency == node) {
-                            throw new IllegalStateException("A view cannot have a dependency" +
-                                    " on itself");
-                        }
-                        if (dependency == null) {
+                        // Skip unknowns and self dependencies
+                        if (dependency == null || dependency == node) {
                             continue;
                         }
                         // Add the current node as a dependent
