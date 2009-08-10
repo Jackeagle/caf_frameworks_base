@@ -1333,6 +1333,19 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
+    setRilPowerOff() {
+        RILRequest rr
+                = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, null);
+
+        rr.mp.writeInt(1);
+        rr.mp.writeInt(2);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void
     setSuppServiceNotifications(boolean enable, Message result) {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION, result);
