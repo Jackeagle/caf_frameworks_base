@@ -40,15 +40,15 @@ public class UsbStorageActivity extends AlertActivity implements DialogInterface
     private static final int POSITIVE_BUTTON = AlertDialog.BUTTON1;
 
     /** Used to detect when the USB cable is unplugged, so we can call finish() */
-    private BroadcastReceiver mBatteryReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver mMediaChangeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction() == Intent.ACTION_BATTERY_CHANGED) {
-                handleBatteryChanged(intent);
+       String action = intent.getAction();
+       if (action.equals(Intent.ACTION_UMS_DISCONNECTED)) {
+                finish();
             }
         }
     };
-    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -68,15 +68,15 @@ public class UsbStorageActivity extends AlertActivity implements DialogInterface
     @Override
     protected void onResume() {
         super.onResume();
-
-        registerReceiver(mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+      IntentFilter intentFilter = new IntentFilter(Intent.ACTION_UMS_DISCONNECTED);
+      registerReceiver(mMediaChangeReceiver, intentFilter);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        
-        unregisterReceiver(mBatteryReceiver);
+
+        unregisterReceiver(mMediaChangeReceiver);
     }
 
     /**
@@ -108,14 +108,6 @@ public class UsbStorageActivity extends AlertActivity implements DialogInterface
         }
     }
 
-    private void handleBatteryChanged(Intent intent) {
-        int pluggedType = intent.getIntExtra("plugged", 0);
-        if (pluggedType == 0) {
-            // It was disconnected from the plug, so finish
-            finish();
-        }
-    }
-    
     private void showSharingError() {
         Toast.makeText(this, com.android.internal.R.string.usb_storage_error_message,
                 Toast.LENGTH_LONG).show();
