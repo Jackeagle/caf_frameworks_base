@@ -855,7 +855,7 @@ public class GpsLocationProvider extends ILocationProvider.Stub {
 
         synchronized(mListeners) {
             boolean wasNavigating = mNavigating;
-            mNavigating = (status == GPS_STATUS_SESSION_BEGIN);
+            mNavigating = (status == GPS_STATUS_SESSION_BEGIN || status == GPS_STATUS_ENGINE_ON);
     
             if (wasNavigating == mNavigating) {
                 return;
