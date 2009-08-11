@@ -74,7 +74,7 @@ extern int register_android_opengl_jni_GLES11(JNIEnv* env);
 extern int register_android_opengl_jni_GLES11Ext(JNIEnv* env);
 
 extern int register_android_hardware_Camera(JNIEnv *env);
-
+extern int register_android_hardware_fm_FMRxAPI(JNIEnv* env);
 extern int register_android_hardware_SensorManager(JNIEnv *env);
 
 extern int register_android_media_AudioRecord(JNIEnv *env);
@@ -1113,6 +1113,7 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_com_android_internal_os_ZygoteInit),
     REG_JNI(register_android_hardware_Camera),
     REG_JNI(register_android_hardware_SensorManager),
+    REG_JNI(register_android_hardware_fm_FMRxAPI),
     REG_JNI(register_android_media_AudioRecord),
     REG_JNI(register_android_media_AudioSystem),
     REG_JNI(register_android_media_AudioTrack),
