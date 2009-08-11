@@ -1463,6 +1463,20 @@ status_t AudioFlinger::MixerThread::addTrack_l(const sp<Track>& track)
 {
     status_t status = ALREADY_EXISTS;
 
+    // If the PCM driver is in Standby mode, open the driver
+    // to reduce latency at rendering time
+    if (mStandby)
+    {
+      if (0 == mOutput->Open())
+      {
+        mStandby = false;
+      }
+      else
+      {
+        LOGE("Opening PCM driver failed");
+      }
+    }
+
     // here the track could be either new, or restarted
     // in both cases "unstop" the track
     if (track->isPaused()) {
