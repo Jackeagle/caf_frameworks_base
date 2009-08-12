@@ -531,7 +531,8 @@ public final class CdmaCallTracker extends CallTracker {
                 // Dropped connections are removed from the CallTracker
                 // list but kept in the Call list
                 connections[i] = null;
-            } else if (conn != null && dc != null && !conn.compareTo(dc)) {
+            } else if (conn != null && dc != null && conn.address.length() != 0
+                       && !conn.compareTo(dc)) {
                 // Connection in CLCC response does not match what
                 // we were tracking. Assume dropped call and new call
 
