@@ -17,7 +17,7 @@
 package android.view;
 
 import android.content.Context;
-import android.content.res.CompatibilityInfo;
+import android.content.res.Resources;
 import android.content.res.CompatibilityInfo.Translator;
 import android.graphics.Canvas;
 import android.graphics.PixelFormat;
@@ -140,7 +140,7 @@ public class SurfaceView extends View {
     int mType = -1;
     final Rect mSurfaceFrame = new Rect();
     private Translator mTranslator;
-
+    
     public SurfaceView(Context context) {
         super(context);
         setWillNotDraw(true);
@@ -253,23 +253,6 @@ public class SurfaceView extends View {
     }
 
     @Override
-    public boolean dispatchTouchEvent(MotionEvent event) {
-        // SurfaceView uses pre-scaled size unless fixed size is requested. This hook
-        // scales the event back to the pre-scaled coordinates for such surface.
-        if (mRequestedWidth < 0 && mTranslator != null) {
-            MotionEvent scaledBack = MotionEvent.obtain(event);
-            scaledBack.scale(mTranslator.applicationScale);
-            try {
-                return super.dispatchTouchEvent(scaledBack);
-            } finally {
-                scaledBack.recycle();
-            }
-        } else {
-            return super.dispatchTouchEvent(event);
-        }
-    }
-
-    @Override
     protected void dispatchDraw(Canvas canvas) {
         // if SKIP_DRAW is cleared, draw() has already punched a hole
         if ((mPrivateFlags & SKIP_DRAW) == SKIP_DRAW) {
@@ -290,26 +273,23 @@ public class SurfaceView extends View {
     public void setWindowType(int type) {
         mWindowType = type;
     }
-    
+
     private void updateWindow(boolean force) {
         if (!mHaveFrame) {
             return;
         }
-        mTranslator = ((ViewRoot)getRootView().getParent()).mTranslator;
+        ViewRoot viewRoot = (ViewRoot) getRootView().getParent();
+        mTranslator = viewRoot.mTranslator;
 
-        float appScale = mTranslator == null ? 1.0f : mTranslator.applicationScale;
+        Resources res = getContext().getResources();
+        if (mTranslator != null || !res.getCompatibilityInfo().supportsScreen()) {
+            mSurface.setCompatibleDisplayMetrics(res.getDisplayMetrics(), mTranslator);
+        }
         
         int myWidth = mRequestedWidth;
         if (myWidth <= 0) myWidth = getWidth();
         int myHeight = mRequestedHeight;
         if (myHeight <= 0) myHeight = getHeight();
-
-        // Use original size if the app specified the size of the view,
-        // and let the flinger to scale up.
-        if (mRequestedWidth <= 0 && mTranslator != null && mTranslator.scalingRequired) {
-            myWidth *= appScale;
-            myHeight *= appScale;
-        }
 
         getLocationInWindow(mLocation);
         final boolean creating = mWindow == null;
@@ -352,8 +332,10 @@ public class SurfaceView extends View {
                               | WindowManager.LayoutParams.FLAG_SCALED
                               | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                               | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                              | WindowManager.LayoutParams.FLAG_NO_COMPATIBILITY_SCALING
                               ;
+                if (!getContext().getResources().getCompatibilityInfo().supportsScreen()) {
+                    mLayout.flags |= WindowManager.LayoutParams.FLAG_COMPATIBLE_WINDOW;
+                }
 
                 mLayout.memoryType = mRequestedType;
 
@@ -381,10 +363,17 @@ public class SurfaceView extends View {
 
                 if (localLOGV) Log.i(TAG, "New surface: " + mSurface
                         + ", vis=" + visible + ", frame=" + mWinFrame);
+                
                 mSurfaceFrame.left = 0;
                 mSurfaceFrame.top = 0;
-                mSurfaceFrame.right = mWinFrame.width();
-                mSurfaceFrame.bottom = mWinFrame.height();
+                if (mTranslator == null) {
+                    mSurfaceFrame.right = mWinFrame.width();
+                    mSurfaceFrame.bottom = mWinFrame.height();
+                } else {
+                    float appInvertedScale = mTranslator.applicationInvertedScale;
+                    mSurfaceFrame.right = (int) (mWinFrame.width() * appInvertedScale + 0.5f);
+                    mSurfaceFrame.bottom = (int) (mWinFrame.height() * appInvertedScale + 0.5f);
+                }
                 mSurfaceLock.unlock();
 
                 try {
@@ -533,6 +522,7 @@ public class SurfaceView extends View {
     private SurfaceHolder mSurfaceHolder = new SurfaceHolder() {
         
         private static final String LOG_TAG = "SurfaceHolder";
+        private int mSaveCount;
         
         public boolean isCreating() {
             return mIsCreating;

@@ -336,6 +336,7 @@ public /* package */ class MimeTypeMap {
             sMimeTypeMap.loadEntry("application/x-object", "o", false);
             sMimeTypeMap.loadEntry("application/x-oz-application", "oza", 
                     false);
+            sMimeTypeMap.loadEntry("application/x-pkcs12", "p12", false);
             sMimeTypeMap.loadEntry("application/x-pkcs7-certreqresp", "p7r", 
                     false);
             sMimeTypeMap.loadEntry("application/x-pkcs7-crl", "crl", false);
@@ -357,6 +358,7 @@ public /* package */ class MimeTypeMap {
             sMimeTypeMap.loadEntry(
                     "application/x-webarchive", "webarchive", false); // added
             sMimeTypeMap.loadEntry("application/x-x509-ca-cert", "crt", false);
+            sMimeTypeMap.loadEntry("application/x-x509-user-cert", "crt", false);
             sMimeTypeMap.loadEntry("application/x-xcf", "xcf", false);
             sMimeTypeMap.loadEntry("application/x-xfig", "fig", false);
             sMimeTypeMap.loadEntry("audio/basic", "snd", false);

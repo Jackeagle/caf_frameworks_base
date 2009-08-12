@@ -526,8 +526,7 @@ status_t CameraService::Client::startRecordingMode()
     }
 
     // start recording mode
-    ret = mHardware->startRecording(recordingCallback,
-                                    mCameraService.get());
+    ret = mHardware->startRecording(recordingCallback, mCameraService.get());
     if (ret != NO_ERROR) {
         LOGE("mHardware->startRecording() failed with status %d", ret);
     }

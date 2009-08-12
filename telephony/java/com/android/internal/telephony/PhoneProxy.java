@@ -708,8 +708,8 @@ public class PhoneProxy extends Handler implements Phone {
          return mActivePhone.getCdmaEriIconMode();
     }
 
-    public void sendBurstDtmf(String dtmfString, Message onComplete){
-        mActivePhone.sendBurstDtmf(dtmfString,onComplete);
+    public void sendBurstDtmf(String dtmfString, int on, int off, Message onComplete){
+        mActivePhone.sendBurstDtmf(dtmfString, on, off, onComplete);
     }
 
     public void exitEmergencyCallbackMode(){

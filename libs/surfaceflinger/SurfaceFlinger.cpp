@@ -694,9 +694,14 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
 
         // some layers might have been removed, so
         // we need to update the regions they're exposing.
-        size_t c = mRemovedLayers.size();
+        const SortedVector<LayerBase*>& removedLayers(mRemovedLayers);
+        size_t c = removedLayers.size();
         if (c) {
             mVisibleRegionsDirty = true;
+            while (c--) {
+                mDirtyRegionRemovedLayer.orSelf(
+                        removedLayers[c]->visibleRegionScreen);
+            }
         }
 
         const LayerVector& currentLayers = mCurrentState.layersSortedByZ;
@@ -736,17 +741,15 @@ void SurfaceFlinger::computeVisibleRegions(
         layer->validateVisibility(planeTransform);
 
         // start with the whole surface at its current location
-        const Layer::State& s = layer->drawingState();
-        const Rect bounds(layer->visibleBounds());
+        const Layer::State& s(layer->drawingState());
 
         // handle hidden surfaces by setting the visible region to empty
         Region opaqueRegion;
         Region visibleRegion;
         Region coveredRegion;
-        if (UNLIKELY((s.flags & ISurfaceComposer::eLayerHidden) || !s.alpha)) {
-            visibleRegion.clear();
-        } else {
+        if (LIKELY(!(s.flags & ISurfaceComposer::eLayerHidden) && s.alpha)) {
             const bool translucent = layer->needsBlending();
+            const Rect bounds(layer->visibleBounds());
             visibleRegion.set(bounds);
             coveredRegion = visibleRegion;
 
@@ -793,11 +796,15 @@ void SurfaceFlinger::computeVisibleRegions(
         layer->setVisibleRegion(visibleRegion);
         layer->setCoveredRegion(coveredRegion);
 
-        // If a secure layer is partially visible, lockdown the screen!
+        // If a secure layer is partially visible, lock-down the screen!
         if (layer->isSecure() && !visibleRegion.isEmpty()) {
             secureFrameBuffer = true;
         }
     }
+
+    // invalidate the areas where a layer was removed
+    dirtyRegion.orSelf(mDirtyRegionRemovedLayer);
+    mDirtyRegionRemovedLayer.clear();
 
     mSecureFrameBuffer = secureFrameBuffer;
     opaqueRegion = aboveOpaqueLayers;
@@ -1240,6 +1247,13 @@ sp<ISurface> SurfaceFlinger::createSurface(ClientID clientId, int pid,
 {
     LayerBaseClient* layer = 0;
     sp<LayerBaseClient::Surface> surfaceHandle;
+
+    if (int32_t(w|h) < 0) {
+        LOGE("createSurface() failed, w or h is negative (w=%d, h=%d)",
+                int(w), int(h));
+        return surfaceHandle;
+    }
+    
     Mutex::Autolock _l(mStateLock);
     Client* const c = mClientsMap.valueFor(clientId);
     if (UNLIKELY(!c)) {

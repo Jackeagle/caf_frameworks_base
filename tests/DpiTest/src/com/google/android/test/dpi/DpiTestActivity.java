@@ -17,6 +17,8 @@
 package com.google.android.test.dpi;
 
 import android.app.Activity;
+import android.app.ActivityThread;
+import android.app.Application;
 import android.os.Bundle;
 import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
@@ -26,14 +28,53 @@ import android.graphics.drawable.Drawable;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.ScrollView;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.res.CompatibilityInfo;
+import android.util.DisplayMetrics;
+import android.util.Log;
 
 public class DpiTestActivity extends Activity {
+    public DpiTestActivity() {
+        super();
+        init(false);
+    }
+    
+    public DpiTestActivity(boolean noCompat) {
+        super();
+        init(noCompat);
+    }
+    
+    public void init(boolean noCompat) {
+        try {
+            // This is all a dirty hack.  Don't think a real application should
+            // be doing it.
+            Application app = ActivityThread.currentActivityThread().getApplication();
+            ApplicationInfo ai = app.getPackageManager().getApplicationInfo(
+                    "com.google.android.test.dpi", 0);
+            if (noCompat) {
+                ai.flags |= ApplicationInfo.FLAG_SUPPORTS_LARGE_SCREENS
+                    | ApplicationInfo.FLAG_SUPPORTS_NORMAL_SCREENS
+                    | ApplicationInfo.FLAG_SUPPORTS_SMALL_SCREENS
+                    | ApplicationInfo.FLAG_RESIZEABLE_FOR_SCREENS
+                    | ApplicationInfo.FLAG_SUPPORTS_SCREEN_DENSITIES;
+                app.getResources().setCompatibilityInfo(new CompatibilityInfo(ai));
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            throw new RuntimeException("ouch", e);
+        }
+    }
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        final LayoutInflater li = (LayoutInflater)getSystemService(
+                LAYOUT_INFLATER_SERVICE);
+        
         this.setTitle(R.string.act_title);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -59,6 +100,14 @@ public class DpiTestActivity extends Activity {
         addLabelToRoot(root, "Prescaled resource drawable");
         addChildToRoot(root, layout);
 
+        layout = (LinearLayout)li.inflate(R.layout.image_views, null);
+        addLabelToRoot(root, "Inflated layout");
+        addChildToRoot(root, layout);
+        
+        layout = (LinearLayout)li.inflate(R.layout.styled_image_views, null);
+        addLabelToRoot(root, "Inflated styled layout");
+        addChildToRoot(root, layout);
+        
         layout = new LinearLayout(this);
         addCanvasBitmap(layout, R.drawable.logo120dpi, true);
         addCanvasBitmap(layout, R.drawable.logo160dpi, true);
@@ -71,6 +120,20 @@ public class DpiTestActivity extends Activity {
         addCanvasBitmap(layout, R.drawable.logo160dpi, false);
         addCanvasBitmap(layout, R.drawable.logo240dpi, false);
         addLabelToRoot(root, "Autoscaled bitmap");
+        addChildToRoot(root, layout);
+
+        layout = new LinearLayout(this);
+        addResourceDrawable(layout, R.drawable.logonodpi120);
+        addResourceDrawable(layout, R.drawable.logonodpi160);
+        addResourceDrawable(layout, R.drawable.logonodpi240);
+        addLabelToRoot(root, "No-dpi resource drawable");
+        addChildToRoot(root, layout);
+
+        layout = new LinearLayout(this);
+        addNinePatchResourceDrawable(layout, R.drawable.smlnpatch120dpi);
+        addNinePatchResourceDrawable(layout, R.drawable.smlnpatch160dpi);
+        addNinePatchResourceDrawable(layout, R.drawable.smlnpatch240dpi);
+        addLabelToRoot(root, "Prescaled 9-patch resource drawable");
         addChildToRoot(root, layout);
 
         setContentView(scrollWrap(root));
@@ -101,8 +164,8 @@ public class DpiTestActivity extends Activity {
 
         View view = new View(this);
 
-        final BitmapDrawable d = new BitmapDrawable(bitmap);
-        if (!scale) d.setDensityScale(getResources().getDisplayMetrics());
+        final BitmapDrawable d = new BitmapDrawable(getResources(), bitmap);
+        if (!scale) d.setTargetDensity(getResources().getDisplayMetrics());
         view.setBackgroundDrawable(d);
 
         view.setLayoutParams(new LinearLayout.LayoutParams(d.getIntrinsicWidth(),
@@ -132,6 +195,19 @@ public class DpiTestActivity extends Activity {
         layout.addView(view);
     }
 
+    private void addNinePatchResourceDrawable(LinearLayout layout, int resource) {
+        View view = new View(this);
+
+        final Drawable d = getResources().getDrawable(resource);
+        view.setBackgroundDrawable(d);
+
+        Log.i("foo", "9-patch #" + Integer.toHexString(resource)
+                + " w=" + d.getIntrinsicWidth() + " h=" + d.getIntrinsicHeight());
+        view.setLayoutParams(new LinearLayout.LayoutParams(
+                d.getIntrinsicWidth()*2, d.getIntrinsicHeight()*2));
+        layout.addView(view);
+    }
+
     private Bitmap loadAndPrintDpi(int id, boolean scale) {
         Bitmap bitmap;
         if (scale) {
@@ -155,7 +231,10 @@ public class DpiTestActivity extends Activity {
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-            setMeasuredDimension(mBitmap.getScaledWidth(), mBitmap.getScaledHeight());
+            final DisplayMetrics metrics = getResources().getDisplayMetrics();
+            setMeasuredDimension(
+                    mBitmap.getScaledWidth(metrics),
+                    mBitmap.getScaledHeight(metrics));
         }
 
         @Override

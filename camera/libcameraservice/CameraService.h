@@ -134,6 +134,8 @@ private:
 
         static      void        recordingCallback(const sp<IMemory>& mem, void* user);
         static      void        previewCallback(const sp<IMemory>& mem, int index, void* user);
+        //        static      void        recordingCallback(nsecs_t timestamp, const sp<IMemory>& mem, void* user);
+        //        static      void        previewCallback(const sp<IMemory>& mem, void* user);
         static      void        shutterCallback(void *user);
         static      void        yuvPictureCallback(const sp<IMemory>& mem, void* user);
         static      void        jpegPictureCallback(const sp<IMemory>& mem, void* user);
@@ -145,6 +147,8 @@ private:
                     void        postJpeg(const sp<IMemory>& mem);
                     void        postPreviewFrame(const sp<IMemory>& mem, int index);
                     void        postRecordingFrame(const sp<IMemory>& frame);
+                    //                    void        postPreviewFrame(const sp<IMemory>& mem);
+                    //                    void        postRecordingFrame(nsecs_t timestamp, const sp<IMemory>& frame);
                     void        copyFrameAndPostCopiedFrame(sp<IMemoryHeap> heap, size_t offset, size_t size);
                     void        postError(status_t error);
                     void        postAutoFocus(bool focused);

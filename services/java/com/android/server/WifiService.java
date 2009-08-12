@@ -192,6 +192,7 @@ public class WifiService extends IWifiManager.Stub {
     WifiService(Context context, WifiStateTracker tracker) {
         mContext = context;
         mWifiStateTracker = tracker;
+        mWifiStateTracker.enableRssiPolling(true);
         mBatteryStats = BatteryStatsService.getService();
         
         /*
@@ -436,7 +437,7 @@ public class WifiService extends IWifiManager.Stub {
      * see {@link android.net.wifi.WifiManager#startScan()}
      * @return {@code true} if the operation succeeds
      */
-    public boolean startScan() {
+    public boolean startScan(boolean forceActive) {
         enforceChangePermission();
         synchronized (mWifiStateTracker) {
             switch (mWifiStateTracker.getSupplicantState()) {
@@ -450,7 +451,7 @@ public class WifiService extends IWifiManager.Stub {
                             WifiStateTracker.SUPPL_SCAN_HANDLING_LIST_ONLY);
                     break;
             }
-            return WifiNative.scanCommand();
+            return WifiNative.scanCommand(forceActive);
         }
     }
 
@@ -1077,6 +1078,17 @@ public class WifiService extends IWifiManager.Stub {
                 break setVariables;
             }
 
+            if ((config.phase2 != null) && !WifiNative.setNetworkVariableCommand(
+                    netId,
+                    WifiConfiguration.phase2VarName,
+                    config.phase2)) {
+                if (DBG) {
+                    Log.d(TAG, config.SSID + ": failed to set phase2: "+
+                          config.phase2);
+                }
+                break setVariables;
+            }
+
             if ((config.identity != null) && !WifiNative.setNetworkVariableCommand(
                     netId,
                     WifiConfiguration.identityVarName,
@@ -1563,9 +1575,11 @@ public class WifiService extends IWifiManager.Stub {
                 mAlarmManager.cancel(mIdleIntent);
                 mDeviceIdle = false;
                 mScreenOff = false;
+                mWifiStateTracker.enableRssiPolling(true);
             } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
                 Log.d(TAG, "ACTION_SCREEN_OFF");
                 mScreenOff = true;
+                mWifiStateTracker.enableRssiPolling(false);
                 /*
                  * Set a timer to put Wi-Fi to sleep, but only if the screen is off
                  * AND the "stay on while plugged in" setting doesn't match the

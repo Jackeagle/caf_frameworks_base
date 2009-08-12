@@ -2444,7 +2444,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
 
         if (ss.error != null) {
-            setError(ss.error);
+            final CharSequence error = ss.error;
+            // Display the error later, after the first layout pass
+            post(new Runnable() {
+                public void run() {
+                    setError(error);
+                }
+            });
         }
     }
 
@@ -3264,7 +3270,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             final TextView err = (TextView) inflater.inflate(com.android.internal.R.layout.textview_hint,
                     null);
 
-            mPopup = new ErrorPopup(err, 200, 50);
+            final float scale = getResources().getDisplayMetrics().density;
+            mPopup = new ErrorPopup(err, (int) (200 * scale + 0.5f),
+                    (int) (50 * scale + 0.5f));
             mPopup.setFocusable(false);
             // The user is entering text, so the input method is needed.  We
             // don't want the popup to be displayed on top of it.
@@ -3318,11 +3326,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
          * The "25" is the distance between the point and the right edge
          * of the background
          */
+        final float scale = getResources().getDisplayMetrics().density;
 
         final Drawables dr = mDrawables;
         return getWidth() - mPopup.getWidth()
                 - getPaddingRight()
-                - (dr != null ? dr.mDrawableSizeRight : 0) / 2 + 25;
+                - (dr != null ? dr.mDrawableSizeRight : 0) / 2 + (int) (25 * scale + 0.5f);
     }
 
     /**

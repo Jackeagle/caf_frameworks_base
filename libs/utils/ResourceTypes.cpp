@@ -1486,7 +1486,7 @@ ssize_t ResTable::Theme::getAttribute(uint32_t resID, Res_value* outValue,
 
 ssize_t ResTable::Theme::resolveAttributeReference(Res_value* inOutValue,
         ssize_t blockIndex, uint32_t* outLastRef,
-        uint32_t* inoutTypeSpecFlags) const
+        uint32_t* inoutTypeSpecFlags, ResTable_config* inoutConfig) const
 {
     //printf("Resolving type=0x%x\n", inOutValue->dataType);
     if (inOutValue->dataType == Res_value::TYPE_ATTRIBUTE) {
@@ -1498,7 +1498,8 @@ ssize_t ResTable::Theme::resolveAttributeReference(Res_value* inOutValue,
             return blockIndex;
         }
     }
-    return mTable.resolveReference(inOutValue, blockIndex, outLastRef);
+    return mTable.resolveReference(inOutValue, blockIndex, outLastRef,
+            inoutTypeSpecFlags, inoutConfig);
 }
 
 void ResTable::Theme::dumpToLog() const
@@ -1573,7 +1574,6 @@ status_t ResTable::add(Asset* asset, void* cookie, bool copyData)
 status_t ResTable::add(ResTable* src)
 {
     mError = src->mError;
-    mParams = src->mParams;
     
     for (size_t i=0; i<src->mHeaders.size(); i++) {
         mHeaders.add(src->mHeaders[i]);
@@ -1892,7 +1892,8 @@ ssize_t ResTable::getResource(uint32_t resID, Res_value* outValue, bool mayBeBag
 }
 
 ssize_t ResTable::resolveReference(Res_value* value, ssize_t blockIndex,
-        uint32_t* outLastRef, uint32_t* inoutTypeSpecFlags) const
+        uint32_t* outLastRef, uint32_t* inoutTypeSpecFlags,
+        ResTable_config* outConfig) const
 {
     int count=0;
     while (blockIndex >= 0 && value->dataType == value->TYPE_REFERENCE
@@ -1900,7 +1901,8 @@ ssize_t ResTable::resolveReference(Res_value* value, ssize_t blockIndex,
         if (outLastRef) *outLastRef = value->data;
         uint32_t lastRef = value->data;
         uint32_t newFlags = 0;
-        const ssize_t newIndex = getResource(value->data, value, true, &newFlags);
+        const ssize_t newIndex = getResource(value->data, value, true, &newFlags,
+                outConfig);
         //LOGI("Resolving reference d=%p: newIndex=%d, t=0x%02x, d=%p\n",
         //     (void*)lastRef, (int)newIndex, (int)value->dataType, (void*)value->data);
         //printf("Getting reference 0x%08x: newIndex=%d\n", value->data, newIndex);
@@ -4008,7 +4010,16 @@ void ResTable::print(bool inclValues) const
                         printf("      NON-INTEGER ResTable_type ADDRESS: %p\n", type);
                         continue;
                     }
-                    printf("      config %d lang=%c%c cnt=%c%c orien=%d touch=%d density=%d key=%d infl=%d nav=%d w=%d h=%d lyt=%d\n",
+                    char density[16];
+                    uint16_t dval = dtohs(type->config.density);
+                    if (dval == ResTable_config::DENSITY_DEFAULT) {
+                        strcpy(density, "def");
+                    } else if (dval == ResTable_config::DENSITY_NONE) {
+                        strcpy(density, "no");
+                    } else {
+                        sprintf(density, "%d", (int)dval);
+                    }
+                    printf("      config %d lang=%c%c cnt=%c%c orien=%d touch=%d density=%s key=%d infl=%d nav=%d w=%d h=%d sz=%d lng=%d\n",
                            (int)configIndex,
                            type->config.language[0] ? type->config.language[0] : '-',
                            type->config.language[1] ? type->config.language[1] : '-',
@@ -4016,13 +4027,14 @@ void ResTable::print(bool inclValues) const
                            type->config.country[1] ? type->config.country[1] : '-',
                            type->config.orientation,
                            type->config.touchscreen,
-                           dtohs(type->config.density),
+                           density,
                            type->config.keyboard,
                            type->config.inputFlags,
                            type->config.navigation,
                            dtohs(type->config.screenWidth),
                            dtohs(type->config.screenHeight),
-                           type->config.screenLayout);
+                           type->config.screenLayout&ResTable_config::MASK_SCREENSIZE,
+                           type->config.screenLayout&ResTable_config::MASK_SCREENLONG);
                     size_t entryCount = dtohl(type->entryCount);
                     uint32_t entriesStart = dtohl(type->entriesStart);
                     if ((entriesStart&0x3) != 0) {
