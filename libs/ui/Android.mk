@@ -34,7 +34,7 @@ ifneq (, $(filter msm7201a_ffa msm7627_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DFFA7K
 endif
 
-ifneq (, $(filter qsd8650_ffa, $(TARGET_PRODUCT)))
+ifneq (, $(filter qsd8650_ffa qsd8250_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DFFA8K
 endif
 
