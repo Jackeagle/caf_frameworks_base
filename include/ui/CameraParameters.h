@@ -97,6 +97,9 @@ public:
     /* Check if Camera is Enabled */
     int getCameraEnabledVal() const;
 
+    /* Led Flash value */
+    const char *getLedflashValue() const;
+
     void dump() const;
     status_t dump(int fd, const Vector<String16>& args) const;
 

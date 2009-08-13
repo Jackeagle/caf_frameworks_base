@@ -309,6 +309,12 @@ int CameraParameters::getJpegMainimageQuality() const
 {
      return atoi(get("jpeg-quality"));
 }
+
+const char* CameraParameters::getLedflashValue() const
+{
+    return get("ledflash");
+}
+
 int CameraParameters::getBrightness() const
 {
      LOGD("in CameraParameters.cpp getbrightness str = %s ", get("luma-adaptation"));
