@@ -33,16 +33,19 @@ static jmethodID method_reportStatus;
 static jmethodID method_reportSvStatus;
 static jmethodID method_reportAGpsStatus;
 static jmethodID method_xtraDownloadRequest;
+static jmethodID method_reportNiNotification;
 
 static const GpsInterface* sGpsInterface = NULL;
 static const GpsXtraInterface* sGpsXtraInterface = NULL;
 static const AGpsInterface* sAGpsInterface = NULL;
+static const GpsNiInterface* sGpsNiInterface = NULL;
 
 // data written to by GPS callbacks
 static GpsLocation  sGpsLocation;
 static GpsStatus    sGpsStatus;
 static GpsSvStatus  sGpsSvStatus;
 static AGpsStatus   sAGpsStatus;
+static GpsNiNotification  sGpsNiNotification;
 
 // a copy of the data shared by android_location_GpsLocationProvider_wait_for_event
 // and android_location_GpsLocationProvider_read_status
@@ -50,6 +53,7 @@ static GpsLocation  sGpsLocationCopy;
 static GpsStatus    sGpsStatusCopy;
 static GpsSvStatus  sGpsSvStatusCopy;
 static AGpsStatus   sAGpsStatusCopy;
+static GpsNiNotification  sGpsNiNotificationCopy;
 
 enum CallbackType {
     kLocation = 1,
@@ -58,6 +62,7 @@ enum CallbackType {
     kAGpsStatus = 8,
     kXtraDownloadRequest = 16,
     kDisableRequest = 32,
+    kNiNotification = 64,
 }; 
 static int sPendingCallbacks;
 
@@ -122,6 +127,20 @@ download_request_callback()
     pthread_mutex_unlock(&sEventMutex);
 }
 
+static void
+gps_ni_notify_callback(GpsNiNotification *notification)
+{
+   LOGD("gps_ni_notify_callback: notif=%d", notification->notification_id);
+
+   pthread_mutex_lock(&sEventMutex);
+
+   sPendingCallbacks |= kNiNotification;
+   memcpy(&sGpsNiNotification, notification, sizeof(GpsNiNotification));
+
+   pthread_cond_signal(&sEventCond);
+   pthread_mutex_unlock(&sEventMutex);
+}
+
 GpsXtraCallbacks sGpsXtraCallbacks = {
     download_request_callback,
 };
@@ -130,12 +149,17 @@ AGpsCallbacks sAGpsCallbacks = {
     agps_status_callback,
 };
 
+GpsNiCallbacks sGpsNiCallbacks = {
+    gps_ni_notify_callback,
+};
+
 static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, jclass clazz) {
     method_reportLocation = env->GetMethodID(clazz, "reportLocation", "(IDDDFFFJ)V");
     method_reportStatus = env->GetMethodID(clazz, "reportStatus", "(I)V");
     method_reportSvStatus = env->GetMethodID(clazz, "reportSvStatus", "()V");
     method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(II)V");
     method_xtraDownloadRequest = env->GetMethodID(clazz, "xtraDownloadRequest", "()V");
+    method_reportNiNotification = env->GetMethodID(clazz, "reportNiNotification", "(IIIIILjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V");
 }
 
 static jboolean android_location_GpsLocationProvider_is_supported(JNIEnv* env, jclass clazz) {
@@ -155,6 +179,12 @@ static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject o
         sAGpsInterface = (const AGpsInterface*)sGpsInterface->get_extension(AGPS_INTERFACE);
     if (sAGpsInterface)
         sAGpsInterface->init(&sAGpsCallbacks);
+
+    if (!sGpsNiInterface)
+       sGpsNiInterface = (const GpsNiInterface*)sGpsInterface->get_extension(GPS_NI_INTERFACE);
+    if (sGpsNiInterface)
+       sGpsNiInterface->init(&sGpsNiCallbacks);
+
     return true;
 }
 
@@ -207,6 +237,7 @@ static void android_location_GpsLocationProvider_wait_for_event(JNIEnv* env, job
     memcpy(&sGpsStatusCopy, &sGpsStatus, sizeof(sGpsStatusCopy));
     memcpy(&sGpsSvStatusCopy, &sGpsSvStatus, sizeof(sGpsSvStatusCopy));
     memcpy(&sAGpsStatusCopy, &sAGpsStatus, sizeof(sAGpsStatusCopy));
+    memcpy(&sGpsNiNotificationCopy, &sGpsNiNotification, sizeof(sGpsNiNotificationCopy));
     pthread_mutex_unlock(&sEventMutex);   
 
     if (pendingCallbacks & kLocation) { 
@@ -230,6 +261,24 @@ static void android_location_GpsLocationProvider_wait_for_event(JNIEnv* env, job
     }
     if (pendingCallbacks & kDisableRequest) {
         // don't need to do anything - we are just poking so wait_for_event will return.
+    }
+    if (pendingCallbacks & kNiNotification) {
+       LOGD("android_location_GpsLocationProvider_wait_for_event: sent notification callback.");
+       jstring reqId = env->NewStringUTF(sGpsNiNotificationCopy.requestor_id);
+       jstring text = env->NewStringUTF(sGpsNiNotificationCopy.text);
+       jstring extras = env->NewStringUTF(sGpsNiNotificationCopy.extras);
+       env->CallVoidMethod(obj, method_reportNiNotification,
+             sGpsNiNotificationCopy.notification_id,
+             sGpsNiNotificationCopy.ni_type,
+             sGpsNiNotificationCopy.notify_flags,
+             sGpsNiNotificationCopy.timeout,
+             sGpsNiNotificationCopy.default_response,
+             reqId,
+             text,
+             sGpsNiNotificationCopy.requestor_id_encoding,
+             sGpsNiNotificationCopy.text_encoding,
+             extras
+       );
     }
 }
 
@@ -348,6 +397,16 @@ static void android_location_GpsLocationProvider_set_agps_server(JNIEnv* env, jo
     }
 }
 
+static void android_location_GpsLocationProvider_send_ni_response(JNIEnv* env, jobject obj,
+      jint notifId, jint response)
+{
+   if (!sGpsNiInterface)
+      sGpsNiInterface = (const GpsNiInterface*)sGpsInterface->get_extension(GPS_NI_INTERFACE);
+   if (sGpsNiInterface) {
+      sGpsNiInterface->respond(notifId, response);
+   }
+}
+
 static JNINativeMethod sMethods[] = {
      /* name, signature, funcPtr */
     {"class_init_native", "()V", (void *)android_location_GpsLocationProvider_class_init_native},
@@ -368,6 +427,7 @@ static JNINativeMethod sMethods[] = {
     {"native_agps_data_conn_closed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_closed},
     {"native_agps_data_conn_failed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_failed},
     {"native_set_agps_server", "(ILjava/lang/String;I)V", (void*)android_location_GpsLocationProvider_set_agps_server},
+    {"native_send_ni_response", "(II)V", (void*)android_location_GpsLocationProvider_send_ni_response},
 };
 
 int register_android_location_GpsLocationProvider(JNIEnv* env)
