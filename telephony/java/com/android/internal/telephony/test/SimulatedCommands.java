@@ -1052,7 +1052,7 @@ public final class SimulatedCommands extends BaseCommands
         }
     }
 
-    public void setRilPowerOff() {
+    public void setRilPowerOff(Message result) {
         return;
     }
 

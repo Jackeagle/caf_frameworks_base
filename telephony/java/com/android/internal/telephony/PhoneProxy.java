@@ -393,7 +393,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void setRilPowerOff() {
-        mCommandsInterface.setRilPowerOff();
+        mCommandsInterface.setRilPowerOff(null);
         return;
     }
 

@@ -1336,9 +1336,9 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    setRilPowerOff() {
+    setRilPowerOff(Message result) {
         RILRequest rr
-                = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, null);
+                = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, result);
 
         rr.mp.writeInt(1);
         rr.mp.writeInt(2);

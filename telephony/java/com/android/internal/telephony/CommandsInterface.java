@@ -948,7 +948,7 @@ public interface CommandsInterface {
 
     void setRadioPower(boolean on, Message response);
 
-    void setRilPowerOff();
+    void setRilPowerOff(Message result);
 
     void acknowledgeLastIncomingGsmSms(boolean success, int cause, Message response);
 
