@@ -541,10 +541,20 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
                         sentSinceLastRecv = 0;
                         newActivity = Activity.DATAIN;
                     } else if (sent == 0 && received == 0) {
-                        newActivity = Activity.NONE;
+                        // If connection was dormant before, it should stay dormant
+                        if (activity == Activity.DORMANT) {
+                            newActivity = Activity.DORMANT;
+                        } else {
+                            newActivity = Activity.NONE;
+                        }
                     } else {
                         sentSinceLastRecv = 0;
-                        newActivity = Activity.NONE;
+                        // If connection was dormant before, it should stay dormant
+                        if (activity == Activity.DORMANT) {
+                            newActivity = Activity.DORMANT;
+                        } else {
+                            newActivity = Activity.NONE;
+                        }
                     }
 
                     if (activity != newActivity) {
@@ -878,6 +888,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
                     Log.v(LOG_TAG, "onDataStateChanged: active=LINK_ACTIVE && CONNECTED, ignore");
                     activity = Activity.NONE;
                     phone.notifyDataActivity();
+                    startNetStatPoll();
                     break;
                 case DATA_CONNECTION_ACTIVE_PH_LINK_INACTIVE:
                     Log.v(LOG_TAG,
@@ -887,6 +898,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
                     break;
                 case DATA_CONNECTION_ACTIVE_PH_LINK_DOWN:
                     Log.v(LOG_TAG, "onDataStateChanged active=LINK_DOWN && CONNECTED, dormant");
+                    stopNetStatPoll();
                     activity = Activity.DORMANT;
                     phone.notifyDataActivity();
                     break;
