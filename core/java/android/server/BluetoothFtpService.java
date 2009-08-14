@@ -658,6 +658,7 @@ public class BluetoothFtpService extends IBluetoothFtp.Stub {
 
             if (intent != null) {
                 intent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, dbItem.mFilename);
+                intent.putExtra(BluetoothObexIntent.PROFILE, BluetoothObexIntent.PROFILE_FTP);
                 intent.putExtra(BluetoothObexIntent.SUCCESS, success);
                 mContext.sendBroadcast(intent, BLUETOOTH_PERM);
             }

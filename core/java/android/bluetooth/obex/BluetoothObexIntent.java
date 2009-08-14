@@ -38,6 +38,12 @@ import android.annotation.SdkConstant.SdkConstantType;
  */
 public interface BluetoothObexIntent {
     /**
+     * OBEX profile identifiers for PROFILE extra
+     */
+    public static final int PROFILE_OPP = 0;
+    public static final int PROFILE_FTP = 1;
+
+    /**
      * OBEX intent extras (parameters)
      */
     public static final String OBJECT_FILENAME =
@@ -54,7 +60,8 @@ public interface BluetoothObexIntent {
         "android.bluetooth.obex.intent.SUCCESS";
     public static final String ERROR_MESSAGE =
         "android.bluetooth.obex.intent.ERROR_MESSAGE";
-
+    public static final String PROFILE =
+        "android.bluetooth.obex.intent.PROFILE";
     /**
      * Broadcasted to update listeners on OBEX transfer progress.
      * <p>
@@ -75,6 +82,7 @@ public interface BluetoothObexIntent {
      * Extras:
      * <ul>
      *   <li>OBJECT_FILENAME (string) - filename containing OBEX object
+     *   <li>PROFILE (int) - OBEX profile used to transfer object: PROFILE_OPP, PROFILE_FTP
      *   <li>SUCCESS (boolean) - true if successful, else false
      * </ul>
      */
@@ -88,6 +96,7 @@ public interface BluetoothObexIntent {
      * Extras:
      * <ul>
      *   <li>OBJECT_FILENAME (string) - filename containing OBEX object
+     *   <li>PROFILE (int) - OBEX profile used to transfer object: PROFILE_OPP, PROFILE_FTP
      *   <li>SUCCESS (boolean) - true if successful, else false
      *   <li>ERROR_MESSAGE (string) - Optional error message (valid if SUCCESS is false)
      * </ul>

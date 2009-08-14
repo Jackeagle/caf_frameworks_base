@@ -274,6 +274,7 @@ public class BluetoothOppService extends IBluetoothOpp.Stub {
         // Send a transfer complete (failure) intent towards the application
         Intent intent = new Intent(BluetoothObexIntent.RX_COMPLETE_ACTION);
         intent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, dbItem.mFilename);
+        intent.putExtra(BluetoothObexIntent.PROFILE, BluetoothObexIntent.PROFILE_OPP);
         intent.putExtra(BluetoothObexIntent.SUCCESS, false);
         mContext.sendBroadcast(intent, BLUETOOTH_PERM);
 
@@ -377,6 +378,7 @@ public class BluetoothOppService extends IBluetoothOpp.Stub {
                 // Notify application layer of failure
                 Intent intent = new Intent(BluetoothObexIntent.TX_COMPLETE_ACTION);
                 intent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, dbItem.mFilename);
+                intent.putExtra(BluetoothObexIntent.PROFILE, BluetoothObexIntent.PROFILE_OPP);
                 intent.putExtra(BluetoothObexIntent.SUCCESS, false);
                 intent.putExtra(BluetoothObexIntent.ERROR_MESSAGE,
                                 "Unknown sendFilesNative failure.");
@@ -408,6 +410,7 @@ public class BluetoothOppService extends IBluetoothOpp.Stub {
             // Notify application layer of success/failure
             Intent intent = new Intent(BluetoothObexIntent.RX_COMPLETE_ACTION);
             intent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, dbItem.mFilename);
+            intent.putExtra(BluetoothObexIntent.PROFILE, BluetoothObexIntent.PROFILE_OPP);
             intent.putExtra(BluetoothObexIntent.SUCCESS, !isError);
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
         }
@@ -437,6 +440,7 @@ public class BluetoothOppService extends IBluetoothOpp.Stub {
 
             if (intent != null) {
                 intent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, dbItem.mFilename);
+                intent.putExtra(BluetoothObexIntent.PROFILE, BluetoothObexIntent.PROFILE_OPP);
                 intent.putExtra(BluetoothObexIntent.SUCCESS, success);
                 mContext.sendBroadcast(intent, BLUETOOTH_PERM);
             }
