@@ -100,6 +100,7 @@ LOCAL_SRC_FILES:= \
 	android_media_ToneGenerator.cpp \
 	android_hardware_Camera.cpp \
 	android_hardware_SensorManager.cpp \
+	android_hardware_fm.cpp \
 	android_debug_JNITest.cpp \
 	android_util_FileObserver.cpp \
 	android/opengl/poly_clip.cpp.arm \
@@ -145,7 +146,8 @@ LOCAL_C_INCLUDES += \
 	external/tremor/Tremor \
 	external/icu4c/i18n \
 	external/icu4c/common \
-	frameworks/opt/emoji
+	frameworks/opt/emoji \
+	kernel/include
 
 LOCAL_SHARED_LIBRARIES := \
 	libexpat \
