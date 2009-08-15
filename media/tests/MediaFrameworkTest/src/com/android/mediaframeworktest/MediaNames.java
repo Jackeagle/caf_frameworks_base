@@ -36,6 +36,17 @@ public class MediaNames {
     public static final String AMR = "/sdcard/media_api/music/test_amr_ietf.amr";
     public static final String OGG = "/sdcard/media_api/music/Revelation.ogg";
   
+    public static final String MP3CBR_PATH = "/sdcard/media_api/music/";
+    public static final String MP3VBR_PATH = "/sdcard/media_api/music/";
+    public static final String SHORTMP3_PATH = "/sdcard/media_api/music/";
+    public static final String MIDI_PATH = "/sdcard/media_api/music/";
+    public static final String WMA9_PATH = "/sdcard/media_api/music/";
+    public static final String WMA10_PATH = "/sdcard/media_api/music/";
+    public static final String WAV_PATH = "/sdcard/media_api/music/";
+    public static final String AMR_PATH = "/sdcard/media_api/music/";
+    public static final String OGG_PATH = "/sdcard/media_api/music/";
+    public static final String OGGSHORT_PATH = "/sdcard/media_api/music/";
+
     public static final int MP3CBR_LENGTH = 71000;
     public static final int MP3VBR_LENGTH = 71000;
     public static final int SHORTMP3_LENGTH = 286;
@@ -72,6 +83,15 @@ public class MediaNames {
     public static final String VIDEO_HIGHRES_H263 = "/sdcard/media_api/video/H263_500_AMRNB_12.3gp";
     public static final String VIDEO_HIGHRES_MP4 = "/sdcard/media_api/video/H264_500_AAC_128.3gp";
     
+     //local video path
+    public static final String VIDEO_MP4_PATH = "/sdcard/media_api/video/";
+    public static final String VIDEO_3GP_PATH = "/sdcard/media_api/video/";
+    public static final String VIDEO_H263_AAC_PATH = "/sdcard/media_api/video/";
+    public static final String VIDEO_H263_AMR_PATH = "/sdcard/media_api/video/";
+    public static final String VIDEO_H264_AAC_PATH = "/sdcard/media_api/video/";
+    public static final String VIDEO_H264_AMR_PATH = "/sdcard/media_api/video/";
+    public static final String VIDEO_WMV_PATH = "/sdcard/media_api/video/";
+
     //ringtone
     public static final String ringtone = "/sdcard/media_api/ringtones/F1_NewVoicemail.mp3";
 
