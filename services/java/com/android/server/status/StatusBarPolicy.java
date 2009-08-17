@@ -56,6 +56,7 @@ import android.widget.TextView;
 import com.android.internal.R;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.location.GpsLocationProvider;
+import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.EriInfo;
@@ -902,6 +903,7 @@ public class StatusBarPolicy {
             } else {
                 mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_null;
             }
+            mService.setIconVisibility(mPhoneIcon,true);
             mService.updateIcon(mPhoneIcon, mPhoneData, null);
             mService.setIconVisibility(mPhoneEvdoIcon,false);
             return;
@@ -926,6 +928,18 @@ public class StatusBarPolicy {
                 iconList = sSignalImages;
             }
         } else {
+
+            //Get the networkMode from Settings.System
+            int settingsNetworkMode = android.provider.Settings.Secure.getInt(mContext.
+                getContentResolver(),android.provider.Settings.Secure.PREFERRED_NETWORK_MODE,
+                Phone.PREFERRED_NT_MODE);
+
+            if (settingsNetworkMode == Phone.NT_MODE_EVDO_NO_CDMA) {
+                mService.setIconVisibility(mPhoneIcon,false);
+            } else {
+                mService.setIconVisibility(mPhoneIcon,true);
+            }
+
             iconList = this.sSignalImages_cdma;
 
             int cdmaDbm = mSignalStrength.getCdmaDbm();
@@ -933,7 +947,8 @@ public class StatusBarPolicy {
             int levelDbm = 0;
             int levelEcio = 0;
 
-            if (cdmaDbm >= -75) levelDbm = 4;
+            if (cdmaDbm == -1) levelDbm = 0;
+            else if (cdmaDbm >= -75) levelDbm = 4;
             else if (cdmaDbm >= -85) levelDbm = 3;
             else if (cdmaDbm >= -95) levelDbm = 2;
             else if (cdmaDbm >= -100) levelDbm = 1;
@@ -960,11 +975,11 @@ public class StatusBarPolicy {
             int levelEvdoSnr = 0;
 
             // Ec/Io are in dB*10
-            if (evdoEcio >= -650) levelEvdoEcio = 4;
-            else if (evdoEcio >= -750) levelEvdoEcio = 3;
-            else if (evdoEcio >= -900) levelEvdoEcio = 2;
-            else if (evdoEcio >= -1050) levelEvdoEcio = 1;
-            else levelEvdoEcio = 0;
+            if (evdoEcio >= -50) levelEvdoEcio = 0;
+            else if (evdoEcio >= -650) levelEvdoEcio = 1;
+            else if (evdoEcio >= -750) levelEvdoEcio = 2;
+            else if (evdoEcio >= -900) levelEvdoEcio = 3;
+            else levelEvdoEcio = 4;
 
             if (evdoSnr > 7) levelEvdoSnr = 4;
             else if (evdoSnr > 5) levelEvdoSnr = 3;
