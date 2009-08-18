@@ -617,9 +617,7 @@ public class StkService extends Handler implements AppInterface {
         ResponseData resp = null;
         boolean helpRequired = false;
         CommandDetails cmdDet = resMsg.getCmdDetails();
-        boolean includeAdditionalInfo = false;
-        int additionalInfo = 0;
-
+        
         switch (resMsg.resCode) {
         case HELP_INFO_REQUIRED:
             helpRequired = true;
@@ -634,6 +632,7 @@ public class StkService extends Handler implements AppInterface {
         case PRFRMD_WITH_MODIFICATION:
         case PRFRMD_NAA_NOT_ACTIVE:
         case PRFRMD_TONE_NOT_PLAYED:
+        case LAUNCH_BROWSER_ERROR:
             switch (AppInterface.CommandType.fromInt(cmdDet.typeOfCommand)) {
             case SET_UP_MENU:
                 helpRequired = resMsg.resCode == ResultCode.HELP_INFO_REQUIRED;
@@ -675,8 +674,8 @@ public class StkService extends Handler implements AppInterface {
         case TERMINAL_CRNTLY_UNABLE_TO_PROCESS:
              //For screenbusy case there will be addtional information in the terminal
              //response. And the value of the additional information byte is 0x01.
-             includeAdditionalInfo = true;
-             additionalInfo = 0x01;
+             resMsg.includeAdditionalInfo = true;
+             resMsg.additionalInfo = 0x01;
         case NO_RESPONSE_FROM_USER:
         case UICC_SESSION_TERM_BY_USER:
         case BACKWARD_MOVE_BY_USER:
@@ -685,7 +684,7 @@ public class StkService extends Handler implements AppInterface {
         default:
             return;
         }
-        sendTerminalResponse(cmdDet, resMsg.resCode, includeAdditionalInfo, additionalInfo, resp);
+        sendTerminalResponse(cmdDet, resMsg.resCode, resMsg.includeAdditionalInfo,resMsg.additionalInfo, resp);
         mCurrntCmd = null;
     }
 }
