@@ -117,8 +117,6 @@ public final class GsmMmiCode  extends Handler implements MmiCode
 
     private boolean isUssdRequest;
 
-    private static boolean isUssdCancel;
-
     State state = State.PENDING;    
     CharSequence message;
     
@@ -425,7 +423,6 @@ public final class GsmMmiCode  extends Handler implements MmiCode
              * There can only be one pending USSD session, so tell the radio to
              * cancel it.
              */
-            isUssdCancel = true;
             phone.mCM.cancelPendingUssd(obtainMessage(EVENT_USSD_CANCEL_COMPLETE, this));
             
             /*
@@ -859,9 +856,6 @@ public final class GsmMmiCode  extends Handler implements MmiCode
                 ar = (AsyncResult) (msg.obj);
 
                 if (ar.exception != null) {
-                   if (isUssdCancel) {
-                      return;
-                   }
                     state = State.FAILED;
                     message = context.getText(
                                             com.android.internal.R.string.mmiError);
@@ -877,8 +871,7 @@ public final class GsmMmiCode  extends Handler implements MmiCode
             break;
 
             case EVENT_USSD_CANCEL_COMPLETE:
-                   phone.onMMIDone(this);
-                   isUssdCancel = false;
+                phone.onMMIDone(this);
             break;
         }
     }
