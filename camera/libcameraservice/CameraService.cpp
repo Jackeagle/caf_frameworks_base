@@ -248,7 +248,8 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
        mUseOverlay = false;
     }
     mMediaPlayerClick = newMediaPlayer("/system/media/audio/ui/camera_click.ogg");
-    mMediaPlayerBeep = newMediaPlayer("/system/media/audio/ui/VideoRecord.ogg");
+    //Commented to avoid audio playback/recording/camcorder concurrency issue
+    //mMediaPlayerBeep = newMediaPlayer("/system/media/audio/ui/VideoRecord.ogg");
 
     // Callback is disabled by default
     mPreviewCallbackFlag = FRAME_CALLBACK_FLAG_NOOP;
