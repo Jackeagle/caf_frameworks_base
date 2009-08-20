@@ -85,7 +85,7 @@ public class PdpConnection extends DataConnection {
         receivedDisconnectReq = false;
 
         phone.mCM.setupDataCall(Integer.toString(RILConstants.GSM_PHONE),
-                null, apn.apn, apn.user,
+                Integer.toString(RILConstants.DATA_PROFILE_DEFAULT), apn.apn, apn.user,
                 apn.password, obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE));
     }
 
