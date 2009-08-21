@@ -217,6 +217,17 @@ public abstract class DataConnectionTracker extends Handler {
         }
     }
 
+    public boolean getSocketDataCallEnabled() {
+       try {
+            return Settings.System.getInt(phone.getContext().getContentResolver(),
+                Settings.System.SOCKET_DATA_CALL_ENABLE) > 0;
+        } catch (SettingNotFoundException snfe) {
+           //Data connection should be enabled by default.
+           //So returning true here.
+            return true;
+        }
+    }
+
     // abstract handler methods
     protected abstract void onTrySetupData(String reason);
     protected abstract void onRoamingOff();

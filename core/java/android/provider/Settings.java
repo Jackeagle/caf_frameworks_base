@@ -840,9 +840,9 @@ public final class Settings {
         public static final String STAY_ON_WHILE_PLUGGED_IN = "stay_on_while_plugged_in";
 
         /**
-         * Whether Dun Mode is on.
+         * Whether Data call is enabled.
          */
-        public static final String DUN_ENABLE = "dun_enable";
+        public static final String SOCKET_DATA_CALL_ENABLE = "socket_data_call_enable";
 
         /**
          * Default file manager to show files on extrenal storage media

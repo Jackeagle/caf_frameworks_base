@@ -578,6 +578,10 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
             Log.i(LOG_TAG, "(fix?) We're on the simulator; assuming data is connected");
             return true;
         }
+        if (!getSocketDataCallEnabled()) {
+            Log.i(LOG_TAG, "Socket data call is disabled");
+            return false;
+        }
 
         int gprsState = mGsmPhone.mSST.getCurrentGprsState();
         boolean roaming = phone.getServiceState().getRoaming();
