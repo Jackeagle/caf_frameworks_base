@@ -12,6 +12,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ *
  */
 
 package android.location;
@@ -1265,4 +1268,17 @@ public class LocationManager {
             return false;
         }
     }
+
+    /**
+     * {@hide}
+     */
+    public boolean sendNiResponse(int notifId, int userResponse) {
+    	boolean rc = false;
+        try {
+            rc = mService.sendNiResponse(notifId, userResponse);
+        } catch (RemoteException e) {
+            Log.e(TAG, "RemoteException in sendNiResponse: ", e);
+        }
+    	return rc;
+    }    
 }

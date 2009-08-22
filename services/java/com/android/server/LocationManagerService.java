@@ -13,6 +13,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * 
  */
 
 package com.android.server;
@@ -76,6 +79,7 @@ import com.android.internal.location.ILocationCollector;
 import com.android.internal.location.INetworkLocationManager;
 import com.android.internal.location.INetworkLocationProvider;
 import com.android.internal.location.TrackProvider;
+import com.android.internal.location.GpsNetInitiatedHandler;
 import com.android.server.am.BatteryStatsService;
 
 /**
@@ -1203,6 +1207,22 @@ public class LocationManagerService extends ILocationManager.Stub
             }
     
             return impl.sendExtraCommand(command, extras);
+        }
+    }
+
+    public boolean sendNiResponse(int notifId, int userResponse) {
+    	// TODO Add Permission check
+        synchronized (mLocationListeners) {
+        	LocationProviderImpl impl = LocationProviderImpl.getProvider(LocationManager.GPS_PROVIDER);
+            if (impl == null) {
+                return false;
+            }
+ 
+            Bundle bundle = new Bundle();
+        	bundle.putInt(GpsNetInitiatedHandler.NI_EXTRA_CMD_NOTIF_ID, notifId);
+        	bundle.putInt(GpsNetInitiatedHandler.NI_EXTRA_CMD_RESPONSE, userResponse);
+            
+            return impl.sendExtraCommand(GpsNetInitiatedHandler.NI_RESPONSE_EXTRA_CMD, bundle);
         }
     }
 
