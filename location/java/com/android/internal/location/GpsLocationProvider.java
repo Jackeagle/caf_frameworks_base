@@ -12,6 +12,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ *
  */
 
 package com.android.internal.location;
@@ -36,14 +39,18 @@ import android.util.Log;
 
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.location.GpsNetInitiatedHandler.*;
+import static com.android.internal.location.GpsNetInitiatedHandler.*;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.StringBufferInputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Properties;
+import java.util.Map.Entry;
 
 /**
  * A GPS implementation of LocationProvider used by LocationManager.
@@ -54,6 +61,9 @@ public class GpsLocationProvider extends LocationProviderImpl {
 
     private static final String TAG = "GpsLocationProvider";
 
+    private static final boolean DEBUG = true;
+    private static final boolean VERBOSE = false;
+    
     /**
      * Broadcast intent action indicating that the GPS has either been
      * enabled or disabled. An intent extra provides this state as a boolean,
@@ -174,6 +184,7 @@ public class GpsLocationProvider extends LocationProviderImpl {
     private String mSuplHost;
     private int mSuplPort;
     private boolean mSetSuplServer;
+    private final GpsNetInitiatedHandler mNIHandler; 
 
     // how often to request NTP time, in milliseconds
     // current setting 4 hours
@@ -212,6 +223,7 @@ public class GpsLocationProvider extends LocationProviderImpl {
     public GpsLocationProvider(Context context) {
         super(LocationManager.GPS_PROVIDER);
         mContext = context;
+        mNIHandler= new GpsNetInitiatedHandler(context, this);
 
         TelephonyBroadcastReceiver receiver = new TelephonyBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter();
@@ -558,6 +570,12 @@ public class GpsLocationProvider extends LocationProviderImpl {
             return deleteAidingData(extras);
         }
         
+        if (GpsNetInitiatedHandler.NI_RESPONSE_EXTRA_CMD.equals(command)) {
+        	return sendNiResponse(
+        			extras.getInt(GpsNetInitiatedHandler.NI_EXTRA_CMD_NOTIF_ID), 
+        			extras.getInt(GpsNetInitiatedHandler.NI_EXTRA_CMD_RESPONSE) );
+        }
+        
         Log.w(TAG, "sendExtraCommand: unknown command " + command);
         return false;
     }
@@ -788,7 +806,90 @@ public class GpsLocationProvider extends LocationProviderImpl {
             mNetworkThread.xtraDownloadRequest();
         }
     }
+    
+    //=============================================================
+    // NI Client support
+	//=============================================================
+    
+    // Called by JNI function to report an NI request.
+	@SuppressWarnings("deprecation")
+	public void reportNiNotification(
+        	int notificationId,
+        	int niType,
+        	int notifyFlags,
+        	int timeout,
+        	int defaultResponse,
+        	String requestorId,
+        	String text,
+        	int requestorIdEncoding,
+        	int textEncoding,
+        	String extras  // Encoded extra data
+        )
+	{
+		Log.i(TAG, "reportNiNotification: entered");
+		Log.i(TAG, "notificationId: " + notificationId +
+				", niType: " + niType +
+				", notifyFlags: " + notifyFlags +
+				", timeout: " + timeout +
+				", defaultResponse: " + defaultResponse);
+		
+		Log.i(TAG, "requestorId: " + requestorId +
+				", text: " + text +
+				", requestorIdEncoding: " + requestorIdEncoding +
+				", textEncoding: " + textEncoding);
+		
+		GpsNiNotification notification = new GpsNiNotification();
+		
+		notification.notificationId = notificationId;
+		notification.niType = niType;
+		notification.needNotify = (notifyFlags & GPS_NI_NEED_NOTIFY)!=0;
+		notification.needVerify = (notifyFlags & GPS_NI_NEED_VERIFY)!=0;
+		notification.privacyOverride = (notifyFlags & GPS_NI_PRIVACY_OVERRIDE)!=0;
+		notification.timeout = timeout;
+		notification.defaultResponse = defaultResponse;
+		notification.requestorId = requestorId;
+		notification.text = text;
+		notification.requestorIdEncoding = requestorIdEncoding;
+		notification.textEncoding = textEncoding;
+		
+		// Process extras, assuming the format is
+		// one of more lines of "key = value"
+		Bundle bundle = new Bundle();
+		
+		if (extras == null) extras = "";
+		Properties extraProp = new Properties();
+		
+		try {
+			extraProp.load(new StringBufferInputStream(extras));
+		}
+		catch (IOException e)
+		{
+			Log.e(TAG, "reportNiNotification cannot parse extras data: " + extras);
+		}
+		
+		for (Entry<Object, Object> ent : extraProp.entrySet())
+		{
+			bundle.putString((String) ent.getKey(), (String) ent.getValue());
+		}				
+		
+		notification.extras = bundle;
+		
+		mNIHandler.handleNiNotification(notification);
+	}
 
+	// Sends a response for an NI reqeust to HAL.
+	public boolean sendNiResponse(int notificationId, int userResponse)
+	{
+		StringBuilder extrasBuf = new StringBuilder();
+
+		if (Config.LOGD) Log.d(TAG, "sendNiResponse, notifId: " + notificationId +
+				", response: " + userResponse);
+		
+		native_send_ni_response(notificationId, userResponse);
+		
+		return true;
+	}
+    
     private class GpsEventThread extends Thread {
 
         public GpsEventThread() {
@@ -990,4 +1091,7 @@ public class GpsLocationProvider extends LocationProviderImpl {
     // SUPL Support    
     private native void native_set_supl_server(String hostname, int port);
     private native void native_set_supl_apn(String apn);
+
+    // Network-initiated (NI) Support
+    private native void native_send_ni_response(int notificationId, int userResponse);
 }

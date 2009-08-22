@@ -12,6 +12,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ *
  */
 
 package android.location;
@@ -73,4 +76,7 @@ interface ILocationManager
     void clearTestProviderEnabled(String provider);
     void setTestProviderStatus(String provider, int status, in Bundle extras, long updateTime);
     void clearTestProviderStatus(String provider);
+
+    // for NI support
+    boolean sendNiResponse(int notifId, int userResponse);
 }

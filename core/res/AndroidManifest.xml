@@ -15,6 +15,9 @@
 ** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
+**
+** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+**
 */
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -981,6 +984,10 @@
         <activity android:name="com.android.internal.app.ExternalMediaFormatActivity"
                 android:theme="@style/Theme.Dialog.Alert"
                 android:excludeFromRecents="true">
+        </activity>
+        <activity android:name="com.android.internal.app.NetInitiatedActivity"
+                android:theme="@style/Theme.Dialog.Alert"
+                android:excludeFromRecents="true">              
         </activity>
 
         <provider android:name=".content.SyncProvider"
