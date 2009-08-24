@@ -172,7 +172,8 @@ final class ServiceStateTracker extends Handler
     private String curSpn = null;
     private String curPlmn = null;
     private int curSpnRule = 0;
-    boolean registeredFirstTime = false; 
+    String  prevRegPlmn = null;
+    String  newRegPlmn = null;
 
     //***** Constants
 
@@ -832,14 +833,13 @@ final class ServiceStateTracker extends Handler
                     if (opNames != null && opNames.length >= 3) {
                         newSS.setOperatorName (
                                 opNames[0], opNames[1], opNames[2]);
-                        if((phone.mSIMRecords.getOnsAlg() == EONS_ALG)
-                                 && (opNames[2] != null)
-                                 && (opNames[2].trim().length() != 0)
-                                 && !registeredFirstTime){
-                           if(phone.mSIMRecords.updateSimRecords()){
-                              registeredFirstTime = true;
-                              Log.d(EONS_TAG,opNames[2] + "After First reg updateSimRecords() once");
-                           }
+                        newRegPlmn = newSS.getOperatorNumeric();
+                        if((phone.mSIMRecords.getOnsAlg() == EONS_ALG) &&
+                           (newRegPlmn != null) && !newRegPlmn.equals(prevRegPlmn)) {
+                           phone.mSIMRecords.updateSimRecords();
+                           Log.i(EONS_TAG,"Calling updateSimRecords() if plmn changed, prev plmn "
+                                 + prevRegPlmn + ", new plmn " + newRegPlmn);
+                           prevRegPlmn = newRegPlmn;
                         }
                     }
                 break;
@@ -1003,18 +1003,8 @@ final class ServiceStateTracker extends Handler
         newSS.setStateOutOfService();
 
         GsmCellLocation tcl = cellLoc;
-        /* 
-        *Update all cached sim records when LAC has changed  
-        */  
-        if (cellLoc.getLac() != newCellLoc.getLac()) {  
-        if(phone.mSIMRecords.getOnsAlg() == EONS_ALG) {  
-        Log.d(EONS_TAG,  
-        "LOC updated calling updateSimRecords()");  
-        phone.mSIMRecords.updateSimRecords();  
-        }  
-        }  
-
         cellLoc = newCellLoc;
+
         newCellLoc = tcl;
 
         gprsState = newGPRSState;
@@ -1127,6 +1117,13 @@ final class ServiceStateTracker extends Handler
 
         if (hasLocationChanged) {
             phone.notifyLocationChanged();
+            if(phone.mSIMRecords.getOnsAlg() == EONS_ALG) {
+               /*
+                *Update all cached OPL/PNN records if LAC changes
+               */
+               Log.i(EONS_TAG,"LOC updated calling updateSimRecords()");
+               phone.mSIMRecords.updateSimRecords();
+            }
         }
 
         if (! isGprsConsistant(gprsState, ss.getState())) {
