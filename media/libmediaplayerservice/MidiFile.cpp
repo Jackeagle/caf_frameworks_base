@@ -490,6 +490,9 @@ int MidiFile::render() {
         // LOGV("MidiFile::render - updating state");
         EAS_GetLocation(mEasData, mEasHandle, &mPlayTime);
         EAS_State(mEasData, mEasHandle, &mState);
+        if ((mState == EAS_STATE_STOPPED) || (mState == EAS_STATE_ERROR) || (mState == EAS_STATE_PAUSED)) {
+            mRender = false;
+        }
         mMutex.unlock();
 
         // create audio output track if necessary
@@ -538,7 +541,6 @@ int MidiFile::render() {
             }
             mAudioSink->stop();
             audioStarted = false;
-            mRender = false;
         }
     }
 
