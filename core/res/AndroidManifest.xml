@@ -3,6 +3,7 @@
 /* //device/apps/common/AndroidManifest.xml
 **
 ** Copyright 2006, The Android Open Source Project
+** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -15,6 +16,8 @@
 ** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
+**
+**
 */
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -25,7 +28,7 @@
     <!-- Special broadcasts that only the system can send -->
     <!-- ================================================ -->
     <eat-comment />
-    
+
     <protected-broadcast android:name="android.intent.action.SCREEN_OFF" />
     <protected-broadcast android:name="android.intent.action.SCREEN_ON" />
     <protected-broadcast android:name="android.intent.action.USER_PRESENT" />
@@ -52,7 +55,7 @@
     <protected-broadcast android:name="android.intent.action.AIRPLANE_MODE" />
     <protected-broadcast android:name="android.intent.action.NEW_OUTGOING_CALL" />
     <protected-broadcast android:name="android.intent.action.REBOOT" />
-    
+
     <!-- ====================================== -->
     <!-- Permissions for things that cost money -->
     <!-- ====================================== -->
