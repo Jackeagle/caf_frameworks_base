@@ -97,7 +97,8 @@ static void onCreateSessionComplete(DBusMessage *msg, void *user, void *nat_cb)
   char* c_address = (char *)user;
   DBusError err;
   jboolean is_error = JNI_FALSE;
-  char* c_obj_path;
+  char *c_obj_path = NULL;
+  jstring obj_path = NULL;
 
   JNIEnv *env = NULL;
   nat->vm->GetEnv((void**)&env, nat->envVer);
@@ -108,64 +109,59 @@ static void onCreateSessionComplete(DBusMessage *msg, void *user, void *nat_cb)
 
   jstring address = env->NewStringUTF(c_address);
 
+  dbus_error_init(&err);
+
   if (dbus_set_error_from_message(&err, msg)  ||
-        !dbus_message_get_args(msg, &err,
-                               DBUS_TYPE_OBJECT_PATH, &c_obj_path,
-                               DBUS_TYPE_INVALID))
-  {
-    LOGE("%s: D-Bus error: %s (%s)\n", __FUNCTION__, err.name, err.message);
+    !dbus_message_get_args(msg, &err,
+                           DBUS_TYPE_OBJECT_PATH, &c_obj_path,
+                           DBUS_TYPE_INVALID)) {
+    LOG_AND_FREE_DBUS_ERROR(&err);
 
-    dbus_error_free(&err);
+    is_error = JNI_TRUE;
 
-    env->CallVoidMethod(nat->me,
-                      method_onCreateSessionComplete,
-                      NULL,
-                      address,
-                      JNI_TRUE);
-
-    env->DeleteLocalRef(address);
-
-    return;
+    goto done;
   }
 
-  LOGV(" object path = %s, is_error = %d\n", c_obj_path, is_error);
+  LOGV(" object path = %s\n", c_obj_path);
 
   /* Add an object handler for FTP client agent method calls*/
   if (!dbus_connection_register_object_path(nat->conn,
                                             c_obj_path,
                                             &ftpclient_agent_vtable,
-                                            NULL))
-  {
-      LOGE("%s: Can't register object path %s for agent!",
-           __FUNCTION__, c_obj_path);
+                                            NULL)) {
+    LOGE("%s: Can't register object path %s for agent!",
+         __FUNCTION__, c_obj_path);
 
+    is_error = JNI_TRUE;
+
+    goto done;
+  } else {
+    LOGV("Registered Object Path %s with dbus", c_obj_path);
+    DBusMessage *reply = dbus_func_args_error(env, nat->conn, &err,
+                                              OBEXD_DBUS_CLIENT_SVC,
+                                              c_obj_path,
+                                              OBEXD_DBUS_CLIENT_SESSION_IFC,
+                                              OBEXD_DBUS_CLIENT_SESSION_ASSIGN,
+                                              DBUS_TYPE_OBJECT_PATH,
+                                              &c_obj_path, DBUS_TYPE_INVALID);
+
+    if (reply) {
+      LOGV("Added Object Path %s with BM3", c_obj_path);
+
+      is_error = JNI_FALSE;
+
+      dbus_message_unref(reply);
+    } else {
+      LOG_AND_FREE_DBUS_ERROR(&err);
+
+      is_error = JNI_TRUE;
+    }
   }
-  else
-  {
 
-     DBusError err;
-     dbus_error_init(&err);
-     LOGV("Registered Object Path %s with dbus", c_obj_path);
-     DBusMessage *reply = dbus_func_args_error(env, nat->conn, &err,
-                                               OBEXD_DBUS_CLIENT_SVC,
-                                               c_obj_path,
-                                               OBEXD_DBUS_CLIENT_SESSION_IFC, OBEXD_DBUS_CLIENT_SESSION_ASSIGN,
-                                               DBUS_TYPE_OBJECT_PATH, &c_obj_path,
-                                               DBUS_TYPE_INVALID);
-
-        if (reply)
-        {
-
-            LOGV("Added Object Path %s with BM3", c_obj_path);
-            dbus_message_unref(reply);
-        }
-        else
-        {
-            LOG_AND_FREE_DBUS_ERROR(&err);
-        }
+  done:
+  if (is_error == JNI_FALSE) {
+    obj_path = env->NewStringUTF(c_obj_path);
   }
-
-  jstring obj_path = env->NewStringUTF(c_obj_path);
 
   env->CallVoidMethod(nat->me,
                       method_onCreateSessionComplete,
@@ -173,15 +169,19 @@ static void onCreateSessionComplete(DBusMessage *msg, void *user, void *nat_cb)
                       address,
                       is_error);
 
-  if (env->ExceptionCheck())
-  {
-     env->ExceptionDescribe();
+  if (env->ExceptionCheck()) {
+    env->ExceptionDescribe();
   }
 
   env->DeleteLocalRef(address);
-  env->DeleteLocalRef(obj_path);
+
+  if (obj_path != NULL) {
+    env->DeleteLocalRef(obj_path);
+  }
 
   free(c_address);
+
+  return;
 }
 
 static void onChangeFolderComplete(DBusMessage *msg, void *user, void *nat_cb)
