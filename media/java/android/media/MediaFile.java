@@ -57,22 +57,36 @@ public class MediaFile {
     public static final int FILE_TYPE_3GPP    = 23;
     public static final int FILE_TYPE_3GPP2   = 24;
     public static final int FILE_TYPE_WMV     = 25;
+    public static final int FILE_TYPE_AVI     = 26;
+    public static final int FILE_TYPE_MPEG    = 27;
+    public static final int FILE_TYPE_DL      = 28;
+    public static final int FILE_TYPE_DV      = 29;
+    public static final int FILE_TYPE_FLI     = 30;
+    public static final int FILE_TYPE_QT      = 31;
+    public static final int FILE_TYPE_MXU     = 32;
+    public static final int FILE_TYPE_LSF     = 33;
+    public static final int FILE_TYPE_MNG     = 34;
+    public static final int FILE_TYPE_ASF     = 35;
+    public static final int FILE_TYPE_WM      = 36;
+    public static final int FILE_TYPE_WMX     = 37;
+    public static final int FILE_TYPE_WVX     = 38;
+    public static final int FILE_TYPE_MOVIE   = 39;
     private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_MP4;
-    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_WMV;
+    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_MOVIE;
     
     // Image file types
-    public static final int FILE_TYPE_JPEG    = 31;
-    public static final int FILE_TYPE_GIF     = 32;
-    public static final int FILE_TYPE_PNG     = 33;
-    public static final int FILE_TYPE_BMP     = 34;
-    public static final int FILE_TYPE_WBMP    = 35;
+    public static final int FILE_TYPE_JPEG    = 41;
+    public static final int FILE_TYPE_GIF     = 42;
+    public static final int FILE_TYPE_PNG     = 43;
+    public static final int FILE_TYPE_BMP     = 44;
+    public static final int FILE_TYPE_WBMP    = 45;
     private static final int FIRST_IMAGE_FILE_TYPE = FILE_TYPE_JPEG;
     private static final int LAST_IMAGE_FILE_TYPE = FILE_TYPE_WBMP;
    
     // Playlist file types
-    public static final int FILE_TYPE_M3U     = 41;
-    public static final int FILE_TYPE_PLS     = 42;
-    public static final int FILE_TYPE_WPL     = 43;
+    public static final int FILE_TYPE_M3U     = 51;
+    public static final int FILE_TYPE_PLS     = 52;
+    public static final int FILE_TYPE_WPL     = 53;
     private static final int FIRST_PLAYLIST_FILE_TYPE = FILE_TYPE_M3U;
     private static final int LAST_PLAYLIST_FILE_TYPE = FILE_TYPE_WPL;
     
@@ -121,6 +135,27 @@ public class MediaFile {
         addFileType("3G2", FILE_TYPE_3GPP2, "video/3gpp2");
         addFileType("3GPP2", FILE_TYPE_3GPP2, "video/3gpp2");
         addFileType("WMV", FILE_TYPE_WMV, "video/x-ms-wmv");
+        addFileType("MPEG", FILE_TYPE_MPEG, "video/mpeg");
+        addFileType("MPG", FILE_TYPE_MPEG, "video/mpeg");
+        addFileType("VOB", FILE_TYPE_MPEG, "video/mpeg");
+        addFileType("MPE", FILE_TYPE_MPEG, "video/mpeg");
+        addFileType("AVI", FILE_TYPE_AVI, "video/x-msvideo");
+        addFileType("DL", FILE_TYPE_DL, "video/dl");
+        addFileType("DIF", FILE_TYPE_DV, "video/dv");
+        addFileType("DV", FILE_TYPE_DV, "video/dv");
+        addFileType("FLI", FILE_TYPE_FLI, "video/fli");
+        addFileType("MOV", FILE_TYPE_QT, "video/quicktime");
+        addFileType("QT", FILE_TYPE_QT, "video/quicktime");
+        addFileType("MXU", FILE_TYPE_MXU, "video/vnd.mpegurl");
+        addFileType("LSF", FILE_TYPE_LSF, "video/x-la-asf");
+        addFileType("LSX", FILE_TYPE_LSF, "video/x-la-asf");
+        addFileType("MNG", FILE_TYPE_MNG, "video/x-mng");
+        addFileType("ASF", FILE_TYPE_ASF, "video/x-ms-asf");
+        addFileType("ASX", FILE_TYPE_ASF, "video/x-ms-asf");
+        addFileType("WM", FILE_TYPE_WM, "video/x-ms-wm");
+        addFileType("WMX", FILE_TYPE_WMX, "video/x-ms-wmx");
+        addFileType("WVX", FILE_TYPE_WVX, "video/x-ms-wvx");
+        addFileType("MOVIE", FILE_TYPE_MOVIE, "video/x-sgi-movie");
 
         addFileType("JPG", FILE_TYPE_JPEG, "image/jpeg");
         addFileType("JPEG", FILE_TYPE_JPEG, "image/jpeg");

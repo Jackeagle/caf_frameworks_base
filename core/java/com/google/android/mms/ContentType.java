@@ -64,6 +64,21 @@ public class ContentType {
     public static final String VIDEO_3G2         = "video/3gpp2";
     public static final String VIDEO_H263        = "video/h263";
     public static final String VIDEO_MP4         = "video/mp4";
+    public static final String VIDEO_WMV         = "video/x-ms-wmv";
+    public static final String VIDEO_MPEG        = "video/mpeg";
+    public static final String VIDEO_AVI         = "video/x-msvideo";
+    public static final String VIDEO_DL          = "video/3dl";
+    public static final String VIDEO_DV          = "video/3dv";
+    public static final String VIDEO_FLI         = "video/3fli";
+    public static final String VIDEO_QT          = "video/quicktime";
+    public static final String VIDEO_MXU         = "video/vnd.mpegurl";
+    public static final String VIDEO_LSF         = "video/x-la-asf";
+    public static final String VIDEO_MNG         = "video/x-mng";
+    public static final String VIDEO_ASF         = "video/x-ms-asf";
+    public static final String VIDEO_WM          = "video/x-ms-wm";
+    public static final String VIDEO_WMX         = "video/x-ms-wmx";
+    public static final String VIDEO_WVX         = "video/x-ms-wvx";
+    public static final String VIDEO_MOVIE       = "video/x-sgi-movie";
 
     public static final String APP_SMIL          = "application/smil";
     public static final String APP_WAP_XHTML     = "application/vnd.wap.xhtml+xml";
@@ -112,6 +127,21 @@ public class ContentType {
         sSupportedContentTypes.add(VIDEO_3G2);
         sSupportedContentTypes.add(VIDEO_H263);
         sSupportedContentTypes.add(VIDEO_MP4);
+        sSupportedContentTypes.add(VIDEO_WMV);
+        sSupportedContentTypes.add(VIDEO_MPEG);
+        sSupportedContentTypes.add(VIDEO_AVI);
+        sSupportedContentTypes.add(VIDEO_DL);
+        sSupportedContentTypes.add(VIDEO_DV);
+        sSupportedContentTypes.add(VIDEO_FLI);
+        sSupportedContentTypes.add(VIDEO_QT);
+        sSupportedContentTypes.add(VIDEO_MXU);
+        sSupportedContentTypes.add(VIDEO_LSF);
+        sSupportedContentTypes.add(VIDEO_MNG);
+        sSupportedContentTypes.add(VIDEO_ASF);
+        sSupportedContentTypes.add(VIDEO_WM);
+        sSupportedContentTypes.add(VIDEO_WMX);
+        sSupportedContentTypes.add(VIDEO_WVX);
+        sSupportedContentTypes.add(VIDEO_MOVIE);
 
         sSupportedContentTypes.add(APP_SMIL);
         sSupportedContentTypes.add(APP_WAP_XHTML);
@@ -152,6 +182,21 @@ public class ContentType {
         sSupportedVideoTypes.add(VIDEO_3G2);
         sSupportedVideoTypes.add(VIDEO_H263);
         sSupportedVideoTypes.add(VIDEO_MP4);
+        sSupportedVideoTypes.add(VIDEO_WMV);
+        sSupportedVideoTypes.add(VIDEO_MPEG);
+        sSupportedVideoTypes.add(VIDEO_AVI);
+        sSupportedVideoTypes.add(VIDEO_DL);
+        sSupportedVideoTypes.add(VIDEO_DV);
+        sSupportedVideoTypes.add(VIDEO_FLI);
+        sSupportedVideoTypes.add(VIDEO_QT);
+        sSupportedVideoTypes.add(VIDEO_MXU);
+        sSupportedVideoTypes.add(VIDEO_LSF);
+        sSupportedVideoTypes.add(VIDEO_MNG);
+        sSupportedVideoTypes.add(VIDEO_ASF);
+        sSupportedVideoTypes.add(VIDEO_WM);
+        sSupportedVideoTypes.add(VIDEO_WMX);
+        sSupportedVideoTypes.add(VIDEO_WVX);
+        sSupportedVideoTypes.add(VIDEO_MOVIE);
     }
 
     // This class should never be instantiated.

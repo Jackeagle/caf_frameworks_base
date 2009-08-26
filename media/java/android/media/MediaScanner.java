@@ -504,8 +504,22 @@ public class MediaScanner
                             mFileType == MediaFile.FILE_TYPE_M4A ||
                             mFileType == MediaFile.FILE_TYPE_3GPP ||
                             mFileType == MediaFile.FILE_TYPE_3GPP2 ||
+                            mFileType == MediaFile.FILE_TYPE_AVI ||
+                            mFileType == MediaFile.FILE_TYPE_MPEG ||
                             mFileType == MediaFile.FILE_TYPE_OGG ||
                             mFileType == MediaFile.FILE_TYPE_MID ||
+                            mFileType == MediaFile.FILE_TYPE_DL ||
+                            mFileType == MediaFile.FILE_TYPE_DV ||
+                            mFileType == MediaFile.FILE_TYPE_FLI ||
+                            mFileType == MediaFile.FILE_TYPE_QT ||
+                            mFileType == MediaFile.FILE_TYPE_MXU ||
+                            mFileType == MediaFile.FILE_TYPE_LSF ||
+                            mFileType == MediaFile.FILE_TYPE_MNG ||
+                            mFileType == MediaFile.FILE_TYPE_ASF ||
+                            mFileType == MediaFile.FILE_TYPE_WM ||
+                            mFileType == MediaFile.FILE_TYPE_WMX ||
+                            mFileType == MediaFile.FILE_TYPE_WVX ||
+                            mFileType == MediaFile.FILE_TYPE_MOVIE ||
                             mFileType == MediaFile.FILE_TYPE_WMA) {
                         // we only extract metadata from MP3, M4A, OGG, MID and WMA files.
                         // check MP4 files, to determine if they contain only audio.
