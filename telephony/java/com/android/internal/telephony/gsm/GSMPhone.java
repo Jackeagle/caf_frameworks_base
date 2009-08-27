@@ -1162,7 +1162,9 @@ public class GSMPhone extends PhoneBase {
     }
 
     public boolean enableDataConnectivity() {
-        return mDataConnection.setDataEnabled(true);
+       Settings.System.putInt(getContext().getContentResolver(),Settings.System.
+             SOCKET_DATA_CALL_ENABLE,1);
+       return mDataConnection.setDataEnabled(true);
     }
 
     public int enableApnType(String type) {
@@ -1174,7 +1176,9 @@ public class GSMPhone extends PhoneBase {
     }
 
     public boolean disableDataConnectivity() {
-        return mDataConnection.setDataEnabled(false);
+       Settings.System.putInt(getContext().getContentResolver(),Settings.System.
+             SOCKET_DATA_CALL_ENABLE,0);
+       return mDataConnection.setDataEnabled(false);
     }
 
     public String getInterfaceName(String apnType) {

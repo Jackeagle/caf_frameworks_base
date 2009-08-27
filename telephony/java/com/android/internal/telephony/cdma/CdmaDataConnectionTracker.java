@@ -348,6 +348,11 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             return true;
         }
 
+        if (!getSocketDataCallEnabled()) {
+            Log.i(LOG_TAG, "Socket data call is disabled");
+            return false;
+        }
+
         int psState = mCdmaPhone.mSST.getCurrentCdmaDataConnectionState();
         boolean roaming = phone.getServiceState().getRoaming();
         boolean desiredPowerState = mCdmaPhone.mSST.getDesiredPowerState();
