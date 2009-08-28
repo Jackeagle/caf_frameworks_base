@@ -642,7 +642,11 @@ public class AudioManager {
     public void setSpeakerphoneOn(boolean on){
         // Temporary fix for issue #1713090 until audio routing is refactored in eclair release.
         // MODE_INVALID indicates to AudioService that setRouting() was initiated by AudioManager
-        setRoutingP(MODE_INVALID, on ? ROUTE_SPEAKER: 0, ROUTE_SPEAKER);
+        if (isDualMicrophoneOn()) {
+            setDualMicrophoneOn(true, on);
+        } else {
+            setRoutingP(MODE_INVALID, on ? ROUTE_SPEAKER: 0, ROUTE_SPEAKER);
+        }
     }
 
     /**
