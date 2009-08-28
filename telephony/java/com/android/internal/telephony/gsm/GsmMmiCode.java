@@ -453,6 +453,20 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
      * AND conditions are correct for it to be treated as such.
      */
     static private boolean isShortCode(String dialString, GSMPhone phone) {
+        //check for any  Adapt change requirements.
+        String adaptProp = SystemProperties.get("persist.cust.tel.adapt") ;
+        boolean  shortCodeExclusionFlag = false;
+        if (adaptProp != null && adaptProp.length() != 0) {
+              try {
+                  if (Integer.valueOf(adaptProp) == 1 && dialString.length() == 2) {
+                  Log.i(LOG_TAG,"Adapt, Number needs to be checked for short code exclusion list");
+                  shortCodeExclusionFlag= isExcludedShortCode( dialString);
+                  }
+              }
+              catch(Exception e){
+                  Log.e(LOG_TAG,"Exception while reading value of Adapt Feature flag" + e);
+              }
+        }
         // Refer to TS 22.030 Figure 3.5.3.2:
         // A 1 or 2 digit "short code" is treated as USSD if it is entered while on a call or
         // does not satisfy the condition (exactly 2 digits && starts with '1').
@@ -460,12 +474,23 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                 && !PhoneNumberUtils.isEmergencyNumber(dialString)
                 && (phone.isInCall()
                     || !((dialString.length() == 2 && dialString.charAt(0) == '1')
+                         || shortCodeExclusionFlag
                          /* While contrary to TS 22.030, there is strong precendence
                           * for treating "0" and "00" as call setup strings.
                           */
                          || dialString.equals("0")
                          || dialString.equals("00"))));
+
     }
+
+    /**
+     *  return true if the Short Code needs to be excluded as part of Adapt requirements
+     */
+    static boolean isExcludedShortCode(String dialString) {
+        return ( (dialString.charAt(0) == '*' || dialString.charAt(0) == '#')
+                 &&  (dialString.charAt(1) >= '1' &&  dialString.charAt(1) <= '9'));
+    }
+
     /**
      * @return true if the Service Code is PIN/PIN2/PUK/PUK2-related
      */
