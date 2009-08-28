@@ -45,11 +45,11 @@ interface FmRxEvCallbacks {
     public void FmRxEvGetSignalThreshold();
     public void FmRxEvSearchInProgress();
     public void FmRxEvSearchRdsInProgress();
-    public void FmRxEvSerachListInProgress();
-    public void FmRxEvSerachComplete();
-    public void FmRxEvSerachRdsComplete();
-    public void FmRxEvSerachListComplete();
-    public void FmRxEvSerachCancelled();
+    public void FmRxEvSearchListInProgress();
+    public void FmRxEvSearchComplete(double freq);
+    public void FmRxEvSearchRdsComplete();
+    public void FmRxEvSearchListComplete();
+    public void FmRxEvSearchCancelled();
     public void FmRxEvRdsGroupData();
     public void FmRxEvRdsPsInfo(StringBuffer PSData);
     public void FmRxEvRdsRtInfo(StringBuffer RTData);

@@ -33,10 +33,11 @@ import android.util.Log;
 
 class FmRxEventListner {
 
-    FmRxEventType rxEvent;
-    private final int READY_EVENT = 0x01;
-    private final int TUNE_EVENT = 0x02;
-    private final int SEEK_COMPLETE_EVENT = 0x03;
+    FmRxEventType mRxEvent;
+    private final int EVENT_LISTEN = 2;
+    private final int READY_EVENT = 0x00;
+    private final int TUNE_EVENT = 0x01;
+    private final int SEEK_COMPLETE_EVENT = 0x02;
     private final int MUTE_EVENT = 0x04;
     private final int RDS_EVENT = 0x08;
     private Thread mThread;
@@ -48,17 +49,17 @@ class FmRxEventListner {
                 while (true) {
                     byte []buff = new byte[128];
                     Log.d("Rec Events", "Starting the listen " + fd);
-                    int i =FmReceiverJNI.listenForEventsNative(fd, buff, 5);
+                    int i =FmReceiverJNI.listenForEventsNative(fd, buff, EVENT_LISTEN);
                     Log.d("Receiver Events", "Returned with " +buff[0]+ " event. Int:" + i);
                     switch(buff[0]){
                     case READY_EVENT:
                         cb.FmRxEvEnableReceiver();
-                    break;
+                        break;
                     case TUNE_EVENT:
                         cb.FmRxEvRadioTuneStatus();
                         break;
                     case SEEK_COMPLETE_EVENT:
-                        cb.FmRxEvSerachComplete();
+                        cb.FmRxEvSearchComplete(FmReceiverJNI.getFrequencyNative(fd));
                         break;
                     case RDS_EVENT:
                         Log.d("Receiver Events", "Returned with new RDS tx event.");

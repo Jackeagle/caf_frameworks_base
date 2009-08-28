@@ -45,7 +45,7 @@
 #define SEARCH_UP 0
 #define SEARCH_DOWN 1
 #define TUNE_MULT 16000.
-enum search_t {
+enum search_dir_t {
     SEEK_UP,
     SEEK_DN,
     SCAN_UP,
@@ -59,17 +59,24 @@ static jint android_hardware_FMRxAPI_FmReceiverJNI_acquireFdNative
         (JNIEnv* env, jobject thiz, jstring path)
 {
     int fd;
-    const char* radio_path = env->GetStringUTFChars(path, NULL);
+    jboolean isCopy;
+    const char* radio_path = env->GetStringUTFChars(path, &isCopy);
     if(radio_path == NULL){
         fd = open(RADIO, O_RDONLY);
+        if(fd < 0){
+          return FM_JNI_FAILURE;
+        }
+        return fd;
     }
     else{
         fd = open(radio_path, O_RDONLY);
     }
     if(fd < 0){
-         return FM_JNI_FAILURE;
+        return FM_JNI_FAILURE;
     }
-    env->ReleaseStringUTFChars(path, NULL);
+    if(isCopy == JNI_TRUE){
+        env->ReleaseStringUTFChars(path, radio_path);
+    }
     return fd;
 }
 
@@ -103,11 +110,13 @@ static jdouble android_hardware_FMRxAPI_FmReceiverJNI_getFrequencyNative
     (JNIEnv * env, jobject thiz, jint fd)
 {
     int err;
-    unsigned long fq;
     struct v4l2_frequency freq;
     freq.type = V4L2_TUNER_RADIO;
-    fq = (double)ioctl(fd, VIDIOC_G_FREQUENCY, &freq);
-    return (TUNE_MULT/fq);
+    err = (double)ioctl(fd, VIDIOC_G_FREQUENCY, &freq);
+    if(err < 0){
+      return FM_JNI_FAILURE;
+    }
+    return (freq.frequency/TUNE_MULT);
 }
 
 /* native interface */
@@ -147,15 +156,17 @@ static jint android_hardware_FMRxAPI_FmReceiverJNI_seekScanControlNative
 (JNIEnv * env, jobject thiz, jint fd, jint searchControl, jint dwell_time)
 {
     int ret;
-    switch((enum search_t)searchControl)
+    switch(searchControl)
     {
     /* Seek Up */
     case SEEK_UP:
-        ret=seekScan(fd,SEEK,SEARCH_UP,dwell_time);
+        ret=3;
+	    seekScan(fd,SEEK,SEARCH_UP,dwell_time);
         break;
     /* Seek Down */
     case SEEK_DN:
-        ret=seekScan(fd,SEEK,SEARCH_DOWN,dwell_time);
+    	ret =4;
+        seekScan(fd,SEEK,SEARCH_DOWN,dwell_time);
         break;
     /* Scan Up */
     case SCAN_UP:
