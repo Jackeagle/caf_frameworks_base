@@ -29,22 +29,18 @@
 
 package com.android.internal.app;
 
+import java.util.TimerTask;
+
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.IMountService;
-import android.os.Message;
-import android.os.RemoteException;
-import android.os.ServiceManager;
-import android.widget.Toast;
 import android.util.Log;
-import android.location.LocationManager;
-import com.android.internal.location.GpsLocationProvider;
 import com.android.internal.location.GpsNetInitiatedHandler;
 
 /**
@@ -65,10 +61,21 @@ public class NetInitiatedActivity extends AlertActivity implements DialogInterfa
     public static final String BUTTON_TEXT_ACCEPT = "Accept";
     public static final String BUTTON_TEXT_DENY = "Deny";
 
-    // Received ID from intent, -1 when no notification is in progress
-    private int notificationId = -1;
+    /** Received ID from intent, -1 when no notification is in progress */
+    private int mNotificationId = -1;
 
-    /** Used to detect when NI request is received */
+    /**
+     * Default response when timeout. This value should match the constants
+     * defined in GpsNetInitiatedHandler and GpsUserResponseType in gps_ni.h.
+     */
+    private int mDefaultResponse = GpsNetInitiatedHandler.GPS_NI_RESPONSE_NORESP;
+
+    /** Total timeout time in seconds, 0 for no timeout handling.  */
+    private int mTimeout = 0;
+
+    /** Remaining time */
+    private long mStartTime = 0L;
+    /** Used to detect when NI request as a broadcast intent, not used yet */
     private BroadcastReceiver mNetInitiatedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -79,6 +86,75 @@ public class NetInitiatedActivity extends AlertActivity implements DialogInterfa
         }
     };
 
+    /** Used to handle response timeout */
+    private Handler mHandler= new Handler();
+
+    // Timer task class
+    abstract class UpdateTimeTask extends TimerTask {
+        public abstract void displayRemainTime(int minutes, int seconds);
+        public abstract void onTimeOut();
+        public void run() {
+            long millis = System.currentTimeMillis() - mStartTime;
+            int totalRemainSeconds = mTimeout - (int) (millis / 1000);
+            int minutes = totalRemainSeconds / 60;
+            int secs = totalRemainSeconds % 60;
+
+            mHandler.removeCallbacks(mUpdateTimeTask);
+
+            displayRemainTime(minutes, secs);
+
+            if (totalRemainSeconds <= 0)
+            {
+                onTimeOut();
+            }
+            else {
+                mHandler.postDelayed(mUpdateTimeTask, 1000);
+            }
+        }
+    }
+
+    // Timer handling routines
+    private UpdateTimeTask mUpdateTimeTask = new UpdateTimeTask() {
+        /**
+         * Handles remaining time display on the Activity.
+         */
+        public void displayRemainTime(int minutes, int seconds) {
+            // Handle remaining time diplay
+            int whichButton;
+            String btnText;
+
+            if (DEBUG) Log.d(TAG, "Remaining time: " + minutes + "m " + seconds + "s");
+
+            if (mDefaultResponse == GpsNetInitiatedHandler.GPS_NI_RESPONSE_ACCEPT)
+            {
+                whichButton = POSITIVE_BUTTON;
+                btnText = BUTTON_TEXT_ACCEPT + " (" + seconds + ")";
+            }
+            else {
+                whichButton = NEGATIVE_BUTTON;
+                btnText = BUTTON_TEXT_DENY + " (" + seconds + ")";
+            }
+
+            mAlert.getButton(whichButton).setText(btnText);
+        }
+
+        /**
+         * Handles user response timeout.
+         *
+         * Usually, this routine should send a response when user input timed out.
+         * However, if the GPS driver (under HAL) can handle timeout responses
+         * automatically, this routine can simply close the dialog.
+         */
+        public void onTimeOut() {
+            Log.i(TAG, "User response timeout.");
+
+            // Sending either GPS_NI_RESPONSE_NORESP or mDefaultResponse will be OK.
+            sendUserResponse(mDefaultResponse);
+
+            // Close the dialog
+            finishDialog();
+        }
+    };
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -86,7 +162,7 @@ public class NetInitiatedActivity extends AlertActivity implements DialogInterfa
         // Set up the "dialog"
         final Intent intent = getIntent();
         final AlertController.AlertParams p = mAlertParams;
-        p.mIconId = com.android.internal.R.drawable.ic_dialog_usb;
+        p.mIconId = com.android.internal.R.drawable.ic_dialog_alert; /* TODO change the icon */
         p.mTitle = intent.getStringExtra(GpsNetInitiatedHandler.NI_INTENT_KEY_TITLE);
         p.mMessage = intent.getStringExtra(GpsNetInitiatedHandler.NI_INTENT_KEY_MESSAGE);
         p.mPositiveButtonText = BUTTON_TEXT_ACCEPT;
@@ -94,9 +170,19 @@ public class NetInitiatedActivity extends AlertActivity implements DialogInterfa
         p.mNegativeButtonText = BUTTON_TEXT_DENY;
         p.mNegativeButtonListener = this;
 
-        notificationId = intent.getIntExtra(GpsNetInitiatedHandler.NI_INTENT_KEY_NOTIF_ID, -1);
-        if (DEBUG) Log.d(TAG, "onCreate, notifId: " + notificationId);
+        mNotificationId = intent.getIntExtra(GpsNetInitiatedHandler.NI_INTENT_KEY_NOTIF_ID, -1);
+        mTimeout = intent.getIntExtra(GpsNetInitiatedHandler.NI_INTENT_KEY_TIMEOUT, 0);
+        mDefaultResponse = intent.getIntExtra(GpsNetInitiatedHandler.NI_INTENT_KEY_DEFAULT_RESPONSE,
+                GpsNetInitiatedHandler.GPS_NI_RESPONSE_NORESP);
 
+        if (DEBUG) Log.d(TAG, "onCreate, notifId: " + mNotificationId + ", timeout: " + mTimeout);
+
+        // Set up timer
+        mStartTime = System.currentTimeMillis();
+        mHandler.removeCallbacks(mUpdateTimeTask);
+        mHandler.postDelayed(mUpdateTimeTask, 1000);
+
+        // setup dialog
         setupAlert();
     }
 
@@ -128,8 +214,18 @@ public class NetInitiatedActivity extends AlertActivity implements DialogInterfa
         }
 
         // No matter what, finish the activity
-        finish();
-        notificationId = -1;
+        finishDialog();
+    }
+
+    // Finish the dialog
+    private synchronized void finishDialog()
+    {
+        mHandler.removeCallbacks(mUpdateTimeTask);
+        if (mNotificationId != -1)
+        {
+            mNotificationId = -1;
+            finish();
+        }
     }
 
     // Respond to NI Handler under GpsLocationProvider, 1 = accept, 2 = deny
@@ -138,19 +234,16 @@ public class NetInitiatedActivity extends AlertActivity implements DialogInterfa
 
       LocationManager locationManager = (LocationManager)
       this.getSystemService(Context.LOCATION_SERVICE);
-      locationManager.sendNiResponse(notificationId, response);
+        locationManager.sendNiResponse(mNotificationId, response);
     }
 
     private void handleNIVerify(Intent intent) {
      int notifId = intent.getIntExtra(GpsNetInitiatedHandler.NI_INTENT_KEY_NOTIF_ID, -1);
-     notificationId = notifId;
+        mNotificationId = notifId;
 
      if (DEBUG) Log.d(TAG, "handleNIVerify action: " + intent.getAction());
     }
 
-    private void showNIError() {
-        Toast.makeText(this, "NI error" /* com.android.internal.R.string.usb_storage_error_message */,
-          Toast.LENGTH_LONG).show();
-    }
+
 
 }

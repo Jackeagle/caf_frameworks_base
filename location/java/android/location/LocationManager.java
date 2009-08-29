@@ -1322,12 +1322,13 @@ public class LocationManager {
      * {@hide}
      */
     public boolean sendNiResponse(int notifId, int userResponse) {
+        boolean rc = false;
         try {
-            return mService.sendNiResponse(notifId, userResponse);
+            rc= mService.sendNiResponse(notifId, userResponse);
         } catch (RemoteException e) {
             Log.e(TAG, "RemoteException in sendNiResponse: ", e);
-            return false;
         }
+       return rc;
      }
 
 }
