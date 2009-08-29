@@ -37,6 +37,7 @@ import android.util.Log;
 
 import java.io.File;
 import java.io.FileReader;
+import java.util.StringTokenizer;
 
 /**
  * MountService implements an to the mount service daemon
@@ -140,8 +141,22 @@ class MountService extends IMountService.Stub {
             /* Add path to the mount point list */
             if (mountPointList == null)
                 mountPointList = mount_point_value;
-            else
-                mountPointList = mountPointList +  mount_point_value;
+            else {
+                /* if mount point is already exist in the
+                 * safe removal mount point list then don't add it again
+                 */
+                boolean mountPointExist = false;
+                StringTokenizer st = new StringTokenizer(mountPointList, ":");
+                while (st.hasMoreElements()) {
+                    String mountPoint = st.nextToken();
+                    if (path.equals(mountPoint)) {
+                        mountPointExist = true;
+                        break;
+                    }
+                }
+                if (!mountPointExist)
+                    mountPointList = mountPointList +  mount_point_value;
+            }
         }
     }
 
@@ -193,7 +208,6 @@ class MountService extends IMountService.Stub {
         // Set a flag so that when we get the unmounted event, we know
         // to display the notification
         mShowSafeUnmountNotificationWhenUnmounted = true;
-
         // tell mountd to unmount the media
         mListener.ejectMedia(mountPath);
     }
