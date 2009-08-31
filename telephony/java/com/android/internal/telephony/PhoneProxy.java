@@ -518,6 +518,14 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.invokeOemRilRequestStrings(strings, response);
     }
 
+    public void setOnUnsolOemHookRaw(Handler h, int what, Object obj) {
+        mActivePhone.setOnUnsolOemHookRaw(h, what, obj);
+    }
+
+    public void unSetOnUnsolOemHookRaw(Handler h) {
+        mActivePhone.unSetOnUnsolOemHookRaw(h);
+    }
+
     /**
      * @deprecated
      */

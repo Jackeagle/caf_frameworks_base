@@ -1113,6 +1113,22 @@ public interface Phone {
     void invokeOemRilRequestStrings(String[] strings, Message response);
 
     /**
+     * Register for RIL_UNSOL_OEM_HOOK_RAW responses from RIL
+     *
+     * @param h Handler that receives the notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void setOnUnsolOemHookRaw(Handler h, int what, Object obj);
+
+    /**
+     * Unregister a RIL_UNSOL_OEM_HOOK_RAW response handler
+     *
+     * @param h Handler to be removed from the registrant list.
+     */
+    void unSetOnUnsolOemHookRaw(Handler h);
+
+    /**
      * Get the current active PDP context list
      *
      * @deprecated
