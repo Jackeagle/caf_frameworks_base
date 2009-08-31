@@ -174,9 +174,6 @@ public class ExifInterface {
      * Model -> Nikon. Numeric values are returned as strings.
      */
     public HashMap<String, String> getAttributes() {
-        if (mCachedAttributes != null) {
-            return mCachedAttributes;
-        }
         // format of string passed from native C code:
         // "attrCnt attr1=valueLen value1attr2=value2Len value2..."
         // example:
