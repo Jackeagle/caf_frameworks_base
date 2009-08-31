@@ -357,15 +357,25 @@ public class IccProvider extends ContentProvider {
         if (adnRecords != null) {
             // Load the results
 
-            int N = adnRecords.size();
-            if (DBG) log("adnRecords.size=" + N);
-            List newAdn = new ArrayList(adnRecords);
-            newAdn = adnRecords;
-            //Sort the list in ascending order of names.
-            Collections.sort(newAdn,mAdnComparator);
-            for (int i = 0; i < N ; i++) {
-                loadRecord(adnRecords.get(i), results);
-            }
+           int N = adnRecords.size();
+           if (DBG) log("adnRecords.size=" + N);
+           //Making a local copy of records which are non empty
+           List newAdn = new ArrayList<AdnRecord>();
+           for (int i = 0; i < N ; i++) {
+              AdnRecord record = adnRecords.get(i);
+              if (!record.isEmpty()) {
+                 newAdn.add(record);
+              }
+           }
+           //Sort the list in ascending order of names
+           Collections.sort(newAdn,mAdnComparator);
+
+           if (DBG) log("loadFromEf: results =" + newAdn);
+
+           N = newAdn.size();
+           for (int i = 0; i < N ; i++) {
+              loadRecord((AdnRecord)newAdn.get(i), results);
+           }
         } else {
             // No results to load
             Log.w(TAG, "Cannot load ADN records");
