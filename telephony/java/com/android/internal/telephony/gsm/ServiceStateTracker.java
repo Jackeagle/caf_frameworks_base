@@ -835,10 +835,11 @@ final class ServiceStateTracker extends Handler
                                 opNames[0], opNames[1], opNames[2]);
                         newRegPlmn = newSS.getOperatorNumeric();
                         if((phone.mSIMRecords.getOnsAlg() == EONS_ALG) &&
-                           (newRegPlmn != null) && !newRegPlmn.equals(prevRegPlmn)) {
-                           phone.mSIMRecords.updateSimRecords();
+                           (newRegPlmn != null) && (newRegPlmn.trim().length() != 0)
+                           && !newRegPlmn.equals(prevRegPlmn)) {
                            Log.i(EONS_TAG,"Calling updateSimRecords() if plmn changed, prev plmn "
                                  + prevRegPlmn + ", new plmn " + newRegPlmn);
+                           phone.mSIMRecords.updateSimRecords(1);
                            prevRegPlmn = newRegPlmn;
                         }
                     }
@@ -1122,7 +1123,7 @@ final class ServiceStateTracker extends Handler
                 *Update all cached OPL/PNN records if LAC changes
                */
                Log.i(EONS_TAG,"LOC updated calling updateSimRecords()");
-               phone.mSIMRecords.updateSimRecords();
+               phone.mSIMRecords.updateSimRecords(0);
             }
         }
 

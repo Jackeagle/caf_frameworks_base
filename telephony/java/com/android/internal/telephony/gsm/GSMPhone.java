@@ -153,6 +153,7 @@ public class GSMPhone extends PhoneBase {
     static final int EVENT_SET_CLIR_COMPLETE = 17;
     static final int EVENT_REGISTERED_TO_NETWORK = 18;
     static final int EVENT_SET_VM_NUMBER_DONE = 19;
+    static final int EVENT_GET_NETWORKS_DONE = 200;
 
     //***** Constructors
 
@@ -1037,7 +1038,9 @@ public class GSMPhone extends PhoneBase {
 
     public void 
     getAvailableNetworks(Message response) {
-        mCM.getAvailableNetworks(response);
+        Message msg;
+        msg = h.obtainMessage(EVENT_GET_NETWORKS_DONE,response);
+        mCM.getAvailableNetworks(msg);
     }
 
     /**
@@ -1520,6 +1523,27 @@ public class GSMPhone extends PhoneBase {
                     if (onComplete != null) {
                         AsyncResult.forMessage(onComplete, ar.result, ar.exception);
                         onComplete.sendToTarget();
+                    }
+                    break;
+
+                case EVENT_GET_NETWORKS_DONE:
+                    ar = (AsyncResult)msg.obj;
+                    ArrayList<NetworkInfo> eonsNWNames = null;
+                    onComplete = (Message) ar.userObj;
+                    if (onComplete != null) {
+                       eonsNWNames =
+                          mSIMRecords.getEonsAvailableNetworks((ArrayList<NetworkInfo>)ar.result);
+                       if (eonsNWNames != null) {
+                          Log.i(LOG_TAG, "In EVENT_GET_NETWORKS_DONE, populated EONS names");
+                          AsyncResult.forMessage(onComplete, eonsNWNames, ar.exception);
+                       }
+                       else {
+                          AsyncResult.forMessage(onComplete, ar.result, ar.exception);
+                       }
+                       onComplete.sendToTarget();
+                    }
+                    else {
+                       Log.e(LOG_TAG, "In EVENT_GET_NETWORKS_DONE, onComplete is null");
                     }
                     break;
             }
