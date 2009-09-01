@@ -718,6 +718,11 @@ int EventHub::open_device(const char *deviceName)
         }
     }
 
+#ifdef QCOM_TEST_ONLY
+    /* Workaround for non-touchscreen devices to work without app resources */
+    device->classes |= CLASS_TOUCHSCREEN;
+#endif
+
 #ifdef EV_SW
     // figure out the switches this device reports
     uint8_t sw_bitmask[(SW_MAX+1)/8];
