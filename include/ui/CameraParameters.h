@@ -83,9 +83,6 @@ public:
     /* Digital Zoom control */
     float getZoomValue() const;
 
-    /* Check if Camera is Enabled */
-    int getCameraEnabledVal() const;
-
     void dump() const;
     status_t dump(int fd, const Vector<String16>& args) const;
 

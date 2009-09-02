@@ -321,13 +321,4 @@ float CameraParameters::getZoomValue() const
          return 0;
     }
 }
-
-int CameraParameters::getCameraEnabledVal() const
-{
-    LOGD(" Camera_Enabled value is  %s ", get("camera_enabled"));
-    if( (NULL == get("camera_enabled") ) )
-        return 0;
-    else
-       return atoi(get("camera_enabled"));
-}
 }; // namespace android
