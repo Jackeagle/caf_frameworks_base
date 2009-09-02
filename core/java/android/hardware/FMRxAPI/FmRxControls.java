@@ -109,7 +109,8 @@ class FmRxControls {
         default:
             break;
         }
-        FmReceiverJNI.seekScanControlNative(fd, type, 2);
+        int re = FmReceiverJNI.seekScanControlNative(fd, type, 2);
+        Log.d("FmControl","Seek ret:" + re);
     }
 
     public void searchRdsStations(FmRxSrchMode mode,FmRxScanTime dwelling,
