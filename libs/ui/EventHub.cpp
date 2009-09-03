@@ -718,7 +718,7 @@ int EventHub::open_device(const char *deviceName)
         }
     }
 
-#ifdef QCOM_TEST_ONLY
+#ifdef SURF7X30
     /* Workaround for non-touchscreen devices to work without app resources */
     device->classes |= CLASS_TOUCHSCREEN;
 #endif
