@@ -38,6 +38,11 @@ ifneq (, $(filter qsd8250_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DFFA8K
 endif
 
+ifneq (, $(filter msm7630_surf, $(TARGET_PRODUCT)))
+  LOCAL_CFLAGS += -DSURF7X30
+endif
+
+
 ifeq ($(BOARD_USE_QCOM_TESTONLY),true)
   LOCAL_CFLAGS += -DQCOM_TEST_ONLY
 endif
