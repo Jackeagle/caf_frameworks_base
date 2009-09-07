@@ -3658,6 +3658,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
         if (android.util.Config.LOGV) {
             captureViewInfo("captureViewKeyEvent", this);
         }
+	if (android.util.Config.LOGD && Integer.valueOf(SystemProperties.get("GET_KEY_EVENTS")) == 1) {
+	    if (mContext.getResources() != null) {
+	        String st = "No name";
+		try {
+		    st = mContext.getResources().getResourceName(this.getId());
+		} catch (Exception e) {
+		    //do nothing
+		} finally {
+		    EventLog.writeEvent(70104,"Resource is: " + st + ", Event is: " + event.toString());
+		}
+	   }
+	}
 
         if (mOnKeyListener != null && (mViewFlags & ENABLED_MASK) == ENABLED
                 && mOnKeyListener.onKey(this, event.getKeyCode(), event)) {
@@ -3685,6 +3697,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
      * @return True if the event was handled by the view, false otherwise.
      */
     public boolean dispatchTouchEvent(MotionEvent event) {
+        if (android.util.Config.LOGD && Integer.valueOf(SystemProperties.get("GET_TOUCH_EVENTS")) == 1) {
+	    if (mContext.getResources() != null) {
+	        String st = "No name";
+	        try {
+	            st = mContext.getResources().getResourceName(this.getId());
+		} catch (Exception e) {
+		    //do nothing
+		} finally {
+		    EventLog.writeEvent(70103, "Resource is: " + st + " Event is: " + event.toString());
+		}
+	    }
+	}
+
         if (mOnTouchListener != null && (mViewFlags & ENABLED_MASK) == ENABLED &&
                 mOnTouchListener.onTouch(this, event)) {
             return true;
