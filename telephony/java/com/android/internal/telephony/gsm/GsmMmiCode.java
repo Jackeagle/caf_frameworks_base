@@ -680,8 +680,14 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                     } else {
                         facility = scToBarringFacility(sia);
                     }
-                    //phone.mCM.changeBarringPassword(facility, oldPwd, newPwd, pwd,
-                    //    obtainMessage(EVENT_SET_COMPLETE, this));
+                    if (newPwd.equals(pwd)) {
+                        phone.mCM.changeBarringPassword(facility, oldPwd,
+                             newPwd, obtainMessage(EVENT_SET_COMPLETE, this));
+                    }
+                    else {
+                       // password mismatch; return error
+                        handlePasswordError(com.android.internal.R.string.passwordIncorrect);
+                    }
                 } else {
                     throw new RuntimeException ("Invalid or Unsupported MMI Code");
                 }
