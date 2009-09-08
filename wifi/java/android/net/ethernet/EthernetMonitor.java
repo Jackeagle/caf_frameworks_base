@@ -40,26 +40,24 @@ public class EthernetMonitor {
     private NotificationManager mNotificationManager;
 
     /**
-     * Keep track of the last state of the ethernet device.
-     */
-    private static boolean last_state;
-
-    /**
      * Keep track of Context object.
      */
     private static Context mContext;
 
     /**
-      * The icon to show a connected ethernet connection.
+      * The icons to show a connected ethernet connection states.
       */
-    private static final int ICON_ETHERNET_CONNECTED =
-            com.android.internal.R.drawable.stat_sys_gps_on;
+    private static final int ICON_ETHERNET_DHCP_CONNECTED =
+            com.android.internal.R.drawable.rate_star_big_on;
+
+    private static final int ICON_ETHERNET_UP_CONNECTED =
+            com.android.internal.R.drawable.rate_star_big_half;
 
     /**
       * The icon to show a disconnected ethernet connection.
       */
     private static final int ICON_ETHERNET_DISCONNECTED =
-            com.android.internal.R.drawable.stat_sys_gps_acquiring;
+            com.android.internal.R.drawable.rate_star_big_off;
 
 
     public EthernetMonitor(Context context) {
@@ -78,29 +76,35 @@ public class EthernetMonitor {
         }
 
         public void run() {
-            last_state = false;
+            /**
+             * Keep last hash value of message to be sure
+             * we don't double report a message.
+             */
+            int message_hash = 0;
 
             for (;;) {
                 boolean status = EthernetNative.getEthernetStatus();
                 int icon;
                 CharSequence message;
 
-                nap(1);
-
                 /**
-                  * Don't notify if userspace already knows state
-                  */
-                if (last_state == status) {
-                    continue;
-                }
+                 * Poll every 500 milliseconds
+                 */
+                nap(500);
 
                 if (status) {
                     String address = EthernetNative.getEthernetAddress();
+
                     if (DBG)
                         Log.i(TAG, "Ethernet device link up");
 
-                    icon = ICON_ETHERNET_CONNECTED;
-                    message = "Ethernet connection is up at '" + address + "'";
+                    if (address.equals("0.0.0.0")) {
+                        icon = ICON_ETHERNET_UP_CONNECTED;
+                        message = "Ethernet connection is up without an IP address";
+                    } else {
+                        icon = ICON_ETHERNET_DHCP_CONNECTED;
+                        message = "Ethernet connection is up at '" + address + "'";
+                    }
                 } else {
                     if (DBG)
                         Log.i(TAG, "Ethernet device link down");
@@ -114,19 +118,22 @@ public class EthernetMonitor {
                         System.currentTimeMillis(),
                         message, "", null);
 
+                if (message_hash == n.hashCode())
+                    continue;
+
                 mNotificationManager.notify(1, n);
 
-                last_state = status;
+                message_hash = n.hashCode();
             }
         }
 
         /**
          * Sleep for a period of time.
-         * @param secs the number of seconds to sleep
+         * @param secs the number of millseconds to sleep
          */
-        private void nap(int secs) {
+        private void nap(int millisecs) {
             try {
-               Thread.sleep(secs * 1000);
+               Thread.sleep(millisecs);
             } catch (InterruptedException ignore) {
             }
         }
