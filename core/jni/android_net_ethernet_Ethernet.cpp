@@ -24,13 +24,35 @@
 #include <android_runtime/AndroidRuntime.h>
 #include <utils/Log.h>
 
+extern "C" {
+
+extern int ifc_init();
+extern void ifc_close();
+extern int ifc_get_info(const char *name, unsigned *addr, unsigned *mask, unsigned *flags);
+
+};
+
 /* TODO: Basic support for notifying userspace of a ethernet connection
  * At some point we need to expand to actually configuring from Android userspace
  */
 
 #define ETHERNET_PKG_NAME "android/net/ethernet/EthernetNative"
 
+
+
 namespace android {
+
+static const char *ipaddr(unsigned addr)
+{
+    static char buf[32];
+
+    sprintf(buf,"%d.%d.%d.%d",
+            addr & 255,
+            ((addr >> 8) & 255),
+            ((addr >> 16) & 255),
+            (addr >> 24));
+    return buf;
+}
 
 static jboolean android_net_ethernet_getEthernetStatus(JNIEnv* env, jobject clazz)
 {
@@ -54,11 +76,36 @@ static jboolean android_net_ethernet_getEthernetStatus(JNIEnv* env, jobject claz
 	return false;
 }
 
+static jstring android_net_ethernet_getEthernetAddress(JNIEnv* env, jobject clazz)
+{
+	char buf[PROPERTY_VALUE_MAX];
+	int len;
+	unsigned int addr, mask, flags;
+
+	len = property_get("net.device", buf, "");
+
+	if (!len)
+		return env->NewStringUTF(NULL);
+
+    if(ifc_init()) {
+		return env->NewStringUTF(NULL);
+	}
+
+    if(ifc_get_info(buf, &addr, &mask, &flags)) {
+		return env->NewStringUTF(NULL);
+    }
+
+    ifc_close();
+
+	return env->NewStringUTF(ipaddr(addr));
+}
+
 /*
  * JNI registration.
  */
 static JNINativeMethod gEthernetMethods[] = {
-	{ "getEthernetStatus", "()Z", (void*) android_net_ethernet_getEthernetStatus },
+    { "getEthernetStatus", "()Z", (void*) android_net_ethernet_getEthernetStatus },
+    { "getEthernetAddress", "()Ljava/lang/String;", (void*) android_net_ethernet_getEthernetAddress },
 };
 
 int register_android_net_ethernet_EthernetManager(JNIEnv* env)

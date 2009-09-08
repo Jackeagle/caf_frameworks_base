@@ -28,6 +28,7 @@ import android.net.MobileDataStateTracker;
 import android.net.NetworkInfo;
 import android.net.NetworkStateTracker;
 import android.net.wifi.WifiStateTracker;
+import android.net.ethernet.EthernetMonitor;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.Looper;
@@ -59,6 +60,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      */
     private NetworkStateTracker mNetTrackers[];
     private WifiStateTracker mWifiStateTracker;
+    private EthernetMonitor mEthernetMonitor;
     private MobileDataStateTracker mMobileDataStateTracker;
     private WifiWatchdogService mWifiWatchdogService;
 
@@ -146,6 +148,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         for (NetworkStateTracker t : mNetTrackers)
             t.startMonitoring();
+
+        mEthernetMonitor = new EthernetMonitor(context);
+        mEthernetMonitor.startMonitoring();
 
         // Constructing this starts it too
         mWifiWatchdogService = new WifiWatchdogService(context, mWifiStateTracker);
