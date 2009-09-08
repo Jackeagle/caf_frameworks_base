@@ -53,13 +53,13 @@ public class EthernetMonitor {
       * The icon to show a connected ethernet connection.
       */
     private static final int ICON_ETHERNET_CONNECTED =
-            com.android.internal.R.drawable.star_big_on;
+            com.android.internal.R.drawable.stat_sys_gps_on;
 
     /**
       * The icon to show a disconnected ethernet connection.
       */
     private static final int ICON_ETHERNET_DISCONNECTED =
-            com.android.internal.R.drawable.star_big_off;
+            com.android.internal.R.drawable.stat_sys_gps_acquiring;
 
 
     public EthernetMonitor(Context context) {

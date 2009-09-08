@@ -70,8 +70,8 @@ static jboolean android_net_ethernet_getEthernetStatus(JNIEnv* env, jobject claz
 
 	if (!strcmp(buf, "dhcp"))
 		return true;
-	else if (!strcmp(buf, "up"))
-		return true;
+	//else if (!strcmp(buf, "up"))
+	//	return true;
 
 	return false;
 }
