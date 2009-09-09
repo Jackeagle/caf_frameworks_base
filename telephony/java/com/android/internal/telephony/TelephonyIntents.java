@@ -244,4 +244,14 @@ public class TelephonyIntents {
     public static final String ACTION_CDMA_OTA_MDN_CHANGED
             = "android.intent.action.ACTION_MDN_STATE_CHANGED";
 
+    /**
+     * <p>Broadcast Action: It indicates the an RIL_UNSOL_OEM_HOOK_RAW message was received
+     * <p class="note">.
+     * This is to indicate OEM applications that an unsolicited OEM message was received.
+     *
+     * <p class="note">This is a protected intent that can only be sent
+     * by the system.
+     */
+    public static final String ACTION_UNSOL_RESPONSE_OEM_HOOK_RAW
+            = "android.intent.action.ACTION_UNSOL_RESPONSE_OEM_HOOK_RAW";
 }

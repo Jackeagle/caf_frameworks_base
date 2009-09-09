@@ -285,6 +285,14 @@ public abstract class PhoneBase implements Phone {
         mCM.unregisterForInCallVoicePrivacyOff(h);
     }
 
+    public void setOnUnsolOemHookRaw(Handler h, int what, Object obj){
+        mCM.setOnUnsolOemHookRaw(h,what,obj);
+    }
+
+    public void unSetOnUnsolOemHookRaw(Handler h){
+        mCM.unSetOnUnsolOemHookRaw(h);
+    }
+
     /**
      * Notifiy registrants of a new ringing Connection.
      * Subclasses of Phone probably want to replace this with a
