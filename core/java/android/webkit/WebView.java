@@ -4573,7 +4573,9 @@ public class WebView extends AbsoluteLayout
                 case SWITCH_TO_LONGPRESS: {
                     if (!mPreventDrag) {
                         mTouchMode = TOUCH_DONE_MODE;
-                        performLongClick();
+                        if (getParent() != null) {
+                           performLongClick();
+                        }
                         updateTextEntry();
                     }
                     break;
