@@ -141,6 +141,10 @@ bool LayerBuffer::transformed() const
     return false;
 }
 
+void LayerBuffer::updateCropRect(int mdpscaleflag, int l, int r,int t,int b)
+{
+    mSource->updateCropRect(mdpscaleflag, l,r,t,b);
+}
 /**
  * This creates a "buffer" source for this surface
  */
@@ -217,6 +221,7 @@ status_t LayerBuffer::SurfaceBuffer::onTransact(
         case REGISTER_BUFFERS:
         case UNREGISTER_BUFFERS:
         case CREATE_OVERLAY:
+        case UPDATE_CROPRECT:
         {
             // codes that require permission check
             IPCThreadState* ipc = IPCThreadState::self();
@@ -238,6 +243,12 @@ status_t LayerBuffer::SurfaceBuffer::onTransact(
     return LayerBaseClient::Surface::onTransact(code, data, reply, flags);
 }
 
+void LayerBuffer::SurfaceBuffer::updateCropRect(int mdpscaleflag, int t, int l, int r, int b)
+{
+    LayerBuffer* owner(getOwner());
+    if (owner)
+        return owner->updateCropRect(mdpscaleflag, t, l, r, b);
+}
 status_t LayerBuffer::SurfaceBuffer::registerBuffers(const ISurface::BufferHeap& buffers)
 {
     LayerBuffer* owner(getOwner());
@@ -283,10 +294,18 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers, ssize_t offset)
     : mBufferHeap(buffers)
 {
     NativeBuffer& src(mNativeBuffer);
-    src.crop.l = 0;
-    src.crop.t = 0;
-    src.crop.r = buffers.w;
-    src.crop.b = buffers.h;
+    if(buffers.mdpScaleFlag)
+    {
+        src.crop.l = buffers.cropRect.l;
+        src.crop.t = buffers.cropRect.t;
+        src.crop.r = buffers.cropRect.r;
+        src.crop.b = buffers.cropRect.b;
+    } else {
+        src.crop.l = 0;
+        src.crop.t = 0;
+        src.crop.r = buffers.w;
+        src.crop.b = buffers.h;
+    }
     src.img.w = buffers.hor_stride ?: buffers.w;
     src.img.h = buffers.ver_stride ?: buffers.h;
     src.img.format = buffers.format;
@@ -328,6 +347,8 @@ void LayerBuffer::Source::onVisibilityResolved(
 void LayerBuffer::Source::postBuffer(ssize_t offset) {
 }
 void LayerBuffer::Source::unregisterBuffers() {
+}
+void LayerBuffer::Source::updateCropRect(int a, int b , int c, int d , int e) {
 }
 bool LayerBuffer::Source::transformed() const {
     return mLayer.mTransformed; 
@@ -392,7 +413,14 @@ LayerBuffer::BufferSource::~BufferSource()
         LayerBase::deletedTextures.add(mTextureName);
     }
 }
-
+void LayerBuffer::BufferSource::updateCropRect(int mdpscaleflag, int l, int r, int t, int b)
+{
+    mBufferHeap.mdpScaleFlag = mdpscaleflag;
+    mBufferHeap.cropRect.l = l;
+    mBufferHeap.cropRect.r = r;
+    mBufferHeap.cropRect.t = t;
+    mBufferHeap.cropRect.b = b;
+}
 void LayerBuffer::BufferSource::postBuffer(ssize_t offset)
 {    
     ISurface::BufferHeap buffers;

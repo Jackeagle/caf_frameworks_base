@@ -27,6 +27,9 @@ namespace android {
 /** Callback for startPreview() */
 typedef void (*preview_callback)(const sp<IMemory>& mem, int index, void* user);
 
+/** callback from zoom crop rect update for surface flinger */
+typedef void (*zoomUpScale_callback)(void* croprect, void* user);
+
 /** Callback for startRecord() */
 typedef void (*recording_callback)(nsecs_t timestamp, const sp<IMemory>& mem, void* user);
 
@@ -96,7 +99,9 @@ public:
      * preview_callback is called with the user parameter. The
      * call back parameter may be null.
      */
-    virtual status_t    startPreview(preview_callback cb, void* user) = 0;
+   virtual status_t    startPreview(preview_callback cb,
+                                        zoomUpScale_callback zcb,
+                                        void* user) = 0;
     /**
      * Only used if overlays are used for camera preview.
      */

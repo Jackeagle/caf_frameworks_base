@@ -32,6 +32,7 @@ ISurface::BufferHeap::BufferHeap()
     transform(0), flags(0) 
 {     
     htype = SINGLE_HEAP;
+    mdpScaleFlag = MDP_SCALE_FLAG_OFF;
 }
 
 ISurface::BufferHeap::BufferHeap(uint32_t w, uint32_t h,
@@ -41,6 +42,7 @@ ISurface::BufferHeap::BufferHeap(uint32_t w, uint32_t h,
       format(format), transform(0), flags(0), heap(heap) 
 {
     htype = SINGLE_HEAP;
+    mdpScaleFlag = MDP_SCALE_FLAG_OFF;
 }
 
 ISurface::BufferHeap::BufferHeap(uint32_t w, uint32_t h,
@@ -51,6 +53,7 @@ ISurface::BufferHeap::BufferHeap(uint32_t w, uint32_t h,
           format(format), transform(transform), flags(flags), heap(heap)
 {
     htype = SINGLE_HEAP;
+    mdpScaleFlag = MDP_SCALE_FLAG_OFF;
 }
 
 ISurface::BufferHeap::BufferHeap(uint32_t w, uint32_t h,
@@ -66,6 +69,7 @@ ISurface::BufferHeap::BufferHeap(uint32_t w, uint32_t h,
     heaps[2] = heap2;
     heaps[3] = heap3;
     htype = MULTI_HEAP;
+    mdpScaleFlag = MDP_SCALE_FLAG_OFF;
 }
 
 ISurface::BufferHeap::~BufferHeap() 
@@ -111,6 +115,17 @@ public:
         data.writeInterfaceToken(ISurface::getInterfaceDescriptor());
         data.writeInt32(offset);
         remote()->transact(POST_BUFFER, data, &reply, IBinder::FLAG_ONEWAY);
+    }
+    virtual void updateCropRect(int mdpscaleflag, int l , int r, int t, int b)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurface::getInterfaceDescriptor());
+        data.writeInt32(mdpscaleflag);
+        data.writeInt32(l);
+        data.writeInt32(r);
+        data.writeInt32(t);
+        data.writeInt32(b);
+        remote()->transact(UPDATE_CROPRECT, data, &reply, IBinder::FLAG_ONEWAY);
     }
 
     virtual void unregisterBuffers()
@@ -187,6 +202,15 @@ status_t BnSurface::onTransact(
             sp<OverlayRef> o = createOverlay(w, h, f);
             return OverlayRef::writeToParcel(reply, o);
         } break;
+        case UPDATE_CROPRECT: {
+            CHECK_INTERFACE(ISurface, data, reply);
+            int mdpscaleflag = data.readInt32();
+            int l = data.readInt32();
+            int r = data.readInt32();
+            int t = data.readInt32();
+            int b = data.readInt32();
+            updateCropRect(mdpscaleflag,l,r,t,b);
+            }break;
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }

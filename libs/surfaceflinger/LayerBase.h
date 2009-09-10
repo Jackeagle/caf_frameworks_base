@@ -339,6 +339,8 @@ public:
                 uint32_t w, uint32_t h, int32_t format) {
             return NULL;
         };
+        void updateCropRect(int mdpscaleflag, int l, int r,int t,int b) {};
+
 
     private:
         ISurfaceFlingerClient::surface_data_t mParams;

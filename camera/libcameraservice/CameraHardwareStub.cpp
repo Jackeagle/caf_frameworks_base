@@ -167,7 +167,7 @@ int CameraHardwareStub::previewThread()
     return NO_ERROR;
 }
 
-status_t CameraHardwareStub::startPreview(preview_callback cb, void* user)
+status_t CameraHardwareStub::startPreview(preview_callback cb, zoomUpScale_callback zcb, void* user)
 {
     Mutex::Autolock lock(mLock);
     if (mPreviewThread != 0) {

@@ -33,7 +33,7 @@ public:
     virtual sp<IMemoryHeap> getPreviewHeapnew(int i) const;
     virtual sp<IMemoryHeap> getRawHeap() const;
 
-    virtual status_t    startPreview(preview_callback cb, void* user);
+    virtual status_t    startPreview(preview_callback cb, zoomUpScale_callback zcb, void* user);
     virtual void        stopPreview();
     virtual bool        previewEnabled();
 

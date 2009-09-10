@@ -596,9 +596,9 @@ status_t CameraService::Client::startPreviewMode()
             ret = setOverlay();
         }
         if (ret != NO_ERROR) return ret;
-        ret = mHardware->startPreview(NULL, mCameraService.get());
+        ret = mHardware->startPreview(NULL, NULL, mCameraService.get());
     } else {
-        ret = mHardware->startPreview(previewCallback,
+        ret = mHardware->startPreview(previewCallback,zoomUpScale_callback,
                                       mCameraService.get());
         if (ret != NO_ERROR) return ret;
         // If preview display has been set, register preview buffers now.
@@ -756,6 +756,24 @@ static void dump_to_file(const char *fname,
     ::close(fd);
 }
 #endif
+
+void CameraService::Client::zoomUpScale_callback(void* croprect, void* user)
+{
+    LOGE("zoomUpScale_callback");
+    status_t result;
+    sp<Client> client = getClientFromCookie(user);
+    if (client == 0) {
+        return;
+    }
+    copybit_rect_t crop_rect = *(copybit_rect_t*)croprect;
+
+    if(crop_rect.r >0 && crop_rect.b >0){
+        // pass the crop params to surface flinger
+        LOGV("in zoomUpscale_callback : updating crop rect.");
+        LOGV("croprect : l = %d r = %d t = %d b = %d ", crop_rect.l, crop_rect.r, crop_rect.t, crop_rect.b);
+        client->mSurface->updateCropRect(MDP_SCALE_FLAG_ON, crop_rect.l, crop_rect.r, crop_rect.t, crop_rect.b);
+    }
+}
 
 // preview callback - frame buffer update
 void CameraService::Client::previewCallback(const sp<IMemory>& mem, int index, void* user)

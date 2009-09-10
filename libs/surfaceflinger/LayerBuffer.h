@@ -47,6 +47,7 @@ class LayerBuffer : public LayerBaseClient
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual bool transformed() const;
+        virtual void updateCropRect(int mdpscaleflag, int l, int r,int t,int b);
     protected:
         LayerBuffer& mLayer;
     };
@@ -74,6 +75,7 @@ public:
     void postBuffer(ssize_t offset);
     void unregisterBuffers();
     sp<OverlayRef> createOverlay(uint32_t w, uint32_t h, int32_t format);
+    void updateCropRect(int mdpscaleflag, int l, int r,int t,int b);
     
     sp<Source> getSource() const;
     sp<Source> clearSource();
@@ -122,6 +124,7 @@ private:
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual bool transformed() const;
+        void updateCropRect(int mdpscaleflag, int t, int l, int r, int b);
     private:
         mutable Mutex   mLock;
         sp<Buffer>      mBuffer;
@@ -190,6 +193,7 @@ private:
         virtual void unregisterBuffers();
         virtual sp<OverlayRef> createOverlay(
                 uint32_t w, uint32_t h, int32_t format);
+        virtual void updateCropRect(int mdpscaleflag, int l, int r,int t,int b);
        void disown();
     private:
         LayerBuffer* getOwner() const {

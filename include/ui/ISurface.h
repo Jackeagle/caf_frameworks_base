@@ -26,6 +26,7 @@
 #include <ui/PixelFormat.h>
 
 #include <hardware/hardware.h>
+#include <hardware/copybit.h>
 
 namespace android {
 
@@ -42,6 +43,11 @@ enum {
     MULTI_HEAP
 };
 
+enum {
+    MDP_SCALE_FLAG_OFF,
+    MDP_SCALE_FLAG_ON
+};
+
 class IMemoryHeap;
 class OverlayRef;
 
@@ -53,6 +59,7 @@ protected:
         UNREGISTER_BUFFERS,
         POST_BUFFER, // one-way transaction
         CREATE_OVERLAY,
+        UPDATE_CROPRECT
     };
 
 public: 
@@ -94,6 +101,9 @@ public:
         uint32_t htype;
         sp<IMemoryHeap> heap;
         sp<IMemoryHeap> heaps[NUM_SF_BUFFERS];
+        int32_t mdpScaleFlag;
+        copybit_rect_t cropRect;
+
     };
     
     virtual status_t registerBuffers(const BufferHeap& buffers) = 0;
@@ -104,6 +114,7 @@ public:
     
     virtual sp<OverlayRef> createOverlay(
             uint32_t w, uint32_t h, int32_t format) = 0;
+    virtual void updateCropRect(int mdpscaleflag, int l , int r, int t, int b) = 0;
 };
 
 // ----------------------------------------------------------------------------
