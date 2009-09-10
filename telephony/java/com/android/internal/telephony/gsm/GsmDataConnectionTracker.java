@@ -244,7 +244,8 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
         // This preference tells us 1) initial condition for "dataEnabled",
         // and 2) whether the RIL will setup the baseband to auto-PS attach.
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(phone.getContext());
-        dataEnabled[APN_DEFAULT_ID] = !sp.getBoolean(GSMPhone.DATA_DISABLED_ON_BOOT_KEY, false);
+        dataEnabled[APN_DEFAULT_ID] = getSocketDataCallEnabled();
+        Log.d(LOG_TAG, "data enabled =" + dataEnabled[APN_DEFAULT_ID]);
         noAutoAttach = !dataEnabled[APN_DEFAULT_ID];
     }
 

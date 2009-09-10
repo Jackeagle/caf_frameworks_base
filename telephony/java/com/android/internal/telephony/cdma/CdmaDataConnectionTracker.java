@@ -179,9 +179,9 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
         // This preference tells us 1) initial condition for "dataEnabled",
         // and 2) whether the RIL will setup the baseband to auto-PS attach.
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(phone.getContext());
+        dataEnabled[EXTERNAL_NETWORK_DEFAULT_ID] = getSocketDataCallEnabled();
+        Log.d(LOG_TAG, "data enabled =" + dataEnabled[EXTERNAL_NETWORK_DEFAULT_ID]);
 
-        dataEnabled[EXTERNAL_NETWORK_DEFAULT_ID] =
-                !sp.getBoolean(CDMAPhone.DATA_DISABLED_ON_BOOT_KEY, false);
         noAutoAttach = !dataEnabled[EXTERNAL_NETWORK_DEFAULT_ID];
     }
 
