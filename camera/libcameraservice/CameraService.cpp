@@ -66,7 +66,6 @@ extern "C" {
 static int debug_frame_cnt;
 #endif
 
-static char mdp_version[16];
 
 static int getCallingPid() {
     return IPCThreadState::self()->getCallingPid();
@@ -100,22 +99,6 @@ sp<ICamera> CameraService::connect(const sp<ICameraClient>& cameraClient)
     int callingPid = getCallingPid();
     LOGD("CameraService::connect E (pid %d, client %p)", callingPid,
             cameraClient->asBinder().get());
-
-    // Get the MDP version
-    int fd = -1;
-    struct fb_fix_screeninfo finfo;
-    fd = open("/dev/graphics/fb0", O_RDWR, 0);
-    if(fd < 0) {
-        LOGE("Client::connect() : could not open /dev/graphics/fb0");
-    } else {
-        if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) == -1){
-            LOGE("Client::Client() : FBIOGET_FSCREENINFO ioctl returned -1");
-        } else {
-            strcpy(mdp_version, finfo.id);
-            LOGV("mdp_version : %s", mdp_version);
-        }
-        close(fd);
-    }
 
     Mutex::Autolock lock(mServiceLock);
     sp<Client> client;
@@ -885,30 +868,8 @@ void CameraService::Client::shutterCallback(void *user)
         client->mMediaPlayerClick->start();
     }
 
-    // Screen goes black after the buffer is unregistered.
-    // Donot unregister the buffers to show the last frame in case of MDP3.1
-    if (strncmp(mdp_version, "msmfb31_30001", 7) && client->mSurface != 0 && !client->mUseOverlay) {
-        client->mSurface->unregisterBuffers();
-    }
-
     client->postShutter();
 
-    // It takes some time before yuvPicture callback to be called.
-    // Register the buffer for raw image here to reduce latency.
-    if (strncmp(mdp_version, "msmfb31_30001", 7) && client->mSurface != 0 && !client->mUseOverlay) {
-        int w, h;
-        CameraParameters params(client->mHardware->getParameters());
-        params.getPictureSize(&w, &h);
-        uint32_t transform = 0;
-        if (params.getOrientation() == CameraParameters::CAMERA_ORIENTATION_PORTRAIT) {
-            LOGV("portrait mode");
-            transform = ISurface::BufferHeap::ROT_90;
-        }
-        ISurface::BufferHeap buffers(w, h, w, h,
-            PIXEL_FORMAT_YCbCr_420_SP, transform, 0, client->mHardware->getRawHeap());
-
-        client->mSurface->registerBuffers(buffers);
-    }
 }
 
 // picture callback - raw image ready
@@ -938,12 +899,6 @@ void CameraService::Client::yuvPictureCallback(const sp<IMemory>& mem,
                  (uint8_t *)heap->base() + offset, size);
 #endif
 
-
-    // Put the YUV version of the snapshot in the preview display, if the MDP
-    // version is not 3.1
-    if (strncmp(mdp_version, "msmfb31_30001", 7) && client->mSurface != 0 && !client->mUseOverlay) {
-        client->mSurface->postBuffer(offset);
-    }
 
     /* The yuv image is stored in the pmem_adsp memory. Hence it
      * should not be sent to the upper layers through postRaw().
