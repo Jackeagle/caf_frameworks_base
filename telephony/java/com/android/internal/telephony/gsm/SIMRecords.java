@@ -86,7 +86,6 @@ public final class SIMRecords extends IccRecords {
     String newVoiceMailNum = null;
     String newVoiceMailTag = null;
     boolean isVoiceMailFixed = false;
-    int countVoiceMessages = 0;
     boolean oplDataPresent;
     int     oplDataLac1;
     int     oplDataLac2;
