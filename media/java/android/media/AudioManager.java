@@ -634,6 +634,18 @@ public class AudioManager {
     }
 
     /**
+     * Sets fm radio device on or off.
+     *
+     * @param on set <var>true</var> to turn on fm radio;
+     *           <var>false</var> to turn it off
+     */
+    public void setFmRadioOn(boolean on){
+        // Temporary fix for issue #1713090 until audio routing is refactored in eclair release.
+        // MODE_INVALID indicates to AudioService that setRouting() was initiated by AudioManager
+            setRoutingP(MODE_INVALID, on ? ROUTE_FMRADIO: 0, ROUTE_FMRADIO);
+    }
+
+    /**
      * Sets the speakerphone on or off.
      *
      * @param on set <var>true</var> to turn on speakerphone;
@@ -867,6 +879,12 @@ public class AudioManager {
      * Routing audio output to earpiece
      */
     public static final int ROUTE_EARPIECE          = AudioSystem.ROUTE_EARPIECE;
+
+    /**
+     * Routing audio to FM Radio
+     */
+    public static final int ROUTE_FMRADIO           = AudioSystem.ROUTE_FMRADIO;
+
     /**
      * Routing audio output to spaker
      */

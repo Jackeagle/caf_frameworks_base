@@ -711,6 +711,21 @@ public class AudioService extends IAudioService.Stub {
             // command will be ignored.
             if (mode == AudioSystem.MODE_INVALID) {
                 switch (mask) {
+                case AudioSystem.ROUTE_FMRADIO:
+                    //handle setFmRadioOn()
+                    if(routes!=0) {
+                       mRoutes[AudioSystem.MODE_NORMAL] = (mRoutes[AudioSystem.MODE_NORMAL]
+                                                          & AudioSystem.ROUTE_BLUETOOTH_A2DP)
+                                                          | mask;
+                    }
+                    else {
+                       mRoutes[AudioSystem.MODE_NORMAL] = (mRoutes[AudioSystem.MODE_NORMAL]
+                                                          & AudioSystem.ROUTE_BLUETOOTH_A2DP)
+                                                          | AudioSystem.ROUTE_EARPIECE;
+                    }
+                    normalMask = AudioSystem.ROUTE_ALL & ~AudioSystem.ROUTE_BLUETOOTH_A2DP;
+                    break;
+
                 case AudioSystem.ROUTE_SPEAKER:
                     // handle setSpeakerphoneOn()
                     if (routes != 0 && !mSpeakerIsOn) {

@@ -80,6 +80,7 @@ public:
         ROUTE_TTY_DEVICE_FULL   = (1 << 7),
         ROUTE_TTY_DEVICE_HCO    = (1 << 8),
         ROUTE_TTY_DEVICE_VCO    = (1 << 9),
+        ROUTE_FMRADIO           = (1 << 10),
         ROUTE_ALL               = -1UL,
     };
 
