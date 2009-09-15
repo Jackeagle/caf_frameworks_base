@@ -181,6 +181,7 @@ final class ServiceStateTracker extends Handler
     static final String LOG_TAG = "GSM";
     static final String EONS_TAG = "EONS"; 
     static final int EONS_ALG = 0x01; 
+    static final int EONS_DISABLED = 0;
 
     // signal strength poll rate
     static final int POLL_PERIOD_MILLIS = 20 * 1000;
@@ -573,7 +574,7 @@ final class ServiceStateTracker extends Handler
                 break;
 
             case EVENT_SIM_RECORDS_LOADED:
-                updateSpnDisplay();
+                checkEonsAndUpdateSpnDisplay();
                 break;
 
             case EVENT_LOCATION_UPDATES_ENABLED:
@@ -1092,7 +1093,7 @@ final class ServiceStateTracker extends Handler
             phone.setSystemProperty(PROPERTY_OPERATOR_ISROAMING,
                 ss.getRoaming() ? "true" : "false");
 
-            updateSpnDisplay();
+            checkEonsAndUpdateSpnDisplay();
             phone.notifyServiceStateChanged(ss);
         }
 
@@ -1801,5 +1802,14 @@ final class ServiceStateTracker extends Handler
             // update restricted state notification
             notificationManager.notify(notificationId, mNotification);
         }
+    }
+
+    void checkEonsAndUpdateSpnDisplay() {
+       if ((!SystemProperties.getBoolean("persist.cust.tel.adapt",false) &&
+            !SystemProperties.getBoolean("persist.cust.tel.eons",false))  ||
+           (phone.mSIMRecords.getSstPlmnOplValue() == EONS_DISABLED))
+       {
+            updateSpnDisplay();
+       }
     }
 }

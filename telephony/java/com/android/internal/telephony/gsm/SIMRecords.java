@@ -175,6 +175,7 @@ public final class SIMRecords extends Handler implements SimConstants
     private static final String TIMEZONE_PROPERTY = "persist.sys.timezone";
 
     //EONS constants
+    private static int NOT_INITIALIZED  = -1;
     private static int EONS_DISABLED    = 0;
     private static int PNN_OPL_ENABLED  = 1;
     private static int ONLY_PNN_ENABLED = 2;
@@ -229,7 +230,7 @@ public final class SIMRecords extends Handler implements SimConstants
         pnnHomeName = null;
         oplDataPresent = false;
         pnnDataPresent = false;
-        sstPlmnOplValue = EONS_DISABLED;
+        sstPlmnOplValue = NOT_INITIALIZED;
         oplCache = null;
         pnnCache = null;
 
@@ -360,7 +361,7 @@ public final class SIMRecords extends Handler implements SimConstants
         String eons_prop   = SystemProperties.get("persist.cust.tel.eons");
 
         //EONS algorithm is disabled if PNN service is not activated.
-        if (sstPlmnOplValue == EONS_DISABLED) {
+        if (sstPlmnOplValue == EONS_DISABLED || sstPlmnOplValue == NOT_INITIALIZED) {
             return 0;
         }
         //persist.cust.tel.adapt is super flag, if this is set then EONS
@@ -1087,6 +1088,7 @@ public final class SIMRecords extends Handler implements SimConstants
                 }
                 break;
             case EVENT_GET_SST_DONE:
+                sstPlmnOplValue = EONS_DISABLED;
                 isRecordLoadResponse = true;
 
                 ar = (AsyncResult)msg.obj;
@@ -1541,9 +1543,7 @@ public final class SIMRecords extends Handler implements SimConstants
               obtainMessage(EVENT_GET_PNN_DONE));
         recordsToLoad++;
 
-        phone.mSIMFileHandler.loadEFTransparent(EF_SST,
-            obtainMessage(EVENT_GET_SST_DONE));
-        recordsToLoad++;
+
 
         phone.mSIMFileHandler.loadEFTransparent(EF_INFO_CPHS,
                 obtainMessage(EVENT_GET_INFO_CPHS_DONE));
@@ -1555,6 +1555,9 @@ public final class SIMRecords extends Handler implements SimConstants
         //Read PNN file and cache it
         updatePnnCache();
 
+        phone.mSIMFileHandler.loadEFTransparent(EF_SST,
+            obtainMessage(EVENT_GET_SST_DONE));
+        recordsToLoad++;
         // XXX should seek instead of examining them all
         if (false) { // XXX
             phone.mSIMFileHandler.loadEFLinearFixedAll(EF_SMS,
@@ -1849,8 +1852,7 @@ public final class SIMRecords extends Handler implements SimConstants
        if (oplCache == null) {
           //If the cache is null, probably there is an exception in reading
           //records from EF_OPl file, display name form ME database.
-          Log.w(EONS_TAG,"oplCache is null, using default method");
-          useMEName();
+          Log.w(EONS_TAG,"oplCache is null.");
           return;
        }
        count = oplCache.size();
@@ -1873,6 +1875,11 @@ public final class SIMRecords extends Handler implements SimConstants
        hLac = -1;
        GsmCellLocation loc = ((GsmCellLocation)phone.getCellLocation());
        if (loc != null) hLac = loc.getLac();
+       if (hLac == -1) {
+          Log.w(EONS_TAG,"Registered Lac is -1.");
+          return;
+       }
+
        try {
           for (ind = 0; ind < count; ind++) {
              byte[] data = (byte[]) oplCache.get(ind);
@@ -2006,7 +2013,9 @@ public final class SIMRecords extends Handler implements SimConstants
                }
             }
             /*Update the display*/
-            phone.mSST.updateSpnDisplayWrapper();
+            if (sstPlmnOplValue == EONS_DISABLED) {
+                phone.mSST.updateSpnDisplayWrapper();
+            }
        } catch(Exception e){
            Log.e(EONS_TAG,"Exception in processing SST Data " + e);
        }
@@ -2147,5 +2156,9 @@ public final class SIMRecords extends Handler implements SimConstants
           name = null;
        }
        return name;
+   }
+
+   public int getSstPlmnOplValue() {
+      return sstPlmnOplValue;
    }
 }
