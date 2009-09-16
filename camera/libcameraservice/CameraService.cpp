@@ -767,7 +767,7 @@ void CameraService::Client::zoomUpScale_callback(void* croprect, void* user)
     }
     copybit_rect_t crop_rect = *(copybit_rect_t*)croprect;
 
-    if(crop_rect.r >0 && crop_rect.b >0){
+    if( (client->mSurface != NULL ) && (crop_rect.r >0 && crop_rect.b >0) ){
         // pass the crop params to surface flinger
         LOGV("in zoomUpscale_callback : updating crop rect.");
         LOGV("croprect : l = %d r = %d t = %d b = %d ", crop_rect.l, crop_rect.r, crop_rect.t, crop_rect.b);
