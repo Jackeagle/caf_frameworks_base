@@ -346,9 +346,9 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
 #ifdef HAVE_TSLIB
                           }
                           else{
-                              LOGE("mTS->fd = %d", mTS->fd);
+                              LOGI("mTS->fd = %d", mTS->fd);
                               struct ts_sample samp;
-                              LOGE("tslib: calling ts_read from eventhub\n");
+                              LOGI("tslib: calling ts_read from eventhub\n");
                               res = ts_read(mTS, &samp, 1);
 
                               if (res < 0) {
@@ -360,7 +360,7 @@ bool EventHub::getEvent(int32_t* outDeviceId, int32_t* outType,
                                     // Using ev.flag to store the y coord. TS does not use the flags
                                     *outFlags = samp.y;
                                     iev.value = samp.x;
-                                    LOGE("samp.x = %d and samp.y = %d samp.pressure = %d\n",samp.x,samp.y,samp.pressure);
+                                    LOGI("samp.x = %d and samp.y = %d samp.pressure = %d\n",samp.x,samp.y,samp.pressure);
 
                                     if (samp.pressure > 0) {
                                         //Setting this New TSLIB type from RawInput

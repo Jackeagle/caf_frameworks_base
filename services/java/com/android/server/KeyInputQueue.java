@@ -339,7 +339,7 @@ public abstract class KeyInputQueue {
 
                                 if (ev.scancode == RawInputEvent.ABS_TSLIB_DOWN
                                         || ev.scancode == RawInputEvent.ABS_TSLIB_UP){
-                                     Log.v(TAG,"Entering rawinput event EV_SYN");
+
                                      di.mAbs.changed = true;
                                      if (ev.scancode == RawInputEvent.ABS_TSLIB_DOWN){
                                          di.mAbs.down = true;
@@ -359,7 +359,7 @@ public abstract class KeyInputQueue {
                                       //which is for touchscreen
                                       di.mAbs.x = ev.value;
                                       di.mAbs.y = ev.flags;
-                                      Log.v(TAG,"ev.value = " + ev.value + "ev.flags = " + ev.flags);
+
                                       // Defaulting back the flags value
                                       ev.flags = 0;
                                  }
