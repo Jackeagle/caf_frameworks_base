@@ -954,9 +954,6 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                     sb.append(context.getText(
                             com.android.internal.R.string.mmiError));
                 }
-            } else {
-                sb.append(context.getText(
-                        com.android.internal.R.string.mmiError));
             }
         } else if (isActivate()) {
             state = State.COMPLETE;
@@ -1007,15 +1004,15 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
         if (ar.exception != null) {
             state = State.FAILED;
             if (ar.exception instanceof CommandException) {
-              CommandException.Error err = ((CommandException)(ar.exception)).getCommandError();
-              if (err == CommandException.Error.FDN_FAILURE) {
-                 Log.i(LOG_TAG, "FDN_FAILURE");
-                 sb.append(context.getText(com.android.internal.R.string.mmiFdnError));
-              }
-           }
-           else {
-              sb.append(context.getText(com.android.internal.R.string.mmiError));
-           }
+               CommandException.Error err = ((CommandException)(ar.exception)).getCommandError();
+               if (err == CommandException.Error.FDN_FAILURE) {
+                  Log.i(LOG_TAG, "FDN_FAILURE");
+                  sb.append(context.getText(com.android.internal.R.string.mmiFdnError));
+               }
+               else {
+                  sb.append(context.getText(com.android.internal.R.string.mmiError));
+               }
+            }
         } else {
             int clirArgs[];
 
@@ -1186,15 +1183,15 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
         if (ar.exception != null) {
             state = State.FAILED;
             if (ar.exception instanceof CommandException) {
-              CommandException.Error err = ((CommandException)(ar.exception)).getCommandError();
-              if (err == CommandException.Error.FDN_FAILURE) {
-                 Log.i(LOG_TAG, "FDN_FAILURE");
-                 sb.append(context.getText(com.android.internal.R.string.mmiFdnError));
-              }
-           }
-           else {
-              sb.append(context.getText(com.android.internal.R.string.mmiError));
-           }
+               CommandException.Error err = ((CommandException)(ar.exception)).getCommandError();
+               if (err == CommandException.Error.FDN_FAILURE) {
+                  Log.i(LOG_TAG, "FDN_FAILURE");
+                  sb.append(context.getText(com.android.internal.R.string.mmiFdnError));
+               }
+               else {
+                  sb.append(context.getText(com.android.internal.R.string.mmiError));
+               }
+            }
         } else {
             CallForwardInfo infos[];
 
@@ -1252,9 +1249,9 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                  Log.i(LOG_TAG, "FDN_FAILURE");
                  sb.append(context.getText(com.android.internal.R.string.mmiFdnError));
               }
-           }
-           else {
-              sb.append(context.getText(com.android.internal.R.string.mmiError));
+              else {
+                 sb.append(context.getText(com.android.internal.R.string.mmiError));
+              }
            }
         } else {
             int[] ints = (int[])ar.result;
