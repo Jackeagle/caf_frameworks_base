@@ -431,7 +431,7 @@ static void tearDownEventLoop(native_data_t *nat) {
                                OBEXD_DBUS_SRV_MGR_PATH,
                                OBEXD_DBUS_SRV_MGR_IFC,
                                OBEXD_DBUS_SRV_MGR_UNREG_AGENT,
-                               DBUS_TYPE_STRING, &path,
+                               DBUS_TYPE_OBJECT_PATH, &path,
                                DBUS_TYPE_INVALID);
 
         if (reply) dbus_message_unref(reply);
@@ -659,7 +659,7 @@ static void *eventLoopMain(void *ptr) {
                 break;
             }
         }
-        while (dbus_connection_dispatch(nat->conn) == 
+        while (dbus_connection_dispatch(nat->conn) ==
                 DBUS_DISPATCH_DATA_REMAINS) {
         }
 
@@ -824,11 +824,16 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s class = %#X rssi = %hd", c_address, n_class,
                  n_rssi);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me,
                                 method_onRemoteDeviceFound,
-                                env->NewStringUTF(c_address),
+                                address,
                                 (jint)n_class,
                                 (jshort)n_rssi);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -851,8 +856,13 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_address,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me, method_onRemoteDeviceDisappeared,
-                                env->NewStringUTF(c_address));
+                                address);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -865,8 +875,13 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_UINT32, &n_class,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me, method_onRemoteClassUpdated,
-                                env->NewStringUTF(c_address), (jint)n_class);
+                                address, (jint)n_class);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -879,10 +894,17 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_name,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s, name = %s", c_address, c_name);
+
+            jstring address = env->NewStringUTF(c_address);
+            jstring name = env->NewStringUTF(c_name);
+
             env->CallVoidMethod(nat->me,
                                 method_onRemoteNameUpdated,
-                                env->NewStringUTF(c_address),
-                                env->NewStringUTF(c_name));
+                                address,
+                                name);
+
+            env->DeleteLocalRef(address);
+            env->DeleteLocalRef(name);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -893,9 +915,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_address,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me,
                                 method_onRemoteNameFailed,
-                                env->NewStringUTF(c_address));
+                                address);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -906,9 +933,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_address,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me,
                                 method_onRemoteDeviceConnected,
-                                env->NewStringUTF(c_address));
+                                address);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -919,9 +951,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_address,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me,
                                 method_onRemoteDeviceDisconnectRequested,
-                                env->NewStringUTF(c_address));
+                                address);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -932,9 +969,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_address,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me,
                                 method_onRemoteDeviceDisconnected,
-                                env->NewStringUTF(c_address));
+                                address);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -945,9 +987,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_address,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me,
                                 method_onBondingCreated,
-                                env->NewStringUTF(c_address));
+                                address);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -958,9 +1005,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_address,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... address = %s", c_address);
+
+            jstring address = env->NewStringUTF(c_address);
+
             env->CallVoidMethod(nat->me,
                                 method_onBondingRemoved,
-                                env->NewStringUTF(c_address));
+                                address);
+
+            env->DeleteLocalRef(address);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -971,9 +1023,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_mode,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... mode = %s", c_mode);
+
+            jstring mode = env->NewStringUTF(c_mode);
+
             env->CallVoidMethod(nat->me,
                                 method_onModeChanged,
-                                env->NewStringUTF(c_mode));
+                                mode);
+
+            env->DeleteLocalRef(mode);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -984,9 +1041,14 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                   DBUS_TYPE_STRING, &c_name,
                                   DBUS_TYPE_INVALID)) {
             LOGV("... name = %s", c_name);
+
+            jstring name = env->NewStringUTF(c_name);
+
             env->CallVoidMethod(nat->me,
                                 method_onNameChanged,
-                                env->NewStringUTF(c_name));
+                                name);
+
+            env->DeleteLocalRef(name);
         } else LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_signal(msg,
@@ -1036,42 +1098,50 @@ static DBusHandlerResult agent_event_filter(DBusConnection *conn,
     if (dbus_message_is_method_call(msg,
             "org.bluez.PasskeyAgent", "Request")) {
 
-        const char *adapter;
-        const char *address;
+        const char *c_adapter;
+        const char *c_address;
         if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_STRING, &adapter,
-                                   DBUS_TYPE_STRING, &address,
+                                   DBUS_TYPE_STRING, &c_adapter,
+                                   DBUS_TYPE_STRING, &c_address,
                                    DBUS_TYPE_INVALID)) {
             LOGE("%s: Invalid arguments for Request() method", __FUNCTION__);
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
         }
 
-        LOGV("... address = %s", address);
+        LOGV("... address = %s", c_address);
 
         dbus_message_ref(msg);  // increment refcount because we pass to java
 
+        jstring address = env->NewStringUTF(c_address);
+
         env->CallVoidMethod(nat->me, method_onPasskeyAgentRequest,
-                            env->NewStringUTF(address), (int)msg);
+                            address, (int)msg);
+
+        env->DeleteLocalRef(address);
 
         return DBUS_HANDLER_RESULT_HANDLED;
 
     } else if (dbus_message_is_method_call(msg,
             "org.bluez.PasskeyAgent", "Cancel")) {
 
-        const char *adapter;
-        const char *address;
+        const char *c_adapter;
+        const char *c_address;
         if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_STRING, &adapter,
-                                   DBUS_TYPE_STRING, &address,
+                                   DBUS_TYPE_STRING, &c_adapter,
+                                   DBUS_TYPE_STRING, &c_address,
                                    DBUS_TYPE_INVALID)) {
             LOGE("%s: Invalid arguments for Cancel() method", __FUNCTION__);
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
         }
 
-        LOGV("... address = %s", address);
+        LOGV("... address = %s", c_address);
+
+        jstring address = env->NewStringUTF(c_address);
 
         env->CallVoidMethod(nat->me, method_onPasskeyAgentCancel,
-                            env->NewStringUTF(address));
+                            address);
+
+        env->DeleteLocalRef(address);
 
         // reply
         DBusMessage *reply = dbus_message_new_method_return(msg);
@@ -1098,27 +1168,34 @@ static DBusHandlerResult agent_event_filter(DBusConnection *conn,
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_method_call(msg,
             "org.bluez.AuthorizationAgent", "Authorize")) {
-        const char *adapter;
-        const char *address;
-        const char *service;
-        const char *uuid;
+        const char *c_adapter;
+        const char *c_address;
+        const char *c_service;
+        const char *c_uuid;
         if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_STRING, &adapter,
-                                   DBUS_TYPE_STRING, &address,
-                                   DBUS_TYPE_STRING, &service,
-                                   DBUS_TYPE_STRING, &uuid,
+                                   DBUS_TYPE_STRING, &c_adapter,
+                                   DBUS_TYPE_STRING, &c_address,
+                                   DBUS_TYPE_STRING, &c_service,
+                                   DBUS_TYPE_STRING, &c_uuid,
                                    DBUS_TYPE_INVALID)) {
             LOGE("%s: Invalid arguments for Authorize() method", __FUNCTION__);
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
         }
 
-        LOGV("... address = %s", address);
-        LOGV("... service = %s", service);
-        LOGV("... uuid = %s", uuid);
+        LOGV("... address = %s", c_address);
+        LOGV("... service = %s", c_service);
+        LOGV("... uuid = %s", c_uuid);
+
+        jstring address = env->NewStringUTF(c_address);
+        jstring service = env->NewStringUTF(c_service);
+        jstring uuid = env->NewStringUTF(c_uuid);
 
         bool auth_granted = env->CallBooleanMethod(nat->me,
-                method_onAuthAgentAuthorize, env->NewStringUTF(address),
-                env->NewStringUTF(service), env->NewStringUTF(uuid));
+                method_onAuthAgentAuthorize, address, service, uuid);
+
+        env->DeleteLocalRef(address);
+        env->DeleteLocalRef(service);
+        env->DeleteLocalRef(uuid);
 
         // reply
         if (auth_granted) {
@@ -1142,27 +1219,34 @@ static DBusHandlerResult agent_event_filter(DBusConnection *conn,
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (dbus_message_is_method_call(msg,
             "org.bluez.AuthorizationAgent", "Cancel")) {
-        const char *adapter;
-        const char *address;
-        const char *service;
-        const char *uuid;
+        const char *c_adapter;
+        const char *c_address;
+        const char *c_service;
+        const char *c_uuid;
         if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_STRING, &adapter,
-                                   DBUS_TYPE_STRING, &address,
-                                   DBUS_TYPE_STRING, &service,
-                                   DBUS_TYPE_STRING, &uuid,
+                                   DBUS_TYPE_STRING, &c_adapter,
+                                   DBUS_TYPE_STRING, &c_address,
+                                   DBUS_TYPE_STRING, &c_service,
+                                   DBUS_TYPE_STRING, &c_uuid,
                                    DBUS_TYPE_INVALID)) {
             LOGE("%s: Invalid arguments for Cancel() method", __FUNCTION__);
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
         }
 
-        LOGV("... address = %s", address);
-        LOGV("... service = %s", service);
-        LOGV("... uuid = %s", uuid);
+        LOGV("... address = %s", c_address);
+        LOGV("... service = %s", c_service);
+        LOGV("... uuid = %s", c_uuid);
+
+        jstring address = env->NewStringUTF(c_address);
+        jstring service = env->NewStringUTF(c_service);
+        jstring uuid = env->NewStringUTF(c_uuid);
 
         env->CallVoidMethod(nat->me,
-                method_onAuthAgentCancel, env->NewStringUTF(address),
-                env->NewStringUTF(service), env->NewStringUTF(uuid));
+                method_onAuthAgentCancel, address, service, uuid);
+
+        env->DeleteLocalRef(address);
+        env->DeleteLocalRef(service);
+        env->DeleteLocalRef(uuid);
 
         // reply
         DBusMessage *reply = dbus_message_new_method_return(msg);
@@ -1210,13 +1294,15 @@ void onCreateBondingResult(DBusMessage *msg, void *user, void *n) {
     LOGV(__FUNCTION__);
 
     native_data_t *nat = (native_data_t *)n;
-    const char *address = (const char *)user;
+    const char *c_address = (const char *)user;
     DBusError err;
     dbus_error_init(&err);
     JNIEnv *env;
     nat->vm->GetEnv((void**)&env, nat->envVer);
 
-    LOGV("... address = %s", address);
+    jstring address = env->NewStringUTF(c_address);
+
+    LOGV("... address = %s", c_address);
 
     jint result = BOND_RESULT_SUCCESS;
     if (dbus_set_error_from_message(&err, msg)) {
@@ -1258,9 +1344,11 @@ void onCreateBondingResult(DBusMessage *msg, void *user, void *n) {
 
     env->CallVoidMethod(nat->me,
                         method_onCreateBondingResult,
-                        env->NewStringUTF(address),
+                        address,
                         result);
+
 done:
+    env->DeleteLocalRef(address);
     dbus_error_free(&err);
     free(user);
 }
@@ -1268,7 +1356,7 @@ done:
 void onGetRemoteServiceChannelResult(DBusMessage *msg, void *user, void *n) {
     LOGV(__FUNCTION__);
 
-    const char *address = (const char *) user;
+    const char *c_address = (const char *) user;
     native_data_t *nat = (native_data_t *) n;
 
     DBusError err;
@@ -1278,7 +1366,7 @@ void onGetRemoteServiceChannelResult(DBusMessage *msg, void *user, void *n) {
 
     jint channel = -2;
 
-    LOGV("... address = %s", address);
+    LOGV("... address = %s", c_address);
 
     if (dbus_set_error_from_message(&err, msg) ||
         !dbus_message_get_args(msg, &err,
@@ -1289,11 +1377,15 @@ void onGetRemoteServiceChannelResult(DBusMessage *msg, void *user, void *n) {
         dbus_error_free(&err);
     }
 
-done:
+    jstring address = env->NewStringUTF(c_address);
+
     env->CallVoidMethod(nat->me,
                         method_onGetRemoteServiceChannelResult,
-                        env->NewStringUTF(address),
+                        address,
                         channel);
+
+    env->DeleteLocalRef(address);
+
     free(user);
 }
 #endif
