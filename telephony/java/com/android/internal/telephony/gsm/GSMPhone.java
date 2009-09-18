@@ -1640,4 +1640,10 @@ public class GSMPhone extends PhoneBase {
         Log.e(LOG_TAG, "Error! This functionality is not implemented for GSM.");
     }
 
+    /**
+     * Notify data connection lost
+     */
+    public void notifyDataConnectionLost() {
+        mDataConnection.onCleanUpConnection(false, REASON_RADIO_TURNED_OFF);
+    }
 }

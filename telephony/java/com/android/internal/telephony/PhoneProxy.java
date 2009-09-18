@@ -73,6 +73,7 @@ public class PhoneProxy extends Handler implements Phone {
                     (mOutgoingPhone.equals("GSM") ? "CDMAPhone" : "GSMPhone") );
             if(mOutgoingPhone.equals("GSM")) {
                 logd("Make a new CDMAPhone and destroy the old GSMPhone.");
+                ((GSMPhone)mActivePhone).notifyDataConnectionLost();
 
                 ((GSMPhone)mActivePhone).dispose();
                 Phone oldPhone = mActivePhone;
@@ -89,6 +90,7 @@ public class PhoneProxy extends Handler implements Phone {
                 oldPhone = null;
             } else {
                 logd("Make a new GSMPhone and destroy the old CDMAPhone.");
+                ((CDMAPhone)mActivePhone).notifyDataConnectionLost();
 
                 ((CDMAPhone)mActivePhone).dispose();
                 //mActivePhone = null;
