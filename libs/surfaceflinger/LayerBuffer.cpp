@@ -143,7 +143,8 @@ bool LayerBuffer::transformed() const
 
 void LayerBuffer::updateCropRect(int mdpscaleflag, int l, int r,int t,int b)
 {
-    mSource->updateCropRect(mdpscaleflag, l,r,t,b);
+    if(mSource != NULL)
+        mSource->updateCropRect(mdpscaleflag, l,r,t,b);
 }
 /**
  * This creates a "buffer" source for this surface
