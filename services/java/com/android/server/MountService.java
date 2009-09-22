@@ -48,11 +48,16 @@ class MountService extends IMountService.Stub {
     private static final String TAG = "MountService";
 
     private final String usbMountPath = "/data/";
+
+    private final int notificationMaxId = 0x2000;
+
+    private final int notificationInitId = 0x1000;
     /**
      * Binder context for this service
      */
     private Context mContext;
-    
+
+    private int mNotificationId;
     /**
      * listener object for communicating with the mount service daemon
      */
@@ -96,6 +101,7 @@ class MountService extends IMountService.Stub {
      */
     public MountService(Context context) {
         mContext = context;
+        mNotificationId = notificationInitId;
 
         // Register a BOOT_COMPLETED handler so that we can start
         // MountListener. We defer the startup so that we don't
@@ -543,6 +549,17 @@ class MountService extends IMountService.Stub {
     }
     
     /**
+     * Notify USB device speed mismatch.
+     */
+    void notifySpeedMismatch(String path) {
+
+        setSpeedMismatchNotification(com.android.internal.R.string.usb_speed_mismatch_title,
+                                    com.android.internal.R.string.usb_speed_mismatch_message,
+                                    com.android.internal.R.drawable.stat_sys_data_usb, path, null);
+
+    }
+
+    /**
      * Sets the USB storage notification.
      */
     private synchronized void setUsbStorageNotification(int titleId, int messageId, int icon, boolean sound, boolean visible,
@@ -602,6 +619,44 @@ class MountService extends IMountService.Stub {
             return true;
 
         return false;
+    }
+
+    /**
+     * Sets USB device speed mismatch notification.
+     */
+    private synchronized void setSpeedMismatchNotification(int titleId,
+                                int messageId, int icon, String path,
+                                                       PendingIntent pi) {
+        Notification mSpeedMismatchNotification;
+
+        NotificationManager notificationManager = (NotificationManager) mContext
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (notificationManager == null) {
+            return;
+        }
+        Resources r = Resources.getSystem();
+        CharSequence title = r.getText(titleId);
+        CharSequence message;
+        String msgstr = path.concat(r.getText(messageId).toString());
+
+        message = msgstr.subSequence(0, msgstr.length());
+        mSpeedMismatchNotification = new Notification();
+        mSpeedMismatchNotification.when = 0;
+
+        mSpeedMismatchNotification.flags = Notification.FLAG_AUTO_CANCEL;
+        mSpeedMismatchNotification.tickerText = title;
+        if (pi == null) {
+            Intent intent = new Intent();
+            pi = PendingIntent.getBroadcast(mContext, 0, intent, 0);
+        }
+
+        mSpeedMismatchNotification.icon = icon;
+        mSpeedMismatchNotification.setLatestEventInfo(mContext, title, message, pi);
+
+        if (mNotificationId++ > notificationMaxId)
+            mNotificationId = notificationInitId;
+        notificationManager.notify(mNotificationId, mSpeedMismatchNotification);
     }
 
     /**
