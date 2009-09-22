@@ -355,7 +355,14 @@ status_t GPUHardware::requestLocked(int pid)
         } else {
             // first time, initialize the stuff.
             if (mSMIHeap == 0)
+#ifdef ADRENO_200
+                // Prevent Surface Flinger from stealing all of graphics memory
+                // by allowing the allocation of GPUAreaHeap to succeed
+                // but the PMEM allocation to fail
+                mSMIHeap = new GPUAreaHeap(this, "/dev/pmem_gpu0", 0);
+#else
                 mSMIHeap = new GPUAreaHeap(this, "/dev/pmem_gpu0");
+#endif
             if (mEBIHeap == 0)
 #ifdef ADRENO_200
                 // For Adreno 200, only allocate GPU_RESERVED_SIZE bytes and not
