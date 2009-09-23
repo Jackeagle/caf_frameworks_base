@@ -379,54 +379,66 @@ public class AudioService extends IAudioService.Stub {
 
     /** @see AudioManager#adjustStreamVolume(int, int, int) */
     public void adjustStreamVolume(int streamType, int direction, int flags) {
+        boolean ttyStateFullOrVco = false;
         ensureValidDirection(direction);
         ensureValidStreamType(streamType);
 
-        boolean notificationsUseRingVolume = Settings.System.getInt(mContentResolver,
-                Settings.System.NOTIFICATIONS_USE_RING_VOLUME, 1) == 1;
-        if (notificationsUseRingVolume && streamType == AudioManager.STREAM_NOTIFICATION) {
-            // Redirect the volume change to the ring stream
-            streamType = AudioManager.STREAM_RING;
+        // Check if TTY device is connected & is set to VCO or FULL mode.
+        // If it does, don't update the volume changes.
+        if (mHeadsetIsConnected) {
+            if ((mRoutes[AudioSystem.MODE_IN_CALL] == AudioSystem.ROUTE_TTY_DEVICE_FULL)
+                    || (mRoutes[AudioSystem.MODE_IN_CALL] == AudioSystem.ROUTE_TTY_DEVICE_VCO)) {
+                    ttyStateFullOrVco = true;
+            }
         }
-
-        VolumeStreamState streamState = mStreamStates[streamType];
-        final int oldIndex = streamState.mIndex;
-        boolean adjustVolume = true;
-
-        // If either the client forces allowing ringer modes for this adjustment,
-        // or the stream type is one that is affected by ringer modes
-        if ((flags & AudioManager.FLAG_ALLOW_RINGER_MODES) != 0
-                || streamType == AudioManager.STREAM_RING) {
-            // Check if the ringer mode changes with this volume adjustment. If
-            // it does, it will handle adjusting the volume, so we won't below
-            adjustVolume = checkForRingerModeChange(oldIndex, direction);
-        }
-
-        if (adjustVolume && streamState.adjustIndex(direction)) {
-
-            boolean alsoUpdateNotificationVolume =  notificationsUseRingVolume &&
-                    streamType == AudioManager.STREAM_RING;
-            if (alsoUpdateNotificationVolume) {
-                mStreamStates[AudioManager.STREAM_NOTIFICATION].adjustIndex(direction);
+        if (!ttyStateFullOrVco) {
+            Log.e(TAG,"Setting the volume changes normally");
+            boolean notificationsUseRingVolume = Settings.System.getInt(mContentResolver,
+                    Settings.System.NOTIFICATIONS_USE_RING_VOLUME, 1) == 1;
+            if (notificationsUseRingVolume && streamType == AudioManager.STREAM_NOTIFICATION) {
+                // Redirect the volume change to the ring stream
+                streamType = AudioManager.STREAM_RING;
             }
 
-            // Post message to set system volume (it in turn will post a message
-            // to persist). Do not change volume if stream is muted.
-            if (streamState.muteCount() == 0) {
-                sendMsg(mAudioHandler, MSG_SET_SYSTEM_VOLUME, streamType, SENDMSG_NOOP, 0, 0,
-                        streamState, 0);
+            VolumeStreamState streamState = mStreamStates[streamType];
+            final int oldIndex = streamState.mIndex;
+            boolean adjustVolume = true;
 
+            // If either the client forces allowing ringer modes for this adjustment,
+            // or the stream type is one that is affected by ringer modes
+            if ((flags & AudioManager.FLAG_ALLOW_RINGER_MODES) != 0
+                    || streamType == AudioManager.STREAM_RING) {
+                // Check if the ringer mode changes with this volume adjustment. If
+                // it does, it will handle adjusting the volume, so we won't below
+                adjustVolume = checkForRingerModeChange(oldIndex, direction);
+            }
+
+            if (adjustVolume && streamState.adjustIndex(direction)) {
+
+                boolean alsoUpdateNotificationVolume =  notificationsUseRingVolume &&
+                        streamType == AudioManager.STREAM_RING;
                 if (alsoUpdateNotificationVolume) {
-                    sendMsg(mAudioHandler, MSG_SET_SYSTEM_VOLUME, AudioManager.STREAM_NOTIFICATION,
-                            SENDMSG_NOOP, 0, 0, mStreamStates[AudioManager.STREAM_NOTIFICATION], 0);
+                    mStreamStates[AudioManager.STREAM_NOTIFICATION].adjustIndex(direction);
+                }
+
+                // Post message to set system volume (it in turn will post a message
+                // to persist). Do not change volume if stream is muted.
+                if (streamState.muteCount() == 0) {
+                    sendMsg(mAudioHandler, MSG_SET_SYSTEM_VOLUME, streamType, SENDMSG_NOOP, 0, 0,
+                            streamState, 0);
+
+                    if (alsoUpdateNotificationVolume) {
+                        sendMsg(mAudioHandler, MSG_SET_SYSTEM_VOLUME, AudioManager.STREAM_NOTIFICATION,
+                                SENDMSG_NOOP, 0, 0, mStreamStates[AudioManager.STREAM_NOTIFICATION], 0);
+                    }
                 }
             }
-        }
 
-        // UI
-        mVolumePanel.postVolumeChanged(streamType, flags);
-        // Broadcast Intent
-        sendVolumeUpdate(streamType);
+            // UI
+            mVolumePanel.postVolumeChanged(streamType, flags);
+            // Broadcast Intent
+            sendVolumeUpdate(streamType);
+        }
     }
 
     /** @see AudioManager#setStreamVolume(int, int, int) */
