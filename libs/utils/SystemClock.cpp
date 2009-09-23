@@ -52,8 +52,6 @@ int setCurrentTimeMillis(int64_t millis)
     struct timeval tv;
 #if HAVE_ANDROID_OS
     struct timespec ts;
-    struct rtc_time rtc_tm;
-    const time_t t =(time_t) (millis / 1000LL);
     int fd;
     int res;
 #endif
@@ -80,18 +78,6 @@ int setCurrentTimeMillis(int64_t millis)
     if(res < 0) {
         LOGW("Unable to set rtc to %ld: %s\n", tv.tv_sec, strerror(errno));
         ret = -1;
-    }
-    close(fd);
-
-    fd = open("/dev/rtc1", O_RDWR);
-    if(fd < 0) {
-        LOGW("Unable to open /dev/rtc1: %s\n", strerror(errno));
-        return -1;
-    }
-    localtime_r(&t,(struct tm*)&rtc_tm);
-    res = ioctl(fd,RTC_SET_TIME,&rtc_tm);
-    if(res < 0) {
-        LOGW("Unable to set /dev/rtc1 to : %s\n", strerror(errno));
     }
     close(fd);
 #else
