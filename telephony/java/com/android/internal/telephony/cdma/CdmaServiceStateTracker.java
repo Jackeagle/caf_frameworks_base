@@ -566,18 +566,18 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
 
                 if (states.length == 14) {
                     try {
-                        registrationState = Integer.parseInt(states[0]);
-                        radioTechnology = Integer.parseInt(states[3]);
-                        baseStationId = Integer.parseInt(states[4]);
-                        baseStationLatitude = Integer.parseInt(states[5], 16);
-                        baseStationLongitude = Integer.parseInt(states[6], 16);
-                        cssIndicator = Integer.parseInt(states[7]);
-                        systemId = Integer.parseInt(states[8]);
-                        networkId = Integer.parseInt(states[9]);
-                        roamingIndicator = Integer.parseInt(states[10]);
-                        systemIsInPrl = Integer.parseInt(states[11]);
-                        defaultRoamingIndicator = Integer.parseInt(states[12]);
-                        reasonForDenial = Integer.parseInt(states[13]);
+                        registrationState = (states[0] != null) ? Integer.parseInt(states[0]) : registrationState;
+                        radioTechnology = (states[3] != null) ? Integer.parseInt(states[3]) : radioTechnology;
+                        baseStationId = (states[4] != null) ? Integer.parseInt(states[4]) : baseStationId;
+                        baseStationLatitude = (states[5] != null) ? Integer.parseInt(states[5], 16) : baseStationLatitude;
+                        baseStationLongitude = (states[6] != null) ? Integer.parseInt(states[6], 16) : baseStationLongitude;
+                        cssIndicator = (states[7] != null) ? Integer.parseInt(states[7]) : cssIndicator;
+                        systemId = (states[8] != null) ? Integer.parseInt(states[8]) : systemId;
+                        networkId = (states[9] != null) ? Integer.parseInt(states[9]) : networkId;
+                        roamingIndicator = (states[10] != null) ? Integer.parseInt(states[10]) : roamingIndicator;
+                        systemIsInPrl = (states[11] != null) ? Integer.parseInt(states[11]) : systemIsInPrl;
+                        defaultRoamingIndicator = (states[12] != null) ? Integer.parseInt(states[12]) : defaultRoamingIndicator;
+                        reasonForDenial = (states[13] != null) ? Integer.parseInt(states[13]) : reasonForDenial;
                     }
                     catch(NumberFormatException ex) {
                         Log.w(LOG_TAG, "error parsing RegistrationState: " + ex);
