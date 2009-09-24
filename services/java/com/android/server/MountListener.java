@@ -68,6 +68,7 @@ final class MountListener implements Runnable {
     private static final String VOLD_EVT_CHECKING = "volume_checking:";
     private static final String VOLD_EVT_NOFS = "volume_nofs:";
     private static final String VOLD_EVT_EJECTING = "volume_ejecting:";
+    private static final String VOLD_EVT_SPEED_MISMATCH = "speed_mismatch:";
 
     /**
      * MountService that handles events received from the vol service daemon
@@ -143,7 +144,9 @@ final class MountListener implements Runnable {
             mService.notifyMediaUnmountable(path);
         } else if (event.startsWith(VOLD_EVT_EJECTING)) {
             mService.notifyMediaEject(path);
-        }    
+        } else if (event.startsWith(VOLD_EVT_SPEED_MISMATCH)) {
+            mService.notifySpeedMismatch(path);
+        }
     }
     
     /**

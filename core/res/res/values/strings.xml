@@ -1806,7 +1806,8 @@
     <string name="usb_storage_stop_button_unmount">Cancel</string>
     <!-- See USB_STORAGE_STOP_DIALOG.  If there was an error stopping, this is the text. --> 
     <string name="usb_storage_stop_error_message">We've encountered a problem turning off USB storage. Check to make sure you have unmounted the USB host, then try again.</string>
-
+    <string name="usb_speed_mismatch_title">USB device speed mismatch</string>
+    <string name="usb_speed_mismatch_message">device connected to slower speed port</string>
     <!-- External media format dialog strings -->
     <!-- This is the label for the activity, and should never be visible to the user. -->
     <!-- See EXTMEDIA_FORMAT.  EXTMEDIA_FORMAT_DIALOG:  After the user selects the notification, a dialog is shown asking if he wants to format the SD card.  This is the title. -->
