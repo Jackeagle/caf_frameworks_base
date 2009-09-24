@@ -886,6 +886,17 @@ public final class BearerData {
         }
     }
 
+    private static String decodeOctet(byte[] data, int offset, int numFields)
+        throws CodingException
+    {
+        try {
+            return new String(data, offset, numFields, "US-ASCII");
+        } catch (java.io.UnsupportedEncodingException ex) {
+            throw new CodingException("Octet decode failed: " + ex);
+        }
+    }
+
+
     private static String decode7bitGsm(byte[] data, int offset, int numFields)
         throws CodingException
     {
@@ -914,6 +925,7 @@ public final class BearerData {
         }
         switch (userData.msgEncoding) {
         case UserData.ENCODING_OCTET:
+            userData.payloadStr = decodeOctet(userData.payload, offset, userData.numFields);
             break;
         case UserData.ENCODING_7BIT_ASCII:
             userData.payloadStr = decode7bitAscii(userData.payload, offset, userData.numFields);
