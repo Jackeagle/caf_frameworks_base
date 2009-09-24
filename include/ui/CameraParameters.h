@@ -92,13 +92,17 @@ public:
     int getBrightness() const;
 
     /* Digital Zoom control */
-    float getZoomValue() const;
+    int getZoomValue() const;
 
     /* Check if Camera is Enabled */
     int getCameraEnabledVal() const;
 
     /* Led Flash value */
     const char *getLedflashValue() const;
+
+    /*  set/get maximum zoom value */
+    void setMaxZoomValue( int );
+    int getMaxZoomValue() const;
 
     void dump() const;
     status_t dump(int fd, const Vector<String16>& args) const;

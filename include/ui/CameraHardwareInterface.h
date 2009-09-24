@@ -28,7 +28,7 @@ namespace android {
 typedef void (*preview_callback)(const sp<IMemory>& mem, int index, void* user);
 
 /** callback from zoom crop rect update for surface flinger */
-typedef void (*zoomUpScale_callback)(void* croprect, void* user);
+typedef void (*zoomUpScale_callback)(void* croprect, void* user, void* status);
 
 /** Callback for startRecord() */
 typedef void (*recording_callback)(nsecs_t timestamp, const sp<IMemory>& mem, void* user);

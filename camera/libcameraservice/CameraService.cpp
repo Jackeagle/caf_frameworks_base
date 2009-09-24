@@ -757,22 +757,31 @@ static void dump_to_file(const char *fname,
 }
 #endif
 
-void CameraService::Client::zoomUpScale_callback(void* croprect, void* user)
+void CameraService::Client::zoomUpScale_callback(void* croprect, void* user, void* status)
 {
-    LOGE("zoomUpScale_callback");
-    status_t result;
+    LOGV("zoomUpScale_callback");
+    status_t result =  NO_ERROR;
+    status_t *statusptr = (status_t*)status;
     sp<Client> client = getClientFromCookie(user);
     if (client == 0) {
+        result = UNKNOWN_ERROR;
+        *statusptr = result;
         return;
     }
     copybit_rect_t crop_rect = *(copybit_rect_t*)croprect;
-
-    if( (client->mSurface != NULL ) && (crop_rect.r >0 && crop_rect.b >0) ){
+    if(crop_rect.r >0 && crop_rect.b >0){
         // pass the crop params to surface flinger
         LOGV("in zoomUpscale_callback : updating crop rect.");
         LOGV("croprect : l = %d r = %d t = %d b = %d ", crop_rect.l, crop_rect.r, crop_rect.t, crop_rect.b);
+        if(client->mSurface == 0){
+            result = UNKNOWN_ERROR;
+            *statusptr = result;
+            LOGE("surface is null");
+            return;
+        }
         client->mSurface->updateCropRect(MDP_SCALE_FLAG_ON, crop_rect.l, crop_rect.r, crop_rect.t, crop_rect.b);
     }
+    *statusptr = result;
 }
 
 // preview callback - frame buffer update
