@@ -330,13 +330,13 @@ int CameraParameters::getBrightness() const
      }
 }
 
-float CameraParameters::getZoomValue() const
+int CameraParameters::getZoomValue() const
 {
     LOGD(" CameraParameters.cpp :: ZOOM = %s ", get("zoom"));
     if( get("zoom") )
     {
-        LOGD("CameraParameters.cpp :: ZOOM Value not null int = %2.2f ", atof(get("zoom")));
-        return atof(get("zoom"));
+        LOGD("CameraParameters.cpp :: ZOOM Value not null int = %d ", atoi(get("zoom")));
+        return atoi(get("zoom"));
     }
     else
     {
@@ -353,4 +353,15 @@ int CameraParameters::getCameraEnabledVal() const
     else
        return atoi(get("camera_enabled"));
 }
+
+void CameraParameters::setMaxZoomValue(int maxzoomvalue)
+{
+    set("max-zoom-value", maxzoomvalue);
+}
+
+int CameraParameters::getMaxZoomValue() const
+{
+    return getInt("max-zoom-value");
+}
+
 }; // namespace android

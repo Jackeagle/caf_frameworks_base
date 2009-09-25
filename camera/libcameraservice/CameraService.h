@@ -134,7 +134,7 @@ private:
 
         static      void        recordingCallback(nsecs_t timestamp, const sp<IMemory>& mem, void* user);
         static      void        previewCallback(const sp<IMemory>& mem, int index, void* user);
-        static      void        zoomUpScale_callback(void* croprect, void* user);
+        static      void        zoomUpScale_callback(void* croprect, void* user, void* status);
         //        static      void        recordingCallback(nsecs_t timestamp, const sp<IMemory>& mem, void* user);
         //        static      void        previewCallback(const sp<IMemory>& mem, void* user);
         static      void        shutterCallback(void *user);
