@@ -65,6 +65,7 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OP
 import java.util.Arrays;
 import java.util.Date;
 import java.util.TimeZone;
+import java.math.BigInteger;
 
 /**
  * {@hide}
@@ -569,8 +570,8 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                         registrationState = (states[0] != null) ? Integer.parseInt(states[0]) : registrationState;
                         radioTechnology = (states[3] != null) ? Integer.parseInt(states[3]) : radioTechnology;
                         baseStationId = (states[4] != null) ? Integer.parseInt(states[4]) : baseStationId;
-                        baseStationLatitude = (states[5] != null) ? Integer.parseInt(states[5], 16) : baseStationLatitude;
-                        baseStationLongitude = (states[6] != null) ? Integer.parseInt(states[6], 16) : baseStationLongitude;
+                        baseStationLatitude = (states[5] != null) ? new BigInteger(states[5], 16).intValue() : baseStationLatitude;
+                        baseStationLongitude = (states[6] != null) ? new BigInteger(states[6], 16).intValue() : baseStationLongitude;
                         cssIndicator = (states[7] != null) ? Integer.parseInt(states[7]) : cssIndicator;
                         systemId = (states[8] != null) ? Integer.parseInt(states[8]) : systemId;
                         networkId = (states[9] != null) ? Integer.parseInt(states[9]) : networkId;
