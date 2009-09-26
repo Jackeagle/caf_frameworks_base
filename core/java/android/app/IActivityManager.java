@@ -242,6 +242,7 @@ public interface IActivityManager extends IInterface {
      * SIGUSR1 is delivered. All others are ignored.
      */
     public void signalPersistentProcesses(int signal) throws RemoteException;
+    public void signalAllProcesses(int signal) throws RemoteException;
     // Retrieve running application processes in the system
     public List<ActivityManager.RunningAppProcessInfo> getRunningAppProcesses()
             throws RemoteException;
@@ -427,4 +428,5 @@ public interface IActivityManager extends IInterface {
     int START_ACTIVITY_IN_PACKAGE_TRANSACTION = IBinder.FIRST_CALL_TRANSACTION+94;
     int KILL_APPLICATION_WITH_UID_TRANSACTION = IBinder.FIRST_CALL_TRANSACTION+95;
     int CLOSE_SYSTEM_DIALOGS_TRANSACTION = IBinder.FIRST_CALL_TRANSACTION+96;
+    int SIGNAL_ALL_PROCESSES_TRANSACTION = IBinder.FIRST_CALL_TRANSACTION+97;
 }

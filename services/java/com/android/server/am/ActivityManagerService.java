@@ -13091,6 +13091,23 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         }
     }
 
+  /** @hide
+   * This method sends the specified signal to each of the running apps */
+    public void signalAllProcesses(int sig) throws RemoteException {
+        if (sig != Process.SIGNAL_USR1) {
+            throw new SecurityException("Only SIGNAL_USR1 is allowed");
+        }
+
+        synchronized (this) {
+            for (int i = mLRUProcesses.size() - 1 ; i >= 0 ; i--) {
+                ProcessRecord r = mLRUProcesses.get(i);
+                if (r.thread != null) {
+                    Process.sendSignal(r.pid, sig);
+                }
+            }
+        }
+    }
+
     public boolean profileControl(String process, boolean start,
             String path, ParcelFileDescriptor fd) throws RemoteException {
 

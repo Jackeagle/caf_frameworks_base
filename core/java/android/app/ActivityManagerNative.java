@@ -1102,6 +1102,14 @@ public abstract class ActivityManagerNative extends Binder implements IActivityM
             reply.writeNoException();
             return true;
         }
+
+        case SIGNAL_ALL_PROCESSES_TRANSACTION: {
+            data.enforceInterface(IActivityManager.descriptor);
+            int sig = data.readInt();
+            signalAllProcesses(sig);
+            reply.writeNoException();
+            return true;
+        }
         }
         
         return super.onTransact(code, data, reply, flags);
@@ -2254,6 +2262,17 @@ class ActivityManagerProxy implements IActivityManager
         data.writeInterfaceToken(IActivityManager.descriptor);
         data.writeInt(sig);
         mRemote.transact(SIGNAL_PERSISTENT_PROCESSES_TRANSACTION, data, reply, 0);
+        reply.readException();
+        data.recycle();
+        reply.recycle();
+    }
+
+    public void signalAllProcesses(int sig) throws RemoteException {
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        data.writeInterfaceToken(IActivityManager.descriptor);
+        data.writeInt(sig);
+        mRemote.transact(SIGNAL_ALL_PROCESSES_TRANSACTION, data, reply, 0);
         reply.readException();
         data.recycle();
         reply.recycle();
