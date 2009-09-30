@@ -302,6 +302,7 @@ public abstract class SMSDispatcher extends Handler {
                     acknowledgeLastIncomingSms(false, Intents.RESULT_SMS_OUT_OF_MEMORY, null);
                 }
             } catch (RuntimeException ex) {
+                ex.printStackTrace();
                 acknowledgeLastIncomingSms(false, Intents.RESULT_SMS_GENERIC_ERROR, null);
             }
 
