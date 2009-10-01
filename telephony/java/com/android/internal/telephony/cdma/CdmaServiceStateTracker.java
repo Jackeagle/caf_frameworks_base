@@ -938,6 +938,8 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             operatorNumeric = ss.getOperatorNumeric();
             phone.setSystemProperty(PROPERTY_OPERATOR_NUMERIC, operatorNumeric);
 
+            phone.updateCurrentCarrierInProvider(operatorNumeric);
+
             if (operatorNumeric == null) {
                 phone.setSystemProperty(PROPERTY_OPERATOR_ISO_COUNTRY, "");
             } else {

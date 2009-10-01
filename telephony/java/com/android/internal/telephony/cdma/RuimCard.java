@@ -112,8 +112,8 @@ public final class RuimCard extends Handler implements IccCard {
                     //this should be transient-only
                     return State.UNKNOWN;
                 case RUIM_READY:
-                    return State.READY;
                 case NV_READY:
+                    return State.READY;
                 case NV_NOT_READY:
                     return State.ABSENT;
             }

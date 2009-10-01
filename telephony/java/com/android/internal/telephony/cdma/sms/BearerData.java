@@ -806,7 +806,7 @@ public final class BearerData {
     }
 
     private static void decodeUserData(BearerData bData, BitwiseInputStream inStream)
-        throws BitwiseInputStream.AccessException
+        throws BitwiseInputStream.AccessException, CodingException
     {
         int paramBytes = inStream.read(8);
         bData.userData = new UserData();
@@ -821,8 +821,44 @@ public final class BearerData {
         }
         bData.userData.numFields = inStream.read(8);
         consumedBits += 8;
-        int dataBits = (paramBytes * 8) - consumedBits;
+
+        /**
+         * Size of user data to read will depend on character size.
+         * (See 3GPP2 C.R1001-F, v1.0, table 9.1-1)
+         */
+
+        int dataBits;
+
+        switch (bData.userData.msgEncoding) {
+            case UserData.ENCODING_OCTET:
+                dataBits = 8 * bData.userData.numFields;
+                break;
+            case UserData.ENCODING_7BIT_ASCII:
+            case UserData.ENCODING_IA5:
+            case UserData.ENCODING_GSM_7BIT_ALPHABET:
+                dataBits = 7 * bData.userData.numFields;
+                break;
+            case UserData.ENCODING_UNICODE_16:
+                dataBits = 16 * bData.userData.numFields;
+                break;
+            case UserData.ENCODING_IS91_EXTENDED_PROTOCOL:
+            case UserData.ENCODING_GSM_DCS:
+                // with padding is ok, gets handled decodeUserDataPayload(),
+                // and decodeIs91()
+                dataBits = paramBytes * 8 - consumedBits;
+                break;
+            default:
+                throw new CodingException("unsupported user data encoding ("
+                        + bData.userData.msgEncoding + ")");
+        }
+
         bData.userData.payload = inStream.readByteArray(dataBits);
+        consumedBits += dataBits;
+
+        int paddingBits = paramBytes * 8 - consumedBits;
+        if (paddingBits > 0) {
+            inStream.readByteArray(paddingBits); // discard padding.
+        }
     }
 
     private static String decodeUtf16(byte[] data, int offset, int numFields)
