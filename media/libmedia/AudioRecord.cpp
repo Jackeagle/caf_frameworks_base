@@ -432,7 +432,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
             if (__builtin_expect(result!=NO_ERROR, false)) {
                 cblk->waitTimeMs += waitTimeMs;
                 if (cblk->waitTimeMs >= cblk->bufferTimeoutMs) {
-                    LOGW(   "obtainBuffer timed out (is the CPU pegged?) "
+                    LOGI(   "obtainBuffer timed out (is the CPU pegged?) "
                             "user=%08x, server=%08x", cblk->user, cblk->server);
                     timeout = 1;
                     cblk->waitTimeMs = 0;
@@ -493,7 +493,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
       }
       else
       {
-         LOGE("The buffer ready count less than the minimum. SO dont expect any data");
+         LOGI("The buffer ready count less than the minimum. SO dont expect any data");
          audioBuffer->size = 0;
       }
     }

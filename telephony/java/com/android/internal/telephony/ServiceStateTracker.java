@@ -49,7 +49,7 @@ public abstract class ServiceStateTracker extends Handler {
     protected CommandsInterface cm;
 
     public ServiceState ss;
-    protected ServiceState newSS;
+    public ServiceState newSS;
 
     public SignalStrength mSignalStrength;
 

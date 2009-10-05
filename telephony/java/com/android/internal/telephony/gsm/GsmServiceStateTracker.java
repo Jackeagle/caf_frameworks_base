@@ -159,13 +159,15 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     private String curSpn = null;
     private String curPlmn = null;
     private int curSpnRule = 0;
-    boolean registeredFirstTime = false;
+    String  prevRegPlmn = null;
+    String  newRegPlmn = null;
     //***** Constants
 
     static final boolean DBG = true;
     static final String LOG_TAG = "GSM";
     static final String EONS_TAG = "EONS";
     static final int EONS_ALG = 0x01;
+    static final int EONS_DISABLED = 0;
     // signal strength poll rate
     static final int POLL_PERIOD_MILLIS = 20 * 1000;
 
@@ -539,7 +541,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 break;
 
             case EVENT_SIM_RECORDS_LOADED:
-                updateSpnDisplay();
+                checkEonsAndUpdateSpnDisplay();
                 break;
 
             case EVENT_LOCATION_UPDATES_ENABLED:
@@ -823,15 +825,14 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     if (opNames != null && opNames.length >= 3) {
                         newSS.setOperatorName (
                                 opNames[0], opNames[1], opNames[2]);
-                        if((phone.mSIMRecords.getOnsAlg() == EONS_ALG)
-                            && (opNames[2] != null)
-                            && (opNames[2].trim().length() != 0)
-                            && !registeredFirstTime){
-                           if(phone.mSIMRecords.updateSimRecords()){
-                              registeredFirstTime = true;
-                              Log.d(EONS_TAG,opNames[2] +
-                              "After First reg updateSimRecords() once");
-                            }
+                        newRegPlmn = newSS.getOperatorNumeric();
+                        if((phone.mSIMRecords.getOnsAlg() == EONS_ALG) &&
+                           (newRegPlmn != null) && (newRegPlmn.trim().length() != 0)
+                           && !newRegPlmn.equals(prevRegPlmn)) {
+                           Log.i(EONS_TAG,"Calling updateSimRecords() if plmn changed, prev plmn "
+                                 + prevRegPlmn + ", new plmn " + newRegPlmn);
+                           phone.mSIMRecords.updateSimRecords(1);
+                           prevRegPlmn = newRegPlmn;
                         }
                     }
                 break;
@@ -1017,16 +1018,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         newSS.setStateOutOfService();
 
         GsmCellLocation tcl = cellLoc;
-        /*
-         *Update all cached sim records when LAC has changed
-         */
-        if (cellLoc.getLac() != newCellLoc.getLac()) {
-            if(phone.mSIMRecords.getOnsAlg() == EONS_ALG) {
-               Log.d(EONS_TAG,
-                     "LOC updated calling updateSimRecords()");
-               phone.mSIMRecords.updateSimRecords();
-            }
-        }
+
         cellLoc = newCellLoc;
         newCellLoc = tcl;
 
@@ -1115,7 +1107,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             phone.setSystemProperty(PROPERTY_OPERATOR_ISROAMING,
                 ss.getRoaming() ? "true" : "false");
 
-            updateSpnDisplay();
+            checkEonsAndUpdateSpnDisplay();
             phone.notifyServiceStateChanged(ss);
         }
 
@@ -1141,6 +1133,13 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
 
         if (hasLocationChanged) {
             phone.notifyLocationChanged();
+            if(phone.mSIMRecords.getOnsAlg() == EONS_ALG) {
+               /*
+                *Update all cached OPL/PNN records if LAC changes
+               */
+               Log.i(EONS_TAG,"LOC updated calling updateSimRecords()");
+               phone.mSIMRecords.updateSimRecords(0);
+            }
         }
 
         if (! isGprsConsistant(gprsState, ss.getState())) {
@@ -1947,6 +1946,15 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             // update restricted state notification
             notificationManager.notify(notificationId, mNotification);
         }
+    }
+
+    void checkEonsAndUpdateSpnDisplay() {
+       if ((!SystemProperties.getBoolean("persist.cust.tel.adapt",false) &&
+            !SystemProperties.getBoolean("persist.cust.tel.eons",false))  ||
+           (phone.mSIMRecords.getSstPlmnOplValue() == EONS_DISABLED))
+       {
+            updateSpnDisplay();
+       }
     }
 
     private void log(String s) {

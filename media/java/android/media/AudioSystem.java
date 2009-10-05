@@ -135,6 +135,7 @@ public class AudioSystem
     public static final int ROUTE_TTY_DEVICE_FULL   = (1 << 7);
     public static final int ROUTE_TTY_DEVICE_HCO    = (1 << 8);
     public static final int ROUTE_TTY_DEVICE_VCO    = (1 << 9);
+    public static final int ROUTE_FMRADIO           = (1 << 10);
     public static final int ROUTE_ALL               = 0xFFFFFFFF;
 
     /*
