@@ -681,16 +681,20 @@ DBusHandlerResult opp_event_filter(DBusMessage *msg, JNIEnv *env) {
     } else if (dbus_message_is_signal(msg, OBEXD_DBUS_SRV_MGR_IFC,
                                       OBEXD_DBUS_SRV_MGR_SGNL_OPP_TRANS_COMPLETED)) {
         const char *c_transfer;
+        dbus_bool_t c_success;
 
         if (dbus_message_get_args(msg, &err,
                                   DBUS_TYPE_OBJECT_PATH, &c_transfer,
+                                  DBUS_TYPE_BOOLEAN, &c_success,
                                   DBUS_TYPE_INVALID)) {
-            LOGV("... Transfer Completed = %s", c_transfer);
+            LOGV("... Transfer Completed = %s  Success = %d", c_transfer,
+                c_success);
 
             jstring transfer = env->NewStringUTF(c_transfer);
+            jboolean success = c_success ? JNI_TRUE : JNI_FALSE;
 
             env->CallVoidMethod(nat->me, method_onObexTransferComplete,
-                                transfer, JNI_TRUE, NULL);
+                                transfer, success, NULL);
 
             env->DeleteLocalRef(transfer);
         } else {
