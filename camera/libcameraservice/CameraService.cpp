@@ -221,6 +221,7 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
 {
     int callingPid = getCallingPid();
     LOGD("Client::Client E (pid %d)", callingPid);
+    Mutex::Autolock lock(mLock);
     mCameraService = cameraService;
     mCameraClient = cameraClient;
     mClientPid = clientPid;
