@@ -214,7 +214,6 @@ final class MountListener implements Runnable {
 
             writeCommand(VOLD_CMD_SEND_UMS_STATUS);
             mountMedia(Environment.getExternalStorageDirectory().getAbsolutePath());
-            writeCommand(VOLD_CMD_MOUNTED_VOLUMES);
 
             while (true) {
                 int count = inputStream.read(buffer);
