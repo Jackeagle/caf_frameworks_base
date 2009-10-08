@@ -132,6 +132,10 @@ public final class SimCard extends Handler implements IccCard {
                 case ICC_PUK:               return State.PUK_REQUIRED;
                 case ICC_NETWORK_PERSONALIZATION: return State.NETWORK_LOCKED;
                 case ICC_CARD_IO_ERROR:            return State.CARD_IO_ERROR;
+                case ICC_NETWORK_SUBSET_PERSONALIZATION: return State.NETWORK_SUBSET_LOCKED;
+                case ICC_CORPORATE_PERSONALIZATION: return State.CORPORATE_LOCKED;
+                case ICC_SERVICE_PROVIDER_PERSONALIZATION: return State.SERVICE_PROVIDER_LOCKED;
+                case ICC_SIM_PERSONALIZATION: return State.SIM_LOCKED;
             }
         }
 
@@ -440,6 +444,10 @@ public final class SimCard extends Handler implements IccCard {
         boolean transitionedIntoAbsent;
         boolean transitionedIntoCardIOError;
         boolean transitionedIntoNetworkLocked;
+        boolean transitionedIntoNetworkSubsetLocked;
+        boolean transitionedIntoCorporateLocked;
+        boolean transitionedIntoServiceProviderLocked;
+        boolean transitionedIntoSimLocked;
 
         SimCard.State oldState, newState;
 
@@ -456,6 +464,14 @@ public final class SimCard extends Handler implements IccCard {
         transitionedIntoCardIOError = (oldState != State.CARD_IO_ERROR && newState == State.CARD_IO_ERROR);
         transitionedIntoNetworkLocked = (oldState != State.NETWORK_LOCKED
                 && newState == State.NETWORK_LOCKED);
+        transitionedIntoNetworkSubsetLocked = (oldState != State.NETWORK_SUBSET_LOCKED
+                && newState == State.NETWORK_SUBSET_LOCKED);
+        transitionedIntoCorporateLocked = (oldState != State.CORPORATE_LOCKED
+                && newState == State.CORPORATE_LOCKED);
+        transitionedIntoServiceProviderLocked = (oldState != State.SERVICE_PROVIDER_LOCKED
+                && newState == State.SERVICE_PROVIDER_LOCKED);
+        transitionedIntoSimLocked = (oldState != State.SIM_LOCKED
+                && newState == State.SIM_LOCKED);
 
         if (transitionedIntoPinLocked) {
             if(DBG) log("Notify SIM pin or puk locked.");
@@ -475,6 +491,22 @@ public final class SimCard extends Handler implements IccCard {
             networkLockedRegistrants.notifyRegistrants();
             broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_ICC_LOCKED,
                   INTENT_VALUE_LOCKED_NETWORK);
+        } else if (transitionedIntoNetworkSubsetLocked) {
+            Log.i(LOG_TAG,"Notify SIM network Subset locked.");
+            broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_ICC_LOCKED,
+                  INTENT_VALUE_LOCKED_NETWORK_SUBSET);
+        } else if (transitionedIntoCorporateLocked) {
+            Log.i(LOG_TAG,"Notify SIM Corporate locked.");
+            broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_ICC_LOCKED,
+                  INTENT_VALUE_LOCKED_CORPORATE);
+        } else if (transitionedIntoServiceProviderLocked) {
+            Log.i(LOG_TAG,"Notify SIM Service Provider locked.");
+            broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_ICC_LOCKED,
+                  INTENT_VALUE_LOCKED_SERVICE_PROVIDER);
+        } else if (transitionedIntoSimLocked) {
+            Log.i(LOG_TAG,"Notify SIM SIM locked.");
+            broadcastSimStateChangedIntent(SimCard.INTENT_VALUE_ICC_LOCKED,
+                  INTENT_VALUE_LOCKED_SIM);
         }
     }
 
