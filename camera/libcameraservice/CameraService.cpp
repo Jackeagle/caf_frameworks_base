@@ -137,6 +137,10 @@ sp<ICamera> CameraService::connect(const sp<ICameraClient>& cameraClient)
 
     // create a new Client object
     client = new Client(this, cameraClient, callingPid);
+
+    if(client->getCameraDevice() == NULL)
+        return NULL;
+
     mClient = client;
 #if DEBUG_CLIENT_REFERENCES
     // Enable tracking for this object, and track increments and decrements of
