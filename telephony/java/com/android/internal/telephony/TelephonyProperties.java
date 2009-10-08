@@ -108,5 +108,5 @@ public interface TelephonyProperties
     static final String PROPERTY_ECM_EXIT_TIMER = "ro.cdma.ecmexittimer";
 
     /** The international dialing prefix conversion string */
-    static final String PROPERTY_IDP_STRING = "ro.cdma.idpstring";
+    static final String PROPERTY_IDP_STRING = "persist.ro.cdma.idpstring";
 }
