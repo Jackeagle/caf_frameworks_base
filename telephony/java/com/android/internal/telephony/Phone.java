@@ -1660,9 +1660,15 @@ public interface Phone {
     void unsetOnEcbModeExitResponse(Handler h);
 
     /**
-    * Get CspPlmnStatus from EF_CSP
-    * @return 1 if CspPlmn bit is set, 0 if it is not set
-    */
+     * Get CspPlmnStatus from EF_CSP
+     * @return 1 if CspPlmn bit is set, 0 if it is not set
+     */
     public int getCspPlmnStatus();
+
+    /**
+     * Checks whether the modem is in power save mode
+     * @return 1 if modem is in power save mode
+     */
+    boolean isModemPowerSave();
 
 }
