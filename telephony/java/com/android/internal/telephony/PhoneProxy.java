@@ -805,4 +805,9 @@ public class PhoneProxy extends Handler implements Phone {
     public int getCspPlmnStatus() {
         return mActivePhone.getCspPlmnStatus();
     }
+
+    public boolean isModemPowerSave() {
+        return mActivePhone.isModemPowerSave();
+    }
+
 }

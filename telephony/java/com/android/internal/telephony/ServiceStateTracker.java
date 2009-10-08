@@ -63,6 +63,8 @@ public abstract class ServiceStateTracker extends Handler {
     // If we're getting unsolicited signal strength updates from the radio,
     // set value to true and don't bother polling any more
 
+    protected boolean mModemPowerSaveStatus;
+
     protected RegistrantList networkAttachedRegistrants = new RegistrantList();
     protected RegistrantList roamingOnRegistrants = new RegistrantList();
     protected RegistrantList roamingOffRegistrants = new RegistrantList();
@@ -160,6 +162,9 @@ public abstract class ServiceStateTracker extends Handler {
         return mDesiredPowerState;
     }
 
+    public boolean getPowerSaveStatus() {
+       return mModemPowerSaveStatus;
+    }
     /**
      * Registration point for combined roaming on
      * combined roaming is true when roaming is true and ONS differs SPN

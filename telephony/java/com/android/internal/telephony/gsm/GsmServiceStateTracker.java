@@ -1532,10 +1532,13 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     }
 
     /** code is registration state 0-5 from TS 27.007 7.2 */
-    private int
-    regCodeToServiceState(int code) {
-        switch (code) {
-            case 0:
+    private int regCodeToServiceState(int code) {
+       mModemPowerSaveStatus = false;
+       switch (code) {
+          case 0:
+             mModemPowerSaveStatus = true;
+                return ServiceState.STATE_OUT_OF_SERVICE;
+
             case 2: // 2 is "searching"
                 return ServiceState.STATE_OUT_OF_SERVICE;
 
