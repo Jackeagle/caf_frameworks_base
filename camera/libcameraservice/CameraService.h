@@ -122,6 +122,9 @@ private:
         // our client...
         const sp<ICameraClient>&    getCameraClient() const { return mCameraClient; }
 
+        // camera hardware handle
+        sp<CameraHardwareInterface>& getCameraDevice() { return mHardware; }
+
     private:
         friend class CameraService;
                                 Client(const sp<CameraService>& cameraService,
