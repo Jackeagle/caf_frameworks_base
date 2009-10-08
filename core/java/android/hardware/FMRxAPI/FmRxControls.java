@@ -66,7 +66,7 @@ class FmRxControls {
     public void muteControl(int fd, boolean on) {
         mStateStereo = on;
         if(on){
-            int err = FmReceiverJNI.audioControlNative(fd, 1, 1);
+            int err = FmReceiverJNI.audioControlNative(fd, 3, 3);
             Log.d("ControlMute", "Returned: " + err);
         }else
             FmReceiverJNI.audioControlNative(fd, 0,1);
