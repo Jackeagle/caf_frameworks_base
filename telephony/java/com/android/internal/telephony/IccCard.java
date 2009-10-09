@@ -47,6 +47,26 @@ public interface IccCard {
     static public final String INTENT_VALUE_LOCKED_ON_PUK = "PUK";
     /* NETWORK means ICC is locked on NETWORK PERSONALIZATION */
     static public final String INTENT_VALUE_LOCKED_NETWORK = "NETWORK";
+    /* NETWORK SUBSET means ICC is locked on NETWORK SUBSET PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_NETWORK_SUBSET = "NETWORK SUBSET";
+    /* CORPORATE means ICC is locked on CORPORATE PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_CORPORATE = "CORPORATE";
+    /* SERVICE PROVIDER means ICC is locked on SERVICE PROVIDER PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_SERVICE_PROVIDER = "SERVICE PROVIDER";
+    /* SIM means ICC is locked on SIM PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_SIM = "SIM";
+    /* RUIM NETWORK1 means ICC is locked on RUIM NETWORK1 PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_RUIM_NETWORK1 = "RUIM NETWORK1";
+    /* RUIM NETWORK2 means ICC is locked on RUIM NETWORK2 PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_RUIM_NETWORK2 = "RUIM NETWORK2";
+    /* RUIM HRPD means ICC is locked on RUIM HRPD PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_RUIM_HRPD = "RUIM HRPD";
+    /* RUIM CORPORATE means ICC is locked on RUIM CORPORATE PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_RUIM_CORPORATE = "RUIM CORPORATE";
+    /* RUIM SERVICE PROVIDER means ICC is locked on RUIM SERVICE PROVIDER PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_RUIM_SERVICE_PROVIDER = "RUIM SERVICE PROVIDER";
+    /* RUIM RUIM means ICC is locked on RUIM RUIM PERSONALIZATION */
+    static public final String INTENT_VALUE_LOCKED_RUIM_RUIM = "RUIM RUIM";
 
 
     /*
@@ -61,7 +81,17 @@ public interface IccCard {
         PUK_REQUIRED,
         NETWORK_LOCKED,
         READY,
-        CARD_IO_ERROR;
+        CARD_IO_ERROR,
+        NETWORK_SUBSET_LOCKED,
+        CORPORATE_LOCKED,
+        SERVICE_PROVIDER_LOCKED,
+        SIM_LOCKED,
+        RUIM_NETWORK1_LOCKED,
+        RUIM_NETWORK2_LOCKED,
+        RUIM_HRPD_LOCKED,
+        RUIM_CORPORATE_LOCKED,
+        RUIM_SERVICE_PROVIDER_LOCKED,
+        RUIM_RUIM_LOCKED;
 
         public boolean isPinLocked() {
             return ((this == PIN_REQUIRED) || (this == PUK_REQUIRED));

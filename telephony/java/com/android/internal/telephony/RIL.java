@@ -2816,6 +2816,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 index = status.gsm_umts_subscription_app_index;
             }
 
+            Log.i(LOG_TAG,"app_state " + status.application.get(index).app_state +
+                  ", perso_substate " + status.application.get(index).perso_substate);
             // check if PIN required
             if (status.application.get(index).app_state.isPinRequired()) {
                 return IccStatus.ICC_PIN;
@@ -2824,7 +2826,56 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 return IccStatus.ICC_PUK;
             }
             if (status.application.get(index).app_state.isSubscriptionPersoEnabled()) {
-                return IccStatus.ICC_NETWORK_PERSONALIZATION;
+                //Decoding the personalization sub type for proper handling.
+                //Following De Personalizations are supported.
+                //01.PERSOSUBSTATE_SIM_NETWORK
+                //02.PERSOSUBSTATE_SIM_NETWORK_SUBSET
+                //03.PERSOSUBSTATE_SIM_CORPORATE
+                //04.PERSOSUBSTATE_SIM_SERVICE_PROVIDER
+                //05.PERSOSUBSTATE_SIM_SIM
+                //06.PERSOSUBSTATE_RUIM_NETWORK1
+                //07.PERSOSUBSTATE_RUIM_NETWORK2
+                //08.PERSOSUBSTATE_RUIM_HRPD
+                //09.PERSOSUBSTATE_RUIM_CORPORATE
+                //10.PERSOSUBSTATE_RUIM_SERVICE_PROVIDER
+                //11.PERSOSUBSTATE_RUIM_RUIM
+                if (status.application.get(index).perso_substate.isPersoSubStateSimNetwork()) {
+                    return IccStatus.ICC_NETWORK_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateSimNetworkSubset()) {
+                    return IccStatus.ICC_NETWORK_SUBSET_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateSimCorporate()) {
+                    return IccStatus.ICC_CORPORATE_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateSimServiceProvider()) {
+                    return IccStatus.ICC_SERVICE_PROVIDER_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateSimSim()) {
+                    return IccStatus.ICC_SIM_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateRuimNetwork1()) {
+                    return IccStatus.ICC_RUIM_NETWORK1_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateRuimNetwork2()) {
+                    return IccStatus.ICC_RUIM_NETWORK2_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateRuimHrpd()) {
+                    return IccStatus.ICC_RUIM_HRPD_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateRuimCorporate()) {
+                    return IccStatus.ICC_RUIM_CORPORATE_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateRuimServiceProvider()) {
+                   return IccStatus.ICC_RUIM_SERVICE_PROVIDER_PERSONALIZATION;
+                }
+                else if (status.application.get(index).perso_substate.isPersoSubStateRuimRuim()) {
+                   return IccStatus.ICC_RUIM_RUIM_PERSONALIZATION;
+                }
+                else {
+                    Log.e(LOG_TAG,"RIL_REQUEST_GET_SIM_STATUS UnSupported Personalization");
+                    return IccStatus.ICC_PERSONALIZATION_NOT_SUPPORTED;
+                }
             }
             if (status.application.get(index).app_state.isAppReady()) {
                 return IccStatus.ICC_READY;
