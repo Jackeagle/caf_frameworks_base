@@ -1350,4 +1350,8 @@ public class CDMAPhone extends PhoneBase {
         mDataConnection.onCleanUpConnection(false, REASON_RADIO_TURNED_OFF);
     }
 
+    public boolean isModemPowerSave() {
+       return mSST.getPowerSaveStatus();
+    }
+
 }

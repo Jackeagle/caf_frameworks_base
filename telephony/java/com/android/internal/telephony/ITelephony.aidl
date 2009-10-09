@@ -255,5 +255,11 @@ interface ITelephony {
       */
     int getVoiceMessageCount();
 
+  /**
+   * Checks whether the modem is in power save mode
+   * {@hide}
+   */
+  boolean isModemPowerSave();
+
 }
 
