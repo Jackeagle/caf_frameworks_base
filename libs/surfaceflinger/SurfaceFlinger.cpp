@@ -332,6 +332,7 @@ void SurfaceFlinger::bootFinished()
     const nsecs_t duration = now - mBootTime;
     LOGI("Boot is finished (%ld ms)", long(ns2ms(duration)) );  
     property_set("ctl.stop", "bootanim");
+    property_set("dev.bootdone", "1");
 }
 
 void SurfaceFlinger::onFirstRef()
