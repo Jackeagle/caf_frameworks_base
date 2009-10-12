@@ -1049,8 +1049,10 @@ public class CDMAPhone extends PhoneBase {
                         onComplete.sendToTarget();
                     }
                 }
+                break;
 
                 default:{
+                    Log.e(LOG_TAG, "Unhandled message received : " + msg.toString());
                     throw new RuntimeException("unexpected event not handled");
                 }
             }
