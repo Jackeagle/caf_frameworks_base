@@ -276,7 +276,7 @@ status_t MidiFile::pause()
     if (!mEasHandle) {
         return ERROR_NOT_OPEN;
     }
-    if ((mState == EAS_STATE_PAUSING) || (mState == EAS_STATE_PAUSED)) return NO_ERROR;
+    if ((mState == EAS_STATE_PAUSING) || (mState == EAS_STATE_PAUSED) || (mState == EAS_STATE_STOPPING) || (mState == EAS_STATE_STOPPED)) return NO_ERROR;
     if (EAS_Pause(mEasData, mEasHandle) != EAS_SUCCESS) {
         return ERROR_EAS_FAILURE;
     }
