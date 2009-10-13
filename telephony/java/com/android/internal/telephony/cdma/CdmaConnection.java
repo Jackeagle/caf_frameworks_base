@@ -894,11 +894,12 @@ public class CdmaConnection extends Connection {
             if (PhoneNumberUtils.isDialable(c)) {
                 if (c == '+') {
                     String ps = null;
-                    SystemProperties.get(TelephonyProperties.PROPERTY_IDP_STRING, ps);
-                    if (TextUtils.isEmpty(ps)) {
-                        ps = "011";
+                    ps = SystemProperties.get(TelephonyProperties.PROPERTY_IDP_STRING);
+                    if (!TextUtils.isEmpty(ps) && currIndex == 0) {
+                        ret.append(ps);
+                    } else {
+                        ret.append(c);
                     }
-                    ret.append(ps);
                 } else {
                     ret.append(c);
                 }
