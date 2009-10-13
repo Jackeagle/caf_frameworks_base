@@ -110,13 +110,13 @@ public class PhoneFactory {
 
                 int phoneType = getPhoneType(networkMode);
                 if (phoneType == RILConstants.GSM_PHONE) {
+                    Log.i(LOG_TAG, "Creating GSMPhone");
                     sProxyPhone = new PhoneProxy(new GSMPhone(context,
                             sCommandsInterface, sPhoneNotifier));
-                    Log.i(LOG_TAG, "Creating GSMPhone");
                 } else if (phoneType == RILConstants.CDMA_PHONE) {
+                    Log.i(LOG_TAG, "Creating CDMAPhone");
                     sProxyPhone = new PhoneProxy(new CDMAPhone(context,
                             sCommandsInterface, sPhoneNotifier));
-                    Log.i(LOG_TAG, "Creating CDMAPhone");
                 }
 
                 sMadeDefaults = true;
