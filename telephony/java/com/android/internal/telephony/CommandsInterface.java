@@ -1192,9 +1192,9 @@ public interface CommandsInterface {
 
     void invokeOemRilRequestStrings(String[] strings, Message response);
 
-    void setOnUnsolOemHookRaw(Handler h, int what, Object obj);
+    void setOnUnsolOemHookExtApp(Handler h, int what, Object obj);
 
-    void unSetOnUnsolOemHookRaw(Handler h);
+    void unSetOnUnsolOemHookExtApp(Handler h);
 
     /**
      * Send TERMINAL RESPONSE to the SIM, after processing a proactive command

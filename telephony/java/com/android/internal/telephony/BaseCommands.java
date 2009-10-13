@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +56,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mVoicePrivacyOnRegistrants = new RegistrantList();
     protected RegistrantList mVoicePrivacyOffRegistrants = new RegistrantList();
     protected Registrant mUnsolOemHookRawRegistrant;
+    protected Registrant mUnsolOemHookExtAppRegistrant;
     protected RegistrantList mOtaProvisionRegistrants = new RegistrantList();
     protected RegistrantList mCallWaitingInfoRegistrants = new RegistrantList();
     protected RegistrantList mDisplayInfoRegistrants = new RegistrantList();
@@ -64,6 +66,10 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mLineControlInfoRegistrants = new RegistrantList();
     protected RegistrantList mT53ClirInfoRegistrants = new RegistrantList();
     protected RegistrantList mT53AudCntrlInfoRegistrants = new RegistrantList();
+    protected RegistrantList mCdmaFwdBurstDtmfRegistrants = new RegistrantList();
+    protected RegistrantList mLocalRingbackToneRegistrants = new RegistrantList();
+    protected RegistrantList mCdmaFwdContDtmfStartRegistrants = new RegistrantList();
+    protected RegistrantList mCdmaFwdContDtmfStopRegistrants = new RegistrantList();
 
     protected Registrant mSMSRegistrant;
     protected Registrant mNITZTimeRegistrant;
@@ -511,6 +517,14 @@ public abstract class BaseCommands implements CommandsInterface {
         mUnsolOemHookRawRegistrant.clear();
     }
 
+    public void setOnUnsolOemHookExtApp(Handler h, int what, Object obj) {
+        mUnsolOemHookExtAppRegistrant = new Registrant(h, what, obj);
+    }
+
+    public void unSetOnUnsolOemHookExtApp(Handler h) {
+        mUnsolOemHookExtAppRegistrant.clear();
+    }
+
     public void unregisterForSignalInfo(Handler h) {
         mSignalInfoRegistrants.remove(h);
     }
@@ -567,6 +581,38 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForT53AudioControlInfo(Handler h) {
         mT53AudCntrlInfoRegistrants.remove(h);
+    }
+
+    public void registerForLocalRingbackTone(Handler h, int what, Object obj) {
+        mLocalRingbackToneRegistrants.addUnique(h, what, obj);
+    }
+
+    public void unregisterForLocalRingbackTone(Handler h) {
+        mLocalRingbackToneRegistrants.remove(h);
+    }
+
+    public void registerForCdmaFwdBurstDtmf(Handler h, int what, Object obj) {
+        mCdmaFwdBurstDtmfRegistrants.addUnique(h, what, obj);
+    }
+
+    public void unregisterForCdmaFwdBurstDtmf(Handler h) {
+        mCdmaFwdBurstDtmfRegistrants.remove(h);
+    }
+
+    public void registerForCdmaFwdContDtmfStart(Handler h, int what, Object obj) {
+        mCdmaFwdContDtmfStartRegistrants.addUnique(h, what, obj);
+    }
+
+    public void unregisterForCdmaFwdContDtmfStart(Handler h) {
+        mCdmaFwdContDtmfStartRegistrants.remove(h);
+    }
+
+    public void registerForCdmaFwdContDtmfStop(Handler h, int what, Object obj) {
+        mCdmaFwdContDtmfStopRegistrants.addUnique(h, what, obj);
+    }
+
+    public void unregisterForCdmaFwdContDtmfStop(Handler h) {
+        mCdmaFwdContDtmfStopRegistrants.remove(h);
     }
 
     //***** Protected Methods
