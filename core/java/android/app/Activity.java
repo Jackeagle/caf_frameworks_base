@@ -38,6 +38,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -2529,6 +2530,10 @@ public class Activity extends ContextThemeWrapper
      */
     public void startSearch(String initialQuery, boolean selectInitialQuery, 
             Bundle appSearchData, boolean globalSearch) {
+
+        if (SystemProperties.getInt("debug.log.enable", 0) == 1) {
+            Log.v(TAG, "Launching Search UI");
+        }
         ensureSearchManager();
         mSearchManager.startSearch(initialQuery, selectInitialQuery, getComponentName(),
                         appSearchData, globalSearch); 
