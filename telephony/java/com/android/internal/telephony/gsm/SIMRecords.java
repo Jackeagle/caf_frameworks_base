@@ -256,6 +256,7 @@ public final class SIMRecords extends IccRecords {
         phone.setSystemProperty(PROPERTY_ICC_OPERATOR_NUMERIC, null);
         phone.setSystemProperty(PROPERTY_ICC_OPERATOR_ALPHA, null);
         phone.setSystemProperty(PROPERTY_ICC_OPERATOR_ISO_COUNTRY, null);
+        SystemProperties.set("gsm.eons.name", null);
 
         // recordsRequested is set to false indicating that the SIM
         // read requests made so far are not valid. This is set to
@@ -320,9 +321,15 @@ public final class SIMRecords extends IccRecords {
     String getPnnLongName()
     {
         if(pnnDataPresent) {
+           //Update EONS name in system property so that it can be used in
+           //phone status display page.
+           SystemProperties.set("gsm.eons.name", pnnDataLongName);
+           Log.i(EONS_TAG,"Property gsm.eons.name set to " +
+                 SystemProperties.get("gsm.eons.name"));
            return pnnDataLongName;
         }
         else {
+           SystemProperties.set("gsm.eons.name", null);
            return null;
         }
     }
