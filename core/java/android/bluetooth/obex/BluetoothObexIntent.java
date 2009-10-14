@@ -63,6 +63,18 @@ public interface BluetoothObexIntent {
     public static final String PROFILE =
         "android.bluetooth.obex.intent.PROFILE";
     /**
+     * Broadcasted to update listeners on OPP connection status.
+     * <p>
+     * Extras:
+     * <ul>
+     *   <li>SUCCESS (boolean)
+     * </ul>
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String CONNECT_STATUS_ACTION =
+        "android.bluetooth.obex.intent.action.CONNECT_STATUS";
+
+    /**
      * Broadcasted to update listeners on OBEX transfer progress.
      * <p>
      * Extras:
