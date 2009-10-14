@@ -999,6 +999,8 @@ public class PduPersister {
                     + "content://mms/temp.");
         }
 
+        PDU_CACHE_INSTANCE.purge(uri);
+
         PduHeaders header = pdu.getPduHeaders();
         PduBody body = null;
         ContentValues values = new ContentValues();
