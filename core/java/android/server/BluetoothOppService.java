@@ -371,21 +371,16 @@ public class BluetoothOppService extends IBluetoothOpp.Stub {
             // Remove transfer from pending operation list.
             mTransferDb.deleteByAddress(address);
 
-            if (isError) {
+            // Notify application layer of connection status
+            Intent intent = new Intent(BluetoothObexIntent.CONNECT_STATUS_ACTION);
+            intent.putExtra(BluetoothObexIntent.SUCCESS, isError ? false : true);
+
+            if (isError == true) {
                 // Remove transfer from transfer database
                 mTransferDb.deleteByFilename(dbItem.mFilename);
-
-                // Notify application layer of failure
-                Intent intent = new Intent(BluetoothObexIntent.TX_COMPLETE_ACTION);
-                intent.putExtra(BluetoothObexIntent.OBJECT_FILENAME, dbItem.mFilename);
-                intent.putExtra(BluetoothObexIntent.PROFILE, BluetoothObexIntent.PROFILE_OPP);
-                intent.putExtra(BluetoothObexIntent.SUCCESS, false);
-                intent.putExtra(BluetoothObexIntent.ERROR_MESSAGE,
-                                "Unknown sendFilesNative failure.");
-                mContext.sendBroadcast(intent, BLUETOOTH_PERM);
             }
 
-            // No need to signal anything on success.
+            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
         }
     }
 
