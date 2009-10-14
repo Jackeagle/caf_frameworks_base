@@ -364,4 +364,72 @@ int CameraParameters::getMaxZoomValue() const
     return getInt("max-zoom-value");
 }
 
+int CameraParameters::getRecordLocation() const
+{
+    LOGD(" getRecordLocation value is  %s ", get("record-location"));
+    if( (NULL == get("record-location") ) )
+        return 0;
+    else
+       return atoi(get("record-location"));
+}
+
+const char* CameraParameters::getLatitudeRef() const
+{
+    LOGD(" getLatitudeRef value is  %s ", get("gps-latitude-ref"));
+    if( (NULL == get("gps-latitude-ref") ) )
+        return 0;
+    else
+       return (get("gps-latitude-ref"));
+}
+
+const char* CameraParameters::getLatitude() const
+{
+    LOGD(" getLatitude value is  %s ", get("gps-latitude"));
+    if( (NULL == get("gps-latitude") ) )
+        return 0;
+    else
+       return (get("gps-latitude"));
+}
+
+const char* CameraParameters::getLongitudeRef() const
+{
+    LOGD(" getLongitudeRef value is  %s ", get("gps-longitude-ref"));
+    if( (NULL == get("gps-longitude-ref") ) )
+        return 0;
+    else
+       return (get("gps-longitude-ref"));
+}
+
+const char* CameraParameters::getLongitude() const
+{
+    LOGD(" getLongitude value is  %s ", get("gps-longitude"));
+    if( (NULL == get("gps-longitude") ) )
+        return 0;
+    else
+       return (get("gps-longitude"));
+}
+
+int CameraParameters::getAltitudeRef() const
+{
+    return getInt("gps-altitude-ref");
+}
+
+const char* CameraParameters::getAltitude() const
+{
+    LOGD(" getAltitude value is  %s ", get("gps-altitude"));
+    if( (NULL == get("gps-altitude") ) )
+        return 0;
+    else
+       return (get("gps-altitude"));
+}
+
+const char* CameraParameters::getDateTime() const
+{
+    LOGD(" getDateTime value is  %s ", get("exif-dateTime"));
+    if( (NULL == get("exif-dateTime") ) )
+        return 0;
+    else
+       return (get("exif-dateTime"));
+}
+
 }; // namespace android
