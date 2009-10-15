@@ -270,6 +270,10 @@ implements DialogInterface.OnCancelListener, DialogInterface.OnDismissListener {
             int ident = msgData.getInt(KEY_IDENT);
             performStartSearch(initialQuery, selectInitialQuery, launchActivity,
                     appSearchData, globalSearch, searchManagerCallback, ident);
+
+            if (SystemProperties.getInt("debug.log.enable", 0) == 1) {
+                Log.v(TAG, "Displayed Search UI");
+            }
         }
 
     }
