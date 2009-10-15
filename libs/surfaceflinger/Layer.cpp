@@ -111,7 +111,11 @@ status_t Layer::setBuffers( Client* client,
 
     if ((flags & ISurfaceComposer::eGPU) && (mFlinger->getGPU() != 0)) {
         // FIXME: this value should come from the h/w
+#ifdef ADRENO_200
+        alignment = 32;
+#else
         alignment = 8; 
+#endif
         // FIXME: this is msm7201A specific, as its GPU only supports
         // BGRA_8888.
         if (format == PIXEL_FORMAT_RGBA_8888) {
