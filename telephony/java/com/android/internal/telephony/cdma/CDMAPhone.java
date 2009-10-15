@@ -426,7 +426,7 @@ public class CDMAPhone extends PhoneBase {
         return mRuimRecords.getPrlVersion();
     }
 
-    public String getCdmaMIN() {
+    public String getCdmaMin() {
         return mSST.getCdmaMin();
     }
 
