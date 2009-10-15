@@ -2339,10 +2339,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         switch(response) {
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
+                if (RILJ_LOGD) unsljLogMore(response, mState.toString());
+
                 /* has bonus radio state int */
                 setRadioStateFromRILInt(p.readInt());
-
-                if (RILJ_LOGD) unsljLogMore(response, mState.toString());
             break;
             case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
                 if (RILJ_LOGD) unsljLog(response);
