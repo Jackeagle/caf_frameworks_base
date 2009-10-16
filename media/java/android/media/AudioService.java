@@ -412,6 +412,9 @@ public class AudioService extends IAudioService.Stub {
                 // it does, it will handle adjusting the volume, so we won't below
                 adjustVolume = checkForRingerModeChange(oldIndex, direction);
             }
+            // Don't allow volume level to go down to zero 
+            if( streamType == AudioManager.STREAM_VOICE_CALL && oldIndex == 1 && direction == AudioManager.ADJUST_LOWER)
+                return;
 
             if (adjustVolume && streamState.adjustIndex(direction)) {
 
