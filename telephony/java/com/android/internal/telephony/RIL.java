@@ -3107,7 +3107,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         CdmaCallWaitingNotification notification = new CdmaCallWaitingNotification();
 
         notification.number = p.readString();
-        notification.numberPresentation = p.readInt();
+        notification.numberPresentation = DriverCall.presentationFromCLIP(p.readInt());
         notification.name = p.readString();
         notification.namePresentation = notification.numberPresentation;
         notification.isPresent = p.readInt();
