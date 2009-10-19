@@ -863,6 +863,8 @@ public final class CdmaCallTracker extends CallTracker {
         ringingCall.setGeneric(false);
         new CdmaConnection(phone.getContext(), cw, this, ringingCall);
 
+        updatePhoneState();
+
         // Finally notify application
         notifyCallWaitingInfo(cw);
     }
