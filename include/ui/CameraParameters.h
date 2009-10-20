@@ -97,6 +97,30 @@ public:
     /* Check if Camera is Enabled */
     int getCameraEnabledVal() const;
 
+    /* get the getRecordLocation Value */
+    int getRecordLocation() const;
+
+    /* get the LatitudeRef Value */
+    const char* getLatitudeRef() const;
+
+    /* get the Latitude Value */
+    const char* getLatitude() const;
+
+    /* get the LongitudeRef Value */
+    const char* getLongitudeRef() const;
+
+    /* get the Longitude Value */
+    const char* getLongitude() const;
+
+    /* get the AltitudeRef Value */
+    int getAltitudeRef() const;
+
+    /* get the Altitude Value */
+    const char* getAltitude() const;
+
+    /* get the getDateTime Value */
+    const char* getDateTime() const;
+
     /* Led Flash value */
     const char *getLedflashValue() const;
 
