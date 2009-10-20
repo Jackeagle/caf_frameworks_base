@@ -31,15 +31,23 @@ endif
 
 
 ifneq (, $(filter qsd8250_surf qsd8250_ffa, $(TARGET_PRODUCT)))
-  LOCAL_CFLAGS += -DQCOM_SCORPION -DSURF8K
+  LOCAL_CFLAGS += -DQCOM_SCORPION -DSURF8K -DWVGA
+endif
+
+ifneq (, $(filter msm7625_surf msm7625_ffa, $(TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DSURF7X25 -DHVGA
+endif
+
+ifneq (, $(filter msm7630_surf msm7630_ffa generic, $(TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DWVGA
 endif
 
 ifneq (, $(filter msm7627_surf msm7627_ffa, $(TARGET_PRODUCT)))
-    LOCAL_CFLAGS += -DSURF7X2X
+    LOCAL_CFLAGS += -DSURF7X2X -DWVGA
 endif
 
 ifeq ($(TARGET_PRODUCT),msm7201a_surf msm7201a_ffa)
-    LOCAL_CFLAGS += -DFEATURE_7K_PMEM
+    LOCAL_CFLAGS += -DFEATURE_7K_PMEM -DHVGA
 endif
 
 ifeq ($(strip $(BOARD_USES_ADRENO_200)), true)

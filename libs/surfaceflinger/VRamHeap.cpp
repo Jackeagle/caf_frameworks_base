@@ -55,9 +55,13 @@ namespace android {
  * (PMEM is used for 2D acceleration)
  * 8 MB of address space per client should be enough.
  */
+#ifdef HVGA
+static const int PMEM_SIZE = int(10 * 1024 * 1024);
+#endif
 
+#ifdef WVGA
 static const int PMEM_SIZE = int(16 * 1024 * 1024);
-
+#endif
 int SurfaceHeapManager::global_pmem_heap = 0;
 
 // ---------------------------------------------------------------------------

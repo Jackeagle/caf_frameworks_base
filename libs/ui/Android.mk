@@ -26,11 +26,11 @@ LOCAL_SRC_FILES:= \
 	SurfaceComposerClient.cpp \
 	SurfaceFlingerSynchro.cpp 
 
-ifneq (, $(filter msm7201a_surf msm7201a_ffa, $(TARGET_PRODUCT)))
-  LOCAL_CFLAGS += -DSURF7201A
+ifneq (, $(filter msm7201a_surf msm7201a_ffa msm7625_surf msm7625_ffa, $(TARGET_PRODUCT)))
+  LOCAL_CFLAGS += -DHVGA
 endif
 
-ifneq (, $(filter msm7201a_ffa msm7627_ffa, $(TARGET_PRODUCT)))
+ifneq (, $(filter msm7201a_ffa msm7627_ffa msm7625_ffa, $(TARGET_PRODUCT)))
   LOCAL_CFLAGS += -DFFA7K
 endif
 

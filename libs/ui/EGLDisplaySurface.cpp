@@ -412,7 +412,7 @@ status_t EGLDisplaySurface::mapFrameBuffer()
         return -errno;
 
     mOldYres = info.yres;
-#ifdef SURF7201A
+#ifdef HVGA
     // Changing the display resolution to hvga portrait for MSM7201A target 
     info.xres = 320;
     info.yres = 480;
