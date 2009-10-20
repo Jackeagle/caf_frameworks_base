@@ -172,15 +172,6 @@ uint32_t EGLDisplaySurface::swapBuffers()
         return 0;
     }
 
-    // do the actual flip
-    mIndex = 1 - mIndex;
-    mInfo.activate = FB_ACTIVATE_VBL;
-    mInfo.yoffset = mIndex ? mOldYres : 0;
-    if (ioctl(egl_native_window_t::fd, FBIOPUT_VSCREENINFO, &mInfo) == -1) {
-        LOGE("FBIOPUT_VSCREENINFO failed");
-        return 0;
-    }
-
     /*
      * this is a monstrous hack: Because the h/w accelerator is not able
      * to render directly into the framebuffer, we need to copy its
@@ -222,6 +213,44 @@ uint32_t EGLDisplaySurface::swapBuffers()
         copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 0xFF);
         copybit->set_parameter(copybit, COPYBIT_DITHER, COPYBIT_DISABLE);
         copybit->stretch(copybit, &dst, &src, &sdrect, &sdrect, &it);
+    }
+#ifdef ADRENO_200
+    else if (egl_native_window_t::memory_type == NATIVE_MEMORY_TYPE_GPU && oem[0])
+    {
+        // Perform a software memcopy when copybit is not available
+
+        // Adreno 200 requires page-aligned surfaces
+        intptr_t src_offset = (egl_native_window_t::offset + 0xfff) & ~0xfff;
+
+        // The GPU virtual address of the surface is passed in by the graphics driver
+        void* src_base = (void*) egl_native_window_t::oem[1];
+
+        intptr_t dst_offset = egl_native_window_t::offset;
+        void* dst_base = (void*)egl_native_window_t::base;
+
+        void* src_vaddr = (void*) (intptr_t(src_base) + src_offset);
+        void* dst_vaddr = (void*) (intptr_t(dst_base) + dst_offset);
+
+        if(egl_native_window_t::format == COPYBIT_FORMAT_RGB_565)
+        {
+            int size = egl_native_window_t::width * egl_native_window_t::height * 2;
+            memcpy(dst_vaddr, src_vaddr, size);
+        }
+        else
+        {
+            // TODO: Support color conversions and scaling!!!
+            LOGE("Unsupported copybit format");
+        }
+    }
+#endif
+
+    // do the actual flip
+    mIndex = 1 - mIndex;
+    mInfo.activate = FB_ACTIVATE_VBL;
+    mInfo.yoffset = mIndex ? mOldYres : 0;
+    if (ioctl(egl_native_window_t::fd, FBIOPUT_VSCREENINFO, &mInfo) == -1) {
+        LOGE("FBIOPUT_VSCREENINFO failed");
+        return 0;
     }
 
     // update the address of the buffer to draw to next
