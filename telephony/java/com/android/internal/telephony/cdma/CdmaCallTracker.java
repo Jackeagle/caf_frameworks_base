@@ -675,6 +675,7 @@ public final class CdmaCallTracker extends CallTracker {
             // the hangup reason is user ignoring or timing out. So conn.onDisconnect()
             // is not called here. Instead, conn.onLocalDisconnect() is called.
             conn.onLocalDisconnect();
+            updatePhoneState();
             phone.notifyCallStateChanged();
             return;
         } else {
