@@ -29,6 +29,8 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -64,6 +66,15 @@ public class SimProvider extends ContentProvider {
 
     private boolean mSimulator;
 
+    public static class AdnComparator implements Comparator<AdnRecord> {
+       public final int compare(AdnRecord a, AdnRecord b) {
+          String alabel = a.getAlphaTag();
+          String blabel = b.getAlphaTag();
+          return alabel.compareToIgnoreCase(blabel);
+       }
+    }
+
+    private AdnComparator mAdnComparator;
     @Override
     public boolean onCreate() {
         String device = SystemProperties.get("ro.product.device");
@@ -323,6 +334,7 @@ public class SimProvider extends ContentProvider {
     private ArrayList<ArrayList> loadFromEf(int efType) {
         ArrayList<ArrayList> results = new ArrayList<ArrayList>();
         List<AdnRecord> adnRecords = null;
+        mAdnComparator = new AdnComparator();
 
         if (DBG) log("loadFromEf: efType=" + efType);
 
@@ -341,11 +353,25 @@ public class SimProvider extends ContentProvider {
         if (adnRecords != null) {
             // Load the results
 
-            int N = adnRecords.size();
-            if (DBG) log("adnRecords.size=" + N);
-            for (int i = 0; i < N ; i++) {
-                loadRecord(adnRecords.get(i), results);
-            }
+           int N = adnRecords.size();
+           if (DBG) log("adnRecords.size=" + N);
+           //Making a local copy of records which are non empty
+           List newAdn = new ArrayList<AdnRecord>();
+           for (int i = 0; i < N ; i++) {
+              AdnRecord record = adnRecords.get(i);
+              if (!record.isEmpty()) {
+                 newAdn.add(record);
+              }
+           }
+           //Sort the list in ascending order of names
+           Collections.sort(newAdn,mAdnComparator);
+
+           if (DBG) log("loadFromEf: results =" + newAdn);
+
+           N = newAdn.size();
+           for (int i = 0; i < N ; i++) {
+              loadRecord((AdnRecord)newAdn.get(i), results);
+           }
         } else {
             // No results to load
             Log.w(TAG, "Cannot load ADN records");
