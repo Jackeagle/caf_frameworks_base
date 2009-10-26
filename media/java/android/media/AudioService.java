@@ -412,9 +412,6 @@ public class AudioService extends IAudioService.Stub {
                 // it does, it will handle adjusting the volume, so we won't below
                 adjustVolume = checkForRingerModeChange(oldIndex, direction);
             }
-            // Don't allow volume level to go down to zero 
-            if( streamType == AudioManager.STREAM_VOICE_CALL && oldIndex == 1 && direction == AudioManager.ADJUST_LOWER)
-                return;
 
             if (adjustVolume && streamState.adjustIndex(direction)) {
 
@@ -1421,10 +1418,11 @@ public class AudioService extends IAudioService.Stub {
 
             // Adjust volume
             // For in-call voice volume, there is nothing like inaudible volume.
-            if (!(streamState.mStreamType == AudioSystem.STREAM_VOICE_CALL && streamState.mVolumes[streamState.mIndex] == 0)) {
-               AudioSystem
-                          .setVolume(streamState.mStreamType, streamState.mVolumes[streamState.mIndex]);
+            if (streamState.mStreamType == AudioSystem.STREAM_VOICE_CALL && streamState.mVolumes[streamState.mIndex] == 0) {
+                streamState.mVolumes[streamState.mIndex] = streamState.mVolumes[streamState.mIndex + 1];
             }
+            AudioSystem
+                      .setVolume(streamState.mStreamType, streamState.mVolumes[streamState.mIndex]);
 
             // Post a persist volume msg
             sendMsg(mAudioHandler, MSG_PERSIST_VOLUME, streamState.mStreamType,
