@@ -384,6 +384,11 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.setRadioPower(power);
     }
 
+    public void setRilPowerOff() {
+        mCommandsInterface.setRilPowerOff();
+        return;
+    }
+
     public boolean getMessageWaitingIndicator() {
         return mActivePhone.getMessageWaitingIndicator();
     }

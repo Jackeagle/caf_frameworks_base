@@ -1034,6 +1034,10 @@ public final class SimulatedCommands extends BaseCommands
         }
     }
 
+    public void setRilPowerOff() {
+        return;
+    }
+
 
     public void acknowledgeLastIncomingSMS(boolean success, Message result) {
         unimplemented(result);

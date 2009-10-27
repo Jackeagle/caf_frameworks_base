@@ -835,6 +835,8 @@ public interface CommandsInterface {
     void setRadioPower(boolean on, Message response);
 
     void acknowledgeLastIncomingSMS(boolean success, Message response);
+    void setRilPowerOff();
+
 
     void acknowledgeLastIncomingCdmaSms(boolean success, Message response);
 

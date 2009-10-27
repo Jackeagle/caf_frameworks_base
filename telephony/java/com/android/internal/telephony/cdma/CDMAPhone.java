@@ -359,6 +359,11 @@ public class CDMAPhone extends PhoneBase {
         mSST.setRadioPower(power);
     }
 
+    public void
+    setRilPowerOff() {
+        return;
+    }
+
     public String getEsn() {
         return mEsn;
     }
