@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,6 +101,8 @@ public final class SIMRecords extends Handler implements SimConstants
      *  mCphsInfo[1] and mCphsInfo[2] is CPHS Service Table
      */
     private byte[] mCphsInfo = null;
+    private byte[] cspCphsInfo = null;
+    int cspPlmn = 1;
 
     byte[] efMWIS = null;
     byte[] efCPHS_MWI =null;
@@ -170,6 +173,8 @@ public final class SIMRecords extends Handler implements SimConstants
     private static final int EVENT_SIM_REFRESH = 31;
     private static final int EVENT_GET_CFIS_DONE = 32;
     private static final int EVENT_GET_ALL_OPL_RECORDS_DONE = 33;
+    private static final int EVENT_GET_CSP_CPHS_DONE = 34;
+    private static final int EVENT_AUTO_SELECT_DONE = 300;
     private static final int EVENT_GET_ALL_PNN_RECORDS_DONE = 35;
 
     private static final String TIMEZONE_PROPERTY = "persist.sys.timezone";
@@ -405,6 +410,10 @@ public final class SIMRecords extends Handler implements SimConstants
         return true;
     }
 
+    /** Return the csp plmn status from EF_CSP if present*/
+    public int getCspPlmn() {
+        return cspPlmn;
+    }
 
     /**
      * Set voice mail number to SIM record
@@ -1116,6 +1125,36 @@ public final class SIMRecords extends Handler implements SimConstants
                 if (DBG) log("iCPHS: " + SimUtils.bytesToHexString(mCphsInfo));
             break;
 
+            case EVENT_GET_CSP_CPHS_DONE:
+                Log.i(CSP_TAG,"Got Response for GET CSP");
+                isRecordLoadResponse = true;
+
+                ar = (AsyncResult)msg.obj;
+
+                if (ar.exception != null) {
+                    Log.e(CSP_TAG,"Exception " + ar.exception);
+                    break;
+                }
+
+                cspCphsInfo = (byte[])ar.result;
+
+                Log.i(CSP_TAG,SimUtils.bytesToHexString(cspCphsInfo));
+                processEFCspData();
+            break;
+
+            case EVENT_AUTO_SELECT_DONE:
+                Log.i(CSP_TAG,"Got Response for Automatic network selection");
+                isRecordLoadResponse = false;
+
+                ar = (AsyncResult) msg.obj;
+
+                if (ar.exception != null) {
+                    Log.e(CSP_TAG,"Automatic network selection: failed!");
+                } else {
+                    Log.i(CSP_TAG,"Automatic network selection: succeeded!");
+                }
+            break;
+
             case EVENT_SET_MBDN_DONE:
                 isRecordLoadResponse = false;
                 ar = (AsyncResult)msg.obj;
@@ -1269,6 +1308,17 @@ public final class SIMRecords extends Handler implements SimConstants
                  }
                  else {
                      fetchSimRecords();
+                 }
+                 break;
+            case EF_CSP_CPHS:
+                 if (SystemProperties.getBoolean("persist.cust.tel.adapt",false) ||
+                     SystemProperties.getBoolean("persist.cust.tel.efcsp.plmn",false)) {
+                     //Update EF_CSP data when there is a sim refresh
+                     //indication for EF_CSP_CPHS file.
+                     Log.i(CSP_TAG,"SIM Refresh called for EF_CSP_CPHS");
+                     phone.mSIMFileHandler.loadEFTransparent(EF_CSP_CPHS,
+                           obtainMessage(EVENT_GET_CSP_CPHS_DONE));
+                     recordsToLoad++;
                  }
                  break;
             case EF_SST:
@@ -1558,6 +1608,17 @@ public final class SIMRecords extends Handler implements SimConstants
         phone.mSIMFileHandler.loadEFTransparent(EF_SST,
             obtainMessage(EVENT_GET_SST_DONE));
         recordsToLoad++;
+
+        //persist.cust.tel.adapt is super flag, if this is set then EF_CSP
+        //will be used irrespective of the value of
+        //persist.cust.tel.efcsp.plmn.Otherwise EF_CSP will be used if
+        //persist.cust.tel.efcsp.plmn is set.
+        if (SystemProperties.getBoolean("persist.cust.tel.adapt",false) ||
+            SystemProperties.getBoolean("persist.cust.tel.efcsp.plmn",false)) {
+            phone.mSIMFileHandler.loadEFTransparent(EF_CSP_CPHS,
+                 obtainMessage(EVENT_GET_CSP_CPHS_DONE));
+            recordsToLoad++;
+        }
         // XXX should seek instead of examining them all
         if (false) { // XXX
             phone.mSIMFileHandler.loadEFLinearFixedAll(EF_SMS,
@@ -1817,6 +1878,44 @@ public final class SIMRecords extends Handler implements SimConstants
         Log.d(LOG_TAG, "[SIMRecords] " + s);
     }
 
+    /**
+     *process EF CSP data and check whether network operator menu item in
+     *Call Settings menu,is to be enabled/disabled
+     */
+    private void processEFCspData() {
+       int i = 0;
+       /*
+        *According to doc CPHS4_2.WW6,CPHS B.4.7.1,elementary file
+        *EF_CSP contians CPHS defined 18 bytes (i.e 9 service groups info) and
+        *additional records specific to operator if any
+       */
+       int used_csp_groups = 13;
+       /*
+       * This is the Servive group number of the service we need to check.
+       * This represents value added services group.
+       */
+       byte value_added_services_group = (byte)0xC0;
+       Message msg = obtainMessage(EVENT_AUTO_SELECT_DONE);
+       for (i = 0;i < used_csp_groups;i++) {
+           if (cspCphsInfo[2*i] == value_added_services_group) {
+               Log.i(CSP_TAG, "sevice group 0xC0,value " + cspCphsInfo[(2*i) +1]);
+               //If bit 8 is set then the value is negative since it is signed
+               //byte,so checking value to be less than zero.
+               if (cspCphsInfo[(2*i)+1] < 0) {
+                  //Bit 8 is for Restriction of menu options
+                  //for manual PLMN selection
+                  cspPlmn = 1;
+               } else {
+                  cspPlmn = 0;
+                 // Manual Network Selection option is disabled, so enable
+                 // Automatic Network Selection mode.
+                 phone.setNetworkSelectionModeAutomatic(msg);
+               }
+               return;
+           }
+       }
+       Log.e(CSP_TAG, "sevice group 0xC0,Not founf in EF CSP");
+    }
     /**
      * Update OPL cache from EF_OPL file.
      */
