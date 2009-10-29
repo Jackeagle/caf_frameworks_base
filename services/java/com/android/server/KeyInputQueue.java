@@ -643,6 +643,19 @@ public abstract class KeyInputQueue {
                                     di.mAbs.changed = true;
                                     di.mAbs.mDown[0] = ev.value != 0;
                                 }
+                            } else if (ev.scancode == RawInputEvent.BTN_RIGHT) {
+                                if ((classes&RawInputEvent.CLASS_MOUSE) != 0) {
+                                    boolean down = (ev.value != 0);
+                                    if (down)
+                                        di.mKeyDownTime = curTime;
+
+                                    addLocked(di, curTime, ev.flags,
+                                        RawInputEvent.CLASS_KEYBOARD,
+                                        newKeyEvent(di, di.mKeyDownTime, curTime, down,
+                                            KeyEvent.KEYCODE_MENU, 0, scancode,
+                                            ((ev.flags & WindowManagerPolicy.FLAG_WOKE_HERE) != 0)
+                                            ? KeyEvent.FLAG_WOKE_HERE : 0));
+                                }
                             }
     
                         // Process position events from multitouch protocol.
