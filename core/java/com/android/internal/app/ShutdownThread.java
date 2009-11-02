@@ -136,7 +136,7 @@ public final class ShutdownThread extends Thread {
     public void run() {
         boolean bluetoothOff;
         boolean radioOff;
-
+        boolean rilPowerOffRequested = false;
         BroadcastReceiver br = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
                 // We don't allow apps to cancel this, so ignore the result.
@@ -231,13 +231,18 @@ public final class ShutdownThread extends Thread {
                 Log.i(TAG, "Radio and Bluetooth shutdown complete.");
 
                 try {
-                    Log.w(TAG, "ril Power-off ...");
-                    phone.setRilPowerOff();
-                    Log.w(TAG, "ril Power-off completed");
+                    if (!rilPowerOffRequested) {
+                        Log.w(TAG, "ril Power-off ...");
+                        phone.setRilPowerOff();
+                        rilPowerOffRequested = true;
+                    }
+                    if (phone.isRilPowerOffComplete()) {
+                        Log.w(TAG, "ril Power-off completed");
+                        break;
+                    }
                 } catch (RemoteException ex) {
                     Log.e(TAG, "RemoteException during Phone Power-off", ex);
                 }
-                break;
             }
             SystemClock.sleep(PHONE_STATE_POLL_SLEEP_MSEC);
         }

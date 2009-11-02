@@ -788,6 +788,13 @@ public interface Phone {
     void setRilPowerOff();
 
     /**
+     * Get the RIL_REQUEST_RADIO_POWER status.
+     *
+     * @return true if "RIL_REQUEST_RADIO_POWER Complete" is received from Ril
+     */
+    boolean isRilPowerOffComplete();
+
+    /**
      * Get voice message waiting indicator status. No change notification
      * available on this interface. Use PhoneStateNotifier or similar instead.
      *

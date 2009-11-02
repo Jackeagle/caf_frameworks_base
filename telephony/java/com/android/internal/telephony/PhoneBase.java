@@ -681,6 +681,11 @@ public abstract class PhoneBase implements Phone {
         return 0;
     }
 
+    /** @hide */
+    public boolean isRilPowerOffComplete() {
+        return false;
+    }
+
     /**
      * Returns the CDMA ERI icon index to display
      */
