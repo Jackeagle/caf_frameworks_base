@@ -1643,6 +1643,25 @@ public interface Phone {
      */
     void unregisterForT53AudioControlInfo(Handler h);
 
+   /**
+    * Registers for LOCAL_RINGBACK_START and LOCAL_RINGBACK_STOP notifications
+    * from the network
+    * Here Message.obj will contain an AsyncResult.
+    * AsyncResult.result is a Boolean object
+    * @param h Handler that receives the notification message.
+    * @param what User-defined message code.
+    * @param obj User object.
+    */
+    void registerForLocalRingbackTone(Handler h, int what, Object obj);
+
+    /**
+     * Unregisters for LOCAL_RINGBACK_START and LOCAL_RINGBACK_STOP
+     * notification.
+     *
+     * @param h Handler to be removed from the registrant list.
+     */
+    void unregisterForLocalRingbackTone(Handler h);
+
     /**
      * registers for exit emergency call back mode request response
      *

@@ -552,6 +552,17 @@ public interface CommandsInterface {
      void registerForCdmaOtaProvision(Handler h,int what, Object obj);
      void unregisterForCdmaOtaProvision(Handler h);
 
+     /**
+      * Registers for LOCAL_RINGBACK_START and LOCAL_RINGBACK_STOP event
+      *
+      *  @param h Handler for notification message.
+      *  @param what User-defined message code.
+      *  @param obj User object.
+      */
+
+     void registerForLocalRingbackTone(Handler h, int what, Object obj);
+     void unregisterForLocalRingbackTone(Handler h);
+
     /**
      * Returns current ICC status.
      *

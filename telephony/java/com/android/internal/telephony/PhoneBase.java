@@ -787,6 +787,15 @@ public abstract class PhoneBase implements Phone {
         mCM.unregisterForT53AudioControlInfo(h);
     }
 
+    public  void registerForLocalRingbackTone(Handler h, int what, Object obj) {
+       mCM.registerForLocalRingbackTone( h, what, obj);
+    }
+
+    public void unregisterForLocalRingbackTone(Handler h) {
+       mCM.unregisterForLocalRingbackTone(h);
+    }
+
+
      public void setOnEcbModeExitResponse(Handler h, int what, Object obj){
          // This function should be overridden by the class CDMAPhone. Not implemented in GSMPhone.
          Log.e(LOG_TAG, "Error! This function should never be executed, inactive CDMAPhone.");

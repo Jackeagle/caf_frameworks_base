@@ -795,6 +795,14 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.unregisterForT53AudioControlInfo(h);
     }
 
+    public void registerForLocalRingbackTone(Handler h, int what, Object obj) {
+       mActivePhone.registerForLocalRingbackTone( h, what, obj);
+    }
+
+    public void unregisterForLocalRingbackTone(Handler h) {
+       mActivePhone.unregisterForLocalRingbackTone(h);
+    }
+
     public void setOnEcbModeExitResponse(Handler h, int what, Object obj){
         mActivePhone.setOnEcbModeExitResponse(h,what,obj);
     }
