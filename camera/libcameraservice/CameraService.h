@@ -187,6 +187,7 @@ private:
                     sp<ISurface>                mSurface;
                     sp<MemoryHeapBase>          mPreviewBuffer;
                     int                         mPreviewCallbackFlag;
+                    int                         mReusePreviewBuffers;
 
                     sp<MediaPlayer>             mMediaPlayerClick;
                     sp<MediaPlayer>             mMediaPlayerBeep;
