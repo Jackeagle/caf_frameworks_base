@@ -34,13 +34,26 @@ import android.util.Log;
 class FmRxEventListner {
 
     FmRxEventType mRxEvent;
-    private final int EVENT_LISTEN = 2;
+    private final int EVENT_LISTEN = 1;
     private final int READY_EVENT = 0x00;
     private final int TUNE_EVENT = 0x01;
     private final int SEEK_COMPLETE_EVENT = 0x02;
-    private final int MUTE_EVENT = 0x04;
-    private final int RDS_EVENT = 0x08;
+    private final int SCAN_NEXT_EVENT = 0x03;
+    private final int SYNC_EVENT = 0x04;
+    private final int SIGNAL_EVENT = 0x05;
+    private final int AUDIO_EVENT = 0x06;
+    private final int RAW_RDS_EVENT = 0x07;
+    private final int RT_EVENT = 0x08;
+    private final int PS_EVENT = 0x09;
+    private final int ERROR_EVENT = 0x0A;
+    private final int BELOW_TH_EVENT = 0x0B;
+    private final int ABOVE_TH_EVENT = 0x0C;
+    private final int STEREO_EVENT = 0x0D;
+    private final int MONO_EVENT = 0x0E;
+    private final int RDS_AVAL_EVENT = 0x0F;
+    private final int RDS_NOT_AVAL_EVENT = 0x10;
     private Thread mThread;
+    private static final String TAG = "FMRadio";
 
     public void startListner (final int fd, final FmRxEvCallbacks cb) {
         /* start a thread and listen for messages */
@@ -48,27 +61,68 @@ class FmRxEventListner {
             public void run(){
                 while (true) {
                     byte []buff = new byte[128];
-                    Log.d("Rec Events", "Starting the listen " + fd);
+                    Log.d(TAG, "Starting the listener " + fd);
                     int i =FmReceiverJNI.listenForEventsNative(fd, buff, EVENT_LISTEN);
-                    Log.d("Receiver Events", "Returned with " +buff[0]+ " event. Int:" + i);
+                    Log.d(TAG, "Returned with " +buff[0]+ " event. Int:" + i);
                     switch(buff[0]){
                     case READY_EVENT:
+                        Log.d(TAG, "Got READY_EVENT");
                         cb.FmRxEvEnableReceiver();
                         break;
                     case TUNE_EVENT:
+                        Log.d(TAG, "Got TUNE_EVENT");
                         cb.FmRxEvRadioTuneStatus();
                         break;
                     case SEEK_COMPLETE_EVENT:
+                        Log.d(TAG, "Got SEEK_COMPLETE_EVENT");
                         cb.FmRxEvSearchComplete(FmReceiverJNI.getFrequencyNative(fd));
                         break;
-                    case RDS_EVENT:
-                        Log.d("Receiver Events", "Returned with new RDS tx event.");
+                    case SCAN_NEXT_EVENT:
+                        Log.d(TAG, "Got SCAN_NEXT_EVENT");
+                        break;
+                    case SYNC_EVENT:
+                        Log.d(TAG, "Got SYNC_EVENT");
+                        break;
+                    case SIGNAL_EVENT:
+                        Log.d(TAG, "Got SIGNAL_EVENT");
+                        break;
+                    case AUDIO_EVENT:
+                        Log.d(TAG, "Got AUDIO_EVENT");
+                        break;
+                    case RAW_RDS_EVENT:
+                        Log.d(TAG, "Got RAW_RDS_EVENT");
+                        break;
+                    case RT_EVENT:
+                        Log.d(TAG, "Got RT_EVENT");
                         cb.FmRxEvRdsRtInfo(new StringBuffer ("This is a test RT data"));
                         break;
-                    case MUTE_EVENT:
-                        Log.d("Receiver Events", "Got Mute Interrupt");
+                    case PS_EVENT:
+                        Log.d(TAG, "Got PS_EVENT");
+                        cb.FmRxEvRdsPsInfo(new StringBuffer ("This is a test PS data"));
+                        break;
+                    case ERROR_EVENT:
+                        Log.d(TAG, "Got ERROR_EVENT");
+                        break;
+                    case BELOW_TH_EVENT:
+                        Log.d(TAG, "Got BELOW_TH_EVENT");
+                        break;
+                    case ABOVE_TH_EVENT:
+                        Log.d(TAG, "Got ABOVE_TH_EVENT");
+                        break;
+                    case STEREO_EVENT:
+                        Log.d(TAG, "Got STEREO_EVENT");
+                        break;
+                    case MONO_EVENT:
+                        Log.d(TAG, "Got MONO_EVENT");
+                        break;
+                    case RDS_AVAL_EVENT:
+                        Log.d(TAG, "Got RDS_AVAL_EVENT");
+                        break;
+                    case RDS_NOT_AVAL_EVENT:
+                        Log.d(TAG, "Got RDS_NOT_AVAL_EVENT");
                         break;
                     default:
+                        Log.d(TAG, "Unknown event");
                         break;
                     }
                 }
