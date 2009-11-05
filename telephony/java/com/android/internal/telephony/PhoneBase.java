@@ -295,6 +295,30 @@ public abstract class PhoneBase implements Phone {
         mCM.unSetOnUnsolOemHookExtApp(h);
     }
 
+    public void registerForCdmaFwdBurstDtmf(Handler h, int what, Object obj) {
+        mCM.registerForCdmaFwdBurstDtmf(h, what, obj);
+    }
+
+    public void unregisterForCdmaFwdBurstDtmf(Handler h) {
+        mCM.unregisterForCdmaFwdBurstDtmf(h);
+    }
+
+    public void registerForCdmaFwdContDtmfStart(Handler h, int what, Object obj) {
+        mCM.registerForCdmaFwdContDtmfStart(h, what, obj);
+    }
+
+    public void unregisterForCdmaFwdContDtmfStart(Handler h) {
+        mCM.unregisterForCdmaFwdContDtmfStart(h);
+    }
+
+    public void registerForCdmaFwdContDtmfStop(Handler h, int what, Object obj) {
+        mCM.registerForCdmaFwdContDtmfStop(h, what, obj);
+    }
+
+    public void unregisterForCdmaFwdContDtmfStop(Handler h) {
+        mCM.unregisterForCdmaFwdContDtmfStop(h);
+    }
+
     /**
      * Notifiy registrants of a new ringing Connection.
      * Subclasses of Phone probably want to replace this with a
