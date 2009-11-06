@@ -335,6 +335,11 @@ public class FmReceiver extends FmTransceiver {
      */
     public void FmRxApi_RxGetPSInfo(StringBuffer ps) {
 
+        byte [] buff = new byte[120];
+        FmReceiverJNI.listenForEventsNative(sFd, buff, 3);
+	String rdsStr = new String(buff);
+        rdsStr = rdsStr.substring(5, ( (int) buff[0]*8) + 5);
+	ps.append(rdsStr);
     }
 
     /**
@@ -354,7 +359,7 @@ public class FmReceiver extends FmTransceiver {
      */
     public void FmRxApi_RxGetRTInfo (StringBuffer radiotext) {
         byte [] buff = new byte[120];
-        FmReceiverJNI.listenForEventsNative(sFd, buff, 0);
+        FmReceiverJNI.listenForEventsNative(sFd, buff, 2);
         String rdsStr = new String(buff);
         rdsStr = rdsStr.substring(5, (int) buff[0]+ 5);
         radiotext.append(rdsStr);
