@@ -240,6 +240,7 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
 
     // Callback is disabled by default
     mPreviewCallbackFlag = FRAME_CALLBACK_FLAG_NOOP;
+    mReusePreviewBuffers = 0;
     cameraService->incUsers();
     LOGD("Client::Client X (pid %d)", callingPid);
 }
@@ -607,11 +608,12 @@ status_t CameraService::Client::startPreviewMode()
                                       mCameraService.get());
         if (ret != NO_ERROR) return ret;
         // If preview display has been set, register preview buffers now.
-        if (mSurface != 0) {
+        if (mSurface != 0 && mReusePreviewBuffers == 0) {
            // Unregister here because the surface registered with raw heap.
            mSurface->unregisterBuffers();
            ret = registerPreviewBuffers();
         }
+        mReusePreviewBuffers = 0;
     }
     return ret;
 }
@@ -872,6 +874,7 @@ status_t CameraService::Client::takePicture()
     LOGD("takePicture (pid %d)", getCallingPid());
 
     Mutex::Autolock lock(mLock);
+    mReusePreviewBuffers = 1;
     status_t result = checkPid();
     if (result != NO_ERROR) return result;
 
