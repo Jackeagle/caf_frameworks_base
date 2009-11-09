@@ -170,6 +170,11 @@ interface ITelephony {
     void setRilPowerOff();
 
     /**
+     * Get the RIL_REQUEST_RADIO_POWER status.
+     */
+    boolean  isRilPowerOffComplete();
+
+    /**
      * Request to update location information in service state
      */
     void updateServiceLocation();

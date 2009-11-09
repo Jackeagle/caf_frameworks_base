@@ -44,11 +44,13 @@ public class PhoneProxy extends Handler implements Phone {
     private Phone mActivePhone;
     private String mOutgoingPhone;
     private CommandsInterface mCommandsInterface;
+    public boolean mRilPowerOffComplete = false;
     private IccSmsInterfaceManagerProxy mIccSmsInterfaceManagerProxy;
     private IccPhoneBookInterfaceManagerProxy mIccPhoneBookInterfaceManagerProxy;
     private PhoneSubInfoProxy mPhoneSubInfoProxy;
 
     private static final int EVENT_RADIO_TECHNOLOGY_CHANGED = 1;
+    private static final int EVENT_RADIO_POWER_OFF = 2;
     private static final String LOG_TAG = "PHONE";
 
     //***** Class Methods
@@ -121,6 +123,9 @@ public class PhoneProxy extends Handler implements Phone {
             Intent intent = new Intent(TelephonyIntents.ACTION_RADIO_TECHNOLOGY_CHANGED);
             intent.putExtra(Phone.PHONE_NAME_KEY, mActivePhone.getPhoneName());
             ActivityManagerNative.broadcastStickyIntent(intent, null);
+            break;
+        case EVENT_RADIO_POWER_OFF:
+            mRilPowerOffComplete = true;
             break;
         default:
             Log.e(LOG_TAG,"Error! This handler was not registered for this message type. Message: "
@@ -396,12 +401,18 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void setRilPowerOff() {
-        mCommandsInterface.setRilPowerOff(null);
+        Message msg;
+        msg = obtainMessage(EVENT_RADIO_POWER_OFF);
+        mCommandsInterface.setRilPowerOff(msg);
         return;
     }
 
     public boolean getMessageWaitingIndicator() {
         return mActivePhone.getMessageWaitingIndicator();
+    }
+
+    public boolean isRilPowerOffComplete() {
+        return mRilPowerOffComplete;
     }
 
     public boolean getCallForwardingIndicator() {
