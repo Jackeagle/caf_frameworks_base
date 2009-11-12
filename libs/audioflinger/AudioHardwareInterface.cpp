@@ -219,6 +219,19 @@ size_t AudioHardwareBase::getInputBufferSize(uint32_t sampleRate, int format, in
         return 0;
     }
 
+    if (format == AudioSystem::FORMAT_AMR_IETF)
+    {
+      return 1280;
+    }
+    else if (format == AudioSystem::FORMAT_QCELP)
+    {
+      return 1050;
+    }
+    else if (format == AudioSystem::FORMAT_EVRC)
+    {
+      return 1150;
+    }
+
     return 2048;
 }
 

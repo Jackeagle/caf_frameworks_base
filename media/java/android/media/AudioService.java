@@ -1418,10 +1418,11 @@ public class AudioService extends IAudioService.Stub {
 
             // Adjust volume
             // For in-call voice volume, there is nothing like inaudible volume.
-            if (!(streamState.mStreamType == AudioSystem.STREAM_VOICE_CALL && streamState.mVolumes[streamState.mIndex] == 0)) {
-               AudioSystem
-                          .setVolume(streamState.mStreamType, streamState.mVolumes[streamState.mIndex]);
+            if (streamState.mStreamType == AudioSystem.STREAM_VOICE_CALL && streamState.mVolumes[streamState.mIndex] == 0) {
+                streamState.mVolumes[streamState.mIndex] = streamState.mVolumes[streamState.mIndex + 1];
             }
+            AudioSystem
+                      .setVolume(streamState.mStreamType, streamState.mVolumes[streamState.mIndex]);
 
             // Post a persist volume msg
             sendMsg(mAudioHandler, MSG_PERSIST_VOLUME, streamState.mStreamType,

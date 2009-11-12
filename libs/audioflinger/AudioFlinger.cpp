@@ -2583,7 +2583,7 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
                 LOGV("AudioRecordThread read: read %d bytes ", bytesRead);
                 if (bytesRead < 0) {
                     LOGE("Error reading audio input");
-                    sleep(1);
+                    usleep(250000); // Reducing the sleep to ensure lower codec drop
                 }
 
                if ((buffer.frameCount >=10) &&
