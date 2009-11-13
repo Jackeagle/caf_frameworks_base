@@ -192,9 +192,8 @@ public class VolumePanel extends Handler
                  * Rescale the UI control so the progress bar doesn't go all
                  * the way to zero and don't show the mute icon.
                  */
-                if (index == 0) {
-                    index=1;
-                }
+                index++;
+                max++;
                 message = INCALL_VOLUME_TEXT;
                 setSmallIcon(index);
                 break;
