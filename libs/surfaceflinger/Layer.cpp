@@ -115,12 +115,10 @@ status_t Layer::setBuffers( Client* client,
         alignment = 32;
 #else
         alignment = 8; 
-#endif
-        // FIXME: this is msm7201A specific, as its GPU only supports
-        // BGRA_8888.
         if (format == PIXEL_FORMAT_RGBA_8888) {
             format = PIXEL_FORMAT_BGRA_8888;
         }
+#endif
     }
 
     mSecure = (flags & ISurfaceComposer::eSecure) ? true : false;
