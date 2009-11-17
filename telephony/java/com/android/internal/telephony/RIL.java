@@ -2897,8 +2897,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             ca.aid            = p.readString();
             ca.app_label      = p.readString();
             ca.pin1_replaced  = p.readInt();
-            ca.pin1           = p.readInt();
-            ca.pin2           = p.readInt();
+            ca.pin1           = ca.PinStateFromRILInt(p.readInt());
+            ca.pin2           = ca.PinStateFromRILInt(p.readInt());
             status.application.add(ca);
         }
 
@@ -2941,6 +2941,35 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
             Log.i(LOG_TAG,"app_state " + status.application.get(index).app_state +
                   ", perso_substate " + status.application.get(index).perso_substate);
+
+            Log.i(LOG_TAG,"pin1_status " + status.application.get(index).pin1 +
+                  ", pin2_status " + status.application.get(index).pin2);
+
+            if (status.application.get(index).pin2.isPinBlocked()) {
+                //check if PIN2 is blocked
+                Log.i(LOG_TAG,"PIN2 is Blocked, PUK2 required. Notify Registrants");
+                if (mPin2StatusChangedRegistrant != null) {
+                    int pin2Status[] = {2};
+                    mPin2StatusChangedRegistrant.notifyRegistrant(
+                                        new AsyncResult (null, pin2Status, null));
+                }
+            }  else if (status.application.get(index).pin2.isPinPermBlocked()) {
+                //check if PUK2 is blocked
+                Log.i(LOG_TAG,"PUK2 is permanently blocked. Notify Registrants");
+                if (mPin2StatusChangedRegistrant != null) {
+                    int pin2Status[] = {3};
+                    mPin2StatusChangedRegistrant.notifyRegistrant(
+                                        new AsyncResult (null, pin2Status, null));
+                }
+            } else {
+                Log.i(LOG_TAG,"Neither PIN2 nor PUK2 is Blocked.Notify Registrants");
+                if (mPin2StatusChangedRegistrant != null) {
+                    int pin2Status[] = {1};
+                    mPin2StatusChangedRegistrant.notifyRegistrant(
+                                        new AsyncResult (null, pin2Status, null));
+                }
+            }
+
             // check if PIN required
             if (status.application.get(index).app_state.isPinRequired()) {
                 return IccStatus.ICC_PIN;

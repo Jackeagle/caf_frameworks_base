@@ -1433,4 +1433,14 @@ public interface CommandsInterface {
      * @param response callback message
      */
     public void exitEmergencyCallbackMode(Message response);
+
+    /**
+     * Sets the handler for PIN2 status changed to desired state notification.
+     *
+     * AsyncResult.result is an int[1]
+     * response.obj.result[0] is one of the desired PIN2 state
+     */
+
+    void setOnPin2StatusChanged(Handler h, int what, Object obj);
+    void unSetOnPin2StatusChanged(Handler h);
 }
