@@ -528,7 +528,8 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
         if (src_height > H*min)         yscale = 1.0f / min;
         else if (src_height*mag < H)    yscale = mag;
 
-        if (UNLIKELY(xscale!=1.0f || yscale!=1.0f)) {
+        if ((UNLIKELY(xscale!=1.0f || yscale!=1.0f))
+		|| mBufferHeap.mdpScaleFlag) {
             if (UNLIKELY(mTemporaryDealer == 0)) {
                 // allocate a memory-dealer for this the first time
                 mTemporaryDealer = mLayer.mFlinger->getSurfaceHeapManager()
@@ -538,7 +539,10 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
 
             const int tmp_w = floorf(src_width  * xscale);
             const int tmp_h = floorf(src_height * yscale);
-            err = mTempBitmap.setBits(tmp_w, tmp_h, 1, src.img.format);
+	    if (mBufferHeap.mdpScaleFlag)
+		err = mTempBitmap.setBits(src.img.w, src.img.h, 1, src.img.format);
+	    else
+		err = mTempBitmap.setBits(tmp_w, tmp_h, 1, src.img.format);
 
             if (LIKELY(err == NO_ERROR)) {
                 NativeBuffer tmp;
@@ -549,11 +553,15 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                 tmp.crop.b = tmp.img.h;
 
                 region_iterator tmp_it(Region(Rect(tmp.crop.r, tmp.crop.b)));
+		if (mBufferHeap.mdpScaleFlag)
+			copybit->set_parameter(copybit, COPYBIT_CROP_PRESCALED, COPYBIT_ENABLE);
                 copybit->set_parameter(copybit, COPYBIT_TRANSFORM, 0);
                 copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 0xFF);
                 copybit->set_parameter(copybit, COPYBIT_DITHER, COPYBIT_DISABLE);
                 err = copybit->stretch(copybit,
                         &tmp.img, &src.img, &tmp.crop, &src.crop, &tmp_it);
+		if (mBufferHeap.mdpScaleFlag)
+			copybit->set_parameter(copybit, COPYBIT_CROP_PRESCALED, COPYBIT_DISABLE);
                 src = tmp;
             }
         }
