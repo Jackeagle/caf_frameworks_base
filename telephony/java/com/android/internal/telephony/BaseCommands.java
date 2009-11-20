@@ -82,6 +82,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected Registrant mRingRegistrant;
     protected Registrant mRestrictedStateRegistrant;
     protected Registrant mGsmBroadcastSmsRegistrant;
+    protected Registrant mPin2StatusChangedRegistrant;
 
     // Network Mode received from PhoneFactory
     protected int mNetworkMode;
@@ -567,6 +568,14 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForT53AudioControlInfo(Handler h) {
         mT53AudCntrlInfoRegistrants.remove(h);
+    }
+
+    public void setOnPin2StatusChanged(Handler h, int what, Object obj) {
+        mPin2StatusChangedRegistrant = new Registrant (h, what, obj);
+    }
+
+    public void unSetOnPin2StatusChanged(Handler h) {
+        mPin2StatusChangedRegistrant.clear();
     }
 
     //***** Protected Methods

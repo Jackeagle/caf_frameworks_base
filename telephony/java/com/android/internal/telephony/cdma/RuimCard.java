@@ -57,6 +57,8 @@ public final class RuimCard extends Handler implements IccCard {
     private boolean mRuimPinLocked = true; // default to locked
     private boolean mRuimFdnEnabled = false; // Default to disabled.
                                             // Will be updated when RUIM_READY.
+    private boolean mRuimPin2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
+    private boolean mRuimPuk2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
 //    //***** Constants
 
 //    // FIXME I hope this doesn't conflict with the Dialer's notifications
@@ -77,6 +79,7 @@ public final class RuimCard extends Handler implements IccCard {
     static final int EVENT_QUERY_FACILITY_FDN_DONE = 10;
     static final int EVENT_CHANGE_FACILITY_FDN_DONE = 11;
     static final int EVENT_RUIM_STATUS_CHANGED = 101;
+    static final int EVENT_RUIM_PIN2_STATUS_CHANGED = 102;
 
 
     //***** Constructor
@@ -95,6 +98,9 @@ public final class RuimCard extends Handler implements IccCard {
 
         phone.mCM.registerForIccStatusChanged(
                         this, EVENT_RUIM_STATUS_CHANGED, null);
+
+        phone.mCM.setOnPin2StatusChanged(
+                        this, EVENT_RUIM_PIN2_STATUS_CHANGED, null);
 
         updateStateProperty();
     }
@@ -143,6 +149,7 @@ public final class RuimCard extends Handler implements IccCard {
         phone.mCM.unregisterForOffOrNotAvailable(this);
         phone.mCM.unregisterForRUIMReady(this);
         phone.mCM.unregisterForIccStatusChanged(this);
+        phone.mCM.unSetOnPin2StatusChanged(this);
     }
 
     protected void finalize() {
@@ -393,6 +400,11 @@ public final class RuimCard extends Handler implements IccCard {
                 Log.d(LOG_TAG, "Event EVENT_RUIM_STATUS_CHANGED Received");
                 phone.mCM.getIccStatus(obtainMessage(EVENT_GET_RUIM_STATUS_DONE));
                 break;
+            case EVENT_RUIM_PIN2_STATUS_CHANGED:
+                Log.d(LOG_TAG, "Received Event EVENT_RUIM_PIN2_STATUS_CHANGED");
+                ar = (AsyncResult)msg.obj;
+                onPin2StatusChanged(ar);
+                break;
             default:
                 Log.e(LOG_TAG, "[CdmaRuimCard] Unknown Event " + msg.what);
         }
@@ -436,6 +448,46 @@ public final class RuimCard extends Handler implements IccCard {
         } else {
             Log.e(LOG_TAG, "[CdmaRuimCard] Bogus facility lock response");
         }
+    }
+
+    /**
+     * Handle PIN2 Status change
+     * @param ar is asyncResult of PIN2 status
+     */
+    private void onPin2StatusChanged(AsyncResult ar) {
+        if(ar.exception != null) {
+           Log.e(LOG_TAG, "Error in receiving pin2 status with exception" + ar.exception);
+           return;
+        }
+        int[] ints = (int[])ar.result;
+        if (DBG) log("onPin2StatusChanged: received pin2 status: " + ints[0]);
+
+        switch (ints[0]) {
+           case 1:
+              //PIN2 state is neither PINSTATE_ENABLED_BLOCKED
+              //nor PINSTATE_ENABLED_PERM_BLOCKED. So reset these flags.
+              mRuimPin2Blocked = false;
+              mRuimPuk2Blocked = false;
+              break;
+           case 2:
+              //PIN2 state is PINSTATE_ENABLED_BLOCKED
+              mRuimPin2Blocked = true;
+              break;
+           case 3:
+              //PIN2 state is PINSTATE_ENABLED_PERM_BLOCKED.
+              mRuimPuk2Blocked = true;
+              break;
+           default:
+              Log.e(LOG_TAG, "Un Handled pin2 status " + ints[0]);
+        }
+    }
+
+    public boolean getIccPin2Blocked() {
+       return mRuimPin2Blocked;
+    }
+
+    public boolean getIccPuk2Blocked() {
+       return mRuimPuk2Blocked;
     }
 
     private void

@@ -192,6 +192,24 @@ public interface IccCard {
     boolean getIccFdnEnabled ();
 
     /**
+     * Check whether ICC is PIN2 blocked
+     * This is a sync call which returns the cached pin2 blocked status
+     *
+     * @return true if ICC is pin2 blocked
+     *         false if ICC is not pin2 blocked
+     */
+    public boolean getIccPin2Blocked();
+
+    /**
+     * Check whether ICC is PUK2 blocked
+     * This is a sync call which returns the cached puk2 blocked status
+     *
+     * @return true if ICC is puk2 blocked
+     *         false if ICC is not puk2 blocked
+     */
+    public boolean getIccPuk2Blocked();
+
+    /**
      * Set the ICC fdn enabled or disabled
      * When the operation is complete, onComplete will be sent to its handler
      *
