@@ -55,6 +55,8 @@ public final class SimCard extends Handler implements IccCard {
     private boolean mSimPinLocked = true; // Default to locked
     private boolean mSimFdnEnabled = false; // Default to disabled.
                                             // Will be updated when SIM_READY.
+    private boolean mSimPin2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
+    private boolean mSimPuk2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
 
     //***** Constants
 
@@ -75,6 +77,7 @@ public final class SimCard extends Handler implements IccCard {
     static final int EVENT_QUERY_FACILITY_FDN_DONE = 10;
     static final int EVENT_CHANGE_FACILITY_FDN_DONE = 11;
     static final int EVENT_SIM_STATUS_CHANGED = 101;
+    static final int EVENT_SIM_PIN2_STATUS_CHANGED = 102;
 
 
     //***** Constructor
@@ -94,6 +97,9 @@ public final class SimCard extends Handler implements IccCard {
         phone.mCM.registerForIccStatusChanged(
                         this, EVENT_SIM_STATUS_CHANGED, null);
 
+        phone.mCM.setOnPin2StatusChanged(
+                        this, EVENT_SIM_PIN2_STATUS_CHANGED, null);
+
         updateStateProperty();
     }
 
@@ -103,6 +109,7 @@ public final class SimCard extends Handler implements IccCard {
         phone.mCM.unregisterForOffOrNotAvailable(this);
         phone.mCM.unregisterForSIMReady(this);
         phone.mCM.unregisterForIccStatusChanged(this);
+        phone.mCM.unSetOnPin2StatusChanged(this);
     }
 
     protected void finalize() {
@@ -387,6 +394,11 @@ public final class SimCard extends Handler implements IccCard {
                 Log.d(LOG_TAG, "Received Event EVENT_SIM_STATUS_CHANGED");
                 phone.mCM.getIccStatus(obtainMessage(EVENT_GET_SIM_STATUS_DONE));
                 break;
+            case EVENT_SIM_PIN2_STATUS_CHANGED:
+                Log.d(LOG_TAG, "Received Event EVENT_SIM_PIN2_STATUS_CHANGED");
+                ar = (AsyncResult)msg.obj;
+                onPin2StatusChanged(ar);
+                break;
             default:
                 Log.e(LOG_TAG, "[GsmSimCard] Unknown Event " + msg.what);
         }
@@ -431,6 +443,47 @@ public final class SimCard extends Handler implements IccCard {
         } else {
             Log.e(LOG_TAG, "[GsmSimCard] Bogus facility lock response");
         }
+    }
+
+
+    /**
+     * Handle PIN2 Status change
+     * @param ar is asyncResult of PIN2 status
+     */
+    private void onPin2StatusChanged(AsyncResult ar) {
+        if(ar.exception != null) {
+           Log.e(LOG_TAG, "Error in receiving pin2 status with exception" + ar.exception);
+           return;
+        }
+        int[] ints = (int[])ar.result;
+        if (DBG) log("onPin2StatusChanged: received pin2 status: " + ints[0]);
+
+        switch (ints[0]) {
+           case 1:
+              //PIN2 state is neither PINSTATE_ENABLED_BLOCKED
+              //nor PINSTATE_ENABLED_PERM_BLOCKED. So reset these flags.
+              mSimPin2Blocked = false;
+              mSimPuk2Blocked = false;
+              break;
+           case 2:
+              //PIN2 state is PINSTATE_ENABLED_BLOCKED
+              mSimPin2Blocked = true;
+              break;
+           case 3:
+              //PIN2 state is PINSTATE_ENABLED_PERM_BLOCKED.
+              mSimPuk2Blocked = true;
+              break;
+           default:
+              Log.e(LOG_TAG, "Un Handled pin2 status " + ints[0]);
+        }
+    }
+
+    public boolean getIccPin2Blocked() {
+       return mSimPin2Blocked;
+    }
+
+    public boolean getIccPuk2Blocked() {
+       return mSimPuk2Blocked;
     }
 
     private void
