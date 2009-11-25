@@ -211,7 +211,12 @@ public class CdmaConnection extends Connection {
         //
         // We assume we know when MO calls are created (since we created them)
         // and therefore don't need to compare the phone number anyway.
-        if (! (isIncoming || c.isMT)) return true;
+
+        // Commented for now, as we don't currently support CCAT.
+        // This condition should be revisited when CCAT is supported to make it
+        // more adequate for call control modification scenarios.
+        // (probably use call index?)
+        // if (! (isIncoming || c.isMT)) return true;
 
         // ... but we can compare phone numbers on MT calls, and we have
         // no control over when they begin, so we might as well
