@@ -139,7 +139,7 @@ static int seekScan(int fd,int mode, int dir, int dwell)
 {
     struct v4l2_control control;
     struct v4l2_hw_freq_seek seek;
-    control.id=V4L2_CID_PRIVATE_TAVARUA_SRCHMODE;
+    control.id=V4L2_CID_PRIVATE_TAVARUA_SRHCMODE;
     control.value=mode;
     if(ioctl(fd, VIDIOC_S_CTRL, &control) < 0){
         return FM_JNI_FAILURE;
