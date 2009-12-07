@@ -665,14 +665,15 @@ static jint util_texImage2D(JNIEnv *env, jclass clazz,
         }
         const size_t size = bitmap.getSize();
         const size_t palette_size = 256*sizeof(SkPMColor);
-        void* const data = malloc(size + palette_size);
+        const size_t imageSize = size + palette_size;
+        void* const data = malloc(imageSize);
         if (data) {
             void* const pixels = (char*)data + palette_size;
             SkColorTable* ctable = bitmap.getColorTable();
             memcpy(data, ctable->lockColors(), ctable->count() * sizeof(SkPMColor));
             memcpy(pixels, p, size);
             ctable->unlockColors(false);
-            glCompressedTexImage2D(target, level, internalformat, w, h, border, 0, data);
+            glCompressedTexImage2D(target, level, internalformat, w, h, border, imageSize, data);
             free(data);
         } else {
             err = -1;
