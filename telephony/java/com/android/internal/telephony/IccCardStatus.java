@@ -29,10 +29,16 @@ public class IccCardStatus {
     public enum CardState {
         CARDSTATE_ABSENT,
         CARDSTATE_PRESENT,
-        CARDSTATE_ERROR;
+        CARDSTATE_ERROR,
+        CARDSTATE_ILLEGAL;
+
+        //Even if the card is marked as Illegal by NAS, ICC IO
+        //operations should be permitted. Hence treating the illegal
+        //card state as card present. Network access requests
+        //will anyway be rejected and ME will be in limited service.
 
         boolean isCardPresent() {
-            return this == CARDSTATE_PRESENT;
+            return ((this == CARDSTATE_PRESENT) || (this == CARDSTATE_ILLEGAL));
         }
 
         boolean isCardFaulty() {
@@ -64,6 +70,7 @@ public class IccCardStatus {
             case 0: newState = CardState.CARDSTATE_ABSENT; break;
             case 1: newState = CardState.CARDSTATE_PRESENT; break;
             case 2: newState = CardState.CARDSTATE_ERROR; break;
+            case 3: newState = CardState.CARDSTATE_ILLEGAL; break;
             default:
                 throw new RuntimeException(
                             "Unrecognized RIL_CardState: " +state);
