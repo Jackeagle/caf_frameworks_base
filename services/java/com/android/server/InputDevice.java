@@ -21,11 +21,14 @@ import android.view.Display;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.WindowManagerPolicy;
+import android.view.RawInputEvent;
 
 public class InputDevice {
     static final boolean DEBUG_POINTERS = false;
     static final boolean DEBUG_HACKS = false;
-    
+    static final boolean DEBUG_MOUSE = false;
+    static final String TAG = "InputDevice";
+  
     /** Amount that trackball needs to move in order to generate a key event. */
     static final int TRACKBALL_MOVEMENT_THRESHOLD = 6;
 
@@ -518,13 +521,15 @@ public class InputDevice {
         MotionEvent generateAbsMotion(InputDevice device, long curTime,
                 long curTimeNano, Display display, int orientation,
                 int metaState) {
-            
+            boolean isMouse = ((device.classes & RawInputEvent.CLASS_MOUSE)
+                    == RawInputEvent.CLASS_MOUSE);
             if (mSkipLastPointers) {
                 mSkipLastPointers = false;
                 mLastNumPointers = 0;
             }
             
-            if (mNextNumPointers <= 0 && mLastNumPointers <= 0) {
+            if (!isMouse &&
+                (mNextNumPointers <= 0 && mLastNumPointers <= 0)) {
                 return null;
             }
             
@@ -535,24 +540,29 @@ public class InputDevice {
                         + " exceeded maximum of " + MAX_POINTERS);
                 mNextNumPointers = MAX_POINTERS;
             }
-            
-            int upOrDownPointer = updatePointerIdentifiers();
+
+            /*
+             * This is not used for mouse
+             */
+            int upOrDownPointer = isMouse ? 0 : updatePointerIdentifiers();
             
             final float[] reportData = mReportData;
             final int[] rawData;
-            if (KeyInputQueue.BAD_TOUCH_HACK) {
-                rawData = generateAveragedData(upOrDownPointer, lastNumPointers,
+            if (!isMouse && KeyInputQueue.BAD_TOUCH_HACK) {
+                rawData = generateAveragedData(upOrDownPointer,
+                        lastNumPointers,
                         nextNumPointers);
             } else {
-                rawData = mLastData;
+                rawData = isMouse ? mNextData : mLastData;
             }
             
-            final int numPointers = mLastNumPointers;
+            final int numPointers = isMouse ? 1 : mLastNumPointers;
             
-            if (DEBUG_POINTERS) Log.v("InputDevice", "Processing "
+            if (DEBUG_POINTERS || DEBUG_MOUSE)
+                    Log.v("InputDevice", "Processing "
                     + numPointers + " pointers (going from " + lastNumPointers
-                    + " to " + nextNumPointers + ")");
-            
+                    + " to " + nextNumPointers + ")" + " touch hack "
+                    + KeyInputQueue.BAD_TOUCH_HACK);
             for (int i=0; i<numPointers; i++) {
                 final int pos = i * MotionEvent.NUM_SAMPLE_DATA;
                 reportData[pos + MotionEvent.SAMPLE_X] = rawData[pos + MotionEvent.SAMPLE_X];
@@ -560,29 +570,48 @@ public class InputDevice {
                 reportData[pos + MotionEvent.SAMPLE_PRESSURE] = rawData[pos + MotionEvent.SAMPLE_PRESSURE];
                 reportData[pos + MotionEvent.SAMPLE_SIZE] = rawData[pos + MotionEvent.SAMPLE_SIZE];
             }
-            
+
             int action;
             int edgeFlags = 0;
-            if (nextNumPointers != lastNumPointers) {
-                if (nextNumPointers > lastNumPointers) {
-                    if (lastNumPointers == 0) {
+            if (!isMouse) {
+                 if (nextNumPointers != lastNumPointers) {
+                    if (nextNumPointers > lastNumPointers) {
+                        if (lastNumPointers == 0) {
+                            action = MotionEvent.ACTION_DOWN;
+                            mDownTime = curTime;
+                        } else {
+                            action = MotionEvent.ACTION_POINTER_DOWN
+                                    | (upOrDownPointer << MotionEvent.ACTION_POINTER_ID_SHIFT);
+                        }
+                    } else {
+                        if (numPointers == 1) {
+                             action = MotionEvent.ACTION_UP;
+                        } else {
+                            action = MotionEvent.ACTION_POINTER_UP
+                                | (upOrDownPointer << MotionEvent.ACTION_POINTER_ID_SHIFT);
+                        }
+                    }
+                    currentMove = null;
+                } else {
+                    action = MotionEvent.ACTION_MOVE;
+                }
+            } else {
+                if (mNextNumPointers != mLastNumPointers) {
+                    if (mNextNumPointers == 1) {
                         action = MotionEvent.ACTION_DOWN;
                         mDownTime = curTime;
-                    } else {
-                        action = MotionEvent.ACTION_POINTER_DOWN
-                                | (upOrDownPointer << MotionEvent.ACTION_POINTER_ID_SHIFT);
-                    }
-                } else {
-                    if (numPointers == 1) {
+                    } else if (mNextNumPointers == 2) {
                         action = MotionEvent.ACTION_UP;
                     } else {
-                        action = MotionEvent.ACTION_POINTER_UP
-                                | (upOrDownPointer << MotionEvent.ACTION_POINTER_ID_SHIFT);
+                        action = MotionEvent.ACTION_MOVE;
                     }
+                    mLastNumPointers = mNextNumPointers;
+                    currentMove = null;
+                } else {
+                    action = MotionEvent.ACTION_MOVE;
                 }
-                currentMove = null;
-            } else {
-                action = MotionEvent.ACTION_MOVE;
+                if (DEBUG_MOUSE)
+                    Log.i(TAG, "mouse action " + action);
             }
             
             final int dispW = display.getWidth()-1;
@@ -661,7 +690,7 @@ public class InputDevice {
             }
             
             if (currentMove != null) {
-                if (false) Log.i("InputDevice", "Adding batch x="
+                if (DEBUG_MOUSE) Log.i("InputDevice", "Adding batch x="
                         + reportData[MotionEvent.SAMPLE_X]
                         + " y=" + reportData[MotionEvent.SAMPLE_Y]
                         + " to " + currentMove);
@@ -679,7 +708,7 @@ public class InputDevice {
                 currentMove = me;
             }
             
-            if (nextNumPointers < lastNumPointers) {
+            if ((!isMouse) && (nextNumPointers < lastNumPointers)) {
                 removeOldPointer(upOrDownPointer);
             }
             

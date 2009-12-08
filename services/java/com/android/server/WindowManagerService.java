@@ -140,6 +140,7 @@ public class WindowManagerService extends IWindowManager.Stub
     static final boolean DEBUG_LAYOUT = false;
     static final boolean DEBUG_LAYERS = false;
     static final boolean DEBUG_INPUT = false;
+    static final boolean DEBUG_MOUSE = false;
     static final boolean DEBUG_INPUT_METHOD = false;
     static final boolean DEBUG_VISIBILITY = false;
     static final boolean DEBUG_WINDOW_MOVEMENT = false;
@@ -6283,7 +6284,8 @@ public class WindowManagerService extends IWindowManager.Stub
                     if (screenIsOff) {
                         if (!mPolicy.isWakeAbsMovementTq(event.deviceId,
                                 device.classes, event)) {
-                            //Log.i(TAG, "dropping because screenIsOff and !isWakeKey");
+                            if (DEBUG_INPUT)
+                                Log.i(TAG, "dropping because screenIsOff and !isWakeKey");
                             return false;
                         }
                         event.flags |= WindowManagerPolicy.FLAG_WOKE_HERE;
@@ -6478,15 +6480,20 @@ public class WindowManagerService extends IWindowManager.Stub
                                 MotionEvent mmev = (MotionEvent)ev.event;
                                 int mcx = (int)mmev.getX();
                                 int mcy = (int)mmev.getY();
-
+                                if (DEBUG_MOUSE)
+                                   Log.i(TAG,"moving mouse " +
+                                    mMouseSurface + " action "
+                                    + mmev.getAction() + " lx " + mMlx
+                                    + " ly " + mMly + " nx " + mcx + " ny " +
+                                    mcy);
                                 if (mMouseSurface != null && (mMlx != mcx || mMly != mcy)) {
                                     Surface.openTransaction();
-                                    if (DEBUG_INPUT)
+                                    if (DEBUG_MOUSE)
                                         Log.i(TAG, "Open transaction for the mouse surface");
                                     WindowState top =
                                         (WindowState)mWindows.get(mWindows.size() - 1);
                                     try {
-                                        if (DEBUG_INPUT)
+                                        if (DEBUG_MOUSE)
                                             Log.i(TAG, "Move surf, x: " +
                                                   Integer.toString(mcx) + " y:"
                                                   + Integer.toString(mcy));
