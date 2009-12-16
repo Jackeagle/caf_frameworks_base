@@ -57,6 +57,14 @@ public class SimTlv
         return hasValidTlvObject;
     }
 
+    public boolean incrementCurOffset(byte offset) {
+        if (!hasValidTlvObject) return false;
+
+        curOffset = curOffset + offset;
+        hasValidTlvObject = parseCurrentTlvObject();
+        return hasValidTlvObject;
+    }
+
     /**
      * Returns the tag for the current TLV object
      * Return 0 if !isValidObject()
