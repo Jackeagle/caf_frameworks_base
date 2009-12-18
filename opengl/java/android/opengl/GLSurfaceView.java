@@ -865,7 +865,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
             mDone = false;
             mWidth = 0;
             mHeight = 0;
-            mRequestRender = true;
+            mRequestRender = 1;
             mRenderMode = RENDERMODE_CONTINUOUSLY;
             mRenderer = renderer;
             setName("GLThread");
@@ -942,11 +942,12 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                     w = mWidth;
                     h = mHeight;
                     mSizeChanged = false;
-                    mRequestRender = false;
+                    if(mRequestRender > 0)
+                        --mRequestRender;
                     if (mHasSurface && mWaitingForSurface) {
                         changed = true;
                         mWaitingForSurface = false;
-                        mRequestRender = true; // Forces a redraw for RENDERMODE_RENDER_WHEN_DIRTY
+                        mRequestRender = 2; // Forces two redraws for RENDERMODE_RENDER_WHEN_DIRTY
                     }
                 }
                 if (needStart) {
@@ -994,7 +995,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                 return true;
             }
 
-            if ((mWidth > 0) && (mHeight > 0) && (mRequestRender || (mRenderMode == RENDERMODE_CONTINUOUSLY))) {
+            if ((mWidth > 0) && (mHeight > 0) && ((mRequestRender > 0) || (mRenderMode == RENDERMODE_CONTINUOUSLY))) {
                 return false;
             }
 
@@ -1021,7 +1022,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 
         public void requestRender() {
             synchronized(this) {
-                mRequestRender = true;
+                mRequestRender = 1;
                 notify();
             }
         }
@@ -1065,6 +1066,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                 mWidth = w;
                 mHeight = h;
                 mSizeChanged = true;
+                mRequestRender = 2; // Forces two redraws for RENDERMODE_RENDER_WHEN_DIRTY
                 notify();
             }
         }
@@ -1110,7 +1112,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
         private int mWidth;
         private int mHeight;
         private int mRenderMode;
-        private boolean mRequestRender;
+        private int mRequestRender;
         private Renderer mRenderer;
         private ArrayList<Runnable> mEventQueue = new ArrayList<Runnable>();
         private EglHelper mEglHelper;
