@@ -59,7 +59,7 @@ import com.android.internal.app.IBatteryStats;
 
 public class BluetoothDeviceService extends IBluetoothDevice.Stub {
     private static final String TAG = "BluetoothDeviceService";
-    private static final boolean DBG = true;
+    private static final boolean DBG = false;
 
     private int mNativeData;
     private BluetoothEventLoop mEventLoop;
@@ -109,14 +109,17 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
         mIsDiscovering = false;
         mEventLoop = new BluetoothEventLoop(mContext, this);
         registerForAirplaneMode();
+        registerForUmsMode();
     }
     private native void initializeNativeDataNative();
 
     @Override
     protected void finalize() throws Throwable {
         if (mIsAirplaneSensitive) {
-            mContext.unregisterReceiver(mReceiver);
+            mContext.unregisterReceiver(mReceiverAirplane);
         }
+
+         mContext.unregisterReceiver(mReceiverUMS);
         try {
             cleanupNativeDataNative();
         } finally {
@@ -1128,7 +1131,7 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
     }
     private native boolean cancelPinNative(String address, int natveiData);
 
-    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver mReceiverAirplane = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -1156,8 +1159,42 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
                 ? true : airplaneModeRadios.contains(Settings.System.RADIO_BLUETOOTH);
         if (mIsAirplaneSensitive) {
             mIntentFilter = new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-            mContext.registerReceiver(mReceiver, mIntentFilter);
+            mContext.registerReceiver(mReceiverAirplane, mIntentFilter);
         }
+    }
+
+    private final BroadcastReceiver mReceiverUMS = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            if (!intent.getAction().equals(Intent.ACTION_MEDIA_EJECT)) {
+                return;
+            }
+
+            if (DBG) {
+                Log.i(TAG, "Received SD Card Ejected notification: " +
+                        Intent.ACTION_MEDIA_EJECT);
+            }
+
+            if (isEnabled()) {
+                if (DBG) {
+                    Log.i(TAG, "Cancelling all OBEX operations");
+                }
+                cancelAllObexNative();
+            }
+
+            return;
+        }
+    };
+    protected native void cancelAllObexNative();
+
+    private void registerForUmsMode() {
+
+        mIntentFilter = new IntentFilter();
+        mIntentFilter.addAction(Intent.ACTION_MEDIA_EJECT);
+        mIntentFilter.addDataScheme("file");
+
+        mContext.registerReceiver(mReceiverUMS, mIntentFilter);
     }
 
     /* Returns true if airplane mode is currently on */
