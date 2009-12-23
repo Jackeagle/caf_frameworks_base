@@ -35,6 +35,16 @@ LOCAL_LDLIBS := -lpthread -ldl
 ifeq ($(TARGET_ARCH),arm)
 	LOCAL_SRC_FILES += fixed_asm.S iterators.S
 	LOCAL_CFLAGS += -fstrict-aliasing
+  #
+  # Define HAVE_ARM_TLS_REGISTER macro to indicate to the C library
+  # that it should access the hardware TLS register directly in
+  # private/bionic_tls.h
+  #
+  # The value must match your kernel configuration
+  #
+  ifeq ($(ARCH_ARM_HAVE_TLS_REGISTER),true)
+    LOCAL_CFLAGS += -DHAVE_ARM_TLS_REGISTER
+  endif
 endif
 
 ifneq ($(TARGET_SIMULATOR),true)
