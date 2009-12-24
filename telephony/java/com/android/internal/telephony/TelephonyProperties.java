@@ -112,4 +112,11 @@ public interface TelephonyProperties
 
     /** The delay between sms sending retries */
     static final String PROPERTY_SMS_RETRY_DELAY = "persist.radio.sms_retry_delay";
+ 
+    /**
+     * Indicates whether sms should be sent in synchronous manner.
+     * Type: boolean ( false = asynchronous, true = send next queued sms after
+     * making sure previous sms was sent) */
+     static final String SMS_SYNCHRONOUS_SENDING = "persist.ro.ril.sms_sync_sending";
+
 }
