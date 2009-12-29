@@ -984,9 +984,9 @@ static jboolean cancelPinNative(JNIEnv *env, jobject object, jstring address,
     return JNI_FALSE;
 }
 
-static void cancelAllOBEXNative(JNIEnv* env, jobject object) {
-#ifdef HAVE_BLUETOOTH
+static void cancelAllObexNative(JNIEnv* env, jobject object) {
     LOGI(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
 
     native_data_t *nat = get_native_data(env, object);
 
@@ -1086,7 +1086,7 @@ static JNINativeMethod sMethods[] = {
     {"lastUsedNative", "(Ljava/lang/String;)Ljava/lang/String;", (void *)lastUsedNative},
     {"setPinNative", "(Ljava/lang/String;Ljava/lang/String;I)Z", (void *)setPinNative},
     {"cancelPinNative", "(Ljava/lang/String;I)Z", (void *)cancelPinNative},
-    {"cancelAllOBEXNative", "()V", (void *)cancelAllOBEXNative},
+    {"cancelAllObexNative", "()V", (void *)cancelAllObexNative},
 };
 
 int register_android_server_BluetoothDeviceService(JNIEnv *env) {

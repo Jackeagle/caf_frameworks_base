@@ -109,7 +109,7 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
         mIsDiscovering = false;
         mEventLoop = new BluetoothEventLoop(mContext, this);
         registerForAirplaneMode();
-        registerForUMSMode();
+        registerForUmsMode();
     }
     private native void initializeNativeDataNative();
 
@@ -1180,15 +1180,15 @@ public class BluetoothDeviceService extends IBluetoothDevice.Stub {
                 if (DBG) {
                     Log.i(TAG, "Cancelling all OBEX operations");
                 }
-                cancelAllOBEXNative();
+                cancelAllObexNative();
             }
 
             return;
         }
     };
-    protected native void cancelAllOBEXNative();
+    protected native void cancelAllObexNative();
 
-    private void registerForUMSMode() {
+    private void registerForUmsMode() {
 
         mIntentFilter = new IntentFilter();
         mIntentFilter.addAction(Intent.ACTION_MEDIA_EJECT);
