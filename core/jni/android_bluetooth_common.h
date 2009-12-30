@@ -61,6 +61,7 @@ namespace android {
 #define OBEXD_DBUS_CLIENT_PULLCARD          "PullBusinessCard"
 #define OBEXD_DBUS_CLIENT_EXCHANGE          "ExchangeBusinessCards"
 #define OBEXD_DBUS_CLIENT_CREATE            "CreateSession"
+#define OBEXD_DBUS_CLIENT_CANCELALL         "CancelAll"
 
 #define OBEXD_DBUS_CLIENT_SESSION_IFC       OBEXD_DBUS_BASE_IFC".Session"
 #define OBEXD_DBUS_CLIENT_SESSION_GETPROPS  "GetProperties"
@@ -96,6 +97,7 @@ namespace android {
 #define OBEXD_DBUS_SRV_MGR_PATH                     "/"
 #define OBEXD_DBUS_SRV_MGR_REG_AGENT                "RegisterAgent"
 #define OBEXD_DBUS_SRV_MGR_UNREG_AGENT              "UnregisterAgent"
+#define OBEXD_DBUS_SRV_MGR_CANCELALL                "CancelAll"
 
 #define OBEXD_DBUS_SRV_MGR_SGNL_RULE \
         OBEXD_DBUS_SGNL_RULE(OBEXD_DBUS_SRV_MGR_IFC, OBEXD_DBUS_SRV_MGR_PATH)

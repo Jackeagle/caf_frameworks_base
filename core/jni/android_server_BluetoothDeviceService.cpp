@@ -2,16 +2,16 @@
 ** Copyright 2006, The Android Open Source Project
 ** Copyright (c) 2009, Code Aurora Forum, Inc. All rights reserved.
 **
-** Licensed under the Apache License, Version 2.0 (the "License"); 
-** you may not use this file except in compliance with the License. 
-** You may obtain a copy of the License at 
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
 **
-**     http://www.apache.org/licenses/LICENSE-2.0 
+**     http://www.apache.org/licenses/LICENSE-2.0
 **
-** Unless required by applicable law or agreed to in writing, software 
-** distributed under the License is distributed on an "AS IS" BASIS, 
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-** See the License for the specific language governing permissions and 
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
 
@@ -984,6 +984,55 @@ static jboolean cancelPinNative(JNIEnv *env, jobject object, jstring address,
     return JNI_FALSE;
 }
 
+static void cancelAllObexNative(JNIEnv* env, jobject object) {
+    LOGI(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+
+    native_data_t *nat = get_native_data(env, object);
+
+    if (nat) {
+        DBusMessage *reply = NULL;
+        DBusError error;
+
+        dbus_error_init(&error);
+
+        reply = dbus_func_args_error(env, nat->conn,&error,
+                                     OBEXD_DBUS_SRV_SVC,
+                                     OBEXD_DBUS_SRV_MGR_PATH,
+                                     OBEXD_DBUS_SRV_MGR_IFC,
+                                     OBEXD_DBUS_SRV_MGR_CANCELALL,
+                                     DBUS_TYPE_INVALID);
+
+        if (reply) {
+            dbus_message_unref(reply);
+        } else {
+            LOG_AND_FREE_DBUS_ERROR(&error);
+        }
+
+        reply = dbus_func_args_error(env, nat->conn, &error,
+                                     OBEXD_DBUS_CLIENT_SVC,
+                                     OBEXD_DBUS_CLIENT_PATH,
+                                     OBEXD_DBUS_CLIENT_IFC,
+                                     OBEXD_DBUS_CLIENT_CANCELALL,
+                                     DBUS_TYPE_INVALID);
+
+        if (reply) {
+            dbus_message_unref(reply);
+        } else {
+            LOG_AND_FREE_DBUS_ERROR(&error);
+        }
+    }
+
+    if (env->ExceptionCheck()) {
+        LOGE("VM Exception occurred in native function %s (%s:%d)",
+            __FUNCTION__, __FILE__, __LINE__);
+    }
+#endif
+
+    return;
+}
+
+
 static JNINativeMethod sMethods[] = {
      /* name, signature, funcPtr */
     {"classInitNative", "()V", (void*)classInitNative},
@@ -1037,6 +1086,7 @@ static JNINativeMethod sMethods[] = {
     {"lastUsedNative", "(Ljava/lang/String;)Ljava/lang/String;", (void *)lastUsedNative},
     {"setPinNative", "(Ljava/lang/String;Ljava/lang/String;I)Z", (void *)setPinNative},
     {"cancelPinNative", "(Ljava/lang/String;I)Z", (void *)cancelPinNative},
+    {"cancelAllObexNative", "()V", (void *)cancelAllObexNative},
 };
 
 int register_android_server_BluetoothDeviceService(JNIEnv *env) {
