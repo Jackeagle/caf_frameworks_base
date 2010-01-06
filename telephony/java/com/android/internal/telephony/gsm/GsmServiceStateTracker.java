@@ -159,8 +159,6 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     private String curSpn = null;
     private String curPlmn = null;
     private int curSpnRule = 0;
-    String  prevRegPlmn = null;
-    String  newRegPlmn = null;
     //***** Constants
 
     static final boolean DBG = true;
@@ -825,15 +823,6 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     if (opNames != null && opNames.length >= 3) {
                         newSS.setOperatorName (
                                 opNames[0], opNames[1], opNames[2]);
-                        newRegPlmn = newSS.getOperatorNumeric();
-                        if((phone.mSIMRecords.getOnsAlg() == EONS_ALG) &&
-                           (newRegPlmn != null) && (newRegPlmn.trim().length() != 0)
-                           && !newRegPlmn.equals(prevRegPlmn)) {
-                           Log.i(EONS_TAG,"Calling updateSimRecords() if plmn changed, prev plmn "
-                                 + prevRegPlmn + ", new plmn " + newRegPlmn);
-                           phone.mSIMRecords.updateSimRecords(1);
-                           prevRegPlmn = newRegPlmn;
-                        }
                     }
                 break;
 
@@ -1107,6 +1096,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             phone.setSystemProperty(PROPERTY_OPERATOR_ISROAMING,
                 ss.getRoaming() ? "true" : "false");
 
+            Log.i(EONS_TAG,"ServiceState changed,calling checkEonsAndUpdateSpnDisplay()");
             checkEonsAndUpdateSpnDisplay();
             phone.notifyServiceStateChanged(ss);
         }
@@ -1959,9 +1949,10 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     void checkEonsAndUpdateSpnDisplay() {
        if ((!SystemProperties.getBoolean("persist.cust.tel.adapt",false) &&
             !SystemProperties.getBoolean("persist.cust.tel.eons",false))  ||
-           (phone.mSIMRecords.getSstPlmnOplValue() == EONS_DISABLED))
-       {
+           (phone.mSIMRecords.getSstPlmnOplValue() == EONS_DISABLED)) {
             updateSpnDisplay();
+       } else {
+           phone.mSIMRecords.updateSimRecords(0);
        }
     }
 
