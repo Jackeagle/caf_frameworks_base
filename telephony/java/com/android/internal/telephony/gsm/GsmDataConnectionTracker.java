@@ -835,8 +835,10 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
 
         if ((preferredApn != null )&& ( mActiveApn != null))  {
            if( (mActiveApn.toString().equals(preferredApn.toString() )) &&
-               (mActiveApn.user.equals(preferredApn.user))  &&
-               (mActiveApn.password.equals(preferredApn.password)))  {
+               ((mActiveApn.user != null && mActiveApn.user.equals(preferredApn.user)) ||
+                (mActiveApn.user == null && preferredApn.user == null)) &&
+               ((mActiveApn.password != null && mActiveApn.password.equals(preferredApn.password)) ||
+                (mActiveApn.password == null && preferredApn.password == null)))  {
                change = false;
            }
         }
