@@ -1280,44 +1280,54 @@ public final class SIMRecords extends IccRecords {
                         1, obtainMessage(EVENT_GET_CPHS_MAILBOX_DONE));
                 break;
             case EF_OPL:
-                 if (getOnsAlg() == EONS_ALG) {
-                     //Update EF_OPL cache on EF_OPL sim refresh indication.
-                     Log.i(EONS_TAG,"SIM Refresh called for EF_OPL");
-                     updateOplCache();
-                 }
-                 else {
-                     fetchSimRecords();
-                 }
-                 break;
+                //Update EF_OPL cache on EF_OPL sim refresh indication.
+                Log.i(EONS_TAG,"SIM Refresh called for EF_OPL");
+                updateOplCache();
+                break;
             case EF_PNN:
-                 if (getOnsAlg() == EONS_ALG) {
-                     //Update EF_PNN cache on EF_PNN sim refresh indication.
-                     Log.i(EONS_TAG,"SIM Refresh called for EF_PNN");
-                     updatePnnCache();
-                 }
-                 else {
-                     fetchSimRecords();
-                 }
-                 break;
+                //Update EF_PNN cache on EF_PNN sim refresh indication.
+                Log.i(EONS_TAG,"SIM Refresh called for EF_PNN");
+                updatePnnCache();
+                break;
             case EF_CSP_CPHS:
-                 if (useEfCspPlmn()) {
-                     //Update EF_CSP data when there is a sim refresh
-                     //indication for EF_CSP_CPHS file.
-                     Log.i(CSP_TAG,"SIM Refresh called for EF_CSP_CPHS");
-                     phone.getIccFileHandler().loadEFTransparent(EF_CSP_CPHS,
-                           obtainMessage(EVENT_GET_CSP_CPHS_DONE));
-                     recordsToLoad++;
-                 }
-                 break;
+                //Update EF_CSP data when there is a sim refresh
+                //indication for EF_CSP_CPHS file.
+                recordsToLoad++;
+                Log.i(CSP_TAG,"SIM Refresh called for EF_CSP_CPHS");
+                phone.getIccFileHandler().loadEFTransparent(EF_CSP_CPHS,
+                      obtainMessage(EVENT_GET_CSP_CPHS_DONE));
+                break;
             case EF_SST:
-                 Log.i(EONS_TAG,"SIM Refresh called for EF_SST");
-                 phone.getIccFileHandler().loadEFTransparent(EF_SST,
-                 obtainMessage(EVENT_GET_SST_DONE));
-                 recordsToLoad++;
-                 break;
+                recordsToLoad++;
+                Log.i(EONS_TAG,"SIM Refresh called for EF_SST");
+                phone.getIccFileHandler().loadEFTransparent(EF_SST,
+                      obtainMessage(EVENT_GET_SST_DONE));
+                break;
+            case EF_MSISDN:
+                recordsToLoad++;
+                Log.i(LOG_TAG,"SIM Refresh called for EF_MSISDN");
+                new AdnRecordLoader(phone).loadFromEF(EF_MSISDN, EF_EXT1, 1,
+                      obtainMessage(EVENT_GET_MSISDN_DONE));
+                break;
+            case EF_SPN:
+                Log.i(LOG_TAG,"SIM Refresh called for EF_SPN");
+                getSpnFsm(true, null);
+                break;
+            case EF_CFIS:
+                recordsToLoad++;
+                Log.i(LOG_TAG,"SIM Refresh called for EF_CFIS");
+                phone.getIccFileHandler().loadEFLinearFixed(EF_CFIS,
+                      1, obtainMessage(EVENT_GET_CFIS_DONE));
+                break;
+            case EF_CFF_CPHS:
+                recordsToLoad++;
+                Log.i(LOG_TAG,"SIM Refresh called for EF_CFF_CPHS");
+                phone.getIccFileHandler().loadEFTransparent(EF_CFF_CPHS,
+                      obtainMessage(EVENT_GET_CFF_DONE));
+                break;
             default:
-                // For now, fetch all records if this is not a
-                // voicemail number.
+                // For now, fetch all records if this is not
+                // one of the handled files.
                 // TODO: Handle other cases, instead of fetching all.
                 adnCache.reset();
                 fetchSimRecords();
