@@ -1237,7 +1237,9 @@ public final class SIMRecords extends IccRecords {
                     break;
                 }
                 oplCache = (ArrayList)ar.result;
-                displayEonsName(0);
+                if (getOnsAlg() == EONS_ALG) {
+                    displayEonsName(0);
+                }
                 break;
 
             case EVENT_GET_ALL_PNN_RECORDS_DONE:
@@ -1249,7 +1251,9 @@ public final class SIMRecords extends IccRecords {
                     break;
                 }
                 pnnCache = (ArrayList)ar.result;
-                displayEonsName(0);
+                if (getOnsAlg() == EONS_ALG) {
+                    displayEonsName(0);
+                }
                 break;
 
         }}catch (RuntimeException exc) {
