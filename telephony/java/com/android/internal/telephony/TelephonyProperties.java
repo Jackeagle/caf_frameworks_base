@@ -109,4 +109,11 @@ public interface TelephonyProperties
 
     /** The international dialing prefix conversion string */
     static final String PROPERTY_IDP_STRING = "persist.ro.cdma.idpstring";
+
+    /**
+     * Indicates whether sms should be sent in synchronous manner.
+     * Type: boolean ( false = asynchronous, true = send next queued sms after
+     * making sure previous sms was sent) */
+     static final String SMS_SYNCHRONOUS_SENDING = "persist.ro.ril.sms_sync_sending";
+
 }
