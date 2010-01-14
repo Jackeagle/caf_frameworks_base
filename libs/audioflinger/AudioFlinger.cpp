@@ -1521,6 +1521,20 @@ void AudioFlinger::MixerThread::destroyTrack_l(const sp<Track>& track)
 // addActiveTrack_l() must be called with AudioFlinger::mLock held
 void AudioFlinger::MixerThread::addActiveTrack_l(const wp<Track>& t)
 {
+    // If the PCM driver is in Standby mode, open the driver
+    // to reduce latency at rendering time
+    if (mStandby)
+    {
+      if (0 == mOutput->Open())
+      {
+        mStandby = false;
+      }
+      else
+      {
+        LOGE("Opening PCM driver failed");
+      }
+    }
+
     mActiveTracks.add(t);
 
     // Force routing to speaker for certain stream types
