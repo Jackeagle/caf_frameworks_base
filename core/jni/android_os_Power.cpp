@@ -1,5 +1,6 @@
 /* //device/libs/android_runtime/android_os_Power.cpp
 **
+** Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 ** Copyright 2006, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
@@ -75,6 +76,19 @@ setScreenState(JNIEnv *env, jobject clazz, jboolean on)
     return set_screen_state(on);
 }
 
+static int
+setUMtoDPD(JNIEnv *env, jobject clazz, jboolean on)
+{
+    return set_ebi1_to_dpd(on);
+}
+
+static int
+setUMtoSR(JNIEnv *env, jobject clazz, jboolean on)
+{
+    return set_ebi1_to_sr(on);
+}
+
+
 static void android_os_Power_shutdown(JNIEnv *env, jobject clazz)
 {
     sync();
@@ -104,6 +118,8 @@ static JNINativeMethod method_table[] = {
     { "releaseWakeLock", "(Ljava/lang/String;)V", (void*)releaseWakeLock },
     { "setLastUserActivityTimeout", "(J)I", (void*)setLastUserActivityTimeout },
     { "setScreenState", "(Z)I", (void*)setScreenState },
+    { "setUMtoDPD",  "(Z)I", (void*)setUMtoDPD},
+    { "setUMtoSR",  "(Z)I", (void*)setUMtoSR},
     { "shutdown", "()V", (void*)android_os_Power_shutdown },
     { "rebootNative", "(Ljava/lang/String;)V", (void*)android_os_Power_reboot },
 };

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -78,6 +79,20 @@ public class Power
      * @param on Whether you want the screen on or off
      */
     public static native int setScreenState(boolean on);
+
+    /**
+     * Set Unstable Memory block to Self-Refresh or Active
+     *
+     * @param on Whether you want Self-Refresh(true) or Active(False)
+     */
+    public static native int setUMtoSR(boolean on);
+
+    /**
+     * Set Unstable Memory block to Deep-Power-Down or Active
+     *
+     * @param on Whether you want Deep-Power-Down(true) or Active(False)
+     */
+    public static native int setUMtoDPD(boolean on);
 
     public static native int setLastUserActivityTimeout(long ms);
 

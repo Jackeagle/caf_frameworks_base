@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,6 +47,7 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.provider.Settings.SettingNotFoundException;
 import android.provider.Settings;
 import android.util.EventLog;
@@ -243,6 +245,9 @@ class PowerManagerService extends IPowerManager.Stub
     private static final boolean mDebugProximitySensor = (true || mSpew);
     private static final boolean mDebugLightSensor = (false || mSpew);
 
+    private boolean mDMMAvailable = false;
+    DMMControl mDMMController;
+
     /*
     static PrintStream mLog;
     static {
@@ -430,6 +435,15 @@ class PowerManagerService extends IPowerManager.Stub
         mActivityService = activity;
         mBatteryStats = BatteryStatsService.getService();
         mBatteryService = battery;
+
+        Log.w(TAG, "DMM: ro.dev.dmm = " + SystemProperties.getInt("ro.dev.dmm", 0));
+
+        if(SystemProperties.getInt("ro.dev.dmm", 0) == 1) {
+            mDMMAvailable = true;
+            mDMMController =  new DMMControl(mContext);
+        }
+        else
+            Log.w(TAG, "DMM disabled. DMMController will not be initialized.");
 
         mHandlerThread = new HandlerThread("PowerManagerService") {
             @Override
@@ -1455,6 +1469,11 @@ class PowerManagerService extends IPowerManager.Stub
                         reallyTurnScreenOn = false;
                     }
                     if (reallyTurnScreenOn) {
+                        if(mDMMAvailable) {
+                            Log.i(TAG, "Activate Unstable memory");
+                            mDMMController.enableUnstableMemory(true);
+                        }
+
                         err = setScreenStateLocked(true);
                         long identity = Binder.clearCallingIdentity();
                         try {
@@ -1513,6 +1532,18 @@ class PowerManagerService extends IPowerManager.Stub
         // called multiple times in the same state. -joeo
         EventLog.writeEvent(LOG_POWER_SCREEN_STATE, 0, reason, mTotalTouchDownTime, mTouchCycles);
         mLastTouchDown = 0;
+
+        if(mDMMAvailable) {
+            //DMM: Call DMM control to disable unstable memory.
+            if(mPartialCount == 0) {
+                Log.w(TAG, "No Partial wakelocks enabled. Deactivating unstable memory.");
+                if(mDMMController.enableUnstableMemory(false) != 0)
+                    Log.e(TAG, "Deactivating Unstable memory failed.");
+            }
+            else
+                Log.w(TAG, "Partial wakelocks enabled. Cannot deativate unstable memory.");
+        }
+
         int err = setScreenStateLocked(false);
         if (mScreenOnStartTime != 0) {
             mScreenOnTime += SystemClock.elapsedRealtime() - mScreenOnStartTime;
