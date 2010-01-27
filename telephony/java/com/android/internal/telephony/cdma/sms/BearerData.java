@@ -538,7 +538,10 @@ public final class BearerData {
                     // which case we use GSM encodings.
                     int paddingBits = calcUdhSeptetPadding(headerDataLen);
                     payloadData = encode7bitGsm(uData.payloadStr, paddingBits);
-                    codeUnitCount = ((payloadData.length + headerDataLen) * 8) / 7;
+                    // Header resides in the beginning of the payload and takes as many full
+                    // septets as it needs. (hence ((headerDataLen) * 8 + 6) / 7)
+                    // After header there is payloadStr.length() septets of user data
+                    codeUnitCount = ((headerDataLen) * 8 + 6) / 7 + uData.payloadStr.length();
                     uData.msgEncoding = UserData.ENCODING_GSM_7BIT_ALPHABET;
                 }
             } catch (CodingException ex) {
@@ -835,7 +838,6 @@ public final class BearerData {
                 break;
             case UserData.ENCODING_7BIT_ASCII:
             case UserData.ENCODING_IA5:
-            case UserData.ENCODING_GSM_7BIT_ALPHABET:
                 dataBits = 7 * bData.userData.numFields;
                 break;
             case UserData.ENCODING_UNICODE_16:
@@ -843,6 +845,7 @@ public final class BearerData {
                 break;
             case UserData.ENCODING_IS91_EXTENDED_PROTOCOL:
             case UserData.ENCODING_GSM_DCS:
+            case UserData.ENCODING_GSM_7BIT_ALPHABET:
                 // with padding is ok, gets handled decodeUserDataPayload(),
                 // and decodeIs91()
                 dataBits = paramBytes * 8 - consumedBits;
