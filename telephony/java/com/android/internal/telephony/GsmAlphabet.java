@@ -255,8 +255,8 @@ public class GsmAlphabet {
                     + " septets");
         }
 
-        // Enough for all the septets and the length 2 byte prefix
-        byte[] ret = new byte[1 + (((septetCount * 7) + 7) / 8)];
+        // Enough for all the septets, the length of 1 byte prefix and requested offset
+        byte[] ret = new byte[1 + (((septetCount * 7) + 7 + startingBitOffset) / 8)];
 
         int bitOffset = startingBitOffset;
         int septets = startingBitOffset/7;
