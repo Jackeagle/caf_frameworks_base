@@ -670,14 +670,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 || !TextUtils.equals(plmn, curPlmn)) {
             boolean showSpn =
                 (rule & SIMRecords.SPN_RULE_SHOW_SPN) == SIMRecords.SPN_RULE_SHOW_SPN;
-            boolean showPlmn;
-            if (phone.mSIMRecords.getOnsAlg() == EONS_ALG) {
-                showPlmn = true;
-            }
-            else {
-                showPlmn =
-                   (rule & SIMRecords.SPN_RULE_SHOW_PLMN) == SIMRecords.SPN_RULE_SHOW_PLMN;
-            }
+            boolean showPlmn =
+                (rule & SIMRecords.SPN_RULE_SHOW_PLMN) == SIMRecords.SPN_RULE_SHOW_PLMN;
             Intent intent = new Intent(Intents.SPN_STRINGS_UPDATED_ACTION);
             intent.putExtra(Intents.EXTRA_SHOW_SPN, showSpn);
             intent.putExtra(Intents.EXTRA_SPN, spn);
