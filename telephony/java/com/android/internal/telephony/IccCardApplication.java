@@ -28,7 +28,23 @@ public class IccCardApplication {
         APPTYPE_SIM,
         APPTYPE_USIM,
         APPTYPE_RUIM,
-        APPTYPE_CSIM
+        APPTYPE_CSIM;
+
+        boolean isAppTypeSim() {
+            return this == APPTYPE_SIM;
+        }
+
+        boolean isAppTypeUsim() {
+            return this == APPTYPE_USIM;
+        }
+
+        boolean isAppTypeRuim() {
+            return this == APPTYPE_RUIM;
+        }
+
+        boolean isAppTypeCsim() {
+            return this == APPTYPE_CSIM;
+        }
     };
 
     public enum AppState{
