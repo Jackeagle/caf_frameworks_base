@@ -253,6 +253,7 @@ public final class SIMRecords extends IccRecords {
         phone.setSystemProperty(PROPERTY_ICC_OPERATOR_ALPHA, null);
         phone.setSystemProperty(PROPERTY_ICC_OPERATOR_ISO_COUNTRY, null);
         SystemProperties.set("gsm.eons.name", null);
+        SystemProperties.set("ril.icctype", "0");
 
         // recordsRequested is set to false indicating that the SIM
         // read requests made so far are not valid. This is set to
@@ -2064,7 +2065,10 @@ public final class SIMRecords extends IccRecords {
     }
     void handleSstData(byte[] data) {
        try {
-            if (SystemProperties.getBoolean("persist.cust.tel.simtype",false)) {
+            int iccType = SystemProperties.getInt("ril.icctype",0);
+
+            Log.i(EONS_TAG,"SST: ril.icctype value:  " + iccType);
+            if (iccType == 1) {
                 //2G Sim.
                 //Service no 51:   PLMN Network Name
                 //Service no 52:   Operator PLMN List
@@ -2082,8 +2086,7 @@ public final class SIMRecords extends IccRecords {
                     sstPlmnOplValue = EONS_DISABLED;
                     Log.i(EONS_TAG,"SST: 2G Sim,PNN disabled, disabling EONS "+sstPlmnOplValue);
                 }
-            }
-            else {
+            } else if (iccType == 2) {
                //3G Sim.
                //Service no 45: PLMN Network Name
                //Service no 46: Operator PLMN List
@@ -2101,7 +2104,11 @@ public final class SIMRecords extends IccRecords {
                    sstPlmnOplValue = EONS_DISABLED;
                    Log.i(EONS_TAG,"SST: 3G Sim,PNN disabled, disabling EONS "+sstPlmnOplValue);
                }
+            } else {
+               sstPlmnOplValue = EONS_DISABLED;
+               Log.e(EONS_TAG,"SST: Unhandled ICC type, disabling EONS");
             }
+
             /*Update the display*/
             if (sstPlmnOplValue == EONS_DISABLED) {
                 ((GSMPhone) phone).mSST.updateSpnDisplayWrapper();
