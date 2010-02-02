@@ -1164,8 +1164,6 @@ public class GSMPhone extends PhoneBase {
     }
 
     public boolean enableDataConnectivity() {
-       Settings.System.putInt(getContext().getContentResolver(),Settings.System.
-             SOCKET_DATA_CALL_ENABLE,1);
        return mDataConnection.setDataEnabled(true);
     }
 
@@ -1178,8 +1176,6 @@ public class GSMPhone extends PhoneBase {
     }
 
     public boolean disableDataConnectivity() {
-       Settings.System.putInt(getContext().getContentResolver(),Settings.System.
-             SOCKET_DATA_CALL_ENABLE,0);
        return mDataConnection.setDataEnabled(false);
     }
 
