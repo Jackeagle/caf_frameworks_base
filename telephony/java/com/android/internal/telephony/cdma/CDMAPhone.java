@@ -54,6 +54,7 @@ import com.android.internal.telephony.cdma.CdmaMmiCode;
 // since there is no difference between CDMA and GSM for MccTable and
 // CDMA uses gsm's MccTable is not good.
 import com.android.internal.telephony.gsm.MccTable;
+import com.android.internal.telephony.gsm.stk.StkService;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccException;
 import com.android.internal.telephony.IccFileHandler;
@@ -104,6 +105,7 @@ public class CDMAPhone extends PhoneBase {
     RuimSmsInterfaceManager mRuimSmsInterfaceManager;
     PhoneSubInfo mSubInfo;
     EriManager mEriManager;
+    StkService mStkService;
 
     // mNvLoadedRegistrants are informed after the EVENT_NV_READY
     private RegistrantList mNvLoadedRegistrants = new RegistrantList();
@@ -153,6 +155,8 @@ public class CDMAPhone extends PhoneBase {
         mRuimSmsInterfaceManager = new RuimSmsInterfaceManager(this);
         mSubInfo = new PhoneSubInfo(this);
         mEriManager = new EriManager(this, context, EriManager.ERI_FROM_XML);
+        mStkService = StkService.getInstance(mCM, mRuimRecords, mContext,
+                mIccFileHandler, mRuimCard);
 
         mCM.registerForAvailable(h, EVENT_RADIO_AVAILABLE, null);
         mRuimRecords.registerForRecordsLoaded(h, EVENT_RUIM_RECORDS_LOADED, null);
@@ -210,6 +214,7 @@ public class CDMAPhone extends PhoneBase {
             mPendingMmis.clear();
 
             //Force all referenced classes to unregister their former registered events
+            mStkService.dispose();
             mCT.dispose();
             mDataConnection.dispose();
             mSST.dispose();
@@ -225,6 +230,7 @@ public class CDMAPhone extends PhoneBase {
     }
 
     public void removeReferences() {
+            this.mStkService = null;
             this.mRuimPhoneBookInterfaceManager = null;
             this.mRuimSmsInterfaceManager = null;
             this.mSMS = null;
