@@ -2940,7 +2940,20 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             }
 
             Log.i(LOG_TAG,"app_state " + status.application.get(index).app_state +
-                  ", perso_substate " + status.application.get(index).perso_substate);
+                  ", perso_substate " + status.application.get(index).perso_substate +
+                  ", app_type " + status.application.get(index).app_type);
+
+            if (status.application.get(index).app_type.isAppTypeSim()) {
+                SystemProperties.set("ril.icctype","1");
+            } else if (status.application.get(index).app_type.isAppTypeUsim()) {
+                SystemProperties.set("ril.icctype","2");
+            } else if (status.application.get(index).app_type.isAppTypeRuim()) {
+                SystemProperties.set("ril.icctype","3");
+            } else if (status.application.get(index).app_type.isAppTypeCsim()) {
+                SystemProperties.set("ril.icctype","4");
+            } else {
+                SystemProperties.set("ril.icctype","0");
+            }
 
             Log.i(LOG_TAG,"pin1_status " + status.application.get(index).pin1 +
                   ", pin2_status " + status.application.get(index).pin2);
