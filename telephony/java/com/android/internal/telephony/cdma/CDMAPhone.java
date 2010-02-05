@@ -480,7 +480,6 @@ public class CDMAPhone extends PhoneBase {
     }
 
     public boolean disableDataConnectivity() {
-       Settings.System.putInt(getContext().getContentResolver(),Settings.System.SOCKET_DATA_CALL_ENABLE,0);
        return mDataConnection.setDataEnabled(false);
     }
 
@@ -769,7 +768,6 @@ public class CDMAPhone extends PhoneBase {
             ActivityManagerNative.broadcastStickyIntent(intent, null);
             return false;
         } else {
-            Settings.System.putInt(getContext().getContentResolver(),Settings.System.SOCKET_DATA_CALL_ENABLE,1);
             return mDataConnection.setDataEnabled(true);
         }
     }
