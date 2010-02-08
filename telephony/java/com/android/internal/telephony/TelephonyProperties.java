@@ -109,4 +109,7 @@ public interface TelephonyProperties
 
     /** The international dialing prefix conversion string */
     static final String PROPERTY_IDP_STRING = "persist.ro.cdma.idpstring";
+
+    /** The delay between sms sending retries */
+    static final String PROPERTY_SMS_RETRY_DELAY = "persist.radio.sms_retry_delay";
 }
