@@ -31,8 +31,10 @@ import android.os.SystemProperties;
 import android.preference.PreferenceManager;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
+import android.provider.Settings;
 
 import com.android.internal.R;
 import com.android.internal.telephony.gsm.PdpConnection;
@@ -834,4 +836,33 @@ public abstract class PhoneBase implements Phone {
         // This function should be overridden by the class CDMAPhone. Not implemented in GSMPhone.
          Log.e(LOG_TAG, "Error! This function should never be executed, inactive CDMAPhone.");
      }
+
+    public int getPhoneTypeFromNetworkType() {
+
+        int preferredNetworkMode = RILConstants.PREFERRED_NETWORK_MODE;
+        Context context = getContext();
+        int networkMode = Settings.Secure.getInt(context.getContentResolver(),
+                Settings.Secure.PREFERRED_NETWORK_MODE, preferredNetworkMode);
+
+        if ((networkMode == RILConstants.NETWORK_MODE_CDMA)
+                || (networkMode == RILConstants.NETWORK_MODE_CDMA_NO_EVDO)
+                || (networkMode == RILConstants.NETWORK_MODE_EVDO_NO_CDMA)) {
+            return RILConstants.CDMA_PHONE;
+        } else if ((networkMode == RILConstants.NETWORK_MODE_WCDMA_PREF)
+                || (networkMode == RILConstants.NETWORK_MODE_GSM_ONLY)
+                || (networkMode == RILConstants.NETWORK_MODE_WCDMA_ONLY)
+                || (networkMode == RILConstants.NETWORK_MODE_GSM_UMTS)) {
+            return RILConstants.GSM_PHONE;
+        } else if (networkMode == RILConstants.NETWORK_MODE_GLOBAL) {
+            if (TelephonyManager.PHONE_TYPE_CDMA == TelephonyManager.getDefault().getPhoneType()) {
+                return RILConstants.CDMA_PHONE;
+            } else if (TelephonyManager.PHONE_TYPE_GSM == TelephonyManager.getDefault()
+                    .getPhoneType()) {
+                return RILConstants.GSM_PHONE;
+            }
+        }
+
+        return RILConstants.NO_PHONE;
+    }
+
 }
