@@ -65,7 +65,7 @@ class ServerThread extends Thread {
             boolean enableAdb = (Settings.Secure.getInt(mContentResolver,
                 Settings.Secure.ADB_ENABLED, 0) > 0);
             // setting this secure property will start or stop adbd
-           SystemProperties.set("persist.service.adb.enable", enableAdb ? "1" : "0");
+           //SystemProperties.set("persist.service.adb.enable", enableAdb ? "1" : "0");
         }
     }
 
