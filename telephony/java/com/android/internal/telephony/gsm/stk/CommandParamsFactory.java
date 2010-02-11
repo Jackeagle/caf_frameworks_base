@@ -114,7 +114,10 @@ class CommandParamsFactory extends Handler {
         AppInterface.CommandType cmdType = AppInterface.CommandType
                 .fromInt(cmdDet.typeOfCommand);
         if (cmdType == null) {
-            sendCmdParams(ResultCode.CMD_TYPE_NOT_UNDERSTOOD);
+            // This PROACTIVE COMMAND is presently not handled. Hence set
+            // result code as BEYOND_TERMINAL_CAPABILITY in TR.
+            mCmdParams = new CommandParams(cmdDet);
+            sendCmdParams(ResultCode.BEYOND_TERMINAL_CAPABILITY);
             return;
         }
 
@@ -163,7 +166,7 @@ class CommandParamsFactory extends Handler {
             default:
                 // unsupported proactive commands
                 mCmdParams = new CommandParams(cmdDet);
-                sendCmdParams(ResultCode.CMD_TYPE_NOT_UNDERSTOOD);
+                sendCmdParams(ResultCode.BEYOND_TERMINAL_CAPABILITY);
                 return;
             }
         } catch (ResultException e) {
