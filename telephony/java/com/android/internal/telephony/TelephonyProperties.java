@@ -116,4 +116,6 @@ public interface TelephonyProperties
      * making sure previous sms was sent) */
      static final String SMS_SYNCHRONOUS_SENDING = "persist.ro.ril.sms_sync_sending";
 
+    /** The delay between sms sending retries */
+    static final String PROPERTY_SMS_RETRY_DELAY = "persist.radio.sms_retry_delay";
 }
