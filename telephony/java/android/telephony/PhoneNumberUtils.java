@@ -1144,7 +1144,6 @@ public class PhoneNumberUtils
         // are pre-configured list of emergency numbers.
         String numbers = SystemProperties.get("ril.ecclist");
         if (TextUtils.isEmpty(numbers)) {
-            log("IsEmergencyNumber: ril.ecclist is empty. Using ro.ril.ecclist");
             numbers = SystemProperties.get("ro.ril.ecclist");
         }
 
