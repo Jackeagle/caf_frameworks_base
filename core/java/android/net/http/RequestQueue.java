@@ -62,13 +62,12 @@ public class RequestQueue implements RequestFeeder {
 
     /** true if connected */
     boolean mNetworkConnected = true;
-    /* Track uninitialised state of the Network, before getting CONNECTED event. */
-    boolean mNetworkUnInit    = false;
 
     private HttpHost mProxyHost = null;
     private BroadcastReceiver mProxyChangeReceiver;
 
     private ActivePool mActivePool;
+    private final ConnectivityManager mConnectivityManager;
 
     /* default simultaneous connection count */
     private static final int CONNECTION_COUNT = 4;
@@ -120,7 +119,6 @@ public class RequestQueue implements RequestFeeder {
                  * shouldn't.
                  */
                 mCurrentNetworkType = ConnectivityManager.TYPE_WIFI;
-                mNetworkUnInit      = true;
                 mConnectivityListener = new NetworkConnectivityListener();
                 mConnectivityListener.registerHandler(mHandler, EVENT_DATA_STATE_CHANGED);
                 mConnectivityListener.startListening(mContext);
@@ -153,7 +151,6 @@ public class RequestQueue implements RequestFeeder {
             if (mConnectivityListener == null)
                 return;
 
-            mNetworkUnInit = false;
             NetworkConnectivityListener.State connectivityState = mConnectivityListener.getState();
             NetworkInfo info = mConnectivityListener.getNetworkInfo();
             if (info == null) {
@@ -351,6 +348,9 @@ public class RequestQueue implements RequestFeeder {
 
         mActivePool = new ActivePool(connectionCount);
         mActivePool.startup();
+
+        mConnectivityManager = (ConnectivityManager)
+                context.getSystemService(Context.CONNECTIVITY_SERVICE);
     }
 
     /**
@@ -409,8 +409,9 @@ public class RequestQueue implements RequestFeeder {
      * synchronize setting the proxy
      */
     private synchronized void setProxyConfig() {
-        if (mNetworkStateTracker.getCurrentNetworkType() == ConnectivityManager.TYPE_WIFI &&
-            mNetworkUnInit == false ) {
+        NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
+        if (info != null && info.getType() == ConnectivityManager.TYPE_WIFI) {
+            //TBD :Currently there is no support to configure proxy while in WIFI hence setting it to null.
             mProxyHost = null;
         } else {
             String host = Proxy.getHost(mContext);
