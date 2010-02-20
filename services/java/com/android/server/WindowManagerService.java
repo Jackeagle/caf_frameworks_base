@@ -8750,9 +8750,20 @@ public class WindowManagerService extends IWindowManager.Stub implements Watchdo
                         Log.w(TAG, "LEAKED SURFACE (app token hidden): "
                                 + ws + " surface=" + ws.mSurface
                                 + " token=" + win.mAppToken);
-                        ws.mSurface.clear();
-                        ws.mSurface = null;
-                        leakedSurface = true;
+                        // Spare the StatusBar
+                        boolean isStatusBar = false;
+                        isStatusBar = (ws.toString().indexOf("StatusBar") > 0);
+
+                        if (!isStatusBar)
+                        {
+                            ws.mSurface.clear();
+                            ws.mSurface = null;
+                            leakedSurface = true;
+                        }
+                        else 
+                        {
+                            Log.w(TAG, "LEAKED SURFACE: Spare StatusBar");
+                        }
                     }
                 }
             }
