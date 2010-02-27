@@ -63,6 +63,10 @@
 
 #include <OMX.h>
 
+#ifdef BUILD_WITH_GST
+#include <GstPlayer.h>
+#endif
+
 /* desktop Linux needs a little help with gettid() */
 #if defined(HAVE_GETTID) && !defined(HAVE_ANDROID_OS)
 #define __KERNEL__
@@ -626,6 +630,12 @@ void MediaPlayerService::Client::disconnect()
 }
 
 static player_type getDefaultPlayerType() {
+#ifdef BUILD_WITH_GST
+    // if GST_CONFIG_FILE exists, replace pv player with gst player
+    if (access(GST_CONFIG_FILE, 0) == 0)
+        return GST_PLAYER;
+#endif
+
 #if BUILD_WITH_FULL_STAGEFRIGHT
     char value[PROPERTY_VALUE_MAX];
     if (property_get("media.stagefright.enable-player", value, NULL)
@@ -666,12 +676,24 @@ player_type getPlayerType(int fd, int64_t offset, int64_t length)
         }
         EAS_Shutdown(easdata);
     }
+    
+#ifdef BUILD_WITH_GST
+    // if GST_CONFIG_FILE exists, replace pv player with gst player
+    if (access(GST_CONFIG_FILE, 0) == 0)
+        return GST_PLAYER;
+#endif
 
     return getDefaultPlayerType();
 }
 
 player_type getPlayerType(const char* url)
 {
+#ifdef BUILD_WITH_GST
+    // if GST_CONFIG_FILE exists, replace pv player with gst player
+    if (access(GST_CONFIG_FILE, 0) == 0)
+        return GST_PLAYER;
+#endif
+
     if (TestPlayerStub::canBeUsed(url)) {
         return TEST_PLAYER;
     }
@@ -720,6 +742,12 @@ static sp<MediaPlayerBase> createPlayer(player_type playerType, void* cookie,
             LOGV("Create Test Player stub");
             p = new TestPlayerStub();
             break;
+#ifdef BUILD_WITH_GST
+        case GST_PLAYER:
+            LOGV(" create GstPlayer");
+            p = new GstPlayer();
+            break;
+#endif
     }
     if (p != NULL) {
         if (p->initCheck() == NO_ERROR) {
