@@ -3163,7 +3163,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
        for (int i = 0 ; i < num ; i++) {
            int rssi = p.readInt();
-           int cid = Integer.valueOf(p.readString(), 16);
+           int cid = NeighboringCellInfo.UNKNOWN_CID;
+           String location = p.readString();
+           try {
+               if (!location.equalsIgnoreCase(String.valueOf("FFFFFFFF"))) {
+                  cid = Integer.valueOf(location, 16);
+               }
+           } catch (NumberFormatException e) {
+               cid = NeighboringCellInfo.UNKNOWN_CID;
+           }
            cell = new NeighboringCellInfo(rssi, cid);
            response.add(cell);
        }
