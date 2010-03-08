@@ -111,6 +111,10 @@ LOCAL_LDLIBS := -lpthread -ldl
 LOCAL_MODULE:= libRS
 LOCAL_MODULE_TAGS := eng
 
+ifeq "$(findstring msm7627,$(TARGET_PRODUCT))" "msm7627"
+	LOCAL_CFLAGS += -mno-thumb
+endif
+
 include $(BUILD_SHARED_LIBRARY)
 
 # include the java examples
