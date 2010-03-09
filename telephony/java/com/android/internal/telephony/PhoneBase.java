@@ -80,6 +80,7 @@ public abstract class PhoneBase implements Phone {
     protected static final int EVENT_SET_CALL_FORWARD_DONE       = 12;
     protected static final int EVENT_GET_CALL_FORWARD_DONE       = 13;
     protected static final int EVENT_CALL_RING                   = 14;
+    protected static final int EVENT_CALL_RING_CONTINUE          = 26;
     // Used to intercept the carrier selection calls so that
     // we can save the values.
     protected static final int EVENT_SET_NETWORK_MANUAL_COMPLETE    = 15;

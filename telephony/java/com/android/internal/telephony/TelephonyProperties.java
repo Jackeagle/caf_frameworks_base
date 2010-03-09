@@ -118,4 +118,15 @@ public interface TelephonyProperties
 
     /** The delay between sms sending retries */
     static final String PROPERTY_SMS_RETRY_DELAY = "persist.radio.sms_retry_delay";
+
+    /**
+     * Set to true for vendor RIL's that send multiple UNSOL_CALL_RING notifications.
+     */
+    static final String PROPERTY_RIL_SENDS_MULTIPLE_CALL_RING =
+        "ro.telephony.call_ring.multiple";
+
+    /**
+     * The number of milli-seconds between CALL_RING notifications.
+     */
+    static final String PROPERTY_CALL_RING_DELAY = "ro.telephony.call_ring.delay";
 }
