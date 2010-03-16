@@ -218,6 +218,7 @@ status_t AudioRecord::set(
     mNewPosition = 0;
     mUpdatePeriod = 0;
     mInputSource = (uint8_t)inputSource;
+    mFirstread = false;
 
     return NO_ERROR;
 }
@@ -477,7 +478,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     }
     else
     {
-      if (framesReq >= 10)
+      if ( framesReq >= 10 || !mFirstread )
       {
         if (mFormat == AudioSystem::FORMAT_AMR_IETF)
         {
@@ -564,6 +565,12 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize)
         read += bytesRead;
 
         releaseBuffer(&audioBuffer);
+
+        if (!mFirstread)
+        {
+            mFirstread = true;
+            break;
+        }
 
         // Voicememo driver (Minimum buffer size = Full rate frame size * 10)
         if ( (mFormat == AudioSystem::FORMAT_AMR_IETF) &&

@@ -342,6 +342,7 @@ private:
     bool                    mMarkerReached;
     uint32_t                mNewPosition;
     uint32_t                mUpdatePeriod;
+    bool                    mFirstread;
 };
 
 }; // namespace android
