@@ -85,6 +85,12 @@ public interface RILConstants {
     int CDM_TTY_HCO_MODE = 2;
     int CDM_TTY_VCO_MODE = 3;
 
+    /* Setup a packet data connection. See ril.h RIL_REQUEST_SETUP_DATA_CALL */
+    int SETUP_DATA_AUTH_NONE = 0;
+    int SETUP_DATA_AUTH_PAP = 1;
+    int SETUP_DATA_AUTH_CHAP = 2;
+    int SETUP_DATA_AUTH_PAP_CHAP = 3;
+
 /*
 cat include/telephony/ril.h | \
    egrep '^#define' | \
