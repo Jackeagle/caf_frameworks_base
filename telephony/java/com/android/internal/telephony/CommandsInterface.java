@@ -1383,13 +1383,11 @@ public interface CommandsInterface {
      *            the username for APN, or NULL
      * @param password
      *            the password for APN, or NULL
-     * @param authType
-     *            the PAP / CHAP auth type. Values is one of SETUP_DATA_AUTH_*
      * @param result
      *            Callback message
      */
-    public void setupDataCall(String radioTechnology, String profile, String apn, String user,
-            String password, String authType, Message result);
+    public void setupDataCall(String radioTechnology, String profile, String apn,
+            String user, String password, Message result);
 
     /**
      * Deactivate packet data connection

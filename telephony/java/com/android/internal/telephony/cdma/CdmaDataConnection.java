@@ -144,9 +144,8 @@ public class CdmaDataConnection extends DataConnection {
         lastFailCause = FailCause.NONE;
         receivedDisconnectReq = false;
         phone.mCM.setupDataCall(Integer.toString(RILConstants.CDMA_PHONE),
-                Integer.toString(RILConstants.DATA_PROFILE_DEFAULT), null, null, null,
-                Integer.toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP),
-                obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE));
+                Integer.toString(RILConstants.DATA_PROFILE_DEFAULT), null, null,
+                null, obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE));
     }
 
     private void tearDownData(Message msg) {
