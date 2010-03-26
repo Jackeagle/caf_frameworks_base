@@ -603,10 +603,16 @@ public class StkService extends Handler implements AppInterface {
     }
 
     private boolean validateResponse(StkResponseMessage resMsg) {
-        if (mCurrntCmd != null) {
-            return (resMsg.cmdDet.compareTo(mCurrntCmd.mCmdDet));
+        boolean validResponse = false;
+        if ((resMsg.cmdDet.typeOfCommand == CommandType.SET_UP_EVENT_LIST.value())
+                || (resMsg.cmdDet.typeOfCommand == CommandType.SET_UP_MENU.value())) {
+            StkLog.d(this, "CmdType: " + resMsg.cmdDet.typeOfCommand);
+            validResponse = true;
+        } else if (mCurrntCmd != null) {
+            validResponse = resMsg.cmdDet.compareTo(mCurrntCmd.mCmdDet);
+            StkLog.d(this, "isResponse for last valid cmd: " + validResponse);
         }
-        return false;
+        return validResponse;
     }
 
     private boolean removeMenu(Menu menu) {
@@ -631,7 +637,9 @@ public class StkService extends Handler implements AppInterface {
         // available for relaunch using the latest application dialog
         // (long press on the home button). Relaunching that activity can send
         // the same command's result again to the StkService and can cause it to
-        // get out of sync with the SIM.
+        // get out of sync with the SIM. Envelope commands from SETUP_EVENT_LIST
+        // and SET_UP_MENU can occur asynchronously. These commands needs to be
+        // sent irrespective of last valid command.
         if (!validateResponse(resMsg)) {
             return;
         }
