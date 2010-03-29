@@ -13161,7 +13161,11 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
         // important to least, and assign an appropriate OOM adjustment.
         int adj;
         int N;
-        if (app == TOP_APP) {
+        if(app.processName.equals("android.process.acore") || app.processName.equals("android.process.launcher2")){
+            // Set adj value of core/launcher 2 as HOME_APP_ADJ . This will prevent the OOM from killing these processes.
+            adj = HOME_APP_ADJ;
+            app.adjType = "home";
+        }else if (app == TOP_APP) {
             // The last app on the list is the foreground app.
             adj = FOREGROUND_APP_ADJ;
             app.adjType = "top-activity";
