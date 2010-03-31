@@ -339,11 +339,52 @@ public final class CNE
                 int pluginType = intent.getIntExtra("plugged", 0);
                 int status = intent.getIntExtra("status", 0);
                 updateBatteryStatus(level, pluginType, status);
-            }
-            else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
 
+            } else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
                 Log.i(LOG_TAG, "CNE received action RSSI Changed events: " + action);
-                int rssi = intent.getIntExtra(WifiManager.EXTRA_NEW_RSSI, -200);
+                if (mWifiManager != null) {
+                    String ipAddr=null;
+                    ConnectivityManager cm =
+                      (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+                    NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+                    NetworkInfo.State networkState =
+                        (networkInfo == null ? NetworkInfo.State.UNKNOWN:networkInfo.getState());
+                    if(networkState == NetworkInfo.State.CONNECTED){
+                      try {
+                        DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
+                        int ipAddressInt = dhcpInfo.ipAddress;
+
+                        ipAddr = ((ipAddressInt)&0xff) + "."
+                                 + ((ipAddressInt>>8)&0xff) + "."
+                                 + ((ipAddressInt>>16)&0xff) + "."
+                                 + ((ipAddressInt>>24)&0xff);
+
+                      } catch (Exception e) {
+                            Log.w(LOG_TAG, "CNE receiver exception", e);
+                      }
+
+                    }
+
+                    WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
+                    String ssid = wifiInfo.getSSID();
+                    int rssi = wifiInfo.getRssi();
+                    String tsStr = null;
+                    long currentTime = System.currentTimeMillis();
+                    Timestamp ts = new Timestamp(currentTime);
+                    tsStr = ts.toString();
+
+                    Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
+                                   " networkState: " + networkState);
+
+                    Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
+                                   "ssid= " + ssid + ",rssi=" + rssi + ",ipAddr=" +
+                                   ipAddr + ",timeStamp:" + tsStr);
+
+                    updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G,NetworkStateToInt(networkState),
+                                     rssi, ssid, ipAddr, tsStr);
+                } else {
+                    Log.w(LOG_TAG, "CNE received action RSSI Changed events, null WifiManager");
+                }
 
 
             } else if ((action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) ||
@@ -1152,6 +1193,40 @@ public final class CNE
             Log.i(LOG_TAG,"CNE onSignalStrengthsChanged ");
             mSignalStrength = signalStrength;
 
+            if (mTelephonyManager != null) {
+              String ipAddr = null;
+              ConnectivityManager cm =
+                (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+              NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+              NetworkInfo.State networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
+                    networkInfo.getState());
+
+              ipAddr = mTelephonyManager.getActiveIpAddress(null);
+
+              int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
+              int type = networkInfo.getSubtype();
+              int rssi = getSignalStrength(type);
+              String tsStr = null;
+              long currentTime = System.currentTimeMillis();
+              Timestamp ts = new Timestamp(currentTime);
+              tsStr = ts.toString();
+
+              Log.i(LOG_TAG,"CNE onSignalStrengthsChanged - type:" + type + ",strength:"
+                    + rssi + ",state:" + networkState);
+
+              Log.i(LOG_TAG, "CNE onSignalStrengthsChanged - ipAddr:" + ipAddr +
+                    ",roaming:" + roaming + ",timeStamp:" + tsStr);
+
+              updateWwanStatus(type, NetworkStateToInt(networkState),
+                               rssi, roaming, ipAddr, tsStr);
+
+
+            } else {
+              Log.i(LOG_TAG, "onDataConnectionStateChanged null TelephonyManager");
+            }
+
+
+
         }
 
         @Override
@@ -1188,8 +1263,8 @@ public final class CNE
                 }
                 if(ipAddr != null && ipAddr.length() !=0 && ifName != null && ifName.length()!=0) {
                    activeWwanIfName = ifName;
+                   Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
                    configureIproute2(CNE_IPROUTE2_ADD_DEFAULT, ifName, ipAddr, gatewayAddr);
-
                 }
               } else if (networkState == NetworkInfo.State.DISCONNECTED) {
                 configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT, activeWwanIfName, null, null);
@@ -1258,7 +1333,8 @@ public final class CNE
            case TelephonyManager.NETWORK_TYPE_HSDPA:
            case TelephonyManager.NETWORK_TYPE_HSUPA:
            case TelephonyManager.NETWORK_TYPE_HSPA:
-             return (mSignalStrength.getGsmSignalStrength());
+             // dBm = -113 + 2*asu
+             return (-113 + 2*(mSignalStrength.getGsmSignalStrength()));
            case TelephonyManager.NETWORK_TYPE_1xRTT:
            case TelephonyManager.NETWORK_TYPE_CDMA:
              return(mSignalStrength.getCdmaDbm());
