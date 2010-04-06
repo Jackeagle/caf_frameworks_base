@@ -6349,8 +6349,13 @@ public class WindowManagerService extends IWindowManager.Stub
                 return true;
             }
 
+            String hwNoPMStr = SystemProperties.get("hw.nopm");
+            boolean hwNoPM = Boolean.parseBoolean(hwNoPMStr);
+
             switch (event.type) {
                 case RawInputEvent.EV_KEY: {
+                    if (hwNoPM)
+                        return true;
                     // XXX begin hack
                     if (DEBUG) {
                         if (event.keycode == KeyEvent.KEYCODE_G) {
@@ -6400,6 +6405,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
 
                 case RawInputEvent.EV_REL: {
+                    if (hwNoPM)
+                        return true;
                     boolean screenIsOff = !mPowerManager.isScreenOn();
                     boolean screenIsDim = !mPowerManager.isScreenBright();
                     if (screenIsOff) {
@@ -6418,6 +6425,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
 
                 case RawInputEvent.EV_ABS: {
+                    if (hwNoPM)
+                        return true;
                     boolean screenIsOff = !mPowerManager.isScreenOn();
                     boolean screenIsDim = !mPowerManager.isScreenBright();
                     if (screenIsOff) {
