@@ -63,6 +63,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
     private String mInterfaceName;
     private int mDefaultGatewayAddr;
     private int mLastCallingPid = -1;
+    private boolean mMmsApnEnablingRequestInProcess = false;
+    private boolean mSuplApnEnablingRequestInProcess = false;
 
     /**
      * Create a new MobileDataStateTracker
@@ -103,54 +105,63 @@ public class MobileDataStateTracker extends NetworkStateTracker {
 
     private class MobileDataStateReceiver extends BroadcastReceiver {
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)) {
-                Phone.DataState state = getMobileDataState(intent);
-                String reason = intent.getStringExtra(Phone.STATE_CHANGE_REASON_KEY);
-                String apnName = intent.getStringExtra(Phone.DATA_APN_KEY);
-                boolean unavailable = intent.getBooleanExtra(Phone.NETWORK_UNAVAILABLE_KEY, false);
-                if (DBG) Log.d(TAG, "Received " + intent.getAction() +
-                    " broadcast - state = " + state
-                    + ", unavailable = " + unavailable
-                    + ", reason = " + (reason == null ? "(unspecified)" : reason));
-                mNetworkInfo.setIsAvailable(!unavailable);
-                if (mMobileDataState != state) {
-                    mMobileDataState = state;
+            synchronized(this) {
+                if (intent.getAction().equals(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)) {
+                    Phone.DataState state = getMobileDataState(intent);
+                    String reason = intent.getStringExtra(Phone.STATE_CHANGE_REASON_KEY);
+                    String apnName = intent.getStringExtra(Phone.DATA_APN_KEY);
+                    boolean unavailable = intent.getBooleanExtra(Phone.NETWORK_UNAVAILABLE_KEY, false);
+                    if (DBG) Log.d(TAG, "Received " + intent.getAction() +
+                            " broadcast - state = " + state
+                            + ", unavailable = " + unavailable
+                            + ", reason = " + (reason == null ? "(unspecified)" : reason));
+                    mNetworkInfo.setIsAvailable(!unavailable);
+                    if (mMobileDataState != state) {
+                        mMobileDataState = state;
 
-                    switch (state) {
-                    case DISCONNECTED:
-                        setDetailedState(DetailedState.DISCONNECTED, reason, apnName);
-                        if (mInterfaceName != null) {
-                            NetworkUtils.resetConnections(mInterfaceName);
+                        switch (state) {
+                            case DISCONNECTED:
+                                setDetailedState(DetailedState.DISCONNECTED, reason, apnName);
+                                if (mInterfaceName != null) {
+                                    NetworkUtils.resetConnections(mInterfaceName);
+                                }
+                                mInterfaceName = null;
+                                mDefaultGatewayAddr = 0;
+                                break;
+                            case CONNECTING:
+                                setDetailedState(DetailedState.CONNECTING, reason, apnName);
+                                break;
+                            case SUSPENDED:
+                                setDetailedState(DetailedState.SUSPENDED, reason, apnName);
+                                break;
+                            case CONNECTED:
+                                mInterfaceName = intent.getStringExtra(Phone.DATA_IFACE_NAME_KEY);
+                                if (mInterfaceName == null) {
+                                    Log.d(TAG, "CONNECTED event did not supply interface name.");
+                                }
+                                setupDnsProperties();
+                                setDetailedState(DetailedState.CONNECTED, reason, apnName);
+                                if (mMmsApnEnablingRequestInProcess == true) {
+                                    mMmsApnEnablingRequestInProcess = false;
+                                }
+                                if (mSuplApnEnablingRequestInProcess == true) {
+                                    mSuplApnEnablingRequestInProcess = false;
+                                }
+
+                                break;
                         }
-                        mInterfaceName = null;
-                        mDefaultGatewayAddr = 0;
-                        break;
-                    case CONNECTING:
-                        setDetailedState(DetailedState.CONNECTING, reason, apnName);
-                        break;
-                    case SUSPENDED:
-                        setDetailedState(DetailedState.SUSPENDED, reason, apnName);
-                        break;
-                    case CONNECTED:
-                        mInterfaceName = intent.getStringExtra(Phone.DATA_IFACE_NAME_KEY);
-                        if (mInterfaceName == null) {
-                            Log.d(TAG, "CONNECTED event did not supply interface name.");
-                        }
-                        setupDnsProperties();
-                        setDetailedState(DetailedState.CONNECTED, reason, apnName);
-                        break;
                     }
+                } else if (intent.getAction().equals(TelephonyIntents.ACTION_DATA_CONNECTION_FAILED)) {
+                    String reason = intent.getStringExtra(Phone.FAILURE_REASON_KEY);
+                    String apnName = intent.getStringExtra(Phone.DATA_APN_KEY);
+                    if (DBG) Log.d(TAG, "Received " + intent.getAction() + " broadcast" +
+                            reason == null ? "" : "(" + reason + ")");
+                    setDetailedState(DetailedState.FAILED, reason, apnName);
                 }
-            } else if (intent.getAction().equals(TelephonyIntents.ACTION_DATA_CONNECTION_FAILED)) {
-                String reason = intent.getStringExtra(Phone.FAILURE_REASON_KEY);
-                String apnName = intent.getStringExtra(Phone.DATA_APN_KEY);
-                if (DBG) Log.d(TAG, "Received " + intent.getAction() + " broadcast" +
-                    reason == null ? "" : "(" + reason + ")");
-                setDetailedState(DetailedState.FAILED, reason, apnName);
+                TelephonyManager tm = TelephonyManager.getDefault();
+                setRoamingStatus(tm.isNetworkRoaming());
+                setSubtype(tm.getNetworkType(), tm.getNetworkTypeName());
             }
-            TelephonyManager tm = TelephonyManager.getDefault();
-            setRoamingStatus(tm.isNetworkRoaming());
-            setSubtype(tm.getNetworkType(), tm.getNetworkTypeName());
         }
     }
 
@@ -373,15 +384,30 @@ public class MobileDataStateTracker extends NetworkStateTracker {
      * <li>{@code Phone.APN_REQUEST_FAILED}</li>
      * </ul>
      */
-    public int startUsingNetworkFeature(String feature, int callingPid, int callingUid) {
+    public synchronized int startUsingNetworkFeature(String feature, int callingPid, int callingUid) {
+        int retval = -1;
+
         if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_MMS)) {
             mLastCallingPid = callingPid;
-            return setEnableApn(Phone.APN_TYPE_MMS, true);
+            if(mMmsApnEnablingRequestInProcess) {
+                return Phone.APN_REQUEST_STARTED;
+            }
+            retval = setEnableApn(Phone.APN_TYPE_MMS, true);
+            if(retval == Phone.APN_REQUEST_STARTED) {
+                mMmsApnEnablingRequestInProcess = true;
+            }
         } else if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_SUPL)) {
-            return setEnableApn(Phone.APN_TYPE_SUPL, true);
-        } else {
-            return -1;
+
+            if(mSuplApnEnablingRequestInProcess) {
+                return Phone.APN_REQUEST_STARTED;
+            }
+            retval = setEnableApn(Phone.APN_TYPE_SUPL, true);
+            if(retval == Phone.APN_REQUEST_STARTED) {
+                mSuplApnEnablingRequestInProcess = true;
+            }
         }
+
+        return retval;
     }
 
     /**
@@ -396,10 +422,12 @@ public class MobileDataStateTracker extends NetworkStateTracker {
      * The interpretation of this value is feature-specific, except that
      * the value {@code -1} always indicates failure.
      */
-    public int stopUsingNetworkFeature(String feature, int callingPid, int callingUid) {
+    public synchronized int stopUsingNetworkFeature(String feature, int callingPid, int callingUid) {
         if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_MMS)) {
+            mMmsApnEnablingRequestInProcess = false;
             return setEnableApn(Phone.APN_TYPE_MMS, false);
         } else if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_SUPL)) {
+            mSuplApnEnablingRequestInProcess = false;
             return setEnableApn(Phone.APN_TYPE_SUPL, false);
         } else {
             return -1;
