@@ -86,9 +86,6 @@ import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import java.net.SocketException;
 
-import com.android.internal.telephony.gsm.GsmDataConnectionTracker;
-
-
 
 /**
  * {@hide}
@@ -1982,38 +1979,70 @@ public final class CNE
         int ratType = p.readInt();
 
         Log.i(LOG_TAG,"handleRatUpMsg called ratType = "+ ratType);
+        switch (ratType) {
+            case CNE_RAT_WLAN:
+                handleWlanBringUp();
+                break;
+            case CNE_RAT_WWAN:
+                handleWwanBringUp();
+                break;
+            default:
+                Log.d(LOG_TAG,"UnHandled Rat Type: "+ratType);
 
-        ConnectivityManager cm = (ConnectivityManager)
-            mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = cm.getNetworkInfo(ratType);
-        NetworkInfo.State networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
-                        networkInfo.getState());
-        String ipAddr = null;
-        if(networkState == NetworkInfo.State.CONNECTED){
-            try {
-                if(ratType == CNE_RAT_WLAN){
-                    DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
-                    int ipAddressInt = dhcpInfo.ipAddress;
-                    ipAddr = ((ipAddressInt)&0xff) + "."
-                             + ((ipAddressInt>>8)&0xff) + "."
-                             + ((ipAddressInt>>16)&0xff) + "."
-                             + ((ipAddressInt>>24)&0xff);
-                }
-                if(ratType == CNE_RAT_WWAN){
-                    ipAddr = mTelephonyManager.getActiveIpAddress(null);
-                }
-                notifyRatConnectStatus(ratType, NetworkStateToInt(networkState), ipAddr);
-            } catch (Exception e) {
-                 Log.w(LOG_TAG, "HandleRatUp Exception", e);
-           }
-        }else if (mService != null) {
-          mService.bringUpRat(ratType);
         }
-
-
         return;
+    }
 
+    private void handleWlanBringUp(){
+        try {
+            ConnectivityManager cm = (ConnectivityManager)
+                mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo =
+                cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            NetworkInfo.State networkState = networkInfo.getState();
+            if(networkState == NetworkInfo.State.CONNECTED){
+                String ipAddr = null;
+                DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
+                int ipAddressInt = dhcpInfo.ipAddress;
+                ipAddr = ((ipAddressInt)&0xff) + "."
+                         + ((ipAddressInt>>8)&0xff) + "."
+                         + ((ipAddressInt>>16)&0xff) + "."
+                         + ((ipAddressInt>>24)&0xff);
+                notifyRatConnectStatus(CNE_RAT_WLAN,
+                                       NetworkStateToInt(networkState),
+                                       ipAddr);
 
+            } else {
+              mService.bringUpRat(CNE_RAT_WLAN);
+            }
+        } catch(NullPointerException e){
+            Log.w(LOG_TAG, "handleWlanBringUp", e);
+            e.printStackTrace();
+        }
+    }
+
+    private void handleWwanBringUp(){
+        try {
+            ConnectivityManager cm = (ConnectivityManager)
+                mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            for (NetworkInfo networkInfo : cm.getAllNetworkInfo()) {
+                if(networkInfo.getType() != ConnectivityManager.TYPE_WIFI){
+                    NetworkInfo.State networkState = networkInfo.getState();
+                    if(networkState == NetworkInfo.State.CONNECTED){
+                        String ipAddr = null;
+                        ipAddr = mTelephonyManager.getActiveIpAddress(null);
+                        notifyRatConnectStatus(CNE_RAT_WWAN,
+                                               NetworkStateToInt(networkState),
+                                               ipAddr);
+                        return;
+                    }
+                }
+            }
+            mService.bringUpRat(CNE_RAT_WWAN);
+        } catch(NullPointerException e){
+            Log.w(LOG_TAG, "handleWwanBringUp", e);
+            e.printStackTrace();
+        }
     }
 
     private void handleStartScanWlanMsg(Parcel p){
