@@ -143,6 +143,8 @@ public:
 
     virtual status_t setVoiceVolume(float volume);
 
+    virtual status_t deregisterClient(const sp<IAudioFlingerClient>& client);
+
     // IBinder::DeathRecipient
     virtual     void        binderDied(const wp<IBinder>& who);
 
@@ -800,6 +802,7 @@ private:
 
                 SortedVector< sp<IBinder> >         mNotificationClients;
                 int                                 mNextThreadId;
+                int                                 mA2DPHandle; // Handle to notify client (MIO)
                 KeyedVector<audio_io_handle_t, AudioStreamOut *> mOutputSessions;   // list of output descriptors
 };
 
