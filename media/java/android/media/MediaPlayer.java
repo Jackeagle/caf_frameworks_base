@@ -18,6 +18,7 @@ package android.media;
 
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.net.Uri;
 import android.os.Handler;
@@ -469,6 +470,7 @@ public class MediaPlayer
         native_init();
     }
 
+    private Context mContext = null;
     private final static String TAG = "MediaPlayer";
     // Name of the remote interface for the media player. Must be kept
     // in sync with the 2nd parameter of the IMPLEMENT_META_INTERFACE
@@ -666,10 +668,16 @@ public class MediaPlayer
     public void setDataSource(Context context, Uri uri)
         throws IOException, IllegalArgumentException, SecurityException, IllegalStateException {
 
+        mContext = context;
         String scheme = uri.getScheme();
         if(scheme == null || scheme.equals("file")) {
             setDataSource(uri.getPath());
             return;
+        }
+
+        // Broadcast intent to stop cacheservice
+        if(mContext != null) {
+            mContext.sendBroadcast(new Intent(Intent.ACTION_REQUEST_CACHESERVICE_STOP));
         }
 
         AssetFileDescriptor fd = null;
@@ -1014,6 +1022,11 @@ public class MediaPlayer
         mOnInfoListener = null;
         mOnVideoSizeChangedListener = null;
         _release();
+
+        // Broadcast intent to start cacheservice
+        if(mContext != null) {
+            mContext.sendBroadcast(new Intent(Intent.ACTION_REQUEST_CACHESERVICE_START));
+        }
     }
 
     private native void _release();
