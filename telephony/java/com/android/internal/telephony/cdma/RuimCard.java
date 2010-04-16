@@ -57,6 +57,8 @@ public final class RuimCard extends Handler implements IccCard {
     private boolean mRuimPinLocked = true; // default to locked
     private boolean mRuimFdnEnabled = false; // Default to disabled.
                                             // Will be updated when RUIM_READY.
+    private boolean mRuimFdnAvailable = true; // Default to available.
+                                             // Will be updated when RUIM_READY.
     private boolean mRuimPin2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
     private boolean mRuimPuk2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
 //    //***** Constants
@@ -227,6 +229,10 @@ public final class RuimCard extends Handler implements IccCard {
 
     public boolean getIccLockEnabled() {
        return mRuimPinLocked;
+    }
+
+    public boolean getIccFdnAvailable() {
+       return mRuimFdnAvailable;
     }
 
     public boolean getIccFdnEnabled() {
@@ -443,7 +449,13 @@ public final class RuimCard extends Handler implements IccCard {
 
         int[] ints = (int[])ar.result;
         if(ints.length != 0) {
-            mRuimFdnEnabled = (0!=ints[0]);
+            if (ints[0] != 2) {
+                mRuimFdnEnabled = (0!=ints[0]);
+                mRuimFdnAvailable = true;
+            } else {
+                if(DBG) log("Query facility lock: FDN Service Unavailable!");
+                mRuimFdnAvailable = false;
+            }
             if(DBG) log("Query facility lock : "  + mRuimFdnEnabled);
         } else {
             Log.e(LOG_TAG, "[CdmaRuimCard] Bogus facility lock response");

@@ -55,6 +55,8 @@ public final class SimCard extends Handler implements IccCard {
     private boolean mSimPinLocked = true; // Default to locked
     private boolean mSimFdnEnabled = false; // Default to disabled.
                                             // Will be updated when SIM_READY.
+    private boolean mSimFdnAvailable = true; // Default to available.
+                                             // Will be updated when SIM_READY.
     private boolean mSimPin2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
     private boolean mSimPuk2Blocked = false; // Default to unblocked.Updated on SIM STATE change.
 
@@ -230,6 +232,10 @@ public final class SimCard extends Handler implements IccCard {
 
     public boolean getIccLockEnabled() {
        return mSimPinLocked;
+    }
+
+    public boolean getIccFdnAvailable() {
+        return mSimFdnAvailable;
     }
 
     public boolean getIccFdnEnabled() {
@@ -438,7 +444,13 @@ public final class SimCard extends Handler implements IccCard {
 
         int[] ints = (int[])ar.result;
         if(ints.length != 0) {
-            mSimFdnEnabled = (0!=ints[0]);
+            if (ints[0] != 2) {
+                mSimFdnAvailable = true;
+                mSimFdnEnabled = (0!=ints[0]);
+            } else {
+                log("Query facility lock : FDN Service Unavailable!");
+                mSimFdnAvailable = false;
+            }
             if(DBG) log("Query facility lock : "  + mSimFdnEnabled);
         } else {
             Log.e(LOG_TAG, "[GsmSimCard] Bogus facility lock response");
