@@ -321,13 +321,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (mNetworkPreference != preference) {
                 persistNetworkPreference(preference);
                 mNetworkPreference = preference;
-                if((SystemProperties.get(CNE.UseCne,"false").equals("true") ||
-                    SystemProperties.get(CNE.UseCne,"false").equals("TRUE")) &&
-                     CNE.isCndUp && mCneService != null) {
-                  /* send it to cne and it will handle it */
-                  mCneService.setDefaultConnectionNwPref(preference);
-                }
-                else {
+                if (isCneEnabled()) {
+                    /* send it to cne and it will handle it */
+                    mCneService.setDefaultConnectionNwPref(preference);
+                } else {
                     enforcePreference();
                 }
             }
@@ -1036,13 +1033,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         mNetAttributes[mActiveDefaultNetwork].mPriority >
                         mNetAttributes[type].mPriority) ||
                         mNetworkPreference == mActiveDefaultNetwork) {
-                        if(!((SystemProperties.get(CNE.UseCne,"false").equals("true") ||
-                              SystemProperties.get(CNE.UseCne,"false").equals("TRUE"))&&
-                               CNE.isCndUp)) {
+                        if(!isCneEnabled()) {
                             // don't accept this one
                             if (DBG) Log.v(TAG, "Not broadcasting CONNECT_ACTION " +
                                     "to torn down network " + info.getTypeName());
                             teardown(thisNet);
+                        } else {
+                            handleDnsConfigurationChange();
                         }
                         return;
                 } else {
@@ -1052,9 +1049,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                     if (DBG) Log.v(TAG, "Policy requires " +
                             otherNet.getNetworkInfo().getTypeName() +
                             " teardown");
-                    if(!((SystemProperties.get(CNE.UseCne,"false").equals("true") ||
-                           SystemProperties.get(CNE.UseCne,"false").equals("TRUE"))&&
-                            CNE.isCndUp)) {
+                    if (!isCneEnabled()) {
                         if (DBG) Log.i(TAG, "CNE To support Simultaneous Nws we"+
                                  " will not tear down other nw");
                         if (!teardown(otherNet)) {
@@ -1201,6 +1196,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     private void handleDnsConfigurationChange() {
+
+        if(isCneEnabled()) {
+            // reset dns list
+            Log.d(TAG, "handleDnsConfigurationChange called - numDnsEntries=" + mNumDnsEntries);
+            for (int i=1; i <= mNumDnsEntries; i++) {
+                Log.d(TAG, "handleDnsConfigurationChange - reset set.dns-i=" + i);
+                SystemProperties.set("net.dns" + i, "");
+            }
+            mNumDnsEntries = 0;
+        }
+        int j = 1;
         // add default net's dns entries
         for (int x = mPriorityList.length-1; x>= 0; x--) {
             int netType = mPriorityList[x];
@@ -1209,7 +1215,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                     !nt.isTeardownRequested()) {
                 String[] dnsList = nt.getNameServers();
                 if (mNetAttributes[netType].isDefault()) {
-                    int j = 1;
+                    if(!isCneEnabled())
+                        j = 1;
                     for (String dns : dnsList) {
                         if (dns != null && !TextUtils.equals(dns, "0.0.0.0")) {
                             if (DBG) {
@@ -1386,8 +1393,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     /* CNE related methods. */
     public void startCne(){
         if(!mCneStarted){
-            if(SystemProperties.get(CNE.UseCne,"false").equals("true") ||
-                 SystemProperties.get(CNE.UseCne,"false").equals("TRUE")) {
+            if(SystemProperties.get(CNE.UseCne,"false").equalsIgnoreCase("true")) {
                     Log.v(TAG, "CNE starting up");
                     /* sychronised to wait until cne creation so that
                      * defualt connection can start.
@@ -1409,6 +1415,15 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     public boolean isCneStarted(){
         return mCneStarted;
     }
+
+    public boolean isCneEnabled(){
+        if((SystemProperties.get(CNE.UseCne,"false").equalsIgnoreCase("true")) &&
+            CNE.isCndUp)
+            return true;
+
+        return false;
+    }
+
     /** {@hide} */
     public boolean bringUpRat(int ratType){
 
