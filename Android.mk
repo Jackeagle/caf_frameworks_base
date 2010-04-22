@@ -53,6 +53,16 @@ else
   LOCAL_SRC_FILES += $(call find-other-java-files,core/config/ndebug)
 endif
 
+#
+# Select the source root for telephony based on flag.
+#
+ifeq ($(BUILD_FUSION), true)
+     TELEPHONY := telephony_fusion
+else
+     TELEPHONY := telephony
+endif
+
+
 ## READ ME: ########################################################
 ##
 ## When updating this list of aidl files, consider if that aidl is
@@ -116,9 +126,9 @@ LOCAL_SRC_FILES += \
 	core/java/android/os/IParentalControlCallback.aidl \
 	core/java/android/os/IPermissionController.aidl \
 	core/java/android/os/IPowerManager.aidl \
-    core/java/android/service/wallpaper/IWallpaperConnection.aidl \
-    core/java/android/service/wallpaper/IWallpaperEngine.aidl \
-    core/java/android/service/wallpaper/IWallpaperService.aidl \
+	core/java/android/service/wallpaper/IWallpaperConnection.aidl \
+	core/java/android/service/wallpaper/IWallpaperEngine.aidl \
+	core/java/android/service/wallpaper/IWallpaperService.aidl \
 	core/java/android/text/IClipboard.aidl \
 	core/java/android/view/accessibility/IAccessibilityManager.aidl \
 	core/java/android/view/accessibility/IAccessibilityManagerClient.aidl \
@@ -155,15 +165,16 @@ LOCAL_SRC_FILES += \
 	media/java/android/media/IAudioService.aidl \
 	media/java/android/media/IMediaScannerListener.aidl \
 	media/java/android/media/IMediaScannerService.aidl \
-	telephony/java/com/android/internal/telephony/IPhoneStateListener.aidl \
-	telephony/java/com/android/internal/telephony/IPhoneSubInfo.aidl \
-	telephony/java/com/android/internal/telephony/ITelephony.aidl \
-	telephony/java/com/android/internal/telephony/ITelephonyRegistry.aidl \
-	telephony/java/com/android/internal/telephony/IIccPhoneBook.aidl \
-	telephony/java/com/android/internal/telephony/ISms.aidl \
 	wifi/java/android/net/wifi/IWifiManager.aidl \
-	telephony/java/com/android/internal/telephony/IExtendedNetworkService.aidl \
 	vpn/java/android/net/vpn/IVpnService.aidl \
+	$(TELEPHONY)/java/com/android/internal/telephony/IPhoneStateListener.aidl \
+	$(TELEPHONY)/java/com/android/internal/telephony/IPhoneSubInfo.aidl \
+	$(TELEPHONY)/java/com/android/internal/telephony/ITelephony.aidl \
+	$(TELEPHONY)/java/com/android/internal/telephony/ITelephonyRegistry.aidl \
+	$(TELEPHONY)/java/com/android/internal/telephony/IIccPhoneBook.aidl \
+	$(TELEPHONY)/java/com/android/internal/telephony/ISms.aidl \
+	$(TELEPHONY)/java/com/android/internal/telephony/IExtendedNetworkService.aidl \
+
 
 # FRAMEWORKS_BASE_JAVA_SRC_DIRS comes from build/core/pathmap.mk
 LOCAL_AIDL_INCLUDES += $(FRAMEWORKS_BASE_JAVA_SRC_DIRS)
@@ -202,6 +213,7 @@ framework_built := $(LOCAL_BUILT_MODULE)
 # AIDL files to be preprocessed and included in the SDK,
 # relative to the root of the build tree.
 # ============================================================
+
 aidl_files := \
 	frameworks/base/core/java/android/accounts/IAccountManager.aidl \
 	frameworks/base/core/java/android/accounts/IAccountManagerResponse.aidl \
@@ -236,10 +248,11 @@ aidl_files := \
 	frameworks/base/graphics/java/android/graphics/Region.aidl \
 	frameworks/base/location/java/android/location/Criteria.aidl \
 	frameworks/base/location/java/android/location/Location.aidl \
-	frameworks/base/telephony/java/android/telephony/ServiceState.aidl \
-	frameworks/base/telephony/java/com/android/internal/telephony/IPhoneSubInfo.aidl \
-	frameworks/base/telephony/java/com/android/internal/telephony/ITelephony.aidl \
 	frameworks/base/vpn/java/android/net/vpn/IVpnService.aidl \
+	frameworks/base/$(TELEPHONY)/java/android/telephony/ServiceState.aidl \
+	frameworks/base/$(TELEPHONY)/java/com/android/internal/telephony/IPhoneSubInfo.aidl \
+	frameworks/base/$(TELEPHONY)/java/com/android/internal/telephony/ITelephony.aidl \
+
 
 gen := $(TARGET_OUT_COMMON_INTERMEDIATES)/framework.aidl
 $(gen): PRIVATE_SRC_FILES := $(aidl_files)
