@@ -321,12 +321,15 @@ public final class CNE
     private TelephonyManager mTelephonyManager;
     private ConnectivityService mService;
     private int mNetworkPreference;
+    private int mDefaultNetwork = ConnectivityManager.MAX_NETWORK_TYPE;
 
     private Phone mPhone;
     private SignalStrength mSignalStrength = new SignalStrength();
     ServiceState mServiceState;
     private String activeWlanIfName = null;
     private String activeWwanIfName = null;
+    private String activeWwanGatewayAddr = null;
+    private String activeWwanIpAddr = null;
 
     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -388,37 +391,35 @@ public final class CNE
 
 
             } else if ((action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) ||
-                     (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) ){
+                       (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) ){
 
                 Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed: " + action);
 
                 if (mWifiManager != null) {
-                  String ifName = null;
-                  String ipAddr = null;
-                  String gatewayAddr = null;
-                  NetworkInfo.State networkState = NetworkInfo.State.UNKNOWN;
+                    String ifName = null;
+                    String ipAddr = null;
+                    String gatewayAddr = null;
+                    NetworkInfo.State networkState = NetworkInfo.State.UNKNOWN;
 
-                  if(action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)){
-                      NetworkInfo networkInfo = (NetworkInfo)
-                          intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                      networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
-                          networkInfo.getState());
-                  }
-
-                  if(action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)){
-                    final boolean enabled = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
-                    WifiManager.WIFI_STATE_UNKNOWN) == WifiManager.WIFI_STATE_ENABLED;
-                    if(!enabled){
-                        networkState = NetworkInfo.State.DISCONNECTED;
-                    }else{
-                        networkState = NetworkInfo.State.UNKNOWN;
+                    if(action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)){
+                        NetworkInfo networkInfo = (NetworkInfo)
+                        intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                        networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
+                        networkInfo.getState());
                     }
-                  }
 
-                  Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed"+
+                    if(action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)){
+                        final boolean enabled = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
+                        WifiManager.WIFI_STATE_UNKNOWN) == WifiManager.WIFI_STATE_ENABLED;
+                        if(!enabled){
+                            networkState = NetworkInfo.State.DISCONNECTED;
+                        }else{
+                            networkState = NetworkInfo.State.UNKNOWN;
+                        }
+                    }
+                    Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed"+
                                  " networkState: " + networkState);
-
-                  if (networkState == NetworkInfo.State.CONNECTED) {
+                    if (networkState == NetworkInfo.State.CONNECTED) {
                       try {
                           DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
                           int ipAddressInt = dhcpInfo.ipAddress;
@@ -439,17 +440,33 @@ public final class CNE
                              = NetworkInterface.getByInetAddress(inetAddress);
                           ifName = deviceInterface.getName();
                           activeWlanIfName = ifName;
+
+                          // add network interface to main table and create
+                          // an interface specific table if it does not already exist
                           configureIproute2(CNE_IPROUTE2_ADD_DEFAULT,
                                             ifName,
                                             ipAddr,
                                             gatewayAddr);
+
+                          if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
+                             (mDefaultNetwork != ConnectivityManager.TYPE_WIFI) &&
+                             (activeWlanIfName != null)) {
+                              Log.i(LOG_TAG,"CNE received Network/Wifi State Changed -"+
+                                          "DELETE Wlan From Main");
+                              // remove network interface from main table if it is not preferred interface
+                              configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_FROM_MAIN,
+                                                activeWlanIfName, null, null);
+                          }
+
+
                       } catch (Exception e) {
                             Log.w(LOG_TAG, "CNE receiver exception", e);
                       }
 
                   } else if (networkState == NetworkInfo.State.DISCONNECTED) {
-                     configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT, activeWlanIfName,
+                      configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT, activeWlanIfName,
                                        null, null);
+                      activeWlanIfName = null;
                   }
                   WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
                   String ssid = wifiInfo.getSSID();
@@ -458,7 +475,6 @@ public final class CNE
                   long currentTime = System.currentTimeMillis();
                   Timestamp ts = new Timestamp(currentTime);
                   tsStr = ts.toString();
-
 
                   Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed - " +
                                 "ssid= " + ssid + ",rssi=" + rssi + ",networkState=" +
@@ -480,8 +496,8 @@ public final class CNE
                 Log.i(LOG_TAG, "CNE received action: " + action);
                 if(mWifiManager != null)
                 {
-                   List<ScanResult> results = mWifiManager.getScanResults();
-                   //updateWlanScanResults(results);
+                    List<ScanResult> results = mWifiManager.getScanResults();
+                    //updateWlanScanResults(results);
                 }
             } else {
                 Log.w(LOG_TAG, "CNE received unexpected action: " + action);
@@ -1244,55 +1260,74 @@ public final class CNE
         @Override
         public void onDataConnectionStateChanged(int dataState, int networkType) {
 
-            Log.i(LOG_TAG,"onDataConnectionStateChanged dataState=" + dataState + ",networkType=" + networkType);
+            Log.i(LOG_TAG,"onDataConnectionStateChanged dataState=" + dataState
+                   + ",networkType=" + networkType);
 
             if (mTelephonyManager != null) {
-              String ifName = null;
-              String ipAddr = null;
-              String gatewayAddr = null;
-              NetworkInfo.State networkState = converToNetworkState(dataState);
+                String ifName = null;
+                String ipAddr = null;
+                String gatewayAddr = null;
+                NetworkInfo.State networkState = converToNetworkState(dataState);
 
-              if (networkState == NetworkInfo.State.CONNECTED){
-                ifName = mTelephonyManager.getActiveInterfaceName(null);
-                ipAddr = mTelephonyManager.getActiveIpAddress(null);
-                gatewayAddr = mTelephonyManager.getActiveGateway(null);
+                if (networkState == NetworkInfo.State.CONNECTED){
+                    ifName = mTelephonyManager.getActiveInterfaceName(null);
+                    ipAddr = mTelephonyManager.getActiveIpAddress(null);
+                    gatewayAddr = mTelephonyManager.getActiveGateway(null);
 
-                if((gatewayAddr == null) || (gatewayAddr.length() == 0)) {
-                   Log.w(LOG_TAG, "onDataConnectionStateChanged: gateway address is empty string");
-                   gatewayAddr = null;
+                    if((gatewayAddr == null) || (gatewayAddr.length() == 0)) {
+                        Log.w(LOG_TAG, "onDataConnectionStateChanged: gateway "+
+                                       "address is empty string");
+                        gatewayAddr = null;
+                    }
+                    if(ipAddr != null && ipAddr.length() !=0 &&
+                       ifName != null &&
+                       ifName.length()!=0) {
+                       activeWwanIfName = ifName;
+                       activeWwanIpAddr = ipAddr;
+                       activeWwanGatewayAddr = gatewayAddr;
+                       Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
+                       // add network interface to main table and create an interface
+                       // specific table if it does not already exist
+                       configureIproute2(CNE_IPROUTE2_ADD_DEFAULT, ifName,
+                                         ipAddr, gatewayAddr);
+                       if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
+                          (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE) &&
+                          (activeWwanIfName != null)) {
+                           Log.i(LOG_TAG,"onDataConnectionStateChanged: "+
+                                         "Delete Wwan From Main");
+                           // remove network interface from main table if it is not
+                           // preferred interface
+                           configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_FROM_MAIN,
+                                             activeWwanIfName, null, null);
+                       }
+                   }
+                } else if (networkState == NetworkInfo.State.DISCONNECTED) {
+                    configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT,
+                                      activeWwanIfName, null, null);
+                    activeWwanIfName = null;
                 }
-                if(ipAddr != null && ipAddr.length() !=0 && ifName != null && ifName.length()!=0) {
-                   activeWwanIfName = ifName;
-                   Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
-                   configureIproute2(CNE_IPROUTE2_ADD_DEFAULT, ifName, ipAddr, gatewayAddr);
-                }
-              } else if (networkState == NetworkInfo.State.DISCONNECTED) {
-                configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT, activeWwanIfName, null, null);
-              }
+                int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
+                //int type = mTelephonyManager.getNetworkType();
+                int signalStrength = getSignalStrength(networkType);
+                String tsStr = null;
+                long currentTime = System.currentTimeMillis();
+                Timestamp ts = new Timestamp(currentTime);
+                tsStr = ts.toString();
 
-              int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
-              //int type = mTelephonyManager.getNetworkType();
-              int signalStrength = getSignalStrength(networkType);
-              String tsStr = null;
-              long currentTime = System.currentTimeMillis();
-              Timestamp ts = new Timestamp(currentTime);
-              tsStr = ts.toString();
+                Log.i(LOG_TAG, "onDataConnectionStateChanged - networkType= "
+                      + networkType + ",networkState=" + networkState +
+                      ",signalStr=" + signalStrength + ",roaming=" + roaming);
 
-              Log.i(LOG_TAG, "onDataConnectionStateChanged - networkType= "
-                    + networkType + ",networkState=" + networkState +
-                    ",signalStr=" + signalStrength + ",roaming=" + roaming);
+                Log.i(LOG_TAG, "onDataConnectionStateChanged - ifName="
+                      + activeWwanIfName + ",ipAddr=" + ipAddr + "gateway="
+                      + gatewayAddr + ",timeStamp=" + tsStr);
 
-              Log.i(LOG_TAG, "onDataConnectionStateChanged - ifName="
-                    + activeWwanIfName + ",ipAddr=" + ipAddr + "gateway="
-                    + gatewayAddr + ",timeStamp=" + tsStr);
-
-              updateWwanStatus(networkType, NetworkStateToInt(networkState),
-                               signalStrength, roaming, ipAddr, tsStr);
-              notifyRatConnectStatus(CNE_RAT_WWAN, NetworkStateToInt(networkState), ipAddr);
-
+                updateWwanStatus(networkType, NetworkStateToInt(networkState),
+                                 signalStrength, roaming, ipAddr, tsStr);
+                notifyRatConnectStatus(CNE_RAT_WWAN, NetworkStateToInt(networkState), ipAddr);
 
             } else {
-              Log.i(LOG_TAG, "onDataConnectionStateChanged null TelephonyManager");
+                Log.i(LOG_TAG, "onDataConnectionStateChanged null TelephonyManager");
             }
         }
     };
@@ -2297,17 +2332,18 @@ public final class CNE
 
     /** {@hide} */
     public void notifyDefaultNwChange(int nwId){
-     Log.i(LOG_TAG, "notifyDefaultNwChange: nwId: " + nwId + ",activeWwanIfname:"
-           + activeWwanIfName);
-     if ( nwId == ConnectivityManager.TYPE_WIFI) {
-       configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_FROM_MAIN,
-                         activeWwanIfName, null, null);
-     } else {
-       configureIproute2(CNE_IPROUTE2_CHANGE_DEFAULT_FROM_MAIN,
-                         activeWwanIfName, null, null);
-     }
-
-     return;
+        Log.i(LOG_TAG, "notifyDefaultNwChange: nwId: " + nwId + ",activeWwanIfname:"
+              + activeWwanIfName + ",activeWlanIfname:" + activeWlanIfName);
+        mDefaultNetwork = nwId;
+        // Change default network interface in main table to new one
+        if (( nwId == ConnectivityManager.TYPE_WIFI) && ( activeWlanIfName != null) ) {
+            configureIproute2(CNE_IPROUTE2_CHANGE_DEFAULT_FROM_MAIN,
+                              activeWlanIfName, null, null);
+        } else if (( nwId == ConnectivityManager.TYPE_MOBILE) && ( activeWwanIfName != null) ){
+            configureIproute2(CNE_IPROUTE2_CHANGE_DEFAULT_FROM_MAIN,
+                              activeWwanIfName, null, null);
+        }
+        return;
     }
 
 }
