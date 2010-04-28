@@ -89,12 +89,14 @@ public class Watchdog extends Thread {
     final Handler mHandler;
     final Runnable mGlobalPssCollected;
     final ArrayList<Monitor> mMonitors = new ArrayList<Monitor>();
+    final ArrayList<Long> mMonitorsResponseTime = new ArrayList<Long>();
     ContentResolver mResolver;
     BatteryService mBattery;
     PowerManagerService mPower;
     AlarmManagerService mAlarm;
     ActivityManagerService mActivity;
     boolean mCompleted;
+    boolean mWaitFinished;
     boolean mForceKillSystem;
     Monitor mCurrentMonitor;
 
@@ -301,15 +303,44 @@ public class Watchdog extends Thread {
                         }
                     }
 
+                    mMonitorsResponseTime.clear();
+                    long responseTime;
+
                     final int size = mMonitors.size();
                     for (int i = 0 ; i < size ; i++) {
                         mCurrentMonitor = mMonitors.get(i);
+                        responseTime = SystemClock.uptimeMillis();
                         mCurrentMonitor.monitor();
+                        responseTime = SystemClock.uptimeMillis() - responseTime;
+                        mMonitorsResponseTime.add((Long)responseTime);
+
+                        synchronized (Watchdog.this) {
+                          if(mWaitFinished){
+                            Log.e(TAG, "Wait of watchdog has completed, stop invoking monitors, current monitor is : " + mCurrentMonitor.getClass().getName());
+                            break;
+                          }
+                        }
                     }
 
                     synchronized (Watchdog.this) {
-                        mCompleted = true;
-                        mCurrentMonitor = null;
+                        if(!mWaitFinished){
+                           /*
+                             Do not update the variables if the Main watchdog thread has done
+                             waiting and decided to quit. Updating the variables will result
+                             in loss of value stored in mCurrentMonitor, needed for further
+                             debugging as to which thread didn't respond back in time (usually
+                             the last one)
+
+                             This is a rare scenario where in Monitor has executed the for loop
+                             as the Main thread was waiting. Main thread times out and holds
+                             Watchdog.this lock, checks for mCompletd (which is marked locked),
+                             decides to kill system_server, releases Watchdog.this, dalvik VM
+                             switches the control back to this function. In such case, make
+                             sure the variables aren't updated.
+                            */
+                           mCompleted = true;
+                           mCurrentMonitor = null;
+                        }
                     }
                 } break;
             }
@@ -804,6 +835,7 @@ public class Watchdog extends Thread {
     public void run() {
         while (true) {
             mCompleted = false;
+            mWaitFinished = false;
             mHandler.sendEmptyMessage(MONITOR);
 
             synchronized (this) {
@@ -828,6 +860,8 @@ public class Watchdog extends Thread {
                     timeout = TIME_TO_WAIT - (SystemClock.uptimeMillis() - start);
                 } while (timeout > 0 && !mForceKillSystem);
 
+                mWaitFinished = true;
+
                 if (mCompleted && !mForceKillSystem) {
                     // The monitors have returned.
                     continue;
@@ -839,6 +873,21 @@ public class Watchdog extends Thread {
             // kill this process so that the system will restart.
             String name = (mCurrentMonitor != null) ? mCurrentMonitor.getClass().getName() : "null";
             EventLog.writeEvent(EVENT_LOG_TAG, name);
+
+
+            // Log the time taken by each monitor to respond back
+            // The timestamp would correspond to the last MONITOR message which failed
+
+            // Size of array mMonitorsResponseTime could be less than that of mMonitors
+            // as response time for a monitor which does't respond back can't be tracked.
+            final int size = (mMonitorsResponseTime.size() <= mMonitors.size()) ? mMonitorsResponseTime.size() : mMonitors.size();
+
+            Log.i(TAG, "Number of registered Monitors : [" + mMonitors.size() + "]");
+
+            for (int i = 0 ; i < size ; i++) {
+               Log.i(TAG, "Monitor [" + mMonitors.get(i).getClass().getName() + "] responded in [" + mMonitorsResponseTime.get(i).toString() + "] milli seconds");
+            }
+
             Process.sendSignal(Process.myPid(), Process.SIGNAL_QUIT);
 
             // Wait a bit longer before killing so we can make sure that the stacks are captured.
