@@ -301,6 +301,7 @@ public:
     static const char ISO_200[] ;
     static const char ISO_400[];
     static const char ISO_800[];
+    static const char ISO_1600[];
 
     // Values for Lens Shading
     static const char LENSSHADE_ENABLE[] ;
