@@ -152,6 +152,7 @@ const char CameraParameters::ISO_100[] = "ISO100";
 const char CameraParameters::ISO_200[] = "ISO200";
 const char CameraParameters::ISO_400[] = "ISO400";
 const char CameraParameters::ISO_800[] = "ISO800";
+const char CameraParameters::ISO_1600[] = "ISO1600";
 
 //Values for Lens Shading
 const char CameraParameters::LENSSHADE_ENABLE[] = "enable";
