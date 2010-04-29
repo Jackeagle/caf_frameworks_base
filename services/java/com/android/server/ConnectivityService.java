@@ -1430,25 +1430,41 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         Log.d(TAG, "Bring Up Rat called for rat="+ratType);
         int networkType = 0;
 
-        if (ratType == CNE.CNE_RAT_WLAN)
-        {
+        if (ratType == CNE.CNE_RAT_WLAN){
           networkType = ConnectivityManager.TYPE_WIFI;
+          return reconnect(networkType);
+        } else if (ratType == CNE.CNE_RAT_WWAN) {
+            networkType = ConnectivityManager.TYPE_MOBILE;
+            /* right now we are only considering default wwan
+             * not the special networks(like MMS). If any of the special
+             * connection is up request to default network connection
+             * will override it and may cause ping pong connection between
+             * special feature nw and the default one.
+             */
+             if(mFeatureUsers.size() == 0){
+                 return reconnect(networkType);
+             } else{
+                 Log.d(TAG,"Specail network features in use not" +
+                       "reconnecting to wwan!!");
+             }
+        } else{
+            Log.d(TAG, "Unknown RatType = " + ratType);
         }
-        else if (ratType == CNE.CNE_RAT_WWAN)
-        {
-          networkType = ConnectivityManager.TYPE_MOBILE;
-        }
+        return false;
+    }
+
+    private boolean reconnect(int networkType){
         NetworkStateTracker network = mNetTrackers[networkType];
-        if (network != null) {
+        try{
           network.setTeardownRequested(true);
           Log.d(TAG, "Sending Network Connection Request to Driver.");
           network.reconnect();
           return true;
+        } catch(NullPointerException e){
+            Log.d(TAG, "network Obj is Null" + e);
+            e.printStackTrace();
         }
-        else
-          Log.d(TAG, "bringupRat network null");
         return false;
-
     }
 
     /** {@hide} */
@@ -1456,21 +1472,20 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         int networkType = 0;
 
-        if (ratType == CNE.CNE_RAT_WLAN)
-        {
+        if (ratType == CNE.CNE_RAT_WLAN){
           networkType = ConnectivityManager.TYPE_WIFI;
-        }
-        else if (ratType == CNE.CNE_RAT_WWAN)
-        {
-          networkType = ConnectivityManager.TYPE_MOBILE;
-        }
-        NetworkStateTracker network = mNetTrackers[networkType];
-        if (network != null) {
-          if (network.teardown())
-          {
-            network.setTeardownRequested(true);
-            return true;
+          WifiStateTracker network = (WifiStateTracker)mNetTrackers[networkType];
+          if(!network.hasWifiLocks()){
+              return teardown(network);
+          }else{
+              Log.d(TAG, "WifiLocks active not issuing bring down");
           }
+        }else if (ratType == CNE.CNE_RAT_WWAN){
+          networkType = ConnectivityManager.TYPE_MOBILE;
+          NetworkStateTracker network = mNetTrackers[networkType];
+          return teardown(network);
+        }else{
+            Log.d(TAG, "Unknown RatType = " + ratType);
         }
         return false;
 
