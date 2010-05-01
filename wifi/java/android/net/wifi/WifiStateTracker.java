@@ -1503,6 +1503,13 @@ public class WifiStateTracker extends NetworkStateTracker {
     }
 
     /**
+     * Reset mTornDownbyConnMgr flag.
+     */
+    public void resetTornDownbyConnMgr() {
+        mTornDownByConnMgr = false;
+    }
+
+    /**
      * Reenable Wi-Fi connectivity by restarting the driver.
      */
     public boolean reconnect() {
