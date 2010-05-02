@@ -385,6 +385,11 @@ public class GsmConnection extends Connection {
             case CallFailCause.FDN_BLOCKED:
                 return DisconnectCause.FDN_BLOCKED;
 
+            case CallFailCause.UNOBTAINABLE_NUMBER:
+                return DisconnectCause.UNOBTAINABLE_NUMBER;
+
+                // Display the following call fail cause only
+                // when Adapt feature is enabled.
             case CallFailCause.IMSI_UNKNOWN_IN_VLR:
                 if (featureAdapt())
                    return DisconnectCause.IMSI_UNKNOWN_IN_VLR;
