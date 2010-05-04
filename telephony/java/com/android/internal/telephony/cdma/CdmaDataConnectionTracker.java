@@ -858,7 +858,13 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
                     TelephonyManager.getDefault().getNetworkType());
             EventLog.writeEvent(TelephonyEventLog.EVENT_LOG_PDP_NETWORK_DROP, val);
 
-            cleanUpConnection(true, null);
+            boolean desiredPowerState = mCdmaPhone.mSST.getDesiredPowerState();
+            if (desiredPowerState == true) {
+                cleanUpConnection(true, null);
+            } else {
+                Log.i(LOG_TAG, "Due to radio turn off cleanup the data call");
+                cleanUpConnection(false, Phone.REASON_RADIO_TURNED_OFF);
+            }
         }
         Log.i(LOG_TAG, "Data connection has changed.");
     }

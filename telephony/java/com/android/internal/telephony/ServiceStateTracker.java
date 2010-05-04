@@ -148,6 +148,9 @@ public abstract class ServiceStateTracker extends Handler {
 
     }
 
+    public boolean getDesiredPowerState() {
+        return mDesiredPowerState;
+    }
 
     /**
      * Registration point for combined roaming on

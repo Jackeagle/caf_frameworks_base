@@ -390,20 +390,31 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                         (dcTracker.getAnyDataEnabled() ? 1 : 0) );
                 EventLog.writeEvent(TelephonyEventLog.EVENT_LOG_DATA_STATE_RADIO_OFF, val);
             }
-            dcTracker.cleanConnectionBeforeRadioOff();
-            
-            // poll data state up to 15 times, with a 100ms delay
-            // totaling 1.5 sec. Normal data disable action will finish in 100ms.
-            for (int i = 0; i < MAX_NUM_DATA_STATE_READS; i++) {
-                if (dcTracker.getState() != DataConnectionTracker.State.CONNECTED 
-                        && dcTracker.getState() != DataConnectionTracker.State.DISCONNECTING) {
-                    Log.d(LOG_TAG, "Data shutdown complete.");
-                    break;
+
+            if (networkType == ServiceState.RADIO_TECHNOLOGY_1xRTT) {
+                /*
+                 * In 1x CDMA , during radio power off modem will disconnect the
+                 * data call and sends the power down registration message along
+                 * with the data call release message to the network
+                 */
+                Log.w(LOG_TAG, "Turn off the radio right away");
+                cm.setRadioPower(false, null);
+            } else {
+                dcTracker.cleanConnectionBeforeRadioOff();
+
+                // poll data state up to 15 times, with a 100ms delay
+                // totaling 1.5 sec. Normal data disable action will finish in 100ms.
+                for (int i = 0; i < MAX_NUM_DATA_STATE_READS; i++) {
+                    if (dcTracker.getState() != DataConnectionTracker.State.CONNECTED
+                            && dcTracker.getState() != DataConnectionTracker.State.DISCONNECTING) {
+                        Log.d(LOG_TAG, "Data shutdown complete.");
+                        break;
+                    }
+                    SystemClock.sleep(DATA_STATE_POLL_SLEEP_MS);
                 }
-                SystemClock.sleep(DATA_STATE_POLL_SLEEP_MS);
+                // If it's on and available and we want it off..
+                cm.setRadioPower(false, null);
             }
-            // If it's on and available and we want it off..
-            cm.setRadioPower(false, null);
         } // Otherwise, we're in the desired state
     }
 
