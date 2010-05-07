@@ -885,7 +885,13 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
                     Log.v(LOG_TAG,
                     "onDataStateChanged active=LINK_INACTIVE && CONNECTED, disconnecting/cleanup");
                     writeEventLogCdmaDataDrop();
-                    cleanUpConnection(true, null);
+                    boolean desiredPowerState = mCdmaPhone.mSST.getDesiredPowerState();
+                    if (desiredPowerState == true) {
+                        cleanUpConnection(true, null);
+                    } else {
+                        Log.i(LOG_TAG, "Due to radio turn off cleanup the data call");
+                        cleanUpConnection(false, Phone.REASON_RADIO_TURNED_OFF);
+                    }
                     break;
                 case DATA_CONNECTION_ACTIVE_PH_LINK_DOWN:
                     Log.v(LOG_TAG, "onDataStateChanged active=LINK_DOWN && CONNECTED, dormant");
@@ -900,7 +906,12 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             } else {
                 Log.v(LOG_TAG, "onDataStateChanged: network disconnected, clean up");
                 writeEventLogCdmaDataDrop();
-                cleanUpConnection(true, null);
+                boolean desiredPowerState = mCdmaPhone.mSST.getDesiredPowerState();
+                if (desiredPowerState == true) {
+                    cleanUpConnection(true, null);
+                } else {
+                    cleanUpConnection(false, Phone.REASON_RADIO_TURNED_OFF);
+                }
             }
         } else {
             // TODO: Do we need to do anything?
