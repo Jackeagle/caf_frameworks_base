@@ -81,6 +81,10 @@ public interface CommandsInterface {
                     || this == NV_NOT_READY
                     || this == NV_READY;
         }
+
+        public  boolean  isSIMNotReady() {
+             return  this == SIM_NOT_READY;
+        }
     }
 
     enum IccStatus {
@@ -229,6 +233,18 @@ public interface CommandsInterface {
      */
     void registerForSIMReady(Handler h, int what, Object obj);
     void unregisterForSIMReady(Handler h);
+
+
+    /**
+     * Fires on any transition into SIM_NOT_READY
+     * Fires immediately if if currently in that state
+     * In general, actions should be idempotent. State may change
+     * before event is received.
+     */
+    void registerForSIMNotReady(Handler h, int what, Object obj);
+    void unregisterForSIMNotReady(Handler h);
+
+
 
     /** Any transition into SIM_LOCKED_OR_ABSENT */
     void registerForSIMLockedOrAbsent(Handler h, int what, Object obj);
