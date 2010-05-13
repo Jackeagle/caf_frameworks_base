@@ -139,7 +139,8 @@ public class StkService extends Handler implements AppInterface {
     // Events to signal SIM presence or absent in the device.
     private static final int MSG_ID_SIM_LOADED       = 20;
 
-    static final int MSG_ID_SIM_NOT_READY            = 30;
+    // Event to signal ICC Refresh Reset.
+    static final int MSG_ID_ICC_REFRESH_RESET            = 30;
 
     private static final int DEV_ID_KEYPAD      = 0x01;
     private static final int DEV_ID_DISPLAY     = 0x02;
@@ -168,11 +169,14 @@ public class StkService extends Handler implements AppInterface {
         mCmdIf.setOnStkEvent(this, MSG_ID_EVENT_NOTIFY, null);
         mCmdIf.setOnStkCallSetUp(this, MSG_ID_CALL_SETUP, null);
         //mCmdIf.setOnSimRefresh(this, MSG_ID_REFRESH, null);
-        mCmdIf.registerForSIMNotReady(this,MSG_ID_SIM_NOT_READY,null);
+
         mSimRecords = sr;
 
         // Register for SIM ready event.
         mSimRecords.registerForRecordsLoaded(this, MSG_ID_SIM_LOADED, null);
+
+        // Register for IccRefreshReset event.
+        mSimRecords.registerForIccRefreshReset(this, MSG_ID_ICC_REFRESH_RESET, null);
 
         mCmdIf.reportStkServiceIsRunning(null);
         StkLog.d(this, "StkService: is running");
@@ -180,11 +184,12 @@ public class StkService extends Handler implements AppInterface {
 
     public void dispose() {
         mSimRecords.unregisterForRecordsLoaded(this);
+        mSimRecords.unregisterForIccRefreshReset(this);
         mCmdIf.unSetOnStkSessionEnd(this);
         mCmdIf.unSetOnStkProactiveCmd(this);
         mCmdIf.unSetOnStkEvent(this);
         mCmdIf.unSetOnStkCallSetUp(this);
-        mCmdIf.unregisterForSIMNotReady(this);
+
         this.removeCallbacksAndMessages(null);
     }
 
@@ -590,8 +595,8 @@ public class StkService extends Handler implements AppInterface {
         case MSG_ID_RESPONSE:
             handleCmdResponse((StkResponseMessage) msg.obj);
             break;
-        case MSG_ID_SIM_NOT_READY:
-            handleSimNotReady();
+        case MSG_ID_ICC_REFRESH_RESET:
+            handleIccRefreshReset();
             break;
         default:
             throw new AssertionError("Unrecognized STK command: " + msg.what);
@@ -634,7 +639,7 @@ public class StkService extends Handler implements AppInterface {
 
 
 
-    private  void  handleSimNotReady() {
+    private  void  handleIccRefreshReset() {
         CommandDetails cmdDet = new  CommandDetails();
 	cmdDet.typeOfCommand = AppInterface.CommandType.SET_UP_MENU.value();
         SelectItemParams cmdParams = new  SelectItemParams(cmdDet,null,false);

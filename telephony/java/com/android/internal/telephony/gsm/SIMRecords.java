@@ -1357,6 +1357,7 @@ public final class SIMRecords extends IccRecords {
                 break;
             case CommandsInterface.SIM_REFRESH_RESET:
 		if (DBG) log("handleSimRefresh with SIM_REFRESH_RESET");
+                onIccRefreshReset();
                 break;
             default:
                 // unknown refresh operation
@@ -2254,3 +2255,4 @@ public final class SIMRecords extends IccRecords {
       return sstPlmnOplValue;
    }
 }
+

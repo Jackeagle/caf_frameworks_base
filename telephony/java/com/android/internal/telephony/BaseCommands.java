@@ -44,7 +44,6 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mOffOrNotAvailRegistrants = new RegistrantList();
     protected RegistrantList mNotAvailRegistrants = new RegistrantList();
     protected RegistrantList mSIMReadyRegistrants = new RegistrantList();
-    protected RegistrantList mSIMNotReadyRegistrants = new RegistrantList();
     protected RegistrantList mSIMLockedRegistrants = new RegistrantList();
     protected RegistrantList mRUIMReadyRegistrants = new RegistrantList();
     protected RegistrantList mRUIMLockedRegistrants = new RegistrantList();
@@ -215,27 +214,6 @@ public abstract class BaseCommands implements CommandsInterface {
             mSIMReadyRegistrants.remove(h);
         }
     }
-
-
-    /** Any transition into SIM_NOT_READY */
-    public void registerForSIMNotReady(Handler h, int what, Object obj) {
-        Registrant r = new Registrant (h, what, obj);
-
-        synchronized (mStateMonitor) {
-            mSIMNotReadyRegistrants.add(r);
-
-            if (mState.isSIMNotReady()) {
-                r.notifyRegistrant(new AsyncResult(null, null, null));
-            }
-        }
-    }
-
-    public void unregisterForSIMNotReady(Handler h) {
-        synchronized (mStateMonitor) {
-            mSIMNotReadyRegistrants.remove(h);
-        }
-    }
-
 
     /** Any transition into RUIM_READY */
     public void registerForRUIMReady(Handler h, int what, Object obj) {
@@ -703,11 +681,6 @@ public abstract class BaseCommands implements CommandsInterface {
             if (mState == RadioState.SIM_LOCKED_OR_ABSENT) {
                 Log.d(LOG_TAG,"Notifying: SIM locked or absent");
                 mSIMLockedRegistrants.notifyRegistrants();
-            }
-
-            if (mState == RadioState.SIM_NOT_READY) {
-                Log.d(LOG_TAG,"Notifying: SIM NOT READY");
-                mSIMNotReadyRegistrants.notifyRegistrants();
             }
 
             if (mState.isRUIMReady() && !oldState.isRUIMReady()) {
