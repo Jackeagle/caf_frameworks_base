@@ -119,6 +119,7 @@ public:
     virtual int openSession(   uint32_t *pDevices,
                                     uint32_t *pFormat,
                                     uint32_t flags,
+                                    int32_t  streamType,
                                     int32_t  sessionId);
 
     virtual status_t closeSession(int output);
@@ -803,6 +804,7 @@ private:
                 SortedVector< sp<IBinder> >         mNotificationClients;
                 int                                 mNextThreadId;
                 int                                 mA2DPHandle; // Handle to notify client (MIO)
+                int                                 mLPAStreamType;
                 KeyedVector<audio_io_handle_t, AudioStreamOut *> mOutputSessions;   // list of output descriptors
 };
 
