@@ -118,6 +118,7 @@ public:
     virtual int openSession(uint32_t *pDevices,
                                  uint32_t *pFormat,
                                  uint32_t flags,
+                                 int32_t  stream,
                                  int32_t  sessionId){return 0;};
     virtual status_t closeSession(int output) = 0;
     virtual int openDuplicateOutput(int output1, int output2) = 0;

@@ -485,8 +485,9 @@ status_t AudioFlinger::setStreamVolume(int stream, float value, int output)
 
     AutoMutex lock(mLock);
 
-    if(mOutputSessions.indexOfKey(output) >= 0) {
+    if(mOutputSessions.indexOfKey(output) >= 0 && mLPAStreamType == stream) {
         mOutputSessions.valueFor(output)->setVolume(value, value);
+        mStreamTypes[stream].volume = value;
         return NO_ERROR;
     }
 
@@ -568,7 +569,7 @@ bool AudioFlinger::isMusicActive() const
             return true;
         }
     }
-    if (!mOutputSessions.isEmpty()) {
+    if (!mOutputSessions.isEmpty() && mLPAStreamType == AudioSystem::MUSIC) {
         return true;
     }
     return false;
@@ -3781,6 +3782,7 @@ int AudioFlinger::openOutput(uint32_t *pDevices,
 int AudioFlinger::openSession(uint32_t *pDevices,
                                    uint32_t *pFormat,
                                    uint32_t flags,
+                                   int32_t  streamType,
                                    int32_t  sessionId)
 {
     status_t status;
@@ -3811,7 +3813,7 @@ int AudioFlinger::openSession(uint32_t *pDevices,
     if (output != 0) {
         mNextThreadId++;
         mOutputSessions.add(mNextThreadId, output);
-
+        mLPAStreamType = streamType;
         if (pFormat) *pFormat = format;
         return mNextThreadId;
     }
