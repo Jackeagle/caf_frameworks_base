@@ -1,6 +1,6 @@
 /* 
  ** Copyright 2007, The Android Open Source Project
- ** Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ ** Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  **
  ** Licensed under the Apache License, Version 2.0 (the "License"); 
  ** you may not use this file except in compliance with the License. 
@@ -996,8 +996,9 @@ EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
             }
         }
 #endif
+        EGLContext sl = share_list ? get_context(share_list)->context : EGL_NO_CONTEXT;
         EGLContext context = cnx->hooks->egl.eglCreateContext(
-                dp->dpys[i], dp->configs[i][index], share_list, attrib_list);
+                dp->dpys[i], dp->configs[i][index], sl, attrib_list);
         if (context != EGL_NO_CONTEXT) {
             egl_context_t* c = new egl_context_t(dpy, context, i, cnx);
             return c;
