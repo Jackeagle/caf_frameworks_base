@@ -245,6 +245,7 @@ public class AudioSystem
     public static final int DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100;
     public static final int DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER = 0x200;
     public static final int DEVICE_OUT_AUX_DIGITAL = 0x400;
+    public static final int DEVICE_OUT_HDMI = 0x800;
     public static final int DEVICE_OUT_FM = 0x1000;
     public static final int DEVICE_OUT_DEFAULT = 0x8000;
     // input devices
