@@ -375,6 +375,7 @@ public:
     virtual int openSession(uint32_t *pDevices,
                             uint32_t *pFormat,
                             uint32_t flags,
+                            int32_t  stream,
                             int32_t  sessionId)
     {
         Parcel data, reply;
@@ -385,6 +386,7 @@ public:
         data.writeInt32(devices);
         data.writeInt32(format);
         data.writeInt32(flags);
+        data.writeInt32(stream);
         data.writeInt32(sessionId);
         remote()->transact(OPEN_SESSION, data, &reply);
         int  output = reply.readInt32();
@@ -696,10 +698,12 @@ status_t BnAudioFlinger::onTransact(
             uint32_t devices = data.readInt32();
             uint32_t format = data.readInt32();
             uint32_t flags = data.readInt32();
+            int32_t  stream = data.readInt32();
             int32_t  sessionId = data.readInt32();
             int output = openSession(&devices,
                                      &format,
                                      flags,
+                                     stream,
                                      sessionId);
             LOGV("OPEN_SESSION output, %p", output);
             reply->writeInt32(output);

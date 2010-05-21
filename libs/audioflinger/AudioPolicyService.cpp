@@ -464,6 +464,7 @@ audio_io_handle_t AudioPolicyService::openOutput(uint32_t *pDevices,
 audio_io_handle_t AudioPolicyService::openSession(uint32_t *pDevices,
                                 uint32_t *pFormat,
                                 AudioSystem::output_flags flags,
+                                int32_t stream,
                                 int32_t sessionId)
 {
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
@@ -472,7 +473,7 @@ audio_io_handle_t AudioPolicyService::openSession(uint32_t *pDevices,
         return 0;
     }
 
-    return af->openSession(pDevices, (uint32_t *)pFormat, flags, sessionId);
+    return af->openSession(pDevices, (uint32_t *)pFormat, flags, stream, sessionId);
 }
 
 status_t AudioPolicyService::closeSession(audio_io_handle_t output)
