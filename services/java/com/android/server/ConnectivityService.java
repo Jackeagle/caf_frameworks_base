@@ -1476,6 +1476,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
           networkType = ConnectivityManager.TYPE_WIFI;
           WifiStateTracker network = (WifiStateTracker)mNetTrackers[networkType];
           if(!network.hasWifiLocks()){
+              network.resetTornDownbyConnMgr();
               return teardown(network);
           }else{
               Log.d(TAG, "WifiLocks active not issuing bring down");
