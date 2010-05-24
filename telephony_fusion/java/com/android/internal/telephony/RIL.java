@@ -56,10 +56,10 @@ import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SuppServiceNotification;
 import com.android.internal.telephony.IccCardApplication;
-import com.android.internal.telephony.IccCardStatus;
 import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.SmsResponse;
+import com.android.internal.telephony.RegStateResponse;
 import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
 
@@ -590,14 +590,18 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RILConstants.NETWORK_MODE_GSM_ONLY:
             case RILConstants.NETWORK_MODE_WCDMA_ONLY:
             case RILConstants.NETWORK_MODE_GSM_UMTS:
+            case RILConstants.NETWORK_MODE_GSM_WCDMA_LTE:
                 mPhoneType = RILConstants.GSM_PHONE;
                 break;
             case RILConstants.NETWORK_MODE_CDMA:
             case RILConstants.NETWORK_MODE_CDMA_NO_EVDO:
             case RILConstants.NETWORK_MODE_EVDO_NO_CDMA:
+            case RILConstants.NETWORK_MODE_CDMA_AND_LTE_EVDO:
                 mPhoneType = RILConstants.CDMA_PHONE;
                 break;
             case RILConstants.NETWORK_MODE_GLOBAL:
+            case RILConstants.NETWORK_MODE_CDMA_GSM_WCDMA:
+            case RILConstants.NETWORK_MODE_LTE_ONLY:
                 mPhoneType = RILConstants.CDMA_PHONE;
                 break;
             default:
@@ -628,6 +632,51 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     //***** CommandsInterface implementation
+
+    public void getVoiceRadioTechnology(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_VOICE_RADIO_TECH, result);
+
+        if (RILJ_LOGD)
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void getDataRadioTechnology(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_DATA_RADIO_TECH, result);
+
+        if (RILJ_LOGD)
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void getCdmaSubscriptionSource(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE, result);
+
+        if (RILJ_LOGD)
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void getCdmaPrlVersion(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_CDMA_PRL_VERSION, result);
+
+        if (RILJ_LOGD)
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void getImsRegistrationState(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_IMS_REGISTRATION_STATE, result);
+
+        if (RILJ_LOGD)
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
 
     @Override public void
     setOnNITZTime(Handler h, int what, Object obj) {
@@ -1027,9 +1076,9 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    getGPRSRegistrationState (Message result) {
+    getDataRegistrationState (Message result) {
         RILRequest rr
-                = RILRequest.obtain(RIL_REQUEST_GPRS_REGISTRATION_STATE, result);
+                = RILRequest.obtain(RIL_REQUEST_DATA_REGISTRATION_STATE, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
@@ -1397,13 +1446,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
 
     public void
-    iccIO (int command, int fileid, String path, int p1, int p2, int p3,
+    iccIO (int slot, String aid, int command, int fileid, String path, int p1, int p2, int p3,
             String data, String pin2, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SIM_IO, result);
 
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
         rr.mp.writeInt(command);
         rr.mp.writeInt(fileid);
         rr.mp.writeString(path);
@@ -1949,14 +2000,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         switch(stateInt) {
             case 0: state = RadioState.RADIO_OFF; break;
             case 1: state = RadioState.RADIO_UNAVAILABLE; break;
-            case 2: state = RadioState.SIM_NOT_READY; break;
-            case 3: state = RadioState.SIM_LOCKED_OR_ABSENT; break;
-            case 4: state = RadioState.SIM_READY; break;
-            case 5: state = RadioState.RUIM_NOT_READY; break;
-            case 6: state = RadioState.RUIM_READY; break;
-            case 7: state = RadioState.RUIM_LOCKED_OR_ABSENT; break;
-            case 8: state = RadioState.NV_NOT_READY; break;
-            case 9: state = RadioState.NV_READY; break;
+            case 2: state = RadioState.RADIO_ON; break;
 
             default:
                 throw new RuntimeException(
@@ -2108,8 +2152,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_UDUB: ret =  responseVoid(p); break;
             case RIL_REQUEST_LAST_CALL_FAIL_CAUSE: ret =  responseInts(p); break;
             case RIL_REQUEST_SIGNAL_STRENGTH: ret =  responseSignalStrength(p); break;
-            case RIL_REQUEST_REGISTRATION_STATE: ret =  responseStrings(p); break;
-            case RIL_REQUEST_GPRS_REGISTRATION_STATE: ret =  responseStrings(p); break;
+            case RIL_REQUEST_REGISTRATION_STATE: ret =  responseRegState(p); break;
+            case RIL_REQUEST_DATA_REGISTRATION_STATE: ret =  responseRegState(p); break;
             case RIL_REQUEST_OPERATOR: ret =  responseStrings(p); break;
             case RIL_REQUEST_RADIO_POWER: ret =  responseVoid(p); break;
             case RIL_REQUEST_DTMF: ret =  responseVoid(p); break;
@@ -2192,6 +2236,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
             case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS: ret = responseVoid(p); break;
             case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: ret = responseVoid(p); break;
+            case RIL_REQUEST_VOICE_RADIO_TECH: ret = responseInts(p); break;
+            case RIL_REQUEST_DATA_RADIO_TECH: ret = responseInts(p); break;
+            case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE: ret = responseInts(p); break;
+            case RIL_REQUEST_CDMA_PRL_VERSION: ret = responseInts(p); break;
+            case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -2306,6 +2355,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED: ret =  responseVoid(p); break;
             case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED: ret =  responseVoid(p); break;
             case RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED: ret =  responseVoid(p); break;
+            case RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED: ret = responseVoid(p); break;
             case RIL_UNSOL_RESPONSE_NEW_SMS: ret =  responseString(p); break;
             case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT: ret =  responseString(p); break;
             case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM: ret =  responseInts(p); break;
@@ -2332,6 +2382,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_CDMA_INFO_REC: ret = responseCdmaInformationRecord(p); break;
             case RIL_UNSOL_OEM_HOOK_RAW: ret = responseRaw(p); break;
             case RIL_UNSOL_RINGBACK_TONE: ret = responseInts(p); break;
+            case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: ret =  responseVoid(p); break;
+            case RIL_UNSOL_DATA_RADIO_TECH_CHANGED: ret =  responseVoid(p); break;
+            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: ret =  responseVoid(p); break;
+            case RIL_UNSOL_CDMA_PRL_CHANGED: ret =  responseVoid(p); break;
+            case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: ret =  responseVoid(p); break;
 
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -2350,6 +2405,36 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
                 switchToRadioState(newState);
             break;
+            case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED:
+                if (RILJ_LOGD) unsljLog(response);
+
+                mVoiceRadioTechChangedRegistrants
+                    .notifyRegistrants(new AsyncResult(null, null, null));
+                break;
+            case RIL_UNSOL_DATA_RADIO_TECH_CHANGED:
+                if (RILJ_LOGD) unsljLog(response);
+
+                mDataRadioTechChangedRegistrants
+                    .notifyRegistrants(new AsyncResult(null, null, null));
+                break;
+            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
+                if (RILJ_LOGD) unsljLog(response);
+
+                mCdmaSubscriptionSourceChangedRegistrants
+                    .notifyRegistrants(new AsyncResult(null, null, null));
+                break;
+            case RIL_UNSOL_CDMA_PRL_CHANGED:
+                if (RILJ_LOGD) unsljLog(response);
+
+                mCdmaPrlChangedRegistrants
+                    .notifyRegistrants(new AsyncResult(null, null, null));
+                break;
+            case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED:
+                if (RILJ_LOGD) unsljLog(response);
+
+                mImsNetworkStateChangedRegistrants
+                    .notifyRegistrants(new AsyncResult(null, null, null));
+                break;
             case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
                 if (RILJ_LOGD) unsljLog(response);
 
@@ -2360,6 +2445,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 if (RILJ_LOGD) unsljLog(response);
 
                 mNetworkStateRegistrants
+                    .notifyRegistrants(new AsyncResult(null, null, null));
+            break;
+            case RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED:
+                if (RILJ_LOGD) unsljLog(response);
+
+                mDataNetworkStateRegistrants
                     .notifyRegistrants(new AsyncResult(null, null, null));
             break;
             case RIL_UNSOL_RESPONSE_NEW_SMS: {
@@ -2858,6 +2949,33 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         return response;
     }
 
+    private Object
+    responseRegState(Parcel p) {
+        int num;
+        String regstates[][] = new String [RIL_MAX_NETWORKS][];
+
+        for (int i = 0; i < RIL_MAX_NETWORKS; ++i) {
+            num = p.readInt();
+
+            if (num == 0) {
+
+                regstates[i] = null;
+            }
+            else {
+
+                regstates[i] = new String[num];
+
+                for (int j = 0; j < num; j++) {
+                    regstates[i][j] = p.readString();
+                }
+            }
+        }
+
+        RegStateResponse response = new RegStateResponse(regstates);
+
+        return response;
+    }
+
 
     private Object
      responseICC_IO(Parcel p) {
@@ -2880,34 +2998,46 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
     private Object
     responseIccCardStatus(Parcel p) {
-        IccCardApplication ca;
+        UiccCardStatusResponse r = new UiccCardStatusResponse();
+        int num_cards = p.readInt();
+        r.cards = new UiccCardStatusResponse.CardStatus[num_cards];
+        for (int i = 0; i < num_cards; i ++) {
+            r.cards[i] = r.new CardStatus();
+            UiccCardStatusResponse.CardStatus cs = r.cards[i];
+            cs.card_state = UiccConstants.CardState.values()[p.readInt()];
+            cs.universal_pin_state = UiccConstants.PinState.values()[p.readInt()];
+            int num_current_3gpp_indexes = p.readInt();
+            cs.subscription_3gpp_app_index = new int[num_current_3gpp_indexes];
+            for (int j = 0; j < num_current_3gpp_indexes; j++) {
+                cs.subscription_3gpp_app_index[j] = p.readInt();
+            }
+            int num_current_3gpp2_indexes = p.readInt();
+            cs.subscription_3gpp2_app_index = new int[num_current_3gpp2_indexes];
+            for (int j = 0; j < num_current_3gpp2_indexes; j++) {
+                cs.subscription_3gpp2_app_index[j] = p.readInt();
+            }
+            int num_applications = p.readInt();
 
-        IccCardStatus status = new IccCardStatus();
-        status.setCardState(p.readInt());
-        status.setUniversalPinState(p.readInt());
-        status.setGsmUmtsSubscriptionAppIndex(p.readInt());
-        status.setCdmaSubscriptionAppIndex(p.readInt());
-        int numApplications = p.readInt();
+            if (num_applications > UiccConstants.RIL_CARD_MAX_APPS) {
+                num_applications = UiccConstants.RIL_CARD_MAX_APPS;
+            }
 
-        // limit to maximum allowed applications
-        if (numApplications > IccCardStatus.CARD_MAX_APPS) {
-            numApplications = IccCardStatus.CARD_MAX_APPS;
+            cs.applications = new UiccCardStatusResponse.CardStatus.AppStatus[num_applications];
+            for (int j = 0 ; j < num_applications ; j++) {
+                UiccCardStatusResponse.CardStatus.AppStatus ca;
+                ca = r.cards[i].new AppStatus();
+                ca.app_type       = UiccConstants.AppType.values()[p.readInt()];
+                ca.app_state      = UiccConstants.AppState.values()[p.readInt()];
+                ca.perso_substate = UiccConstants.PersoSubState.values()[p.readInt()];
+                ca.aid            = p.readString();
+                ca.app_label      = p.readString();
+                ca.pin1_replaced  = p.readInt();
+                ca.pin1           = UiccConstants.PinState.values()[p.readInt()];
+                ca.pin2           = UiccConstants.PinState.values()[p.readInt()];
+                r.cards[i].applications[j] = ca;
+            }
         }
-        status.setNumApplications(numApplications);
-
-        for (int i = 0 ; i < numApplications ; i++) {
-            ca = new IccCardApplication();
-            ca.app_type       = ca.AppTypeFromRILInt(p.readInt());
-            ca.app_state      = ca.AppStateFromRILInt(p.readInt());
-            ca.perso_substate = ca.PersoSubstateFromRILInt(p.readInt());
-            ca.aid            = p.readString();
-            ca.app_label      = p.readString();
-            ca.pin1_replaced  = p.readInt();
-            ca.pin1           = ca.PinStateFromRILInt(p.readInt());
-            ca.pin2           = ca.PinStateFromRILInt(p.readInt());
-            status.addApplication(ca);
-        }
-        return status;
+        return r;
     }
 
     private Object
@@ -3247,7 +3377,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_LAST_CALL_FAIL_CAUSE: return "LAST_CALL_FAIL_CAUSE";
             case RIL_REQUEST_SIGNAL_STRENGTH: return "SIGNAL_STRENGTH";
             case RIL_REQUEST_REGISTRATION_STATE: return "REGISTRATION_STATE";
-            case RIL_REQUEST_GPRS_REGISTRATION_STATE: return "GPRS_REGISTRATION_STATE";
+            case RIL_REQUEST_DATA_REGISTRATION_STATE: return "DATA_REGISTRATION_STATE";
             case RIL_REQUEST_OPERATOR: return "OPERATOR";
             case RIL_REQUEST_RADIO_POWER: return "RADIO_POWER";
             case RIL_REQUEST_DTMF: return "DTMF";
@@ -3330,6 +3460,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE: return "REQUEST_EXIT_EMERGENCY_CALLBACK_MODE";
             case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS: return "RIL_REQUEST_REPORT_SMS_MEMORY_STATUS";
             case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: return "RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING";
+            case RIL_REQUEST_VOICE_RADIO_TECH: return "RIL_REQUEST_VOICE_RADIO_TECH";
+            case RIL_REQUEST_DATA_RADIO_TECH: return "RIL_REQUEST_DATA_RADIO_TECH";
+            case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_CDMA_PRL_VERSION: return "RIL_REQUEST_CDMA_PRL_VERSION";
+            case RIL_REQUEST_IMS_REGISTRATION_STATE: return "RIL_REQUEST_IMS_REGISTRATION_STATE";
             default: return "<unknown request>";
         }
     }
@@ -3346,6 +3481,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED: return "UNSOL_RESPONSE_RADIO_STATE_CHANGED";
             case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED: return "UNSOL_RESPONSE_CALL_STATE_CHANGED";
             case RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_NETWORK_STATE_CHANGED";
+            case RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED: return "RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED";
             case RIL_UNSOL_RESPONSE_NEW_SMS: return "UNSOL_RESPONSE_NEW_SMS";
             case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT: return "UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT";
             case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM: return "UNSOL_RESPONSE_NEW_SMS_ON_SIM";
@@ -3373,6 +3509,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_CDMA_INFO_REC: return "UNSOL_CDMA_INFO_REC";
             case RIL_UNSOL_OEM_HOOK_RAW: return "UNSOL_OEM_HOOK_RAW";
             case RIL_UNSOL_RINGBACK_TONE: return "UNSOL_RINGBACK_TONG";
+            case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: return "UNSOL_VOICE_RADIO_TECH_CHANGED";
+            case RIL_UNSOL_DATA_RADIO_TECH_CHANGED: return "UNSOL_DATA_RADIO_TECH_CHANGED";
+            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: return "UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED";
+            case RIL_UNSOL_CDMA_PRL_CHANGED: return "UNSOL_CDMA_PRL_CHANGED";
+            case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
             default: return "<unknown reponse>";
         }
     }

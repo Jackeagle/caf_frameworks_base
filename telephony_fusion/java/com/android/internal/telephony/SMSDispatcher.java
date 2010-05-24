@@ -116,7 +116,7 @@ public abstract class SMSDispatcher extends Handler {
     /** Radio is ON */
     static final protected int EVENT_RADIO_ON = 12;
 
-    protected Phone mPhone;
+    protected VoicePhone mPhone;
     protected Context mContext;
     protected ContentResolver mResolver;
     protected CommandsInterface mCm;

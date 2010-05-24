@@ -737,8 +737,9 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                     } else if (pinLen < 4 || pinLen > 8 ) {
                         // invalid length
                         handlePasswordError(com.android.internal.R.string.invalidPin);
-                    } else if (sc.equals(SC_PIN) &&
-                               phone.mSimCard.getState() == SimCard.State.PUK_REQUIRED ) {
+                    } else if (sc.equals(SC_PIN)
+                            && phone.m3gppApplication != null
+                            && phone.m3gppApplication.getState() == UiccConstants.AppState.APPSTATE_PUK) {
                         // Sim is puk-locked
                         handlePasswordError(com.android.internal.R.string.needPuk);
                     } else {
@@ -865,7 +866,11 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                 */
                 if ((ar.exception == null) && (msg.arg1 == 1)) {
                     boolean cffEnabled = (msg.arg2 == 1);
-                    phone.mSIMRecords.setVoiceCallForwardingFlag(1, cffEnabled);
+                    if (phone.mSIMRecords != null) {
+                        phone.mSIMRecords.setVoiceCallForwardingFlag(1, cffEnabled);
+                    } else {
+                        Log.w(LOG_TAG, "setVoiceCallForwardingFlag aborted. sim records is null.");
+                    }
                 }
 
                 onSetComplete(ar);
@@ -1194,7 +1199,11 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                 (info.serviceClass & serviceClassMask)
                         == CommandsInterface.SERVICE_CLASS_VOICE) {
             boolean cffEnabled = (info.status == 1);
-            phone.mSIMRecords.setVoiceCallForwardingFlag(1, cffEnabled);
+            if (phone.mSIMRecords != null) {
+                phone.mSIMRecords.setVoiceCallForwardingFlag(1, cffEnabled);
+            } else {
+                Log.w(LOG_TAG, "setVoiceCallForwardingFlag aborted. sim records is null.");
+            }
         }
 
         return TextUtils.replace(template, sources, destinations);
@@ -1219,7 +1228,11 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                 sb.append(context.getText(com.android.internal.R.string.serviceDisabled));
 
                 // Set unconditional CFF in SIM to false
-                phone.mSIMRecords.setVoiceCallForwardingFlag(1, false);
+                if (phone.mSIMRecords != null) {
+                    phone.mSIMRecords.setVoiceCallForwardingFlag(1, false);
+                } else {
+                    Log.w(LOG_TAG, "setVoiceCallForwardingFlag aborted. sim records is null.");
+                }
             } else {
 
                 SpannableStringBuilder tb = new SpannableStringBuilder();

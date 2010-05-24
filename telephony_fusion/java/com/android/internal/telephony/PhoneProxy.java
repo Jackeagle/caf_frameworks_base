@@ -18,45 +18,53 @@
 package com.android.internal.telephony;
 
 
+import java.util.List;
+
 import android.app.ActivityManagerNative;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
+import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
 import android.os.SystemProperties;
-import android.preference.PreferenceManager;
+import android.provider.Settings;
 import android.telephony.CellLocation;
-import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.util.Log;
 
+import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 import com.android.internal.telephony.cdma.CDMAPhone;
 import com.android.internal.telephony.gsm.GSMPhone;
 import com.android.internal.telephony.gsm.NetworkInfo;
-import com.android.internal.telephony.gsm.PdpConnection;
 import com.android.internal.telephony.test.SimulatedRadioControl;
-
-import java.util.List;
 
 public class PhoneProxy extends Handler implements Phone {
     public final static Object lockForRadioTechnologyChange = new Object();
 
-    private Phone mActivePhone;
-    private String mOutgoingPhone;
+    private VoicePhone mActivePhone;
+    DataConnectionTracker mDataConnectionTracker = null;
+
     private CommandsInterface mCommandsInterface;
     private IccSmsInterfaceManagerProxy mIccSmsInterfaceManagerProxy;
     private IccPhoneBookInterfaceManagerProxy mIccPhoneBookInterfaceManagerProxy;
     private PhoneSubInfoProxy mPhoneSubInfoProxy;
+    private IccCardProxy mIccProxy;
 
     private boolean mResetModemOnRadioTechnologyChange = false;
+    private int mVoiceTechQueryContext = 0;
 
-    private static final int EVENT_RADIO_TECHNOLOGY_CHANGED = 1;
-    private static final String LOG_TAG = "PHONE";
+    private boolean mDesiredPowerState;
+
+    private static final int EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED = 1;
+    private static final int EVENT_RADIO_STATE_CHANGED = 2;
+    private static final int EVENT_REQUEST_VOICE_RADIO_TECH_DONE = 3;
+    private static final int EVENT_SET_RADIO_POWER = 4;
+
+    private static final String LOG_TAG = "RIL_PhoneProxy";
 
     //***** Class Methods
-    public PhoneProxy(Phone phone) {
+    public PhoneProxy(VoicePhone phone) {
         mActivePhone = phone;
         mResetModemOnRadioTechnologyChange = SystemProperties.getBoolean(
                 TelephonyProperties.PROPERTY_RESET_ON_RADIO_TECH_CHANGE, false);
@@ -66,84 +74,170 @@ public class PhoneProxy extends Handler implements Phone {
                 phone.getIccPhoneBookInterfaceManager());
         mPhoneSubInfoProxy = new PhoneSubInfoProxy(phone.getPhoneSubInfo());
         mCommandsInterface = ((PhoneBase)mActivePhone).mCM;
-        mCommandsInterface.registerForRadioTechnologyChanged(
-                this, EVENT_RADIO_TECHNOLOGY_CHANGED, null);
+
+        mCommandsInterface.registerForRadioStateChanged(this, EVENT_RADIO_STATE_CHANGED, null);
+        mCommandsInterface.registerForVoiceRadioTechChanged(this,
+                EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED, null);
+
+        mIccProxy = new IccCardProxy(phone.getContext(), mCommandsInterface);
+        mIccProxy.setVoiceRadioTech(
+                phone.getPhoneType() == VoicePhone.PHONE_TYPE_CDMA ?
+                        RadioTechnologyFamily.RADIO_TECH_3GPP2
+                        : RadioTechnologyFamily.RADIO_TECH_3GPP);
+
+        // system setting property AIRPLANE_MODE_ON is set in Settings.
+        int airplaneMode = Settings.System.getInt(phone.getContext().getContentResolver(),
+                Settings.System.AIRPLANE_MODE_ON, 0);
+        mDesiredPowerState = !(airplaneMode > 0);
+        UiccManager.getInstance(phone.getContext(), mCommandsInterface);
     }
 
     @Override
     public void handleMessage(Message msg) {
-        switch(msg.what) {
-        case EVENT_RADIO_TECHNOLOGY_CHANGED:
-            //switch Phone from CDMA to GSM or vice versa
-            mOutgoingPhone = ((PhoneBase)mActivePhone).getPhoneName();
-            logd("Switching phone from " + mOutgoingPhone + "Phone to " +
-                    (mOutgoingPhone.equals("GSM") ? "CDMAPhone" : "GSMPhone") );
-            boolean oldPowerState = false; // old power state to off
-            if (mResetModemOnRadioTechnologyChange) {
-                if (mCommandsInterface.getRadioState().isOn()) {
-                    oldPowerState = true;
-                    logd("Setting Radio Power to Off");
-                    mCommandsInterface.setRadioPower(false, null);
+        AsyncResult ar;
+        switch (msg.what) {
+
+            case EVENT_RADIO_STATE_CHANGED:
+
+                logv("EVENT_RADIO_STATE_CHANGED : newState = " + mCommandsInterface.getRadioState());
+
+                setPowerStateToDesired();
+
+                if (mDesiredPowerState && mCommandsInterface.getRadioState().isOn()) {
+                    /* Proactively query voice radio technologies */
+                    mVoiceTechQueryContext++;
+                    mCommandsInterface.getVoiceRadioTechnology(this.obtainMessage(
+                            EVENT_REQUEST_VOICE_RADIO_TECH_DONE, mVoiceTechQueryContext));
                 }
-            }
+                break;
 
-            if(mOutgoingPhone.equals("GSM")) {
-                logd("Make a new CDMAPhone and destroy the old GSMPhone.");
+            case EVENT_SET_RADIO_POWER:
+                boolean newPowerState = (Boolean) msg.obj;
+                logv("EVENT_SET_RADIO_POWER : newPowerState = " + newPowerState);
+                mCommandsInterface.setRadioPower(newPowerState, null);
+                break;
 
-                ((GSMPhone)mActivePhone).dispose();
-                Phone oldPhone = mActivePhone;
+            case EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED:
+                mVoiceTechQueryContext++;
+                mCommandsInterface.getVoiceRadioTechnology(this
+                        .obtainMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE, mVoiceTechQueryContext));
+                break;
 
-                //Give the garbage collector a hint to start the garbage collection asap
-                // NOTE this has been disabled since radio technology change could happen during
-                //   e.g. a multimedia playing and could slow the system. Tests needs to be done
-                //   to see the effects of the GC call here when system is busy.
-                //System.gc();
+            case EVENT_REQUEST_VOICE_RADIO_TECH_DONE:
+                ar = (AsyncResult) msg.obj;
 
-                mActivePhone = PhoneFactory.getCdmaPhone();
-                ((GSMPhone)oldPhone).removeReferences();
-                oldPhone = null;
-            } else {
-                logd("Make a new GSMPhone and destroy the old CDMAPhone.");
+                if ((Integer)ar.userObj != mVoiceTechQueryContext) return;
 
-                ((CDMAPhone)mActivePhone).dispose();
-                //mActivePhone = null;
-                Phone oldPhone = mActivePhone;
+                if (ar.exception == null) {
+                    RadioTechnologyFamily newVoiceTech =
+                            RadioTechnologyFamily.getRadioTechFamilyFromInt(((int[]) ar.result)[0]);
+                    updatePhoneObject(newVoiceTech);
+                } else {
+                    loge("Voice Radio Technology query failed!");
+                }
+                break;
 
-                // Give the GC a hint to start the garbage collection asap
-                // NOTE this has been disabled since radio technology change could happen during
-                //   e.g. a multimedia playing and could slow the system. Tests needs to be done
-                //   to see the effects of the GC call here when system is busy.
-                //System.gc();
-
-                mActivePhone = PhoneFactory.getGsmPhone();
-                ((CDMAPhone)oldPhone).removeReferences();
-                oldPhone = null;
-            }
-
-            if (mResetModemOnRadioTechnologyChange) {
-                logd("Resetting Radio");
-                mCommandsInterface.setRadioPower(oldPowerState, null);
-            }
-
-            //Set the new interfaces in the proxy's
-            mIccSmsInterfaceManagerProxy.setmIccSmsInterfaceManager(
-                    mActivePhone.getIccSmsInterfaceManager());
-            mIccPhoneBookInterfaceManagerProxy.setmIccPhoneBookInterfaceManager(
-                    mActivePhone.getIccPhoneBookInterfaceManager());
-            mPhoneSubInfoProxy.setmPhoneSubInfo(this.mActivePhone.getPhoneSubInfo());
-            mCommandsInterface = ((PhoneBase)mActivePhone).mCM;
-
-            //Send an Intent to the PhoneApp that we had a radio technology change
-            Intent intent = new Intent(TelephonyIntents.ACTION_RADIO_TECHNOLOGY_CHANGED);
-            intent.putExtra(Phone.PHONE_NAME_KEY, mActivePhone.getPhoneName());
-            ActivityManagerNative.broadcastStickyIntent(intent, null);
-            break;
-        default:
-            Log.e(LOG_TAG,"Error! This handler was not registered for this message type. Message: "
-                    + msg.what);
-        break;
+            default:
+                Log.e(LOG_TAG,
+                        "Error! This handler was not registered for this message type. Message: "
+                                + msg.what);
+                break;
         }
-        super.handleMessage(msg);
+    }
+
+    private void updatePhoneObject(RadioTechnologyFamily newVoiceRadioTech) {
+
+        if (mActivePhone != null
+                && ((newVoiceRadioTech.isCdma() && mActivePhone.getPhoneType() == PHONE_TYPE_CDMA))
+                || ((newVoiceRadioTech.isGsm() && mActivePhone.getPhoneType() == PHONE_TYPE_GSM))) {
+            // Nothing changed. Keep phone as it is.
+            Log.v(LOG_TAG, "Ignoring voice radio technology changed message. newVoiceRadioTech = "
+                    + newVoiceRadioTech + "Active Phone = " + mActivePhone.getPhoneName());
+            return;
+        }
+
+        if (newVoiceRadioTech.isUnknown()) {
+            // We need some voice phone object to be active always, so never
+            // delete the phone without anything to replace it with!
+            Log.i(LOG_TAG,
+                    "Ignoring voice radio technology changed message. newVoiceRadioTech = Unknown."
+                            + "Active Phone = " + mActivePhone.getPhoneName());
+            return;
+        }
+
+        boolean oldPowerState = false; // old power state to off
+        if (mResetModemOnRadioTechnologyChange) {
+            if (mCommandsInterface.getRadioState().isOn()) {
+                oldPowerState = true;
+                logd("Setting Radio Power to Off");
+                mCommandsInterface.setRadioPower(false, null);
+            }
+        }
+
+        deleteAndCreatePhone(newVoiceRadioTech);
+
+        if (mResetModemOnRadioTechnologyChange) { // restore power state
+            logd("Resetting Radio");
+            mCommandsInterface.setRadioPower(oldPowerState, null);
+        }
+
+        // Set the new interfaces in the proxy's
+        mIccSmsInterfaceManagerProxy.setmIccSmsInterfaceManager(mActivePhone
+                .getIccSmsInterfaceManager());
+        mIccPhoneBookInterfaceManagerProxy.setmIccPhoneBookInterfaceManager(mActivePhone
+                .getIccPhoneBookInterfaceManager());
+        mPhoneSubInfoProxy.setmPhoneSubInfo(this.mActivePhone.getPhoneSubInfo());
+        mIccProxy.setVoiceRadioTech(newVoiceRadioTech);
+
+        // Send an Intent to the PhoneApp that we had a radio technology change
+        Intent intent = new Intent(TelephonyIntents.ACTION_RADIO_TECHNOLOGY_CHANGED);
+        intent.putExtra(Phone.PHONE_NAME_KEY, mActivePhone.getPhoneName());
+        ActivityManagerNative.broadcastStickyIntent(intent, null);
+
+    }
+
+    private void deleteAndCreatePhone(RadioTechnologyFamily newVoiceRadioTech) {
+
+        String mOutgoingPhoneName = "Unknown";
+
+        if (mActivePhone != null) {
+            mOutgoingPhoneName = ((PhoneBase) mActivePhone).getPhoneName();
+        }
+
+        Log.i(LOG_TAG, "Switching Voice Phone : " + mOutgoingPhoneName + " >>> "
+                + (newVoiceRadioTech.isGsm() ? "GSM" : "CDMA"));
+
+        if (mActivePhone != null) {
+            Log.v(LOG_TAG, "Disposing old phone..");
+            if (mActivePhone instanceof GSMPhone) {
+                ((GSMPhone) mActivePhone).dispose();
+            } else if (mActivePhone instanceof CDMAPhone) {
+                ((CDMAPhone) mActivePhone).dispose();
+            }
+        }
+
+        VoicePhone oldPhone = mActivePhone;
+
+        // Give the garbage collector a hint to start the garbage collection
+        // asap NOTE this has been disabled since radio technology change could
+        // happen during e.g. a multimedia playing and could slow the system.
+        // Tests needs to be done to see the effects of the GC call here when
+        // system is busy.
+        // System.gc();
+
+        if (newVoiceRadioTech.isCdma()) {
+            mActivePhone = PhoneFactory.getCdmaPhone();
+            if (null != oldPhone) {
+                ((GSMPhone) oldPhone).removeReferences();
+            }
+        } else if (newVoiceRadioTech.isGsm()) {
+            mActivePhone = PhoneFactory.getGsmPhone();
+            if (null != oldPhone) {
+                ((CDMAPhone) oldPhone).removeReferences();
+            }
+        }
+
+        oldPhone = null;
     }
 
     private void logv(String msg) {
@@ -171,28 +265,13 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.getCellLocation();
     }
 
-    public DataState getDataConnectionState() {
-        return mActivePhone.getDataConnectionState();
-    }
-
-    public DataActivityState getDataActivityState() {
-        return mActivePhone.getDataActivityState();
-    }
-
     public Context getContext() {
         return mActivePhone.getContext();
     }
 
-    public void disableDnsCheck(boolean b) {
-        mActivePhone.disableDnsCheck(b);
-    }
-
-    public boolean isDnsCheckDisabled() {
-        return mActivePhone.isDnsCheckDisabled();
-    }
 
     public State getState() {
-        return mActivePhone.getState();
+        return (VoicePhone.State)mActivePhone.getState();
     }
 
     public String getPhoneName() {
@@ -201,14 +280,6 @@ public class PhoneProxy extends Handler implements Phone {
 
     public int getPhoneType() {
         return mActivePhone.getPhoneType();
-    }
-
-    public String[] getActiveApnTypes() {
-        return mActivePhone.getActiveApnTypes();
-    }
-
-    public String getActiveApn() {
-        return mActivePhone.getActiveApn();
     }
 
     public SignalStrength getSignalStrength() {
@@ -356,7 +427,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public IccCard getIccCard() {
-        return mActivePhone.getIccCard();
+        return mIccProxy;
     }
 
     public void acceptCall() throws CallStateException {
@@ -436,7 +507,29 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void setRadioPower(boolean power) {
-        mActivePhone.setRadioPower(power);
+        mDesiredPowerState = power;
+        setPowerStateToDesired();
+    }
+
+    private synchronized void setPowerStateToDesired() {
+        logv("setPowerStateToDesired : mDesiredPowerState = " + mDesiredPowerState
+                + ", getRadioState() = " + mCommandsInterface.getRadioState());
+
+        // If we want it on and it's off, turn it on
+        if (mDesiredPowerState
+                && mCommandsInterface.getRadioState() == CommandsInterface.RadioState.RADIO_OFF) {
+            mCommandsInterface.setRadioPower(true, null);
+        } else if (!mDesiredPowerState && mCommandsInterface.getRadioState().isOn()) {
+            Message powerOffMsg = obtainMessage(EVENT_SET_RADIO_POWER, mDesiredPowerState);
+            // we want it off, but might need data to be disconnected.
+            if (mDataConnectionTracker == null) {
+                sendMessage(powerOffMsg);
+            } else {
+                // TODO: fusion - DCT will send the powerOffMsg, once data is set as desired.
+                // mDataConnectionTracker.setDataConnectionAsDesired(mDesiredPowerState,
+                // powerOffMsg);
+            }
+        }
     }
 
     public boolean getMessageWaitingIndicator() {
@@ -607,24 +700,6 @@ public class PhoneProxy extends Handler implements Phone {
     /**
      * @deprecated
      */
-    public void getPdpContextList(Message response) {
-        mActivePhone.getPdpContextList(response);
-    }
-
-    public void getDataCallList(Message response) {
-        mActivePhone.getDataCallList(response);
-    }
-
-    /**
-     * @deprecated
-     */
-    public List<PdpConnection> getCurrentPdpList() {
-        return mActivePhone.getCurrentPdpList();
-    }
-
-    public List<DataConnection> getCurrentDataConnectionList() {
-        return mActivePhone.getCurrentDataConnectionList();
-    }
 
     public void updateServiceLocation() {
         mActivePhone.updateServiceLocation();
@@ -654,14 +729,6 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.queryAvailableBandMode(response);
     }
 
-    public boolean getDataRoamingEnabled() {
-        return mActivePhone.getDataRoamingEnabled();
-    }
-
-    public void setDataRoamingEnabled(boolean enable) {
-        mActivePhone.setDataRoamingEnabled(enable);
-    }
-
     public void queryCdmaRoamingPreference(Message response) {
         mActivePhone.queryCdmaRoamingPreference(response);
     }
@@ -676,46 +743,6 @@ public class PhoneProxy extends Handler implements Phone {
 
     public SimulatedRadioControl getSimulatedRadioControl() {
         return mActivePhone.getSimulatedRadioControl();
-    }
-
-    public boolean enableDataConnectivity() {
-        return mActivePhone.enableDataConnectivity();
-    }
-
-    public boolean disableDataConnectivity() {
-        return mActivePhone.disableDataConnectivity();
-    }
-
-    public int enableApnType(String type) {
-        return mActivePhone.enableApnType(type);
-    }
-
-    public int disableApnType(String type) {
-        return mActivePhone.disableApnType(type);
-    }
-
-    public boolean isDataConnectivityEnabled() {
-        return mActivePhone.isDataConnectivityEnabled();
-    }
-
-    public boolean isDataConnectivityPossible() {
-        return mActivePhone.isDataConnectivityPossible();
-    }
-
-    public String getInterfaceName(String apnType) {
-        return mActivePhone.getInterfaceName(apnType);
-    }
-
-    public String getIpAddress(String apnType) {
-        return mActivePhone.getIpAddress(apnType);
-    }
-
-    public String getGateway(String apnType) {
-        return mActivePhone.getGateway(apnType);
-    }
-
-    public String[] getDnsServers(String apnType) {
-        return mActivePhone.getDnsServers(apnType);
     }
 
     public String getDeviceId() {
@@ -772,10 +799,6 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void setCellBroadcastSmsConfig(int[] configValuesArray, Message response) {
         mActivePhone.setCellBroadcastSmsConfig(configValuesArray, response);
-    }
-
-    public void notifyDataActivity() {
-         mActivePhone.notifyDataActivity();
     }
 
     public void getSmscAddress(Message result) {
@@ -892,5 +915,115 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void invokeDepersonalization(String pin, int type, Message response) {
         mActivePhone.invokeDepersonalization(pin, type, response);
+    }
+
+    public void disableDnsCheck(boolean b) {
+        // TODO Auto-generated method stub
+    }
+
+    public String getActiveApn() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public String[] getActiveApnTypes() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public DataActivityState getDataActivityState() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public DataState getDataConnectionState() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public ServiceState getDataServiceState() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public boolean isDnsCheckDisabled() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public int disableApnType(String type) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public boolean disableDataConnectivity() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public int enableApnType(String type) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public boolean enableDataConnectivity() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public List<DataConnection> getCurrentDataConnectionList() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public void getDataCallList(Message response) {
+        // TODO Auto-generated method stub
+    }
+
+    public boolean getDataRoamingEnabled() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public String[] getDnsServers(String apnType) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public String getGateway(String apnType) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public String getInterfaceName(String apnType) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public String getIpAddress(String apnType) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public void getPdpContextList(Message response) {
+        // TODO Auto-generated method stub
+    }
+
+    public boolean isDataConnectivityEnabled() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public boolean isDataConnectivityPossible() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public void notifyDataActivity() {
+        // TODO Auto-generated method stub
+    }
+
+    public void setDataRoamingEnabled(boolean enable) {
+        // TODO Auto-generated method stub
     }
 }

@@ -85,8 +85,7 @@ public final class SimulatedCommands extends BaseCommands
 
     //***** Constructor
 
-    public
-    SimulatedCommands() {
+    public SimulatedCommands() {
         super(null);  // Don't log statistics
         mHandlerThread = new HandlerThread("SimulatedCommands");
         mHandlerThread.start();
@@ -122,7 +121,8 @@ public final class SimulatedCommands extends BaseCommands
 
         if (pin != null && pin.equals(mPinCode)) {
             Log.i(LOG_TAG, "[SimCmd] supplyIccPin: success!");
-            setRadioState(RadioState.SIM_READY);
+            // TODO: fusion - replace with appropiate sim status change message! 
+            // setRadioState(RadioState.SIM_READY); 
             mPinUnlockAttempts = 0;
             mSimLockedState = SimLockState.NONE;
 
@@ -164,7 +164,8 @@ public final class SimulatedCommands extends BaseCommands
 
         if (puk != null && puk.equals(SIM_PUK_CODE)) {
             Log.i(LOG_TAG, "[SimCmd] supplyIccPuk: success!");
-            setRadioState(RadioState.SIM_READY);
+            // TODO: fusion - replace with appropiate sim status change message!
+            //setRadioState(RadioState.SIM_READY);
             mSimLockedState = SimLockState.NONE;
             mPukUnlockAttempts = 0;
 
@@ -446,7 +447,8 @@ public final class SimulatedCommands extends BaseCommands
      *      The ar.result List is sorted by DriverCall.index
      */
     public void getCurrentCalls (Message result) {
-        if (mState == RadioState.SIM_READY) {
+        //TODO: fusion - replace with appropriate sim status check
+        if (/*mState == RadioState.SIM_READY*/ false) {
             //Log.i("GSM", "[SimCmds] getCurrentCalls");
             resultSuccess(result, simulatedCallState.getDriverCalls());
         } else {
@@ -833,29 +835,30 @@ public final class SimulatedCommands extends BaseCommands
     }
 
     /**
-     * response.obj.result is an String[4]
-     * response.obj.result[0] is registration state 0-5 from TS 27.007 7.2
-     * response.obj.result[1] is LAC if registered or NULL if not
-     * response.obj.result[2] is CID if registered or NULL if not
-     * response.obj.result[3] indicates the available radio technology, where:
-     *      0 == unknown
-     *      1 == GPRS only
-     *      2 == EDGE
-     *      3 == UMTS
-     *
-     * valid LAC are 0x0000 - 0xffff
-     * valid CID are 0x00000000 - 0xffffffff
+     * response.obj.result is an String[14]
+     * See ril.h for details
      *
      * Please note that registration state 4 ("unknown") is treated
-     * as "out of service" in the Android telephony system
+     * as "out of service" above
      */
-    public void getGPRSRegistrationState (Message result) {
-        String ret[] = new String[4];
+    public void getDataRegistrationState (Message result) {
+        String ret[] = new String[14];
 
-        ret[0] = "5"; // registered roam
+        ret[0] = "5"; // registered roam (TODO: is there a better value?)
         ret[1] = null;
         ret[2] = null;
-        ret[3] = "2";
+        ret[3] = null;
+        ret[4] = null;
+        ret[5] = null;
+        ret[6] = null;
+        ret[7] = null;
+        ret[8] = null;
+        ret[9] = null;
+        ret[10] = null;
+        ret[11] = null;
+        ret[12] = null;
+        ret[13] = null;
+        ret[14] = null;
 
         resultSuccess(result, ret);
     }
@@ -1007,14 +1010,7 @@ public final class SimulatedCommands extends BaseCommands
 
     public void setRadioPower(boolean on, Message result) {
         if(on) {
-            if (isSimLocked()) {
-                Log.i("SIM", "[SimCmd] setRadioPower: SIM locked! state=" +
-                        mSimLockedState);
-                setRadioState(RadioState.SIM_LOCKED_OR_ABSENT);
-            }
-            else {
-                setRadioState(RadioState.SIM_READY);
-            }
+            setRadioState(RadioState.RADIO_ON);
         } else {
             setRadioState(RadioState.RADIO_OFF);
         }
@@ -1034,7 +1030,7 @@ public final class SimulatedCommands extends BaseCommands
      * response.obj will be an AsyncResult
      * response.obj.userObj will be a SimIoResult on success
      */
-    public void iccIO (int command, int fileid, String path, int p1, int p2,
+    public void iccIO (int slot, String aid, int command, int fileid, String path, int p1, int p2,
                        int p3, String data, String pin2, Message result) {
         unimplemented(result);
     }
@@ -1462,6 +1458,26 @@ public final class SimulatedCommands extends BaseCommands
     }
 
     public void getGsmBroadcastConfig(Message response) {
+        unimplemented(response);
+    }
+
+    public void getDataRadioTechnology(Message response) {
+        unimplemented(response);
+    }
+
+    public void getVoiceRadioTechnology(Message response) {
+        unimplemented(response);
+    }
+
+    public void getCdmaSubscriptionSource(Message response) {
+        unimplemented(response);
+    }
+
+    public void getCdmaPrlVersion(Message response) {
+        unimplemented(response);
+    }
+
+    public void getImsRegistrationState(Message response) {
         unimplemented(response);
     }
 }

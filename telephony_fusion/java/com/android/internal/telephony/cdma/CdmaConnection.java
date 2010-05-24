@@ -359,7 +359,7 @@ public class CdmaConnection extends Connection {
             buf.append(postDialString.substring(nextPostDialChar));
             postDialString = buf.toString();
             nextPostDialChar = 0;
-            if (Phone.DEBUG_PHONE) {
+            if (VoicePhone.DEBUG_PHONE) {
                 log("proceedAfterWildChar: new postDialString is " +
                         postDialString);
             }
@@ -430,10 +430,13 @@ public class CdmaConnection extends Connection {
                 } else if (serviceState == ServiceState.STATE_OUT_OF_SERVICE
                         || serviceState == ServiceState.STATE_EMERGENCY_ONLY) {
                     return DisconnectCause.OUT_OF_SERVICE;
-                } else if (phone.mCM.getRadioState() != CommandsInterface.RadioState.NV_READY
-                        && phone.getIccCard().getState() != RuimCard.State.READY) {
-                    return DisconnectCause.ICC_ERROR;
-                } else if (causeCode==CallFailCause.NORMAL_CLEARING) {
+                }
+                //TODO: fusion - use the new ICC manager equivalent
+//                    else if (phone.mCM.getRadioState() != CommandsInterface.RadioState.NV_READY
+//                        && phone.getIccCard().getState() != RuimCard.State.READY) {
+//                    return DisconnectCause.ICC_ERROR;
+//                }
+                else if (causeCode==CallFailCause.NORMAL_CLEARING) {
                     return DisconnectCause.NORMAL;
                 } else {
                     return DisconnectCause.ERROR_UNSPECIFIED;
@@ -490,7 +493,7 @@ public class CdmaConnection extends Connection {
 
         newParent = parentFromDCState(dc.state);
 
-        if (Phone.DEBUG_PHONE) log("parent= " +parent +", newParent= " + newParent);
+        if (VoicePhone.DEBUG_PHONE) log("parent= " +parent +", newParent= " + newParent);
 
         if (!equalsHandlesNulls(address, dc.number)) {
             if (Phone.DEBUG_PHONE) log("update: phone # changed!");
@@ -585,7 +588,7 @@ public class CdmaConnection extends Connection {
 
         // bug #678474: incoming call interpreted as missed call, even though
         // it sounds like the user has picked up the call.
-        if (Phone.DEBUG_PHONE) {
+        if (VoicePhone.DEBUG_PHONE) {
             log("onConnectedInOrOut: connectTime=" + connectTime);
         }
 

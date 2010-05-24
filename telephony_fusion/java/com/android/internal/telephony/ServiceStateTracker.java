@@ -47,6 +47,7 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final int DATA_ACCESS_CDMA_EvDo_B = 12;
 
     protected CommandsInterface cm;
+    protected UiccManager mUiccManager;
 
     public ServiceState ss;
     protected ServiceState newSS;
@@ -59,7 +60,6 @@ public abstract class ServiceStateTracker extends Handler {
      * expected responses in this pollingContext.
      */
     protected int[] pollingContext;
-    protected boolean mDesiredPowerState;
 
     /**
      * By default, strength polling is enabled.  However, if we're
@@ -87,7 +87,6 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final int EVENT_NETWORK_STATE_CHANGED             = 2;
     protected static final int EVENT_GET_SIGNAL_STRENGTH               = 3;
     protected static final int EVENT_POLL_STATE_REGISTRATION           = 4;
-    protected static final int EVENT_POLL_STATE_GPRS                   = 5;
     protected static final int EVENT_POLL_STATE_OPERATOR               = 6;
     protected static final int EVENT_POLL_SIGNAL_STRENGTH              = 10;
     protected static final int EVENT_NITZ_TIME                         = 11;
@@ -101,7 +100,6 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final int EVENT_GET_PREFERRED_NETWORK_TYPE        = 19;
     protected static final int EVENT_SET_PREFERRED_NETWORK_TYPE        = 20;
     protected static final int EVENT_RESET_PREFERRED_NETWORK_TYPE      = 21;
-    protected static final int EVENT_CHECK_REPORT_GPRS                 = 22;
     protected static final int EVENT_RESTRICTED_STATE_CHANGED          = 23;
 
     /** CDMA events */
@@ -121,6 +119,14 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final int EVENT_OTA_PROVISION_STATUS_CHANGE       = 37;
     protected static final int EVENT_SET_RADIO_POWER_OFF               = 38;
     protected static final int EVENT_RUIM_LOCKED_OR_ABSENT             = 39;
+    protected static final int EVENT_GET_CDMA_SUBSCRIPTION_SOURCE      = 40;
+    protected static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED  = 41;
+    protected static final int EVENT_CDMA_PRL_VERSION_CHANGED          = 42;
+    protected static final int EVENT_GET_CDMA_PRL_VERSION              = 43;
+
+    protected static final int EVENT_ICC_CHANGED                       = 44;
+    protected static final int EVENT_RADIO_ON                          = 45;
+    protected static final int EVENT_ICC_RECORD_EVENTS                 = 46;
 
     protected static final String TIMEZONE_PROPERTY = "persist.sys.timezone";
 
@@ -159,10 +165,6 @@ public abstract class ServiceStateTracker extends Handler {
 
     public ServiceStateTracker() {
 
-    }
-
-    public boolean getDesiredPowerState() {
-        return mDesiredPowerState;
     }
 
     /**
@@ -221,13 +223,6 @@ public abstract class ServiceStateTracker extends Handler {
                 obtainMessage(EVENT_GET_PREFERRED_NETWORK_TYPE, onComplete));
     }
 
-    public void
-    setRadioPower(boolean power) {
-        mDesiredPowerState = power;
-
-        setPowerStateToDesired();
-    }
-
     /**
      * These two flags manage the behavior of the cell lock -- the
      * lock should be held if either flag is true.  The intention is
@@ -271,7 +266,6 @@ public abstract class ServiceStateTracker extends Handler {
 
     protected abstract void handlePollStateResult(int what, AsyncResult ar);
     protected abstract void updateSpnDisplay();
-    protected abstract void setPowerStateToDesired();
 
     /** Cancel a pending (if any) pollState() operation */
     protected void cancelPollState() {

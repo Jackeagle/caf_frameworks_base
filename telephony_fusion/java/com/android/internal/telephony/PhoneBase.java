@@ -17,11 +17,9 @@
 
 package com.android.internal.telephony;
 
-import android.app.ActivityManagerNative;
-import android.app.IActivityManager;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.net.wifi.WifiManager;
 import android.os.AsyncResult;
 import android.os.Handler;
@@ -36,11 +34,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.R;
-import com.android.internal.telephony.gsm.PdpConnection;
 import com.android.internal.telephony.test.SimulatedRadioControl;
-
-import java.util.List;
-import java.util.Locale;
 
 
 /**
@@ -55,7 +49,7 @@ import java.util.Locale;
  *
  */
 
-public abstract class PhoneBase extends Handler implements Phone {
+public abstract class PhoneBase extends Handler implements VoicePhone {
     private static final String LOG_TAG = "PHONE";
     private static final boolean LOCAL_DEBUG = true;
 
@@ -63,10 +57,6 @@ public abstract class PhoneBase extends Handler implements Phone {
     public static final String NETWORK_SELECTION_KEY = "network_selection_key";
     // Key used to read and write the saved network selection operator name
     public static final String NETWORK_SELECTION_NAME_KEY = "network_selection_name_key";
-
-
-    // Key used to read/write "disable data connection on boot" pref (used for testing)
-    public static final String DATA_DISABLED_ON_BOOT_KEY = "disabled_on_boot_key";
 
     /* Event Constants */
     protected static final int EVENT_RADIO_AVAILABLE             = 1;
@@ -101,18 +91,20 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected static final int EVENT_SET_ENHANCED_VP                = 24;
     protected static final int EVENT_EMERGENCY_CALLBACK_MODE_ENTER  = 25;
     protected static final int EVENT_EXIT_EMERGENCY_CALLBACK_RESPONSE = 26;
+    protected static final int EVENT_GET_CDMA_SUBSCRIPTION_SOURCE    = 27;
+    protected static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED= 28;
+    //other
+    protected static final int EVENT_ICC_CHANGED                    = 29;
+    protected static final int EVENT_SET_NETWORK_AUTOMATIC          = 30;
+    protected static final int EVENT_NEW_ICC_SMS                    = 31;
+    protected static final int EVENT_ICC_RECORD_EVENTS              = 32;
 
     // Key used to read/write current CLIR setting
     public static final String CLIR_KEY = "clir_key";
 
-    // Key used to read/write "disable DNS server check" pref (used for testing)
-    public static final String DNS_SERVER_CHECK_DISABLED_KEY = "dns_server_check_disabled_key";
-
     /* Instance Variables */
     public CommandsInterface mCM;
-    protected IccFileHandler mIccFileHandler;
-    boolean mDnsCheckDisabled = false;
-    public DataConnectionTracker mDataConnection;
+
     boolean mDoesRilSendMultipleCallRing;
     int mCallRingContinueToken = 0;
     int mCallRingDelay;
@@ -205,7 +197,6 @@ public abstract class PhoneBase extends Handler implements Phone {
         setUnitTestMode(unitTestMode);
 
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
-        mDnsCheckDisabled = sp.getBoolean(DNS_SERVER_CHECK_DISABLED_KEY, false);
         mCM.setOnCallRing(this, EVENT_CALL_RING, null);
 
         /**
@@ -231,7 +222,6 @@ public abstract class PhoneBase extends Handler implements Phone {
     public void dispose() {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
             mCM.unSetOnCallRing(this);
-            mDataConnection.onCleanUpConnection(false, REASON_RADIO_TURNED_OFF);
             mIsTheCurrentActivePhone = false;
         }
     }
@@ -257,9 +247,9 @@ public abstract class PhoneBase extends Handler implements Phone {
                 Log.d(LOG_TAG, "Event EVENT_CALL_RING Received state=" + getState());
                 ar = (AsyncResult)msg.obj;
                 if (ar.exception == null) {
-                    Phone.State state = getState();
+                    VoicePhone.State state = getState();
                     if ((!mDoesRilSendMultipleCallRing)
-                            && ((state == Phone.State.RINGING) || (state == Phone.State.IDLE))) {
+                            && ((state == VoicePhone.State.RINGING) || (state == VoicePhone.State.IDLE))) {
                         mCallRingContinueToken += 1;
                         sendIncomingCallRingNotification(mCallRingContinueToken);
                     } else {
@@ -270,7 +260,7 @@ public abstract class PhoneBase extends Handler implements Phone {
 
             case EVENT_CALL_RING_CONTINUE:
                 Log.d(LOG_TAG, "Event EVENT_CALL_RING_CONTINUE Received stat=" + getState());
-                if (getState() == Phone.State.RINGING) {
+                if (getState() == VoicePhone.State.RINGING) {
                     sendIncomingCallRingNotification(msg.arg1);
                 }
                 break;
@@ -283,26 +273,6 @@ public abstract class PhoneBase extends Handler implements Phone {
     // Inherited documentation suffices.
     public Context getContext() {
         return mContext;
-    }
-
-    /**
-     * Disables the DNS check (i.e., allows "0.0.0.0").
-     * Useful for lab testing environment.
-     * @param b true disables the check, false enables.
-     */
-    public void disableDnsCheck(boolean b) {
-        mDnsCheckDisabled = b;
-        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
-        SharedPreferences.Editor editor = sp.edit();
-        editor.putBoolean(DNS_SERVER_CHECK_DISABLED_KEY, b);
-        editor.commit();
-    }
-
-    /**
-     * Returns true if the DNS check is currently disabled.
-     */
-    public boolean isDnsCheckDisabled() {
-        return mDnsCheckDisabled;
     }
 
     // Inherited documentation suffices.
@@ -604,7 +574,7 @@ public abstract class PhoneBase extends Handler implements Phone {
                 if (l.length() >=5) {
                     country = l.substring(3, 5);
                 }
-                setSystemLocale(language, country);
+                MccTable.setSystemLocale(mContext, language, country);
 
                 if (wifiChannels != 0) {
                     try {
@@ -623,61 +593,15 @@ public abstract class PhoneBase extends Handler implements Phone {
     }
 
     /**
-     * Utility code to set the system locale if it's not set already
-     * @param langauge Two character language code desired
-     * @param country Two character country code desired
-     *
-     *  {@hide}
-     */
-    public void setSystemLocale(String language, String country) {
-        String l = SystemProperties.get("persist.sys.language");
-        String c = SystemProperties.get("persist.sys.country");
-
-        if (null == language) {
-            return; // no match possible
-        }
-        language = language.toLowerCase();
-        if (null == country) {
-            country = "";
-        }
-        country = country.toUpperCase();
-
-        if((null == l || 0 == l.length()) && (null == c || 0 == c.length())) {
-            try {
-                // try to find a good match
-                String[] locales = mContext.getAssets().getLocales();
-                final int N = locales.length;
-                String bestMatch = null;
-                for(int i = 0; i < N; i++) {
-                    // only match full (lang + country) locales
-                    if (locales[i]!=null && locales[i].length() >= 5 &&
-                            locales[i].substring(0,2).equals(language)) {
-                        if (locales[i].substring(3,5).equals(country)) {
-                            bestMatch = locales[i];
-                            break;
-                        } else if (null == bestMatch) {
-                            bestMatch = locales[i];
-                        }
-                    }
-                }
-                if (null != bestMatch) {
-                    IActivityManager am = ActivityManagerNative.getDefault();
-                    Configuration config = am.getConfiguration();
-                    config.locale = new Locale(bestMatch.substring(0,2),
-                                               bestMatch.substring(3,5));
-                    config.userSetLocale = true;
-                    am.updateConfiguration(config);
-                }
-            } catch (Exception e) {
-                // Intentionally left blank
-            }
-        }
-    }
-
-    /**
      * Get state
      */
-    public abstract Phone.State getState();
+    public abstract VoicePhone.State getState();
+
+    /**
+     * Returns the ICC card interface for this phone, or null
+     * if not applicable to underlying technology.
+     */
+    public abstract UiccCard getUiccCard();
 
     /**
      * Retrieves the IccFileHandler of the Phone instance
@@ -741,15 +665,6 @@ public abstract class PhoneBase extends Handler implements Phone {
         Log.e(LOG_TAG, "Error! This function should never be executed, inactive CDMAPhone.");
     }
 
-    /**
-     * This should only be called in GSM mode.
-     * Only here for some backward compatibility
-     * issues concerning the GSMPhone class.
-     * @deprecated Always returns null.
-     */
-    public List<PdpConnection> getCurrentPdpList() {
-        return null;
-    }
 
     public void enableEnhancedVoicePrivacy(boolean enable, Message onComplete) {
         // This function should be overridden by the class CDMAPhone. Not implemented in GSMPhone.
@@ -781,17 +696,9 @@ public abstract class PhoneBase extends Handler implements Phone {
         mCM.invokeOemRilRequestStrings(strings, response);
     }
 
-    public void notifyDataActivity() {
-        mNotifier.notifyDataActivity(this);
-    }
-
     public void notifyMessageWaitingIndicator() {
         // This function is added to send the notification to DefaultPhoneNotifier.
         mNotifier.notifyMessageWaitingChanged(this);
-    }
-
-    public void notifyDataConnection(String reason) {
-        mNotifier.notifyDataConnection(this, reason);
     }
 
     public abstract String getPhoneName();
@@ -969,73 +876,6 @@ public abstract class PhoneBase extends Handler implements Phone {
          Log.e(LOG_TAG, "Error! This function should never be executed, inactive CDMAPhone.");
      }
 
-    public String getInterfaceName(String apnType) {
-        return mDataConnection.getInterfaceName(apnType);
-    }
-
-    public String getIpAddress(String apnType) {
-        return mDataConnection.getIpAddress(apnType);
-    }
-
-    public boolean isDataConnectivityEnabled() {
-        return mDataConnection.getDataEnabled();
-    }
-
-    public String getGateway(String apnType) {
-        return mDataConnection.getGateway(apnType);
-    }
-
-    public String[] getDnsServers(String apnType) {
-        return mDataConnection.getDnsServers(apnType);
-    }
-
-    public String[] getActiveApnTypes() {
-        return mDataConnection.getActiveApnTypes();
-    }
-
-    public String getActiveApn() {
-        return mDataConnection.getActiveApnString();
-    }
-
-    public int enableApnType(String type) {
-        return mDataConnection.enableApnType(type);
-    }
-
-    public int disableApnType(String type) {
-        return mDataConnection.disableApnType(type);
-    }
-
-    /**
-     * simulateDataConnection
-     *
-     * simulates various data connection states. This messes with
-     * DataConnectionTracker's internal states, but doesn't actually change
-     * the underlying radio connection states.
-     *
-     * @param state Phone.DataState enum.
-     */
-    public void simulateDataConnection(Phone.DataState state) {
-        DataConnectionTracker.State dcState;
-
-        switch (state) {
-            case CONNECTED:
-                dcState = DataConnectionTracker.State.CONNECTED;
-                break;
-            case SUSPENDED:
-                dcState = DataConnectionTracker.State.CONNECTED;
-                break;
-            case DISCONNECTED:
-                dcState = DataConnectionTracker.State.FAILED;
-                break;
-            default:
-                dcState = DataConnectionTracker.State.CONNECTING;
-                break;
-        }
-
-        mDataConnection.setState(dcState);
-        notifyDataConnection(null);
-    }
-
     /**
      * Notifiy registrants of a new ringing Connection.
      * Subclasses of Phone probably want to replace this with a
@@ -1100,17 +940,21 @@ public abstract class PhoneBase extends Handler implements Phone {
 
         if ((networkMode == RILConstants.NETWORK_MODE_CDMA)
                 || (networkMode == RILConstants.NETWORK_MODE_CDMA_NO_EVDO)
-                || (networkMode == RILConstants.NETWORK_MODE_EVDO_NO_CDMA)) {
+                || (networkMode == RILConstants.NETWORK_MODE_EVDO_NO_CDMA)
+                || (networkMode == RILConstants.NETWORK_MODE_CDMA_AND_LTE_EVDO)) {
             return RILConstants.CDMA_PHONE;
         } else if ((networkMode == RILConstants.NETWORK_MODE_WCDMA_PREF)
                 || (networkMode == RILConstants.NETWORK_MODE_GSM_ONLY)
                 || (networkMode == RILConstants.NETWORK_MODE_WCDMA_ONLY)
-                || (networkMode == RILConstants.NETWORK_MODE_GSM_UMTS)) {
+                || (networkMode == RILConstants.NETWORK_MODE_GSM_UMTS)
+                || (networkMode == RILConstants.NETWORK_MODE_GSM_WCDMA_LTE)) {
             return RILConstants.GSM_PHONE;
-        } else if (networkMode == RILConstants.NETWORK_MODE_GLOBAL) {
-            if (getPhoneType() == Phone.PHONE_TYPE_CDMA) {
+        } else if ((networkMode == RILConstants.NETWORK_MODE_GLOBAL)
+                || (networkMode == RILConstants.NETWORK_MODE_CDMA_GSM_WCDMA)
+                || (networkMode == RILConstants.NETWORK_MODE_LTE_ONLY)) {
+            if (getPhoneType() == VoicePhone.PHONE_TYPE_CDMA) {
                 return RILConstants.CDMA_PHONE;
-            } else if (getPhoneType() == Phone.PHONE_TYPE_GSM) {
+            } else if (getPhoneType() == VoicePhone.PHONE_TYPE_GSM) {
                 return RILConstants.GSM_PHONE;
             }
         }

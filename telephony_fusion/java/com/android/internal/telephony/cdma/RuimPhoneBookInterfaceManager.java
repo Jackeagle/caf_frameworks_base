@@ -27,6 +27,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.AdnRecord;
 import com.android.internal.telephony.AdnRecordCache;
+import com.android.internal.telephony.IccFileHandler;
 import com.android.internal.telephony.IccPhoneBookInterfaceManager;
 import com.android.internal.telephony.PhoneProxy;
 
@@ -58,7 +59,9 @@ public class RuimPhoneBookInterfaceManager extends IccPhoneBookInterfaceManager 
 
     public RuimPhoneBookInterfaceManager(CDMAPhone phone) {
         super(phone);
-        adnCache = phone.mRuimRecords.getAdnCache();
+        //TODO: fusion - fix this.
+        //adnCache = phone.mRuimRecords.getAdnCache();
+
         //NOTE service "simphonebook" added by IccSmsInterfaceManagerProxy
     }
 
@@ -79,11 +82,15 @@ public class RuimPhoneBookInterfaceManager extends IccPhoneBookInterfaceManager 
             //Using mBaseHandler, no difference in EVENT_GET_SIZE_DONE handling
             Message response = mBaseHandler.obtainMessage(EVENT_GET_SIZE_DONE);
 
-            phone.getIccFileHandler().getEFLinearRecordSize(efid, response);
-            try {
-                mLock.wait();
-            } catch (InterruptedException e) {
-                logd("interrupted while trying to load from the RUIM");
+            IccFileHandler fh = phone.getIccFileHandler();
+            //IccFileHandler can be null if there is no icc card present.
+            if (fh != null) {
+                fh.getEFLinearRecordSize(efid, response);
+                try {
+                    mLock.wait();
+                } catch (InterruptedException e) {
+                    logd("interrupted while trying to load from the RUIM");
+                }
             }
         }
 

@@ -23,26 +23,28 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.android.internal.telephony.ITelephonyRegistry;
+import com.android.internal.telephony.DataPhone.DataState;
 
 /**
  * broadcast intents
  */
 public class DefaultPhoneNotifier implements PhoneNotifier {
+    static final String LOG_TAG = "Phone";
 
-    static final String LOG_TAG = "GSM";
     private static final boolean DBG = true;
+
     private ITelephonyRegistry mRegistry;
 
-    /*package*/
+    /* package */
     DefaultPhoneNotifier() {
-        mRegistry = ITelephonyRegistry.Stub.asInterface(ServiceManager.getService(
-                    "telephony.registry"));
+        mRegistry = ITelephonyRegistry.Stub.asInterface(ServiceManager
+                .getService("telephony.registry"));
     }
 
-    public void notifyPhoneState(Phone sender) {
+    public void notifyPhoneState(VoicePhone sender) {
         Call ringingCall = sender.getRingingCall();
         String incomingNumber = "";
-        if (ringingCall != null && ringingCall.getEarliestConnection() != null){
+        if (ringingCall != null && ringingCall.getEarliestConnection() != null) {
             incomingNumber = ringingCall.getEarliestConnection().getAddress();
         }
         try {
@@ -52,7 +54,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyServiceState(Phone sender) {
+    public void notifyServiceState(VoicePhone sender) {
         try {
             mRegistry.notifyServiceState(sender.getServiceState());
         } catch (RemoteException ex) {
@@ -60,7 +62,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifySignalStrength(Phone sender) {
+    public void notifySignalStrength(VoicePhone sender) {
         try {
             mRegistry.notifySignalStrength(sender.getSignalStrength());
         } catch (RemoteException ex) {
@@ -68,7 +70,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyMessageWaitingChanged(Phone sender) {
+    public void notifyMessageWaitingChanged(VoicePhone sender) {
         try {
             mRegistry.notifyMessageWaitingChanged(sender.getMessageWaitingIndicator());
         } catch (RemoteException ex) {
@@ -76,7 +78,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyCallForwardingChanged(Phone sender) {
+    public void notifyCallForwardingChanged(VoicePhone sender) {
         try {
             mRegistry.notifyCallForwardingChanged(sender.getCallForwardingIndicator());
         } catch (RemoteException ex) {
@@ -84,7 +86,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyDataActivity(Phone sender) {
+    public void notifyDataActivity(DataPhone sender) {
         try {
             mRegistry.notifyDataActivity(convertDataActivityState(sender.getDataActivityState()));
         } catch (RemoteException ex) {
@@ -92,7 +94,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyDataConnection(Phone sender, String reason) {
+    public void notifyDataConnection(DataPhone sender, String reason) {
         TelephonyManager telephony = TelephonyManager.getDefault();
         try {
             mRegistry.notifyDataConnection(
@@ -101,14 +103,14 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
                     sender.getActiveApn(),
                     sender.getActiveApnTypes(),
                     sender.getInterfaceName(null),
-                    ((telephony!=null) ? telephony.getNetworkType() :
+                    ((telephony != null) ? telephony.getNetworkType() :
                     TelephonyManager.NETWORK_TYPE_UNKNOWN));
         } catch (RemoteException ex) {
             // system process is dead
         }
     }
 
-    public void notifyDataConnectionFailed(Phone sender, String reason) {
+    public void notifyDataConnectionFailed(DataPhone sender, String reason) {
         try {
             mRegistry.notifyDataConnectionFailed(reason);
         } catch (RemoteException ex) {
@@ -116,7 +118,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyCellLocation(Phone sender) {
+    public void notifyCellLocation(VoicePhone sender) {
         Bundle data = new Bundle();
         sender.getCellLocation().fillInNotifierBundle(data);
         try {
@@ -131,10 +133,10 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
     }
 
     /**
-     * Convert the {@link State} enum into the TelephonyManager.CALL_STATE_* constants
-     * for the public API.
+     * Convert the {@link State} enum into the TelephonyManager.CALL_STATE_*
+     * constants for the public API.
      */
-    public static int convertCallState(Phone.State state) {
+    public static int convertCallState(VoicePhone.State state) {
         switch (state) {
             case RINGING:
                 return TelephonyManager.CALL_STATE_RINGING;
@@ -146,25 +148,25 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
     }
 
     /**
-     * Convert the TelephonyManager.CALL_STATE_* constants into the {@link State} enum
-     * for the public API.
+     * Convert the TelephonyManager.CALL_STATE_* constants into the
+     * {@link State} enum for the public API.
      */
-    public static Phone.State convertCallState(int state) {
+    public static VoicePhone.State convertCallState(int state) {
         switch (state) {
             case TelephonyManager.CALL_STATE_RINGING:
-                return Phone.State.RINGING;
+                return VoicePhone.State.RINGING;
             case TelephonyManager.CALL_STATE_OFFHOOK:
-                return Phone.State.OFFHOOK;
+                return VoicePhone.State.OFFHOOK;
             default:
-                return Phone.State.IDLE;
+                return VoicePhone.State.IDLE;
         }
     }
 
     /**
-     * Convert the {@link DataState} enum into the TelephonyManager.DATA_* constants
-     * for the public API.
+     * Convert the {@link DataState} enum into the TelephonyManager.DATA_*
+     * constants for the public API.
      */
-    public static int convertDataState(Phone.DataState state) {
+    public static int convertDataState(DataPhone.DataState state) {
         switch (state) {
             case CONNECTING:
                 return TelephonyManager.DATA_CONNECTING;
@@ -181,24 +183,24 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
      * Convert the TelephonyManager.DATA_* constants into {@link DataState} enum
      * for the public API.
      */
-    public static Phone.DataState convertDataState(int state) {
+    public static DataPhone.DataState convertDataState(int state) {
         switch (state) {
             case TelephonyManager.DATA_CONNECTING:
-                return Phone.DataState.CONNECTING;
+                return DataPhone.DataState.CONNECTING;
             case TelephonyManager.DATA_CONNECTED:
-                return Phone.DataState.CONNECTED;
+                return DataPhone.DataState.CONNECTED;
             case TelephonyManager.DATA_SUSPENDED:
-                return Phone.DataState.SUSPENDED;
+                return DataPhone.DataState.SUSPENDED;
             default:
-                return Phone.DataState.DISCONNECTED;
+                return DataPhone.DataState.DISCONNECTED;
         }
     }
 
     /**
-     * Convert the {@link DataState} enum into the TelephonyManager.DATA_* constants
-     * for the public API.
+     * Convert the {@link DataState} enum into the TelephonyManager.DATA_*
+     * constants for the public API.
      */
-    public static int convertDataActivityState(Phone.DataActivityState state) {
+    public static int convertDataActivityState(DataPhone.DataActivityState state) {
         switch (state) {
             case DATAIN:
                 return TelephonyManager.DATA_ACTIVITY_IN;
@@ -214,21 +216,21 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
     }
 
     /**
-     * Convert the TelephonyManager.DATA_* constants into the {@link DataState} enum
-     * for the public API.
+     * Convert the TelephonyManager.DATA_* constants into the {@link DataState}
+     * enum for the public API.
      */
-    public static Phone.DataActivityState convertDataActivityState(int state) {
+    public static DataPhone.DataActivityState convertDataActivityState(int state) {
         switch (state) {
             case TelephonyManager.DATA_ACTIVITY_IN:
-                return Phone.DataActivityState.DATAIN;
+                return DataPhone.DataActivityState.DATAIN;
             case TelephonyManager.DATA_ACTIVITY_OUT:
-                return Phone.DataActivityState.DATAOUT;
+                return DataPhone.DataActivityState.DATAOUT;
             case TelephonyManager.DATA_ACTIVITY_INOUT:
-                return Phone.DataActivityState.DATAINANDOUT;
+                return DataPhone.DataActivityState.DATAINANDOUT;
             case TelephonyManager.DATA_ACTIVITY_DORMANT:
-                return Phone.DataActivityState.DORMANT;
+                return DataPhone.DataActivityState.DORMANT;
             default:
-                return Phone.DataActivityState.NONE;
+                return DataPhone.DataActivityState.NONE;
         }
     }
 }

@@ -28,6 +28,7 @@ package com.android.internal.telephony;
  * {@hide}
  */
 public interface RILConstants {
+    int RIL_MAX_NETWORKS = 2;                 // (from ril.h)
     // From the top of ril.cpp
     int RIL_ERRNO_INVALID_RESPONSE = -1;
 
@@ -53,17 +54,22 @@ public interface RILConstants {
                                                 sends sms or call or sends USSD string to non FDN number. */
 
     /* NETWORK_MODE_* See ril.h RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE */
-    int NETWORK_MODE_WCDMA_PREF     = 0; /* GSM/WCDMA (WCDMA preferred) */
-    int NETWORK_MODE_GSM_ONLY       = 1; /* GSM only */
-    int NETWORK_MODE_WCDMA_ONLY     = 2; /* WCDMA only */
-    int NETWORK_MODE_GSM_UMTS       = 3; /* GSM/WCDMA (auto mode, according to PRL)
-                                            AVAILABLE Application Settings menu*/
-    int NETWORK_MODE_CDMA           = 4; /* CDMA and EvDo (auto mode, according to PRL)
-                                            AVAILABLE Application Settings menu*/
-    int NETWORK_MODE_CDMA_NO_EVDO   = 5; /* CDMA only */
-    int NETWORK_MODE_EVDO_NO_CDMA   = 6; /* EvDo only */
-    int NETWORK_MODE_GLOBAL         = 7; /* GSM/WCDMA, CDMA, and EvDo (auto mode, according to PRL)
-                                            AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_WCDMA_PREF     = 0;      /* GSM/WCDMA (WCDMA preferred) */
+    int NETWORK_MODE_GSM_ONLY       = 1;      /* GSM only */
+    int NETWORK_MODE_WCDMA_ONLY     = 2;      /* WCDMA only */
+    int NETWORK_MODE_GSM_UMTS       = 3;      /* GSM/WCDMA (auto mode, according to PRL)
+                                                 AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_CDMA           = 4;      /* CDMA and EvDo (auto mode, according to PRL)
+                                                 AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_CDMA_NO_EVDO   = 5;      /* CDMA only */
+    int NETWORK_MODE_EVDO_NO_CDMA   = 6;      /* EvDo only */
+    int NETWORK_MODE_CDMA_GSM_WCDMA = 7;      /* GSM/WCDMA, CDMA, and EvDo (auto mode, according to PRL)
+                                                 AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_CDMA_AND_LTE_EVDO  = 8;  /* CDMA + LTE/EvDo auto */
+    int NETWORK_MODE_GSM_WCDMA_LTE  = 9;      /* GSM/WCDMA/LTE auto */
+    int NETWORK_MODE_GLOBAL = 10;             /* CDMA/EvDo/GSM/WCDMA/LTE auto */
+    int NETWORK_MODE_LTE_ONLY = 11;           /* LTE only */
+
     int PREFERRED_NETWORK_MODE      = NETWORK_MODE_WCDMA_PREF;
 
     /* CDMA subscription source. See ril.h RIL_REQUEST_CDMA_SET_SUBSCRIPTION */
@@ -151,7 +157,7 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_LAST_CALL_FAIL_CAUSE = 18;
     int RIL_REQUEST_SIGNAL_STRENGTH = 19;
     int RIL_REQUEST_REGISTRATION_STATE = 20;
-    int RIL_REQUEST_GPRS_REGISTRATION_STATE = 21;
+    int RIL_REQUEST_DATA_REGISTRATION_STATE = 21;
     int RIL_REQUEST_OPERATOR = 22;
     int RIL_REQUEST_RADIO_POWER = 23;
     int RIL_REQUEST_DTMF = 24;
@@ -234,6 +240,11 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_SET_SMSC_ADDRESS = 101;
     int RIL_REQUEST_REPORT_SMS_MEMORY_STATUS = 102;
     int RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING = 103;
+    int RIL_REQUEST_VOICE_RADIO_TECH = 104;
+    int RIL_REQUEST_DATA_RADIO_TECH = 105;
+    int RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE = 106;
+    int RIL_REQUEST_CDMA_PRL_VERSION = 107;
+    int RIL_REQUEST_IMS_REGISTRATION_STATE = 108;
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
     int RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED = 1001;
@@ -265,4 +276,10 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_CDMA_INFO_REC = 1027;
     int RIL_UNSOL_OEM_HOOK_RAW = 1028;
     int RIL_UNSOL_RINGBACK_TONE = 1029;
+    int RIL_UNSOL_VOICE_RADIO_TECH_CHANGED = 1030;
+    int RIL_UNSOL_DATA_RADIO_TECH_CHANGED = 1031;
+    int RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED = 1032;
+    int RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 1033;
+    int RIL_UNSOL_CDMA_PRL_CHANGED = 1034;
+    int RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED = 1035;
 }

@@ -1052,8 +1052,6 @@ com.android.internal.telephony.ITelephony$Stub$Proxy
 com.android.internal.telephony.ITelephonyRegistry$Stub
 com.android.internal.telephony.ITelephonyRegistry$Stub$Proxy
 com.android.internal.telephony.IccCard$State
-com.android.internal.telephony.Phone$DataState
-com.android.internal.telephony.Phone$State
 com.android.internal.telephony.PhoneFactory
 com.android.internal.telephony.PhoneStateIntentReceiver
 com.android.internal.telephony.SmsAddress
