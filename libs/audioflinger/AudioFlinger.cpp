@@ -120,7 +120,7 @@ static uint32_t getInputChannelCount(uint32_t channels) {
 
 AudioFlinger::AudioFlinger()
     : BnAudioFlinger(),
-        mAudioHardware(0), mMasterVolume(1.0f), mMasterMute(false), mNextThreadId(0)
+        mAudioHardware(0), mMasterVolume(1.0f), mMasterMute(false), mNextThreadId(0),  mFmOn(false)
 {
     mHardwareStatus = AUDIO_HW_IDLE;
     mA2DPHandle = -1;
@@ -572,6 +572,9 @@ bool AudioFlinger::isMusicActive() const
     if (!mOutputSessions.isEmpty() && mLPAStreamType == AudioSystem::MUSIC) {
         return true;
     }
+    if (mFmOn) {
+        return true;
+    }
     return false;
 }
 
@@ -586,6 +589,16 @@ status_t AudioFlinger::setParameters(int ioHandle, const String8& keyValuePairs)
         return PERMISSION_DENIED;
     }
 
+    AudioParameter param = AudioParameter(keyValuePairs);
+    String8 key = String8(AudioParameter::keyRouting);
+    int device;
+    if (param.getInt(key, device) == NO_ERROR) {
+        if((device & AudioSystem::DEVICE_OUT_FM) && mFmOn == false){
+            mFmOn=true;
+         } else if (mFmOn == true && !(device & AudioSystem::DEVICE_OUT_FM)){
+            mFmOn=false;
+         }
+    }
     // ioHandle == 0 means the parameters are global to the audio hardware interface
     if (ioHandle == 0) {
         AutoMutex lock(mHardwareLock);
@@ -652,6 +665,21 @@ status_t AudioFlinger::setVoiceVolume(float value)
     AutoMutex lock(mHardwareLock);
     mHardwareStatus = AUDIO_SET_VOICE_VOLUME;
     status_t ret = mAudioHardware->setVoiceVolume(value);
+    mHardwareStatus = AUDIO_HW_IDLE;
+
+    return ret;
+}
+
+status_t AudioFlinger::setFmVolume(float value)
+{
+    // check calling permissions
+    if (!settingsAllowed()) {
+        return PERMISSION_DENIED;
+    }
+
+    AutoMutex lock(mHardwareLock);
+    mHardwareStatus = AUDIO_SET_FM_VOLUME;
+    status_t ret = mAudioHardware->setFmVolume(value);
     mHardwareStatus = AUDIO_HW_IDLE;
 
     return ret;
