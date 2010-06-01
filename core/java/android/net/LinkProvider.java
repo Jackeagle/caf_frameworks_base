@@ -39,6 +39,9 @@ import android.util.Log;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Looper;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 /** {@hide}
  * This class provides a means for applications to specify their requirements
@@ -82,6 +85,9 @@ public class LinkProvider
     private static final int ON_LINK_LOST         =  3;
     private static final int ON_GET_LINK_FAILURE  =  4;
 
+    private Lock mLock;
+    private Condition mHandlerAvail;
+
 
     /** {@hide}
      * This constructor can be used by apps to specify a role and optional
@@ -90,7 +96,8 @@ public class LinkProvider
      * @param reqs Requirements of the app for that role
      * @param notifier LinkNotifier object to provide notification to the app
      */
-    public LinkProvider(int role, LinkRequirements reqs, LinkNotifier notifier){
+    public LinkProvider(int role, LinkRequirements reqs, LinkNotifier notifier)
+      throws InterruptedException {
         mRole = role;
         mLinkReqs = reqs;
         mLinkNotifier = notifier;
@@ -102,8 +109,19 @@ public class LinkProvider
             throw new IllegalStateException(
                 "mService can not be null");
         }
+        mLock = new ReentrantLock();
+        mHandlerAvail  = mLock.newCondition();
         mThread = new NotificationsThread();
         mThread.start();
+        /* block until mHandler gets created. */
+        try{
+            mLock.lock();
+            if (mHandler == null) {
+                mHandlerAvail.await();
+            }
+        } finally {
+            mLock.unlock();
+        }
     }
 
 
@@ -324,6 +342,10 @@ public class LinkProvider
               }
            }
          };
+         mLock.lock();
+         mHandlerAvail.signal();
+         mLock.unlock();
+
          Looper.loop();
         }
     };
