@@ -76,6 +76,8 @@ public:
     PixelFormat getFormat() const;
     uint32_t    getFlags() const;
     void        makeCurrent() const;
+    void        orientationChanged(int orientation) const;
+    void        videoOverlayStarted(bool started) const;
 
     uint32_t getPageFlipCount() const;
     EGLDisplay getEGLDisplay() const { return mDisplay; }

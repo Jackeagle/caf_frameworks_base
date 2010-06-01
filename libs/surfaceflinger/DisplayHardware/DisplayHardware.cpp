@@ -344,3 +344,13 @@ void DisplayHardware::makeCurrent() const
 {
     eglMakeCurrent(mDisplay, mSurface, mSurface, mContext);
 }
+
+void DisplayHardware::orientationChanged(int orientation) const
+{
+    mNativeWindow->orientationChanged(orientation);
+}
+
+void DisplayHardware::videoOverlayStarted(bool started) const
+{
+    mNativeWindow->videoOverlayStarted(started);
+}

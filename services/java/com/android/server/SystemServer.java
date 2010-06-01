@@ -266,6 +266,13 @@ class ServerThread extends Thread {
             }
 
             try {
+                Log.i(TAG, "HDMI Service");
+                ServiceManager.addService("hdmi", new HDMIService(context));
+            } catch (Throwable e) {
+                Log.e(TAG, "Failure starting HDMI Service ", e);
+            }
+
+            try {
                 Log.i(TAG, "Device Storage Monitor");
                 ServiceManager.addService(DeviceStorageMonitorService.SERVICE,
                         new DeviceStorageMonitorService(context));
