@@ -147,6 +147,8 @@ status_t AudioRecord::set(
         return BAD_VALUE;
     }
 
+    mFirstread = false;
+
     // Change for Codec type
     int frameSizeInBytes = 0;
     if (format == AudioSystem::AMR_NB) {
@@ -163,6 +165,8 @@ status_t AudioRecord::set(
       } else {
         frameSizeInBytes = sizeof(int8_t);
       }
+      // For PCM recording, do not break after read
+      mFirstread = true;
 	}
 
     // We use 2* size of input buffer for ping pong use of record buffer.
@@ -214,7 +218,6 @@ status_t AudioRecord::set(
     mUpdatePeriod = 0;
     mInputSource = (uint8_t)inputSource;
     mFlags = flags;
-    mFirstread = false;
 
     return NO_ERROR;
 }
