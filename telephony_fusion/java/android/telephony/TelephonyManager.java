@@ -387,6 +387,10 @@ public class TelephonyManager {
     public static final int NETWORK_TYPE_HSUPA = 9;
     /** Current network is HSPA */
     public static final int NETWORK_TYPE_HSPA = 10;
+    /** Current network is EVDO revision B*/
+    /** @hide */
+    public static final int NETWORK_TYPE_EVDO_B = 12;
+
 
     /**
      * Returns a constant indicating the radio technology (network type)
@@ -403,6 +407,7 @@ public class TelephonyManager {
      * @see #NETWORK_TYPE_CDMA
      * @see #NETWORK_TYPE_EVDO_0
      * @see #NETWORK_TYPE_EVDO_A
+     * @see #NETWORK_TYPE_EVDO_B
      * @see #NETWORK_TYPE_1xRTT
      */
     public int getNetworkType() {
@@ -450,6 +455,8 @@ public class TelephonyManager {
                 return "CDMA - EvDo rev. 0";
             case NETWORK_TYPE_EVDO_A:
                 return "CDMA - EvDo rev. A";
+            case NETWORK_TYPE_EVDO_B:
+                return "CDMA - EvDo rev. B";
             case NETWORK_TYPE_1xRTT:
                 return "CDMA - 1xRTT";
             default:

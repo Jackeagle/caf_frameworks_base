@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -961,6 +962,9 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         case DATA_ACCESS_CDMA_EvDo_A:
             ret = "CDMA - EvDo rev. A";
             break;
+        case DATA_ACCESS_CDMA_EvDo_B:
+            ret = "CDMA - EvDo rev. B";
+            break;
         default:
             if (DBG) {
                 Log.e(LOG_TAG, "Wrong network. Can not return a string.");
@@ -1225,7 +1229,8 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             int evdoEcio = -1;
             int evdoSnr = -1;
             if ((networkType == ServiceState.RADIO_TECHNOLOGY_EVDO_0)
-                    || (networkType == ServiceState.RADIO_TECHNOLOGY_EVDO_A)) {
+                    || (networkType == ServiceState.RADIO_TECHNOLOGY_EVDO_A)
+                    || (networkType == ServiceState.RADIO_TECHNOLOGY_EVDO_B)) {
                 evdoRssi = (ints[offset+2] > 0) ? -ints[offset+2] : -120;
                 evdoEcio = (ints[offset+3] > 0) ? -ints[offset+3] : -1;
                 evdoSnr  = ((ints[offset+4] > 0) && (ints[offset+4] <= 8)) ? ints[offset+4] : -1;

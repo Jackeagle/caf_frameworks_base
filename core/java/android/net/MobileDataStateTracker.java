@@ -299,9 +299,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
             networkTypeStr = "1xrtt";
             break;
         case TelephonyManager.NETWORK_TYPE_EVDO_0:
-            networkTypeStr = "evdo";
-            break;
         case TelephonyManager.NETWORK_TYPE_EVDO_A:
+        case TelephonyManager.NETWORK_TYPE_EVDO_B:
             networkTypeStr = "evdo";
             break;
         }
