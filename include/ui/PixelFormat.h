@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2005 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,13 +70,19 @@ enum {
     PIXEL_FORMAT_LA_88       = GGL_PIXEL_FORMAT_LA_88,      // 16-bit LA
     PIXEL_FORMAT_RGB_332     = GGL_PIXEL_FORMAT_RGB_332,    // 8-bit RGB
 
-    PIXEL_FORMAT_YCbCr_422_SP= GGL_PIXEL_FORMAT_YCbCr_422_SP,
-    PIXEL_FORMAT_YCbCr_420_SP= GGL_PIXEL_FORMAT_YCbCr_420_SP,
-    PIXEL_FORMAT_YCbCr_422_P = GGL_PIXEL_FORMAT_YCbCr_422_P,
-    PIXEL_FORMAT_YCbCr_420_P = GGL_PIXEL_FORMAT_YCbCr_420_P,
-    PIXEL_FORMAT_YCbCr_422_I = GGL_PIXEL_FORMAT_YCbCr_422_I,
-    PIXEL_FORMAT_YCbCr_420_I = GGL_PIXEL_FORMAT_YCbCr_420_I,
-
+    PIXEL_FORMAT_YCbCr_422_SP       = GGL_PIXEL_FORMAT_YCbCr_422_SP,
+    PIXEL_FORMAT_YCrCb_420_SP       = GGL_PIXEL_FORMAT_YCrCb_420_SP,
+    PIXEL_FORMAT_YCbCr_422_P        = GGL_PIXEL_FORMAT_YCbCr_422_P,
+    PIXEL_FORMAT_YCbCr_420_P        = GGL_PIXEL_FORMAT_YCbCr_420_P,
+    PIXEL_FORMAT_YCbCr_422_I        = GGL_PIXEL_FORMAT_YCbCr_422_I,
+    PIXEL_FORMAT_YCbCr_420_I        = GGL_PIXEL_FORMAT_YCbCr_420_I,
+    PIXEL_FORMAT_CbYCrY_422_I       = GGL_PIXEL_FORMAT_CbYCrY_422_I,
+    PIXEL_FORMAT_CbYCrY_420_I       = GGL_PIXEL_FORMAT_CbYCrY_420_I,
+    PIXEL_FORMAT_YCbCr_420_SP_TILED = GGL_PIXEL_FORMAT_YCbCr_420_SP_TILED,
+    PIXEL_FORMAT_YCbCr_420_SP       = GGL_PIXEL_FORMAT_YCbCr_420_SP,
+    PIXEL_FORMAT_YCrCb_420_SP_TILED = GGL_PIXEL_FORMAT_YCrCb_420_SP_TILED,
+    PIXEL_FORMAT_YCrCb_422_SP       = GGL_PIXEL_FORMAT_YCrCb_422_SP,
+    PIXEL_FORMAT_YCrCb_422_P        = GGL_PIXEL_FORMAT_YCrCb_422_P,
     // New formats can be added if they're also defined in
     // pixelflinger/format.h
 };
