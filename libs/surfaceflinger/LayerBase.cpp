@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -340,15 +341,25 @@ void LayerBase::draw(const Region& inClip) const
     */
 }
 
-GLuint LayerBase::createTexture() const
+GLuint LayerBase::createTexture(PixelFormat pixelFormat) const
 {
     GLuint textureName = -1;
     glGenTextures(1, &textureName);
-    glBindTexture(GL_TEXTURE_2D, textureName);
-    glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    if((pixelFormat == PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
+       (pixelFormat == PIXEL_FORMAT_YCrCb_420_SP)) {
+        glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureName);
+        glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    }else {
+        glBindTexture(GL_TEXTURE_2D, textureName);
+        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    }
     return textureName;
 }
 
@@ -380,18 +391,24 @@ void LayerBase::clearWithOpenGL(const Region& clip) const
     clearWithOpenGL(clip,0,0,0,0);
 }
 
-void LayerBase::drawWithOpenGL(const Region& clip, const Texture& texture) const
+void LayerBase::drawWithOpenGL(const Region& clip, const Texture& texture, PixelFormat pixelFormat) const
 {
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     const uint32_t fbHeight = hw.getHeight();
     const State& s(drawingState());
     
     // bind our texture
-    validateTexture(texture.name);
+    validateTexture(texture.name, pixelFormat);
     uint32_t width  = texture.width; 
     uint32_t height = texture.height;
     
-    glEnable(GL_TEXTURE_2D);
+    if((pixelFormat == PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
+       (pixelFormat == PIXEL_FORMAT_YCrCb_420_SP)) {
+        glEnable(GL_TEXTURE_EXTERNAL_OES);
+        glDisable(GL_TEXTURE_2D);
+    } else {
+        glEnable(GL_TEXTURE_2D);
+    }
 
     if (UNLIKELY(s.alpha < 0xFF)) {
         // We have an alpha-modulation. We need to modulate all
@@ -478,19 +495,44 @@ void LayerBase::drawWithOpenGL(const Region& clip, const Texture& texture) const
             glDrawTexiOES(x, y, 0, width, height);
         }
     }
+
+    if((pixelFormat == PIXEL_FORMAT_YCbCr_420_SP_TILED)||
+       (pixelFormat == PIXEL_FORMAT_YCrCb_420_SP)) {
+        glDisable(GL_TEXTURE_EXTERNAL_OES);
+    } else {
+        glDisable(GL_TEXTURE_2D);
+    }
 }
 
-void LayerBase::validateTexture(GLint textureName) const
+void LayerBase::validateTexture(GLint textureName, PixelFormat pixelFormat) const
 {
-    glBindTexture(GL_TEXTURE_2D, textureName);
+    if((pixelFormat == PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
+       (pixelFormat == PIXEL_FORMAT_YCrCb_420_SP)) {
+        glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureName);
+    } else {
+        glBindTexture(GL_TEXTURE_2D, textureName);
+    }
+
     // TODO: reload the texture if needed
     // this is currently done in loadTexture() below
     if (mUseLinearFiltering) {
-        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        if((pixelFormat == PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
+           (pixelFormat == PIXEL_FORMAT_YCrCb_420_SP)) {
+            glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        } else {
+            glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        }
     } else {
-        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        if((pixelFormat == PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
+           (pixelFormat == PIXEL_FORMAT_YCrCb_420_SP)) {
+            glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameterx(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        } else {
+            glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        }
     }
 
     if (needsDithering()) {
@@ -648,9 +690,17 @@ status_t LayerBase::initializeEglImage(
             eglGetError());
 
     if (texture->image != EGL_NO_IMAGE_KHR) {
-        glBindTexture(GL_TEXTURE_2D, texture->name);
-        glEGLImageTargetTexture2DOES(GL_TEXTURE_2D,
-                (GLeglImageOES)texture->image);
+        if ((buffer->getPixelFormat() == PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
+            (buffer->getPixelFormat() == PIXEL_FORMAT_YCrCb_420_SP)) {
+            glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture->name);
+            glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES,
+                                         (GLeglImageOES)texture->image);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, texture->name);
+            glEGLImageTargetTexture2DOES(GL_TEXTURE_2D,
+                                         (GLeglImageOES)texture->image);
+        }
+
         GLint error = glGetError();
         if (UNLIKELY(error != GL_NO_ERROR)) {
             // this failed, for instance, because we don't support NPOT.
