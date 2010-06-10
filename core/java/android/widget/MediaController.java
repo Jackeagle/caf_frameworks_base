@@ -331,6 +331,7 @@ public class MediaController extends FrameLayout {
 
         if (mShowing) {
             try {
+                setProgress();
                 mHandler.removeMessages(SHOW_PROGRESS);
                 mWindowManager.removeView(mDecor);
             } catch (IllegalArgumentException ex) {
