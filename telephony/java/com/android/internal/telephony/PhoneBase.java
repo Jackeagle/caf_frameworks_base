@@ -64,10 +64,6 @@ public abstract class PhoneBase extends Handler implements Phone {
     // Key used to read and write the saved network selection operator name
     public static final String NETWORK_SELECTION_NAME_KEY = "network_selection_name_key";
 
-
-    // Key used to read/write "disable data connection on boot" pref (used for testing)
-    public static final String DATA_DISABLED_ON_BOOT_KEY = "disabled_on_boot_key";
-
     /* Event Constants */
     protected static final int EVENT_RADIO_AVAILABLE             = 1;
     /** Supplementary Service Notification received. */

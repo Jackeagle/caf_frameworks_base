@@ -141,6 +141,8 @@ public interface Phone {
     static final int APN_TYPE_NOT_AVAILABLE = 2;
     static final int APN_REQUEST_FAILED     = 3;
 
+    // Key used to read/write "disable data connection on boot" pref (used for testing)
+    public static final String DATA_DISABLED_ON_BOOT_KEY = "disabled_on_boot_key";
 
     /**
      * Optional reasons for disconnect and connect
