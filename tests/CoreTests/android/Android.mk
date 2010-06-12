@@ -8,14 +8,11 @@ LOCAL_SRC_FILES := \
 
 ifeq ($(BUILD_FUSION), true)
 LOCAL_SRC_FILES += \
-	$(call all-java-files-under, ../com/android/internal/telephony_fusion)
+	$(call all-java-files-under, ../telephony_fusion/com)
 else
 LOCAL_SRC_FILES += \
-	$(call all-java-files-under, ../com/android/internal/telephony)
+	$(call all-java-files-under, ../com)
 endif
-
-LOCAL_SRC_FILES += \
-	$(call all-java-files-under, ../com/android/internal/util)
 
 LOCAL_JAVA_LIBRARIES := android.test.runner
 
