@@ -19,8 +19,6 @@ package com.android.internal.telephony;
 
 import java.util.List;
 
-import android.content.Context;
-import android.os.Handler;
 import android.os.Message;
 import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
@@ -57,6 +55,10 @@ public interface DataPhone {
         NONE, DATAIN, DATAOUT, DATAINANDOUT, DORMANT;
     };
 
+    public enum IPVersion {
+        IPV4, IPV6
+    }
+
     // Key used to read/write "disable data connection on boot" pref (used for testing)
     public static final String DATA_DISABLED_ON_BOOT_KEY = "disabled_on_boot_key";
 
@@ -70,7 +72,8 @@ public interface DataPhone {
     static final String DATA_APN_TYPES_KEY = "apnType";
     static final String DATA_APN_KEY = "apn";
 
-    static final String DATA_IFACE_NAME_KEY = "iface";
+    static final String DATA_IFACE_NAME_KEY = "iface"; //ipv4 interface
+    static final String DATA_IFACE_IPV6_NAME_KEY = "ifaceIpv6";
     /**
      * APN types for data connections.  These are usage categories for an APN
      * entry.  One APN entry may support multiple APN types, eg, a single APN
@@ -90,12 +93,15 @@ public interface DataPhone {
     static final String APN_TYPE_DUN = "dun";
     /** APN type for HiPri traffic */
     static final String APN_TYPE_HIPRI = "hipri";
+    /** APN type for Verizon applications */
+    static final String APN_TYPE_VERIZON = "verizon";
 
     // "Features" accessible through the connectivity manager
     static final String FEATURE_ENABLE_MMS = "enableMMS";
     static final String FEATURE_ENABLE_SUPL = "enableSUPL";
     static final String FEATURE_ENABLE_DUN = "enableDUN";
     static final String FEATURE_ENABLE_HIPRI = "enableHIPRI";
+    static final String FEATURE_ENABLE_VERIZON = "enableVerizon";
 
     /**
      * Return codes for <code>enableApnType()</code>
@@ -131,11 +137,13 @@ public interface DataPhone {
     static final String REASON_RADIO_TECHNOLOGY_CHANGED = "radioTechnologyChanged";
 
     /**
-     * Get the current ServiceState. Use
-     * <code>registerForServiceStateChanged</code> to be informed of
-     * updates.
+     * Get the current DataState. No change notification exists at this
+     * interface -- use
+     * {@link com.android.telephony.PhoneStateListener PhoneStateListener}
+     * instead.
      */
-    ServiceState getDataServiceState();
+    @Deprecated
+    DataState getDataConnectionState();
 
     /**
      * Get the current DataState. No change notification exists at this
@@ -143,7 +151,7 @@ public interface DataPhone {
      * {@link com.android.telephony.PhoneStateListener PhoneStateListener}
      * instead.
      */
-    DataState getDataConnectionState();
+    DataState getDataConnectionState(String type, IPVersion ipv);
 
     /**
      * Get the current DataActivityState. No change notification exists at this
@@ -153,9 +161,11 @@ public interface DataPhone {
     DataActivityState getDataActivityState();
 
     /**
-     * Gets the context for the phone, as set at initialization time.
+     * Get the current data network ServiceState. Use
+     * <code>registerForDataServiceStateChanged</code> to be informed of
+     * updates.
      */
-    Context getContext();
+    ServiceState getDataServiceState();
 
     /**
      * Disables the DNS check (i.e., allows "0.0.0.0").
@@ -168,45 +178,6 @@ public interface DataPhone {
      * Returns true if the DNS check is currently disabled.
      */
     boolean isDnsCheckDisabled();
-
-    /**
-     * Returns a string identifier for this phone interface for parties
-     *  outside the phone app process.
-     *  @return The string name.
-     */
-    String getPhoneName();
-
-    /**
-     * Return a numerical identifier for the phone radio interface.
-     * @return PHONE_TYPE_XXX as defined above.
-     */
-    int getPhoneType();
-
-    /**
-     * Returns an array of string identifiers for the APN types serviced by the
-     * currently active or last connected APN.
-     *  @return The string array.
-     */
-    String[] getActiveApnTypes();
-
-    /**
-     * Returns a string identifier for currently active or last connected APN.
-     *  @return The string name.
-     */
-    String getActiveApn();
-
-    /**
-     * Register for ServiceState changed.
-     * Message.obj will contain an AsyncResult.
-     * AsyncResult.result will be a ServiceState instance
-     */
-    void registerForServiceStateChanged(Handler h, int what, Object obj);
-
-    /**
-     * Unregisters for ServiceStateChange notification.
-     * Extraneous calls are tolerated silently
-     */
-    void unregisterForServiceStateChanged(Handler h);
 
     /**
      * Get the current active Data Call list, substitutes getPdpContextList
@@ -222,22 +193,11 @@ public interface DataPhone {
     void getDataCallList(Message response);
 
     /**
-     * Get current mutiple data connection status
+     * Get current multiple data connection status
      *
      * @return list of data connections
      */
     List<DataConnection> getCurrentDataConnectionList ();
-
-    /**
-     * For unit tests; don't send notifications to "Phone"
-     * mailbox registrants if true.
-     */
-    void setUnitTestMode(boolean f);
-
-    /**
-     * @return true If unit test mode is enabled
-     */
-    boolean getUnitTestMode();
 
     /**
      * @return true if enable data connection on roaming
@@ -280,6 +240,11 @@ public interface DataPhone {
     boolean isDataConnectivityEnabled();
 
     /**
+     * Report on whether data connectivity is allowed.
+     */
+    boolean isDataConnectivityPossible();
+
+    /**
      * Enables the specified APN type. Only works for "special" APN types,
      * i.e., not the default APN.
      * @param type The desired APN type. Cannot be {@link #APN_TYPE_DEFAULT}.
@@ -312,33 +277,89 @@ public interface DataPhone {
     int disableApnType(String type);
 
     /**
-     * Report on whether data connectivity is allowed.
+     * Returns an array of string identifiers for the APN types serviced by the
+     * currently active apns.
+     *  @return The string array.
      */
-    boolean isDataConnectivityPossible();
+    String[] getActiveApnTypes();
+
+    /**
+     * Returns a string identifier for currently active default APN if any.
+     * This function is deprecated and will now return for IPV4 type only. Please use
+     * API which takes IP Version as a parameter.
+     *  @return The string name.
+     */
+    @Deprecated
+    String getActiveApn();
+
+    /**
+     * Returns a string identifier for currently active APN on the specified apn
+     * type and ip version if any.
+     *
+     * @return The string name.
+     */
+
+    String getActiveApn(String type, IPVersion ipv);
+
+    /**
+     * Returns the name of the network interface used by the specified APN type.
+     * This function is deprecated and will now return for IPV4 type only. Please use
+     * API which takes IP Version as a parameter.
+     */
+    @Deprecated
+    String getInterfaceName(String apnType);
 
     /**
      * Returns the name of the network interface used by the specified APN type.
      */
-    String getInterfaceName(String apnType);
+    String getInterfaceName(String apnType, IPVersion ipv);
 
     /**
      * Returns the IP address of the network interface used by the specified
      * APN type.
+     * This function is deprecated and will now return for IPV4 type only. Please use
+     * API which takes IP Version as a parameter.
      */
+    @Deprecated
     String getIpAddress(String apnType);
+
+    /**
+     * Returns the IP address of the network interface used by the specified
+     * APN type on the specified IPVersion.
+     */
+    @Deprecated
+    String getIpAddress(String apnType, IPVersion ipv);
 
     /**
      * Returns the gateway for the network interface used by the specified APN
      * type.
+     * This function is deprecated and will now return for IPV4 type only. Please use
+     * API which takes IP Version as a parameter.
      */
+    @Deprecated
     String getGateway(String apnType);
+
+    /**
+     * Returns the gateway for the network interface used by the specified APN
+     * type on the specified IPVersion
+     */
+   String getGateway(String apnType, IPVersion ipv);
 
     /**
      * Returns the DNS servers for the network interface used by the specified
      * APN type.
+     * This function is deprecated and will now return for IPV4 type only. Please use
+     * API which takes IP Version as a parameter.
      */
+    @Deprecated
     public String[] getDnsServers(String apnType);
 
-    public void notifyDataActivity();
+    /**
+     * Returns the DNS servers for the network interface used by the specified
+     * APN type on specified ip version
+     */
+    public String[] getDnsServers(String apnType, IPVersion ipv);
 
+    @Deprecated
+    public void notifyDataActivity();
 }

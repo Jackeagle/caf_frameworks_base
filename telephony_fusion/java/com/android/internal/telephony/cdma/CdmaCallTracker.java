@@ -16,11 +16,15 @@
 
 package com.android.internal.telephony.cdma;
 
+import android.content.Context;
+import android.content.Intent;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Registrant;
 import android.os.RegistrantList;
+import android.os.RemoteException;
+import android.os.ServiceManager;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
 import android.util.Log;
@@ -31,7 +35,9 @@ import com.android.internal.telephony.CallTracker;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Connection;
 import com.android.internal.telephony.DriverCall;
+import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.VoicePhone;
 
@@ -442,11 +448,15 @@ public final class CdmaCallTracker extends CallTracker {
         if (state == VoicePhone.State.IDLE && oldState != state) {
             voiceCallEndedRegistrants.notifyRegistrants(
                 new AsyncResult(null, null, null));
+            Intent intent = new Intent(TelephonyIntents.ACTION_VOICE_CALL_ENDED);
+            phone.getContext().sendBroadcast(intent, android.Manifest.permission.READ_PHONE_STATE);
         } else if (oldState == VoicePhone.State.IDLE && oldState != state) {
             voiceCallStartedRegistrants.notifyRegistrants (
                     new AsyncResult(null, null, null));
+            Intent intent = new Intent(TelephonyIntents.ACTION_VOICE_CALL_STARTED);
+            phone.getContext().sendBroadcast(intent, android.Manifest.permission.READ_PHONE_STATE);
         }
-        if (Phone.DEBUG_PHONE) {
+        if (VoicePhone.DEBUG_PHONE) {
             log("update phone state, old=" + oldState + " new="+ state);
         }
         if (state != oldState) {
@@ -576,7 +586,7 @@ public final class CdmaCallTracker extends CallTracker {
                         return;
                     }
                 } else {
-                    if (Phone.DEBUG_PHONE) {
+                    if (VoicePhone.DEBUG_PHONE) {
                         log("pendingMo=" + pendingMO + ", dc=" + dc);
                     }
                     // find if the MT call is a new ring or unknown connection
@@ -584,6 +594,7 @@ public final class CdmaCallTracker extends CallTracker {
                     if (newRinging == null) {
                         unknownConnectionAppeared = true;
                     }
+                    checkAndEnableDataCallAfterEmergencyCallDropped();
                 }
                 hasNonHangupStateChanged = true;
             } else if (conn != null && dc == null) {
@@ -600,7 +611,7 @@ public final class CdmaCallTracker extends CallTracker {
                     // it contains the known logical connections.
                     int count = foregroundCall.connections.size();
                     for (int n = 0; n < count; n++) {
-                        if (Phone.DEBUG_PHONE)
+                        if (VoicePhone.DEBUG_PHONE)
                             log("adding fgCall cn " + n + " to droppedDuringPoll");
                         CdmaConnection cn = (CdmaConnection)foregroundCall.connections.get(n);
                         droppedDuringPoll.add(cn);
@@ -609,7 +620,7 @@ public final class CdmaCallTracker extends CallTracker {
                     // Loop through ringing call connections as
                     // it may contain the known logical connections.
                     for (int n = 0; n < count; n++) {
-                        if (Phone.DEBUG_PHONE)
+                        if (VoicePhone.DEBUG_PHONE)
                             log("adding rgCall cn " + n + " to droppedDuringPoll");
                         CdmaConnection cn = (CdmaConnection)ringingCall.connections.get(n);
                         droppedDuringPoll.add(cn);
@@ -622,6 +633,9 @@ public final class CdmaCallTracker extends CallTracker {
                 if (mIsEcmTimerCanceled) {
                     handleEcmTimer(phone.RESTART_ECM_TIMER);
                 }
+                // If emergency call is not going through while dialing
+                checkAndEnableDataCallAfterEmergencyCallDropped();
+
                 // Dropped connections are removed from the CallTracker
                 // list but kept in the Call list
                 connections[i] = null;
@@ -636,6 +650,7 @@ public final class CdmaCallTracker extends CallTracker {
                         if (newRinging == null) {
                             unknownConnectionAppeared = true;
                         }
+                        checkAndEnableDataCallAfterEmergencyCallDropped();
                     } else {
                         // Call info stored in conn is not consistent with the call info from dc.
                         // We should follow the rule of MT calls taking precedence over MO calls
@@ -704,7 +719,7 @@ public final class CdmaCallTracker extends CallTracker {
                     cause = Connection.DisconnectCause.INCOMING_MISSED;
                 }
 
-                if (Phone.DEBUG_PHONE) {
+                if (VoicePhone.DEBUG_PHONE) {
                     log("missed/rejected call, conn.cause=" + conn.cause);
                     log("setting cause to " + cause);
                 }
@@ -1107,6 +1122,40 @@ public final class CdmaCallTracker extends CallTracker {
         if (PhoneNumberUtils.isEmergencyNumber(dialString)) {
             if (VoicePhone.DEBUG_PHONE) log("disableDataCallInEmergencyCall");
             mIsInEmergencyCall = true;
+            //use phonemanager interaface to disable data call
+            ITelephony phoneMgr = ITelephony.Stub.asInterface(ServiceManager
+                    .getService(Context.TELEPHONY_SERVICE));
+            try {
+                phoneMgr.disableDataConnectivity();
+            } catch (RemoteException e) {
+                Log.e(LOG_TAG, "Unable to disable data connectivity during emergency call.");
+            }
+        }
+    }
+
+    /**
+     * Check and enable data call after an emergency call is dropped if it's
+     * not in ECM
+     */
+    private void checkAndEnableDataCallAfterEmergencyCallDropped() {
+        if (mIsInEmergencyCall) {
+            mIsInEmergencyCall = false;
+            String inEcm=SystemProperties.get(TelephonyProperties.PROPERTY_INECM_MODE, "false");
+            if (VoicePhone.DEBUG_PHONE) {
+                log("checkAndEnableDataCallAfterEmergencyCallDropped,inEcm=" + inEcm);
+            }
+            if (inEcm.compareTo("false") == 0) {
+                // Re-initiate data connection
+                // TODO - can this be changed to phone.enableDataConnectivity();
+                //use phonemanager interaface to enable data call
+                ITelephony phoneMgr = ITelephony.Stub.asInterface(ServiceManager
+                        .getService(Context.TELEPHONY_SERVICE));
+                try {
+                    phoneMgr.enableDataConnectivity();
+                } catch (RemoteException e) {
+                    Log.e(LOG_TAG, "Unable to enable data connectivity after emergency call.");
+                }
+            }
         }
     }
 

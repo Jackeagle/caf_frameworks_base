@@ -48,7 +48,6 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mDataNetworkStateRegistrants = new RegistrantList();
     protected RegistrantList mDataConnectionRegistrants = new RegistrantList();
     protected RegistrantList mVoiceRadioTechChangedRegistrants = new RegistrantList();
-    protected RegistrantList mDataRadioTechChangedRegistrants = new RegistrantList();
     protected RegistrantList mCdmaSubscriptionSourceChangedRegistrants = new RegistrantList();
     protected RegistrantList mCdmaPrlChangedRegistrants = new RegistrantList();
     protected RegistrantList mImsNetworkStateChangedRegistrants = new RegistrantList();
@@ -131,15 +130,6 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForVoiceRadioTechChanged(Handler h) {
         mVoiceRadioTechChangedRegistrants.remove(h);
-    }
-
-    public void registerForDataRadioTechChanged(Handler h, int what, Object obj) {
-        Registrant r = new Registrant (h, what, obj);
-        mDataRadioTechChangedRegistrants.add(r);
-    }
-
-    public void unregisterForDataRadioTechChanged(Handler h) {
-        mDataRadioTechChangedRegistrants.remove(h);
     }
 
     public void registerForCdmaSubscriptionSourceChanged(Handler h, int what, Object obj) {

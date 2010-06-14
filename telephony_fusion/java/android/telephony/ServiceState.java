@@ -92,6 +92,10 @@ public class ServiceState implements Parcelable {
     public static final int RADIO_TECHNOLOGY_HSPA = 11;
     /** @hide */
     public static final int RADIO_TECHNOLOGY_EVDO_B = 12;
+    /** @hide */
+    public static final int RADIO_TECHNOLOGY_EHRPD = 13;
+    /** @hide */
+    public static final int RADIO_TECHNOLOGY_LTE = 14;
 
     /**
      * Available registration states for GSM, UMTS and CDMA.

@@ -108,13 +108,15 @@ public class PhoneFactory {
                 sCommandsInterface = new RIL(context, networkMode, cdmaSubscription);
 
                 int phoneType = getPhoneType(networkMode);
+                DataPhone dct = new MMDataConnectionTracker(context, sPhoneNotifier,
+                        sCommandsInterface);
                 if (phoneType == VoicePhone.PHONE_TYPE_GSM) {
                     sProxyPhone = new PhoneProxy(new GSMPhone(context,
-                            sCommandsInterface, sPhoneNotifier));
+                            sCommandsInterface, sPhoneNotifier), dct);
                     Log.i(LOG_TAG, "Creating GSMPhone");
                 } else if (phoneType == VoicePhone.PHONE_TYPE_CDMA) {
                     sProxyPhone = new PhoneProxy(new CDMAPhone(context,
-                            sCommandsInterface, sPhoneNotifier));
+                            sCommandsInterface, sPhoneNotifier), dct);
                     Log.i(LOG_TAG, "Creating CDMAPhone");
                 }
 
