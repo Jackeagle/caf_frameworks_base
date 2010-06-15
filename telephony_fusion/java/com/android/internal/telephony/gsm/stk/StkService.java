@@ -153,8 +153,7 @@ public class StkService extends Handler implements AppInterface {
     /* Intentionally private for singleton */
     private StkService(CommandsInterface ci, UiccApplicationRecords ir, Context context,
             IccFileHandler fh, IccCard ic) {
-        if (ci == null || ir == null || context == null || fh == null
-                || ic == null) {
+        if (ci == null || ir == null || context == null || fh == null) {
             throw new NullPointerException(
                     "Service: Input parameters must not be null");
         }
@@ -606,8 +605,7 @@ public class StkService extends Handler implements AppInterface {
     public static StkService getInstance(CommandsInterface ci, UiccApplicationRecords ir,
             Context context, IccFileHandler fh, IccCard ic) {
         if (sInstance == null) {
-            if (ci == null || ir == null || context == null || fh == null
-                    || ic == null) {
+            if (ci == null || ir == null || context == null || fh == null) {
                 return null;
             }
             HandlerThread thread = new HandlerThread("Stk Telephony service");
