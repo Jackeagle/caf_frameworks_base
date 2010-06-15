@@ -824,10 +824,16 @@ public class Camera {
         // Formats for setPreviewFormat and setPictureFormat.
         private static final String PIXEL_FORMAT_YUV422SP = "yuv422sp";
         private static final String PIXEL_FORMAT_YUV420SP = "yuv420sp";
+        private static final String PIXEL_FORMAT_YUV420SP_ADRENO = "yuv420sp-adreno";
         private static final String PIXEL_FORMAT_YUV422I = "yuv422i-yuyv";
         private static final String PIXEL_FORMAT_RGB565 = "rgb565";
         private static final String PIXEL_FORMAT_JPEG = "jpeg";
         private static final String PIXEL_FORMAT_RAW = "raw";
+        /* Application has to set this to 1, if it is expecting the preview
+         * frames to reach it, instead of reaching overlay. If not, preview
+         * frames will be given to overlay all the times. This parameter is
+         * valid only for overlay enabled targets only */
+        private static final String SKIP_OVERLAY = "skipOverlay";
 
         private HashMap<String, String> mMap;
 
@@ -1201,6 +1207,7 @@ public class Camera {
             switch(pixel_format) {
             case PixelFormat.YCbCr_422_SP: return PIXEL_FORMAT_YUV422SP;
             case PixelFormat.YCbCr_420_SP: return PIXEL_FORMAT_YUV420SP;
+            case PixelFormat.YCrCb_420_SP: return PIXEL_FORMAT_YUV420SP_ADRENO;
             case PixelFormat.YCbCr_422_I:  return PIXEL_FORMAT_YUV422I;
             case PixelFormat.RGB_565:      return PIXEL_FORMAT_RGB565;
             case PixelFormat.JPEG:         return PIXEL_FORMAT_JPEG;
@@ -1217,6 +1224,9 @@ public class Camera {
 
             if (format.equals(PIXEL_FORMAT_YUV420SP))
                 return PixelFormat.YCbCr_420_SP;
+
+            if (format.equals(PIXEL_FORMAT_YUV420SP_ADRENO))
+                return PixelFormat.YCrCb_420_SP;
 
             if (format.equals(PIXEL_FORMAT_YUV422I))
                 return PixelFormat.YCbCr_422_I;

@@ -201,6 +201,7 @@ private:
                     sp<Overlay>                 mOverlay;
                     int                         mOverlayW;
                     int                         mOverlayH;
+                    int                         mPixelFormat;
 
         mutable     Mutex                       mPreviewLock;
                     sp<MemoryHeapBase>          mPreviewBuffer;
