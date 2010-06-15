@@ -146,7 +146,7 @@ public class PhoneFactory {
             return Phone.PHONE_TYPE_GSM;
 
         case RILConstants.NETWORK_MODE_GLOBAL:
-        case RILConstants.NETWORK_MODE_CDMA_GSM_WCDMA:
+        case RILConstants.NETWORK_MODE_GLOBAL_LTE:
         case RILConstants.NETWORK_MODE_LTE_ONLY:
             return Phone.PHONE_TYPE_CDMA;
         default:

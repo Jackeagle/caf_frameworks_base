@@ -53,17 +53,22 @@ public interface RILConstants {
                                                 sends sms or call or sends USSD string to non FDN number. */
 
     /* NETWORK_MODE_* See ril.h RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE */
-    int NETWORK_MODE_WCDMA_PREF     = 0; /* GSM/WCDMA (WCDMA preferred) */
-    int NETWORK_MODE_GSM_ONLY       = 1; /* GSM only */
-    int NETWORK_MODE_WCDMA_ONLY     = 2; /* WCDMA only */
-    int NETWORK_MODE_GSM_UMTS       = 3; /* GSM/WCDMA (auto mode, according to PRL)
-                                            AVAILABLE Application Settings menu*/
-    int NETWORK_MODE_CDMA           = 4; /* CDMA and EvDo (auto mode, according to PRL)
-                                            AVAILABLE Application Settings menu*/
-    int NETWORK_MODE_CDMA_NO_EVDO   = 5; /* CDMA only */
-    int NETWORK_MODE_EVDO_NO_CDMA   = 6; /* EvDo only */
-    int NETWORK_MODE_GLOBAL         = 7; /* GSM/WCDMA, CDMA, and EvDo (auto mode, according to PRL)
-                                            AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_WCDMA_PREF     = 0;      /* GSM/WCDMA (WCDMA preferred) */
+    int NETWORK_MODE_GSM_ONLY       = 1;      /* GSM only */
+    int NETWORK_MODE_WCDMA_ONLY     = 2;      /* WCDMA only */
+    int NETWORK_MODE_GSM_UMTS       = 3;      /* GSM/WCDMA (auto mode, according to PRL)
+                                                 AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_CDMA           = 4;      /* CDMA and EvDo (auto mode, according to PRL)
+                                                 AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_CDMA_NO_EVDO   = 5;      /* CDMA only */
+    int NETWORK_MODE_EVDO_NO_CDMA   = 6;      /* EvDo only */
+    int NETWORK_MODE_GLOBAL         = 7;      /* GSM/WCDMA, CDMA, and EvDo (auto mode, according to PRL)
+                                                 AVAILABLE Application Settings menu*/
+    int NETWORK_MODE_CDMA_AND_LTE_EVDO  = 8;  /* CDMA + LTE/EvDo auto */
+    int NETWORK_MODE_GSM_WCDMA_LTE  = 9;      /* GSM/WCDMA/LTE auto */
+    int NETWORK_MODE_GLOBAL_LTE = 10;         /* CDMA/EvDo/GSM/WCDMA/LTE auto */
+    int NETWORK_MODE_LTE_ONLY = 11;           /* LTE only */
+
     int PREFERRED_NETWORK_MODE      = NETWORK_MODE_WCDMA_PREF;
 
     /* CDMA subscription source. See ril.h RIL_REQUEST_CDMA_SET_SUBSCRIPTION */

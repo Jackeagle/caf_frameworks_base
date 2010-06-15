@@ -950,7 +950,7 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
                 || (networkMode == RILConstants.NETWORK_MODE_GSM_WCDMA_LTE)) {
             return RILConstants.GSM_PHONE;
         } else if ((networkMode == RILConstants.NETWORK_MODE_GLOBAL)
-                || (networkMode == RILConstants.NETWORK_MODE_CDMA_GSM_WCDMA)
+                || (networkMode == RILConstants.NETWORK_MODE_GLOBAL_LTE)
                 || (networkMode == RILConstants.NETWORK_MODE_LTE_ONLY)) {
             if (getPhoneType() == VoicePhone.PHONE_TYPE_CDMA) {
                 return RILConstants.CDMA_PHONE;
