@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
@@ -37,6 +38,10 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
     private static final boolean DBG = true;
 
     private ITelephonyRegistry mRegistry;
+
+
+    private ServiceState mVoiceServiceState;
+    private ServiceState mDataServiceState;
 
     /* package */
     DefaultPhoneNotifier() {
@@ -57,12 +62,67 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyServiceState(VoicePhone sender) {
+    private void notifyCombinedServiceState() {
+        ServiceState service = new ServiceState();
+        if (mVoiceServiceState != null) {
+            /*
+             * Copy all the fields from voice service state as voice phone has
+             * the majority fields updated if data service is also present some
+             * fields will be overwritten by data service below
+             */
+            service = mVoiceServiceState;
+        } else if (mDataServiceState != null) {
+            /* Voice phone did not send service state, use data service */
+            service = mDataServiceState;
+        } else {
+            /* neither voice nor data , we should not get here */
+            log("Null Service state");
+            return;
+        }
+
+        /*
+         * Update combined service state with data service information for the
+         * below fields
+         * 1. State is STATE_IN_SERVICE if voice or data has service
+         * 2. Radio technology is data radio if data is in service
+         *    Radio technology is voice radio only if data is not in service
+         * 3. Roaming is set if either voice or data is roaming
+         */
+
+        if ((mDataServiceState != null) && (mVoiceServiceState != null)
+                && (mDataServiceState.getState() == ServiceState.STATE_IN_SERVICE)) {
+
+            /*
+             * If voice was not in service it will be overwritten with data
+             * service state here
+             */
+            service.setState(ServiceState.STATE_IN_SERVICE);
+
+            /* Update radio technology to reflect the data technology */
+            service.setRadioTechnology(mDataServiceState.getRadioTechnology());
+
+            /* Overwrite voice roaming state if data is on roaming */
+            if (mDataServiceState.getRoaming())
+                service.setRoaming(true);
+        }
+
         try {
-            mRegistry.notifyServiceState(sender.getServiceState());
+            // send combined service state to UI
+            mRegistry.notifyServiceState(service);
         } catch (RemoteException ex) {
             // system process is dead
         }
+    }
+
+
+    public void notifyServiceState(VoicePhone sender) {
+        mVoiceServiceState = sender.getServiceState();
+        notifyCombinedServiceState();
+    }
+
+    public void notifyDataServiceState(DataPhone sender) {
+        mDataServiceState = sender.getDataServiceState();
+        notifyCombinedServiceState();
     }
 
     public void notifySignalStrength(VoicePhone sender) {

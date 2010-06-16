@@ -388,11 +388,12 @@ public class TelephonyManager {
     /** Current network is HSPA */
     public static final int NETWORK_TYPE_HSPA = 10;
     /** @hide Current network is EVDO revision B*/
-    public static final int NETWORK_TYPE_EVDO_B = 11;
+    public static final int NETWORK_TYPE_EVDO_B = 12;
     /** @hide Current network is EHRPD */
-    public static final int NETWORK_TYPE_EHRPD = 12;
+    public static final int NETWORK_TYPE_EHRPD = 13;
     /** @hide Current network is LTE */
-    public static final int NETWORK_TYPE_LTE = 13;
+    public static final int NETWORK_TYPE_LTE = 14;
+
 
     /**
      * Returns a constant indicating the radio technology (network type)

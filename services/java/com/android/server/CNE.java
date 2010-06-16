@@ -1368,6 +1368,7 @@ public final class CNE
            case TelephonyManager.NETWORK_TYPE_HSDPA:
            case TelephonyManager.NETWORK_TYPE_HSUPA:
            case TelephonyManager.NETWORK_TYPE_HSPA:
+           case TelephonyManager.NETWORK_TYPE_LTE:
              // dBm = -113 + 2*asu
              return (-113 + 2*(mSignalStrength.getGsmSignalStrength()));
            case TelephonyManager.NETWORK_TYPE_1xRTT:
