@@ -76,4 +76,21 @@ public class Duration implements Parcelable {
             return new Duration[size];
         }
     };
+
+    public int getMillis() {
+        int millisecs = 0;
+
+        switch (timeUnit) {
+        case MINUTE:
+            millisecs = 60 * 1000 * timeInterval;
+            break;
+        case SECOND:
+            millisecs = 1000 * timeInterval;
+            break;
+        case TENTH_SECOND:
+            millisecs = 100 * timeInterval;
+            break;
+        }
+        return millisecs;
+    }
 }
