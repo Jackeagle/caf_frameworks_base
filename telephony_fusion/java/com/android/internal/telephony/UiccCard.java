@@ -20,6 +20,7 @@ package com.android.internal.telephony;
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.UiccConstants.PinState;
 import com.android.internal.telephony.UiccConstants.AppType;
+import com.android.internal.telephony.gsm.stk.StkService;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Registrant;
@@ -47,6 +48,7 @@ public class UiccCard extends Handler{
     private boolean mDestroyed = false; //set to true once this card is commanded to be disposed of.
     private Context mContext;
     private CommandsInterface mCi;
+    private StkService mStkService;
 
 
     UiccCard(UiccManager uiccManager, int slotId, UiccCardStatusResponse.CardStatus ics, Context c, CommandsInterface ci) {
@@ -64,6 +66,11 @@ public class UiccCard extends Handler{
         Log.d(mLogTag, "Creating " + ics.applications.length + " applications");
         for (int i = 0; i < ics.applications.length; i++) {
             mUiccApplications[i] = new UiccCardApplication(this, ics.applications[i], mUiccRecords, mContext, mCi);
+        }
+
+        if (mUiccApplications[0] != null) {
+            mStkService = StkService.getInstance(mCi, mUiccApplications[0].getApplicationRecords(), mContext,
+                                                 mUiccApplications[0].getIccFileHandler(), null);
         }
     }
 
@@ -103,6 +110,10 @@ public class UiccCard extends Handler{
 
         mUiccRecords.dispose();
         mUiccRecords = null;
+        if (mStkService != null) {
+            mStkService.dispose();
+        }
+        mStkService = null;
         for (UiccCardApplication app: mUiccApplications) {
             if (app != null) {
                 app.dispose();
