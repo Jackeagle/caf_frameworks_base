@@ -948,7 +948,7 @@ public final class SimulatedCommands extends BaseCommands
     }
 
     public void setupDataCall(String radioTechnology, String profile, String apn, String user,
-            String password, String authType, Message result) {
+            String password, String authType, String ipVersion, Message result) {
         unimplemented(result);
     }
 
@@ -1458,10 +1458,6 @@ public final class SimulatedCommands extends BaseCommands
     }
 
     public void getGsmBroadcastConfig(Message response) {
-        unimplemented(response);
-    }
-
-    public void getDataRadioTechnology(Message response) {
         unimplemented(response);
     }
 

@@ -484,7 +484,7 @@ public final class SIMRecords extends UiccApplicationRecords {
     /** Returns the 5 or 6 digit MCC/MNC of the operator that
      *  provided the SIM card. Returns null of SIM is not yet ready
      */
-    String getSIMOperatorNumeric() {
+    public String getSIMOperatorNumeric() {
         if (mImsi == null || mncLength == UNINITIALIZED || mncLength == UNKNOWN) {
             return null;
         }

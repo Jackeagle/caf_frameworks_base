@@ -16,6 +16,7 @@
 
 package com.android.internal.telephony.gsm;
 
+import android.content.Intent;
 import android.os.*;
 import android.telephony.gsm.GsmCellLocation;
 import android.telephony.PhoneNumberUtils;
@@ -33,8 +34,6 @@ import com.android.internal.telephony.gsm.CallFailCause;
 import com.android.internal.telephony.gsm.GsmCall;
 import com.android.internal.telephony.gsm.GsmConnection;
 import com.android.internal.telephony.gsm.GSMPhone;
-import com.android.internal.telephony.VoicePhone;
-import com.android.internal.telephony.TelephonyEventLog;
 import com.android.internal.telephony.*;
 
 import java.util.List;
@@ -388,9 +387,13 @@ public final class GsmCallTracker extends CallTracker {
         if (state == VoicePhone.State.IDLE && oldState != state) {
             voiceCallEndedRegistrants.notifyRegistrants(
                 new AsyncResult(null, null, null));
+            Intent intent = new Intent(TelephonyIntents.ACTION_VOICE_CALL_ENDED);
+            phone.getContext().sendBroadcast(intent, android.Manifest.permission.READ_PHONE_STATE);
         } else if (oldState == VoicePhone.State.IDLE && oldState != state) {
             voiceCallStartedRegistrants.notifyRegistrants (
                     new AsyncResult(null, null, null));
+            Intent intent = new Intent(TelephonyIntents.ACTION_VOICE_CALL_STARTED);
+            phone.getContext().sendBroadcast(intent, android.Manifest.permission.READ_PHONE_STATE);
         }
 
         if (state != oldState) {

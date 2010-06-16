@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-package com.android.internal.telephony.gsm;
+package com.android.internal.telephony;
 
-import com.android.internal.telephony.*;
+import com.android.internal.telephony.DataPhone;
+import com.android.internal.telephony.DataPhone.IPVersion;
+
 /**
  * This class represents a apn setting for create PDP link
  */
-public class ApnSetting {
+public class ApnSetting extends DataProfile {
 
     String carrier;
     String apn;
@@ -32,7 +34,8 @@ public class ApnSetting {
     String user;
     String password;
     int authType;
-    String[] types;
+    @Deprecated String[] types;
+    DataServiceType serviceTypes[];
     int id;
     String numeric;
 
@@ -40,6 +43,7 @@ public class ApnSetting {
     ApnSetting(int id, String numeric, String carrier, String apn, String proxy, String port,
             String mmsc, String mmsProxy, String mmsPort,
             String user, String password, int authType, String[] types) {
+        super();
         this.id = id;
         this.numeric = numeric;
         this.carrier = carrier;
@@ -57,7 +61,9 @@ public class ApnSetting {
 
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append(carrier)
+
+        sb.append(super.toString())
+        .append(carrier)
         .append(", ").append(id)
         .append(", ").append(numeric)
         .append(", ").append(apn)
@@ -66,13 +72,26 @@ public class ApnSetting {
         .append(", ").append(mmsProxy)
         .append(", ").append(mmsPort)
         .append(", ").append(port)
-        .append(", ").append(authType);
+        .append(", ").append(authType)
+        .append(", [");
         for (String t : types) {
             sb.append(", ").append(t);
         }
+        sb.append("]");
+        sb.append("]");
         return sb.toString();
     }
 
+    public String toShortString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(super.toString())
+          .append(numeric)
+          .append(", ").append(apn)
+          .append("]");
+        return sb.toString();
+    }
+
+    @Deprecated
     boolean canHandleType(String type) {
         for (String t : types) {
             // DEFAULT handles all, and HIPRI is handled by DEFAULT
@@ -82,6 +101,27 @@ public class ApnSetting {
                 return true;
             }
         }
+        return false;
+    }
+
+    boolean canHandleServiceType(DataServiceType type) {
+        for (DataServiceType t : serviceTypes) {
+            if (t == type
+                    || (t == DataServiceType.SERVICE_TYPE_DEFAULT && type == DataServiceType.SERVICE_TYPE_HIPRI))
+                return true;
+        }
+        return false;
+    }
+
+    DataProfileType getDataProfileType() {
+        return DataProfileType.PROFILE_TYPE_3GPP_APN;
+    }
+
+    @Override
+    boolean canSupportIpVersion(IPVersion ipv) {
+        /* TODO: fusion - this should be read from the APN database */
+        if (ipv == IPVersion.IPV4)
+            return true;
         return false;
     }
 }

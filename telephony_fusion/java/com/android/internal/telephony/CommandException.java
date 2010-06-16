@@ -42,6 +42,7 @@ public class CommandException extends RuntimeException {
         SUBSCRIPTION_NOT_AVAILABLE,
         MODE_NOT_SUPPORTED,
         FDN_FAILURE,
+        SETUP_DATA_CALL_FAILURE,
     }
 
     public CommandException(Error e) {
@@ -83,6 +84,8 @@ public class CommandException extends RuntimeException {
                 return new CommandException(Error.MODE_NOT_SUPPORTED);
             case RILConstants.FDN_CHECK_FAILURE:
                 return new CommandException(Error.FDN_FAILURE);
+            case RILConstants.SETUP_DATA_CALL_FAILURE:
+                return new CommandException(Error.SETUP_DATA_CALL_FAILURE);
             default:
                 Log.e("GSM", "Unrecognized RIL errno " + ril_errno);
                 return new CommandException(Error.INVALID_RESPONSE);

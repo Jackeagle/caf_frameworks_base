@@ -51,7 +51,8 @@ public interface RILConstants {
                                                  location */
     int MODE_NOT_SUPPORTED = 13;              /* HW does not support preferred network type */
     int FDN_CHECK_FAILURE = 14;               /* send operation barred error when FDN is enabled and the user
-                                                sends sms or call or sends USSD string to non FDN number. */
+                                                 sends sms or call or sends USSD string to non FDN number. */
+    int SETUP_DATA_CALL_FAILURE = 15;         /* setup data call failure */
 
     /* NETWORK_MODE_* See ril.h RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE */
     int NETWORK_MODE_WCDMA_PREF     = 0;      /* GSM/WCDMA (WCDMA preferred) */
@@ -241,10 +242,9 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_REPORT_SMS_MEMORY_STATUS = 102;
     int RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING = 103;
     int RIL_REQUEST_VOICE_RADIO_TECH = 104;
-    int RIL_REQUEST_DATA_RADIO_TECH = 105;
-    int RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE = 106;
-    int RIL_REQUEST_CDMA_PRL_VERSION = 107;
-    int RIL_REQUEST_IMS_REGISTRATION_STATE = 108;
+    int RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE = 105;
+    int RIL_REQUEST_CDMA_PRL_VERSION = 106;
+    int RIL_REQUEST_IMS_REGISTRATION_STATE = 107;
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
     int RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED = 1001;
@@ -277,7 +277,7 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_OEM_HOOK_RAW = 1028;
     int RIL_UNSOL_RINGBACK_TONE = 1029;
     int RIL_UNSOL_VOICE_RADIO_TECH_CHANGED = 1030;
-    int RIL_UNSOL_DATA_RADIO_TECH_CHANGED = 1031;
+    int RIL_UNSOL_TETHERED_MODE_STATE_CHANGED = 1031;
     int RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED = 1032;
     int RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 1033;
     int RIL_UNSOL_CDMA_PRL_CHANGED = 1034;

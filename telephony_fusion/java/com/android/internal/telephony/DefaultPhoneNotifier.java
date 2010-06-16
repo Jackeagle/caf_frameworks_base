@@ -16,6 +16,8 @@
 
 package com.android.internal.telephony;
 
+import java.util.ArrayList;
+
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -24,6 +26,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.ITelephonyRegistry;
 import com.android.internal.telephony.DataPhone.DataState;
+import com.android.internal.telephony.DataPhone.IPVersion;
 
 /**
  * broadcast intents
@@ -94,15 +97,35 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyDataConnection(DataPhone sender, String reason) {
+    public void notifyDataConnection(DataPhone sender, String type, IPVersion ipv, String reason) {
         TelephonyManager telephony = TelephonyManager.getDefault();
+
+        /*
+         * Notify Data Connection is called by DCT, whenever there is a change in data connection state
+         * associated with <data service type / apn type, ipv>. We then pass the following information
+         * to Telephony Registry.
+         * 1. data connection State of service type <type> on IP Version <ipv>
+         * 2. reason why data connection state changed
+         * 3. apn/data profile through which <type> is active on <ipv>
+         * 4. interface through which <type> is active on <ipv>
+         * 5. ipv
+         */
+
+        /* TODO : clean up this - notify data connection expects an array of types!*/
+        ArrayList<String> typeArrayList = new ArrayList<String>();
+        typeArrayList.add(type);
+        String typeArray[] = new String[typeArrayList.size()];
+        typeArray= (String[]) typeArrayList.toArray(typeArray);
+
         try {
             mRegistry.notifyDataConnection(
-                    convertDataState(sender.getDataConnectionState()),
-                    sender.isDataConnectivityPossible(), reason,
-                    sender.getActiveApn(),
-                    sender.getActiveApnTypes(),
-                    sender.getInterfaceName(null),
+                    convertDataState(sender.getDataConnectionState(type, ipv)),
+                    sender.isDataConnectivityPossible(),
+                    reason,
+                    sender.getActiveApn(type, ipv),
+                    typeArray,
+                    sender.getInterfaceName(type, ipv),
+                    /* TODO: pass up the IP type that this notification corresponds to */
                     ((telephony != null) ? telephony.getNetworkType() :
                     TelephonyManager.NETWORK_TYPE_UNKNOWN));
         } catch (RemoteException ex) {

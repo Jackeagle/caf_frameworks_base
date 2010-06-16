@@ -16,10 +16,13 @@
 
 package com.android.internal.telephony;
 
+import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
-import android.util.Log;
+import android.os.SystemProperties;
+
+import com.android.internal.telephony.DataPhone.IPVersion;
 
 /**
  * {@hide}
@@ -35,12 +38,12 @@ public abstract class DataConnection extends Handler {
 
         public String toString() {
             switch (this) {
-            case ACTIVE:
-                return "active";
-            case ACTIVATING:
-                return "setting up";
-            default:
-                return "inactive";
+                case ACTIVE:
+                    return "active";
+                case ACTIVATING:
+                    return "setting up";
+                default:
+                    return "inactive";
             }
         }
 
@@ -53,147 +56,76 @@ public abstract class DataConnection extends Handler {
         }
     }
 
-    public enum FailCause {
-        NONE,
-        OPERATOR_BARRED,
-        INSUFFICIENT_RESOURCES,
-        MISSING_UKNOWN_APN,
-        UNKNOWN_PDP_ADDRESS,
-        USER_AUTHENTICATION,
-        ACTIVATION_REJECT_GGSN,
-        ACTIVATION_REJECT_UNSPECIFIED,
-        SERVICE_OPTION_NOT_SUPPORTED,
-        SERVICE_OPTION_NOT_SUBSCRIBED,
-        SERVICE_OPTION_OUT_OF_ORDER,
-        NSAPI_IN_USE,
-        PROTOCOL_ERRORS,
-        REGISTRATION_FAIL,
-        GPRS_REGISTRATION_FAIL,
-        UNKNOWN,
-
-        RADIO_NOT_AVAILABLE,
-        RADIO_ERROR_RETRY;
-
-        public boolean isPermanentFail() {
-            return (this == OPERATOR_BARRED) || (this == MISSING_UKNOWN_APN) ||
-                   (this == UNKNOWN_PDP_ADDRESS) || (this == USER_AUTHENTICATION) ||
-                   (this == ACTIVATION_REJECT_GGSN) || (this == ACTIVATION_REJECT_UNSPECIFIED) ||
-                   (this == SERVICE_OPTION_NOT_SUPPORTED) ||
-                   (this == SERVICE_OPTION_NOT_SUBSCRIBED) || (this == NSAPI_IN_USE) ||
-                   (this == PROTOCOL_ERRORS);
-        }
-
-        public boolean isEventLoggable() {
-            return (this == OPERATOR_BARRED) || (this == INSUFFICIENT_RESOURCES) ||
-                    (this == UNKNOWN_PDP_ADDRESS) || (this == USER_AUTHENTICATION) ||
-                    (this == ACTIVATION_REJECT_GGSN) || (this == ACTIVATION_REJECT_UNSPECIFIED) ||
-                    (this == SERVICE_OPTION_NOT_SUBSCRIBED) ||
-                    (this == SERVICE_OPTION_NOT_SUPPORTED) ||
-                    (this == SERVICE_OPTION_OUT_OF_ORDER) || (this == NSAPI_IN_USE) ||
-                    (this == PROTOCOL_ERRORS);
-        }
-
-        @Override
-        public String toString() {
-            switch (this) {
-            case NONE:
-                return "No Error";
-            case OPERATOR_BARRED:
-                return "Operator Barred";
-            case INSUFFICIENT_RESOURCES:
-                return "Insufficient Resources";
-            case MISSING_UKNOWN_APN:
-                return "Missing / Unknown APN";
-            case UNKNOWN_PDP_ADDRESS:
-                return "Unknown PDP Address";
-            case USER_AUTHENTICATION:
-                return "Error User Autentication";
-            case ACTIVATION_REJECT_GGSN:
-                return "Activation Reject GGSN";
-            case ACTIVATION_REJECT_UNSPECIFIED:
-                return "Activation Reject unspecified";
-            case SERVICE_OPTION_NOT_SUPPORTED:
-                return "Data Not Supported";
-            case SERVICE_OPTION_NOT_SUBSCRIBED:
-                return "Data Not subscribed";
-            case SERVICE_OPTION_OUT_OF_ORDER:
-                return "Data Services Out of Order";
-            case NSAPI_IN_USE:
-                return "NSAPI in use";
-            case PROTOCOL_ERRORS:
-                return "Protocol Errors";
-            case REGISTRATION_FAIL:
-                return "Network Registration Failure";
-            case GPRS_REGISTRATION_FAIL:
-                return "Data Network Registration Failure";
-            case RADIO_NOT_AVAILABLE:
-                return "Radio Not Available";
-            case RADIO_ERROR_RETRY:
-                return "Transient Radio Rrror";
-            default:
-                return "Unknown Data Error";
-            }
-        }
-    }
-
     // ***** Event codes
     protected static final int EVENT_SETUP_DATA_CONNECTION_DONE = 1;
-    protected static final int EVENT_GET_LAST_FAIL_DONE = 2;
-    protected static final int EVENT_LINK_STATE_CHANGED = 3;
-    protected static final int EVENT_DEACTIVATE_DONE = 4;
-    protected static final int EVENT_FORCE_RETRY = 5;
+    protected static final int EVENT_DEACTIVATE_DONE = 2;
 
-    //***** Tag IDs for EventLog
-    protected static final int EVENT_LOG_BAD_DNS_ADDRESS = 50100;
+    // ***** Member Variables
+    protected CommandsInterface mCM;
+    protected Context mContext;
 
+    // data call state
+    protected State state;
 
-    //***** Member Variables
-    protected PhoneBase phone;
-    protected Message onConnectCompleted;
-    protected Message onDisconnect;
+    // if state==ACTIVE, has a valid cid
     protected int cid;
+
+    // if state == ACTIVE, the data profile in use
+    protected DataProfile mDataProfile;
+
+    // call back data for connect()
+    protected Message onConnectCompleted;
+
+    // call back data for disconnect()
+    protected Message onDisconnect;
+
     protected String interfaceName;
     protected String ipAddress;
     protected String gatewayAddress;
     protected String[] dnsServers;
-    protected State state;
+    protected IPVersion ipVersion;
+
     protected long createTime;
     protected long lastFailTime;
-    protected FailCause lastFailCause;
-    protected static final String NULL_IP = "0.0.0.0";
-    Object userData;
 
-    // receivedDisconnectReq is set when disconnect during activation
+    protected DataConnectionFailCause lastFailCause;
+
+    // receivedDisconnectReq is set if disconnect() was
+    // done at state == ACTIVATING
     protected boolean receivedDisconnectReq;
 
-    /* Instance Methods */
+    // call back for SETUP_DATA_CALL
     protected abstract void onSetupConnectionCompleted(AsyncResult ar);
 
+    // call back for DEACTIVATE_DATA_CALL
     protected abstract void onDeactivated(AsyncResult ar);
 
+    // setup a data call with the specified data profile, and IP version
+    protected abstract void connect(DataProfile dp, Message onCompleted, IPVersion ipVersion);
+
+    // disconnect()
     protected abstract void disconnect(Message msg);
 
-    protected abstract void notifyFail(FailCause cause, Message onCompleted);
+    // notify connect success
+    protected abstract void notifySuccess(Message onCompleted);
 
+    // notify connect fail
+    protected abstract void notifyFail(DataConnectionFailCause cause, Message onCompleted);
+
+    // notify disconnect complete
     protected abstract void notifyDisconnect(Message msg);
-
-    protected abstract void onLinkStateChanged(DataLink.LinkState linkState);
-
-    protected abstract FailCause getFailCauseFromRequest(int rilCause);
 
     public abstract String toString();
 
     protected abstract void log(String s);
 
-
-   //***** Constructor
-    protected DataConnection(PhoneBase phone) {
+    // ***** Constructor
+    protected DataConnection(Context context, CommandsInterface ci) {
         super();
-        this.phone = phone;
-        onConnectCompleted = null;
-        onDisconnect = null;
-        this.cid = -1;
-        receivedDisconnectReq = false;
+
+        mCM = ci;
+        mContext = context;
+
         this.dnsServers = new String[2];
 
         clearSettings();
@@ -201,16 +133,70 @@ public abstract class DataConnection extends Handler {
 
     protected void setHttpProxy(String httpProxy, String httpPort) {
         if (httpProxy == null || httpProxy.length() == 0) {
-            phone.setSystemProperty("net.gprs.http-proxy", null);
+            SystemProperties.set("net.gprs.http-proxy", null);
             return;
         }
 
         if (httpPort == null || httpPort.length() == 0) {
-            httpPort = "8080";     // Default to port 8080
+            httpPort = "8080"; // Default to port 8080
         }
 
-        phone.setSystemProperty("net.gprs.http-proxy",
-                "http://" + httpProxy + ":" + httpPort + "/");
+        SystemProperties.set("net.gprs.http-proxy", "http://" + httpProxy + ":" + httpPort + "/");
+    }
+
+    public void clearSettings() {
+
+        cid = -1;
+        state = State.INACTIVE;
+        mDataProfile = null;
+
+        createTime = -1;
+        lastFailTime = -1;
+        lastFailCause = DataConnectionFailCause.NONE;
+
+        receivedDisconnectReq = false;
+
+        onDisconnect = null;
+        onConnectCompleted = null;
+
+        ipVersion = null;
+        interfaceName = null;
+        ipAddress = null;
+        gatewayAddress = null;
+        dnsServers[0] = null;
+        dnsServers[1] = null;
+    }
+
+    @Override
+    public void handleMessage(Message msg) {
+        AsyncResult ar;
+
+        switch (msg.what) {
+
+            case EVENT_SETUP_DATA_CONNECTION_DONE:
+                onSetupConnectionCompleted((AsyncResult) msg.obj);
+                break;
+
+            case EVENT_DEACTIVATE_DONE:
+                onDeactivated((AsyncResult) msg.obj);
+                break;
+        }
+    }
+
+    public State getState() {
+        return state;
+    }
+
+    public long getConnectionTime() {
+        return createTime;
+    }
+
+    public long getLastFailTime() {
+        return lastFailTime;
+    }
+
+    public DataConnectionFailCause getLastFailCause() {
+        return lastFailCause;
     }
 
     public String getInterface() {
@@ -229,97 +215,11 @@ public abstract class DataConnection extends Handler {
         return dnsServers;
     }
 
-    public void clearSettings() {
-        log("DataConnection.clearSettings()");
-
-        this.state = State.INACTIVE;
-        this.createTime = -1;
-        this.lastFailTime = -1;
-        this.lastFailCause = FailCause.NONE;
-
-        receivedDisconnectReq = false;
-        onConnectCompleted = null;
-        interfaceName = null;
-        ipAddress = null;
-        gatewayAddress = null;
-        dnsServers[0] = null;
-        dnsServers[1] = null;
+    public DataProfile getDataProfile() {
+        return mDataProfile;
     }
 
-    protected void onGetLastFailCompleted(AsyncResult ar) {
-        if (receivedDisconnectReq) {
-            // Don't bother reporting the error if there's already a
-            // pending disconnect request, since DataConnectionTracker
-            // has already updated its state.
-            notifyDisconnect(onDisconnect);
-        } else {
-            FailCause cause = FailCause.UNKNOWN;
-
-            if (ar.exception == null) {
-                int rilFailCause = ((int[]) (ar.result))[0];
-                cause = getFailCauseFromRequest(rilFailCause);
-            }
-            notifyFail(cause, onConnectCompleted);
-        }
-    }
-
-    protected void onForceRetry() {
-        if (receivedDisconnectReq) {
-            notifyDisconnect(onDisconnect);
-        } else {
-            notifyFail(FailCause.RADIO_ERROR_RETRY, onConnectCompleted);
-        }
-    }
-
-    @Override
-    public void handleMessage(Message msg) {
-        AsyncResult ar;
-
-        log("DataConnection.handleMessage()");
-
-        switch (msg.what) {
-
-        case EVENT_SETUP_DATA_CONNECTION_DONE:
-            onSetupConnectionCompleted((AsyncResult) msg.obj);
-            break;
-
-        case EVENT_FORCE_RETRY:
-            onForceRetry();
-            break;
-
-        case EVENT_GET_LAST_FAIL_DONE:
-            onGetLastFailCompleted((AsyncResult) msg.obj);
-            break;
-
-        case EVENT_LINK_STATE_CHANGED:
-            ar = (AsyncResult) msg.obj;
-            DataLink.LinkState ls  = (DataLink.LinkState) ar.result;
-            onLinkStateChanged(ls);
-            break;
-
-        case EVENT_DEACTIVATE_DONE:
-            onDeactivated((AsyncResult) msg.obj);
-            break;
-        }
-    }
-
-    public State getState() {
-        log("DataConnection.getState()");
-        return state;
-    }
-
-    public long getConnectionTime() {
-        log("DataConnection.getConnectionTime()");
-        return createTime;
-    }
-
-    public long getLastFailTime() {
-        log("DataConnection.getLastFailTime()");
-        return lastFailTime;
-    }
-
-    public FailCause getLastFailCause() {
-        log("DataConnection.getLastFailCause()");
-        return lastFailCause;
+    public IPVersion getIpVersion() {
+        return ipVersion;
     }
 }

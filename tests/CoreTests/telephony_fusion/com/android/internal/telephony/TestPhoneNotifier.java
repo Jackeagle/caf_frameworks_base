@@ -16,6 +16,9 @@
 
 package com.android.internal.telephony;
 
+import com.android.internal.telephony.DataPhone;
+import com.android.internal.telephony.DataPhone.IPVersion;
+
 /**
  * Stub class used for unit tests
  */
@@ -42,7 +45,7 @@ public class TestPhoneNotifier implements PhoneNotifier {
     public void notifyCallForwardingChanged(VoicePhone sender) {
     }
 
-    public void notifyDataConnection(DataPhone sender, String reason) {
+    public void notifyDataConnection(DataPhone sender, String type, IPVersion ipv, String reason) {
     }
 
     public void notifyDataConnectionFailed(DataPhone sender, String reason) {
