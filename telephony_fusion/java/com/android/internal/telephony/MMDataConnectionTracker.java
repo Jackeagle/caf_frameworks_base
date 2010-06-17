@@ -133,7 +133,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     //TODO: Read this from properties
     private static final boolean SUPPORT_IPV4 = true;
-    private static final boolean SUPPORT_IPV6 = false; /* TODO: for now */
+    private static final boolean SUPPORT_IPV6 = false;
+    boolean mIsEhrpdCapable = false;
 
     /*
      * warning: if this flag is set then all connections are disconnected when
@@ -239,6 +240,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         boolean dataDisabledOnBoot = sp.getBoolean(DataPhone.DATA_DISABLED_ON_BOOT_KEY, false);
         mDpt.setServiceTypeEnabled(DataServiceType.SERVICE_TYPE_DEFAULT, !dataDisabledOnBoot);
         mNoAutoAttach = dataDisabledOnBoot;
+
+        mIsEhrpdCapable = SystemProperties.getBoolean("ro.config.ehrpd", false);
     }
 
     public void dispose() {
@@ -884,11 +887,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
 
         // Check for data readiness!
-        boolean desiredPowerState = getDesiredPowerState();
-        boolean isReadyForData = isReadyForData();
+        boolean isReadyForData = isReadyForData()
+                                    && getDesiredPowerState()
+                                    && mCm.getRadioState().isOn();
 
-        if (desiredPowerState == false || isReadyForData == false) {
+        if (isReadyForData == false) {
             logi("Not Ready for Data :");
+            logi("   " + "getDesiredPowerState() = " + getDesiredPowerState());
+            logi("   " + "mCm.getRadioState() = " + mCm.getRadioState());
             logi("   " + dumpDataReadinessinfo());
             return; // we will be called, when some event, triggers us back into readiness.
         }
@@ -1057,8 +1063,18 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     private boolean trySetupDataCall(DataServiceType ds, IPVersion ipv, String reason) {
         logv("trySetupDataCall : ds=" + ds + ", ipv=" + ipv + ", reason=" + reason);
         DataProfile dp = mDpt.getNextWorkingDataProfile(ds, getDataProfileTypeToUse(), ipv);
+        /*
+         * It might not possible to distinguish an EVDO only network from
+         * one that supports EHRPD, until the data call is actually made! So
+         * if THIS is an EHRPD capable device, then we have to make
+         * sure that we send APN if available. But, if we do not have APNs
+         * configured then we should fall back to NAI!
+         */
+        if (dp == null && mIsEhrpdCapable && getRadioTechnology().isEvdo()) {
+            dp = mDpt.getNextWorkingDataProfile(ds, DataProfileType.PROFILE_TYPE_3GPP2_NAI, ipv);
+        }
         if (dp == null) {
-            logw("no working data profile available to establish service type " + ds);
+            logw("no working data profile available to establish service type " + ds + "on " + ipv);
             updateStateAndNotify(State.FAILED, ds, ipv, reason);
             return false;
         }
@@ -1089,17 +1105,19 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     private DataProfileType getDataProfileTypeToUse() {
         DataProfileType type = null;
-        if (mDsst == null || mDsst.getServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
-            // we are not sure what kind of data profile to use.
-            // this shouldn't really happen, as we check for these things before trying to setup
-            // a data call
-            logw("getDataProfileTypeToUse() returns null!");
-            return null;
-        }
         RadioTechnology r = getRadioTechnology();
         if (r == RadioTechnology.RADIO_TECH_UNKNOWN || r == null) {
             type = null;
-        } else if (r.isGsm() || r == RadioTechnology.RADIO_TECH_EHRPD) {
+        } else if (r == RadioTechnology.RADIO_TECH_EHRPD
+                || ( mIsEhrpdCapable && r.isEvdo())) {
+            /*
+             * It might not possible to distinguish an EVDO only network from
+             * one that supports EHRPD, until the data call is actually made! So
+             * if THIS is an EHRPD capable device, then we have to make
+             * sure that we send APN if its available!
+             */
+            type = DataProfileType.PROFILE_TYPE_3GPP_APN;
+        } else if (r.isGsm()) {
             type = DataProfileType.PROFILE_TYPE_3GPP_APN;
         } else {
             type = DataProfileType.PROFILE_TYPE_3GPP2_NAI;
