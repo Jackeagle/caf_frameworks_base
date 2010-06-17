@@ -103,6 +103,11 @@ public interface CommandsInterface {
                     || this == RADIO_TECH_EVDO_B || this == RADIO_TECH_EHRPD;
         }
 
+        public boolean isEvdo() {
+            return this == RADIO_TECH_EVDO_0 || this == RADIO_TECH_EVDO_A
+                    || this == RADIO_TECH_EVDO_B;
+        }
+
         public static RadioTechnology getRadioTechFromInt(int techInt) {
             RadioTechnology rt = RADIO_TECH_UNKNOWN;
             try {
