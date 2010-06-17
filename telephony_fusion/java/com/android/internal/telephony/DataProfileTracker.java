@@ -19,9 +19,13 @@ package com.android.internal.telephony;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.ContentObserver;
 import android.database.Cursor;
+import android.net.Uri;
+import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Registrant;
@@ -160,12 +164,22 @@ public class DataProfileTracker extends Handler {
 
         mAllDataProfilesList = allDataProfiles;
 
+        /* update preferred APN for SERVICE_TYPE_DEFAULT/IPV4 */
+        boolean hasPreferredApnChanged = false;
+        ApnSetting newPreferredDefaultApn = getPreferredDefaultApnFromDb(dsMap
+                .get(DataServiceType.SERVICE_TYPE_DEFAULT).mDataProfileList);
+        if (isApnDifferent(mPreferredDefaultApn, newPreferredDefaultApn) == true) {
+            hasPreferredApnChanged = true;
+            mPreferredDefaultApn = newPreferredDefaultApn;
+        }
+
         /*
          * Notify DCT about profile db change.
-         * TODO: this should be done only if the data profiles in use,
-         * have really changed.
+         * TODO: rather than sending info about preferredApnChange, should it really be,
+         * if _any_ APN in use has changed?
          */
-        mDataDataProfileDbChangedRegistrants.notifyRegistrants();
+        mDataDataProfileDbChangedRegistrants.notifyRegistrants(new AsyncResult(null,
+                hasPreferredApnChanged, null));
     }
 
     public void setOperatorNumeric(String newOperatorNumeric) {
@@ -186,12 +200,12 @@ public class DataProfileTracker extends Handler {
 
     void resetAllServiceStates() {
         for (DataServiceType ds : DataServiceType.values()) {
-            dsMap.get(ds).resetServiceState();
+            dsMap.get(ds).resetServiceConnectionState();
         }
     }
 
     void resetServiceState(DataServiceType ds) {
-        dsMap.get(ds).resetServiceState();
+        dsMap.get(ds).resetServiceConnectionState();
     }
 
     /*
@@ -223,7 +237,10 @@ public class DataProfileTracker extends Handler {
                 }
             }
         }
-        return (DataServiceType[]) result.toArray();
+        DataServiceType typeArray[] = new DataServiceType[result.size()];
+        typeArray= (DataServiceType[]) result.toArray(typeArray);
+
+        return typeArray;
     }
 
     private ArrayList<DataProfile> createDataProfileList(Cursor cursor) {
@@ -265,6 +282,17 @@ public class DataProfileTracker extends Handler {
 
     void setServiceTypeAsActive(DataServiceType ds, DataConnection dc, IPVersion ipv) {
         dsMap.get(ds).setDataServiceTypeAsActive(dc, ipv);
+
+        /* preferred APN handling */
+        if (ds == DataServiceType.SERVICE_TYPE_DEFAULT
+                && ipv == IPVersion.IPV4
+                && dc.getDataProfile().getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN) {
+            ApnSetting apnUsed = (ApnSetting) dc.getDataProfile();
+            if (isApnDifferent(mPreferredDefaultApn, apnUsed) == true) {
+                mPreferredDefaultApn = apnUsed;
+                setPreferredDefaultApnToDb(apnUsed);
+            }
+        }
     }
 
     void setServiceTypeAsInactive(DataServiceType ds, IPVersion ipv) {
@@ -284,6 +312,16 @@ public class DataProfileTracker extends Handler {
     }
 
     DataProfile getNextWorkingDataProfile(DataServiceType ds, DataProfileType dpt, IPVersion ipv) {
+        /*
+         * For default service type on IPV4, return preferred APN if it is known
+         * to work.
+         */
+        if (ds == DataServiceType.SERVICE_TYPE_DEFAULT && ipv == IPVersion.IPV4) {
+            if (mPreferredDefaultApn != null && mPreferredDefaultApn.isWorking(IPVersion.IPV4)) {
+                return mPreferredDefaultApn;
+            }
+        }
+
         return dsMap.get(ds).getNextWorkingDataProfile(dpt, ipv);
     }
 
@@ -307,6 +345,93 @@ public class DataProfileTracker extends Handler {
     void unregisterForDataProfileDbChanged(Handler h) {
         mDataDataProfileDbChangedRegistrants.remove(h);
     }
+
+    /*
+     * The following is relevant only for the default profile Type + IPV4.
+     */
+
+    static final Uri PREFER_DEFAULT_APN_URI = Uri.parse("content://telephony/carriers/preferapn");
+    static final String APN_ID = "apn_id";
+
+    ApnSetting mPreferredDefaultApn = null;
+    boolean mCanSetDefaultPreferredApn = false;
+
+    /*
+     * return a preferred APN for default internet connection if any.
+     * This function has side effects! (TODO: fix this).
+     * mCanSetDefaultPreferredApn is set to true if such a table entry exists.
+     * setPreferredDefaultApn() is set to null if preferred apn id is invalid
+     */
+    private ApnSetting getPreferredDefaultApnFromDb(ArrayList<DataProfile> defaultDataProfileList) {
+
+        if (defaultDataProfileList.isEmpty()) {
+            return null;
+        }
+
+        Cursor cursor = mContext.getContentResolver().query(PREFER_DEFAULT_APN_URI, new String[] {
+                "_id", "name", "apn"
+        }, null, null, Telephony.Carriers.DEFAULT_SORT_ORDER);
+
+        if (cursor != null) {
+            mCanSetDefaultPreferredApn = true;
+        } else {
+            mCanSetDefaultPreferredApn = false;
+        }
+
+        if (mCanSetDefaultPreferredApn && cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            int pos = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Carriers._ID));
+            for (DataProfile p : defaultDataProfileList) {
+                if (p.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN) {
+                    ApnSetting apn = (ApnSetting) p;
+                    if (apn.id == pos
+                            && apn.canHandleServiceType(DataServiceType.SERVICE_TYPE_DEFAULT)) {
+                        cursor.close();
+                        return apn;
+                    }
+                }
+            }
+        }
+
+        if (cursor != null) {
+            cursor.close();
+        }
+
+        return null;
+    }
+
+    private void setPreferredDefaultApnToDb(ApnSetting apn) {
+
+        if (!mCanSetDefaultPreferredApn)
+            return;
+
+        ContentResolver resolver = mContext.getContentResolver();
+        resolver.delete(PREFER_DEFAULT_APN_URI, null, null);
+
+        if (apn != null) {
+            ContentValues values = new ContentValues();
+            values.put(APN_ID, apn.id);
+            resolver.insert(PREFER_DEFAULT_APN_URI, values);
+        }
+    }
+
+    /*
+     * used to check if preferred apn has changed.
+     */
+    private boolean isApnDifferent(ApnSetting oldApn, ApnSetting newApn) {
+        boolean different = true;
+
+        if ((newApn != null) && (oldApn != null))  {
+            if ((oldApn.toString().equals(newApn.toString() )) &&
+                ((oldApn.user != null && oldApn.user.equals(newApn.user)) ||
+                 (oldApn.user == null && newApn.user == null)) &&
+                ((oldApn.password != null && oldApn.password.equals(newApn.password)) ||
+                 (oldApn.password == null && newApn.password == null)))  {
+                 different = false;
+           }
+        }
+        return different;
+     }
 
     private void logv(String msg) {
         Log.v(LOG_TAG, "[DPT] " + msg);

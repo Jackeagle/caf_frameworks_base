@@ -32,6 +32,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
+import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.telephony.cdma.RuimRecords;
@@ -83,6 +84,7 @@ public class DataServiceStateTracker extends Handler {
     static final int PS_NOTIFICATION = 888; // Id to update and cancel PS
                                             // restricted
 
+    private DataPhone mDct;
     private CommandsInterface cm;
     private Context mContext;
     private UiccManager mUiccManager;
@@ -115,10 +117,14 @@ public class DataServiceStateTracker extends Handler {
     /* gsm only stuff */
     private RestrictedState mRs;
     private boolean mGsmRoaming = false;
+    private PhoneNotifier mNotifier;
 
-    public DataServiceStateTracker(Context context, CommandsInterface ci) {
+    public DataServiceStateTracker(DataPhone dct, Context context, PhoneNotifier notifier,
+            CommandsInterface ci) {
+        this.mDct = dct;
         this.cm = ci;
         this.mContext = context;
+        this.mNotifier = notifier;
 
         this.mUiccManager = UiccManager.getInstance(context, this.cm);
 
@@ -140,7 +146,7 @@ public class DataServiceStateTracker extends Handler {
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
         //cdma only
-        //TODO: fusion - cm.registerForCdmaSubscriptionSourceChanged(this, EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
+        cm.registerForCdmaSubscriptionSourceChanged(this, EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
     }
 
     @Override
@@ -151,25 +157,32 @@ public class DataServiceStateTracker extends Handler {
         switch (msg.what) {
             case EVENT_RADIO_STATE_CHANGED:
                 pollState("radio state changed");
+                if (cm.getRadioState().isOn()) {
+                    cm.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+                }
                 break;
 
             case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
-              //TODO: - fusion - cm.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+                cm.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
                 break;
 
             case EVENT_GET_CDMA_SUBSCRIPTION_SOURCE:
-                int newSubscriptionSource = ((int[]) ar.result)[0];
+                if (ar.exception != null) {
+                    logw("cdma subscrion source query returned exception : " + ar.exception.toString());
+                } else {
+                    int newSubscriptionSource = ((int[]) ar.result)[0];
 
-                if (newSubscriptionSource != mCdmaSubscriptionSource) {
-                    Log.v(LOG_TAG, "cdma subscription Ssurce changed : " + mCdmaSubscriptionSource
-                            + " >> " + newSubscriptionSource);
-                    mCdmaSubscriptionSource = newSubscriptionSource;
+                    if (newSubscriptionSource != mCdmaSubscriptionSource) {
+                        Log.v(LOG_TAG, "cdma subscription Ssurce changed : "
+                                + mCdmaSubscriptionSource + " >> " + newSubscriptionSource);
+                        mCdmaSubscriptionSource = newSubscriptionSource;
 
-                    if (newSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV) {
-                        // NV is already ready, if subscription is NV.
-                        sendMessage(obtainMessage(EVENT_NV_READY));
+                        if (newSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV) {
+                            // NV is already ready, if subscription is NV.
+                            sendMessage(obtainMessage(EVENT_NV_READY));
+                        }
+                        pollState("cdma subscription source changed");
                     }
-                    pollState("cdma subscription source changed");
                 }
                 break;
 
@@ -254,7 +267,7 @@ public class DataServiceStateTracker extends Handler {
 
             default:
                 mPollingContext[0]++;
-                cm.getRegistrationState(obtainMessage(EVENT_POLL_STATE_REGISTRATION,
+                cm.getDataRegistrationState(obtainMessage(EVENT_POLL_STATE_REGISTRATION,
                         mPollingContext));
 
                 break;
@@ -442,7 +455,7 @@ public class DataServiceStateTracker extends Handler {
         mDataConnectionState = mNewDataConnectionState;
 
         if (hasChanged) {
-            /* TODO: fusion - should phone notifier service state change should be called? */
+            mNotifier.notifyDataServiceState(mDct);
         }
 
         if (hasDataConnectionAttached) {
@@ -454,7 +467,7 @@ public class DataServiceStateTracker extends Handler {
         }
 
         if (hasDataConnectionChanged) {
-            /* TODO: fusion - should phone notifier service state change should be called? */
+            mNotifier.notifyDataServiceState(mDct);
         }
 
         if (hasRoamingOn) {
@@ -751,7 +764,7 @@ public class DataServiceStateTracker extends Handler {
             int[] ints = (int[]) ar.result;
             int state = ints[0];
 
-            if (m3gpp2App != null /* && TODO: m3gpp2Application.getState() == IccCard.State.READY*/) {
+            if (m3gpp2App != null && m3gpp2App.getState() == AppState.APPSTATE_READY) {
                 newRs.setPsRestricted(
                         (state & RILConstants.RIL_RESTRICTED_STATE_PS_ALL)!= 0);
             }
@@ -817,7 +830,7 @@ public class DataServiceStateTracker extends Handler {
         cm.unregisterForRadioStateChanged(this);
         cm.unregisterForDataNetworkStateChanged(this);
         cm.unSetOnRestrictedStateChanged(this);
-        //TODO: cm.unregisterForCdmaSubscriptionSourceChanged();
+        cm.unregisterForCdmaSubscriptionSourceChanged(this);
 
         mUiccManager.unregisterForIccChanged(this);
 

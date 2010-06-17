@@ -41,4 +41,5 @@ public interface PhoneNotifier {
 
     public void notifyDataActivity(DataPhone sender);
 
+    public void notifyDataServiceState(DataPhone sender);
 }

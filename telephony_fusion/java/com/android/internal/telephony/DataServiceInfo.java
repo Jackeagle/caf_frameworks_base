@@ -18,13 +18,8 @@ package com.android.internal.telephony;
 
 import java.util.ArrayList;
 
-import android.content.ContentResolver;
-import android.content.ContentValues;
 import android.content.Context;
-import android.database.Cursor;
-import android.net.Uri;
 import android.os.SystemProperties;
-import android.provider.Telephony;
 import android.util.Log;
 
 import com.android.internal.telephony.DataConnectionTracker.State;
@@ -64,7 +59,7 @@ public class DataServiceInfo {
     ArrayList<DataProfile> mDataProfileList;
 
     /** Retry configuration: A doubling of retry times from 5secs to 30 minutes */
-    private  static final String DEFAULT_DATA_RETRY_CONFIG = "default_randomization=2000,"
+    private static final String DEFAULT_DATA_RETRY_CONFIG = "default_randomization=2000,"
             + "5000,10000,20000,40000,80000:5000,160000:5000,"
             + "320000:5000,640000:5000,1280000:5000,1800000:5000";
 
@@ -111,10 +106,10 @@ public class DataServiceInfo {
         isEnabled = false;
         activeIpv4Dc = null;
         activeIpv6Dc = null;
-        resetServiceState();
+        resetServiceConnectionState();
     }
 
-    void resetServiceState() {
+    void resetServiceConnectionState() {
         if (ipv4State == State.FAILED)
             setState(State.IDLE, IPVersion.IPV4);
         if (ipv6State == State.FAILED)
@@ -129,25 +124,12 @@ public class DataServiceInfo {
     // gets the next data profile of the specified data profile type and ip
     // version that needs to be tried out.
     DataProfile getNextWorkingDataProfile(DataProfileType profileType, IPVersion ipv) {
-        /*
-         * If we are asked for an APN and the service type is DEFAULT then we
-         * should return the preferred APN if its available.
-         */
-        if (mServiceType == DataServiceType.SERVICE_TYPE_DEFAULT
-                && profileType == DataProfileType.PROFILE_TYPE_3GPP_APN) {
-            DataProfile dp = getPreferredDefaultApn();
-            if (dp != null && dp.canSupportIpVersion(ipv) && dp.isWorking(ipv)) {
-                return dp;
-            }
-        }
-
         for (DataProfile dp : mDataProfileList) {
             if (dp.getDataProfileType() == profileType && dp.isWorking(ipv) == true
                     && dp.canSupportIpVersion(ipv)) {
                 return dp;
             }
         }
-
         return null; // no working DP found
     }
 
@@ -164,8 +146,8 @@ public class DataServiceInfo {
     }
 
     /*
-     * if data connection is active, dc should be valid, can be called even if
-     * service is not enabled.
+     * Dc should be valid when this function is called. It can be called even if
+     * service is not enabled. State is set to CONNECTED!
      */
     void setDataServiceTypeAsActive(DataConnection dc, IPVersion ipv) {
         if (dc == null || ipv == null) {
@@ -182,11 +164,6 @@ public class DataServiceInfo {
             this.activeIpv4Dc = dc;
         }
         setState(State.CONNECTED, ipv);
-        if (mServiceType == DataServiceType.SERVICE_TYPE_DEFAULT
-                && dc.getDataProfile().getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN) {
-            // TODO: does preferred APN means, valid IPV4 apn?
-            setPreferredDefaultApn((ApnSetting) dc.getDataProfile());
-        }
     }
 
     void setDataServiceTypeAsInactive(IPVersion ipv) {
@@ -224,9 +201,7 @@ public class DataServiceInfo {
 
     public synchronized void setState(State newState, IPVersion ipv) {
         State oldState = ipv == IPVersion.IPV4 ? ipv4State : ipv6State;
-        if (oldState == State.SCANNING && newState == State.CONNECTING) {
-            newState = State.SCANNING;
-        }
+
         if (newState != oldState) {
             if (ipv == IPVersion.IPV6) {
                 ipv6State = newState;
@@ -241,82 +216,6 @@ public class DataServiceInfo {
             return ipv4State;
         else
             return ipv6State;
-    }
-
-    /*
-     * The following is relevant only for the default profile Type.
-     */
-
-    static final Uri PREFER_DEFAULT_APN_URI = Uri.parse("content://telephony/carriers/preferapn");
-    static final String APN_ID = "apn_id";
-
-    ApnSetting mPreferredApn = null;
-    boolean mCanSetDefaultPreferredApn = false;
-
-    private void setPreferredDefaultApn(ApnSetting apn) {
-
-        if (!mCanSetDefaultPreferredApn)
-            return;
-
-        if (false ) {
-            //TODO: preferred APN handling has to be fixed.
-            ContentResolver resolver = mContext.getContentResolver();
-            resolver.delete(PREFER_DEFAULT_APN_URI, null, null);
-
-            if (apn != null) {
-                ContentValues values = new ContentValues();
-                values.put(APN_ID, apn.id);
-                resolver.insert(PREFER_DEFAULT_APN_URI, values);
-                logi("Default APN set :" + apn);
-            }
-        }
-    }
-
-    /*
-     * return a preferred APN for default internet connection if any.
-     * mCanSetDefaultPreferredApn is set to true if such a table entry exists.
-     */
-    private ApnSetting getPreferredDefaultApn() {
-
-        if (mDataProfileList.isEmpty()) {
-            return null;
-        }
-
-        Cursor cursor = mContext.getContentResolver().query(PREFER_DEFAULT_APN_URI, new String[] {
-                "_id", "name", "apn"
-        }, null, null, Telephony.Carriers.DEFAULT_SORT_ORDER);
-
-        /* TODO: fusion - fix this side effect */
-        if (cursor != null) {
-            mCanSetDefaultPreferredApn = true;
-        } else {
-            mCanSetDefaultPreferredApn = false;
-        }
-
-        if (mCanSetDefaultPreferredApn && cursor.getCount() > 0) {
-            cursor.moveToFirst();
-            int pos = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Carriers._ID));
-            for (DataProfile p : mDataProfileList) {
-                if (p.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN) {
-                    ApnSetting apn = (ApnSetting) p;
-                    if (apn.id == pos
-                            && apn.canHandleServiceType(DataServiceType.SERVICE_TYPE_DEFAULT)) {
-                        cursor.close();
-                        return apn;
-                    }
-                }
-            }
-            // if we reach here, it probably means that the profile id set is no
-            // longer valid, or doesn't work clear!
-            // TODO: fusion - should be a better way to do this.
-            setPreferredDefaultApn(null);
-        }
-
-        if (cursor != null) {
-            cursor.close();
-        }
-
-        return null;
     }
 
     static private final String LOG_TAG = "DATA";

@@ -82,7 +82,9 @@ public class MMDataConnection extends DataConnection {
                     Integer.toString(ipVersion == IPVersion.IPV6 ? 1 : 0),
                     obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE));
         } else if (dp.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP2_NAI) {
-            this.mCM.setupDataCall(Integer.toString(1), null, null, null, null, Integer
+            this.mCM.setupDataCall(Integer.toString(1),
+                    //TODO - fill in this from DP
+                    Integer.toString(0), null, null, null, Integer
                     .toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP), Integer
                     .toString(ipVersion == IPVersion.IPV6 ? 1 : 0),
                     obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE));

@@ -53,4 +53,7 @@ public class TestPhoneNotifier implements PhoneNotifier {
 
     public void notifyDataActivity(DataPhone sender) {
     }
+
+    public void notifyDataServiceState(DataPhone sender) {
+    }
 }
