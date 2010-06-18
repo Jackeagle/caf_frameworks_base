@@ -194,7 +194,7 @@ public class DataServiceStateTracker extends Handler {
 
             case EVENT_SIM_RECORDS_LOADED:
             case EVENT_RUIM_RECORDS_LOADED:
-                mRecordsLoadedRegistrants.notify();
+                mRecordsLoadedRegistrants.notifyRegistrants();
                 pollState("records loaded");
                 break;
 
