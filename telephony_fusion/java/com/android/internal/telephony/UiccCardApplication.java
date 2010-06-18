@@ -49,6 +49,7 @@ public class UiccCardApplication {
 
     private UiccApplicationRecords mUiccApplicationRecords;
     private AppState      mAppState;
+    private AppType       mAppType;
     private PersoSubState mPersoSubState;
     private String        mAid;
     private String        mAppLabel;
@@ -73,6 +74,7 @@ public class UiccCardApplication {
         mSlotId = uiccCard.getSlotId();
         mUiccCard = uiccCard;
         mAppState = as.app_state;
+        mAppType = as.app_type;
         mPersoSubState = as.perso_substate;
         mAid = as.aid;
         mAppLabel = as.app_label;
@@ -95,11 +97,10 @@ public class UiccCardApplication {
         mContext = c;
         mCi = ci;
 
-        if (as.app_type != mUiccApplicationRecords.getType()) {
+        if (as.app_type != mAppType) {
             mUiccApplicationRecords.dispose();
-            if (as.app_type == AppType.APPTYPE_USIM) {
-                mUiccApplicationRecords = createUiccApplicationRecords(as.app_type, ur, c, ci);
-            }
+            mUiccApplicationRecords = createUiccApplicationRecords(as.app_type, ur, c, ci);
+            mAppType = as.app_type;
         }
 
         if (mPersoSubState != as.perso_substate) {
@@ -145,7 +146,7 @@ public class UiccCardApplication {
     }
 
     public AppType getType() {
-        return mUiccApplicationRecords.getType();
+        return mAppType;
     }
 
     public synchronized UiccApplicationRecords getApplicationRecords() {

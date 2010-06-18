@@ -75,7 +75,6 @@ public abstract class UiccApplicationRecords extends Handler{
         mUnavailableRegistrants.notifyRegistrants();
         //TODO: Do we need to to anything here? Probably - once we have code here
     }
-    abstract public AppType getType ();
 
     public synchronized void registerForUnavailable(Handler h, int what, Object obj) {
         if (mDestroyed) {

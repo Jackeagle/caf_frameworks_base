@@ -189,11 +189,6 @@ public final class SIMRecords extends UiccApplicationRecords {
         // Start off by setting empty state
         onRadioOffOrNotAvailable();
     }
-    
-    public AppType getType () {
-        return AppType.APPTYPE_SIM;
-    }
-
 
     public void dispose() {
         //Unregister for all events

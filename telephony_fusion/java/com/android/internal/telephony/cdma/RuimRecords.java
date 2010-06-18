@@ -90,10 +90,6 @@ public final class RuimRecords extends UiccApplicationRecords {
         onRadioOffOrNotAvailable();
     }
 
-    public AppType getType () {
-        return AppType.APPTYPE_RUIM;
-    }
-
     public void dispose() {
         //Unregister for all events
         //TODO: fusion - to be changed as part of UICC framework
