@@ -45,6 +45,7 @@ public:
         ENFORCED_AUDIBLE = 7, // Sounds that cannot be muted by user and must be routed to speaker
         DTMF             = 8,
         TTS              = 9,
+        FM              = 10,
         NUM_STREAM_TYPES
     };
 
@@ -223,6 +224,7 @@ public:
         size_t* buffSize);
 
     static status_t setVoiceVolume(float volume);
+    static status_t setFmVolume(float volume);
 
     //
     // AudioPolicyService interface
@@ -234,6 +236,7 @@ public:
         DEVICE_OUT_SPEAKER = 0x2,
         DEVICE_OUT_WIRED_HEADSET = 0x4,
         DEVICE_OUT_WIRED_HEADPHONE = 0x8,
+        DEVICE_OUT_FMRADIO= 0x16,
         DEVICE_OUT_BLUETOOTH_SCO = 0x10,
         DEVICE_OUT_BLUETOOTH_SCO_HEADSET = 0x20,
         DEVICE_OUT_BLUETOOTH_SCO_CARKIT = 0x40,
@@ -241,9 +244,10 @@ public:
         DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100,
         DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER = 0x200,
         DEVICE_OUT_AUX_DIGITAL = 0x400,
+        DEVICE_OUT_FM = 0x1000,
         DEVICE_OUT_DEFAULT = 0x8000,
         DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE | DEVICE_OUT_SPEAKER | DEVICE_OUT_WIRED_HEADSET |
-                DEVICE_OUT_WIRED_HEADPHONE | DEVICE_OUT_BLUETOOTH_SCO | DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
+                DEVICE_OUT_WIRED_HEADPHONE | DEVICE_OUT_FM | DEVICE_OUT_BLUETOOTH_SCO | DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
                 DEVICE_OUT_BLUETOOTH_SCO_CARKIT | DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
                 DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER | DEVICE_OUT_AUX_DIGITAL | DEVICE_OUT_DEFAULT),
 
@@ -256,11 +260,13 @@ public:
         DEVICE_IN_AUX_DIGITAL = 0x200000,
         DEVICE_IN_VOICE_CALL = 0x400000,
         DEVICE_IN_BACK_MIC = 0x800000,
+        DEVICE_IN_FM_RX = 0x1000000,
+        DEVICE_IN_FM_RX_A2DP = 0x2000000,
         DEVICE_IN_DEFAULT = 0x80000000,
 
         DEVICE_IN_ALL = (DEVICE_IN_COMMUNICATION | DEVICE_IN_AMBIENT | DEVICE_IN_BUILTIN_MIC |
                 DEVICE_IN_BLUETOOTH_SCO_HEADSET | DEVICE_IN_WIRED_HEADSET | DEVICE_IN_AUX_DIGITAL |
-                DEVICE_IN_VOICE_CALL | DEVICE_IN_BACK_MIC | DEVICE_IN_DEFAULT)
+                DEVICE_IN_VOICE_CALL | DEVICE_IN_BACK_MIC | DEVICE_IN_FM_RX | DEVICE_IN_FM_RX_A2DP | DEVICE_IN_DEFAULT)
     };
 
     // device connection states used for setDeviceConnectionState()
