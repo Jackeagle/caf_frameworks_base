@@ -232,6 +232,7 @@ public class StatusBarPolicy {
             com.android.internal.R.drawable.stat_sys_data_out_g,
             com.android.internal.R.drawable.stat_sys_data_inandout_g,
         };
+    // Use 3G icons for EVDO data
     private static final int[] sDataNetType_3g = new int[] {
             com.android.internal.R.drawable.stat_sys_data_connected_3g,
             com.android.internal.R.drawable.stat_sys_data_in_3g,
@@ -251,14 +252,19 @@ public class StatusBarPolicy {
             com.android.internal.R.drawable.stat_sys_data_out_h,
             com.android.internal.R.drawable.stat_sys_data_inandout_h,
     };
-
-    //CDMA
-    // Use 3G icons for EVDO data and 1x icons for 1XRTT data
+    //CDMA - 1x icons for 1XRTT data
     private static final int[] sDataNetType_1x = new int[] {
         com.android.internal.R.drawable.stat_sys_data_connected_1x,
         com.android.internal.R.drawable.stat_sys_data_in_1x,
         com.android.internal.R.drawable.stat_sys_data_out_1x,
         com.android.internal.R.drawable.stat_sys_data_inandout_1x,
+    };
+    //LTE - use 4G icon
+    private static final int[] sDataNetType_lte = new int[] {
+        com.android.internal.R.drawable.stat_sys_data_connected_4g,
+        com.android.internal.R.drawable.stat_sys_data_in_4g,
+        com.android.internal.R.drawable.stat_sys_data_out_4g,
+        com.android.internal.R.drawable.stat_sys_data_inandout_4g,
     };
 
     // Assume it's all good unless we hear otherwise.  We don't always seem
@@ -790,17 +796,13 @@ public class StatusBarPolicy {
         public void onServiceStateChanged(ServiceState state) {
             mServiceState = state;
             updateSignalStrength();
-            updateCdmaRoamingIcon(state);
             updateDataIcon();
         }
 
         @Override
         public void onCallStateChanged(int state, String incomingNumber) {
             updateCallState(state);
-            // In cdma, if a voice call is made, RSSI should switch to 1x.
-            if (isCdma()) {
-                updateSignalStrength();
-            }
+            updateSignalStrength();
         }
 
         @Override
@@ -865,28 +867,67 @@ public class StatusBarPolicy {
         updateDataIcon();
     }
 
-    private boolean isCdma() {
-        return (mSignalStrength != null) && !mSignalStrength.isGsm();
+    private boolean isDataGsm() {
+        if (mServiceState == null) {
+            Log.e(TAG, "Service state not updated");
+            return false;
+        }
+        /*find out radio technology by looking at service state */
+        switch(mServiceState.getRadioTechnology()){
+            case ServiceState.RADIO_TECHNOLOGY_GPRS:
+            case ServiceState.RADIO_TECHNOLOGY_EDGE:
+            case ServiceState.RADIO_TECHNOLOGY_UMTS:
+            case ServiceState.RADIO_TECHNOLOGY_HSDPA:
+            case ServiceState.RADIO_TECHNOLOGY_HSUPA:
+            case ServiceState.RADIO_TECHNOLOGY_HSPA:
+            case ServiceState.RADIO_TECHNOLOGY_LTE:
+                return true;
+            default:
+                return false;
+        }
     }
 
-    private boolean isEvdo() {
-        return ( (mServiceState != null)
-                 && ((mServiceState.getRadioTechnology()
-                        == ServiceState.RADIO_TECHNOLOGY_EVDO_0)
-                     || (mServiceState.getRadioTechnology()
-                        == ServiceState.RADIO_TECHNOLOGY_EVDO_A)
-                     || (mServiceState.getRadioTechnology()
-                        == ServiceState.RADIO_TECHNOLOGY_EVDO_B)));
+    private boolean isDataCdma() {
+        if (mServiceState == null) {
+            Log.e(TAG, "Service state not updated");
+            return false;
+        }
+        /*find out radio technology by looking at service state */
+        switch(mServiceState.getRadioTechnology()){
+            case ServiceState.RADIO_TECHNOLOGY_IS95A:
+            case ServiceState.RADIO_TECHNOLOGY_IS95B:
+            case ServiceState.RADIO_TECHNOLOGY_1xRTT:
+                return true;
+            default:
+                return false;
+        }
     }
 
+    private boolean isDataEvdo() {
+        if (mServiceState == null) {
+            Log.e(TAG, "Service state not updated");
+            return false;
+        }
+        /*find out radio technology by looking at service state */
+        switch(mServiceState.getRadioTechnology()){
+            case ServiceState.RADIO_TECHNOLOGY_EVDO_0:
+            case ServiceState.RADIO_TECHNOLOGY_EVDO_A:
+            case ServiceState.RADIO_TECHNOLOGY_EVDO_B:
+                return true;
+            default:
+                return false;
+        }
+    }
     private boolean hasService() {
-        if (mServiceState != null) {
+        if ((mServiceState != null) && (mSignalStrength != null)){
             switch (mServiceState.getState()) {
+                case ServiceState.STATE_IN_SERVICE:
+                case ServiceState.STATE_EMERGENCY_ONLY:
+                    return true;
                 case ServiceState.STATE_OUT_OF_SERVICE:
                 case ServiceState.STATE_POWER_OFF:
-                    return false;
                 default:
-                    return true;
+                    return false;
             }
         } else {
             return false;
@@ -909,42 +950,73 @@ public class StatusBarPolicy {
             return;
         }
 
-        if (!isCdma()) {
-            int asu = mSignalStrength.getGsmSignalStrength();
+        if (mPhoneState != TelephonyManager.CALL_STATE_IDLE) // phone in voice
+        {
+            /* signalstrength-isGsm has voice tech
+             * GSM - isGSM flag is on
+             * CDMA 1x -isGSM flag is off
+             */
+            if (mSignalStrength.isGsm()) { // Gsm voice call
+                iconLevel = getGsmLevel();
+            } else { // cdma voice call
+                iconLevel = getCdmaLevel();
+            }
+        } else { // phone not in voice call
+            /* find out data radio tech by looking at service state */
+            if (isDataGsm()) {
+                iconLevel = getGsmLevel();
+            } else if (isDataEvdo()) {
+                iconLevel = getEvdoLevel();
+            } else if (isDataCdma()) {
+                iconLevel = getCdmaLevel();
+            } else
+                Log.d(TAG, "invalid Radio ");
+        }// end of CALL_STATE_IDLE
 
-            // ASU ranges from 0 to 31 - TS 27.007 Sec 8.5
-            // asu = 0 (-113dB or less) is very weak
-            // signal, its better to show 0 bars to the user in such cases.
-            // asu = 99 is a special case, where the signal strength is unknown.
-            if (asu <= 0 || asu == 99) iconLevel = 0;
-            else if (asu >= 16) iconLevel = 4;
-            else if (asu >= 8)  iconLevel = 3;
-            else if (asu >= 4)  iconLevel = 2;
-            else iconLevel = 1;
-
-            // Though mPhone is a Manager, this call is not an IPC
-            if (mPhone.isNetworkRoaming()) {
+        /* Assumption - for roaming ( voice and/or data)
+         * the roaming icon corresponding to voice tech will be displayed
+         */
+        if (mServiceState.getRoaming())
+        {
+            if (mSignalStrength.isGsm()) {
                 iconList = sSignalImages_r;
             } else {
                 iconList = sSignalImages;
+                updateCdmaRoamingIcon(mServiceState);
             }
         } else {
-            iconList = this.sSignalImages;
-
-            // If 3G(EV) and 1x network are available than 3G should be
-            // displayed, displayed RSSI should be from the EV side.
-            // If a voice call is made then RSSI should switch to 1x.
-            if ((mPhoneState == TelephonyManager.CALL_STATE_IDLE) && isEvdo()){
-                iconLevel = getEvdoLevel();
-                if (false) {
-                    Log.d(TAG, "use Evdo level=" + iconLevel + " to replace Cdma Level=" + getCdmaLevel());
-                }
-            } else {
-                iconLevel = getCdmaLevel();
-            }
+            iconList = sSignalImages;
         }
-        mPhoneData.iconId = iconList[iconLevel];
+
+        if (iconLevel != -1) {
+            mPhoneData.iconId = iconList[iconLevel];
+        } else {
+            mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_null;
+        }
         mService.updateIcon(mPhoneIcon, mPhoneData, null);
+        return;
+    }
+
+    private int getGsmLevel() {
+        int asu = mSignalStrength.getGsmSignalStrength();
+        int iconLevel = -1;
+
+        // ASU ranges from 0 to 31 - TS 27.007 Sec 8.5
+        // asu = 0 (-113dB or less) is very weak
+        // signal, its better to show 0 bars to the user in such cases.
+        // asu = 99 is a special case, where the signal strength is unknown.
+        if (asu <= 0 || asu == 99)
+            iconLevel = 0;
+        else if (asu >= 16)
+            iconLevel = 4;
+        else if (asu >= 8)
+            iconLevel = 3;
+        else if (asu >= 4)
+            iconLevel = 2;
+        else
+            iconLevel = 1;
+
+        return iconLevel;
     }
 
     private int getCdmaLevel() {
@@ -953,18 +1025,28 @@ public class StatusBarPolicy {
         int levelDbm = 0;
         int levelEcio = 0;
 
-        if (cdmaDbm >= -75) levelDbm = 4;
-        else if (cdmaDbm >= -85) levelDbm = 3;
-        else if (cdmaDbm >= -95) levelDbm = 2;
-        else if (cdmaDbm >= -100) levelDbm = 1;
-        else levelDbm = 0;
+        if (cdmaDbm >= -75)
+            levelDbm = 4;
+        else if (cdmaDbm >= -85)
+            levelDbm = 3;
+        else if (cdmaDbm >= -95)
+            levelDbm = 2;
+        else if (cdmaDbm >= -100)
+            levelDbm = 1;
+        else
+            levelDbm = 0;
 
         // Ec/Io are in dB*10
-        if (cdmaEcio >= -90) levelEcio = 4;
-        else if (cdmaEcio >= -110) levelEcio = 3;
-        else if (cdmaEcio >= -130) levelEcio = 2;
-        else if (cdmaEcio >= -150) levelEcio = 1;
-        else levelEcio = 0;
+        if (cdmaEcio >= -90)
+            levelEcio = 4;
+        else if (cdmaEcio >= -110)
+            levelEcio = 3;
+        else if (cdmaEcio >= -130)
+            levelEcio = 2;
+        else if (cdmaEcio >= -150)
+            levelEcio = 1;
+        else
+            levelEcio = 0;
 
         return (levelDbm < levelEcio) ? levelDbm : levelEcio;
     }
@@ -975,17 +1057,27 @@ public class StatusBarPolicy {
         int levelEvdoDbm = 0;
         int levelEvdoSnr = 0;
 
-        if (evdoDbm >= -65) levelEvdoDbm = 4;
-        else if (evdoDbm >= -75) levelEvdoDbm = 3;
-        else if (evdoDbm >= -90) levelEvdoDbm = 2;
-        else if (evdoDbm >= -105) levelEvdoDbm = 1;
-        else levelEvdoDbm = 0;
+        if (evdoDbm >= -65)
+            levelEvdoDbm = 4;
+        else if (evdoDbm >= -75)
+            levelEvdoDbm = 3;
+        else if (evdoDbm >= -90)
+            levelEvdoDbm = 2;
+        else if (evdoDbm >= -105)
+            levelEvdoDbm = 1;
+        else
+            levelEvdoDbm = 0;
 
-        if (evdoSnr >= 7) levelEvdoSnr = 4;
-        else if (evdoSnr >= 5) levelEvdoSnr = 3;
-        else if (evdoSnr >= 3) levelEvdoSnr = 2;
-        else if (evdoSnr >= 1) levelEvdoSnr = 1;
-        else levelEvdoSnr = 0;
+        if (evdoSnr >= 7)
+            levelEvdoSnr = 4;
+        else if (evdoSnr >= 5)
+            levelEvdoSnr = 3;
+        else if (evdoSnr >= 3)
+            levelEvdoSnr = 2;
+        else if (evdoSnr >= 1)
+            levelEvdoSnr = 1;
+        else
+            levelEvdoSnr = 0;
 
         return (levelEvdoDbm < levelEvdoSnr) ? levelEvdoDbm : levelEvdoSnr;
     }
@@ -1020,6 +1112,9 @@ public class StatusBarPolicy {
         case TelephonyManager.NETWORK_TYPE_EVDO_B:
             mDataIconList = sDataNetType_3g;
             break;
+        case TelephonyManager.NETWORK_TYPE_LTE:
+            mDataIconList = sDataNetType_lte;
+            break;
         default:
             mDataIconList = sDataNetType_g;
         break;
@@ -1030,7 +1125,7 @@ public class StatusBarPolicy {
         int iconId;
         boolean visible = true;
 
-        if (!isCdma()) {
+        if (isDataGsm()) {
             // GSM case, we have to check also the sim state
             if (mSimState == IccCard.State.READY || mSimState == IccCard.State.UNKNOWN) {
                 if (hasService() && mDataState == TelephonyManager.DATA_CONNECTED) {
@@ -1247,53 +1342,44 @@ public class StatusBarPolicy {
     }
 
     private final void updateCdmaRoamingIcon(ServiceState state) {
-        if (!hasService()) {
-            mService.setIconVisibility(mCdmaRoamingIndicatorIcon, false);
-            return;
-        }
-
-        if (!isCdma()) {
-            mService.setIconVisibility(mCdmaRoamingIndicatorIcon, false);
-            return;
-        }
+        /* called only when CDMA is voice tech and
+         * 1. roaming on voice (cdma) and roaming/not roaming on data (cdma/gsm)
+         * 2. not roaming on voice (cdma) and roaming on data (cdma /gsm )
+         */
 
         int[] iconList = sRoamingIndicatorImages_cdma;
         int iconIndex = state.getCdmaEriIconIndex();
         int iconMode = state.getCdmaEriIconMode();
 
-        if (iconIndex == -1) {
-            Log.e(TAG, "getCdmaEriIconIndex returned null, skipping ERI icon update");
-            return;
-        }
-
-        if (iconMode == -1) {
-            Log.e(TAG, "getCdmeEriIconMode returned null, skipping ERI icon update");
-            return;
-        }
-
-        if (iconIndex == EriInfo.ROAMING_INDICATOR_OFF) {
-            if (false) Log.v(TAG, "Cdma ROAMING_INDICATOR_OFF, removing ERI icon");
-            mService.setIconVisibility(mCdmaRoamingIndicatorIcon, false);
-            return;
-        }
-
-        switch (iconMode) {
-            case EriInfo.ROAMING_ICON_MODE_NORMAL:
-                mCdmaRoamingIndicatorIconData.iconId = iconList[iconIndex];
-                mService.updateIcon(mCdmaRoamingIndicatorIcon, mCdmaRoamingIndicatorIconData, null);
-                mService.setIconVisibility(mCdmaRoamingIndicatorIcon, true);
-                break;
-            case EriInfo.ROAMING_ICON_MODE_FLASH:
-                mCdmaRoamingIndicatorIconData.iconId =
+        if ((iconIndex != -1) && (iconMode != -1)) {
+            // voice is roaming
+            if (iconIndex == EriInfo.ROAMING_INDICATOR_OFF) {
+                if (false) Log.v(TAG, "Cdma ROAMING_INDICATOR_OFF, removing ERI icon");
+                mService.setIconVisibility(mCdmaRoamingIndicatorIcon, false);
+                return;
+            }
+            switch (iconMode) {
+                case EriInfo.ROAMING_ICON_MODE_NORMAL:
+                    mCdmaRoamingIndicatorIconData.iconId = iconList[iconIndex];
+                    break;
+                case EriInfo.ROAMING_ICON_MODE_FLASH:
+                    mCdmaRoamingIndicatorIconData.iconId =
                         com.android.internal.R.drawable.stat_sys_roaming_cdma_flash;
-                mService.updateIcon(mCdmaRoamingIndicatorIcon, mCdmaRoamingIndicatorIconData, null);
-                mService.setIconVisibility(mCdmaRoamingIndicatorIcon, true);
-                break;
-
+                    break;
+            }
+        } else {
+            /* data is roaming (GSM/CDMA)
+             * There is no separate roaming icon for data
+             * Assumption - if voice is cdma then data will also be cdma
+             * so we decide to display cdma roaming icon as long as voice is cdma
+             */
+            mCdmaRoamingIndicatorIconData.iconId =
+                com.android.internal.R.drawable.stat_sys_roaming_cdma_0;
         }
-        mService.updateIcon(mPhoneIcon, mPhoneData, null);
+        mService.setIconVisibility(mCdmaRoamingIndicatorIcon, true);
+        mService.updateIcon(mCdmaRoamingIndicatorIcon, mCdmaRoamingIndicatorIconData, null);
+        return;
     }
-
 
     private class StatusBarHandler extends Handler {
         @Override
