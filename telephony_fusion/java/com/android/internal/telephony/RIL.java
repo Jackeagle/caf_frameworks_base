@@ -1455,7 +1455,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         rr.mp.writeString(data);
         rr.mp.writeString(pin2);
 
-        if (RILJ_LOGD) riljLog(rr.serialString() + "> iccIO: " + requestToString(rr.mRequest)
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> iccIO: "
+                + " slot: " + slot
+                + " aid: " + aid + " "
+                + requestToString(rr.mRequest)
                 + " 0x" + Integer.toHexString(command)
                 + " 0x" + Integer.toHexString(fileid) + " "
                 + " path: " + path + ","
