@@ -693,28 +693,30 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    supplyIccPin(String pin, Message result) {
+    supplyIccPin(int slot, String aid, String pin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PIN, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(1);
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
         rr.mp.writeString(pin);
 
         send(rr);
     }
 
     public void
-    supplyIccPuk(String puk, String newPin, Message result) {
+    supplyIccPuk(int slot, String aid, String puk, String newPin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PUK, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(2);
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
         rr.mp.writeString(puk);
         rr.mp.writeString(newPin);
 
@@ -722,28 +724,30 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    supplyIccPin2(String pin, Message result) {
+    supplyIccPin2(int slot, String aid, String pin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PIN2, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(1);
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
         rr.mp.writeString(pin);
 
         send(rr);
     }
 
     public void
-    supplyIccPuk2(String puk, String newPin2, Message result) {
+    supplyIccPuk2(int slot, String aid, String puk, String newPin2, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PUK2, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(2);
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
         rr.mp.writeString(puk);
         rr.mp.writeString(newPin2);
 
@@ -751,14 +755,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    changeIccPin(String oldPin, String newPin, Message result) {
+    changeIccPin(int slot, String aid, String oldPin, String newPin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_CHANGE_SIM_PIN, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(2);
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
         rr.mp.writeString(oldPin);
         rr.mp.writeString(newPin);
 
@@ -766,14 +771,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    changeIccPin2(String oldPin2, String newPin2, Message result) {
+    changeIccPin2(int slot, String aid, String oldPin2, String newPin2, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_CHANGE_SIM_PIN2, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(2);
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
         rr.mp.writeString(oldPin2);
         rr.mp.writeString(newPin2);
 
@@ -842,12 +848,17 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    getIMSI(Message result) {
+    getIMSI(int slot, String aid, Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_IMSI, result);
+
+        rr.mp.writeInt(slot);
+        rr.mp.writeString(aid);
 
         if (RILJ_LOGD) riljLog(rr.serialString() +
                               "> getIMSI:RIL_REQUEST_GET_IMSI " +
                               RIL_REQUEST_GET_IMSI +
+                              " slot: " + slot +
+                              " aid: " + aid +
                               " " + requestToString(rr.mRequest));
 
         send(rr);
