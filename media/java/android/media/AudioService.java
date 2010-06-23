@@ -268,6 +268,9 @@ public class AudioService extends IAudioService.Stub {
         intentFilter.addAction(BluetoothHeadset.ACTION_STATE_CHANGED);
         intentFilter.addAction(TtyIntent.TTY_ENABLED_CHANGE_ACTION);
         intentFilter.addAction(Intent.ACTION_FM);
+        intentFilter.addAction("HDMI_CONNECTED");
+        intentFilter.addAction("HDMI_DISCONNECTED");
+        intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
         context.registerReceiver(mReceiver, intentFilter);
     }
 
@@ -1549,6 +1552,18 @@ public class AudioService extends IAudioService.Stub {
                             "");
                     mConnectedDevices.remove(AudioSystem.DEVICE_OUT_FM);
                 }
+            } else if (action.equals("HDMI_CONNECTED")) {
+                Log.v(TAG, "HDMI connected");
+                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_HDMI,
+                                                     AudioSystem.DEVICE_STATE_AVAILABLE,
+                                                     "");
+                mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_HDMI), "");
+            } else if (action.equals("HDMI_DISCONNECTED")) {
+                Log.v(TAG, "HDMI disconnected");
+                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_HDMI,
+                                                     AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                                                     "");
+                mConnectedDevices.remove(AudioSystem.DEVICE_OUT_HDMI);
             }
         }
     }
