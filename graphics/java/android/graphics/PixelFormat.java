@@ -58,7 +58,7 @@ public class PixelFormat
      *  otherwise set with 
      *  {@link android.hardware.Camera.Parameters#setPreviewFormat(int)}.
      */
-    public static final int YCbCr_420_SP= 0x11;
+    public static final int YCbCr_420_SP= 0x21;
 
     /** YCbCr format used for images, which uses YUYV (YUY2) encoding format.
      *  This is an alternative format for camera preview images. Whether this
@@ -67,6 +67,16 @@ public class PixelFormat
      */
     public static final int YCbCr_422_I = 0x14;
 
+    public static final int YCrCb_420_SP       = 0x11;     // NV21 (_adreno)
+    public static final int YCbCr_422_P        = 0x12;     // IYUV
+    public static final int YCbCr_420_P        = 0x13;     // YUV9
+    public static final int YCbCr_420_I        = 0x15;
+    public static final int CbYCrY_422_I       = 0x16;     // UYVY (_adreno)
+    public static final int CbYCrY_420_I       = 0x17;
+    public static final int YCbCr_420_SP_TILED = 0x20;     // NV12_adreno_tiled
+    public static final int YCrCb_420_SP_TILED = 0x22;     // NV21_adreno_tiled
+    public static final int YCrCb_422_SP       = 0x23;     // NV61
+    public static final int YCrCb_422_P        = 0x24;
     /**
      * Encoded formats.  These are not necessarily supported by the hardware.
      */
