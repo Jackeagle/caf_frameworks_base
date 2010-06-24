@@ -266,7 +266,7 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
                 break;
 
             default:
-                throw new RuntimeException("unexpected event not handled");
+                throw new RuntimeException("unexpected event not handled: " + msg.what);
         }
     }
 
