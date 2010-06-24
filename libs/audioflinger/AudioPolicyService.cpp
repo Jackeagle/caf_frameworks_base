@@ -30,10 +30,13 @@
 #include <utils/String16.h>
 #include <utils/threads.h>
 #include "AudioPolicyService.h"
-#include <hardware_legacy/AudioPolicyManagerBase.h>
 #include <cutils/properties.h>
 #include <dlfcn.h>
 #include <hardware_legacy/power.h>
+
+#if (defined GENERIC_AUDIO)
+#include <hardware_legacy/AudioPolicyManagerBase.h>
+#endif
 
 // ----------------------------------------------------------------------------
 // the sim build doesn't have gettid
@@ -76,16 +79,14 @@ AudioPolicyService::AudioPolicyService()
 #if (defined GENERIC_AUDIO) || (defined AUDIO_POLICY_TEST)
     mpPolicyManager = new AudioPolicyManagerBase(this);
     LOGV("build for GENERIC_AUDIO - using generic audio policy");
-#else
     // if running in emulation - use the emulator driver
     if (property_get("ro.kernel.qemu", value, 0)) {
         LOGV("Running in emulation - using generic audio policy");
         mpPolicyManager = new AudioPolicyManagerBase(this);
     }
-    else {
+#else
         LOGV("Using hardware specific audio policy");
         mpPolicyManager = createAudioPolicyManager(this);
-    }
 #endif
 
     // load properties
