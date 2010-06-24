@@ -141,7 +141,7 @@ public final class RuimRecords extends UiccApplicationRecords {
 
     public void setImsi(String imsi) {
         mImsi = imsi;
-        mImsiReadyRegistrants.notifyAll();
+        mImsiReadyRegistrants.notifyRegistrants();
     }
 
     /**
