@@ -476,7 +476,7 @@ public class CDMAPhone extends PhoneBase {
     }
 
     public boolean handlePinMmi(String dialString) {
-        CdmaMmiCode mmi = CdmaMmiCode.newFromDialString(dialString, this);
+        CdmaMmiCode mmi = CdmaMmiCode.newFromDialString(dialString, this, m3gpp2Application);
 
         if (mmi == null) {
             Log.e(LOG_TAG, "Mmi is NULL!");

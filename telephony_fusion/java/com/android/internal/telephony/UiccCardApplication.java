@@ -181,6 +181,10 @@ public class UiccCardApplication {
     public PinState getPin2State() {
         return mPin2State;
     }
+    
+    public String getAid() {
+        return mAid;
+    }
 
     private synchronized void notifyAllRegistrants() {
         notifyUnavailableRegistrants();
@@ -475,21 +479,21 @@ public class UiccCardApplication {
      */
 
     public void supplyPin (String pin, Message onComplete) {
-        mCi.supplyIccPin(pin, mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
+        mCi.supplyIccPin(mSlotId, mAid, pin, mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
     }
 
     public void supplyPuk (String puk, String newPin, Message onComplete) {
-        mCi.supplyIccPuk(puk, newPin,
+        mCi.supplyIccPuk(mSlotId, mAid, puk, newPin,
                 mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
     }
 
     public void supplyPin2 (String pin2, Message onComplete) {
-        mCi.supplyIccPin2(pin2,
+        mCi.supplyIccPin2(mSlotId, mAid, pin2,
                 mHandler.obtainMessage(EVENT_PIN2PUK2_DONE, onComplete));
     }
 
     public void supplyPuk2 (String puk2, String newPin2, Message onComplete) {
-        mCi.supplyIccPuk2(puk2, newPin2,
+        mCi.supplyIccPuk2(mSlotId, mAid, puk2, newPin2,
                 mHandler.obtainMessage(EVENT_PIN2PUK2_DONE, onComplete));
     }
 
@@ -610,7 +614,7 @@ public class UiccCardApplication {
      public void changeIccLockPassword(String oldPassword, String newPassword,
              Message onComplete) {
          if(mDbg) log("Change Pin1 old: " + oldPassword + " new: " + newPassword);
-         mCi.changeIccPin(oldPassword, newPassword,
+         mCi.changeIccPin(mSlotId, mAid, oldPassword, newPassword,
                  mHandler.obtainMessage(EVENT_CHANGE_ICC_PASSWORD_DONE, onComplete));
 
      }
@@ -629,7 +633,7 @@ public class UiccCardApplication {
      public void changeIccFdnPassword(String oldPassword, String newPassword,
              Message onComplete) {
          if(mDbg) log("Change Pin2 old: " + oldPassword + " new: " + newPassword);
-         mCi.changeIccPin2(oldPassword, newPassword,
+         mCi.changeIccPin2(mSlotId, mAid, oldPassword, newPassword,
                  mHandler.obtainMessage(EVENT_CHANGE_ICC_PASSWORD_DONE, onComplete));
 
      }

@@ -661,7 +661,7 @@ public class GSMPhone extends PhoneBase {
             return null;
         }
 
-        GsmMmiCode mmi = GsmMmiCode.newFromDialString(newDialString, this);
+        GsmMmiCode mmi = GsmMmiCode.newFromDialString(newDialString, this, m3gppApplication);
         if (LOCAL_DEBUG) Log.d(LOG_TAG,
                                "dialing w/ mmi '" + mmi + "'...");
 
@@ -680,7 +680,7 @@ public class GSMPhone extends PhoneBase {
     }
 
     public boolean handlePinMmi(String dialString) {
-        GsmMmiCode mmi = GsmMmiCode.newFromDialString(dialString, this);
+        GsmMmiCode mmi = GsmMmiCode.newFromDialString(dialString, this, m3gppApplication);
 
         if (mmi != null && mmi.isPinCommand()) {
             mPendingMMIs.add(mmi);
@@ -693,7 +693,7 @@ public class GSMPhone extends PhoneBase {
     }
 
     public void sendUssdResponse(String ussdMessge) {
-        GsmMmiCode mmi = GsmMmiCode.newFromUssdUserInput(ussdMessge, this);
+        GsmMmiCode mmi = GsmMmiCode.newFromUssdUserInput(ussdMessge, this, m3gppApplication);
         mPendingMMIs.add(mmi);
         mMmiRegistrants.notifyRegistrants(new AsyncResult(null, mmi, null));
         mmi.sendUssd(ussdMessge);
@@ -1104,7 +1104,8 @@ public class GSMPhone extends PhoneBase {
                 GsmMmiCode mmi;
                 mmi = GsmMmiCode.newNetworkInitiatedUssd(ussdMessage,
                                                    isUssdRequest,
-                                                   GSMPhone.this);
+                                                   GSMPhone.this,
+                                                   m3gppApplication);
                 onNetworkInitiatedUssd(mmi);
             }
         }

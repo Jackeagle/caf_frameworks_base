@@ -1322,7 +1322,7 @@ public final class SIMRecords extends UiccApplicationRecords {
 
         Log.v(LOG_TAG, "SIMRecords:fetchSimRecords " + recordsToLoad);
 
-        mCi.getIMSI(obtainMessage(EVENT_GET_IMSI_DONE));
+        mCi.getIMSI(mParentApp.getCard().getSlotId(), mParentApp.getAid(),obtainMessage(EVENT_GET_IMSI_DONE));
         recordsToLoad++;
 
         mFh.loadEFTransparent(IccConstants.EF_ICCID, obtainMessage(EVENT_GET_ICCID_DONE));
