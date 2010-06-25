@@ -75,6 +75,9 @@ import com.android.internal.telephony.DataProfile.DataProfileType;
  * - We don't know if modem can disconnect existing calls in favor of new ones
  *   based on some profile priority.
  * - We don't know if IP continuity is possible or not possible across technologies.
+ * - It may not pe possible to determine whether network is EVDO or EHRPD by looking at the
+ *   data registration state messages. So, if this is an EHRPD capable device, then we will have
+ *   to use APN if available, or fall back to NAI.
  *
  * What we assume:
  * - Modem will not tear down the data call if IP continuity is possible.
@@ -133,7 +136,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     //TODO: Read this from properties
     private static final boolean SUPPORT_IPV4 = true;
-    private static final boolean SUPPORT_IPV6 = false;
+    private static final boolean SUPPORT_IPV6 = true;
     boolean mIsEhrpdCapable = false;
 
     /*
@@ -141,6 +144,13 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
      * updatedata connections is called
      */
     private boolean mDisconnectAllDataCalls = false;
+    private boolean mDataCallSetupPending = false;
+
+    /*
+     * context to make sure the onUpdateDataConnections doesn't get executed
+     * over and over again unnecessarily.
+     */
+    int mUpdateDataConnectionsContext = 0;
 
     /**
      * mDataCallList holds all the Data connection,
@@ -163,7 +173,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
             } else if (action.equals((INTENT_RECONNECT_ALARM))) {
                 String reason = intent.getStringExtra(INTENT_RECONNECT_ALARM_EXTRA_REASON);
-                sendMessage(obtainMessage(EVENT_UPDATE_DATA_CONNECTIONS, reason));
+                updateDataConnections(reason);
 
             } else if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
                 final android.net.NetworkInfo networkInfo = (NetworkInfo) intent
@@ -191,7 +201,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     protected MMDataConnectionTracker(Context context, PhoneNotifier notifier, CommandsInterface ci) {
         super(context, notifier, ci);
 
-        mDsst = new DataServiceStateTracker(context, ci);
+        mDsst = new DataServiceStateTracker(this, context, notifier, ci);
         mPollNetStat = new DataNetStatistics(this);
 
         // register for events.
@@ -287,7 +297,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         switch (msg.what) {
             case EVENT_UPDATE_DATA_CONNECTIONS:
-                onUpdateDataConnections(((String)msg.obj));
+                onUpdateDataConnections(((String)msg.obj), (int)msg.arg1);
                 break;
 
             case EVENT_RECORDS_LOADED:
@@ -308,7 +318,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 break;
 
             case EVENT_DATA_PROFILE_DB_CHANGED:
-                onDataProfileDbChanged();
+                onDataProfileListChanged((AsyncResult) msg.obj);
                 break;
 
             case EVENT_CDMA_OTA_PROVISION:
@@ -344,7 +354,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     protected void updateDataConnections(String reason) {
-        Message msg = obtainMessage(EVENT_UPDATE_DATA_CONNECTIONS, reason);
+        mUpdateDataConnectionsContext++;
+        Message msg = obtainMessage(EVENT_UPDATE_DATA_CONNECTIONS, //what
+                mUpdateDataConnectionsContext, //arg1
+                0, //arg2
+                reason); //userObj
         sendMessage(msg);
     }
 
@@ -366,15 +380,21 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
-    private void onDataProfileDbChanged() {
+    private void onDataProfileListChanged(AsyncResult ar) {
 
         mDpt.resetAllProfilesAsWorking();
         mDpt.resetAllServiceStates();
 
-        /* ideally data profile tracker should send this event only if any of
-         * the data profiles in use have changed. or we end up disconnecting
-         * all the time. */
-        disconnectAllConnections(REASON_DATA_PROFILE_DB_CHANGED);
+        boolean hasPreferredApnChanged = (Boolean) ((AsyncResult) ar).result;
+        if (hasPreferredApnChanged
+                && mDpt.isServiceTypeActive(DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.IPV4)) {
+            DataConnection dcInUse = mDpt.getActiveDataConnection(
+                    DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.IPV4);
+            tryDisconnectDataCall(dcInUse, REASON_DATA_PROFILE_LIST_CHANGED);
+            /* call will be brought up next time updateDataConnections() is run */
+        } else {
+            updateDataConnections(REASON_DATA_PROFILE_LIST_CHANGED);
+        }
     }
 
     protected void onRecordsLoaded() {
@@ -465,14 +485,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     @Override
-    protected void onServiceTypeDisabled(AsyncResult obj) {
+    protected void onServiceTypeDisabled(DataServiceType type) {
         updateDataConnections(REASON_SERVICE_TYPE_DISABLED);
     }
 
     @Override
-    protected void onServiceTypeEnabled(AsyncResult ar) {
+    protected void onServiceTypeEnabled(DataServiceType type) {
         mDpt.resetAllProfilesAsWorking();
-        mDpt.resetServiceState((DataServiceType)ar.result);
+        mDpt.resetServiceState(type);
         updateDataConnections(REASON_SERVICE_TYPE_ENABLED);
     }
 
@@ -563,12 +583,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         notifyDataActivity();
     }
 
-    void updateStateAndNotify(State state, DataServiceType ds, IPVersion ipv, String reason) {
-        mDpt.setState(state, ds, ipv);
-        //TODO: check if we might generate a lot of unnecessary notifications.
-        notifyDataConnection(ds, ipv, reason);
-    }
-
     private DataCallState getDataCallStateByCid(ArrayList<DataCallState> states, int cid) {
         for (int i = 0, s = states.size(); i < s; i++) {
             if (states.get(i).cid == cid)
@@ -579,6 +593,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     @Override
     protected void onConnectDone(AsyncResult ar) {
+
+        mDataCallSetupPending = false;
 
         CallbackData c = (CallbackData) ar.userObj;
 
@@ -598,7 +614,9 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
             //mark requested service type as active through this dc, or else
             //updateDataConnections() will tear it down.
+            //state is set to CONNECTED internally.
             mDpt.setServiceTypeAsActive(c.ds, dc, c.ipv);
+            notifyDataConnection(c.ds, c.ipv, c.reason);
 
             if (c.ds == DataServiceType.SERVICE_TYPE_DEFAULT) {
                 SystemProperties.set("gsm.defaultpdpcontext.active", "true");
@@ -637,9 +655,9 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * that doesn't support IPV6!
              */
             c.dp.setWorking(false, c.ipv);
-            // set state to scanning because we are now trying for other data
-            // profiles that might work with this ipv.
-            updateStateAndNotify(State.SCANNING, c.ds, c.ipv, c.reason);
+            // set state to scanning because can try on other data
+            // profiles that might work with this ds+ipv.
+            mDpt.setState(State.SCANNING, c.ds, c.ipv);
         } else if (cause.isDataProfileFailure()) {
             /*
              * this profile doesn't work, mark it as not working, so that we
@@ -648,7 +666,9 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * might still work with other IPV.
              */
             c.dp.setWorking(false, c.ipv);
-            updateStateAndNotify(State.SCANNING, c.ds, c.ipv, c.reason);
+            // set state to scanning because can try on other data
+            // profiles that might work with this ds+ipv.
+            mDpt.setState(State.SCANNING, c.ds, c.ipv);
         } else if (cause.isPdpAvailabilityFailure()) {
             /*
              * not every modem, or network might be able to report this but if
@@ -659,12 +679,18 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 needDataConnectionUpdate = false;
                 // will be called, when disconnect is complete.
             }
+            // set state to scanning because can try on other data
+            // profiles that might work with this ds+ipv.
+            mDpt.setState(State.SCANNING, c.ds, c.ipv);
         } else if (disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
             /*
              * We do this because there is no way to know if the failure was caused
              * because of network resources not being available!
              * */
             needDataConnectionUpdate = false;
+            // set state to scanning because can try on other data
+            // profiles that might work with this ds+ipv.
+            mDpt.setState(State.SCANNING, c.ds, c.ipv);
         } else if (cause.isPermanentFail()) {
             /*
              * even though modem reports permanent failure, it is not clear
@@ -672,7 +698,9 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * its safer to try and exhaust all data profiles.
              */
             c.dp.setWorking(false, c.ipv);
-            updateStateAndNotify(State.SCANNING, c.ds, c.ipv, c.reason);
+            // set state to scanning because can try on other data
+            // profiles that might work with this ds+ipv.
+            mDpt.setState(State.SCANNING, c.ds, c.ipv);
         } else {
             /*
              * If we reach here, then it is a temporary failure and we are trying
@@ -691,24 +719,32 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             int nextReconnectDelay = 0; /* if scheduleAlarm == true */
 
             if (retryManager.isRetryNeeded()) {
-                /* 1 : we have retries left */
+                /* 1 : we have retries left. so Retry! */
                 scheduleAlarm  = true;
                 nextReconnectDelay = retryManager.getRetryTimer();
                 retryManager.increaseRetryCount();
+                // set state to scanning because can try on other data
+                // profiles that might work with this ds+ipv.
+                mDpt.setState(State.SCANNING, c.ds, c.ipv);
             } else {
                 /* 2 : enough of retries. disable the data profile */
                 c.dp.setWorking(false, c.ipv);
-                if (mDpt.getNextWorkingDataProfile(c.ds,
-                        getDataProfileTypeToUse(), c.ipv) != null) {
-                    updateStateAndNotify(State.SCANNING, c.ds, c.ipv, c.reason);
+                if (mDpt.getNextWorkingDataProfile(c.ds, getDataProfileTypeToUse(), c.ipv) != null) {
+                    // set state to scanning because can try on other data
+                    // profiles that might work with this ds+ipv.
+                    mDpt.setState(State.SCANNING, c.ds, c.ipv);
                 } else {
                     if (c.ds != DataServiceType.SERVICE_TYPE_DEFAULT) {
-                        /* 3 */
+                        /*
+                         * No more valid data profiles, mark service as disabled
+                         * and set state to failed, notify.
+                         */
                         // but make sure service is not active on different IPV!
-                        updateStateAndNotify(State.FAILED, c.ds, c.ipv, c.reason);
                         if (mDpt.isServiceTypeActive(c.ds) == false) {
                             mDpt.setServiceTypeEnabled(c.ds, false);
                         }
+                        mDpt.setState(State.FAILED, c.ds, c.ipv);
+                        notifyDataConnection(c.ds, c.ipv, c.reason);
                     } else {
                         /* 4 */
                         /* we don't have any higher priority services
@@ -716,7 +752,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                          * So retry forever with the last profile we have.
                          */
                         c.dp.setWorking(true, c.ipv);
-                        updateStateAndNotify(State.FAILED, c.ds, c.ipv, c.reason);
+                        mDpt.setState(State.FAILED, c.ds, c.ipv);
+                        notifyDataConnection(c.ds, c.ipv, c.reason);
                         notifyDataConnectionFail(c.reason);
 
                         retryManager.retryForeverUsingLastTimeout();
@@ -816,17 +853,24 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
      * @seecom.android.internal.telephony.data.DataConnectionTracker#
      * onServiceTypeEnableDisable() This function does the following:
      */
-    synchronized protected void onUpdateDataConnections(String reason) {
+    synchronized protected void onUpdateDataConnections(String reason, int context) {
+        if (context != mUpdateDataConnectionsContext) {
+            //we have other EVENT_UPDATE_DATA_CONNECTIONS on the way.
+            logv("onUpdateDataConnections [ignored] : reason=" + reason);
+            return;
+        }
+
         logv("onUpdateDataConnections: reason=" + reason);
+
         /*
          * Phase 1:
          * - Free up any data calls that we don't need.
          * - Some data calls, may have got inactive, without the data profile tracker
          *   knowing about it, so update it.
+         *   TODO: we don't really need to run Phase 1 all the time, we can optimize this!
          */
 
         boolean wasDcDisconnected = false;
-        boolean isAnyDcActive = false;
 
         for (DataConnection dc : mDataConnectionList) {
             if (dc.getState() == DataConnection.State.INACTIVE) {
@@ -842,12 +886,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                         mDpt.setServiceTypeAsInactive(ds, IPVersion.IPV6);
                     }
                 }
-            } else if (dc.getState() == DataConnection.State.ACTIVE) {
+            } else if (dc.getState() == DataConnection.State.ACTIVE
+                    && mDataCallSetupPending == false) {
                 /*
                  * 1b. If this active data call is not in use by any enabled
                  * service, bring it down.
                  */
-                isAnyDcActive = true;
                 boolean needsTearDown = true;
                 for (DataServiceType ds : DataServiceType.values()) {
                     if (mDpt.isServiceTypeEnabled(ds)
@@ -900,11 +944,19 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
 
         /*
+         * If we had issued a data call setup before, then wait for it to complete before
+         * trying any new calls.
+         */
+        if (mDataCallSetupPending == true) {
+            logi("Data Call setup pending. Not trying to bring up any new data connections.");
+            return;
+        }
+
+        /*
          * Phase 2: Ensure that all requested services are active. Do setup data
          * call as required in order of decreasing service priority - highest priority
          * service gets data call setup first!
          */
-        boolean isAnyServiceEnabled = false;
         for (DataServiceType ds : DataServiceType.getPrioritySortedValues()) {
             /*
              * 2a : Poll all data calls and update the latest info.
@@ -922,29 +974,21 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * 2b : Bring up data calls as required.
              */
             if (mDpt.isServiceTypeEnabled(ds) == true) {
-                isAnyServiceEnabled = true;
+
                 //IPV4
                 if (SUPPORT_IPV4 && mDpt.isServiceTypeActive(ds, IPVersion.IPV4) == false) {
                     boolean setupDone = trySetupDataCall(ds, IPVersion.IPV4, reason);
                     if (setupDone)
                         return; //one at a time, in order of priority
                 }
-                // IPV6
+
+                //IPV4
                 if (SUPPORT_IPV6 && mDpt.isServiceTypeActive(ds, IPVersion.IPV6) == false) {
                     boolean setupDone = trySetupDataCall(ds, IPVersion.IPV6, reason);
                     if (setupDone)
                         return; //one at a time, in order of priority
                 }
             }
-        }
-
-        if (isAnyDcActive == false && isAnyServiceEnabled == true) {
-            /*
-             * We have services enabled, but we don't have any dc active. if we
-             * reach here, it means that we ran out of data profiles to try. So
-             * notify fail.
-             */
-            notifyDataConnectionFail(reason);
         }
     }
 
@@ -984,6 +1028,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         isDataEnabled = isDataEnabled && (!roaming || getDataOnRoamingEnabled());
 
         int dataRegState = this.mDsst.getServiceState().getState();
+
         isDataEnabled = isDataEnabled
                         && (dataRegState == ServiceState.STATE_IN_SERVICE || mNoAutoAttach);
 
@@ -1075,7 +1120,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
         if (dp == null) {
             logw("no working data profile available to establish service type " + ds + "on " + ipv);
-            updateStateAndNotify(State.FAILED, ds, ipv, reason);
+            mDpt.setState(State.FAILED, ds, ipv);
+            notifyDataConnection(ds, ipv, reason);
             return false;
         }
         DataConnection dc = findFreeDataCall();
@@ -1091,7 +1137,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             return true;
         }
 
-        updateStateAndNotify(State.CONNECTING, ds, ipv, reason);
+        mDpt.setState(State.CONNECTING, ds, ipv);
+        notifyDataConnection(ds, ipv, reason);
+
+        mDataCallSetupPending = true;
 
         //Assertion: dc!=null && dp!=null
         CallbackData c = new CallbackData();

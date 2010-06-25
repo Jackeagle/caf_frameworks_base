@@ -120,8 +120,6 @@ public class ApnSetting extends DataProfile {
     @Override
     boolean canSupportIpVersion(IPVersion ipv) {
         /* TODO: fusion - this should be read from the APN database */
-        if (ipv == IPVersion.IPV4)
-            return true;
-        return false;
+        return true;
     }
 }

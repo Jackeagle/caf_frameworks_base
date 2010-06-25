@@ -136,7 +136,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     protected static final String REASON_NETWORK_DISCONNECT = "networkOrModemDisconnect";
     protected static final String REASON_DATA_NETWORK_ATTACH = "dataNetworkAttached";
     protected static final String REASON_DATA_NETWORK_DETACH = "dataNetworkDetached";
-    protected static final String REASON_DATA_PROFILE_DB_CHANGED = "dataProfileDbChanged";
+    protected static final String REASON_DATA_PROFILE_LIST_CHANGED = "dataProfileDbChanged";
 
     /**
      * Default constructor
@@ -167,11 +167,11 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
                 break;
 
             case EVENT_SERVICE_TYPE_DISABLED:
-                onServiceTypeDisabled((AsyncResult) msg.obj);
+                onServiceTypeDisabled((DataServiceType) msg.obj);
                 break;
 
             case EVENT_SERVICE_TYPE_ENABLED:
-                onServiceTypeEnabled((AsyncResult) msg.obj);
+                onServiceTypeEnabled((DataServiceType) msg.obj);
                 break;
 
             case EVENT_CONNECT_DONE:
@@ -211,8 +211,8 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
         }
     }
 
-    abstract protected void onServiceTypeEnabled(AsyncResult obj);
-    abstract protected void onServiceTypeDisabled(AsyncResult obj);
+    abstract protected void onServiceTypeEnabled(DataServiceType type);
+    abstract protected void onServiceTypeDisabled(DataServiceType type);
     abstract protected void onDisconnectDone(AsyncResult obj);
     abstract protected void onConnectDone(AsyncResult obj);
     abstract protected void onRoamingOff();
@@ -476,6 +476,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
         mNotifier.notifyDataConnection(this, ds.toApnTypeString(), ipv, reason);
     }
 
+    // notify data connection as failed - applicable for default type only?
     void notifyDataConnectionFail(String reason) {
         mNotifier.notifyDataConnectionFailed(this, reason);
     }

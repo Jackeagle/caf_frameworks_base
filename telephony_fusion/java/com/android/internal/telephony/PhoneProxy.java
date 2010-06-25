@@ -61,7 +61,7 @@ public class PhoneProxy extends Handler implements Phone {
     private static final int EVENT_REQUEST_VOICE_RADIO_TECH_DONE = 3;
     private static final int EVENT_SET_RADIO_POWER = 4;
 
-    private static final String LOG_TAG = "RIL_PhoneProxy";
+    private static final String LOG_TAG = "PHONE";
 
     public PhoneProxy(VoicePhone voicePhone, DataPhone dataPhone) {
 
