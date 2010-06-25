@@ -138,10 +138,17 @@ public class UiccCardApplication {
     }
 
     private IccFileHandler createUiccFileHandler(AppType type) {
-        if (type == AppType.APPTYPE_USIM || type == AppType.APPTYPE_SIM) {
-            return new SIMFileHandler(this, mSlotId, mAid, mCi);
-        } else {
-            return new RuimFileHandler(this, mSlotId, mAid, mCi);
+        switch (type) {
+            case APPTYPE_SIM:
+                return new SIMFileHandler(this, mSlotId, mAid, mCi);
+            case APPTYPE_RUIM:
+                return new RuimFileHandler(this, mSlotId, mAid, mCi);
+            case APPTYPE_USIM:
+                return new UsimFileHandler(this, mSlotId, mAid, mCi);
+            case APPTYPE_CSIM:
+                return new CsimFileHandler(this, mSlotId, mAid, mCi);
+            default:
+                return null;
         }
     }
 
@@ -181,7 +188,7 @@ public class UiccCardApplication {
     public PinState getPin2State() {
         return mPin2State;
     }
-    
+
     public String getAid() {
         return mAid;
     }
@@ -569,7 +576,7 @@ public class UiccCardApplication {
 
          mDesiredPinLocked = enabled;
 
-         mCi.setFacilityLock(CommandsInterface.CB_FACILITY_BA_SIM,
+         mCi.setFacilityLock(mSlotId, mAid, CommandsInterface.CB_FACILITY_BA_SIM,
                  enabled, password, serviceClassX,
                  mHandler.obtainMessage(EVENT_CHANGE_FACILITY_LOCK_DONE, onComplete));
      }
@@ -595,7 +602,7 @@ public class UiccCardApplication {
 
          mDesiredFdnEnabled = enabled;
 
-         mCi.setFacilityLock(CommandsInterface.CB_FACILITY_BA_FD,
+         mCi.setFacilityLock(mSlotId, mAid, CommandsInterface.CB_FACILITY_BA_FD,
                  enabled, password, serviceClassX,
                  mHandler.obtainMessage(EVENT_CHANGE_FACILITY_FDN_DONE, onComplete));
      }
@@ -637,7 +644,6 @@ public class UiccCardApplication {
                  mHandler.obtainMessage(EVENT_CHANGE_ICC_PASSWORD_DONE, onComplete));
 
      }
-
 
     /**
      * Returns service provider name stored in ICC card.
@@ -765,15 +771,15 @@ public class UiccCardApplication {
                 case EVENT_ICC_READY:
                     //TODO: Fusion - Does comment below still apply?
                     //TODO: put facility read in SIM_READY now, maybe in REG_NW
-                    mCi.queryFacilityLock (
+                    mCi.queryFacilityLock (mSlotId, mAid,
                             CommandsInterface.CB_FACILITY_BA_SIM, "", serviceClassX,
                             obtainMessage(EVENT_QUERY_FACILITY_LOCK_DONE));
-                    mCi.queryFacilityLock (
+                    mCi.queryFacilityLock (mSlotId, mAid,
                             CommandsInterface.CB_FACILITY_BA_FD, "", serviceClassX,
                             obtainMessage(EVENT_QUERY_FACILITY_FDN_DONE));
                     break;
                 case EVENT_ICC_LOCKED_OR_ABSENT:
-                    mCi.queryFacilityLock (
+                    mCi.queryFacilityLock (mSlotId, mAid,
                             CommandsInterface.CB_FACILITY_BA_SIM, "", serviceClassX,
                             obtainMessage(EVENT_QUERY_FACILITY_LOCK_DONE));
                     break;

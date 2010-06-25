@@ -1641,14 +1641,17 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    queryFacilityLock (String facility, String password, int serviceClass,
+    queryFacilityLock (int slot, String aid, String facility, String password, int serviceClass,
                             Message response) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_QUERY_FACILITY_LOCK, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
         // count strings
-        rr.mp.writeInt(3);
+        rr.mp.writeInt(5);
+
+        rr.mp.writeString(Integer.toString(slot));
+        rr.mp.writeString(aid);
 
         rr.mp.writeString(facility);
         rr.mp.writeString(password);
@@ -1659,7 +1662,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    setFacilityLock (String facility, boolean lockState, String password,
+    setFacilityLock (int slot, String aid, String facility, boolean lockState, String password,
                         int serviceClass, Message response) {
         String lockString;
          RILRequest rr
@@ -1668,7 +1671,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
         // count strings
-        rr.mp.writeInt(4);
+        rr.mp.writeInt(6);
+
+        rr.mp.writeString(Integer.toString(slot));
+        rr.mp.writeString(aid);
 
         rr.mp.writeString(facility);
         lockString = (lockState)?"1":"0";
