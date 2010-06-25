@@ -1333,7 +1333,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SETUP_DATA_CALL, result);
 
-        rr.mp.writeInt(6);
+        rr.mp.writeInt(7);
 
         rr.mp.writeString(radioTechnology);
         rr.mp.writeString(profile);

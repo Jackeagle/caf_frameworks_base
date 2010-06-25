@@ -654,6 +654,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * doesn't support IPV6 in general, or if its the profile we tried
              * that doesn't support IPV6!
              */
+            logv("Disabling data profile. dp=" + c.dp.toShortString() + ", ipv=" + c.ipv);
             c.dp.setWorking(false, c.ipv);
             // set state to scanning because can try on other data
             // profiles that might work with this ds+ipv.
@@ -665,6 +666,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * modem/network didn't report IP_VERSION_NOT_SUPPORTED, but profile
              * might still work with other IPV.
              */
+            logv("Disabling data profile. dp=" + c.dp.toShortString() + ", ipv=" + c.ipv);
             c.dp.setWorking(false, c.ipv);
             // set state to scanning because can try on other data
             // profiles that might work with this ds+ipv.
@@ -676,6 +678,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * check if low priority services are active, if yes tear it down!
              */
             if (disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
+                logv("Disconnected low priority data call [pdp availability failure.]");
                 needDataConnectionUpdate = false;
                 // will be called, when disconnect is complete.
             }
@@ -683,6 +686,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             // profiles that might work with this ds+ipv.
             mDpt.setState(State.SCANNING, c.ds, c.ipv);
         } else if (disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
+            logv("Disconnected low priority data call [pdp availability failure.]");
             /*
              * We do this because there is no way to know if the failure was caused
              * because of network resources not being available!
@@ -697,11 +701,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * if failure is related to data profile, ip version, mpdp etc.
              * its safer to try and exhaust all data profiles.
              */
+            logv("Permanent failure. Disabling data profile. dp=" +
+                    c.dp.toShortString() + ", ipv="+ c.ipv);
             c.dp.setWorking(false, c.ipv);
             // set state to scanning because can try on other data
             // profiles that might work with this ds+ipv.
             mDpt.setState(State.SCANNING, c.ds, c.ipv);
         } else {
+            logv("Data call setup failure cause unknown / temporary failure.");
             /*
              * If we reach here, then it is a temporary failure and we are trying
              * to setup data call on the highest priority service that is enabled.
@@ -728,6 +735,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 mDpt.setState(State.SCANNING, c.ds, c.ipv);
             } else {
                 /* 2 : enough of retries. disable the data profile */
+                logv("No retries left, disabling data profile. dp=" +
+                        c.dp.toShortString() + ", ipv = "+ c.ipv);
                 c.dp.setWorking(false, c.ipv);
                 if (mDpt.getNextWorkingDataProfile(c.ds, getDataProfileTypeToUse(), c.ipv) != null) {
                     // set state to scanning because can try on other data
@@ -741,6 +750,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                          */
                         // but make sure service is not active on different IPV!
                         if (mDpt.isServiceTypeActive(c.ds) == false) {
+                            logv("No data profiles left to try, disabling service  " + c.ds);
                             mDpt.setServiceTypeEnabled(c.ds, false);
                         }
                         mDpt.setState(State.FAILED, c.ds, c.ipv);
@@ -751,6 +761,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                          * enabled and we ran out of other profiles to try.
                          * So retry forever with the last profile we have.
                          */
+                        logv("Retry forever using last disabled data profile. dp=" +
+                                c.dp.toShortString() + ", ipv = " + c.ipv);
                         c.dp.setWorking(true, c.ipv);
                         mDpt.setState(State.FAILED, c.ds, c.ipv);
                         notifyDataConnection(c.ds, c.ipv, c.reason);

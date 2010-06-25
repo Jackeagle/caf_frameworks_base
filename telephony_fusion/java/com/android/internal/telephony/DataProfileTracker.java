@@ -98,6 +98,9 @@ public class DataProfileTracker extends Handler {
         mDpObserver = new DataProfileDbObserver(this);
         mContext.getContentResolver().registerContentObserver(Telephony.Carriers.CONTENT_URI, true,
                 mDpObserver);
+
+        //Load APN List
+        this.sendMessage(obtainMessage(EVENT_DATA_PROFILE_DB_CHANGED));
     }
 
     public void dispose() {
@@ -119,6 +122,8 @@ public class DataProfileTracker extends Handler {
      * this.
      */
     private void onDataprofileDbChanged() {
+
+        logv("Data profile database changed.. Reloading.");
 
         ArrayList<DataProfile> allDataProfiles = new ArrayList<DataProfile>();
 
@@ -156,6 +161,7 @@ public class DataProfileTracker extends Handler {
         }
 
         for (DataProfile dp : allDataProfiles) {
+            logv("new dp found : "+dp.toString());
             for (DataServiceType t : DataServiceType.values()) {
                 if (dp.canHandleServiceType(t))
                     dsMap.get(t).mDataProfileList.add(dp);
@@ -184,6 +190,7 @@ public class DataProfileTracker extends Handler {
 
     public void setOperatorNumeric(String newOperatorNumeric) {
         if (newOperatorNumeric != mOperatorNumeric) {
+            logv("Operator numeric changed : " + mOperatorNumeric + "  >>  " + newOperatorNumeric);
             mOperatorNumeric = newOperatorNumeric;
             obtainMessage(EVENT_DATA_PROFILE_DB_CHANGED).sendToTarget();
         }
