@@ -1464,7 +1464,7 @@ public class CDMAPhone extends PhoneBase {
 
     private void registerForRuimRecordEvents() {
         mRuimRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
-        mRuimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
+        mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
     }
 
     private void unregisterForRuimRecordEvents() {

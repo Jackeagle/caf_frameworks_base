@@ -91,6 +91,7 @@ public class IccCardProxy extends Handler implements IccCard {
      * voice radio technology only!
      */
     public void setVoiceRadioTech(RadioTechnologyFamily mVoiceRadioFamily) {
+        Log.d(LOG_TAG, "Setting radio tech " + mVoiceRadioFamily);
         if (mVoiceRadioFamily == RadioTechnologyFamily.RADIO_TECH_3GPP2)
             mCurrentAppType = AppFamily.APP_FAM_3GPP2;
         else
