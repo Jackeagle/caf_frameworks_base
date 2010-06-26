@@ -674,10 +674,10 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                 String facility = scToBarringFacility(sc);
 
                 if (isInterrogate()) {
-                    phone.mCM.queryFacilityLock(facility, password,
+                    phone.mCM.queryFacilityLock(0, "", facility, password,
                             serviceClass, obtainMessage(EVENT_QUERY_COMPLETE, this));
                 } else if (isActivate() || isDeactivate()) {
-                    phone.mCM.setFacilityLock(facility, isActivate(), password,
+                    phone.mCM.setFacilityLock(0, "", facility, isActivate(), password,
                             serviceClass, obtainMessage(EVENT_SET_COMPLETE, this));
                 } else {
                     throw new RuntimeException ("Invalid or Unsupported MMI Code");
@@ -747,19 +747,19 @@ public final class GsmMmiCode  extends Handler implements MmiCode {
                     } else {
                         // pre-checks OK
                         if (sc.equals(SC_PIN)) {
-                            if (mUiccApp != null) 
+                            if (mUiccApp != null)
                                 mUiccApp.changeIccLockPassword(oldPinOrPuk, newPin,
                                     obtainMessage(EVENT_SET_COMPLETE, this));
                         } else if (sc.equals(SC_PIN2)) {
-                            if (mUiccApp != null) 
+                            if (mUiccApp != null)
                                 mUiccApp.changeIccFdnPassword(oldPinOrPuk, newPin,
                                         obtainMessage(EVENT_SET_COMPLETE, this));
                         } else if (sc.equals(SC_PUK)) {
-                            if (mUiccApp != null) 
+                            if (mUiccApp != null)
                                 mUiccApp.supplyPuk(oldPinOrPuk, newPin,
                                         obtainMessage(EVENT_SET_COMPLETE, this));
                         } else if (sc.equals(SC_PUK2)) {
-                            if (mUiccApp != null) 
+                            if (mUiccApp != null)
                                 mUiccApp.supplyPuk2(oldPinOrPuk, newPin,
                                         obtainMessage(EVENT_SET_COMPLETE, this));
                         }

@@ -1138,7 +1138,7 @@ public interface CommandsInterface {
      * @param response is callback message
      */
 
-    void queryFacilityLock (String facility, String password, int serviceClass,
+    void queryFacilityLock (int slot, String aid, String facility, String password, int serviceClass,
         Message response);
 
     /**
@@ -1148,7 +1148,7 @@ public interface CommandsInterface {
      * @param serviceClass is a sum of SERVICE_CLASS_*
      * @param response is callback message
      */
-    void setFacilityLock (String facility, boolean lockState, String password,
+    void setFacilityLock (int slot, String aid, String facility, boolean lockState, String password,
         int serviceClass, Message response);
 
 

@@ -343,7 +343,7 @@ public final class SimulatedCommands extends BaseCommands
      * @param serviceClass is a sum of SERVICE_CLASS_*
      */
 
-    public void queryFacilityLock (String facility, String pin,
+    public void queryFacilityLock (int slot, String aid, String facility, String pin,
                                    int serviceClass, Message result) {
         if (facility != null &&
                 facility.equals(CommandsInterface.CB_FACILITY_BA_SIM)) {
@@ -378,7 +378,7 @@ public final class SimulatedCommands extends BaseCommands
      * @param pin the SIM pin or "" if not required
      * @param serviceClass is a sum of SERVICE_CLASS_*
      */
-    public void setFacilityLock (String facility, boolean lockEnabled,
+    public void setFacilityLock (int slot, String aid, String facility, boolean lockEnabled,
                                  String pin, int serviceClass,
                                  Message result) {
         if (facility != null &&

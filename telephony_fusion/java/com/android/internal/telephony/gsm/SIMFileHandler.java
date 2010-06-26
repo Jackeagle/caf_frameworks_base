@@ -87,12 +87,6 @@ public final class SIMFileHandler extends IccFileHandler implements IccConstants
         }
         String path = getCommonIccEFPath(efid);
         if (path == null) {
-            // The EFids in USIM phone book entries are decided by the card manufacturer.
-            // So if we don't match any of the cases above and if its a USIM return
-            // the phone book path.
-            if (mApplication.getType() == AppType.APPTYPE_USIM) {
-                return MF_SIM + DF_TELECOM + DF_PHONEBOOK;
-            }
             Log.e(LOG_TAG, "Error: EF Path being returned in null");
         }
         return path;
