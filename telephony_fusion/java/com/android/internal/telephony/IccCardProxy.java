@@ -106,13 +106,13 @@ public class IccCardProxy extends Handler implements IccCard {
                 updateIccAvailability();
                 break;
             case EVENT_ICC_ABSENT:
-                mAbsentRegistrants.notify();
+                mAbsentRegistrants.notifyRegistrants();
                 break;
             case EVENT_ICC_LOCKED:
-                mPinLockedRegistrants.notify();
+                mPinLockedRegistrants.notifyRegistrants();
                 break;
             case EVENT_NETWORK_LOCKED:
-                mNetworkLockedRegistrants.notify();
+                mNetworkLockedRegistrants.notifyRegistrants();
                 break;
             case EVENT_APP_READY:
                 broadcastIccStateChangedIntent(IccCard.INTENT_VALUE_ICC_READY, null);
