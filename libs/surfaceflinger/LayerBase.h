@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -236,7 +237,7 @@ protected:
     const GraphicPlane& graphicPlane(int dpy) const;
           GraphicPlane& graphicPlane(int dpy);
 
-          GLuint createTexture() const;
+          GLuint createTexture(PixelFormat pixelFormat) const;
     
           struct Texture {
               Texture() : name(-1U), width(0), height(0),
@@ -258,7 +259,7 @@ protected:
           void clearWithOpenGL(const Region& clip, GLclampx r, GLclampx g,
                                GLclampx b, GLclampx alpha) const;
           void clearWithOpenGL(const Region& clip) const;
-          void drawWithOpenGL(const Region& clip, const Texture& texture) const;
+          void drawWithOpenGL(const Region& clip, const Texture& texture, PixelFormat pixelFormat) const;
           void loadTexture(Texture* texture, 
                   const Region& dirty, const GGLSurface& t) const;
           status_t initializeEglImage(
@@ -294,7 +295,7 @@ protected:
 
 private:
     LayerBase(const LayerBase& rhs);
-    void validateTexture(GLint textureName) const;
+    void validateTexture(GLint textureName, PixelFormat pixelFormat) const;
 };
 
 

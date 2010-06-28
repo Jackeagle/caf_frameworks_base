@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,7 +147,7 @@ void Layer::reloadTexture(const Region& dirty)
 
     // create the new texture name if needed
     if (UNLIKELY(mTextures[index].name == -1U)) {
-        mTextures[index].name = createTexture();
+        mTextures[index].name = createTexture(buffer->format);
         mTextures[index].width = 0;
         mTextures[index].height = 0;
     }
@@ -262,7 +263,7 @@ void Layer::onDraw(const Region& clip) const
         clearWithOpenGL(clip);
         return;
     }
-    drawWithOpenGL(clip, mTextures[index]);
+    drawWithOpenGL(clip, mTextures[index], PIXEL_FORMAT_UNKNOWN);
 }
 
 sp<GraphicBuffer> Layer::requestBuffer(int index, int usage)
