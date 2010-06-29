@@ -87,6 +87,9 @@ public class UiccCardApplication {
 
         mIccFh = createUiccFileHandler(as.app_type);
         mUiccApplicationRecords = createUiccApplicationRecords(as.app_type, ur, mContext, mCi);
+        if (mAppState == AppState.APPSTATE_READY) {
+            mHandler.sendMessage(mHandler.obtainMessage(EVENT_ICC_READY));
+        }
     }
 
     void update (UiccCardStatusResponse.CardStatus.AppStatus as, UiccRecords ur, Context c, CommandsInterface ci) {
@@ -198,6 +201,7 @@ public class UiccCardApplication {
         notifyLockedRegistrants();
         notifyReadyRegistrants();
         notifyNetworkLockedRegistrants();
+        notifyPersoSubstateRegistrants();
     }
 
     /** Notifies specified registrant.
@@ -236,6 +240,7 @@ public class UiccCardApplication {
                 Log.e(mLogTag, "Sanity check failed! APPSTATE is locked while PIN1 is not!!!");
             }
             if (r == null) {
+                mHandler.sendMessage(mHandler.obtainMessage(EVENT_ICC_LOCKED_OR_ABSENT));
                 mLockedRegistrants.notifyRegistrants();
             } else {
                 r.notifyRegistrant(new AsyncResult(null, null, null));
@@ -280,6 +285,7 @@ public class UiccCardApplication {
                 Log.e(mLogTag, "Sanity check failed! APPSTATE is ready while PIN1 is not verified!!!");
             }
             if (r == null) {
+                mHandler.sendMessage(mHandler.obtainMessage(EVENT_ICC_READY));
                 mReadyRegistrants.notifyRegistrants();
             } else {
                 r.notifyRegistrant(new AsyncResult(null, null, null));
