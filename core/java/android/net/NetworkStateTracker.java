@@ -408,6 +408,17 @@ public abstract class NetworkStateTracker extends Handler {
     }
 
     /**
+     * Ensure that a network route exists to deliver traffic to the specified
+     * host via this network interface.
+     * @param addressType the IP address type of the host to which the route is desired
+     * @param hostAddress the IP address of the host to which the route is desired
+     * @return {@code true} on success, {@code false} on failure
+     */
+    public boolean requestRouteToHostAddress(int addressType, String hostAddress) {
+        return false;
+    }
+
+    /**
      * Interprets scan results. This will be called at a safe time for
      * processing, and from a safe thread.
      */

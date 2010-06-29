@@ -730,6 +730,32 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     /**
+     * Ensure that a network route exists to deliver traffic to the specified
+     * host via the specified network interface.
+     * @param networkType the type of the network over which traffic to the
+     * specified host is to be routed
+     * @param addressType the IP address type of the host to which the route is desired
+     * @param hostAddress the IP address of the host to which the route is
+     * desired
+     * @return {@code true} on success, {@code false} on failure
+     */
+    public boolean requestRouteToHostAddress(int networkType, int addressType, String hostAddress) {
+        enforceChangePermission();
+        if (!ConnectivityManager.isNetworkTypeValid(networkType)) {
+            return false;
+        }
+        NetworkStateTracker tracker = mNetTrackers[networkType];
+
+        if (!tracker.getNetworkInfo().isConnected() || tracker.isTeardownRequested()) {
+            if (DBG) {
+                Log.d(TAG, "requestRouteToHost on down network (" + networkType + ") - dropped");
+            }
+            return false;
+        }
+        return tracker.requestRouteToHostAddress(addressType, hostAddress);
+    }
+
+    /**
      * @see ConnectivityManager#getBackgroundDataSetting()
      */
     public boolean getBackgroundDataSetting() {

@@ -463,6 +463,29 @@ public class MobileDataStateTracker extends NetworkStateTracker {
         }
     }
 
+    /**
+     * Ensure that a network route exists to deliver traffic to the specified
+     * host via the mobile data network.
+     * @param addressType the IP address type of the host to which the route is desired,
+     * @param hostAddress the IP address of the host to which the route is desired,
+     * in network byte order.
+     * @return {@code true} on success, {@code false} on failure
+     */
+    @Override
+    public boolean requestRouteToHostAddress(int addressType, String hostAddress) {
+        if (DBG) {
+            Log.d(TAG, "Requested host route to " + hostAddress +
+                    " for " + mApnType + "(" + mInterfaceName + ")");
+        }
+        // TODO: addressType should be used to select the interface (Ipv4/Ipv6)
+        // when both IPv4 and IPv6 interfaces are UP for this APN Type.
+        if (mInterfaceName != null && !TextUtils.isEmpty(hostAddress)) {
+            return NetworkUtils.addRouteToHost(mInterfaceName, addressType, hostAddress) == 0;
+        } else {
+            return false;
+        }
+    }
+
     @Override
     public String toString() {
         StringBuffer sb = new StringBuffer("Mobile data state: ");

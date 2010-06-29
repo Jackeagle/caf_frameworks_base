@@ -21,6 +21,10 @@ import android.annotation.SdkConstant.SdkConstantType;
 import android.os.Binder;
 import android.os.RemoteException;
 
+import java.net.InetAddress;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+
 /**
  * Class that answers queries about the state of network connectivity. It also
  * notifies applications when network connectivity changes. Get an instance
@@ -169,6 +173,11 @@ public class ConnectivityManager
 
     public static final int DEFAULT_NETWORK_PREFERENCE = TYPE_WIFI;
 
+    /** {@hide} */
+    public static final int IPv4 = 4;
+    /** {@hide} */
+    public static final int IPv6 = 6;
+
     private IConnectivityManager mService;
 
     static public boolean isNetworkTypeValid(int networkType) {
@@ -284,6 +293,35 @@ public class ConnectivityManager
         try {
             return mService.requestRouteToHost(networkType, hostAddress);
         } catch (RemoteException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Ensure that a network route exists to deliver traffic to the specified
+     * host via the specified network interface. An attempt to add a route that
+     * already exists is ignored, but treated as successful.
+     * @param networkType the type of the network over which traffic to the specified
+     * host is to be routed
+     * @param hostAddress the IP address of the host to which the route is desired
+     * @return {@code true} on success, {@code false} on failure
+     * @hide
+     */
+    public boolean requestRouteToHostAddress(int networkType, InetAddress hostAddress) {
+        try {
+            String address;
+            int addressType;
+            if (hostAddress instanceof Inet4Address) {
+                address = hostAddress.getHostAddress();
+                addressType = IPv4;
+            } else if (hostAddress instanceof Inet6Address) {
+                address = hostAddress.getHostAddress();
+                addressType = IPv6;
+            } else {
+                return false;
+            }
+            return mService.requestRouteToHostAddress(networkType, addressType, address);
+        } catch (Exception e) {
             return false;
         }
     }

@@ -34,6 +34,9 @@ public class NetworkUtils {
     /** Add a route to the specified host via the named interface. */
     public native static int addHostRoute(String interfaceName, int hostaddr);
 
+    /** Add a route to the specified host via the named interface. */
+    public native static int addRouteToHost(String interfaceName, int addressType, String hostAddr);
+
     /** Add a default route for the named interface. */
     public native static int setDefaultRoute(String interfaceName, int gwayAddr);
 
@@ -127,5 +130,22 @@ public class NetworkUtils {
                 | ((addrBytes[1] & 0xff) << 8)
                 |  (addrBytes[0] & 0xff);
         return addr;
+    }
+
+    /**
+     * Look up a host name and return the result as InetAddress. This can be used for IPv4
+     * and IPv6 addresses.
+     * @param hostname the name of the host (or the IP address)
+     * @return the IP address as an {@code InetAddress} instance if the
+     * hostname is valid. Otherwise returns null
+     */
+    public static InetAddress lookupHostByName(String hostname) {
+        InetAddress inetAddress = null;
+        try {
+            inetAddress = InetAddress.getByName(hostname);
+        } catch (UnknownHostException e) {
+        } finally {
+            return inetAddress;
+        }
     }
 }
