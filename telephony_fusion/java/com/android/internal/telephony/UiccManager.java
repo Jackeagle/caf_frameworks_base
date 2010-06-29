@@ -108,6 +108,9 @@ public class UiccManager extends Handler{
                             onComplete.sendToTarget();
                         }
                     }
+                } else if (ar.userObj != null && ar.userObj instanceof Message) {
+                    Message onComplete = (Message)ar.userObj;
+                    onComplete.sendToTarget();
                 }
                 break;
             case EVENT_RADIO_OFF_OR_UNAVAILABLE:

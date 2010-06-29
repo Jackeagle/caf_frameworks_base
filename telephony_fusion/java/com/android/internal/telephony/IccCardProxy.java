@@ -44,7 +44,7 @@ import com.android.internal.telephony.UiccManager.AppFamily;
 
 public class IccCardProxy extends Handler implements IccCard {
 
-    private static final String LOG_TAG = "IccCardProxy";
+    private static final String LOG_TAG = "RIL_IccCardProxy";
 
     private static final int EVENT_ICC_CHANGED = 1;
     private static final int EVENT_ICC_ABSENT = 2;
@@ -104,21 +104,24 @@ public class IccCardProxy extends Handler implements IccCard {
         switch (msg.what) {
             case EVENT_ICC_CHANGED:
                 updateIccAvailability();
+                updateStateProperty();
                 break;
             case EVENT_ICC_ABSENT:
                 mAbsentRegistrants.notifyRegistrants();
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
                 break;
             case EVENT_ICC_LOCKED:
-                mPinLockedRegistrants.notifyRegistrants();
+                processLockedState();
                 break;
             case EVENT_NETWORK_LOCKED:
                 mNetworkLockedRegistrants.notifyRegistrants();
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOCKED, INTENT_VALUE_LOCKED_NETWORK);
                 break;
             case EVENT_APP_READY:
-                broadcastIccStateChangedIntent(IccCard.INTENT_VALUE_ICC_READY, null);
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_READY, null);
                 break;
             case EVENT_RECORDS_LOADED:
-                broadcastIccStateChangedIntent(IccCard.INTENT_VALUE_ICC_LOADED, null);
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOADED, null);
                 break;
             case EVENT_IMSI_READY:
                 broadcastIccStateChangedIntent(IccCard.INTENT_VALUE_ICC_IMSI, null);
@@ -146,7 +149,9 @@ public class IccCardProxy extends Handler implements IccCard {
                 mUiccCard = null;
                 mAppRecords = null;
             }
-            if (newApplication != null) {
+            if (newApplication == null) {
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
+            } else {
                 mApplication = newApplication;
                 /*
                  * TODO : fusion - study this. we request the card in which the
@@ -157,7 +162,6 @@ public class IccCardProxy extends Handler implements IccCard {
                 mUiccCard = newApplication.getCard();
                 mAppRecords = newApplication.getApplicationRecords();
                 registerUiccCardEvents();
-                updateStateProperty();
             }
         }
     }
@@ -183,7 +187,9 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     private void updateStateProperty() {
-        if (mUiccCard != null) {
+        if (mUiccCard == null) {
+            SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, CardState.ABSENT.toString());
+        } else {
             SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, mUiccCard.getCardState().toString());
         }
     }
@@ -222,6 +228,23 @@ public class IccCardProxy extends Handler implements IccCard {
         }
     }
 
+    private void processLockedState() {
+        if (mApplication == null) {
+            //Don't need to do anything if non-existent application is locked
+            return;
+        }
+        AppState appState = mApplication.getState();
+        switch (mApplication.getState()) {
+            case APPSTATE_PIN:
+                mPinLockedRegistrants.notifyRegistrants();
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOCKED, INTENT_VALUE_LOCKED_ON_PIN);
+                break;
+            case APPSTATE_PUK:
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOCKED, INTENT_VALUE_LOCKED_ON_PUK);
+                break;
+        }
+    }
+
     public State getIccCardState() {
         /*
          * TODO: fusion - what is difference between getState() and
@@ -255,10 +278,12 @@ public class IccCardProxy extends Handler implements IccCard {
         State retState = State.UNKNOWN;
         CardState cardState = CardState.ABSENT;
         AppState appState = AppState.APPSTATE_UNKNOWN;
+        PersoSubState persoState = PersoSubState.PERSOSUBSTATE_UNKNOWN;
 
         if (mUiccCard != null && mApplication != null) {
             appState = mApplication.getState();
             cardState = mUiccCard.getCardState();
+            persoState = mApplication.getPersonalizationState();
         }
 
         switch (cardState) {
@@ -284,8 +309,60 @@ public class IccCardProxy extends Handler implements IccCard {
                         retState = State.PUK_REQUIRED;
                         break;
                     case APPSTATE_SUBSCRIPTION_PERSO:
-                        /* TODO: fusion - get personalization substate from uicc */
-                        retState = State.UNKNOWN;
+                        switch (persoState) {
+                            case PERSOSUBSTATE_UNKNOWN:
+                            case PERSOSUBSTATE_IN_PROGRESS:
+                                retState = State.UNKNOWN;
+                                break;
+                            case PERSOSUBSTATE_READY:
+                                //This should never happen
+                                retState = State.UNKNOWN;
+                                break;
+                            case PERSOSUBSTATE_SIM_NETWORK:
+                            case PERSOSUBSTATE_SIM_NETWORK_PUK:
+                                retState = State.NETWORK_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_SIM_NETWORK_SUBSET:
+                            case PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK:
+                                retState = State.SIM_NETWORK_SUBSET_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_SIM_CORPORATE:
+                            case PERSOSUBSTATE_SIM_CORPORATE_PUK:
+                                retState = State.SIM_CORPORATE_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_SIM_SERVICE_PROVIDER:
+                            case PERSOSUBSTATE_SIM_SERVICE_PROVIDER_PUK:
+                                retState = State.SIM_SERVICE_PROVIDER_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_SIM_SIM:
+                            case PERSOSUBSTATE_SIM_SIM_PUK:
+                                retState = State.SIM_SIM_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_RUIM_NETWORK1:
+                            case PERSOSUBSTATE_RUIM_NETWORK1_PUK:
+                                retState = State.RUIM_NETWORK1_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_RUIM_NETWORK2:
+                            case PERSOSUBSTATE_RUIM_NETWORK2_PUK:
+                                retState = State.RUIM_NETWORK2_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_RUIM_HRPD:
+                            case PERSOSUBSTATE_RUIM_HRPD_PUK:
+                                retState = State.RUIM_HRPD_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_RUIM_CORPORATE:
+                            case PERSOSUBSTATE_RUIM_CORPORATE_PUK:
+                                retState = State.RUIM_CORPORATE_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_RUIM_SERVICE_PROVIDER:
+                            case PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_PUK:
+                                retState = State.RUIM_SERVICE_PROVIDER_LOCKED;
+                                break;
+                            case PERSOSUBSTATE_RUIM_RUIM:
+                            case PERSOSUBSTATE_RUIM_RUIM_PUK:
+                                retState = State.RUIM_RUIM_LOCKED;
+                                break;
+                        }
                         break;
                     case APPSTATE_DETECTED:
                         /* TODO: fusion - ???? */

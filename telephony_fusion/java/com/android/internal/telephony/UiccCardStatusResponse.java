@@ -40,6 +40,11 @@ public class UiccCardStatusResponse {
             public int            pin1_replaced;
             public PinState       pin1;
             public PinState       pin2;
+            public String toString() {
+                return "AppStatus: " + app_type + " " + app_state + " " + perso_substate +
+                       " aid:" + aid + " app_label:" + app_label + " pin1_replaced: " +
+                       pin1_replaced + " pin1:" + pin1 + " pin2:" + pin2;
+            }
         }
         CardState     card_state;
         PinState      universal_pin_state;
