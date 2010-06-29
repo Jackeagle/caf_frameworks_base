@@ -1105,7 +1105,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     private boolean tryDisconnectDataCall(DataConnection dc, String reason) {
-        logv("trySetupDataCall : dc=" + dc + ", reason=" + reason);
+        logv("tryDisconnectDataCall : dc=" + dc + ", reason=" + reason);
         dc.disconnect(obtainMessage(EVENT_DISCONNECT_DONE, reason));
         return true;
     }
