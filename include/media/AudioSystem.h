@@ -346,6 +346,8 @@ public:
                                         output_flags flags = OUTPUT_FLAG_DIRECT,
                                         int32_t sessionId = -1);
     static void closeSession(audio_io_handle_t output);
+    static status_t pauseSession(audio_io_handle_t output, stream_type stream);
+    static status_t resumeSession(audio_io_handle_t output, stream_type stream);
     static status_t startOutput(audio_io_handle_t output, AudioSystem::stream_type stream);
     static status_t stopOutput(audio_io_handle_t output, AudioSystem::stream_type stream);
     static void releaseOutput(audio_io_handle_t output);

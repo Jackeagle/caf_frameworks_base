@@ -476,6 +476,48 @@ audio_io_handle_t AudioPolicyService::openSession(uint32_t *pDevices,
     return af->openSession(pDevices, (uint32_t *)pFormat, flags, stream, sessionId);
 }
 
+status_t AudioPolicyService::pauseSession(audio_io_handle_t output, AudioSystem::stream_type stream)
+{
+    LOGV("pauseSession() tid %d", gettid());
+    if (mpPolicyManager != NULL) {
+        Mutex::Autolock _l(mLock);
+        mpPolicyManager->pauseSession(output,
+                                      stream);
+    }
+
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == 0) {
+        LOGW("pauseSession() could not get AudioFlinger");
+        return 0;
+    }
+
+    return af->pauseSession((int) output, (int32_t) stream);
+}
+
+status_t AudioPolicyService::resumeSession(audio_io_handle_t output, AudioSystem::stream_type stream)
+{
+    LOGV("pauseSession() tid %d", gettid());
+
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == 0) {
+        LOGW("resumeSession() could not get AudioFlinger");
+        return 0;
+    }
+
+    if (NO_ERROR != af->resumeSession((int) output, (int32_t) stream))
+    {
+        LOGE("Resume Session failed from AudioFligner");
+    }
+
+    if (mpPolicyManager != NULL) {
+        Mutex::Autolock _l(mLock);
+        mpPolicyManager->resumeSession(output,
+                                       stream);
+    }
+
+    return 0;
+}
+
 status_t AudioPolicyService::closeSession(audio_io_handle_t output)
 {
     LOGV("closeSession() tid %d", gettid());

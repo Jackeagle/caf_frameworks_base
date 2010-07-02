@@ -56,6 +56,8 @@ enum {
     OPEN_SESSION,
     OPEN_DUPLICATE_OUTPUT,
     CLOSE_OUTPUT,
+    PAUSE_SESSION,
+    RESUME_SESSION,
     CLOSE_SESSION,
     SUSPEND_OUTPUT,
     RESTORE_OUTPUT,
@@ -398,6 +400,26 @@ public:
         return output;
     }
 
+    virtual status_t pauseSession(int output, int32_t  stream)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeInt32(output);
+        data.writeInt32(stream);
+        remote()->transact(PAUSE_SESSION, data, &reply);
+        return reply.readInt32();
+    }
+
+    virtual status_t resumeSession(int output, int32_t  stream)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeInt32(output);
+        data.writeInt32(stream);
+        remote()->transact(RESUME_SESSION, data, &reply);
+        return reply.readInt32();
+    }
+
     virtual status_t closeSession(int output)
     {
         Parcel data, reply;
@@ -709,6 +731,22 @@ status_t BnAudioFlinger::onTransact(
             reply->writeInt32(output);
             reply->writeInt32(devices);
             reply->writeInt32(format);
+            return NO_ERROR;
+        } break;
+        case PAUSE_SESSION: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            int output = data.readInt32();
+            int32_t  stream = data.readInt32();
+            reply->writeInt32(pauseSession(output,
+                                           stream));
+            return NO_ERROR;
+        } break;
+        case RESUME_SESSION: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            int output = data.readInt32();
+            int32_t  stream = data.readInt32();
+            reply->writeInt32(resumeSession(output,
+                                           stream));
             return NO_ERROR;
         } break;
         case CLOSE_SESSION: {

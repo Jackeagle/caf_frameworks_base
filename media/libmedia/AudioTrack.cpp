@@ -383,6 +383,15 @@ sp<IMemory>& AudioTrack::sharedBuffer()
 
 void AudioTrack::start()
 {
+    if ( mAudioSession != -1  ) {
+        if ( NO_ERROR != AudioSystem::resumeSession(mAudioSession,
+                                   (AudioSystem::stream_type)mStreamType) )
+        {
+            LOGE("ResumeSession failed");
+        }
+        return;
+    }
+
     sp<AudioTrackThread> t = mAudioTrackThread;
 
     LOGV("start %p", this);
@@ -497,6 +506,16 @@ void AudioTrack::flush()
 void AudioTrack::pause()
 {
     LOGV("pause");
+
+    if ( mAudioSession != -1 ) {
+        if ( NO_ERROR != AudioSystem::pauseSession(mAudioSession,
+                                  (AudioSystem::stream_type)mStreamType) )
+        {
+            LOGE("PauseSession failed");
+        }
+        return;
+    }
+
     if (android_atomic_and(~1, &mActive) == 1) {
         mAudioTrack->pause();
     }

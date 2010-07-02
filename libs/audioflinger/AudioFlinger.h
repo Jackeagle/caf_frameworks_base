@@ -122,6 +122,10 @@ public:
                                     int32_t  streamType,
                                     int32_t  sessionId);
 
+    virtual status_t pauseSession(int output, int32_t  streamType);
+
+    virtual status_t resumeSession(int output, int32_t  streamType);
+
     virtual status_t closeSession(int output);
 
     virtual int openDuplicateOutput(int output1, int output2);
@@ -805,7 +809,10 @@ private:
                 int                                 mNextThreadId;
                 int                                 mA2DPHandle; // Handle to notify client (MIO)
                 int                                 mLPAStreamType;
-                KeyedVector<audio_io_handle_t, AudioStreamOut *> mOutputSessions;   // list of output descriptors
+                AudioStreamOut                     *mLPAOutput;
+                audio_io_handle_t                   mLPAHandle;
+                //KeyedVector<audio_io_handle_t, AudioStreamOut *> mOutputSessions;   // list of output descriptors
+                int                                 mLPAStreamIsActive;
 };
 
 // ----------------------------------------------------------------------------

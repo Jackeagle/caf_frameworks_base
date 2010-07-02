@@ -588,6 +588,20 @@ void AudioSystem::releaseOutput(audio_io_handle_t output)
     aps->releaseOutput(output);
 }
 
+status_t AudioSystem::pauseSession(audio_io_handle_t output, stream_type stream)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->pauseSession(output, stream);
+}
+
+status_t AudioSystem::resumeSession(audio_io_handle_t output, stream_type stream)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->resumeSession(output, stream);
+}
+
 void AudioSystem::closeSession(audio_io_handle_t output)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();

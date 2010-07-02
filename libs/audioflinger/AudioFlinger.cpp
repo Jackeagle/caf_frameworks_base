@@ -124,6 +124,9 @@ AudioFlinger::AudioFlinger()
 {
     mHardwareStatus = AUDIO_HW_IDLE;
     mA2DPHandle = -1;
+    mLPAOutput = NULL;
+    mLPAHandle = -1;
+    mLPAStreamIsActive = false;
 
     mAudioHardware = AudioHardwareInterface::create();
 
@@ -150,9 +153,9 @@ AudioFlinger::~AudioFlinger()
         // closeOutput() will remove first entry from mPlaybackThreads
         closeOutput(mPlaybackThreads.keyAt(0));
     }
-    while (!mOutputSessions.isEmpty()) {
-        // closeOutput() will remove first entry from mOutputSessions
-        closeSession(mOutputSessions.keyAt(0));
+    if (mLPAOutput) {
+        // Close the Output
+        closeSession(mLPAHandle);
     }
     if (mAudioHardware) {
         delete mAudioHardware;
@@ -485,8 +488,9 @@ status_t AudioFlinger::setStreamVolume(int stream, float value, int output)
 
     AutoMutex lock(mLock);
 
-    if(mOutputSessions.indexOfKey(output) >= 0 && mLPAStreamType == stream) {
-        mOutputSessions.valueFor(output)->setVolume(value, value);
+    if( (mLPAOutput != NULL) &&
+        (mLPAStreamType == stream) ) {
+        mLPAOutput->setVolume(value, value);
         mStreamTypes[stream].volume = value;
         return NO_ERROR;
     }
@@ -569,7 +573,7 @@ bool AudioFlinger::isMusicActive() const
             return true;
         }
     }
-    if (!mOutputSessions.isEmpty() && mLPAStreamType == AudioSystem::MUSIC) {
+    if (mLPAStreamIsActive && mLPAOutput && mLPAStreamType == AudioSystem::MUSIC) {
         return true;
     }
     return false;
@@ -595,8 +599,8 @@ status_t AudioFlinger::setParameters(int ioHandle, const String8& keyValuePairs)
         return result;
     }
     // Check Direct outputs
-    if (mOutputSessions.indexOfKey(ioHandle) >= 0) {
-        result = mOutputSessions.valueFor(ioHandle)->setParameters(keyValuePairs);
+    if (mLPAOutput) {
+        result = mLPAOutput->setParameters(keyValuePairs);
         return result;
     }
     // hold a strong ref on thread in case closeOutput() or closeInput() is called
@@ -3812,13 +3816,33 @@ int AudioFlinger::openSession(uint32_t *pDevices,
     mHardwareStatus = AUDIO_HW_IDLE;
     if (output != 0) {
         mNextThreadId++;
-        mOutputSessions.add(mNextThreadId, output);
+        mLPAOutput = output;
+        mLPAHandle = mNextThreadId;
         mLPAStreamType = streamType;
+        mLPAStreamIsActive = true;
         if (pFormat) *pFormat = format;
         return mNextThreadId;
     }
 
     return 0;
+}
+
+status_t AudioFlinger::pauseSession(int output, int32_t  streamType)
+{
+    if (output == mLPAHandle && streamType == mLPAStreamType ) {
+        mLPAStreamIsActive = false;
+    }
+
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::resumeSession(int output, int32_t  streamType)
+{
+    if (output == mLPAHandle && streamType == mLPAStreamType ) {
+        mLPAStreamIsActive = true;
+    }
+
+    return NO_ERROR;
 }
 
 status_t AudioFlinger::closeSession(int output)
@@ -3830,12 +3854,12 @@ status_t AudioFlinger::closeSession(int output)
     //AudioSystem::stopOutput(output, (AudioSystem::stream_type)mStreamType);
 
     // Delete the Audio session
-    if(mOutputSessions.indexOfKey(output) >= 0) {
-        AudioStreamOut* audioOut = mOutputSessions.valueFor(output);
-        audioOut->standby();
-        delete mOutputSessions.valueFor(output);
-
-        mOutputSessions.removeItem(output);
+    if(mLPAOutput) {
+        mLPAOutput->standby();
+        delete mLPAOutput;
+        mLPAOutput = NULL;
+        mLPAHandle = -1;
+        mLPAStreamIsActive = false;
     }
 
     return NO_ERROR;

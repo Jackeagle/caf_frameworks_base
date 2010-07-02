@@ -1574,6 +1574,22 @@ void MediaPlayerService::AudioOutput::closeSession()
     }
 }
 
+void MediaPlayerService::AudioOutput::pauseSession()
+{
+    LOGV("pauseSession");
+    if(mSession != NULL) {
+        mSession->pause();
+    }
+}
+
+void MediaPlayerService::AudioOutput::resumeSession()
+{
+    LOGV("resumeSession");
+    if(mSession != NULL) {
+        mSession->start();
+    }
+}
+
 void MediaPlayerService::AudioOutput::setVolume(float left, float right)
 {
     LOGV("setVolume(%f, %f)", left, right);

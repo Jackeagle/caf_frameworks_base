@@ -93,6 +93,8 @@ public:
         virtual void        stop() = 0;
         virtual void        flush() = 0;
         virtual void        pause() = 0;
+        virtual void        pauseSession() {return;};
+        virtual void        resumeSession() {return;};
         virtual void        close() = 0;
         virtual void        closeSession() {return;};
     };
