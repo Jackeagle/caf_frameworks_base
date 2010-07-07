@@ -2604,27 +2604,30 @@ bool AudioFlinger::AudioRecordThread::threadLoop()
                    (bytesRead < inBufferSize) &&
                    ((mRecordTrack->format() == AudioSystem::FORMAT_AMR_IETF) ||
                     (mRecordTrack->format() == AudioSystem::FORMAT_EVRC) ||
-                    (mRecordTrack->format() == AudioSystem::FORMAT_QCELP)))
-               {
-                 LOGV("Updating the framecount, so that it reflects the actual frames read from the HAL");
-                 if ( mRecordTrack->format() == AudioSystem::FORMAT_AMR_IETF)
-                 {
-                   buffer.frameCount = bytesRead / 32; // frame size of the FULL rate AMRNB
-                 }
-                 else if ( mRecordTrack->format() == AudioSystem::FORMAT_EVRC)
-                 {
-                   buffer.frameCount = bytesRead / 23;
-                 }
-                 else if ( mRecordTrack->format() == AudioSystem::FORMAT_QCELP)
-                 {
-                   buffer.frameCount = bytesRead / 35;
-                 }
+                    (mRecordTrack->format() == AudioSystem::FORMAT_QCELP))) {
 
-                 LOGV("Updated the framecount, and the value is %d", buffer.frameCount);
+                 if( bytesRead < 0 ){
+                   LOGE("input->read returned < 0 bytes");
+                 }
+                 else {
+                   LOGV("Updating the framecount, so that it reflects the actual frames read from the HAL");
+                   if ( mRecordTrack->format() == AudioSystem::FORMAT_AMR_IETF)
+                     {
+                       buffer.frameCount = bytesRead / 32; // frame size of the FULL rate AMRNB
+                     }
+                   else if ( mRecordTrack->format() == AudioSystem::FORMAT_EVRC)
+                     {
+                       buffer.frameCount = bytesRead / 23;
+                     }
+                   else if ( mRecordTrack->format() == AudioSystem::FORMAT_QCELP)
+                     {
+                       buffer.frameCount = bytesRead / 35;
+                     }
+                   LOGV("Updated the framecount, and the value is %d", buffer.frameCount);
+                 }
                }
-
-                mRecordTrack->releaseBuffer(&buffer);
-                mRecordTrack->overflow();
+               mRecordTrack->releaseBuffer(&buffer);
+               mRecordTrack->overflow();
             }
             // client isn't retrieving buffers fast enough
             else {
