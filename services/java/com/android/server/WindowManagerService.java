@@ -6620,6 +6620,7 @@ public class WindowManagerService extends IWindowManager.Stub
                                 int mcy = (int)mmev.getY();
 
                                 if (mMouseSurface != null && (mMlx != mcx || mMly != mcy)) {
+                                synchronized(mWindowMap) {
                                     Surface.openTransaction();
                                     if (DEBUG_INPUT)
                                         Slog.i(TAG, "Open transaction for the mouse surface");
@@ -6643,6 +6644,7 @@ public class WindowManagerService extends IWindowManager.Stub
                                         Slog.e(TAG, "Failure showing mouse surface",e);
                                     }
                                     Surface.closeTransaction();
+                                    }
                                 }
                                 dispatchPointer(ev, (MotionEvent)ev.event, 0, 0);
                                 break;
