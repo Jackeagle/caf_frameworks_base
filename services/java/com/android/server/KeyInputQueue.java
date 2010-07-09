@@ -633,7 +633,7 @@ public abstract class KeyInputQueue {
                                             == RawInputEvent.CLASS_TOUCHSCREEN) {
                                 di.mAbs.changed = true;
                                 di.mAbs.mDown[0] = ev.value != 0;
-                            
+                                //Log.i(TAG,"TS key event found, down: " + ev.value);
                             // Trackball (mouse) protocol: press down or up.
                             } else if (ev.scancode == RawInputEvent.BTN_MOUSE) {
                                 if ((classes&RawInputEvent.CLASS_TRACKBALL) != 0) {
@@ -650,16 +650,25 @@ public abstract class KeyInputQueue {
                                             (ev.value != 0) ? 1 : 2;
                                     send = true;
                                 }
-                            } else if (ev.scancode == RawInputEvent.BTN_RIGHT) {
+                            } else if (ev.scancode == RawInputEvent.BTN_RIGHT||
+                                ev.scancode == RawInputEvent.BTN_MIDDLE) {
                                 if ((classes&RawInputEvent.CLASS_MOUSE) != 0) {
                                     boolean down = (ev.value != 0);
+                                    int keycode;
                                     if (down)
                                         di.mKeyDownTime = curTime;
+
+                                    if (ev.scancode == RawInputEvent.BTN_RIGHT) {
+                                        keycode = KeyEvent.KEYCODE_BACK;
+                                    } else {
+                                        /* mouse middle key as MENU key */
+                                        keycode = KeyEvent.KEYCODE_MENU;
+                                    }
 
                                     addLocked(di, curTime, ev.flags,
                                         RawInputEvent.CLASS_KEYBOARD,
                                         newKeyEvent(di, di.mKeyDownTime, curTime, down,
-                                            KeyEvent.KEYCODE_MENU, 0, scancode,
+                                            keycode, 0, scancode,
                                             ((ev.flags & WindowManagerPolicy.FLAG_WOKE_HERE) != 0)
                                             ? KeyEvent.FLAG_WOKE_HERE : 0));
                                 }
