@@ -24,6 +24,7 @@ import android.os.Message;
 import android.util.Log;
 
 import com.android.internal.telephony.IccConstants;
+import com.android.internal.telephony.IccFileHandler;
 import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.SmsRawData;
@@ -88,6 +89,16 @@ public class SimSmsInterfaceManager extends IccSmsInterfaceManager {
         if (messages == null) {
             return;
         }
+
+        //IccFileHandler can be null, if icc card is absent.
+        IccFileHandler fh = mPhone.getIccFileHandler();
+        if (fh == null) {
+            //shouldn't really happen, as messages are marked as read, only
+            //after importing it from icc.
+            Log.e(LOG_TAG, "markMessagesAsRead - aborting, no icc card present.");
+            return;
+        }
+
         int count = messages.size();
 
         for (int i = 0; i < count; i++) {
@@ -97,8 +108,7 @@ public class SimSmsInterfaceManager extends IccSmsInterfaceManager {
                  byte[] nba = new byte[n - 1];
                  System.arraycopy(ba, 1, nba, 0, n - 1);
                  byte[] record = makeSmsRecordData(STATUS_ON_ICC_READ, nba);
-                 ((SIMFileHandler)mPhone.getIccFileHandler()).updateEFLinearFixed(
-                   IccConstants.EF_SMS, i + 1, record, null, null);
+                 fh.updateEFLinearFixed(IccConstants.EF_SMS, i + 1, record, null, null);
                  log("SMS " + (i + 1) + " marked as read");
              }
         }
@@ -145,10 +155,16 @@ public class SimSmsInterfaceManager extends IccSmsInterfaceManager {
             if (status == STATUS_ON_ICC_FREE) {
                 // Special case FREE: call deleteSmsOnSim instead of
                 // manipulating the SIM record
+                // Will eventually fail if icc card is not present.
                 mPhone.mCM.deleteSmsOnSim(index, response);
             } else {
                 byte[] record = makeSmsRecordData(status, pdu);
-                mPhone.getIccFileHandler().updateEFLinearFixed(
+                IccFileHandler fh = mPhone.getIccFileHandler();
+                if (fh == null) {
+                    response.recycle();
+                    return mSuccess; /* is false */
+                }
+                fh.updateEFLinearFixed(
                         IccConstants.EF_SMS,
                         index, record, null, response);
             }
@@ -205,8 +221,17 @@ public class SimSmsInterfaceManager extends IccSmsInterfaceManager {
                 "android.permission.RECEIVE_SMS",
                 "Reading messages from SIM");
         synchronized(mLock) {
+
+            IccFileHandler fh = (IccFileHandler) mPhone.getIccFileHandler();
+            if (fh == null) {
+                Log.e(LOG_TAG, "Cannot load Sms records. No icc card?");
+                mSms.clear();
+                return mSms;
+            }
+
             Message response = mHandler.obtainMessage(EVENT_LOAD_DONE);
-            mPhone.getIccFileHandler().loadEFLinearFixedAll(IccConstants.EF_SMS, response);
+            fh.loadEFLinearFixedAll(IccConstants.EF_SMS,
+                    response);
 
             try {
                 mLock.wait();

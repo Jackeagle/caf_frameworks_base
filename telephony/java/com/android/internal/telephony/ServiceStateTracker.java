@@ -47,6 +47,7 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final int DATA_ACCESS_CDMA_EvDo_B = 12;
 
     protected CommandsInterface cm;
+    protected UiccManager mUiccManager;
 
     public ServiceState ss;
     protected ServiceState newSS;
@@ -118,6 +119,14 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final int EVENT_OTA_PROVISION_STATUS_CHANGE       = 37;
     protected static final int EVENT_SET_RADIO_POWER_OFF               = 38;
     protected static final int EVENT_RUIM_LOCKED_OR_ABSENT             = 39;
+    protected static final int EVENT_GET_CDMA_SUBSCRIPTION_SOURCE      = 40;
+    protected static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED  = 41;
+    protected static final int EVENT_CDMA_PRL_VERSION_CHANGED          = 42;
+    protected static final int EVENT_GET_CDMA_PRL_VERSION              = 43;
+
+    protected static final int EVENT_ICC_CHANGED                       = 44;
+    protected static final int EVENT_RADIO_ON                          = 45;
+    protected static final int EVENT_ICC_RECORD_EVENTS                 = 46;
 
     protected static final String TIMEZONE_PROPERTY = "persist.sys.timezone";
 
