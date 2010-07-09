@@ -171,11 +171,13 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
          * 5. ipv
          */
 
-        /* TODO : clean up this - notify data connection expects an array of types!*/
-        ArrayList<String> typeArrayList = new ArrayList<String>();
-        typeArrayList.add(type);
-        String typeArray[] = new String[typeArrayList.size()];
-        typeArray= (String[]) typeArrayList.toArray(typeArray);
+        Log.v("DATA", "[DefaultPhoneNotifier] : "
+                + type + ", " + ipv + ", " + sender.getDataConnectionState(type, ipv));
+
+        /* TODO : change telephony registry interface to accept String instead of String[] */
+        String typeArray[] = new String[1];
+        typeArray[0] =type;
+
 
         try {
             mRegistry.notifyDataConnection(
