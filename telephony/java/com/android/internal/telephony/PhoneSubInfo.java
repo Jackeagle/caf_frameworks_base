@@ -25,12 +25,12 @@ import android.util.Log;
 
 public class PhoneSubInfo extends IPhoneSubInfo.Stub {
     static final String LOG_TAG = "PHONE";
-    private Phone mPhone;
+    private VoicePhone mPhone;
     private Context mContext;
     private static final String READ_PHONE_STATE =
         android.Manifest.permission.READ_PHONE_STATE;
 
-    public PhoneSubInfo(Phone phone) {
+    public PhoneSubInfo(VoicePhone phone) {
         mPhone = phone;
         mContext = phone.getContext();
     }
