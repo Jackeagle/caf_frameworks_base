@@ -65,6 +65,12 @@ status_t Overlay::resizeInput(uint32_t width, uint32_t height)
     return mOverlayData->resizeInput(mOverlayData, width, height);
 }
 
+status_t Overlay::frameCopy(overlay_buffer_t inbuf, overlay_buffer_t outbuf)
+{
+    if (mStatus != NO_ERROR) return mStatus;
+    return mOverlayData->frameCopy(mOverlayData, inbuf, outbuf);
+}
+
 status_t Overlay::setParameter(int param, int value)
 {
     if (mStatus != NO_ERROR) return mStatus;
