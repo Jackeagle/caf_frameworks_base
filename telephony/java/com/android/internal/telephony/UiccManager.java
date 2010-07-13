@@ -27,6 +27,7 @@ import android.os.RegistrantList;
 import android.util.Log;
 
 import com.android.internal.telephony.UiccConstants.CardState;
+import com.android.internal.telephony.gsm.stk.StkService;
 
 /* This class will be responsible for keeping all knowledge about
  * ICCs in the system. It will also be used as API to get appropriate
@@ -51,6 +52,7 @@ public class UiccManager extends Handler{
     UiccCard[] mUiccCards;
 
     private RegistrantList mIccChangedRegistrants = new RegistrantList();
+    private StkService mStkService;
 
     public static UiccManager getInstance(Context c, CommandsInterface ci) {
         if (mInstance == null) {
@@ -80,6 +82,9 @@ public class UiccManager extends Handler{
         mCi.registerForOn(this,EVENT_RADIO_ON, null);
         mCi.registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, null);
         mCi.registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, null);
+
+        mStkService = StkService.getInstance(mCi, null, mContext, null, null);
+
     }
 
     @Override
