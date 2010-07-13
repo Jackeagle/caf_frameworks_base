@@ -1,0 +1,185 @@
+/*
+ * Copyright 2007, The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.android.server;
+
+import android.net.LocalSocketAddress;
+import android.net.LocalSocket;
+import android.os.Environment;
+import android.os.SystemClock;
+import android.os.SystemProperties;
+import android.util.Config;
+import android.util.Log;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
+
+/**
+ * @hide
+ */
+
+final class HDMIListener implements Runnable {
+
+    private static final String TAG = "HDMIListener";
+
+    // socket name for connecting to hdmi
+    private static final String HDMI_SOCKET = "hdmid";
+
+    // hdmi commands
+    private static final String HDMI_CMD_ENABLE_HDMI = "enable_hdmi";
+    private static final String HDMI_CMD_DISABLE_HDMI = "disable_hdmi";
+
+    // hdmi events
+    private static final String HDMI_EVT_CONNECTED = "hdmi_connected";
+    private static final String HDMI_EVT_DISCONNECTED = "hdmi_disconnected";
+    private static final String HDMI_EVT_START = "hdmi_listner_started";
+
+    private HDMIService mService;
+    private OutputStream mOutputStream;
+    private boolean mHDMIConnected = false;
+    private boolean mHDMIEnabled = false;
+
+    HDMIListener(HDMIService service) {
+        mService = service;
+    }
+
+    private void handleEvent(String event) {
+        Log.e(TAG, "handleEvent " + event);
+
+        if (event.equals(HDMI_EVT_CONNECTED)) {
+            mHDMIConnected = true;
+	    mService.notifyHDMIConnected();
+        } else if (event.equals(HDMI_EVT_DISCONNECTED)) {
+            mHDMIConnected = false;
+	    mService.notifyHDMIDisconnected();
+        }
+    }
+
+    private void writeCommand(String command, String argument) {
+        synchronized (this) {
+            if (mOutputStream == null) {
+                Log.e(TAG, "No connection to hdmi daemon");
+            } else {
+                StringBuilder builder = new StringBuilder(command);
+                if (argument != null) {
+                    builder.append(argument);
+                }
+                builder.append('\0');
+
+                try {
+                    mOutputStream.write(builder.toString().getBytes());
+                } catch (IOException ex) {
+                    Log.e(TAG, "IOException in writeCommand", ex);
+                }
+            }
+        }
+    }
+
+    private void listenToSocket() {
+       LocalSocket socket = null;
+
+        try {
+            socket = new LocalSocket();
+            LocalSocketAddress address = new LocalSocketAddress(HDMI_SOCKET,
+                    LocalSocketAddress.Namespace.RESERVED);
+
+            socket.connect(address);
+
+            InputStream inputStream = socket.getInputStream();
+            mOutputStream = socket.getOutputStream();
+
+            /*
+             * All available messages in the socket are read into the buffer.
+             * If Socket contians more number of messages whose total size
+             * is greater than buffer size then last message may read partially.
+             * Partial messages are not processed.
+             * This issue has to be fixed.
+             */
+            byte[] buffer = new byte[512];
+
+            writeCommand(HDMI_EVT_START, null);
+            while (true) {
+                int count = inputStream.read(buffer);
+                if (count < 0) break;
+
+                int start = 0;
+                for (int i = 0; i < count; i++) {
+                    if (buffer[i] == 0) {
+                        String event = new String(buffer, start, i - start);
+                        handleEvent(event);
+                        start = i + 1;
+                    }
+                }
+            }
+        } catch (IOException ex) {
+	    Log.e(TAG, "Could not open listner socket");
+        }
+
+        synchronized (this) {
+            if (mOutputStream != null) {
+                try {
+                    mOutputStream.close();
+                } catch (IOException e) {
+                    Log.w(TAG, "IOException closing output stream");
+                }
+
+                mOutputStream = null;
+            }
+        }
+
+        try {
+            if (socket != null) {
+                socket.close();
+            }
+        } catch (IOException ex) {
+            Log.w(TAG, "IOException closing socket");
+        }
+
+        Log.d(TAG, "Failed to connect to hdmi daemon", new IllegalStateException());
+    }
+
+    /**
+     * Main loop for HDMIListener thread.
+     */
+    public void run() {
+        try {
+            listenToSocket();
+        } catch (Throwable t) {
+            // catch all Throwables so we don't bring down the system process
+            Log.d(TAG, "Fatal error " + t + " in HDMIListener thread!");
+        }
+    }
+
+    boolean isHDMIConnected() {
+        return mHDMIConnected;
+    }
+
+    public void enableHDMIOutput(boolean hdmiEnable) {
+	if (mHDMIEnabled == hdmiEnable)
+	    return;
+	if (hdmiEnable) {
+            writeCommand(HDMI_CMD_ENABLE_HDMI, null);
+	    mHDMIEnabled = true;
+	}
+	else {
+            writeCommand(HDMI_CMD_DISABLE_HDMI, null);
+	    mHDMIEnabled = false;
+	}
+    }
+}

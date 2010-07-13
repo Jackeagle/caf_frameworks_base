@@ -305,6 +305,12 @@ class ServerThread extends Thread {
                 Slog.e(TAG, "Failure starting Notification Manager", e);
             }
 
+			try {
+                Slog.i(TAG, "HDMI Service");
+                ServiceManager.addService("hdmi", new HDMIService(context));
+            } catch (Throwable e) {
+                Slog.e(TAG, "Failure starting HDMI Service ", e);
+            }
             try {
                 Slog.i(TAG, "Device Storage Monitor");
                 ServiceManager.addService(DeviceStorageMonitorService.SERVICE,

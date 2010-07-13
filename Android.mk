@@ -124,6 +124,7 @@ LOCAL_SRC_FILES += \
 	core/java/android/os/storage/IMountServiceListener.aidl \
 	core/java/android/os/storage/IMountShutdownObserver.aidl \
 	core/java/android/os/INetworkManagementService.aidl \
+	core/java/android/os/IHDMIService.aidl  \
 	core/java/android/os/INetStatService.aidl \
 	core/java/android/os/IPermissionController.aidl \
 	core/java/android/os/IPowerManager.aidl \

@@ -78,6 +78,8 @@ public:
     void        makeCurrent() const;
     uint32_t    getMaxTextureSize() const;
     uint32_t    getMaxViewportDims() const;
+    void        orientationChanged(int orientation) const;
+    void        videoOverlayStarted(bool started) const;
 
     uint32_t getPageFlipCount() const;
     EGLDisplay getEGLDisplay() const { return mDisplay; }
