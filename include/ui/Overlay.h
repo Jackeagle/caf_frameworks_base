@@ -85,6 +85,9 @@ public:
     /* change the width and height of the overlay */
     status_t resizeInput(uint32_t width, uint32_t height);
 
+    /* copy DSP buffer into overlay */
+    status_t frameCopy(overlay_buffer_t inbuf, overlay_buffer_t outbuf);
+
     status_t setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) ;
 
     status_t getCrop(uint32_t* x, uint32_t* y, uint32_t* w, uint32_t* h) ;
