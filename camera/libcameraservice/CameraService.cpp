@@ -70,17 +70,6 @@ extern "C" {
 static int debug_frame_cnt;
 #endif
 
-struct camera_size_type {
-    int width;
-    int height;
-};
-
-static const camera_size_type preview_sizes[] = {
-     { 1280, 720 }, // 720P
-     { 768,  432 },
-};
-
-
 static int getCallingPid() {
     return IPCThreadState::self()->getCallingPid();
 }
@@ -587,16 +576,6 @@ status_t CameraService::Client::setOverlay()
     CameraParameters params(mHardware->getParameters());
     params.getPreviewSize(&w, &h);
 
-    //for 720p recording , preview can be 800X448
-    char mDeviceName[PROPERTY_VALUE_MAX];
-    property_get("ro.product.device",mDeviceName," ");
-    if(!strncmp(mDeviceName, "msm7630",7) || !strncmp(mDeviceName, "qsd8250",7)){
-        if(w == preview_sizes[0].width && h==preview_sizes[0].height){
-            LOGD("Changing overlay dimensions to 768X432 for 720p recording.");
-            w = preview_sizes[1].width;
-            h = preview_sizes[1].height;
-        }
-    }
     if ( w != mOverlayW || h != mOverlayH )
     {
         // Force the destruction of any previous overlay
@@ -650,18 +629,6 @@ status_t CameraService::Client::registerPreviewBuffers()
     int w, h;
     CameraParameters params(mHardware->getParameters());
     params.getPreviewSize(&w, &h);
-
-    //for 720p recording , preview can be 800X448
-    char mDeviceName[PROPERTY_VALUE_MAX];
-
-    property_get("ro.product.device",mDeviceName," ");
-    if(!strncmp(mDeviceName,"msm7630", 7) || !strncmp(mDeviceName,"qsd8250", 7)){
-        if(w ==  preview_sizes[0].width && h== preview_sizes[0].height){
-            LOGD("registerpreviewbufs :changing dimensions to 768X432 for 720p recording.");
-            w = preview_sizes[1].width;
-            h = preview_sizes[1].height;
-        }
-    }
 
     // don't use a hardcoded format here
     ISurface::BufferHeap buffers(w, h, w, h,
