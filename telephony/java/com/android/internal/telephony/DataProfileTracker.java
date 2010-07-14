@@ -323,7 +323,9 @@ public class DataProfileTracker extends Handler {
          * For default service type on IPV4, return preferred APN if it is known
          * to work.
          */
-        if (ds == DataServiceType.SERVICE_TYPE_DEFAULT && ipv == IPVersion.IPV4) {
+        if (dpt == DataProfileType.PROFILE_TYPE_3GPP_APN
+                && ds == DataServiceType.SERVICE_TYPE_DEFAULT
+                && ipv == IPVersion.IPV4) {
             if (mPreferredDefaultApn != null && mPreferredDefaultApn.isWorking(IPVersion.IPV4)) {
                 return mPreferredDefaultApn;
             }

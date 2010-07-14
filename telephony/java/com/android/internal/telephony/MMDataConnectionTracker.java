@@ -953,11 +953,17 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                                     && mCm.getRadioState().isOn();
 
         if (isReadyForData == false) {
-            logi("Not Ready for Data :");
+            logi("***** NOT Ready for data :");
             logi("   " + "getDesiredPowerState() = " + getDesiredPowerState());
             logi("   " + "mCm.getRadioState() = " + mCm.getRadioState());
             logi("   " + dumpDataReadinessinfo());
-            return; // we will be called, when some event, triggers us back into readiness.
+            return; // we will be called, when some event, triggers us back into
+                    // readiness.
+        } else {
+            logi("Ready for data : ");
+            logi("   " + "getDesiredPowerState() = " + getDesiredPowerState());
+            logi("   " + "mCm.getRadioState() = " + mCm.getRadioState());
+            logi("   " + dumpDataReadinessinfo());
         }
 
         /*
