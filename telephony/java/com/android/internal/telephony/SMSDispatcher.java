@@ -503,7 +503,7 @@ public abstract class SMSDispatcher extends Handler {
                 Log.d(TAG, "SMS send failed");
             }
 
-            int ss = mPhone.getServiceState().getState();
+            int ss = mPhone.getVoiceServiceState().getState();
 
             if (ss != ServiceState.STATE_IN_SERVICE) {
                 handleNotInService(ss, tracker);
@@ -817,7 +817,7 @@ public abstract class SMSDispatcher extends Handler {
 
         SmsTracker tracker = new SmsTracker(map, sentIntent,
                 deliveryIntent);
-        int ss = mPhone.getServiceState().getState();
+        int ss = mPhone.getVoiceServiceState().getState();
 
         if (ss != ServiceState.STATE_IN_SERVICE) {
             handleNotInService(ss, tracker);

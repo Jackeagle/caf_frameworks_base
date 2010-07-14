@@ -136,11 +136,11 @@ public interface VoicePhone {
 
 
     /**
-     * Get the current ServiceState. Use
-     * <code>registerForServiceStateChanged</code> to be informed of
+     * Get the current voice ServiceState. Use
+     * <code>registerForVoiceerviceStateChanged</code> to be informed of
      * updates.
      */
-    ServiceState getServiceState();
+    ServiceState getVoiceServiceState();
 
     /**
      * Get the current CellLocation.
@@ -372,17 +372,17 @@ public interface VoicePhone {
     public void sendUssdResponse(String ussdMessge);
 
     /**
-     * Register for ServiceState changed.
+     * Register for voice service state changed.
      * Message.obj will contain an AsyncResult.
      * AsyncResult.result will be a ServiceState instance
      */
-    void registerForServiceStateChanged(Handler h, int what, Object obj);
+    void registerForVoiceServiceStateChanged(Handler h, int what, Object obj);
 
     /**
-     * Unregisters for ServiceStateChange notification.
+     * Unregisters for voice service state change notification.
      * Extraneous calls are tolerated silently
      */
-    void unregisterForServiceStateChanged(Handler h);
+    void unregisterForVoiceServiceStateChanged(Handler h);
 
     /**
      * Register for Supplementary Service notifications from the network.

@@ -275,7 +275,7 @@ public class CDMAPhone extends PhoneBase {
         }
     }
 
-    public ServiceState getServiceState() {
+    public ServiceState getVoiceServiceState() {
         return mSST.ss;
     }
 
@@ -1361,7 +1361,7 @@ public class CDMAPhone extends PhoneBase {
 
     @Override
     public int getCdmaEriIconIndex() {
-        return getServiceState().getCdmaEriIconIndex();
+        return getVoiceServiceState().getCdmaEriIconIndex();
     }
 
     /**
@@ -1371,7 +1371,7 @@ public class CDMAPhone extends PhoneBase {
      */
     @Override
     public int getCdmaEriIconMode() {
-        return getServiceState().getCdmaEriIconMode();
+        return getVoiceServiceState().getCdmaEriIconMode();
     }
 
     /**
@@ -1379,8 +1379,8 @@ public class CDMAPhone extends PhoneBase {
      */
     @Override
     public String getCdmaEriText() {
-        int roamInd = getServiceState().getCdmaRoamingIndicator();
-        int defRoamInd = getServiceState().getCdmaDefaultRoamingIndicator();
+        int roamInd = getVoiceServiceState().getCdmaRoamingIndicator();
+        int defRoamInd = getVoiceServiceState().getCdmaDefaultRoamingIndicator();
         return mEriManager.getCdmaEriText(roamInd, defRoamInd);
     }
 

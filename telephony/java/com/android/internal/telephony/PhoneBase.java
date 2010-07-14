@@ -140,7 +140,7 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
     protected final RegistrantList mDisconnectRegistrants
             = new RegistrantList();
 
-    protected final RegistrantList mServiceStateRegistrants
+    protected final RegistrantList mVoiceServiceStateRegistrants
             = new RegistrantList();
 
     protected final RegistrantList mMmiCompleteRegistrants
@@ -497,16 +497,16 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
     }
 
     // Inherited documentation suffices.
-    public void registerForServiceStateChanged(
+    public void registerForVoiceServiceStateChanged(
             Handler h, int what, Object obj) {
         checkCorrectThread(h);
 
-        mServiceStateRegistrants.add(h, what, obj);
+        mVoiceServiceStateRegistrants.add(h, what, obj);
     }
 
     // Inherited documentation suffices.
-    public void unregisterForServiceStateChanged(Handler h) {
-        mServiceStateRegistrants.remove(h);
+    public void unregisterForVoiceServiceStateChanged(Handler h) {
+        mVoiceServiceStateRegistrants.remove(h);
     }
 
     // Inherited documentation suffices.
@@ -535,9 +535,9 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
      */
     protected void notifyServiceStateChangedP(ServiceState ss) {
         AsyncResult ar = new AsyncResult(null, ss, null);
-        mServiceStateRegistrants.notifyRegistrants(ar);
+        mVoiceServiceStateRegistrants.notifyRegistrants(ar);
 
-        mNotifier.notifyServiceState(this);
+        mNotifier.notifyVoiceServiceState(this);
     }
 
     // Inherited documentation suffices.
