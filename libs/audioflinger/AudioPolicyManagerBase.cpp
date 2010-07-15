@@ -915,9 +915,19 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
         mForceUse[i] = AudioSystem::FORCE_NONE;
     }
 
+#ifndef HW_USES_DEFAULT_HEADSET
     uint32_t defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_EARPIECE;
+#else
+    uint32_t defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_WIRED_HEADSET;
+#endif
+
     // devices available by default are speaker, ear piece and microphone
+#ifndef HW_USES_DEFAULT_HEADSET
     mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE;
+#else
+    mAvailableOutputDevices = AudioSystem::DEVICE_OUT_WIRED_HEADSET;
+#endif
+
 #ifndef HW_NO_SPEAKER
     mAvailableOutputDevices |= AudioSystem::DEVICE_OUT_SPEAKER;
     defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_SPEAKER;
