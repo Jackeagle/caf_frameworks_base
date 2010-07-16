@@ -81,6 +81,16 @@ AudioTrack::AudioTrack(
             0, flags, cbf, user, notificationFrames, sharedBuffer);
 }
 
+AudioTrack::AudioTrack(
+        int streamType,
+        int format,
+        uint32_t flags,
+        int sessionId)
+    : mStatus(NO_INIT), mAudioSession(-1)
+{
+    mStatus = set(streamType, format, flags, sessionId);
+}
+
 AudioTrack::~AudioTrack()
 {
     LOGV_IF(mSharedBuffer != 0, "Destructor sharedBuffer: %p", mSharedBuffer->pointer());
@@ -94,7 +104,13 @@ AudioTrack::~AudioTrack()
             mAudioTrackThread->requestExitAndWait();
             mAudioTrackThread.clear();
         }
-        mAudioTrack.clear();
+        if(mAudioTrack != NULL) {
+            mAudioTrack.clear();
+        }
+        if(mAudioSession >= 0) {
+            AudioSystem::closeSession(mAudioSession);
+            mAudioSession = -1;
+        }
         IPCThreadState::self()->flushCommands();
     }
 }
@@ -248,7 +264,71 @@ status_t AudioTrack::set(
     mNewPosition = 0;
     mUpdatePeriod = 0;
     mFlags = flags;
+    mAudioSession = -1;
 
+    return NO_ERROR;
+}
+
+status_t AudioTrack::set(
+        int streamType,
+        int format,
+        uint32_t flags,
+        int sessionId)
+{
+    // handle default values first.
+    if (streamType == AudioSystem::DEFAULT) {
+        streamType = AudioSystem::MUSIC;
+    }
+    // these below should probably come from the audioFlinger too...
+    if (format == 0) {
+        format = AudioSystem::PCM_16_BIT;
+    }
+    // validate parameters
+    if (!AudioSystem::isValidFormat(format)) {
+        LOGE("Invalid format");
+        return BAD_VALUE;
+    }
+    // force direct flag if format is not linear PCM
+    if (!AudioSystem::isLinearPCM(format)) {
+        flags |= AudioSystem::OUTPUT_FLAG_DIRECT;
+    }
+
+    audio_io_handle_t output = AudioSystem::getSession((AudioSystem::stream_type)streamType,
+            format, (AudioSystem::output_flags)flags, sessionId);
+
+    if (output == 0) {
+        LOGE("Could not get audio output for stream type %d", streamType);
+        return BAD_VALUE;
+    }
+    
+    mVolume[LEFT] = 1.0f;
+    mVolume[RIGHT] = 1.0f;
+    mStatus = NO_ERROR;
+    mStreamType = streamType;
+    mFormat = format;
+    mChannels = 2;
+    mChannelCount = 2;
+    mSharedBuffer = NULL;
+    mMuted = false;
+    mActive = 0;
+    mCbf = NULL;
+    mNotificationFrames = 0;
+    mRemainingFrames = 0;
+    mUserData = NULL;
+    mLatency = 0;
+    mLoopCount = 0;
+    mMarkerPosition = 0;
+    mMarkerReached = false;
+    mNewPosition = 0;
+    mUpdatePeriod = 0;
+    mFlags = flags;
+    mAudioTrack = NULL;
+    mAudioSession = output;
+
+    /* Make the track active and start output */
+    android_atomic_or(1, &mActive);
+    AudioSystem::startOutput(output, (AudioSystem::stream_type)mStreamType);
+    LOGV("AudioTrack::set() - Started output(%d)",output);
     return NO_ERROR;
 }
 
@@ -302,6 +382,15 @@ sp<IMemory>& AudioTrack::sharedBuffer()
 
 void AudioTrack::start()
 {
+    if ( mAudioSession != -1  ) {
+        if ( NO_ERROR != AudioSystem::resumeSession(mAudioSession,
+                                   (AudioSystem::stream_type)mStreamType) )
+        {
+            LOGE("ResumeSession failed");
+        }
+        return;
+    }
+
     sp<AudioTrackThread> t = mAudioTrackThread;
 
     LOGV("start %p", this);
@@ -363,23 +452,25 @@ void AudioTrack::stop()
     }
 
     if (android_atomic_and(~1, &mActive) == 1) {
-        mCblk->cv.signal();
-        mAudioTrack->stop();
-        // Cancel loops (If we are in the middle of a loop, playback
-        // would not stop until loopCount reaches 0).
-        setLoop(0, 0, 0);
-        // the playback head position will reset to 0, so if a marker is set, we need
-        // to activate it again
-        mMarkerReached = false;
-        // Force flush if a shared buffer is used otherwise audioflinger
-        // will not stop before end of buffer is reached.
-        if (mSharedBuffer != 0) {
-            flush();
-        }
-        if (t != 0) {
-            t->requestExit();
-        } else {
-            setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_NORMAL);
+        if(mAudioTrack != NULL) {
+            mCblk->cv.signal();
+            mAudioTrack->stop();
+            // Cancel loops (If we are in the middle of a loop, playback
+            // would not stop until loopCount reaches 0).
+            setLoop(0, 0, 0);
+            // the playback head position will reset to 0, so if a marker is set, we need
+            // to activate it again
+            mMarkerReached = false;
+            // Force flush if a shared buffer is used otherwise audioflinger
+            // will not stop before end of buffer is reached.
+            if (mSharedBuffer != 0) {
+                flush();
+            }
+            if (t != 0) {
+                t->requestExit();
+            } else {
+                setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_NORMAL);
+            }
         }
     }
 
@@ -414,6 +505,16 @@ void AudioTrack::flush()
 void AudioTrack::pause()
 {
     LOGV("pause");
+
+    if ( mAudioSession != -1 ) {
+        if ( NO_ERROR != AudioSystem::pauseSession(mAudioSession,
+                                  (AudioSystem::stream_type)mStreamType) )
+        {
+            LOGE("PauseSession failed");
+        }
+        return;
+    }
+
     if (android_atomic_and(~1, &mActive) == 1) {
         mAudioTrack->pause();
     }
