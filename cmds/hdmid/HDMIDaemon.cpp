@@ -32,8 +32,6 @@
 #include <utils/AssetManager.h>
 
 #include <ui/DisplayInfo.h>
-#include <surfaceflinger/ISurfaceComposer.h>
-#include <surfaceflinger/ISurfaceFlingerClient.h>
 #include <ui/FramebufferNativeWindow.h>
 #include <linux/msm_mdp.h>
 #include <linux/fb.h>
@@ -50,7 +48,9 @@ namespace android {
 
 HDMIDaemon::HDMIDaemon() : Thread(false), mHDMISocketName("hdmid"),
            mFrameworkSock(-1), mAcceptedConnection(-1), mUeventSock(-1),
-	   mHDMIUeventQueueHead(NULL)
+	   mHDMIUeventQueueHead(NULL), mHDMIConnected("hdmi_connected"),
+	   mHDMIDisConnected("hdmi_disconnected"),
+	   mHDMIStateFile("/sys/kernel/hdmi_kset/hdmi_kobj/hdmi_state_obj")
 {
     fd0 = open("/dev/graphics/fb0", O_RDWR);
     fd1 = open("/dev/graphics/fb1", O_RDWR);
@@ -182,9 +182,28 @@ bool HDMIDaemon::threadLoop()
 	    mSession = new SurfaceComposerClient();
 	    processUeventQueue();
 
-	    // In current code no HPD events send that its connected
-	    char* message = "hdmi_connected";
-            int result = write(mAcceptedConnection, message, strlen(message) + 1);
+	    // Until HPD gets stabilized we are going
+	    // to send the event as always connected
+
+	    sendCommandToFramework(true);
+
+	    int hdmiStateFile = open(mHDMIStateFile, O_RDONLY, 0);
+	    if (hdmiStateFile < 0)
+	        LOGE("hdmi state file not present... ");
+	    else {
+		char buf;
+	        int err = read(hdmiStateFile, &buf, 1);
+		if (err <= 0)
+		    LOGE("No read from hdmi state");
+	        else {
+		    if (buf == '1')
+		        //sendCommandToFramework(true);
+		        LOGE("evnentLOG from Driver:: HDMI Cable connected..");
+		    else
+		        //sendCommandToFramework(false);
+		        LOGE("evnentLOG from Driver::HDMI Cable disconnected..");
+		}
+	    }
         }
 
         LOGE("Accepted connection from framework");
@@ -221,7 +240,7 @@ bool HDMIDaemon::processUeventMessage(uevent& event)
             char *p;
             for (p = s; *p != '@'; p++);
             p++;
-	    if (!strcasestr(p, "msm_fb")) {
+	    if (!strcasestr(p, "hdmi_kobj")) {
 	        return false;
 	    }
 	    event.path = new char[strlen(p) + 1];
@@ -237,6 +256,10 @@ bool HDMIDaemon::processUeventMessage(uevent& event)
                     event.action = action_change;
                 else if (!strcmp(a, "remove"))
                     event.action = action_remove;
+                else if (!strcmp(a, "online"))
+                    event.action = action_online;
+                else if (!strcmp(a, "offline"))
+                    event.action = action_offline;
             } else if (!strncmp(s, "SEQNUM=", strlen("SEQNUM=")))
                 event.seqnum = atoi(s + strlen("SEQNUM="));
             else if (!strncmp(s, "SUBSYSTEM=", strlen("SUBSYSTEM="))) {
@@ -282,6 +305,11 @@ void HDMIDaemon::processUeventQueue()
     HDMIUeventQueue* tmp = mHDMIUeventQueueHead, *tmp1;
     while (tmp != NULL) {
 	tmp1 = tmp;
+	// Code commented until HPD stabilizes
+        /*if (tmp->mEvent.action == action_offline)
+	    sendCommandToFramework(false);
+        else if (tmp->mEvent.action == action_online)
+	    sendCommandToFramework(true);*/
 	tmp = tmp->next;
         delete tmp1;
     }
@@ -292,6 +320,13 @@ void HDMIDaemon::processUevent()
 {
     uevent event;
     if(processUeventMessage(event)) {
+        if (event.action == action_offline)
+	    LOGE("evnentLOG from Driver::HDMI Cable disconnected");
+	    //sendCommandToFramework(false);
+        else if (event.action == action_online) {
+	    //sendCommandToFramework(true);
+	    LOGE("evnentLOG from Driver::HDMI Cable connected");
+        }
     }
 }
 
@@ -310,6 +345,38 @@ int HDMIDaemon::processFrameworkCommand()
     buffer[ret] = 0;
     int en = 0;
     if (!strcmp(buffer, "enable_hdmi")) {
+	int hdmiStateFile = open(mHDMIStateFile, O_RDONLY, 0);
+	int xres = 1280, yres = 720;
+	if (hdmiStateFile < 0)
+            LOGE("Couldn't open the HDMIState file");
+        else {
+	    char buf[1024];
+            xres = 0; yres = 0;
+	    memset(buf, 0, 1024);
+	    int err = read(hdmiStateFile, buf, 1024);
+	    if (err <= 0)
+	        LOGE("No state information from hdmi state file");
+	    else {
+	        char* c = strstr(buf, "RES=");
+		if (c) {
+		    c += 4;
+		    while ((*c) && ((*c) != 'x')) {
+		        xres = (xres * 10) + (*c) - '0';
+			c++;
+		    }
+		    c++;
+		    while ((*c)) {
+		        yres = (yres * 10) + (*c) - '0';
+			c++;
+		    }
+		}
+		else
+		    LOGE("State information not accurate, \
+		                      no resolution information");
+	    }
+        }
+	close(hdmiStateFile);
+
         struct fb_var_screeninfo info;
         ioctl(fd1, FBIOBLANK, FB_BLANK_UNBLANK);
         ioctl(fd1, FBIOGET_VSCREENINFO, &info);
@@ -318,18 +385,34 @@ int HDMIDaemon::processFrameworkCommand()
         info.reserved[2] = 0;
         info.xoffset = 0;
         info.yoffset = 0;
+        info.xres = xres;
+        info.yres = yres;
         info.activate = FB_ACTIVATE_NOW;
-        ioctl(fd1, FBIOPAN_DISPLAY,  &info);
+        ioctl(fd1, FBIOPUT_VSCREENINFO, &info);
 	en = 1;
 	ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
 	property_set("hw.hdmiON", "1");
     } else if (!strcmp(buffer, "disable_hdmi")) {
-        ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
         ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
         property_set("hw.hdmiON", "0");
+        ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
     }
 
     return 0;
+}
+
+bool HDMIDaemon::sendCommandToFramework(bool connected)
+{
+    const char* message;
+    if (!connected)
+        message = mHDMIDisConnected;
+    else
+        message = mHDMIConnected;
+
+    int result = write(mAcceptedConnection, message, strlen(message) + 1);
+    if (result < 0)
+        return false;
+    return true;
 }
 
 // ---------------------------------------------------------------------------

@@ -52,7 +52,8 @@
 
 namespace android {
 
-enum uevent_action { action_add, action_remove, action_change };
+enum uevent_action { action_add, action_remove, action_change, 
+                                  action_online, action_offline };
 const int ueventParamMax = 32;
 struct uevent {
     char *path;
@@ -91,8 +92,12 @@ class HDMIDaemon : public Thread, public IBinder::DeathRecipient
     void processUeventQueue();
     void processUevent();
     int processFrameworkCommand();
+    bool sendCommandToFramework(bool connected = false);
 
     const char* mHDMISocketName;
+    const char* mHDMIConnected;
+    const char* mHDMIDisConnected;
+    const char* mHDMIStateFile;
     int mFrameworkSock;
     int mAcceptedConnection;
     int mUeventSock;
