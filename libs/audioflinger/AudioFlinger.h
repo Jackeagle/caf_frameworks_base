@@ -150,6 +150,8 @@ public:
     virtual status_t setVoiceVolume(float volume);
 
     virtual status_t getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames, int output);
+ 
+    virtual status_t deregisterClient(const sp<IAudioFlingerClient>& client);
 
     // IBinder::DeathRecipient
     virtual     void        binderDied(const wp<IBinder>& who);
