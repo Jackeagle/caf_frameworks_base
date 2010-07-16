@@ -21,6 +21,7 @@ import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 
 import android.os.Message;
 import android.os.Handler;
+import android.util.Log;
 
 
 /**
@@ -30,56 +31,91 @@ public interface CommandsInterface {
     enum RadioState {
         RADIO_OFF,         /* Radio explictly powered off (eg CFUN=0) */
         RADIO_UNAVAILABLE, /* Radio unavailable (eg, resetting or not booted) */
-        SIM_NOT_READY,     /* Radio is on, but the SIM interface is not ready */
-        SIM_LOCKED_OR_ABSENT,  /* SIM PIN locked, PUK required, network
-                               personalization, or SIM absent */
-        SIM_READY,         /* Radio is on and SIM interface is available */
-        RUIM_NOT_READY,    /* Radio is on, but the RUIM interface is not ready */
-        RUIM_READY,        /* Radio is on and the RUIM interface is available */
-        RUIM_LOCKED_OR_ABSENT, /* RUIM PIN locked, PUK required, network
-                                  personalization locked, or RUIM absent */
-        NV_NOT_READY,      /* Radio is on, but the NV interface is not available */
-        NV_READY;          /* Radio is on and the NV interface is available */
+        RADIO_ON;          /* Radio is */
 
         public boolean isOn() /* and available...*/ {
-            return this == SIM_NOT_READY
-                    || this == SIM_LOCKED_OR_ABSENT
-                    || this == SIM_READY
-                    || this == RUIM_NOT_READY
-                    || this == RUIM_READY
-                    || this == RUIM_LOCKED_OR_ABSENT
-                    || this == NV_NOT_READY
-                    || this == NV_READY;
+            return this == RADIO_ON;
         }
 
         public boolean isAvailable() {
             return this != RADIO_UNAVAILABLE;
         }
+    }
 
-        public boolean isSIMReady() {
-            return this == SIM_READY;
-        }
+    public enum RadioTechnologyFamily {
+        RADIO_TECH_UNKNOWN,     /* Indicate that RIL is not initialized */
+        RADIO_TECH_3GPP,        /* 3GPP Technologies - GSM, WCDMA, LTE */
+        RADIO_TECH_3GPP2;       /* 3GPP2 Technologies - CDMA, EVDO */
 
-        public boolean isRUIMReady() {
-            return this == RUIM_READY;
-        }
-
-        public boolean isNVReady() {
-            return this == NV_READY;
+        public boolean isUnknown() {
+            return this == RADIO_TECH_UNKNOWN;
         }
 
         public boolean isGsm() {
-            return this == SIM_NOT_READY
-                    || this == SIM_LOCKED_OR_ABSENT
-                    || this == SIM_READY;
+            return this == RADIO_TECH_3GPP;
         }
 
         public boolean isCdma() {
-            return this ==  RUIM_NOT_READY
-                    || this == RUIM_READY
-                    || this == RUIM_LOCKED_OR_ABSENT
-                    || this == NV_NOT_READY
-                    || this == NV_READY;
+            return this == RADIO_TECH_3GPP2;
+        }
+
+        public static RadioTechnologyFamily getRadioTechFamilyFromInt(int techInt) {
+            RadioTechnologyFamily ret = RADIO_TECH_UNKNOWN;
+            try {
+                ret = values()[techInt];
+            } catch (IndexOutOfBoundsException e) {
+                Log.e("RIL", "Invalid radio technology family : " + techInt);
+            }
+            return ret;
+        }
+    }
+
+    public enum RadioTechnology {
+        RADIO_TECH_UNKNOWN,
+        RADIO_TECH_GPRS,
+        RADIO_TECH_EDGE,
+        RADIO_TECH_UMTS,
+        RADIO_TECH_IS95A,
+        RADIO_TECH_IS95B,
+        RADIO_TECH_1xRTT,
+        RADIO_TECH_EVDO_0,
+        RADIO_TECH_EVDO_A,
+        RADIO_TECH_HSDPA,
+        RADIO_TECH_HSUPA,
+        RADIO_TECH_HSPA,
+        RADIO_TECH_EVDO_B,
+        RADIO_TECH_EHRPD,
+        RADIO_TECH_LTE;
+
+        public boolean isUnknown() {
+            return this == RADIO_TECH_UNKNOWN;
+        }
+
+        public boolean isGsm() {
+            return this == RADIO_TECH_GPRS || this == RADIO_TECH_EDGE || this == RADIO_TECH_UMTS
+                    || this == RADIO_TECH_HSDPA || this == RADIO_TECH_HSUPA
+                    || this == RADIO_TECH_HSPA || this == RADIO_TECH_LTE;
+        }
+
+        public boolean isCdma() {
+            return this == RADIO_TECH_IS95A || this == RADIO_TECH_IS95B || this == RADIO_TECH_1xRTT
+                    || this == RADIO_TECH_EVDO_0 || this == RADIO_TECH_EVDO_A
+                    || this == RADIO_TECH_EVDO_B || this == RADIO_TECH_EHRPD;
+        }
+
+        public boolean isEvdo() {
+            return this == RADIO_TECH_EVDO_0 || this == RADIO_TECH_EVDO_A
+                    || this == RADIO_TECH_EVDO_B;
+        }
+
+        public static RadioTechnology getRadioTechFromInt(int techInt) {
+            RadioTechnology rt = RADIO_TECH_UNKNOWN;
+            try {
+                rt = values()[techInt];
+            } catch (IndexOutOfBoundsException e) {
+                Log.e("RIL", "Invalid radio technology : " + techInt);
+            }
+            return rt;
         }
     }
 
@@ -155,6 +191,11 @@ public interface CommandsInterface {
 
     RadioState getRadioState();
 
+    void getVoiceRadioTechnology(Message result);
+    void getCdmaSubscriptionSource(Message result);
+    void getCdmaPrlVersion(Message result);
+    void getImsRegistrationState(Message result);
+
     /**
      * Fires on any RadioState transition
      * Always fires immediately as well
@@ -163,8 +204,21 @@ public interface CommandsInterface {
      * on previous invocations of this notification. Instead, use the other
      * registration methods
      */
+
     void registerForRadioStateChanged(Handler h, int what, Object obj);
     void unregisterForRadioStateChanged(Handler h);
+
+    void registerForVoiceRadioTechChanged(Handler h, int what, Object obj);
+    void unregisterForVoiceRadioTechChanged(Handler h);
+
+    void registerForCdmaSubscriptionSourceChanged(Handler h, int what, Object obj);
+    void unregisterForCdmaSubscriptionSourceChanged(Handler h);
+
+    void registerForCdmaPrlChanged(Handler h, int what, Object obj);
+    void unregisterForCdmaPrlChanged(Handler h);
+
+    void registerForImsNetworkStateChanged(Handler h, int what, Object obj);
+    void unregisterForImsNetworkStateChanged(Handler h);
 
     /**
      * Fires on any transition into RadioState.isOn()
@@ -202,47 +256,20 @@ public interface CommandsInterface {
     void registerForOffOrNotAvailable(Handler h, int what, Object obj);
     void unregisterForOffOrNotAvailable(Handler h);
 
-    /**
-     * Fires on any transition into SIM_READY
-     * Fires immediately if if currently in that state
-     * In general, actions should be idempotent. State may change
-     * before event is received.
-     */
-    void registerForSIMReady(Handler h, int what, Object obj);
-    void unregisterForSIMReady(Handler h);
-
-    /** Any transition into SIM_LOCKED_OR_ABSENT */
-    void registerForSIMLockedOrAbsent(Handler h, int what, Object obj);
-    void unregisterForSIMLockedOrAbsent(Handler h);
-
     void registerForCallStateChanged(Handler h, int what, Object obj);
     void unregisterForCallStateChanged(Handler h);
     void registerForNetworkStateChanged(Handler h, int what, Object obj);
     void unregisterForNetworkStateChanged(Handler h);
+    void registerForDataNetworkStateChanged(Handler h, int what, Object obj);
+    void unregisterForDataNetworkStateChanged(Handler h);
     void registerForDataStateChanged(Handler h, int what, Object obj);
     void unregisterForDataStateChanged(Handler h);
-
-    void registerForRadioTechnologyChanged(Handler h, int what, Object obj);
-    void unregisterForRadioTechnologyChanged(Handler h);
-    void registerForNVReady(Handler h, int what, Object obj);
-    void unregisterForNVReady(Handler h);
-    void registerForRUIMLockedOrAbsent(Handler h, int what, Object obj);
-    void unregisterForRUIMLockedOrAbsent(Handler h);
 
     /** InCall voice privacy notifications */
     void registerForInCallVoicePrivacyOn(Handler h, int what, Object obj);
     void unregisterForInCallVoicePrivacyOn(Handler h);
     void registerForInCallVoicePrivacyOff(Handler h, int what, Object obj);
     void unregisterForInCallVoicePrivacyOff(Handler h);
-
-    /**
-     * Fires on any transition into RUIM_READY
-     * Fires immediately if if currently in that state
-     * In general, actions should be idempotent. State may change
-     * before event is received.
-     */
-    void registerForRUIMReady(Handler h, int what, Object obj);
-    void unregisterForRUIMReady(Handler h);
 
     /**
      * Fires on any change in ICC status
@@ -610,7 +637,7 @@ public interface CommandsInterface {
      * ar.exception and ar.result are null on success
      */
 
-    void supplyIccPin(String pin, Message result);
+    void supplyIccPin(int slot, String aid, String pin, Message result);
 
     /**
      * Supply the ICC PUK to the ICC card
@@ -624,7 +651,7 @@ public interface CommandsInterface {
      * ar.exception and ar.result are null on success
      */
 
-    void supplyIccPuk(String puk, String newPin, Message result);
+    void supplyIccPuk(int slot, String aid, String puk, String newPin, Message result);
 
     /**
      * Supply the ICC PIN2 to the ICC card
@@ -640,7 +667,7 @@ public interface CommandsInterface {
      * ar.exception and ar.result are null on success
      */
 
-    void supplyIccPin2(String pin2, Message result);
+    void supplyIccPin2(int slot, String aid, String pin2, Message result);
 
     /**
      * Supply the SIM PUK2 to the SIM card
@@ -656,10 +683,10 @@ public interface CommandsInterface {
      * ar.exception and ar.result are null on success
      */
 
-    void supplyIccPuk2(String puk2, String newPin2, Message result);
+    void supplyIccPuk2(int slot, String aid, String puk2, String newPin2, Message result);
 
-    void changeIccPin(String oldPin, String newPin, Message result);
-    void changeIccPin2(String oldPin2, String newPin2, Message result);
+    void changeIccPin(int slot, String aid, String oldPin, String newPin, Message result);
+    void changeIccPin2(int slot, String aid, String oldPin2, String newPin2, Message result);
 
     void changeBarringPassword(String facility, String oldPwd, String newPwd, Message result);
 
@@ -715,7 +742,7 @@ public interface CommandsInterface {
      *  ar.userObject contains the orignal value of result.obj
      *  ar.result is String containing IMSI on success
      */
-    void getIMSI(Message result);
+    void getIMSI(int slot, String aid, Message result);
 
     /**
      *  returned message
@@ -901,7 +928,7 @@ public interface CommandsInterface {
      * Please note that registration state 4 ("unknown") is treated
      * as "out of service" above
      */
-    void getGPRSRegistrationState (Message response);
+    void getDataRegistrationState (Message response);
 
     /**
      * response.obj.result is a String[3]
@@ -1014,7 +1041,7 @@ public interface CommandsInterface {
      * response.obj will be an AsyncResult
      * response.obj.userObj will be a IccIoResult on success
      */
-    void iccIO (int command, int fileid, String path, int p1, int p2, int p3,
+    void iccIO (int slot, String aid, int command, int fileid, String path, int p1, int p2, int p3,
             String data, String pin2, Message response);
 
     /**
@@ -1123,7 +1150,7 @@ public interface CommandsInterface {
      * @param response is callback message
      */
 
-    void queryFacilityLock (String facility, String password, int serviceClass,
+    void queryFacilityLock (int slot, String aid, String facility, String password, int serviceClass,
         Message response);
 
     /**
@@ -1133,7 +1160,7 @@ public interface CommandsInterface {
      * @param serviceClass is a sum of SERVICE_CLASS_*
      * @param response is callback message
      */
-    void setFacilityLock (String facility, boolean lockState, String password,
+    void setFacilityLock (int slot, String aid, String facility, boolean lockState, String password,
         int serviceClass, Message response);
 
 
@@ -1384,11 +1411,13 @@ public interface CommandsInterface {
      *            the password for APN, or NULL
      * @param authType
      *            the PAP / CHAP auth type. Values is one of SETUP_DATA_AUTH_*
+     * @param ipVersion
+     *            0 - IPV4, 1 - IPV6
      * @param result
      *            Callback message
      */
     public void setupDataCall(String radioTechnology, String profile, String apn,
-            String user, String password, String authType, Message result);
+            String user, String password, String authType, String ipVersion, Message result);
 
     /**
      * Deactivate packet data connection

@@ -29,7 +29,8 @@ import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccFileHandler;
-import com.android.internal.telephony.IccRecords;
+import com.android.internal.telephony.UiccApplicationRecords;
+
 import static  com.android.internal.telephony.gsm.stk.StkCmdMessage.SetupEventListConstants.*;
 import android.util.Config;
 
@@ -116,7 +117,7 @@ class RilMessage {
 public class StkService extends Handler implements AppInterface {
 
     // Class members
-    private static IccRecords mIccRecords;
+    private static UiccApplicationRecords mIccRecords;
 
     // Service members.
     private static StkService sInstance;
@@ -150,13 +151,13 @@ public class StkService extends Handler implements AppInterface {
     private static final int DEV_ID_NETWORK     = 0x83;
 
     /* Intentionally private for singleton */
-    private StkService(CommandsInterface ci, IccRecords ir, Context context,
+    private StkService(CommandsInterface ci, UiccApplicationRecords ir, Context context,
             IccFileHandler fh, IccCard ic) {
-        if (ci == null || ir == null || context == null || fh == null
-                || ic == null) {
+        if (ci == null || context == null) {
             throw new NullPointerException(
                     "Service: Input parameters must not be null");
         }
+
         mCmdIf = ci;
         mContext = context;
 
@@ -171,12 +172,13 @@ public class StkService extends Handler implements AppInterface {
         //mCmdIf.setOnSimRefresh(this, MSG_ID_REFRESH, null);
 
         mIccRecords = ir;
+        if(ir != null) {
+            // Register for SIM ready event.
+            mIccRecords.registerForRecordsLoaded(this, MSG_ID_ICC_RECORDS_LOADED, null);
 
-        // Register for SIM ready event.
-        mIccRecords.registerForRecordsLoaded(this, MSG_ID_ICC_RECORDS_LOADED, null);
-
-        // Register for IccRefreshReset event.
-        mIccRecords.registerForIccRefreshReset(this, MSG_ID_ICC_REFRESH_RESET, null);
+            // Register for IccRefreshReset event.
+            mIccRecords.registerForIccRefreshReset(this, MSG_ID_ICC_REFRESH_RESET, null);
+        }
 
         mCmdIf.reportStkServiceIsRunning(null);
         StkLog.d(this, "StkService: is running");
@@ -603,27 +605,36 @@ public class StkService extends Handler implements AppInterface {
      * @param ic Icc card
      * @return The only Service object in the system
      */
-    public static StkService getInstance(CommandsInterface ci, IccRecords ir,
+    public static StkService getInstance(CommandsInterface ci, UiccApplicationRecords ir,
             Context context, IccFileHandler fh, IccCard ic) {
         if (sInstance == null) {
-            if (ci == null || ir == null || context == null || fh == null
-                    || ic == null) {
+            if (ci == null || context == null ) {
                 return null;
             }
             HandlerThread thread = new HandlerThread("Stk Telephony service");
             thread.start();
             sInstance = new StkService(ci, ir, context, fh, ic);
             StkLog.d(sInstance, "NEW sInstance");
-        } else if ((ir != null) && (mIccRecords != ir)) {
+            return sInstance;
+        }
+
+        if ((ir != null) && (mIccRecords != ir)) {
             StkLog.d(sInstance, "Reinitialize the Service with SIMRecords");
             mIccRecords = ir;
-
             // re-Register for SIM ready event.
             mIccRecords.registerForRecordsLoaded(sInstance, MSG_ID_ICC_RECORDS_LOADED, null);
             StkLog.d(sInstance, "sr changed reinitialize and return current sInstance");
-        } else {
-            StkLog.d(sInstance, "Return current sInstance");
         }
+
+        if (fh != null) {
+            StkLog.d(sInstance, "Reinitialize the Service with new IccFilehandler");
+            IconLoader mIconLoader = IconLoader.getInstance(null,null);
+            if (mIconLoader != null) {
+                mIconLoader.updateIccFileHandler(fh);
+            }
+        }
+
+        StkLog.d(sInstance, "Return current sInstance");
         return sInstance;
     }
 

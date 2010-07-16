@@ -661,7 +661,6 @@ com.android.internal.telephony.ITelephony$Stub
 com.android.internal.telephony.ITelephony$Stub$Proxy
 com.android.internal.telephony.ITelephonyRegistry$Stub
 com.android.internal.telephony.IccCard$State
-com.android.internal.telephony.Phone$State
 com.android.internal.telephony.SmsAddress
 com.android.internal.telephony.SmsMessageBase
 com.android.internal.telephony.gsm.GsmSmsAddress
