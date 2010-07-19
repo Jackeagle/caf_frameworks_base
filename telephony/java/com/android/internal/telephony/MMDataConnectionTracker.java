@@ -524,7 +524,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         for (DataConnection dc: mDataConnectionList) {
 
-            if (dc.isActive()) {
+            if (dc.isActive() == false) {
                 continue;
             }
 
