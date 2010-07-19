@@ -146,7 +146,6 @@ public interface DataPhone {
      * {@link com.android.telephony.PhoneStateListener PhoneStateListener}
      * instead.
      */
-    @Deprecated
     DataState getDataConnectionState();
 
     /**

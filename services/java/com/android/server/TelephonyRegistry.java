@@ -347,12 +347,13 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         }
     }
 
-    public void notifyDataConnection(int state, boolean isDataConnectivityPossible,
+    public void notifyDataConnection(int anyDataConnectionState, int state, boolean isDataConnectivityPossible,
             String reason, String apn, String[] apnTypes, String interfaceName, int networkType) {
         if (!checkNotifyPermission("notifyDataConnection()" )) {
             return;
         }
         synchronized (mRecords) {
+            /* cache last notifcation - for logs only */
             mDataConnectionState = state;
             mDataConnectionPossible = isDataConnectivityPossible;
             mDataConnectionReason = reason;
@@ -360,11 +361,12 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
             mDataConnectionApnTypes = apnTypes;
             mDataConnectionInterfaceName = interfaceName;
             mDataConnectionNetworkType = networkType;
+
             for (int i = mRecords.size() - 1; i >= 0; i--) {
                 Record r = mRecords.get(i);
                 if ((r.events & PhoneStateListener.LISTEN_DATA_CONNECTION_STATE) != 0) {
                     try {
-                        r.callback.onDataConnectionStateChanged(state, networkType);
+                        r.callback.onDataConnectionStateChanged(anyDataConnectionState, networkType);
                     } catch (RemoteException ex) {
                         remove(r.binder);
                     }

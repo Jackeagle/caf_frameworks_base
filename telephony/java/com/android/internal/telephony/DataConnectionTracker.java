@@ -299,7 +299,30 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     }
 
     public DataState getDataConnectionState() {
-        return getDataConnectionState(DataPhone.APN_TYPE_DEFAULT, IPVersion.IPV4);
+        /*
+         * return state as CONNECTED, if at least one data connection is active
+         * on either IPV4 or IPV6.
+         */
+        DataState ret = DataState.DISCONNECTED;
+        if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
+            // If we're out of service, open TCP sockets may still work
+            // but no data will flow
+            ret = DataState.DISCONNECTED;
+        } else {
+            /*
+             * TODO: we do not keep global data connection state in DCT now.
+             * Instead, state is associated with <apn type, ipv>. The following
+             * code will be simplified once this is done.
+             */
+            for (DataServiceType ds : DataServiceType.values()) {
+                if (mDpt.getState(ds, IPVersion.IPV4) == State.CONNECTED
+                        || mDpt.getState(ds, IPVersion.IPV6) == State.CONNECTED) {
+                    ret = DataState.CONNECTED;
+                    break;
+                }
+            }
+        }
+        return ret;
     }
 
     public DataState getDataConnectionState(String apnType, IPVersion ipv) {
@@ -312,18 +335,11 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
         State dsState = mDpt.getState(ds, ipv);
 
-        if ((SystemProperties.get("adb.connected", "").length() > 0)
-                && (SystemProperties.get("android.net.use-adb-networking", "").length() > 0)) {
-            // We're connected to an ADB host and we have USB networking
-            // turned on. No matter what the radio state is,
-            // we report data connected
-
-            ret = DataState.CONNECTED;
-        } else if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
+        if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
             // If we're out of service, open TCP sockets may still work
             // but no data will flow
             ret = DataState.DISCONNECTED;
-        } else { /* mSST.gprsState == ServiceState.STATE_IN_SERVICE */
+        } else {
             switch (dsState) {
                 case FAILED:
                 case IDLE:
