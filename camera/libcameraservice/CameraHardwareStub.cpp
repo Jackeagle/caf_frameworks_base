@@ -408,4 +408,8 @@ status_t CameraHardwareStub::getBufferInfo(sp<IMemory>& Frame, size_t *alignedSi
 
     return UNKNOWN_ERROR;
 }
+
+void  CameraHardwareStub::encodeData() {
+    /* No Support in STUB Camera. */
+}
 }; // namespace android

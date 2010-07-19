@@ -446,6 +446,12 @@ public class Camera {
     }
     private native final void native_cancelAutoFocus();
 
+    public final void encodeData()
+    {
+        native_encodeData();
+    }
+    private native final void native_encodeData();
+
     /**
      * An interface which contains a callback for the shutter closing after taking a picture.
      */
