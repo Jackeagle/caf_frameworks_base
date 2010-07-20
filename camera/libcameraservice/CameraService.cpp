@@ -488,7 +488,8 @@ status_t CameraService::Client::setPreviewDisplay(const sp<ISurface>& surface)
         // buffers now.
         if (mHardware->previewEnabled() || mUseOverlay) {
             if (mUseOverlay) {
-                result = setOverlay();
+                if( mSurface != NULL)
+                    result = setOverlay();
             } else if (mSurface != 0) {
                 result = registerPreviewBuffers();
             }
