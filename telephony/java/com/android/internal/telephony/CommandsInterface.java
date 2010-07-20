@@ -194,7 +194,16 @@ public interface CommandsInterface {
     void getVoiceRadioTechnology(Message result);
     void getCdmaSubscriptionSource(Message result);
     void getCdmaPrlVersion(Message result);
-    void getImsRegistrationState(Message result);
+
+    /**
+     * response.obj.result is an int[2]
+     * response.obj.result[0] is registration state
+     *                        0 == IMS not registered or
+     *                        1 == IMS registered
+     * response.obj.result[1] is of type const RIL_RadioTechnologyFamily,
+     *                        corresponds to encoding type used for SMS over IMS.
+     */
+    void getImsRegistrationState (Message result);
 
     /**
      * Fires on any RadioState transition
@@ -286,6 +295,9 @@ public interface CommandsInterface {
      */
     void setOnNewSMS(Handler h, int what, Object obj);
     void unSetOnNewSMS(Handler h);
+
+    void setOnNewCdmaSMS(Handler h, int what, Object obj);
+    void unSetOnNewCdmaSMS(Handler h);
 
    /**
      * Register for NEW_SMS_ON_SIM unsolicited message
@@ -980,6 +992,22 @@ public interface CommandsInterface {
      * @param response sent when operation completes
      */
     void sendCdmaSms(byte[] pdu, Message response);
+
+    /**
+     * send SMS over IMS with 3GPP/GSM SMS encoding
+     * @param smscPDU is smsc address in PDU form GSM BCD format prefixed
+     *      by a length byte (as expected by TS 27.005) or NULL for default SMSC
+     * @param pdu is SMS in PDU format as an ASCII hex string
+     *      less the SMSC address
+     */
+    void sendImsGsmSms (String smscPDU, String pdu, Message response);
+
+    /**
+     * send SMS over IMS with 3GPP2/CDMA SMS encoding
+     * @param pdu is CDMA-SMS in internal pseudo-PDU format
+     * @param response sent when operation completes
+     */
+    void sendImsCdmaSms(byte[] pdu, Message response);
 
     /**
      * Deletes the specified SMS record from SIM memory (EF_SMS).
