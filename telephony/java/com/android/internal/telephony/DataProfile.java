@@ -105,6 +105,9 @@ public abstract class DataProfile {
         return "[dpt=" + getDataProfileType() + ", active=" + isActive() + ", ";
     }
 
+    /* some way to identify this data profile uniquely */
+    abstract String toHash();
+
     public abstract String toShortString();
 
     /* package */abstract boolean canSupportIpVersion(IPVersion ipv);

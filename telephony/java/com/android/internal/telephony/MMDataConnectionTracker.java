@@ -383,19 +383,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     private void onDataProfileListChanged(AsyncResult ar) {
-
-        mDpt.resetAllProfilesAsWorking();
-        mDpt.resetAllServiceStates();
-
-        boolean hasPreferredApnChanged = (Boolean) ((AsyncResult) ar).result;
-        if (hasPreferredApnChanged
-                && mDpt.isServiceTypeActive(DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.IPV4)) {
-            DataConnection dcInUse = mDpt.getActiveDataConnection(
-                    DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.IPV4);
-            tryDisconnectDataCall(dcInUse, REASON_DATA_PROFILE_LIST_CHANGED);
-            /* call will be brought up next time updateDataConnections() is run */
-        } else {
-            updateDataConnections(REASON_DATA_PROFILE_LIST_CHANGED);
+        boolean hasProfileDatabaseChanged = (Boolean) ((AsyncResult) ar).result;
+        if (hasProfileDatabaseChanged) {
+            mDpt.resetAllProfilesAsWorking();
+            mDpt.resetAllServiceStates();
+            disconnectAllConnections(REASON_DATA_PROFILE_LIST_CHANGED);
         }
     }
 

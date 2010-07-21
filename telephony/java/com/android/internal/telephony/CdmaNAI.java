@@ -45,4 +45,9 @@ class CdmaNAI extends DataProfile {
         return "CDMA NAI";
     }
 
+    @Override
+    String toHash() {
+        return this.toString();
+    }
+
 }
