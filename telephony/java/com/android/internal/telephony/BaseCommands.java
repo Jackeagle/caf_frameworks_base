@@ -72,6 +72,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mCallReestablishIndRegistrants = new RegistrantList();
 
     protected Registrant mSMSRegistrant;
+    protected Registrant mCdmaSMSRegistrant;
     protected Registrant mNITZTimeRegistrant;
     protected Registrant mSignalStrengthRegistrant;
     protected Registrant mUSSDRegistrant;
@@ -284,6 +285,14 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unSetOnNewSMS(Handler h) {
         mSMSRegistrant.clear();
+    }
+
+    public void setOnNewCdmaSMS(Handler h, int what, Object obj) {
+        mCdmaSMSRegistrant = new Registrant (h, what, obj);
+    }
+
+    public void unSetOnNewCdmaSMS(Handler h) {
+        mCdmaSMSRegistrant.clear();
     }
 
     public void setOnNewGsmBroadcastSms(Handler h, int what, Object obj) {

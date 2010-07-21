@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.internal.telephony.cdma;
+package com.android.internal.telephony;
 
 
 import android.app.Activity;
@@ -36,12 +36,10 @@ import android.util.Log;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage.MessageClass;
 
-import com.android.internal.telephony.TelephonyProperties;
-import com.android.internal.telephony.CommandsInterface;
-import com.android.internal.telephony.SmsHeader;
-import com.android.internal.telephony.SmsMessageBase;
-import com.android.internal.telephony.SMSDispatcher;
+import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 import com.android.internal.telephony.SmsMessageBase.TextEncodingDetails;
+import com.android.internal.telephony.UiccManager.AppFamily;
+import com.android.internal.telephony.cdma.CDMAPhone;
 import com.android.internal.telephony.cdma.SmsMessage;
 import com.android.internal.telephony.cdma.sms.SmsEnvelope;
 import com.android.internal.telephony.cdma.sms.UserData;
@@ -51,20 +49,23 @@ import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.lang.Boolean;
-
 
 final class CdmaSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "CDMA";
 
-    private CDMAPhone mCdmaPhone;
-
     private byte[] mLastDispatchedSmsFingerprint;
     private byte[] mLastAcknowledgedSmsFingerprint;
 
-    CdmaSMSDispatcher(CDMAPhone phone) {
-        super(phone);
-        mCdmaPhone = phone;
+    CdmaSMSDispatcher(VoicePhone phone, CommandsInterface cm) {
+        super(phone, cm);
+        Log.d(TAG, "Register for EVENT_NEW_SMS");
+        mCm.setOnNewCdmaSMS(this, EVENT_NEW_SMS, null);
+    }
+
+    public void dispose() {
+        //TODO: fusion - who should call this now?
+        super.dispose();
+        mCm.unSetOnNewCdmaSMS(this);
     }
 
     /**
@@ -88,6 +89,7 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
                 PendingIntent intent = tracker.mDeliveryIntent;
                 Intent fillIn = new Intent();
                 fillIn.putExtra("pdu", sms.getPdu());
+                fillIn.putExtra("encoding", getEncoding());
                 try {
                     intent.send(mContext, Activity.RESULT_OK, fillIn);
                 } catch (CanceledException ex) {}
@@ -129,11 +131,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
             Log.d(TAG, "Voicemail count=" + voicemailCount);
             // Store the voicemail count in preferences.
             SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(
-                    ((CDMAPhone) mPhone).getContext());
+                    mContext);
             SharedPreferences.Editor editor = sp.edit();
             editor.putInt(CDMAPhone.VM_COUNT_CDMA, voicemailCount);
             editor.commit();
-            ((CDMAPhone) mPhone).updateMessageWaitingIndicator(voicemailCount);
+            updateMessageWaitingIndicator(voicemailCount);
             handled = true;
         } else if (((SmsEnvelope.TELESERVICE_WMT == teleService) ||
                 (SmsEnvelope.TELESERVICE_WEMT == teleService)) &&
@@ -214,6 +216,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
             // Process the message part.
             return processMessagePart(sms, smsHeader.concatRef, smsHeader.portAddrs);
         }
+    }
+
+    /** {@inheritDoc} */
+    protected int getEncoding() {
+        return VoicePhone.PHONE_TYPE_CDMA;
     }
 
     /**
@@ -344,7 +351,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
             byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent) {
         SmsMessage.SubmitPdu pdu = SmsMessage.getSubmitPdu(
                 scAddr, destAddr, destPort, data, (deliveryIntent != null));
-        sendSubmitPdu(pdu, sentIntent, deliveryIntent);
+
+        HashMap map =  SmsTrackerMapFactory(destAddr, scAddr, destPort, data, pdu);
+        SmsTracker tracker = SmsTrackerFactory(map, sentIntent, deliveryIntent,
+                RadioTechnologyFamily.RADIO_TECH_3GPP2);
+        sendSubmitPdu(tracker);
     }
 
     /** {@inheritDoc} */
@@ -352,7 +363,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
         SmsMessage.SubmitPdu pdu = SmsMessage.getSubmitPdu(
                 scAddr, destAddr, text, (deliveryIntent != null), null);
-        sendSubmitPdu(pdu, sentIntent, deliveryIntent);
+
+        HashMap map =  SmsTrackerMapFactory(destAddr, scAddr, text, pdu);
+        SmsTracker tracker = SmsTrackerFactory(map, sentIntent,
+                deliveryIntent, RadioTechnologyFamily.RADIO_TECH_3GPP2);
+        sendSubmitPdu(tracker);
     }
 
     /** {@inheritDoc} */
@@ -416,16 +431,19 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
             SmsMessage.SubmitPdu submitPdu = SmsMessage.getSubmitPdu(destAddr,
                     uData, (deliveryIntent != null) && (i == (msgCount - 1)));
 
-            sendSubmitPdu(submitPdu, sentIntent, deliveryIntent);
+            HashMap map =  SmsTrackerMapFactory(destAddr, scAddr,
+                    parts.get(i), submitPdu);
+            SmsTracker tracker = SmsTrackerFactory(map, sentIntent,
+                    deliveryIntent, RadioTechnologyFamily.RADIO_TECH_3GPP2);
+            sendSubmitPdu(tracker);
         }
     }
 
-    protected void sendSubmitPdu(SmsMessage.SubmitPdu pdu,
-            PendingIntent sentIntent, PendingIntent deliveryIntent) {
+    protected void sendSubmitPdu(SmsTracker tracker) {
         if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_INECM_MODE, false)) {
-            if (sentIntent != null) {
+            if (tracker.mSentIntent != null) {
                 try {
-                    sentIntent.send(SmsManager.RESULT_ERROR_NO_SERVICE);
+                    tracker.mSentIntent.send(SmsManager.RESULT_ERROR_NO_SERVICE);
                 } catch (CanceledException ex) {}
             }
             if (Config.LOGD) {
@@ -433,7 +451,7 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
             }
             return;
         }
-        sendRawPdu(pdu.encodedScAddress, pdu.encodedMessage, sentIntent, deliveryIntent);
+        sendRawPdu(tracker);
     }
 
     /** {@inheritDoc} */
@@ -445,7 +463,12 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
 
         Message reply = obtainMessage(EVENT_SEND_SMS_COMPLETE, tracker);
 
-        mCm.sendCdmaSms(pdu, reply);
+        if (tracker.mRetryCount > 0 || !isIms()) {
+            // this is retry, use old method
+            mCm.sendCdmaSms(pdu, reply);
+        } else {
+            mCm.sendImsCdmaSms(pdu, reply);
+        }
     }
 
      /** {@inheritDoc} */
@@ -473,21 +496,6 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         }
     }
 
-    /** {@inheritDoc} */
-    protected void activateCellBroadcastSms(int activate, Message response) {
-        mCm.setCdmaBroadcastActivation((activate == 0), response);
-    }
-
-    /** {@inheritDoc} */
-    protected void getCellBroadcastSmsConfig(Message response) {
-        mCm.getCdmaBroadcastConfig(response);
-    }
-
-    /** {@inheritDoc} */
-    protected void setCellBroadcastConfig(int[] configValuesArray, Message response) {
-        mCm.setCdmaBroadcastConfig(configValuesArray, response);
-    }
-
     private int resultToCause(int rc) {
         switch (rc) {
         case Activity.RESULT_OK:
@@ -501,6 +509,40 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         case Intents.RESULT_SMS_GENERIC_ERROR:
         default:
             return CommandsInterface.CDMA_SMS_FAIL_CAUSE_ENCODING_PROBLEM;
+        }
+    }
+
+    protected void updateIccAvailability() {
+        UiccCardApplication newApplication = mUiccManager
+                .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+
+        if (mApplication != newApplication) {
+            if (mApplication != null) {
+                Log.d(TAG, "Removing stale 3gpp2 Application.");
+                if (mRecords != null) {
+                    mRecords = null;
+                }
+                mApplication = null;
+            }
+            if (newApplication != null) {
+                Log.d(TAG, "New 3gpp2 application found");
+                mApplication = newApplication;
+                mRecords = mApplication.getApplicationRecords();
+            }
+        }
+    }
+
+    /*package*/ void
+    updateMessageWaitingIndicator(boolean mwi) {
+        updateMessageWaitingIndicator(mwi ? -1 : 0);
+    }
+
+    /* This function is overloaded to send number of voicemails instead of sending true/false */
+    /*package*/ void
+    updateMessageWaitingIndicator(int mwi) {
+        // this also calls notifyMessageWaitingIndicator()
+        if (mRecords != null) {
+            mRecords.setVoiceMessageWaiting(1, mwi);
         }
     }
 }

@@ -48,7 +48,7 @@ public class PhoneProxy extends Handler implements Phone {
     private DataPhone mActiveDataPhone;
 
     private CommandsInterface mCi;
-    private IccSmsInterfaceManagerProxy mIccSmsInterfaceManagerProxy;
+    private IccSmsInterfaceManager mIccSmsInterfaceManager;
     private IccPhoneBookInterfaceManagerProxy mIccPhoneBookInterfaceManagerProxy;
     private PhoneSubInfoProxy mPhoneSubInfoProxy;
     private IccCardProxy mIccProxy;
@@ -73,14 +73,13 @@ public class PhoneProxy extends Handler implements Phone {
 
         mResetModemOnRadioTechnologyChange = SystemProperties.getBoolean(
                 TelephonyProperties.PROPERTY_RESET_ON_RADIO_TECH_CHANGE, false);
-        mIccSmsInterfaceManagerProxy = new IccSmsInterfaceManagerProxy(voicePhone
-                .getIccSmsInterfaceManager());
+        // TODO: fusion - gets commands interface from voice rt now, might change later
+        mCi = ((PhoneBase) mActiveVoicePhone).mCM;
+        mIccSmsInterfaceManager = new IccSmsInterfaceManager(this.mActiveVoicePhone, mCi);
         mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(voicePhone
                 .getIccPhoneBookInterfaceManager());
         mPhoneSubInfoProxy = new PhoneSubInfoProxy(voicePhone.getPhoneSubInfo());
 
-        // TODO: fusion - gets commands interface from voice rt now, might change later
-        mCi = ((PhoneBase) mActiveVoicePhone).mCM;
         mCi.registerForRadioStateChanged(this, EVENT_RADIO_STATE_CHANGED, null);
         mCi.registerForVoiceRadioTechChanged(this, EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED, null);
 
@@ -200,12 +199,11 @@ public class PhoneProxy extends Handler implements Phone {
         }
 
         // Set the new interfaces in the proxy's
-        mIccSmsInterfaceManagerProxy.setmIccSmsInterfaceManager(mActiveVoicePhone
-                .getIccSmsInterfaceManager());
         mIccPhoneBookInterfaceManagerProxy.setmIccPhoneBookInterfaceManager(mActiveVoicePhone
                 .getIccPhoneBookInterfaceManager());
         mPhoneSubInfoProxy.setmPhoneSubInfo(this.mActiveVoicePhone.getPhoneSubInfo());
         mIccProxy.setVoiceRadioTech(newVoiceRadioTech);
+        mIccSmsInterfaceManager.updatePhoneObject(this.mActiveVoicePhone);
 
         mActiveVoicePhone.registerForVoiceServiceStateChanged(this, EVENT_SERVICE_STATE_CHANGED, null);
 
@@ -801,10 +799,6 @@ public class PhoneProxy extends Handler implements Phone {
 
     public PhoneSubInfo getPhoneSubInfo(){
         return mActiveVoicePhone.getPhoneSubInfo();
-    }
-
-    public IccSmsInterfaceManager getIccSmsInterfaceManager(){
-        return mActiveVoicePhone.getIccSmsInterfaceManager();
     }
 
     public IccPhoneBookInterfaceManager getIccPhoneBookInterfaceManager(){

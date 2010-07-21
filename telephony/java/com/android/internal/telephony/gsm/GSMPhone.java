@@ -55,10 +55,8 @@ import com.android.internal.telephony.CallForwardInfo;
 import com.android.internal.telephony.CallStateException;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Connection;
-import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccFileHandler;
 import com.android.internal.telephony.IccPhoneBookInterfaceManager;
-import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.MmiCode;
 import com.android.internal.telephony.UiccCard;
 import com.android.internal.telephony.UiccCardApplication;
@@ -100,11 +98,9 @@ public class GSMPhone extends PhoneBase {
     // Instance Variables
     GsmCallTracker mCT;
     GsmServiceStateTracker mSST;
-    GsmSMSDispatcher mSMS;
 
     ArrayList <GsmMmiCode> mPendingMMIs = new ArrayList<GsmMmiCode>();
     SimPhoneBookInterfaceManager mSimPhoneBookIntManager;
-    SimSmsInterfaceManager mSimSmsIntManager;
     PhoneSubInfo mSubInfo;
 
     /* icc stuff */
@@ -151,12 +147,10 @@ public class GSMPhone extends PhoneBase {
         mCM.setPhoneType(VoicePhone.PHONE_TYPE_GSM);
         mCT = new GsmCallTracker(this);
         mSST = new GsmServiceStateTracker (this);
-        mSMS = new GsmSMSDispatcher(this);
 
         if (!unitTestMode) {
             //TODO: fusion - SimPhoneBookInterfaceManager expects msim records at start.
             //mSimPhoneBookIntManager = new SimPhoneBookInterfaceManager(this);
-            mSimSmsIntManager = new SimSmsInterfaceManager(this);
             mSubInfo = new PhoneSubInfo(this);
         }
 
@@ -226,7 +220,6 @@ public class GSMPhone extends PhoneBase {
 
             //TODO - fusion
             //mSimPhoneBookIntManager.dispose();
-            mSimSmsIntManager.dispose();
             mSubInfo.dispose();
 
             //cleanup icc stuff
@@ -240,8 +233,6 @@ public class GSMPhone extends PhoneBase {
     public void removeReferences() {
             this.mSimulatedRadioControl = null;
             this.mSimPhoneBookIntManager = null;
-            this.mSimSmsIntManager = null;
-            this.mSMS = null;
             this.mSubInfo = null;
             this.mCT = null;
             this.mSST = null;
@@ -349,13 +340,6 @@ public class GSMPhone extends PhoneBase {
     /*package*/ void
     notifySignalStrength() {
         mNotifier.notifySignalStrength(this);
-    }
-
-    /*package*/ void
-    updateMessageWaitingIndicator(boolean mwi) {
-        // this also calls notifyMessageWaitingIndicator()
-        if (mSIMRecords != null)
-            mSIMRecords.setVoiceMessageWaiting(1, mwi ? -1 : 0);
     }
 
     public void
@@ -1264,11 +1248,6 @@ public class GSMPhone extends PhoneBase {
                 }
                 break;
 
-            case EVENT_NEW_ICC_SMS:
-                ar = (AsyncResult)msg.obj;
-                mSMS.dispatchMessage((SmsMessage)ar.result);
-                break;
-
             case EVENT_SET_NETWORK_AUTOMATIC:
                 ar = (AsyncResult)msg.obj;
                 setNetworkSelectionModeAutomatic((Message)ar.result);
@@ -1466,13 +1445,6 @@ public class GSMPhone extends PhoneBase {
     }
 
     /**
-     * Retrieves the IccSmsInterfaceManager of the GSMPhone
-     */
-    public IccSmsInterfaceManager getIccSmsInterfaceManager(){
-        return mSimSmsIntManager;
-    }
-
-    /**
      * Retrieves the IccPhoneBookInterfaceManager of the GSMPhone
      */
     public IccPhoneBookInterfaceManager getIccPhoneBookInterfaceManager(){
@@ -1510,14 +1482,12 @@ public class GSMPhone extends PhoneBase {
 
     private void registerForSimRecordEvents() {
         mSIMRecords.registerForNetworkSelectionModeAutomatic(this, EVENT_SET_NETWORK_AUTOMATIC, null);
-        mSIMRecords.registerForNewSms(this, EVENT_NEW_ICC_SMS, null);
         mSIMRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
         mSIMRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
     }
 
     private void unregisterForSimRecordEvents() {
         mSIMRecords.unregisterForNetworkSelectionModeAutomatic(this);
-        mSIMRecords.unregisterForNewSms(this);
         mSIMRecords.unregisterForRecordsEvents(this);
         mSIMRecords.unregisterForRecordsLoaded(this);
     }
