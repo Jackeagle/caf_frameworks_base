@@ -86,6 +86,12 @@ public class Process {
     public static final int WIFI_UID = 1010;
 
     /**
+     * Defines the UID/GID for the FM supplicant process.
+     * @hide
+     */
+    public static final int FM_RADIO_UID = 1019;
+
+    /**
      * Defines the start of a range of UIDs (and GIDs), going from this
      * number to {@link #LAST_APPLICATION_UID} that are reserved for assigning
      * to applications.
@@ -101,7 +107,7 @@ public class Process {
      * Defines a secondary group id for access to the bluetooth hardware.
      */
     public static final int BLUETOOTH_GID = 2000;
-    
+
     /**
      * Standard priority of application threads.
      * Use with {@link #setThreadPriority(int)} and
