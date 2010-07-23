@@ -62,7 +62,7 @@ public class DataProfileTracker extends Handler {
     /* MCC/MNC of the current active operator */
     private String mOperatorNumeric;
     private RegistrantList mDataDataProfileDbChangedRegistrants = new RegistrantList();
-    private ArrayList<DataProfile> mAllDataProfilesList;
+    private ArrayList<DataProfile> mAllDataProfilesList = new ArrayList<DataProfile>();
 
     private static final int EVENT_DATA_PROFILE_DB_CHANGED = 1;
 
@@ -168,24 +168,40 @@ public class DataProfileTracker extends Handler {
             }
         }
 
-        mAllDataProfilesList = allDataProfiles;
-
-        /* update preferred APN for SERVICE_TYPE_DEFAULT/IPV4 */
-        boolean hasPreferredApnChanged = false;
-        ApnSetting newPreferredDefaultApn = getPreferredDefaultApnFromDb(dsMap
-                .get(DataServiceType.SERVICE_TYPE_DEFAULT).mDataProfileList);
-        if (isApnDifferent(mPreferredDefaultApn, newPreferredDefaultApn) == true) {
-            hasPreferredApnChanged = true;
-            mPreferredDefaultApn = newPreferredDefaultApn;
+        /*
+         * compare old list of data profiles with new list and check if anything
+         * has really changed, added or deleted. Ideally we wouldn't need this
+         * but sometimes content observer reports that db has changed even if
+         * nothing has actually changed.
+         */
+        String oldHash = "";
+        for (DataProfile dp : mAllDataProfilesList) {
+            oldHash = oldHash + ":" + dp.toHash();
+        }
+        String newHash = "";
+        for (DataProfile dp : allDataProfiles) {
+            newHash = newHash + ":" + dp.toHash();
         }
 
-        /*
-         * Notify DCT about profile db change.
-         * TODO: rather than sending info about preferredApnChange, should it really be,
-         * if _any_ APN in use has changed?
-         */
+        mAllDataProfilesList = allDataProfiles;
+
+        boolean hasProfileDbChanged = true;
+        if (oldHash.equals(newHash)) {
+            hasProfileDbChanged = false;
+        }
+
+        ApnSetting newPreferredApn = getPreferredDefaultApnFromDb(dsMap
+                .get(DataServiceType.SERVICE_TYPE_DEFAULT).mDataProfileList);
+        if (isApnDifferent(newPreferredApn, mPreferredDefaultApn)) {
+            logv("preferred apn has changed");
+            hasProfileDbChanged = true;
+            mPreferredDefaultApn = newPreferredApn;
+        }
+
+        logv("hasProfileDbChanged = " + hasProfileDbChanged);
+
         mDataDataProfileDbChangedRegistrants.notifyRegistrants(new AsyncResult(null,
-                hasPreferredApnChanged, null));
+                hasProfileDbChanged, null));
     }
 
     public void setOperatorNumeric(String newOperatorNumeric) {
@@ -270,7 +286,8 @@ public class DataProfileTracker extends Handler {
                         cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Carriers.USER)),
                         cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Carriers.PASSWORD)),
                         cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Carriers.AUTH_TYPE)),
-                        types);
+                        types,
+                        cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Carriers.IPVERSION)));
                 apn.serviceTypes = parseServiceTypes(cursor.getString(cursor
                         .getColumnIndexOrThrow(Telephony.Carriers.TYPE)));
                 result.add(apn);
@@ -326,7 +343,9 @@ public class DataProfileTracker extends Handler {
         if (dpt == DataProfileType.PROFILE_TYPE_3GPP_APN
                 && ds == DataServiceType.SERVICE_TYPE_DEFAULT
                 && ipv == IPVersion.IPV4) {
-            if (mPreferredDefaultApn != null && mPreferredDefaultApn.isWorking(IPVersion.IPV4)) {
+            if (mPreferredDefaultApn != null
+                    && mPreferredDefaultApn.isWorking(IPVersion.IPV4)
+                    && mPreferredDefaultApn.canSupportIpVersion(IPVersion.IPV4)) {
                 return mPreferredDefaultApn;
             }
         }
@@ -429,18 +448,13 @@ public class DataProfileTracker extends Handler {
      */
     private boolean isApnDifferent(ApnSetting oldApn, ApnSetting newApn) {
         boolean different = true;
-
-        if ((newApn != null) && (oldApn != null))  {
-            if ((oldApn.toString().equals(newApn.toString() )) &&
-                ((oldApn.user != null && oldApn.user.equals(newApn.user)) ||
-                 (oldApn.user == null && newApn.user == null)) &&
-                ((oldApn.password != null && oldApn.password.equals(newApn.password)) ||
-                 (oldApn.password == null && newApn.password == null)))  {
-                 different = false;
-           }
+        if ((newApn != null) && (oldApn != null)) {
+            if (oldApn.toHash().equals(newApn.toHash())) {
+                different = false;
+            }
         }
         return different;
-     }
+    }
 
     private void logv(String msg) {
         Log.v(LOG_TAG, "[DPT] " + msg);
