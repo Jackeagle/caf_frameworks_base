@@ -117,6 +117,18 @@ public:
                                     uint32_t *pLatencyMs,
                                     uint32_t flags);
 
+    virtual int openSession(   uint32_t *pDevices,
+                                    uint32_t *pFormat,
+                                    uint32_t flags,
+                                    int32_t  streamType,
+                                    int32_t  sessionId);
+
+    virtual status_t pauseSession(int output, int32_t  streamType);
+
+    virtual status_t resumeSession(int output, int32_t  streamType);
+
+    virtual status_t closeSession(int output);
+
     virtual int openDuplicateOutput(int output1, int output2);
 
     virtual status_t closeOutput(int output);
@@ -798,6 +810,12 @@ private:
 
                 SortedVector< sp<IBinder> >         mNotificationClients;
                 int                                 mNextThreadId;
+                int                                 mA2DPHandle; // Handle to notify client (MIO)
+                int                                 mLPAStreamType;
+                AudioStreamOut                     *mLPAOutput;
+                audio_io_handle_t                   mLPAHandle;
+                //KeyedVector<audio_io_handle_t, AudioStreamOut *> mOutputSessions;   // list of output descriptors
+                int                                 mLPAStreamIsActive;
 };
 
 // ----------------------------------------------------------------------------
