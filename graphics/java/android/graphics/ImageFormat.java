@@ -58,6 +58,18 @@ public class ImageFormat
 
 
     /**
+     *  NV21 Adreno format supported by the adreno driver
+     */
+    public static final int NV21_ADRENO = 0x10A;
+
+
+    /**
+     *  NV21 Adreno format supported by the adreno driver
+     */
+    public static final int NV12_TILED = 0x108;
+
+
+    /**
      * Use this function to retrieve the number of bits per pixel of
      * an ImageFormat.
      * @param format
@@ -66,10 +78,12 @@ public class ImageFormat
      */
     public static int getBitsPerPixel(int format) {
         switch (format) {
-            case RGB_565:   return 16;
-            case NV16:      return 16;
-            case NV21:      return 12;
-            case YUY2:      return 16;
+            case RGB_565:       return 16;
+            case NV16:          return 16;
+            case NV21:          return 12;
+            case YUY2:          return 16;
+            case NV21_ADRENO:   return 12;
+            case NV12_TILED:    return 12;
         }
         return -1;
     }
