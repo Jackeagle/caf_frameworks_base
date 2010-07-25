@@ -665,11 +665,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             // set state to scanning because can try on other data
             // profiles that might work with this ds+ipv.
             mDpt.setState(State.SCANNING, c.ds, c.ipv);
-        } else if (cause.isPdpAvailabilityFailure()) {
+        } else if (mDpt.isServiceTypeActive(c.ds) == false &&
+                cause.isPdpAvailabilityFailure()) {
             /*
              * not every modem, or network might be able to report this but if
              * we know this is the failure reason, we know exactly what to do!
              * check if low priority services are active, if yes tear it down!
+             * But do not bother de-activating low priority calls if the same service
+             * is already active on other ip versions.
              */
             if (disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
                 logv("Disconnected low priority data call [pdp availability failure.]");
@@ -679,12 +682,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             // set state to scanning because can try on other data
             // profiles that might work with this ds+ipv.
             mDpt.setState(State.SCANNING, c.ds, c.ipv);
-        } else if (disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
+        } else if (mDpt.isServiceTypeActive(c.ds) == false
+                && disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
             logv("Disconnected low priority data call [pdp availability failure.]");
             /*
-             * We do this because there is no way to know if the failure was caused
-             * because of network resources not being available!
-             * */
+             * We do this because there is no way to know if the failure was
+             * caused because of network resources not being available! But do
+             * not bother de-activating low priority calls if the same service
+             * is already active on other ip versions.
+             */
             needDataConnectionUpdate = false;
             // set state to scanning because can try on other data
             // profiles that might work with this ds+ipv.
