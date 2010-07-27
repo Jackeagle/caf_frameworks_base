@@ -3156,7 +3156,7 @@ public final class ViewRoot extends Handler implements ViewParent,
             int movement = 0;
             nonAccelMovement = 0;
             do {
-                final int dir = position >= 0 ? 1 : -1;
+                final int dir = ( Float.compare(position, 0.0f) >= 0 ) ? 1 : -1;
                 switch (step) {
                     // If we are going to execute the first step, then we want
                     // to do this as soon as possible instead of waiting for
