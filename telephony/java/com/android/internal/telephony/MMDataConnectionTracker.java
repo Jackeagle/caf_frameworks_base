@@ -254,6 +254,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         mNoAutoAttach = dataDisabledOnBoot;
 
         mIsEhrpdCapable = SystemProperties.getBoolean("ro.config.ehrpd", false);
+
+        if (SystemProperties.getBoolean("persist.cust.tel.sdc.feature", false)) {
+            /* use the SOCKET_DATA_CALL_ENABLE setting do determine the boot up value of
+             * mMasterDataEnable - but only if persist.cust.tel.sdc.feature is on.
+             */
+            mMasterDataEnabled = Settings.System.getInt(
+                    mContext.getContentResolver(),
+                    Settings.System.SOCKET_DATA_CALL_ENABLE, 1) > 0;
+        }
     }
 
     public void dispose() {
@@ -1235,17 +1244,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     protected void stopNetStatPoll() {
         mPollNetStat.setEnablePoll(false);
         removeCallbacks(mPollNetStat);
-    }
-
-    public boolean getSocketDataCallEnabled() {
-        try {
-            return Settings.System.getInt(mContext.getContentResolver(),
-                    Settings.System.SOCKET_DATA_CALL_ENABLE) > 0;
-        } catch (SettingNotFoundException e) {
-            // Data connection should be enabled by default.
-            // So return true here.
-            return true;
-        }
     }
 
     // Retrieve the data roaming setting from the shared preferences.
