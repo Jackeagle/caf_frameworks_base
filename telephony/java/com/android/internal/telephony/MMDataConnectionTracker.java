@@ -136,9 +136,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     Message mPendingPowerOffCompleteMsg;
 
-    //TODO: Read this from properties
-    private static final boolean SUPPORT_IPV4 = true;
-    private static final boolean SUPPORT_IPV6 = true;
+    private static final boolean SUPPORT_IPV4 = SystemProperties.getBoolean(
+            "persist.telephony.support_ipv4", true);
+
+    private static final boolean SUPPORT_IPV6 = SystemProperties.getBoolean(
+            "persist.telephony.support_ipv6", true);
+
     boolean mIsEhrpdCapable = false;
 
     /*
