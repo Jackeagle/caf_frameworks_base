@@ -201,6 +201,11 @@ typedef void* GLeglImageOES;
 #define GL_MIRRORED_REPEAT_OES                                  0x8370
 #endif
 
+/* GL_OES_EGL_image_external */
+#ifndef GL_TEXTURE_EXTERNAL_OES
+#define GL_TEXTURE_EXTERNAL_OES                                 0x8D65
+#endif
+
 /*------------------------------------------------------------------------*
  * AMD extension tokens
  *------------------------------------------------------------------------*/
