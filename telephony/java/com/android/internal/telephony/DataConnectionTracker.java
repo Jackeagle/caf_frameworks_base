@@ -394,7 +394,8 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
             if (mDpt.isServiceTypeActive(ds))
                 result.add(ds.toApnTypeString());
         }
-        return (String[]) result.toArray();
+        String[] ret  = new String[result.size()];
+        return (String[]) result.toArray(ret);
     }
 
     // The data roaming setting is now located in the shared preferences.
