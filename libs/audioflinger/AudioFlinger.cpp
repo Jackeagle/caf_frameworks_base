@@ -653,8 +653,12 @@ status_t AudioFlinger::setParameters(int ioHandle, const String8& keyValuePairs)
         mHardwareStatus = AUDIO_HW_IDLE;
         return result;
     }
-    // Check Direct outputs
-    if (mLPAOutput) {
+
+    // Ensure that the routing to LPA is invoked only when the LPA stream is
+    // active. Otherwise if there is a input routing request and if there is a
+    // Valid LPA handle, routing gets applied for the output descriptor rather
+    // than to the input descriptor.
+    if ( mLPAOutput && mLPAStreamIsActive ) {
         result = mLPAOutput->setParameters(keyValuePairs);
         return result;
     }
