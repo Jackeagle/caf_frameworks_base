@@ -169,7 +169,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         }
     }
 
-    public void notifyDataConnection(DataPhone sender, String type, IPVersion ipv, String reason) {
+    public void notifyDataConnection(DataPhone sender, String apnType, IPVersion ipv, String reason) {
         TelephonyManager telephony = TelephonyManager.getDefault();
 
         /*
@@ -184,25 +184,20 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
          */
 
         Log.v("DATA", "[DefaultPhoneNotifier] : "
-                + type + ", " + ipv + ", " + sender.getDataConnectionState(type, ipv));
-
-        /* TODO : change telephony registry interface to accept String instead of String[] */
-        String typeArray[] = new String[1];
-        typeArray[0] =type;
-
+                + apnType + ", " + ipv + ", " + sender.getDataConnectionState(apnType, ipv));
 
         try {
             mRegistry.notifyDataConnection(
                     convertDataState(sender.getDataConnectionState()),
-                    convertDataState(sender.getDataConnectionState(type, ipv)),
+                    apnType,
+                    ipv.toString(),
+                    convertDataState(sender.getDataConnectionState(apnType, ipv)),
+                    sender.getActiveApn(apnType, ipv),
+                    sender.getInterfaceName(apnType, ipv),
                     sender.isDataConnectivityPossible(),
-                    reason,
-                    sender.getActiveApn(type, ipv),
-                    typeArray,
-                    sender.getInterfaceName(type, ipv),
-                    /* TODO: pass up the IP type that this notification corresponds to */
                     ((telephony != null) ? telephony.getNetworkType() :
-                    TelephonyManager.NETWORK_TYPE_UNKNOWN));
+                        TelephonyManager.NETWORK_TYPE_UNKNOWN),
+                    reason);
         } catch (RemoteException ex) {
             // system process is dead
         }

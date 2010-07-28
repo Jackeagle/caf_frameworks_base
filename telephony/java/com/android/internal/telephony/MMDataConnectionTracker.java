@@ -417,8 +417,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         } else {
             loge("records are loaded, but both mSimrecords & mRuimRecords are null.");
         }
-        // updateDataConnections() will be called if profile DB was changed as a
-        // result of setting the operator numeric.
+        updateDataConnections(REASON_ICC_RECORDS_LOADED);
     }
 
     protected void onDataConnectionAttached() {
