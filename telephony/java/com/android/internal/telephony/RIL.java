@@ -2295,7 +2295,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: ret = responseVoid(p); break;
             case RIL_REQUEST_VOICE_RADIO_TECH: ret = responseInts(p); break;
             case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE: ret = responseInts(p); break;
-            case RIL_REQUEST_CDMA_PRL_VERSION: ret = responseInts(p); break;
+            case RIL_REQUEST_CDMA_PRL_VERSION: ret = responseString(p); break;
             case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
             case RIL_REQUEST_IMS_SEND_SMS: ret =  responseSMS(p); break;
             default:
