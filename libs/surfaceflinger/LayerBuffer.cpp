@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -281,12 +282,15 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
     if (module && module->perform) {
         int err = module->perform(module,
                 GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER,
-                buffers.heap->heapID(), bufferSize,
-                offset, buffers.heap->base(),
+                buffers.heap->heapID(), src.img.w, src.img.h,
+                src.img.format, offset, buffers.heap->base(),
                 &src.img.handle);
 
-        // we can fail here is the passed buffer is purely software
-        mSupportsCopybit = (err == NO_ERROR);
+        // we can fail here is the passed buffer is purely software or if the
+        // buffer format is NV12 Tiled or NV21 Adreno
+        if ((buffers.format != HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) &&
+            (buffers.format != HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO))
+                mSupportsCopybit = (err == NO_ERROR);
     }
  }
 
@@ -463,7 +467,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     const Rect transformedBounds(mLayer.getTransformedBounds());
 
     if (UNLIKELY(mTexture.name == -1LU)) {
-        mTexture.name = mLayer.createTexture();
+        mTexture.name = mLayer.createTexture(src.img.format);
     }
 
 #if defined(EGL_ANDROID_image_native_buffer)
@@ -509,6 +513,15 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                     }
                 }
             }
+        } else if((src.img.format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
+                  (src.img.format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO)) {
+               sp<GraphicBuffer> mTempGraphicBuffer = new GraphicBuffer(src.img.w,
+                           src.img.h, src.img.format,
+                           GraphicBuffer::USAGE_HW_TEXTURE, src.img.w,
+                           src.img.handle, false);
+               err = mLayer.initializeEglImage(mTempGraphicBuffer, &mTexture);
+        } else {
+               err = INVALID_OPERATION;
         }
     }
 #endif
@@ -531,7 +544,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     }
 
     mTexture.transform = mBufferHeap.transform;
-    mLayer.drawWithOpenGL(clip, mTexture);
+    mLayer.drawWithOpenGL(clip, mTexture, src.img.format);
 }
 
 status_t LayerBuffer::BufferSource::initTempBuffer() const
@@ -609,7 +622,7 @@ void LayerBuffer::BufferSource::clearTempBufferImage() const
     glDeleteTextures(1, &mTexture.name);
     Texture defaultTexture;
     mTexture = defaultTexture;
-    mTexture.name = mLayer.createTexture();
+    mTexture.name = mLayer.createTexture(PIXEL_FORMAT_UNKNOWN);
 }
 
 // ---------------------------------------------------------------------------
