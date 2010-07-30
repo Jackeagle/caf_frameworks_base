@@ -1411,6 +1411,7 @@ AudioPolicyManagerBase::routing_strategy AudioPolicyManagerBase::getStrategy(Aud
         // while key clicks are played produces a poor result
     case AudioSystem::TTS:
     case AudioSystem::MUSIC:
+    case AudioSystem::FM:
         return STRATEGY_MEDIA;
     }
 }
