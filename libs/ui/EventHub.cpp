@@ -757,8 +757,9 @@ int EventHub::open_device(const char *deviceName)
     uint8_t sw_bitmask[(SW_MAX+7)/8];
     memset(sw_bitmask, 0, sizeof(sw_bitmask));
     if (ioctl(fd, EVIOCGBIT(EV_SW, sizeof(sw_bitmask)), sw_bitmask) >= 0) {
-        //Let switch devices be considered as belonging to the keyboard class
-        device->classes |= CLASS_KEYBOARD;
+        // Let switch devices be considered as part of a  class
+        // so that they are not bypassed by KeyInputQueue.
+        device->classes |= CLASS_SWITCH;
         for (int i=0; i<EV_SW; i++) {
             //LOGI("Device 0x%x sw %d: has=%d", device->id, i, test_bit(i, sw_bitmask));
             if (test_bit(i, sw_bitmask)) {
