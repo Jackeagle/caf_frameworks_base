@@ -320,6 +320,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         case EVENT_RUIM_READY:
 
             cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
+            cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
             if (DBG) log("Receive EVENT_RUIM_READY and Send Request getCDMASubscription.");
 
             // Restore the previous network selection.
@@ -334,6 +335,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             // Non Volatile. Here when Non-Volatile is ready, we can poll the CDMA
             // subscription info.
             cm.getCDMASubscription( obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
+            cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
             pollState();
             // Signal strength polling stops when radio is off.
             queueNextSignalStrengthPoll();
