@@ -51,10 +51,74 @@ class HDMIService extends IHDMIService.Stub {
 
     private HDMIListener mListener;
     private boolean mHDMIUserOption = false;
+    private int mHDMIModes[];
     public final String HDMICableConnectedEvent = "HDMI_CABLE_CONNECTED";
     public final String HDMICableDisconnectedEvent = "HDMI_CABLE_DISCONNECTED";
     public final String HDMIONEvent = "HDMI_CONNECTED";
     public final String HDMIOFFEvent = "HDMI_DISCONNECTED";
+
+    final int m640x480p60_4_3         = 1;
+    final int m720x480p60_4_3         = 2;
+    final int m720x480p60_16_9        = 3;
+    final int m1280x720p60_16_9       = 4;
+    final int m1920x1080i60_16_9      = 5;
+    final int m1440x480i60_4_3        = 6;
+    final int m1440x480i60_16_9       = 7;
+    final int m1920x1080p60_16_9      = 16;
+    final int m720x576p50_4_3         = 17;
+    final int m720x576p50_16_9        = 18;
+    final int m1280x720p50_16_9       = 19;
+    final int m1440x576i50_4_3        = 21;
+    final int m1440x576i50_16_9       = 22;
+    final int m1920x1080p50_16_9      = 31;
+    final int m1920x1080p24_16_9      = 32;
+    final int m1920x1080p25_16_9      = 33;
+    final int m1920x1080p30_16_9      = 34;
+
+    int getModeOrder(int mode)
+    {
+        switch (mode) {
+        default:
+        case m1440x480i60_4_3:
+        case m1440x480i60_16_9:
+            return 1; // 480i
+        case m1440x576i50_4_3:
+        case m1440x576i50_16_9:
+            return 2; // 576i
+        case m640x480p60_4_3:
+            return 3; // 480p x640
+        case m720x480p60_4_3:
+        case m720x480p60_16_9:
+            return 4; // 480p x720
+        case m720x576p50_4_3:
+        case m720x576p50_16_9:
+            return 5; // 576p
+        case m1920x1080i60_16_9:
+            return 6; // 1080i
+        case m1280x720p60_16_9:
+        case m1280x720p50_16_9:
+            return 7; // 720p
+        case m1920x1080p24_16_9:
+        case m1920x1080p25_16_9:
+        case m1920x1080p30_16_9:
+        case m1920x1080p50_16_9:
+        case m1920x1080p60_16_9:
+            return 8;
+        }
+    }
+
+    int getBestMode()
+    {
+        int bestOrder = 0, bestMode = m640x480p60_4_3;
+        for (int mode : mHDMIModes) {
+            int order = getModeOrder(mode);
+            if (order > bestOrder) {
+                bestOrder = order;
+                bestMode = mode;
+            }
+        }
+        return bestMode;
+    }
 
     public HDMIService(Context context) {
         mContext = context;
@@ -65,10 +129,10 @@ class HDMIService extends IHDMIService.Stub {
                 new IntentFilter(Intent.ACTION_BOOT_COMPLETED), null, null);
         mListener =  new HDMIListener(this);
         String hdmiUserOption = Settings.System.getString(
-	                          mContext.getContentResolver(),
-				  "HDMI_USEROPTION");
+                              mContext.getContentResolver(),
+                  "HDMI_USEROPTION");
         if (hdmiUserOption != null && hdmiUserOption.equals("HDMI_ON"))
-	    mHDMIUserOption = true;
+            mHDMIUserOption = true;
     }
 
     BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -77,7 +141,8 @@ class HDMIService extends IHDMIService.Stub {
 
             String targetDevice = SystemProperties.get("ro.product.device");
             if (action.equals(Intent.ACTION_BOOT_COMPLETED)
-	             && (targetDevice != null && (targetDevice.equals("msm7630_surf") || targetDevice.equals("msm8660_surf")))) {
+                    && (targetDevice != null
+                    && (targetDevice.equals("msm7630_surf") || targetDevice.equals("msm8660_surf")))) {
                 Thread thread = new Thread(mListener, HDMIListener.class.getName());
                 thread.start();
             }
@@ -95,29 +160,31 @@ class HDMIService extends IHDMIService.Stub {
     }
 
     public boolean isHDMIConnected() {
-	if (mListener == null)
-	    return false;
+        if (mListener == null)
+            return false;
         return mListener.isHDMIConnected();
     }
 
     public void setHDMIOutput(boolean enableHDMI) {
-	if (mListener != null && isHDMIConnected()) {
-            mListener.enableHDMIOutput(enableHDMI);
+        Settings.System.putString(mContext.getContentResolver(),
+            "HDMI_USEROPTION", enableHDMI ? "HDMI_ON" : "HDMI_OFF");
+        mHDMIUserOption = enableHDMI;
 
-	    if (enableHDMI)
-                broadcastEvent(HDMIONEvent);
+        if (mListener != null && isHDMIConnected()) {
+            if (enableHDMI)
+                broadcastEvent(HDMIONEvent, mHDMIModes);
             else
                 broadcastEvent(HDMIOFFEvent);
-        }
+            mListener.enableHDMIOutput(enableHDMI);
 
-	String hdmiUserOption;
-	if (enableHDMI)
-	    hdmiUserOption = "HDMI_ON";
-	else
-	    hdmiUserOption = "HDMI_OFF";
-	Settings.System.putString(mContext.getContentResolver(),
-	                   "HDMI_USEROPTION", hdmiUserOption);
-	mHDMIUserOption = enableHDMI;
+            if (enableHDMI) {
+                /* NOTE: this can be done from the UI, the 'changeDisplayMode'
+                 * can be called at any point to dynamically switch the display
+                 * mode to any other supported mode. */
+                int mode = getBestMode();
+                mListener.changeDisplayMode(mode);
+            }
+        }
     }
 
     public boolean getHDMIUserOption() {
@@ -131,16 +198,34 @@ class HDMIService extends IHDMIService.Stub {
         Log.e(TAG, "Broadcasting ... " + eventName);
     }
 
-    public void notifyHDMIConnected() {
+    public void broadcastEvent(String eventName, int[] modes) {
+        Intent intent = new Intent(eventName);
+        intent.addCategory(Intent.CATEGORY_DEFAULT);
+        intent.putExtra("EDID", modes);
+        mContext.sendBroadcast(intent);
+        Log.e(TAG, "Broadcasting ... " + eventName + ", modes: " + modes.length);
+    }
+
+    public void notifyHDMIConnected(int[] modes) {
         broadcastEvent(HDMICableConnectedEvent);
+        mHDMIModes = modes;
         if (getHDMIUserOption()) {
+            broadcastEvent(HDMIONEvent, mHDMIModes);
             mListener.enableHDMIOutput(true);
-            broadcastEvent(HDMIONEvent);
+
+            /* NOTE: this can be done from the UI, the 'changeDisplayMode'
+             * can be called at any point to dynamically switch the display
+             * mode to any other supported mode. */
+            int mode = getBestMode();
+            mListener.changeDisplayMode(mode);
         }
     }
 
     public void notifyHDMIDisconnected() {
+        mHDMIModes = null;
         broadcastEvent(HDMICableDisconnectedEvent);
+        if (getHDMIUserOption())
+            mListener.enableHDMIOutput(false);
         broadcastEvent(HDMIOFFEvent);
     }
 }
