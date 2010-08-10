@@ -833,6 +833,8 @@ public class CDMAPhone extends PhoneBase {
             }
             // send an Intent
             sendEmergencyCallbackModeChange();
+            // Enable data call
+            mCT.enableDataCall();
         }
     }
 
