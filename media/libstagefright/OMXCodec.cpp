@@ -961,16 +961,17 @@ status_t OMXCodec::setVideoOutputFormat(
         // color format.
 
         if (!strncmp(mComponentName, "OMX.qcom",8)) {
-            for(OMX_U32 index = 0 ; index < 2 ; index++){
+            OMX_U32 index;
+            for(index = 0 ; index < 2 ; index++){
                 format.nIndex = index;
                 if(mOMX->getParameter(
                             mNode, OMX_IndexParamVideoPortFormat,
                             &format, sizeof(format)) != OK) {
                     if(index > 0) index--;
-                    format.nIndex = (mOMXLivesLocally == true) ? 0 : index;
                     break;
                 }
             }
+            format.nIndex = (mOMXLivesLocally == true) ? 0 : index;
         } else
             format.nIndex = 0;
 
