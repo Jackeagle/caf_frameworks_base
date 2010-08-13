@@ -744,6 +744,9 @@ void CameraService::Client::stopPreview()
 
         if (mSurface != 0 && !mUseOverlay) {
             mSurface->unregisterBuffers();
+        } else {
+            mOverlayW = 0;
+            mOverlayH = 0;
         }
     }
 
