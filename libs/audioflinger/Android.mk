@@ -64,10 +64,6 @@ else
  LOCAL_SHARED_LIBRARIES += libdl
 endif
 
-ifeq ($(strip $(BOARD_USES_DEFAULT_HEADSET)),true)
-  LOCAL_CFLAGS += -DHW_USES_DEFAULT_HEADSET
-endif
-
 LOCAL_MODULE:= libaudiopolicybase
 
 ifeq ($(BOARD_HAVE_BLUETOOTH),true)
