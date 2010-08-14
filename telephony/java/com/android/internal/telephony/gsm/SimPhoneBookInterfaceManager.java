@@ -33,7 +33,9 @@ public class SimPhoneBookInterfaceManager extends IccPhoneBookInterfaceManager {
 
     public SimPhoneBookInterfaceManager(GSMPhone phone) {
         super(phone);
-        adnCache = phone.mSIMRecords.getAdnCache();
+        if (phone.mSIMRecords != null) {
+            adnCache = phone.mSIMRecords.getAdnCache();
+        }
         //NOTE service "simphonebook" added by IccSmsInterfaceManagerProxy
     }
 
@@ -48,6 +50,14 @@ public class SimPhoneBookInterfaceManager extends IccPhoneBookInterfaceManager {
             Log.e(LOG_TAG, "Error while finalizing:", throwable);
         }
         if(DBG) Log.d(LOG_TAG, "SimPhoneBookInterfaceManager finalized");
+    }
+
+    public void updateSimRecords(SIMRecords simRecords) {
+        if (simRecords != null) {
+            adnCache = simRecords.getAdnCache();
+        } else {
+            adnCache = null;
+        }
     }
 
     public int[] getAdnRecordsSize(int efid) {
