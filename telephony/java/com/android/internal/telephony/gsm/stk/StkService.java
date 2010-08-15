@@ -284,8 +284,13 @@ public class StkService extends Handler implements AppInterface {
             eventval = cmdMsg.getSetEventList().eventList[i];
             StkLog.d(this,"Event: "+eventval);
             switch (eventval) {
-                /* Currently android is supporting only BrowserTermination in SetupEventList */
+                /* Currently android is supporting only the below events in SetupEventList
+                 * Browser Termination,
+                 * Idle Screen Available and
+                 * Language Selection.  */
                 case BROWSER_TERMINATION_EVENT:
+                case IDLE_SCREEN_AVAILABLE_EVENT:
+                case LANGUAGE_SELECTION_EVENT:
                     break;
                 default:
                     flag = false;
@@ -440,27 +445,32 @@ public class StkService extends Handler implements AppInterface {
     }
 
     private void encodeOptionalTags(CommandDetails cmdDet, ResultCode resultCode, Input cmdInput, ByteArrayOutputStream buf) {
-	switch (AppInterface.CommandType.fromInt(cmdDet.typeOfCommand)) {
-	    case GET_INKEY:
-		// ETSI TS 102 384,27.22.4.2.8.4.2.
-		// If it is a response for GET_INKEY command and the response
-		// timeout has
-		// occured, then add DURATION TLV for variable timeout case.
-		if ((resultCode.value() == ResultCode.NO_RESPONSE_FROM_USER.value()) &&
-		    (cmdInput != null) && (cmdInput.duration != null)) {
-		    getInKeyResponse(buf, cmdInput);
-		}
-	    break;
-	    case PROVIDE_LOCAL_INFORMATION:
-		if ((cmdDet.commandQualifier == CommandParamsFactory.LANGUAGE_SETTING) &&
-		    (resultCode.value() == ResultCode.OK.value())) {
-		    getPliResponse(buf);
-		}
-	    break;
-	    default:
-		StkLog.d(this, "encodeOptionalTags() Unsupported Command Type:" + cmdDet.typeOfCommand);
-		break;
-	}
+        AppInterface.CommandType cmdType = AppInterface.CommandType.fromInt(cmdDet.typeOfCommand);
+        if (cmdType != null) {
+            switch (cmdType) {
+            case GET_INKEY:
+                // ETSI TS 102 384,27.22.4.2.8.4.2.
+                // If it is a response for GET_INKEY command and the response
+                // timeout has
+                // occured, then add DURATION TLV for variable timeout case.
+                if ((resultCode.value() == ResultCode.NO_RESPONSE_FROM_USER.value()) &&
+                    (cmdInput != null) && (cmdInput.duration != null)) {
+                    getInKeyResponse(buf, cmdInput);
+                }
+                break;
+            case PROVIDE_LOCAL_INFORMATION:
+                if ((cmdDet.commandQualifier == CommandParamsFactory.LANGUAGE_SETTING) &&
+                    (resultCode.value() == ResultCode.OK.value())) {
+                    getPliResponse(buf);
+                }
+                break;
+            default:
+                StkLog.d(this, "encodeOptionalTags() Unsupported Command Type:" + cmdDet.typeOfCommand);
+                break;
+            }
+        } else {
+            StkLog.d(this, "encodeOptionalTags() Unsupported Command Type:" + cmdDet.typeOfCommand);
+        }
     }
 
     private void getInKeyResponse(ByteArrayOutputStream buf, Input cmdInput) {
@@ -561,8 +571,11 @@ public class StkService extends Handler implements AppInterface {
          */
 
         /*
-         * Currently only Brower termination is supported. Other event download
-         * commands should be encoded similar way
+         * Currently the below events are supported:
+         * Browser Termination,
+         * Idle Screen Available and
+         * Language Selection Event.
+         * Other event download commands should be encoded similar way
          */
         /* TODO: eventDownload should be extended for other Envelope Commands */
         switch (event) {
@@ -572,6 +585,16 @@ public class StkService extends Handler implements AppInterface {
                 buf.write(tag);
                 // Browser Termination length should be 1 byte
                 buf.write(0x01);
+                break;
+            case IDLE_SCREEN_AVAILABLE_EVENT:
+                StkLog.d(sInstance, " Sending Idle Screen Available event download to ICC");
+                break;
+            case LANGUAGE_SELECTION_EVENT:
+                StkLog.d(sInstance, " Sending Language Selection event download to ICC");
+                tag = 0x80 | ComprehensionTlvTag.LANGUAGE.value();
+                buf.write(tag);
+                // Language length should be 2 byte
+                buf.write(0x02);
                 break;
             default:
                 break;
@@ -591,6 +614,10 @@ public class StkService extends Handler implements AppInterface {
         rawData[1] = (byte) len;
 
         String hexString = IccUtils.bytesToHexString(rawData);
+
+        if (Config.LOGD) {
+            StkLog.d(this, "ENVELOPE COMMAND: " + hexString);
+        }
 
         mCmdIf.sendEnvelope(hexString, null);
     }
@@ -649,7 +676,7 @@ public class StkService extends Handler implements AppInterface {
 
     @Override
     public void handleMessage(Message msg) {
-        StkLog.d(this, "Messge received :"+msg.what);
+        StkLog.d(this, "Message received :"+msg.what);
         switch (msg.what) {
         case MSG_ID_SESSION_END:
         case MSG_ID_PROACTIVE_COMMAND:
@@ -784,43 +811,50 @@ public class StkService extends Handler implements AppInterface {
         case PRFRMD_NAA_NOT_ACTIVE:
         case PRFRMD_TONE_NOT_PLAYED:
         case LAUNCH_BROWSER_ERROR:
-            switch (AppInterface.CommandType.fromInt(cmdDet.typeOfCommand)) {
-            case SET_UP_MENU:
-                helpRequired = resMsg.resCode == ResultCode.HELP_INFO_REQUIRED;
-                sendMenuSelection(resMsg.usersMenuSelection, helpRequired);
-                return;
-            case SELECT_ITEM:
-                resp = new SelectItemResponseData(resMsg.usersMenuSelection);
-                break;
-            case GET_INPUT:
-            case GET_INKEY:
-                Input input = mCurrntCmd.geInput();
-                if (!input.yesNo) {
-                    // when help is requested there is no need to send the text
-                    // string object.
-                    if (!helpRequired) {
-                        resp = new GetInkeyInputResponseData(resMsg.usersInput,
-                                input.ucs2, input.packed);
+            AppInterface.CommandType cmdType = AppInterface.CommandType.fromInt(cmdDet.typeOfCommand);
+            if (cmdType != null) {
+                switch (cmdType) {
+                case SET_UP_MENU:
+                    helpRequired = resMsg.resCode == ResultCode.HELP_INFO_REQUIRED;
+                    sendMenuSelection(resMsg.usersMenuSelection, helpRequired);
+                    return;
+                case SELECT_ITEM:
+                    resp = new SelectItemResponseData(resMsg.usersMenuSelection);
+                    break;
+                case GET_INPUT:
+                case GET_INKEY:
+                    Input input = mCurrntCmd.geInput();
+                    if (!input.yesNo) {
+                        // when help is requested there is no need to send the text
+                        // string object.
+                        if (!helpRequired) {
+                            resp = new GetInkeyInputResponseData(resMsg.usersInput,
+                                    input.ucs2, input.packed);
+                        }
+                    } else {
+                        resp = new GetInkeyInputResponseData(
+                                resMsg.usersYesNoSelection);
                     }
-                } else {
-                    resp = new GetInkeyInputResponseData(
-                            resMsg.usersYesNoSelection);
+                    break;
+                case DISPLAY_TEXT:
+                case LAUNCH_BROWSER:
+                    break;
+                case SET_UP_CALL:
+                    mCmdIf.handleCallSetupRequestFromSim(resMsg.usersConfirm, null);
+                    // No need to send terminal response for SET UP CALL. The user's
+                    // confirmation result is send back using a dedicated ril message
+                    // invoked by the CommandInterface call above.
+                    mCurrntCmd = null;
+                    return;
+                case SET_UP_EVENT_LIST:
+                    eventDownload(resMsg.eventValue, DEV_ID_DISPLAY, DEV_ID_UICC,
+                            resMsg.addedInfo, false);
+                    // No need to send the terminal response after event download.
+                    mCurrntCmd = null;
+                    return;
                 }
-                break;
-            case DISPLAY_TEXT:
-            case LAUNCH_BROWSER:
-                break;
-            case SET_UP_CALL:
-                mCmdIf.handleCallSetupRequestFromSim(resMsg.usersConfirm, null);
-                // No need to send terminal response for SET UP CALL. The user's
-                // confirmation result is send back using a dedicated ril message
-                // invoked by the CommandInterface call above.
-                mCurrntCmd = null;
-                return;
-            case SET_UP_EVENT_LIST:
-                eventDownload(resMsg.eventValue, DEV_ID_TERMINAL, DEV_ID_UICC,
-                        resMsg.addedInfo, false);
-                break;
+            } else {
+                StkLog.d(this, "Unsupported Command Type:" + cmdDet.typeOfCommand);
             }
             break;
         case TERMINAL_CRNTLY_UNABLE_TO_PROCESS:

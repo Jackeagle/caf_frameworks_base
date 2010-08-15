@@ -68,6 +68,10 @@ public class ImageDescriptor {
             d.lowOffset = rawData[valueIndex++] & 0xff; // low byte offset
 
             d.length = ((rawData[valueIndex++] & 0xff) << 8 | (rawData[valueIndex++] & 0xff));
+
+            StkLog.d("ImageDescripter", "parse; Descriptor : " + d.width + ", " + d.height +
+                     ", " + d.codingScheme + ", 0x" + Integer.toHexString(d.imageId) + ", " +
+                     d.highOffset + ", " + d.lowOffset + ", " + d.length);
         } catch (IndexOutOfBoundsException e) {
             StkLog.d("ImageDescripter", "parse; failed parsing image descriptor");
             d = null;
