@@ -298,9 +298,8 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
         response.sendToTarget();
     }
 
-    private boolean processException(AsyncResult ar) {
+    private boolean processException(Message response, AsyncResult ar) {
         IccException iccException;
-        Message response = null;
         boolean flag = false;
         IccIoResult result = (IccIoResult) ar.result;
 
@@ -343,7 +342,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 result = (IccIoResult) ar.result;
                 response = lc.onLoaded;
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
                 data = result.payload;
@@ -370,7 +369,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 response = (Message) ar.userObj;
                 result = (IccIoResult) ar.result;
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
                 logd("IccFileHandler: read img success");
@@ -383,7 +382,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 response = (Message) ar.userObj;
                 result = (IccIoResult) ar.result;
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
                 logd("IccFileHandler: read icon success");
@@ -395,7 +394,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 result = (IccIoResult) ar.result;
                 response = lc.onLoaded;
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
 
@@ -420,7 +419,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 result = (IccIoResult) ar.result;
                 response = lc.onLoaded;
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
                 data = result.payload;
@@ -457,7 +456,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 response = (Message) ar.userObj;
                 result = (IccIoResult) ar.result;
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
                 data = result.payload;
@@ -489,7 +488,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 response = lc.onLoaded;
 
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
                 if (!lc.loadAll) {
@@ -517,7 +516,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 response = (Message) ar.userObj;
                 result = (IccIoResult) ar.result;
 
-                if (processException((AsyncResult) msg.obj)) {
+                if (processException(response, (AsyncResult) msg.obj)) {
                     break;
                 }
                 sendResult(response, result.payload, null);
