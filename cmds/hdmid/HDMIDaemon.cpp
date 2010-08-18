@@ -50,10 +50,9 @@ HDMIDaemon::HDMIDaemon() : Thread(false), mHDMISocketName("hdmid"),
            mFrameworkSock(-1), mAcceptedConnection(-1), mUeventSock(-1),
 	   mHDMIUeventQueueHead(NULL), mHDMIConnected("hdmi_connected"),
 	   mHDMIDisConnected("hdmi_disconnected"),
-	   mHDMIStateFile("/sys/kernel/hdmi_kset/hdmi_kobj/hdmi_state_obj")
+	   mHDMIStateFile("/sys/kernel/hdmi_kset/hdmi_kobj/hdmi_state_obj"),
+	   fd1(-1)
 {
-    fd0 = open("/dev/graphics/fb0", O_RDWR);
-    fd1 = open("/dev/graphics/fb1", O_RDWR);
 }
 
 HDMIDaemon::~HDMIDaemon() {
@@ -64,7 +63,6 @@ HDMIDaemon::~HDMIDaemon() {
         delete tmp1;
     }
     mHDMIUeventQueueHead = NULL;
-    close(fd0);
     close(fd1);
 }
 
@@ -84,8 +82,7 @@ void HDMIDaemon::binderDied(const wp<IBinder>& who)
 
 status_t HDMIDaemon::readyToRun() {
 
-    if (fd0 < 0 || fd1 < 0 ||
-          (mFrameworkSock = android_get_control_socket(mHDMISocketName)) < 0) {
+    if ((mFrameworkSock = android_get_control_socket(mHDMISocketName)) < 0) {
         LOGE("Obtaining file descriptor socket '%s' failed: %s",
              mHDMISocketName, strerror(errno));
         return -1;
@@ -377,6 +374,12 @@ int HDMIDaemon::processFrameworkCommand()
         }
 	close(hdmiStateFile);
 
+        if (fd1 < 0)
+            fd1 = open("/dev/graphics/fb1", O_RDWR);
+        if (fd1 < 0) {
+            LOGE("Fb1 not available");
+            return -1;
+        }
         struct fb_var_screeninfo info;
         ioctl(fd1, FBIOBLANK, FB_BLANK_UNBLANK);
         ioctl(fd1, FBIOGET_VSCREENINFO, &info);
@@ -393,9 +396,17 @@ int HDMIDaemon::processFrameworkCommand()
 	ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
 	property_set("hw.hdmiON", "1");
     } else if (!strcmp(buffer, "disable_hdmi")) {
+        if (fd1 < 0)
+            fd1 = open("/dev/graphics/fb1", O_RDWR);
+        if (fd1 < 0) {
+            LOGE("Fb1 not available");
+            return -1;
+        }
         ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
         property_set("hw.hdmiON", "0");
         ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
+        close(fd1);
+        fd1 = -1;
     }
 
     return 0;
