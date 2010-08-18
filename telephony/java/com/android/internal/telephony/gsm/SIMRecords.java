@@ -21,9 +21,11 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OP
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.AsyncResult;
 import android.os.Message;
 import android.os.SystemProperties;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.telephony.gsm.GsmCellLocation;
 
@@ -155,6 +157,8 @@ public final class SIMRecords extends UiccApplicationRecords {
     private static final int EVENT_GET_ALL_OPL_RECORDS_DONE = 33;
     private static final int EVENT_GET_ALL_PNN_RECORDS_DONE = 34;
     private static final int EVENT_GET_CSP_CPHS_DONE = 35;
+    private static final int EVENT_SET_MWIS_DONE = 36;
+    private static final int EVENT_SET_CPHS_MWIS_DONE = 37;
     private static final int EVENT_AUTO_SELECT_DONE = 300;
 
     //EONS constants
@@ -352,7 +356,7 @@ public final class SIMRecords extends UiccApplicationRecords {
      *                      messages are waiting
      */
     public void
-    setVoiceMessageWaiting(int line, int countWaiting) {
+    setVoiceMessageWaiting(int line, int countWaiting, Message onComplete) {
         if (line != 1) {
             // only profile 1 is supported
             return;
@@ -390,7 +394,7 @@ public final class SIMRecords extends UiccApplicationRecords {
 
                 mFh.updateEFLinearFixed(
                     IccConstants.EF_MWIS, 1, efMWIS, null,
-                    obtainMessage (EVENT_UPDATE_DONE, IccConstants.EF_MWIS));
+                    obtainMessage (EVENT_SET_MWIS_DONE, IccConstants.EF_MWIS, 0, onComplete));
             }
 
             if (efCPHS_MWI != null) {
@@ -400,8 +404,17 @@ public final class SIMRecords extends UiccApplicationRecords {
 
                 mFh.updateEFTransparent(
                     IccConstants.EF_VOICE_MAIL_INDICATOR_CPHS, efCPHS_MWI,
-                    obtainMessage (EVENT_UPDATE_DONE, IccConstants.EF_VOICE_MAIL_INDICATOR_CPHS));
+                    obtainMessage (EVENT_SET_CPHS_MWIS_DONE,
+                            IccConstants.EF_VOICE_MAIL_INDICATOR_CPHS, 0, onComplete));
             }
+
+            if ((efMWIS == null) && (efCPHS_MWI == null)) {
+                AsyncResult.forMessage((onComplete)).exception =
+                    new IccVmNotSupportedException(
+                        "SIM does not support EF_MWIS & EF_CPHS_MWIS");
+                onComplete.sendToTarget();
+            }
+
         } catch (ArrayIndexOutOfBoundsException ex) {
             Log.w(LOG_TAG,
                 "Error saving voice mail state to SIM. Probably malformed SIM record", ex);
@@ -698,22 +711,63 @@ public final class SIMRecords extends UiccApplicationRecords {
                 mRecordsEventsRegistrants.notifyResult(EVENT_MWI);
             break;
 
+            case EVENT_SET_MWIS_DONE:
+            case EVENT_SET_CPHS_MWIS_DONE: {
+                ar = (AsyncResult) msg.obj;
+                Message onComplete = (Message) ar.userObj;
+                if (onComplete == null) {
+                    break;
+                }
+                if (ar.exception != null) {
+                    AsyncResult.forMessage((onComplete)).exception =
+                        new IccVmNotSupportedException(
+                            "SIM update failed for EF_MWIS/EF_CPHS_MWIS");
+                } else {
+                    AsyncResult.forMessage((onComplete)).exception = null;
+                }
+                onComplete.sendToTarget();
+                break;
+            }
+
             case EVENT_GET_VOICE_MAIL_INDICATOR_CPHS_DONE:
                 isRecordLoadResponse = true;
-
                 ar = (AsyncResult)msg.obj;
                 data = (byte[])ar.result;
 
+                Log.d(LOG_TAG, "EF_CPHS_MWI: " +
+                        IccUtils.bytesToHexString(data));
+
                 if (ar.exception != null) {
+                    // voice mail count not available from CPHS
+                    if (efMWIS == null) {
+                        // voice mail count not available in MWIS & CPHS ,
+                        // read from phone
+
+                        SharedPreferences sp = PreferenceManager
+                        .getDefaultSharedPreferences(mContext);
+                        SharedPreferences.Editor editor = sp.edit();
+                        String imsi = sp.getString(VM_ID, null);
+
+                        if (imsi != null && (mImsi.equals(imsi))) {
+                            countVoiceMessages = sp.getInt(VM_COUNT, 0);
+                            mRecordsEventsRegistrants.notifyResult(EVENT_MWI);
+                            Log.d(LOG_TAG, "Voicemail count " + countVoiceMessages
+                                    + " from phone for imsi= " + imsi);
+                        } else {
+                            countVoiceMessages = 0;
+                            Log.d(LOG_TAG, " Voicemail count from phone, imsi mismatch . imsi="
+                                    + imsi + "mImsi=" + mImsi);
+                        }
+                    }
                     break;
                 }
-
                 efCPHS_MWI = data;
 
                 // Use this data if the EF[MWIS] exists and
                 // has been loaded
 
                 if (efMWIS == null) {
+                    //use voice mail count from CPHS
                     int indicator = (int)(data[0] & 0xf);
 
                     // Refer CPHS4_2.WW6 B4.2.3
@@ -723,7 +777,6 @@ public final class SIMRecords extends UiccApplicationRecords {
                     } else if (indicator == 0x5) {
                         countVoiceMessages = 0;
                     }
-
                     mRecordsEventsRegistrants.notifyResult(EVENT_MWI);
                 }
             break;

@@ -188,6 +188,16 @@ final class ImsSMSDispatcher extends SMSDispatcher {
     }
 
     @Override
+    protected void storeVoiceMailCount() {
+        //check if isCdmaMo is the correct function to be used
+        if (isCdmaMo()) {
+            mCdmaDispatcher.storeVoiceMailCount();
+        } else {
+            mGsmDispatcher.storeVoiceMailCount();
+        }
+    }
+
+    @Override
     protected void sendText(String destAddr, String scAddr, String text,
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
         Log.d(TAG, "sendText");
