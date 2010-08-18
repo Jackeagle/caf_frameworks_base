@@ -349,11 +349,12 @@ public class Browser {
      *  @hide pending API council approval
      */
     public static final String[] getVisitedHistoryByOrder(ContentResolver cr, String order, int num) {
+        Cursor c = null;
         try {
             String[] projection = new String[] {
                 "url"
             };
-            Cursor c = cr.query(BOOKMARKS_URI, projection, "visits > 0", null,
+            c = cr.query(BOOKMARKS_URI, projection, "visits > 0", null,
                     order);
 
             int count = (c.getCount() > num)? num:c.getCount();
@@ -363,10 +364,12 @@ public class Browser {
                 str[i] = c.getString(0);
                 i++;
             }
-            c.deactivate();
             return str;
         } catch (IllegalStateException e) {
             return new String[0];
+        } finally {
+            // Close the cursor object to avoid bulk JNI cursor leaks
+            if (c != null) c.close();
         }
     }
 
