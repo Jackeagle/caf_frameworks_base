@@ -52,7 +52,7 @@ import java.util.HashMap;
 
 final class CdmaSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "CDMA";
-
+    private int mVmCount =0;
     private byte[] mLastDispatchedSmsFingerprint;
     private byte[] mLastAcknowledgedSmsFingerprint;
 
@@ -127,15 +127,7 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         if ((SmsEnvelope.TELESERVICE_VMN == teleService) ||
                 (SmsEnvelope.TELESERVICE_MWI == teleService)) {
             // handling Voicemail
-            int voicemailCount = sms.getNumOfVoicemails();
-            Log.d(TAG, "Voicemail count=" + voicemailCount);
-            // Store the voicemail count in preferences.
-            SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(
-                    mContext);
-            SharedPreferences.Editor editor = sp.edit();
-            editor.putInt(CDMAPhone.VM_COUNT_CDMA, voicemailCount);
-            editor.commit();
-            updateMessageWaitingIndicator(voicemailCount);
+            updateMessageWaitingIndicator(sms.getNumOfVoicemails());
             handled = true;
         } else if (((SmsEnvelope.TELESERVICE_WMT == teleService) ||
                 (SmsEnvelope.TELESERVICE_WEMT == teleService)) &&
@@ -537,12 +529,30 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         updateMessageWaitingIndicator(mwi ? -1 : 0);
     }
 
-    /* This function is overloaded to send number of voicemails instead of sending true/false */
-    /*package*/ void
-    updateMessageWaitingIndicator(int mwi) {
+    /*
+     * This function is overloaded to send number of voicemails instead of
+     * sending true/false
+     */
+    /* package */void updateMessageWaitingIndicator(int mwi) {
         // this also calls notifyMessageWaitingIndicator()
+        Log.d(TAG, "Voicemail count=" + mwi);
+        mVmCount = mwi;
+        Message onComplete;
+        storeVoiceMailCount();
         if (mRecords != null) {
-            mRecords.setVoiceMessageWaiting(1, mwi);
+            onComplete = obtainMessage(EVENT_UPDATE_ICC_MWI);
+            mRecords.setVoiceMessageWaiting(1, mwi, onComplete);
+        } else {
+            Log.d(TAG, "UIM Records not found");
         }
     }
+
+    protected void storeVoiceMailCount() {
+        // Store the voicemail count in preferences.
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putInt(CDMAPhone.VM_COUNT_CDMA, mVmCount);
+        editor.commit();
+    }
+
 }
