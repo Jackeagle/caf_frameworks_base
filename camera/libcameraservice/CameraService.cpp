@@ -668,12 +668,12 @@ status_t CameraService::Client::startPreviewMode()
     status_t ret = NO_ERROR;
 
     if (mUseOverlay) {
+        ret = mHardware->startPreview();
+        if (ret != NO_ERROR) return ret;
         // If preview display has been set, set overlay now.
         if (mSurface != 0) {
             ret = setOverlay();
         }
-        if (ret != NO_ERROR) return ret;
-        ret = mHardware->startPreview();
     } else {
         mHardware->enableMsgType(CAMERA_MSG_PREVIEW_FRAME);
         ret = mHardware->startPreview();
