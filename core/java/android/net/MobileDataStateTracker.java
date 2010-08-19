@@ -396,44 +396,14 @@ public class MobileDataStateTracker extends NetworkStateTracker {
         setTeardownRequested(false);
         switch (setEnableApn(mApnType, true)) {
             case Phone.APN_ALREADY_ACTIVE:
-                /* APN is already active, we are not going to any more intents from
-                 * data connection tracker, so we need to rebroadcast the intent.
-                 */
                 mEnabled = true;
-
                 logv("dct reports apn already active. " + this);
-
-                setDetailedState(DetailedState.CONNECTING, Phone.REASON_APN_CHANGED, null);
-
-                /* trigger onReceive function to send updates to connectivity service */
-
-                Intent intent = new Intent(TelephonyIntents.
-                        ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
-                intent.putExtra(Phone.STATE_KEY, Phone.DataState.CONNECTED.toString());
-                intent.putExtra(Phone.STATE_CHANGE_REASON_KEY, Phone.REASON_APN_CHANGED);
-                intent.putExtra(Phone.DATA_APN_TYPES_KEY, mApnTypeToWatchFor);
-                intent.putExtra(Phone.NETWORK_UNAVAILABLE_KEY, false);
-
-                /* Once for IPV4 */
-                intent.putExtra(Phone.DATA_APN_KEY, mIpv4ApnName);
-                intent.putExtra(Phone.DATA_APN_TYPE_STATE, mIpv4MobileDataState.toString());
-                intent.putExtra(Phone.DATA_IPVERSION_KEY, IPVersion.IPV4.toString());
-                intent.putExtra(Phone.DATA_IFACE_NAME_KEY, mIpv4InterfaceName);
-                mIpv4MobileDataState = Phone.DataState.CONNECTING; //so that intent actually gets processed.
-                if (mStateReceiver != null) mStateReceiver.onReceive(mContext, intent);
-
-                /* Once for IPV6 */
-                intent.putExtra(Phone.DATA_APN_KEY, mIpv6ApnName);
-                intent.putExtra(Phone.DATA_APN_TYPE_STATE, mIpv6MobileDataState.toString());
-                intent.putExtra(Phone.DATA_IPVERSION_KEY, IPVersion.IPV6.toString());
-                intent.putExtra(Phone.DATA_IFACE_NAME_KEY, mIpv6InterfaceName);
-                mIpv6MobileDataState = Phone.DataState.CONNECTING;  //so that intent actually gets processed.
-                if (mStateReceiver != null) mStateReceiver.onReceive(mContext, intent);
-
+                //we will be sent intents again.
                 break;
             case Phone.APN_REQUEST_STARTED:
                 mEnabled = true;
-                // no need to do anything - we're already due some status update intents
+                // no need to do anything - we're already due some status update
+                // intents
                 break;
             case Phone.APN_REQUEST_FAILED:
                 if (mPhoneService == null && mApnType == Phone.APN_TYPE_DEFAULT) {
