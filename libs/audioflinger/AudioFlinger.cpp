@@ -658,7 +658,7 @@ status_t AudioFlinger::setParameters(int ioHandle, const String8& keyValuePairs)
     // active. Otherwise if there is a input routing request and if there is a
     // Valid LPA handle, routing gets applied for the output descriptor rather
     // than to the input descriptor.
-    if ( mLPAOutput && mLPAStreamIsActive ) {
+    if ( mLPAOutput && mLPAStreamIsActive && mLPAHandle == ioHandle ) {
         result = mLPAOutput->setParameters(keyValuePairs);
         return result;
     }
