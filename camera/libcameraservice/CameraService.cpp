@@ -249,7 +249,7 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
 
        mOverlayW = 0;
        mOverlayH = 0;
-       mPixelFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP;
+       mPixelFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
 
       // Callback is disabled by default
       mPreviewCallbackFlag = FRAME_CALLBACK_FLAG_NOOP;
@@ -688,6 +688,16 @@ status_t CameraService::Client::startPreviewMode()
     return ret;
 }
 
+void CameraService::Client::encodeData()
+{
+    LOGD("encodeData: E");
+    if(mHardware == NULL) {
+        LOGE("mHardware is NULL, returning.");
+        return;
+    }
+    mHardware->encodeData();
+    LOGD("encodeData: X");
+}
 status_t CameraService::Client::getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize)
 {
     LOGD(" getBufferInfo : E");

@@ -89,6 +89,9 @@ private:
         // get the recording buffers information from HAL Layer.
         virtual status_t        getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
 
+        // encode the YUV data
+        virtual void            encodeData();
+
         // start preview mode, must call setPreviewDisplay first
         virtual status_t        startPreview();
 
