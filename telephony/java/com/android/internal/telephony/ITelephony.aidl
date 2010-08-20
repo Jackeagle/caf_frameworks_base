@@ -276,5 +276,19 @@ interface ITelephony {
      */
     int getIccPin1RetryCount();
 
+    /**
+     * Returns Interface Name
+     */
+    String getActiveInterfaceName(String apnType);
+
+    /**
+     * Returns Ip address
+     */
+    String getActiveIpAddress(String apnType);
+
+    /**
+     * Returns Gateway address
+     */
+    String getActiveGateway(String apnType);
 }
 
