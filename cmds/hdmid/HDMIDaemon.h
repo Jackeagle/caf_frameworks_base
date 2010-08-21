@@ -103,7 +103,7 @@ class HDMIDaemon : public Thread, public IBinder::DeathRecipient
     int mUeventSock;
     HDMIUeventQueue* mHDMIUeventQueueHead;
     sp<SurfaceComposerClient>       mSession;
-    int fd0, fd1;
+    int fd1;
 
 public:
                 HDMIDaemon();
