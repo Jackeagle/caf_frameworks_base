@@ -33,7 +33,9 @@ public class RuimPhoneBookInterfaceManager extends IccPhoneBookInterfaceManager 
 
     public RuimPhoneBookInterfaceManager(CDMAPhone phone) {
         super(phone);
-        adnCache = phone.mRuimRecords.getAdnCache();
+        if (phone.mRuimRecords != null) {
+            adnCache = phone.mRuimRecords.getAdnCache();
+        }
         //NOTE service "simphonebook" added by IccSmsInterfaceManagerProxy
     }
 
@@ -48,6 +50,14 @@ public class RuimPhoneBookInterfaceManager extends IccPhoneBookInterfaceManager 
             Log.e(LOG_TAG, "Error while finalizing:", throwable);
         }
         if(DBG) Log.d(LOG_TAG, "RuimPhoneBookInterfaceManager finalized");
+    }
+
+    public void updateRuimRecords(RuimRecords ruimRecords) {
+        if (ruimRecords != null) {
+            adnCache = ruimRecords.getAdnCache();
+        } else {
+            adnCache = null;
+        }
     }
 
     public int[] getAdnRecordsSize(int efid) {

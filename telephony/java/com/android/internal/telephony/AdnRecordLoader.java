@@ -20,6 +20,7 @@ import java.util.ArrayList;
 
 import android.os.AsyncResult;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 
@@ -59,8 +60,7 @@ public class AdnRecordLoader extends Handler {
     public AdnRecordLoader(IccFileHandler fh) {
         // The telephony unit-test cases may create AdnRecords
         // in secondary threads
-        //TODO: Fusion - might be a problem
-        //super(phone.getHandler().getLooper());
+        super(Looper.getMainLooper());
         mFh = fh;
     }
 

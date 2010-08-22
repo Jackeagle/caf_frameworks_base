@@ -149,8 +149,8 @@ public class GSMPhone extends PhoneBase {
         mSST = new GsmServiceStateTracker (this);
 
         if (!unitTestMode) {
-            //TODO: fusion - SimPhoneBookInterfaceManager expects msim records at start.
-            //mSimPhoneBookIntManager = new SimPhoneBookInterfaceManager(this);
+            //TODO: fusion move SimPhoneBookIntManager functionality to IccPhoneBookIntManager
+            mSimPhoneBookIntManager = new SimPhoneBookInterfaceManager(this);
             mSubInfo = new PhoneSubInfo(this);
         }
 
@@ -218,8 +218,7 @@ public class GSMPhone extends PhoneBase {
             mCT.dispose();
             mSST.dispose();
 
-            //TODO - fusion
-            //mSimPhoneBookIntManager.dispose();
+            mSimPhoneBookIntManager.dispose();
             mSubInfo.dispose();
 
             //cleanup icc stuff
@@ -1328,7 +1327,7 @@ public class GSMPhone extends PhoneBase {
                 if (mSIMRecords != null) {
                     unregisterForSimRecordEvents();
                     mSIMRecords = null;
-                    //TODO: fusion - mSimPhoneBookIntManager.setSIMRecords(mSIMRecords);
+                    mSimPhoneBookIntManager.updateSimRecords(null);
                 }
                 m3gppApplication = null;
                 mSimCard = null;
@@ -1339,7 +1338,7 @@ public class GSMPhone extends PhoneBase {
                 mSimCard = new3gppApplication.getCard();
                 mSIMRecords = (SIMRecords) m3gppApplication.getApplicationRecords();
                 registerForSimRecordEvents();
-                //TODO: fusion - mSimPhoneBookIntManager.setSIMRecords(mSIMRecords);
+                mSimPhoneBookIntManager.updateSimRecords(mSIMRecords);
             }
         }
     }
