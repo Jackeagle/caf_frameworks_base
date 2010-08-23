@@ -108,13 +108,13 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
         // Special case the message waiting indicator messages
         if (sms.isMWISetMessage()) {
-            updateMessageWaitingIndicator(true);
+            updateMessageWaitingIndicator(sms.getNumOfVoicemails());
             handled |= sms.isMwiDontStore();
             if (Config.LOGD) {
                 Log.d(TAG, "Received voice mail indicator set SMS shouldStore=" + !handled);
             }
         } else if (sms.isMWIClearMessage()) {
-            updateMessageWaitingIndicator(false);
+            updateMessageWaitingIndicator(0);
             handled |= sms.isMwiDontStore();
             if (Config.LOGD) {
                 Log.d(TAG, "Received voice mail indicator clear SMS shouldStore=" + !handled);
@@ -417,9 +417,16 @@ final class GsmSMSDispatcher extends SMSDispatcher {
     }
 
     /*package*/ void
-    updateMessageWaitingIndicator(boolean mwi) {
+    updateMessageWaitingIndicator(int mwi) {
         // this also calls notifyMessageWaitingIndicator()
-        if (mRecords != null)
-            mRecords.setVoiceMessageWaiting(1, mwi ? -1 : 0);
+
+       /* mwi = number of voice mails; count is known, set notification
+        * mwi = -1; count is unknown, set notification
+        * mwi = 0; no unread voicemails , clear notification
+        */
+        if (mRecords != null) {
+            mRecords.setVoiceMessageWaiting(1, mwi);
+        }
     }
+
 }
