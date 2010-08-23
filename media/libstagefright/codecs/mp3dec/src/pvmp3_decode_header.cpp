@@ -123,7 +123,7 @@ ERROR_CODE pvmp3_decode_header(tmp3Bits  *inputStream,
     /*
      *  Verify that at least the header is complete
      */
-    if (inputStream->inputBufferCurrentLength < (SYNC_WORD_LNGTH + 21))
+    if (inputStream->inputBufferCurrentLength < (SYNC_WORD_LNGTH + 25))
     {
         return NO_ENOUGH_MAIN_DATA_ERROR;
     }
