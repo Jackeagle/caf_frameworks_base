@@ -102,7 +102,7 @@ public final class ContentService extends IContentService.Stub {
             throw new IllegalArgumentException("You must pass a valid uri and observer");
         }
         synchronized (mRootNode) {
-            mRootNode.addObserver(uri, observer, notifyForDescendents);
+            mRootNode.addObserver(uri, observer, notifyForDescendents, mRootNode);
             if (Config.LOGV) Log.v(TAG, "Registered observer " + observer + " at " + uri +
                     " with notifyForDescendents " + notifyForDescendents);
         }
@@ -434,8 +434,10 @@ public final class ContentService extends IContentService.Stub {
         private class ObserverEntry implements IBinder.DeathRecipient {
             public IContentObserver observer;
             public boolean notifyForDescendents;
+            private final Object observersLock;
 
-            public ObserverEntry(IContentObserver o, boolean n) {
+            public ObserverEntry(IContentObserver o, boolean n, Object observersLock) {
+                this.observersLock = observersLock;
                 observer = o;
                 notifyForDescendents = n;
                 try {
@@ -446,7 +448,9 @@ public final class ContentService extends IContentService.Stub {
             }
 
             public void binderDied() {
-                removeObserver(observer);
+                synchronized (observersLock) {
+                    removeObserver(observer);
+                }
             }
         }
 
@@ -481,16 +485,16 @@ public final class ContentService extends IContentService.Stub {
             return uri.getPathSegments().size() + 1;
         }
 
-        public void addObserver(Uri uri, IContentObserver observer, boolean notifyForDescendents) {
-            addObserver(uri, 0, observer, notifyForDescendents);
+        public void addObserver(Uri uri, IContentObserver observer, boolean notifyForDescendents, Object observersLock) {
+            addObserver(uri, 0, observer, notifyForDescendents, observersLock);
         }
 
         private void addObserver(Uri uri, int index, IContentObserver observer,
-                boolean notifyForDescendents) {
+                boolean notifyForDescendents, Object observersLock) {
 
             // If this is the leaf node add the observer
             if (index == countUriSegments(uri)) {
-                mObservers.add(new ObserverEntry(observer, notifyForDescendents));
+                mObservers.add(new ObserverEntry(observer, notifyForDescendents, observersLock));
                 return;
             }
 
@@ -500,7 +504,7 @@ public final class ContentService extends IContentService.Stub {
             for (int i = 0; i < N; i++) {
                 ObserverNode node = mChildren.get(i);
                 if (node.mName.equals(segment)) {
-                    node.addObserver(uri, index + 1, observer, notifyForDescendents);
+                    node.addObserver(uri, index + 1, observer, notifyForDescendents, observersLock);
                     return;
                 }
             }
@@ -508,7 +512,7 @@ public final class ContentService extends IContentService.Stub {
             // No child found, create one
             ObserverNode node = new ObserverNode(segment);
             mChildren.add(node);
-            node.addObserver(uri, index + 1, observer, notifyForDescendents);
+            node.addObserver(uri, index + 1, observer, notifyForDescendents, observersLock);
         }
 
         public boolean removeObserver(IContentObserver observer) {
