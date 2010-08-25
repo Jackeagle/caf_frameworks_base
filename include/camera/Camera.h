@@ -78,7 +78,8 @@ enum {
     CAMERA_MSG_POSTVIEW_FRAME   = 0x040,
     CAMERA_MSG_RAW_IMAGE        = 0x080,
     CAMERA_MSG_COMPRESSED_IMAGE = 0x100,
-    CAMERA_MSG_ALL_MSGS         = 0x1FF
+    CAMERA_MSG_STATS_DATA      = 0x200,
+    CAMERA_MSG_ALL_MSGS         = 0x3FF
 };
 
 // cmdType in sendCommand functions
@@ -86,6 +87,9 @@ enum {
     CAMERA_CMD_START_SMOOTH_ZOOM     = 1,
     CAMERA_CMD_STOP_SMOOTH_ZOOM      = 2,
     CAMERA_CMD_SET_DISPLAY_ORIENTATION = 3,
+    CAMERA_CMD_HISTOGRAM_ON     = 4,
+    CAMERA_CMD_HISTOGRAM_OFF     = 5,
+    CAMERA_CMD_HISTOGRAM_SEND_DATA  = 6,
 };
 
 // camera fatal errors
