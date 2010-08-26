@@ -133,6 +133,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     private boolean mNoAutoAttach = false;
     private boolean mIsPsRestricted = false;
     private boolean mDesiredPowerState = true;
+    private boolean mCheckForConnectivity = true;
+    private boolean mCheckForSubscription = true;
 
     Message mPendingPowerOffCompleteMsg;
 
@@ -1092,32 +1094,33 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     private boolean isReadyForData() {
 
-        //TODO: Check voice call state, emergency call back info
         boolean isDataEnabled = isDataConnectivityEnabled();
 
-        boolean roaming = mDsst.getDataServiceState().getRoaming();
-        isDataEnabled = isDataEnabled && (!roaming || getDataOnRoamingEnabled());
-
-        int dataRegState = this.mDsst.getDataServiceState().getState();
-
-        isDataEnabled = isDataEnabled
-                        && (dataRegState == ServiceState.STATE_IN_SERVICE || mNoAutoAttach);
-
-        RadioTechnology r = getRadioTechnology();
-
-        //TODO: EHRPD requires that both SIM records and RUIM records are loaded?
-        if (r.isGsm()
-                || r == RadioTechnology.RADIO_TECH_EHRPD
-                || (r.isUnknown() && mNoAutoAttach)) {
-            isDataEnabled = isDataEnabled && mDsst.mSimRecords != null
-                    && mDsst.mSimRecords.getRecordsLoaded() && !mIsPsRestricted;
+        if (mCheckForConnectivity) {
+            boolean roaming = mDsst.getDataServiceState().getRoaming();
+            isDataEnabled = isDataEnabled && (!roaming || getDataOnRoamingEnabled());
+            int dataRegState = this.mDsst.getDataServiceState().getState();
+            isDataEnabled = isDataEnabled
+                    && (dataRegState == ServiceState.STATE_IN_SERVICE || mNoAutoAttach);
         }
 
-        if (r.isCdma()) {
-            isDataEnabled = isDataEnabled
-                    && (mDsst.mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV
-                            || (mDsst.mRuimRecords != null
-                                    && mDsst.mRuimRecords.getRecordsLoaded()));
+        if (mCheckForSubscription) {
+            RadioTechnology r = getRadioTechnology();
+
+            //TODO: EHRPD requires that both SIM records and RUIM records are loaded?
+            if (r.isGsm()
+                    || r == RadioTechnology.RADIO_TECH_EHRPD
+                    || (r.isUnknown() && mNoAutoAttach)) {
+                isDataEnabled = isDataEnabled && mDsst.mSimRecords != null
+                && mDsst.mSimRecords.getRecordsLoaded() && !mIsPsRestricted;
+            }
+
+            if (r.isCdma()) {
+                isDataEnabled = isDataEnabled
+                && (mDsst.mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV
+                        || (mDsst.mRuimRecords != null
+                                && mDsst.mRuimRecords.getRecordsLoaded()));
+            }
         }
 
         return isDataEnabled;
@@ -1160,6 +1163,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         sb.append(", mRuimRecords = ");
         if (mDsst.mRuimRecords != null)
             sb.append(mDsst.mRuimRecords.getRecordsLoaded());
+        sb.append(", checks = ").append(mCheckForConnectivity).append("/")
+                .append(mCheckForSubscription);
         sb.append("]");
         return sb.toString();
     }
@@ -1302,6 +1307,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     @Override
     protected boolean isConcurrentVoiceAndData() {
         return mDsst.isConcurrentVoiceAndData();
+    }
+
+    public void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
+        mCheckForConnectivity = checkConnectivity;
+        mCheckForSubscription = checkSubscription;
+        if (tryDataCalls) {
+            updateDataConnections(REASON_DATA_READINESS_CHECKS_MODIFIED);
+        }
     }
 
     public DataActivityState getDataActivityState() {

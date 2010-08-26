@@ -1070,4 +1070,9 @@ public class PhoneProxy extends Handler implements Phone {
     public void unregisterForDataServiceStateChanged(Handler h) {
         mActiveDataPhone.unregisterForDataServiceStateChanged(h);
     }
+
+    public void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
+        mActiveDataPhone.setDataReadinessChecks(checkConnectivity, checkSubscription, tryDataCalls);
+    }
 }
