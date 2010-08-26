@@ -693,4 +693,11 @@ static void *ffttable = NULL;
     return 0;
 }
 
+status_t MediaPlayer::setVideoSurface(const sp<ISurface>& surface) {
+    LOGV("setVideoSurface");
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == 0) return NO_INIT;
+    return  mPlayer->setVideoSurface(surface);
+}
+
 }; // namespace android

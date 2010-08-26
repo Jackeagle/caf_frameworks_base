@@ -167,6 +167,7 @@ public:
             status_t        getMetadata(bool update_only, bool apply_filter, Parcel *metadata);
             status_t        suspend();
             status_t        resume();
+            status_t        setVideoSurface(const sp<ISurface>& surface);
 private:
             void            clear_l();
             status_t        seekTo_l(int msec);
