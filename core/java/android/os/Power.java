@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -77,6 +78,13 @@ public class Power
      * @param on Whether you want the screen on or off
      */
     public static native int setScreenState(boolean on);
+
+    /**
+     * Activate/DeActivate Unstable Memory block
+     *
+     * @param on Whether you want Activate(true) or DeActive(False)
+     */
+    public static native int SetUnstableMemoryState(boolean on);
 
     public static native int setLastUserActivityTimeout(long ms);
 
