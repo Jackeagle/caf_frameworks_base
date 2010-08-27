@@ -581,12 +581,19 @@ status_t CameraService::Client::startRecordingMode()
     return ret;
 }
 
-status_t CameraService::Client::setOverlay()
+status_t CameraService::Client::setOverlay(int pw, int ph)
 {
     LOGV("setOverlay");
     int w, h;
     CameraParameters params(mHardware->getParameters());
-    params.getPreviewSize(&w, &h);
+    if(pw == 0 && ph == 0)
+        params.getPreviewSize(&w, &h);
+    else {
+        w = pw;
+        h = ph;
+    }
+
+
 
     if ( w != mOverlayW || h != mOverlayH )
     {
@@ -1006,21 +1013,21 @@ void CameraService::Client::handleShutter(
 
     mHardware->disableMsgType(CAMERA_MSG_SHUTTER);
 
+    int w, h;
+    CameraParameters params(mHardware->getParameters());
+    if (size == NULL) {
+        params.getPictureSize(&w, &h);
+    } else {
+        w = size->width;
+        h = size->height;
+        w &= ~1;
+        h &= ~1;
+    }
+    LOGV("Snapshot image width=%d, height=%d", w, h);
+
     // It takes some time before yuvPicture callback to be called.
     // Register the buffer for raw image here to reduce latency.
     if (mSurface != 0 && !mUseOverlay) {
-        int w, h;
-        CameraParameters params(mHardware->getParameters());
-        if (size == NULL) {
-            params.getPictureSize(&w, &h);
-        } else {
-            w = size->width;
-            h = size->height;
-            w &= ~1;
-            h &= ~1;
-            LOGV("Snapshot image width=%d, height=%d", w, h);
-        }
-
         // FIXME: don't use hardcoded format constants here
         ISurface::BufferHeap buffers(w, h, w, h,
             mPixelFormat, mOrientation, 0,
@@ -1028,6 +1035,8 @@ void CameraService::Client::handleShutter(
 
         mSurface->registerBuffers(buffers);
     }
+    if (mUseOverlay)
+        setOverlay(w, h);
 }
 
 // preview callback - frame buffer update
