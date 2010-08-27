@@ -204,6 +204,7 @@ extmap FILE_EXTS [] =  {
         {".wma", PV_PLAYER},
         {".wmv", PV_PLAYER},
         {".asf", PV_PLAYER},
+        {".3g2", PV_PLAYER},
 #endif
 };
 
@@ -796,6 +797,12 @@ player_type getPlayerType(const char* url)
         int start = lenURL - len;
         if (start > 0) {
             if (!strncmp(url + start, FILE_EXTS[i].extension, len)) {
+                if( !strncmp(FILE_EXTS[i].extension, ".3g2", len)
+                    && !strncasecmp(url, "http://", 7) )
+                {
+                   LOGV("Fallback to PV for HTTP 3g2 clips ");
+                   return PV_PLAYER;
+                }
                 if (FILE_EXTS[i].playertype == VORBIS_PLAYER
                     && !strncasecmp(url, "http://", 7)
                     && useStagefrightForHTTP) {
