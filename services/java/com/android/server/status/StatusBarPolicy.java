@@ -1058,50 +1058,71 @@ public class StatusBarPolicy {
             return;
         }
 
-        if (mPhoneState != TelephonyManager.CALL_STATE_IDLE) // phone in voice
-        {
-            /* signalstrength-isGsm has voice tech
-             * GSM - isGSM flag is on
-             * CDMA 1x -isGSM flag is off
+        /*
+         * Determine which radio tech signal level should be displayed based on
+         * 1.phone type (voice and/or/no data), 2. call state( idle/data or in
+         * voice call ), 3. radio tech
+         */
+        iconLevel = getIconLevel();
+
+        if (iconLevel == -1) {
+            mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_null;
+        } else {
+            /*
+             * Determine which icon should be displayed. Assumption - for
+             * roaming ( voice and/or/no data) the roaming icon corresponding to
+             * voice technology will be displayed
+             */
+            if (mServiceState.getRoaming()) {
+                if (mSignalStrength.isGsm()) {
+                    iconList = sSignalImages_r;
+                } else {
+                    /* roaming on CDMA, CDMA roaming indicator will be on */
+                    iconList = sSignalImages;
+                }
+            } else {
+                iconList = sSignalImages;
+            }
+            mPhoneData.iconId = iconList[iconLevel];
+        }
+        mService.updateIcon(mPhoneIcon, mPhoneData, null);
+        return;
+    }
+
+    private int getIconLevel() {
+        int iconLevel = -1;
+        if (mPhoneState != TelephonyManager.CALL_STATE_IDLE) {
+            /*
+             * phone is in voice call , display voice tech signal isGsm has
+             * voice tech. For GSM - isGSM flag is on. For CDMA 1x -isGSM flag
+             * is off
              */
             if (mSignalStrength.isGsm()) { // Gsm voice call
                 iconLevel = getGsmLevel();
             } else { // cdma voice call
                 iconLevel = getCdmaLevel();
             }
-        } else { // phone not in voice call
-            /* find out data radio tech by looking at service state */
+        } else {
+            /*
+             * phone is not in voice call display data radio tech signal by
+             * looking at service state if data radio tech is not available ,
+             * display voice radio signal by looking at signal strength
+             */
             if (isDataGsm()) {
+                /* 3GPP GSM data tech */
                 iconLevel = getGsmLevel();
             } else if (isDataEvdo()) {
+                /* 3GPP2 EVDO data tech */
                 iconLevel = getEvdoLevel();
-            } else if (isDataCdma()) {
+            } else if (isDataCdma() || (!mSignalStrength.isGsm())) {
+                /* 3GPP2 CDMA data or CDMA voice only */
                 iconLevel = getCdmaLevel();
-            } else
-                Slog.e(TAG, "Invalid Radio - Signal cannot be displayed");
-        }// end of CALL_STATE_IDLE
-
-        /* Assumption - for roaming ( voice and/or data)
-         * the roaming icon corresponding to voice tech will be displayed
-         */
-        if (mServiceState.getRoaming())
-        {
-            if (mSignalStrength.isGsm()) {
-                iconList = sSignalImages_r;
             } else {
-                iconList = sSignalImages;
+                /* 3GPP GSM voice only */
+                iconLevel = getGsmLevel();
             }
-        } else {
-            iconList = sSignalImages;
-        }
-
-        if (iconLevel != -1) {
-            mPhoneData.iconId = iconList[iconLevel];
-        } else {
-            mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_null;
-        }
-        mService.updateIcon(mPhoneIcon, mPhoneData, null);
-        return;
+        }// end of CALL_STATE_IDLE
+        return iconLevel;
     }
 
     private int getGsmLevel() {
