@@ -50,10 +50,9 @@ public class IccCardProxy extends Handler implements IccCard {
     private static final int EVENT_ICC_ABSENT = 2;
     private static final int EVENT_ICC_LOCKED = 3;
     private static final int EVENT_APP_READY = 4;
-    private static final int EVENT_NETWORK_LOCKED = 5;
     private static final int EVENT_RECORDS_LOADED = 6;
     private static final int EVENT_IMSI_READY = 7;
-    private static final int EVENT_PERSO_SUBSTATE_CHANGED = 8;
+    private static final int EVENT_PERSO_LOCKED = 8;
 
     private Context mContext;
     private CommandsInterface cm;
@@ -113,10 +112,6 @@ public class IccCardProxy extends Handler implements IccCard {
             case EVENT_ICC_LOCKED:
                 processLockedState();
                 break;
-            case EVENT_NETWORK_LOCKED:
-                mNetworkLockedRegistrants.notifyRegistrants();
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOCKED, INTENT_VALUE_LOCKED_NETWORK);
-                break;
             case EVENT_APP_READY:
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_READY, null);
                 break;
@@ -126,9 +121,20 @@ public class IccCardProxy extends Handler implements IccCard {
             case EVENT_IMSI_READY:
                 broadcastIccStateChangedIntent(IccCard.INTENT_VALUE_ICC_IMSI, null);
                 break;
-            case EVENT_PERSO_SUBSTATE_CHANGED:
+            case EVENT_PERSO_LOCKED:
                 if (mApplication != null) {
-                    broadcastPersoSubState(mApplication.getPersonalizationState());
+                    PersoSubState subState = mApplication.getPersonalizationState();
+                    broadcastPersoSubState(subState);
+                    if (subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK ||
+                        subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_SUBSET ||
+                        subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_PUK ||
+                        subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK ||
+                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK1 ||
+                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK2 ||
+                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK1_PUK ||
+                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK2_PUK) {
+                        mNetworkLockedRegistrants.notifyRegistrants();
+                    }
                 }
                 break;
             default:
@@ -169,7 +175,6 @@ public class IccCardProxy extends Handler implements IccCard {
     private void unregisterUiccCardEvents() {
         mApplication.unregisterForReady(this);
         mApplication.unregisterForLocked(this);
-        mApplication.unregisterForNetworkLocked(this);
         mApplication.unregisterForPersoSubstate(this);
         mUiccCard.unregisterForAbsent(this);
         mAppRecords.unregisterForImsiReady(this);
@@ -179,8 +184,7 @@ public class IccCardProxy extends Handler implements IccCard {
     private void registerUiccCardEvents() {
         mApplication.registerForReady(this, EVENT_APP_READY, null);
         mApplication.registerForLocked(this, EVENT_ICC_LOCKED, null);
-        mApplication.registerForNetworkLocked(this, EVENT_NETWORK_LOCKED, null);
-        mApplication.registerForPersoSubstate(this, EVENT_PERSO_SUBSTATE_CHANGED, null);
+        mApplication.registerForPersoSubstate(this, EVENT_PERSO_LOCKED, null);
         mUiccCard.registerForAbsent(this, EVENT_ICC_ABSENT, null);
         mAppRecords.registerForImsiReady(this, EVENT_IMSI_READY, null);
         mAppRecords.registerForRecordsLoaded(this, EVENT_RECORDS_LOADED, null);
@@ -502,11 +506,15 @@ public class IccCardProxy extends Handler implements IccCard {
         }
     }
 
+    /**
+     * @deprecated
+     * Use invokeDepersonalization from PhoneBase class instead.
+     */
     public void supplyNetworkDepersonalization(String pin, Message onComplete) {
-        if (mApplication != null) {
-            mApplication.supplyNetworkDepersonalization(pin, onComplete);
+        if (cm != null) {
+            cm.invokeDepersonalization(pin, PersoSubState.PERSOSUBSTATE_SIM_NETWORK.ordinal(), onComplete);
         } else if (onComplete != null) {
-            Exception e = new RuntimeException("ICC card is absent.");
+            Exception e = new RuntimeException("CommandsInterface is not set.");
             AsyncResult.forMessage(onComplete).exception = e;
             onComplete.sendToTarget();
             return;
