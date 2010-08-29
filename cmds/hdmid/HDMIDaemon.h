@@ -52,7 +52,7 @@
 
 namespace android {
 
-enum uevent_action { action_add, action_remove, action_change, 
+enum uevent_action { action_add, action_remove, action_change,
                                   action_online, action_offline };
 const int ueventParamMax = 32;
 struct uevent {
@@ -93,17 +93,20 @@ class HDMIDaemon : public Thread, public IBinder::DeathRecipient
     void processUevent();
     int processFrameworkCommand();
     bool sendCommandToFramework(bool connected = false);
+    bool cableConnected(bool defaultValue = true) const;
+    bool readResolution();
+    void setResolution(int ID);
+    bool openFramebuffer();
 
-    const char* mHDMISocketName;
-    const char* mHDMIConnected;
-    const char* mHDMIDisConnected;
-    const char* mHDMIStateFile;
     int mFrameworkSock;
     int mAcceptedConnection;
     int mUeventSock;
     HDMIUeventQueue* mHDMIUeventQueueHead;
-    sp<SurfaceComposerClient>       mSession;
+    sp<SurfaceComposerClient> mSession;
     int fd1;
+    bool mDriverOnline;
+    int mCurrentID;
+    char mEDIDs[128];
 
 public:
                 HDMIDaemon();

@@ -44,6 +44,7 @@ final class HDMIListener implements Runnable {
     // hdmi commands
     private static final String HDMI_CMD_ENABLE_HDMI = "enable_hdmi";
     private static final String HDMI_CMD_DISABLE_HDMI = "disable_hdmi";
+    private static final String HDMI_CMD_CHANGE_MODE = "change_mode: ";
 
     // hdmi events
     private static final String HDMI_EVT_CONNECTED = "hdmi_connected";
@@ -54,20 +55,30 @@ final class HDMIListener implements Runnable {
     private OutputStream mOutputStream;
     private boolean mHDMIConnected = false;
     private boolean mHDMIEnabled = false;
+    private int[] mEDIDs = new int[0];
 
     HDMIListener(HDMIService service) {
         mService = service;
     }
 
     private void handleEvent(String event) {
-        Log.e(TAG, "handleEvent " + event);
+        Log.e(TAG, "handleEvent '" + event + "'");
 
-        if (event.equals(HDMI_EVT_CONNECTED)) {
+        if (event.startsWith(HDMI_EVT_CONNECTED)) {
+            String[] ids = event.substring(HDMI_EVT_CONNECTED.length() + 2).split(",");
+            mEDIDs = new int[ids.length];
+            for (int i = 0; i < mEDIDs.length; ++i) {
+                try {
+                    mEDIDs[i] = Integer.parseInt(ids[i].trim());
+                } catch (NumberFormatException ex) {
+                    Log.e(TAG, "NumberFormatException in handleEvent", ex);
+                }
+            }
             mHDMIConnected = true;
-	    mService.notifyHDMIConnected();
-        } else if (event.equals(HDMI_EVT_DISCONNECTED)) {
+            mService.notifyHDMIConnected(mEDIDs);
+        } else if (event.startsWith(HDMI_EVT_DISCONNECTED)) {
             mHDMIConnected = false;
-	    mService.notifyHDMIDisconnected();
+            mService.notifyHDMIDisconnected();
         }
     }
 
@@ -84,6 +95,8 @@ final class HDMIListener implements Runnable {
 
                 try {
                     mOutputStream.write(builder.toString().getBytes());
+                    Log.e(TAG, "writeCommand: '"
+                        + builder.toString().substring(0, builder.length()-1) + "'");
                 } catch (IOException ex) {
                     Log.e(TAG, "IOException in writeCommand", ex);
                 }
@@ -128,7 +141,7 @@ final class HDMIListener implements Runnable {
                 }
             }
         } catch (IOException ex) {
-	    Log.e(TAG, "Could not open listner socket");
+            Log.e(TAG, "Could not open listner socket");
         }
 
         synchronized (this) {
@@ -171,15 +184,21 @@ final class HDMIListener implements Runnable {
     }
 
     public void enableHDMIOutput(boolean hdmiEnable) {
-	if (mHDMIEnabled == hdmiEnable)
-	    return;
-	if (hdmiEnable) {
+        if (mHDMIEnabled == hdmiEnable) {
+            Log.d(TAG, "enableHDMIOutput ignored, unchanged!");
+            return;
+        }
+        if (hdmiEnable) {
             writeCommand(HDMI_CMD_ENABLE_HDMI, null);
-	    mHDMIEnabled = true;
-	}
-	else {
+            mHDMIEnabled = true;
+        }
+        else {
             writeCommand(HDMI_CMD_DISABLE_HDMI, null);
-	    mHDMIEnabled = false;
-	}
+            mHDMIEnabled = false;
+        }
+    }
+
+    public void changeDisplayMode(int mode) {
+        writeCommand(HDMI_CMD_CHANGE_MODE, new Integer(mode).toString());
     }
 }
