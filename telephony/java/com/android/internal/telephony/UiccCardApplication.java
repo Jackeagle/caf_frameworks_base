@@ -74,7 +74,6 @@ public class UiccCardApplication {
     private RegistrantList mReadyRegistrants = new RegistrantList();
     private RegistrantList mUnavailableRegistrants = new RegistrantList();
     private RegistrantList mLockedRegistrants = new RegistrantList();
-    private RegistrantList mNetworkLockedRegistrants = new RegistrantList();
     private RegistrantList mPersoSubstateRegistrants = new RegistrantList();
 
     UiccCardApplication(UiccCard uiccCard, UiccCardStatusResponse.CardStatus.AppStatus as, UiccRecords ur, Context c, CommandsInterface ci) {
@@ -115,7 +114,6 @@ public class UiccCardApplication {
 
         if (mPersoSubState != as.perso_substate) {
             mPersoSubState = as.perso_substate;
-            notifyNetworkLockedRegistrants();
             notifyPersoSubstateRegistrants();
         }
 
@@ -212,7 +210,6 @@ public class UiccCardApplication {
         notifyUnavailableRegistrants();
         notifyLockedRegistrants();
         notifyReadyRegistrants();
-        notifyNetworkLockedRegistrants();
         notifyPersoSubstateRegistrants();
     }
 
@@ -246,8 +243,7 @@ public class UiccCardApplication {
         }
 
         if (mAppState == AppState.APPSTATE_PIN ||
-            mAppState == AppState.APPSTATE_PUK ||
-            mAppState == AppState.APPSTATE_SUBSCRIPTION_PERSO) {
+            mAppState == AppState.APPSTATE_PUK) {
             if (mPin1State == PinState.PINSTATE_ENABLED_VERIFIED || mPin1State == PinState.PINSTATE_DISABLED) {
                 Log.e(mLogTag, "Sanity check failed! APPSTATE is locked while PIN1 is not!!!");
                 //Don't notify if application is in insane state
@@ -276,10 +272,14 @@ public class UiccCardApplication {
            return;
        }
 
-       if (r == null) {
-           mPersoSubstateRegistrants.notifyRegistrants();
-       } else {
-           r.notifyRegistrant(new AsyncResult(null, null, null));
+       if (mAppState == AppState.APPSTATE_SUBSCRIPTION_PERSO) {
+           if (r == null) {
+               Log.d(mLogTag, "Notifying registrants: PERSO_LOCKED");
+               mPersoSubstateRegistrants.notifyRegistrants();
+           } else {
+               Log.d(mLogTag, "Notifying 1 registrant: PERSO_LOCKED");
+               r.notifyRegistrant(new AsyncResult(null, null, null));
+           }
        }
    }
 
@@ -315,32 +315,6 @@ public class UiccCardApplication {
         notifyReadyRegistrants(null);
     }
 
-    /** Notifies specified registrant.
-     *
-     * @param r Registrant to be notified. If null - all registrants will be notified
-     */
-    private synchronized void notifyNetworkLockedRegistrants(Registrant r) {
-        if (mPersoSubState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK ||
-                mPersoSubState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_SUBSET ||
-                mPersoSubState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_PUK ||
-                mPersoSubState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK ||
-                mPersoSubState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK1 ||
-                mPersoSubState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK2 ||
-                mPersoSubState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK1_PUK ||
-                mPersoSubState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK2_PUK) {
-            if (r == null) {
-                mNetworkLockedRegistrants.notifyRegistrants();
-            } else {
-                r.notifyRegistrant(new AsyncResult(null, null, null));
-            }
-            return;
-        }
-    }
-
-    private synchronized void notifyNetworkLockedRegistrants() {
-        notifyNetworkLockedRegistrants(null);
-    }
-
     public synchronized void registerForReady(Handler h, int what, Object obj) {
         if (mDestroyed) {
             return;
@@ -372,26 +346,13 @@ public class UiccCardApplication {
     }
 
     /**
-     * Notifies handler of any transition into State.NETWORK_LOCKED
-     */
-    public void registerForNetworkLocked(Handler h, int what, Object obj) {
-        Registrant r = new Registrant (h, what, obj);
-
-        mNetworkLockedRegistrants.add(r);
-        notifyNetworkLockedRegistrants(r);
-    }
-
-    public void unregisterForNetworkLocked(Handler h) {
-        mNetworkLockedRegistrants.remove(h);
-    }
-
-    /**
      * Notifies handler of any changes to PersoSubstate
      */
     public void registerForPersoSubstate(Handler h, int what, Object obj) {
         Registrant r = new Registrant (h, what, obj);
 
         mPersoSubstateRegistrants.add(r);
+        notifyPersoSubstateRegistrants(r);
     }
 
     public void unregisterForPersoSubstate(Handler h) {
@@ -451,12 +412,6 @@ public class UiccCardApplication {
     public void supplyPuk2 (String puk2, String newPin2, Message onComplete) {
         mCi.supplyIccPuk2(mSlotId, mAid, puk2, newPin2,
                 mHandler.obtainMessage(EVENT_PIN2PUK2_DONE, onComplete));
-    }
-
-    public void supplyNetworkDepersonalization (String pin, Message onComplete) {
-        if(mDbg) log("Network Despersonalization: " + pin);
-        mCi.supplyNetworkDepersonalization(pin,
-                mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
     }
 
     /**
