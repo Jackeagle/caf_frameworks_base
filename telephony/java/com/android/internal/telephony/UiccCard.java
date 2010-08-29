@@ -68,7 +68,7 @@ public class UiccCard extends Handler{
             mUiccApplications[i] = new UiccCardApplication(this, ics.applications[i], mUiccRecords, mContext, mCi);
         }
 
-        if (mUiccApplications[0] != null) {
+        if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
             mStkService = StkService.getInstance(mCi, mUiccApplications[0].getApplicationRecords(), mContext,
                                                  mUiccApplications[0].getIccFileHandler(), null);
         }
