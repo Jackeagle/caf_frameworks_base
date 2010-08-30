@@ -37,6 +37,7 @@ using android::sp;
 using android::status_t;
 using android::String8;
 using android::KeyedVector;
+using android::NO_ERROR;
 
 // This file contains a test player that is loaded via the
 // TestPlayerStub class.  The player contains various implementation
@@ -81,6 +82,7 @@ class Player: public MediaPlayerBase
     virtual status_t    setLooping(int loop) {return OK;}
     virtual player_type playerType() {return TEST_PLAYER;}
     virtual status_t    invoke(const Parcel& request, Parcel *reply);
+    virtual status_t    setParameters(const String8& params);
 
   private:
     // Take a request, copy it to the reply.
@@ -99,6 +101,11 @@ status_t Player::invoke(const Parcel& request, Parcel *reply)
         default: mStatus = UNKNOWN_ERROR;
     }
     return mStatus;
+}
+
+status_t Player::setParameters(const String8& params)
+{
+    return NO_ERROR;
 }
 
 void Player::ping(const Parcel& request, Parcel *reply)

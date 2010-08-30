@@ -705,6 +705,25 @@ android_media_MediaPlayer_native_suspend_resume(
     return isSuspend ? mp->suspend() : mp->resume();
 }
 
+static void
+android_media_MediaPlayer_setParameters(JNIEnv *env, jobject thiz, jstring params)
+{
+    LOGV("setParameters(%s)", env->GetStringUTFChars(params, NULL));
+    sp<MediaPlayer> mp = getMediaPlayer(env, thiz);
+    if (mp == NULL ) {
+        jniThrowException(env, "java/lang/IllegalStateException", NULL);
+        return;
+    }
+
+    const char *paramsStr = env->GetStringUTFChars(params, NULL);
+    if (paramsStr == NULL) {  // Out of memory
+        jniThrowException(env, "java/lang/RuntimeException", "Out of memory");
+        return;
+    }
+
+    process_media_player_call(env, thiz, mp->setParameters(String8(paramsStr)), NULL, NULL);
+}
+
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod gMethods[] = {
@@ -738,6 +757,7 @@ static JNINativeMethod gMethods[] = {
     {"native_finalize",     "()V",                              (void *)android_media_MediaPlayer_native_finalize},
     {"snoop",               "([SI)I",                           (void *)android_media_MediaPlayer_snoop},
     {"native_suspend_resume", "(Z)I",                           (void *)android_media_MediaPlayer_native_suspend_resume},
+    {"setParameters",       "(Ljava/lang/String;)V",            (void *)android_media_MediaPlayer_setParameters},
 };
 
 static const char* const kClassPathName = "android/media/MediaPlayer";

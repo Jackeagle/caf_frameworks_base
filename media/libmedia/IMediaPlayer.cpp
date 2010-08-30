@@ -23,6 +23,8 @@
 #include <media/IMediaPlayer.h>
 #include <surfaceflinger/ISurface.h>
 
+#include <utils/String8.h>
+
 namespace android {
 
 enum {
@@ -45,6 +47,7 @@ enum {
     GET_METADATA,
     SUSPEND,
     RESUME,
+    SET_PARAMETERS,
 };
 
 class BpMediaPlayer: public BpInterface<IMediaPlayer>
@@ -221,6 +224,15 @@ public:
 
         return reply.readInt32();
     }
+
+    status_t setParameters(const String8& params)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+        data.writeString8(params);
+        remote()->transact(SET_PARAMETERS, data, &reply);
+        return reply.readInt32();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaPlayer, "android.media.IMediaPlayer");
@@ -337,6 +349,11 @@ status_t BnMediaPlayer::onTransact(
             reply->setDataPosition(0);
             reply->writeInt32(retcode);
             reply->setDataPosition(0);
+            return NO_ERROR;
+        } break;
+        case SET_PARAMETERS: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            reply->writeInt32(setParameters(data.readString8()));
             return NO_ERROR;
         } break;
         default:

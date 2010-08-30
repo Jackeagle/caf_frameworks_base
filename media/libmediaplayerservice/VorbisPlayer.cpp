@@ -526,4 +526,8 @@ threadExit:
     return result;
 }
 
+status_t VorbisPlayer::setParameters(const String8& params) {
+    return NO_ERROR;
+}
+
 } // end namespace android

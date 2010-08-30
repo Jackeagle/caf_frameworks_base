@@ -62,6 +62,7 @@ public:
         Parcel *records);
     virtual status_t    suspend();
     virtual status_t    resume();
+    virtual status_t    setParameters(const String8& params);
 
     // make available to PlayerDriver
     void        sendEvent(int msg, int ext1=0, int ext2=0) { MediaPlayerBase::sendEvent(msg, ext1, ext2); }

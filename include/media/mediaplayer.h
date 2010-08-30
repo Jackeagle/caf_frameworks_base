@@ -168,6 +168,7 @@ public:
             status_t        suspend();
             status_t        resume();
             status_t        setVideoSurface(const sp<ISurface>& surface);
+            status_t        setParameters(const String8& params);
 private:
             void            clear_l();
             status_t        seekTo_l(int msec);

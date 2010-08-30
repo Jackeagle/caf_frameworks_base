@@ -88,6 +88,8 @@ struct AwesomePlayer {
     // This is a mask of MediaExtractor::Flags.
     uint32_t flags() const;
 
+    status_t setParameters(const String8& params);
+
 private:
     friend struct AwesomeEvent;
 
@@ -131,6 +133,7 @@ private:
 
     uint32_t mFlags;
     uint32_t mExtractorFlags;
+    uint32_t mCodecFlags;
 
     int32_t mVideoWidth, mVideoHeight;
     int64_t mTimeSourceDeltaUs;
@@ -233,6 +236,8 @@ private:
 
     static bool ContinuePreparation(void *cookie);
     void setNumFramesToHold();
+
+    status_t setParameter(const String8& key, const String8& value);
 
     AwesomePlayer(const AwesomePlayer &);
     AwesomePlayer &operator=(const AwesomePlayer &);

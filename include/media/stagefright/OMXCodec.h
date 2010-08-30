@@ -32,6 +32,7 @@ struct OMXCodec : public MediaSource,
                   public MediaBufferObserver {
     enum CreationFlags {
         kPreferSoftwareCodecs = 1,
+        kEnableGPUComposition = 2,
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,
@@ -140,6 +141,8 @@ private:
     bool mOutputPortSettingsHaveChanged;
     int64_t mSeekTimeUs;
 
+    bool mGPUComposition;
+
     MediaBuffer *mLeftOverBuffer;
 
     Mutex mLock;
@@ -234,6 +237,8 @@ private:
             bool createEncoder, const char *matchComponentName,
             uint32_t flags,
             Vector<String8> *matchingCodecs);
+
+    void parseFlags(uint32_t flags);
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);

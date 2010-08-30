@@ -49,6 +49,7 @@
 namespace android {
 
 static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
+static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
 
 struct CodecInfo {
     const char *mime;
@@ -416,6 +417,8 @@ sp<MediaSource> OMXCodec::Create(
                     source);
 
             observer->setCodec(codec);
+
+            codec->parseFlags(flags);
 
             err = codec->configureCodec(meta);
 
@@ -1005,6 +1008,11 @@ status_t OMXCodec::setVideoOutputFormat(
                || format.eColorFormat == QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
                || format.eColorFormat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka);
 
+        if (mGPUComposition) {
+            LOGV("Set GPU Composition");
+            format.eColorFormat = (OMX_COLOR_FORMATTYPE)QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka;
+        }
+
         err = mOMX->setParameter(
                 mNode, OMX_IndexParamVideoPortFormat,
                 &format, sizeof(format));
@@ -1094,8 +1102,9 @@ OMXCodec::OMXCodec(
       mNoMoreOutputData(false),
       mOutputPortSettingsHaveChanged(false),
       mSeekTimeUs(-1),
+      mGPUComposition(false),
       mLeftOverBuffer(NULL),
-      mPmemInfo(NULL){
+      mPmemInfo(NULL) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
@@ -2661,6 +2670,8 @@ static const char *colorFormatString(OMX_COLOR_FORMATTYPE type) {
 
     if (type == OMX_QCOM_COLOR_FormatYVU420SemiPlanar) {
         return "OMX_QCOM_COLOR_FormatYVU420SemiPlanar";
+    } else if (type == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) {
+        return "QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka";
     } else if (type < 0 || (size_t)type >= numNames) {
         return "UNKNOWN";
     } else {
@@ -3055,6 +3066,10 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
             break;
         }
     }
+}
+
+void OMXCodec::parseFlags(uint32_t flags) {
+    mGPUComposition = ((flags & kEnableGPUComposition) ? true : false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

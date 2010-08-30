@@ -193,4 +193,8 @@ status_t TestPlayerStub::resetInternal()
     return isTestBuild() && isTestUrl(url);
 }
 
+status_t TestPlayerStub::setParameters(const String8& params) {
+    return NO_ERROR;
+}
+
 }  // namespace android

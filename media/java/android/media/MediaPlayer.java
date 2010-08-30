@@ -1583,4 +1583,15 @@ public class MediaPlayer
      * @hide
      */
     public native static int snoop(short [] outData, int kind);
+
+    /**
+     * Sets parameters for the MediaPlayer in key-value format. Parameters
+     * are passed in the form 'key=value' and are separated by semicolons
+     * (;).
+     *
+     * @param params the parameters to set for the MediaPlayer in key=value
+     * format
+     * @hide
+     */
+    public native void setParameters(String params) throws IllegalStateException;
 }
