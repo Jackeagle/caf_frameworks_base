@@ -59,7 +59,7 @@ public class UiccCard extends Handler{
         mSubscription3gppAppIndex = ics.subscription_3gpp_app_index;
         mSubscription3gpp2AppIndex = ics.subscription_3gpp2_app_index;
         mUiccRecords = new UiccRecords(this);
-        mUiccApplications = new UiccCardApplication[ics.applications.length];
+        mUiccApplications = new UiccCardApplication[UiccConstants.RIL_CARD_MAX_APPS];
         mContext = c;
         mCi = ci;
 
@@ -220,7 +220,7 @@ public class UiccCard extends Handler{
 
     public boolean isApplicationOnIcc(AppType type) {
         for (UiccCardApplication a : mUiccApplications) {
-            if (a.getType() == type) {
+            if (a != null && a.getType() == type) {
                 return true;
             }
         }
