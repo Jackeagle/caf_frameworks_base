@@ -308,7 +308,7 @@ uint32_t OMXCodec::getComponentQuirks(const char *componentName) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
         quirks |= kDefersOutputBufferAllocation;
-        quirks |= kDoesNotRequireMemcpyOnOutputPort;
+        //quirks |= kDoesNotRequireMemcpyOnOutputPort;
     }
 
     if (!strncmp(componentName, "OMX.TI.", 7)) {

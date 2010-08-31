@@ -405,6 +405,7 @@ void OMXNodeInstance::onMessage(const omx_message &msg) {
 
         BufferMeta *buffer_meta =
             static_cast<BufferMeta *>(buffer->pAppPrivate);
+#if 0
         PLATFORM_PRIVATE_LIST *pPlatfromList = (PLATFORM_PRIVATE_LIST *)buffer->pPlatformPrivate;
         PLATFORM_PRIVATE_ENTRY *pPlatformEntry;
         PLATFORM_PRIVATE_PMEM_INFO *pPMEMInfo;
@@ -433,6 +434,7 @@ void OMXNodeInstance::onMessage(const omx_message &msg) {
                 pmem_registered_with_client = true;
             }
         }
+#endif
         buffer_meta->CopyFromOMX(buffer);
     }
 
