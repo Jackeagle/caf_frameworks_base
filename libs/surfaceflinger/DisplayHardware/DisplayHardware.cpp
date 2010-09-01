@@ -372,3 +372,9 @@ void DisplayHardware::videoOverlayStarted(bool started) const
 {
     mNativeWindow->videoOverlayStarted(started);
 }
+
+void DisplayHardware::enableHDMIOutput(int enable) const
+{
+    mNativeWindow->enableHDMIOutput(enable);
+}
+

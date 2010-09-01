@@ -111,6 +111,8 @@ public:
      * This is an ASYNCHRONOUS call.
      */
     virtual void signal() const = 0;
+
+    virtual void enableHDMIOutput(int enable) = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -129,7 +131,8 @@ public:
         SET_ORIENTATION,
         FREEZE_DISPLAY,
         UNFREEZE_DISPLAY,
-        SIGNAL
+        SIGNAL,
+	ENABLE_HDMI_OUTPUT
     };
 
     virtual status_t    onTransact( uint32_t code,

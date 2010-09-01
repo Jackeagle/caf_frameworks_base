@@ -647,6 +647,9 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     }
 
     mOverlayDevice = overlay_dev;
+    const DisplayHardware& hw(mLayer.mFlinger->
+                               graphicPlane(0).displayHardware());
+    hw.videoOverlayStarted(true);
     overlay_t* overlay = overlay_dev->createOverlay(overlay_dev, w, h, format);
     if (overlay == NULL) {
         // couldn't create the overlay (no memory? no more overlays?)
@@ -672,9 +675,6 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     *overlayRef = new OverlayRef(mOverlayHandle, channel,
             mWidth, mHeight, mFormat, mWidthStride, mHeightStride);
     mLayer.mFlinger->signalEvent();
-    const DisplayHardware& hw(mLayer.mFlinger->
-                               graphicPlane(0).displayHardware());
-    hw.videoOverlayStarted(true);
 }
 
 LayerBuffer::OverlaySource::~OverlaySource()

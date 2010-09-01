@@ -121,6 +121,14 @@ public:
         data.writeInterfaceToken(ISurfaceComposer::getInterfaceDescriptor());
         remote()->transact(BnSurfaceComposer::SIGNAL, data, &reply, IBinder::FLAG_ONEWAY);
     }
+
+    virtual void enableHDMIOutput(int enable)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurfaceComposer::getInterfaceDescriptor());
+        data.writeInt32(enable);
+        remote()->transact(BnSurfaceComposer::ENABLE_HDMI_OUTPUT, data, &reply);
+    }
 };
 
 IMPLEMENT_META_INTERFACE(SurfaceComposer, "android.ui.ISurfaceComposer");
@@ -175,6 +183,11 @@ status_t BnSurfaceComposer::onTransact(
             CHECK_INTERFACE(ISurfaceComposer, data, reply);
             sp<IBinder> b = getCblk()->asBinder();
             reply->writeStrongBinder(b);
+        } break;
+        case ENABLE_HDMI_OUTPUT: {
+            CHECK_INTERFACE(ISurfaceComposer, data, reply);
+            int enable = data.readInt32();
+            enableHDMIOutput(enable);
         } break;
         default:
             return BBinder::onTransact(code, data, reply, flags);

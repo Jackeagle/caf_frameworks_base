@@ -190,7 +190,8 @@ SurfaceFlinger::SurfaceFlinger()
         mLastTransactionTime(0),
         mBootFinished(false),
         mConsoleSignals(0),
-        mSecureFrameBuffer(0)
+        mSecureFrameBuffer(0),
+        mHDMIOutput(false)
 {
     init();
 }
@@ -1224,6 +1225,18 @@ int SurfaceFlinger::setOrientation(DisplayID dpy,
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     hw.orientationChanged(orientation);
     return orientation;
+}
+
+void SurfaceFlinger::enableHDMIOutput(int enable)
+{
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    mHDMIOutput = enable;
+    if (!enable) {
+        hw.enableHDMIOutput(enable);
+    }
+    else {
+        hw.enableHDMIOutput(enable);
+    }
 }
 
 sp<ISurface> SurfaceFlinger::createSurface(ClientID clientId, int pid,

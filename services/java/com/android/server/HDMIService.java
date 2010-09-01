@@ -170,9 +170,12 @@ class HDMIService extends IHDMIService.Stub {
             "HDMI_USEROPTION", enableHDMI ? "HDMI_ON" : "HDMI_OFF");
         mHDMIUserOption = enableHDMI;
 
-        if (mListener != null && isHDMIConnected()) {
-            if (enableHDMI)
+        if (mListener != null){
+            if(enableHDMI && isHDMIConnected()){
+                /* HDMI Cable is connected, broadcast cable connected */
                 broadcastEvent(HDMIONEvent, mHDMIModes);
+                broadcastEvent(HDMICableConnectedEvent);
+            }
             else
                 broadcastEvent(HDMIOFFEvent);
             mListener.enableHDMIOutput(enableHDMI);
@@ -207,9 +210,10 @@ class HDMIService extends IHDMIService.Stub {
     }
 
     public void notifyHDMIConnected(int[] modes) {
-        broadcastEvent(HDMICableConnectedEvent);
         mHDMIModes = modes;
+        broadcastEvent(HDMICableConnectedEvent);
         if (getHDMIUserOption()) {
+            Log.d(TAG, "notifyHDMIConnected ... Broadcasting On" );
             broadcastEvent(HDMIONEvent, mHDMIModes);
             mListener.enableHDMIOutput(true);
 
@@ -222,10 +226,11 @@ class HDMIService extends IHDMIService.Stub {
     }
 
     public void notifyHDMIDisconnected() {
-        mHDMIModes = null;
-        broadcastEvent(HDMICableDisconnectedEvent);
-        if (getHDMIUserOption())
-            mListener.enableHDMIOutput(false);
-        broadcastEvent(HDMIOFFEvent);
+         mHDMIModes = null;
+         broadcastEvent(HDMICableDisconnectedEvent);
+         if (getHDMIUserOption()){
+            Log.d(TAG, "notifyHDMIDisconnected ... Broadcasting Off" );
+            broadcastEvent(HDMIOFFEvent);
+         }
     }
 }
