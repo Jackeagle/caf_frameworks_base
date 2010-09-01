@@ -308,8 +308,8 @@ public final class CNE
     static final int CNE_IPROUTE2_DELETE_DEFAULT_FROM_MAIN = 2;
     static final int CNE_IPROUTE2_CHANGE_DEFAULT_FROM_MAIN = 3;
 
-    static final int CNE_NET_SUBTYPE_WLAN_B = 11;
-    static final int CNE_NET_SUBTYPE_WLAN_G = 12;
+    static final int CNE_NET_SUBTYPE_WLAN_B = 20;
+    static final int CNE_NET_SUBTYPE_WLAN_G = 21;
 
 
     private static int mRoleRegId = 0;
