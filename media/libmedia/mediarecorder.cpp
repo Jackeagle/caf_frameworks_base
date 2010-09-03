@@ -25,7 +25,6 @@
 #include <media/IMediaPlayerService.h>
 #include <media/IMediaRecorder.h>
 #include <media/mediaplayer.h>  // for MEDIA_ERROR_SERVER_DIED
-#include <cutils/properties.h>
 
 namespace android {
 
@@ -140,11 +139,6 @@ status_t MediaRecorder::setVideoSource(int vs)
 
 status_t MediaRecorder::setAudioSource(int as)
 {
-    char deviceName[20];
-    property_get("ro.product.device",deviceName," ");
-    if(strncmp(deviceName,"msm8660_surf",12) == 0) {
-        return OK;
-    }
     LOGV("setAudioSource(%d)", as);
     if(mMediaRecorder == NULL) {
         LOGE("media recorder is not initialized yet");
@@ -234,11 +228,6 @@ status_t MediaRecorder::setVideoEncoder(int ve)
 
 status_t MediaRecorder::setAudioEncoder(int ae)
 {
-    char deviceName[20];
-    property_get("ro.product.device",deviceName," ");
-    if(strncmp(deviceName,"msm8660_surf",12) == 0) {
-        return OK;
-    }
     LOGV("setAudioEncoder(%d)", ae);
     if(mMediaRecorder == NULL) {
         LOGE("media recorder is not initialized yet");
