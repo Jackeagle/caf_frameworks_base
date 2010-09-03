@@ -489,6 +489,27 @@ status_t MediaRecorder::start()
     return ret;
 }
 
+status_t MediaRecorder::takeLiveSnapshot()
+{
+    LOGV("MediaRecorder.cpp - takeLiveSnapshot");
+    if (mMediaRecorder == NULL) {
+        LOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    if ((mCurrentState != MEDIA_RECORDER_RECORDING)) {
+        LOGE("takeLiveSnapshot called in an invalid state: %d", mCurrentState);
+        return INVALID_OPERATION;
+    }
+
+    status_t ret = mMediaRecorder->takeLiveSnapshot();
+    if (OK != ret) {
+        LOGE("takeLiveSnapshot failed: %d", ret);
+        mCurrentState = MEDIA_RECORDER_ERROR;
+        return ret;
+    }
+    return ret;
+}
+
 status_t MediaRecorder::stop()
 {
     LOGV("stop");
@@ -657,6 +678,21 @@ void MediaRecorder::notify(int msg, int ext1, int ext2)
         LOGV("back from callback");
     }
 }
+
+void MediaRecorder::dataCallback(int32_t msgType, const sp<IMemory>& dataPtr)
+{
+    sp<MediaRecorderListener> listener;
+    mLock.lock();
+    listener = mListener;
+    mLock.unlock();
+    if (listener != NULL) {
+        Mutex::Autolock _l(mdataCallbackLock);
+        LOGV("callback application");
+        listener->postData(msgType, dataPtr);
+        LOGV("back from callback");
+    }
+}
+
 
 void MediaRecorder::died()
 {

@@ -126,7 +126,8 @@ enum media_recorder_states {
 // The "msg" code passed to the listener in notify.
 enum media_recorder_event_type {
     MEDIA_RECORDER_EVENT_ERROR                    = 1,
-    MEDIA_RECORDER_EVENT_INFO                     = 2
+    MEDIA_RECORDER_EVENT_INFO                     = 2,
+    MEDIA_RECORDER_MSG_COMPRESSED_IMAGE           = 8
 };
 
 enum media_recorder_error_type {
@@ -150,6 +151,7 @@ class MediaRecorderListener: virtual public RefBase
 {
 public:
     virtual void notify(int msg, int ext1, int ext2) = 0;
+	virtual void postData(int32_t msgType, const sp<IMemory>& dataPtr) = 0;
 };
 
 class MediaRecorder : public BnMediaPlayerClient,
@@ -178,12 +180,14 @@ public:
     status_t    prepare();
     status_t    getMaxAmplitude(int* max);
     status_t    start();
+    status_t    takeLiveSnapshot();
     status_t    stop();
     status_t    reset();
     status_t    init();
     status_t    close();
     status_t    release();
     void        notify(int msg, int ext1, int ext2);
+    void        dataCallback(int32_t msgType, const sp<IMemory>& dataPtr);
 
 private:
     void                    doCleanUp();
@@ -199,6 +203,7 @@ private:
     bool                        mIsOutputFileSet;
     Mutex                       mLock;
     Mutex                       mNotifyLock;
+    Mutex                       mdataCallbackLock;
 };
 
 };  // namespace android

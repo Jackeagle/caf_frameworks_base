@@ -151,6 +151,9 @@ public:
             // start recording mode, must call setPreviewDisplay first
             status_t    startRecording();
 
+            // start Livesnapshot, must be in recording mode
+            status_t    takeLiveSnapshot();
+
             // stop recording mode
             void        stopRecording();
 

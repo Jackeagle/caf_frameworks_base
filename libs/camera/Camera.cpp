@@ -210,6 +210,16 @@ status_t Camera::startRecording()
     return c->startRecording();
 }
 
+// start Livesnapshot, must be in recording mode
+status_t Camera::takeLiveSnapshot()
+{
+    LOGV("takeLiveSnapshot");
+    sp <ICamera> c = mCamera;
+    if (c == 0) return NO_INIT;
+    return c->takeLiveSnapshot();
+}
+
+
 // stop preview mode
 void Camera::stopPreview()
 {

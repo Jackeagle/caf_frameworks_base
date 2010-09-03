@@ -63,6 +63,7 @@ extern "C" {
 
 #define DEBUG_DUMP_PREVIEW_FRAME_TO_FILE 0 /* n-th frame to write */
 #define DEBUG_DUMP_JPEG_SNAPSHOT_TO_FILE 0
+#define DEBUG_DUMP_JPEG_LIVESHOT_TO_FILE 0
 #define DEBUG_DUMP_YUV_SNAPSHOT_TO_FILE 0
 #define DEBUG_DUMP_POSTVIEW_SNAPSHOT_TO_FILE 0
 
@@ -743,6 +744,26 @@ status_t CameraService::Client::startRecording()
     return startCameraMode(CAMERA_RECORDING_MODE);
 }
 
+status_t CameraService::Client::takeLiveSnapshot()
+{
+    LOGV("takeLiveSnapshot (pid %d)", getCallingPid());
+
+    Mutex::Autolock lock(mLock);
+
+    if (mHardware == 0) {
+        LOGE("mHardware is NULL, returning.");
+        return INVALID_OPERATION;
+    }
+    mHardware->enableMsgType(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE);
+    if(mHardware->takeLiveSnapshot() != NO_ERROR) {
+        mHardware->disableMsgType(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE);
+        return INVALID_OPERATION;
+    }
+
+    LOGV("takeLiveSnapshot: X");
+    return NO_ERROR;
+}
+
 // stop preview mode
 void CameraService::Client::stopPreview()
 {
@@ -1144,6 +1165,27 @@ void CameraService::Client::handleCompressedPicture(const sp<IMemory>& mem)
     mHardware->disableMsgType(CAMERA_MSG_COMPRESSED_IMAGE);
 }
 
+// Liveshot callback - jpeg picture ready
+void CameraService::Client::handleLiveShot(const sp<IMemory>& mem)
+{
+#if DEBUG_DUMP_JPEG_LIVESHOT_TO_FILE // for testing pursposes only
+    {
+        ssize_t offset;
+        size_t size;
+        sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
+        dump_to_file("/data/Liveshot.jpg",
+                     (uint8_t *)heap->base() + offset, size);
+    }
+#endif
+
+    sp<ICameraClient> c = mCameraClient;
+    if (c != NULL) {
+        c->dataCallback(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE, mem);
+    }
+    mHardware->disableMsgType(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE);
+}
+
+
 void CameraService::Client::notifyCallback(int32_t msgType, int32_t ext1, int32_t ext2, void* user)
 {
     LOGV("notifyCallback(%d)", msgType);
@@ -1205,6 +1247,9 @@ void CameraService::Client::dataCallback(int32_t msgType, const sp<IMemory>& dat
             break;
         case CAMERA_MSG_COMPRESSED_IMAGE:
             client->handleCompressedPicture(dataPtr);
+            break;
+        case MEDIA_RECORDER_MSG_COMPRESSED_IMAGE:
+            client->handleLiveShot(dataPtr);
             break;
         default:
             if (c != NULL) {

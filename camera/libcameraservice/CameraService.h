@@ -23,6 +23,7 @@
 #include <camera/ICameraService.h>
 #include <camera/CameraHardwareInterface.h>
 #include <camera/Camera.h>
+#include <media/mediarecorder.h>
 
 namespace android {
 
@@ -104,6 +105,9 @@ private:
         // start recording mode
         virtual status_t        startRecording();
 
+        // takeLiveSnapshot
+        virtual status_t        takeLiveSnapshot();
+
         // stop recording mode
         virtual void            stopRecording();
 
@@ -156,6 +160,7 @@ private:
                     void        handlePostview(const sp<IMemory>&);
                     void        handleRawPicture(const sp<IMemory>&);
                     void        handleCompressedPicture(const sp<IMemory>&);
+                    void        handleLiveShot(const sp<IMemory>&);
 
                     void        copyFrameAndPostCopiedFrame(const sp<ICameraClient>& client,
                                     const sp<IMemoryHeap>& heap, size_t offset, size_t size);

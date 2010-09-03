@@ -501,6 +501,11 @@ status_t MediaPlayer::setVolume(float leftVolume, float rightVolume)
     return OK;
 }
 
+void MediaPlayer::dataCallback( int msg, const sp<IMemory>& data ){
+    //not implemented
+    return;
+}
+
 void MediaPlayer::notify(int msg, int ext1, int ext2)
 {
     LOGV("message received msg=%d, ext1=%d, ext2=%d", msg, ext1, ext2);

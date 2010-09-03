@@ -312,6 +312,12 @@ status_t CameraHardwareStub::takePicture()
     return NO_ERROR;
 }
 
+status_t CameraHardwareStub::takeLiveSnapshot()
+{
+    //Not Implemented
+    return NO_ERROR;
+}
+
 status_t CameraHardwareStub::cancelPicture()
 {
     return NO_ERROR;

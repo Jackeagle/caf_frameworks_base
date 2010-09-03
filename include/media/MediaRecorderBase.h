@@ -45,6 +45,7 @@ struct MediaRecorderBase {
     virtual status_t setListener(const sp<IMediaPlayerClient>& listener) = 0;
     virtual status_t prepare() = 0;
     virtual status_t start() = 0;
+    virtual status_t takeLiveSnapshot() {return NO_ERROR;}
     virtual status_t stop() = 0;
     virtual status_t close() = 0;
     virtual status_t reset() = 0;

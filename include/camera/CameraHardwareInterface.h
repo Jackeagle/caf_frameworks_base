@@ -198,6 +198,11 @@ public:
     virtual status_t    takePicture() = 0;
 
     /**
+     * Take a LiveSnapshot - Picture while recording
+     */
+    virtual status_t    takeLiveSnapshot() = 0;
+
+    /**
      * Cancel a picture that was started with takePicture.  Calling this
      * method when no picture is being taken is a no-op.
      */

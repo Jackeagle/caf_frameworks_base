@@ -25,6 +25,7 @@ namespace android {
 
 enum {
     NOTIFY = IBinder::FIRST_CALL_TRANSACTION,
+    DATA_CALLBACK
 };
 
 class BpMediaPlayerClient: public BpInterface<IMediaPlayerClient>
@@ -44,6 +45,16 @@ public:
         data.writeInt32(ext2);
         remote()->transact(NOTIFY, data, &reply, IBinder::FLAG_ONEWAY);
     }
+
+    virtual void dataCallback(int32_t msgType, const sp<IMemory>& imageData){
+        LOGV("dataCallback");
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayerClient::getInterfaceDescriptor());
+        data.writeInt32(msgType);
+        data.writeStrongBinder(imageData->asBinder());
+        remote()->transact(DATA_CALLBACK, data, &reply, IBinder::FLAG_ONEWAY);
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(MediaPlayerClient, "android.media.IMediaPlayerClient");
@@ -60,6 +71,14 @@ status_t BnMediaPlayerClient::onTransact(
             int ext1 = data.readInt32();
             int ext2 = data.readInt32();
             notify(msg, ext1, ext2);
+            return NO_ERROR;
+        } break;
+        case DATA_CALLBACK: {
+            LOGV("DATA_CALLBACK");
+            CHECK_INTERFACE(IMediaPlayerClient, data, reply);
+            int32_t msgType = data.readInt32();
+            sp<IMemory> imageData = interface_cast<IMemory>(data.readStrongBinder());
+                                                            dataCallback(msgType, imageData);
             return NO_ERROR;
         } break;
         default:

@@ -54,6 +54,7 @@ public:
     virtual status_t    autoFocus();
     virtual status_t    cancelAutoFocus();
     virtual status_t    takePicture();
+    virtual status_t    takeLiveSnapshot();
     virtual status_t    cancelPicture();
     virtual status_t    dump(int fd, const Vector<String16>& args) const;
     virtual status_t    setParameters(const CameraParameters& params);

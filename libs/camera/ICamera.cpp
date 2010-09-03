@@ -43,6 +43,7 @@ enum {
     UNLOCK,
     PREVIEW_ENABLED,
     START_RECORDING,
+    TAKE_LIVESNAPSHOT,
     STOP_RECORDING,
     RECORDING_ENABLED,
     RELEASE_RECORDING_FRAME,
@@ -130,6 +131,16 @@ public:
         Parcel data, reply;
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
         remote()->transact(START_RECORDING, data, &reply);
+        return reply.readInt32();
+    }
+
+    // take Live Snapshot, Must be in recording mode
+    status_t takeLiveSnapshot()
+    {
+        LOGV("takeLiveSnapshot");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        remote()->transact(TAKE_LIVESNAPSHOT, data, &reply);
         return reply.readInt32();
     }
 
@@ -321,6 +332,12 @@ status_t BnCamera::onTransact(
             LOGV("START_RECORDING");
             CHECK_INTERFACE(ICamera, data, reply);
             reply->writeInt32(startRecording());
+            return NO_ERROR;
+        } break;
+        case TAKE_LIVESNAPSHOT: {
+            LOGV("TAKE_LIVESNAPSHOT");
+            CHECK_INTERFACE(ICamera, data, reply);
+            reply->writeInt32(takeLiveSnapshot());
             return NO_ERROR;
         } break;
         case STOP_PREVIEW: {

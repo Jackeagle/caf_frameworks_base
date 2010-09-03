@@ -71,6 +71,9 @@ public:
     // start recording mode
     virtual status_t        startRecording() = 0;
 
+    // takeLiveSnapshot
+    virtual status_t        takeLiveSnapshot() = 0;
+
     // stop recording mode
     virtual void            stopRecording() = 0;    
 

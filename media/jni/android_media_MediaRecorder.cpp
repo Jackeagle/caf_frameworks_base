@@ -63,10 +63,13 @@ public:
     JNIMediaRecorderListener(JNIEnv* env, jobject thiz, jobject weak_thiz);
     ~JNIMediaRecorderListener();
     void notify(int msg, int ext1, int ext2);
+    void postData(int32_t msgType, const sp<IMemory>& dataPtr);
 private:
     JNIMediaRecorderListener();
+    void copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int32_t msgType);
     jclass      mClass;     // Reference to MediaRecorder class
     jobject     mObject;    // Weak ref to MediaRecorder Java object to call on
+    Mutex       mLock;
 };
 
 JNIMediaRecorderListener::JNIMediaRecorderListener(JNIEnv* env, jobject thiz, jobject weak_thiz)
@@ -102,6 +105,76 @@ void JNIMediaRecorderListener::notify(int msg, int ext1, int ext2)
     JNIEnv *env = AndroidRuntime::getJNIEnv();
     env->CallStaticVoidMethod(mClass, fields.post_event, mObject, msg, ext1, ext2, 0);
 }
+
+void JNIMediaRecorderListener::postData(int32_t msgType, const sp<IMemory>& dataPtr)
+{
+    LOGV("JNIMediaRecorderListener::postData");
+
+    Mutex::Autolock _l(mLock);
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    if (mObject == NULL) {
+        LOGW("callback on dead MediaRecorder object");
+        return;
+    }
+
+    // return data based on callback type
+    switch(msgType) {
+    case CAMERA_MSG_VIDEO_FRAME:
+        // should never happen
+        break;
+    // don't return raw data to Java
+    case CAMERA_MSG_RAW_IMAGE:
+        LOGV("rawCallback");
+        //just notify java layer without any data.
+        env->CallStaticVoidMethod(mClass, fields.post_event,
+                mObject, msgType, 0, 0, NULL);
+        break;
+    case MEDIA_RECORDER_MSG_COMPRESSED_IMAGE:
+        LOGV("dataCallback(%d, %p)", msgType, dataPtr.get());
+        copyAndPost(env, dataPtr, msgType);
+        break;
+    default:
+        LOGV("Unhandled Message: %d",msgType);
+        break;
+    }
+}
+
+void JNIMediaRecorderListener::copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int32_t msgType)
+{
+    jbyteArray obj = NULL;
+
+    // allocate Java byte array and copy data
+    if (dataPtr != NULL) {
+        ssize_t offset;
+        size_t size;
+        sp<IMemoryHeap> heap = dataPtr->getMemory(&offset, &size);
+        LOGV("postData: off=%d, size=%d", offset, size);
+        uint8_t *heapBase = (uint8_t*)heap->base();
+
+        if (heapBase != NULL) {
+            const jbyte* data = reinterpret_cast<const jbyte*>(heapBase + offset);
+
+            LOGV("Allocating callback buffer");
+            obj = env->NewByteArray(size);
+            if (obj == NULL) {
+                LOGE("Couldn't allocate byte array for JPEG data");
+                env->ExceptionClear();
+            } else {
+                env->SetByteArrayRegion(obj, 0, size, data);
+            }
+        } else {
+            LOGE("image heap is NULL");
+        }
+    }
+
+    // post image data to Java
+    env->CallStaticVoidMethod(mClass, fields.post_event,
+            mObject, msgType, 0, 0, obj);
+    if (obj) {
+        env->DeleteLocalRef(obj);
+    }
+}
+
 
 // ----------------------------------------------------------------------------
 
@@ -367,6 +440,16 @@ android_media_MediaRecorder_start(JNIEnv *env, jobject thiz)
     process_media_recorder_call(env, mr->start(), "java/lang/RuntimeException", "start failed.");
 }
 
+static bool
+android_media_MediaRecorder_takeLiveSnapshot(JNIEnv *env, jobject thiz)
+{
+    LOGV("takeLiveSnapshot");
+    sp<MediaRecorder> mr = getMediaRecorder(env, thiz);
+    if(process_media_recorder_call(env, mr->takeLiveSnapshot(), "java/lang/RuntimeException", "takeLiveSnapshot failed."))
+        return false;
+    return true;
+}
+
 static void
 android_media_MediaRecorder_stop(JNIEnv *env, jobject thiz)
 {
@@ -488,6 +571,7 @@ static JNINativeMethod gMethods[] = {
     {"_prepare",             "()V",                             (void *)android_media_MediaRecorder_prepare},
     {"getMaxAmplitude",      "()I",                             (void *)android_media_MediaRecorder_native_getMaxAmplitude},
     {"start",                "()V",                             (void *)android_media_MediaRecorder_start},
+    {"native_takeLiveSnapshot",     "()Z",                      (void *)android_media_MediaRecorder_takeLiveSnapshot},
     {"stop",                 "()V",                             (void *)android_media_MediaRecorder_stop},
     {"native_reset",         "()V",                             (void *)android_media_MediaRecorder_native_reset},
     {"release",              "()V",                             (void *)android_media_MediaRecorder_release},
