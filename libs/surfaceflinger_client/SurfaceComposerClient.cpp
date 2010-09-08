@@ -638,5 +638,11 @@ status_t SurfaceComposerClient::setFreezeTint(SurfaceID id, uint32_t tint)
     return NO_ERROR;
 }
 
+void SurfaceComposerClient::enableHDMIOutput(int enable)
+{
+    sp<ISurfaceComposer> sm(getComposerService());
+    return sm->enableHDMIOutput(enable);
+}
+
 }; // namespace android
 

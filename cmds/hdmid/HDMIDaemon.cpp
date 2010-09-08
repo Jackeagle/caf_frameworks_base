@@ -131,7 +131,7 @@ status_t HDMIDaemon::readyToRun() {
         return -1;
     }
 
-    LOGE("readyToRun: success");
+    LOGD("readyToRun: success");
 
     return NO_ERROR;
 }
@@ -263,7 +263,7 @@ bool HDMIDaemon::processUeventMessage(uevent& event)
             if (!strcasestr(p, DEVICE_NODE)) {
                 return false;
             }
-            LOGE("device uevent (%s)", buffer);
+            LOGD("device uevent (%s)", buffer);
             event.path = new char[strlen(p) + 1];
             strcpy(event.path, p);
             first = false;
@@ -282,7 +282,7 @@ bool HDMIDaemon::processUeventMessage(uevent& event)
                 else if (!strcmp(a, "offline"))
                     event.action = action_offline;
                 else
-                    LOGE("%s: action (%s) unknown", __func__, a);
+                    LOGD("%s: action (%s) unknown", __func__, a);
             } else if (!strncmp(s, "SEQNUM=", strlen("SEQNUM=")))
                 event.seqnum = atoi(s + strlen("SEQNUM="));
             else if (!strncmp(s, "SUBSYSTEM=", strlen("SUBSYSTEM="))) {
@@ -328,18 +328,15 @@ void HDMIDaemon::processUeventQueue()
     HDMIUeventQueue* tmp = mHDMIUeventQueueHead, *tmp1;
     while (tmp != NULL) {
         tmp1 = tmp;
-	// Code commented until HPD stabilizes
-	/*
-        if (tmp->mEvent.action == action_offline) {
-            LOGE("processUeventQueue: event.action == offline");
+	if (tmp->mEvent.action == action_offline) {
+            LOGD("processUeventQueue: event.action == offline");
             mDriverOnline = true;
             sendCommandToFramework(false);
         } else if (tmp->mEvent.action == action_online) {
-            LOGE("processUeventQueue: event.action == online");
+            LOGD("processUeventQueue: event.action == online");
             mDriverOnline = true;
             sendCommandToFramework(true);
         }
-	*/
         tmp = tmp->next;
         delete tmp1;
     }
@@ -351,13 +348,13 @@ void HDMIDaemon::processUevent()
     uevent event;
     if(processUeventMessage(event)) {
         if (event.action == action_offline) {
-            LOGE("processUevent: event.action == offline");
+            LOGD("processUevent: event.action == offline");
             mDriverOnline = true;
-            //sendCommandToFramework(false);
+            sendCommandToFramework(false);
         } else if (event.action == action_online) {
-            LOGE("processUevent: event.action == online");
+            LOGD("processUevent: event.action == online");
             mDriverOnline = true;
-            //sendCommandToFramework(true);
+            sendCommandToFramework(true);
         }
     }
 }
@@ -489,7 +486,7 @@ void HDMIDaemon::setResolution(int ID)
         if (cur->video_format == ID)
             mode = cur;
     }
-
+    SurfaceComposerClient::enableHDMIOutput(0);
     struct fb_var_screeninfo info;
     ioctl(fd1, FBIOGET_VSCREENINFO, &info);
     LOGD("GET Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>",
@@ -505,6 +502,7 @@ void HDMIDaemon::setResolution(int ID)
         info.pixclock/1000/1000);
     info.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
     ioctl(fd1, FBIOPUT_VSCREENINFO, &info);
+    SurfaceComposerClient::enableHDMIOutput(1);
     mCurrentID = ID;
 }
 
@@ -526,7 +524,7 @@ int HDMIDaemon::processFrameworkCommand()
         if (!openFramebuffer())
             return -1;
         struct fb_var_screeninfo info;
-        LOGE(HDMI_CMD_ENABLE_HDMI);
+        LOGD(HDMI_CMD_ENABLE_HDMI);
         ioctl(fd1, FBIOBLANK, FB_BLANK_UNBLANK);
         ioctl(fd1, FBIOGET_VSCREENINFO, &info);
         info.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
@@ -534,14 +532,16 @@ int HDMIDaemon::processFrameworkCommand()
         property_set("hw.hdmiON", "1");
         int en = 1;
         ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
+        SurfaceComposerClient::enableHDMIOutput(1);
     } else if (!strcmp(buffer, HDMI_CMD_DISABLE_HDMI)) {
-        LOGE(HDMI_CMD_DISABLE_HDMI);
+        LOGD(HDMI_CMD_DISABLE_HDMI);
 
         if (!openFramebuffer())
             return -1;
         int en = 0;
         ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
         property_set("hw.hdmiON", "0");
+        SurfaceComposerClient::enableHDMIOutput(0);
         ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
         close(fd1);
         fd1 = -1;

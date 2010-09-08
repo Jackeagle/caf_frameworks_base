@@ -60,6 +60,11 @@ public:
                                 if (fbDev->videoOverlayStarted)
                                     fbDev->videoOverlayStarted(fbDev, started);
                               }
+    void enableHDMIOutput(int enable)
+                              {
+                                if (fbDev->enableHDMIOutput)
+                                    fbDev->enableHDMIOutput(fbDev, enable);
+                              }
     bool isUpdateOnDemand() const { return mUpdateOnDemand; }
     status_t setUpdateRectangle(const Rect& updateRect);
     status_t compositionComplete();

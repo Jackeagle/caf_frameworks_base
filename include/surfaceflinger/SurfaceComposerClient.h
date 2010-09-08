@@ -122,7 +122,7 @@ public:
 
     status_t linkToComposerDeath(const sp<IBinder::DeathRecipient>& recipient,
             void* cookie = NULL, uint32_t flags = 0);
-
+    static void enableHDMIOutput(int enable);
 private:
     friend class Surface;
     friend class SurfaceControl;

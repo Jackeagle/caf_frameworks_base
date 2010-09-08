@@ -167,6 +167,7 @@ public:
     virtual status_t                    freezeDisplay(DisplayID dpy, uint32_t flags);
     virtual status_t                    unfreezeDisplay(DisplayID dpy, uint32_t flags);
     virtual int                         setOrientation(DisplayID dpy, int orientation, uint32_t flags);
+    virtual void                        enableHDMIOutput(int enable);
     virtual void                        signal() const;
 
             void                        screenReleased(DisplayID dpy);
@@ -372,6 +373,7 @@ private:
 
    // only written in the main thread, only read in other threads
    volatile     int32_t                     mSecureFrameBuffer;
+   bool mHDMIOutput;
 };
 
 // ---------------------------------------------------------------------------
