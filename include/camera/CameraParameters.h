@@ -165,6 +165,8 @@ public:
     static const char KEY_SUPPORTED_ISO_MODES[];
     static const char KEY_LENSSHADE[] ;
     static const char KEY_SUPPORTED_LENSSHADE_MODES[] ;
+    static const char KEY_HISTOGRAM[] ;
+    static const char KEY_SUPPORTED_HISTOGRAM_MODES[] ;
     static const char KEY_SHARPNESS[];
     static const char KEY_MAX_SHARPNESS[];
     static const char KEY_CONTRAST[];
@@ -401,6 +403,11 @@ public:
     // Values for Lens Shading
     static const char LENSSHADE_ENABLE[] ;
     static const char LENSSHADE_DISABLE[] ;
+
+    // Values for HISTOGRAM
+    static const char HISTOGRAM_ENABLE[] ;
+    static const char HISTOGRAM_DISABLE[] ;
+
 
     // Values for Continuous AF
     static const char CONTINUOUS_AF_OFF[] ;

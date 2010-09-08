@@ -1317,7 +1317,14 @@ status_t CameraService::Client::sendCommand(int32_t cmd, int32_t arg1, int32_t a
     status_t result = checkPid();
     if (result != NO_ERROR) return result;
 
-    if (cmd == CAMERA_CMD_SET_DISPLAY_ORIENTATION) {
+    if (mHardware == 0) {
+        LOGE("mHardware is NULL, returning.");
+        return INVALID_OPERATION;
+    }
+
+    switch(cmd)  {
+
+      case CAMERA_CMD_SET_DISPLAY_ORIENTATION:
         // The orientation cannot be set during preview.
         if (mHardware->previewEnabled()) {
             return INVALID_OPERATION;
@@ -1339,11 +1346,18 @@ status_t CameraService::Client::sendCommand(int32_t cmd, int32_t arg1, int32_t a
                 return BAD_VALUE;
         }
         return OK;
-    }
 
-    if (mHardware == 0) {
-        LOGE("mHardware is NULL, returning.");
-        return INVALID_OPERATION;
+      case CAMERA_CMD_HISTOGRAM_ON:
+         mHardware->enableMsgType(CAMERA_MSG_STATS_DATA);
+         break;
+
+      case CAMERA_CMD_HISTOGRAM_OFF:
+         mHardware->disableMsgType(CAMERA_MSG_STATS_DATA);
+         break;
+
+      case CAMERA_CMD_HISTOGRAM_SEND_DATA:
+         break;
+
     }
 
     return mHardware->sendCommand(cmd, arg1, arg2);
