@@ -294,6 +294,10 @@ public:
     static const char KEY_CONTINUOUS_AF[];
     static const char KEY_SUPPORTED_CONTINUOUS_AF[];
 
+    //Continuous AF.
+    static const char KEY_SELECTABLE_ZONE_AF[];
+    static const char KEY_SUPPORTED_SELECTABLE_ZONE_AF[];
+
     // Values for white balance settings.
     static const char WHITE_BALANCE_AUTO[];
     static const char WHITE_BALANCE_INCANDESCENT[];
@@ -413,6 +417,11 @@ public:
     static const char CONTINUOUS_AF_OFF[] ;
     static const char CONTINUOUS_AF_ON[] ;
 
+    // Values for auto exposure settings.
+    static const char SELECTABLE_ZONE_AF_AUTO[];
+    static const char SELECTABLE_ZONE_AF_SPOT_METERING[];
+    static const char SELECTABLE_ZONE_AF_CENTER_WEIGHTED[];
+    static const char SELECTABLE_ZONE_AF_FRAME_AVERAGE[];
 private:
     DefaultKeyedVector<String8,String8>    mMap;
 };
