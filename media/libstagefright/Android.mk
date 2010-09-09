@@ -15,6 +15,7 @@ LOCAL_SRC_FILES:=                 \
 ifeq ($(BUILD_WITH_FULL_STAGEFRIGHT),true)
 
 LOCAL_SRC_FILES +=                \
+        ExtendedExtractor.cpp     \
         AMRExtractor.cpp          \
         AMRWriter.cpp             \
         AudioPlayer.cpp           \

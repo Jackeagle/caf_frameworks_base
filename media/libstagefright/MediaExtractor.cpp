@@ -23,6 +23,7 @@
 #include "include/MPEG4Extractor.h"
 #include "include/WAVExtractor.h"
 #include "include/OggExtractor.h"
+#include "include/ExtendedExtractor.h"
 
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaDefs.h>
@@ -70,8 +71,8 @@ sp<MediaExtractor> MediaExtractor::Create(
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_OGG)) {
         return new OggExtractor(source);
     }
-
-    return NULL;
+    LOGV(" Using ExtendedExtractor\n");
+    return ExtendedExtractor::CreateExtractor(source, mime);
 }
 
 }  // namespace android

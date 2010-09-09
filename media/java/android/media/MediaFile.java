@@ -66,8 +66,10 @@ public class MediaFile {
     public static final int FILE_TYPE_3GPP2   = 24;
     public static final int FILE_TYPE_WMV     = 25;
     public static final int FILE_TYPE_ASF     = 26;
+    public static final int FILE_TYPE_AVI     = 27;
+    public static final int FILE_TYPE_DIVX    = 28;
     private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_MP4;
-    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_ASF;
+    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_DIVX;
     
     // Image file types
     public static final int FILE_TYPE_JPEG    = 31;
@@ -158,6 +160,8 @@ public class MediaFile {
         addFileType("3GPP", FILE_TYPE_3GPP, "video/3gpp");
         addFileType("3G2", FILE_TYPE_3GPP2, "video/3gpp2");
         addFileType("3GPP2", FILE_TYPE_3GPP2, "video/3gpp2");
+        addFileType("AVI", FILE_TYPE_AVI, "video/avi");
+        addFileType("DIVX", FILE_TYPE_DIVX, "video/divx");
         if (isWMVEnabled()) {
             addFileType("WMV", FILE_TYPE_WMV, "video/x-ms-wmv");
             addFileType("ASF", FILE_TYPE_ASF, "video/x-ms-asf");
