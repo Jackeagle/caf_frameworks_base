@@ -103,6 +103,7 @@ enum {
     kKeyEditOffset        = 'edof',  // bool (int64_t)
 
     kKeyIsUnreadable      = 'unre',  // bool (int32_t)
+    kKeyRawCodecSpecificData = 'rcsd',  // raw data - added to support mmParser
 };
 
 enum {

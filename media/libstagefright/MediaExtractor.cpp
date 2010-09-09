@@ -24,6 +24,7 @@
 #include "include/WAVExtractor.h"
 #include "include/OggExtractor.h"
 #include "include/MPEG2TSExtractor.h"
+#include "include/ExtendedExtractor.h"
 
 #include "matroska/MatroskaExtractor.h"
 
@@ -80,8 +81,8 @@ sp<MediaExtractor> MediaExtractor::Create(
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2TS)) {
         return new MPEG2TSExtractor(source);
     }
-
-    return NULL;
+    LOGV(" Using ExtendedExtractor\n");
+    return ExtendedExtractor::CreateExtractor(source, mime);
 }
 
 }  // namespace android

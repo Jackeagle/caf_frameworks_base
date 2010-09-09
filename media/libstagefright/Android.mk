@@ -12,6 +12,7 @@ LOCAL_SRC_FILES:=                         \
         CameraSource.cpp                  \
         DataSource.cpp                    \
         ESDS.cpp                          \
+        ExtendedExtractor.cpp             \
         FileSource.cpp                    \
         HTTPStream.cpp                    \
         JPEGSource.cpp                    \
