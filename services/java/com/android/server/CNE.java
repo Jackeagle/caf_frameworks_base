@@ -54,6 +54,10 @@ import android.net.LinkProvider.LinkRequirement;
 import android.net.LinkNotifier;
 import android.net.IConSvcEventListener;
 import android.net.LinkInfo;
+
+import android.net.IFmcEventListener;
+import android.net.FmcNotifier;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -261,6 +265,9 @@ public final class CNE
     static final int CNE_REQUEST_UPDATE_WLAN_SCAN_RESULTS = 12;
     static final int CNE_NOTIFY_SENSOR_EVENT_CMD = 13;
     static final int CNE_REQUEST_CONFIG_IPROUTE2_CMD = 14;
+    static final int CNE_NOTIFY_TIMER_EXPIRED_CMD = 15;
+    static final int CNE_REQUEST_START_FMC_CMD = 16;
+    static final int CNE_REQUEST_STOP_FMC_CMD = 17;
 
     /* UNSOL Responses - corresponding to cnd_unsol_messages.h */
     static final int CNE_RESPONSE_REG_ROLE = 1;
@@ -274,6 +281,8 @@ public final class CNE
     static final int CNE_NOTIFY_RAT_LOST = 8;
     static final int CNE_REQUEST_START_SCAN_WLAN = 9;
     static final int CNE_NOTIFY_INFLIGHT_STATUS = 10;
+    static final int CNE_NOTIFY_FMC_STATUS = 11;
+    static final int CNE_NOTIFY_HOST_ROUTING_IP = 12;
 
     /* RAT type - corresponding to CneRatType */
     static final int CNE_RAT_MIN = 0;
@@ -303,10 +312,15 @@ public final class CNE
     static final int CNE_MASK_ON_LINK_AVAIL_SENT = 0x0001;
     static final int CNE_MASK_ON_BETTER_LINK_AVAIL_SENT = 0x0002;
 
-    static final int CNE_IPROUTE2_ADD_DEFAULT = 0;
-    static final int CNE_IPROUTE2_DELETE_DEFAULT = 1;
-    static final int CNE_IPROUTE2_DELETE_DEFAULT_FROM_MAIN = 2;
-    static final int CNE_IPROUTE2_CHANGE_DEFAULT_FROM_MAIN = 3;
+    static final int CNE_IPROUTE2_ADD_ROUTING = 0;
+    static final int CNE_IPROUTE2_DELETE_ROUTING = 1;
+    static final int CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN = 2;
+    static final int CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN = 3;
+    static final int CNE_IPROUTE2_ADD_HOST_TO_MAIN = 4;
+    static final int CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN = 5;
+    static final int CNE_IPROUTE2_DELETE_HOST_ROUTING = 6;
+    static final int CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN = 7;
+    static final int CNE_IPROUTE2_DELETE_HOST_IN_MAIN = 8;
 
     static final int CNE_NET_SUBTYPE_WLAN_B = 20;
     static final int CNE_NET_SUBTYPE_WLAN_G = 21;
@@ -325,8 +339,11 @@ public final class CNE
     ServiceState mServiceState;
     private String activeWlanIfName = null;
     private String activeWwanIfName = null;
+    private String activeWlanGatewayAddr = null;
     private String activeWwanGatewayAddr = null;
     private String activeWwanIpAddr = null;
+    private String hostRoutingIpAddr = null;
+    private static boolean mRemoveHostEntry = false;
 
     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -437,10 +454,10 @@ public final class CNE
                              = NetworkInterface.getByInetAddress(inetAddress);
                           ifName = deviceInterface.getName();
                           activeWlanIfName = ifName;
-
+                          activeWlanGatewayAddr = gatewayAddr;
                           // add network interface to main table and create
                           // an interface specific table if it does not already exist
-                          configureIproute2(CNE_IPROUTE2_ADD_DEFAULT,
+                          configureIproute2(CNE_IPROUTE2_ADD_ROUTING,
                                             ifName,
                                             ipAddr,
                                             gatewayAddr);
@@ -451,7 +468,7 @@ public final class CNE
                               Log.i(LOG_TAG,"CNE received Network/Wifi State Changed -"+
                                           "DELETE Wlan From Main");
                               // remove network interface from main table if it is not preferred interface
-                              configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_FROM_MAIN,
+                              configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
                                                 activeWlanIfName, null, null);
                           }
 
@@ -461,9 +478,8 @@ public final class CNE
                       }
 
                   } else if (networkState == NetworkInfo.State.DISCONNECTED) {
-                      configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT, activeWlanIfName,
+                      configureIproute2(CNE_IPROUTE2_DELETE_ROUTING, activeWlanIfName,
                                        null, null);
-                      activeWlanIfName = null;
                   }
                   WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
                   String ssid = wifiInfo.getSSID();
@@ -1165,6 +1181,15 @@ public final class CNE
                 handleNotifyInFlightStatusMsg(p);
                 break;
             }
+            case CNE_NOTIFY_FMC_STATUS: {
+                handleFmcStatusMsg(p);
+            break;
+            }
+            case CNE_NOTIFY_HOST_ROUTING_IP: {
+                handleHostRoutingIpMsg(p);
+            break;
+            }
+
 
              default: {
                  Log.w(LOG_TAG,"UNKOWN Unsolicited Event "+response);
@@ -1214,7 +1239,7 @@ public final class CNE
               NetworkInfo.State networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
                     networkInfo.getState());
 
-              ipAddr = mTelephonyManager.getActiveIpAddress(null);
+              ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
 
               int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
               int type = networkInfo.getSubtype();
@@ -1267,9 +1292,9 @@ public final class CNE
                 NetworkInfo.State networkState = converToNetworkState(dataState);
 
                 if (networkState == NetworkInfo.State.CONNECTED){
-                    ifName = mTelephonyManager.getActiveInterfaceName(null);
-                    ipAddr = mTelephonyManager.getActiveIpAddress(null);
-                    gatewayAddr = mTelephonyManager.getActiveGateway(null);
+                    ifName = mTelephonyManager.getActiveInterfaceName(Phone.APN_TYPE_DEFAULT);
+                    ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
+                    gatewayAddr = mTelephonyManager.getActiveGateway(Phone.APN_TYPE_DEFAULT);
 
                     if((gatewayAddr == null) || (gatewayAddr.length() == 0)) {
                         Log.w(LOG_TAG, "onDataConnectionStateChanged: gateway "+
@@ -1285,23 +1310,27 @@ public final class CNE
                        Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
                        // add network interface to main table and create an interface
                        // specific table if it does not already exist
-                       configureIproute2(CNE_IPROUTE2_ADD_DEFAULT, ifName,
+                       configureIproute2(CNE_IPROUTE2_ADD_ROUTING, ifName,
                                          ipAddr, gatewayAddr);
                        if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
                           (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE) &&
                           (activeWwanIfName != null)) {
-                           Log.i(LOG_TAG,"onDataConnectionStateChanged: "+
+                           Log.i(LOG_TAG,"onDataConnectionStateChanged: CONNECTED"+
                                          "Delete Wwan From Main");
                            // remove network interface from main table if it is not
                            // preferred interface
-                           configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_FROM_MAIN,
+                           configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
                                              activeWwanIfName, null, null);
                        }
                    }
+
                 } else if (networkState == NetworkInfo.State.DISCONNECTED) {
-                    configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT,
+                    Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
+                                  "Delete Wwan(before)"+activeWwanIfName);
+                    configureIproute2(CNE_IPROUTE2_DELETE_ROUTING,
                                       activeWwanIfName, null, null);
-                    activeWwanIfName = null;
+                    Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
+                                  "Delete Wwan(after)"+activeWwanIfName);
                 }
                 int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
                 //int type = mTelephonyManager.getNetworkType();
@@ -1584,14 +1613,27 @@ public final class CNE
     public boolean configureIproute2(int command, String ifName, String ipAddr,
                                      String gatewayAddr) {
 
-      CNERequest rr = CNERequest.obtain(CNE_REQUEST_CONFIG_IPROUTE2_CMD);
+      CNERequest rr = null;
 
-      if (rr == null) {
+      Log.i(LOG_TAG, "configureIproute2: Command=" + command + ",ifName=" + ifName +
+            ",ipAddr=" + ipAddr + ",gatewayAddr=" + gatewayAddr);
+
+      if (getFmcObj() != null) {
+          if ((getFmcObj().dsAvail == true) &&
+              (command == CNE_IPROUTE2_ADD_ROUTING ||
+               command == CNE_IPROUTE2_DELETE_ROUTING ||
+               command == CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN ||
+               command == CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN)) {
+              Log.w(LOG_TAG, "configureIproute2: cmd=" + command + "invalid in FMC");
+              return false;
+          }
+      }
+
+      rr = CNERequest.obtain(CNE_REQUEST_CONFIG_IPROUTE2_CMD);
+      if (rr == null)   {
           Log.e(LOG_TAG, "configureIproute2: rr=NULL");
           return false;
       }
-      Log.i(LOG_TAG, "configureIproute2: Command=" + command + ",ifName=" + ifName +
-            ",ipAddr=" + ipAddr + ",gatewayAddr=" + gatewayAddr);
 
       rr.mp.writeInt(command);
       rr.mp.writeString(ifName);
@@ -2030,7 +2072,7 @@ public final class CNE
                     NetworkInfo.State networkState = networkInfo.getState();
                     if(networkState == NetworkInfo.State.CONNECTED){
                         String ipAddr = null;
-                        ipAddr = mTelephonyManager.getActiveIpAddress(null);
+                        ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
                         notifyRatConnectStatus(CNE_RAT_WWAN,
                                                NetworkStateToInt(networkState),
                                                ipAddr);
@@ -2077,6 +2119,56 @@ public final class CNE
 
     }
 
+    private void handleFmcStatusMsg(Parcel p){
+        FmcRegInfo rInfo = getFmcObj();
+        int numInts = p.readInt();
+        int status = p.readInt();
+
+        if (rInfo != null)
+        {
+            Log.i(LOG_TAG,"handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
+            if (status == FmcNotifier.FMC_STATUS_ENABLED) {
+                String ifName = mTelephonyManager.getActiveInterfaceName(Phone.APN_TYPE_DEFAULT);
+                String ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
+                String gatewayAddr = mTelephonyManager.getActiveGateway(Phone.APN_TYPE_DEFAULT);
+                configureIproute2(CNE_IPROUTE2_DELETE_HOST_ROUTING, activeWlanIfName, null, null);
+                configureIproute2(CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN, activeWwanIfName, null, null);
+                configureIproute2(CNE_IPROUTE2_ADD_HOST_TO_MAIN, activeWlanIfName, hostRoutingIpAddr, activeWlanGatewayAddr);
+                configureIproute2(CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN, ifName, ipAddr, gatewayAddr);
+                rInfo.enabled = true;
+            } else {
+            if ((status == FmcNotifier.FMC_STATUS_CLOSED) ||
+                    (status == FmcNotifier.FMC_STATUS_FAILURE) ||
+                    (status == FmcNotifier.FMC_STATUS_RETRIED)) {
+                    rInfo.enabled = false;
+                    rInfo.dsAvail = false;
+                }
+            }
+            if (status == FmcNotifier.FMC_STATUS_CLOSED) {
+                if (rInfo.actionStop) {
+                    onFmcStatus(status);
+                    setFmcObj(null);
+                } else {
+                    onFmcStatus(FmcNotifier.FMC_STATUS_FAILURE);
+                }
+            } else {
+                onFmcStatus(status);
+            }
+         }
+    }
+
+
+    private void handleHostRoutingIpMsg(Parcel p){
+      String ipAddr = new String(p.readString());
+
+      Log.i(LOG_TAG,"handleHostRoutingIpMsg ip=" + ipAddr);
+      hostRoutingIpAddr = ipAddr;
+      if (getFmcObj() != null) {
+          getFmcObj().dsAvail = true;
+      }
+      return;
+
+    }
 
     /** {@hide} */
     public void setDefaultConnectionNwPref(int preference){
@@ -2414,13 +2506,203 @@ public final class CNE
         mDefaultNetwork = nwId;
         // Change default network interface in main table to new one
         if (( nwId == ConnectivityManager.TYPE_WIFI) && ( activeWlanIfName != null) ) {
-            configureIproute2(CNE_IPROUTE2_CHANGE_DEFAULT_FROM_MAIN,
+            // Need to delete the host entry
+            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN,
                               activeWlanIfName, null, null);
+            if (mRemoveHostEntry) {
+                mRemoveHostEntry = false;
+                Log.i(LOG_TAG, "notifyDefaultNwChange: CNE_IPROUTE2_DELETE_HOST_IN_MAIN");
+                configureIproute2(CNE_IPROUTE2_DELETE_HOST_IN_MAIN, activeWlanIfName, null, null);
+            }
         } else if (( nwId == ConnectivityManager.TYPE_MOBILE) && ( activeWwanIfName != null) ){
-            configureIproute2(CNE_IPROUTE2_CHANGE_DEFAULT_FROM_MAIN,
+            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN,
                               activeWwanIfName, null, null);
         }
         return;
     }
 
-}
+
+
+    /*           Fmc Related               */
+    private FmcRegInfo fmcRegInfo = null;
+
+    /** {@hide} */
+    private class FmcRegInfo implements IBinder.DeathRecipient {
+        protected boolean enabled;         // true when FMC is enabled
+        protected boolean actionStop;      // when stop got pushed
+        protected boolean dsAvail;         // DS is available
+        protected int     lastSendStatus;  // last send status to OEM
+        protected String  ssid;            // CT AP
+        private IBinder mBinder;
+        IFmcEventListener mListener;
+
+        /* constructor */
+        public FmcRegInfo(IBinder binder){
+            mBinder   = binder;
+            mListener = null;
+            enabled   = false;
+            actionStop = false;
+            dsAvail    = false;
+            ssid       = "";
+            lastSendStatus = -1;
+
+            Log.d(LOG_TAG,"FmcRegInfo - binder="+ mBinder);
+            if(mBinder != null){
+                mListener = (IFmcEventListener)
+                IFmcEventListener.Stub.asInterface(binder);
+                try {
+                    Log.d(LOG_TAG,"FmcRegInfo: linking binder to death");
+                    mBinder.linkToDeath(this, 0);
+                } catch (RemoteException e) {
+                    binderDied();
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        public void binderDied() {
+            mListener = null;
+            Log.d(LOG_TAG, "CNE@FmcRegInfo: RemoteException.");
+        }
+    }
+
+    /** {@hide}
+     * return: true when send out status successfully
+     */
+    private void onFmcStatus(int status) {
+        FmcRegInfo rInfo;
+
+        rInfo = getFmcObj();
+        if(rInfo != null){
+            rInfo.lastSendStatus = status;
+            if ((rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_CLOSED) ||
+                (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_FAILURE) ||
+                (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
+                mRemoveHostEntry = true;
+            }
+            Log.i(LOG_TAG,"onFmcStatus: mRemoveHostEntry=" + mRemoveHostEntry);
+            if (rInfo.mListener != null) {
+                try {
+                    // Check status and send to OEM
+                    Log.i(LOG_TAG,"onFmcStatus: fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
+                    rInfo.mListener.onFmcStatus(status);
+                } catch (RemoteException e) {
+                    Log.e(LOG_TAG, "onFmcStatus: exception onFmcStatus");
+                }
+            }
+        } else {
+            Log.e(LOG_TAG, "onFmcStatus: regInfo = null");
+        }
+    }
+
+    /** {@hide} */
+    private FmcRegInfo getFmcObj(){
+        return fmcRegInfo;
+    }
+
+    /** {@hide} */
+    private void setFmcObj(FmcRegInfo obj){
+        fmcRegInfo = obj;
+    }
+
+    /** {@hide} */
+    private FmcRegInfo reestablishBinder(FmcRegInfo rSrc, IBinder binder) {
+        FmcRegInfo r = null;
+
+        if (binder != rSrc.mBinder) {
+            Log.d(LOG_TAG,"reestablishBinder: new binder");
+            r = new FmcRegInfo(binder);
+            r.ssid    = rSrc.ssid;
+            r.enabled = rSrc.enabled;
+            r.dsAvail = rSrc.dsAvail;
+            r.lastSendStatus = rSrc.lastSendStatus;
+            setFmcObj(r);
+        } else {
+            Log.d(LOG_TAG,"reestablishBinder: existing binder");
+            r = rSrc;
+        }
+        return r;
+    }
+
+    /** {@hide} */
+    public boolean startFmc(IBinder binder){
+        boolean ok = true;
+        boolean reqToStart = true;
+        FmcRegInfo rInfo = getFmcObj();
+
+        Log.d(LOG_TAG,"startFmc: ");
+        if(rInfo != null){
+            rInfo = reestablishBinder(rInfo, binder);
+            if (rInfo.enabled) {                // already enabled
+                onFmcStatus(FmcNotifier.FMC_STATUS_ENABLED);
+                reqToStart = false;
+            } else if (rInfo.lastSendStatus != -1) {
+                onFmcStatus(rInfo.lastSendStatus);  // re-send last status
+            }
+          } else { /* new OEM registration for this app  */
+            setFmcObj(new FmcRegInfo(binder));
+        }
+        if (reqToStart) {
+
+            onFmcStatus(FmcNotifier.FMC_STATUS_INITIALIZED);
+
+            // send enableFMC to Cnd
+            CNERequest rr = CNERequest.obtain(CNE_REQUEST_START_FMC_CMD);
+            if (rr == null) {
+                ok = false;
+                Log.e(LOG_TAG, "startFmc: rr=NULL.");
+                onFmcStatus(FmcNotifier.FMC_STATUS_FAILURE);
+            } else {
+                WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
+                String ssid = wifiInfo.getSSID();
+
+                rr.mp.writeString(ssid);
+                send(rr);
+            }
+        }
+        return ok;
+    }
+
+
+    /** {@hide} */
+    public boolean stopFmc(IBinder binder){
+        boolean ok = true;
+        FmcRegInfo rInfo = getFmcObj();
+
+        Log.d(LOG_TAG,"stopFmc");
+
+        if(rInfo != null) {
+            rInfo.actionStop = true;
+                onFmcStatus(FmcNotifier.FMC_STATUS_SHUTTING_DOWN);
+
+                // Send stopFMC to cnd
+                CNERequest rr = CNERequest.obtain(CNE_REQUEST_STOP_FMC_CMD);
+                if (rr == null) {
+                    Log.e(LOG_TAG, "stopFmc: rr=NULL.");
+                    ok = false;
+                } else {
+                    send(rr);
+                }
+            }
+
+        return ok;
+    }
+
+    /** {@hide} */
+    public boolean getFmcStatus(IBinder binder){
+        boolean ok = false;
+        FmcRegInfo rInfo = getFmcObj();
+
+        Log.d(LOG_TAG,"getFmcStatus: ");
+        if(rInfo != null){
+            rInfo = reestablishBinder(rInfo, binder);
+            if (rInfo.lastSendStatus != -1) {
+                onFmcStatus(rInfo.lastSendStatus);  // re-send last status
+                ok = true;
+            }
+        }
+
+        return ok;
+    }
+
+    }
