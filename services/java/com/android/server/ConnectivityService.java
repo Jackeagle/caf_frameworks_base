@@ -1783,4 +1783,55 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
+    /** {@hide}
+     * This function will be used by apps to request to start FMC
+     * @param listener callback to notifier
+     * @return {@code true} if the request has been accepted,
+     * {@code false} otherwise.  A return value of true does NOT mean that a
+     * FMC is available for the app to use. That will delivered via
+     * the FmcNotifier.
+     */
+    public boolean startFmc(IBinder listener){
+        if(mCneService != null) {
+            return mCneService.startFmc(listener);
+        }
+        else {
+            Slog.d(TAG, "mCneService is null while calling startFmc");
+            return false;
+        }
+    }
+
+    /** {@hide}
+    * This function will be used by apps to stop FMC.
+    * @return {@code true} if the request has been accepted by Cne
+    * framework, {@code false} otherwise.
+    */
+    public boolean stopFmc(IBinder listener){
+        if(mCneService != null) {
+            return mCneService.stopFmc(listener);
+        }
+        else {
+            Slog.d(TAG, "mCneService is null while calling startFmc");
+            return false;
+        }
+    }
+
+    /** {@hide}
+     * This function will be used by apps to request to start FMC
+     * @param listener callback to notifier
+     * @return {@code true} if there was a last sent status
+     * {@code false} otherwise.
+     */
+    public boolean getFmcStatus(IBinder listener){
+        if(mCneService != null) {
+            return mCneService.getFmcStatus(listener);
+        }
+        else {
+            Slog.d(TAG, "mCneService is null while calling startFmc");
+            return false;
+        }
+    }
+
+
+
 }
