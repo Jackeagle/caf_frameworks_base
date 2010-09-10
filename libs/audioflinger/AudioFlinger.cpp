@@ -1767,7 +1767,7 @@ int AudioFlinger::MixerThread::getTrackName_l()
 // deleteTrackName_l() must be called with ThreadBase::mLock held
 void AudioFlinger::MixerThread::deleteTrackName_l(int name)
 {
-    LOGV("remove track (%d) and delete from mixer", name);
+    LOGE("remove track (%d) and delete from mixer", name);
     mAudioMixer->deleteTrackName(name);
 }
 
@@ -2602,7 +2602,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             PlaybackThread *playbackThread = (PlaybackThread *)baseThread.get();
             mName = playbackThread->getTrackName_l();
         }
-        LOGV("Track constructor name %d, calling thread %d", mName, IPCThreadState::self()->getCallingPid());
+        LOGE("Track constructor name %d, calling thread %d", mName, IPCThreadState::self()->getCallingPid());
         if (mName < 0) {
             LOGE("no more track names available");
         }

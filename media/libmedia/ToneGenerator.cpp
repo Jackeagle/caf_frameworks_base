@@ -801,7 +801,7 @@ const unsigned char ToneGenerator::sToneMappingTable[NUM_REGIONS-1][NUM_SUP_TONE
 ////////////////////////////////////////////////////////////////////////////////
 ToneGenerator::ToneGenerator(int streamType, float volume, bool threadCanCallJava) {
 
-    LOGV("ToneGenerator constructor: streamType=%d, volume=%f\n", streamType, volume);
+    LOGE("ToneGenerator constructor: streamType=%d, volume=%f\n", streamType, volume);
 
     mState = TONE_IDLE;
 
@@ -854,11 +854,11 @@ ToneGenerator::ToneGenerator(int streamType, float volume, bool threadCanCallJav
 //
 ////////////////////////////////////////////////////////////////////////////////
 ToneGenerator::~ToneGenerator() {
-    LOGV("ToneGenerator destructor\n");
+    LOGE("ToneGenerator destructor\n");
 
     if (mpAudioTrack) {
         stopTone();
-        LOGV("Delete Track: %p\n", mpAudioTrack);
+        LOGE("Delete Track: %p\n", mpAudioTrack);
         delete mpAudioTrack;
     }
 }
@@ -1022,7 +1022,7 @@ bool ToneGenerator::initAudioTrack() {
         LOGE("AudioTrack allocation failed");
         goto initAudioTrack_exit;
     }
-    LOGV("Create Track: %p\n", mpAudioTrack);
+    LOGE("Create Track: %p\n", mpAudioTrack);
 
     mpAudioTrack->set(mStreamType,
                       0,
@@ -1051,7 +1051,7 @@ initAudioTrack_exit:
 
     // Cleanup
     if (mpAudioTrack) {
-        LOGV("Delete Track I: %p\n", mpAudioTrack);
+        LOGE("Delete Track I: %p\n", mpAudioTrack);
         delete mpAudioTrack;
         mpAudioTrack = 0;
     }
