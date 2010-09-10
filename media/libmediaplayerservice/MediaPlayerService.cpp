@@ -617,7 +617,7 @@ void MediaPlayerService::removeClient(wp<Client> client)
 MediaPlayerService::Client::Client(const sp<MediaPlayerService>& service, pid_t pid,
         int32_t connId, const sp<IMediaPlayerClient>& client)
 {
-    LOGV("Client(%d) constructor", connId);
+    LOGE("Client(%d) constructor pid(%d)", connId,pid);
     mPid = pid;
     mConnId = connId;
     mService = service;
@@ -632,7 +632,7 @@ MediaPlayerService::Client::Client(const sp<MediaPlayerService>& service, pid_t 
 
 MediaPlayerService::Client::~Client()
 {
-    LOGV("Client(%d) destructor pid = %d", mConnId, mPid);
+    LOGE("Client(%d) destructor pid = %d", mConnId, mPid);
     mAudioOutput.clear();
     wp<Client> client(this);
     disconnect();
@@ -641,7 +641,7 @@ MediaPlayerService::Client::~Client()
 
 void MediaPlayerService::Client::disconnect()
 {
-    LOGV("disconnect(%d) from pid %d", mConnId, mPid);
+    LOGE("disconnect(%d) from pid %d", mConnId, mPid);
     // grab local reference and clear main reference to prevent future
     // access to object
     sp<MediaPlayerBase> p;

@@ -90,7 +90,7 @@ AudioMixer::AudioMixer(size_t frameCount, uint32_t sampleRate)
         n++;
     }
     if (mask) {
-        LOGV("add track (%d)", n);
+        LOGE("getTrackName: add track (%d)", n);
         mTrackNames |= mask;
         return TRACK0 + n;
     }
@@ -109,7 +109,7 @@ AudioMixer::AudioMixer(size_t frameCount, uint32_t sampleRate)
  {
     name -= TRACK0;
     if (uint32_t(name) < MAX_NUM_TRACKS) {
-        LOGV("deleteTrackName(%d)", name);
+        LOGE("deleteTrackName(%d)", name);
         track_t& track(mState.tracks[ name ]);
         if (track.enabled != 0) {
             track.enabled = 0;
