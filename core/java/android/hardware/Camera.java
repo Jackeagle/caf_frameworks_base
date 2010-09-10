@@ -1476,7 +1476,7 @@ public class Camera {
         /**
          * Sets GPS latitude reference coordinate. This will be stored in JPEG EXIF
          * header.
-         * @param latitude GPS latitude reference coordinate.
+         * @param latRef GPS latitude reference coordinate.
          */
         public void setGpsLatitudeRef(String latRef) {
             set(KEY_GPS_LATITUDE_REF, latRef);
@@ -1495,7 +1495,7 @@ public class Camera {
         /**
          * Sets GPS longitude reference coordinate. This will be stored in JPEG EXIF
          * header.
-         * @param latitude GPS longitude reference coordinate.
+         * @param lonRef GPS longitude reference coordinate.
          */
         public void setGpsLongitudeRef(String lonRef) {
             set(KEY_GPS_LONGITUDE_REF, lonRef);
@@ -1513,7 +1513,7 @@ public class Camera {
 
         /**
          * Sets GPS altitude reference. This will be stored in JPEG EXIF header.
-         * @param altitude reference GPS altitude in meters.
+         * @param altRef reference GPS altitude in meters.
          */
         public void setGpsAltitudeRef(double altRef) {
             set(KEY_GPS_ALTITUDE_REF, Double.toString(altRef));
@@ -1552,7 +1552,7 @@ public class Camera {
         /**
          * Sets system timestamp. This will be stored in JPEG EXIF header.
          *
-         * @param timestamp current timestamp (UTC in seconds since January 1,
+         * @param dateTime current timestamp (UTC in seconds since January 1,
          *                  1970).
          */
         public void setExifDateTime(String dateTime) {
