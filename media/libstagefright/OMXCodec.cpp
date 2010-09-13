@@ -1647,6 +1647,10 @@ void OMXCodec::onCmdComplete(OMX_COMMANDTYPE cmd, OMX_U32 data) {
 
         case OMX_CommandPortDisable:
         {
+            if(mState == ERROR) {
+              CODEC_LOGE("Ignoring OMX_CommandPortDisable in ERROR state");
+              break;
+            }
             OMX_U32 portIndex = data;
             CODEC_LOGV("PORT_DISABLED(%ld)", portIndex);
 
