@@ -919,23 +919,29 @@ status_t MPEG4Extractor::parseChunk(sfoff_t *offset, int depth) {
 
         case FOURCC('e', 's', 'd', 's'):
         {
+            status_t err = OK;
+            uint8_t * buffer = new uint8_t[chunk_data_size];
+
             if (chunk_data_size < 4) {
-                return ERROR_MALFORMED;
+                err = ERROR_MALFORMED;
+                goto esds_parse_fail;
             }
 
-            uint8_t buffer[256];
-            if (chunk_data_size > (sfoff_t)sizeof(buffer)) {
-                return ERROR_BUFFER_TOO_SMALL;
+            if (buffer == NULL) {
+                err = ERROR_BUFFER_TOO_SMALL;
+                goto esds_parse_fail;
             }
 
             if (mDataSource->readAt(
                         data_offset, buffer, chunk_data_size) < chunk_data_size) {
-                return ERROR_IO;
+                err = ERROR_IO;
+                goto esds_parse_fail;
             }
 
             if (U32_AT(buffer) != 0) {
                 // Should be version 0, flags 0.
-                return ERROR_MALFORMED;
+                err = ERROR_MALFORMED;
+                goto esds_parse_fail;
             }
 
             mLastTrack->meta->setData(
@@ -948,13 +954,19 @@ status_t MPEG4Extractor::parseChunk(sfoff_t *offset, int depth) {
                 // The generic header appears to only contain generic
                 // information...
 
-                status_t err = updateAudioTrackInfoFromESDS_MPEG4Audio(
+                err = updateAudioTrackInfoFromESDS_MPEG4Audio(
                         &buffer[4], chunk_data_size - 4);
 
                 if (err != OK) {
-                    return err;
+                    goto esds_parse_fail;
                 }
             }
+
+
+        esds_parse_fail: //do memory cleanup
+            delete [] buffer;
+            if (err != OK)
+                return err;
 
             *offset += chunk_size;
             break;
@@ -962,18 +974,26 @@ status_t MPEG4Extractor::parseChunk(sfoff_t *offset, int depth) {
 
         case FOURCC('a', 'v', 'c', 'C'):
         {
-            char buffer[256];
-            if (chunk_data_size > (sfoff_t)sizeof(buffer)) {
-                return ERROR_BUFFER_TOO_SMALL;
+            status_t err = OK;
+            uint8_t * buffer = new uint8_t[chunk_data_size];
+            if (buffer == NULL) {
+                err = ERROR_BUFFER_TOO_SMALL;
+                goto avcC_parse_fail;
             }
 
             if (mDataSource->readAt(
                         data_offset, buffer, chunk_data_size) < chunk_data_size) {
-                return ERROR_IO;
+                err = ERROR_IO;
+                goto avcC_parse_fail;
             }
 
             mLastTrack->meta->setData(
                     kKeyAVCC, kTypeAVCC, buffer, chunk_data_size);
+
+        avcC_parse_fail: //do memory cleanup
+            delete [] buffer;
+            if (err != OK)
+                return err;
 
             *offset += chunk_size;
             break;
