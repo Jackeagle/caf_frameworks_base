@@ -194,6 +194,8 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
                     convertDataState(sender.getDataConnectionState(apnType, ipv)),
                     sender.getActiveApn(apnType, ipv),
                     sender.getInterfaceName(apnType, ipv),
+                    sender.getIpAddress(apnType, ipv),
+                    sender.getGateway(apnType, ipv),
                     sender.isDataConnectivityPossible(),
                     ((telephony != null) ? telephony.getNetworkType() :
                         TelephonyManager.NETWORK_TYPE_UNKNOWN),
