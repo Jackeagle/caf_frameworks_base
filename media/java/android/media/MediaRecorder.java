@@ -591,6 +591,11 @@ public class MediaRecorder
      */
     public static final int MEDIA_RECORDER_ERROR_UNKNOWN = 1;
 
+    /** media recorder error due to a resource like camera sensor.
+     * @see android.media.MediaRecorder.OnErrorListener
+     */
+    public static final int MEDIA_RECORDER_ERROR_RESOURCE = 2;
+
     /**
      * Interface definition for a callback to be invoked when an error
      * occurs while recording.

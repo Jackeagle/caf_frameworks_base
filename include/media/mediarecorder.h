@@ -131,7 +131,8 @@ enum media_recorder_event_type {
 };
 
 enum media_recorder_error_type {
-    MEDIA_RECORDER_ERROR_UNKNOWN                  = 1
+    MEDIA_RECORDER_ERROR_UNKNOWN                  = 1,
+    MEDIA_RECORDER_ERROR_RESOURCE                 = 2
 };
 
 // The codes are distributed as follow:
