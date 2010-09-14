@@ -15,80 +15,69 @@
  */
 
 package com.android.server;
+import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Enumeration;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.StringTokenizer;
+import java.util.NoSuchElementException;
+
+import com.android.internal.telephony.DataPhone;
+import com.android.internal.telephony.DataPhone.IPVersion;
+import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneFactory;
+import com.android.internal.telephony.TelephonyIntents;
+import com.android.server.BatteryService;
+
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
+import android.net.DhcpInfo;
+import android.net.IConSvcEventListener;
 import android.net.IConnectivityManager;
-import android.os.Binder;
-import android.os.IBinder;
-import android.net.LocalSocket;
-import android.net.LocalSocketAddress;
-import android.os.AsyncResult;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
-import android.os.Message;
-import android.os.RemoteException;
-import android.os.Parcel;
-import android.os.Bundle;
-import android.os.PowerManager;
-import android.os.SystemClock;
-import android.telephony.PhoneNumberUtils;
-import android.telephony.NeighboringCellInfo;
-import android.util.Config;
-import android.util.Log;
-import android.provider.Settings;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.sql.Timestamp;
-
+import android.net.LinkInfo;
+import android.net.LinkNotifier;
 import android.net.LinkProvider;
 import android.net.LinkProvider.LinkRequirement;
-import android.net.LinkNotifier;
-import android.net.IConSvcEventListener;
-import android.net.LinkInfo;
-
 import android.net.IFmcEventListener;
 import android.net.FmcNotifier;
-
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
-
-import com.android.server.BatteryService;
-import android.telephony.TelephonyManager;
-import android.telephony.CellLocation;
+import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
+import android.net.NetworkInfo;
+import android.net.NetworkInfo.State;
+import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiStateTracker;
-import android.net.wifi.ScanResult;
-import android.os.ServiceManager;
-import com.android.internal.telephony.TelephonyIntents;
-import android.net.DhcpInfo;
-import android.net.NetworkInfo;
-import android.net.NetworkInfo.State;
-import java.io.*;
-import java.util.StringTokenizer;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-
-
-import com.android.internal.telephony.Phone;
-import com.android.internal.telephony.PhoneFactory;
+import android.os.*;
+import android.provider.Settings;
+import android.telephony.CellLocation;
+import android.telephony.NeighboringCellInfo;
+import android.telephony.PhoneNumberUtils;
 import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
-import java.net.SocketException;
+import android.telephony.TelephonyManager;
+import android.util.Config;
+import android.util.Log;
 
 
 /**
@@ -207,8 +196,6 @@ public final class CNE
 {
     static final String LOG_TAG = "CNEJ";
     private static final boolean DBG = false;
-    static final boolean CNEJ_LOGD = Config.LOGD;
-    static final boolean CNEJ_LOGV = DBG ? Config.LOGD : Config.LOGV;
 
     //***** Instance Variables
 
@@ -225,13 +212,10 @@ public final class CNE
     ArrayList<CNERequest> mRequestsList = new ArrayList<CNERequest>();
 
 
-    Object     mLastNITZTimeInfo;
-
     /* to do move all the constants to one file */
     //***** Events
 
     static final int EVENT_SEND                 = 1;
-    static final int EVENT_WAKE_LOCK_TIMEOUT    = 2;
 
     //***** Constants
 
@@ -246,9 +230,6 @@ public final class CNE
     static final String SOCKET_NAME_CNE = "cnd";
 
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
-
-
-    static final int CNE_SRM_ITEM_STATUS_UNKNOWN = 65535;
 
     /* Different requests types - corresponding to cnd_commands.h */
     static final int CNE_REQUEST_INIT = 1;
@@ -325,7 +306,6 @@ public final class CNE
     static final int CNE_NET_SUBTYPE_WLAN_B = 20;
     static final int CNE_NET_SUBTYPE_WLAN_G = 21;
 
-
     private static int mRoleRegId = 0;
     private BatteryService mBatteryService;
     private WifiManager mWifiManager;
@@ -338,12 +318,102 @@ public final class CNE
     private SignalStrength mSignalStrength = new SignalStrength();
     ServiceState mServiceState;
     private String activeWlanIfName = null;
-    private String activeWwanIfName = null;
+    private String activeWwanV4IfName = null;
+    private String activeWwanV6IfName = null;
     private String activeWlanGatewayAddr = null;
     private String activeWwanGatewayAddr = null;
     private String activeWwanIpAddr = null;
     private String hostRoutingIpAddr = null;
     private static boolean mRemoveHostEntry = false;
+
+    private class AddressInfo {
+        String ipAddr;
+        String gatewayAddr;
+        String ifName;
+        public AddressInfo(){
+            ipAddr = null;
+            gatewayAddr = null;
+            ifName = null;
+        }
+    };
+
+
+    AddressInfo getWlanAddrInfo(IPVersion version){
+        AddressInfo wlanAddrInfo = new AddressInfo();
+        String ipAddr = null;
+        String gatewayAddr = null;
+        if(version == IPVersion.IPV4){
+            try{
+                DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
+                int ipAddressInt = dhcpInfo.ipAddress;
+                int gatewayInt = dhcpInfo.gateway;
+                if(ipAddressInt != 0){
+                    ipAddr = ((ipAddressInt)&0xff) + "."
+                              + ((ipAddressInt>>8)&0xff) + "."
+                              + ((ipAddressInt>>16)&0xff) + "."
+                              + ((ipAddressInt>>24)&0xff);
+                }
+                if(gatewayInt != 0){
+                    gatewayAddr = ((gatewayInt)&0xff) + "."
+                                   + ((gatewayInt>>8)&0xff) + "."
+                                   + ((gatewayInt>>16)&0xff) +"."
+                                   + ((gatewayInt>>24)&0xff);
+                }
+                wlanAddrInfo.ipAddr = ipAddr;
+                wlanAddrInfo.gatewayAddr = gatewayAddr;
+                InetAddress inetAddr = InetAddress.getByName(ipAddr);
+                NetworkInterface netIface = NetworkInterface.getByInetAddress(inetAddr);
+                wlanAddrInfo.ifName = netIface.getName();
+            } catch (SocketException sexp){
+                Log.v(LOG_TAG, "Could not get the netIface obj");
+            } catch(NullPointerException nexp){
+                // WiFi is probably down.
+                Log.v(LOG_TAG, "DhcpInfo obj is NULL. V4 address is not yet available.");
+            } catch(UnknownHostException uexp){
+                Log.v(LOG_TAG, "Invalid host name" + ipAddr);
+            }
+        } else if(version == IPVersion.IPV6){
+            /* currently wifistate tracker is not supporting V6 address,
+             * without this if V6 interface is brought up by kernel,
+             * we can get the V6 address info if we have a valid v4 address.
+             */
+            AddressInfo v4Addr = getWlanAddrInfo(IPVersion.IPV4);
+            try{
+                InetAddress inet4Addr = InetAddress.getByName(v4Addr.ipAddr);
+                NetworkInterface netIface = NetworkInterface.getByInetAddress(inet4Addr);
+                wlanAddrInfo.ifName = netIface.getName();
+                Enumeration e = netIface.getInetAddresses();
+                while (e.hasMoreElements()) {
+                    InetAddress inetAddr = (InetAddress)e.nextElement();
+                    if(!inetAddr.equals(inet4Addr)){
+                        wlanAddrInfo.ipAddr = inetAddr.getHostAddress();
+                        //TODO: get the gateway addr for v6
+                    }
+                }
+            } catch (SocketException sexp){
+                Log.v(LOG_TAG, "Could not get the netIface obj");
+            } catch(NullPointerException nexp){
+                Log.v(LOG_TAG, "V4Adrr is not yet available");
+             }catch(UnknownHostException uexp){
+                Log.v(LOG_TAG, "Can't get V6Addr without valid V4Addr= " + v4Addr);
+            }
+        } else {
+            Log.v(LOG_TAG,"Unsupported ipversion." + version);
+        }
+        return wlanAddrInfo;
+    }
+
+    AddressInfo getWwanAddrInfo(String apnType, IPVersion ipv){
+        AddressInfo wwanAddrInfo = new AddressInfo();
+        try {
+            wwanAddrInfo.ifName = mTelephonyManager.getActiveInterfaceName(apnType,ipv);
+            wwanAddrInfo.ipAddr = mTelephonyManager.getActiveIpAddress(apnType,ipv);
+            wwanAddrInfo.gatewayAddr = mTelephonyManager.getActiveGateway(apnType,ipv);
+        } catch(NullPointerException nexp){
+            Log.v(LOG_TAG, "mTelephonyManager is null");
+        }
+        return wwanAddrInfo;
+    }
 
     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -360,26 +430,14 @@ public final class CNE
             } else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
                 Log.i(LOG_TAG, "CNE received action RSSI Changed events: " + action);
                 if (mWifiManager != null) {
-                    String ipAddr=null;
+                    String ipV4Addr=null;
                     ConnectivityManager cm =
                       (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
                     NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
                     NetworkInfo.State networkState =
                         (networkInfo == null ? NetworkInfo.State.UNKNOWN:networkInfo.getState());
                     if(networkState == NetworkInfo.State.CONNECTED){
-                      try {
-                        DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
-                        int ipAddressInt = dhcpInfo.ipAddress;
-
-                        ipAddr = ((ipAddressInt)&0xff) + "."
-                                 + ((ipAddressInt>>8)&0xff) + "."
-                                 + ((ipAddressInt>>16)&0xff) + "."
-                                 + ((ipAddressInt>>24)&0xff);
-
-                      } catch (Exception e) {
-                            Log.w(LOG_TAG, "CNE receiver exception", e);
-                      }
-
+                      ipV4Addr = (getWlanAddrInfo(IPVersion.IPV4)).ipAddr;
                     }
 
                     WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
@@ -391,14 +449,14 @@ public final class CNE
                     tsStr = ts.toString();
 
                     Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
-                                   " networkState: " + networkState);
+                          " networkState: " + networkState);
 
                     Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
-                                   "ssid= " + ssid + ",rssi=" + rssi + ",ipAddr=" +
-                                   ipAddr + ",timeStamp:" + tsStr);
-
+                          "ssid= " + ssid + ",rssi=" + rssi + ",ipV4Addr=" +
+                          ipV4Addr + ",timeStamp:" + tsStr + " networkState: " +
+                          networkState);
                     updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G,NetworkStateToInt(networkState),
-                                     rssi, ssid, ipAddr, tsStr);
+                                     rssi, ssid, ipV4Addr, tsStr);
                 } else {
                     Log.w(LOG_TAG, "CNE received action RSSI Changed events, null WifiManager");
                 }
@@ -410,18 +468,14 @@ public final class CNE
                 Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed: " + action);
 
                 if (mWifiManager != null) {
-                    String ifName = null;
-                    String ipAddr = null;
-                    String gatewayAddr = null;
+                    AddressInfo wlanV4Addr = getWlanAddrInfo(IPVersion.IPV4);
                     NetworkInfo.State networkState = NetworkInfo.State.UNKNOWN;
-
                     if(action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)){
                         NetworkInfo networkInfo = (NetworkInfo)
                         intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
                         networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
                         networkInfo.getState());
                     }
-
                     if(action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)){
                         final boolean enabled = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
                         WifiManager.WIFI_STATE_UNKNOWN) == WifiManager.WIFI_STATE_ENABLED;
@@ -435,32 +489,14 @@ public final class CNE
                                  " networkState: " + networkState);
                     if (networkState == NetworkInfo.State.CONNECTED) {
                       try {
-                          DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
-                          int ipAddressInt = dhcpInfo.ipAddress;
-                          int gatewayInt = dhcpInfo.gateway;
-
-                          ipAddr = ((ipAddressInt)&0xff) + "."
-                                   + ((ipAddressInt>>8)&0xff) + "."
-                                   + ((ipAddressInt>>16)&0xff) + "."
-                                   + ((ipAddressInt>>24)&0xff);
-
-                          gatewayAddr = ((gatewayInt)&0xff) + "."
-                                        + ((gatewayInt>>8)&0xff) + "."
-                                        + ((gatewayInt>>16)&0xff) +"."
-                                        + ((gatewayInt>>24)&0xff);
-
-                          InetAddress inetAddress = InetAddress.getByName(ipAddr);
-                          NetworkInterface deviceInterface
-                             = NetworkInterface.getByInetAddress(inetAddress);
-                          ifName = deviceInterface.getName();
-                          activeWlanIfName = ifName;
-                          activeWlanGatewayAddr = gatewayAddr;
+                          activeWlanIfName = wlanV4Addr.ifName;
+                          activeWlanGatewayAddr = wlanV4Addr.gatewayAddr;
                           // add network interface to main table and create
                           // an interface specific table if it does not already exist
                           configureIproute2(CNE_IPROUTE2_ADD_ROUTING,
-                                            ifName,
-                                            ipAddr,
-                                            gatewayAddr);
+                                            wlanV4Addr.ifName,
+                                            wlanV4Addr.ipAddr,
+                                            wlanV4Addr.gatewayAddr);
 
                           if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
                              (mDefaultNetwork != ConnectivityManager.TYPE_WIFI) &&
@@ -492,15 +528,14 @@ public final class CNE
                   Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed - " +
                                 "ssid= " + ssid + ",rssi=" + rssi + ",networkState=" +
                                 networkState);
-                  Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed - ifName:" +
-                                ifName + ",ipAddr=" + ipAddr + ",gateway:" + gatewayAddr +
-                                ",timeStamp=" + tsStr);
+                  Log.i(LOG_TAG,"CNE received action Network/Wifi State Changed- ifName:"+
+                        wlanV4Addr.ifName + ",ipV4Addr=" + wlanV4Addr.ipAddr + ",gateway:" +
+                        wlanV4Addr.gatewayAddr + ",timeStamp=" + tsStr);
 
                   updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G,NetworkStateToInt(networkState),
-                                   rssi, ssid, ipAddr, tsStr);
-                  notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState), ipAddr);
-
-
+                                   rssi, ssid, wlanV4Addr.ipAddr, tsStr);
+                  notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState),
+                                         wlanV4Addr.ipAddr);
                 } else {
                   Log.w(LOG_TAG, "CNE received action Network State Changed, null WifiManager");
                 }
@@ -511,6 +546,81 @@ public final class CNE
                 {
                     List<ScanResult> results = mWifiManager.getScanResults();
                     //updateWlanScanResults(results);
+                }
+            } else if (action.equals(TelephonyIntents.
+                        ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)){
+                String apnType = intent.getStringExtra(Phone.DATA_APN_TYPES_KEY);
+                if(apnType.equals(DataPhone.APN_TYPE_DEFAULT) ){
+                    AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
+                        DataPhone.APN_TYPE_DEFAULT, IPVersion.IPV4);
+                    IPVersion ipv = IPVersion.IPV4;
+                    String str = intent.getStringExtra(Phone.DATA_IPVERSION_KEY);
+                    if (str != null) {
+                        ipv = Enum.valueOf(IPVersion.class, str);
+                    }
+                    AddressInfo wwanAddrInfo;
+                    if (ipv == IPVersion.IPV4) {
+                        wwanAddrInfo = wwanV4AddrInfo;
+                    } else {
+                        Log.i(LOG_TAG, "IPV6 is not supported by CNE yet");
+                        return;
+                    }
+                    str = intent.getStringExtra(Phone.DATA_APN_TYPE_STATE);
+                    NetworkInfo.State netState = NetworkInfo.State.DISCONNECTED;
+                    if (str != null) {
+                      netState =
+                          convertToNetworkState(Enum.valueOf(Phone.DataState.class,str));
+                    }
+                    if (netState == NetworkInfo.State.CONNECTED){
+                        if (ipv == IPVersion.IPV4) {
+                            activeWwanV4IfName = wwanV4AddrInfo.ifName;
+                        }
+                        Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
+                        // add network interface to main table and create an interface
+                        // specific table if it does not already exist
+                        configureIproute2(CNE_IPROUTE2_ADD_ROUTING, wwanAddrInfo.ifName,
+                                          wwanAddrInfo.ipAddr, wwanAddrInfo.gatewayAddr);
+                        if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
+                           (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE)) {
+                            Log.i(LOG_TAG,"onDataConnectionStateChanged: "+
+                                          "Delete Wwan From Main");
+                            // remove network interface from main table if it is not
+                            // preferred interface
+                            configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
+                                              wwanAddrInfo.ifName, null, null);
+                        }
+                    } else if(netState == NetworkInfo.State.DISCONNECTED){
+                        if(ipv == IPVersion.IPV4){
+                            Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
+                                  "Delete Wwan(before)"+activeWwanV4IfName);
+                            configureIproute2(CNE_IPROUTE2_DELETE_ROUTING,
+                                              activeWwanV4IfName, null, null);
+                            Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
+                                  "Delete Wwan(after)"+activeWwanV4IfName);
+                        }
+                    }
+                    int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
+                    int networkType = mTelephonyManager.getNetworkType();
+                    int signalStrength = getSignalStrength(networkType);
+                    String tsStr = null;
+                    long currentTime = System.currentTimeMillis();
+                    Timestamp ts = new Timestamp(currentTime);
+                    tsStr = ts.toString();
+
+                    Log.i(LOG_TAG, "onDataConnectionStateChanged - networkType= "
+                          + networkType + ",networkState=" + netState +
+                          ",signalStr=" + signalStrength + ",roaming=" + roaming);
+                    Log.i(LOG_TAG, "onDataConnectionStateChanged - ifName="
+                          + wwanAddrInfo.ifName + ",ipAddr=" + wwanAddrInfo.ipAddr +
+                          "gateway=" + wwanAddrInfo.gatewayAddr + ",timeStamp=" + tsStr);
+
+                    updateWwanStatus(networkType,NetworkStateToInt(netState),
+                                     signalStrength,roaming,wwanV4AddrInfo.ipAddr,tsStr);
+                    notifyRatConnectStatus(CNE_RAT_WWAN,NetworkStateToInt(netState),
+                                           wwanV4AddrInfo.ipAddr);
+                } else {
+                    Log.i(LOG_TAG,"CNE currently does not support this apnType="+
+                          apnType);
                 }
             } else {
                 Log.w(LOG_TAG, "CNE received unexpected action: " + action);
@@ -564,6 +674,7 @@ public final class CNE
         public RegInfo(IBinder binder){
             role = CNE_ROLE_INVALID;
             regId = mRoleRegId++;
+
             pid = CNE_INVALID_PID;
             compatibleRatsList = new ArrayList<RatInfo>();
             activeRat = CNE_RAT_INVALID;
@@ -599,7 +710,7 @@ public final class CNE
         }
     };
     /* regId, RegInfo map */
-    private HashMap<Integer, RegInfo> activeRegsList;
+    private ConcurrentHashMap<Integer, RegInfo> activeRegsList;
 
 
     /* DefaultConnection Class: this class registers for default role and keeps
@@ -1035,10 +1146,10 @@ public final class CNE
         filter.addAction(WifiManager.RSSI_CHANGED_ACTION);
         filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
         filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
-        filter.addAction(TelephonyIntents.ACTION_SIGNAL_STRENGTH_CHANGED);
+        filter.addAction(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
 
         context.registerReceiver(mIntentReceiver, filter);
-        activeRegsList = new HashMap<Integer, RegInfo>();
+        activeRegsList = new ConcurrentHashMap<Integer, RegInfo>();
 
         /* create the default connection no metatdata right now */
         Map<LinkRequirement,String> linkReqs = null;
@@ -1048,16 +1159,11 @@ public final class CNE
 
         // register for phone state notifications.
         ((TelephonyManager)mContext.getSystemService(Context.TELEPHONY_SERVICE))
-                .listen(mPhoneStateListener,
-                          PhoneStateListener.LISTEN_SERVICE_STATE
-                        | PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
-                        | PhoneStateListener.LISTEN_CALL_STATE
-                        | PhoneStateListener.LISTEN_DATA_CONNECTION_STATE
-                        | PhoneStateListener.LISTEN_DATA_ACTIVITY);
+                .listen(mPhoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+
         mReceiver = new CNEReceiver();
         mReceiverThread = new Thread(mReceiver, "CNEReceiver");
         mReceiverThread.start();
-
     }
 
     private void
@@ -1130,6 +1236,7 @@ public final class CNE
             rr.release();
             return;
         }
+        rr.release();
     }
 
     private void
@@ -1232,15 +1339,14 @@ public final class CNE
             mSignalStrength = signalStrength;
 
             if (mTelephonyManager != null) {
-              String ipAddr = null;
               ConnectivityManager cm =
                 (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
               NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
               NetworkInfo.State networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
                     networkInfo.getState());
 
-              ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
-
+              AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
+                                                           IPVersion.IPV4);
               int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
               int type = networkInfo.getSubtype();
               int rssi = getSignalStrength(type);
@@ -1252,122 +1358,28 @@ public final class CNE
               Log.i(LOG_TAG,"CNE onSignalStrengthsChanged - type:" + type + ",strength:"
                     + rssi + ",state:" + networkState);
 
-              Log.i(LOG_TAG, "CNE onSignalStrengthsChanged - ipAddr:" + ipAddr +
+              Log.i(LOG_TAG, "CNE onSignalStrengthsChanged - ipV4Addr:" + wwanV4AddrInfo.ipAddr +
                     ",roaming:" + roaming + ",timeStamp:" + tsStr);
 
               updateWwanStatus(type, NetworkStateToInt(networkState),
-                               rssi, roaming, ipAddr, tsStr);
-
-
-            } else {
-              Log.i(LOG_TAG, "onDataConnectionStateChanged null TelephonyManager");
-            }
-
-
-
-        }
-
-        @Override
-        public void onServiceStateChanged(ServiceState state) {
-            mServiceState = state;
-            Log.i(LOG_TAG,"CNE onServiceStateChanged ");
-        }
-
-        @Override
-        public void onCallStateChanged(int state, String incomingNumber) {
-            Log.i(LOG_TAG,"CNE onCallStateChanged ");
-
-        }
-
-        @Override
-        public void onDataConnectionStateChanged(int dataState, int networkType) {
-
-            Log.i(LOG_TAG,"onDataConnectionStateChanged dataState=" + dataState
-                   + ",networkType=" + networkType);
-
-            if (mTelephonyManager != null) {
-                String ifName = null;
-                String ipAddr = null;
-                String gatewayAddr = null;
-                NetworkInfo.State networkState = converToNetworkState(dataState);
-
-                if (networkState == NetworkInfo.State.CONNECTED){
-                    ifName = mTelephonyManager.getActiveInterfaceName(Phone.APN_TYPE_DEFAULT);
-                    ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
-                    gatewayAddr = mTelephonyManager.getActiveGateway(Phone.APN_TYPE_DEFAULT);
-
-                    if((gatewayAddr == null) || (gatewayAddr.length() == 0)) {
-                        Log.w(LOG_TAG, "onDataConnectionStateChanged: gateway "+
-                                       "address is empty string");
-                        gatewayAddr = null;
-                    }
-                    if(ipAddr != null && ipAddr.length() !=0 &&
-                       ifName != null &&
-                       ifName.length()!=0) {
-                       activeWwanIfName = ifName;
-                       activeWwanIpAddr = ipAddr;
-                       activeWwanGatewayAddr = gatewayAddr;
-                       Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
-                       // add network interface to main table and create an interface
-                       // specific table if it does not already exist
-                       configureIproute2(CNE_IPROUTE2_ADD_ROUTING, ifName,
-                                         ipAddr, gatewayAddr);
-                       if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
-                          (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE) &&
-                          (activeWwanIfName != null)) {
-                           Log.i(LOG_TAG,"onDataConnectionStateChanged: CONNECTED"+
-                                         "Delete Wwan From Main");
-                           // remove network interface from main table if it is not
-                           // preferred interface
-                           configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
-                                             activeWwanIfName, null, null);
-                       }
-                   }
-
-                } else if (networkState == NetworkInfo.State.DISCONNECTED) {
-                    Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
-                                  "Delete Wwan(before)"+activeWwanIfName);
-                    configureIproute2(CNE_IPROUTE2_DELETE_ROUTING,
-                                      activeWwanIfName, null, null);
-                    Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
-                                  "Delete Wwan(after)"+activeWwanIfName);
-                }
-                int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
-                //int type = mTelephonyManager.getNetworkType();
-                int signalStrength = getSignalStrength(networkType);
-                String tsStr = null;
-                long currentTime = System.currentTimeMillis();
-                Timestamp ts = new Timestamp(currentTime);
-                tsStr = ts.toString();
-
-                Log.i(LOG_TAG, "onDataConnectionStateChanged - networkType= "
-                      + networkType + ",networkState=" + networkState +
-                      ",signalStr=" + signalStrength + ",roaming=" + roaming);
-
-                Log.i(LOG_TAG, "onDataConnectionStateChanged - ifName="
-                      + activeWwanIfName + ",ipAddr=" + ipAddr + "gateway="
-                      + gatewayAddr + ",timeStamp=" + tsStr);
-
-                updateWwanStatus(networkType, NetworkStateToInt(networkState),
-                                 signalStrength, roaming, ipAddr, tsStr);
-                notifyRatConnectStatus(CNE_RAT_WWAN, NetworkStateToInt(networkState), ipAddr);
+                               rssi, roaming, wwanV4AddrInfo.ipAddr, tsStr);
 
             } else {
-                Log.i(LOG_TAG, "onDataConnectionStateChanged null TelephonyManager");
+              Log.i(LOG_TAG, "onSignalStrengthsChanged null TelephonyManager");
             }
         }
     };
 
 
-    private NetworkInfo.State converToNetworkState(int dataState){
+    private NetworkInfo.State convertToNetworkState(Phone.DataState dataState){
         switch(dataState){
-        case TelephonyManager.DATA_DISCONNECTED :
+        case DISCONNECTED :
             return NetworkInfo.State.DISCONNECTED;
-        case TelephonyManager.DATA_CONNECTING :
+        case CONNECTING :
             return NetworkInfo.State.CONNECTING;
-        case TelephonyManager.DATA_CONNECTED :
+        case CONNECTED :
             return NetworkInfo.State.CONNECTED;
-        case TelephonyManager.DATA_SUSPENDED :
+        case SUSPENDED :
             return NetworkInfo.State.SUSPENDED;
         default:
             return NetworkInfo.State.UNKNOWN;
@@ -1568,7 +1580,7 @@ public final class CNE
 
     /** {@hide} */
     public boolean updateWwanStatus(int type, int state, int rssi, int roaming,
-                                    String ipAddr, String timeStamp) {
+                                    String ipV4Addr, String timeStamp) {
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WWAN_INFO);
         if (rr == null) {
@@ -1576,13 +1588,14 @@ public final class CNE
             return false;
         }
         Log.i(LOG_TAG, "UpdateWwanStatus type=" + type + ",state=" + state + ",rssi="
-               + rssi + ",roaming=" + roaming + ",ipAddr" + ipAddr + ",timeStamp" + timeStamp);
+              + rssi + ",roaming=" + roaming + ",ipV4Addr" + ipV4Addr + ",timeStamp"
+              + timeStamp);
 
         rr.mp.writeInt(type);
         rr.mp.writeInt(state);
         rr.mp.writeInt(rssi);
         rr.mp.writeInt(roaming);
-        rr.mp.writeString(ipAddr);
+        rr.mp.writeString(ipV4Addr);
         rr.mp.writeString(timeStamp);
 
         send(rr);
@@ -1590,7 +1603,7 @@ public final class CNE
     }
 
     /** {@hide} */
-    public boolean notifyRatConnectStatus(int type, int status, String ipAddr) {
+    public boolean notifyRatConnectStatus(int type, int status, String ipV4Addr) {
 
         CNERequest rr = CNERequest.obtain(CNE_NOTIFY_RAT_CONNECT_STATUS);
 
@@ -1599,11 +1612,11 @@ public final class CNE
             return false;
         }
         Log.i(LOG_TAG, "notifyRatConnectStatus ratType=" + type + ",status="
-                      + status + ",ipAddr=" + ipAddr);
+              + status + ",ipV4Addr=" + ipV4Addr);
 
         rr.mp.writeInt(type);
         rr.mp.writeInt(status);
-        rr.mp.writeString(ipAddr);
+        rr.mp.writeString(ipV4Addr);
 
         send(rr);
         return true;
@@ -1782,14 +1795,14 @@ public final class CNE
         Log.i(LOG_TAG,"handleRegRoleRsp called with numInts = "+ numInts +
               " RoleRegId = "+ roleRegId + " evtStatus = " + evtStatus);
         /* does this role already exists? */
-        if(activeRegsList.containsKey(roleRegId)){
+        RegInfo regInfo = activeRegsList.get(roleRegId);
+        if(regInfo != null){
             if(evtStatus == STATUS_SUCCESS){
                 /* register role was success so get the compatible networks */
                 sendGetCompatibleNwsReq(roleRegId);
                 return;
             }
             else{
-                RegInfo regInfo = activeRegsList.get(roleRegId);
                 IConSvcEventListener listener = regInfo.cbInfo.listener;
                 if(listener != null){
                     try {
@@ -1813,8 +1826,8 @@ public final class CNE
         Log.i(LOG_TAG,"handleGetCompatibleNwsRsp called for roleRegId = "+
               roleRegId + " evtStatus = " + evtStatus);
         /* does this role already exists? */
-        if(activeRegsList.containsKey(roleRegId)){
-            RegInfo regInfo = activeRegsList.get(roleRegId);
+        RegInfo regInfo = activeRegsList.get(roleRegId);
+        if(regInfo != null){
             if(evtStatus == STATUS_SUCCESS){
                 /* save the returned info */
                 regInfo.activeRat = p.readInt();
@@ -1850,7 +1863,7 @@ public final class CNE
                 String ipAddr = new String(p.readString());
                 int flBwEst = p.readInt();
                 int rlBwEst = p.readInt();
-                Log.i(LOG_TAG,"IPAddr = "+ ipAddr +" flBwEst = "+flBwEst+
+                Log.v(LOG_TAG,"ipV4Addr = "+ ipAddr + " flBwEst = " + flBwEst +
                       " rlBwEst = " + rlBwEst);
                 prevCompatibleRatsList.clear();
                 regInfo.compatibleRatsList = newCompatibleRatsList;
@@ -1916,8 +1929,8 @@ public final class CNE
               " roleRegId = "+ roleRegId + " evtStatus = " + evtStatus);
         /* clean up */
         /* does this role already exists? */
-        if(activeRegsList.containsKey(roleRegId)){
-            RegInfo regInfo = activeRegsList.get(roleRegId);
+        RegInfo regInfo = activeRegsList.get(roleRegId);
+        if(regInfo != null){
             regInfo.compatibleRatsList.clear();
             activeRegsList.remove(roleRegId);
         }
@@ -1937,8 +1950,8 @@ public final class CNE
                roleRegId + " betterRat = " + betterRat + " ipAddr = "+ipAddr+
               " flBwEst = " + flBwEst+ " rlBwEst = "+rlBwEst);
         /* does this role already exists? */
-        if(activeRegsList.containsKey(roleRegId)){
-            RegInfo regInfo = activeRegsList.get(roleRegId);
+        RegInfo regInfo = activeRegsList.get(roleRegId);
+        if(regInfo != null){
             /* save the betterRat info */
             regInfo.betterRat = betterRat;
                             /* call the call backs */
@@ -1973,8 +1986,8 @@ public final class CNE
         Log.i(LOG_TAG,"handleRatLostEvent called with numInts = "+ numInts +
               " roleRegId = "+ roleRegId + " rat = " + rat);
         /* does this role already exists? */
-        if(activeRegsList.containsKey(roleRegId)){
-            RegInfo regInfo = activeRegsList.get(roleRegId);
+        RegInfo regInfo = activeRegsList.get(roleRegId);
+        if(regInfo != null){
             if(regInfo.activeRat == rat){
                 IConSvcEventListener listener = regInfo.cbInfo.listener;
                 if(listener != null ){
@@ -2043,16 +2056,10 @@ public final class CNE
                 cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             NetworkInfo.State networkState = networkInfo.getState();
             if(networkState == NetworkInfo.State.CONNECTED){
-                String ipAddr = null;
-                DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
-                int ipAddressInt = dhcpInfo.ipAddress;
-                ipAddr = ((ipAddressInt)&0xff) + "."
-                         + ((ipAddressInt>>8)&0xff) + "."
-                         + ((ipAddressInt>>16)&0xff) + "."
-                         + ((ipAddressInt>>24)&0xff);
+                AddressInfo wlanV4AddrInfo = getWlanAddrInfo(IPVersion.IPV4);
                 notifyRatConnectStatus(CNE_RAT_WLAN,
                                        NetworkStateToInt(networkState),
-                                       ipAddr);
+                                       wlanV4AddrInfo.ipAddr);
 
             } else {
               mService.bringUpRat(CNE_RAT_WLAN);
@@ -2071,11 +2078,11 @@ public final class CNE
                 if(networkInfo.getType() != ConnectivityManager.TYPE_WIFI){
                     NetworkInfo.State networkState = networkInfo.getState();
                     if(networkState == NetworkInfo.State.CONNECTED){
-                        String ipAddr = null;
-                        ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
+                        AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
+                            DataPhone.APN_TYPE_DEFAULT,IPVersion.IPV4);
                         notifyRatConnectStatus(CNE_RAT_WWAN,
                                                NetworkStateToInt(networkState),
-                                               ipAddr);
+                                               wwanV4AddrInfo.ipAddr);
                         return;
                     }
                 }
@@ -2128,13 +2135,15 @@ public final class CNE
         {
             Log.i(LOG_TAG,"handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
             if (status == FmcNotifier.FMC_STATUS_ENABLED) {
-                String ifName = mTelephonyManager.getActiveInterfaceName(Phone.APN_TYPE_DEFAULT);
-                String ipAddr = mTelephonyManager.getActiveIpAddress(Phone.APN_TYPE_DEFAULT);
-                String gatewayAddr = mTelephonyManager.getActiveGateway(Phone.APN_TYPE_DEFAULT);
+                AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
+                                                             IPVersion.IPV4);
                 configureIproute2(CNE_IPROUTE2_DELETE_HOST_ROUTING, activeWlanIfName, null, null);
-                configureIproute2(CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN, activeWwanIfName, null, null);
+                configureIproute2(CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN, activeWwanV4IfName, null, null);
                 configureIproute2(CNE_IPROUTE2_ADD_HOST_TO_MAIN, activeWlanIfName, hostRoutingIpAddr, activeWlanGatewayAddr);
-                configureIproute2(CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN, ifName, ipAddr, gatewayAddr);
+                configureIproute2(CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN,
+                                  wwanV4AddrInfo.ifName,
+                                  wwanV4AddrInfo.ipAddr,
+                                  wwanV4AddrInfo.gatewayAddr);
                 rInfo.enabled = true;
             } else {
             if ((status == FmcNotifier.FMC_STATUS_CLOSED) ||
@@ -2174,8 +2183,8 @@ public final class CNE
     public void setDefaultConnectionNwPref(int preference){
         Log.d(LOG_TAG,"setDefaultConnectionNwPref called with pref = " + preference);
         /* does this role already exists? */
-        if(activeRegsList.containsKey(CNE_DEFAULT_CON_REGID)){
-            RegInfo regInfo = activeRegsList.get(CNE_DEFAULT_CON_REGID);
+        RegInfo regInfo = activeRegsList.get(CNE_DEFAULT_CON_REGID);
+        if(regInfo != null){
             /* preference can be either wlan or wwan send the confirmNw
              * with the next best wwan or wlan rat in the compatiblerats list
              * for this role
@@ -2316,8 +2325,8 @@ public final class CNE
               "isSatisfied = " + isSatisfied + "isNotifyBetterLink" +
               isNotifyBetterLink);
         int regId = getRegId(pid,role);
-        if( regId != CNE_REGID_INVALID){
-            RegInfo regInfo = activeRegsList.get(regId);
+        RegInfo regInfo = activeRegsList.get(regId);
+        if( regInfo != null){
             if((regInfo.notificationsSent & CNE_MASK_ON_LINK_AVAIL_SENT) ==
                CNE_MASK_ON_LINK_AVAIL_SENT){
                 regInfo.cbInfo.isNotifBetterRat = isNotifyBetterLink;
@@ -2364,10 +2373,15 @@ public final class CNE
     public boolean releaseLink(int role,int pid){
         Log.d(LOG_TAG,"releasing link for role = " + role);
         int regId = getRegId(pid,role);
-        if( regId != CNE_REGID_INVALID){
-            RegInfo regInfo = activeRegsList.get(regId);
+        RegInfo regInfo = activeRegsList.get(regId);
+        if( regInfo != null){
             sendDeregRoleReq(regInfo.regId);
             /* clean up */
+            try{
+                regInfo.mBinder.unlinkToDeath(regInfo, 0);
+            } catch (NoSuchElementException exp){
+                Log.w(LOG_TAG,"bindrLinkToDeatch was not registered");
+            }
             regInfo.compatibleRatsList.clear();
             activeRegsList.remove(regId);
             return true;
@@ -2385,8 +2399,8 @@ public final class CNE
                               boolean isNotifyBetterLink){
         Log.d(LOG_TAG,"switch link for role = " + role);
         int regId = getRegId(pid,role);
-        if( regId != CNE_REGID_INVALID){
-            RegInfo regInfo = activeRegsList.get(regId);
+        RegInfo regInfo = activeRegsList.get(regId);
+        if( regInfo != null){
             if((regInfo.notificationsSent & CNE_MASK_ON_BETTER_LINK_AVAIL_SENT) ==
                CNE_MASK_ON_BETTER_LINK_AVAIL_SENT){
                 regInfo.activeRat = info==null? regInfo.betterRat:info.getNwId();
@@ -2415,8 +2429,8 @@ public final class CNE
                                 boolean isNotifyBetterLink){
         Log.d(LOG_TAG,"rejectSwitch for role = " + role);
         int regId = getRegId(pid,role);
-        if( regId != CNE_REGID_INVALID){
-            RegInfo regInfo = activeRegsList.get(regId);
+        RegInfo regInfo = activeRegsList.get(regId);
+        if( regInfo != null){
             if((regInfo.notificationsSent & CNE_MASK_ON_BETTER_LINK_AVAIL_SENT) ==
                CNE_MASK_ON_BETTER_LINK_AVAIL_SENT){
                 sendConfirmNwReq(regInfo.regId,
@@ -2501,8 +2515,9 @@ public final class CNE
 
     /** {@hide} */
     public void notifyDefaultNwChange(int nwId){
-        Log.i(LOG_TAG, "notifyDefaultNwChange: nwId: " + nwId + ",activeWwanIfname:"
-              + activeWwanIfName + ",activeWlanIfname:" + activeWlanIfName);
+        Log.i(LOG_TAG, "notifyDefaultNwChange: nwId: " + nwId + ",activeWwanV4Ifname:"
+              + activeWwanV4IfName + ",activeWwanV6Ifname:" + activeWwanV6IfName +
+              ",activeWlanIfname:" + activeWlanIfName);
         mDefaultNetwork = nwId;
         // Change default network interface in main table to new one
         if (( nwId == ConnectivityManager.TYPE_WIFI) && ( activeWlanIfName != null) ) {
@@ -2514,9 +2529,9 @@ public final class CNE
                 Log.i(LOG_TAG, "notifyDefaultNwChange: CNE_IPROUTE2_DELETE_HOST_IN_MAIN");
                 configureIproute2(CNE_IPROUTE2_DELETE_HOST_IN_MAIN, activeWlanIfName, null, null);
             }
-        } else if (( nwId == ConnectivityManager.TYPE_MOBILE) && ( activeWwanIfName != null) ){
+        } else if (( nwId == ConnectivityManager.TYPE_MOBILE) && ( activeWwanV4IfName != null) ){
             configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN,
-                              activeWwanIfName, null, null);
+                              activeWwanV4IfName, null, null);
         }
         return;
     }
