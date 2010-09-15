@@ -83,7 +83,9 @@ void OMXMaster::addPlugin(OMXPluginBase *plugin) {
 
         mPluginByComponentName.add(name8, plugin);
     }
+#if !defined( TARGET_OMAP3) /* So that non-dsp codec plugin is still picked up */
     CHECK_EQ(err, OMX_ErrorNoMore);
+#endif
 }
 
 void OMXMaster::clearPlugins() {
