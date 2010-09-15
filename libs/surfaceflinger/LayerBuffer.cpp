@@ -595,10 +595,20 @@ status_t LayerBuffer::BufferSource::initTempBuffer() const
     // Allocate a temporary buffer and create the corresponding EGLImageKHR
     // once the EGLImage has been created we don't need the
     // graphic buffer reference anymore.
+#ifdef USE_ASHMEM
     sp<GraphicBuffer> buffer = new GraphicBuffer(
             w, h, HAL_PIXEL_FORMAT_RGB_565,
             GraphicBuffer::USAGE_HW_TEXTURE |
-            GraphicBuffer::USAGE_HW_2D);
+            GraphicBuffer::USAGE_HW_2D |
+            GraphicBuffer::USAGE_HW_PMEM
+            );
+#else
+    sp<GraphicBuffer> buffer = new GraphicBuffer(
+            w, h, HAL_PIXEL_FORMAT_RGB_565,
+            GraphicBuffer::USAGE_HW_TEXTURE |
+            GraphicBuffer::USAGE_HW_2D
+            );
+#endif
 
     status_t err = buffer->initCheck();
     if (err == NO_ERROR) {
