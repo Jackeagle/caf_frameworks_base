@@ -312,7 +312,7 @@ public final class RuimRecords extends UiccApplicationRecords {
     }
 
     @Override
-    public void setVoiceMessageWaiting(int line, int countWaiting) {
+    public void setVoiceMessageWaiting(int line, int countWaiting, Message onComplete) {
         if (line != 1) {
             // only profile 1 is supported
             return;
