@@ -82,10 +82,16 @@ public interface TelephonyProperties
     static String PROPERTY_SIM_STATE = "gsm.sim.state";
 
     /** The MCC+MNC (mobile country code+mobile network code) of the
-     *  provider of the SIM. 5 or 6 decimal digits.
+     *  provider of the default subscription/SUB0. 5 or 6 decimal digits.
      *  Availablity: SIM state must be "READY"
      */
     static String PROPERTY_ICC_OPERATOR_NUMERIC = "gsm.sim.operator.numeric";
+
+    /** The MCC+MNC (mobile country code+mobile network code) of the
+     *  provider of second subscription/SUB1. 5 or 6 decimal digits.
+     *  Availablity: SIM state must be "READY"
+     */
+    static String PROPERTY_ICC_OPERATOR_NUMERIC_SECOND_SUB = "gsm.sim.operator.numeric_sub";
 
     /** PROPERTY_ICC_OPERATOR_ALPHA is also known as the SPN, or Service Provider Name.
      *  Availablity: SIM state must be "READY"

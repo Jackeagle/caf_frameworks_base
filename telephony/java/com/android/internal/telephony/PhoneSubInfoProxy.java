@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,10 +26,18 @@ import android.os.ServiceManager;
 
 
 public class PhoneSubInfoProxy extends IPhoneSubInfo.Stub {
+    private Phone[] mPhone;
     private PhoneSubInfo mPhoneSubInfo;
 
     public PhoneSubInfoProxy(PhoneSubInfo phoneSubInfo) {
         mPhoneSubInfo = phoneSubInfo;
+        if(ServiceManager.getService("iphonesubinfo") == null) {
+            ServiceManager.addService("iphonesubinfo", this);
+        }
+    }
+
+    public PhoneSubInfoProxy(Phone[] phone) {
+        mPhone = phone;
         if(ServiceManager.getService("iphonesubinfo") == null) {
             ServiceManager.addService("iphonesubinfo", this);
         }
@@ -39,56 +48,120 @@ public class PhoneSubInfoProxy extends IPhoneSubInfo.Stub {
     }
 
     public String getDeviceId() {
-        return mPhoneSubInfo.getDeviceId();
+        return getDeviceIdOnSubscription(getDefaultSubscription());
+    }
+
+    public String getDeviceIdOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getDeviceId();
     }
 
     public String getDeviceSvn() {
-        return mPhoneSubInfo.getDeviceSvn();
+        return getDeviceSvnOnSubscription(getDefaultSubscription());
+    }
+
+    public String getDeviceSvnOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getDeviceSvn();
     }
 
     /**
      * Retrieves the unique sbuscriber ID, e.g., IMSI for GSM phones.
      */
     public String getSubscriberId() {
-        return mPhoneSubInfo.getSubscriberId();
+        return getSubscriberIdOnSubscription(getDefaultSubscription());
+    }
+
+    /**
+     * Retrieves the unique sbuscriber ID, e.g., IMSI for GSM phones
+     * for a subscription
+     */
+    public String getSubscriberIdOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getSubscriberId();
     }
 
     /**
      * Retrieves the serial number of the ICC, if applicable.
      */
     public String getIccSerialNumber() {
-        return mPhoneSubInfo.getIccSerialNumber();
+        return getIccSerialNumberOnSubscription(getDefaultSubscription());
+    }
+
+    /**
+     * Retrieves the serial number of the ICC, if applicable
+     * for a subscription.
+     */
+    public String getIccSerialNumberOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getIccSerialNumber();
     }
 
     /**
      * Retrieves the phone number string for line 1.
      */
     public String getLine1Number() {
-        return mPhoneSubInfo.getLine1Number();
+        return getLine1NumberOnSubscription(getDefaultSubscription());
+    }
+
+    /**
+     * Retrieves the phone number string for line 1
+     * for a subscription.
+     */
+    public String getLine1NumberOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getLine1Number();
     }
 
     /**
      * Retrieves the alpha identifier for line 1.
      */
     public String getLine1AlphaTag() {
-        return mPhoneSubInfo.getLine1AlphaTag();
+        return getLine1AlphaTagOnSubscription(getDefaultSubscription());
+    }
+
+    /**
+     * Retrieves the alpha identifier for line 1
+     * for a subscription.
+     */
+    public String getLine1AlphaTagOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getLine1AlphaTag();
     }
 
     /**
      * Retrieves the voice mail number.
      */
     public String getVoiceMailNumber() {
-        return mPhoneSubInfo.getVoiceMailNumber();
+        return getVoiceMailNumberOnSubscription(getDefaultSubscription());
+    }
+
+    /**
+     * Retrieves the voice mail number
+     * for a subscription.
+     */
+    public String getVoiceMailNumberOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getVoiceMailNumber();
     }
 
     /**
      * Retrieves the alpha identifier associated with the voice mail number.
      */
     public String getVoiceMailAlphaTag() {
-        return mPhoneSubInfo.getVoiceMailAlphaTag();
+        return getVoiceMailAlphaTagOnSubscription(getDefaultSubscription());
+    }
+
+    /**
+     * Retrieves the alpha identifier associated with the voice mail number
+     * for a subscription.
+     */
+    public String getVoiceMailAlphaTagOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getVoiceMailAlphaTag();
     }
 
     protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         mPhoneSubInfo.dump(fd, pw, args);
+    }
+
+    private PhoneSubInfo getPhoneSubInfo(int subscription) {
+        return mPhone[subscription].getPhoneSubInfo();
+    }
+
+    private int getDefaultSubscription() {
+        return PhoneFactory.getDefaultSubscription();
     }
 }

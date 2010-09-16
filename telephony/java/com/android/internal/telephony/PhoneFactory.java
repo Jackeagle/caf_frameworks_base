@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +22,13 @@ import android.net.LocalServerSocket;
 import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
+import android.telephony.TelephonyManager;
 
 import com.android.internal.telephony.cdma.CDMAPhone;
 import com.android.internal.telephony.gsm.GSMPhone;
+import com.android.internal.telephony.UiccManager;
+import com.android.internal.telephony.ProxyManager;
+import android.provider.Settings.SettingNotFoundException;
 
 /**
  * {@hide}
@@ -34,20 +39,31 @@ public class PhoneFactory {
     static final int SOCKET_OPEN_MAX_RETRY = 3;
     //***** Class Variables
 
-    static private Phone sProxyPhone = null;
-    static private CommandsInterface sCommandsInterface = null;
+    static private Phone sProxyPhone[] = null;
+    static private CommandsInterface sCommandsInterface[] = null;
+    static private UiccManager mUiccManager = null;
+    static private ProxyManager mProxyManager = null;
 
     static private boolean sMadeDefaults = false;
     static private PhoneNotifier sPhoneNotifier;
     static private Looper sLooper;
     static private Context sContext;
+    static private int numPhones = 1;
+    static private int defaultSubscription = 0;
+    static private int voiceSubscription = 0;
+    static private int dataSubscription = 0;
+    static private int smsSubscription = 0;
+
+
+    static final int NORMAL_PHONE = 1;
+    static final int DSDS_PHONE = 2;
+
 
     static final int preferredNetworkMode = RILConstants.PREFERRED_NETWORK_MODE;
 
     static final int preferredCdmaSubscription = RILConstants.PREFERRED_CDMA_SUBSCRIPTION;
 
     //***** Class Methods
-
     public static void makeDefaultPhones(Context context) {
         makeDefaultPhone(context);
     }
@@ -57,6 +73,7 @@ public class PhoneFactory {
      * instances
      */
     public static void makeDefaultPhone(Context context) {
+        Log.i(LOG_TAG, "In makeDefaultPhone function");
         synchronized(Phone.class) {
             if (!sMadeDefaults) {
                 sLooper = Looper.myLooper();
@@ -91,37 +108,52 @@ public class PhoneFactory {
                         }
                     }
                 }
+                /* In case of DSDS two instances of PhoneProxy,RIL are created.
+                   where as in non-DSDS only instance. isDsdsEnabled() function checks
+                   whether it is DSDS or non-DSDS */
 
+                //DSDS num of phone instance2, non-DSDS it is 1
+                numPhones = TelephonyManager.getPhoneCount();
                 sPhoneNotifier = new DefaultPhoneNotifier();
-
+                /* TODO DSDS currently one setting is used to create two default phone objects*/
                 //Get preferredNetworkMode from Settings.System
                 int networkMode = Settings.Secure.getInt(context.getContentResolver(),
-                        Settings.Secure.PREFERRED_NETWORK_MODE, preferredNetworkMode);
+                    Settings.Secure.PREFERRED_NETWORK_MODE, preferredNetworkMode);
                 Log.i(LOG_TAG, "Network Mode set to " + Integer.toString(networkMode));
 
                 //Get preferredNetworkMode from Settings.System
                 int cdmaSubscription = Settings.Secure.getInt(context.getContentResolver(),
-                        Settings.Secure.PREFERRED_CDMA_SUBSCRIPTION, preferredCdmaSubscription);
+                    Settings.Secure.PREFERRED_CDMA_SUBSCRIPTION, preferredCdmaSubscription);
                 Log.i(LOG_TAG, "Cdma Subscription set to " + Integer.toString(cdmaSubscription));
+                sProxyPhone = new PhoneProxy[numPhones];
+                sCommandsInterface = new RIL[numPhones];
 
-                //reads the system properties and makes commandsinterface
-                sCommandsInterface = new RIL(context, networkMode, cdmaSubscription);
-
-                int phoneType = getPhoneType(networkMode);
-                DataPhone dct = new MMDataConnectionTracker(context, sPhoneNotifier,
-                        sCommandsInterface);
-                if (phoneType == VoicePhone.PHONE_TYPE_GSM) {
-                    sProxyPhone = new PhoneProxy(new GSMPhone(context,
-                            sCommandsInterface, sPhoneNotifier), dct);
-                    Log.i(LOG_TAG, "Creating GSMPhone");
-                } else if (phoneType == VoicePhone.PHONE_TYPE_CDMA) {
-                    sProxyPhone = new PhoneProxy(new CDMAPhone(context,
-                            sCommandsInterface, sPhoneNotifier), dct);
-                    Log.i(LOG_TAG, "Creating CDMAPhone");
+                for(int i = 0; i < numPhones; i++) {
+                    //reads the system properties and makes commandsinterface
+                    sCommandsInterface[i] = new RIL(context, networkMode, cdmaSubscription);
                 }
 
+                mUiccManager = UiccManager.getInstance(context, sCommandsInterface);
+                for( int i = 0; i < numPhones; i++) {
+                    int phoneType = getPhoneType(networkMode);
+                    Log.i(LOG_TAG, "get Phone Type:"+ phoneType);
+                    DataPhone dct = new MMDataConnectionTracker(context, sPhoneNotifier,
+                                                                    sCommandsInterface[i]);
+
+                    if (phoneType == VoicePhone.PHONE_TYPE_GSM) {
+                        sProxyPhone[i] = new PhoneProxy(new GSMPhone(context,
+                                                             sCommandsInterface[i], sPhoneNotifier), dct);
+                        Log.i(LOG_TAG, "Creating GSMPhone");
+                    } else if (phoneType == VoicePhone.PHONE_TYPE_CDMA) {
+                        sProxyPhone[i] = new PhoneProxy(new CDMAPhone(context,
+                                     sCommandsInterface[i], sPhoneNotifier), dct);
+                        Log.i(LOG_TAG, "Creating CDMAPhone");
+                    }
+                }
                 sMadeDefaults = true;
+                mProxyManager = ProxyManager.getInstance(context, sProxyPhone, mUiccManager, sCommandsInterface);
             }
+
         }
     }
 
@@ -156,12 +188,41 @@ public class PhoneFactory {
         }
     }
 
+    /* Sets the default subscription. If only one phone instance is active that
+     * that subscription is set as default subscription. If both phone isntances
+     * are active the first instance "0" is set as default subscription
+     */
+    public static void setDefaultSubscription(int subscription) {
+       defaultSubscription = subscription;
+    }
+
     public static Phone getDefaultPhone() {
         if (sLooper != Looper.myLooper()) {
             throw new RuntimeException(
                 "PhoneFactory.getDefaultPhone must be called from Looper thread");
         }
+        if (!sMadeDefaults) {
+            throw new IllegalStateException("Default phones haven't been made yet!");
+        }
+       return sProxyPhone[defaultSubscription];
+    }
 
+    public static Phone getPhone(int subscription) {
+        if (sLooper != Looper.myLooper()) {
+            throw new RuntimeException(
+                "PhoneFactory.getPhone must be called from Looper thread");
+        }
+        if (!sMadeDefaults) {
+            throw new IllegalStateException("Default phones haven't been made yet!");
+        }
+       return sProxyPhone[subscription];
+    }
+
+    public static Phone[] getPhones() {
+        if (sLooper != Looper.myLooper()) {
+            throw new RuntimeException(
+                "PhoneFactory.getDefaultPhone must be called from Looper thread");
+        }
         if (!sMadeDefaults) {
             throw new IllegalStateException("Default phones haven't been made yet!");
         }
@@ -170,15 +231,90 @@ public class PhoneFactory {
 
     public static VoicePhone getCdmaPhone() {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            VoicePhone phone = new CDMAPhone(sContext, sCommandsInterface, sPhoneNotifier);
+            VoicePhone phone = new CDMAPhone(sContext, sCommandsInterface[0], sPhoneNotifier);
+            return phone;
+        }
+    }
+
+    /* Gets CDMA phone attached with proper CommandInterface */
+    public static VoicePhone getCdmaPhone(int subscription) {
+        synchronized(PhoneProxy.lockForRadioTechnologyChange) {
+            VoicePhone phone;
+            phone = new CDMAPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier);
             return phone;
         }
     }
 
     public static VoicePhone getGsmPhone() {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            VoicePhone phone = new GSMPhone(sContext, sCommandsInterface, sPhoneNotifier);
+            VoicePhone phone = new GSMPhone(sContext, sCommandsInterface[0], sPhoneNotifier);
             return phone;
         }
+    }
+
+    /* Gets GSM phone attached with proper CommandInterface */
+    public static VoicePhone getGsmPhone(int subscription) {
+        Log.d(LOG_TAG,"getGsmPhone on sub :" + subscription);
+        synchronized(PhoneProxy.lockForRadioTechnologyChange) {
+            VoicePhone phone = new GSMPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier);
+            return phone;
+        }
+    }
+
+    /* Gets the default subscription */
+    public static int getDefaultSubscription() {
+        return defaultSubscription;
+    }
+
+     static public void setVoiceSubscription(int subscription) {
+        Log.d(LOG_TAG, "setVoiceSubscription setting subscription to: " + subscription);
+        Settings.System.putInt(sContext.getContentResolver(),Settings.System.DUAL_SIM_VOICE_CALL, subscription);
+        voiceSubscription = subscription;
+        Log.d(LOG_TAG, "setVoiceSubscription voiceSubscription: " + voiceSubscription);
+    }
+
+    static public void setDataSubscription(int subscription) {
+        Settings.System.putInt(sContext.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL, subscription);
+        dataSubscription = subscription;
+        Log.d(LOG_TAG, "-----: setDataSubscription: " + dataSubscription);
+    }
+
+    static public void setSMSSubscription(int subscription) {
+        Log.d(LOG_TAG, "setSMSSubscription setting subscription to: " + subscription);
+        Settings.System.putInt(sContext.getContentResolver(),Settings.System.DUAL_SIM_SMS, subscription);
+        smsSubscription = subscription;
+        Log.d(LOG_TAG, "setSMSSubscription set subscription value: " + smsSubscription);
+    }
+
+    /* Gets User preferred Voice subscription setting*/
+    public static int getVoiceSubscription(Context context) {
+        try {
+            voiceSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_VOICE_CALL);
+            Log.d(LOG_TAG, "getVoiceSubscription voiceSubscription: " + voiceSubscription);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Settings Exception Reading Dual Sim Voice Call Values", snfe);
+        }
+        return voiceSubscription;
+    }
+
+    /* Gets User preferred Data subscription setting*/
+    public static int getDataSubscription(Context context) {
+        try {
+            dataSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Settings Exception Reading Dual Sim Data Call Values", snfe);
+        }
+        return dataSubscription;
+    }
+
+    /* Gets User preferred SMS subscription setting*/
+    public static int getSMSSubscription(Context context) {
+        try {
+            smsSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_SMS);
+            Log.d(LOG_TAG, "getSMSSubscription 1: " + smsSubscription);
+            } catch (SettingNotFoundException snfe) {
+                Log.e(LOG_TAG, "Settings Exception Reading Dual Sim SMS Values", snfe);
+            }
+        return smsSubscription;
     }
 }

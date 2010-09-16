@@ -34,7 +34,10 @@ import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.UiccConstants.PersoSubState;
 import com.android.internal.telephony.UiccManager.AppFamily;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 import static com.android.internal.telephony.VoicePhone.CDMA_SUBSCRIPTION_NV;
+
+import android.telephony.TelephonyManager;
 
 /*
  * The Phone App UI and the external world assumes that there is only one icc card,
@@ -71,6 +74,7 @@ public class IccCardProxy extends Handler implements IccCard {
     private UiccCard mUiccCard = null;
     private UiccCardApplication mApplication = null;
     private UiccApplicationRecords mAppRecords = null;
+    private Subscription mSubscriptionData = null;
 
     private boolean mFirstRun = true;
     private boolean mRadioOn = false;
@@ -207,9 +211,25 @@ public class IccCardProxy extends Handler implements IccCard {
         }
     }
 
-    void updateIccAvailability() {
+    /* Sets subscription information */
+    void setSubscriptionInfo(Subscription subscription) {
+        mSubscriptionData = subscription;
+    }
 
-        UiccCardApplication newApplication = mUiccManager.getCurrentApplication(mCurrentAppType);
+    void updateIccAvailability() {
+        UiccCardApplication newApplication = null;
+
+        if (TelephonyManager.isDsdsEnabled()) {
+            /* In DSDS the current active application is identified by slot,app_index */
+            if (mSubscriptionData != null) {
+                newApplication = mUiccManager.getApplication(mSubscriptionData.slotId, mSubscriptionData.subIndex);
+            }
+            else {
+                return;
+            }
+        } else {
+            newApplication = mUiccManager.getCurrentApplication(mCurrentAppType);
+        }
 
         if (mFirstRun) {
             if (newApplication == null) {
@@ -286,8 +306,12 @@ public class IccCardProxy extends Handler implements IccCard {
         intent.putExtra(VoicePhone.PHONE_NAME_KEY, "Phone");
         intent.putExtra(INTENT_KEY_ICC_STATE, value);
         intent.putExtra(INTENT_KEY_LOCKED_REASON, reason);
+        if ((TelephonyManager.isDsdsEnabled()) && (mSubscriptionData != null)) {
+            intent.putExtra(INTENT_KEY_SUBSCRIPTION, mSubscriptionData.subNum);
+            Log.d(LOG_TAG, "sub info " + mSubscriptionData.subNum);
+        }
         Log.e(LOG_TAG, "Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
-                + " reason " + reason);
+            + " reason " + reason);
         ActivityManagerNative.broadcastStickyIntent(intent, READ_PHONE_STATE);
     }
 

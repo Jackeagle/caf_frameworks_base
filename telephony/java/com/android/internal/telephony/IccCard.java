@@ -27,6 +27,8 @@ public interface IccCard {
 
     /* The extra data for broacasting intent INTENT_ICC_STATE_CHANGE */
     static public final String INTENT_KEY_ICC_STATE = "ss";
+    /* The extra data for broacasting intent INTENT_ICC_STATE_CHANGE holding subscription info */
+    static public final String INTENT_KEY_SUBSCRIPTION = "phone_subscription";
     /* UNUSED means the ICC state not used (eg, nv ready) */
     static public final String INTENT_VALUE_ICC_UNUSED = "UNUSED";
     /* NOT_READY means the ICC interface is not ready (eg, radio is off or powering on) */

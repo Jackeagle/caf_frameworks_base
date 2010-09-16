@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import android.telephony.CellLocation;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -66,10 +67,12 @@ import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.PhoneNotifier;
 import com.android.internal.telephony.PhoneProxy;
 import com.android.internal.telephony.PhoneSubInfo;
+import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.IccVmNotSupportedException;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -94,6 +97,9 @@ public class GSMPhone extends PhoneBase {
     public static final String VM_NUMBER = "vm_number_key";
     // Key used to read/write the SIM IMSI used for storing the voice mail
     public static final String VM_SIM_IMSI = "vm_sim_imsi_key";
+
+    Subscription subscriptionData; //to store subscription information
+    int subscription = 0;
 
     // Instance Variables
     GsmCallTracker mCT;
@@ -267,6 +273,44 @@ public class GSMPhone extends PhoneBase {
 
     public int getPhoneType() {
         return VoicePhone.PHONE_TYPE_GSM;
+    }
+
+    //Sets Subscription information in the Phone Object
+    public void setSubscriptionInfo(Subscription subData) {
+        subscriptionData = subData;
+        setSubscription(subscriptionData.subNum);
+        Log.d(LOG_TAG, "slotId:"+subscriptionData.slotId +"app_id:"+subscriptionData.subIndex+"subNum:"+subscriptionData.subNum);
+        getRecords();
+        mSST.getRecords();
+    }
+
+    //Gets Subscription information in the Phone Object
+    public Subscription getSubscriptionInfo() {
+        return subscriptionData;
+    }
+
+    //Gets Application records and register for record events
+    public void getRecords() {
+        m3gppApplication = mUiccManager.getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+        if(m3gppApplication != null) {
+            mSimCard = m3gppApplication.getCard();
+            //gets records from the active suscription application
+            mSIMRecords = (SIMRecords) m3gppApplication.getApplicationRecords();
+            //set the subscription info in SIMRecords.
+            mSIMRecords.setSubscription(subscriptionData.subNum);
+            //Register for Record events once records are available.
+            registerForSimRecordEvents();
+        }
+    }
+
+    //sets subscription SUB0("0") or SUB1("1)
+    public void setSubscription(int subNum) {
+        subscription = subNum;
+    }
+
+    //gets subscription SUB0("0") or SUB1("1")
+    public int getSubscription() {
+        return subscription;
     }
 
     public SignalStrength getSignalStrength() {
@@ -628,7 +672,7 @@ public class GSMPhone extends PhoneBase {
         return result;
     }
 
-    boolean isInCall() {
+    public boolean isInCall() {
         GsmCall.State foregroundCallState = getForegroundCall().getState();
         GsmCall.State backgroundCallState = getBackgroundCall().getState();
         GsmCall.State ringingCallState = getRingingCall().getState();
@@ -1338,9 +1382,19 @@ public class GSMPhone extends PhoneBase {
     }
 
     void updateIccAvailability() {
-
-        UiccCardApplication new3gppApplication = mUiccManager
+        UiccCardApplication new3gppApplication = null;
+        if (TelephonyManager.isDsdsEnabled()) {
+            //DSDS, gets current active subscription application
+            if(subscriptionData != null) {
+                new3gppApplication = mUiccManager
+                    .getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+            } else {
+                return;
+            }
+        } else {
+            new3gppApplication = mUiccManager
                 .getCurrentApplication(AppFamily.APP_FAM_3GPP);
+        }
 
         if (m3gppApplication != new3gppApplication) {
             if (m3gppApplication != null) {

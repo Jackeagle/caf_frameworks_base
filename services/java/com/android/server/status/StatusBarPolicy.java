@@ -66,6 +66,7 @@ import com.android.internal.app.IBatteryStats;
 import com.android.internal.location.GpsLocationProvider;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.telephony.cdma.TtyIntent;
 import com.android.server.am.BatteryStatsService;
@@ -118,10 +119,10 @@ public class StatusBarPolicy {
 
     // phone
     private TelephonyManager mPhone;
-    private IBinder mPhoneIcon;
+    private IBinder[] mPhoneIcon;
 
     //***** Signal strength icons
-    private IconData mPhoneData;
+    private IconData[] mPhoneData;
     //GSM/UMTS
     private static final int[] sSignalImages = new int[] {
         com.android.internal.R.drawable.stat_sys_signal_0,
@@ -284,12 +285,13 @@ public class StatusBarPolicy {
 
     // Assume it's all good unless we hear otherwise.  We don't always seem
     // to get broadcasts that it *is* there.
-    IccCard.State mSimState = IccCard.State.READY;
+    IccCard.State[] mSimState;
     int mPhoneState = TelephonyManager.CALL_STATE_IDLE;
     int mDataState = TelephonyManager.DATA_DISCONNECTED;
     int mDataActivity = TelephonyManager.DATA_ACTIVITY_NONE;
-    ServiceState mServiceState;
-    SignalStrength mSignalStrength;
+    ServiceState[] mServiceState;
+    SignalStrength[] mSignalStrength;
+    private PhoneStateListener[] mPhoneStateListener;
 
     // data connection
     private IBinder mDataIcon;
@@ -418,7 +420,6 @@ public class StatusBarPolicy {
     private StatusBarPolicy(Context context, StatusBarService service) {
         mContext = context;
         mService = service;
-        mSignalStrength = new SignalStrength();
         mBatteryStats = BatteryStatsService.getService();
 
         // clock
@@ -437,20 +438,41 @@ public class StatusBarPolicy {
                 null, com.android.internal.R.drawable.stat_sys_battery_unknown, 0, 0);
         mBatteryIcon = service.addIcon(mBatteryData, null);
 
-        // phone_signal
-        mPhone = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
-        mPhoneData = IconData.makeIcon("phone_signal",
-                null, com.android.internal.R.drawable.stat_sys_signal_null, 0, 0);
-        mPhoneIcon = service.addIcon(mPhoneData, null);
+        int numPhones = TelephonyManager.getPhoneCount();
+        Slog.d(TAG, "num phones =" + numPhones);
+        mSignalStrength = new SignalStrength[numPhones];
+        mServiceState = new ServiceState[numPhones];
+        mSimState = new IccCard.State[numPhones];
+        mPhoneIcon = new IBinder[numPhones];
+        mPhoneData = new IconData[numPhones];
+        mPhoneStateListener = new PhoneStateListener[numPhones];
 
-        // register for phone state notifications.
-        ((TelephonyManager)mContext.getSystemService(Context.TELEPHONY_SERVICE))
-                .listen(mPhoneStateListener,
-                          PhoneStateListener.LISTEN_SERVICE_STATE
-                        | PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
-                        | PhoneStateListener.LISTEN_CALL_STATE
-                        | PhoneStateListener.LISTEN_DATA_CONNECTION_STATE
-                        | PhoneStateListener.LISTEN_DATA_ACTIVITY);
+        mPhone = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
+        // phone_signal for subscription 1
+        mPhoneData[0] = IconData.makeIcon("phone_signal",
+                null, com.android.internal.R.drawable.stat_sys_signal_null, 0, 0);
+
+        if (TelephonyManager.isDsdsEnabled()) {
+            // phone_signal for subscription 2
+            mPhoneData[1] = IconData.makeIcon("phone_signal_second_sub",
+                    null, com.android.internal.R.drawable.stat_sys_signal_null, 0, 0);
+        }
+
+        for (int i=0; i < numPhones; i++) {
+            mSignalStrength[i] = new SignalStrength();
+            mServiceState[i] = new ServiceState();
+            mSimState[i] = IccCard.State.READY;
+            mPhoneIcon[i] = service.addIcon(mPhoneData[i], null);
+            mPhoneStateListener[i] = getPhoneStateListener(i);
+            // register for phone state notifications.
+            ((TelephonyManager)mContext.getSystemService(Context.TELEPHONY_SERVICE))
+                    .listen(mPhoneStateListener[i],
+                              PhoneStateListener.LISTEN_SERVICE_STATE
+                            | PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
+                            | PhoneStateListener.LISTEN_CALL_STATE
+                            | PhoneStateListener.LISTEN_DATA_CONNECTION_STATE
+                            | PhoneStateListener.LISTEN_DATA_ACTIVITY);
+        }
 
         // data_connection
         mDataData = IconData.makeIcon("data_connection",
@@ -890,97 +912,126 @@ public class StatusBarPolicy {
         }
     }
 
-    private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
-        @Override
-        public void onSignalStrengthsChanged(SignalStrength signalStrength) {
-            mSignalStrength = signalStrength;
-            updateSignalStrength();
-        }
-
-        @Override
-        public void onServiceStateChanged(ServiceState state) {
-            mServiceState = state;
-            updateSignalStrength();
-            updateCdmaRoamingIcon();
-            updateDataIcon();
-        }
-
-        @Override
-        public void onCallStateChanged(int state, String incomingNumber) {
-            updateCallState(state);
-            // In cdma, if a voice call is made, RSSI should switch to 1x.
-            updateSignalStrength();
-        }
-
-        @Override
-        public void onDataConnectionStateChanged(int state, int networkType) {
-            mDataState = state;
-            updateDataNetType(networkType);
-            updateDataIcon();
-        }
-
-        @Override
-        public void onDataActivity(int direction) {
-            mDataActivity = direction;
-            updateDataIcon();
-        }
-    };
-
-    private final void updateSimState(Intent intent) {
-        String stateExtra = intent.getStringExtra(IccCard.INTENT_KEY_ICC_STATE);
-        if (IccCard.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
-            mSimState = IccCard.State.ABSENT;
-        }
-        else if (IccCard.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
-            mSimState = IccCard.State.CARD_IO_ERROR;
-        }
-        else if (IccCard.INTENT_VALUE_ICC_READY.equals(stateExtra)) {
-            mSimState = IccCard.State.READY;
-        }
-        else if (IccCard.INTENT_VALUE_ICC_LOCKED.equals(stateExtra)) {
-            final String lockedReason = intent.getStringExtra(IccCard.INTENT_KEY_LOCKED_REASON);
-            if (IccCard.INTENT_VALUE_LOCKED_ON_PIN.equals(lockedReason)) {
-                mSimState = IccCard.State.PIN_REQUIRED;
-            } else if (IccCard.INTENT_VALUE_LOCKED_ON_PUK.equals(lockedReason)) {
-                mSimState = IccCard.State.PUK_REQUIRED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_NETWORK.equals(lockedReason)) {
-                mSimState = IccCard.State.NETWORK_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_NETWORK_SUBSET.equals(lockedReason)) {
-                mSimState = IccCard.State.SIM_NETWORK_SUBSET_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_CORPORATE.equals(lockedReason)) {
-                mSimState = IccCard.State.SIM_CORPORATE_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_SERVICE_PROVIDER.equals(lockedReason)) {
-                mSimState = IccCard.State.SIM_SERVICE_PROVIDER_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_SIM.equals(lockedReason)) {
-                mSimState = IccCard.State.SIM_SIM_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_NETWORK1.equals(lockedReason)) {
-                mSimState = IccCard.State.RUIM_NETWORK1_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_NETWORK2.equals(lockedReason)) {
-                mSimState = IccCard.State.RUIM_NETWORK2_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_HRPD.equals(lockedReason)) {
-                mSimState = IccCard.State.RUIM_HRPD_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_CORPORATE.equals(lockedReason)) {
-                mSimState = IccCard.State.RUIM_CORPORATE_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_SERVICE_PROVIDER.equals(lockedReason)) {
-                mSimState = IccCard.State.RUIM_SERVICE_PROVIDER_LOCKED;
-            } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_RUIM.equals(lockedReason)) {
-                mSimState = IccCard.State.RUIM_RUIM_LOCKED;
-            } else {
-                mSimState = IccCard.State.UNKNOWN;
+    private PhoneStateListener getPhoneStateListener(int subscription) {
+        PhoneStateListener phoneStateListener = new PhoneStateListener(subscription) {
+            @Override
+            public void onSignalStrengthsChanged(SignalStrength signalStrength) {
+                Slog.e(TAG, "onSignalStrengthsChangedreceived on subscription :" + mSubscription);
+                mSignalStrength[mSubscription] = signalStrength;
+                updateSignalStrength(mSubscription);
             }
-        } else {
-            mSimState = IccCard.State.UNKNOWN;
-        }
-        updateDataIcon();
+
+
+            @Override
+            public void onServiceStateChanged(ServiceState state) {
+                Slog.d(TAG, "onServiceStateChanged Received on subscription :" + mSubscription);
+                mServiceState[mSubscription] = state;
+                updateSignalStrength(mSubscription);
+                updateCdmaRoamingIcon(mSubscription);
+                updateDataIcon(mSubscription);
+            }
+
+            @Override
+            public void onCallStateChanged(int state, String incomingNumber) {
+                Slog.e(TAG, "onCallStateChanged Received on subscription :" + mSubscription);
+                updateCallState(state);
+                // In cdma, if a voice call is made, RSSI should switch to 1x.
+                updateSignalStrength(mSubscription);
+            }
+
+            @Override
+            public void onDataConnectionStateChanged(int state, int networkType) {
+                Slog.d(TAG, "StatusBarPolicy onDataConnectionStateChanged on subscription : " + mSubscription);
+                mDataState = state;
+                updateDataNetType(networkType);
+                int dds = Settings.System.getInt(mContext.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL, -1);
+                updateDataIcon(dds);
+            }
+
+            @Override
+            public void onDataActivity(int direction) {
+                mDataActivity = direction;
+                updateDataIcon(mSubscription);
+            }
+        };
+        return phoneStateListener;
     }
 
-    private boolean isDataGsm() {
-        if (mServiceState == null) {
+    private final void updateSimState(Intent intent) {
+        IccCard.State simState;
+        String stateExtra = intent.getStringExtra(IccCard.INTENT_KEY_ICC_STATE);
+        // Obtain the subscription info from intent.
+        int sub = intent.getIntExtra(IccCard.INTENT_KEY_SUBSCRIPTION, -1);
+        Slog.d(TAG, "updateSimState for subscription :" + sub);
+        if (sub >= 0) {
+            if (IccCard.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
+                simState = IccCard.State.ABSENT;
+            }
+            else if (IccCard.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
+                simState = IccCard.State.CARD_IO_ERROR;
+            }
+            else if (IccCard.INTENT_VALUE_ICC_READY.equals(stateExtra)) {
+                simState = IccCard.State.READY;
+            }
+            else if (IccCard.INTENT_VALUE_ICC_LOCKED.equals(stateExtra)) {
+                final String lockedReason = intent.getStringExtra(IccCard.INTENT_KEY_LOCKED_REASON);
+                if (IccCard.INTENT_VALUE_LOCKED_ON_PIN.equals(lockedReason)) {
+                    simState = IccCard.State.PIN_REQUIRED;
+                } else if (IccCard.INTENT_VALUE_LOCKED_ON_PUK.equals(lockedReason)) {
+                    simState = IccCard.State.PUK_REQUIRED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_NETWORK.equals(lockedReason)) {
+                    simState = IccCard.State.NETWORK_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_NETWORK_SUBSET.equals(lockedReason)) {
+                    simState = IccCard.State.SIM_NETWORK_SUBSET_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_CORPORATE.equals(lockedReason)) {
+                    simState = IccCard.State.SIM_CORPORATE_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_SERVICE_PROVIDER.equals(lockedReason)) {
+                    simState = IccCard.State.SIM_SERVICE_PROVIDER_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_SIM.equals(lockedReason)) {
+                    simState = IccCard.State.SIM_SIM_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_NETWORK1.equals(lockedReason)) {
+                    simState = IccCard.State.RUIM_NETWORK1_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_NETWORK2.equals(lockedReason)) {
+                    simState = IccCard.State.RUIM_NETWORK2_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_HRPD.equals(lockedReason)) {
+                    simState = IccCard.State.RUIM_HRPD_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_CORPORATE.equals(lockedReason)) {
+                    simState = IccCard.State.RUIM_CORPORATE_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_SERVICE_PROVIDER.equals(lockedReason)) {
+                    simState = IccCard.State.RUIM_SERVICE_PROVIDER_LOCKED;
+                } else if(IccCard.INTENT_VALUE_LOCKED_RUIM_RUIM.equals(lockedReason)) {
+                    simState = IccCard.State.RUIM_RUIM_LOCKED;
+                } else {
+                    simState = IccCard.State.UNKNOWN;
+                }
+            } else {
+                simState = IccCard.State.UNKNOWN;
+            }
+            mSimState[sub] = simState;
+            updateDataIcon(sub);
+        }
+    }
+
+    // Return the service state corresonding to the "subscription".
+    private ServiceState getServiceStateForSubscription(int subscription) {
+        ServiceState ss;
+        if (subscription >= 0) {
+            ss = mServiceState[subscription];
+        } else {
+            Slog.e(TAG, "Invalid subscription :" + subscription);
+            ss = null;
+        }
+        return ss;
+    }
+
+    private boolean isDataGsm(int subscription) {
+        ServiceState ss = getServiceStateForSubscription(subscription);
+        if (ss == null) {
             Slog.e(TAG, "Service state not updated");
             return false;
         }
         /*find out radio technology by looking at service state */
-        switch(mServiceState.getRadioTechnology()){
+        switch(ss.getRadioTechnology()){
             case ServiceState.RADIO_TECHNOLOGY_GPRS:
             case ServiceState.RADIO_TECHNOLOGY_EDGE:
             case ServiceState.RADIO_TECHNOLOGY_UMTS:
@@ -994,13 +1045,14 @@ public class StatusBarPolicy {
         }
     }
 
-    private boolean isDataCdma() {
-        if (mServiceState == null) {
+    private boolean isDataCdma(int subscription) {
+        ServiceState ss = getServiceStateForSubscription(subscription);
+        if (ss == null) {
             Slog.e(TAG, "Service state not updated");
             return false;
         }
         /*find out radio technology by looking at service state */
-        switch(mServiceState.getRadioTechnology()){
+        switch(ss.getRadioTechnology()){
             case ServiceState.RADIO_TECHNOLOGY_IS95A:
             case ServiceState.RADIO_TECHNOLOGY_IS95B:
             case ServiceState.RADIO_TECHNOLOGY_1xRTT:
@@ -1010,13 +1062,14 @@ public class StatusBarPolicy {
         }
     }
 
-    private boolean isDataEvdo() {
-        if (mServiceState == null) {
+    private boolean isDataEvdo(int subscription) {
+        ServiceState ss = getServiceStateForSubscription(subscription);
+        if (ss == null) {
             Slog.e(TAG, "Service state not updated");
             return false;
         }
         /*find out radio technology by looking at service state */
-        switch(mServiceState.getRadioTechnology()){
+        switch(ss.getRadioTechnology()){
             case ServiceState.RADIO_TECHNOLOGY_EVDO_0:
             case ServiceState.RADIO_TECHNOLOGY_EVDO_A:
             case ServiceState.RADIO_TECHNOLOGY_EVDO_B:
@@ -1026,9 +1079,10 @@ public class StatusBarPolicy {
         }
     }
 
-    private boolean hasService() {
-        if (mServiceState != null) {
-            switch (mServiceState.getState()) {
+    private boolean hasService(int subscription) {
+        ServiceState ss = getServiceStateForSubscription(subscription);
+        if (ss != null) {
+            switch (ss.getState()) {
                 case ServiceState.STATE_OUT_OF_SERVICE:
                 case ServiceState.STATE_POWER_OFF:
                     return false;
@@ -1039,22 +1093,22 @@ public class StatusBarPolicy {
             return false;
         }
     }
-
-    private final void updateSignalStrength() {
+    private final void updateSignalStrength(int subscription) {
         int iconLevel = -1;
         int[] iconList;
 
+        Slog.d(TAG,"updateSignalStrength on subscription :" + subscription);
         // Display signal strength while in "emergency calls only" mode
-        if ((mSignalStrength == null) || (mServiceState == null)
-                || (!hasService() && !mServiceState.isEmergencyOnly())) {
+        if ((mSignalStrength[subscription] == null) || (mServiceState[subscription] == null) ||
+           (!hasService(subscription) && !mServiceState[subscription].isEmergencyOnly())){
             //Slog.d(TAG, "updateSignalStrength: no service");
             if (Settings.System.getInt(mContext.getContentResolver(),
                     Settings.System.AIRPLANE_MODE_ON, 0) == 1) {
-                mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_flightmode;
+                mPhoneData[subscription].iconId = com.android.internal.R.drawable.stat_sys_signal_flightmode;
             } else {
-                mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_null;
+                mPhoneData[subscription].iconId = com.android.internal.R.drawable.stat_sys_signal_null;
             }
-            mService.updateIcon(mPhoneIcon, mPhoneData, null);
+            mService.updateIcon(mPhoneIcon[subscription], mPhoneData[subscription], null);
             return;
         }
 
@@ -1063,18 +1117,18 @@ public class StatusBarPolicy {
          * 1.phone type (voice and/or/no data), 2. call state( idle/data or in
          * voice call ), 3. radio tech
          */
-        iconLevel = getIconLevel();
+        iconLevel = getIconLevel(subscription);
 
         if (iconLevel == -1) {
-            mPhoneData.iconId = com.android.internal.R.drawable.stat_sys_signal_null;
+            mPhoneData[subscription].iconId = com.android.internal.R.drawable.stat_sys_signal_null;
         } else {
             /*
              * Determine which icon should be displayed. Assumption - for
              * roaming ( voice and/or/no data) the roaming icon corresponding to
              * voice technology will be displayed
              */
-            if (mServiceState.getRoaming()) {
-                if (mSignalStrength.isGsm()) {
+            if (mServiceState[subscription].getRoaming()) {
+                if (mSignalStrength[subscription].isGsm()) {
                     iconList = sSignalImages_r;
                 } else {
                     /* roaming on CDMA, CDMA roaming indicator will be on */
@@ -1083,13 +1137,13 @@ public class StatusBarPolicy {
             } else {
                 iconList = sSignalImages;
             }
-            mPhoneData.iconId = iconList[iconLevel];
+            mPhoneData[subscription].iconId = iconList[iconLevel];
         }
-        mService.updateIcon(mPhoneIcon, mPhoneData, null);
+        mService.updateIcon(mPhoneIcon[subscription], mPhoneData[subscription], null);
         return;
     }
 
-    private int getIconLevel() {
+    private int getIconLevel(int subscription) {
         int iconLevel = -1;
         if (mPhoneState != TelephonyManager.CALL_STATE_IDLE) {
             /*
@@ -1097,10 +1151,10 @@ public class StatusBarPolicy {
              * voice tech. For GSM - isGSM flag is on. For CDMA 1x -isGSM flag
              * is off
              */
-            if (mSignalStrength.isGsm()) { // Gsm voice call
-                iconLevel = getGsmLevel();
+            if (mSignalStrength[subscription].isGsm()) { // Gsm voice call
+                iconLevel = getGsmLevel(mSignalStrength[subscription]);
             } else { // cdma voice call
-                iconLevel = getCdmaLevel();
+                iconLevel = getCdmaLevel(mSignalStrength[subscription]);
             }
         } else {
             /*
@@ -1108,25 +1162,25 @@ public class StatusBarPolicy {
              * looking at service state if data radio tech is not available ,
              * display voice radio signal by looking at signal strength
              */
-            if (isDataGsm()) {
+            if (isDataGsm(subscription)) {
                 /* 3GPP GSM data tech */
-                iconLevel = getGsmLevel();
-            } else if (isDataEvdo()) {
+                iconLevel = getGsmLevel(mSignalStrength[subscription]);
+            } else if (isDataEvdo(subscription)) {
                 /* 3GPP2 EVDO data tech */
-                iconLevel = getEvdoLevel();
-            } else if (isDataCdma() || (!mSignalStrength.isGsm())) {
+                iconLevel = getEvdoLevel(mSignalStrength[subscription]);
+            } else if (isDataCdma(subscription) || (!mSignalStrength[subscription].isGsm())) {
                 /* 3GPP2 CDMA data or CDMA voice only */
-                iconLevel = getCdmaLevel();
+                iconLevel = getCdmaLevel(mSignalStrength[subscription]);
             } else {
                 /* 3GPP GSM voice only */
-                iconLevel = getGsmLevel();
+                iconLevel = getGsmLevel(mSignalStrength[subscription]);
             }
         }// end of CALL_STATE_IDLE
         return iconLevel;
     }
 
-    private int getGsmLevel() {
-        int asu = mSignalStrength.getGsmSignalStrength();
+    private int getGsmLevel(SignalStrength sigStrength) {
+        int asu = sigStrength.getGsmSignalStrength();
         int iconLevel = -1;
 
         // ASU ranges from 0 to 31 - TS 27.007 Sec 8.5
@@ -1141,9 +1195,9 @@ public class StatusBarPolicy {
         return iconLevel;
     }
 
-    private int getCdmaLevel() {
-        final int cdmaDbm = mSignalStrength.getCdmaDbm();
-        final int cdmaEcio = mSignalStrength.getCdmaEcio();
+    private int getCdmaLevel(SignalStrength sigStrength) {
+        final int cdmaDbm = sigStrength.getCdmaDbm();
+        final int cdmaEcio = sigStrength.getCdmaEcio();
         int levelDbm = 0;
         int levelEcio = 0;
 
@@ -1163,9 +1217,9 @@ public class StatusBarPolicy {
         return (levelDbm < levelEcio) ? levelDbm : levelEcio;
     }
 
-    private int getEvdoLevel() {
-        int evdoDbm = mSignalStrength.getEvdoDbm();
-        int evdoSnr = mSignalStrength.getEvdoSnr();
+    private int getEvdoLevel(SignalStrength sigStrength) {
+        int evdoDbm = sigStrength.getEvdoDbm();
+        int evdoSnr = sigStrength.getEvdoSnr();
         int levelEvdoDbm = 0;
         int levelEvdoSnr = 0;
 
@@ -1184,7 +1238,9 @@ public class StatusBarPolicy {
         return (levelEvdoDbm < levelEvdoSnr) ? levelEvdoDbm : levelEvdoSnr;
     }
 
+    // TODO Support for two data icons
     private final void updateDataNetType(int net) {
+        Slog.d(TAG, "updateDataNetType network type:" + net);
         switch (net) {
         case TelephonyManager.NETWORK_TYPE_EDGE:
             mDataIconList = sDataNetType_e;
@@ -1222,14 +1278,26 @@ public class StatusBarPolicy {
         }
     }
 
-    private final void updateDataIcon() {
-        int iconId;
+    private final void updateDataIcon(int subscription) {
+        int iconId, dds;
         boolean visible = true;
-
-        if (isDataGsm()) {
+        IccCard.State simState;
+        if (TelephonyManager.isDsdsEnabled()) {
+            dds = Settings.System.getInt(mContext.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL, -1);
+            Slog.d(TAG, "StatusBarPolicy updateDataIcon subscription = " + subscription + "DDS = " + dds);
+            // Update icon only if DDS in properly set and "subscription" matches DDS.
+            if ((dds < 0) || (subscription != dds)) {
+                Slog.d(TAG, "StatusBarPolicy updateDataIcon subscription != DDS");
+                return;
+            }
+        } else {
+            subscription = 0;
+        }
+        simState = mSimState[subscription];
+        if (isDataGsm(subscription)) {
             // GSM case, we have to check also the sim state
-            if (mSimState == IccCard.State.READY || mSimState == IccCard.State.UNKNOWN) {
-                if (hasService() && mDataState == TelephonyManager.DATA_CONNECTED) {
+            if (simState == IccCard.State.READY || simState == IccCard.State.UNKNOWN) {
+                if (hasService(subscription) && mDataState == TelephonyManager.DATA_CONNECTED) {
                     switch (mDataActivity) {
                         case TelephonyManager.DATA_ACTIVITY_IN:
                             iconId = mDataIconList[1];
@@ -1255,7 +1323,7 @@ public class StatusBarPolicy {
             }
         } else {
             // CDMA case, mDataActivity can be also DATA_ACTIVITY_DORMANT
-            if (hasService() && mDataState == TelephonyManager.DATA_CONNECTED) {
+            if (hasService(subscription) && mDataState == TelephonyManager.DATA_CONNECTED) {
                 switch (mDataActivity) {
                     case TelephonyManager.DATA_ACTIVITY_IN:
                         iconId = mDataIconList[1];
@@ -1442,11 +1510,14 @@ public class StatusBarPolicy {
         }
     }
 
-    private final void updateCdmaRoamingIcon() {
-        if ((!hasService())
-                || (mSignalStrength == null)
-                || (!mServiceState.getRoaming())
-                || (mSignalStrength.isGsm())){
+    private final void updateCdmaRoamingIcon(int subscription) {
+        ServiceState ss = getServiceStateForSubscription(subscription);
+        SignalStrength sigStrength;
+        sigStrength = mSignalStrength[subscription];
+        if ((!hasService(subscription))
+                || (sigStrength == null)
+                || (!ss.getRoaming())
+                || (sigStrength.isGsm())){
             mService.setIconVisibility(mCdmaRoamingIndicatorIcon, false);
             return;
         }
@@ -1457,8 +1528,8 @@ public class StatusBarPolicy {
          */
 
         int[] iconList = sRoamingIndicatorImages_cdma;
-        int iconIndex = mServiceState.getCdmaEriIconIndex();
-        int iconMode = mServiceState.getCdmaEriIconMode();
+        int iconIndex = ss.getCdmaEriIconIndex();
+        int iconMode = ss.getCdmaEriIconMode();
 
         if ((iconIndex != -1) && (iconMode != -1)) {
             // voice is roaming (CDMA)
@@ -1487,7 +1558,7 @@ public class StatusBarPolicy {
         }
         mService.updateIcon(mCdmaRoamingIndicatorIcon, mCdmaRoamingIndicatorIconData, null);
         mService.setIconVisibility(mCdmaRoamingIndicatorIcon, true);
-        mService.updateIcon(mPhoneIcon, mPhoneData, null);
+        mService.updateIcon(mPhoneIcon[subscription], mPhoneData[subscription], null);
         return;
     }
 

@@ -105,4 +105,7 @@ interface IConnectivityManager
     boolean stopFmc(IBinder listener);
 
     boolean getFmcStatus(IBinder listener);
+    boolean getMobileDataEnabledOnSubscription(int subscription);
+
+    void setMobileDataEnabledOnSubscription(boolean enabled, int subscription);
 }

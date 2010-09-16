@@ -62,6 +62,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         mCm.setOnNewCdmaSMS(this, EVENT_NEW_SMS, null);
     }
 
+    public void updatePhoneObject(VoicePhone phone) {
+
+        super.updatePhoneObject(phone);
+    }
+
     public void dispose() {
         //TODO: fusion - who should call this now?
         super.dispose();
@@ -353,6 +358,7 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
     /** {@inheritDoc} */
     protected void sendText(String destAddr, String scAddr, String text,
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
+        Log.d(TAG, "**Cdma Dispatcher SendText **");
         SmsMessage.SubmitPdu pdu = SmsMessage.getSubmitPdu(
                 scAddr, destAddr, text, (deliveryIntent != null), null);
 

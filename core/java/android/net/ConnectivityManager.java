@@ -348,14 +348,14 @@ public class ConnectivityManager
      * <p>
      * All applications that have background services that use the network
      * should listen to {@link #ACTION_BACKGROUND_DATA_SETTING_CHANGED}.
-     * 
+     *
      * @return Whether background data usage is allowed.
      */
     public boolean getBackgroundDataSetting() {
         try {
             return mService.getBackgroundDataSetting();
         } catch (RemoteException e) {
-            // Err on the side of safety 
+            // Err on the side of safety
             return false;
         }
     }
@@ -392,6 +392,21 @@ public class ConnectivityManager
     }
 
     /**
+     * Gets the value of the setting for enabling Mobile data.
+     *
+     * @param subscription
+     * @return Whether mobile data is enabled.
+     * @hide
+     */
+    public boolean getMobileDataEnabled(int subscription) {
+        try {
+            return mService.getMobileDataEnabledOnSubscription(subscription);
+        } catch (RemoteException e) {
+            return true;
+        }
+    }
+
+    /**
      * Sets the persisted value for enabling/disabling Mobile data.
      *
      * @param enabled Whether the mobile data connection should be
@@ -401,6 +416,22 @@ public class ConnectivityManager
     public void setMobileDataEnabled(boolean enabled) {
         try {
             mService.setMobileDataEnabled(enabled);
+        } catch (RemoteException e) {
+        }
+    }
+
+    /**
+     * Sets the persisted value for enabling/disabling Mobile data.
+     *
+     * @param enabled Whether the mobile data connection should be
+     *            used or not.
+     * @param subscription the subscription for which data enabled
+     *            value is set.
+     * @hide
+     */
+    public void setMobileDataEnabled(boolean enabled, int subscription) {
+        try {
+            mService.setMobileDataEnabledOnSubscription(enabled, subscription);
         } catch (RemoteException e) {
         }
     }

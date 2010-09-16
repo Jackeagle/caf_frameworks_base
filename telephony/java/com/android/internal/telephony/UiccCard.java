@@ -134,8 +134,15 @@ public class UiccCard extends Handler{
         return mSubscription3gpp2AppIndex;
     }
 
+    /* Returns valid number of applications in a card */
     public int getNumApplications() {
-        return mUiccApplications.length;
+        int count = 0;
+        for (int i = 0; i < mUiccApplications.length; i++) {
+            if (mUiccApplications[i] != null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public int getSlotId() {

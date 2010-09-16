@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +31,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import android.telephony.TelephonyManager;
+import com.android.internal.telephony.PhoneProxy;
 import static android.telephony.SmsManager.STATUS_ON_ICC_FREE;
 import static android.telephony.SmsManager.STATUS_ON_ICC_READ;
 import static android.telephony.SmsManager.STATUS_ON_ICC_UNREAD;
@@ -44,20 +47,21 @@ public class IccSmsInterfaceManager extends ISms.Stub {
 
     private final Object mLock = new Object();
     private boolean mSuccess;
-    private List<SmsRawData> mSms;
+    private ArrayList<SmsRawData> [] mSms;
 
     private static final int EVENT_LOAD_DONE = 1;
     private static final int EVENT_UPDATE_DONE = 2;
 
-    protected VoicePhone mPhone;
-    protected Context mContext;
-    protected SMSDispatcher mDispatcher;
-    protected CommandsInterface mCm;
+    protected VoicePhone[] mPhone;
+    protected Context[] mContext;
+    protected SMSDispatcher[] mDispatcher;
+    protected CommandsInterface[] mCm;
 
     Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
-            AsyncResult ar;
+            AsyncResult ar = (AsyncResult) msg.obj;
+            int subscription = ((Integer) ar.userObj).intValue();
 
             switch (msg.what) {
                 case EVENT_UPDATE_DONE:
@@ -71,14 +75,14 @@ public class IccSmsInterfaceManager extends ISms.Stub {
                     ar = (AsyncResult)msg.obj;
                     synchronized (mLock) {
                         if (ar.exception == null) {
-                            mSms  = (List<SmsRawData>)
+                            mSms[subscription]  = (ArrayList<SmsRawData>)
                                     buildValidRawData((ArrayList<byte[]>) ar.result);
                             //Mark SMS as read after importing it from card.
-                            markMessagesAsRead((ArrayList<byte[]>) ar.result);
+                            markMessagesAsRead((ArrayList<byte[]>) ar.result, subscription);
                         } else {
                             if(DBG) log("Cannot load Sms records");
-                            if (mSms != null)
-                                mSms.clear();
+                            if (mSms[subscription] != null)
+                                mSms[subscription].clear();
                         }
                         mLock.notifyAll();
                     }
@@ -90,13 +94,13 @@ public class IccSmsInterfaceManager extends ISms.Stub {
     /**
      * markMessagesAsRead
      */
-    private void markMessagesAsRead(ArrayList<byte[]> messages) {
+    private void markMessagesAsRead(ArrayList<byte[]> messages, int subscription) {
         if (messages == null) {
             return;
         }
 
         //IccFileHandler can be null, if icc card is absent.
-        IccFileHandler fh = getIccFileHandler();
+        IccFileHandler fh = getIccFileHandler(subscription);
         if (fh == null) {
             //shouldn't really happen, as messages are marked as read, only
             //after importing it from icc.
@@ -119,18 +123,51 @@ public class IccSmsInterfaceManager extends ISms.Stub {
         }
     }
 
+    /*Non-DSDS case*/
+
     protected IccSmsInterfaceManager(VoicePhone phone, CommandsInterface cm){
-        mPhone = phone;
-        mContext = phone.getContext();
-        mCm = cm;
-        mDispatcher = new ImsSMSDispatcher(phone, cm);
+        int numPhones = TelephonyManager.getPhoneCount();
+        mPhone = new VoicePhone[numPhones];
+        mPhone[0] = phone;
+        mDispatcher = new ImsSMSDispatcher [numPhones];
+        mSms = new ArrayList[numPhones];
+        mCm = new CommandsInterface[numPhones];
+        mContext = new Context[numPhones];
+
+        mCm[0] = cm;
+        mContext[0] = phone.getContext();
+        mDispatcher[0] = new ImsSMSDispatcher (phone, mCm[0]);
+        mSms[0] = new ArrayList<SmsRawData> ();
+        if(ServiceManager.getService("isms") == null) {
+            ServiceManager.addService("isms", this);
+        }
+    }
+
+    /* DSDS case */
+    protected IccSmsInterfaceManager(Phone[] phone, CommandsInterface[] cm){
+        int numPhones = TelephonyManager.getPhoneCount();
+        mPhone = new VoicePhone[numPhones];
+        mDispatcher = new ImsSMSDispatcher [numPhones];
+        mSms = new ArrayList[numPhones];
+        mCm = new CommandsInterface[numPhones];
+        mContext = new Context[numPhones];
+
+        for (int i = 0; i < numPhones ; i++) {
+            mPhone[i] = phone[i].getVoicePhone();
+            mCm[i] = cm[i];
+            mContext[i] =  mPhone[i].getContext();
+            mDispatcher[i] = new ImsSMSDispatcher (mPhone[i], cm[i]);
+            mSms[i] = new ArrayList<SmsRawData> ();
+        }
         if(ServiceManager.getService("isms") == null) {
             ServiceManager.addService("isms", this);
         }
     }
 
     public void dispose() {
-        mDispatcher.dispose();
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            mDispatcher[i].dispose();
+        }
     }
 
     protected void finalize() {
@@ -138,15 +175,28 @@ public class IccSmsInterfaceManager extends ISms.Stub {
     }
 
     protected void updatePhoneObject(VoicePhone phone) {
-        mPhone = phone;
-        mDispatcher.updatePhoneObject(phone);
+        Log.d(LOG_TAG, "IccSmsInterfaceManager updatePhoneObject");
+        mPhone[0] = phone;
+        mDispatcher[0].updatePhoneObject(phone);
     }
 
-    protected void enforceReceiveAndSend(String message) {
-        mContext.enforceCallingPermission(
+    protected void updatePhoneObject(VoicePhone phone, int subscription) {
+        Log.d(LOG_TAG, "IccSmsInterfaceManager updatePhoneObject");
+        mPhone[subscription] = phone;
+        mDispatcher[subscription].updatePhoneObject(phone);
+    }
+
+    protected void enforceReceiveAndSend(String message, int subscription) {
+        mContext[subscription].enforceCallingPermission(
                 "android.permission.RECEIVE_SMS", message);
-        mContext.enforceCallingPermission(
+        mContext[subscription].enforceCallingPermission(
                 "android.permission.SEND_SMS", message);
+    }
+
+    /**
+       Gets Default SMS subscription */
+    public int getDefaultSMSSubscription() {
+        return PhoneFactory.getDefaultSubscription();
     }
 
     /**
@@ -162,27 +212,31 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      */
     public boolean
     updateMessageOnIccEf(int index, int status, byte[] pdu) {
+        return updateMessageOnIccEfOnSubscription(index, status, pdu, getDefaultSMSSubscription());
+    }
+
+    public boolean
+    updateMessageOnIccEfOnSubscription(int index, int status, byte[] pdu, int subscription) {
         if (DBG) log("updateMessageOnIccEf: index=" + index +
                 " status=" + status + " ==> " +
-                "("+ Arrays.toString(pdu) + ")");
-        enforceReceiveAndSend("Updating message on UIcc");
+                "("+ pdu + ")");
+        enforceReceiveAndSend("Updating message on UIcc", subscription);
         synchronized(mLock) {
             mSuccess = false;
-            Message response = mHandler.obtainMessage(EVENT_UPDATE_DONE);
+            Message response = mHandler.obtainMessage(EVENT_UPDATE_DONE, subscription);
 
             if (status == STATUS_ON_ICC_FREE) {
                 // RIL_REQUEST_DELETE_SMS_ON_SIM vs RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM
                 // Special case FREE: call deleteSmsOnSim/Ruim instead of
                 // manipulating the record
-                // Will eventually fail if icc card is not present.
-                if (VoicePhone.PHONE_TYPE_GSM == mPhone.getPhoneType()) {
-                    mCm.deleteSmsOnSim(index, response);
+                if (VoicePhone.PHONE_TYPE_GSM == mPhone[subscription].getPhoneType()) {
+                    mCm[subscription].deleteSmsOnSim(index, response);
                 } else {
-                    mCm.deleteSmsOnRuim(index, response);
+                    mCm[subscription].deleteSmsOnRuim(index, response);
                 }
             } else {
                 //IccFilehandler can be null if ICC card is not present.
-                IccFileHandler fh = getIccFileHandler();
+                IccFileHandler fh = getIccFileHandler(subscription);
                 if (fh == null) {
                     response.recycle();
                     return mSuccess; /* is false */
@@ -211,21 +265,24 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      *
      */
     public boolean copyMessageToIccEf(int status, byte[] pdu, byte[] smsc) {
+        return copyMessageToIccEfOnSubscription(status, pdu, smsc, getDefaultSMSSubscription());
+    }
+
+    public boolean copyMessageToIccEfOnSubscription(int status, byte[] pdu, byte[] smsc, int subscription) {
         //NOTE smsc not used in RUIM
         if (DBG) log("copyMessageToIccEf: status=" + status + " ==> " +
-                "pdu=("+ Arrays.toString(pdu) +
-                "), smsm=(" + Arrays.toString(smsc) +")");
-        enforceReceiveAndSend("Copying message to UIcc");
+                "pdu=("+ pdu + "), smsm=(" + smsc +")");
+        enforceReceiveAndSend("Copying message to UIcc", subscription);
         synchronized(mLock) {
             mSuccess = false;
-            Message response = mHandler.obtainMessage(EVENT_UPDATE_DONE);
+            Message response = mHandler.obtainMessage(EVENT_UPDATE_DONE, subscription);
 
             //RIL_REQUEST_WRITE_SMS_TO_SIM vs RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM
-            if (VoicePhone.PHONE_TYPE_GSM == mPhone.getPhoneType()) {
-                mCm.writeSmsToSim(status, IccUtils.bytesToHexString(smsc),
+            if (VoicePhone.PHONE_TYPE_GSM == mPhone[subscription].getPhoneType()) {
+                mCm[subscription].writeSmsToSim(status, IccUtils.bytesToHexString(smsc),
                         IccUtils.bytesToHexString(pdu), response);
             } else {
-                mCm.writeSmsToRuim(status, IccUtils.bytesToHexString(pdu),
+                mCm[subscription].writeSmsToRuim(status, IccUtils.bytesToHexString(pdu),
                         response);
             }
 
@@ -244,23 +301,27 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      * @return list of SmsRawData of all sms on UIcc
      */
     public List<SmsRawData> getAllMessagesFromIccEf() {
+        return getAllMessagesFromIccEfOnSubscription(getDefaultSMSSubscription());
+    }
+
+    public List<SmsRawData> getAllMessagesFromIccEfOnSubscription(int subscription) {
         if (DBG) log("getAllMessagesFromEF");
 
-        mContext.enforceCallingPermission(
+        mContext[subscription].enforceCallingPermission(
                 "android.permission.RECEIVE_SMS",
                 "Reading messages from SIM");
         synchronized(mLock) {
 
-            IccFileHandler fh = getIccFileHandler();
+            IccFileHandler fh = getIccFileHandler(subscription);
             if (fh == null) {
                 Log.e(LOG_TAG, "Cannot load Sms records. No icc card?");
-                if (mSms != null) {
-                    mSms.clear();
-                    return mSms;
+                if (mSms[subscription] != null) {
+                    mSms[subscription].clear();
+                    return mSms[subscription];
                 }
             }
 
-            Message response = mHandler.obtainMessage(EVENT_LOAD_DONE);
+            Message response = mHandler.obtainMessage(EVENT_LOAD_DONE, subscription);
             fh.loadEFLinearFixedAll(IccConstants.EF_SMS, response);
 
             try {
@@ -269,7 +330,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
                 log("interrupted while trying to load from the UIcc");
             }
         }
-        return mSms;
+        return mSms[subscription];
     }
 
     /**
@@ -299,7 +360,12 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      */
     public void sendData(String destAddr, String scAddr, int destPort,
             byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent) {
-        mContext.enforceCallingPermission(
+      sendDataOnSubscription(destAddr, scAddr, destPort, data, sentIntent, deliveryIntent, getDefaultSMSSubscription());
+    }
+
+    public void sendDataOnSubscription(String destAddr, String scAddr, int destPort,
+            byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent, int subscription) {
+        mContext[subscription].enforceCallingPermission(
                 "android.permission.SEND_SMS",
                 "Sending SMS message");
         if (Log.isLoggable("SMS", Log.VERBOSE)) {
@@ -307,7 +373,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
                 destPort + " data='"+ HexDump.toHexString(data)  + "' sentIntent=" +
                 sentIntent + " deliveryIntent=" + deliveryIntent);
         }
-        mDispatcher.sendData(destAddr, scAddr, destPort, data, sentIntent, deliveryIntent);
+        mDispatcher[subscription].sendData(destAddr, scAddr, destPort, data, sentIntent, deliveryIntent);
     }
 
     /**
@@ -336,7 +402,11 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      */
     public void sendText(String destAddr, String scAddr,
             String text, PendingIntent sentIntent, PendingIntent deliveryIntent) {
-        mContext.enforceCallingPermission(
+        sendTextOnSubscription(destAddr, scAddr, text, sentIntent, deliveryIntent, getDefaultSMSSubscription() );
+    }
+    public void sendTextOnSubscription(String destAddr, String scAddr,
+            String text, PendingIntent sentIntent, PendingIntent deliveryIntent, int subscription) {
+        mContext[subscription].enforceCallingPermission(
                 "android.permission.SEND_SMS",
                 "Sending SMS message");
         if (Log.isLoggable("SMS", Log.VERBOSE)) {
@@ -344,7 +414,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
                 " text='"+ text + "' sentIntent=" +
                 sentIntent + " deliveryIntent=" + deliveryIntent);
         }
-        mDispatcher.sendText(destAddr, scAddr, text, sentIntent, deliveryIntent);
+        mDispatcher[subscription].sendText(destAddr, scAddr, text, sentIntent, deliveryIntent);
     }
 
     /**
@@ -372,9 +442,15 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      *   to the recipient.  The raw pdu of the status report is in the
      *   extended data ("pdu").
      */
+
     public void sendMultipartText(String destAddr, String scAddr, List<String> parts,
             List<PendingIntent> sentIntents, List<PendingIntent> deliveryIntents) {
-        mContext.enforceCallingPermission(
+        sendMultipartTextOnSubscription(destAddr, scAddr, (ArrayList<String>) parts,
+                (ArrayList<PendingIntent>) sentIntents, (ArrayList<PendingIntent>) deliveryIntents, getDefaultSMSSubscription() );
+    }
+    public void sendMultipartTextOnSubscription(String destAddr, String scAddr, List<String> parts,
+            List<PendingIntent> sentIntents, List<PendingIntent> deliveryIntents, int subscription) {
+        mContext[subscription].enforceCallingPermission(
                 "android.permission.SEND_SMS",
                 "Sending SMS message");
         if (Log.isLoggable("SMS", Log.VERBOSE)) {
@@ -384,7 +460,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
                         ", part[" + (i++) + "]=" + part);
             }
         }
-        mDispatcher.sendMultipartText(destAddr, scAddr, (ArrayList<String>) parts,
+        mDispatcher[subscription].sendMultipartText(destAddr, scAddr, (ArrayList<String>) parts,
                 (ArrayList<PendingIntent>) sentIntents, (ArrayList<PendingIntent>) deliveryIntents);
     }
 
@@ -440,7 +516,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
         Log.d(LOG_TAG, "[IccSmsInterfaceManager] " + msg);
     }
 
-    private IccFileHandler getIccFileHandler() {
-        return mDispatcher.getIccFileHandler();
+    private IccFileHandler getIccFileHandler(int subscription) {
+        return mDispatcher[subscription].getIccFileHandler();
     }
 }

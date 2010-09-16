@@ -64,6 +64,8 @@ public class DataProfileTracker extends Handler {
     private RegistrantList mDataDataProfileDbChangedRegistrants = new RegistrantList();
     private ArrayList<DataProfile> mAllDataProfilesList = new ArrayList<DataProfile>();
 
+    private int mSubId = 0;
+
     private static final int EVENT_DATA_PROFILE_DB_CHANGED = 1;
 
     /*
@@ -225,6 +227,10 @@ public class DataProfileTracker extends Handler {
             mOperatorNumeric = newOperatorNumeric;
             obtainMessage(EVENT_DATA_PROFILE_DB_CHANGED).sendToTarget();
         }
+    }
+
+    public void setSubscription(int subId) {
+        mSubId = subId;
     }
 
     public void resetAllProfilesAsWorking() {
@@ -472,18 +478,18 @@ public class DataProfileTracker extends Handler {
     }
 
     private void logv(String msg) {
-        Log.v(LOG_TAG, "[DPT] " + msg);
+        Log.v(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 
     private void logd(String msg) {
-        Log.d(LOG_TAG, "[DPT] " + msg);
+        Log.d(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 
     private void logw(String msg) {
-        Log.w(LOG_TAG, "[DPT] " + msg);
+        Log.w(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 
     private void loge(String msg) {
-        Log.e(LOG_TAG, "[DPT] " + msg);
+        Log.e(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 }

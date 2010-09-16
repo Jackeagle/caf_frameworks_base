@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package com.android.internal.telephony.gsm;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC_SECOND_SUB;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.AsyncResult;
@@ -222,8 +223,10 @@ public final class SIMRecords extends UiccApplicationRecords {
         pnnCache = null;
 
         adnCache.reset();
-
+        //property for SUB0
         SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, null);
+        //property for SUB1
+        SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC_SECOND_SUB, null);
         SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, null);
         SystemProperties.set(PROPERTY_ICC_OPERATOR_ISO_COUNTRY, null);
         SystemProperties.set("gsm.eons.name", null);
@@ -1082,7 +1085,7 @@ public final class SIMRecords extends UiccApplicationRecords {
             case EVENT_SIM_REFRESH:
                 isRecordLoadResponse = false;
                 ar = (AsyncResult)msg.obj;
-		if (DBG) log("Sim REFRESH with exception: " + ar.exception);
+                if (DBG) log("Sim REFRESH with exception: " + ar.exception);
                 if (ar.exception == null) {
                     handleSimRefresh((int[])(ar.result));
                 }
@@ -1212,13 +1215,13 @@ public final class SIMRecords extends UiccApplicationRecords {
 
     private void handleSimRefresh(int[] result) {
         if (result == null || result.length == 0) {
-	    if (DBG) log("handleSimRefresh without input");
+            if (DBG) log("handleSimRefresh without input");
             return;
         }
 
         switch ((result[0])) {
             case CommandsInterface.SIM_REFRESH_FILE_UPDATED:
- 		if (DBG) log("handleSimRefresh with SIM_REFRESH_FILE_UPDATED");
+                if (DBG) log("handleSimRefresh with SIM_REFRESH_FILE_UPDATED");
                 // result[1] contains the EFID of the updated file.
                 int efid = result[1];
                 handleFileUpdate(efid);
@@ -1230,12 +1233,12 @@ public final class SIMRecords extends UiccApplicationRecords {
                 adnCache.reset();
                 break;
             case CommandsInterface.SIM_REFRESH_RESET:
-		if (DBG) log("handleSimRefresh with SIM_REFRESH_RESET");
+                if (DBG) log("handleSimRefresh with SIM_REFRESH_RESET");
                 onIccRefreshReset();
                 break;
             default:
                 // unknown refresh operation
-		if (DBG) log("handleSimRefresh with unknown operation");
+                if (DBG) log("handleSimRefresh with unknown operation");
                 break;
         }
     }
@@ -1302,7 +1305,6 @@ public final class SIMRecords extends UiccApplicationRecords {
         recordsToLoad -= 1;
         Log.d(LOG_TAG, "SIMRecords:onRecordLoaded " + recordsToLoad + " requested: " + recordsRequested);
 
-
         if (recordsToLoad == 0 && recordsRequested == true) {
             onAllRecordsLoaded();
         } else if (recordsToLoad < 0) {
@@ -1317,7 +1319,13 @@ public final class SIMRecords extends UiccApplicationRecords {
         String operator = getSIMOperatorNumeric();
 
         // Some fields require more than one SIM record to set
-        SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
+        if (mSubscription == 0) {
+            Log.d(LOG_TAG, "SIMRecords setting operator for sub0: " + operator);
+            SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
+        } else {
+            Log.d(LOG_TAG, "SIMRecords setting operator for sub1: " + operator);
+            SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC_SECOND_SUB, operator);
+        }
 
         if (mImsi != null) {
             SystemProperties.set(PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
@@ -1455,7 +1463,6 @@ public final class SIMRecords extends UiccApplicationRecords {
                             obtainMessage(EVENT_MARK_SMS_READ_DONE, 1));
         }
         Log.d(LOG_TAG, "SIMRecords:fetchSimRecords " + recordsToLoad + " requested: " + recordsRequested);
-
     }
 
     /**

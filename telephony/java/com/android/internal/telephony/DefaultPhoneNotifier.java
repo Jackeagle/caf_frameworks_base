@@ -40,23 +40,31 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
     private ITelephonyRegistry mRegistry;
 
 
-    private ServiceState mVoiceServiceState;
-    private ServiceState mDataServiceState;
+    private ServiceState[] mVoiceServiceState;
+    private ServiceState[] mDataServiceState;
 
     /* package */
     DefaultPhoneNotifier() {
         mRegistry = ITelephonyRegistry.Stub.asInterface(ServiceManager.getService(
                     "telephony.registry"));
+        int numPhones = TelephonyManager.getPhoneCount();
+        mVoiceServiceState = new ServiceState[numPhones];
+        mDataServiceState = new ServiceState[numPhones];
+        for (int i = 0; i < numPhones; i++) {
+            mVoiceServiceState[i] = new ServiceState();
+            mDataServiceState[i] = new ServiceState();
+        }
     }
 
     public void notifyPhoneState(VoicePhone sender) {
         Call ringingCall = sender.getRingingCall();
+        int subscription = sender.getSubscription();
         String incomingNumber = "";
         if (ringingCall != null && ringingCall.getEarliestConnection() != null) {
             incomingNumber = ringingCall.getEarliestConnection().getAddress();
         }
         try {
-            mRegistry.notifyCallState(convertCallState(sender.getState()), incomingNumber);
+            mRegistry.notifyCallStateOnSubscription(convertCallState(sender.getState()), incomingNumber, subscription);
         } catch (RemoteException ex) {
             // system process is dead
         }
@@ -115,31 +123,37 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         return ss;
     }
 
-    private void notifyCombinedServiceState() {
+    private void notifyCombinedServiceState(int subscription) {
 
-        ServiceState ss = combineVoiceDataServiceStates(mVoiceServiceState, mDataServiceState);
+        ServiceState ss = combineVoiceDataServiceStates(mVoiceServiceState[subscription], mDataServiceState[subscription]);
 
         try {
             // send combined service state to UI
-            mRegistry.notifyServiceState(ss);
+            mRegistry.notifyServiceStateOnSubscription(ss, subscription);
         } catch (RemoteException ex) {
             // system process is dead
         }
     }
 
     public void notifyVoiceServiceState(VoicePhone sender) {
-        mVoiceServiceState = new ServiceState(sender.getVoiceServiceState());
-        notifyCombinedServiceState();
+        int subscription = sender.getSubscription();
+        mVoiceServiceState[subscription] = new ServiceState(sender.getVoiceServiceState());
+        notifyCombinedServiceState(subscription);
     }
 
     public void notifyDataServiceState(DataPhone sender) {
-        mDataServiceState = new ServiceState(sender.getDataServiceState());
-        notifyCombinedServiceState();
+        int subscription = sender.getSubscription();
+        // DataPhone may return -1 if subscription is not initialized.
+        if (subscription >= 0) {
+            mDataServiceState[subscription] = new ServiceState(sender.getDataServiceState());
+            notifyCombinedServiceState(subscription);
+        }
     }
 
     public void notifySignalStrength(VoicePhone sender) {
         try {
-            mRegistry.notifySignalStrength(sender.getSignalStrength());
+            mRegistry.notifySignalStrengthOnSubscription(sender.getSignalStrength(),
+                                           sender.getSubscription());
         } catch (RemoteException ex) {
             // system process is dead
         }
@@ -147,7 +161,8 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
 
     public void notifyMessageWaitingChanged(VoicePhone sender) {
         try {
-            mRegistry.notifyMessageWaitingChanged(sender.getMessageWaitingIndicator());
+            mRegistry.notifyMessageWaitingChangedOnSubscription(sender.getMessageWaitingIndicator(),
+                                                 sender.getSubscription());
         } catch (RemoteException ex) {
             // system process is dead
         }
@@ -155,7 +170,8 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
 
     public void notifyCallForwardingChanged(VoicePhone sender) {
         try {
-            mRegistry.notifyCallForwardingChanged(sender.getCallForwardingIndicator());
+            mRegistry.notifyCallForwardingChangedOnSubscription(sender.getCallForwardingIndicator(),
+                                                 sender.getSubscription());
         } catch (RemoteException ex) {
             // system process is dead
         }
@@ -163,7 +179,8 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
 
     public void notifyDataActivity(DataPhone sender) {
         try {
-            mRegistry.notifyDataActivity(convertDataActivityState(sender.getDataActivityState()));
+            mRegistry.notifyDataActivityOnSubscription(convertDataActivityState(sender.getDataActivityState()),
+                                        sender.getSubscription());
         } catch (RemoteException ex) {
             // system process is dead
         }
@@ -186,8 +203,13 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         Log.v("DATA", "[DefaultPhoneNotifier] : "
                 + apnType + ", " + ipv + ", " + sender.getDataConnectionState(apnType, ipv));
 
+        int subscription = sender.getSubscription();
+        // Sometimes DataConnectionTracker returns -1 as subscription.
+        if (subscription < 0) {
+           subscription = 0;
+        }
         try {
-            mRegistry.notifyDataConnection(
+            mRegistry.notifyDataConnectionOnSubscription(
                     convertDataState(sender.getDataConnectionState()),
                     apnType,
                     ipv.toString(),
@@ -197,9 +219,10 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
                     sender.getIpAddress(apnType, ipv),
                     sender.getGateway(apnType, ipv),
                     sender.isDataConnectivityPossible(),
-                    ((telephony != null) ? telephony.getNetworkType() :
-                        TelephonyManager.NETWORK_TYPE_UNKNOWN),
-                    reason);
+                    ((telephony != null) ? telephony.getNetworkType(subscription) :
+                    TelephonyManager.NETWORK_TYPE_UNKNOWN),
+                    reason,
+                    sender.getSubscription());
         } catch (RemoteException ex) {
             // system process is dead
         }
@@ -207,7 +230,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
 
     public void notifyDataConnectionFailed(DataPhone sender, String reason) {
         try {
-            mRegistry.notifyDataConnectionFailed(reason);
+            mRegistry.notifyDataConnectionFailedOnSubscription(reason, sender.getSubscription());
         } catch (RemoteException ex) {
             // system process is dead
         }
@@ -217,7 +240,7 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
         Bundle data = new Bundle();
         sender.getCellLocation().fillInNotifierBundle(data);
         try {
-            mRegistry.notifyCellLocation(data);
+            mRegistry.notifyCellLocationOnSubscription(data, sender.getSubscription());
         } catch (RemoteException ex) {
             // system process is dead
         }

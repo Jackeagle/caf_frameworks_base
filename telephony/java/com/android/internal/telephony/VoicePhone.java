@@ -27,6 +27,7 @@ import android.telephony.SignalStrength;
 
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 import java.util.List;
 
@@ -585,7 +586,10 @@ public interface VoicePhone {
      */
     void clearDisconnected();
 
-
+    /**
+     * To know whether any call is active on the voice phone instance.
+     */
+    boolean isInCall();
     /**
      * Gets the foreground call object, which represents all connections that
      * are dialing or active (all connections
@@ -1506,5 +1510,26 @@ public interface VoicePhone {
      * @return 1 if this bit is set, 0 if it is not set
      */
     int getCspPlmnStatus();
+
+
+    /* Sets the subscription information (slotId, subIndex, subNum)
+     * @param subscription information
+     */
+    public void setSubscriptionInfo(Subscription subscription);
+
+    /* Gets the subscription information (slotId, subIndex, subNum)
+     * @return Subscription information
+     */
+    public Subscription getSubscriptionInfo();
+
+    /* Gets the subscription
+     * @return subscription number "0" or "1"
+     */
+    public int getSubscription();
+
+    /* Sets the subscription
+     * @param subscription number "0" or "1"
+     */
+    public void setSubscription(int subscripton);
 
 }

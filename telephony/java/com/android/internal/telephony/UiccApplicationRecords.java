@@ -59,6 +59,7 @@ public abstract class UiccApplicationRecords extends Handler{
     protected RegistrantList mNewSmsRegistrants = new RegistrantList();
     protected RegistrantList mNetworkSelectionModeAutomaticRegistrants = new RegistrantList();
     protected RegistrantList mImsiReadyRegistrants = new RegistrantList();
+    protected int mSubscription = 0;
 
     public UiccApplicationRecords(UiccCardApplication parent, Context c, CommandsInterface ci, UiccRecords ur) {
         mContext = c;
@@ -330,6 +331,18 @@ public abstract class UiccApplicationRecords extends Handler{
         } else {
             return false;
         }
+    }
+
+    /* Sets subscription for an application */
+    public void setSubscription(int subNum) {
+        if(subNum == 0 || subNum == 1) {
+            mSubscription = subNum;
+        }
+    }
+
+    /* Gets subscription for an application */
+    public int getSubscription() {
+        return mSubscription;
     }
 
     //***** Overridden from Handler

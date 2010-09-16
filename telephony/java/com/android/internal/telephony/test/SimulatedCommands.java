@@ -33,6 +33,7 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.gsm.CallFailCause;
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SuppServiceNotification;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 import java.util.ArrayList;
 
@@ -1485,4 +1486,17 @@ public final class SimulatedCommands extends BaseCommands
     public void sendImsGsmSms(String smscPDU, String pdu, Message response){
         unimplemented(response);
     }
+
+    public void setUiccSubscription(Subscription subscription, Message response) {
+        unimplemented(response);
+    }
+
+    public void setDataSubscription (Message response) {
+        unimplemented(response);
+    }
+
+    public void setSubscriptionMode(int subscription_mode, Message response) {
+        unimplemented(response);
+    }
+
 }

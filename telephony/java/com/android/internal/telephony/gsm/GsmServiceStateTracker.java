@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,6 +80,7 @@ import com.android.internal.telephony.UiccCardApplication;
 import com.android.internal.telephony.UiccManager;
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 /**
  * {@hide}
@@ -217,7 +218,12 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         cm.setOnSignalStrengthUpdate(this, EVENT_SIGNAL_STRENGTH_UPDATE, null);
         cm.registerForRestrictedStateChanged(this, EVENT_RESTRICTED_STATE_CHANGED, null);
 
-        mUiccManager = UiccManager.getInstance(phone.getContext(), this.cm);
+        if( TelephonyManager.isDsdsEnabled() ) {
+            mUiccManager = UiccManager.getInstance();
+        } else {
+            mUiccManager = UiccManager.getInstance(phone.getContext(), this.cm);
+        }
+
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
         cr = phone.getContext().getContentResolver();
@@ -497,6 +503,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 intent.putExtra(Intents.EXTRA_SPN, spn);
                 intent.putExtra(Intents.EXTRA_SHOW_PLMN, showPlmn);
                 intent.putExtra(Intents.EXTRA_PLMN, plmn);
+                intent.putExtra(Intents.EXTRA_SUBSCRIPTION, phone.getSubscription());
+                Log.d(LOG_TAG, "updateSpnDisplay sending on sub :" + phone.getSubscription());
                 phone.getContext().sendStickyBroadcast(intent);
             }
 
@@ -542,7 +550,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     err != CommandException.Error.OP_NOT_ALLOWED_BEFORE_REG_NW) {
                 Log.e(LOG_TAG,
                         "RIL implementation has returned an error where it must succeed" +
-                        ar.exception);
+                        ar.exception+"event id=:"+what);
             }
         } else try {
             switch (what) {
@@ -748,6 +756,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
 
     private void pollStateDone() {
         if (DBG) {
+            Log.d(LOG_TAG,"Phone subscription:" +phone.getSubscription());
             Log.d(LOG_TAG, "Poll ServiceState done: " +
                 " oldSS=[" + ss + "] newSS=[" + newSS +
                 "] " +
@@ -938,10 +947,35 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         }
     }
 
-    void updateIccAvailability() {
+    //Gets Application records and register for record events
+    public void getRecords() {
+        Log.d(LOG_TAG, "getRecords GsmServiceStateTracer");
+        Subscription subscriptionData = phone.getSubscriptionInfo();
+        m3gppApplication = mUiccManager.getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+        if(m3gppApplication != null) {
+            mSIMRecords = (SIMRecords) m3gppApplication.getApplicationRecords();
+            Log.d(LOG_TAG, "registerForSimRecordEvents");
+            mSIMRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
+            mSIMRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
 
-        UiccCardApplication new3gppApplication = mUiccManager
+        }
+    }
+
+    void updateIccAvailability() {
+        UiccCardApplication new3gppApplication = null;
+        if( TelephonyManager.isDsdsEnabled() ) {
+            //DSDS, gets current active subscription application
+            Subscription subscriptionData = phone.getSubscriptionInfo();
+            if(subscriptionData != null) {
+                new3gppApplication = mUiccManager
+                    .getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+            } else {
+                return ;
+            }
+        }else {
+            new3gppApplication = mUiccManager
                 .getCurrentApplication(AppFamily.APP_FAM_3GPP);
+        }
 
         if (m3gppApplication != new3gppApplication) {
             if (m3gppApplication != null) {
@@ -1213,6 +1247,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         intent.putExtra(Intents.EXTRA_SPN, spn);
         intent.putExtra(Intents.EXTRA_SHOW_PLMN, showPlmn);
         intent.putExtra(Intents.EXTRA_PLMN, plmn);
+        intent.putExtra(Intents.EXTRA_SUBSCRIPTION, phone.getSubscription());
+        Log.d(LOG_TAG, "handleLimitedService sending on sub :" + phone.getSubscription());
         phone.getContext().sendStickyBroadcast(intent);
     }
 

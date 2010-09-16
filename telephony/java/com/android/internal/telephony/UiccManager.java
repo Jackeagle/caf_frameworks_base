@@ -28,6 +28,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.gsm.stk.StkService;
+import android.telephony.TelephonyManager;
 
 /* This class will be responsible for keeping all knowledge about
  * ICCs in the system. It will also be used as API to get appropriate
@@ -47,7 +48,7 @@ public class UiccManager extends Handler{
     private static final int EVENT_RADIO_OFF_OR_UNAVAILABLE = 4;
 
     private String mLogTag = "RIL_UiccManager";
-    CommandsInterface mCi;
+    CommandsInterface[] mCi;
     Context mContext;
     UiccCard[] mUiccCards;
     private boolean mRadioOn = false;
@@ -55,11 +56,22 @@ public class UiccManager extends Handler{
     private RegistrantList mIccChangedRegistrants = new RegistrantList();
     private StkService mStkService;
 
-    public static UiccManager getInstance(Context c, CommandsInterface ci) {
+
+    public static UiccManager getInstance(Context c, CommandsInterface[] ci) {
         if (mInstance == null) {
             mInstance = new UiccManager(c, ci);
         } else {
             mInstance.mCi = ci;
+            mInstance.mContext = c;
+        }
+        return mInstance;
+    }
+
+    public static UiccManager getInstance(Context c, CommandsInterface ci) {
+        if (mInstance == null) {
+            mInstance = new UiccManager(c, ci);
+        } else {
+            mInstance.mCi[0] = ci;
             mInstance.mContext = c;
         }
         return mInstance;
@@ -73,19 +85,21 @@ public class UiccManager extends Handler{
         }
     }
 
-    private UiccManager(Context c, CommandsInterface ci) {
-        Log.e(mLogTag, "Creating");
+    private UiccManager(Context c, CommandsInterface[] ci) {
+        this(c, ci[0]);
+    }
 
+    private UiccManager(Context c, CommandsInterface ci) {
+        Log.e(mLogTag, "Constructing");
         mUiccCards = new UiccCard[UiccConstants.RIL_MAX_CARDS];
 
+        mCi = new CommandsInterface[TelephonyManager.getPhoneCount()];
         mContext = c;
-        mCi = ci;
-        mCi.registerForOn(this,EVENT_RADIO_ON, null);
-        mCi.registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, null);
-        mCi.registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, null);
-
-        mStkService = StkService.getInstance(mCi, null, mContext, null, null);
-
+        mCi[0] = ci;
+        mCi[0].registerForOn(this,EVENT_RADIO_ON, null);
+        mCi[0].registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, null);
+        mCi[0].registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, null);
+        mStkService = StkService.getInstance(mCi[0], null, mContext, null, null);
     }
 
     @Override
@@ -101,12 +115,13 @@ public class UiccManager extends Handler{
             case EVENT_ICC_STATUS_CHANGED:
                 if (mRadioOn) {
                     Log.d(mLogTag, "Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus");
-                    mCi.getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE, msg.obj));
+                    mCi[0].getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE, msg.obj));
                 } else {
                     Log.d(mLogTag, "Received EVENT_ICC_STATUS_CHANGED while radio is not ON. Ignoring");
                 }
                 break;
             case EVENT_GET_ICC_STATUS_DONE:
+                Log.d(mLogTag, " Received EVENT_ICC_STATUS_DONE");
                 ar = (AsyncResult)msg.obj;
 
                 onGetIccCardStatusDone(ar);
@@ -150,7 +165,7 @@ public class UiccManager extends Handler{
         for (int i = 0; i < UiccConstants.RIL_MAX_CARDS; i++) {
             //Update already existing cards
             if (mUiccCards[i] != null && i < status.cards.length) {
-                mUiccCards[i].update(status.cards[i], mContext, mCi);
+                mUiccCards[i].update(status.cards[i], mContext, mCi[0]);
             }
 
             //Dispose of removed cards
@@ -161,7 +176,7 @@ public class UiccManager extends Handler{
 
             //Create added cards
             if (mUiccCards[i] == null && i < status.cards.length) {
-                mUiccCards[i] = new UiccCard(this, i, status.cards[i], mContext, mCi);
+                mUiccCards[i] = new UiccCard(this, i, status.cards[i], mContext, mCi[0]);
             }
         }
 
@@ -186,11 +201,15 @@ public class UiccManager extends Handler{
     public synchronized UiccCard[] getIccCards() {
         ArrayList<UiccCard> cards = new ArrayList<UiccCard>();
         for (UiccCard c: mUiccCards) {
-            if (c != null && c.getCardState() == CardState.PRESENT) {
+            //present and absent both cards are returned.
+            if (c != null && (c.getCardState() == CardState.PRESENT || c.getCardState() == CardState.ABSENT )) {
                 cards.add(c);
             }
         }
-        return (UiccCard[])cards.toArray();
+        Log.d(mLogTag, "Number of cards = " + cards.size());
+        UiccCard arrayCards[] = new UiccCard[cards.size()];
+        arrayCards = (UiccCard[])cards.toArray(arrayCards);
+        return arrayCards;
     }
 
     /* Return First subscription of selected family */
@@ -216,15 +235,25 @@ public class UiccManager extends Handler{
         return null;
     }
 
+    //Gets current application based on slotId and appId
+    public synchronized UiccCardApplication getApplication(int slotId, int appId) {
+        if (slotId >= 0 && slotId < mUiccCards.length &&
+            appId >= 0 && appId < mUiccCards.length) {
+            UiccCard c = mUiccCards[slotId];
+            if (c != null && c.getCardState() == CardState.PRESENT) {
+                UiccCardApplication app = c.getUiccCardApplication(appId);
+                return app;
+            }
+        }
+        return null;
+    }
+
     //Notifies when any of the cards' STATE changes (or card gets added or removed)
     public void registerForIccChanged(Handler h, int what, Object obj) {
         Registrant r = new Registrant (h, what, obj);
         synchronized (mIccChangedRegistrants) {
             mIccChangedRegistrants.add(r);
         }
-        //Notify registrants soon after registering, so that it will get the latest ICC status,
-        //otherwise which may not happen until there is an actual change in ICC status.
-        r.notifyRegistrant();
     }
     public void unregisterForIccChanged(Handler h) {
         synchronized (mIccChangedRegistrants) {

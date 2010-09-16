@@ -994,7 +994,7 @@ public final class Settings {
         public static boolean hasInterestingConfigurationChanges(int changes) {
             return (changes&ActivityInfo.CONFIG_FONT_SCALE) != 0;
         }
-        
+
         public static boolean getShowGTalkServiceStatus(ContentResolver cr) {
             return getInt(cr, SHOW_GTALK_SERVICE_STATUS, 0) != 0;
         }
@@ -1218,7 +1218,7 @@ public final class Settings {
         public static final String LOCK_PATTERN_VISIBLE = "lock_pattern_visible_pattern";
 
         /**
-         * @deprecated Use 
+         * @deprecated Use
          * {@link android.provider.Settings.Secure#LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED}
          * instead
          */
@@ -1562,6 +1562,29 @@ public final class Settings {
           * 10 sec, 15 sec and -1 (for disabling).
           */
         public static final String AUTO_ANSWER_TIMEOUT = "auto_answer";
+
+        /**
+          * Dual Sim Selected Value for Voice Call. The supported values are 0 = SUB1,
+          * 1 = SUB2 and -1 (for not selected).
+          */
+        public static final String DUAL_SIM_VOICE_CALL = "dual_sim_voice_call";
+
+        /**
+          * Dual Sim Selected Value for Data Call. The supported values are 0 = SUB1,
+          * 1 = SUB2 and -1 (for not selected).
+          */
+        public static final String DUAL_SIM_DATA_CALL = "dual_sim_data_call";
+
+        /**
+          * Dual Sim Selected Value for SMS. The supported values are 0 = SUB1,
+          * 1 = SUB2 and -1 (for not selected).
+          */
+        public static final String DUAL_SIM_SMS = "dual_sim_sms";
+
+        /** User preferred subscriptions for one and two i.e. sub1 preferred, sub2 preferred
+          * @hide
+          */
+        public static final String [] USER_PREFERRED_SUBS = {"user_preferred_sub1", "user_preferred_sub2"};
 
         /**
          * CDMA only settings
@@ -2069,6 +2092,37 @@ public final class Settings {
         }
 
         /**
+         * @hide
+         */
+        public static int getIntAtIndex(ContentResolver cr, String name, int index)
+                throws SettingNotFoundException {
+            int ret[] = null;
+            String v = getString(cr, name);
+            try {
+                if (v != null) {
+                    String valArray[] = v.split(",");
+                    if (valArray != null) {
+                        ret = new int[valArray.length];
+                        for (int i = 0; i < valArray.length; i++) {
+                            if (valArray[i] != null) {
+                                ret[i] = Integer.parseInt(valArray[i]);
+                            }
+                        }
+                    }
+                    if (index < ret.length) {
+                        return ret[index];
+                    } else {
+                        throw new SettingNotFoundException(name);
+                    }
+                } else {
+                    throw new SettingNotFoundException(name);
+                }
+            } catch (NumberFormatException e) {
+                throw new SettingNotFoundException(name);
+            }
+        }
+
+        /**
          * Convenience function for retrieving a single secure settings value
          * as an integer.  Note that internally setting values are always
          * stored as strings; this function converts the string to an integer
@@ -2111,6 +2165,52 @@ public final class Settings {
          */
         public static boolean putInt(ContentResolver cr, String name, int value) {
             return putString(cr, name, Integer.toString(value));
+        }
+
+        /**
+         * @hide
+         */
+        public static boolean putIntAtIndex(ContentResolver cr, String name, int index, int value) {
+            String data = null;
+            String v = getString(cr, name);
+
+            if (v == null) {
+                return putString(cr, name, Integer.toString(value));
+            }
+
+            String valArray[] = v.split(",");
+            if (valArray == null) {
+               return false;
+            }
+
+            // If the value needs to update at the first index
+            if (index == 0) {
+                data = Integer.toString(value);
+            } else {
+                // Copy the elements form valArray till index
+                // put '0' as default if there is no element
+                for (int i = 0; i < index; i++) {
+                    String str;
+                    if (i < valArray.length) {
+                        str = valArray[i];
+                    } else {
+                        str = "0";
+                    }
+                    if (data == null) {
+                        data = str + ",";
+                    } else {
+                        data = data + str + ",";
+                    }
+                }
+                data = data + Integer.toString(value);
+            }
+            // Copy the remaining elements from valArray if any.
+            if (index+1 < valArray.length) {
+                for (int i = index+1; i < valArray.length; i++) {
+                    data = data + "," + valArray[i];
+                }
+            }
+            return putString(cr, name, data);
         }
 
         /**
@@ -2300,7 +2400,8 @@ public final class Settings {
         }
 
         /**
-         * Whether or not data roaming is enabled. (0 = false, 1 = true)
+         * Whether or not data roaming is enabled, This string contains the coma
+         * seperated list of values(SUB1, SUB2). (0 = false, 1 = true)
          */
         public static final String DATA_ROAMING = "data_roaming";
 
@@ -2667,8 +2768,8 @@ public final class Settings {
                 = "allowed_geolocation_origins";
 
         /**
-         * Whether mobile data connections are allowed by the user.  See
-         * ConnectivityManager for more info.
+         * Whether mobile data connections are allowed by the user. This string contains the coma
+         * seperated list of values(SUB1, SUB2). See ConnectivityManager for more info.
          * @hide
          */
         public static final String MOBILE_DATA = "mobile_data";

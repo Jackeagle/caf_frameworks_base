@@ -61,6 +61,8 @@ import com.android.internal.telephony.SmsResponse;
 import com.android.internal.telephony.RegStateResponse;
 import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -699,6 +701,43 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         send(rr);
     }
+
+    public void
+    setUiccSubscription(Subscription subscription, Message result) {
+        //Note: This RIL request is also valid for SIM and RUIM (ICC card)
+        Log.d(LOG_TAG, "In UiccSubscription Source");
+        Log.d(LOG_TAG, "slot id="+subscription.slotId+",sub id="+subscription.subIndex+",status="+subscription.subStatus);
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE, result);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        rr.mp.writeInt(subscription.slotId);
+        rr.mp.writeInt(subscription.subIndex);
+                rr.mp.writeInt(subscription.subNum);
+        rr.mp.writeInt(subscription.subStatus);
+
+        Log.d(LOG_TAG, "Send subscription");
+        send(rr);
+    }
+
+    public void setSubscriptionMode(int subscription_mode, Message result) {
+        /* Sets the subscription mode SingleStandBy or DualStandBy
+         * This request does not come into picture in non-DSDS
+         */
+        Log.d(LOG_TAG, "In setSubscriptionMode ");
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_SUBSCRIPTION_MODE, result);
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        rr.mp.writeInt(1);
+        rr.mp.writeInt(subscription_mode);
+        send(rr);
+    }
+
+    public void setDataSubscription(Message result) {
+        Log.d(LOG_TAG, "In setDataSubscription ");
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE, result);
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
 
     public void
     supplyIccPin(int slot, String aid, String pin, Message result) {
@@ -2295,6 +2334,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_CDMA_PRL_VERSION: ret = responseString(p); break;
             case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
             case RIL_REQUEST_IMS_SEND_SMS: ret =  responseSMS(p); break;
+            case RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE: ret = responseVoid(p); break;
+            case RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE: ret = responseVoid(p); break;
+            case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: ret = responseUiccSubscription(p); break;
+            case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: ret = responseDataSubscription(p); break;
+            case RIL_REQUEST_SET_SUBSCRIPTION_MODE: ret = responseVoid(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -3370,6 +3414,28 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         return response;
     }
 
+    private Object
+    responseUiccSubscription(Parcel p) {
+        //TODO
+        //currently data subscripton is not queried from RIL.
+        /*SubscriptionData subscriptionData = new SubscriptionData();
+        subscriptionData.subscription = new SubscriptionData.Subscription[1];
+        subscriptionData.subscription[0].slotId = p.readInt();
+        subscriptionData.subscription[0].subIndex = p.readInt();
+        subscriptionData.subscription[0].subNum = p.readInt();
+        subscriptionData.subscription[0].subStatus = (SubscriptionData.Subscription.subStatus) p.readInt();
+        return subscriptionData;*/
+        return null;
+    }
+
+    private Object
+    responseDataSubscription(Parcel p) {
+       //TODO DSDS
+       //currently data subscripton is not queried from RIL.
+       return null;
+    }
+
+
     private void
     notifyRegistrantsCdmaInfoRec(CdmaInformationRecords infoRec) {
         int response = RIL_UNSOL_CDMA_INFO_REC;
@@ -3534,6 +3600,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_CDMA_PRL_VERSION: return "RIL_REQUEST_CDMA_PRL_VERSION";
             case RIL_REQUEST_IMS_REGISTRATION_STATE: return "RIL_REQUEST_IMS_REGISTRATION_STATE";
             case RIL_REQUEST_IMS_SEND_SMS: return "RIL_REQUEST_IMS_SEND_SMS";
+            case RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_SET_SUBSCRIPTION_MODE: return "RIL_REQUEST_SET_SUBSCRIPTION_MODE";
             default: return "<unknown request>";
         }
     }
@@ -3589,27 +3660,39 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     private void riljLog(String msg) {
-        Log.d(LOG_TAG, msg);
+        String str = Thread.currentThread().getName();
+        long id = Thread.currentThread().getId();
+        Log.d(LOG_TAG, msg + ",thread name:"+ str + ",thread_id:" + id);
     }
 
     private void riljLogv(String msg) {
-        Log.v(LOG_TAG, msg);
+        String str = Thread.currentThread().getName();
+        long id = Thread.currentThread().getId();
+        Log.v(LOG_TAG, msg + ",thread name:"+ str + ",thread_id:" + id );
     }
 
     private void unsljLog(int response) {
-        riljLog("[UNSL]< " + responseToString(response));
+        String str = Thread.currentThread().getName();
+        long id = Thread.currentThread().getId();
+        riljLog("[UNSL]< " + responseToString(response) + ",thread name:"+ str + ",thread_id:" + id);
     }
 
     private void unsljLogMore(int response, String more) {
-        riljLog("[UNSL]< " + responseToString(response) + " " + more);
+        String str = Thread.currentThread().getName();
+        long id = Thread.currentThread().getId();
+        riljLog("[UNSL]< " + responseToString(response) + " " + more + ",thread name:"+ str + ",thread_id:" + id);
     }
 
     private void unsljLogRet(int response, Object ret) {
-        riljLog("[UNSL]< " + responseToString(response) + " " + retToString(response, ret));
+        String str = Thread.currentThread().getName();
+        long id = Thread.currentThread().getId();
+        riljLog("[UNSL]< " + responseToString(response) + " " + retToString(response, ret) + ",thread name:"+ str + ",thread_id:" + id);
     }
 
     private void unsljLogvRet(int response, Object ret) {
-        riljLogv("[UNSL]< " + responseToString(response) + " " + retToString(response, ret));
+        String str = Thread.currentThread().getName();
+        long id = Thread.currentThread().getId();
+        riljLogv("[UNSL]< " + responseToString(response) + " " + retToString(response, ret) + ",thread name:"+ str + ",thread_id:" + id);
     }
 
 

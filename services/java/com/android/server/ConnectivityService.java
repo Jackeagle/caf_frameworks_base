@@ -41,6 +41,8 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.Slog;
+import android.telephony.TelephonyManager;
+import android.provider.Settings.SettingNotFoundException;
 
 import com.android.internal.telephony.Phone;
 
@@ -829,9 +831,30 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      * @see ConnectivityManager#getMobileDataEnabled()
      */
     public boolean getMobileDataEnabled() {
+        int current_dds = 0;
+        if (TelephonyManager.isDsdsEnabled()) {
+            try {
+                current_dds = Settings.System.getInt(mContext.getContentResolver(),
+                        Settings.System.DUAL_SIM_DATA_CALL);
+            } catch (SettingNotFoundException snfe) {
+                Slog.e(TAG, "Settings Exception Reading data subscription", snfe);
+            }
+
+        }
+        return getMobileDataEnabledOnSubscription(current_dds);
+    }
+
+    public boolean getMobileDataEnabledOnSubscription(int subscription) {
         enforceAccessPermission();
-        boolean retVal = Settings.Secure.getInt(mContext.getContentResolver(),
-                Settings.Secure.MOBILE_DATA, 1) == 1;
+        boolean retVal;
+
+        try {
+            retVal = Settings.Secure.getIntAtIndex(mContext.getContentResolver(),
+                        Settings.Secure.MOBILE_DATA, subscription) == 1;
+        } catch (SettingNotFoundException snfe) {
+            retVal = true;
+        }
+
         if (DBG) Slog.d(TAG, "getMobileDataEnabled returning " + retVal);
         return retVal;
     }
@@ -840,13 +863,28 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      * @see ConnectivityManager#setMobileDataEnabled(boolean)
      */
     public synchronized void setMobileDataEnabled(boolean enabled) {
+        int current_dds = 0;
+        if (TelephonyManager.isDsdsEnabled()) {
+            try {
+                current_dds = Settings.System.getInt(mContext.getContentResolver(),
+                        Settings.System.DUAL_SIM_DATA_CALL);
+            } catch (SettingNotFoundException snfe) {
+                Slog.e(TAG, "Settings Exception Reading data subscription", snfe);
+            }
+
+        }
+        setMobileDataEnabledOnSubscription(enabled, current_dds);
+    }
+
+    public synchronized void setMobileDataEnabledOnSubscription(boolean enabled, int subscription) {
         enforceChangePermission();
-        if (DBG) Slog.d(TAG, "setMobileDataEnabled(" + enabled + ")");
+        if (DBG) Slog.d(TAG, "setMobileDataEnabledOnSubscription("
+                              + enabled + ", " + subscription + ")");
 
-        if (getMobileDataEnabled() == enabled) return;
+        if (getMobileDataEnabledOnSubscription(subscription) == enabled) return;
 
-        Settings.Secure.putInt(mContext.getContentResolver(),
-                Settings.Secure.MOBILE_DATA, enabled ? 1 : 0);
+        Settings.Secure.putIntAtIndex(mContext.getContentResolver(),
+                Settings.Secure.MOBILE_DATA, subscription, enabled?1:0);
 
         if (enabled) {
             if (mNetTrackers[ConnectivityManager.TYPE_MOBILE] != null) {

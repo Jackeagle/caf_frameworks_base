@@ -37,8 +37,20 @@
     <TextView android:id="@+id/carrier"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/pinDisplayGroup"
+        android:layout_above="@+id/carrier_sub2"
         android:layout_marginTop="9dip"
+        android:gravity="left|bottom"
+        android:singleLine="true"
+        android:ellipsize="marquee"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+    />
+
+    <!-- Carrier info for second subscription-->
+    <TextView android:id="@+id/carrier_sub2"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/pinDisplayGroup"
+        android:layout_marginTop="39dip"
         android:gravity="left|bottom"
         android:singleLine="true"
         android:ellipsize="marquee"

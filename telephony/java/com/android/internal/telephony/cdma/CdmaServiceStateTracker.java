@@ -55,6 +55,8 @@ import com.android.internal.telephony.UiccManager;
 import com.android.internal.telephony.VoicePhone;
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import android.telephony.TelephonyManager;
 
 import java.util.Arrays;
 import java.util.Calendar;
@@ -580,6 +582,8 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             intent.putExtra(Intents.EXTRA_SPN, spn);
             intent.putExtra(Intents.EXTRA_SHOW_PLMN, showPlmn);
             intent.putExtra(Intents.EXTRA_PLMN, plmn);
+            intent.putExtra(Intents.EXTRA_SUBSCRIPTION, phone.getSubscription());
+            Log.d(LOG_TAG, "updateSpnDisplay on sub :" + phone.getSubscription());
             phone.getContext().sendStickyBroadcast(intent);
         }
 
@@ -1064,10 +1068,39 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         }
     }
 
+    //Gets Application records and register for record events
+    public void getRecords() {
+
+        Log.d(LOG_TAG, "getRecords CdmaServiceStateTracer");
+        Subscription subscriptionData = phone.getSubscriptionInfo();
+        m3gpp2Application = mUiccManager.getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+
+        if(m3gpp2Application != null) {
+            mRuimRecords = (RuimRecords) m3gpp2Application.getApplicationRecords();
+            Log.d(LOG_TAG, "registerForSimRecordEvents");
+            mRuimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
+            mRuimRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
+
+        }
+    }
+
     void updateIccAvailability() {
 
-        UiccCardApplication new3gpp2Application = mUiccManager
-                .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        UiccCardApplication new3gpp2Application = null;
+
+        if( TelephonyManager.isDsdsEnabled() ) {
+            //DSDS, gets current active subscription application
+            Subscription subscriptionData = phone.getSubscriptionInfo();
+            if(subscriptionData != null) {
+                new3gpp2Application = mUiccManager
+                       .getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+            } else {
+                return;
+            }
+        }else {
+             new3gpp2Application = mUiccManager
+                    .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        }
 
         if (m3gpp2Application != new3gpp2Application) {
             if (m3gpp2Application != null) {

@@ -48,6 +48,22 @@
             android:textAppearance="?android:attr/textAppearanceMedium"
             />
 
+        <!-- Carrier info for second subscription-->
+        <TextView
+            android:id="@+id/carrier_sub2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/carrier"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="36dip"
+            android:layout_alignParentRight="true"
+            android:layout_marginRight="8dip"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:gravity="right|bottom"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            />
+
         <com.android.internal.widget.DigitalClock android:id="@+id/time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

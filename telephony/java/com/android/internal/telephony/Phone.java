@@ -19,6 +19,7 @@ package com.android.internal.telephony;
 
 import android.os.Handler;
 import android.telephony.ServiceState;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 
 /**
@@ -31,10 +32,22 @@ import android.telephony.ServiceState;
 public interface Phone extends DataPhone, VoicePhone {
 
     /**
+     * Used to pass subscription information of a
+     * phone object to PhoneApp
+     */
+    static final String PHONE_SUBSCRIPTION = "phone_subscription";
+
+    /**
      * Returns the ICC card interface for this phone, or null
      * if not applicable to underlying technology.
      */
     IccCard getIccCard();
+
+    /**
+     * Updates the phoneproxy with new voice phone object
+     * when phone object changes in case of DSDS.
+     */
+    public void updatePhoneProxy(VoicePhone phone);
 
     /**
      * Sets the radio power on/off state (off is sometimes
@@ -69,4 +82,10 @@ public interface Phone extends DataPhone, VoicePhone {
      * Extraneous calls are tolerated silently
      */
     void unregisterForServiceStateChanged(Handler h);
+
+    /**
+     * Gets the voice phone object
+     */
+    VoicePhone getVoicePhone();
+
 }

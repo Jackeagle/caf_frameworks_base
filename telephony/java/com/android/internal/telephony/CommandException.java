@@ -43,6 +43,7 @@ public class CommandException extends RuntimeException {
         FDN_CHECK_FAILURE,
         ILLEGAL_SIM_OR_ME,
         SETUP_DATA_CALL_FAILURE,
+        SUBSCRIPTION_NOT_SUPPORTED
     }
 
     public CommandException(Error e) {
@@ -86,6 +87,9 @@ public class CommandException extends RuntimeException {
                 return new CommandException(Error.ILLEGAL_SIM_OR_ME);
             case RILConstants.SETUP_DATA_CALL_FAILURE:
                 return new CommandException(Error.SETUP_DATA_CALL_FAILURE);
+            case RILConstants.SUBSCRIPTION_NOT_SUPPORTED :
+                return new CommandException(Error.SUBSCRIPTION_NOT_SUPPORTED);
+
             default:
                 Log.e("GSM", "Unrecognized RIL errno " + ril_errno);
                 return new CommandException(Error.INVALID_RESPONSE);

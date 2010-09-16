@@ -23,6 +23,8 @@ import android.os.Message;
 import android.os.Handler;
 import android.util.Log;
 
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+
 
 /**
  * {@hide}
@@ -1498,4 +1500,30 @@ public interface CommandsInterface {
      *          Callback message containing {@link IccCardStatus} structure for the card.
      */
     public void getIccCardStatus(Message result);
+
+    /**
+     * Sets user selected subscription at Modem.
+     * @param subscription
+                  subscription structure with slot,app_id,subscription_num
+     * @param result
+     *          Callback message contains the information of SUCCESS/FAILURE.
+    */
+    public void setUiccSubscription(Subscription subscription, Message result);
+
+    /**
+     * Set DataSubscription preference at Modem.
+     * @param result
+     *          Callback message contains the information of SUCCESS/FAILURE.
+    */
+    public void setDataSubscription (Message result);
+
+    /**
+     * Sets SingleStandByMode or DualStandBy mode at Modem.
+     * @param subscription_mode
+                1 for SingleStandBy
+                2 for DualStandBy
+     * @param result
+     *          Callback message contains the information of SUCCESS/FAILURE.
+    */
+    public void setSubscriptionMode (int subscription_mode, Message result);
 }

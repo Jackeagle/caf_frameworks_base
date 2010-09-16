@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,8 +62,11 @@ import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.PhoneNotifier;
 import com.android.internal.telephony.PhoneProxy;
 import com.android.internal.telephony.PhoneSubInfo;
+import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import android.telephony.TelephonyManager;
 
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
@@ -97,6 +100,9 @@ public class CDMAPhone extends PhoneBase {
 
     static final int RESTART_ECM_TIMER = 0; // restart Ecm timer
     static final int CANCEL_ECM_TIMER = 1; // cancel Ecm timer
+
+    Subscription subscriptionData; // to store subscription information
+    int subscription = 0;
 
     // Instance Variables
     CdmaCallTracker mCT;
@@ -281,6 +287,40 @@ public class CDMAPhone extends PhoneBase {
         return VoicePhone.PHONE_TYPE_CDMA;
     }
 
+    //Sets Subscription information in the Phone Object
+    public void setSubscriptionInfo(Subscription subData) {
+        subscriptionData = subData;
+        setSubscription(subscriptionData.subNum);
+        getRecords();
+        mSST.getRecords();
+    }
+
+    //Gets Application records and register for record events.
+    public void getRecords() {
+        //gets records from the active suscription application
+        m3gpp2Application = mUiccManager.getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+        if(m3gpp2Application != null) {
+            mRuimCard = m3gpp2Application.getCard();
+            mRuimRecords = (RuimRecords) m3gpp2Application.getApplicationRecords();
+            mRuimRecords.setSubscription(subscriptionData.subNum);
+            //Register for Record events once records are available.
+            registerForRuimRecordEvents();
+        }
+    }
+
+    //Gets Subscription Information
+    public Subscription getSubscriptionInfo() {
+        return subscriptionData;
+    }
+
+    public void setSubscription(int subNum) {
+        subscription = subNum;
+    }
+
+    public int getSubscription() {
+        return subscription;
+    }
+
     public boolean canTransfer() {
         Log.e(LOG_TAG, "canTransfer: not possible in CDMA");
         return false;
@@ -355,12 +395,12 @@ public class CDMAPhone extends PhoneBase {
         return false;
     }
 
-    boolean isInCall() {
+    public boolean isInCall() {
         CdmaCall.State foregroundCallState = getForegroundCall().getState();
         CdmaCall.State backgroundCallState = getBackgroundCall().getState();
         CdmaCall.State ringingCallState = getRingingCall().getState();
 
-       return (foregroundCallState.isAlive() ||
+        return (foregroundCallState.isAlive() ||
                 backgroundCallState.isAlive() ||
                 ringingCallState.isAlive());
     }
@@ -973,16 +1013,21 @@ public class CDMAPhone extends PhoneBase {
 
             case EVENT_GET_CDMA_SUBSCRIPTION_SOURCE:
                 ar = (AsyncResult) msg.obj;
-                int newSubscriptionSource = ((int[]) ar.result)[0];
 
-                if (newSubscriptionSource != mCdmaSubscriptionSource) {
-                    Log.v(LOG_TAG, "Subscription Source Changed : " + mCdmaSubscriptionSource
-                            + " >> " + newSubscriptionSource);
-                    mCdmaSubscriptionSource = newSubscriptionSource;
-                    if (newSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
-                        // NV is ready when subscription source is NV
-                        sendMessage(obtainMessage(EVENT_NV_READY));
+                if (ar.exception == null) {
+                    int newSubscriptionSource = ((int[]) ar.result)[0];
+
+                    if (newSubscriptionSource != mCdmaSubscriptionSource) {
+                        Log.v(LOG_TAG, "Subscription Source Changed : " + mCdmaSubscriptionSource
+                                + " >> " + newSubscriptionSource);
+                        mCdmaSubscriptionSource = newSubscriptionSource;
+                        if (newSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
+                            // NV is ready when subscription source is NV
+                            sendMessage(obtainMessage(EVENT_NV_READY));
+                        }
                     }
+                } else {
+                    Log.w(LOG_TAG, "Error in parsing CDMA_SUBSCRIPTION_SOURCE:" +ar.exception);
                 }
                 break;
 
@@ -1034,8 +1079,20 @@ public class CDMAPhone extends PhoneBase {
 
     void updateIccAvailability() {
 
-        UiccCardApplication new3gpp2Application = mUiccManager
-                .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        Log.d(LOG_TAG, "In CDMA phone updateIccAvailability fn");
+        UiccCardApplication new3gpp2Application = null;
+
+        if( TelephonyManager.isDsdsEnabled() ) {
+            if(subscriptionData != null) {
+                new3gpp2Application = mUiccManager
+                    .getApplication(subscriptionData.slotId, subscriptionData.subIndex);
+            } else {
+                return;
+            }
+        } else {
+            new3gpp2Application = mUiccManager
+                   .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        }
 
         if (m3gpp2Application != new3gpp2Application) {
             if (m3gpp2Application != null) {

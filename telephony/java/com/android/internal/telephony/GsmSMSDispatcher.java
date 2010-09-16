@@ -50,6 +50,10 @@ final class GsmSMSDispatcher extends SMSDispatcher {
         mCm.setOnSmsStatus(this, EVENT_NEW_SMS_STATUS_REPORT, null);
     }
 
+    public void updatePhoneObject(VoicePhone phone) {
+        super.updatePhoneObject(phone);
+    }
+
     public void dispose() {
         //TODO: fusion - who should call this now?
         super.dispose();

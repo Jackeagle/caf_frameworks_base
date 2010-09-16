@@ -62,6 +62,7 @@ import static android.telephony.SmsManager.RESULT_ERROR_NULL_PDU;
 import static android.telephony.SmsManager.RESULT_ERROR_RADIO_OFF;
 import static android.telephony.SmsManager.RESULT_ERROR_LIMIT_EXCEEDED;
 import static android.telephony.SmsManager.RESULT_ERROR_FDN_CHECK_FAILURE;
+import android.telephony.TelephonyManager;
 
 
 public abstract class SMSDispatcher extends Handler {
@@ -136,7 +137,9 @@ public abstract class SMSDispatcher extends Handler {
     static protected boolean mIms = false;
     static protected RadioTechnologyFamily mImsSmsEncoding = RadioTechnologyFamily.RADIO_TECH_UNKNOWN;
     static protected Registrant mSendRetryRegistrant;
-    static protected VoicePhone mPhone;
+    //static protected VoicePhone mPhone;
+    //DSDS static cannot be used
+    protected VoicePhone mPhone;
 
     protected Context mContext;
     protected ContentResolver mResolver;
@@ -289,8 +292,11 @@ public abstract class SMSDispatcher extends Handler {
         filter.addAction(Intent.ACTION_DEVICE_STORAGE_LOW);
         filter.addAction(Intent.ACTION_DEVICE_STORAGE_OK);
         mContext.registerReceiver(mResultReceiver, filter);
-
-        mUiccManager = UiccManager.getInstance(mContext, mCm);
+        if (TelephonyManager.isDsdsEnabled()) {
+            mUiccManager = UiccManager.getInstance();
+        } else {
+            mUiccManager = UiccManager.getInstance(mContext, mCm);
+        }
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
     }
 
@@ -332,6 +338,7 @@ public abstract class SMSDispatcher extends Handler {
         switch (msg.what) {
         case EVENT_NEW_SMS:
             // A new SMS has been received by the device
+            Log.d(TAG, "EVENT_NEW_SMS phone id :" + mPhone.getSubscription());
             if (Config.LOGD) {
                 Log.d(TAG, "New SMS Message Received");
             }
@@ -741,6 +748,7 @@ public abstract class SMSDispatcher extends Handler {
         Intent intent = new Intent(Intents.SMS_RECEIVED_ACTION);
         intent.putExtra("pdus", pdus);
         intent.putExtra("encoding", getEncoding());
+        intent.putExtra("phone_id", mPhone.getSubscription()); //Subscription information to be passed in an intent
         dispatch(intent, "android.permission.RECEIVE_SMS");
     }
 
@@ -755,6 +763,7 @@ public abstract class SMSDispatcher extends Handler {
         Intent intent = new Intent(Intents.DATA_SMS_RECEIVED_ACTION, uri);
         intent.putExtra("pdus", pdus);
         intent.putExtra("encoding", getEncoding());
+        intent.putExtra("phone_id", mPhone.getSubscription()); //Subscription information to be passed in an intent
         dispatch(intent, "android.permission.RECEIVE_SMS");
     }
 

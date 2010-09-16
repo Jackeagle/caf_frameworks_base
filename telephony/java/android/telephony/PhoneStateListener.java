@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@ import android.telephony.CellLocation;
 import android.util.Log;
 
 import com.android.internal.telephony.IPhoneStateListener;
+import com.android.internal.telephony.PhoneFactory;
 
 /**
  * A listener class for monitoring changes in specific telephony states
@@ -147,7 +149,21 @@ public class PhoneStateListener {
      */
     public static final int LISTEN_SIGNAL_STRENGTHS                         = 0x00000100;
 
+    /**
+     * @hide
+     */
+    public int mSubscription;
+
     public PhoneStateListener() {
+        // If subscription is not passed set the default subscription.
+        mSubscription = PhoneFactory.getDefaultSubscription();
+    }
+
+    /**
+     * @hide
+     */
+    public PhoneStateListener(int subscription) {
+        mSubscription = subscription;
     }
 
     /**

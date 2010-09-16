@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +34,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.DataPhone.IPVersion;
 import com.android.internal.telephony.DataProfile.DataProfileType;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 /**
  * {@hide}
@@ -142,6 +144,9 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     protected static final String REASON_DATA_PROFILE_LIST_CHANGED = "dataProfileDbChanged";
     protected static final String REASON_CDMA_SUBSCRIPTION_SOURCE_CHANGED = "cdmaSubscriptionSourceChanged";
 
+    protected Message mPendingDataDisableCompleteMsg;
+    Subscription mSubscriptionData;
+
     /**
      * Default constructor
      */
@@ -152,6 +157,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
         this.mNotifier = notifier;
 
         this.mDpt = new DataProfileTracker(context);
+
     }
 
     public void dispose() {
@@ -308,6 +314,13 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
         return true;
     }
 
+    public boolean disableDataConnectivity(Message onCompleteMsg) {
+        mMasterDataEnabled = false;
+        sendMessage(obtainMessage(EVENT_MASTER_DATA_DISABLED));
+        mPendingDataDisableCompleteMsg = onCompleteMsg;
+        return true;
+    }
+
     public boolean enableDataConnectivity() {
         boolean inEcm =
             SystemProperties.getBoolean(TelephonyProperties.PROPERTY_INECM_MODE, false);
@@ -317,6 +330,16 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
         mMasterDataEnabled = true;
         sendMessage(obtainMessage(EVENT_MASTER_DATA_ENABLED));
+        return true;
+    }
+
+    public boolean enableDataConnectivity(Message onCompleteMsg) {
+        mMasterDataEnabled = true;
+        sendMessage(obtainMessage(EVENT_MASTER_DATA_ENABLED));
+
+        if (onCompleteMsg != null) {
+            onCompleteMsg.sendToTarget();
+        }
         return true;
     }
 
@@ -429,8 +452,10 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     // the shared values. If it is not, then update it.
     public void setDataRoamingEnabled(boolean enabled) {
         if (getDataRoamingEnabled() != enabled) {
-            Settings.Secure.putInt(mContext.getContentResolver(),
-                    Settings.Secure.DATA_ROAMING, enabled ? 1 : 0);
+            int index = (mSubscriptionData != null) ? mSubscriptionData.subNum : 0;
+            Settings.Secure.putIntAtIndex(mContext.getContentResolver(),
+                Settings.Secure.DATA_ROAMING, index, enabled?1:0);
+
             if (getDataServiceState().getRoaming()) {
                 sendMessage(obtainMessage(EVENT_ROAMING_ON));
             }
@@ -439,9 +464,10 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
     // Retrieve the data roaming setting from the shared preferences.
     public boolean getDataRoamingEnabled() {
+        int index = (mSubscriptionData != null) ? mSubscriptionData.subNum : 0;
         try {
-            return Settings.Secure.getInt(mContext.getContentResolver(),
-                    Settings.Secure.DATA_ROAMING) > 0;
+            return Settings.Secure.getIntAtIndex(mContext.getContentResolver(),
+                Settings.Secure.DATA_ROAMING, index) > 0;
         } catch (SettingNotFoundException snfe) {
             return false;
         }

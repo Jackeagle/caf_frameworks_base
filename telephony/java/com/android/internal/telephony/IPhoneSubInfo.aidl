@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,4 +63,22 @@ interface IPhoneSubInfo {
      * Retrieves the alpha identifier associated with the voice mail number.
      */
     String getVoiceMailAlphaTag();
+
+    // Methods with subscription info addded.
+
+    String getDeviceIdOnSubscription(int subscription);
+
+    String getDeviceSvnOnSubscription(int subscription);
+
+    String getSubscriberIdOnSubscription(int subscription);
+
+    String getIccSerialNumberOnSubscription(int subscription);
+
+    String getLine1NumberOnSubscription(int subscription);
+
+    String getLine1AlphaTagOnSubscription(int subscription);
+
+    String getVoiceMailNumberOnSubscription(int subscription);
+
+    String getVoiceMailAlphaTagOnSubscription(int subscription);
 }

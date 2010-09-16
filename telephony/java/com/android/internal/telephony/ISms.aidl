@@ -1,5 +1,6 @@
 /*
 ** Copyright 2007, The Android Open Source Project
+** Copyright (C) 2010, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -35,14 +36,26 @@ import com.android.internal.telephony.SmsRawData;
 
 interface ISms {
     /**
-     * Retrieves all messages currently stored on ICC.
+     * Retrieves all messages currently stored on ICC of the
+     * default subscription.
      *
      * @return list of SmsRawData of all sms on ICC
      */
      List<SmsRawData> getAllMessagesFromIccEf();
 
     /**
-     * Update the specified message on the ICC.
+     * Retrieves all messages currently stored on ICC of the
+     * given subscription.
+     *
+     * @param subscriptionId the subscription id.
+     *
+     * @return list of SmsRawData of all sms on ICC
+     */
+     List<SmsRawData> getAllMessagesFromIccEfOnSubscription(in int subscriptionId);
+
+    /**
+     * Update the specified message on the ICC of the default
+     * subscription.
      *
      * @param messageIndex record index of message to update
      * @param newStatus new message status (STATUS_ON_ICC_READ,
@@ -56,7 +69,23 @@ interface ISms {
             in byte[] pdu);
 
     /**
-     * Copy a raw SMS PDU to the ICC.
+     * Update the specified message on the ICC of the given
+     * given subscription.
+     *
+     * @param messageIndex record index of message to update
+     * @param newStatus new message status (STATUS_ON_ICC_READ,
+     *                  STATUS_ON_ICC_UNREAD, STATUS_ON_ICC_SENT,
+     *                  STATUS_ON_ICC_UNSENT, STATUS_ON_ICC_FREE)
+     * @param pdu the raw PDU to store
+     * @param subscriptionId the subscription id.
+     * @return success or not
+     *
+     */
+     boolean updateMessageOnIccEfOnSubscription(int messageIndex, int newStatus,
+            in byte[] pdu, in int subscriptionId);
+
+    /**
+     * Copy a raw SMS PDU to the ICC of the default subscription.
      *
      * @param pdu the raw PDU to store
      * @param status message status (STATUS_ON_ICC_READ, STATUS_ON_ICC_UNREAD,
@@ -67,7 +96,20 @@ interface ISms {
     boolean copyMessageToIccEf(int status, in byte[] pdu, in byte[] smsc);
 
     /**
-     * Send a data SMS.
+     * Copy a raw SMS PDU to the ICC of the given subscription.
+     *
+     * @param pdu the raw PDU to store
+     * @param status message status (STATUS_ON_ICC_READ, STATUS_ON_ICC_UNREAD,
+     *               STATUS_ON_ICC_SENT, STATUS_ON_ICC_UNSENT)
+     * @param subscriptionId the subscription id.
+     * @return success or not
+     *
+     */
+    boolean copyMessageToIccEfOnSubscription(int status, in byte[] pdu,
+           in byte[] smsc, in int subscriptionId);
+
+    /**
+     * Send a data SMS on default subscription.
      *
      * @param smsc the SMSC to send the message through, or NULL for the
      *  default SMSC
@@ -93,7 +135,35 @@ interface ISms {
             in byte[] data, in PendingIntent sentIntent, in PendingIntent deliveryIntent);
 
     /**
-     * Send an SMS.
+     * Send a data SMS on subscription.
+     *
+     * @param smsc the SMSC to send the message through, or NULL for the
+     *  default SMSC
+     * @param data the body of the message to send
+     * @param sentIntent if not NULL this <code>PendingIntent</code> is
+     *  broadcast when the message is sucessfully sent, or failed.
+     *  The result code will be <code>Activity.RESULT_OK<code> for success,
+     *  or one of these errors:<br>
+     *  <code>RESULT_ERROR_GENERIC_FAILURE</code><br>
+     *  <code>RESULT_ERROR_RADIO_OFF</code><br>
+     *  <code>RESULT_ERROR_NULL_PDU</code><br>
+     *  For <code>RESULT_ERROR_GENERIC_FAILURE</code> the sentIntent may include
+     *  the extra "errorCode" containing a radio technology specific value,
+     *  generally only useful for troubleshooting.<br>
+     *  The per-application based SMS control checks sentIntent. If sentIntent
+     *  is NULL the caller will be checked against all unknown applicaitons,
+     *  which cause smaller number of SMS to be sent in checking period.
+     * @param deliveryIntent if not NULL this <code>PendingIntent</code> is
+     *  broadcast when the message is delivered to the recipient.  The
+     *  raw pdu of the status report is in the extended data ("pdu").
+     * @param subscriptionId the subscription id on which the SMS has to be sent.
+     */
+    void sendDataOnSubscription(in String destAddr, in String scAddr, in int destPort,
+            in byte[] data, in PendingIntent sentIntent, in PendingIntent deliveryIntent,
+            in int subscriptionId);
+
+    /**
+     * Send an SMS on default subscription.
      *
      * @param smsc the SMSC to send the message through, or NULL for the
      *  default SMSC
@@ -119,7 +189,35 @@ interface ISms {
             in PendingIntent sentIntent, in PendingIntent deliveryIntent);
 
     /**
-     * Send a multi-part text based SMS.
+     * Send an SMS on the subscription.
+     *
+     * @param smsc the SMSC to send the message through, or NULL for the
+     *  default SMSC
+     * @param text the body of the message to send
+     * @param sentIntent if not NULL this <code>PendingIntent</code> is
+     *  broadcast when the message is sucessfully sent, or failed.
+     *  The result code will be <code>Activity.RESULT_OK<code> for success,
+     *  or one of these errors:<br>
+     *  <code>RESULT_ERROR_GENERIC_FAILURE</code><br>
+     *  <code>RESULT_ERROR_RADIO_OFF</code><br>
+     *  <code>RESULT_ERROR_NULL_PDU</code><br>
+     *  For <code>RESULT_ERROR_GENERIC_FAILURE</code> the sentIntent may include
+     *  the extra "errorCode" containing a radio technology specific value,
+     *  generally only useful for troubleshooting.<br>
+     *  The per-application based SMS control checks sentIntent. If sentIntent
+     *  is NULL the caller will be checked against all unknown applications,
+     *  which cause smaller number of SMS to be sent in checking period.
+     * @param deliveryIntent if not NULL this <code>PendingIntent</code> is
+     *  broadcast when the message is delivered to the recipient.  The
+     *  raw pdu of the status report is in the extended data ("pdu").
+     * @param subscriptionId the subscription id on which the SMS has to be sent.
+     */
+    void sendTextOnSubscription(in String destAddr, in String scAddr, in String text,
+            in PendingIntent sentIntent, in PendingIntent deliveryIntent,
+            in int subscriptionId);
+
+    /**
+     * Send a multi-part text based SMS on default subscription.
      *
      * @param destinationAddress the address to send the message to
      * @param scAddress is the service center address or null to use
@@ -143,5 +241,32 @@ interface ISms {
     void sendMultipartText(in String destinationAddress, in String scAddress,
             in List<String> parts, in List<PendingIntent> sentIntents,
             in List<PendingIntent> deliveryIntents);
+
+    /**
+     * Send a multi-part text based SMS on the subscription.
+     *
+     * @param destinationAddress the address to send the message to
+     * @param scAddress is the service center address or null to use
+     *   the current default SMSC
+     * @param parts an <code>ArrayList</code> of strings that, in order,
+     *   comprise the original message
+     * @param sentIntents if not null, an <code>ArrayList</code> of
+     *   <code>PendingIntent</code>s (one for each message part) that is
+     *   broadcast when the corresponding message part has been sent.
+     *   The result code will be <code>Activity.RESULT_OK<code> for success,
+     *   or one of these errors:
+     *   <code>RESULT_ERROR_GENERIC_FAILURE</code>
+     *   <code>RESULT_ERROR_RADIO_OFF</code>
+     *   <code>RESULT_ERROR_NULL_PDU</code>.
+     * @param deliveryIntents if not null, an <code>ArrayList</code> of
+     *   <code>PendingIntent</code>s (one for each message part) that is
+     *   broadcast when the corresponding message part has been delivered
+     *   to the recipient.  The raw pdu of the status report is in the
+     *   extended data ("pdu").
+     * @param subscriptionId the subscription id on which the SMS has to be sent.
+     */
+    void sendMultipartTextOnSubscription(in String destinationAddress, in String scAddress,
+            in List<String> parts, in List<PendingIntent> sentIntents,
+            in List<PendingIntent> deliveryIntents, in int subscriptionId);
 
 }

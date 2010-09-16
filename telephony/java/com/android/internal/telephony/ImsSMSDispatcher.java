@@ -39,6 +39,7 @@ final class ImsSMSDispatcher extends SMSDispatcher {
 
     public ImsSMSDispatcher(VoicePhone phone, CommandsInterface cm) {
         super(phone, cm);
+        Log.d(TAG, "Ims Ims SMS Dispatcher phone ref:"+phone.toString());
         mCdmaDispatcher = new CdmaSMSDispatcher(phone, cm);
         mGsmDispatcher = new GsmSMSDispatcher(phone, cm);
 
@@ -47,6 +48,15 @@ final class ImsSMSDispatcher extends SMSDispatcher {
 
         mCm.registerForImsNetworkStateChanged(this, EVENT_IMS_STATE_CHANGED, null);
         registerSendRetry(this, EVENT_PROCESS_SEND_RETRY, null);
+    }
+
+    /* Updates the voice phoneobject when there is a change in a phone object*/
+    @Override
+    public void updatePhoneObject(VoicePhone phone) {
+      Log.d(TAG, "In IMS updatePhoneObject ");
+      super.updatePhoneObject(phone);
+      mCdmaDispatcher.updatePhoneObject(phone);
+      mGsmDispatcher.updatePhoneObject(phone);
     }
 
     public void dispose() {
@@ -202,9 +212,11 @@ final class ImsSMSDispatcher extends SMSDispatcher {
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
         Log.d(TAG, "sendText");
         if (isCdmaMo()) {
+            Log.d(TAG, "**cdma dispatcher**");
             mCdmaDispatcher.sendText(destAddr, scAddr,
                     text, sentIntent, deliveryIntent);
         } else {
+            Log.d(TAG, "**gsm dispatcher**");
             mGsmDispatcher.sendText(destAddr, scAddr,
                     text, sentIntent, deliveryIntent);
         }

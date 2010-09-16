@@ -23,7 +23,7 @@ import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.util.Log;
 
-public class PhoneSubInfo extends IPhoneSubInfo.Stub {
+public class PhoneSubInfo {
     static final String LOG_TAG = "PHONE";
     private VoicePhone mPhone;
     private Context mContext;

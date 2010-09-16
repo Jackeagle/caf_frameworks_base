@@ -22,6 +22,7 @@ import android.os.Message;
 import android.telephony.ServiceState;
 import com.android.internal.telephony.DataConnection;
 import java.util.List;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 /**
  * Internal interface used to control the phone; SDK developers cannot
@@ -262,6 +263,18 @@ public interface DataPhone {
     boolean enableDataConnectivity();
 
     /**
+     * Allow mobile data connections.
+     * @param onCompleteMsg message to sent back to the caller
+     * @return {@code true} if the operation started successfully
+     * <br/>{@code false} if it
+     * failed immediately.<br/>
+     * Even in the {@code true} case, it may still fail later
+     * during setup, in which case an asynchronous indication will
+     * be supplied.
+     */
+    boolean enableDataConnectivity(Message onCompleteMsg);
+
+    /**
      * Disallow mobile data connections, and terminate any that
      * are in progress.
      * @return {@code true} if the operation started successfully
@@ -272,6 +285,20 @@ public interface DataPhone {
      * be supplied.
      */
     boolean disableDataConnectivity();
+
+    /**
+     * Disallow mobile data connections, and terminate any that
+     * are in progress.
+     * @param onCompleteMsg message to sent back to the caller once
+     * all the data connections are disconnected.
+     * @return {@code true} if the operation started successfully
+     * <br/>{@code false} if it
+     * failed immediately.<br/>
+     * Even in the {@code true} case, it may still fail later
+     * during setup, in which case an asynchronous indication will
+     * be supplied.
+     */
+    boolean disableDataConnectivity(Message onCompleteMsg);
 
     /**
      * Report the current state of data connectivity (enabled or disabled)
@@ -382,4 +409,19 @@ public interface DataPhone {
      * Extraneous calls are tolerated silently
      */
     void unregisterForDataServiceStateChanged(Handler h);
+
+    /**
+     * Set the subscription info.
+     */
+    public void setSubscriptionInfo(Subscription subscription);
+
+    /**
+     * Returns the subscription info.
+     */
+    public Subscription getSubscriptionInfo();
+
+    /**
+     * Returns the subscription id.
+     */
+    public int getSubscription();
 }

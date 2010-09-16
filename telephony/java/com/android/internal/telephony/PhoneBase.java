@@ -37,6 +37,7 @@ import android.util.Log;
 
 import com.android.internal.R;
 import com.android.internal.telephony.test.SimulatedRadioControl;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 import java.util.List;
 import java.util.Locale;
@@ -317,7 +318,6 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
     public void registerForNewRingingConnection(
             Handler h, int what, Object obj) {
         checkCorrectThread(h);
-
         mNewRingingConnectionRegistrants.addUnique(h, what, obj);
     }
 
@@ -722,6 +722,14 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
     public abstract String getPhoneName();
 
     public abstract int getPhoneType();
+
+    public abstract void setSubscriptionInfo(Subscription subData);
+
+    public abstract Subscription getSubscriptionInfo();
+
+    public abstract void setSubscription(int subscription);
+
+    public abstract int getSubscription();
 
     /** @hide */
     public int getVoiceMessageCount(){

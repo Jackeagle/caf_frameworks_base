@@ -48,7 +48,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires the READ_PHONE_STATE permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -69,12 +69,34 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires no permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
     public static final String ACTION_RADIO_TECHNOLOGY_CHANGED
             = "android.intent.action.RADIO_TECHNOLOGY";
+
+    /**
+     * <p>Broadcast Action: The radio technology has changed. The intent will have the following
+     * extra values:</p>
+     * <ul>
+     *   <li><em>phone_subscription</em> - A string version of the new phone name.</li>
+     * </ul>
+     *
+     * <p class="note">
+     * You can <em>not</em> receive this through components declared
+     * in manifests, only by explicitly registering for it with
+     * {@link android.content.Context#registerReceiver(android.content.BroadcastReceiver,
+     * android.content.IntentFilter) Context.registerReceiver()}.
+     *
+     * <p class="note">
+     * Requires no permission.
+     *
+     * <p class="note">This is a protected intent that can only be sent
+     * by the system.
+     */
+    public static final String ACTION_PHONE_CHANGED = "android.intentaction.PHONE_CHANGED" ;
+
     /**
      * <p>Broadcast Action: Voice Call Started.</p>
      *
@@ -122,7 +144,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires no permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -148,7 +170,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires the READ_PHONE_STATE permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -172,7 +194,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires the READ_PHONE_STATE permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -192,7 +214,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires the READ_PHONE_STATE permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -216,7 +238,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires the READ_PHONE_STATE permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -234,7 +256,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires the READ_PHONE_STATE permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -252,7 +274,7 @@ public class TelephonyIntents {
      *
      * <p class="note">
      * Requires the READ_PHONE_STATE permission.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */
@@ -264,7 +286,7 @@ public class TelephonyIntents {
      * <p class="note">.
      * This is to pop up a notice to show user that the phone is in emergency callback mode
      * and atacalls and outgoing sms are blocked.
-     * 
+     *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
      */

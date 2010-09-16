@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -301,5 +301,250 @@ interface ITelephony {
      */
     void setDataReadinessChecks(
             boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls);
+
+    /**
+     * Dial a number. This doesn't place the call. It displays
+     * the Dialer screen.
+     * @param number the number to be dialed. If null, this
+     * would display the Dialer screen with no number pre-filled.
+     * @param subscription user preferred subscription.
+     */
+    void dialOnSubscription(String number, int subscription);
+
+    /**
+     * Place a call to the specified number.
+     * @param number the number to be called.
+     * @param subscription user preferred subscription.
+     */
+    void callOnSubscription(String number, int subscription);
+
+    /**
+     * End call or go to the Home screen
+     * @param subscription user preferred subscription.
+     * @return whether it hung up
+     */
+    boolean endCallOnSubscription(int subscription);
+
+    /**
+     * Answer the currently-ringing call.
+     *
+     * If there's already a current active call, that call will be
+     * automatically put on hold.  If both lines are currently in use, the
+     * current active call will be ended.
+     *
+     * TODO: provide a flag to let the caller specify what policy to use
+     * if both lines are in use.  (The current behavior is hardwired to
+     * "answer incoming, end ongoing", which is how the CALL button
+     * is specced to behave.)
+     *
+     * TODO: this should be a oneway call (especially since it's called
+     * directly from the key queue thread).
+     *
+     * @param subscription user preferred subscription.
+     */
+    void answerRingingCallOnSubscription(int subscription);
+
+    /**
+     * Check if we are in either an active or holding call
+     * @param subscription user preferred subscription.
+     * @return true if the phone state is OFFHOOK.
+     */
+    boolean isOffhookOnSubscription(int subscription);
+
+    /**
+     * Check if an incoming phone call is ringing or call waiting.
+     *
+     * @param subscription user preferred subscription.
+     * @return true if the phone state is RINGING.
+     */
+    boolean isRingingOnSubscription(int subscription);
+
+    /**
+     * Check if the phone is idle.
+     * @param subscription user preferred subscription.
+     * @return true if the phone state is IDLE.
+     */
+    boolean isIdleOnSubscription(int subscription);
+
+    /**
+     * Check to see if the radio is on or not.
+     * @param subscription user preferred subscription.
+     * @return returns true if the radio is on.
+     */
+    boolean isRadioOnOnSubscription(int subscription);
+
+    /**
+     * Check if the SIM pin lock is enabled.
+     *
+     * @param subscription user preferred subscription.
+     * @return true if the SIM pin lock is enabled.
+     */
+    boolean isSimPinEnabledOnSubscription(int subscription);
+
+    /**
+     * Cancels the missed calls notification.
+     * @param subscription user preferred subscription.
+     */
+    void cancelMissedCallsNotificationOnSubscription(int subscription);
+
+    /**
+     * Supply a pin to unlock the SIM.  Blocks until a result is determined.
+     * @param pin The pin to check.
+     * @param subscription user preferred subscription.
+     * @return whether the operation was a success.
+     */
+    boolean supplyPinOnSubscription(String pin, int subscription);
+
+    /**
+     * Handles PIN MMI commands (PIN/PIN2/PUK/PUK2), which are initiated
+     * without SEND (so <code>dial</code> is not appropriate).
+     * 
+     * @param dialString the MMI command to be executed.
+     * @param subscription user preferred subscription.
+     * @return true if MMI command is executed.
+     */
+    boolean handlePinMmiOnSubscription(String dialString, int subscription);
+
+    /**
+     * Toggles the radio on or off.
+     * @param subscription user preferred subscription.
+     */
+    void toggleRadioOnOffOnSubscription(int subscription);
+
+    /**
+     * Set the radio to on or off
+     * @param subscription user preferred subscription.
+     */
+    boolean setRadioOnSubscription(boolean turnOn, int subscription);
+
+    /**
+     * Request to update location information in service state
+     * @param subscription user preferred subscription.
+     */
+    void updateServiceLocationOnSubscription(int subscription);
+
+    /**
+     * Enable location update notifications.
+     * @param subscription user preferred subscription.
+     */
+    void enableLocationUpdatesOnSubscription(int subscription);
+
+    /**
+     * Disable location update notifications.
+     * @param subscription user preferred subscription.
+     */
+    void disableLocationUpdatesOnSubscription(int subscription);
+
+    /**
+     * Enable a specific APN type.
+     * @param subscription user preferred subscription.
+     */
+    int enableApnTypeOnSubscription(String type, int subscription);
+
+    /**
+     * Disable a specific APN type.
+     * @param subscription user preferred subscription.
+     */
+    int disableApnTypeOnSubscription(String type, int subscription);
+
+    /**
+     * Allow mobile data connections.
+     * @param subscription user preferred subscription.
+     */
+    boolean enableDataConnectivityOnSubscription(int subscription);
+
+    /**
+     * Disallow mobile data connections.
+     * @param subscription user preferred subscription.
+     */
+    boolean disableDataConnectivityOnSubscription(int subscription);
+
+    /**
+     * Report whether data connectivity is possible.
+     * @param subscription user preferred subscription.
+     */
+    boolean isDataConnectivityPossibleOnSubscription(int subscription);
+
+    Bundle getCellLocationOnSubscription(int subscription);
+
+    /**
+     * Returns the neighboring cell information of the device.
+     * @param subscription user preferred subscription.
+     */
+    List<NeighboringCellInfo> getNeighboringCellInfoOnSubscription(int subscription);
+
+     int getCallStateOnSubscription(int subscription);
+     int getDataActivityOnSubscription(int subscription);
+     int getDataStateOnSubscription(int subscription);
+
+    /**
+     * Returns the current active phone type as integer.
+     * Returns TelephonyManager.PHONE_TYPE_CDMA if RILConstants.CDMA_PHONE
+     * and TelephonyManager.PHONE_TYPE_GSM if RILConstants.GSM_PHONE
+     * @param subscription user preferred subscription.
+     */
+    int getActivePhoneTypeOnSubscription(int subscription);
+
+    /**
+     * @param subscription user preferred subscription.
+     * Returns the unread count of voicemails
+     */
+    int getVoiceMessageCountOnSubscription(int subscription);
+
+    /**
+     * @param subscription user preferred subscription.
+     * Returns the network type
+     */
+    int getNetworkTypeOnSubscription(int subscription);
+
+    /**
+     * Checks whether the modem is in power save mode
+     * @param subscription user preferred subscription.
+     * {@hide}
+     */
+    boolean isModemPowerSaveOnSubscription(int subscription);
+
+    /**
+     * @param subscription user preferred subscription.
+     * Return true if an ICC card is present
+     */
+    boolean hasIccCardOnSubscription(int subscription);
+
+    /**
+     * @param subscription user preferred subscription.
+     * Returns Interface Name
+     */
+    String getActiveInterfaceNameOnSubscription(String apnType, int subscription);
+
+    /**
+     * @param subscription user preferred subscription.
+     * Returns Ip address
+     */
+    String getActiveIpAddressOnSubscription(String apnType, int subscription);
+
+    /**
+     * @param subscription user preferred subscription.
+     * Returns Gateway address
+     */
+    String getActiveGatewayOnSubscription(String apnType, int subscription);
+
+    /**
+     * @param subscription user preferred subscription.
+     * Gets the number of attempts remaining for PIN1/PUK1 unlock.
+     */
+    int getIccPin1RetryCountOnSubscription(int subscription);
+
+    /**
+     * Modify data readiness checks performed during data call setup
+     *
+     * @param checkConnectivity - check for network state in service, roaming and data in roaming enabled.
+     * @param checkSubscription - check for icc/nv ready and icc records loaded.
+     * @param tryDataCalls - set to true to attempt data calls if data call is not already active.
+     * @param subscription - user preferred subscription.
+     *
+     */
+    void setDataReadinessChecksOnSubscription(boolean checkConnectivity,
+               boolean checkSubscription, boolean tryDataCalls, int subscription);
+
 }
 

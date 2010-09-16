@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +37,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.android.internal.telephony.PhoneFactory;
 
 /**
  * The Telephony provider contains data related to phone operation.
@@ -68,6 +70,8 @@ public final class Telephony {
         public static final int MESSAGE_TYPE_OUTBOX = 4;
         public static final int MESSAGE_TYPE_FAILED = 5; // for failed outgoing messages
         public static final int MESSAGE_TYPE_QUEUED = 6; // for messages to send later
+        public static final int MESSAGE_TYPE_INBOX_SIM1 = 7;
+        public static final int MESSAGE_TYPE_INBOX_SIM2 = 8;
 
 
         /**
@@ -160,6 +164,12 @@ public final class Telephony {
         public static final String LOCKED = "locked";
 
         /**
+         * The phone id which message belongs to
+         * <p>Type: INTEGER (boolean)</p>
+         */
+        public static final String PHONE_ID = "phone_id";
+
+        /**
          * Error code associated with sending or receiving this message
          * <P>Type: INTEGER</P>
          */
@@ -208,17 +218,55 @@ public final class Telephony {
          * @param date the timestamp for the message
          * @param read true if the message has been read, false if not
          * @param deliveryReport true if a delivery report was requested, false if not
+         * @param phoneId the phone id which message belongs to
          * @return the URI for the new message
          */
         public static Uri addMessageToUri(ContentResolver resolver,
                 Uri uri, String address, String body, String subject,
-                Long date, boolean read, boolean deliveryReport) {
+                Long date, boolean read, boolean deliveryReport, int phoneId) {
             return addMessageToUri(resolver, uri, address, body, subject,
-                    date, read, deliveryReport, -1L);
+                    date, read, deliveryReport, -1L, phoneId);
         }
 
         /**
          * Add an SMS to the given URI with thread_id specified.
+         *
+         * @param resolver the content resolver to use
+         * @param uri the URI to add the message to
+         * @param address the address of the sender
+         * @param body the body of the message
+         * @param subject the psuedo-subject of the message
+         * @param date the timestamp for the message
+         * @param read true if the message has been read, false if not
+         * @param deliveryReport true if a delivery report was requested, false if not
+         * @param threadId the thread_id of the message
+         * @param phoneId the phone id which message belongs to
+         * @return the URI for the new message
+         */
+        public static Uri addMessageToUri(ContentResolver resolver,
+                Uri uri, String address, String body, String subject,
+                Long date, boolean read, boolean deliveryReport, long threadId, int phoneId) {
+            ContentValues values = new ContentValues(8);
+            Log.v(TAG,"Telephony addMessageToUri phone id: " + phoneId);
+            values.put(PHONE_ID, phoneId);
+            values.put(ADDRESS, address);
+            if (date != null) {
+                values.put(DATE, date);
+            }
+            values.put(READ, read ? Integer.valueOf(1) : Integer.valueOf(0));
+            values.put(SUBJECT, subject);
+            values.put(BODY, body);
+            if (deliveryReport) {
+                values.put(STATUS, STATUS_PENDING);
+            }
+            if (threadId != -1L) {
+                values.put(THREAD_ID, threadId);
+            }
+            return resolver.insert(uri, values);
+        }
+
+        /**
+         * Add an SMS to the given URI.
          *
          * @param resolver the content resolver to use
          * @param uri the URI to add the message to
@@ -234,22 +282,8 @@ public final class Telephony {
         public static Uri addMessageToUri(ContentResolver resolver,
                 Uri uri, String address, String body, String subject,
                 Long date, boolean read, boolean deliveryReport, long threadId) {
-            ContentValues values = new ContentValues(7);
-
-            values.put(ADDRESS, address);
-            if (date != null) {
-                values.put(DATE, date);
-            }
-            values.put(READ, read ? Integer.valueOf(1) : Integer.valueOf(0));
-            values.put(SUBJECT, subject);
-            values.put(BODY, body);
-            if (deliveryReport) {
-                values.put(STATUS, STATUS_PENDING);
-            }
-            if (threadId != -1L) {
-                values.put(THREAD_ID, threadId);
-            }
-            return resolver.insert(uri, values);
+            return addMessageToUri(resolver, uri, address, body, subject, date, read,
+                       deliveryReport, threadId, PhoneFactory.getDefaultSubscription());
         }
 
         /**
@@ -339,7 +373,26 @@ public final class Telephony {
                     String address, String body, String subject, Long date,
                     boolean read) {
                 return addMessageToUri(resolver, CONTENT_URI, address, body,
-                        subject, date, read, false);
+                        subject, date, read, false, PhoneFactory.getDefaultSubscription());
+            }
+
+            /**
+             * Add an SMS to the Draft box.
+             *
+             * @param resolver the content resolver to use
+             * @param address the address of the sender
+             * @param body the body of the message
+             * @param subject the psuedo-subject of the message
+             * @param date the timestamp for the message
+             * @param read true if the message has been read, false if not
+             * @param phoneId the phone id which the message belongs to
+             * @return the URI for the new message
+             */
+            public static Uri addMessage(ContentResolver resolver,
+                    String address, String body, String subject, Long date,
+                    boolean read, int phoneId) {
+                return addMessageToUri(resolver, CONTENT_URI, address, body,
+                        subject, date, read, false, phoneId);
             }
         }
 
@@ -371,7 +424,24 @@ public final class Telephony {
             public static Uri addMessage(ContentResolver resolver,
                     String address, String body, String subject, Long date) {
                 return addMessageToUri(resolver, CONTENT_URI, address, body,
-                        subject, date, true, false);
+                        subject, date, true, false, PhoneFactory.getDefaultSubscription());
+            }
+
+            /**
+             * Add an SMS to the Draft box.
+             *
+             * @param resolver the content resolver to use
+             * @param address the address of the sender
+             * @param body the body of the message
+             * @param subject the psuedo-subject of the message
+             * @param date the timestamp for the message
+             * @param phoneId the phone id which the message belongs to
+             * @return the URI for the new message
+             */
+            public static Uri addMessage(ContentResolver resolver,
+                    String address, String body, String subject, Long date, int phoneId) {
+                return addMessageToUri(resolver, CONTENT_URI, address, body,
+                        subject, date, true, false, phoneId);
             }
         }
 
@@ -403,7 +473,24 @@ public final class Telephony {
             public static Uri addMessage(ContentResolver resolver,
                     String address, String body, String subject, Long date) {
                 return addMessageToUri(resolver, CONTENT_URI, address, body,
-                        subject, date, true, false);
+                        subject, date, true, false, PhoneFactory.getDefaultSubscription());
+            }
+
+            /**
+             * Add an SMS to the Draft box.
+             *
+             * @param resolver the content resolver to use
+             * @param address the address of the sender
+             * @param body the body of the message
+             * @param subject the psuedo-subject of the message
+             * @param date the timestamp for the message
+             * @param phoneId the phone id which the message belongs to
+             * @return the URI for the new message
+             */
+            public static Uri addMessage(ContentResolver resolver,
+                    String address, String body, String subject, Long date, int phoneId) {
+                return addMessageToUri(resolver, CONTENT_URI, address, body,
+                        subject, date, true, false, phoneId);
             }
 
             /**
@@ -452,9 +539,29 @@ public final class Telephony {
             public static Uri addMessage(ContentResolver resolver,
                     String address, String body, String subject, Long date,
                     boolean deliveryReport, long threadId) {
-                return addMessageToUri(resolver, CONTENT_URI, address, body,
-                        subject, date, true, deliveryReport, threadId);
+                return addMessageToUri(resolver, CONTENT_URI, address, body, subject, date,
+                        true, deliveryReport, threadId, PhoneFactory.getDefaultSubscription());
             }
+
+            /**
+             * Add an SMS to the Out box.
+             *
+             * @param resolver the content resolver to use
+             * @param address the address of the sender
+             * @param body the body of the message
+             * @param subject the psuedo-subject of the message
+             * @param date the timestamp for the message
+             * @param deliveryReport whether a delivery report was requested for the message
+             * @param phoneId the phone id which the message belongs to
+             * @return the URI for the new message
+             */
+            public static Uri addMessage(ContentResolver resolver,
+                    String address, String body, String subject, Long date,
+                    boolean deliveryReport, long threadId, int phoneId) {
+                return addMessageToUri(resolver, CONTENT_URI, address, body,
+                        subject, date, true, deliveryReport, threadId, phoneId);
+            }
+
         }
 
         /**
@@ -612,6 +719,9 @@ public final class Telephony {
                     Intent intent) {
                 Object[] messages = (Object[]) intent.getSerializableExtra("pdus");
                 byte[][] pduObjs = new byte[messages.length][];
+                int id = intent.getIntExtra("phone_id", 0);
+
+                Log.v(TAG, " getMessagesFromIntent phone_id : " + id);
 
                 int encoding = intent.getIntExtra("encoding", -1);
 
@@ -628,6 +738,7 @@ public final class Telephony {
                     } else {
                         msgs[i] = SmsMessage.createFromPdu(pdus[i]);
                     }
+                    msgs[i].phone_id = id;
                 }
                 return msgs;
             }
@@ -1766,5 +1877,6 @@ public final class Telephony {
         public static final String EXTRA_PLMN       = "plmn";
         public static final String EXTRA_SHOW_SPN   = "showSpn";
         public static final String EXTRA_SPN        = "spn";
+        public static final String EXTRA_SUBSCRIPTION = "subscription";
     }
 }

@@ -47,6 +47,7 @@ import android.util.Log;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.DataProfile.DataProfileType;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
 
 /*
  * Definitions:
@@ -988,6 +989,13 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 mPendingPowerOffCompleteMsg.sendToTarget();
                 mPendingPowerOffCompleteMsg = null;
             }
+
+            //check for pending data disabled message
+            if (mPendingDataDisableCompleteMsg != null) {
+                logd("onUpdateDataConnections: All the Data Connections are down! Notifying the caller");
+                mPendingDataDisableCompleteMsg.sendToTarget();
+                mPendingDataDisableCompleteMsg = null;
+            }
         }
 
         // Check for data readiness!
@@ -1292,9 +1300,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     // Retrieve the data roaming setting from the shared preferences.
     public boolean getDataOnRoamingEnabled() {
+        int index = (mSubscriptionData != null) ? mSubscriptionData.subNum : 0;
         try {
-            return Settings.Secure.getInt(mContext.getContentResolver(),
-                    Settings.Secure.DATA_ROAMING) > 0;
+            return Settings.Secure.getIntAtIndex(mContext.getContentResolver(),
+                Settings.Secure.DATA_ROAMING, index) > 0;
         } catch (SettingNotFoundException snfe) {
             return false;
         }
@@ -1352,6 +1361,24 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     public void unregisterForDataServiceStateChanged(Handler h) {
         mDsst.unregisterForServiceStateChanged(h);
+    }
+
+    public void setSubscriptionInfo(Subscription subData) {
+        mSubscriptionData = subData;
+        mDsst.getRecords();
+        mDpt.setSubscription(mSubscriptionData.subNum);
+    }
+
+    public Subscription getSubscriptionInfo() {
+        return mSubscriptionData;
+    }
+
+    public int getSubscription() {
+        if (mSubscriptionData != null) {
+           return mSubscriptionData.subNum;
+        } else {
+            return 0;
+        }
     }
 
     void loge(String string) {

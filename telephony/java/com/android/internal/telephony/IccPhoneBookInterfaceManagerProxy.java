@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,9 +36,17 @@ import java.util.List;
  */
 public class IccPhoneBookInterfaceManagerProxy extends IIccPhoneBook.Stub {
     private IccPhoneBookInterfaceManager mIccPhoneBookInterfaceManager;
+    private Phone[] mPhone;
 
-    public IccPhoneBookInterfaceManagerProxy(IccPhoneBookInterfaceManager
-            iccPhoneBookInterfaceManager) {
+    /* In DSDS only one IccPhonBookInterfaceManagerProxy exists */
+    public IccPhoneBookInterfaceManagerProxy(Phone[] phone) {
+        if(ServiceManager.getService("simphonebook") == null) {
+               ServiceManager.addService("simphonebook", this);
+        }
+        mPhone = phone;
+    }
+
+    public IccPhoneBookInterfaceManagerProxy(IccPhoneBookInterfaceManager iccPhoneBookInterfaceManager) {
         mIccPhoneBookInterfaceManager = iccPhoneBookInterfaceManager;
         if(ServiceManager.getService("simphonebook") == null) {
             ServiceManager.addService("simphonebook", this);
@@ -49,27 +58,64 @@ public class IccPhoneBookInterfaceManagerProxy extends IIccPhoneBook.Stub {
         this.mIccPhoneBookInterfaceManager = iccPhoneBookInterfaceManager;
     }
 
+    /* Non DSDS function is routed through DSDS function with default phone object */
     public boolean
-    updateAdnRecordsInEfBySearch (int efid,
+        updateAdnRecordsInEfBySearch (int efid,
             String oldTag, String oldPhoneNumber,
             String newTag, String newPhoneNumber,
             String pin2) throws android.os.RemoteException {
-        return mIccPhoneBookInterfaceManager.updateAdnRecordsInEfBySearch(
+        return updateAdnRecordsInEfBySearchOnSubscription(getDefaultSubscription(),
                 efid, oldTag, oldPhoneNumber, newTag, newPhoneNumber, pin2);
     }
 
     public boolean
+    updateAdnRecordsInEfBySearchOnSubscription(int subscription, int efid,
+            String oldTag, String oldPhoneNumber,
+            String newTag, String newPhoneNumber,
+            String pin2) throws android.os.RemoteException {
+        return getIccPhoneBookInterfaceManager(subscription).updateAdnRecordsInEfBySearch(
+                efid, oldTag, oldPhoneNumber, newTag, newPhoneNumber, pin2);
+    }
+
+    /* Non DSDS function is routed through DSDS function with default phone object */
+    public boolean
     updateAdnRecordsInEfByIndex(int efid, String newTag,
             String newPhoneNumber, int index, String pin2) throws android.os.RemoteException {
-        return mIccPhoneBookInterfaceManager.updateAdnRecordsInEfByIndex(efid,
+        return updateAdnRecordsInEfByIndexOnSubscription(getDefaultSubscription(), efid,
                 newTag, newPhoneNumber, index, pin2);
     }
 
-    public int[] getAdnRecordsSize(int efid) throws android.os.RemoteException {
-        return mIccPhoneBookInterfaceManager.getAdnRecordsSize(efid);
+    public boolean
+    updateAdnRecordsInEfByIndexOnSubscription(int subscription, int efid, String newTag,
+            String newPhoneNumber, int index, String pin2) throws android.os.RemoteException {
+        return getIccPhoneBookInterfaceManager(subscription).updateAdnRecordsInEfByIndex(efid,
+                newTag, newPhoneNumber, index, pin2);
     }
 
-    public List<AdnRecord> getAdnRecordsInEf(int efid) throws android.os.RemoteException {
-        return mIccPhoneBookInterfaceManager.getAdnRecordsInEf(efid);
+    /* Non DSDS function is routed through DSDS function with default phone object */
+    public int[] getAdnRecordsSize(int efid) throws android.os.RemoteException {
+        return getAdnRecordsSizeOnSubscription(getDefaultSubscription(), efid);
     }
+
+    public int[] getAdnRecordsSizeOnSubscription(int subscription, int efid) throws android.os.RemoteException {
+        return getIccPhoneBookInterfaceManager(subscription).getAdnRecordsSize(efid);
+    }
+
+    /* Non DSDS function is routed through DSDS function with default phone object */
+    public List<AdnRecord> getAdnRecordsInEf(int efid) throws android.os.RemoteException {
+        return getAdnRecordsInEfOnSubscription(getDefaultSubscription(), efid);
+    }
+
+    public List<AdnRecord> getAdnRecordsInEfOnSubscription(int subscription, int efid) throws android.os.RemoteException {
+        return getIccPhoneBookInterfaceManager(subscription).getAdnRecordsInEf(efid);
+    }
+
+    private IccPhoneBookInterfaceManager getIccPhoneBookInterfaceManager(int subscription) {
+        return mPhone[subscription].getIccPhoneBookInterfaceManager();
+    }
+
+    private int getDefaultSubscription() {
+        return PhoneFactory.getDefaultSubscription();
+    }
+
 }

@@ -41,6 +41,9 @@ import com.android.internal.telephony.gsm.RestrictedState;
 import com.android.internal.telephony.gsm.SIMRecords;
 
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
+import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.UiccConstants.AppType;
+import android.telephony.TelephonyManager;
 
 /**
  * {@hide}
@@ -133,8 +136,12 @@ public class DataServiceStateTracker extends Handler {
         this.cm = ci;
         this.mContext = context;
         this.mNotifier = notifier;
-
-        this.mUiccManager = UiccManager.getInstance(context, this.cm);
+        if( TelephonyManager.isDsdsEnabled() ) {
+            this.mUiccManager = UiccManager.getInstance(context, this.cm);
+        }
+        else {
+            this.mUiccManager = UiccManager.getInstance(context, this.cm);
+        }
 
         /* initialize */
         mSs = new ServiceState();
@@ -507,9 +514,11 @@ public class DataServiceStateTracker extends Handler {
 
 
     private void notifyDataServiceStateChanged(ServiceState ss) {
-        mNotifier.notifyDataServiceState(mDct);
-        AsyncResult ar = new AsyncResult(null, ss, null);
-        mDataServiceStateRegistrants.notifyRegistrants(ar);
+        if (mDct.getSubscriptionInfo() != null) {
+            mNotifier.notifyDataServiceState(mDct);
+            AsyncResult ar = new AsyncResult(null, ss, null);
+            mDataServiceStateRegistrants.notifyRegistrants(ar);
+        }
     }
 
     /** Cancel a pending (if any) pollState() operation */
@@ -550,12 +559,59 @@ public class DataServiceStateTracker extends Handler {
         return ret;
     }
 
+    void getRecords() {
+        logv(" DSST get Records function");
+
+        Subscription subscription_data = mDct.getSubscriptionInfo();
+
+        if (subscription_data != null) {
+            logv("slot id:" + subscription_data.slotId
+                    + ", app_index:" + subscription_data.subIndex);
+            UiccCardApplication cardApp;
+            cardApp = mUiccManager.getApplication(subscription_data.slotId,
+                                                     subscription_data.subIndex);
+            AppType appType = cardApp.getType();
+
+            if ((appType == AppType.APPTYPE_USIM) || (appType == AppType.APPTYPE_SIM)) {
+                m3gppApp = cardApp;
+                m3gppApp.registerForReady(this, EVENT_SIM_READY, null);
+                mSimRecords = (SIMRecords) m3gppApp.getApplicationRecords();
+
+                if (mSimRecords != null) {
+                    logv(" sim application records found");
+                    mSimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
+                }
+            } else if ((appType == AppType.APPTYPE_RUIM) || (appType == AppType.APPTYPE_CSIM)) {
+                m3gpp2App = cardApp;
+                m3gpp2App.registerForReady(this, EVENT_RUIM_READY, null);
+                mRuimRecords = (RuimRecords) m3gpp2App.getApplicationRecords();
+
+                if (mRuimRecords != null) {
+                    logv(" ruim application records found");
+                    mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
+                }
+            }
+        }
+    }
+
 
     /* Poll ICC Cards/Application/Application Records and update everything */
     void updateIccAvailability() {
 
         /* 3GPP case */
-        UiccCardApplication new3gppApp = mUiccManager.getCurrentApplication(AppFamily.APP_FAM_3GPP);
+        UiccCardApplication new3gppApp = null;
+        if (TelephonyManager.isDsdsEnabled()) {
+            Subscription subscriptionData = mDct.getSubscriptionInfo();
+
+            if (subscriptionData != null) {
+                new3gppApp = mUiccManager.getApplication(subscriptionData.slotId,
+                        subscriptionData.subIndex);
+            } else {
+                return;
+            }
+        } else {
+            new3gppApp = mUiccManager.getCurrentApplication(AppFamily.APP_FAM_3GPP);
+        }
 
         if (m3gppApp != new3gppApp) {
             if (m3gppApp != null) {
@@ -567,20 +623,47 @@ public class DataServiceStateTracker extends Handler {
                     mSimRecords = null;
                 }
             }
+
             if (new3gppApp != null) {
                 logv("New 3gpp application found");
-                new3gppApp.registerForReady(this, EVENT_SIM_READY, null);
-                mSimRecords = (SIMRecords) new3gppApp.getApplicationRecords();
-                if (mSimRecords != null) {
-                    mSimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
+
+                if (TelephonyManager.isDsdsEnabled()) {
+                    AppType appType = new3gppApp.getType();
+
+                    if ((appType == AppType.APPTYPE_USIM) || (appType == AppType.APPTYPE_SIM)) {
+                        new3gppApp.registerForReady(this, EVENT_SIM_READY, null);
+                        mSimRecords = (SIMRecords) new3gppApp.getApplicationRecords();
+
+                        if (mSimRecords != null) {
+                            mSimRecords.registerForRecordsLoaded(this,
+                                    EVENT_SIM_RECORDS_LOADED, null);
+                        }
+                    }
+                } else {
+                    new3gppApp.registerForReady(this, EVENT_SIM_READY, null);
+                    mSimRecords = (SIMRecords) new3gppApp.getApplicationRecords();
+
+                    if (mSimRecords != null) {
+                        mSimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
+                    }
                 }
             }
             m3gppApp = new3gppApp;
         }
 
         /* 3GPP2 case */
-        UiccCardApplication new3gpp2App = mUiccManager
-                .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        UiccCardApplication new3gpp2App = null;
+
+        if (TelephonyManager.isDsdsEnabled()) {
+            Subscription subscription_data = mDct.getSubscriptionInfo();
+
+            if (subscription_data != null) {
+                new3gpp2App = mUiccManager.getApplication(subscription_data.slotId,
+                        subscription_data.subIndex);
+            }
+        }else {
+            new3gpp2App = mUiccManager.getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        }
 
         if (m3gpp2App != new3gpp2App) {
             if (m3gpp2App != null) {
@@ -592,15 +675,33 @@ public class DataServiceStateTracker extends Handler {
                     mRuimRecords = null;
                 }
             }
+
             if (new3gpp2App != null) {
                 logv("New 3gpp2 application found");
-                new3gpp2App.registerForReady(this, EVENT_RUIM_READY, null);
-                mRuimRecords = (RuimRecords) new3gpp2App.getApplicationRecords();
-                if (mRuimRecords != null) {
-                    logv("New ruim application records found");
-                    mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
+
+                if (TelephonyManager.isDsdsEnabled()) {
+                    AppType appType = new3gpp2App.getType();
+
+                    if ((appType == AppType.APPTYPE_RUIM) || (appType == AppType.APPTYPE_CSIM)) {
+                        new3gpp2App.registerForReady(this, EVENT_RUIM_READY, null);
+                        mRuimRecords = (RuimRecords) new3gpp2App.getApplicationRecords();
+
+                        if (mRuimRecords != null) {
+                            logv("New ruim application records found");
+                            mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
+                        }
+                    }
+                }else {
+                    new3gpp2App.registerForReady(this, EVENT_RUIM_READY, null);
+                    mRuimRecords = (RuimRecords) new3gpp2App.getApplicationRecords();
+
+                    if (mRuimRecords != null) {
+                        logv("New ruim application records found");
+                        mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
+                    }
                 }
             }
+
             m3gpp2App = new3gpp2App;
         }
     }

@@ -46,6 +46,17 @@
             android:ellipsize="marquee"
             android:textAppearance="?android:attr/textAppearanceMedium"/>
 
+        <!-- Carrier info for second subscription-->
+        <TextView android:id="@+id/carrier_sub2"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/carrier"
+            android:layout_marginTop="39dip"
+            android:gravity="center"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:textAppearance="?android:attr/textAppearanceMedium"/>
+
         <!-- password entry -->
         <LinearLayout
             android:layout_width="match_parent"
