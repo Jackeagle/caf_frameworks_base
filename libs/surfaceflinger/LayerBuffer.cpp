@@ -146,6 +146,17 @@ void LayerBuffer::onDraw(const Region& clip) const
     }
 }
 
+status_t LayerBuffer::drawWithOverlay(const Region& clip, bool clear) const
+{
+#if defined(SF_BYPASS)
+    sp<Source> source(getSource());
+    if (LIKELY(source != 0)) {
+        return source->drawWithOverlay(clip, clear);
+    }
+#endif
+    return INVALID_OPERATION;
+}
+
 bool LayerBuffer::transformed() const
 {
     sp<Source> source(getSource());
@@ -271,6 +282,8 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
     src.crop.t = 0;
     src.crop.r = buffers.w;
     src.crop.b = buffers.h;
+    src.hor_stride = buffers.hor_stride;
+    src.ver_stride = buffers.ver_stride;
 
     src.img.w       = buffers.hor_stride ?: buffers.w;
     src.img.h       = buffers.ver_stride ?: buffers.h;
@@ -292,7 +305,7 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
             (buffers.format != HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO))
                 mSupportsCopybit = (err == NO_ERROR);
     }
- }
+}
 
 LayerBuffer::Buffer::~Buffer()
 {
@@ -315,6 +328,9 @@ LayerBuffer::Source::Source(LayerBuffer& layer)
 LayerBuffer::Source::~Source() {    
 }
 void LayerBuffer::Source::onDraw(const Region& clip) const {
+}
+status_t LayerBuffer::Source::drawWithOverlay(const Region& clip, bool clear) const {
+    return INVALID_OPERATION;
 }
 void LayerBuffer::Source::onTransaction(uint32_t flags) {
 }
@@ -459,6 +475,60 @@ void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer>& buffer)
 bool LayerBuffer::BufferSource::transformed() const
 {
     return mBufferHeap.transform ? true : Source::transformed(); 
+}
+
+status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool clear) const
+{
+#if defined(SF_BYPASS)
+    sp<Buffer> ourBuffer(getBuffer());
+    if (UNLIKELY(ourBuffer == 0))  {
+        // nothing to do, we don't have a buffer
+        mLayer.clearWithOpenGL(clip);
+        return INVALID_OPERATION;
+    }
+    NativeBuffer src(ourBuffer->getBuffer());
+    const DisplayHardware& hw(mLayer.mFlinger->
+                               graphicPlane(0).displayHardware());
+    overlay::Overlay* temp = hw.getOverlayObject();
+    if (!temp->setSource(src.hor_stride, src.ver_stride, src.img.format, mLayer.getOrientation()))
+        return INVALID_OPERATION;
+    if (!temp->setCrop(0, 0, src.img.w, src.img.h))
+        return INVALID_OPERATION;
+    const Rect bounds(mLayer.mTransformedBounds);
+    int x = bounds.left;
+    int y = bounds.top;
+    int w = bounds.width();
+    int h = bounds.height();
+    int ovpos_x, ovpos_y;
+    uint32_t ovpos_w, ovpos_h;
+    bool ret;
+    if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
+        if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
+            ret = temp->setPosition(x, y, w, h);
+        }
+    }
+    else
+        ret = temp->setPosition(x, y, w, h);
+    if (!ret)
+        return INVALID_OPERATION;
+    int orientation;
+    if (ret = temp->getOrientation(orientation)) {
+        if (orientation != mLayer.getOrientation())
+            ret = temp->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
+    }
+    else
+        ret = temp->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
+    if (!ret)
+        return INVALID_OPERATION;
+    ret = temp->queueBuffer(src.img.handle);
+    if (!ret)
+        return INVALID_OPERATION;
+
+    if (clear)
+        mLayer.clearWithOpenGL(clip);
+    return NO_ERROR;
+#endif
+    return INVALID_OPERATION;
 }
 
 void LayerBuffer::BufferSource::onDraw(const Region& clip) const 
@@ -660,6 +730,7 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     const DisplayHardware& hw(mLayer.mFlinger->
                                graphicPlane(0).displayHardware());
     hw.videoOverlayStarted(true);
+    mLayer.mFlinger->enableOverlayOpt(false);
     overlay_t* overlay = overlay_dev->createOverlay(overlay_dev, w, h, format);
     if (overlay == NULL) {
         // couldn't create the overlay (no memory? no more overlays?)
@@ -695,6 +766,7 @@ LayerBuffer::OverlaySource::~OverlaySource()
         const DisplayHardware& hw(mLayer.mFlinger->
                                    graphicPlane(0).displayHardware());
         hw.videoOverlayStarted(false);
+        mLayer.mFlinger->enableOverlayOpt(true);
     }
 }
 
@@ -759,6 +831,7 @@ void LayerBuffer::OverlaySource::destroy()
         const DisplayHardware& hw(mLayer.mFlinger->
                                    graphicPlane(0).displayHardware());
         hw.videoOverlayStarted(false);
+        mLayer.mFlinger->enableOverlayOpt(true);
     }
 }
 

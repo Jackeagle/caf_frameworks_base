@@ -35,6 +35,9 @@
 #include "Layer.h"
 #include "SurfaceFlinger.h"
 #include "DisplayHardware/DisplayHardware.h"
+#if defined(SF_BYPASS)
+#include "overlayLib.h"
+#endif
 
 
 #define DEBUG_RESIZE    0
@@ -272,6 +275,57 @@ slowpath:
             buffer->unlock();
         }
     }
+}
+
+status_t Layer::drawWithOverlay(const Region& clip, bool clear) const
+{
+#if defined(SF_BYPASS)
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    overlay::Overlay* temp = hw.getOverlayObject();
+    if (!temp->setSource(mWidth, mHeight, mFormat, getOrientation()))
+        return INVALID_OPERATION;
+    const Rect bounds(mTransformedBounds);
+    int x = bounds.left;
+    int y = bounds.top;
+    int w = bounds.width();
+    int h = bounds.height();
+    int ovpos_x, ovpos_y;
+    uint32_t ovpos_w, ovpos_h;
+    bool ret;
+    if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
+        if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
+            ret = temp->setPosition(x, y, w, h);
+        }
+    }
+    else
+        ret = temp->setPosition(x, y, w, h);
+    if (!ret)
+        return INVALID_OPERATION;
+    int orientation;
+    if (ret = temp->getOrientation(orientation)) {
+        if (orientation != getOrientation())
+            ret = temp->setParameter(OVERLAY_TRANSFORM, getOrientation());
+    }
+    else
+        ret = temp->setParameter(OVERLAY_TRANSFORM, getOrientation());
+    if (!ret)
+        return INVALID_OPERATION;
+    int index = mFrontBufferIndex;
+    if (mTextures[index].image == EGL_NO_IMAGE_KHR)
+        index = 0;
+    GLuint textureName = mTextures[index].name;
+    if (UNLIKELY(textureName == -1LU)) {
+        return INVALID_OPERATION;
+    }
+    buffer_handle_t handle = (mBuffers[index]->getNativeBuffer())->handle;
+    ret = temp->queueBuffer(handle);
+    if (!ret)
+        return INVALID_OPERATION;
+    if (clear)
+        clearWithOpenGL(clip);
+    return NO_ERROR;
+#endif
+    return INVALID_OPERATION;
 }
 
 void Layer::onDraw(const Region& clip) const

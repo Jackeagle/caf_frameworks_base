@@ -38,6 +38,10 @@
 #include "Layer.h"
 #include "Tokenizer.h"
 
+#if defined(SF_BYPASS)
+#include "overlayLib.h"
+#endif
+
 #include "MessageQueue.h"
 
 struct copybit_device_t;
@@ -174,6 +178,7 @@ public:
             void                        screenAcquired(DisplayID dpy);
 
             overlay_control_device_t* getOverlayEngine() const;
+            void enableOverlayOpt(bool start) const;
 
             
     status_t removeLayer(const sp<LayerBase>& layer);
@@ -374,6 +379,10 @@ private:
    // only written in the main thread, only read in other threads
    volatile     int32_t                     mSecureFrameBuffer;
    bool mHDMIOutput;
+   mutable bool mOverlayOpt;
+   bool mFullScreen;
+   bool mOverlayUsed;
+   bool mOverlayUsedVideo;
 };
 
 // ---------------------------------------------------------------------------

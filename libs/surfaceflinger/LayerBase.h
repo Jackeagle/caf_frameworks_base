@@ -62,12 +62,14 @@ class LayerBase : public RefBase
     struct getTypeInfoOfAnyType<T*> {
         static uint32_t get() { return getTypeInfoOfAnyType<T>::get(); }
     };
+    int mLayerInitFlags;
 
 public:
     static const uint32_t typeInfo;
     static const char* const typeID;
     virtual char const* getTypeID() const { return typeID; }
     virtual uint32_t getTypeInfo() const { return typeInfo; }
+    virtual int getLayerInitFlags() const { return mLayerInitFlags; }
     
     template<typename T>
     static T dynamicCast(LayerBase* base) {
@@ -133,6 +135,7 @@ public:
      * to perform the actual drawing.  
      */
     virtual void draw(const Region& clip) const;
+    virtual status_t drawWithOverlay(const Region& clip, bool clear) const;
     
     /**
      * onDraw - draws the surface.
