@@ -3660,39 +3660,27 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     private void riljLog(String msg) {
-        String str = Thread.currentThread().getName();
-        long id = Thread.currentThread().getId();
-        Log.d(LOG_TAG, msg + ",thread name:"+ str + ",thread_id:" + id);
+        Log.d(LOG_TAG, msg);
     }
 
     private void riljLogv(String msg) {
-        String str = Thread.currentThread().getName();
-        long id = Thread.currentThread().getId();
-        Log.v(LOG_TAG, msg + ",thread name:"+ str + ",thread_id:" + id );
+        Log.v(LOG_TAG, msg);
     }
 
     private void unsljLog(int response) {
-        String str = Thread.currentThread().getName();
-        long id = Thread.currentThread().getId();
-        riljLog("[UNSL]< " + responseToString(response) + ",thread name:"+ str + ",thread_id:" + id);
+        riljLog("[UNSL]< " + responseToString(response));
     }
 
     private void unsljLogMore(int response, String more) {
-        String str = Thread.currentThread().getName();
-        long id = Thread.currentThread().getId();
-        riljLog("[UNSL]< " + responseToString(response) + " " + more + ",thread name:"+ str + ",thread_id:" + id);
+        riljLog("[UNSL]< " + responseToString(response) + " " + more);
     }
 
     private void unsljLogRet(int response, Object ret) {
-        String str = Thread.currentThread().getName();
-        long id = Thread.currentThread().getId();
-        riljLog("[UNSL]< " + responseToString(response) + " " + retToString(response, ret) + ",thread name:"+ str + ",thread_id:" + id);
+        riljLog("[UNSL]< " + responseToString(response) + " " + retToString(response, ret));
     }
 
     private void unsljLogvRet(int response, Object ret) {
-        String str = Thread.currentThread().getName();
-        long id = Thread.currentThread().getId();
-        riljLogv("[UNSL]< " + responseToString(response) + " " + retToString(response, ret) + ",thread name:"+ str + ",thread_id:" + id);
+        riljLogv("[UNSL]< " + responseToString(response) + " " + retToString(response, ret));
     }
 
 
