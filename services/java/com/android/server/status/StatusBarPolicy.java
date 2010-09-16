@@ -1284,10 +1284,8 @@ public class StatusBarPolicy {
         IccCard.State simState;
         if (TelephonyManager.isDsdsEnabled()) {
             dds = Settings.System.getInt(mContext.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL, -1);
-            Slog.d(TAG, "StatusBarPolicy updateDataIcon subscription = " + subscription + "DDS = " + dds);
             // Update icon only if DDS in properly set and "subscription" matches DDS.
             if ((dds < 0) || (subscription != dds)) {
-                Slog.d(TAG, "StatusBarPolicy updateDataIcon subscription != DDS");
                 return;
             }
         } else {
