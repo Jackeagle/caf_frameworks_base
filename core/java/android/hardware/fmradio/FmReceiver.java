@@ -257,7 +257,7 @@ public class FmReceiver extends FmTransceiver
    private static final int TAVARUA_BUF_AF_LIST=5;
    private static final int TAVARUA_BUF_MAX=6;
 
-
+   private FmRxEvCallbacksAdaptor mCallback;
 
 
    /**
@@ -283,10 +283,8 @@ public class FmReceiver extends FmTransceiver
       mControl = new FmRxControls();
       mRxEvents = new FmRxEventListner();
 
-      if ( !acquire(devicePath))
-        throw new InstantiationException("Unable to open device descriptor");
-
-      registerClient(callback);
+      //registerClient(callback);
+      mCallback = callback;
       mRdsData = new FmRxRdsData(sFd);
    }
 
@@ -397,9 +395,14 @@ public class FmReceiver extends FmTransceiver
          */
       status = super.enable(configSettings, FmTransceiver.FM_RX);
 
-      /* Do Receiver Specific Enable Stuff here.*/
-
-      return true;
+      if( status == true ) {
+         /* Do Receiver Specific Enable Stuff here.*/
+         status = registerClient(mCallback);
+      }
+      else {
+         status = false;
+      }
+      return status;
    }
 
    /*==============================================================
@@ -422,9 +425,17 @@ public class FmReceiver extends FmTransceiver
    */
    public boolean disable(){
       boolean status;
-      status = super.disable();
+      //
+      status = unregisterClient();
 
-      return true;
+      if( status == true ) {
+          status = super.disable();
+      }
+      else {
+          status = false;
+      }
+
+      return status;
    }
 
    /*==============================================================
