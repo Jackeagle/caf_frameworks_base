@@ -52,7 +52,6 @@ import java.util.HashMap;
 
 final class CdmaSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "CDMA";
-    private int mVmCount =0;
     private byte[] mLastDispatchedSmsFingerprint;
     private byte[] mLastAcknowledgedSmsFingerprint;
 
@@ -534,25 +533,18 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
      * sending true/false
      */
     /* package */void updateMessageWaitingIndicator(int mwi) {
-        // this also calls notifyMessageWaitingIndicator()
-        Log.d(TAG, "Voicemail count=" + mwi);
-        mVmCount = mwi;
-        Message onComplete;
-        storeVoiceMailCount();
-        if (mRecords != null) {
-            onComplete = obtainMessage(EVENT_UPDATE_ICC_MWI);
-            mRecords.setVoiceMessageWaiting(1, mwi, onComplete);
-        } else {
-            Log.d(TAG, "UIM Records not found");
+        // range check
+        if (mwi < 0) {
+            mwi = -1;
+        } else if (mwi > 0xff) {
+            // C.S0015-B v2, 4.5.12
+            // range: 0-99
+            mwi = 0xff;
         }
-    }
-
-    protected void storeVoiceMailCount() {
-        // Store the voicemail count in preferences.
-        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
-        SharedPreferences.Editor editor = sp.edit();
-        editor.putInt(CDMAPhone.VM_COUNT_CDMA, mVmCount);
-        editor.commit();
+        // update voice mail count in phone
+        ((PhoneBase)mPhone).setVoiceMessageCount(mwi);
+        // store voice mail count in preferences
+        storeVoiceMailCount();
     }
 
 }

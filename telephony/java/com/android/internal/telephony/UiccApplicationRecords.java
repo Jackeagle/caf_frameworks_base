@@ -41,18 +41,12 @@ public abstract class UiccApplicationRecords extends Handler{
     protected IccFileHandler mFh;
     protected UiccCard mParentCard;
 
-    public static final int EVENT_MWI = 0;
     public static final int EVENT_CFI = 1;
     public static final int EVENT_SPN = 2;
     public static final int EVENT_EONS = 3;
 
     // Internal events
     protected static final int EVENT_APP_READY = 1;
-
-    // Key used for storing voice mail count
-    public static final String VM_COUNT = "vm_count_key";
-    // Key used to read/write the ID for storing the voice mail
-    public static final String VM_ID = "vm_id_key";
 
     private RegistrantList mUnavailableRegistrants = new RegistrantList();
     protected RegistrantList mRecordsEventsRegistrants = new RegistrantList();
@@ -156,7 +150,6 @@ public abstract class UiccApplicationRecords extends Handler{
     protected String newVoiceMailNum = null;
     protected String newVoiceMailTag = null;
     protected boolean isVoiceMailFixed = false;
-    protected int countVoiceMessages = 0;
 
     protected int mncLength = UNINITIALIZED;
     protected int mailboxIndex = 0; // 0 is no mailbox dailing number associated
@@ -301,20 +294,6 @@ public abstract class UiccApplicationRecords extends Handler{
      *                      messages are waiting
      */
     public abstract void setVoiceMessageWaiting(int line, int countWaiting, Message onComplete );
-
-    /** @return  true if there are messages waiting, false otherwise. */
-    public boolean getVoiceMessageWaiting() {
-        return countVoiceMessages != 0;
-    }
-
-    /**
-     * Returns number of voice messages waiting, if available
-     * If not available (eg, on an older CPHS SIM) -1 is returned if
-     * getVoiceMessageWaiting() is true
-     */
-    public int getVoiceMessageCount() {
-        return countVoiceMessages;
-    }
 
     /**
      * Called by STK Service when REFRESH is received.
