@@ -550,6 +550,25 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         success = success && meta->findInt32(kKeyHeight, &height);
         CHECK(success);
 
+        if (mThumbnailMode) {
+            LOGV("Enabling thumbnail mode.");
+            QOMX_ENABLETYPE enableType;
+            OMX_INDEXTYPE indexType;
+
+            status_t err = mOMX->getExtensionIndex(
+                mNode, OMX_QCOM_INDEX_PARAM_VIDEO_SYNCFRAMEDECODINGMODE, &indexType);
+
+            CHECK_EQ(err, OK);
+
+            enableType.bEnable = OMX_TRUE;
+
+            err = mOMX->setParameter(
+                    mNode, indexType, &enableType, sizeof(enableType));
+            CHECK_EQ(err, OK);
+
+            LOGV("Thumbnail mode enabled.");
+        }
+
         if (mIsEncoder) {
             setVideoInputFormat(mMIME, width, height);
         } else {
@@ -1109,6 +1128,7 @@ OMXCodec::OMXCodec(
       mOutputPortSettingsHaveChanged(false),
       mSeekTimeUs(-1),
       mGPUComposition(false),
+      mThumbnailMode(false),
       mLeftOverBuffer(NULL),
       mPmemInfo(NULL),
       mInterlaceFormatDetected(false) {
@@ -1940,15 +1960,23 @@ void OMXCodec::fillOutputBuffers() {
     // end-of-output-stream. If we own all input buffers and also own
     // all output buffers and we already signalled end-of-input-stream,
     // the end-of-output-stream is implied.
-    if (mSignalledEOS
-            && countBuffersWeOwn(mPortBuffers[kPortIndexInput])
-                == mPortBuffers[kPortIndexInput].size()
-            && countBuffersWeOwn(mPortBuffers[kPortIndexOutput])
-                == mPortBuffers[kPortIndexOutput].size()) {
-        mNoMoreOutputData = true;
-        mBufferFilled.signal();
+    //
+    // NOTE: Thumbnail mode needs a call to fillOutputBuffer in order
+    // to get the decoded frame from the component. Currently,
+    // thumbnail mode calls emptyBuffer with an EOS flag on its first
+    // frame and sets mSignalledEOS to true, so without the check for
+    // !mThumbnailMode, fillOutputBuffer will never be called.
+    if (!mThumbnailMode) {
+        if (mSignalledEOS
+                && countBuffersWeOwn(mPortBuffers[kPortIndexInput])
+                    == mPortBuffers[kPortIndexInput].size()
+                && countBuffersWeOwn(mPortBuffers[kPortIndexOutput])
+                    == mPortBuffers[kPortIndexOutput].size()) {
+            mNoMoreOutputData = true;
+            mBufferFilled.signal();
 
-        return;
+            return;
+        }
     }
 
     Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
@@ -2109,6 +2137,16 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
 
     if (signalEOS) {
         flags |= OMX_BUFFERFLAG_EOS;
+    } else if (mThumbnailMode) {
+        // Because we don't get an EOS after getting the first frame, we
+        // need to notify the component with OMX_BUFFERFLAG_EOS, set
+        // mNoMoreOutputData to false so fillOutputBuffer gets called on
+        // the first output buffer (see comment in fillOutputBuffer), and
+        // mSignalledEOS must be true so drainInputBuffer is not executed
+        // on extra frames.
+        flags |= OMX_BUFFERFLAG_EOS;
+        mNoMoreOutputData = false;
+        mSignalledEOS = true;
     } else {
         mNoMoreOutputData = false;
     }
@@ -3097,6 +3135,7 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
 
 void OMXCodec::parseFlags(uint32_t flags) {
     mGPUComposition = ((flags & kEnableGPUComposition) ? true : false);
+    mThumbnailMode = ((flags & kEnableThumbnailMode) ? true : false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
