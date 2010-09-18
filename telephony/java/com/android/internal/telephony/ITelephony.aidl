@@ -279,17 +279,17 @@ interface ITelephony {
     /**
      * Returns Interface Name
      */
-    String getActiveInterfaceName(String apnType);
+    String getActiveInterfaceName(String apnType, String ipv);
 
     /**
      * Returns Ip address
      */
-    String getActiveIpAddress(String apnType);
+    String getActiveIpAddress(String apnType, String ipv);
 
     /**
      * Returns Gateway address
      */
-    String getActiveGateway(String apnType);
+    String getActiveGateway(String apnType, String ipv);
 
     /**
      * Modify data readiness checks performed during data call setup
