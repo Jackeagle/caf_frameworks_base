@@ -358,7 +358,10 @@ public class FmTransceiver
    */
    public boolean enable (FmConfig configSettings, int device){
 
-
+      //Acquire the deviceon Enable
+      if( !acquire("/dev/radio0")){
+         return false;
+      }
       Log.d(TAG, "turning on %d" + device);
       mControl.fmOn(sFd, device);
 
@@ -389,6 +392,8 @@ public class FmTransceiver
    public boolean disable(){
       mControl.fmOff(sFd);
 
+      //Release the device on Disable
+      release("/dev/radio0");
       return true;
    }
 
