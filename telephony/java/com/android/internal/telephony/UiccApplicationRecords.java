@@ -49,6 +49,11 @@ public abstract class UiccApplicationRecords extends Handler{
     // Internal events
     protected static final int EVENT_APP_READY = 1;
 
+    // Key used for storing voice mail count
+    public static final String VM_COUNT = "vm_count_key";
+    // Key used to read/write the ID for storing the voice mail
+    public static final String VM_ID = "vm_id_key";
+
     private RegistrantList mUnavailableRegistrants = new RegistrantList();
     protected RegistrantList mRecordsEventsRegistrants = new RegistrantList();
     protected RegistrantList mNewSmsRegistrants = new RegistrantList();
@@ -295,7 +300,7 @@ public abstract class UiccApplicationRecords extends Handler{
      *                     -1 to indicate that an unknown number of
      *                      messages are waiting
      */
-    public abstract void setVoiceMessageWaiting(int line, int countWaiting);
+    public abstract void setVoiceMessageWaiting(int line, int countWaiting, Message onComplete );
 
     /** @return  true if there are messages waiting, false otherwise. */
     public boolean getVoiceMessageWaiting() {

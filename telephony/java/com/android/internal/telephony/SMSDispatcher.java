@@ -129,6 +129,8 @@ public abstract class SMSDispatcher extends Handler {
 
     static final protected int EVENT_NEW_ICC_SMS = 17;
 
+    static final protected int EVENT_UPDATE_ICC_MWI = 18;
+
     /** Must be static as they are referenced by 3 derived instances, Ims/Cdma/GsmSMSDispatcher */
     /** true if IMS is registered, false otherwise.*/
     static protected boolean mIms = false;
@@ -452,6 +454,16 @@ public abstract class SMSDispatcher extends Handler {
         case EVENT_NEW_ICC_SMS:
             ar = (AsyncResult)msg.obj;
             dispatchMessage((SmsMessageBase)ar.result);
+            break;
+
+        case EVENT_UPDATE_ICC_MWI:
+            ar = (AsyncResult) msg.obj;
+            if ( ar == null)
+                break;
+            if (ar.exception != null) {
+                Log.v(TAG, " MWI update on card failed " + ar.exception );
+                storeVoiceMailCount();
+            }
             break;
         }
     }
@@ -1128,6 +1140,8 @@ public abstract class SMSDispatcher extends Handler {
     }
 
     protected abstract void updateIccAvailability();
+
+    protected abstract void storeVoiceMailCount();
 
     IccFileHandler getIccFileHandler() {
         if (mApplication != null) {

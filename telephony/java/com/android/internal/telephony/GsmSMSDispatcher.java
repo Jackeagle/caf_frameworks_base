@@ -20,8 +20,10 @@ import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.AsyncResult;
 import android.os.Message;
+import android.preference.PreferenceManager;
 import android.provider.Telephony.Sms.Intents;
 import android.telephony.ServiceState;
 import android.util.Config;
@@ -39,6 +41,7 @@ import static android.telephony.SmsMessage.MessageClass;
 
 final class GsmSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "GSM";
+    private int mVmCount =0;
 
     GsmSMSDispatcher(VoicePhone phone, CommandsInterface cm) {
         super(phone, cm);
@@ -416,16 +419,36 @@ final class GsmSMSDispatcher extends SMSDispatcher {
         }
     }
 
-    /*package*/ void
-    updateMessageWaitingIndicator(int mwi) {
+    /* package */void updateMessageWaitingIndicator(int mwi) {
         // this also calls notifyMessageWaitingIndicator()
 
        /* mwi = number of voice mails; count is known, set notification
         * mwi = -1; count is unknown, set notification
         * mwi = 0; no unread voicemails , clear notification
         */
+        Message onComplete;
+        mVmCount = mwi;
         if (mRecords != null) {
-            mRecords.setVoiceMessageWaiting(1, mwi);
+            onComplete = obtainMessage(EVENT_UPDATE_ICC_MWI);
+            mRecords.setVoiceMessageWaiting(1, mwi, onComplete);
+        } else {
+            Log.d(TAG, "SIM Records not found, MWI not updated");
+        }
+    }
+
+    protected void storeVoiceMailCount() {
+        /*
+         * Store the voice mail count in persistent memory This is done when
+         * storing it in SIM fails
+         */
+        if (mRecords != null) {
+            SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
+            SharedPreferences.Editor editor = sp.edit();
+            editor.putInt(mRecords.VM_COUNT, mVmCount);
+            editor.putString(mRecords.VM_ID, mRecords.mImsi);
+            editor.commit();
+            Log.d(TAG, " Storing Voice Mail Count = " + mVmCount +
+                    " for imsi = " + mRecords.mImsi + " in preferences.");
         }
     }
 
