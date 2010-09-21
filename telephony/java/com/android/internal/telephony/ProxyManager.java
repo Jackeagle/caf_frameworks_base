@@ -243,7 +243,8 @@ public class ProxyManager extends Handler {
         mUiccCards = mUiccManager.getIccCards();
         if(mUiccCards.length == UiccConstants.RIL_MAX_CARDS) {
 
-            if (mUiccCards[0] != null && mUiccCards[1] != null) {
+            if ((mUiccCards[0] != null && mUiccCards[0].getNumApplications() > 0)
+                && (mUiccCards[1] != null && mUiccCards[1].getNumApplications() > 0)) {
                 Log.d(LOG_TAG, ":  card 1 state: "+mUiccCards[0].getCardState());
                 Log.d(LOG_TAG, ":  card 2 state: "+mUiccCards[1].getCardState());
 
