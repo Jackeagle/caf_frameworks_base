@@ -41,7 +41,7 @@ import com.android.internal.telephony.gsm.GSMPhone;
 import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 import android.telephony.TelephonyManager;
 
 public class PhoneProxy extends Handler implements Phone {

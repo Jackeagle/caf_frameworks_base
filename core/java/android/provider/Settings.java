@@ -2096,30 +2096,18 @@ public final class Settings {
          */
         public static int getIntAtIndex(ContentResolver cr, String name, int index)
                 throws SettingNotFoundException {
-            int ret[] = null;
             String v = getString(cr, name);
-            try {
-                if (v != null) {
-                    String valArray[] = v.split(",");
-                    if (valArray != null) {
-                        ret = new int[valArray.length];
-                        for (int i = 0; i < valArray.length; i++) {
-                            if (valArray[i] != null) {
-                                ret[i] = Integer.parseInt(valArray[i]);
-                            }
-                        }
+            if (v != null) {
+                String valArray[] = v.split(",");
+                if ((index >= 0) && (index < valArray.length) && (valArray[index] != null)) {
+                    try {
+                        return Integer.parseInt(valArray[index]);
+                    } catch (NumberFormatException e) {
+                        Log.w(TAG, "Exception while parsing Integer: ", e);
                     }
-                    if (index < ret.length) {
-                        return ret[index];
-                    } else {
-                        throw new SettingNotFoundException(name);
-                    }
-                } else {
-                    throw new SettingNotFoundException(name);
                 }
-            } catch (NumberFormatException e) {
-                throw new SettingNotFoundException(name);
             }
+            throw new SettingNotFoundException(name);
         }
 
         /**
@@ -2171,41 +2159,27 @@ public final class Settings {
          * @hide
          */
         public static boolean putIntAtIndex(ContentResolver cr, String name, int index, int value) {
-            String data = null;
+            String data = "";
+            String valArray[] = null;
             String v = getString(cr, name);
 
-            if (v == null) {
-                return putString(cr, name, Integer.toString(value));
+            if (v != null) {
+                valArray = v.split(",");
             }
 
-            String valArray[] = v.split(",");
-            if (valArray == null) {
-               return false;
-            }
-
-            // If the value needs to update at the first index
-            if (index == 0) {
-                data = Integer.toString(value);
-            } else {
-                // Copy the elements form valArray till index
-                // put '0' as default if there is no element
-                for (int i = 0; i < index; i++) {
-                    String str;
-                    if (i < valArray.length) {
-                        str = valArray[i];
-                    } else {
-                        str = "0";
-                    }
-                    if (data == null) {
-                        data = str + ",";
-                    } else {
-                        data = data + str + ",";
-                    }
+            // Copy the elements from valArray till index
+            for (int i = 0; i < index; i++) {
+                String str = "";
+                if ((valArray != null) && (i < valArray.length)) {
+                    str = valArray[i];
                 }
-                data = data + Integer.toString(value);
+                data = data + str + ",";
             }
+
+            data = data + value;
+
             // Copy the remaining elements from valArray if any.
-            if (index+1 < valArray.length) {
+            if (valArray != null) {
                 for (int i = index+1; i < valArray.length; i++) {
                     data = data + "," + valArray[i];
                 }

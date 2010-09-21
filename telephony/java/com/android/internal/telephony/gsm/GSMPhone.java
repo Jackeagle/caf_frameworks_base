@@ -72,7 +72,7 @@ import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.IccVmNotSupportedException;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

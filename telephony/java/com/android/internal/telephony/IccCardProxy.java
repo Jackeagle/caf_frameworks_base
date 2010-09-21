@@ -34,7 +34,7 @@ import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.UiccConstants.PersoSubState;
 import com.android.internal.telephony.UiccManager.AppFamily;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 import static com.android.internal.telephony.VoicePhone.CDMA_SUBSCRIPTION_NV;
 
 import android.telephony.TelephonyManager;

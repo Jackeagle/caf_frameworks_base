@@ -19,7 +19,7 @@ package com.android.internal.telephony;
 
 import android.os.Handler;
 import android.telephony.ServiceState;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 
 /**

@@ -37,7 +37,7 @@ import android.util.Log;
 
 import com.android.internal.R;
 import com.android.internal.telephony.test.SimulatedRadioControl;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.util.List;
 import java.util.Locale;

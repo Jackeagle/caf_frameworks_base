@@ -61,8 +61,8 @@ import com.android.internal.telephony.SmsResponse;
 import com.android.internal.telephony.RegStateResponse;
 import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.SubscriptionData;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;

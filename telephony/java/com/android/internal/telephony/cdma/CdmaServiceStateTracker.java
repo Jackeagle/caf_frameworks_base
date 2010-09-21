@@ -55,7 +55,7 @@ import com.android.internal.telephony.UiccManager;
 import com.android.internal.telephony.VoicePhone;
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 import android.telephony.TelephonyManager;
 
 import java.util.Arrays;

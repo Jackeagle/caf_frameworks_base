@@ -34,7 +34,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.DataPhone.IPVersion;
 import com.android.internal.telephony.DataProfile.DataProfileType;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 /**
  * {@hide}
