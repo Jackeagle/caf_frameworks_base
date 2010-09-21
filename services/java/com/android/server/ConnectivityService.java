@@ -1603,7 +1603,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     /* CNE related methods. */
     public void startCne(){
         if(!mCneStarted){
-            if(SystemProperties.get(CNE.UseCne,"false").equalsIgnoreCase("true")) {
+            if(SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor") ||
+               SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("reference")) {
                     Slog.v(TAG, "CNE starting up");
                     /* sychronised to wait until cne creation so that
                      * defualt connection can start.
@@ -1627,7 +1628,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     public boolean isCneEnabled(){
-        if((SystemProperties.get(CNE.UseCne,"false").equalsIgnoreCase("true")) &&
+        if((SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor") ||
+            SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("reference")) &&
             CNE.isCndUp)
             return true;
 
