@@ -546,5 +546,6 @@ interface ITelephony {
     void setDataReadinessChecksOnSubscription(boolean checkConnectivity,
                boolean checkSubscription, boolean tryDataCalls, int subscription);
 
+    boolean isSimPukLockedOnSubscription(int subscription);
 }
 
