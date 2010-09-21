@@ -86,4 +86,9 @@ public interface TelephonyProperties
      */
     static String PROPERTY_DATA_NETWORK_TYPE = "gsm.network.type";
 
+    /**
+     * Indicates whether sms should be sent in synchronous manner.
+     * Type: boolean ( false = asynchronous, true = send next queued sms after
+     * making sure previous sms was sent) */
+    static final String SMS_SYNCHRONOUS_SENDING = "persist.radio.sms_sync_sending";
 }
