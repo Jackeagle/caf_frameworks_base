@@ -609,7 +609,7 @@ status_t CameraService::Client::registerPreviewBuffers()
 
     // don't use a hardcoded format here
     ISurface::BufferHeap buffers(w, h, w, h,
-                                 HAL_PIXEL_FORMAT_YCrCb_420_SP,
+                                 HAL_PIXEL_FORMAT_RGB_565,
                                  mOrientation,
                                  0,
                                  mHardware->getPreviewHeap());
@@ -931,7 +931,7 @@ void CameraService::Client::handleShutter(
         }
         // FIXME: don't use hardcoded format constants here
         ISurface::BufferHeap buffers(w, h, w, h,
-            HAL_PIXEL_FORMAT_YCrCb_420_SP, mOrientation, 0,
+            HAL_PIXEL_FORMAT_RGB_565, mOrientation, 0,
             mHardware->getRawHeap());
 
         mSurface->registerBuffers(buffers);
