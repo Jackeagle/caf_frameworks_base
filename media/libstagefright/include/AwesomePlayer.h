@@ -138,6 +138,11 @@ private:
        at what point the shorter track has ended.
        mDurationUs (and by extension getDuration())
        returns the larger duration of the two tracks.
+
+       mAudioDuration: the length of the audio
+       mVideoDuration: the time where the EOS occurs,
+                       which isn't necessarily the
+                       duration of the video track
     */
     int64_t mAudioDurationUs, mVideoDurationUs;
 
@@ -158,7 +163,7 @@ private:
     bool mWatchForAudioEOS;
 
     bool mAudioEOSOccurred;
-    bool mVideoEOSOccurred; //not used for now
+    bool mVideoEOSOccurred;
 
     sp<TimedEventQueue::Event> mVideoEvent;
     bool mVideoEventPending;

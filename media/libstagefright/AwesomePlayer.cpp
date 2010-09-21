@@ -715,9 +715,28 @@ status_t AwesomePlayer::getDuration(int64_t *durationUs) {
 }
 
 status_t AwesomePlayer::getPosition(int64_t *positionUs) {
+    /*
+        In determining the position, use the video source's
+        position whenever possible, unless the video track
+        is shorter than the audio track.
+
+        The conditions below assume that mVideoEOSOccurred !=
+        mAudioEOSOccurred since if both EOSes have occurred,
+        the playback would have ended.
+
+        For the second "else if" we don't need to check if
+        Audio EOS occurred because:
+            a) if we have video, we'll always use video's
+               time. If we don't have video then,
+               notifyStreamDone() will have been triggered
+               and playback would have ended by now
+            b) if video EOS has occurred then audio EOS
+               hasn't occurred. Otherwise we wouldn't be
+               here.
+    */
     if (mSeeking) {
         *positionUs = mSeekTimeUs;
-    } else if (mVideoSource != NULL) {
+    } else if (mVideoSource != NULL && !mVideoEOSOccurred) {
         Mutex::Autolock autoLock(mMiscStateLock);
         *positionUs = mVideoTimeUs;
     } else if (mAudioPlayer != NULL) {
@@ -746,8 +765,6 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
     mSeekTimeUs = timeUs;
     mFlags &= ~AT_EOS;
 
-    seekAudioIfNecessary_l();
-
     //Reset the Audio EOS occurred flag unless
     //we are still past the EOS even after the seek
     if (timeUs < mAudioDurationUs)
@@ -757,6 +774,7 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
     if (timeUs < mVideoDurationUs)
         mVideoEOSOccurred = false;
 
+    seekAudioIfNecessary_l();
     if (!(mFlags & PLAYING)) {
         LOGV("seeking while paused, sending SEEK_COMPLETE notification"
              " immediately.");
@@ -769,7 +787,7 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
 }
 
 void AwesomePlayer::seekAudioIfNecessary_l() {
-    if (mSeeking && mVideoSource == NULL && mAudioPlayer != NULL) {
+    if (mSeeking && (mVideoSource == NULL || mVideoEOSOccurred) && mAudioPlayer != NULL) {
         mAudioPlayer->seekTo(mSeekTimeUs);
         mWatchForAudioSeekComplete = true;
         mWatchForAudioEOS = true;
@@ -865,7 +883,6 @@ status_t AwesomePlayer::initVideoDecoder() {
             if (mDurationUs < 0 || durationUs > mDurationUs) {
                 mDurationUs = durationUs;
             }
-            mVideoDurationUs = durationUs;
         }
 
         CHECK(mVideoTrack->getFormat()->findInt32(kKeyWidth, &mVideoWidth));
@@ -890,6 +907,13 @@ void AwesomePlayer::onVideoEvent() {
         return;
     }
     mVideoEventPending = false;
+
+    if (mVideoEOSOccurred && !mAudioEOSOccurred)
+    {
+        //Continue polling to see if Video EOS went away due to seek
+        postVideoEvent_l();
+        return;
+    }
 
     if (mSeeking) {
         for(int i=0;i<BUFFER_QUEUE_CAPACITY;i++){
@@ -928,7 +952,17 @@ void AwesomePlayer::onVideoEvent() {
                     continue;
                 }
 
-                postStreamDoneEvent_l(err);
+                mVideoEOSOccurred = true;
+                mVideoDurationUs = mVideoTimeUs;
+
+                if (mAudioEOSOccurred || mAudioSource == NULL)
+                    postStreamDoneEvent_l(err);
+                else
+                {
+                    //Post a video event to start polling
+                    //if video EOS went away due to seek
+                    postVideoEvent_l();
+                }
                 return;
             }
 
