@@ -113,9 +113,9 @@ public class PhoneProxy extends Handler implements Phone {
         mCi = ((PhoneBase) mActiveVoicePhone).mCM;
         if( !TelephonyManager.isDsdsEnabled() ) {
             mIccSmsInterfaceManager = new IccSmsInterfaceManager(this.mActiveVoicePhone, mCi);
-            mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(voicePhone
+            mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(this,voicePhone
                 .getIccPhoneBookInterfaceManager());
-            mPhoneSubInfoProxy = new PhoneSubInfoProxy(voicePhone.getPhoneSubInfo());
+            mPhoneSubInfoProxy = new PhoneSubInfoProxy(this,voicePhone.getPhoneSubInfo());
         }
 
         mCi.registerForRadioStateChanged(this, EVENT_RADIO_STATE_CHANGED, null);
