@@ -69,6 +69,9 @@ public:
     static status_t     usePVPlayer(const char *filename);
     static status_t     usePVPlayer(int fd, int64_t offset, int64_t length);
 
+    void   setIsResume(bool set) { mIsResume = set; }
+    bool   getIsResume()         { return mIsResume; }
+
 private:
     static void         do_nothing(status_t s, void *cookie, bool cancelled) { }
     static void         run_init(status_t s, void *cookie, bool cancelled);
@@ -86,6 +89,7 @@ private:
     int                         mDuration;
     int                         mPositionWhenSuspend;
     bool                        mIsPlaying;
+    bool                        mIsResume;
 
 #ifdef MAX_OPENCORE_INSTANCES
     static volatile int32_t     sNumInstances;
