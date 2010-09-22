@@ -134,8 +134,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     private boolean mNoAutoAttach = false;
     private boolean mIsPsRestricted = false;
     private boolean mDesiredPowerState = true;
-    private boolean mCheckForConnectivity = true;
-    private boolean mCheckForSubscription = true;
 
     Message mPendingPowerOffCompleteMsg;
 
@@ -1151,8 +1149,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     private RadioTechnology getRadioTechnology() {
-        return RadioTechnology.getRadioTechFromInt(mDsst.getDataServiceState()
-                .getRadioTechnology());
+        if (mCheckForConnectivity) {
+            return RadioTechnology.getRadioTechFromInt(mDsst.getDataServiceState()
+                    .getRadioTechnology());
+        } else {
+            // Workaround to choose a technology for SETUP_DATA_CALL when
+            // mCheckForConnectivity is set to false. We need a technology for
+            // SETUP_DATA_CALL.
+            return RadioTechnology.RADIO_TECH_1xRTT;
+        }
     }
 
     public String dumpDataReadinessinfo() {

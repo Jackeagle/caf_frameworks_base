@@ -87,6 +87,11 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     boolean mMasterDataEnabled = true;
     boolean mDnsCheckDisabled = false;
 
+    // Flags introduced for FMC (fixed mobile convergence) to trigger
+    // data call even when there is no service on mobile networks.
+    protected boolean mCheckForConnectivity = true;
+    protected boolean mCheckForSubscription = true;
+
     /***** Event Codes *****/
     protected static final int EVENT_UPDATE_DATA_CONNECTIONS = 1;
     protected static final int EVENT_SERVICE_TYPE_DISABLED = 2;
@@ -384,7 +389,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
         State dsState = mDpt.getState(ds, ipv);
 
-        if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
+        if (mCheckForConnectivity && getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
             // If we're out of service, open TCP sockets may still work
             // but no data will flow
             ret = DataState.DISCONNECTED;
