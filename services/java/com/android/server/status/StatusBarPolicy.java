@@ -961,7 +961,7 @@ public class StatusBarPolicy {
         IccCard.State simState;
         String stateExtra = intent.getStringExtra(IccCard.INTENT_KEY_ICC_STATE);
         // Obtain the subscription info from intent.
-        int sub = intent.getIntExtra(IccCard.INTENT_KEY_SUBSCRIPTION, -1);
+        int sub = intent.getIntExtra(IccCard.INTENT_KEY_SUBSCRIPTION, 0);
         Slog.d(TAG, "updateSimState for subscription :" + sub);
         if (sub >= 0) {
             if (IccCard.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
