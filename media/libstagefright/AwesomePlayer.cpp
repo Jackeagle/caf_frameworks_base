@@ -591,12 +591,16 @@ void AwesomePlayer::initRenderer_l() {
 
         int32_t format;
         const char *component;
-        int32_t decodedWidth, decodedHeight, rotation ;
+        int32_t decodedWidth, decodedHeight, rotation = 0;
         CHECK(meta->findInt32(kKeyColorFormat, &format));
         CHECK(meta->findCString(kKeyDecoderComponent, &component));
         CHECK(meta->findInt32(kKeyWidth, &decodedWidth));
         CHECK(meta->findInt32(kKeyHeight, &decodedHeight));
-        CHECK(meta->findInt32(kKeyRotation, &rotation ));
+
+        if( meta->findInt32(kKeyRotation, &rotation ) == false ){
+          LOGV("Rotation information not present in metadata");
+          rotation = 0;
+        }
 
         //temporarily setting flags to 0.
         //GPU composition flag will come in

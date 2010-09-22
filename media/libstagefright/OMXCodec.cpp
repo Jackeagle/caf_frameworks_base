@@ -3128,11 +3128,11 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
     int32_t rotation = 0;
     if( inputFormat->findInt32(kKeyRotation, &rotation ) ){
       LOGV("Setting rotation in output format to %d", rotation );
-      mOutputFormat->setInt32( kKeyRotation, rotation );
     }
     else {
       LOGV("InputFormat did not contain any rotation information");
     }
+    mOutputFormat->setInt32( kKeyRotation, rotation );
 }
 
 void OMXCodec::parseFlags(uint32_t flags) {
