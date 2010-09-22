@@ -1,6 +1,8 @@
 #ifndef MERGE_RES_AND_XLIFF_H
 #define MERGE_RES_AND_XLIFF_H
 
+#include <cstdio>
+
 #include "ValuesFile.h"
 #include "XLIFFFile.h"
 

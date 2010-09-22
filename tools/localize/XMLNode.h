@@ -1,6 +1,7 @@
 #ifndef XMLNODE_H
 #define XMLNODE_H
 
+#include <cstdio>
 #include <string>
 
 using namespace std;

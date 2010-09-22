@@ -4,6 +4,7 @@
 #include "Configuration.h"
 #include "XMLHandler.h"
 
+#include <cstdio>
 #include <string>
 
 using namespace std;

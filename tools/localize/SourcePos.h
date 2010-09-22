@@ -2,6 +2,7 @@
 #define SOURCEPOS_H
 
 #include <string>
+#include <cstdio>
 
 using namespace std;
 
