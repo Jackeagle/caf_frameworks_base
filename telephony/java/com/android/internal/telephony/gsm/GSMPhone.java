@@ -300,6 +300,7 @@ public class GSMPhone extends PhoneBase {
             mSIMRecords.setSubscription(subscriptionData.subNum);
             //Register for Record events once records are available.
             registerForSimRecordEvents();
+            mSimPhoneBookIntManager.updateSimRecords(mSIMRecords);
         }
     }
 

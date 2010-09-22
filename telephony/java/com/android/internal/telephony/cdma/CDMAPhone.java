@@ -304,6 +304,7 @@ public class CDMAPhone extends PhoneBase {
             mRuimRecords.setSubscription(subscriptionData.subNum);
             //Register for Record events once records are available.
             registerForRuimRecordEvents();
+            mRuimPhoneBookInterfaceManager.updateRuimRecords(mRuimRecords);
         }
     }
 
