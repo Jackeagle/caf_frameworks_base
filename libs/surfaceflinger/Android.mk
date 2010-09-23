@@ -50,6 +50,12 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_C_INCLUDES += hardware/libhardware/modules/gralloc
 
+ifeq ($(TARGET_USES_SF_BYPASS),true)
+LOCAL_CFLAGS += -DSF_BYPASS
+LOCAL_SHARED_LIBRARIES += liboverlay
+LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
+endif
+
 LOCAL_MODULE:= libsurfaceflinger
 
 include $(BUILD_SHARED_LIBRARY)
