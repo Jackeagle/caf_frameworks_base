@@ -61,6 +61,7 @@ public:
 
     void setDrawingSize(uint32_t w, uint32_t h);
 
+    virtual status_t drawWithOverlay(const Region& clip, bool clear) const;
     virtual void onDraw(const Region& clip) const;
     virtual uint32_t doTransaction(uint32_t transactionFlags);
     virtual void lockPageFlip(bool& recomputeVisibleRegions);

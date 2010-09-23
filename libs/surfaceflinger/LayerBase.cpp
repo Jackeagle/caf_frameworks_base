@@ -86,6 +86,7 @@ GraphicPlane& LayerBase::graphicPlane(int dpy)
 
 void LayerBase::initStates(uint32_t w, uint32_t h, uint32_t flags)
 {
+    mLayerInitFlags = flags;
     uint32_t layerFlags = 0;
     if (flags & ISurfaceComposer::eHidden)
         layerFlags = ISurfaceComposer::eLayerHidden;
@@ -315,6 +316,11 @@ void LayerBase::drawRegion(const Region& reg) const
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4); 
         }
     }
+}
+
+status_t LayerBase::drawWithOverlay(const Region& inClip, bool clear) const
+{
+    return INVALID_OPERATION;
 }
 
 void LayerBase::draw(const Region& inClip) const

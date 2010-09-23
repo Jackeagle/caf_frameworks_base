@@ -23,6 +23,12 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libcutils
 
+ifeq ($(TARGET_USES_SF_BYPASS),true)
+LOCAL_CFLAGS += -DSF_BYPASS
+LOCAL_SHARED_LIBRARIES += liboverlay
+LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
+endif
+
 LOCAL_MODULE:= libsystem_server
 
 include $(BUILD_SHARED_LIBRARY)
