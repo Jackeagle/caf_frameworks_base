@@ -54,7 +54,7 @@ public class FmRxRdsData {
     private static final int RDS_GROUP_RT = 0x1;
     private static final int RDS_GROUP_PS = 1 << 1;
     private static final int RDS_GROUP_AF = 1 << 2;
-    private static final int RDS_AF_AUTO  = 1 << 3;
+    private static final int RDS_AF_AUTO  = 1 << 6;
     private static final int RDS_PS_ALL   = 1 << 4;
     private static final String LOGTAG="FmRxRdsData";
 
@@ -165,7 +165,7 @@ public class FmRxRdsData {
       }
       else {
         FmReceiverJNI.setControlNative(mFd, V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC,
-                                         rds_group_mask & ~RDS_GROUP_AF);
+                                         rds_group_mask & ~RDS_AF_AUTO);
       }
       return 1;
     }
