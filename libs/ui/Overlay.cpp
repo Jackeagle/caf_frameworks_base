@@ -159,15 +159,15 @@ int32_t Overlay::getHeightStride() const {
 OverlayRef::OverlayRef() 
  : mOverlayHandle(0),
     mWidth(0), mHeight(0), mFormat(0), mWidthStride(0), mHeightStride(0),
-    mOwnHandle(true)
+    mOwnHandle(true), mFormat3D(0)
 {    
 }
 
 OverlayRef::OverlayRef(overlay_handle_t handle, const sp<IOverlay>& channel,
-         uint32_t w, uint32_t h, int32_t f, uint32_t ws, uint32_t hs)
+         uint32_t w, uint32_t h, int32_t f, uint32_t ws, uint32_t hs, int32_t format3D)
     : mOverlayHandle(handle), mOverlayChannel(channel),
     mWidth(w), mHeight(h), mFormat(f), mWidthStride(ws), mHeightStride(hs),
-    mOwnHandle(false)
+    mOwnHandle(false), mFormat3D(format3D)
 {
 }
 
@@ -188,14 +188,15 @@ sp<OverlayRef> OverlayRef::readFromParcel(const Parcel& data) {
         uint32_t f = data.readInt32();
         uint32_t ws = data.readInt32();
         uint32_t hs = data.readInt32();
+        uint32_t f3D = data.readInt32();
         native_handle* handle = data.readNativeHandle();
-
         result = new OverlayRef();
         result->mOverlayHandle = handle;
         result->mOverlayChannel = overlay;
         result->mWidth = w;
         result->mHeight = h;
         result->mFormat = f;
+        result->mFormat3D = f3D;
         result->mWidthStride = ws;
         result->mHeightStride = hs;
     }
@@ -210,6 +211,7 @@ status_t OverlayRef::writeToParcel(Parcel* reply, const sp<OverlayRef>& o) {
         reply->writeInt32(o->mFormat);
         reply->writeInt32(o->mWidthStride);
         reply->writeInt32(o->mHeightStride);
+        reply->writeInt32(o->mFormat3D);
         reply->writeNativeHandle(o->mOverlayHandle);
     } else {
         reply->writeStrongBinder(NULL);

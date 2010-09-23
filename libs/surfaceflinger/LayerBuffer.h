@@ -77,8 +77,8 @@ public:
     void postBuffer(ssize_t offset);
     void unregisterBuffers();
     sp<OverlayRef> createOverlay(uint32_t w, uint32_t h, int32_t format,
-            int32_t orientation);
-    
+            int32_t orientation, int32_t format3D = 0);
+
     sp<Source> getSource() const;
     sp<Source> clearSource();
     void setNeedsBlending(bool blending);
@@ -155,8 +155,9 @@ private:
     class OverlaySource : public Source {
     public:
         OverlaySource(LayerBuffer& layer,
-                sp<OverlayRef>* overlayRef, 
-                uint32_t w, uint32_t h, int32_t format, int32_t orientation);
+                sp<OverlayRef>* overlayRef,
+            uint32_t w, uint32_t h, int32_t format,
+            int32_t orientation, int32_t format3D = 0);
         virtual ~OverlaySource();
         virtual void onDraw(const Region& clip) const;
         virtual void onTransaction(uint32_t flags);
@@ -190,6 +191,7 @@ private:
         int32_t mWidthStride;
         int32_t mHeightStride;
         int32_t mOrientation;
+        int32_t mFormat3D;
         mutable Mutex mOverlaySourceLock;
         bool mInitialized;
     };
@@ -207,7 +209,8 @@ private:
         virtual void unregisterBuffers();
         
         virtual sp<OverlayRef> createOverlay(
-                uint32_t w, uint32_t h, int32_t format, int32_t orientation);
+                uint32_t w, uint32_t h, int32_t format,
+                int32_t orientation, int32_t format3D = 0);
     private:
         sp<LayerBuffer> getOwner() const {
             return static_cast<LayerBuffer*>(Surface::getOwner().get());
