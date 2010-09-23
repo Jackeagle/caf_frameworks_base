@@ -1421,9 +1421,10 @@ void OMXCodec::on_message(const omx_message &msg) {
                  msg.u.extended_buffer_data.timestamp,
                  msg.u.extended_buffer_data.timestamp / 1E6);
 
-            CODEC_LOGV("Calling processExtraDataOfbuffer");
-            processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer),flags);
-
+            if(mOMXLivesLocally) {
+              CODEC_LOGV("Calling processExtraDataOfbuffer");
+              processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer),flags);
+            }
             Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
             size_t i = 0;
             while (i < buffers->size() && (*buffers)[i].mBuffer != buffer) {
