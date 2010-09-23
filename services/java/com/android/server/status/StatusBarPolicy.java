@@ -1292,7 +1292,12 @@ public class StatusBarPolicy {
             subscription = 0;
         }
         simState = mSimState[subscription];
-        if (isDataGsm(subscription)) {
+        if (mSignalStrength != null && mSignalStrength.length > subscription &&
+                mSignalStrength[subscription] != null && mSignalStrength[subscription].isGsm() &&
+                simState != IccCard.State.READY && simState != IccCard.State.UNKNOWN) {
+            mDataData.iconId = com.android.internal.R.drawable.stat_sys_no_sim;
+            mService.updateIcon(mDataIcon, mDataData, null);
+        } else if (isDataGsm(subscription)) {
             // GSM case, we have to check also the sim state
             if (simState == IccCard.State.READY || simState == IccCard.State.UNKNOWN) {
                 if (hasService(subscription) && mDataState == TelephonyManager.DATA_CONNECTED) {
