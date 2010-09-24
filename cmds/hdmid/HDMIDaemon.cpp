@@ -495,7 +495,7 @@ void HDMIDaemon::setResolution(int ID)
         info.lower_margin, info.vsync_len, info.upper_margin,
         info.pixclock/1000/1000);
     mode->set_info(info);
-    LOGD("ID=%d => Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>", ID,
+    LOGD("SET Info<ID=%d => Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>", ID,
         info.reserved[3], info.xres, info.yres,
         info.right_margin, info.hsync_len, info.left_margin,
         info.lower_margin, info.vsync_len, info.upper_margin,
@@ -550,6 +550,31 @@ int HDMIDaemon::processFrameworkCommand()
         int ret = sscanf(buffer, HDMI_CMD_CHANGE_MODE "%d", &mode);
         if (ret == 1) {
             LOGE(HDMI_CMD_CHANGE_MODE);
+
+            /* To change the resolution */
+            char prop_val[PROPERTY_VALUE_MAX];
+            property_get("enable.hdmi.edid", prop_val, "0");
+            int val = atoi(prop_val);
+            if(val == 1) {
+                 /* Based on the hw.yRes set the resolution */
+                 char property_value[PROPERTY_VALUE_MAX];
+                 property_get("hdmi.yRes", property_value, "0");
+                 int yres = atoi(property_value);
+                 switch(yres){
+                 case 480:
+                     mode = 3;
+                     break;
+                 case 720:
+                    mode = 4;
+                    break;
+                 case 1080:
+                    mode = 16;
+                    break;
+                default:
+                    break;
+                 }
+            }
+            LOGD("Setting Mode to =  %d", mode);
             setResolution(mode);
         }
     }
