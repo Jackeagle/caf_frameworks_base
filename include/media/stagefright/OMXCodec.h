@@ -36,6 +36,7 @@ struct OMXCodec : public MediaSource,
     enum CreationFlags {
         kPreferSoftwareCodecs = 1,
         kEnableGPUComposition = 2,
+        kEnableThumbnailMode = 4,
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,
@@ -145,6 +146,7 @@ private:
     int64_t mSeekTimeUs;
 
     bool mGPUComposition;
+    bool mThumbnailMode;
 
     MediaBuffer *mLeftOverBuffer;
 
