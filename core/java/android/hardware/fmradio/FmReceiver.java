@@ -65,49 +65,49 @@ public class FmReceiver extends FmTransceiver
    * @see #searchStations(int, int, int)
    * @see #searchStations(int, int, int, int, int)
    */
-   public static final int FM_RX_DWELL_PERIOD_1S=0;
+   public static final int FM_RX_DWELL_PERIOD_1S=1;
    /**
    * Scan dwell (Preview) duration = 2 seconds
    *
    * @see #searchStations(int, int, int)
    * @see #searchStations(int, int, int, int, int)
    */
-   public static final int FM_RX_DWELL_PERIOD_2S=1;
+   public static final int FM_RX_DWELL_PERIOD_2S=2;
    /**
    * Scan dwell (Preview) duration = 3 seconds
    *
    * @see #searchStations(int, int, int)
    * @see #searchStations(int, int, int, int, int)
    */
-   public static final int FM_RX_DWELL_PERIOD_3S=2;
+   public static final int FM_RX_DWELL_PERIOD_3S=3;
    /**
    * Scan dwell (Preview) duration = 4 seconds
    *
    * @see #searchStations(int, int, int)
    * @see #searchStations(int, int, int, int, int)
    */
-   public static final int FM_RX_DWELL_PERIOD_4S=3;
+   public static final int FM_RX_DWELL_PERIOD_4S=4;
    /**
     * Scan dwell (Preview) duration = 5 seconds
     *
     * @see #searchStations(int, int, int)
     * @see #searchStations(int, int, int, int, int)
     */
-   public static final int FM_RX_DWELL_PERIOD_5S=4;
+   public static final int FM_RX_DWELL_PERIOD_5S=5;
    /**
     * Scan dwell (Preview) duration = 6 seconds
     *
     * @see #searchStations(int, int, int)
     * @see #searchStations(int, int, int, int, int)
     */
-   public static final int FM_RX_DWELL_PERIOD_6S=5;
+   public static final int FM_RX_DWELL_PERIOD_6S=6;
    /**
     * Scan dwell (Preview) duration = 7 second
     *
     * @see #searchStations(int, int, int)
     * @see #searchStations(int, int, int, int, int)
     */
-   public static final int FM_RX_DWELL_PERIOD_7S=6;
+   public static final int FM_RX_DWELL_PERIOD_7S=7;
 
 
    /**
@@ -215,10 +215,10 @@ public class FmReceiver extends FmTransceiver
     *  @see #setSignalThreshold
     *  @see #getSignalThreshold
     */
-   public static final int FM_RX_SIGNAL_STRENGTH_VERY_WEAK  =-141;
-   public static final int FM_RX_SIGNAL_STRENGTH_WEAK       =-126;
-   public static final int FM_RX_SIGNAL_STRENGTH_STRONG     =-111;
-   public static final int FM_RX_SIGNAL_STRENGTH_VERY_STRONG=-96;
+   public static final int FM_RX_SIGNAL_STRENGTH_VERY_WEAK  =0;
+   public static final int FM_RX_SIGNAL_STRENGTH_WEAK       =1;
+   public static final int FM_RX_SIGNAL_STRENGTH_STRONG     =2;
+   public static final int FM_RX_SIGNAL_STRENGTH_VERY_STRONG=3;
 
    /**
     * Power settings
@@ -258,6 +258,16 @@ public class FmReceiver extends FmTransceiver
    private static final int TAVARUA_BUF_MAX=6;
 
    private FmRxEvCallbacksAdaptor mCallback;
+  /**
+    *  Internal Constants for Signal thresholds
+    *
+    *  @see #setSignalThreshold
+    *  @see #getSignalThreshold
+    */
+   private static final int FM_RX_RSSI_LEVEL_VERY_WEAK   = -105;
+   private static final int FM_RX_RSSI_LEVEL_WEAK        = -100;
+   private static final int FM_RX_RSSI_LEVEL_STRONG      = -96;
+   private static final int FM_RX_RSSI_LEVEL_VERY_STRONG = -90;
 
 
    /**
@@ -285,7 +295,6 @@ public class FmReceiver extends FmTransceiver
 
       //registerClient(callback);
       mCallback = callback;
-      mRdsData = new FmRxRdsData(sFd);
    }
 
 
@@ -398,6 +407,7 @@ public class FmReceiver extends FmTransceiver
       if( status == true ) {
          /* Do Receiver Specific Enable Stuff here.*/
          status = registerClient(mCallback);
+         mRdsData = new FmRxRdsData(sFd);
       }
       else {
          status = false;
@@ -988,19 +998,32 @@ public class FmReceiver extends FmTransceiver
 
       boolean bStatus = true;
       int re;
+      Log.d(TAG, "Signal Threshhold input: "+threshold );
+      int rssiLev = 0;
 
-      if ( (threshold != FM_RX_SIGNAL_STRENGTH_VERY_WEAK) &&
-           (threshold != FM_RX_SIGNAL_STRENGTH_WEAK) &&
-           (threshold != FM_RX_SIGNAL_STRENGTH_VERY_STRONG) &&
-           (threshold != FM_RX_SIGNAL_STRENGTH_STRONG)  ) {
-
-           bStatus = false;
-            Log.d (TAG, "Invalid threshol: " + threshold );
-
+      switch(threshold)
+      {
+      case FM_RX_SIGNAL_STRENGTH_VERY_WEAK:
+         rssiLev = FM_RX_RSSI_LEVEL_VERY_WEAK;
+         break;
+      case FM_RX_SIGNAL_STRENGTH_WEAK:
+         rssiLev = FM_RX_RSSI_LEVEL_WEAK;
+         break;
+      case FM_RX_SIGNAL_STRENGTH_STRONG:
+         rssiLev = FM_RX_RSSI_LEVEL_STRONG;
+         break;
+      case FM_RX_SIGNAL_STRENGTH_VERY_STRONG:
+         rssiLev = FM_RX_RSSI_LEVEL_VERY_STRONG;
+         break;
+      default:
+         /* Should never reach here */
+         bStatus = false;
+         Log.d (TAG, "Invalid threshold: " + threshold );
+         return bStatus;
       }
 
       if (bStatus) {
-        re=FmReceiverJNI.setControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH, threshold);
+        re=FmReceiverJNI.setControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH, rssiLev);
 
         if (re !=0)
           bStatus = false;
@@ -1332,8 +1355,47 @@ public class FmReceiver extends FmTransceiver
    *    @return the signal threshold
    */
    public int getSignalThreshold () {
+     int threshold = FM_RX_SIGNAL_STRENGTH_VERY_WEAK, signalStrength;
+     int rmssiThreshold = FmReceiverJNI.getControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH);
+     Log.d(TAG, "Signal Threshhold: "+rmssiThreshold );
 
-      return FmReceiverJNI.getControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH);
+     if ( (FM_RX_RSSI_LEVEL_VERY_WEAK < rmssiThreshold) && (rmssiThreshold <= FM_RX_RSSI_LEVEL_WEAK) )
+     {
+       signalStrength = FM_RX_RSSI_LEVEL_WEAK;
+     }
+     else if ( (FM_RX_RSSI_LEVEL_WEAK < rmssiThreshold) && (rmssiThreshold  <= FM_RX_RSSI_LEVEL_STRONG))
+     {
+       signalStrength = FM_RX_RSSI_LEVEL_STRONG;
+     }
+     else if ((FM_RX_RSSI_LEVEL_STRONG < rmssiThreshold))
+     {
+       signalStrength = FM_RX_RSSI_LEVEL_VERY_STRONG;
+     }
+     else
+     {
+       signalStrength = FM_RX_RSSI_LEVEL_VERY_WEAK;
+     }
+
+     switch(signalStrength)
+     {
+     case FM_RX_RSSI_LEVEL_VERY_WEAK:
+        threshold = FM_RX_SIGNAL_STRENGTH_VERY_WEAK;
+        break;
+     case FM_RX_RSSI_LEVEL_WEAK:
+        threshold = FM_RX_SIGNAL_STRENGTH_WEAK;
+        break;
+     case FM_RX_RSSI_LEVEL_STRONG:
+        threshold = FM_RX_SIGNAL_STRENGTH_STRONG;
+        break;
+     case FM_RX_RSSI_LEVEL_VERY_STRONG:
+        threshold = FM_RX_SIGNAL_STRENGTH_VERY_STRONG;
+        break;
+     default:
+        /* Should never reach here */
+        break;
+     }
+
+     return threshold;
    }
 
 
