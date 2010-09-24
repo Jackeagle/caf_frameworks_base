@@ -41,7 +41,6 @@ import static android.telephony.SmsMessage.MessageClass;
 
 final class GsmSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "GSM";
-    private int mVmCount =0;
 
     GsmSMSDispatcher(VoicePhone phone, CommandsInterface cm) {
         super(phone, cm);
@@ -420,35 +419,23 @@ final class GsmSMSDispatcher extends SMSDispatcher {
     }
 
     /* package */void updateMessageWaitingIndicator(int mwi) {
-        // this also calls notifyMessageWaitingIndicator()
-
-       /* mwi = number of voice mails; count is known, set notification
-        * mwi = -1; count is unknown, set notification
-        * mwi = 0; no unread voicemails , clear notification
-        */
         Message onComplete;
-        mVmCount = mwi;
+        // range check
+        if (mwi < 0) {
+            mwi = -1;
+        } else if (mwi > 0xff) {
+            // TS 23.040 9.2.3.24.2
+            // "The value 255 shall be taken to mean 255 or greater"
+            mwi = 0xff;
+        }
+        // update voice mail count in GsmPhone
+        ((PhoneBase)mPhone).setVoiceMessageCount(mwi);
+        // store voice mail count in SIM/preferences
         if (mRecords != null) {
             onComplete = obtainMessage(EVENT_UPDATE_ICC_MWI);
             mRecords.setVoiceMessageWaiting(1, mwi, onComplete);
         } else {
             Log.d(TAG, "SIM Records not found, MWI not updated");
-        }
-    }
-
-    protected void storeVoiceMailCount() {
-        /*
-         * Store the voice mail count in persistent memory This is done when
-         * storing it in SIM fails
-         */
-        if (mRecords != null) {
-            SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
-            SharedPreferences.Editor editor = sp.edit();
-            editor.putInt(mRecords.VM_COUNT, mVmCount);
-            editor.putString(mRecords.VM_ID, mRecords.mImsi);
-            editor.commit();
-            Log.d(TAG, " Storing Voice Mail Count = " + mVmCount +
-                    " for imsi = " + mRecords.mImsi + " in preferences.");
         }
     }
 

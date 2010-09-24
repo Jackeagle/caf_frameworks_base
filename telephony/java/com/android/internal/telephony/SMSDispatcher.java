@@ -27,6 +27,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.DialogInterface;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.database.SQLException;
@@ -37,6 +38,7 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.Registrant;
 import android.os.SystemProperties;
+import android.preference.PreferenceManager;
 import android.provider.Telephony;
 import android.provider.Telephony.Sms.Intents;
 import android.provider.Settings;
@@ -1141,12 +1143,27 @@ public abstract class SMSDispatcher extends Handler {
 
     protected abstract void updateIccAvailability();
 
-    protected abstract void storeVoiceMailCount();
-
     IccFileHandler getIccFileHandler() {
         if (mApplication != null) {
             return mApplication.getIccFileHandler();
         }
         return null;
     }
+
+    protected void storeVoiceMailCount() {
+        // Store the voice mail count in persistent memory.
+        String imsi = mPhone.getSubscriberId();
+        int mwi = mPhone.getVoiceMessageCount();
+
+        Log.d(TAG, " Storing Voice Mail Count = " + mwi
+                    + " for imsi = " + imsi
+                    + " in preferences.");
+
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putInt(((PhoneBase)mPhone).VM_COUNT, mwi);
+        editor.putString(((PhoneBase)mPhone).VM_ID, imsi);
+        editor.commit();
+    }
+
 }
