@@ -453,7 +453,7 @@ static void android_hardware_Camera_setHasPreviewCallback(JNIEnv *env, jobject t
 }
 static void android_hardware_Camera_sendHistogramData(JNIEnv *env, jobject thiz)
 {
-  LOGV("setHistogramMode: mode:%d", mode);
+  LOGV("sendHistogramData: ");
   JNICameraContext* context;
   status_t rc;
   sp<Camera> camera = get_native_camera(env, thiz, &context);
@@ -467,7 +467,7 @@ static void android_hardware_Camera_sendHistogramData(JNIEnv *env, jobject thiz)
 }
 static void android_hardware_Camera_setHistogramMode(JNIEnv *env, jobject thiz, jboolean mode)
 {
-  LOGV("sendHistogramData: mode:%d", (int)mode);
+  LOGV("setHistogramMode: mode:%d", (int)mode);
   JNICameraContext* context;
   status_t rc;
   sp<Camera> camera = get_native_camera(env, thiz, &context);
