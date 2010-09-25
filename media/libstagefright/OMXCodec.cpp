@@ -2077,7 +2077,11 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
             err = mSource->read(&srcBuffer);
         }
 
-        if (err != OK) {
+        if (err == ERROR_CORRUPT_NAL) {
+            LOGW("Ignore Corrupt NAL");
+            continue;
+        }
+        else if (err != OK) {
             signalEOS = true;
             mFinalStatus = err;
             mSignalledEOS = true;
