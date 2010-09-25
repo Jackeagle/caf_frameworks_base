@@ -1243,6 +1243,9 @@ class PowerManagerService extends IPowerManager.Stub
                 EventLog.writeEvent(EventLogTags.POWER_SCREEN_BROADCAST_DONE, 1,
                         SystemClock.uptimeMillis() - mScreenOnStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
+                if(mDMMAvailable)
+                    if(mDMMController.enableUnstableMemory(false) != 0)
+                        Log.e(TAG, "Deactivating Unstable memory failed.");
             }
         }
     };
@@ -1585,11 +1588,6 @@ class PowerManagerService extends IPowerManager.Stub
         // called multiple times in the same state. -joeo
         EventLog.writeEvent(EventLogTags.POWER_SCREEN_STATE, 0, reason, mTotalTouchDownTime, mTouchCycles);
         mLastTouchDown = 0;
-
-        //DMM: Call DMM control to disable unstable memory.
-        if(mDMMAvailable)
-            if(mDMMController.enableUnstableMemory(false) != 0)
-                Log.e(TAG, "Deactivating Unstable memory failed.");
 
         int err = setScreenStateLocked(false);
         if (err == 0) {
