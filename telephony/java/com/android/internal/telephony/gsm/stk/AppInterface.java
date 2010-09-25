@@ -77,6 +77,7 @@ public interface AppInterface {
         SET_UP_IDLE_MODE_TEXT(0x28),
         SET_UP_MENU(0x25),
         SET_UP_CALL(0x10),
+        OPEN_CHANNEL(0x40),
         PROVIDE_LOCAL_INFORMATION(0x26);
 
         private int mValue;

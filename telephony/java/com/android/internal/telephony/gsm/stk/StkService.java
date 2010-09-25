@@ -353,6 +353,7 @@ public class StkService extends Handler implements AppInterface {
             case SEND_SS:
             case SEND_USSD:
             case PLAY_TONE:
+            case OPEN_CHANNEL:
             case SET_UP_CALL:
                 // nothing to do on telephony!
                 break;
@@ -839,6 +840,7 @@ public class StkService extends Handler implements AppInterface {
                 case DISPLAY_TEXT:
                 case LAUNCH_BROWSER:
                     break;
+                case OPEN_CHANNEL:
                 case SET_UP_CALL:
                     mCmdIf.handleCallSetupRequestFromSim(resMsg.usersConfirm, null);
                     // No need to send terminal response for SET UP CALL. The user's
