@@ -47,7 +47,7 @@ import android.util.Log;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.DataProfile.DataProfileType;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 /*
  * Definitions:
@@ -1382,22 +1382,27 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     void loge(String string) {
-        Log.e(LOG_TAG, "[DCT] " + string);
+        Log.e(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subNum+")" : "")
+                              + " ] " + string);
     }
 
     void logw(String string) {
-        Log.w(LOG_TAG, "[DCT] " + string);
+        Log.w(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subNum+")" : "")
+                              + " ] " + string);
     }
 
     void logd(String string) {
-        Log.d(LOG_TAG, "[DCT] " + string);
+        Log.d(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subNum+")" : "")
+                              + " ] " + string);
     }
 
     void logv(String string) {
-        Log.v(LOG_TAG, "[DCT] " + string);
+        Log.v(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subNum+")" : "")
+                              + " ] " + string);
     }
 
     void logi(String string) {
-        Log.i(LOG_TAG, "[DCT] " + string);
+        Log.i(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subNum+")" : "")
+                              + " ] " + string);
     }
 }

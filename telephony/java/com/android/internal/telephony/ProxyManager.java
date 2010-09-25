@@ -33,7 +33,6 @@ import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.IccPhoneBookInterfaceManagerProxy;
 import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.PhoneSubInfoProxy;
-import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.UiccConstants.AppType;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.CommandException;
@@ -47,11 +46,21 @@ import android.os.Looper;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.telephony.TelephonyManager;
+import java.util.regex.PatternSyntaxException;
+import java.lang.Exception;
 
 public class ProxyManager extends Handler {
     static final String LOG_TAG = "PROXY";
-    static final int SUB_ACTIVATE = 0;
-    static final int SUB_DEACTIVATE = 1;
+
+    // Subscription activation status
+    public static final int SUB_ACTIVATE = 0;
+    public static final int SUB_DEACTIVATE = 1;
+    public static final int SUB_ACTIVATING = 2;
+    public static final int SUB_DEACTIVATING = 3;
+    public static final int SUB_ACTIVATED = 4;
+    public static final int SUB_DEACTIVATED = 5;
+    public static final int SUB_INVALID = 6;
+
     static final int NUM_SUBSCRIPTIONS = 2;
     static final int EVENT_SET_UICC_SUBSCRIPTION_DONE = 1;
     static final int EVENT_SET_DATA_SUBSCRIPTION_DONE = 2;
@@ -60,6 +69,8 @@ public class ProxyManager extends Handler {
     static final int EVENT_GET_ICC_STATUS_DONE = 5;
     static final int EVENT_SET_SUBSCRIPTION_MODE_DONE = 6;
     static final int EVENT_DISABLE_DATA_CONNECTION_DONE = 7;
+    static final int EVENT_GET_ICCID_DONE = 8;
+
     static public final String INTENT_VALUE_SUBSCR_INFO_1 = "SUBSCR INFO 01";
     static public final String INTENT_VALUE_SUBSCR_INFO_2 = "SUBSCR INFO 02";
 
@@ -78,8 +89,7 @@ public class ProxyManager extends Handler {
     private UiccCard[] mUiccCards;
     private static Context  mContext;
     static ProxyManager mProxyManager;
-    private static String[][] cardSubscriptions = null;
-    private boolean uiccSubSet = false;
+    private boolean mUiccSubSet = false;
     SupplySubscription supplySubscription;
     PhoneAppBroadcastReceiver mReceiver;
 
@@ -91,6 +101,15 @@ public class ProxyManager extends Handler {
     static private int voiceSubscription = 0;
     static private int dataSubscription = 0;
     static private int smsSubscription = 0;
+
+    private int mPendingIccidRequest = 0;
+    private boolean setSubscriptionMode = true;
+    private boolean mReadIccid = true;
+    private String[] mIccIds;
+    // The subscription information of all the cards
+    SubscriptionData[] mCardSubData = null;
+    // The User prefered subscription information
+    SubscriptionData mUserPrefSubs = null;
 
 
     //***** Class Methods
@@ -122,6 +141,7 @@ public class ProxyManager extends Handler {
             mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(sProxyPhone);
             mPhoneSubInfoProxy = new PhoneSubInfoProxy(sProxyPhone);
             mUiccManager = uiccManager;
+            mUiccCards = new UiccCard[UiccConstants.RIL_MAX_CARDS];
             mCi = ci;
 
             mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
@@ -139,18 +159,114 @@ public class ProxyManager extends Handler {
         }
     }
 
+    /*
+     *  This function will read from the User Prefered Subscription from the
+     *  system property, parse and populate the member variable mUserPrefSubs.
+     *  User Prefered Subscription is stored in the system property string as
+     *    iccId+appType+appId+activationStatus+subIndex
+     *  If the the property is not set already, then set it to the default values
+     *  for appType to USIM and activationStatus to ACTIVATED.
+     */
     public void getUserPreferredSubs() {
+        boolean errorOnParsing = false;
 
-        userPrefSubs = new String [NUM_SUBSCRIPTIONS];
+        mUserPrefSubs = new SubscriptionData(NUM_SUBSCRIPTIONS);
+
         for(int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
-            userPrefSubs[i] = Settings.System.getString(mContext.getContentResolver(),Settings.System.USER_PREFERRED_SUBS[i]);
-            Log.d(LOG_TAG, "userPrefSubs:"+ userPrefSubs[i]);
-            if (userPrefSubs[i] == null) {
-                Settings.System.putString(mContext.getContentResolver(),Settings.System.USER_PREFERRED_SUBS[i],userDefaultSubs[i] );
-                userPrefSubs[i] = userDefaultSubs[i];
-                Log.d(LOG_TAG, "userPrefSubs:"+ userPrefSubs[i]);
+
+            String strUserSub = Settings.System.getString(mContext.getContentResolver(),
+                                                   Settings.System.USER_PREFERRED_SUBS[i]);
+            if (strUserSub != null) {
+                Log.d(LOG_TAG, "getUserPreferredSubs: strUserSub = " + strUserSub);
+
+                try {
+                    String splitUserSub[] = strUserSub.split(",");
+
+                    // There should be 5 fields in the user prefered settings.
+                    if (splitUserSub.length == 5) {
+                        mUserPrefSubs.subscription[i].iccId = getStringFrom(splitUserSub[0]);
+                        mUserPrefSubs.subscription[i].appType = getStringFrom(splitUserSub[1]);
+                        mUserPrefSubs.subscription[i].appId = getStringFrom(splitUserSub[2]);
+
+                        try {
+                            mUserPrefSubs.subscription[i].subStatus = Integer.parseInt(splitUserSub[3]);
+                        } catch (NumberFormatException ex) {
+                            Log.e(LOG_TAG, "getUserPreferredSubs: NumberFormatException: " + ex);
+                            mUserPrefSubs.subscription[i].subStatus = SUB_INVALID;
+                        }
+
+                        try {
+                            mUserPrefSubs.subscription[i].subIndex = Integer.parseInt(splitUserSub[4]);
+                        } catch (NumberFormatException ex) {
+                            Log.e(LOG_TAG, "getUserPreferredSubs: NumberFormatException: " + ex);
+                            mUserPrefSubs.subscription[i].subIndex = -1;
+                        }
+                    } else {
+                        Log.e(LOG_TAG, "getUserPreferredSubs: splitUserSub.length != 5");
+                        errorOnParsing = true;
+                    }
+                } catch (PatternSyntaxException pe) {
+                    Log.e(LOG_TAG, "getUserPreferredSubs: PatternSyntaxException while split : " + pe);
+                    errorOnParsing = true;
+
+                }
             }
+
+            if (strUserSub == null || errorOnParsing) {
+                String defaultUserSub = " " + "," +                        // iccId
+                                        userDefaultSubs[i] + "," +         // app type
+                                        " " + "," +                        // app id
+                                        Integer.toString(SUB_ACTIVATED)+   // activate state
+                                        ",-1";                             // sub index in the card
+
+                Settings.System.putString(mContext.getContentResolver(),
+                            Settings.System.USER_PREFERRED_SUBS[i], defaultUserSub);
+
+                mUserPrefSubs.subscription[i].iccId = null;
+                mUserPrefSubs.subscription[i].appType = userDefaultSubs[i];
+                mUserPrefSubs.subscription[i].appId = null;
+                mUserPrefSubs.subscription[i].subStatus = SUB_ACTIVATED;
+                mUserPrefSubs.subscription[i].subIndex = -1;
+            }
+
+            mUserPrefSubs.subscription[i].subNum = i;
+
+            Log.d(LOG_TAG, "getUserPreferredSubs: mUserPrefSubs.subscription[" + i + "] = "
+                           + mUserPrefSubs.subscription[i].toString());
         }
+    }
+
+    public void saveUserPreferedSubscription(SubscriptionData userPrefSubData) {
+        Subscription userPrefSub;
+        String userSub;
+
+        // Update the user prefered sub
+        mUserPrefSubs.copyFrom(userPrefSubData);
+
+        for (int index = 0; index < userPrefSubData.numSubscriptions; index++) {
+            userPrefSub = userPrefSubData.subscription[index];
+
+            userSub = ((userPrefSub.iccId != null) ? userPrefSub.iccId : " ") + "," +
+                      ((userPrefSub.appType != null) ? userPrefSub.appType : " ") + "," +
+                      ((userPrefSub.appId != null) ? userPrefSub.appId : " ") + "," +
+                      Integer.toString(userPrefSub.subStatus) + "," +
+                      Integer.toString(userPrefSub.subIndex);
+
+            Log.d(LOG_TAG, "saveUserPreferedSubscription: userPrefSub = " + userPrefSub.toString());
+            Log.d(LOG_TAG, "saveUserPreferedSubscription: userSub = " + userSub);
+
+            // Construct the string and store in Settings data base at index.
+            //update the user pref settings so that next time user is not prompted of the subscriptions
+            Settings.System.putString(mContext.getContentResolver(),Settings.System.USER_PREFERRED_SUBS[index],
+                                  userSub);
+        }
+    }
+
+    String getStringFrom(String str) {
+        if ((str == null) || (str != null && str.equals(" "))) {
+            return null;
+        }
+        return str;
     }
 
 
@@ -158,14 +274,46 @@ public class ProxyManager extends Handler {
     public void handleMessage(Message msg) {
         AsyncResult ar;
         Message     onComplete;
+        int size;
+        int cardIndex = 0;
+        String strCardIndex;
 
         switch(msg.what) {
             case EVENT_ICC_CHANGED: {
-                        Log.d(LOG_TAG, "ProxyManager EVENT_ICC_CHANGED");
-                if (!uiccSubSet)
+                Log.d(LOG_TAG, "ProxyManager EVENT_ICC_CHANGED");
+                for (int i = 0; i < UiccConstants.RIL_MAX_CARDS; i++) {
+                    mUiccCards[i] = mUiccManager.getCard(i);
+                }
+                if (!mUiccSubSet) {
                     checkCardStatus();
-                    break;
+                }
+                break;
             }
+
+            case EVENT_GET_ICCID_DONE:
+                Log.d(LOG_TAG, "ProxyManager EVENT_READ_ICCID_DONE");
+                ar = (AsyncResult)msg.obj;
+                byte []data = (byte[])ar.result;
+                cardIndex = 0;
+                strCardIndex = (String) ar.userObj;
+                if (strCardIndex != null) {
+                    cardIndex = Integer.parseInt(strCardIndex);
+                    Log.d(LOG_TAG, "parsed cardIndex: " + cardIndex);
+                }
+
+                if (ar.exception != null) {
+                    Log.d(LOG_TAG, "Exception in GET ICCID");
+                    mIccIds[cardIndex] = null;
+                } else {
+                    mIccIds[cardIndex] = IccUtils.bcdToString(data, 0, data.length);
+                }
+                Log.d(LOG_TAG, "GET ICCID DONE.. mIccIds[" + cardIndex + "] = "
+                               + mIccIds[cardIndex]);
+                mPendingIccidRequest--;
+                if (mPendingIccidRequest <= 0) {
+                    processCardStatus();
+                }
+                break;
 
             case EVENT_DISABLE_DATA_CONNECTION_DONE:
                 Log.d(LOG_TAG, "EVENT_DISABLE_DATA_CONNECTION_DONE, disableDdsInProgress = "
@@ -236,80 +384,111 @@ public class ProxyManager extends Handler {
                 }
                 break;
         }
-   }
+    }
 
-    public void checkCardStatus() {
+    void getCardIccids() {
+        // get the iccid from the cards present.
+        mIccIds = new String[UiccConstants.RIL_MAX_CARDS];
 
-        mUiccCards = mUiccManager.getIccCards();
-        if(mUiccCards.length == UiccConstants.RIL_MAX_CARDS) {
+        for (int cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
+            mIccIds[cardIndex] = null;
+            if (mUiccCards[cardIndex].getCardState() == CardState.PRESENT) {
+                Log.d(LOG_TAG, "get ICCID for card : " + cardIndex);
+                String strCardIndex = Integer.toString(cardIndex);
 
-            if ((mUiccCards[0] != null && mUiccCards[0].getNumApplications() > 0)
-                && (mUiccCards[1] != null && mUiccCards[1].getNumApplications() > 0)) {
-                Log.d(LOG_TAG, ":  card 1 state: "+mUiccCards[0].getCardState());
-                Log.d(LOG_TAG, ":  card 2 state: "+mUiccCards[1].getCardState());
+                Message response = obtainMessage(EVENT_GET_ICCID_DONE, strCardIndex);
 
-                /* Card status to be processed if
-                  card0 status is present and card1 status is present
-                  card0 status is present and card1 status is absent
-                  card0 status is absent and card1 status is present
-                */
-
-                if (mUiccCards[0].getCardState() == CardState.PRESENT && mUiccCards[1].getCardState() == CardState.PRESENT) {
-                    Log.d(LOG_TAG, "Both cards present");
-                    ProcessCardStatus();
-
-                } else if ((mUiccCards[0].getCardState() == CardState.PRESENT &&
-                          mUiccCards[1].getCardState() == CardState.ABSENT) ||
-                         (mUiccCards[1].getCardState() == CardState.PRESENT &&
-                         mUiccCards[0].getCardState() == CardState.ABSENT)) {
-                    Log.d(LOG_TAG, "one card present and one card absent");
-                    ProcessCardStatus();
-
-                } else if ((mUiccCards[0].getCardState() == CardState.PRESENT &&
-                          mUiccCards[1].getCardState() == CardState.ERROR) ||
-                         (mUiccCards[1].getCardState() == CardState.PRESENT &&
-                          mUiccCards[0].getCardState() == CardState.ERROR)) {
-                   //currently there is a limitation from UIM that with ffa if card status is absent it is sent as error
-                    Log.d(LOG_TAG, "one card present and one card error");
-                    ProcessCardStatus();
-
-                } else {
-                   Log.d(LOG_TAG, "Not Valid Card status");
+                UiccCardApplication cardApp = mUiccCards[cardIndex].getUiccCardApplication(0);
+                if (cardApp != null) {
+                    IccFileHandler fileHandler = cardApp.getIccFileHandler();
+                    if (fileHandler != null) {
+                        fileHandler.loadEFTransparent(IccConstants.EF_ICCID, response);
+                        mPendingIccidRequest++;
+                    }
                 }
             }
         }
     }
 
-    void ProcessCardStatus() {
-        cardSubscriptions = new String [UiccConstants.RIL_MAX_CARDS][UiccConstants.RIL_CARD_MAX_APPS];
+    public void checkCardStatus() {
+        UiccCard card1 = mUiccCards[0];
+        UiccCard card2 = mUiccCards[1];
+
+        if (card1 != null && card2 != null) {
+            Log.d(LOG_TAG, ":  card 1 state: "+card1.getCardState());
+            Log.d(LOG_TAG, ":  card 2 state: "+card2.getCardState());
+
+            /* Card status to be processed if
+              card1 status is present and card2 status is present
+              card1 status is present and card2 status is absent
+              card1 status is absent and card2 status is present
+            */
+            if ((!(card1.getCardState() == CardState.ABSENT &&
+                   card2.getCardState() == CardState.ABSENT)) &&
+                (!(card1.getCardState() == CardState.ERROR &&
+                   card2.getCardState() == CardState.ERROR))) {
+                // Get the Iccid and then process the cards
+                if (mReadIccid) {
+                    mReadIccid = false;
+                    getCardIccids();
+                }
+            }
+        }
+    }
+
+    void processCardStatus() {
         int numApps = 0;
 
-        /* Loop through list of cards and list of applications and store it in a two dimensional array */
+        mCardSubData = new SubscriptionData[UiccConstants.RIL_MAX_CARDS];
+
+        // Loop through list of cards and list of applications and store it in the mCardSubData
         for (int cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
             CardState cardstate = mUiccCards[cardIndex].getCardState();
+            Log.d(LOG_TAG, "cardIndex = " + cardIndex + " cardstate = " + cardstate);
+
             if (cardstate == CardState.PRESENT) {
                 numApps = mUiccCards[cardIndex].getNumApplications();
-                Log.d(LOG_TAG, "num of apps"+ numApps);
+                Log.d(LOG_TAG, "num of apps : " + numApps);
+
+                mCardSubData[cardIndex] = new SubscriptionData(numApps);
 
                 for (int appIndex = 0; appIndex < numApps ; appIndex++ ) {
-                    Log.d(LOG_TAG, ":  appIndex "+ appIndex);
-                    UiccCardApplication mUiccCardApplication = mUiccCards[cardIndex].getUiccCardApplication(appIndex);
-                    AppType type = mUiccCardApplication.getType();
-                    String s = toString(type);
+                    Log.d(LOG_TAG, ":  appIndex : "+ appIndex);
+
+                    Subscription cardSub = mCardSubData[cardIndex].subscription[appIndex];
+
+                    UiccCardApplication uiccCardApplication = mUiccCards[cardIndex]
+                                                                .getUiccCardApplication(appIndex);
+
+                    cardSub.slotId = cardIndex;
+                    cardSub.subIndex = appIndex;
+                    cardSub.subNum = -1;               // Not set the sub id
+                    cardSub.subStatus = SUB_INVALID;
+                    cardSub.appId = uiccCardApplication.getAid();
+                    cardSub.appLabel = uiccCardApplication.getAppLabel();
+                    cardSub.iccId = mIccIds[cardIndex];
+
+                    AppType type = uiccCardApplication.getType();
+                    String subAppType = toString(type);
                     //Apps like ISIM etc are treated as UNKNOWN apps, to be discarded
-                    if (! s.equals("UNKNOWN")) {
-                        Log.d(LOG_TAG, "app type:"+ s);
-                        cardSubscriptions[cardIndex][appIndex] =  s;
+                    if (!subAppType.equals("UNKNOWN")) {
+                        Log.d(LOG_TAG, "app type: "+ subAppType);
+                        cardSub.appType = subAppType;
                     } else {
-                      Log.d(LOG_TAG, "UNKNOWN APP");
+                        cardSub.appType = null;
+                        Log.d(LOG_TAG, "UNKNOWN APP");
                     }
+
+                    Log.d(LOG_TAG, "mCardSubData[" + cardIndex + "].subscription[" + appIndex +
+                                   "] = " + cardSub.toString());
                 }
-           }
+            }
         }
+
         matchSubscriptions();
     }
 
-     public String toString(AppType p) {
+    public String toString(AppType p) {
         switch(p) {
             case APPTYPE_UNKNOWN:
                     {return "UNKNOWN";}
@@ -337,115 +516,94 @@ public class ProxyManager extends Handler {
         return subLength;
     }
 
+    /*
+     * Compare each of the user pref sub with the Subscriptions in each of the card.
+     * If all of the user pref subscriptions, which were activated on the last session,
+     * matches the subscriptions(applications) in the card then automatically set the
+     * subscription.  Otherwise prompt the User to select subscriptions.
+     */
     public void matchSubscriptions() {
         int cardIndex = 0;
-        int matchedIndex = -1;
-        int matchedCard = -1;
-        int[] subIndexMatched ={-1, -1};
-        int[] subSlotMatched = {-1, -1};
+        int num_cards = 0;
+        SubscriptionData matchedSub = new SubscriptionData(NUM_SUBSCRIPTIONS);
 
-        /* For each user preferred subscription loop through all the cards and all the application in each card
-         * to find a match. Once a match is found store the slot id, application id where the match occured.
-         */
-        for(int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
-           Log.d(LOG_TAG, "Index:"+i);
-           for ( cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
-               Log.d(LOG_TAG, "cardIndex: "+cardIndex);
+        Log.d(LOG_TAG, "matchSubscriptions");
 
-               if ( mUiccCards[cardIndex] != null ) {
-                   CardState cardstate = mUiccCards[cardIndex].getCardState();
+        // For each subscription in mUserPrefSubs
+        for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
+            Subscription userSub = mUserPrefSubs.subscription[i];
+            Log.d(LOG_TAG, "subNum: " + i);
 
-                   if ( cardstate == CardState.PRESENT) {
-                       int subIndex = 0;
+            // For each cards in mCardSubData
+            for (cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
+                Log.d(LOG_TAG, "cardIndex: " + cardIndex + " userSub.subIndex: "
+                               + userSub.subIndex);
 
-                       for (subIndex = 0; subIndex < UiccConstants.RIL_CARD_MAX_APPS; subIndex++) {
-                           Log.d(LOG_TAG, "subIndex:" +subIndex);
+                if ((userSub.subIndex != -1) &&
+                    (mCardSubData[cardIndex] != null) &&
+                    (userSub.subIndex < mCardSubData[cardIndex].numSubscriptions)) {
+                    Subscription cardSub = mCardSubData[cardIndex].subscription[userSub.subIndex];
 
-                           if ( cardSubscriptions[cardIndex][subIndex] != null ) {
-                               Log.d(LOG_TAG, "card sub :"+cardSubscriptions[cardIndex][subIndex]+
-                                                            ", userPrefSub[i]="+userPrefSubs[i] );
+                    // Check for the iccid, app id, app name
+                    if (((userSub.iccId == null && cardSub.iccId == null) ||
+                            (userSub.iccId != null && userSub.iccId.equals(cardSub.iccId))) &&
+                        ((userSub.appId == null && cardSub.appId == null) ||
+                            (userSub.appId != null && userSub.appId.equals(cardSub.appId))) &&
+                        ((userSub.appType == null && cardSub.appType == null) ||
+                            (userSub.appType != null && userSub.appType.equals(cardSub.appType)))) {
 
-                               //get user preferred subscription
-                               if ((cardSubscriptions[cardIndex][subIndex].equals( userPrefSubs[i])) &&
-                                  (matchedCard != cardIndex || matchedIndex != subIndex)) {
+                        // Update the matched subscription
+                        matchedSub.subscription[i].copyFrom(userSub);
+                        // Set the activate state
+                        matchedSub.subscription[i].subStatus = SUB_ACTIVATE;
+                        matchedSub.subscription[i].subNum = i;
+                        // Set the slot id, sub index from mCardSubData
+                        matchedSub.subscription[i].slotId = cardSub.slotId;
+                        matchedSub.subscription[i].subIndex = cardSub.subIndex;
 
-                                  /* matchedCard != cardIndex, matchedIndex != subIndex check is
-                                   * introduced to avoid the same application gets matched both times (for both subscriptions)
-                                   */
-                                   matchedCard = cardIndex;
-                                   matchedIndex = subIndex;
-                                   subIndexMatched[i] = subIndex;   //matched app index
-                                   subSlotMatched[i] = cardIndex;   //matched slot id
-                                   Log.d(LOG_TAG, "matched, cardIndex"+cardIndex+"subIndex:"+subIndex+"userPrefSub:"+userPrefSubs[i]);
-                                   Log.d(LOG_TAG, "matchedCard"+matchedCard+",matchedIndex"+subIndex);
-                                   break;
-
-                               } else {
-                                   Log.d(LOG_TAG, "not matched: subIndex, cardIndex:"+subIndex+","+cardIndex );
-                               }
-
-                           }
-                       }
-
-                       // user preferred subscription is matched with from one of the cards
-                       if (subIndex < UiccConstants.RIL_CARD_MAX_APPS) {
-                           Log.d(LOG_TAG,"subscription is matched for cardIndex:"+cardIndex);
-                           break;
-                       }
+                        Log.d(LOG_TAG, "Subscription is matched for UserPrefSub subNum = " + i +
+                                       " cardIndex = " + cardIndex + " subIndex = " + userSub.subIndex);
+                        break;
                     }
-
                 }
+                Log.d(LOG_TAG, "Not matched for UserPrefSub subNum: " + i +
+                     " userSub.subIndex : " + userSub.subIndex + " cardIndex : " + cardIndex);
             }
+            Log.d(LOG_TAG, "matchedSub.subscription[" + i + "] = " + matchedSub.subscription[i].toString());
         }
 
-        Log.d(LOG_TAG, "subIndexMatched[0]"+subIndexMatched[0]+"subIndexMatched[1]:"+subIndexMatched[1]);
-        Log.d(LOG_TAG, "subSlotMatched[0]"+subSlotMatched[0]+"subSlotMatched[1]:"+subSlotMatched[1]);
-
-
-        if (subIndexMatched[0] == -1 && subIndexMatched[1] == -1) {
+        // If the user pref sub is not matched, then propmt the user to select the subs.
+        if ((mUserPrefSubs.subscription[0].subStatus == SUB_ACTIVATED &&
+             matchedSub.subscription[0].subNum == -1) ||
+            (mUserPrefSubs.subscription[1].subStatus == SUB_ACTIVATED &&
+             matchedSub.subscription[1].subNum == -1)) {
 
             //Subscription settings do not match with the card applications
-            Log.d(LOG_TAG, "PromptUserSubscription" );
-            //send intent to app showing two user two cards subscriptions
-
-            uiccSubSet = true;  //card status is processed only the first time
-            promptUserSubscription(cardSubscriptions);
-
-        } else if ((subIndexMatched[0] != -1 && subIndexMatched[1] == -1) ||
-                   (subIndexMatched[0] == -1 && subIndexMatched[1] != -1)) {
-
-            //one subscription mathced another subscription did not match then also prompt user for selection
-            Log.d(LOG_TAG, "PromptUserSubscription" );
-            //send intent to app showing two card subscriptions
-            uiccSubSet = true;
-            promptUserSubscription(cardSubscriptions);
-
+            mUiccSubSet = true;  //card status is processed only the first time
+            promptUserSubscription();
         } else {
-
-            Log.d(LOG_TAG, "setSubscription calling" );
-            setSubscription(NUM_SUBSCRIPTIONS, subSlotMatched, subIndexMatched);
-            uiccSubSet = true;
-
+            // No need to wait for the set subscription to be done in case of
+            // auto set subscription.
+            setSubscription(matchedSub, true);
+            mUiccSubSet = true;
         }
-
     }
 
-    public String[] setSubscription(int num, int[] slotId, int []subIndex) {
+    public String[] setSubscription(SubscriptionData subData, boolean auto) {
 
-        for(int i = 0; i < num ; i++) {
-            Log.d(LOG_TAG, "num"+num+", slotId="+slotId[i]+",subIndex="+subIndex[i]);
+        Log.d(LOG_TAG, "setSubscription");
 
-            /* if slotId[i] != -1 and subIndex[i] != -1 then that slotId,subIndex for a subscription is valid
-             * and the app type of subscription should align with the phone object created.
-             * USIM/SIM should have a GSM phone object created.
-             * RUIM/CSIM should have a CDMA phone object created.
-             * If not re-create the voice phone object accordingly.
-             */
+        for (int i = 0; i < subData.numSubscriptions ; i++) {
+            Log.d(LOG_TAG, "subData.subscription[" + i + "] = " + subData.subscription[i].toString());
 
-            if (slotId[i] != -1 && subIndex[i] != -1) {
+            if ((subData.subscription[i].slotId != -1) &&
+                (subData.subscription[i].subIndex != -1)) {
 
-                if (((cardSubscriptions[slotId[i]][subIndex[i]].equals("SIM")) ||
-                    (cardSubscriptions[slotId[i]][subIndex[i]].equals("USIM"))) &&
+                SubscriptionData cardSubData = mCardSubData[subData.subscription[i].slotId];
+                Subscription cardSub = cardSubData.subscription[subData.subscription[i].subIndex];
+
+                if (((cardSub.appType.equals("SIM")) ||
+                    (cardSub.appType.equals("USIM"))) &&
                     (!sProxyPhone[i].getPhoneName().equals("GSM"))) {
 
                     Log.d(LOG_TAG, "gets New GSM phone" );
@@ -456,26 +614,23 @@ public class ProxyManager extends Handler {
                     intent.putExtra(Phone.PHONE_SUBSCRIPTION, i);
                     ActivityManagerNative.broadcastStickyIntent(intent, null);
 
-                } else if (((cardSubscriptions[slotId[i]][subIndex[i]].equals("RUIM")) ||
-                          (cardSubscriptions[slotId[i]][subIndex[i]].equals("CSIM"))) &&
+                } else if (((cardSub.appType.equals("RUIM")) ||
+                          (cardSub.appType.equals("CSIM"))) &&
                           (!sProxyPhone[i].getPhoneName().equals("CDMA")) ) {
 
                      Log.d(LOG_TAG, "gets New CDMA phone" );
                      sProxyPhone[i].updatePhoneProxy(PhoneFactory.getCdmaPhone(i));
                      mIccSmsInterfaceManager.updatePhoneObject(sProxyPhone[i].getVoicePhone(),i);
-                    //when the phone object is re-created broadcast an intent so that PhoneApp is aware of it
+                     //when the phone object is re-created broadcast an intent so that PhoneApp is aware of it
                      Intent intent = new Intent(TelephonyIntents.ACTION_PHONE_CHANGED);
                      intent.putExtra(Phone.PHONE_SUBSCRIPTION, i);
                      ActivityManagerNative.broadcastStickyIntent(intent, null);
 
                 }
-                //update the user pref settings so that next time user is not prompted of the subscriptions
-                Settings.System.putString( mContext.getContentResolver(),Settings.System.USER_PREFERRED_SUBS[i],
-                                                                   cardSubscriptions[slotId[i]][subIndex[i]] );
-                userPrefSubs[i] = cardSubscriptions[slotId[i]][subIndex[i]];
             }
         }
-        uiccSubSet = true;
+
+        mUiccSubSet = true;
 
         // Setting the subscription at RIL/Modem is handled through a thread. Start the thread
         // if it is not already started.
@@ -483,26 +638,20 @@ public class ProxyManager extends Handler {
             supplySubscription.start();
         }
 
-        return supplySubscription.setSubscription(slotId, subIndex);
-   }
+        return supplySubscription.setSubscription(subData, auto);
+    }
 
-   public void promptUserSubscription(String[][] subInfo) {
-
-       // Send an intent to start SetSubscription.java activity to show the list of apps
-       // on each card for user selection
-       Log.d(LOG_TAG, "Prompt user subscriptin" );
-       Intent setSubscriptionIntent = new Intent(Intent.ACTION_MAIN);
-       setSubscriptionIntent.setClassName("com.android.phone",
+    public void promptUserSubscription() {
+        // Send an intent to start SetSubscription.java activity to show the list of apps
+        // on each card for user selection
+        Log.d(LOG_TAG, "promptUserSubscription" );
+        Intent setSubscriptionIntent = new Intent(Intent.ACTION_MAIN);
+        setSubscriptionIntent.setClassName("com.android.phone",
                 "com.android.phone.SetSubscription");
         setSubscriptionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        Bundle subscrInfo = new Bundle();
-        if (subInfo[0] != null)
-        subscrInfo.putStringArray(INTENT_VALUE_SUBSCR_INFO_1, subInfo[0]);
-        if (subInfo[1] != null)
-        subscrInfo.putStringArray(INTENT_VALUE_SUBSCR_INFO_2, subInfo[1]);
-        setSubscriptionIntent.putExtras(subscrInfo);
-        mContext.startActivity(setSubscriptionIntent);
+        setSubscriptionIntent.putExtra("CONFIG_SUB", false);
 
+        mContext.startActivity(setSubscriptionIntent);
     }
 
     public class SupplySubscription extends Thread {
@@ -517,50 +666,17 @@ public class ProxyManager extends Handler {
         private static final int SUBSCRIPTION_SET_SUCCESS = 0;
         private static final int SUBSCRIPTION_SET_FAILED = 1;
 
-
-        public class SubscriptionData {
-            public class Subscription {
-                public int slotId;       //slotId indicates the card slot
-                public int subIndex;     //subIndex indicates the app in the card
-                public int subNum;       //subNum indicates whether SUB0, SUB1
-                public int subStatus;    //subStatus indicates active/de-active
-            };
-            int numSubscriptions;
-            Subscription [] subscription;
-            public SubscriptionData() {
-            }
-        };
-
         SubscriptionData subscriptionData;
         SubscriptionData prevSubscriptionData;
 
         public SupplySubscription(Context context) {
 
             mContext = context;
-            subscriptionData = new SubscriptionData();
-            subscriptionData.numSubscriptions = NUM_SUBSCRIPTIONS;
-            subscriptionData.subscription = new SubscriptionData.Subscription[NUM_SUBSCRIPTIONS];
             eventsPending = 0;
             subResult = new String[NUM_SUBSCRIPTIONS];
-            prevSubscriptionData = new SubscriptionData();
-            prevSubscriptionData.numSubscriptions = NUM_SUBSCRIPTIONS;
-            prevSubscriptionData.subscription = new SubscriptionData.Subscription[NUM_SUBSCRIPTIONS];
 
-            // TODO DSDS
-            // SupplySubscription logic will be enhanced as part of handling swapping of sim cards use case handled
-            // At that time all use cases are taken care.
-            for ( int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
-                subscriptionData.subscription[i] = subscriptionData. new Subscription();
-                subscriptionData.subscription[i].slotId = -1;
-                subscriptionData.subscription[i].subIndex = -1;
-                subscriptionData.subscription[i].subNum = -1;
-                subscriptionData.subscription[i].subStatus = SUB_DEACTIVATE;
-                prevSubscriptionData.subscription[i] = subscriptionData. new Subscription();
-                prevSubscriptionData.subscription[i].slotId = 0;
-                prevSubscriptionData.subscription[i].subIndex = 0;
-                prevSubscriptionData.subscription[i].subNum = 0;
-                prevSubscriptionData.subscription[i].subStatus = SUB_ACTIVATE;
-            }
+            subscriptionData = new SubscriptionData(NUM_SUBSCRIPTIONS);
+            prevSubscriptionData = new SubscriptionData(NUM_SUBSCRIPTIONS);
         }
 
 
@@ -601,7 +717,7 @@ public class ProxyManager extends Handler {
 
                             case EVENT_SET_UICC_SUBSCRIPTION_DONE: {
                                 // Event received when SET_SUBSCRIPTION is set at RIL
-                                Log.d(LOG_TAG, ":  EVENT_SET_UICC_SUBSCRIPTION_DONE: on sub"+phoneIndex);
+                                Log.d(LOG_TAG, "EVENT_SET_UICC_SUBSCRIPTION_DONE: on sub: "+phoneIndex);
                                 synchronized (SupplySubscription.this) {
                                     eventsPending--;
                                     if ( ar.exception != null ) {
@@ -622,14 +738,22 @@ public class ProxyManager extends Handler {
                                        }
                                     } else {
                                         subResult[phoneIndex] = "SUCCESS";
+                                        subscriptionData.subscription[phoneIndex].subStatus = SUB_ACTIVATED;
                                         //set subscription success, update subscription info in phone objects
                                         sProxyPhone[phoneIndex].setSubscriptionInfo(subscriptionData.subscription[phoneIndex]);
                                         Log.d(LOG_TAG, "EVENT_SET_UICC_SUBSCRIPTION_DONE success, phone index=" + phoneIndex) ;
                                     }
 
                                     if (eventsPending == 0) {
-                                        // All the pending subscription_set responses are received now we can unblock the thread                                            // so that control can go to UI to finish the activity.
+                                        // All the pending subscription_set responses are received now we can unblock the thread
+                                        // so that control can go to UI to finish the activity.
                                         mDone = true;
+
+                                        // Store the User prefered Subscription once all
+                                        // the set uicc subscription is done.
+                                        saveUserPreferedSubscription(subscriptionData);
+                                        prevSubscriptionData.copyFrom(subscriptionData);
+
                                         SupplySubscription.this.notifyAll();
                                         int dataSub = PhoneFactory.getDataSubscription(mContext);
                                         Log.d(LOG_TAG, "dataSub :"+dataSub);
@@ -670,7 +794,7 @@ public class ProxyManager extends Handler {
             Looper.loop();
         }
 
-        synchronized String[] setSubscription( int[] slotId, int[] subIndex ) {
+        synchronized String[] setSubscription(SubscriptionData userSubData, boolean auto) {
 
             String [] string = null;
             subResult[0] = null;
@@ -684,48 +808,58 @@ public class ProxyManager extends Handler {
                     Thread.currentThread().interrupt();
                 }
             }
-            // TODO DSDS
-            // Currently De-activation mechanism logic is not present, as part of that implemenation all use cases are taken care.
 
-            for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
+            Log.d(LOG_TAG, "Copying the subscriptionData from the userSubData");
+            subscriptionData.copyFrom(userSubData);
+            Log.d(LOG_TAG, "subscriptionData.numSubscriptions :"+subscriptionData.numSubscriptions);
 
-                Log.d(LOG_TAG, "supply subscriptin, slotId[i]:"+ slotId[i]+",subIndex[i]:"
-                                                           +subIndex[i]+",status:"+SUB_ACTIVATE );
-                if (slotId[i] != -1 && subIndex[i] != -1) {
+            if (!setSubscriptionMode) {
+                // Workarround for activate/deactivate subscription from Dual SIM Settings menu.
+                // When user try to change the subscription from menu, return with success and
+                // store it in the user prefered subscription property and will be used in the
+                // next power cycle to set the subscriptions.
+                // Once QCRIL supports the activate/deactivate subscriptions, need to remove
+                // this and call the set uicc subscription accordingly.
+                // User need to *reboot manually* to reflect the changes made.
+                for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
+                    subResult[i] = "SUCCESS";
+                    // Set the activation status as ACTIVATED, to activate this
+                    // subscription when user *reboots*.
+                    if (subscriptionData.subscription[i].slotId != -1 &&
+                        subscriptionData.subscription[i].subIndex != -1) {
+                        subscriptionData.subscription[i].subStatus = SUB_ACTIVATED;
+                    } else if (subscriptionData.subscription[i].slotId == -1 &&
+                        subscriptionData.subscription[i].subIndex == -1) {
+                        subscriptionData.subscription[i].subStatus = SUB_DEACTIVATED;
+                    }
+                }
+                mDone = true;
+                // Store the User Pref Subscriptions
+                saveUserPreferedSubscription(subscriptionData);
+                prevSubscriptionData.copyFrom(subscriptionData);
+            } else {
+                Message callback = Message.obtain(mHandler, EVENT_SET_SUBSCRIPTION_MODE_DONE, null);
+                mCi[0].setSubscriptionMode(subscriptionData.numSubscriptions, callback);
+                setSubscriptionMode = false;
+                mDone = false;
+            }
 
-                    if (subscriptionData.subscription[i].slotId != prevSubscriptionData.subscription[i].slotId &&
-                        subscriptionData.subscription[i].subIndex != prevSubscriptionData.subscription[i].subIndex &&
-                        subscriptionData.subscription[i].subNum != prevSubscriptionData.subscription[i].subNum &&
-                        subscriptionData.subscription[i].subStatus != prevSubscriptionData.subscription[i].subStatus ) {
-
-                        subscriptionData.subscription[i].slotId = slotId[i];
-                        subscriptionData.subscription[i].subIndex = subIndex[i];
-                        subscriptionData.subscription[i].subNum = i;
-                        subscriptionData.subscription[i].subStatus = SUB_ACTIVATE;
+            if (!auto) {
+                while (!mDone) {
+                    try {
+                        wait();
+                        Log.d(LOG_TAG, "waiting subscription done");
+                    } catch (InterruptedException e) {
+                        // Restore the interrupted status
+                        Thread.currentThread().interrupt();
                     }
                 }
             }
-            prevSubscriptionData = subscriptionData;
-            Log.d(LOG_TAG, "subscriptionData.numSubscriptions:"+subscriptionData.numSubscriptions);
-            Message callback = Message.obtain(mHandler, EVENT_SET_SUBSCRIPTION_MODE_DONE, null);
-            mCi[0].setSubscriptionMode(subscriptionData.numSubscriptions, callback);
-            mDone = false;
 
-            while (!mDone) {
-                try {
-                    wait();
-                    Log.d(LOG_TAG, "waiting subscription done");
-                } catch (InterruptedException e) {
-                    // Restore the interrupted status
-                    Thread.currentThread().interrupt();
-                }
-            }
-
-       Log.d(LOG_TAG, "setSubscription DONE!!");
-       return subResult;
-     }
-
-   }
+            Log.d(LOG_TAG, "setSubscription DONE!!");
+            return subResult;
+        }
+    }
 
    private class PhoneAppBroadcastReceiver extends BroadcastReceiver {
 
@@ -739,12 +873,14 @@ public class ProxyManager extends Handler {
                 if (enabled) {
                     //unregistering for card status indication when moved to airplane mode
                     mUiccManager.unregisterForIccChanged(mProxyManager);
-                    uiccSubSet = true; //flag which takes care of processing/Handling of card status
+                    mUiccSubSet = true; //flag which takes care of processing/Handling of card status
                                                   //card status is processed only the first time
+                    setSubscriptionMode = true;
                 } else {
                     //registering for card status indication when moved out of airplane mode to get card status once again
                     mUiccManager.registerForIccChanged(mProxyManager, EVENT_ICC_CHANGED, null);
-                    uiccSubSet = false;
+                    mUiccSubSet = false;
+                    mReadIccid = true;
                 }
             }
         }
@@ -767,6 +903,14 @@ public class ProxyManager extends Handler {
             sProxyPhone[currentDds].disableDataConnectivity(allDataDisabledMsg);
             disableDdsInProgress = true;
         }
+    }
+
+    public SubscriptionData[] getCardSubscriptions() {
+        return mCardSubData;
+    }
+
+    public SubscriptionData getCurrentSubscriptions() {
+        return supplySubscription.subscriptionData;
     }
 
     /* Result of the setDataSubscription */
@@ -804,6 +948,108 @@ public class ProxyManager extends Handler {
             Settings.System.putInt(context.getContentResolver(),Settings.System.DUAL_SIM_VOICE_CALL, 0);
             Settings.System.putInt(context.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL, 0);
             Settings.System.putInt(context.getContentResolver(),Settings.System.DUAL_SIM_SMS, 0);
+        }
+    }
+
+    public class SubscriptionData {
+        public int numSubscriptions;
+        public Subscription [] subscription;
+
+        public SubscriptionData(int numSub) {
+            numSubscriptions = numSub;
+            subscription = new Subscription[numSub];
+            for (int i = 0; i < numSub; i++) {
+                subscription[i] = new Subscription();
+            }
+        }
+
+        public SubscriptionData copyFrom(SubscriptionData from) {
+            if (from != null) {
+                numSubscriptions = from.numSubscriptions;
+                subscription = new Subscription[numSubscriptions];
+                for (int i = 0; i < numSubscriptions; i++) {
+                    subscription[i] = new Subscription();
+                    subscription[i].copyFrom(from.subscription[i]);
+                }
+            }
+            return this;
+        }
+    }
+
+    public class Subscription {
+        public int slotId;         // Slot id
+        public int subIndex;       // Subscription index in the card
+        public int subNum;         // SUB 0 or SUB 1
+        public int subStatus;      // ACTIVATE = 0, DEACTIVATE = 1, ACTIVATING = 2,
+                                   // DEACTIVATING = 3, ACTIVATED = 4, DEACTIVATED = 5, INVALID = 6;
+        public String appId;
+        public String appLabel;
+        public String appType;
+        public String iccId;
+
+        public Subscription() {
+            slotId = -1;
+            subIndex = -1;
+            subNum = -1;
+            subStatus = SUB_INVALID;
+            appId = null;
+            appLabel = null;
+            appType = null;
+            iccId = null;
+        }
+
+        public String toString() {
+            return "Subscription = { "
+                   + "slotId = " + slotId
+                   + ", subIndex = " + subIndex
+                   + ", subNum = " + subNum
+                   + ", subStatus = " + subStatus
+                   + ", appId = " + appId
+                   + ", appLabel = " + appLabel
+                   + ", appType = " + appType
+                   + ", iccId = " + iccId + " }";
+        }
+
+        public boolean equals(Subscription sub) {
+            if (sub != null) {
+                if ((slotId == sub.slotId) && (subIndex == sub.subIndex) &&
+                    (subNum == sub.subNum) && (subStatus == sub.subStatus) &&
+                    ((appId == null && sub.appId == null) ||
+                        (appId != null && appId.equals(sub.appId))) &&
+                    ((appLabel == null && sub.appLabel == null) ||
+                        (appLabel != null && appLabel.equals(sub.appLabel))) &&
+                    ((appType == null && sub.appType == null) ||
+                        (appType != null && appType.equals(sub.appType))) &&
+                    ((iccId == null && sub.iccId == null) ||
+                        (iccId != null && iccId.equals(sub.iccId)))) {
+                    return true;
+                }
+            } else {
+                Log.d(LOG_TAG, "Subscription.equals: sub == null");
+            }
+            return false;
+        }
+        public Subscription copyFrom(Subscription from) {
+            if (from != null) {
+                slotId = from.slotId;
+                subIndex = from.subIndex;
+                subNum = from.subNum;
+                subStatus = from.subStatus;
+                if (from.appId != null) {
+                    appId = new String(from.appId);
+                }
+                if (from.appLabel != null) {
+                    appLabel = new String(from.appLabel);
+                }
+                if (from.appType != null) {
+                    appType = new String(from.appType);
+                }
+                if (from.iccId != null) {
+                    iccId = new String(from.iccId);
+                }
+            }
+
+            return this;
         }
     }
 }//end of proxy manager

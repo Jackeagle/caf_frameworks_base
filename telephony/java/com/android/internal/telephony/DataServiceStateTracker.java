@@ -41,7 +41,7 @@ import com.android.internal.telephony.gsm.RestrictedState;
 import com.android.internal.telephony.gsm.SIMRecords;
 
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 import com.android.internal.telephony.UiccConstants.AppType;
 import android.telephony.TelephonyManager;
 
@@ -1163,25 +1163,35 @@ public class DataServiceStateTracker extends Handler {
 
     void logd(String logString) {
         if (DBG) {
-            Log.d(LOG_TAG, "[DSST] " + logString);
+            Log.d(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                      "(" + mDct.getSubscriptionInfo().subNum + ")" : "")
+                                   + "] " + logString);
         }
     }
 
     void logv(String logString) {
         if (DBG) {
-            Log.d(LOG_TAG, "[DSST] " + logString);
+            Log.d(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                      "(" + mDct.getSubscriptionInfo().subNum + ")" : "")
+                                   + "] " + logString);
         }
     }
 
     void logi(String logString) {
-        Log.i(LOG_TAG, "[DSST] " + logString);
+        Log.i(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                  "(" + mDct.getSubscriptionInfo().subNum + ")" : "")
+                               + "] " + logString);
     }
 
     void logw(String logString) {
-        Log.w(LOG_TAG, "[DSST] " + logString);
+        Log.w(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                  "(" + mDct.getSubscriptionInfo().subNum + ")" : "")
+                               + "] " + logString);
     }
 
     void loge(String logString) {
-        Log.e(LOG_TAG, "[DSST] " + logString);
+        Log.e(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                  "(" + mDct.getSubscriptionInfo().subNum + ")" : "")
+                               + "] " + logString);
     }
 }

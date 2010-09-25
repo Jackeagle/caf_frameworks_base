@@ -212,6 +212,22 @@ public class UiccManager extends Handler{
         return arrayCards;
     }
 
+    /*
+     * This Function gets the UiccCard at the index in case of
+     * the card is present and it has any applications or the
+     * card is absent.  Otherwise retrun null.
+     */
+    public synchronized UiccCard getCard(int index) {
+        UiccCard card = mUiccCards[index];
+        if (card != null &&
+            ((card.getCardState() == CardState.PRESENT &&
+              card.getNumApplications() > 0) ||
+             card.getCardState() == CardState.ABSENT)) {
+            return card;
+        }
+        return null;
+    }
+
     /* Return First subscription of selected family */
     public synchronized UiccCardApplication getCurrentApplication(AppFamily family) {
         for (UiccCard c: mUiccCards) {

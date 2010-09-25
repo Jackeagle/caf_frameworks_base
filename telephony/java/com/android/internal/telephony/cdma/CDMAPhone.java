@@ -65,7 +65,7 @@ import com.android.internal.telephony.PhoneSubInfo;
 import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 import android.telephony.TelephonyManager;
 
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;

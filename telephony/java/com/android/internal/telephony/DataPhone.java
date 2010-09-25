@@ -22,7 +22,7 @@ import android.os.Message;
 import android.telephony.ServiceState;
 import com.android.internal.telephony.DataConnection;
 import java.util.List;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 /**
  * Internal interface used to control the phone; SDK developers cannot

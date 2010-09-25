@@ -27,7 +27,7 @@ import android.telephony.SignalStrength;
 
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.util.List;
 

@@ -23,7 +23,7 @@ import android.os.Message;
 import android.os.Handler;
 import android.util.Log;
 
-import com.android.internal.telephony.ProxyManager.SupplySubscription.SubscriptionData.Subscription;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 
 /**
