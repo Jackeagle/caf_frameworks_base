@@ -203,6 +203,7 @@ extmap FILE_EXTS [] =  {
         {".wma", PV_PLAYER},
         {".wmv", PV_PLAYER},
         {".asf", PV_PLAYER},
+        {".aac", PV_PLAYER},
 #endif
 };
 
@@ -715,6 +716,12 @@ player_type getPlayerType(int fd, int64_t offset, int64_t length)
     if (ident == 0x75b22630) {
         // The magic number for .asf files, i.e. wmv and wma content.
         // These are not currently supported through stagefright.
+        return PV_PLAYER;
+    }
+    // ".aac" files are not currently supported through SF so select PV.
+    // Check for ADTS or ADIF formates.
+    if (((ident&0x0000F6FF) == 0x0000F0FF)||(ident==0x46494441)) {
+        LOGD("SF does not support mpeg2 Audio formate (.aac) file so play with PV");
         return PV_PLAYER;
     }
 #endif
