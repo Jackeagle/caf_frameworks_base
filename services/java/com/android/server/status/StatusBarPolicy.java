@@ -1225,8 +1225,11 @@ public class StatusBarPolicy {
     private final void updateDataIcon() {
         int iconId;
         boolean visible = true;
-
-        if (isDataGsm()) {
+        if (mSignalStrength != null && mSignalStrength.isGsm() &&
+            mSimState != IccCard.State.READY && mSimState != IccCard.State.UNKNOWN) {
+            mDataData.iconId = com.android.internal.R.drawable.stat_sys_no_sim;
+            mService.updateIcon(mDataIcon, mDataData, null);
+        } else if (isDataGsm()) {
             // GSM case, we have to check also the sim state
             if (mSimState == IccCard.State.READY || mSimState == IccCard.State.UNKNOWN) {
                 if (hasService() && mDataState == TelephonyManager.DATA_CONNECTED) {
