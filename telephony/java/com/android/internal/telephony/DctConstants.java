@@ -93,7 +93,9 @@ public class DctConstants {
     public static final int CMD_SET_POLICY_DATA_ENABLE = BASE + 32;
     public static final int EVENT_ICC_CHANGED = BASE + 33;
     public static final int EVENT_TETHERED_MODE_STATE_CHANGED = BASE + 34;
-
+    public static final int EVENT_READ_MODEM_PROFILES = BASE + 35;
+    public static final int EVENT_GET_DATA_CALL_PROFILE_DONE = BASE + 36;
+    public static final int EVENT_MODEM_DATA_PROFILE_READY = BASE + 37;
     /***** Constants *****/
 
     public static final int APN_INVALID_ID = -1;

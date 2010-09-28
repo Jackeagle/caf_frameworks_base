@@ -193,4 +193,19 @@ public interface TelephonyProperties
      * Ignore RIL_UNSOL_NITZ_TIME_RECEIVED completely, used for debugging/testing.
      */
     static final String PROPERTY_IGNORE_NITZ = "telephony.test.ignore.nitz";
+
+    /**
+     * Property that shows the status of the OMH feature
+     */
+    static final String PROPERTY_OMH_ENABLED = "persist.omh.enabled";
+
+    /**
+     * Property that can be used to set the IP version for CDMA
+     */
+    static final String PROPERTY_CDMA_IPPROTOCOL = "persist.telephony.cdma.protocol";
+
+    /**
+     * Property that can be used to set the IP version for CDMA when roaming
+     */
+    static final String PROPERTY_CDMA_ROAMING_IPPROTOCOL = "persist.telephony.cdma.rproto";
 }
