@@ -161,8 +161,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
         this.mCm = ci;
         this.mNotifier = notifier;
 
-        this.mDpt = new DataProfileTracker(context);
-
+        this.mDpt = new DataProfileTracker(context, ci);
     }
 
     public void dispose() {

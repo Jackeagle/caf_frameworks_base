@@ -30,12 +30,17 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Registrant;
 import android.os.RegistrantList;
+import android.os.SystemProperties;
 import android.provider.Telephony;
 import android.util.Log;
 
+import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.DataConnectionTracker.State;
 import com.android.internal.telephony.DataPhone.IPVersion;
+import com.android.internal.telephony.DataProfile;
 import com.android.internal.telephony.DataProfile.DataProfileType;
+import com.android.internal.telephony.DataProfileOmh.DataProfileTypeModem;
+import com.android.internal.telephony.DataProfileOmh;
 
 /*
  * This class keeps track of the following :
@@ -49,6 +54,8 @@ public class DataProfileTracker extends Handler {
     private static final String LOG_TAG = "DATA";
 
     private Context mContext;
+
+    private CommandsInterface mCm;
 
     private DataProfileDbObserver mDpObserver;
 
@@ -64,9 +71,18 @@ public class DataProfileTracker extends Handler {
     private RegistrantList mDataDataProfileDbChangedRegistrants = new RegistrantList();
     private ArrayList<DataProfile> mAllDataProfilesList = new ArrayList<DataProfile>();
 
+    /* NOTE: Assumption is that the modem profiles will not change without
+     * requiring a reboot. Modifications over the air is not supported.
+     * Modified or new RUIM cards inserted will require a reboot
+     */
+    // DataProfile list from the modem. These may be from RUIM in case of OMH
+    ArrayList<DataProfile> mDataProfileListModem = new ArrayList<DataProfile>();
+
     private int mSubId = 0;
 
     private static final int EVENT_DATA_PROFILE_DB_CHANGED = 1;
+    private static final int EVENT_READ_MODEM_PROFILES = 2;
+    private static final int EVENT_GET_DATA_CALL_PROFILE_DONE = 3;
 
     /*
      * Observer for keeping track of changes to the APN database.
@@ -82,9 +98,11 @@ public class DataProfileTracker extends Handler {
         }
     }
 
-    DataProfileTracker(Context context) {
+    DataProfileTracker(Context context, CommandsInterface ci) {
 
         mContext = context;
+
+        mCm = ci;
 
         /*
          * initialize data service type specific meta data
@@ -93,6 +111,9 @@ public class DataProfileTracker extends Handler {
         for (DataServiceType t : DataServiceType.values()) {
             dsMap.put(t, new DataServiceInfo(mContext, t));
         }
+
+        /* Read modem profiles. e.g. for OMH */
+        readDataprofilesFromModem();
 
         /*
          * register database observer
@@ -110,12 +131,18 @@ public class DataProfileTracker extends Handler {
     }
 
     public void handleMessage(Message msg) {
+        AsyncResult ar;
 
         switch (msg.what) {
             case EVENT_DATA_PROFILE_DB_CHANGED:
                 reloadAllDataProfiles(Phone.REASON_APN_CHANGED);
                 break;
-
+            case EVENT_READ_MODEM_PROFILES:
+                onReadDataprofilesFromModem();
+                break;
+            case EVENT_GET_DATA_CALL_PROFILE_DONE:
+                onGetDataCallProfileDone((AsyncResult) msg.obj);
+                break;
             default:
                 logw("unhandled msg.what="+msg.what);
         }
@@ -148,27 +175,41 @@ public class DataProfileTracker extends Handler {
             }
         }
 
-        /*
-         * For supporting CDMA, for now, we just create a Data profile of TYPE NAI that supports
-         * all service types and add it to all DataProfiles.
-         * TODO: this information should be read from apns-conf.xml / carriers db.
-         */
-        CdmaNAI cdmaNaiProfile = new CdmaNAI();
-        allDataProfiles.add(cdmaNaiProfile);
+        if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+            /* Clear out the modem profiles which were read/saved */
+            mDataProfileListModem.clear();
+
+            /* TODO: the modem profiles are not a part of allDataProfiles!
+               so the profile DB change check will not include modem profiles
+               */
+
+            readDataprofilesFromModem();
+        } else {
+            /* Only if modem profiles are not being read, create a catch-all
+             * CDMA profile that supports all service types. i.e. non OMH case.
+             *
+             * For supporting CDMA, for now, we just create a Data profile of TYPE NAI that supports
+             * all service types and add it to all DataProfiles.
+             * TODO: this information should be read from apns-conf.xml / carriers db.
+             */
+            CdmaNAI cdmaNaiProfile = new CdmaNAI();
+            allDataProfiles.add(cdmaNaiProfile);
+        }
+
 
         /*
          * clear the data profile list associated with each service type and
          * re-populate them.
          */
         for (DataServiceType t : DataServiceType.values()) {
-            dsMap.get(t).mDataProfileList.clear();
+            dsMap.get(t).clearDataProfiles();
         }
 
         for (DataProfile dp : allDataProfiles) {
             logv("new dp found : "+dp.toString());
             for (DataServiceType t : DataServiceType.values()) {
                 if (dp.canHandleServiceType(t))
-                    dsMap.get(t).mDataProfileList.add(dp);
+                    dsMap.get(t).addDataProfile(dp);
             }
         }
 
@@ -195,7 +236,7 @@ public class DataProfileTracker extends Handler {
         }
 
         ApnSetting newPreferredApn = getPreferredDefaultApnFromDb(dsMap
-                .get(DataServiceType.SERVICE_TYPE_DEFAULT).mDataProfileList);
+                .get(DataServiceType.SERVICE_TYPE_DEFAULT).getDataProfiles());
         if (isApnDifferent(newPreferredApn, mPreferredDefaultApn)) {
             logv("preferred apn has changed");
             hasProfileDbChanged = true;
@@ -210,6 +251,72 @@ public class DataProfileTracker extends Handler {
 
         return hasProfileDbChanged;
     }
+
+    /*
+     * Trigger modem read for data profiles
+     */
+    public void readDataprofilesFromModem() {
+        sendMessage(obtainMessage(EVENT_READ_MODEM_PROFILES));
+        return;
+    }
+
+    /*
+     * Reads all the data profiles from the modem
+     */
+    private void onReadDataprofilesFromModem() {
+
+       if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+            // For all the service types known in modem, read the data profies
+            for (DataProfileTypeModem p : DataProfileTypeModem.values()) {
+                logd("Reading profiles for:" + p.getid());
+                mCm.getDataCallProfile(p.getid(), obtainMessage(EVENT_GET_DATA_CALL_PROFILE_DONE, p));
+            }
+        }
+
+        return;
+    }
+
+    /*
+     * Process the response for the RIL request GET_DATA_CALL_PROFILE.
+     * Save the profile details received.
+     */
+    private void onGetDataCallProfileDone(AsyncResult ar) {
+
+        if (ar.exception != null) {
+            loge("Exception in GetDataCallProfile:" + ar.exception);
+            return;
+        }
+
+        DataProfileTypeModem modemProfile = (DataProfileTypeModem)ar.userObj;
+
+        mDataProfileListModem = (ArrayList<DataProfile>)ar.result;
+
+        logd("onGetDataCallProfileDone()");
+
+        if (mDataProfileListModem != null && mDataProfileListModem.size() > 0) {
+            DataServiceType dst;
+
+            logd("# profiles returned from modem:" + mDataProfileListModem.size());
+
+            /* Get DataServieInfo for that service type, add all the profiles */
+            for (DataProfile dp : mDataProfileListModem) {
+
+                /* For the modem service type, get the android DataServiceType */
+                dst = modemProfile.getDataServiceType();
+
+                /* Store the modem profile type in the data profile */
+                ((DataProfileOmh)dp).setDataProfileTypeModem(modemProfile);
+
+                dsMap.get(dst).addDataProfile(dp);
+
+                // Also add to the master list of profiles
+                mAllDataProfilesList.add(dp);
+            }
+        }
+
+        return;
+    }
+
 
     /*
      * returns true if at least one profile of the specified data profile type is configured

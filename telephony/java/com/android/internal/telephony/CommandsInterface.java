@@ -1524,6 +1524,18 @@ public interface CommandsInterface {
                 2 for DualStandBy
      * @param result
      *          Callback message contains the information of SUCCESS/FAILURE.
-    */
+     */
     public void setSubscriptionMode (int subscription_mode, Message result);
+
+    /**
+     * Get the data call profile information from the modem
+     *
+     * @param appType
+     *          Callback message containing the count and the list of {@link
+     *          RIL_DataCallProfileInfo}
+     *
+     * @param result
+     *          Callback message
+     */
+    public void getDataCallProfile(int appType, Message result);
 }

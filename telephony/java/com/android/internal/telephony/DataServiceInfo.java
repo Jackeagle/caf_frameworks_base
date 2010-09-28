@@ -56,7 +56,7 @@ public class DataServiceInfo {
 
     // list of data profiles that supports this service type
     // populated by DataProfileTracker
-    ArrayList<DataProfile> mDataProfileList;
+    private ArrayList<DataProfile> mDataProfileList;
 
     /** Retry configuration: A doubling of retry times from 5secs to 30 minutes */
     private static final String DEFAULT_DATA_RETRY_CONFIG = "default_randomization=2000,"
@@ -124,13 +124,71 @@ public class DataServiceInfo {
     // gets the next data profile of the specified data profile type and ip
     // version that needs to be tried out.
     DataProfile getNextWorkingDataProfile(DataProfileType profileType, IPVersion ipv) {
+        DataProfile dp;
+
+        dp = getNextArbitratedProfile(profileType, ipv);
+
+        if (dp == null) {
+            // If modem profiles dint have the right profile, look in android
+            dp = getNextWorkingAndroidProfile(profileType, ipv);
+        }
+
+        return dp;
+    }
+
+    /**
+     * Search through the modem profiles and choose the one with the highest
+     * priority.
+     *
+     * The arbitration logic can be changed/enhanced
+     * within this function.
+     */
+    DataProfile getNextArbitratedProfile(DataProfileType profileType, IPVersion ipv) {
+
+        if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+            logi("Looking at OMH profiles");
+            DataProfile profile = null;
+            for (DataProfile dp : mDataProfileList) {
+                if (dp.getDataProfileType() == profileType && dp.isWorking(ipv) == true
+                        && dp.canSupportIpVersion(ipv)) {
+
+                    if (!((DataProfileOmh)dp).isValidPriority()) {
+                        logi("Invalid priority, skipping profile...");
+                        continue;
+                    }
+
+                    if (profile == null) {
+                        profile = dp; // first hit
+                    } else {
+                        // Choose the profile with higher priority
+                        profile = ((DataProfileOmh)dp).isPriorityHigher(((DataProfileOmh)profile).getPriority()) ? dp : profile;
+                    }
+                }
+            }
+            return profile;
+        }
+
+        return null;
+    }
+
+    /* Search through the android profiles for a match */
+    DataProfile getNextWorkingAndroidProfile(DataProfileType profileType, IPVersion ipv) {
+
+        if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+            // If we have reached here, then there are no OMH profiles available
+            // falling back to CDMA NAI profiles
+            logi("No suitable OMH profiles found, fallback to CDMA NAI");
+            profileType = DataProfileType.PROFILE_TYPE_3GPP2_NAI;
+        }
+
         for (DataProfile dp : mDataProfileList) {
             if (dp.getDataProfileType() == profileType && dp.isWorking(ipv) == true
                     && dp.canSupportIpVersion(ipv)) {
+                logi("Data Profile Chosen:" + dp.getDataProfileType());
                 return dp;
             }
         }
-        return null; // no working DP found
+        return null;
     }
 
     /*
@@ -216,6 +274,20 @@ public class DataServiceInfo {
             return ipv4State;
         else
             return ipv6State;
+    }
+
+    public void clearDataProfiles() {
+        mDataProfileList.clear();
+        return;
+    }
+
+    public void addDataProfile(DataProfile dp) {
+        mDataProfileList.add(dp);
+        return;
+    }
+
+    public ArrayList<DataProfile> getDataProfiles() {
+        return mDataProfileList;
     }
 
     static private final String LOG_TAG = "DATA";

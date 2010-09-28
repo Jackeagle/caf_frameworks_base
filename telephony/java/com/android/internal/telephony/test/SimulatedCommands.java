@@ -1499,4 +1499,7 @@ public final class SimulatedCommands extends BaseCommands
         unimplemented(response);
     }
 
+    public void getDataCallProfile(int appType, Message result){
+        unimplemented(result);
+    }
 }

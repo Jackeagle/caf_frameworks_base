@@ -64,6 +64,7 @@ import com.android.internal.telephony.cdma.CdmaInformationRecords;
 import com.android.internal.telephony.ProxyManager.SubscriptionData;
 import com.android.internal.telephony.ProxyManager.Subscription;
 import android.telephony.TelephonyManager;
+import com.android.internal.telephony.DataProfileOmh;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -741,6 +742,21 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
+
+    public void
+    getDataCallProfile(int appType, Message result) {
+        RILRequest rr = RILRequest.obtain(
+                RILConstants.RIL_REQUEST_GET_DATA_CALL_PROFILE, result);
+
+        // count of ints
+        rr.mp.writeInt(1);
+        rr.mp.writeInt(appType);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " : " + appType);
+
+        send(rr);
+    }
 
     public void
     supplyIccPin(int slot, String aid, String pin, Message result) {
@@ -2342,6 +2358,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: ret = responseUiccSubscription(p); break;
             case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: ret = responseDataSubscription(p); break;
             case RIL_REQUEST_SET_SUBSCRIPTION_MODE: ret = responseVoid(p); break;
+            case RIL_REQUEST_GET_DATA_CALL_PROFILE: ret = responseGetDataCallProfile(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -3417,6 +3434,24 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         return response;
     }
 
+    private ArrayList<DataProfile>
+    responseGetDataCallProfile(Parcel p) {
+        int nProfiles = p.readInt();
+        if (RILJ_LOGD) riljLog("# data call profiles:" + nProfiles);
+
+        ArrayList<DataProfile> response = new ArrayList<DataProfile>(nProfiles);
+
+        for (int i = 0; i < nProfiles; i++) {
+            DataProfileOmh profile = new DataProfileOmh();
+            profile.setProfileId(p.readInt());
+            profile.setPriority(p.readInt());
+            if (RILJ_LOGD) riljLog("responseGetDataCallProfile()" + profile.getProfileId() + ":" + profile.getPriority());
+            response.add(profile);
+        }
+
+        return response;
+    }
+
     private Object
     responseUiccSubscription(Parcel p) {
         //TODO
@@ -3608,6 +3643,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE";
             case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE";
             case RIL_REQUEST_SET_SUBSCRIPTION_MODE: return "RIL_REQUEST_SET_SUBSCRIPTION_MODE";
+            case RIL_REQUEST_GET_DATA_CALL_PROFILE: return "RIL_REQUEST_GET_DATA_CALL_PROFILE";
             default: return "<unknown request>";
         }
     }

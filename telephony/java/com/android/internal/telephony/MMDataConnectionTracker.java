@@ -450,6 +450,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     protected void onRecordsLoaded() {
+
+        if (mDsst.mRuimRecords != null) {
+            /* read the modem profiles */
+            mDpt.readDataprofilesFromModem();
+        }
+
         updateOperatorNumericInDpt(REASON_ICC_RECORDS_LOADED);
         updateDataConnections(REASON_ICC_RECORDS_LOADED);
     }
@@ -1095,6 +1101,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                     }
                 }
             }
+
             /*
              * 2b : Bring up data calls as required.
              */
@@ -1285,6 +1292,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     private DataProfileType getDataProfileTypeToUse() {
         DataProfileType type = null;
+
         RadioTechnology r = getRadioTechnology();
         if (r == RadioTechnology.RADIO_TECH_UNKNOWN || r == null) {
             type = null;
@@ -1308,7 +1316,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         } else if (r.isGsm()) {
             type = DataProfileType.PROFILE_TYPE_3GPP_APN;
         } else {
-            type = DataProfileType.PROFILE_TYPE_3GPP2_NAI;
+            if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+                type = DataProfileType.PROFILE_TYPE_3GPP2_OMH;
+            } else {
+                type = DataProfileType.PROFILE_TYPE_3GPP2_NAI;
+            }
         }
         return type;
     }

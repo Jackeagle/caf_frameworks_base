@@ -152,4 +152,8 @@ public class ApnSetting extends DataProfile {
         }
         return false;
     }
+
+    int getProfileId() {
+        return id;
+    }
 }
