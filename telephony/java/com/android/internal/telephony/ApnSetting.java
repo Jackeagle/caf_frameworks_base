@@ -197,4 +197,9 @@ public class ApnSetting extends DataProfile {
     public String toHash() {
         return this.toString();
     }
+
+    @Override
+    public void setProfileId(int profileId) {
+        // TODO Auto-generated method stub
+    }
 }
