@@ -37,6 +37,7 @@ import android.os.IBinder;
 import android.os.storage.IMountService;
 import android.os.storage.StorageManager;
 import android.os.storage.StorageEventListener;
+import android.os.SystemProperties;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.widget.ImageView;
@@ -200,6 +201,9 @@ public class UsbStorageActivity extends Activity
     }
 
     private void switchUsbMassStorageAsync(boolean on) {
+        if(SystemProperties.getBoolean("ro.monkey", false)) {
+            return;
+        }
         mUnmountButton.setVisibility(View.GONE);
         mMountButton.setVisibility(View.GONE);
 
