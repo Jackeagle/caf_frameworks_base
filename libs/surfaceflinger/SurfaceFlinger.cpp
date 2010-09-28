@@ -946,8 +946,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     compcount++;
                     prevClip = clip;
                     ovLayerIndex = i;
-                    // Right now video goess through
-                    // overlays, dont enable overlay for layerbuffer
+                    if (layer->getLayerInitFlags() & ePushBuffers) {
+                        layerbuffercount++;
+                        layerbufferIndex = i;
+                    }
                 }
             }
 
