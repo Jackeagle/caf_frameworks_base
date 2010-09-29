@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include <cstdio>
 using namespace std;
 
 int do_rescheck(const vector<string>& files);

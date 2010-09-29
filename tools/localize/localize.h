@@ -5,6 +5,7 @@
 
 #include <map>
 #include <string>
+#include <cstdio>
 
 using namespace std;
 
