@@ -86,6 +86,7 @@ import android.util.Log;
 class CNERequest
 {
     static final String LOG_TAG = "CNEJ";
+    static final boolean DBG = false;
 
     //***** Class Variables
     static int sNextSerial = 0;
@@ -365,12 +366,12 @@ public final class CNE
                 NetworkInterface netIface = NetworkInterface.getByInetAddress(inetAddr);
                 wlanAddrInfo.ifName = netIface.getName();
             } catch (SocketException sexp){
-                Log.v(LOG_TAG, "Could not get the netIface obj");
+                if (DBG) Log.v(LOG_TAG, "Could not get the netIface obj");
             } catch(NullPointerException nexp){
                 // WiFi is probably down.
-                Log.v(LOG_TAG, "DhcpInfo obj is NULL. V4 address is not yet available.");
+                if (DBG) Log.v(LOG_TAG, "DhcpInfo obj is NULL. V4 address is not yet available.");
             } catch(UnknownHostException uexp){
-                Log.v(LOG_TAG, "Invalid host name" + ipAddr);
+                if (DBG) Log.v(LOG_TAG, "Invalid host name" + ipAddr);
             }
         } else if(version == IPVersion.IPV6){
             /* currently wifistate tracker is not supporting V6 address,
@@ -391,14 +392,14 @@ public final class CNE
                     }
                 }
             } catch (SocketException sexp){
-                Log.v(LOG_TAG, "Could not get the netIface obj");
+                if (DBG) Log.v(LOG_TAG, "Could not get the netIface obj");
             } catch(NullPointerException nexp){
-                Log.v(LOG_TAG, "V4Adrr is not yet available");
+                if (DBG) Log.v(LOG_TAG, "V4Adrr is not yet available");
              }catch(UnknownHostException uexp){
-                Log.v(LOG_TAG, "Can't get V6Addr without valid V4Addr= " + v4Addr);
+                if (DBG) Log.v(LOG_TAG, "Can't get V6Addr without valid V4Addr= " + v4Addr);
             }
         } else {
-            Log.v(LOG_TAG,"Unsupported ipversion." + version);
+            if (DBG) Log.v(LOG_TAG,"Unsupported ipversion." + version);
         }
         return wlanAddrInfo;
     }
@@ -410,7 +411,7 @@ public final class CNE
             wwanAddrInfo.ipAddr = mTelephonyManager.getActiveIpAddress(apnType,ipv);
             wwanAddrInfo.gatewayAddr = mTelephonyManager.getActiveGateway(apnType,ipv);
         } catch(NullPointerException nexp){
-            Log.v(LOG_TAG, "mTelephonyManager is null");
+            if (DBG) Log.v(LOG_TAG, "mTelephonyManager is null");
         }
         return wwanAddrInfo;
     }
@@ -421,14 +422,14 @@ public final class CNE
 
             if (action.equals(Intent.ACTION_BATTERY_CHANGED))
             {
-                Log.i(LOG_TAG, "CNE received action: " + action);
+                if (DBG) Log.i(LOG_TAG, "CNE received action: " + action);
                 int level = intent.getIntExtra("level", 0);
                 int pluginType = intent.getIntExtra("plugged", 0);
                 int status = intent.getIntExtra("status", 0);
                 updateBatteryStatus(level, pluginType, status);
 
             } else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
-                Log.i(LOG_TAG, "CNE received action RSSI Changed events: " + action);
+                if (DBG) Log.i(LOG_TAG, "CNE received action RSSI Changed events: " + action);
                 if (mWifiManager != null) {
                     String ipV4Addr=null;
                     ConnectivityManager cm =
@@ -448,24 +449,24 @@ public final class CNE
                     Timestamp ts = new Timestamp(currentTime);
                     tsStr = ts.toString();
 
-                    Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
+                    if (DBG) Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
                           " networkState: " + networkState);
 
-                    Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
+                    if (DBG) Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
                           "ssid= " + ssid + ",rssi=" + rssi + ",ipV4Addr=" +
                           ipV4Addr + ",timeStamp:" + tsStr + " networkState: " +
                           networkState);
                     updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G,NetworkStateToInt(networkState),
                                      rssi, ssid, ipV4Addr, tsStr);
                 } else {
-                    Log.w(LOG_TAG, "CNE received action RSSI Changed events, null WifiManager");
+                    if (DBG) Log.w(LOG_TAG, "CNE received action RSSI Changed events, null WifiManager");
                 }
 
 
             } else if ((action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) ||
                        (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) ){
 
-                Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed: " + action);
+                if (DBG) Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed: " + action);
 
                 if (mWifiManager != null) {
                     AddressInfo wlanV4Addr = getWlanAddrInfo(IPVersion.IPV4);
@@ -485,7 +486,7 @@ public final class CNE
                             networkState = NetworkInfo.State.UNKNOWN;
                         }
                     }
-                    Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed"+
+                    if (DBG) Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed"+
                                  " networkState: " + networkState);
                     if (networkState == NetworkInfo.State.CONNECTED) {
                       try {
@@ -501,7 +502,7 @@ public final class CNE
                           if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
                              (mDefaultNetwork != ConnectivityManager.TYPE_WIFI) &&
                              (activeWlanIfName != null)) {
-                              Log.i(LOG_TAG,"CNE received Network/Wifi State Changed -"+
+                              if (DBG) Log.i(LOG_TAG,"CNE received Network/Wifi State Changed -"+
                                           "DELETE Wlan From Main");
                               // remove network interface from main table if it is not preferred interface
                               configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
@@ -510,7 +511,7 @@ public final class CNE
 
 
                       } catch (Exception e) {
-                            Log.w(LOG_TAG, "CNE receiver exception", e);
+                            if (DBG) Log.w(LOG_TAG, "CNE receiver exception", e);
                       }
 
                   } else if (networkState == NetworkInfo.State.DISCONNECTED) {
@@ -525,23 +526,25 @@ public final class CNE
                   Timestamp ts = new Timestamp(currentTime);
                   tsStr = ts.toString();
 
-                  Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed - " +
+                  if (DBG) {
+                      Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed - " +
                                 "ssid= " + ssid + ",rssi=" + rssi + ",networkState=" +
                                 networkState);
-                  Log.i(LOG_TAG,"CNE received action Network/Wifi State Changed- ifName:"+
+                      Log.i(LOG_TAG,"CNE received action Network/Wifi State Changed- ifName:"+
                         wlanV4Addr.ifName + ",ipV4Addr=" + wlanV4Addr.ipAddr + ",gateway:" +
                         wlanV4Addr.gatewayAddr + ",timeStamp=" + tsStr);
+                  }
 
                   updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G,NetworkStateToInt(networkState),
                                    rssi, ssid, wlanV4Addr.ipAddr, tsStr);
                   notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState),
                                          wlanV4Addr.ipAddr);
                 } else {
-                  Log.w(LOG_TAG, "CNE received action Network State Changed, null WifiManager");
+                  if (DBG) Log.w(LOG_TAG, "CNE received action Network State Changed, null WifiManager");
                 }
 
             } else if (action.equals(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)) {
-                Log.i(LOG_TAG, "CNE received action: " + action);
+                if (DBG) Log.i(LOG_TAG, "CNE received action: " + action);
                 if(mWifiManager != null)
                 {
                     List<ScanResult> results = mWifiManager.getScanResults();
@@ -562,7 +565,7 @@ public final class CNE
                     if (ipv == IPVersion.IPV4) {
                         wwanAddrInfo = wwanV4AddrInfo;
                     } else {
-                        Log.i(LOG_TAG, "IPV6 is not supported by CNE yet");
+                        if (DBG) Log.i(LOG_TAG, "IPV6 is not supported by CNE yet");
                         return;
                     }
                     str = intent.getStringExtra(Phone.DATA_APN_TYPE_STATE);
@@ -575,14 +578,14 @@ public final class CNE
                         if (ipv == IPVersion.IPV4) {
                             activeWwanV4IfName = wwanV4AddrInfo.ifName;
                         }
-                        Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
+                        if (DBG) Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
                         // add network interface to main table and create an interface
                         // specific table if it does not already exist
                         configureIproute2(CNE_IPROUTE2_ADD_ROUTING, wwanAddrInfo.ifName,
                                           wwanAddrInfo.ipAddr, wwanAddrInfo.gatewayAddr);
                         if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
                            (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE)) {
-                            Log.i(LOG_TAG,"onDataConnectionStateChanged: "+
+                            if (DBG) Log.i(LOG_TAG,"onDataConnectionStateChanged: "+
                                           "Delete Wwan From Main");
                             // remove network interface from main table if it is not
                             // preferred interface
@@ -591,11 +594,11 @@ public final class CNE
                         }
                     } else if(netState == NetworkInfo.State.DISCONNECTED){
                         if(ipv == IPVersion.IPV4){
-                            Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
+                            if (DBG) Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
                                   "Delete Wwan(before)"+activeWwanV4IfName);
                             configureIproute2(CNE_IPROUTE2_DELETE_ROUTING,
                                               activeWwanV4IfName, null, null);
-                            Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
+                            if (DBG) Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
                                   "Delete Wwan(after)"+activeWwanV4IfName);
                         }
                     }
@@ -607,10 +610,10 @@ public final class CNE
                     Timestamp ts = new Timestamp(currentTime);
                     tsStr = ts.toString();
 
-                    Log.i(LOG_TAG, "onDataConnectionStateChanged - networkType= "
+                    if (DBG) Log.i(LOG_TAG, "onDataConnectionStateChanged - networkType= "
                           + networkType + ",networkState=" + netState +
                           ",signalStr=" + signalStrength + ",roaming=" + roaming);
-                    Log.i(LOG_TAG, "onDataConnectionStateChanged - ifName="
+                    if (DBG) Log.i(LOG_TAG, "onDataConnectionStateChanged - ifName="
                           + wwanAddrInfo.ifName + ",ipAddr=" + wwanAddrInfo.ipAddr +
                           "gateway=" + wwanAddrInfo.gatewayAddr + ",timeStamp=" + tsStr);
 
@@ -619,11 +622,11 @@ public final class CNE
                     notifyRatConnectStatus(CNE_RAT_WWAN,NetworkStateToInt(netState),
                                            wwanV4AddrInfo.ipAddr);
                 } else {
-                    Log.i(LOG_TAG,"CNE currently does not support this apnType="+
+                    if (DBG) Log.i(LOG_TAG,"CNE currently does not support this apnType="+
                           apnType);
                 }
             } else {
-                Log.w(LOG_TAG, "CNE received unexpected action: " + action);
+                if (DBG) Log.w(LOG_TAG, "CNE received unexpected action: " + action);
             }
         }
     };
@@ -683,7 +686,7 @@ public final class CNE
             mBinder = binder;
             if(mBinder != null){
                 try {
-                    Log.d(LOG_TAG,"CNE linking binder to death");
+                    if (DBG) Log.d(LOG_TAG,"CNE linking binder to death");
                     mBinder.linkToDeath(this, 0);
                 } catch (RemoteException e) {
                     binderDied();
@@ -692,20 +695,22 @@ public final class CNE
         }
 
         public void binderDied() {
-            Log.d(LOG_TAG,"CNE binder died role=" + role + "regId =" + regId);
+            if (DBG) Log.d(LOG_TAG,"CNE binder died role=" + role + "regId =" + regId);
             releaseLink(role,pid);
         }
 
         public void dump(){
-            Log.d(LOG_TAG, "Role: " + role);
-            Log.d(LOG_TAG, "RegId: " + regId);
-            Log.d(LOG_TAG, "Pid: " + pid);
-            Log.d(LOG_TAG, "ActiveRat: " + activeRat);
-            Log.d(LOG_TAG, "BetterRat: " + betterRat);
-            for(int index = 0; index < compatibleRatsList.size(); index++){
-                RatInfo ratInfo = (RatInfo)compatibleRatsList.get(index);
-                Log.d(LOG_TAG, "compatibleRat["+index+"]="+ ratInfo.rat +
-                  " ratState = " + ratInfo.status);
+            if (DBG) {
+                Log.v(LOG_TAG, "Role: " + role);
+                Log.v(LOG_TAG, "RegId: " + regId);
+                Log.v(LOG_TAG, "Pid: " + pid);
+                Log.v(LOG_TAG, "ActiveRat: " + activeRat);
+                Log.v(LOG_TAG, "BetterRat: " + betterRat);
+                for(int index = 0; index < compatibleRatsList.size(); index++){
+                    RatInfo ratInfo = (RatInfo)compatibleRatsList.get(index);
+                    Log.v(LOG_TAG, "compatibleRat["+index+"]="+ ratInfo.rat +
+                      " ratState = " + ratInfo.status);
+                }
             }
         }
     };
@@ -737,14 +742,14 @@ public final class CNE
 
         /* This fucntion will start the connection with a default role. */
         public void startConnection(){
-            Log.d(LOG_TAG, "DefaultConnection startConnection called");
+            if (DBG) Log.d(LOG_TAG, "DefaultConnection startConnection called");
             mLinkNotifier = new MyLinkNotifier();
             try{
                 mLinkProvider = new LinkProvider(LinkProvider.ROLE_DEFAULT,
                                                  mLinkReqs,
                                                  mLinkNotifier);
             }catch(Exception e){
-                Log.e(LOG_TAG, "LinkProvider Creation threw and excetion"+e);
+                if (DBG) Log.e(LOG_TAG, "LinkProvider Creation threw and excetion"+e);
             }
             if(mLinkProvider != null) {
                 mLinkProvider.getLink();
@@ -753,7 +758,7 @@ public final class CNE
 
         /* Ends the previously started connection */
         public void endConnection(){
-            Log.d(LOG_TAG, "DefaultConnection endConnection called");
+            if (DBG) Log.d(LOG_TAG, "DefaultConnection endConnection called");
             if(mLinkProvider != null) {
                 mLinkProvider.releaseLink();
             }
@@ -772,7 +777,7 @@ public final class CNE
              * it to the iproute to set the default routing table
              */
             public void onLinkAvail(LinkInfo info){
-                Log.d(LOG_TAG, "DefaultConnection onLinkAvail called");
+                if (DBG) Log.d(LOG_TAG, "DefaultConnection onLinkAvail called");
                 if(mLinkProvider != null) {
                     mLinkProvider.reportLinkSatisfaction(info,true,true);
                     /* notify to the default network to iproute2 */
@@ -782,7 +787,7 @@ public final class CNE
 
             /* Link Acquisition/startConnection as failed retry after some time. */
             public void onGetLinkFailure(int reason){
-                Log.d(LOG_TAG, "DefaultConnection onGetLinkFailed reason="
+                if (DBG) Log.d(LOG_TAG, "DefaultConnection onGetLinkFailed reason="
                       + reason);
                 /* we will not release the link here. we might get a
                  * better link avail call later.
@@ -791,7 +796,7 @@ public final class CNE
 
             /* a better link is available accept it. */
             public void onBetterLinkAvail(LinkInfo info){
-                Log.d(LOG_TAG, "DefaultConnection onBetterLinkAvail called");
+                if (DBG) Log.d(LOG_TAG, "DefaultConnection onBetterLinkAvail called");
                 if(mLinkProvider != null) {
                     mLinkProvider.switchLink(info,true);
                     /* notify to the default network to iproute2 */
@@ -801,7 +806,7 @@ public final class CNE
 
             /* current connection is lost. */
             public void onLinkLost(LinkInfo info){
-                Log.i(LOG_TAG, "DefaultConnection Link is lost");
+                if (DBG) Log.i(LOG_TAG, "DefaultConnection Link is lost");
             }
         };
     }
@@ -878,12 +883,12 @@ public final class CNE
                         dataLength[2] = (byte)((data.length >> 8) & 0xff);
                         dataLength[3] = (byte)((data.length) & 0xff);
 
-                        //Log.v(LOG_TAG, "writing packet: " + data.length + " bytes");
+                        //if (DBG) Log.v(LOG_TAG, "writing packet: " + data.length + " bytes");
 
                         s.getOutputStream().write(dataLength);
                         s.getOutputStream().write(data);
                     } catch (IOException ex) {
-                        Log.e(LOG_TAG, "IOException", ex);
+                        if (DBG) Log.e(LOG_TAG, "IOException", ex);
                         req = findAndRemoveRequestFromList(rr.mSerial);
                         // make sure this request has not already been handled,
                         // eg, if CNEReceiver cleared the list.
@@ -892,7 +897,7 @@ public final class CNE
                             rr.release();
                         }
                     } catch (RuntimeException exc) {
-                        Log.e(LOG_TAG, "Uncaught exception ", exc);
+                        if (DBG) Log.e(LOG_TAG, "Uncaught exception ", exc);
                         req = findAndRemoveRequestFromList(rr.mSerial);
                         // make sure this request has not already been handled,
                         // eg, if CNEReceiver cleared the list.
@@ -941,7 +946,7 @@ public final class CNE
             countRead = is.read(buffer, offset, remaining);
 
             if (countRead < 0 ) {
-                Log.e(LOG_TAG, "Hit EOS reading message length");
+                if (DBG) Log.e(LOG_TAG, "Hit EOS reading message length");
                 return -1;
             }
 
@@ -961,7 +966,7 @@ public final class CNE
             countRead = is.read(buffer, offset, remaining);
 
             if (countRead < 0 ) {
-                Log.e(LOG_TAG, "Hit EOS reading message.  messageLength=" + messageLength
+                if (DBG) Log.e(LOG_TAG, "Hit EOS reading message.  messageLength=" + messageLength
                         + " remaining=" + remaining);
                 return -1;
             }
@@ -993,7 +998,7 @@ public final class CNE
                 LocalSocketAddress l;
 
                 try {
-                    Log.v(LOG_TAG, "CNE creating socket");
+                    if (DBG) Log.v(LOG_TAG, "CNE creating socket");
                     s = new LocalSocket();
                     l = new LocalSocketAddress(SOCKET_NAME_CNE,
                             LocalSocketAddress.Namespace.RESERVED);
@@ -1011,12 +1016,12 @@ public final class CNE
                     // or after the 8th time
 
                     if (retryCount == 8) {
-                        Log.e (LOG_TAG,
+                        if (DBG) Log.e(LOG_TAG,
                             "Couldn't find '" + SOCKET_NAME_CNE
                             + "' socket after " + retryCount
                             + " times, continuing to retry silently");
                     } else if (retryCount > 0 && retryCount < 8) {
-                        Log.i (LOG_TAG,
+                        if (DBG) Log.i(LOG_TAG,
                             "Couldn't find '" + SOCKET_NAME_CNE
                             + "' socket; retrying after timeout");
                     }
@@ -1033,7 +1038,7 @@ public final class CNE
                 retryCount = 0;
 
                 mSocket = s;
-                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_CNE + "' socket");
+                if (DBG) Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_CNE + "' socket");
                 isCndUp = true;
 
                 // send the init request to lowerlayer cne
@@ -1048,7 +1053,7 @@ public final class CNE
                     try{
                         mDefaultConn.startConnection();
                     }catch(NullPointerException e){
-                        Log.e(LOG_TAG,"Exception mDefaultConn is null" + e);
+                        if (DBG) Log.e(LOG_TAG,"Exception mDefaultConn is null" + e);
                     }
                 }
 
@@ -1070,20 +1075,20 @@ public final class CNE
                         p.unmarshall(buffer, 0, length);
                         p.setDataPosition(0);
 
-                        //Log.v(LOG_TAG, "Read packet: " + length + " bytes");
+                        //if (DBG) Log.v(LOG_TAG, "Read packet: " + length + " bytes");
 
                         processResponse(p);
                         p.recycle();
                     }
                 } catch (java.io.IOException ex) {
-                    Log.i(LOG_TAG, "'" + SOCKET_NAME_CNE + "' socket closed",
+                    if (DBG) Log.i(LOG_TAG, "'" + SOCKET_NAME_CNE + "' socket closed",
                           ex);
                 } catch (Throwable tr) {
-                    Log.e(LOG_TAG, "Uncaught exception read length=" + length +
+                    if (DBG) Log.e(LOG_TAG, "Uncaught exception read length=" + length +
                         "Exception:" + tr.toString());
                 }
 
-                Log.i(LOG_TAG, "Disconnected from '" + SOCKET_NAME_CNE
+                if (DBG) Log.i(LOG_TAG, "Disconnected from '" + SOCKET_NAME_CNE
                       + "' socket");
                 /* end the default connection it will get started
                  * again when connection gets established
@@ -1091,7 +1096,7 @@ public final class CNE
                 try{
                     mDefaultConn.endConnection();
                 }catch(NullPointerException e){
-                    Log.e(LOG_TAG,"Exception mDefaultConn is null" + e);
+                    if (DBG) Log.e(LOG_TAG,"Exception mDefaultConn is null" + e);
                 }
                 isCndUp = false;
 
@@ -1114,7 +1119,7 @@ public final class CNE
                     mRequestsList.clear();
                 }
             }} catch (Throwable tr) {
-                Log.e(LOG_TAG,"Uncaught exception", tr);
+                if (DBG) Log.e(LOG_TAG,"Uncaught exception", tr);
             }
         }
     }
@@ -1226,7 +1231,7 @@ public final class CNE
         rr = findAndRemoveRequestFromList(serial);
 
         if (rr == null) {
-            Log.w(LOG_TAG, "Unexpected solicited response! sn: "
+            if (DBG) Log.w(LOG_TAG, "Unexpected solicited response! sn: "
                             + serial + " error: " + error);
             return;
         }
@@ -1242,7 +1247,7 @@ public final class CNE
     private void
     processUnsolicited (Parcel p)
     {
-        Log.w(LOG_TAG, "processUnsolicited called");
+        if (DBG) Log.w(LOG_TAG, "processUnsolicited called");
         int response;
         Object ret;
 
@@ -1299,7 +1304,7 @@ public final class CNE
 
 
              default: {
-                 Log.w(LOG_TAG,"UNKOWN Unsolicited Event "+response);
+                 if (DBG) Log.w(LOG_TAG,"UNKOWN Unsolicited Event "+response);
              }
         }
         return;
@@ -1335,7 +1340,7 @@ public final class CNE
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
         @Override
         public void onSignalStrengthsChanged(SignalStrength signalStrength) {
-            Log.i(LOG_TAG,"CNE onSignalStrengthsChanged ");
+            if (DBG) Log.i(LOG_TAG,"CNE onSignalStrengthsChanged ");
             mSignalStrength = signalStrength;
 
             if (mTelephonyManager != null) {
@@ -1355,17 +1360,17 @@ public final class CNE
               Timestamp ts = new Timestamp(currentTime);
               tsStr = ts.toString();
 
-              Log.i(LOG_TAG,"CNE onSignalStrengthsChanged - type:" + type + ",strength:"
+              if (DBG) Log.i(LOG_TAG,"CNE onSignalStrengthsChanged - type:" + type + ",strength:"
                     + rssi + ",state:" + networkState);
 
-              Log.i(LOG_TAG, "CNE onSignalStrengthsChanged - ipV4Addr:" + wwanV4AddrInfo.ipAddr +
+              if (DBG) Log.i(LOG_TAG, "CNE onSignalStrengthsChanged - ipV4Addr:" + wwanV4AddrInfo.ipAddr +
                     ",roaming:" + roaming + ",timeStamp:" + tsStr);
 
               updateWwanStatus(type, NetworkStateToInt(networkState),
                                rssi, roaming, wwanV4AddrInfo.ipAddr, tsStr);
 
             } else {
-              Log.i(LOG_TAG, "onSignalStrengthsChanged null TelephonyManager");
+              if (DBG) Log.i(LOG_TAG, "onSignalStrengthsChanged null TelephonyManager");
             }
         }
     };
@@ -1392,11 +1397,11 @@ public final class CNE
 
         if (mSignalStrength == null)
         {
-          Log.w(LOG_TAG, "getSignalStrength mSignalStrength in null");
+          if (DBG) Log.w(LOG_TAG, "getSignalStrength mSignalStrength in null");
           return -1;
         }
 
-        Log.i(LOG_TAG, "getSignalStrength networkType= " + networkType);
+        if (DBG) Log.i(LOG_TAG, "getSignalStrength networkType= " + networkType);
 
         switch(networkType)
         {
@@ -1488,11 +1493,13 @@ public final class CNE
     }
 
     private void cnejLog(String msg) {
-        Log.d(LOG_TAG, msg);
+        //TODO: This function should be removed
+        if (DBG) Log.d(LOG_TAG, msg);
     }
 
     private void cnejLogv(String msg) {
-        Log.v(LOG_TAG, msg);
+        //TODO: This function should be removed
+        if (DBG) Log.v(LOG_TAG, msg);
     }
 
 
@@ -1502,10 +1509,10 @@ public final class CNE
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_BATTERY_INFO);
         if (rr == null)
         {
-             Log.e(LOG_TAG, "updateBatteryStatus: rr=NULL");
+             if (DBG) Log.e(LOG_TAG, "updateBatteryStatus: rr=NULL");
              return false;
         }
-        Log.i(LOG_TAG, "UpdateBatteryStatus status=" + status + "pluginType="
+        if (DBG) Log.i(LOG_TAG, "UpdateBatteryStatus status=" + status + "pluginType="
                       + pluginType + "level=" + level);
 
         rr.mp.writeInt(3); //num of ints that are getting written
@@ -1524,11 +1531,11 @@ public final class CNE
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WLAN_INFO);
         if (rr == null)
         {
-             Log.e(LOG_TAG, "updateWlanStatus: rr=NULL - no updated");
+             if (DBG) Log.e(LOG_TAG, "updateWlanStatus: rr=NULL - no updated");
              return false;
         }
 
-        Log.i(LOG_TAG, "UpdateWlanStatus type=" + type + ",state=" + state +
+        if (DBG) Log.i(LOG_TAG, "UpdateWlanStatus type=" + type + ",state=" + state +
               ",rssi=" + rssi + ",ssid=" + ssid + ",ipAddr" + ipAddr +
               ",timeStamp" + timeStamp);
 
@@ -1550,13 +1557,13 @@ public final class CNE
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WLAN_SCAN_RESULTS);
         if (rr == null)
         {
-             Log.e(LOG_TAG, "updateWlanScanResults: rr=NULL");
+             if (DBG) Log.e(LOG_TAG, "updateWlanScanResults: rr=NULL");
              return false;
         }
 
         if (scanResults != null)
         {
-             Log.i(LOG_TAG, "CNE- updateWlanScanResults: scanResults size = " + scanResults.size());
+             if (DBG) Log.i(LOG_TAG, "CNE- updateWlanScanResults: scanResults size = " + scanResults.size());
              rr.mp.writeInt(scanResults.size());  // write number of elements
              for (int i = scanResults.size() - 1; i >= 0; i--)
              {
@@ -1584,10 +1591,10 @@ public final class CNE
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WWAN_INFO);
         if (rr == null) {
-            Log.e(LOG_TAG, "updateWwanStatus: rr=NULL - no updated");
+            if (DBG) Log.e(LOG_TAG, "updateWwanStatus: rr=NULL - no updated");
             return false;
         }
-        Log.i(LOG_TAG, "UpdateWwanStatus type=" + type + ",state=" + state + ",rssi="
+        if (DBG) Log.i(LOG_TAG, "UpdateWwanStatus type=" + type + ",state=" + state + ",rssi="
               + rssi + ",roaming=" + roaming + ",ipV4Addr" + ipV4Addr + ",timeStamp"
               + timeStamp);
 
@@ -1608,10 +1615,10 @@ public final class CNE
         CNERequest rr = CNERequest.obtain(CNE_NOTIFY_RAT_CONNECT_STATUS);
 
         if (rr == null) {
-            Log.e(LOG_TAG, "notifyRatConnectStatus: rr=NULL");
+            if (DBG) Log.e(LOG_TAG, "notifyRatConnectStatus: rr=NULL");
             return false;
         }
-        Log.i(LOG_TAG, "notifyRatConnectStatus ratType=" + type + ",status="
+        if (DBG) Log.i(LOG_TAG, "notifyRatConnectStatus ratType=" + type + ",status="
               + status + ",ipV4Addr=" + ipV4Addr);
 
         rr.mp.writeInt(type);
@@ -1628,7 +1635,7 @@ public final class CNE
 
       CNERequest rr = null;
 
-      Log.i(LOG_TAG, "configureIproute2: Command=" + command + ",ifName=" + ifName +
+      if (DBG) Log.i(LOG_TAG, "configureIproute2: Command=" + command + ",ifName=" + ifName +
             ",ipAddr=" + ipAddr + ",gatewayAddr=" + gatewayAddr);
 
       if (getFmcObj() != null) {
@@ -1637,14 +1644,14 @@ public final class CNE
                command == CNE_IPROUTE2_DELETE_ROUTING ||
                command == CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN ||
                command == CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN)) {
-              Log.w(LOG_TAG, "configureIproute2: cmd=" + command + "invalid in FMC");
+              if (DBG) Log.w(LOG_TAG, "configureIproute2: cmd=" + command + "invalid in FMC");
               return false;
           }
       }
 
       rr = CNERequest.obtain(CNE_REQUEST_CONFIG_IPROUTE2_CMD);
       if (rr == null)   {
-          Log.e(LOG_TAG, "configureIproute2: rr=NULL");
+          if (DBG) Log.e(LOG_TAG, "configureIproute2: rr=NULL");
           return false;
       }
 
@@ -1677,7 +1684,7 @@ public final class CNE
             send(rr);
         }
         else{
-            Log.e(LOG_TAG, "sendDefaultNwPref2Cne: rr=NULL");
+            if (DBG) Log.e(LOG_TAG, "sendDefaultNwPref2Cne: rr=NULL");
         }
         return;
     }
@@ -1691,7 +1698,7 @@ public final class CNE
     ) {
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_REG_ROLE);
         if (rr == null) {
-            Log.e(LOG_TAG, "sendRegRoleReq: rr=NULL");
+            if (DBG) Log.e(LOG_TAG, "sendRegRoleReq: rr=NULL");
             return false;
         }
 
@@ -1709,7 +1716,7 @@ public final class CNE
     private boolean sendInitReq() {
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_INIT);
         if (rr == null) {
-            Log.e(LOG_TAG, "sendinitReq: rr=NULL");
+            if (DBG) Log.e(LOG_TAG, "sendinitReq: rr=NULL");
             return false;
         }
         send(rr);
@@ -1721,12 +1728,12 @@ public final class CNE
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_GET_COMPATIBLE_NWS);
         if (rr == null)
         {
-             Log.e(LOG_TAG, "sendGetCompatibleNwsReq: rr=NULL");
+             if (DBG) Log.e(LOG_TAG, "sendGetCompatibleNwsReq: rr=NULL");
              return false;
         }
         rr.mp.writeInt(1); //num of ints that are getting written
         rr.mp.writeInt(roleRegId);
-        Log.d(LOG_TAG, "Sending GetCompatibleNwsReq roleRegId=" + roleRegId);
+        if (DBG) Log.d(LOG_TAG, "Sending GetCompatibleNwsReq roleRegId=" + roleRegId);
         send(rr);
         return true;
     }
@@ -1743,7 +1750,7 @@ public final class CNE
     {
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_CONF_NW);
         if (rr == null) {
-            Log.e(LOG_TAG, "sendConfirmNwReq: rr=NULL");
+            if (DBG) Log.e(LOG_TAG, "sendConfirmNwReq: rr=NULL");
             return false;
         }
         rr.mp.writeInt(5); //num of ints that are getting written
@@ -1762,12 +1769,12 @@ public final class CNE
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_DEREG_ROLE);
         if (rr == null) {
-             Log.e(LOG_TAG, "sendDeregRoleReq: rr=NULL");
+             if (DBG) Log.e(LOG_TAG, "sendDeregRoleReq: rr=NULL");
              return false;
         }
         rr.mp.writeInt(1); //num of ints that are getting written
         rr.mp.writeInt(roleRegId);
-        Log.e(LOG_TAG, "sendDeregRoleReq:");
+        if (DBG) Log.e(LOG_TAG, "sendDeregRoleReq:");
 
         send(rr);
         return true;
@@ -1792,7 +1799,7 @@ public final class CNE
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleRegRoleRsp called with numInts = "+ numInts +
+        if (DBG) Log.i(LOG_TAG,"handleRegRoleRsp called with numInts = "+ numInts +
               " RoleRegId = "+ roleRegId + " evtStatus = " + evtStatus);
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
@@ -1809,13 +1816,13 @@ public final class CNE
                         listener.onGetLinkFailure(LinkNotifier.FAILURE_GENERAL);
                     }
                     catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleRegRoleRsp listener is null");
+                        if (DBG) Log.w(LOG_TAG,"handleRegRoleRsp listener is null");
                    }
                 }
             }
         }
         else {
-            Log.w(LOG_TAG,"handleRegRoleRsp regId=" + roleRegId + " does not exists");
+            if (DBG) Log.w(LOG_TAG,"handleRegRoleRsp regId=" + roleRegId + " does not exists");
             return;
         }
     }
@@ -1823,7 +1830,7 @@ public final class CNE
     private void handleGetCompatibleNwsRsp(Parcel p){
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleGetCompatibleNwsRsp called for roleRegId = "+
+        if (DBG) Log.i(LOG_TAG,"handleGetCompatibleNwsRsp called for roleRegId = "+
               roleRegId + " evtStatus = " + evtStatus);
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
@@ -1863,7 +1870,7 @@ public final class CNE
                 String ipAddr = new String(p.readString());
                 int flBwEst = p.readInt();
                 int rlBwEst = p.readInt();
-                Log.v(LOG_TAG,"ipV4Addr = "+ ipAddr + " flBwEst = " + flBwEst +
+                if (DBG) Log.v(LOG_TAG,"ipV4Addr = "+ ipAddr + " flBwEst = " + flBwEst +
                       " rlBwEst = " + rlBwEst);
                 prevCompatibleRatsList.clear();
                 regInfo.compatibleRatsList = newCompatibleRatsList;
@@ -1889,7 +1896,7 @@ public final class CNE
                         listener.onLinkAvail(linkInfo);
                     }
                     catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleGetCompNwsRsp listener is null");
+                        if (DBG) Log.w(LOG_TAG,"handleGetCompNwsRsp listener is null");
                    }
                 }
                 return;
@@ -1901,13 +1908,13 @@ public final class CNE
                       listener.onGetLinkFailure(LinkNotifier.FAILURE_NO_LINKS);
                     }
                     catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleGetCompNwsRsp listener is null");
+                        if (DBG) Log.w(LOG_TAG,"handleGetCompNwsRsp listener is null");
                    }
                 }
             }
         }
         else {
-            Log.w(LOG_TAG,"handleGetCompatibleNwsRsp role does not exists");
+            if (DBG) Log.w(LOG_TAG,"handleGetCompatibleNwsRsp role does not exists");
             return;
         }
 
@@ -1917,7 +1924,7 @@ public final class CNE
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleConfNwRsp called with numInts = "+ numInts +
+        if (DBG) Log.i(LOG_TAG,"handleConfNwRsp called with numInts = "+ numInts +
               " regRoleId = "+ roleRegId + " evtStatus = " + evtStatus);
     }
 
@@ -1925,7 +1932,7 @@ public final class CNE
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleDeRegRoleRsp called with numInts = "+ numInts +
+        if (DBG) Log.i(LOG_TAG,"handleDeRegRoleRsp called with numInts = "+ numInts +
               " roleRegId = "+ roleRegId + " evtStatus = " + evtStatus);
         /* clean up */
         /* does this role already exists? */
@@ -1935,7 +1942,7 @@ public final class CNE
             activeRegsList.remove(roleRegId);
         }
         else {
-            Log.w(LOG_TAG,"handleDeRegRoleRsp role does not exists");
+            if (DBG) Log.w(LOG_TAG,"handleDeRegRoleRsp role does not exists");
             return;
         }
     }
@@ -1946,7 +1953,7 @@ public final class CNE
         String ipAddr = new String(p.readString());
         int flBwEst = p.readInt();
         int rlBwEst = p.readInt();
-        Log.i(LOG_TAG,"handleMorePrefNwAvailEvent called for roleRegId = "+
+        if (DBG) Log.i(LOG_TAG,"handleMorePrefNwAvailEvent called for roleRegId = "+
                roleRegId + " betterRat = " + betterRat + " ipAddr = "+ipAddr+
               " flBwEst = " + flBwEst+ " rlBwEst = "+rlBwEst);
         /* does this role already exists? */
@@ -1968,12 +1975,12 @@ public final class CNE
                     listener.onBetterLinkAvail(linkInfo);
                 }
                 catch ( RemoteException e ) {
-                    Log.w(LOG_TAG,"handleMorePrefNwAvailEvt listener is null");
+                    if (DBG) Log.w(LOG_TAG,"handleMorePrefNwAvailEvt listener is null");
                }
             }
         }
         else {
-            Log.w(LOG_TAG,"handleMorePrefNwAvailEvent role does not exists");
+            if (DBG) Log.w(LOG_TAG,"handleMorePrefNwAvailEvent role does not exists");
             return;
         }
     }
@@ -1983,7 +1990,7 @@ public final class CNE
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int rat = p.readInt();
-        Log.i(LOG_TAG,"handleRatLostEvent called with numInts = "+ numInts +
+        if (DBG) Log.i(LOG_TAG,"handleRatLostEvent called with numInts = "+ numInts +
               " roleRegId = "+ roleRegId + " rat = " + rat);
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
@@ -2000,16 +2007,16 @@ public final class CNE
                         listener.onLinkLost(linkInfo);
                     }
                     catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleRatLostEvent listener is null");
+                        if (DBG) Log.w(LOG_TAG,"handleRatLostEvent listener is null");
                     }
                 }
             }else{
-                Log.d(LOG_TAG,"Rat lost is not for the active rat=" +
+                if (DBG) Log.d(LOG_TAG,"Rat lost is not for the active rat=" +
                         regInfo.activeRat);
             }
         }
         else {
-            Log.w(LOG_TAG,"handleRatLostEvent role does not exists");
+            if (DBG) Log.w(LOG_TAG,"handleRatLostEvent role does not exists");
             return;
         }
     }
@@ -2019,7 +2026,7 @@ public final class CNE
 
         int ratType = p.readInt();
 
-        Log.i(LOG_TAG,"handleRatDownMsg called ratType = "+ ratType);
+        if (DBG) Log.i(LOG_TAG,"handleRatDownMsg called ratType = "+ ratType);
 
         if (mService != null) {
           mService.bringDownRat(ratType);
@@ -2033,7 +2040,7 @@ public final class CNE
 
         int ratType = p.readInt();
 
-        Log.i(LOG_TAG,"handleRatUpMsg called ratType = "+ ratType);
+        if (DBG) Log.i(LOG_TAG,"handleRatUpMsg called ratType = "+ ratType);
         switch (ratType) {
             case CNE_RAT_WLAN:
                 handleWlanBringUp();
@@ -2042,7 +2049,7 @@ public final class CNE
                 handleWwanBringUp();
                 break;
             default:
-                Log.d(LOG_TAG,"UnHandled Rat Type: "+ratType);
+                if (DBG) Log.d(LOG_TAG,"UnHandled Rat Type: "+ratType);
 
         }
         return;
@@ -2065,7 +2072,7 @@ public final class CNE
               mService.bringUpRat(CNE_RAT_WLAN);
             }
         } catch(NullPointerException e){
-            Log.w(LOG_TAG, "handleWlanBringUp", e);
+            if (DBG) Log.w(LOG_TAG, "handleWlanBringUp", e);
             e.printStackTrace();
         }
     }
@@ -2089,14 +2096,14 @@ public final class CNE
             }
             mService.bringUpRat(CNE_RAT_WWAN);
         } catch(NullPointerException e){
-            Log.w(LOG_TAG, "handleWwanBringUp", e);
+            if (DBG) Log.w(LOG_TAG, "handleWwanBringUp", e);
             e.printStackTrace();
         }
     }
 
     private void handleStartScanWlanMsg(Parcel p){
 
-      Log.i(LOG_TAG,"handleStartScanWlanMsg called");
+      if (DBG) Log.i(LOG_TAG,"handleStartScanWlanMsg called");
 
       if (!mWifiManager.isWifiEnabled())
           return;
@@ -2108,7 +2115,7 @@ public final class CNE
 
     private void handleNotifyInFlightStatusMsg(Parcel p){
 
-      Log.i(LOG_TAG,"handleNotifyInFlightStatusMsg called");
+      if (DBG) Log.i(LOG_TAG,"handleNotifyInFlightStatusMsg called");
       boolean on;
       int numInts = p.readInt();
       int status = p.readInt();
@@ -2133,7 +2140,7 @@ public final class CNE
 
         if (rInfo != null)
         {
-            Log.i(LOG_TAG,"handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
+            if (DBG) Log.i(LOG_TAG,"handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
             if (status == FmcNotifier.FMC_STATUS_ENABLED) {
                 AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
                                                              IPVersion.IPV4);
@@ -2170,7 +2177,7 @@ public final class CNE
     private void handleHostRoutingIpMsg(Parcel p){
       String ipAddr = new String(p.readString());
 
-      Log.i(LOG_TAG,"handleHostRoutingIpMsg ip=" + ipAddr);
+      if (DBG) Log.i(LOG_TAG,"handleHostRoutingIpMsg ip=" + ipAddr);
       hostRoutingIpAddr = ipAddr;
       if (getFmcObj() != null) {
           getFmcObj().dsAvail = true;
@@ -2181,7 +2188,7 @@ public final class CNE
 
     /** {@hide} */
     public void setDefaultConnectionNwPref(int preference){
-        Log.d(LOG_TAG,"setDefaultConnectionNwPref called with pref = " + preference);
+        if (DBG) Log.d(LOG_TAG,"setDefaultConnectionNwPref called with pref = " + preference);
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(CNE_DEFAULT_CON_REGID);
         if(regInfo != null){
@@ -2198,7 +2205,7 @@ public final class CNE
             }
         }
         else {
-            Log.w(LOG_TAG,"Default Registration does not exists");
+            if (DBG) Log.w(LOG_TAG,"Default Registration does not exists");
         }
         return;
     }
@@ -2219,7 +2226,7 @@ public final class CNE
                 break;
             }
         }
-        Log.d(LOG_TAG,"getNextRatToTry called NextRatToTry= " + candidateRat);
+        if (DBG) Log.d(LOG_TAG,"getNextRatToTry called NextRatToTry= " + candidateRat);
         return candidateRat;
     }
 
@@ -2260,10 +2267,10 @@ public final class CNE
       int pid,
       IBinder listener
     ){
-        Log.d(LOG_TAG,"getLink called for role = " + role);
+        if (DBG) Log.d(LOG_TAG,"getLink called for role = " + role);
         /* did the app(pid) register for this role already? */
         if(getRegId(pid,role) != CNE_REGID_INVALID){
-            Log.w(LOG_TAG,"Multpl same role reg's not allowed by single app");
+            if (DBG) Log.w(LOG_TAG,"Multpl same role reg's not allowed by single app");
             return false;
         }
         else{
@@ -2275,9 +2282,9 @@ public final class CNE
             IConSvcEventListener.Stub.asInterface(listener);
             regInfo.cbInfo.listener = evtListener;
             regInfo.cbInfo.isNotifBetterRat = false;
-            Log.i(LOG_TAG, "activeRegsList.size before = " + activeRegsList.size());
+            if (DBG) Log.i(LOG_TAG, "activeRegsList.size before = " + activeRegsList.size());
             activeRegsList.put(regInfo.regId,regInfo);
-            Log.i(LOG_TAG, "activeRolesList.size after = " + activeRegsList.size());
+            if (DBG) Log.i(LOG_TAG, "activeRolesList.size after = " + activeRegsList.size());
 
             int fwLinkBwReq = 0;
             int revLinkBwReq = 0;
@@ -2290,14 +2297,14 @@ public final class CNE
                         case FW_LINK_BW:
                             fwLinkBwReq = parseBwString(value);
                             if (fwLinkBwReq == -1) {
-                                Log.w(LOG_TAG, "Invalid bandwidth req. value: " + value);
+                                if (DBG) Log.w(LOG_TAG, "Invalid bandwidth req. value: " + value);
                                 return false;
                             }
                             break;
                         case REV_LINK_BW:
                             revLinkBwReq = parseBwString(value);
                             if (revLinkBwReq == -1) {
-                                Log.w(LOG_TAG, "Invalid bandwidth req. value: " + value);
+                                if (DBG) Log.w(LOG_TAG, "Invalid bandwidth req. value: " + value);
                                 return false;
                             }
                             break;
@@ -2321,7 +2328,7 @@ public final class CNE
       boolean isSatisfied,
       boolean isNotifyBetterLink
     ){
-        Log.d(LOG_TAG,"reporting connection satisfaction role = " + role +
+        if (DBG) Log.d(LOG_TAG,"reporting connection satisfaction role = " + role +
               "isSatisfied = " + isSatisfied + "isNotifyBetterLink" +
               isNotifyBetterLink);
         int regId = getRegId(pid,role);
@@ -2352,26 +2359,26 @@ public final class CNE
                         return true;
                     }
                     catch ( RemoteException e ) {
-                        Log.e(LOG_TAG,"remoteException while calling onConnectionComplete");
+                        if (DBG) Log.e(LOG_TAG,"remoteException while calling onConnectionComplete");
                         return false;
                     }
                 }
                 return true;
             }
             else{
-                Log.w(LOG_TAG,"OnLinkAvail notification was not sent yet.");
+                if (DBG) Log.w(LOG_TAG,"OnLinkAvail notification was not sent yet.");
                 return false;
             }
         }
         else{
-            Log.w(LOG_TAG,"App did not register for this role");
+            if (DBG) Log.w(LOG_TAG,"App did not register for this role");
             return false;
         }
     }
 
     /** {@hide} */
     public boolean releaseLink(int role,int pid){
-        Log.d(LOG_TAG,"releasing link for role = " + role);
+        if (DBG) Log.d(LOG_TAG,"releasing link for role = " + role);
         int regId = getRegId(pid,role);
         RegInfo regInfo = activeRegsList.get(regId);
         if( regInfo != null){
@@ -2380,14 +2387,14 @@ public final class CNE
             try{
                 regInfo.mBinder.unlinkToDeath(regInfo, 0);
             } catch (NoSuchElementException exp){
-                Log.w(LOG_TAG,"bindrLinkToDeatch was not registered");
+                if (DBG) Log.w(LOG_TAG,"bindrLinkToDeatch was not registered");
             }
             regInfo.compatibleRatsList.clear();
             activeRegsList.remove(regId);
             return true;
         }
         else{
-            Log.w(LOG_TAG,"App did not register for this role");
+            if (DBG) Log.w(LOG_TAG,"App did not register for this role");
             return false;
         }
     }
@@ -2397,7 +2404,7 @@ public final class CNE
                               int pid,
                               LinkInfo info,
                               boolean isNotifyBetterLink){
-        Log.d(LOG_TAG,"switch link for role = " + role);
+        if (DBG) Log.d(LOG_TAG,"switch link for role = " + role);
         int regId = getRegId(pid,role);
         RegInfo regInfo = activeRegsList.get(regId);
         if( regInfo != null){
@@ -2412,12 +2419,12 @@ public final class CNE
                 return true;
             }
             else{
-                Log.w(LOG_TAG,"OnBetterLinkAvail notification was not sent yet.");
+                if (DBG) Log.w(LOG_TAG,"OnBetterLinkAvail notification was not sent yet.");
                 return false;
             }
         }
         else{
-            Log.w(LOG_TAG,"App did not register for this role");
+            if (DBG) Log.w(LOG_TAG,"App did not register for this role");
             return false;
         }
     }
@@ -2427,7 +2434,7 @@ public final class CNE
                                 int pid,
                                 LinkInfo info,
                                 boolean isNotifyBetterLink){
-        Log.d(LOG_TAG,"rejectSwitch for role = " + role);
+        if (DBG) Log.d(LOG_TAG,"rejectSwitch for role = " + role);
         int regId = getRegId(pid,role);
         RegInfo regInfo = activeRegsList.get(regId);
         if( regInfo != null){
@@ -2441,12 +2448,12 @@ public final class CNE
                 return true;
             }
             else{
-                Log.w(LOG_TAG,"OnBetterLinkAvail notification was not sent yet.");
+                if (DBG) Log.w(LOG_TAG,"OnBetterLinkAvail notification was not sent yet.");
                 return false;
             }
         }
         else{
-            Log.w(LOG_TAG,"App did not register for this role");
+            if (DBG) Log.w(LOG_TAG,"App did not register for this role");
             return false;
         }
     }
@@ -2461,7 +2468,7 @@ public final class CNE
          File file = new File("/data/ssidconfig.txt");
          if (file == null)
          {
-             Log.e(LOG_TAG, "configureSsid: Config File not found");
+             if (DBG) Log.e(LOG_TAG, "configureSsid: Config File not found");
              return false;
          }
          // Read file to buffer
@@ -2473,7 +2480,7 @@ public final class CNE
          StringTokenizer newst = new StringTokenizer(newStr, ":");
          String newToken = newst.nextToken();
 
-         Log.i(LOG_TAG, "configureSsid: newToken: " + newToken);
+         if (DBG) Log.i(LOG_TAG, "configureSsid: newToken: " + newToken);
 
          while((line = reader.readLine()) != null)
          {
@@ -2482,10 +2489,10 @@ public final class CNE
              while(oldst.hasMoreTokens())
              {
                  String oldToken = oldst.nextToken();
-                 Log.i(LOG_TAG, "configureSsid: oldToken: " + oldToken);
+                 if (DBG) Log.i(LOG_TAG, "configureSsid: oldToken: " + oldToken);
                  if (newToken.equals(oldToken))
                  {
-                       Log.i(LOG_TAG, "configSsid entry matched");
+                       if (DBG) Log.i(LOG_TAG, "configSsid entry matched");
                        // Save string to be replaced
                        oldStr = line;
                        strMatched = true;
@@ -2494,7 +2501,7 @@ public final class CNE
              }
          }
          if (!strMatched) {
-             Log.i(LOG_TAG, "configSsid entry not matched");
+             if (DBG) Log.i(LOG_TAG, "configSsid entry not matched");
              return false;
          }
          // To replace new text in file
@@ -2515,7 +2522,7 @@ public final class CNE
 
     /** {@hide} */
     public void notifyDefaultNwChange(int nwId){
-        Log.i(LOG_TAG, "notifyDefaultNwChange: nwId: " + nwId + ",activeWwanV4Ifname:"
+        if (DBG) Log.i(LOG_TAG, "notifyDefaultNwChange: nwId: " + nwId + ",activeWwanV4Ifname:"
               + activeWwanV4IfName + ",activeWwanV6Ifname:" + activeWwanV6IfName +
               ",activeWlanIfname:" + activeWlanIfName);
         mDefaultNetwork = nwId;
@@ -2526,7 +2533,7 @@ public final class CNE
                               activeWlanIfName, null, null);
             if (mRemoveHostEntry) {
                 mRemoveHostEntry = false;
-                Log.i(LOG_TAG, "notifyDefaultNwChange: CNE_IPROUTE2_DELETE_HOST_IN_MAIN");
+                if (DBG) Log.i(LOG_TAG, "notifyDefaultNwChange: CNE_IPROUTE2_DELETE_HOST_IN_MAIN");
                 configureIproute2(CNE_IPROUTE2_DELETE_HOST_IN_MAIN, activeWlanIfName, null, null);
             }
         } else if (( nwId == ConnectivityManager.TYPE_MOBILE) && ( activeWwanV4IfName != null) ){
@@ -2561,12 +2568,12 @@ public final class CNE
             ssid       = "";
             lastSendStatus = -1;
 
-            Log.d(LOG_TAG,"FmcRegInfo - binder="+ mBinder);
+            if (DBG) Log.d(LOG_TAG,"FmcRegInfo - binder="+ mBinder);
             if(mBinder != null){
                 mListener = (IFmcEventListener)
                 IFmcEventListener.Stub.asInterface(binder);
                 try {
-                    Log.d(LOG_TAG,"FmcRegInfo: linking binder to death");
+                    if (DBG) Log.d(LOG_TAG,"FmcRegInfo: linking binder to death");
                     mBinder.linkToDeath(this, 0);
                 } catch (RemoteException e) {
                     binderDied();
@@ -2577,7 +2584,7 @@ public final class CNE
 
         public void binderDied() {
             mListener = null;
-            Log.d(LOG_TAG, "CNE@FmcRegInfo: RemoteException.");
+            if (DBG) Log.d(LOG_TAG, "CNE@FmcRegInfo: RemoteException.");
         }
     }
 
@@ -2595,18 +2602,18 @@ public final class CNE
                 (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
                 mRemoveHostEntry = true;
             }
-            Log.i(LOG_TAG,"onFmcStatus: mRemoveHostEntry=" + mRemoveHostEntry);
+            if (DBG) Log.i(LOG_TAG,"onFmcStatus: mRemoveHostEntry=" + mRemoveHostEntry);
             if (rInfo.mListener != null) {
                 try {
                     // Check status and send to OEM
-                    Log.i(LOG_TAG,"onFmcStatus: fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
+                    if (DBG) Log.i(LOG_TAG,"onFmcStatus: fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
                     rInfo.mListener.onFmcStatus(status);
                 } catch (RemoteException e) {
-                    Log.e(LOG_TAG, "onFmcStatus: exception onFmcStatus");
+                    if (DBG) Log.e(LOG_TAG, "onFmcStatus: exception onFmcStatus");
                 }
             }
         } else {
-            Log.e(LOG_TAG, "onFmcStatus: regInfo = null");
+            if (DBG) Log.e(LOG_TAG, "onFmcStatus: regInfo = null");
         }
     }
 
@@ -2625,7 +2632,7 @@ public final class CNE
         FmcRegInfo r = null;
 
         if (binder != rSrc.mBinder) {
-            Log.d(LOG_TAG,"reestablishBinder: new binder");
+            if (DBG) Log.d(LOG_TAG,"reestablishBinder: new binder");
             r = new FmcRegInfo(binder);
             r.ssid    = rSrc.ssid;
             r.enabled = rSrc.enabled;
@@ -2633,7 +2640,7 @@ public final class CNE
             r.lastSendStatus = rSrc.lastSendStatus;
             setFmcObj(r);
         } else {
-            Log.d(LOG_TAG,"reestablishBinder: existing binder");
+            if (DBG) Log.d(LOG_TAG,"reestablishBinder: existing binder");
             r = rSrc;
         }
         return r;
@@ -2645,7 +2652,7 @@ public final class CNE
         boolean reqToStart = true;
         FmcRegInfo rInfo = getFmcObj();
 
-        Log.d(LOG_TAG,"startFmc: ");
+        if (DBG) Log.d(LOG_TAG,"startFmc: ");
         if(rInfo != null){
             rInfo = reestablishBinder(rInfo, binder);
             if (rInfo.enabled) {                // already enabled
@@ -2665,7 +2672,7 @@ public final class CNE
             CNERequest rr = CNERequest.obtain(CNE_REQUEST_START_FMC_CMD);
             if (rr == null) {
                 ok = false;
-                Log.e(LOG_TAG, "startFmc: rr=NULL.");
+                if (DBG) Log.e(LOG_TAG, "startFmc: rr=NULL.");
                 onFmcStatus(FmcNotifier.FMC_STATUS_FAILURE);
             } else {
                 WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
@@ -2684,7 +2691,7 @@ public final class CNE
         boolean ok = true;
         FmcRegInfo rInfo = getFmcObj();
 
-        Log.d(LOG_TAG,"stopFmc");
+        if (DBG) Log.d(LOG_TAG,"stopFmc");
 
         if(rInfo != null) {
             rInfo.actionStop = true;
@@ -2693,7 +2700,7 @@ public final class CNE
                 // Send stopFMC to cnd
                 CNERequest rr = CNERequest.obtain(CNE_REQUEST_STOP_FMC_CMD);
                 if (rr == null) {
-                    Log.e(LOG_TAG, "stopFmc: rr=NULL.");
+                    if (DBG) Log.e(LOG_TAG, "stopFmc: rr=NULL.");
                     ok = false;
                 } else {
                     send(rr);
@@ -2708,7 +2715,7 @@ public final class CNE
         boolean ok = false;
         FmcRegInfo rInfo = getFmcObj();
 
-        Log.d(LOG_TAG,"getFmcStatus: ");
+        if (DBG) Log.d(LOG_TAG,"getFmcStatus: ");
         if(rInfo != null){
             rInfo = reestablishBinder(rInfo, binder);
             if (rInfo.lastSendStatus != -1) {
