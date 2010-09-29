@@ -285,8 +285,8 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
     src.hor_stride = buffers.hor_stride;
     src.ver_stride = buffers.ver_stride;
 
-    src.img.w       = buffers.hor_stride ?: buffers.w;
-    src.img.h       = buffers.ver_stride ?: buffers.h;
+    src.img.w       = buffers.w;
+    src.img.h       = buffers.h;
     src.img.format  = buffers.format;
     src.img.base    = (void*)(intptr_t(buffers.heap->base()) + offset);
     src.img.handle  = 0;
@@ -560,11 +560,10 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
             // First, try to use the buffer as an EGLImage directly
             if (mUseEGLImageDirectly) {
                 // NOTE: Assume the buffer is allocated with the proper USAGE flags
-
                 sp<GraphicBuffer> buffer = new  GraphicBuffer(
                         src.img.w, src.img.h, src.img.format,
                         GraphicBuffer::USAGE_HW_TEXTURE,
-                        src.img.w, src.img.handle, false);
+                        src.hor_stride, src.img.handle, false);
 
                 err = mLayer.initializeEglImage(buffer, &mTexture);
                 if (err != NO_ERROR) {
@@ -594,7 +593,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                   (src.img.format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO)) {
                sp<GraphicBuffer> mTempGraphicBuffer = new GraphicBuffer(src.img.w,
                            src.img.h, src.img.format,
-                           GraphicBuffer::USAGE_HW_TEXTURE, src.img.w,
+                           GraphicBuffer::USAGE_HW_TEXTURE, src.hor_stride,
                            src.img.handle, false);
                err = mLayer.initializeEglImage(mTempGraphicBuffer, &mTexture);
         } else {
