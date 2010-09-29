@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009, 2010 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -279,16 +279,16 @@ interface ITelephony {
     /**
      * Returns Interface Name
      */
-    String getActiveInterfaceName(String apnType);
+    String getActiveInterfaceName(String apnType, String ipv);
 
     /**
      * Returns Ip address
      */
-    String getActiveIpAddress(String apnType);
+    String getActiveIpAddress(String apnType, String ipv);
 
     /**
      * Returns Gateway address
      */
-    String getActiveGateway(String apnType);
+    String getActiveGateway(String apnType, String ipv);
 }
 
