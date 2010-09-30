@@ -19,8 +19,8 @@ LOCAL_SRC_FILES:= \
 LOCAL_CFLAGS:= -DLOG_TAG=\"SurfaceFlinger\"
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 
-ifeq ($(TARGET_BOARD_PLATFORM), msm7k)
-	LOCAL_CFLAGS += -DDIM_WITH_TEXTURE
+ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
+LOCAL_CFLAGS += -DUSE_ASHMEM
 endif
 
 # need "-lrt" on Linux simulator to pick up clock_gettime
