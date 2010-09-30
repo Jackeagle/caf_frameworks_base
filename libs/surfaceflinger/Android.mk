@@ -23,10 +23,6 @@ ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
 LOCAL_CFLAGS += -DUSE_ASHMEM
 endif
 
-ifeq ($(TARGET_BOARD_PLATFORM), msm7k)
-	LOCAL_CFLAGS += -DDIM_WITH_TEXTURE
-endif
-
 # need "-lrt" on Linux simulator to pick up clock_gettime
 ifeq ($(TARGET_SIMULATOR),true)
 	ifeq ($(HOST_OS),linux)
