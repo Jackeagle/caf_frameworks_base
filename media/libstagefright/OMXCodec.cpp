@@ -46,6 +46,8 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <media/stagefright/Utils.h>
 #include <utils/Vector.h>
 
+#include <cutils/properties.h>
+
 #include <OMX_Audio.h>
 #include <OMX_Component.h>
 
@@ -335,6 +337,13 @@ uint32_t OMXCodec::getComponentQuirks(const char *componentName) {
     if (!strcmp(componentName, "OMX.TI.Video.Decoder")) {
         quirks |= kInputBufferSizesAreBogus;
     }
+
+    //if 7x30, we always want to use NV12 tile
+    char platform[128] = {0};
+    property_get("ro.product.device", platform, "0");
+    char device[] = "msm7630_";
+    if (!strncmp(device, platform, sizeof(device)-1))
+        quirks |= kForceNV12TileColorFormat;
 
     return quirks;
 }
@@ -1040,7 +1049,13 @@ status_t OMXCodec::setVideoOutputFormat(
                 }
             }
             if(mOMXLivesLocally)
-              format.nIndex = 0;
+            {
+                //force NV12 tile if needed; assuming NV12 is index 1
+                if (mQuirks & kForceNV12TileColorFormat)
+                    format.nIndex = 1;
+                else
+                    format.nIndex = 0;
+            }
         } else
           format.nIndex = 0;
 #else

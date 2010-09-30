@@ -107,6 +107,7 @@ private:
         kInputBufferSizesAreBogus             = 512,
         kSupportsMultipleFramesPerInputBuffer = 1024,
         kDoesNotRequireMemcpyOnOutputPort     = 2048,
+        kForceNV12TileColorFormat             = 4096
     };
 
     struct BufferInfo {
