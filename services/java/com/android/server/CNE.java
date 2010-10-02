@@ -79,6 +79,8 @@ import android.telephony.TelephonyManager;
 import android.util.Config;
 import android.util.Log;
 
+import com.android.internal.telephony.ITelephony;
+
 
 /**
  * {@hide}
@@ -2087,6 +2089,18 @@ public final class CNE
                     }
                 }
             }
+            // tell telephony service to bypass all network checking
+            if (getFmcObj() != null) {
+                if (getFmcObj().dsAvail == true) {
+                    ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
+                    try {
+                        // bypass connectivity and subscription checking, and bring up data call
+                        phone.setDataReadinessChecks(false, false, true);
+                    } catch (RemoteException e  ) {
+                        Log.e(LOG_TAG,"remoteException while calling setDataReadinessChecks");
+                    }
+                }
+            }
             mService.bringUpRat(CNE_RAT_WWAN);
         } catch(NullPointerException e){
             Log.w(LOG_TAG, "handleWwanBringUp", e);
@@ -2594,6 +2608,14 @@ public final class CNE
                 (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_FAILURE) ||
                 (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
                 mRemoveHostEntry = true;
+
+                ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
+                try {
+                    // tell telephony service to do all necessary network checking, no data call
+                    phone.setDataReadinessChecks(true, true, false);
+                } catch (RemoteException e  ) {
+                    Log.e(LOG_TAG,"remoteException while calling setDataReadinessChecks");
+                }
             }
             Log.i(LOG_TAG,"onFmcStatus: mRemoveHostEntry=" + mRemoveHostEntry);
             if (rInfo.mListener != null) {
