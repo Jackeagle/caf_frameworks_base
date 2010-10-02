@@ -2058,6 +2058,8 @@
     <string name="volume_ringtone">Ringer volume</string>
     <!-- Title of the dialog where the user is adjusting the music volume -->
     <string name="volume_music">Media volume</string>
+
+    <string name="volume_fm">FM volume</string>
     <!-- Hint shown in the volume toast to inform the user that the media audio is playing through Bluetooth. -->
     <string name="volume_music_hint_playing_through_bluetooth">Playing through Bluetooth</string>
     <!-- Hint shown in the volume toast to inform the user that the current ringtone is the silent ringtone. -->

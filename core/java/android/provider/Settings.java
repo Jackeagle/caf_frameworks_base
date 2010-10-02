@@ -1352,6 +1352,7 @@ public final class Settings {
          */
         public static final String VOLUME_MUSIC = "volume_music";
 
+        public static final String VOLUME_FM = "volume_fm";
         /**
          * Alarm volume. This is used internally, changing this
          * value will not change the volume. See AudioManager.
@@ -1402,7 +1403,7 @@ public final class Settings {
          */
         public static final String[] VOLUME_SETTINGS = {
             VOLUME_VOICE, VOLUME_SYSTEM, VOLUME_RING, VOLUME_MUSIC,
-            VOLUME_ALARM, VOLUME_NOTIFICATION, VOLUME_BLUETOOTH_SCO
+            VOLUME_ALARM, VOLUME_NOTIFICATION, VOLUME_BLUETOOTH_SCO,VOLUME_FM
         };
 
         /**
@@ -1732,6 +1733,7 @@ public final class Settings {
             VOLUME_SYSTEM,
             VOLUME_RING,
             VOLUME_MUSIC,
+            VOLUME_FM,
             VOLUME_ALARM,
             VOLUME_NOTIFICATION,
             VOLUME_BLUETOOTH_SCO,

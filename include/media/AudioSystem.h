@@ -42,10 +42,10 @@ public:
         ALARM            = 4,
         NOTIFICATION     = 5,
         BLUETOOTH_SCO    = 6,
-        ENFORCED_AUDIBLE = 7, // Sounds that cannot be muted by user and must be routed to speaker
+        FM              =  7,
         DTMF             = 8,
         TTS              = 9,
-        FM              = 10,
+        ENFORCED_AUDIBLE = 10, // Sounds that cannot be muted by user and must be routed to speaker
         NUM_STREAM_TYPES
     };
 

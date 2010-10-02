@@ -590,7 +590,7 @@ bool AudioFlinger::isStreamActive(int stream) const
     if (mLPAStreamIsActive && mLPAOutput && mLPAStreamType == stream) {
         return true;
     }
-    if (mFmOn && stream == AudioSystem::MUSIC) {
+    if (mFmOn && stream == AudioSystem::FM) {
         return true;
     }
     return false;
