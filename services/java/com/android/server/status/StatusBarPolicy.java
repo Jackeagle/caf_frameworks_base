@@ -927,7 +927,6 @@ public class StatusBarPolicy {
                 Slog.d(TAG, "onServiceStateChanged Received on subscription :" + mSubscription);
                 mServiceState[mSubscription] = state;
                 updateSignalStrength(mSubscription);
-                updateCdmaRoamingIcon(mSubscription);
                 updateDataIcon(mSubscription);
             }
 
@@ -1098,6 +1097,7 @@ public class StatusBarPolicy {
         int[] iconList;
 
         Slog.d(TAG,"updateSignalStrength on subscription :" + subscription);
+        updateCdmaRoamingIcon(subscription);
         // Display signal strength while in "emergency calls only" mode
         if ((mSignalStrength[subscription] == null) || (mServiceState[subscription] == null) ||
            (!hasService(subscription) && !mServiceState[subscription].isEmergencyOnly())){
