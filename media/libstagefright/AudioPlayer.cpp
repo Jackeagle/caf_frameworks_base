@@ -141,10 +141,15 @@ void AudioPlayer::pause() {
     } else {
         mAudioTrack->stop();
     }
+    CHECK(mSource != NULL);
+    mSource->pause();
 }
 
 void AudioPlayer::resume() {
     CHECK(mStarted);
+
+    CHECK(mSource != NULL);
+    mSource->start();
 
     if (mAudioSink.get() != NULL) {
         mAudioSink->start();
