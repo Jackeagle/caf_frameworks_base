@@ -162,10 +162,10 @@ public class AudioService extends IAudioService.Stub {
         7,  // STREAM_ALARM
         7,  // STREAM_NOTIFICATION
         15, // STREAM_BLUETOOTH_SCO
-        7,  // STREAM_SYSTEM_ENFORCED
+        15, // STREAM_FM
         15, // STREAM_DTMF
         15,  // STREAM_TTS
-        15 // STREAM_FM
+        7,  // STREAM_SYSTEM_ENFORCED
     };
     /* STREAM_VOLUME_ALIAS[] indicates for each stream if it uses the volume settings
      * of another stream: This avoids multiplying the volume settings for hidden
@@ -179,10 +179,10 @@ public class AudioService extends IAudioService.Stub {
         AudioSystem.STREAM_ALARM,  // STREAM_ALARM
         AudioSystem.STREAM_NOTIFICATION,  // STREAM_NOTIFICATION
         AudioSystem.STREAM_BLUETOOTH_SCO, // STREAM_BLUETOOTH_SCO
-        AudioSystem.STREAM_SYSTEM,  // STREAM_SYSTEM_ENFORCED
+        AudioSystem.STREAM_FM,
         AudioSystem.STREAM_VOICE_CALL, // STREAM_DTMF
         AudioSystem.STREAM_MUSIC,  // STREAM_TTS
-        AudioSystem.STREAM_MUSIC
+        AudioSystem.STREAM_SYSTEM  // STREAM_SYSTEM_ENFORCED
     };
 
     private AudioSystem.ErrorCallback mAudioSystemCallback = new AudioSystem.ErrorCallback() {
@@ -379,6 +379,7 @@ public class AudioService extends IAudioService.Stub {
         mMuteAffectedStreams = System.getInt(cr,
                 System.MUTE_STREAMS_AFFECTED,
                 ((1 << AudioSystem.STREAM_MUSIC)|(1 << AudioSystem.STREAM_RING)|(1 << AudioSystem.STREAM_SYSTEM)));
+        mMuteAffectedStreams |= (1 << AudioSystem.STREAM_FM);
 
         mNotificationsUseRingVolume = System.getInt(cr,
                 Settings.System.NOTIFICATIONS_USE_RING_VOLUME, 1);
@@ -448,12 +449,13 @@ public class AudioService extends IAudioService.Stub {
         // If stream is muted, adjust last audible index only
         int index;
         if (streamState.muteCount() != 0) {
-            if (adjustVolume) {
+            // Don't allow caching of volume when the stream is muted
+            /*if (adjustVolume) {
                 streamState.adjustLastAudibleIndex(direction);
                 // Post a persist volume msg
                 sendMsg(mAudioHandler, MSG_PERSIST_VOLUME, streamType,
                         SENDMSG_REPLACE, 0, 1, streamState, PERSIST_DELAY);
-            }
+            }*/
             index = streamState.mLastAudibleIndex;
         } else {
             if (adjustVolume && streamState.adjustIndex(direction)) {
@@ -1214,6 +1216,9 @@ public class AudioService extends IAudioService.Stub {
         } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC)) {
             // Log.v(TAG, "getActiveStreamType: Forcing STREAM_MUSIC...");
             return AudioSystem.STREAM_MUSIC;
+        } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_FM)) {
+            // Log.v(TAG, "getActiveStreamType: Forcing STREAM_FM...");
+            return AudioSystem.STREAM_FM;
         } else if (suggestedStreamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
             // Log.v(TAG, "getActiveStreamType: Forcing STREAM_RING...");
             return AudioSystem.STREAM_RING;
