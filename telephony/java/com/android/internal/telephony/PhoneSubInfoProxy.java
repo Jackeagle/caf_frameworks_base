@@ -23,14 +23,19 @@ import java.io.PrintWriter;
 import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.ServiceManager;
-
+import android.telephony.TelephonyManager;
 
 public class PhoneSubInfoProxy extends IPhoneSubInfo.Stub {
     private Phone[] mPhone;
     private PhoneSubInfo mPhoneSubInfo;
 
-    public PhoneSubInfoProxy(PhoneSubInfo phoneSubInfo) {
+    public PhoneSubInfoProxy(Phone Phone,PhoneSubInfo phoneSubInfo) {
         mPhoneSubInfo = phoneSubInfo;
+
+        int numPhones = TelephonyManager.getPhoneCount();
+        mPhone = new Phone[numPhones];
+        mPhone[0] = Phone;
+
         if(ServiceManager.getService("iphonesubinfo") == null) {
             ServiceManager.addService("iphonesubinfo", this);
         }

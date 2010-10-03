@@ -25,6 +25,7 @@ import android.os.Message;
 import android.os.ServiceManager;
 import android.telephony.PhoneNumberUtils;
 import android.util.Log;
+import android.telephony.TelephonyManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,11 +47,15 @@ public class IccPhoneBookInterfaceManagerProxy extends IIccPhoneBook.Stub {
         mPhone = phone;
     }
 
-    public IccPhoneBookInterfaceManagerProxy(IccPhoneBookInterfaceManager iccPhoneBookInterfaceManager) {
+    public IccPhoneBookInterfaceManagerProxy(Phone Phone,IccPhoneBookInterfaceManager iccPhoneBookInterfaceManager) {
         mIccPhoneBookInterfaceManager = iccPhoneBookInterfaceManager;
         if(ServiceManager.getService("simphonebook") == null) {
             ServiceManager.addService("simphonebook", this);
         }
+        int numPhones = TelephonyManager.getPhoneCount();
+        mPhone = new Phone[numPhones];
+
+        mPhone[0] = Phone;
     }
 
     public void setmIccPhoneBookInterfaceManager(
