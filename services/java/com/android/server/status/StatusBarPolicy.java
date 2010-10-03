@@ -901,7 +901,6 @@ public class StatusBarPolicy {
         public void onServiceStateChanged(ServiceState state) {
             mServiceState = state;
             updateSignalStrength();
-            updateCdmaRoamingIcon();
             updateDataIcon();
         }
 
@@ -1044,6 +1043,7 @@ public class StatusBarPolicy {
         int iconLevel = -1;
         int[] iconList;
 
+        updateCdmaRoamingIcon();
         // Display signal strength while in "emergency calls only" mode
         if ((mSignalStrength == null) || (mServiceState == null)
                 || (!hasService() && !mServiceState.isEmergencyOnly())) {
