@@ -221,6 +221,33 @@ void Prefetcher::threadFunc() {
     mThreadExited = true;
     mCondition.signal();
 }
+int64_t Prefetcher::getMaxCachedDurationUs(bool *noMoreData) {
+    Mutex::Autolock autoLock(mLock);
+
+    int64_t maxCacheDurationUs = 0;
+    bool anySourceActive = false;
+    for (size_t i = 0; i < mSources.size(); ++i) {
+        int64_t cacheDurationUs=0;
+        sp<PrefetchedSource> source = mSources[i].promote();
+        if (source == NULL) {
+            continue;
+        }
+
+        if (source->getCacheDurationUs(&cacheDurationUs)) {
+            anySourceActive = true;
+        }
+
+        if (cacheDurationUs > maxCacheDurationUs) {
+            maxCacheDurationUs = cacheDurationUs;
+        }
+    }
+
+    if (noMoreData) {
+        *noMoreData = !anySourceActive;
+    }
+
+    return maxCacheDurationUs < 0 ? 0 : maxCacheDurationUs;
+}
 
 int64_t Prefetcher::getCachedDurationUs(bool *noMoreData) {
     Mutex::Autolock autoLock(mLock);

@@ -34,6 +34,9 @@ struct Prefetcher : public RefBase {
     // that will benefit from prefetching/caching the original one.
     sp<MediaSource> addSource(const sp<MediaSource> &source);
 
+    //It returns the max of cached durations of all streams in the session
+    int64_t getMaxCachedDurationUs(bool *noMoreData = NULL);
+
     int64_t getCachedDurationUs(bool *noMoreData = NULL);
 
     // If provided (non-NULL), "continueFunc" will be called repeatedly
