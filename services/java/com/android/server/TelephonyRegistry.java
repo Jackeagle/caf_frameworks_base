@@ -117,14 +117,6 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
     TelephonyRegistry(Context context) {
         CellLocation  location = CellLocation.getEmpty();
 
-        // Note that location can be null for non-phone builds like
-        // like the generic one.
-        if (location != null) {
-            location.fillInNotifierBundle(mCellLocation[0]);
-            if (TelephonyManager.isDsdsEnabled()) {
-                location.fillInNotifierBundle(mCellLocation[1]);
-            }
-        }
         mContext = context;
         mBatteryStats = BatteryStatsService.getService();
         // Initialize default subscription to be used for single standby.
@@ -156,6 +148,15 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
             mDataConnectionReason[i] = "";
             mCellLocation[i] = new Bundle();
             mDataConnectionNetworkType[i] = 0;
+        }
+
+        // Note that location can be null for non-phone builds like
+        // like the generic one.
+        if (location != null) {
+            location.fillInNotifierBundle(mCellLocation[0]);
+            if (TelephonyManager.isDsdsEnabled()) {
+                location.fillInNotifierBundle(mCellLocation[1]);
+            }
         }
     }
 
