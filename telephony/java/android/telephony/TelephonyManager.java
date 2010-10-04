@@ -223,7 +223,7 @@ public class TelephonyManager {
 
     /**
      * Returns the unique device ID, for example, the IMEI for GSM and the MEID
-     * for CDMA phones. Return null if device ID is not available.
+     * or ESN for CDMA phones. Return null if device ID is not available.
      *
      * <p>Requires Permission:
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
@@ -1117,6 +1117,24 @@ public class TelephonyManager {
         try {
             //return getSubscriberInfo().getVoiceMailNumberOnSubscription(subscription);
             return getSubscriberInfo().getVoiceMailNumber();
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            // This could happen before phone restarts due to crashing
+            return null;
+        }
+    }
+    /**
+     * Returns the complete voice mail number. Return null if it is unavailable.
+     * <p>
+     * Requires Permission:
+     *   {@link android.Manifest.permission#CALL_PRIVILEGED CALL_PRIVILEGED}
+     *
+     * @hide
+     */
+    public String getCompleteVoiceMailNumber() {
+        try {
+            return getSubscriberInfo().getCompleteVoiceMailNumber();
         } catch (RemoteException ex) {
             return null;
         } catch (NullPointerException ex) {
