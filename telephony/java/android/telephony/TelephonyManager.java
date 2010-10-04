@@ -63,9 +63,9 @@ public class TelephonyManager {
     private ITelephonyRegistry mRegistry;
 
     /** @hide */
-    public static final int MAX_PHONE_COUNT_SS = 1; // Single Subscription
+    private static int mPhoneCount = 1; // Phone count is set to 1 by default(Single Standby).
     /** @hide */
-    public static final int MAX_PHONE_COUNT_DS = 2; // Dual Subscription
+    private static final int MAX_PHONE_COUNT_DS = 2; // No. of phones for Dual Subscription.
 
     /** @hide */
     public TelephonyManager(Context context) {
@@ -76,6 +76,9 @@ public class TelephonyManager {
 
     /** @hide */
     private TelephonyManager() {
+        if (isDsdsEnabled()) {
+            mPhoneCount = MAX_PHONE_COUNT_DS;
+        }
     }
 
     private static TelephonyManager sInstance = new TelephonyManager();
@@ -93,11 +96,7 @@ public class TelephonyManager {
      * @hide
     */
     public static int getPhoneCount() {
-         if (isDsdsEnabled()) {
-             return MAX_PHONE_COUNT_DS;
-         } else {
-             return MAX_PHONE_COUNT_SS;
-         }
+         return mPhoneCount;
     }
 
     /** @hide */
