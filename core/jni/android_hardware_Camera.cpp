@@ -56,6 +56,8 @@ public:
 
 private:
     void copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int msgType);
+    void copyAndPostInt(JNIEnv* env, const sp<IMemory>& dataPtr, int msgType);
+
     void clearCallbackBuffers_l(JNIEnv *env);
 
     jobject     mCameraJObjectWeak;     // weak reference to java object
@@ -197,6 +199,40 @@ void JNICameraContext::copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int 
     }
 }
 
+void JNICameraContext::copyAndPostInt(JNIEnv* env, const sp<IMemory>& dataPtr, int msgType) {
+        jintArray obj = (jintArray)NULL ;
+        // allocate Java int array and copy data
+        if (dataPtr != NULL) {
+            ssize_t offset;
+            size_t size;
+            sp<IMemoryHeap> heap = dataPtr->getMemory(&offset, &size);
+            LOGV("postData: off=%d, size=%d", offset, size);
+            uint32_t *heapBase = (uint32_t*)heap->base();
+
+        if (heapBase != NULL) {
+            const jint* data = reinterpret_cast<const jint*>((unsigned int)heapBase + offset);
+            LOGV("Allocating callback buffer");
+            size_t size_array = size/sizeof(int32_t);
+            obj = env->NewIntArray(size_array);
+            if (obj == NULL) {
+                LOGE("Couldn't allocate int array for data");
+                env->ExceptionClear();
+            } else {
+                env->SetIntArrayRegion(obj, 0, size_array, data);
+            }
+         } else {
+            LOGE("Heap is NULL");
+         }
+        }
+
+      // post stats data to Java
+      env->CallStaticVoidMethod(mCameraJClass, fields.post_event,
+            mCameraJObjectWeak, msgType, 0, 0, obj);
+      if (obj) {
+          env->DeleteLocalRef(obj);
+      }
+}
+
 void JNICameraContext::postData(int32_t msgType, const sp<IMemory>& dataPtr)
 {
     // VM pointer will be NULL if object is released
@@ -220,40 +256,14 @@ void JNICameraContext::postData(int32_t msgType, const sp<IMemory>& dataPtr)
         break;
 
     case CAMERA_MSG_STATS_DATA:
-       {
-        jintArray obj = (jintArray)NULL ;
-        // allocate Java int array and copy data
-        if (dataPtr != NULL) {
-            ssize_t offset;
-            size_t size;
-            sp<IMemoryHeap> heap = dataPtr->getMemory(&offset, &size);
-            LOGV("postData: off=%d, size=%d", offset, size);
-            uint32_t *heapBase = (uint32_t*)heap->base();
+        copyAndPostInt(env, dataPtr, msgType);
+        break;
 
-        if (heapBase != NULL) {
-            const jint* data = reinterpret_cast<const jint*>((unsigned int)heapBase + offset);
-            LOGV("Allocating callback buffer");
-            size_t size_array = size/sizeof(int32_t);
-            obj = env->NewIntArray(size_array);
-            if (obj == NULL) {
-                LOGE("Couldn't allocate int array for STATS data");
-                env->ExceptionClear();
-            } else {
-                env->SetIntArrayRegion(obj, 0, size_array, data);
-            }
-         } else {
-            LOGE("Stats heap is NULL");
-         }
-        }
+    case CAMERA_MSG_META_DATA:
+        LOGV("metaDataCallback");
+        copyAndPostInt(env, dataPtr, msgType);
+        break;
 
-      // post stats data to Java
-      env->CallStaticVoidMethod(mCameraJClass, fields.post_event,
-            mCameraJObjectWeak, msgType, 0, 0, obj);
-      if (obj) {
-          env->DeleteLocalRef(obj);
-      }
-      break;
-     }
     default:
         // TODO: Change to LOGV
         LOGV("dataCallback(%d, %p)", msgType, dataPtr.get());
@@ -482,6 +492,39 @@ static void android_hardware_Camera_setHistogramMode(JNIEnv *env, jobject thiz, 
      jniThrowException(env, "java/lang/RuntimeException", "set histogram mode failed");
     }
 }
+
+static void android_hardware_Camera_sendMetaData(JNIEnv *env, jobject thiz)
+{
+  LOGV("sendMetaData");
+  JNICameraContext* context;
+  status_t rc;
+  sp<Camera> camera = get_native_camera(env, thiz, &context);
+  if (camera == 0) return;
+
+  rc = camera->sendCommand(CAMERA_CMD_SEND_META_DATA, 0, 0);
+
+  if (rc != NO_ERROR) {
+     jniThrowException(env, "java/lang/RuntimeException", "send meta data failed");
+    }
+}
+static void android_hardware_Camera_setFaceDetectionCb(JNIEnv *env, jobject thiz, jboolean mode)
+{
+  LOGV("setMetaData: mode:%d", (int)mode);
+  JNICameraContext* context;
+  status_t rc;
+  sp<Camera> camera = get_native_camera(env, thiz, &context);
+  if (camera == 0) return;
+
+  if(mode == true)
+     rc = camera->sendCommand(CAMERA_CMD_FACE_DETECTION_ON, 0, 0);
+  else
+     rc = camera->sendCommand(CAMERA_CMD_FACE_DETECTION_OFF, 0, 0);
+
+  if (rc != NO_ERROR) {
+     jniThrowException(env, "java/lang/RuntimeException", "set face detection mode failed");
+    }
+}
+
 static void android_hardware_Camera_addCallbackBuffer(JNIEnv *env, jobject thiz, jbyteArray bytes) {
     LOGV("addCallbackBuffer");
 
@@ -683,6 +726,12 @@ static JNINativeMethod camMethods[] = {
   { "native_sendHistogramData",
     "()V",
     (void *)android_hardware_Camera_sendHistogramData },
+  { "native_setFaceDetectionCb",
+    "(Z)V",
+    (void *)android_hardware_Camera_setFaceDetectionCb },
+  { "native_sendMetaData",
+    "()V",
+    (void *)android_hardware_Camera_sendMetaData },
   { "native_setParameters",
     "(Ljava/lang/String;)V",
     (void *)android_hardware_Camera_setParameters },

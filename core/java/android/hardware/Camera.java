@@ -68,8 +68,9 @@ public class Camera {
     private static final int CAMERA_MSG_POSTVIEW_FRAME   = 0x040;
     private static final int CAMERA_MSG_RAW_IMAGE        = 0x080;
     private static final int CAMERA_MSG_COMPRESSED_IMAGE = 0x100;
-    private static final int CAMERA_MSG_STATS_DATA = 0x200;
-    private static final int CAMERA_MSG_ALL_MSGS         = 0x3FF;
+    private static final int CAMERA_MSG_STATS_DATA       = 0x200;
+    private static final int CAMERA_MSG_META_DATA        = 0x400;
+    private static final int CAMERA_MSG_ALL_MSGS         = 0x7FF;
 
     private int mNativeContext; // accessed by native methods
     private EventHandler mEventHandler;
@@ -80,6 +81,7 @@ public class Camera {
     private PictureCallback mPostviewCallback;
     private AutoFocusCallback mAutoFocusCallback;
     private CameraDataCallback mCameraDataCallback;
+    private CameraMetaDataCallback mCameraMetaDataCallback;
     private OnZoomChangeListener mZoomListener;
     private ErrorCallback mErrorCallback;
     private boolean mOneShot;
@@ -100,6 +102,7 @@ public class Camera {
         mPostviewCallback = null;
         mZoomListener = null;
         mCameraDataCallback = null;
+        mCameraMetaDataCallback = null;
 
         Looper looper;
         if ((looper = Looper.myLooper()) != null) {
@@ -348,6 +351,11 @@ public class Camera {
                 }
                 return;
 
+            case CAMERA_MSG_META_DATA:
+                if (mCameraMetaDataCallback != null) {
+                    mCameraMetaDataCallback.onCameraMetaData((int[])msg.obj, mCamera);
+                }
+                return;
 
             case CAMERA_MSG_POSTVIEW_FRAME:
                 if (mPostviewCallback != null) {
@@ -510,6 +518,41 @@ public class Camera {
     }
     private native final void native_sendHistogramData();
 
+    /**
+     * Handles the callback for when Camera Meta Data is available.
+     * Meta data is read from the camera.
+     */
+    public interface CameraMetaDataCallback {
+        /**
+         * Callback for when camera meta data is available.
+         *
+         * @param data   a int array of the camera meta data
+         * @param camera the Camera service object
+         */
+        void onCameraMetaData(int[] data, Camera camera);
+    };
+
+    /**
+     * Set camera face detection mode and registers a callback function to run.
+     *  Only valid after startPreview() has been called.
+     *
+     * @param cb the callback to run
+     */
+    public final void setFaceDetectionCb(CameraMetaDataCallback cb)
+    {
+        mCameraMetaDataCallback = cb;
+        native_setFaceDetectionCb(cb!=null);
+    }
+    private native final void native_setFaceDetectionCb(boolean mode);
+
+    /**
+     * Set camera face detection command to send meta data.
+     */
+    public final void sendMetaData()
+    {
+        native_sendMetaData();
+    }
+    private native final void native_sendMetaData();
 
     /**
      * Handles the callback for when a picture is taken.
@@ -861,6 +904,7 @@ public class Camera {
         private static final String KEY_MAX_SATURATION = "max-saturation";
         private static final String KEY_CONTINUOUS_AF = "continuous-af";
         private static final String KEY_SELECTABLE_ZONE_AF = "selectable-zone-af";
+        private static final String KEY_FACE_DETECTION = "face-detection";
 
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
@@ -1029,6 +1073,10 @@ public class Camera {
         public static final String SELECTABLE_ZONE_AF_SPOTMETERING = "spot-metering";
         public static final String SELECTABLE_ZONE_AF_CENTER_WEIGHTED = "center-weighted";
         public static final String SELECTABLE_ZONE_AF_FRAME_AVERAGE = "frame-average";
+
+        // Values for Face Detection settings.
+        public static final String FACE_DETECTION_OFF = "off";
+        public static final String FACE_DETECTION_ON = "on";
 
         private HashMap<String, String> mMap;
 
@@ -2416,6 +2464,39 @@ public class Camera {
          */
         public List<String> getSupportedSelectableZoneAf() {
             String str = get(KEY_SELECTABLE_ZONE_AF + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+        }
+        /**
+         * Gets the current face detection setting.
+         *
+         * @return one of FACE_DETECTION_XXX string constant. null if face detection
+         *         setting is not supported.
+         *
+         */
+        public String getFaceDetectionMode() {
+            return get(KEY_FACE_DETECTION);
+        }
+
+        /**
+         * Sets the auto scene detect. Other settings like Touch AF/AEC might be
+         * changed after setting face detection.
+         *
+         * @param value FACE_DETECTION_XXX string constants.
+         *
+         */
+        public void setFaceDetectionMode(String value) {
+            set(KEY_FACE_DETECTION, value);
+        }
+
+        /**
+         * Gets the supported face detection modes.
+         *
+         * @return a List of FACE_DETECTION_XXX string constant. null if face detection
+         *         setting is not supported.
+         *
+         */
+        public List<String> getSupportedFaceDetectionModes() {
+            String str = get(KEY_FACE_DETECTION + SUPPORTED_VALUES_SUFFIX);
             return split(str);
         }
 

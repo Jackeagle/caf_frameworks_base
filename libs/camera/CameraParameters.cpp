@@ -83,6 +83,8 @@ const char CameraParameters::KEY_CONTINUOUS_AF[] = "continuous-af";
 const char CameraParameters::KEY_SUPPORTED_CONTINUOUS_AF[] = "continuous-af-values";
 const char CameraParameters::KEY_SELECTABLE_ZONE_AF[] = "selectable-zone-af";
 const char CameraParameters::KEY_SUPPORTED_SELECTABLE_ZONE_AF[] = "selectable-zone-af-values";
+const char CameraParameters::KEY_FACE_DETECTION[] = "face-detection";
+const char CameraParameters::KEY_SUPPORTED_FACE_DETECTION[] = "face-detection-values";
 
 const char CameraParameters::TRUE[] = "true";
 
@@ -234,6 +236,10 @@ const char CameraParameters::SELECTABLE_ZONE_AF_AUTO[] = "auto";
 const char CameraParameters::SELECTABLE_ZONE_AF_SPOT_METERING[] = "spot-metering";
 const char CameraParameters::SELECTABLE_ZONE_AF_CENTER_WEIGHTED[] = "center-weighted";
 const char CameraParameters::SELECTABLE_ZONE_AF_FRAME_AVERAGE[] = "frame-average";
+
+// Values for Face Detection settings.
+const char CameraParameters::FACE_DETECTION_OFF[] = "off";
+const char CameraParameters::FACE_DETECTION_ON[] = "on";
 
 static const char* portrait = "portrait";
 static const char* landscape = "landscape";
