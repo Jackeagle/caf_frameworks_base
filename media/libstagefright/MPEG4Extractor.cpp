@@ -1689,11 +1689,17 @@ status_t MPEG4Source::read(
             srcOffset += mNALLengthSize;
 
             if (srcOffset + nalLength > size) {
+                //If NAL Length is corrupt,
+                //return custom error ERROR_CORRUPT_NAL
+                LOGW("ERROR - CORRUPT NAL ");
                 mBuffer->release();
                 mBuffer = NULL;
 
+                srcOffset -= mNALLengthSize;
+                srcOffset += size;
+                ++mCurrentSampleIndex;
                 if (mStatistics) mNumSamplesReadError++;
-                return ERROR_MALFORMED;
+                return ERROR_CORRUPT_NAL;
             }
 
             if (nalLength == 0) {
