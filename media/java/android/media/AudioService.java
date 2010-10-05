@@ -16,6 +16,7 @@
 
 package android.media;
 
+import java.util.NoSuchElementException;
 import android.app.ActivityManagerNative;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -1025,7 +1026,11 @@ public class AudioService extends IAudioService.Stub {
                 } else {
                     mStartcount--;
                     if (mStartcount == 0) {
-                        mCb.unlinkToDeath(this, 0);
+                        try {
+                            mCb.unlinkToDeath(this, 0);
+                        } catch (NoSuchElementException e) {
+                            Log.w(TAG, "decCount() going to 0 but not registered to binder");
+                        }
                     }
                     requestScoState(BluetoothHeadset.AUDIO_STATE_DISCONNECTED);
                 }
@@ -1034,8 +1039,14 @@ public class AudioService extends IAudioService.Stub {
 
         public void clearCount(boolean stopSco) {
             synchronized(mScoClients) {
+                if (mStartcount != 0) {
+                    try {
+                        mCb.unlinkToDeath(this, 0);
+                    } catch (NoSuchElementException e) {
+                        Log.w(TAG, "clearCount() mStartcount: "+mStartcount+" != 0 but not registered to binder");
+                    }
+                }
                 mStartcount = 0;
-                mCb.unlinkToDeath(this, 0);
                 if (stopSco) {
                     requestScoState(BluetoothHeadset.AUDIO_STATE_DISCONNECTED);
                 }
