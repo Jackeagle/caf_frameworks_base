@@ -358,6 +358,11 @@ public class ProxyManager extends Handler {
                     }
                     result = SetDdsResult.SUCCESS;
                     Log.d(LOG_TAG, "  setDataSubscriptionSource is Successful");
+
+                    //Subscription is changed to this new sub, need to update the DB to mark
+                    //the respective profiles as "current".
+                    sProxyPhone[currentDds].updateCurrentCarrierInProvider();
+
                 } else {
                     // error
                     if (ar.exception instanceof CommandException

@@ -21,6 +21,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ContentValues;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
@@ -30,6 +31,11 @@ import android.os.SystemProperties;
 import android.telephony.ServiceState;
 import android.text.TextUtils;
 import android.util.Log;
+import android.provider.Telephony;
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
+import android.net.Uri;
+import android.database.SQLException;
 
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
@@ -121,7 +127,7 @@ public class DataServiceStateTracker extends Handler {
     RuimRecords mRuimRecords = null;
 
     /* cdma only stuff */
-    public int mCdmaSubscriptionSource = Phone.CDMA_SUBSCRIPTION_NV; /* assume NV */
+    public int mCdmaSubscriptionSource = Phone.CDMA_SUBSCRIPTION_NONE; /* Initialize to NONE */
     private CdmaSubscriptionInfo mCdmaSubscriptionInfo;
     private CdmaRoamingInfoHelper mCdmaRoamingInfo;
 
@@ -220,6 +226,7 @@ public class DataServiceStateTracker extends Handler {
                 cm.getCDMASubscription(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_INFO));
                 cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
                 pollState("nv ready");
+                updateCurrentCarrierInProvider();
                 break;
 
             case EVENT_SIM_READY:
@@ -230,6 +237,7 @@ public class DataServiceStateTracker extends Handler {
             case EVENT_RUIM_RECORDS_LOADED:
                 mRecordsLoadedRegistrants.notifyRegistrants();
                 pollState("records loaded");
+                updateCurrentCarrierInProvider();
                 break;
 
 
@@ -1159,6 +1167,50 @@ public class DataServiceStateTracker extends Handler {
 
     public void unregisterForServiceStateChanged(Handler h) {
         mDataServiceStateRegistrants.remove(h);
+    }
+
+    /**
+     * Set the respective profiles as current which matches the
+     * MCC/MNC.
+     * @param void
+     */
+    public void updateCurrentCarrierInProvider() {
+        String operatorNumeric;
+        int currentDds = 0;
+
+        if (mSimRecords != null &&
+            mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NONE) {
+            operatorNumeric = mSimRecords.getSIMOperatorNumeric();
+        } else if (mRuimRecords != null  &&
+                   mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_RUIM_SIM) {
+            operatorNumeric = mRuimRecords.getRUIMOperatorNumeric();
+        } else if (mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV) {
+            operatorNumeric = SystemProperties.get("ro.cdma.home.operator.numeric");
+        } else {
+            Log.e(LOG_TAG, "Not valid");
+            return;
+        }
+
+        try {
+            currentDds = Settings.System.getInt(mContext.getContentResolver(),
+                            Settings.System.DUAL_SIM_DATA_CALL);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Exception Reading Dual Sim Data Subscription Value.", snfe);
+        }
+
+        if (!TextUtils.isEmpty(operatorNumeric) &&
+             (mDct.getSubscription() == currentDds)) {
+            try {
+                Uri uri = Uri.withAppendedPath(Telephony.Carriers.CONTENT_URI, "current");
+                ContentValues map = new ContentValues();
+                map.put(Telephony.Carriers.NUMERIC, operatorNumeric);
+                mContext.getContentResolver().insert(uri, map);
+                return;
+            } catch (SQLException e) {
+                Log.e(LOG_TAG, "Can't store current operator", e);
+            }
+        }
+        return;
     }
 
     void logd(String logString) {

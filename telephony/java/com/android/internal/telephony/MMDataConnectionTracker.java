@@ -1404,6 +1404,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
+    public void updateCurrentCarrierInProvider() {
+        mDsst.updateCurrentCarrierInProvider();
+    }
+
     void loge(String string) {
         Log.e(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subNum+")" : "")
                               + " ] " + string);

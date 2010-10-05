@@ -110,6 +110,7 @@ public interface VoicePhone {
     // Used for CDMA subscription mode
     static final int CDMA_SUBSCRIPTION_RUIM_SIM = 0; // RUIM/SIM (default)
     static final int CDMA_SUBSCRIPTION_NV       = 1; // NV -> non-volatile memory
+    static final int CDMA_SUBSCRIPTION_NONE     = 2; // NONE
 
     static final int PREFERRED_CDMA_SUBSCRIPTION = CDMA_SUBSCRIPTION_NV;
 

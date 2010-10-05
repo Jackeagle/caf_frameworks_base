@@ -101,7 +101,7 @@ public class CDMAPhone extends PhoneBase {
     static final int CANCEL_ECM_TIMER = 1; // cancel Ecm timer
 
     Subscription subscriptionData; // to store subscription information
-    int subscription = 0;
+    int mSubscription = 0;
 
     // Instance Variables
     CdmaCallTracker mCT;
@@ -210,8 +210,8 @@ public class CDMAPhone extends PhoneBase {
         // Sets iso country property by retrieving from build-time system property
         setIsoCountryProperty(operatorNumeric);
 
-        // Sets current entry in the telephony carrier table
-        updateCurrentCarrierInProvider(operatorNumeric);
+        // Updates MCC MNC device configuration information
+        MccTable.updateMccMncConfiguration(mContext, operatorNumeric);
 
         // Notify voicemails.
         updateVoiceMail();
@@ -314,11 +314,11 @@ public class CDMAPhone extends PhoneBase {
     }
 
     public void setSubscription(int subNum) {
-        subscription = subNum;
+        mSubscription = subNum;
     }
 
     public int getSubscription() {
-        return subscription;
+        return mSubscription;
     }
 
     public boolean canTransfer() {
@@ -1412,31 +1412,6 @@ public class CDMAPhone extends PhoneBase {
 
             setSystemProperty(PROPERTY_ICC_OPERATOR_ISO_COUNTRY, iso);
         }
-    }
-
-    /**
-     * Sets the "current" field in the telephony provider according to the
-     * build-time operator numeric property
-     *
-     * @return true for success; false otherwise.
-     */
-    boolean updateCurrentCarrierInProvider(String operatorNumeric) {
-        if (!TextUtils.isEmpty(operatorNumeric)) {
-            try {
-                Uri uri = Uri.withAppendedPath(Telephony.Carriers.CONTENT_URI, "current");
-                ContentValues map = new ContentValues();
-                map.put(Telephony.Carriers.NUMERIC, operatorNumeric);
-                getContext().getContentResolver().insert(uri, map);
-
-                // Updates MCC MNC device configuration information
-                MccTable.updateMccMncConfiguration(this.getContext(), operatorNumeric);
-
-                return true;
-            } catch (SQLException e) {
-                Log.e(LOG_TAG, "Can't store current operator", e);
-            }
-        }
-        return false;
     }
 
     private void registerForRuimRecordEvents() {

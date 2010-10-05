@@ -1036,6 +1036,10 @@ public class PhoneProxy extends Handler implements Phone {
         return mActiveVoicePhone.getSubscription();
     }
 
+    public void updateCurrentCarrierInProvider() {
+        mActiveDataPhone.updateCurrentCarrierInProvider();
+    }
+
     public int disableApnType(String apnType) {
         return mActiveDataPhone.disableApnType(apnType);
     }

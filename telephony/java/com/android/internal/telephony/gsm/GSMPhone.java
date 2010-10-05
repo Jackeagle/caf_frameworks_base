@@ -99,7 +99,7 @@ public class GSMPhone extends PhoneBase {
     public static final String VM_SIM_IMSI = "vm_sim_imsi_key";
 
     Subscription subscriptionData; //to store subscription information
-    int subscription = 0;
+    int mSubscription = 0;
 
     // Instance Variables
     GsmCallTracker mCT;
@@ -306,12 +306,12 @@ public class GSMPhone extends PhoneBase {
 
     //sets subscription SUB0("0") or SUB1("1)
     public void setSubscription(int subNum) {
-        subscription = subNum;
+        mSubscription = subNum;
     }
 
     //gets subscription SUB0("0") or SUB1("1")
     public int getSubscription() {
-        return subscription;
+        return mSubscription;
     }
 
     public SignalStrength getSignalStrength() {
@@ -1185,7 +1185,6 @@ public class GSMPhone extends PhoneBase {
                 break;
 
             case EVENT_SIM_RECORDS_LOADED:
-                updateCurrentCarrierInProvider();
 
                 // Check if this is a different SIM than the previous one. If so unset the
                 // voice mail number.
@@ -1420,26 +1419,6 @@ public class GSMPhone extends PhoneBase {
                 mSimPhoneBookIntManager.updateSimRecords(mSIMRecords);
             }
         }
-    }
-
-    /**
-     * Sets the "current" field in the telephony provider according to the SIM's operator
-     *
-     * @return true for success; false otherwise.
-     */
-    boolean updateCurrentCarrierInProvider() {
-        if (mSIMRecords != null) {
-            try {
-                Uri uri = Uri.withAppendedPath(Telephony.Carriers.CONTENT_URI, "current");
-                ContentValues map = new ContentValues();
-                map.put(Telephony.Carriers.NUMERIC, mSIMRecords.getSIMOperatorNumeric());
-                mContext.getContentResolver().insert(uri, map);
-                return true;
-            } catch (SQLException e) {
-                Log.e(LOG_TAG, "Can't store current operator", e);
-            }
-        }
-        return false;
     }
 
     /**

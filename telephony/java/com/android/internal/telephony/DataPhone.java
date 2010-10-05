@@ -424,4 +424,9 @@ public interface DataPhone {
      * Returns the subscription id.
      */
     public int getSubscription();
+
+    /* Sets active SIM/RUIM related profiles as current
+     * @param void
+     */
+    public void updateCurrentCarrierInProvider();
 }
