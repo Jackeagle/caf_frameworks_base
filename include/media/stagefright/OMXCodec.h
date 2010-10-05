@@ -51,6 +51,7 @@ struct OMXCodec : public MediaSource,
 
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
+    virtual status_t pause();
 
     virtual sp<MetaData> getFormat();
 
@@ -76,6 +77,7 @@ private:
         EXECUTING_TO_IDLE,
         IDLE_TO_LOADED,
         RECONFIGURING,
+        PAUSED,
         ERROR
     };
 

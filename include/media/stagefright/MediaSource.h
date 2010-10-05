@@ -42,6 +42,9 @@ struct MediaSource : public RefBase {
     // held onto by callers be released before a call to stop() !!!
     virtual status_t stop() = 0;
 
+    virtual status_t pause(){return OK;}
+
+    virtual status_t isPaused(){return mIsPaused;}
     // Returns the format of the data output by this media source.
     virtual sp<MetaData> getFormat() = 0;
 
@@ -88,6 +91,7 @@ struct MediaSource : public RefBase {
 
 protected:
     virtual ~MediaSource();
+    bool mIsPaused;
 
 private:
     MediaSource(const MediaSource &);

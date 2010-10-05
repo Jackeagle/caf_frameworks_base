@@ -18,7 +18,7 @@
 
 namespace android {
 
-MediaSource::MediaSource() {}
+MediaSource::MediaSource():mIsPaused(false) {}
 
 MediaSource::~MediaSource() {}
 
