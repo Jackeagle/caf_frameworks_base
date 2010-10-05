@@ -1308,8 +1308,6 @@ int SurfaceFlinger::setOrientation(DisplayID dpy,
             orientation = BAD_VALUE;
         }
     }
-    const DisplayHardware& hw(graphicPlane(0).displayHardware());
-    hw.orientationChanged(orientation);
     return orientation;
 }
 
@@ -2034,6 +2032,10 @@ status_t GraphicPlane::setOrientation(int orientation)
 
     mOrientation = orientation;
     mGlobalTransform = mDisplayTransform * orientationTransform;
+
+    //Informing the gralloc of orientation change for HDMI mirroring
+    hw.orientationChanged(orientation);
+
     return NO_ERROR;
 }
 
