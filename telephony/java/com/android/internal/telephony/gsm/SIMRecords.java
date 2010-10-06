@@ -1172,6 +1172,7 @@ public final class SIMRecords extends UiccApplicationRecords {
                 break;
             case CommandsInterface.SIM_REFRESH_RESET:
                 if (DBG) log("handleSimRefresh with SIM_REFRESH_RESET");
+                adnCache.reset();
                 onIccRefreshReset();
                 break;
             default:
