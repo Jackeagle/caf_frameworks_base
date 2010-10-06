@@ -66,6 +66,7 @@ enum {
     kKeyDate              = 'date',  // cstring
     kKeyWriter            = 'writ',  // cstring
     kKeyRotation          = 'rota',  // int32_t
+    kKeyRawCodecSpecificData = 'rcsd',  // raw data - added to support mmParser
 };
 
 enum {
