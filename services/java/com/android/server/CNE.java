@@ -2076,32 +2076,30 @@ public final class CNE
         try {
             ConnectivityManager cm = (ConnectivityManager)
                 mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-            for (NetworkInfo networkInfo : cm.getAllNetworkInfo()) {
-                if(networkInfo.getType() != ConnectivityManager.TYPE_WIFI){
-                    NetworkInfo.State networkState = networkInfo.getState();
-                    if(networkState == NetworkInfo.State.CONNECTED){
-                        AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
-                            DataPhone.APN_TYPE_DEFAULT,IPVersion.IPV4);
-                        notifyRatConnectStatus(CNE_RAT_WWAN,
-                                               NetworkStateToInt(networkState),
-                                               wwanV4AddrInfo.ipAddr);
-                        return;
+            NetworkInfo networkInfo =
+                cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+            NetworkInfo.State networkState = networkInfo.getState();
+            if(networkState == NetworkInfo.State.CONNECTED){
+                AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
+                DataPhone.APN_TYPE_DEFAULT,IPVersion.IPV4);
+                notifyRatConnectStatus(CNE_RAT_WWAN,
+                                       NetworkStateToInt(networkState),
+                                       wwanV4AddrInfo.ipAddr);
+            } else {
+                // tell telephony service to bypass all network checking
+                if (getFmcObj() != null) {
+                    if (getFmcObj().dsAvail == true) {
+                        ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
+                        try {
+                            // bypass connectivity and subscription checking, and bring up data call
+                            phone.setDataReadinessChecks(false, false, true);
+                        } catch (RemoteException e  ) {
+                            Log.e(LOG_TAG,"remoteException while calling setDataReadinessChecks");
+                        }
                     }
                 }
+                mService.bringUpRat(CNE_RAT_WWAN);
             }
-            // tell telephony service to bypass all network checking
-            if (getFmcObj() != null) {
-                if (getFmcObj().dsAvail == true) {
-                    ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
-                    try {
-                        // bypass connectivity and subscription checking, and bring up data call
-                        phone.setDataReadinessChecks(false, false, true);
-                    } catch (RemoteException e  ) {
-                        Log.e(LOG_TAG,"remoteException while calling setDataReadinessChecks");
-                    }
-                }
-            }
-            mService.bringUpRat(CNE_RAT_WWAN);
         } catch(NullPointerException e){
             Log.w(LOG_TAG, "handleWwanBringUp", e);
             e.printStackTrace();
