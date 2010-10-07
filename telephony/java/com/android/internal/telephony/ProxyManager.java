@@ -36,6 +36,7 @@ import com.android.internal.telephony.PhoneSubInfoProxy;
 import com.android.internal.telephony.UiccConstants.AppType;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.CommandException;
+import com.android.internal.telephony.TelephonyIntents;
 import android.os.Message;
 import android.os.Handler;
 import android.os.AsyncResult;
@@ -90,6 +91,7 @@ public class ProxyManager extends Handler {
     private static Context  mContext;
     static ProxyManager mProxyManager;
     private boolean mUiccSubSet = false;
+    private boolean mDdsSet = false;
     SupplySubscription supplySubscription;
     PhoneAppBroadcastReceiver mReceiver;
 
@@ -151,6 +153,8 @@ public class ProxyManager extends Handler {
             // Register for intent broadcasts.
             IntentFilter intentFilter = new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED);
             mReceiver = new PhoneAppBroadcastReceiver();
+            mContext.registerReceiver(mReceiver, intentFilter);
+            intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
             mContext.registerReceiver(mReceiver, intentFilter);
 
             // get the current active dds
@@ -657,7 +661,7 @@ public class ProxyManager extends Handler {
     public class SupplySubscription extends Thread {
 
         private boolean mDone = false;
-        private Handler mHandler;
+        public Handler mHandler;
         private int eventsPending = 0;
         private Context  mContext;
         private String [] subResult;
@@ -755,13 +759,6 @@ public class ProxyManager extends Handler {
                                         prevSubscriptionData.copyFrom(subscriptionData);
 
                                         SupplySubscription.this.notifyAll();
-                                        int dataSub = PhoneFactory.getDataSubscription(mContext);
-                                        Log.d(LOG_TAG, "dataSub :"+dataSub);
-                                        String str = Integer.toString(dataSub);
-                                        Message callback = Message.obtain(mHandler, EVENT_SET_DATA_SUBSCRIPTION_DONE,str);
-                                        // Set Data Subscription preference at RIL
-                                        Log.d(LOG_TAG, "cmd interface setDataSubscription.....");
-                                        mCi[dataSub].setDataSubscription(callback );
                                     }
 
                                     // Disable the data connectivity if the phone is not the Designated Data Subscription
@@ -881,6 +878,23 @@ public class ProxyManager extends Handler {
                     mUiccManager.registerForIccChanged(mProxyManager, EVENT_ICC_CHANGED, null);
                     mUiccSubSet = false;
                     mReadIccid = true;
+                    mDdsSet = false;
+                }
+            } else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
+                if (!mDdsSet) {
+                    int subscription = intent.getIntExtra(IccCard.INTENT_KEY_SUBSCRIPTION, 0);
+                    String state = intent.getStringExtra(IccCard.INTENT_KEY_ICC_STATE);
+                    // Set Data Subscription Source only when App state becomes READY.
+                    if (IccCard.INTENT_VALUE_ICC_READY.equals(state)) {
+                        if (subscription == currentDds) {
+                            String str = Integer.toString(currentDds);
+                            Message callback = Message.obtain(supplySubscription.mHandler, EVENT_SET_DATA_SUBSCRIPTION_DONE, str);
+                            // Set Data Subscription preference at RIL
+                            Log.d(LOG_TAG, "setDataSubscription on " + currentDds);
+                            mCi[currentDds].setDataSubscription(callback);
+                            mDdsSet = true;
+                        }
+                    }
                 }
             }
         }
