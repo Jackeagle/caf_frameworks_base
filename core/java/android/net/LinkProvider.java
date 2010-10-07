@@ -51,6 +51,7 @@ import java.util.Map;
 public class LinkProvider
 {
     static final String LOG_TAG = "LinkProvider";
+    static final boolean DBG = false;
 
     /** {@hide}
      * Default Role Id, applies to any packet data traffic pattern that
@@ -79,7 +80,7 @@ public class LinkProvider
     private IConnectivityManager mService;
 
     private Handler mHandler;
-    private NotificationsThread mThread;
+    private Looper mLooper;
     private static final int ON_LINK_AVAIL        =  1;
     private static final int ON_BETTER_LINK_AVAIL =  2;
     private static final int ON_LINK_LOST         =  3;
@@ -115,17 +116,6 @@ public class LinkProvider
         }
         mLock = new ReentrantLock();
         mHandlerAvail  = mLock.newCondition();
-        mThread = new NotificationsThread();
-        mThread.start();
-        /* block until mHandler gets created. */
-        try{
-            mLock.lock();
-            if (mHandler == null) {
-                mHandlerAvail.await();
-            }
-        } finally {
-            mLock.unlock();
-        }
     }
 
 
@@ -139,16 +129,45 @@ public class LinkProvider
      */
     public boolean getLink(){
         try {
+            if(mHandler == null){
+                try{
+                    init();
+                }catch(InterruptedException ex){
+                    if (DBG) Log.d(LOG_TAG,"Interrupted exception!");
+                    return false;
+                }
+            }else{
+                if (DBG) Log.d(LOG_TAG,"getLink called before release is called!!");
+                return false;
+            }
             ConSvcEventListener listener = (ConSvcEventListener)
               IConSvcEventListener.Stub.asInterface( new ConSvcEventListener());
             mPid = listener.getCallingPid();
-            Log.d(LOG_TAG,"GetLink called with role="+mRole+"pid="+mPid);
+            if (DBG) Log.d(LOG_TAG,"GetLink called with role="+mRole+"pid="+mPid);
             return mService.getLink(mRole,mLinkReqs,mPid,listener);
 
         } catch ( RemoteException e ) {
-            Log.e(LOG_TAG,"ConSvc throwed remoteExcept'n on startConn call");
+            if (DBG) Log.d(LOG_TAG,"ConSvc throwed remoteExcept'n on startConn call");
             return false;
         }
+    }
+
+    private void init() throws InterruptedException{
+        (new NotificationsThread()).start();
+        /* block until mHandler gets created. */
+        try{
+            mLock.lock();
+            if (mHandler == null) {
+                mHandlerAvail.await();
+            }
+        } finally {
+            mLock.unlock();
+        }
+    }
+
+    private void deInit(){
+        mLooper.quit();
+        mHandler= null;
     }
 
     /** {@hide}
@@ -177,7 +196,7 @@ public class LinkProvider
                                                    isNotifyBetterLink);
 
         } catch ( RemoteException e ) {
-            Log.e(LOG_TAG,"ConSvc throwed remoteExcept'n on reportConnSatis call");
+            if (DBG) Log.d(LOG_TAG,"ConSvc throwed remoteExcept'n on reportConnSatis call");
             return false;
         }
     }
@@ -202,7 +221,7 @@ public class LinkProvider
                                        isNotifyBetterLink);
 
         } catch ( RemoteException e ) {
-            Log.e(LOG_TAG,"ConSvc throwed remoteExcept'n on reportConnSatis call");
+            if (DBG) Log.d(LOG_TAG,"ConSvc throwed remoteExcept'n on reportConnSatis call");
             return false;
         }
     }
@@ -227,7 +246,7 @@ public class LinkProvider
                                          isNotifyBetterLink);
 
         } catch ( RemoteException e ) {
-            Log.e(LOG_TAG,"ConSvc throwed remoteExcept'n on reportConnSatis call");
+            if (DBG) Log.d(LOG_TAG,"ConSvc throwed remoteExcept'n on reportConnSatis call");
             return false;
         }
     }
@@ -242,9 +261,11 @@ public class LinkProvider
      */
     public boolean releaseLink(){
         try {
-            return mService.releaseLink(mRole,mPid);
+            boolean retVal = mService.releaseLink(mRole,mPid);
+            deInit();
+            return retVal;
         } catch ( RemoteException e ) {
-            /* print message */
+            if (DBG) Log.d(LOG_TAG,"ConSvc throwed remoteExcept'n on releaseLink call");
             return false;
         }
     }
@@ -260,7 +281,7 @@ public class LinkProvider
     private class ConSvcEventListener extends IConSvcEventListener.Stub {
 
         public  void onLinkAvail(LinkInfo info) {
-            Log.d(LOG_TAG,"Sending OnLinkAvail with nwId="+info.getNwId()+
+            if (DBG) Log.v(LOG_TAG,"Sending OnLinkAvail with nwId="+info.getNwId()+
                   "to App");
             Message msg;
             msg = mHandler.obtainMessage(ON_LINK_AVAIL,
@@ -271,7 +292,7 @@ public class LinkProvider
         }
 
         public  void onBetterLinkAvail(LinkInfo info) {
-            Log.d(LOG_TAG,"Sending onBetterLinkAvail with nwId="+info.getNwId()+
+            if (DBG) Log.v(LOG_TAG,"Sending onBetterLinkAvail with nwId="+info.getNwId()+
                   "to App");
             Message msg;
             msg = mHandler.obtainMessage(ON_BETTER_LINK_AVAIL,
@@ -282,7 +303,7 @@ public class LinkProvider
         }
 
         public  void onLinkLost(LinkInfo info) {
-            Log.d(LOG_TAG,"Sending onLinkLost with nwId="+info.getNwId()+
+            if (DBG) Log.v(LOG_TAG,"Sending onLinkLost with nwId="+info.getNwId()+
                   "to App");
             Message msg;
             msg = mHandler.obtainMessage(ON_LINK_LOST,
@@ -293,7 +314,7 @@ public class LinkProvider
         }
 
         public  void onGetLinkFailure(int reason) {
-            Log.d(LOG_TAG,"Sending onGetLinkFailure with reason="+reason+
+            if (DBG) Log.v(LOG_TAG,"Sending onGetLinkFailure with reason="+reason+
                   "to App");
             Message msg;
             msg = mHandler.obtainMessage(ON_GET_LINK_FAILURE,
@@ -308,10 +329,11 @@ public class LinkProvider
 
         public void run() {
           Looper.prepare();
+          mLooper = Looper.myLooper();
           mHandler = new Handler(){
             @Override
             public void handleMessage(Message msg) {
-              Log.i(LOG_TAG,"handle Message called for msg = " + msg.what);
+              if (DBG) Log.v(LOG_TAG,"handle Message called for msg = " + msg.what);
               switch (msg.what) {
                   case ON_LINK_AVAIL:{
                       LinkInfo info = (LinkInfo)msg.obj;
@@ -342,7 +364,7 @@ public class LinkProvider
                       break;
                   }
                   default:
-                      Log.w(LOG_TAG,"Unhandled Message msg = " + msg.what);
+                      if (DBG) Log.d(LOG_TAG,"Unhandled Message msg = " + msg.what);
               }
            }
          };
