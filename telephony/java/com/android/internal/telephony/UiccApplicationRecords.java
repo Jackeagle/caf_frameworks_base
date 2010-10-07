@@ -50,7 +50,6 @@ public abstract class UiccApplicationRecords extends Handler{
 
     private RegistrantList mUnavailableRegistrants = new RegistrantList();
     protected RegistrantList mRecordsEventsRegistrants = new RegistrantList();
-    protected RegistrantList mNewSmsRegistrants = new RegistrantList();
     protected RegistrantList mNetworkSelectionModeAutomaticRegistrants = new RegistrantList();
     protected RegistrantList mImsiReadyRegistrants = new RegistrantList();
     protected int mSubscription = 0;
@@ -98,14 +97,6 @@ public abstract class UiccApplicationRecords extends Handler{
     }
     public synchronized void unregisterForRecordsEvents(Handler h) {
         mRecordsEventsRegistrants.remove(h);
-    }
-
-    public synchronized void registerForNewSms(Handler h, int what, Object obj) {
-        Registrant r = new Registrant (h, what, obj);
-        mNewSmsRegistrants.add(r);
-    }
-    public synchronized void unregisterForNewSms(Handler h) {
-        mNewSmsRegistrants.remove(h);
     }
 
     public synchronized void registerForNetworkSelectionModeAutomatic(Handler h, int what, Object obj) {

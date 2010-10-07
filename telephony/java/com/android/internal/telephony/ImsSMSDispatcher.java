@@ -316,6 +316,25 @@ final class ImsSMSDispatcher extends SMSDispatcher {
                         mGsmDispatcher.mApplication;
     }
 
+    /**
+     * Called when a Class2 SMS is  received.
+     *
+     * @param ar AsyncResult passed to this function. ar.result should
+     *           be representing the INDEX of SMS on SIM.
+     */
+    protected void handleSmsOnIcc(AsyncResult ar) {
+        Log.d(TAG, "handleSmsOnIcc function is not applicable for IMS");
+    }
+
+    /**
+     * Called when a SMS on SIM is retrieved.
+     *
+     * @param ar AsyncResult passed to this function.
+     */
+    protected void handleGetIccSmsDone(AsyncResult ar) {
+        Log.d(TAG, "handleGetIccSmsDone function is not applicable for IMS");
+    }
+
    /* Returns the ICC filehandler  */
     @Override
     protected IccFileHandler getIccFileHandler() {
