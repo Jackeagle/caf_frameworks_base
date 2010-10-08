@@ -42,9 +42,12 @@ class HeadsetObserver extends UEventObserver {
     private static final String HEADSET_NAME_PATH = "/sys/class/switch/h2w/name";
 
     private static final int BIT_HEADSET = (1 << 0);
-    private static final int BIT_HEADSET_NO_MIC = (1 << 1);
-    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_NO_MIC);
-    private static final int HEADSETS_WITH_MIC = BIT_HEADSET;
+    private static final int BIT_HEADSET_SPEAKER_ONLY = (1 << 1);
+    private static final int BIT_HEADSET_MIC_ONLY = (1 << 2);
+    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_SPEAKER_ONLY|BIT_HEADSET_MIC_ONLY);
+    private static final int HEADSETS_WITH_MIC_AND_SPEAKER = BIT_HEADSET;
+    private static final int HEADSETS_WITH_SPEAKER_ONLY = BIT_HEADSET_SPEAKER_ONLY;
+    private static final int HEADSETS_WITH_MIC_ONLY = BIT_HEADSET_MIC_ONLY;
 
     private int mHeadsetState;
     private int mPrevHeadsetState;
@@ -102,13 +105,12 @@ class HeadsetObserver extends UEventObserver {
     private synchronized final void update(String newName, int newState) {
         // Retain only relevant bits
         int headsetState = newState & SUPPORTED_HEADSETS;
-        int newOrOld = headsetState | mHeadsetState;
         int delay = 0;
         // reject all suspect transitions: only accept state changes from:
         // - a: 0 heaset to 1 headset
         // - b: 1 headset to 0 headset
-        if (mHeadsetState == headsetState || ((newOrOld & (newOrOld - 1)) != 0)) {
-            return;
+        if (mHeadsetState == headsetState) {
+               return;
         }
 
         mHeadsetName = newName;
@@ -141,10 +143,21 @@ class HeadsetObserver extends UEventObserver {
 
     private synchronized final void sendIntents(int headsetState, int prevHeadsetState, String headsetName) {
         int allHeadsets = SUPPORTED_HEADSETS;
-        for (int curHeadset = 1; allHeadsets != 0; curHeadset <<= 1) {
-            if ((curHeadset & allHeadsets) != 0) {
-                sendIntent(curHeadset, headsetState, prevHeadsetState, headsetName);
-                allHeadsets &= ~curHeadset;
+        //Handle unplug events first and then handle plug-in events
+        for (int curHeadset = 1; curHeadset < SUPPORTED_HEADSETS; curHeadset <<= 1) {
+            if (((headsetState & curHeadset) == 0) && ((prevHeadsetState & curHeadset) == curHeadset)) {
+                if ((curHeadset & allHeadsets) != 0) {
+                    sendIntent(curHeadset, headsetState, prevHeadsetState, headsetName);
+                    allHeadsets &= ~curHeadset;
+                }
+            }
+        }
+        for (int curHeadset = 1; curHeadset < SUPPORTED_HEADSETS; curHeadset <<= 1) {
+            if (((headsetState & curHeadset) == curHeadset) && ((prevHeadsetState & curHeadset) == 0)) {
+                if ((curHeadset & allHeadsets) != 0) {
+                    sendIntent(curHeadset, headsetState, prevHeadsetState, headsetName);
+                    allHeadsets &= ~curHeadset;
+                }
             }
         }
     }
@@ -156,18 +169,30 @@ class HeadsetObserver extends UEventObserver {
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
             int state = 0;
             int microphone = 0;
+            int speaker = 0;
 
-            if ((headset & HEADSETS_WITH_MIC) != 0) {
+            if ((headset & HEADSETS_WITH_SPEAKER_ONLY) != 0) {
+                speaker = 1;
+            }
+
+            if ((headset & HEADSETS_WITH_MIC_AND_SPEAKER) != 0) {
+                microphone = 1;
+                speaker = 1;
+            }
+
+            if ((headset & HEADSETS_WITH_MIC_ONLY) != 0) {
                 microphone = 1;
             }
+
             if ((headsetState & headset) != 0) {
                 state = 1;
             }
             intent.putExtra("state", state);
             intent.putExtra("name", headsetName);
             intent.putExtra("microphone", microphone);
+            intent.putExtra("speaker", speaker);
 
-            if (LOG) Slog.v(TAG, "Intent.ACTION_HEADSET_PLUG: state: "+state+" name: "+headsetName+" mic: "+microphone);
+            if (LOG) Slog.v(TAG, "Intent.ACTION_HEADSET_PLUG: state: "+state+" name: "+headsetName+" mic: "+microphone+" speaker: "+speaker);
             // TODO: Should we require a permission?
             ActivityManagerNative.broadcastStickyIntent(intent, null);
         }
