@@ -474,7 +474,7 @@ void AwesomePlayer::onBufferingUpdate() {
     }
 
     if (durationUs >= 0) {
-        int64_t cachedDurationUs = mPrefetcher->getCachedDurationUs();
+        int64_t cachedDurationUs = mPrefetcher->getMaxCachedDurationUs();
 
         LOGV("cache holds %.2f secs worth of data.", cachedDurationUs / 1E6);
 
