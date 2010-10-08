@@ -22,6 +22,8 @@ namespace android {
 
 static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
 static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
+static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace = 0x7FA30C04;
+
 static const size_t NV12TILE_BLOCK_WIDTH = 64;
 static const size_t NV12TILE_BLOCK_HEIGHT = 32;
 static const size_t NV12TILE_BLOCK_SIZE = NV12TILE_BLOCK_WIDTH* NV12TILE_BLOCK_HEIGHT;
@@ -50,6 +52,7 @@ bool ColorConverter::isValid() const {
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
         case OMX_COLOR_FormatYUV420SemiPlanar:
         case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
+        case OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace:
             return true;
 
         default:
@@ -74,6 +77,7 @@ void ColorConverter::convert(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
             break;
 
+        case OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace:
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
             convertQCOMYUV420SemiPlanar(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
@@ -84,6 +88,8 @@ void ColorConverter::convert(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
             break;
 
+        //TODO fall through in to QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+        //in case of interlace
         case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
             convertNV12Tile(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
