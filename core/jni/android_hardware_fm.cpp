@@ -60,7 +60,7 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
         (JNIEnv* env, jobject thiz, jstring path)
 {
     int fd;
-    int i;
+    int i, retval=0;
     char value = 0;
     int init_success = 0;
     jboolean isCopy;
@@ -75,9 +75,10 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
     if(fd < 0){
         return FM_JNI_FAILURE;
     }
+
     property_set("ctl.start", "fm_dl");
     sleep(1);
-    for(i=0;i<3;i++) {
+    for(i=0;i<6;i++) {
         property_get("hw.fm.init", &value, NULL);
 	if(value == '1') {
             init_success = 1;
@@ -90,6 +91,7 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
     if(!init_success) {
         property_set("ctl.stop", "fm_dl");
 	// close the fd(power down)
+
 	close(fd);
         return FM_JNI_FAILURE;
     }
@@ -101,6 +103,35 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
 static jint android_hardware_fmradio_FmReceiverJNI_closeFdNative
     (JNIEnv * env, jobject thiz, jint fd)
 {
+    int i = 0;
+    int cleanup_success = 0;
+    char value = 0, retval =0;
+
+    property_set("ctl.stop", "fm_dl");
+    /*
+	Start the fm_dl service in disable mode, so that
+	the wan concurrency manger will be disabled properly.
+	This will result in running the patch downloade in disable
+	mode, which disables the wan concurrency manager
+    */
+    property_set("ctl.start", "fm_dl");
+    sleep(1);
+    for(i=0;i<3;i++) {
+        property_get("hw.fm.init", &value, NULL);
+        if(value == '1') {
+            cleanup_success = 1;
+            break;
+        } else {
+            sleep(1);
+        }
+    }
+    LOGE("cleanup_success:%d after %d seconds \n", cleanup_success, i);
+    if(!cleanup_success) {
+        property_set("ctl.stop", "fm_dl");
+	close(fd);
+        return FM_JNI_FAILURE;
+    }
+
     property_set("ctl.stop", "fm_dl");
     close(fd);
     return FM_JNI_SUCCESS;
