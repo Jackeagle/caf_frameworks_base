@@ -275,7 +275,7 @@ sp<OverlayRef> LayerBuffer::SurfaceLayerBuffer::createOverlay(
 
 LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
         ssize_t offset, size_t bufferSize)
-    : mBufferHeap(buffers), mSupportsCopybit(false)
+    : mBufferHeap(buffers)
 {
     NativeBuffer& src(mNativeBuffer);
     src.crop.l = 0;
@@ -298,12 +298,6 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
                 buffers.heap->heapID(), src.img.w, src.img.h,
                 src.img.format, offset, buffers.heap->base(),
                 &src.img.handle);
-
-        // we can fail here is the passed buffer is purely software or if the
-        // buffer format is NV12 Tiled or NV21 Adreno
-        if ((buffers.format != HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) &&
-            (buffers.format != HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO))
-                mSupportsCopybit = (err == NO_ERROR);
     }
 }
 
@@ -350,7 +344,7 @@ bool LayerBuffer::Source::transformed() const {
 LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
         const ISurface::BufferHeap& buffers)
     : Source(layer), mStatus(NO_ERROR), mBufferSize(0),
-      mUseEGLImageDirectly(true)
+      mUseEGLImageDirectly(true), mTargetUsesOverlay(false)
 {
     if (buffers.heap == NULL) {
         // this is allowed, but in this case, it is illegal to receive
@@ -392,6 +386,10 @@ LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
        mUseEGLImageDirectly = true;
     else
        mUseEGLImageDirectly = false;
+
+    overlay_control_device_t* overlay = hw.getOverlayEngine();
+    if(overlay)
+        mTargetUsesOverlay = true;
 
     mBufferHeap = buffers;
     mLayer.setNeedsBlending((info.h_alpha - info.l_alpha) > 0);    
@@ -531,6 +529,22 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool cle
     return INVALID_OPERATION;
 }
 
+bool LayerBuffer::BufferSource::useCopybitToDraw(int format) const
+{
+    if(mTargetUsesOverlay) {
+        // If we use surface flinger to render push buffers on targets which
+        // use overlay, send the buffers to the GPU for now.
+        return false;
+    } else if ((format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED)
+                || (format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO)) {
+        // The MDP version of copybit does not support these color formats
+        // Use the GPU
+        return false;
+    }else {
+        return true;
+    }
+}
+
 void LayerBuffer::BufferSource::onDraw(const Region& clip) const 
 {
     sp<Buffer> ourBuffer(getBuffer());
@@ -551,7 +565,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
 #if defined(EGL_ANDROID_image_native_buffer)
     if (mLayer.mFlags & DisplayHardware::DIRECT_TEXTURE) {
         err = INVALID_OPERATION;
-        if (ourBuffer->supportsCopybit()) {
+        if (useCopybitToDraw(src.img.format)) {
 
             // there are constraints on buffers used by the GPU and these may not
             // be honored here. We need to change the API so the buffers
