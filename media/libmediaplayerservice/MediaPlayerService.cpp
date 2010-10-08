@@ -205,6 +205,7 @@ extmap FILE_EXTS [] =  {
         {".wmv", PV_PLAYER},
         {".asf", PV_PLAYER},
         {".3g2", PV_PLAYER},
+        {".sdp", PV_PLAYER},
 #endif
 };
 
