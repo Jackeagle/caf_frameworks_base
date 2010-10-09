@@ -736,14 +736,14 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
         // couldn't create the overlay (no memory? no more overlays?)
         return;
     }
+    mWidth = w;
+    mHeight = h;
 
     // enable dithering...
     overlay_dev->setParameter(overlay_dev, overlay, 
             OVERLAY_DITHER, OVERLAY_ENABLE);
 
     mOverlay = overlay;
-    mWidth = overlay->w;
-    mHeight = overlay->h;
     mFormat = overlay->format; 
     mWidthStride = overlay->w_stride;
     mHeightStride = overlay->h_stride;
@@ -802,16 +802,38 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
             int y = bounds.top;
             int w = bounds.width();
             int h = bounds.height();
-            
+
             // we need a lock here to protect "destroy"
             Mutex::Autolock _l(mOverlaySourceLock);
             if (mOverlay) {
                 overlay_control_device_t* overlay_dev = mOverlayDevice;
-                overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 // we need to combine the layer orientation and the
                 // user-requested orientation.
                 Transform finalTransform = Transform(mOrientation) *
                         Transform(mLayer.getOrientation());
+
+                 const DisplayHardware& hw(mLayer.mFlinger->
+                                   graphicPlane(0).displayHardware());
+                 int ovWidth = hw.getWidth();
+                 int ovHeight = hw.getHeight();
+                 /* Get the maximum scale factor from the overlay */
+                 int maxScale = overlay_dev->get(overlay_dev, OVERLAY_MAGNIFICATION_LIMIT);
+                 /*  Set the max scale size based on Hardware Overlay Scale Factor */
+                 if((w > ((maxScale-1) * mWidth)) || (h > ((maxScale-1) * mHeight))){
+                     int tmp = 0;
+                     int srcW = mWidth; int srcH = mHeight;
+                     // IF Rotation is 90 or 270, swap width and height
+                     if(finalTransform.getOrientation() == 0x00000004 || finalTransform.getOrientation() == 0x0000007) {
+                         tmp = w; w = h; h = tmp;
+                         tmp = srcW; srcW = srcH ; srcH = tmp;
+                         tmp = x; x=y; y=tmp;
+                     }
+                     w = ((maxScale-1) * srcW);
+                     x = (ovWidth - w )/2;
+                     h = ((maxScale-1) * srcH);
+                     y = (ovHeight - h)/2;
+                 }
+                overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 overlay_dev->setParameter(overlay_dev, mOverlay,
                         OVERLAY_TRANSFORM, finalTransform.getOrientation());
                 overlay_dev->commit(overlay_dev, mOverlay);
