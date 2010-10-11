@@ -547,7 +547,13 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     }
 
     void notifyDataConnection(DataServiceType ds, IPVersion ipv, String reason) {
-        mNotifier.notifyDataConnection(this, ds.toApnTypeString(), ipv, reason);
+        // Notify the Data Connection state only if this is the active DDS.
+        if (getSubscription() == TelephonyManager.getDataSubscription(mContext)) {
+            mNotifier.notifyDataConnection(this, ds.toApnTypeString(), ipv, reason);
+        } else {
+            Log.d(LOG_TAG, "[DCT" + getSubscription() +
+                           "] notifyDataConnection: Not the active DDS");
+        }
     }
 
     protected void notifyAllEnabledDataServiceTypes(String reason) {
@@ -561,7 +567,13 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
     // notify data connection as failed - applicable for default type only?
     void notifyDataConnectionFail(String reason) {
-        mNotifier.notifyDataConnectionFailed(this, reason);
+        // Notify the Data Connection failed only if this is the active DDS.
+        if (getSubscription() == TelephonyManager.getDataSubscription(mContext)) {
+            mNotifier.notifyDataConnectionFailed(this, reason);
+        } else {
+            Log.d(LOG_TAG, "[DCT" + getSubscription() +
+                           "] notifyDataConnectionFail: Not the active DDS");
+        }
     }
 
     public void getDataCallList(Message response) {

@@ -38,6 +38,10 @@ import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.ProxyManager;
 
 import java.util.List;
+
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
+
 /**
  * Provides access to information about the telephony services on
  * the device. Applications can use the methods in this class to
@@ -104,6 +108,24 @@ public class TelephonyManager {
          //returns the property value if set, otherwise initialized to false.
          return SystemProperties.getBoolean("persist.dsds.enabled", false);
      }
+
+    /**
+     * Returns the designated data subscription.
+     *
+     * @hide
+     */
+    public static int getDataSubscription(Context context) {
+        int dataSubscription = 0;
+
+        try {
+            dataSubscription = Settings.System.getInt(context.getContentResolver(),
+                                        Settings.System.DUAL_SIM_DATA_CALL);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(TAG, "Settings Exception Reading Dual Sim Data Call Values", snfe);
+        }
+
+        return dataSubscription;
+    }
 
 
     //
