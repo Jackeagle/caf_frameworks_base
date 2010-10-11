@@ -514,19 +514,19 @@ interface ITelephony {
      * @param subscription user preferred subscription.
      * Returns Interface Name
      */
-    String getActiveInterfaceNameOnSubscription(String apnType, int subscription);
+    String getActiveInterfaceNameOnSubscription(String apnType, String ipv, int subscription);
 
     /**
      * @param subscription user preferred subscription.
      * Returns Ip address
      */
-    String getActiveIpAddressOnSubscription(String apnType, int subscription);
+    String getActiveIpAddressOnSubscription(String apnType, String ipv, int subscription);
 
     /**
      * @param subscription user preferred subscription.
      * Returns Gateway address
      */
-    String getActiveGatewayOnSubscription(String apnType, int subscription);
+    String getActiveGatewayOnSubscription(String apnType, String ipv, int subscription);
 
     /**
      * @param subscription user preferred subscription.
