@@ -240,35 +240,35 @@ public class StatusBarPolicy {
 
     //***** Data connection icons
     private int[] mDataIconList = sDataNetType_g;
-    //GSM/UMTS
+    // g for GSM/UMTS/default
     private static final int[] sDataNetType_g = new int[] {
             com.android.internal.R.drawable.stat_sys_data_connected_g,
             com.android.internal.R.drawable.stat_sys_data_in_g,
             com.android.internal.R.drawable.stat_sys_data_out_g,
             com.android.internal.R.drawable.stat_sys_data_inandout_g,
         };
+    // 3G icons for EVDO data and EHRPD
     private static final int[] sDataNetType_3g = new int[] {
             com.android.internal.R.drawable.stat_sys_data_connected_3g,
             com.android.internal.R.drawable.stat_sys_data_in_3g,
             com.android.internal.R.drawable.stat_sys_data_out_3g,
             com.android.internal.R.drawable.stat_sys_data_inandout_3g,
         };
+    // e for EDGE
     private static final int[] sDataNetType_e = new int[] {
             com.android.internal.R.drawable.stat_sys_data_connected_e,
             com.android.internal.R.drawable.stat_sys_data_in_e,
             com.android.internal.R.drawable.stat_sys_data_out_e,
             com.android.internal.R.drawable.stat_sys_data_inandout_e,
         };
-    //3.5G
+    // 3.5G for HSDPA/HSUPA/HSPA
     private static final int[] sDataNetType_h = new int[] {
             com.android.internal.R.drawable.stat_sys_data_connected_h,
             com.android.internal.R.drawable.stat_sys_data_in_h,
             com.android.internal.R.drawable.stat_sys_data_out_h,
             com.android.internal.R.drawable.stat_sys_data_inandout_h,
     };
-
-    //CDMA
-    // Use 3G icons for EVDO data and 1x icons for 1XRTT data
+    // 1x icons for CDMA IS95A/B and 1XRTT data
     private static final int[] sDataNetType_1x = new int[] {
         com.android.internal.R.drawable.stat_sys_data_connected_1x,
         com.android.internal.R.drawable.stat_sys_data_in_1x,
@@ -1072,6 +1072,7 @@ public class StatusBarPolicy {
             case ServiceState.RADIO_TECHNOLOGY_EVDO_0:
             case ServiceState.RADIO_TECHNOLOGY_EVDO_A:
             case ServiceState.RADIO_TECHNOLOGY_EVDO_B:
+            case ServiceState.RADIO_TECHNOLOGY_EHRPD:
                 return true;
             default:
                 return false;
@@ -1159,14 +1160,14 @@ public class StatusBarPolicy {
         } else {
             /*
              * phone is not in voice call display data radio tech signal by
-             * looking at service state if data radio tech is not available ,
+             * looking at service state. If data radio tech is not available ,
              * display voice radio signal by looking at signal strength
              */
             if (isDataGsm(subscription)) {
                 /* 3GPP GSM data tech */
                 iconLevel = getGsmLevel(mSignalStrength[subscription]);
             } else if (isDataEvdo(subscription)) {
-                /* 3GPP2 EVDO data tech */
+                /* 3GPP2 EVDO data tech or EHRPD*/
                 iconLevel = getEvdoLevel(mSignalStrength[subscription]);
             } else if (isDataCdma(subscription) || (!mSignalStrength[subscription].isGsm())) {
                 /* 3GPP2 CDMA data or CDMA voice only */
@@ -1267,6 +1268,7 @@ public class StatusBarPolicy {
         case TelephonyManager.NETWORK_TYPE_EVDO_0: //fall through
         case TelephonyManager.NETWORK_TYPE_EVDO_A:
         case TelephonyManager.NETWORK_TYPE_EVDO_B:
+        case TelephonyManager.NETWORK_TYPE_EHRPD:
             mDataIconList = sDataNetType_3g;
             break;
         case TelephonyManager.NETWORK_TYPE_LTE:
