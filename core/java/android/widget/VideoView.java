@@ -533,7 +533,8 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                                      keyCode != KeyEvent.KEYCODE_VOLUME_DOWN &&
                                      keyCode != KeyEvent.KEYCODE_MENU &&
                                      keyCode != KeyEvent.KEYCODE_CALL &&
-                                     keyCode != KeyEvent.KEYCODE_ENDCALL;
+                                     keyCode != KeyEvent.KEYCODE_ENDCALL &&
+                                     keyCode != KeyEvent.KEYCODE_UNKNOWN;
         if (isInPlaybackState() && isKeyCodeSupported && mMediaController != null) {
             if (keyCode == KeyEvent.KEYCODE_HEADSETHOOK ||
                     keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
