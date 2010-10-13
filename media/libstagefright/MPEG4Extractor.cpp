@@ -945,6 +945,20 @@ status_t MPEG4Extractor::parseChunk(sfoff_t *offset, int depth) {
             break;
         }
 
+         case FOURCC('c', 't', 't', 's'):
+        {
+            status_t err =
+                mLastTrack->sampleTable->setCompositionTimeToSampleParams(
+                        data_offset, chunk_data_size);
+
+            if (err != OK) {
+                return err;
+            }
+
+            *offset += chunk_size;
+            break;
+        }
+
         case FOURCC('s', 't', 's', 's'):
         {
             status_t err =

@@ -53,6 +53,8 @@ SampleTable::SampleTable(const sp<DataSource> &source)
       mNumSampleSizes(0),
       mTimeToSampleCount(0),
       mTimeToSample(NULL),
+      mCompositionTimeToSampleCount(0),
+      mCompositionTimeToSample(NULL),
       mSyncSampleOffset(-1),
       mNumSyncSamples(0),
       mSampleToChunkEntries(NULL) {
@@ -65,6 +67,9 @@ SampleTable::~SampleTable() {
 
     delete[] mTimeToSample;
     mTimeToSample = NULL;
+
+    delete[] mCompositionTimeToSample;
+    mCompositionTimeToSample = NULL;
 
     delete mSampleIterator;
     mSampleIterator = NULL;
@@ -251,6 +256,40 @@ status_t SampleTable::setTimeToSampleParams(
 
     for (uint32_t i = 0; i < mTimeToSampleCount * 2; ++i) {
         mTimeToSample[i] = ntohl(mTimeToSample[i]);
+    }
+
+    return OK;
+}
+
+status_t SampleTable::setCompositionTimeToSampleParams(
+        sfoff_t data_offset, size_t data_size) {
+
+    if (mCompositionTimeToSample != NULL || data_size < 8) {
+        return ERROR_MALFORMED;
+    }
+
+    uint8_t header[8];
+    if (mDataSource->readAt(
+                data_offset, header, sizeof(header)) < (ssize_t)sizeof(header)) {
+        return ERROR_IO;
+    }
+
+    if (U32_AT(header) != 0) {
+        // Expected version = 0, flags = 0.
+        return ERROR_MALFORMED;
+    }
+
+    mCompositionTimeToSampleCount = U32_AT(&header[4]);
+    mCompositionTimeToSample = new uint32_t[mCompositionTimeToSampleCount * 2];
+
+    size_t size = sizeof(uint32_t) * mCompositionTimeToSampleCount * 2;
+    if (mDataSource->readAt(
+                data_offset + 8, mCompositionTimeToSample, size) < (ssize_t)size) {
+        return ERROR_IO;
+    }
+
+    for (uint32_t i = 0; i < mCompositionTimeToSampleCount * 2; ++i) {
+        mCompositionTimeToSample[i] = ntohl(mCompositionTimeToSample[i]);
     }
 
     return OK;

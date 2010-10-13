@@ -49,6 +49,8 @@ public:
 
     status_t setSyncSampleParams(sfoff_t data_offset, size_t data_size);
 
+    status_t setCompositionTimeToSampleParams(sfoff_t data_offset, size_t data_size);
+
     ////////////////////////////////////////////////////////////////////////////
 
     uint32_t countChunkOffsets() const;
@@ -97,6 +99,10 @@ private:
 
     uint32_t mTimeToSampleCount;
     uint32_t *mTimeToSample;
+
+    //ctts
+    uint32_t mCompositionTimeToSampleCount;
+    uint32_t *mCompositionTimeToSample;
 
     sfoff_t mSyncSampleOffset;
     uint32_t mNumSyncSamples;
