@@ -1284,9 +1284,6 @@ class PowerManagerService extends IPowerManager.Stub
                 EventLog.writeEvent(EventLogTags.POWER_SCREEN_BROADCAST_DONE, 1,
                         SystemClock.uptimeMillis() - mScreenOnStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
-                if(mDMMAvailable)
-                    if(mDMMController.enableUnstableMemory(false) != 0)
-                        Log.e(TAG, "Deactivating Unstable memory failed.");
             }
         }
     };
@@ -1298,6 +1295,9 @@ class PowerManagerService extends IPowerManager.Stub
                 EventLog.writeEvent(EventLogTags.POWER_SCREEN_BROADCAST_DONE, 0,
                         SystemClock.uptimeMillis() - mScreenOffStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
+                if(mDMMAvailable)
+                    if(mDMMController.enableUnstableMemory(false) != 0)
+                        Log.e(TAG, "Deactivating Unstable memory failed.");
             }
         }
     };
