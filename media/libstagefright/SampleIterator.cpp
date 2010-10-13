@@ -37,7 +37,11 @@ SampleIterator::SampleIterator(SampleTable *table)
       mTTSSampleIndex(0),
       mTTSSampleTime(0),
       mTTSCount(0),
-      mTTSDuration(0) {
+      mTTSDuration(0),
+      mCompositionTimeToSampleIndex(0),
+      mCompositionTTSSampleIndex(0),
+      mCompositionTTSCount(0),
+      mCompositionTTSDuration(0) {
     reset();
 }
 
@@ -130,6 +134,15 @@ status_t SampleIterator::seekTo(uint32_t sampleIndex) {
         mTTSSampleTime = 0;
         mTTSCount = 0;
         mTTSDuration = 0;
+    }
+
+    if(mTable->mCompositionTimeToSample) {
+        if(sampleIndex < mCompositionTTSSampleIndex) {
+            mCompositionTimeToSampleIndex = 0;
+            mCompositionTTSSampleIndex = 0;
+            mCompositionTTSCount = 0;
+            mCompositionTTSDuration = 0;
+        }
     }
 
     status_t err;
@@ -305,8 +318,25 @@ status_t SampleIterator::findSampleTime(
         ++mTimeToSampleIndex;
     }
 
-    *time = mTTSSampleTime + mTTSDuration * (sampleIndex - mTTSSampleIndex);
+    if(mTable->mCompositionTimeToSample) {
+        while (sampleIndex >= mCompositionTTSSampleIndex + mCompositionTTSCount) {
+            if (mCompositionTimeToSampleIndex ==
+                mTable->mCompositionTimeToSampleCount) {
+                    return ERROR_OUT_OF_RANGE;
+            }
+            mCompositionTTSSampleIndex += mCompositionTTSCount;
 
+            mCompositionTTSCount =
+                mTable->mCompositionTimeToSample[2 * mCompositionTimeToSampleIndex];
+            mCompositionTTSDuration =
+                mTable->mCompositionTimeToSample[2 * mCompositionTimeToSampleIndex + 1];
+
+            ++mCompositionTimeToSampleIndex;
+        }
+    }
+
+    *time = mTTSSampleTime + mTTSDuration * (sampleIndex - mTTSSampleIndex) +
+        mCompositionTTSDuration;
     return OK;
 }
 
