@@ -787,7 +787,8 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
 }
 
 void AwesomePlayer::seekAudioIfNecessary_l() {
-    if (mSeeking && (mVideoSource == NULL || mVideoEOSOccurred) && mAudioPlayer != NULL) {
+    if (mSeeking && mAudioPlayer != NULL && !mAudioEOSOccurred
+        && (mVideoSource == NULL || mVideoEOSOccurred)) {
         mAudioPlayer->seekTo(mSeekTimeUs);
         mWatchForAudioSeekComplete = true;
         mWatchForAudioEOS = true;
@@ -988,7 +989,7 @@ void AwesomePlayer::onVideoEvent() {
     }
 
     if (mSeeking) {
-        if (mAudioPlayer != NULL) {
+        if (mAudioPlayer != NULL && !mAudioEOSOccurred) {
             LOGV("seeking audio to %lld us (%.2f secs).", timeUs, timeUs / 1E6);
 
             mAudioPlayer->seekTo(timeUs);
@@ -1007,12 +1008,13 @@ void AwesomePlayer::onVideoEvent() {
 
     if (mFlags & FIRST_FRAME) {
         mFlags &= ~FIRST_FRAME;
-        mTimeSourceDeltaUs = mTimeSource->getRealTimeUs() - timeUs;
+        mTimeSourceDeltaUs =(mAudioEOSOccurred ? mFallbackTimeSource : mTimeSource)->getRealTimeUs() - timeUs;
         setNumFramesToHold();
     }
 
     int64_t realTimeUs, mediaTimeUs;
     if (mAudioPlayer != NULL
+        && !mAudioEOSOccurred
         && mAudioPlayer->getMediaTimeMapping(&realTimeUs, &mediaTimeUs)) {
         mTimeSourceDeltaUs = realTimeUs - mediaTimeUs;
     }
@@ -1127,6 +1129,9 @@ void AwesomePlayer::onCheckAudioStatus() {
     if (mWatchForAudioEOS && mAudioPlayer->reachedEOS(&finalStatus)) {
         mWatchForAudioEOS = false;
         mAudioEOSOccurred = true;
+
+        //Pretend it is the first frame so we can reset the sync point
+        mFlags |= FIRST_FRAME;
 
         if (mVideoEOSOccurred || mVideoSource == NULL)
             postStreamDoneEvent_l(finalStatus);
