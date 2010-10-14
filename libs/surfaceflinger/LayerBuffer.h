@@ -105,9 +105,6 @@ private:
     public:
         Buffer(const ISurface::BufferHeap& buffers,
                 ssize_t offset, size_t bufferSize);
-        inline bool supportsCopybit() const {
-            return mSupportsCopybit;
-        }
         inline status_t getStatus() const {
             return mBufferHeap.heap!=0 ? NO_ERROR : NO_INIT;
         }
@@ -122,7 +119,6 @@ private:
     private:
         ISurface::BufferHeap    mBufferHeap;
         NativeBuffer            mNativeBuffer;
-        bool                    mSupportsCopybit;
     };
 
     class BufferSource : public Source {
@@ -140,9 +136,11 @@ private:
         virtual void unregisterBuffers();
         virtual bool transformed() const;
         virtual void destroy() { }
+
     private:
         status_t initTempBuffer() const;
         void clearTempBufferImage() const;
+        bool useCopybitToDraw(int format) const;
         mutable Mutex                   mBufferSourceLock;
         sp<Buffer>                      mBuffer;
         status_t                        mStatus;
@@ -151,6 +149,7 @@ private:
         mutable LayerBase::Texture      mTexture;
         mutable NativeBuffer            mTempBuffer;
         mutable bool                    mUseEGLImageDirectly;
+        bool                            mTargetUsesOverlay;
     };
     
     class OverlaySource : public Source {
