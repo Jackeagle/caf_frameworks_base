@@ -46,6 +46,16 @@ interface IIccPhoneBook {
     List<AdnRecord> getAdnRecordsInEf(int efid);
 
     /**
+     * Loads the AdnRecords in efid and returns them as a
+     * List of AdnRecords
+     *
+     * @param efid the EF id of a ADN-like SIM
+     * @param subscription user preferred subscription
+     * @return List of AdnRecord
+     */
+    List<AdnRecord> getAdnRecordsInEfOnSubscription(int subscription, int efid);
+
+    /**
      * Replace oldAdn with newAdn in ADN-like record in EF
      *
      * getAdnRecordsInEf must be called at least once before this function,

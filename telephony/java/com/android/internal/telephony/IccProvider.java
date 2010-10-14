@@ -35,6 +35,7 @@ import java.util.List;
 import com.android.internal.telephony.IccConstants;
 import com.android.internal.telephony.AdnRecord;
 import com.android.internal.telephony.IIccPhoneBook;
+import android.telephony.TelephonyManager;
 
 /**
  * XXX old code -- should be replaced with MatrixCursor.
@@ -231,20 +232,29 @@ public class IccProvider extends ContentProvider {
     @Override
     public Cursor query(Uri url, String[] projection, String selection,
             String[] selectionArgs, String sort) {
-        ArrayList<ArrayList> results;
+        ArrayList<ArrayList> results = new ArrayList();
+        ArrayList<ArrayList> singleResults = null;
 
         if (!mSimulator) {
             switch (URL_MATCHER.match(url)) {
                 case ADN:
-                    results = loadFromEf(IccConstants.EF_ADN);
+                    for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+                        if (TelephonyManager.getDefault().hasIccCard(i)) {
+                            singleResults = loadFromEf(IccConstants.EF_ADN, i);
+                            Log.i(TAG,"ADN Records Result:: "+singleResults+" Subscription ::"+i);
+                            results.addAll(singleResults);
+                        } else {
+                            Log.e(TAG,"ICC card is not present for subscription ::"+i);
+                        }
+                    }
                     break;
 
                 case FDN:
-                    results = loadFromEf(IccConstants.EF_FDN);
+                    results = loadFromEf(IccConstants.EF_FDN, PhoneFactory.getDefaultSubscription());
                     break;
 
                 case SDN:
-                    results = loadFromEf(IccConstants.EF_SDN);
+                    results = loadFromEf(IccConstants.EF_SDN, PhoneFactory.getDefaultSubscription());
                     break;
 
                 default:
@@ -473,7 +483,7 @@ public class IccProvider extends ContentProvider {
         return 1;
     }
 
-    private ArrayList<ArrayList> loadFromEf(int efType) {
+    private ArrayList<ArrayList> loadFromEf(int efType, int subscription) {
         ArrayList<ArrayList> results = new ArrayList<ArrayList>();
         List<AdnRecord> adnRecords = null;
 
@@ -483,7 +493,7 @@ public class IccProvider extends ContentProvider {
             IIccPhoneBook iccIpb = IIccPhoneBook.Stub.asInterface(
                     ServiceManager.getService("simphonebook"));
             if (iccIpb != null) {
-                adnRecords = iccIpb.getAdnRecordsInEf(efType);
+                adnRecords = iccIpb.getAdnRecordsInEfOnSubscription(subscription, efType);
             }
         } catch (RemoteException ex) {
             // ignore it
