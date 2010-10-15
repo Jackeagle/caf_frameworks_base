@@ -4342,6 +4342,13 @@ status_t AudioFlinger::onTransact(
 // ----------------------------------------------------------------------------
 
 void AudioFlinger::instantiate() {
+    //getService can take up to 5 secs to finish
+    while (defaultServiceManager()->checkService(String16("media.audio_flinger")) != NULL)
+    {
+        LOGW("waiting for media.audio_flinger to die...");
+        usleep(200000);
+    }
+
     defaultServiceManager()->addService(
             String16("media.audio_flinger"), new AudioFlinger());
 }
