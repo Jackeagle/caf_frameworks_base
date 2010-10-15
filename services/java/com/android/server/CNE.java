@@ -2078,23 +2078,21 @@ public final class CNE
     }
 
     private void handleWwanBringUp(){
-        try {
+         try {
             ConnectivityManager cm = (ConnectivityManager)
                 mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-            for (NetworkInfo networkInfo : cm.getAllNetworkInfo()) {
-                if(networkInfo.getType() != ConnectivityManager.TYPE_WIFI){
-                    NetworkInfo.State networkState = networkInfo.getState();
-                    if(networkState == NetworkInfo.State.CONNECTED){
-                        AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
-                            DataPhone.APN_TYPE_DEFAULT,IPVersion.IPV4);
-                        notifyRatConnectStatus(CNE_RAT_WWAN,
-                                               NetworkStateToInt(networkState),
-                                               wwanV4AddrInfo.ipAddr);
-                        return;
-                    }
-                }
+            NetworkInfo networkInfo =
+                cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+            NetworkInfo.State networkState = networkInfo.getState();
+            if(networkState == NetworkInfo.State.CONNECTED){
+                AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
+                DataPhone.APN_TYPE_DEFAULT,IPVersion.IPV4);
+                notifyRatConnectStatus(CNE_RAT_WWAN,
+                                       NetworkStateToInt(networkState),
+                                       wwanV4AddrInfo.ipAddr);
+            } else {
+                mService.bringUpRat(CNE_RAT_WWAN);
             }
-            mService.bringUpRat(CNE_RAT_WWAN);
         } catch(NullPointerException e){
             if (DBG) Log.w(LOG_TAG, "handleWwanBringUp", e);
             e.printStackTrace();
