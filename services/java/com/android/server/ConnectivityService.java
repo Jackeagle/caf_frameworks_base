@@ -1243,7 +1243,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         for (int netType : mPriorityList) {
             if (mNetTrackers[netType].getNetworkInfo().isConnected()) {
                 if (mNetAttributes[netType].isDefault()) {
-                    mNetTrackers[netType].addDefaultRoute();
+                    if (!SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor"))
+                        mNetTrackers[netType].addDefaultRoute();
                 } else {
                     mNetTrackers[netType].addPrivateDnsRoutes();
                 }
