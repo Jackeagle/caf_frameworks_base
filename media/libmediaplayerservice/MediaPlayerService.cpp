@@ -214,6 +214,13 @@ extmap FILE_EXTS [] =  {
 /* static */ bool MediaPlayerService::AudioOutput::mIsOnEmulator = false;
 
 void MediaPlayerService::instantiate() {
+    //getService can take up to 5 secs to finish
+    while (defaultServiceManager()->checkService(String16("media.player")) != NULL)
+    {
+        LOGW("waiting for media.player to die...");
+        usleep(200000);
+    }
+
     defaultServiceManager()->addService(
             String16("media.player"), new MediaPlayerService());
 }

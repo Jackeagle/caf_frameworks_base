@@ -79,6 +79,12 @@ static bool cleanOldclient = false;
 // ----------------------------------------------------------------------------
 
 void CameraService::instantiate() {
+    //getService can take up to 5 secs to finish
+    while (defaultServiceManager()->checkService(String16("media.camera")) != NULL)
+    {
+        LOGW("waiting for media.camera to die...");
+        usleep(200000);
+    }
     defaultServiceManager()->addService(
             String16("media.camera"), new CameraService());
 }
