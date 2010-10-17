@@ -15,6 +15,7 @@
  */
 
 package com.android.server;
+
 import java.io.*;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,7 +42,6 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.server.BatteryService;
-
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -81,15 +81,15 @@ import android.util.Log;
 
 import com.android.internal.telephony.ITelephony;
 
-
 /**
  * {@hide}
  */
-class CNERequest
-{
-    static final String LOG_TAG = "CNEJ";
+class CNERequest {
+    static final String LOG_TAG = "CNE";         // global logcat tag
+    static final String LOCAL_TAG = "CNE_DEBUG"; // local logcat tag
+    private static final boolean DBG = false;    // enable local logging?
 
-    //***** Class Variables
+    // ***** Class Variables
     static int sNextSerial = 0;
     static Object sSerialMonitor = new Object();
     private static Object sPoolSync = new Object();
@@ -97,7 +97,7 @@ class CNERequest
     private static int sPoolSize = 0;
     private static final int MAX_POOL_SIZE = 4;
 
-    //***** Instance Variables
+    // ***** Instance Variables
     int mSerial;
     int mRequest;
     Message mResult;
@@ -107,14 +107,16 @@ class CNERequest
     /**
      * Retrieves a new CNERequest instance from the pool.
      *
-     * @param request CNE_REQUEST_*
-     * @param result sent when operation completes
+     * @param request
+     *            CNE_REQUEST_*
+     * @param result
+     *            sent when operation completes
      * @return a CNERequest instance from the pool.
      */
     static CNERequest obtain(int request) {
         CNERequest rr = null;
 
-        synchronized(sPoolSync) {
+        synchronized (sPoolSync) {
             if (sPool != null) {
                 rr = sPool;
                 sPool = rr.mNext;
@@ -127,16 +129,14 @@ class CNERequest
             rr = new CNERequest();
         }
 
-        synchronized(sSerialMonitor) {
+        synchronized (sSerialMonitor) {
             rr.mSerial = sNextSerial++;
         }
         rr.mRequest = request;
         rr.mp = Parcel.obtain();
-
         // first elements in any CNE Parcel
         rr.mp.writeInt(request);
         rr.mp.writeInt(rr.mSerial);
-
         return rr;
     }
 
@@ -155,30 +155,26 @@ class CNERequest
         }
     }
 
-    private CNERequest()
-    {
+    private CNERequest() {
+        return;
     }
 
-    static void
-    resetSerial()
-    {
-        synchronized(sSerialMonitor) {
+    static void resetSerial() {
+        synchronized (sSerialMonitor) {
             sNextSerial = 0;
         }
     }
 
-    String
-    serialString()
-    {
-        //Cheesy way to do %04d
+    String serialString() {
+        // Cheesy way to do %04d
         StringBuilder sb = new StringBuilder(8);
         String sn;
 
         sn = Integer.toString(mSerial);
 
-        //sb.append("J[");
+        // sb.append("J[");
         sb.append('[');
-        for (int i = 0, s = sn.length() ; i < 4 - s; i++) {
+        for (int i = 0, s = sn.length(); i < 4 - s; i++) {
             sb.append('0');
         }
 
@@ -187,25 +183,20 @@ class CNERequest
         return sb.toString();
     }
 
-    void
-    onError(int error)
-    {
-
+    void onError(int error) {
+        return;
     }
 }
 
-public final class CNE
-{
-    static final String LOG_TAG = "CNEJ";
-    private static final boolean DBG = false;
+public final class CNE {
+    static final String LOG_TAG = "CNE";         // global logcat tag
+    static final String LOCAL_TAG = "CNE_DEBUG"; // local logcat tag
+    private static final boolean DBG = false;    // enable local logging?
 
-    //***** Instance Variables
-
+    // ***** Instance Variables
     LocalSocket mSocket;
     HandlerThread mSenderThread;
     CNESender mSender;
-
-
     Thread mReceiverThread;
     CNEReceiver mReceiver;
     private Context mContext;
@@ -213,13 +204,12 @@ public final class CNE
 
     ArrayList<CNERequest> mRequestsList = new ArrayList<CNERequest>();
 
-
     /* to do move all the constants to one file */
-    //***** Events
+    // ***** Events
 
-    static final int EVENT_SEND                 = 1;
+    static final int EVENT_SEND = 1;
 
-    //***** Constants
+    // ***** Constants
 
     /* CNE feature flag */
     static final String UseCne = "persist.cne.UseCne";
@@ -277,13 +267,12 @@ public final class CNE
     static final int CNE_RAT_INVALID = CNE_RAT_MAX;
 
     /* different status codes */
-    public static final int STATUS_FAILURE  = 0;
+    public static final int STATUS_FAILURE = 0;
     public static final int STATUS_SUCCESS = 1;
 
-    public static final int STATUS_NOT_INFLIGHT= 0;
+    public static final int STATUS_NOT_INFLIGHT = 0;
     public static final int STATUS_INFLIGHT = 1;
 
-    /* */
     static final int CNE_REGID_INVALID = -1;
     static final int CNE_ROLE_INVALID = -1;
     static final int CNE_DEFAULT_CON_REGID = 0;
@@ -332,87 +321,89 @@ public final class CNE
         String ipAddr;
         String gatewayAddr;
         String ifName;
-        public AddressInfo(){
+
+        public AddressInfo() {
             ipAddr = null;
             gatewayAddr = null;
             ifName = null;
         }
     };
 
-
-    AddressInfo getWlanAddrInfo(IPVersion version){
+    AddressInfo getWlanAddrInfo(IPVersion version) {
         AddressInfo wlanAddrInfo = new AddressInfo();
         String ipAddr = null;
         String gatewayAddr = null;
-        if(version == IPVersion.IPV4){
-            try{
+        if (version == IPVersion.IPV4) {
+            try {
                 DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
                 int ipAddressInt = dhcpInfo.ipAddress;
                 int gatewayInt = dhcpInfo.gateway;
-                if(ipAddressInt != 0){
-                    ipAddr = ((ipAddressInt)&0xff) + "."
-                              + ((ipAddressInt>>8)&0xff) + "."
-                              + ((ipAddressInt>>16)&0xff) + "."
-                              + ((ipAddressInt>>24)&0xff);
+                if (ipAddressInt != 0) {
+                    ipAddr = ((ipAddressInt) & 0xff) + "."
+                            + ((ipAddressInt >> 8) & 0xff) + "."
+                            + ((ipAddressInt >> 16) & 0xff) + "."
+                            + ((ipAddressInt >> 24) & 0xff);
                 }
-                if(gatewayInt != 0){
-                    gatewayAddr = ((gatewayInt)&0xff) + "."
-                                   + ((gatewayInt>>8)&0xff) + "."
-                                   + ((gatewayInt>>16)&0xff) +"."
-                                   + ((gatewayInt>>24)&0xff);
+                if (gatewayInt != 0) {
+                    gatewayAddr = ((gatewayInt) & 0xff) + "."
+                            + ((gatewayInt >> 8) & 0xff) + "."
+                            + ((gatewayInt >> 16) & 0xff) + "."
+                            + ((gatewayInt >> 24) & 0xff);
                 }
                 wlanAddrInfo.ipAddr = ipAddr;
                 wlanAddrInfo.gatewayAddr = gatewayAddr;
                 InetAddress inetAddr = InetAddress.getByName(ipAddr);
                 NetworkInterface netIface = NetworkInterface.getByInetAddress(inetAddr);
                 wlanAddrInfo.ifName = netIface.getName();
-            } catch (SocketException sexp){
-                Log.v(LOG_TAG, "Could not get the netIface obj");
-            } catch(NullPointerException nexp){
+            } catch (SocketException sexp) {
+                Log.w(LOG_TAG, "Could not get the netIface obj");
+            } catch (NullPointerException nexp) {
                 // WiFi is probably down.
-                Log.v(LOG_TAG, "DhcpInfo obj is NULL. V4 address is not yet available.");
-            } catch(UnknownHostException uexp){
-                Log.v(LOG_TAG, "Invalid host name" + ipAddr);
+                Log.w(LOG_TAG, "DhcpInfo obj is NULL. V4 address is not yet available.");
+            } catch (UnknownHostException uexp) {
+                Log.w(LOG_TAG, "Invalid host name" + ipAddr);
             }
-        } else if(version == IPVersion.IPV6){
-            /* currently wifistate tracker is not supporting V6 address,
-             * without this if V6 interface is brought up by kernel,
-             * we can get the V6 address info if we have a valid v4 address.
+        } else if (version == IPVersion.IPV6) {
+            /*
+             * currently wifistate tracker is not supporting V6
+             * address, without this if V6 interface is brought up by
+             * kernel, we can get the V6 address info if we have a
+             * valid v4 address.
              */
             AddressInfo v4Addr = getWlanAddrInfo(IPVersion.IPV4);
-            try{
+            try {
                 InetAddress inet4Addr = InetAddress.getByName(v4Addr.ipAddr);
                 NetworkInterface netIface = NetworkInterface.getByInetAddress(inet4Addr);
                 wlanAddrInfo.ifName = netIface.getName();
                 Enumeration e = netIface.getInetAddresses();
                 while (e.hasMoreElements()) {
-                    InetAddress inetAddr = (InetAddress)e.nextElement();
-                    if(!inetAddr.equals(inet4Addr)){
+                    InetAddress inetAddr = (InetAddress) e.nextElement();
+                    if (!inetAddr.equals(inet4Addr)) {
                         wlanAddrInfo.ipAddr = inetAddr.getHostAddress();
-                        //TODO: get the gateway addr for v6
+                        // TODO: get the gateway addr for v6
                     }
                 }
-            } catch (SocketException sexp){
-                Log.v(LOG_TAG, "Could not get the netIface obj");
-            } catch(NullPointerException nexp){
-                Log.v(LOG_TAG, "V4Adrr is not yet available");
-             }catch(UnknownHostException uexp){
-                Log.v(LOG_TAG, "Can't get V6Addr without valid V4Addr= " + v4Addr);
+            } catch (SocketException sexp) {
+                Log.w(LOG_TAG, "Could not get the netIface obj");
+            } catch (NullPointerException nexp) {
+                Log.w(LOG_TAG, "V4Adrr is not yet available");
+            } catch (UnknownHostException uexp) {
+                Log.w(LOG_TAG, "Can't get V6Addr without valid V4Addr= " + v4Addr);
             }
         } else {
-            Log.v(LOG_TAG,"Unsupported ipversion." + version);
+            Log.e(LOG_TAG, "Unsupported ipversion." + version);
         }
         return wlanAddrInfo;
     }
 
-    AddressInfo getWwanAddrInfo(String apnType, IPVersion ipv){
+    AddressInfo getWwanAddrInfo(String apnType, IPVersion ipv) {
         AddressInfo wwanAddrInfo = new AddressInfo();
         try {
-            wwanAddrInfo.ifName = mTelephonyManager.getActiveInterfaceName(apnType,ipv);
-            wwanAddrInfo.ipAddr = mTelephonyManager.getActiveIpAddress(apnType,ipv);
-            wwanAddrInfo.gatewayAddr = mTelephonyManager.getActiveGateway(apnType,ipv);
-        } catch(NullPointerException nexp){
-            Log.v(LOG_TAG, "mTelephonyManager is null");
+            wwanAddrInfo.ifName = mTelephonyManager.getActiveInterfaceName(apnType, ipv);
+            wwanAddrInfo.ipAddr = mTelephonyManager.getActiveIpAddress(apnType, ipv);
+            wwanAddrInfo.gatewayAddr = mTelephonyManager.getActiveGateway(apnType, ipv);
+        } catch (NullPointerException nexp) {
+            Log.w(LOG_TAG, "mTelephonyManager is null");
         }
         return wwanAddrInfo;
     }
@@ -421,140 +412,140 @@ public final class CNE
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
 
-            if (action.equals(Intent.ACTION_BATTERY_CHANGED))
-            {
-                Log.i(LOG_TAG, "CNE received action: " + action);
+            if (action.equals(Intent.ACTION_BATTERY_CHANGED)) {
+                if (DBG) Log.i(LOCAL_TAG, "CNE received action: " + action);
                 int level = intent.getIntExtra("level", 0);
                 int pluginType = intent.getIntExtra("plugged", 0);
                 int status = intent.getIntExtra("status", 0);
                 updateBatteryStatus(level, pluginType, status);
 
             } else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
-                Log.i(LOG_TAG, "CNE received action RSSI Changed events: " + action);
+                if (DBG) Log.i(LOCAL_TAG, "CNE received action RSSI Changed events: " + action);
                 if (mWifiManager != null) {
-                    String ipV4Addr=null;
-                    ConnectivityManager cm =
-                      (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+                    String ipV4Addr = null;
+                    ConnectivityManager cm = (ConnectivityManager) mContext
+                            .getSystemService(Context.CONNECTIVITY_SERVICE);
                     NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-                    NetworkInfo.State networkState =
-                        (networkInfo == null ? NetworkInfo.State.UNKNOWN:networkInfo.getState());
-                    if(networkState == NetworkInfo.State.CONNECTED){
-                      ipV4Addr = (getWlanAddrInfo(IPVersion.IPV4)).ipAddr;
+                    NetworkInfo.State networkState = (networkInfo
+                            == null ? NetworkInfo.State.UNKNOWN : networkInfo.getState());
+                    if (networkState == NetworkInfo.State.CONNECTED) {
+                        ipV4Addr = (getWlanAddrInfo(IPVersion.IPV4)).ipAddr;
                     }
-
                     WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
                     String ssid = wifiInfo.getSSID();
                     int rssi = wifiInfo.getRssi();
-                    String tsStr = null;
-                    long currentTime = System.currentTimeMillis();
-                    Timestamp ts = new Timestamp(currentTime);
-                    tsStr = ts.toString();
-
-                    Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
-                          " networkState: " + networkState);
-
-                    Log.i(LOG_TAG, "CNE received action RSSI Changed events - " +
-                          "ssid= " + ssid + ",rssi=" + rssi + ",ipV4Addr=" +
-                          ipV4Addr + ",timeStamp:" + tsStr + " networkState: " +
-                          networkState);
-                    updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G,NetworkStateToInt(networkState),
-                                     rssi, ssid, ipV4Addr, tsStr);
+                    Timestamp ts = new Timestamp(System.currentTimeMillis());
+                    String tsStr = ts.toString();
+                    if (DBG) {
+                        String logmsg = "CNE received action RSSI Changed events -"
+                            + " networkState: " + networkState
+                            + " ssid= " + ssid
+                            + " rssi=" + rssi
+                            + " ipV4Addr=" + ipV4Addr
+                            + " timeStamp:" + tsStr
+                            + " networkState: " + networkState;
+                        Log.i(LOCAL_TAG, logmsg);
+                    }
+                    updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G, NetworkStateToInt(networkState), rssi,
+                            ssid, ipV4Addr, tsStr);
                 } else {
                     Log.w(LOG_TAG, "CNE received action RSSI Changed events, null WifiManager");
                 }
 
+            } else if ((action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION))
+                    || (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION))) {
 
-            } else if ((action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) ||
-                       (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) ){
-
-                Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed: " + action);
+                if (DBG) {
+                    Log.i(LOCAL_TAG, "CNE received action Network/Wifi State Changed: " + action);
+                }
 
                 if (mWifiManager != null) {
                     AddressInfo wlanV4Addr = getWlanAddrInfo(IPVersion.IPV4);
                     NetworkInfo.State networkState = NetworkInfo.State.UNKNOWN;
-                    if(action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)){
-                        NetworkInfo networkInfo = (NetworkInfo)
-                        intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                        networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
-                        networkInfo.getState());
+                    if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
+                        NetworkInfo networkInfo = (NetworkInfo) intent
+                                .getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                        networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN
+                                : networkInfo.getState());
                     }
-                    if(action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)){
+                    if (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) {
                         final boolean enabled = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
-                        WifiManager.WIFI_STATE_UNKNOWN) == WifiManager.WIFI_STATE_ENABLED;
-                        if(!enabled){
+                                WifiManager.WIFI_STATE_UNKNOWN) == WifiManager.WIFI_STATE_ENABLED;
+                        if (!enabled) {
                             networkState = NetworkInfo.State.DISCONNECTED;
-                        }else{
+                        } else {
                             networkState = NetworkInfo.State.UNKNOWN;
                         }
                     }
-                    Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed"+
-                                 " networkState: " + networkState);
+                    if (DBG) {
+                        Log.i(LOCAL_TAG, "CNE received action Network/Wifi State Changed"
+                                + " networkState: " + networkState);
+                    }
                     if (networkState == NetworkInfo.State.CONNECTED) {
-                      try {
-                          activeWlanIfName = wlanV4Addr.ifName;
-                          activeWlanGatewayAddr = wlanV4Addr.gatewayAddr;
-                          // add network interface to main table and create
-                          // an interface specific table if it does not already exist
-                          configureIproute2(CNE_IPROUTE2_ADD_ROUTING,
-                                            wlanV4Addr.ifName,
-                                            wlanV4Addr.ipAddr,
-                                            wlanV4Addr.gatewayAddr);
+                        try {
+                            activeWlanIfName = wlanV4Addr.ifName;
+                            activeWlanGatewayAddr = wlanV4Addr.gatewayAddr;
+                            // add network interface to main table and
+                            // create
+                            // an interface specific table if it does
+                            // not already exist
+                            configureIproute2(CNE_IPROUTE2_ADD_ROUTING, wlanV4Addr.ifName,
+                                    wlanV4Addr.ipAddr, wlanV4Addr.gatewayAddr);
 
-                          if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
-                             (mDefaultNetwork != ConnectivityManager.TYPE_WIFI) &&
-                             (activeWlanIfName != null)) {
-                              Log.i(LOG_TAG,"CNE received Network/Wifi State Changed -"+
-                                          "DELETE Wlan From Main");
-                              // remove network interface from main table if it is not preferred interface
-                              configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
-                                                activeWlanIfName, null, null);
-                          }
-
-
-                      } catch (Exception e) {
+                            if ((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE)
+                                    && (mDefaultNetwork != ConnectivityManager.TYPE_WIFI)
+                                    && (activeWlanIfName != null)) {
+                                if (DBG) {
+                                    Log.i(LOCAL_TAG, "CNE received Network/Wifi State Changed - "
+                                            + "DELETE Wlan From Main");
+                                }
+                                // remove network interface from main
+                                // table if it is not preferred
+                                // interface
+                                configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
+                                        activeWlanIfName, null, null);
+                            }
+                        } catch (Exception e) {
                             Log.w(LOG_TAG, "CNE receiver exception", e);
-                      }
-
-                  } else if (networkState == NetworkInfo.State.DISCONNECTED) {
-                      configureIproute2(CNE_IPROUTE2_DELETE_ROUTING, activeWlanIfName,
-                                       null, null);
-                  }
-                  WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
-                  String ssid = wifiInfo.getSSID();
-                  int rssi = wifiInfo.getRssi();
-                  String tsStr = null;
-                  long currentTime = System.currentTimeMillis();
-                  Timestamp ts = new Timestamp(currentTime);
-                  tsStr = ts.toString();
-
-                  Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed - " +
-                                "ssid= " + ssid + ",rssi=" + rssi + ",networkState=" +
-                                networkState);
-                  Log.i(LOG_TAG,"CNE received action Network/Wifi State Changed- ifName:"+
-                        wlanV4Addr.ifName + ",ipV4Addr=" + wlanV4Addr.ipAddr + ",gateway:" +
-                        wlanV4Addr.gatewayAddr + ",timeStamp=" + tsStr);
-
-                  updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G,NetworkStateToInt(networkState),
-                                   rssi, ssid, wlanV4Addr.ipAddr, tsStr);
-                  notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState),
-                                         wlanV4Addr.ipAddr);
+                        }
+                    } else if (networkState == NetworkInfo.State.DISCONNECTED) {
+                        configureIproute2(CNE_IPROUTE2_DELETE_ROUTING, activeWlanIfName,
+                                null, null);
+                    }
+                    WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
+                    String ssid = wifiInfo.getSSID();
+                    int rssi = wifiInfo.getRssi();
+                    Timestamp ts = new Timestamp(System.currentTimeMillis());
+                    String tsStr = ts.toString();
+                    if (DBG) {
+                        String logmsg = "CNE received action Network/Wifi State Changed -"
+                                + " ssid=" + ssid
+                                + " rssi=" + rssi
+                                + " networkState=" + networkState
+                                + " ifName=" + wlanV4Addr.ifName
+                                + " ipV4Addr=" + wlanV4Addr.ipAddr
+                                + " gateway=" + wlanV4Addr.gatewayAddr
+                                + " timeStamp=" + tsStr;
+                        Log.i(LOCAL_TAG, logmsg);
+                    }
+                    updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G, NetworkStateToInt(networkState), rssi,
+                            ssid, wlanV4Addr.ipAddr, tsStr);
+                    notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState),
+                            wlanV4Addr.ipAddr);
                 } else {
-                  Log.w(LOG_TAG, "CNE received action Network State Changed, null WifiManager");
+                    Log.w(LOG_TAG, "CNE received action Network State Changed, null WifiManager");
                 }
-
             } else if (action.equals(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)) {
-                Log.i(LOG_TAG, "CNE received action: " + action);
-                if(mWifiManager != null)
-                {
+                if (DBG) Log.i(LOCAL_TAG, "CNE received action: " + action);
+                if (mWifiManager != null) {
                     List<ScanResult> results = mWifiManager.getScanResults();
-                    //updateWlanScanResults(results);
+                    // updateWlanScanResults(results);
                 }
-            } else if (action.equals(TelephonyIntents.
-                        ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)){
+            } else if (action.equals(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)) {
                 String apnType = intent.getStringExtra(Phone.DATA_APN_TYPES_KEY);
-                if(apnType.equals(DataPhone.APN_TYPE_DEFAULT) ){
-                    AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
-                        DataPhone.APN_TYPE_DEFAULT, IPVersion.IPV4);
+                if (apnType.equals(DataPhone.APN_TYPE_DEFAULT)) {
+                    AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
+                            IPVersion.IPV4);
                     IPVersion ipv = IPVersion.IPV4;
                     String str = intent.getStringExtra(Phone.DATA_IPVERSION_KEY);
                     if (str != null) {
@@ -564,65 +555,68 @@ public final class CNE
                     if (ipv == IPVersion.IPV4) {
                         wwanAddrInfo = wwanV4AddrInfo;
                     } else {
-                        Log.i(LOG_TAG, "IPV6 is not supported by CNE yet");
+                        Log.w(LOG_TAG, "IPV6 is not supported by CNE");
                         return;
                     }
                     str = intent.getStringExtra(Phone.DATA_APN_TYPE_STATE);
                     NetworkInfo.State netState = NetworkInfo.State.DISCONNECTED;
                     if (str != null) {
-                      netState =
-                          convertToNetworkState(Enum.valueOf(Phone.DataState.class,str));
+                        netState = convertToNetworkState(Enum.valueOf(Phone.DataState.class, str));
                     }
-                    if (netState == NetworkInfo.State.CONNECTED){
+                    if (netState == NetworkInfo.State.CONNECTED) {
                         if (ipv == IPVersion.IPV4) {
                             activeWwanV4IfName = wwanV4AddrInfo.ifName;
                         }
-                        Log.i(LOG_TAG,"onDataConnectionStateChanged ADD IPROUTE2");
-                        // add network interface to main table and create an interface
+                        if (DBG) Log.i(LOCAL_TAG, "onDataConnectionStateChanged ADD IPROUTE2");
+                        // add network interface to main table and
+                        // create an interface
                         // specific table if it does not already exist
                         configureIproute2(CNE_IPROUTE2_ADD_ROUTING, wwanAddrInfo.ifName,
-                                          wwanAddrInfo.ipAddr, wwanAddrInfo.gatewayAddr);
-                        if((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE) &&
-                           (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE)) {
-                            Log.i(LOG_TAG,"onDataConnectionStateChanged: "+
-                                          "Delete Wwan From Main");
-                            // remove network interface from main table if it is not
-                            // preferred interface
+                                wwanAddrInfo.ipAddr, wwanAddrInfo.gatewayAddr);
+                        if ((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE)
+                                && (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE)) {
+                            if (DBG) {
+                                Log.i(LOCAL_TAG,
+                                        "onDataConnectionStateChanged: Delete Wwan From Main");
+                            }
+                            // remove network interface from main
+                            // table if it is not preferred interface
                             configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
-                                              wwanAddrInfo.ifName, null, null);
+                                    wwanAddrInfo.ifName, null, null);
                         }
-                    } else if(netState == NetworkInfo.State.DISCONNECTED){
-                        if(ipv == IPVersion.IPV4){
-                            Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
-                                  "Delete Wwan(before)"+activeWwanV4IfName);
-                            configureIproute2(CNE_IPROUTE2_DELETE_ROUTING,
-                                              activeWwanV4IfName, null, null);
-                            Log.i(LOG_TAG,"onDataConnectionStateChanged: DISCONNECTED"+
-                                  "Delete Wwan(after)"+activeWwanV4IfName);
+                    } else if (netState == NetworkInfo.State.DISCONNECTED) {
+                        if (ipv == IPVersion.IPV4) {
+                            configureIproute2(CNE_IPROUTE2_DELETE_ROUTING, activeWwanV4IfName,
+                                    null, null);
+                            if (DBG) {
+                                Log.i(LOCAL_TAG, "onDataConnectionStateChanged: DISCONNECTED"
+                                        + "Delete Wwan(after)" + activeWwanV4IfName);
+                            }
                         }
                     }
-                    int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
+                    int roaming = (int) (mTelephonyManager.isNetworkRoaming() ? 1 : 0);
                     int networkType = mTelephonyManager.getNetworkType();
                     int signalStrength = getSignalStrength(networkType);
-                    String tsStr = null;
-                    long currentTime = System.currentTimeMillis();
-                    Timestamp ts = new Timestamp(currentTime);
-                    tsStr = ts.toString();
-
-                    Log.i(LOG_TAG, "onDataConnectionStateChanged - networkType= "
-                          + networkType + ",networkState=" + netState +
-                          ",signalStr=" + signalStrength + ",roaming=" + roaming);
-                    Log.i(LOG_TAG, "onDataConnectionStateChanged - ifName="
-                          + wwanAddrInfo.ifName + ",ipAddr=" + wwanAddrInfo.ipAddr +
-                          "gateway=" + wwanAddrInfo.gatewayAddr + ",timeStamp=" + tsStr);
-
-                    updateWwanStatus(networkType,NetworkStateToInt(netState),
-                                     signalStrength,roaming,wwanV4AddrInfo.ipAddr,tsStr);
-                    notifyRatConnectStatus(CNE_RAT_WWAN,NetworkStateToInt(netState),
-                                           wwanV4AddrInfo.ipAddr);
+                    Timestamp ts = new Timestamp(System.currentTimeMillis());
+                    String tsStr = ts.toString();
+                    if (DBG) {
+                        String logmsg = "onDataConnectionStateChanged -"
+                                + " networkType= " + networkType
+                                + " networkState=" + netState
+                                + " signalStr=" + signalStrength
+                                + " roaming=" + roaming
+                                + " ifName=" + wwanAddrInfo.ifName
+                                + " ipAddr=" + wwanAddrInfo.ipAddr
+                                + " gateway=" + wwanAddrInfo.gatewayAddr
+                                + " timeStamp=" + tsStr;
+                        Log.i(LOCAL_TAG, logmsg);
+                    }
+                    updateWwanStatus(networkType, NetworkStateToInt(netState), signalStrength,
+                            roaming, wwanV4AddrInfo.ipAddr, tsStr);
+                    notifyRatConnectStatus(CNE_RAT_WWAN, NetworkStateToInt(netState),
+                            wwanV4AddrInfo.ipAddr);
                 } else {
-                    Log.i(LOG_TAG,"CNE currently does not support this apnType="+
-                          apnType);
+                    Log.e(LOG_TAG, "CNE currently does not support this apnType=" + apnType);
                 }
             } else {
                 Log.w(LOG_TAG, "CNE received unexpected action: " + action);
@@ -631,28 +625,28 @@ public final class CNE
     };
 
     private static enum RatTriedStatus {
-        RAT_STATUS_TRIED,
-        RAT_STATUS_NOT_TRIED
+        RAT_STATUS_TRIED, RAT_STATUS_NOT_TRIED
     }
 
     private class RatInfo {
         int rat;
         RatTriedStatus status;
+
         /* other rat related info passed by the callback */
-        public RatInfo(){
+        public RatInfo() {
             rat = CNE_RAT_INVALID;
         }
+
         public boolean equals(Object o) {
             if (o instanceof RatInfo) {
                 RatInfo ratInfo = (RatInfo) o;
-                if (this.rat == ratInfo.rat){
+                if (this.rat == ratInfo.rat) {
                     return true;
                 }
             }
-        return false;
-      }
+            return false;
+        }
     }
-
 
     private class CallbackInfo {
         IConSvcEventListener listener;
@@ -665,153 +659,164 @@ public final class CNE
         private int pid;
         private IBinder mBinder;
         private int notificationsSent;
-        /* do we want to have the copy of the Link Reqs?? here? if yes which one
+        /*
+         * do we want to have the copy of the Link Reqs?? here? if yes
+         * which one
          */
         ArrayList<RatInfo> compatibleRatsList;
         int activeRat;
         int betterRat;
         /* pid and callbackInfo list */
         private CallbackInfo cbInfo;
+
         /* constructor */
-        public RegInfo(IBinder binder){
+        public RegInfo(IBinder binder) {
             role = CNE_ROLE_INVALID;
             regId = mRoleRegId++;
-
             pid = CNE_INVALID_PID;
             compatibleRatsList = new ArrayList<RatInfo>();
             activeRat = CNE_RAT_INVALID;
             betterRat = CNE_RAT_INVALID;
             cbInfo = new CallbackInfo();
             mBinder = binder;
-            if(mBinder != null){
+            if (mBinder != null) {
                 try {
-                    Log.d(LOG_TAG,"CNE linking binder to death");
+                    if (DBG) Log.i(LOCAL_TAG, "CNE linking binder to death");
                     mBinder.linkToDeath(this, 0);
                 } catch (RemoteException e) {
                     binderDied();
-                  }
+                }
             }
         }
 
         public void binderDied() {
-            Log.d(LOG_TAG,"CNE binder died role=" + role + "regId =" + regId);
-            releaseLink(role,pid);
+            if (DBG) Log.i(LOCAL_TAG, "CNE binder died role=" + role + "regId =" + regId);
+            releaseLink(role, pid);
         }
 
-        public void dump(){
-            Log.d(LOG_TAG, "Role: " + role);
-            Log.d(LOG_TAG, "RegId: " + regId);
-            Log.d(LOG_TAG, "Pid: " + pid);
-            Log.d(LOG_TAG, "ActiveRat: " + activeRat);
-            Log.d(LOG_TAG, "BetterRat: " + betterRat);
-            for(int index = 0; index < compatibleRatsList.size(); index++){
-                RatInfo ratInfo = (RatInfo)compatibleRatsList.get(index);
-                Log.d(LOG_TAG, "compatibleRat["+index+"]="+ ratInfo.rat +
-                  " ratState = " + ratInfo.status);
+        public void dump() {
+            if (DBG) {
+                Log.i(LOCAL_TAG, "     Role: " + role);
+                Log.i(LOCAL_TAG, "    RegId: " + regId);
+                Log.i(LOCAL_TAG, "      Pid: " + pid);
+                Log.i(LOCAL_TAG, "ActiveRat: " + activeRat);
+                Log.i(LOCAL_TAG, "BetterRat: " + betterRat);
+                for (int index = 0; index < compatibleRatsList.size(); index++) {
+                    RatInfo ratInfo = (RatInfo) compatibleRatsList.get(index);
+                    Log.i(LOCAL_TAG, "compatibleRat[" + index + "]=" + ratInfo.rat + " ratState = "
+                            + ratInfo.status);
+                }
             }
         }
     };
+
     /* regId, RegInfo map */
     private ConcurrentHashMap<Integer, RegInfo> activeRegsList;
 
-
-    /* DefaultConnection Class: this class registers for default role and keeps
-     * one connection up always if available ...so that the device is always
-     * data connected and all the legacy apps that are not using cne api have
-     * connectivity
+    /*
+     * DefaultConnection Class: this class registers for default role
+     * and keeps one connection up always if available ...so that the
+     * device is always data connected and all the legacy apps that
+     * are not using cne api have connectivity
      */
     class DefaultConnection {
         LinkProvider mLinkProvider;
-        Map<LinkRequirement,String> mLinkReqs;
+        Map<LinkRequirement, String> mLinkReqs;
         MyLinkNotifier mLinkNotifier;
 
         /* Default constructor initialising linkrequirements to null */
-        public DefaultConnection(){
+        public DefaultConnection() {
             mLinkReqs = null;
             mLinkProvider = null;
         }
 
-        /*  constructor initialising the linkRequirements */
-        public DefaultConnection(Map<LinkRequirement,String> linkReqs){
+        /* constructor initialising the linkRequirements */
+        public DefaultConnection(Map<LinkRequirement, String> linkReqs) {
             mLinkReqs = linkReqs;
             mLinkProvider = null;
         }
 
-        /* This fucntion will start the connection with a default role. */
-        public void startConnection(){
-            Log.d(LOG_TAG, "DefaultConnection startConnection called");
+        /*
+         * This fucntion will start the connection with a default
+         * role.
+         */
+        public void startConnection() {
+            if (DBG) Log.i(LOCAL_TAG, "DefaultConnection startConnection called");
             mLinkNotifier = new MyLinkNotifier();
-            try{
-                mLinkProvider = new LinkProvider(LinkProvider.ROLE_DEFAULT,
-                                                 mLinkReqs,
-                                                 mLinkNotifier);
-            }catch(Exception e){
-                Log.e(LOG_TAG, "LinkProvider Creation threw and excetion"+e);
+            try {
+                mLinkProvider = new LinkProvider(LinkProvider.ROLE_DEFAULT, mLinkReqs,
+                        mLinkNotifier);
+            } catch (Exception e) {
+                Log.w(LOG_TAG, "LinkProvider creation threw an exception: " + e);
             }
-            if(mLinkProvider != null) {
+            if (mLinkProvider != null) {
                 mLinkProvider.getLink();
             }
         }
 
         /* Ends the previously started connection */
-        public void endConnection(){
-            Log.d(LOG_TAG, "DefaultConnection endConnection called");
-            if(mLinkProvider != null) {
+        public void endConnection() {
+            if (DBG) Log.i(LOCAL_TAG, "DefaultConnection endConnection called");
+            if (mLinkProvider != null) {
                 mLinkProvider.releaseLink();
             }
         }
 
-
-        /* Implementation of the LinkNotifier interface to pass to the
+        /*
+         * Implementation of the LinkNotifier interface to pass to the
          * LinkProvider class used to start connection
          */
         private class MyLinkNotifier implements LinkNotifier {
             /* default constructor */
-            public MyLinkNotifier(){
+            public MyLinkNotifier() {
+                return;
             }
 
-            /* on the linkavailability notification we have to notify it
-             * it to the iproute to set the default routing table
+            /*
+             * on the linkavailability notification we have to notify
+             * it it to the iproute to set the default routing table
              */
-            public void onLinkAvail(LinkInfo info){
-                Log.d(LOG_TAG, "DefaultConnection onLinkAvail called");
-                if(mLinkProvider != null) {
-                    mLinkProvider.reportLinkSatisfaction(info,true,true);
+            public void onLinkAvail(LinkInfo info) {
+                if (DBG) Log.i(LOCAL_TAG, "DefaultConnection onLinkAvail called");
+                if (mLinkProvider != null) {
+                    mLinkProvider.reportLinkSatisfaction(info, true, true);
                     /* notify to the default network to iproute2 */
                     notifyDefaultNwChange(info.getNwId());
                 }
             }
 
-            /* Link Acquisition/startConnection as failed retry after some time. */
-            public void onGetLinkFailure(int reason){
-                Log.d(LOG_TAG, "DefaultConnection onGetLinkFailed reason="
-                      + reason);
-                /* we will not release the link here. we might get a
+            /*
+             * Link Acquisition/startConnection as failed retry after
+             * some time.
+             */
+            public void onGetLinkFailure(int reason) {
+                if (DBG) Log.i(LOCAL_TAG, "DefaultConnection onGetLinkFailed reason=" + reason);
+                /*
+                 * we will not release the link here. we might get a
                  * better link avail call later.
                  */
             }
 
             /* a better link is available accept it. */
-            public void onBetterLinkAvail(LinkInfo info){
-                Log.d(LOG_TAG, "DefaultConnection onBetterLinkAvail called");
-                if(mLinkProvider != null) {
-                    mLinkProvider.switchLink(info,true);
+            public void onBetterLinkAvail(LinkInfo info) {
+                if (DBG) Log.i(LOCAL_TAG, "DefaultConnection onBetterLinkAvail called");
+                if (mLinkProvider != null) {
+                    mLinkProvider.switchLink(info, true);
                     /* notify to the default network to iproute2 */
                     notifyDefaultNwChange(info.getNwId());
                 }
             }
 
             /* current connection is lost. */
-            public void onLinkLost(LinkInfo info){
-                Log.i(LOG_TAG, "DefaultConnection Link is lost");
+            public void onLinkLost(LinkInfo info) {
+                if (DBG) Log.i(LOCAL_TAG, "DefaultConnection Link is lost");
             }
         };
     }
 
     private DefaultConnection mDefaultConn;
 
-    class CNESender extends Handler implements Runnable
-    {
+    class CNESender extends Handler implements Runnable {
         public CNESender(Looper looper) {
             super(looper);
         }
@@ -819,87 +824,70 @@ public final class CNE
         // Only allocated once
         byte[] dataLength = new byte[4];
 
-        //***** Runnable implementation
-        public void
-        run()
-        {
-            //setup if needed
+        // ***** Runnable implementation
+        public void run() {
+            // setup if needed
         }
 
-
-        //***** Handler implemementation
-
-        public void
-        handleMessage(Message msg)
-        {
-            CNERequest rr = (CNERequest)(msg.obj);
+        // ***** Handler implemementation
+        public void handleMessage(Message msg) {
+            CNERequest rr = (CNERequest) (msg.obj);
             CNERequest req = null;
-
 
             switch (msg.what) {
                 case EVENT_SEND:
                     /**
-                     * mRequestMessagePending++ already happened for every
-                     * EVENT_SEND, thus we must make sure
-                     * mRequestMessagePending-- happens once and only once
+                     * mRequestMessagePending++ already happened for
+                     * every EVENT_SEND, thus we must make sure
+                     * mRequestMessagePending-- happens once and only
+                     * once
                      */
                     boolean alreadySubtracted = false;
                     try {
                         LocalSocket s;
-
                         s = mSocket;
-
                         if (s == null) {
                             rr.release();
                             mRequestMessagesPending--;
                             alreadySubtracted = true;
                             return;
                         }
-
                         synchronized (mRequestsList) {
                             mRequestsList.add(rr);
                         }
-
                         mRequestMessagesPending--;
                         alreadySubtracted = true;
-
                         byte[] data;
-
                         data = rr.mp.marshall();
                         rr.mp.recycle();
                         rr.mp = null;
-
                         if (data.length > CNE_MAX_COMMAND_BYTES) {
-                            throw new RuntimeException(
-                                    "Parcel larger than max bytes allowed! "
-                                                          + data.length);
+                            throw new RuntimeException("Parcel larger than max bytes allowed! "
+                                    + data.length);
                         }
 
                         // parcel length in big endian
                         dataLength[0] = dataLength[1] = 0;
-                        dataLength[2] = (byte)((data.length >> 8) & 0xff);
-                        dataLength[3] = (byte)((data.length) & 0xff);
-
-                        //Log.v(LOG_TAG, "writing packet: " + data.length + " bytes");
-
+                        dataLength[2] = (byte) ((data.length >> 8) & 0xff);
+                        dataLength[3] = (byte) ((data.length) & 0xff);
+                        // if (DBG) Log.i(LOCAL_TAG, "writing packet: " + data.length + " bytes");
                         s.getOutputStream().write(dataLength);
                         s.getOutputStream().write(data);
                     } catch (IOException ex) {
-                        Log.e(LOG_TAG, "IOException", ex);
+                        Log.w(LOG_TAG, "IOException", ex);
                         req = findAndRemoveRequestFromList(rr.mSerial);
-                        // make sure this request has not already been handled,
-                        // eg, if CNEReceiver cleared the list.
+                        // make sure this request has not already been
+                        // handled, eg, if CNEReceiver cleared the list.
                         if (req != null || !alreadySubtracted) {
-
                             rr.release();
                         }
                     } catch (RuntimeException exc) {
-                        Log.e(LOG_TAG, "Uncaught exception ", exc);
+                        Log.w(LOG_TAG, "Uncaught exception ", exc);
                         req = findAndRemoveRequestFromList(rr.mSerial);
-                        // make sure this request has not already been handled,
-                        // eg, if CNEReceiver cleared the list.
+                        // make sure this request has not already been
+                        // handled, eg, if CNEReceiver cleared the list.
                         if (req != null || !alreadySubtracted) {
-                            //rr.onError(GENERIC_FAILURE);
+                            // rr.onError(GENERIC_FAILURE);
                             rr.release();
                         }
                     }
@@ -907,30 +895,29 @@ public final class CNE
                     if (!alreadySubtracted) {
                         mRequestMessagesPending--;
                     }
-
                     break;
-
-
             }
         }
     }
 
     /**
-     * Reads in a single CNE message off the wire. A CNE message consists
-     * of a 4-byte little-endian length and a subsequent series of bytes.
-     * The final message (length header omitted) is read into
-     * <code>buffer</code> and the length of the final message (less header)
-     * is returned. A return value of -1 indicates end-of-stream.
+     * Reads in a single CNE message off the wire. A CNE message
+     * consists of a 4-byte little-endian length and a subsequent
+     * series of bytes. The final message (length header omitted) is
+     * read into <code>buffer</code> and the length of the final
+     * message (less header) is returned. A return value of -1
+     * indicates end-of-stream.
      *
-     * @param is non-null; Stream to read from
-     * @param buffer Buffer to fill in. Must be as large as maximum
-     * message size, or an ArrayOutOfBounds exception will be thrown.
+     * @param is
+     *            non-null; Stream to read from
+     * @param buffer
+     *            Buffer to fill in. Must be as large as maximum
+     *            message size, or an ArrayOutOfBounds exception will
+     *            be thrown.
      * @return Length of message less header, or -1 on end of stream.
      * @throws IOException
      */
-    private static int readCneMessage(InputStream is, byte[] buffer)
-            throws IOException
-    {
+    private static int readCneMessage(InputStream is, byte[] buffer) throws IOException {
         int countRead;
         int offset;
         int remaining;
@@ -942,8 +929,8 @@ public final class CNE
         do {
             countRead = is.read(buffer, offset, remaining);
 
-            if (countRead < 0 ) {
-                Log.e(LOG_TAG, "Hit EOS reading message length");
+            if (countRead < 0) {
+                Log.w(LOG_TAG, "Hit EOS reading message length");
                 return -1;
             }
 
@@ -955,15 +942,14 @@ public final class CNE
                 | ((buffer[1] & 0xff) << 16)
                 | ((buffer[2] & 0xff) << 8)
                 | (buffer[3] & 0xff);
-
         // Then, re-use the buffer and read in the message itself
         offset = 0;
         remaining = messageLength;
         do {
             countRead = is.read(buffer, offset, remaining);
 
-            if (countRead < 0 ) {
-                Log.e(LOG_TAG, "Hit EOS reading message.  messageLength=" + messageLength
+            if (countRead < 0) {
+                Log.w(LOG_TAG, "Hit EOS reading message.  messageLength=" + messageLength
                         + " remaining=" + remaining);
                 return -1;
             }
@@ -975,166 +961,147 @@ public final class CNE
         return messageLength;
     }
 
-    class CNEReceiver implements Runnable
-    {
+    class CNEReceiver implements Runnable {
         byte[] buffer;
 
-
-        CNEReceiver()
-        {
+        CNEReceiver() {
             buffer = new byte[CNE_MAX_COMMAND_BYTES];
         }
 
-        public void
-        run()
-        {
+        public void run() {
             int retryCount = 0;
 
-            try {for (;;) {
-                LocalSocket s = null;
-                LocalSocketAddress l;
-
-                try {
-                    Log.v(LOG_TAG, "CNE creating socket");
-                    s = new LocalSocket();
-                    l = new LocalSocketAddress(SOCKET_NAME_CNE,
-                            LocalSocketAddress.Namespace.RESERVED);
-                    s.connect(l);
-                } catch (IOException ex){
-                    try {
-                        if (s != null) {
-                            s.close();
-                        }
-                    } catch (IOException ex2) {
-                        //ignore failure to close after failure to connect
-                    }
-
-                    // don't print an error message after the the first time
-                    // or after the 8th time
-
-                    if (retryCount == 8) {
-                        Log.e (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_CNE
-                            + "' socket after " + retryCount
-                            + " times, continuing to retry silently");
-                    } else if (retryCount > 0 && retryCount < 8) {
-                        Log.i (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_CNE
-                            + "' socket; retrying after timeout");
-                    }
+            try {
+                for (;;) {
+                    LocalSocket s = null;
+                    LocalSocketAddress l;
 
                     try {
-                        Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
-                    } catch (InterruptedException er) {
-                    }
-
-                    retryCount++;
-                    continue;
-                }
-
-                retryCount = 0;
-
-                mSocket = s;
-                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_CNE + "' socket");
-                isCndUp = true;
-
-                // send the init request to lowerlayer cne
-                sendInitReq();
-
-                /* wait until CNE gets created*/
-                synchronized(mService){
-                    /* send DefaultNwPref */
-                    sendDefaultNwPref(mNetworkPreference);
-
-                    /* start the default connection now */
-                    try{
-                        mDefaultConn.startConnection();
-                    }catch(NullPointerException e){
-                        Log.e(LOG_TAG,"Exception mDefaultConn is null" + e);
-                    }
-                }
-
-                int length = 0;
-                try {
-                    InputStream is = mSocket.getInputStream();
-
-                    for (;;) {
-                        Parcel p;
-
-                        length = readCneMessage(is, buffer);
-
-                        if (length < 0) {
-                            // End-of-stream reached
-                            break;
+                        if (DBG) Log.i(LOCAL_TAG, "CNE creating socket");
+                        s = new LocalSocket();
+                        l = new LocalSocketAddress(SOCKET_NAME_CNE,
+                                LocalSocketAddress.Namespace.RESERVED);
+                        s.connect(l);
+                    } catch (IOException ex) {
+                        try {
+                            if (s != null) {
+                                s.close();
+                            }
+                        } catch (IOException ex2) {
+                            // ignore failure to close after failure
+                            // to connect
                         }
 
-                        p = Parcel.obtain();
-                        p.unmarshall(buffer, 0, length);
-                        p.setDataPosition(0);
+                        // don't print an error message after the the
+                        // first time or after the 8th time
+                        if (retryCount == 8) {
+                            Log.w(LOG_TAG, "Couldn't find '" + SOCKET_NAME_CNE + "' socket after "
+                                    + retryCount + " times, continuing to retry silently");
+                        } else if (retryCount > 0 && retryCount < 8) {
+                            if (DBG) {
+                                Log.i(LOCAL_TAG, "Couldn't find '" + SOCKET_NAME_CNE
+                                        + "' socket; retrying after timeout");
+                            }
+                        }
 
-                        //Log.v(LOG_TAG, "Read packet: " + length + " bytes");
-
-                        processResponse(p);
-                        p.recycle();
+                        try {
+                            Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
+                        } catch (InterruptedException er) {
+                            // TODO: print error message
+                        }
+                        retryCount++;
+                        continue;
                     }
-                } catch (java.io.IOException ex) {
-                    Log.i(LOG_TAG, "'" + SOCKET_NAME_CNE + "' socket closed",
-                          ex);
-                } catch (Throwable tr) {
-                    Log.e(LOG_TAG, "Uncaught exception read length=" + length +
-                        "Exception:" + tr.toString());
-                }
+                    retryCount = 0;
+                    mSocket = s;
+                    if (DBG) Log.i(LOCAL_TAG, "Connected to '" + SOCKET_NAME_CNE + "' socket");
+                    isCndUp = true;
+                    // send the init request to lowerlayer cne
+                    sendInitReq();
 
-                Log.i(LOG_TAG, "Disconnected from '" + SOCKET_NAME_CNE
-                      + "' socket");
-                /* end the default connection it will get started
-                 * again when connection gets established
-                 */
-                try{
-                    mDefaultConn.endConnection();
-                }catch(NullPointerException e){
-                    Log.e(LOG_TAG,"Exception mDefaultConn is null" + e);
-                }
-                isCndUp = false;
+                    /* wait until CNE gets created */
+                    synchronized (mService) {
+                        /* send DefaultNwPref */
+                        sendDefaultNwPref(mNetworkPreference);
 
-                try {
-                    mSocket.close();
-                } catch (IOException ex) {
-                }
+                        /* start the default connection now */
+                        try {
+                            mDefaultConn.startConnection();
+                        } catch (NullPointerException e) {
+                            Log.w(LOG_TAG, "Exception mDefaultConn is null" + e);
+                        }
+                    }
+                    int length = 0;
+                    try {
+                        InputStream is = mSocket.getInputStream();
 
-                mSocket = null;
-                CNERequest.resetSerial();
+                        for (;;) {
+                            Parcel p;
 
-                // Clear request list on close
-                synchronized (mRequestsList) {
-                    for (int i = 0, sz = mRequestsList.size() ; i < sz ; i++) {
-                        CNERequest rr = mRequestsList.get(i);
-                        //rr.onError(RADIO_NOT_AVAILABLE);
-                        rr.release();
+                            length = readCneMessage(is, buffer);
+
+                            if (length < 0) {
+                                // End-of-stream reached
+                                break;
+                            }
+                            p = Parcel.obtain();
+                            p.unmarshall(buffer, 0, length);
+                            p.setDataPosition(0);
+                            // if (DBG) Log.i(LOCAL_TAG, "Read packet: " + length + " bytes");
+                            processResponse(p);
+                            p.recycle();
+                        }
+                    } catch (java.io.IOException ex) {
+                        if (DBG) Log.i(LOCAL_TAG, "'" + SOCKET_NAME_CNE + "' socket closed", ex);
+                    } catch (Throwable tr) {
+                        Log.w(LOG_TAG, "Uncaught exception read length=" + length + "Exception:"
+                                + tr.toString());
+                    }
+                    if (DBG) {
+                        Log.i(LOCAL_TAG, "Disconnected from '" + SOCKET_NAME_CNE + "' socket");
+                    }
+                    /*
+                     * end the default connection it will get started
+                     * again when connection gets established
+                     */
+                    try {
+                        mDefaultConn.endConnection();
+                    } catch (NullPointerException e) {
+                        Log.w(LOG_TAG, "Exception mDefaultConn is null" + e);
+                    }
+                    isCndUp = false;
+                    try {
+                        mSocket.close();
+                    } catch (IOException ex) {
                     }
 
-                    mRequestsList.clear();
+                    mSocket = null;
+                    CNERequest.resetSerial();
+
+                    // Clear request list on close
+                    synchronized (mRequestsList) {
+                        for (int i = 0, sz = mRequestsList.size(); i < sz; i++) {
+                            CNERequest rr = mRequestsList.get(i);
+                            // rr.onError(RADIO_NOT_AVAILABLE);
+                            rr.release();
+                        }
+
+                        mRequestsList.clear();
+                    }
                 }
-            }} catch (Throwable tr) {
-                Log.e(LOG_TAG,"Uncaught exception", tr);
+            } catch (Throwable tr) {
+                Log.w(LOG_TAG, "Uncaught exception", tr);
             }
         }
     }
 
+    // ***** Constructor
+    public CNE(Context context, ConnectivityService conn) {
+        // super(context);
 
-    //***** Constructor
-
-    public
-    CNE(Context context, ConnectivityService conn)
-    {
-        //super(context);
-
-        PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
-
+        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         mRequestMessagesPending = 0;
-
         mContext = context;
-
         mService = conn;
         mSenderThread = new HandlerThread("CNESender");
         mSenderThread.start();
@@ -1154,85 +1121,61 @@ public final class CNE
         activeRegsList = new ConcurrentHashMap<Integer, RegInfo>();
 
         /* create the default connection no metatdata right now */
-        Map<LinkRequirement,String> linkReqs = null;
+        Map<LinkRequirement, String> linkReqs = null;
         mDefaultConn = new DefaultConnection(linkReqs);
-        mWifiManager = (WifiManager)mContext.getSystemService(Context.WIFI_SERVICE);
-        mTelephonyManager = (TelephonyManager)mContext.getSystemService(mContext.TELEPHONY_SERVICE);
+        mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
+        mTelephonyManager = (TelephonyManager) mContext
+                .getSystemService(mContext.TELEPHONY_SERVICE);
 
         // register for phone state notifications.
-        ((TelephonyManager)mContext.getSystemService(Context.TELEPHONY_SERVICE))
-                .listen(mPhoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+        ((TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE)).listen(
+                mPhoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
 
         mReceiver = new CNEReceiver();
         mReceiverThread = new Thread(mReceiver, "CNEReceiver");
         mReceiverThread.start();
     }
 
-    private void
-    send(CNERequest rr)
-    {
-        Message msg;
-
-        msg = mSender.obtainMessage(EVENT_SEND, rr);
-
-        //acquireWakeLock();
-
+    private void send(CNERequest rr) {
+        Message msg = mSender.obtainMessage(EVENT_SEND, rr);
+        // acquireWakeLock();
         msg.sendToTarget();
-
-
     }
 
-    private void
-    processResponse (Parcel p)
-    {
+    private void processResponse(Parcel p) {
         int type;
-
         type = p.readInt();
-
         if (type == RESPONSE_UNSOLICITED) {
-            processUnsolicited (p);
+            processUnsolicited(p);
         } else if (type == RESPONSE_SOLICITED) {
-            processSolicited (p);
+            processSolicited(p);
         }
-
     }
 
-
-    private CNERequest findAndRemoveRequestFromList(int serial)
-    {
+    private CNERequest findAndRemoveRequestFromList(int serial) {
         synchronized (mRequestsList) {
-            for (int i = 0, s = mRequestsList.size() ; i < s ; i++) {
+            for (int i = 0, s = mRequestsList.size(); i < s; i++) {
                 CNERequest rr = mRequestsList.get(i);
-
                 if (rr.mSerial == serial) {
                     mRequestsList.remove(i);
                     return rr;
                 }
             }
         }
-
         return null;
     }
 
-    private void
-    processSolicited (Parcel p)
-    {
+    private void processSolicited(Parcel p) {
         int serial, error;
         boolean found = false;
-
         serial = p.readInt();
         error = p.readInt();
-
         CNERequest rr;
-
         rr = findAndRemoveRequestFromList(serial);
-
         if (rr == null) {
-            Log.w(LOG_TAG, "Unexpected solicited response! sn: "
-                            + serial + " error: " + error);
+            Log.w(LOG_TAG, "Unexpected solicited response! sn: " + serial + " error: " + error);
             return;
         }
-
         if (error != 0) {
             rr.onError(error);
             rr.release();
@@ -1241,39 +1184,37 @@ public final class CNE
         rr.release();
     }
 
-    private void
-    processUnsolicited (Parcel p)
-    {
-        Log.w(LOG_TAG, "processUnsolicited called");
+    private void processUnsolicited(Parcel p) {
+        if (DBG) Log.i(LOCAL_TAG, "processUnsolicited called");
         int response;
         Object ret;
 
         response = p.readInt();
-        switch(response) {
-             case CNE_RESPONSE_REG_ROLE: {
-                 handleRegRoleRsp(p);
-                 break;
-             }
-             case CNE_RESPONSE_GET_BEST_NW:{
-                 handleGetCompatibleNwsRsp(p);
-                 break;
-             }
-             case CNE_RESPONSE_CONFIRM_NW: {
-                 handleConfNwRsp(p);
-                 break;
-             }
-             case CNE_RESPONSE_DEREG_ROLE: {
-                 handleDeRegRoleRsp(p);
-                 break;
-             }
+        switch (response) {
+            case CNE_RESPONSE_REG_ROLE: {
+                handleRegRoleRsp(p);
+                break;
+            }
+            case CNE_RESPONSE_GET_BEST_NW: {
+                handleGetCompatibleNwsRsp(p);
+                break;
+            }
+            case CNE_RESPONSE_CONFIRM_NW: {
+                handleConfNwRsp(p);
+                break;
+            }
+            case CNE_RESPONSE_DEREG_ROLE: {
+                handleDeRegRoleRsp(p);
+                break;
+            }
             case CNE_REQUEST_BRING_RAT_DOWN: {
-                 handleRatDownMsg(p);
-                 break;
-             }
+                handleRatDownMsg(p);
+                break;
+            }
             case CNE_REQUEST_BRING_RAT_UP: {
-                 handleRatUpMsg(p);
-                 break;
-             }
+                handleRatUpMsg(p);
+                break;
+            }
             case CNE_NOTIFY_MORE_PREFERED_RAT_AVAIL: {
                 handleMorePrefNwAvailEvent(p);
                 break;
@@ -1292,175 +1233,149 @@ public final class CNE
             }
             case CNE_NOTIFY_FMC_STATUS: {
                 handleFmcStatusMsg(p);
-            break;
+                break;
             }
             case CNE_NOTIFY_HOST_ROUTING_IP: {
                 handleHostRoutingIpMsg(p);
-            break;
+                break;
             }
-
-
-             default: {
-                 Log.w(LOG_TAG,"UNKOWN Unsolicited Event "+response);
-             }
+            default: {
+                Log.w(LOG_TAG, "UNKOWN Unsolicited Event " + response);
+            }
         }
         return;
     }
 
-
-    private int
-    NetworkStateToInt(NetworkInfo.State state)
-    {
-        switch(state)
-        {
-           case CONNECTING: {return 0;}
-           case CONNECTED:  {return 1;}
-           case SUSPENDED:  {return 2;}
-           case DISCONNECTING: {return 3;}
-           case DISCONNECTED:  {return 4;}
-           case UNKNOWN:       {return 5;}
-
+    private int NetworkStateToInt(NetworkInfo.State state) {
+        switch (state) {
+            case CONNECTING: {
+                return 0;
+            }
+            case CONNECTED: {
+                return 1;
+            }
+            case SUSPENDED: {
+                return 2;
+            }
+            case DISCONNECTING: {
+                return 3;
+            }
+            case DISCONNECTED: {
+                return 4;
+            }
+            case UNKNOWN: {
+                return 5;
+            }
         }
         return -1;
-
-
     }
 
     private boolean isEvdo() {
-        return ( (mServiceState != null)
-                 && ((mServiceState.getRadioTechnology()
-                        == ServiceState.RADIO_TECHNOLOGY_EVDO_0)
-                     || (mServiceState.getRadioTechnology()
-                        == ServiceState.RADIO_TECHNOLOGY_EVDO_A)));
+        return ((mServiceState != null)
+                && ((mServiceState.getRadioTechnology() == ServiceState.RADIO_TECHNOLOGY_EVDO_0)
+                        || (mServiceState.getRadioTechnology()
+                                == ServiceState.RADIO_TECHNOLOGY_EVDO_A)));
     }
 
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
         @Override
         public void onSignalStrengthsChanged(SignalStrength signalStrength) {
-            Log.i(LOG_TAG,"CNE onSignalStrengthsChanged ");
             mSignalStrength = signalStrength;
-
             if (mTelephonyManager != null) {
-              ConnectivityManager cm =
-                (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-              NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
-              NetworkInfo.State networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
-                    networkInfo.getState());
-
-              AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
-                                                           IPVersion.IPV4);
-              int roaming =(int)(mTelephonyManager.isNetworkRoaming()?1:0);
-              int type = networkInfo.getSubtype();
-              int rssi = getSignalStrength(type);
-              String tsStr = null;
-              long currentTime = System.currentTimeMillis();
-              Timestamp ts = new Timestamp(currentTime);
-              tsStr = ts.toString();
-
-              Log.i(LOG_TAG,"CNE onSignalStrengthsChanged - type:" + type + ",strength:"
-                    + rssi + ",state:" + networkState);
-
-              Log.i(LOG_TAG, "CNE onSignalStrengthsChanged - ipV4Addr:" + wwanV4AddrInfo.ipAddr +
-                    ",roaming:" + roaming + ",timeStamp:" + tsStr);
-
-              updateWwanStatus(type, NetworkStateToInt(networkState),
-                               rssi, roaming, wwanV4AddrInfo.ipAddr, tsStr);
-
+                ConnectivityManager cm = (ConnectivityManager) mContext
+                        .getSystemService(Context.CONNECTIVITY_SERVICE);
+                NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+                NetworkInfo.State networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN
+                        : networkInfo.getState());
+                AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
+                        IPVersion.IPV4);
+                int roaming = (int) (mTelephonyManager.isNetworkRoaming() ? 1 : 0);
+                int type = networkInfo.getSubtype();
+                int rssi = getSignalStrength(type);
+                Timestamp ts = new Timestamp(System.currentTimeMillis());
+                String tsStr = ts.toString();
+                if (DBG) {
+                    String logmsg = "CNE onSignalStrengthsChanged -"
+                            + " type:" + type
+                            + " strength:" + rssi
+                            + " state:" + networkState
+                            + " ipV4Addr:" + wwanV4AddrInfo.ipAddr
+                            + " roaming:" + roaming
+                            + " timeStamp:" + tsStr;
+                    Log.i(LOCAL_TAG, logmsg);
+                }
+                updateWwanStatus(type, NetworkStateToInt(networkState), rssi, roaming,
+                        wwanV4AddrInfo.ipAddr, tsStr);
             } else {
-              Log.i(LOG_TAG, "onSignalStrengthsChanged null TelephonyManager");
+                Log.w(LOG_TAG, "onSignalStrengthsChanged null TelephonyManager");
             }
         }
     };
 
-
-    private NetworkInfo.State convertToNetworkState(Phone.DataState dataState){
-        switch(dataState){
-        case DISCONNECTED :
-            return NetworkInfo.State.DISCONNECTED;
-        case CONNECTING :
-            return NetworkInfo.State.CONNECTING;
-        case CONNECTED :
-            return NetworkInfo.State.CONNECTED;
-        case SUSPENDED :
-            return NetworkInfo.State.SUSPENDED;
-        default:
-            return NetworkInfo.State.UNKNOWN;
+    private NetworkInfo.State convertToNetworkState(Phone.DataState dataState) {
+        switch (dataState) {
+            case DISCONNECTED:
+                return NetworkInfo.State.DISCONNECTED;
+            case CONNECTING:
+                return NetworkInfo.State.CONNECTING;
+            case CONNECTED:
+                return NetworkInfo.State.CONNECTED;
+            case SUSPENDED:
+                return NetworkInfo.State.SUSPENDED;
+            default:
+                return NetworkInfo.State.UNKNOWN;
         }
     }
 
-    private int
-    getSignalStrength(int networkType)
-    {
-
-        if (mSignalStrength == null)
-        {
-          Log.w(LOG_TAG, "getSignalStrength mSignalStrength in null");
-          return -1;
+    private int getSignalStrength(int networkType) {
+        if (mSignalStrength == null) {
+            Log.w(LOG_TAG, "getSignalStrength mSignalStrength in null");
+            return -1;
         }
-
-        Log.i(LOG_TAG, "getSignalStrength networkType= " + networkType);
-
-        switch(networkType)
-        {
-           case TelephonyManager.NETWORK_TYPE_GPRS:
-           case TelephonyManager.NETWORK_TYPE_EDGE:
-           case TelephonyManager.NETWORK_TYPE_UMTS:
-           case TelephonyManager.NETWORK_TYPE_HSDPA:
-           case TelephonyManager.NETWORK_TYPE_HSUPA:
-           case TelephonyManager.NETWORK_TYPE_HSPA:
-             // dBm = -113 + 2*asu
-             return (-113 + 2*(mSignalStrength.getGsmSignalStrength()));
-           case TelephonyManager.NETWORK_TYPE_1xRTT:
-           case TelephonyManager.NETWORK_TYPE_CDMA:
-             return(mSignalStrength.getCdmaDbm());
-             //return(mSignalStrength.getCdmaEcio());
-           case TelephonyManager.NETWORK_TYPE_EVDO_0:
-           case TelephonyManager.NETWORK_TYPE_EVDO_A:
-             return(mSignalStrength.getEvdoDbm());
-             //return(mSignalStrength.getEvdoSnr());
+        if (DBG) Log.i(LOCAL_TAG, "getSignalStrength networkType= " + networkType);
+        switch (networkType) {
+            case TelephonyManager.NETWORK_TYPE_GPRS:
+            case TelephonyManager.NETWORK_TYPE_EDGE:
+            case TelephonyManager.NETWORK_TYPE_UMTS:
+            case TelephonyManager.NETWORK_TYPE_HSDPA:
+            case TelephonyManager.NETWORK_TYPE_HSUPA:
+            case TelephonyManager.NETWORK_TYPE_HSPA:
+                // dBm = -113 + 2*asu
+                return (-113 + 2 * (mSignalStrength.getGsmSignalStrength()));
+            case TelephonyManager.NETWORK_TYPE_1xRTT:
+            case TelephonyManager.NETWORK_TYPE_CDMA:
+                return (mSignalStrength.getCdmaDbm());
+                // return(mSignalStrength.getCdmaEcio());
+            case TelephonyManager.NETWORK_TYPE_EVDO_0:
+            case TelephonyManager.NETWORK_TYPE_EVDO_A:
+                return (mSignalStrength.getEvdoDbm());
+                // return(mSignalStrength.getEvdoSnr());
         }
         return -1;
-
     }
 
-    private Object
-    responseInts(Parcel p)
-    {
+    private Object responseInts(Parcel p) {
         int numInts;
         int response[];
-
         numInts = p.readInt();
-
         response = new int[numInts];
-
-        for (int i = 0 ; i < numInts ; i++) {
+        for (int i = 0; i < numInts; i++) {
             response[i] = p.readInt();
         }
-
         return response;
     }
 
-
-    private Object
-    responseVoid(Parcel p)
-    {
+    private Object responseVoid(Parcel p) {
         return null;
     }
 
-
-    private Object
-    responseString(Parcel p)
-    {
+    private Object responseString(Parcel p) {
         String response;
-
         response = p.readString();
-
         return response;
     }
 
-    private Object
-    responseStrings(Parcel p)
-    {
+    private Object responseStrings(Parcel p) {
         int num;
         String response[];
 
@@ -1474,65 +1389,53 @@ public final class CNE
                 response[i] = p.readString();
             }
         }
-
         return response;
     }
 
-    private Object
-    responseRaw(Parcel p)
-    {
+    private Object responseRaw(Parcel p) {
         int num;
         byte response[];
-
         response = p.createByteArray();
-
         return response;
     }
-
-    private void cnejLog(String msg) {
-        Log.d(LOG_TAG, msg);
-    }
-
-    private void cnejLogv(String msg) {
-        Log.v(LOG_TAG, msg);
-    }
-
 
     /* API functions */
     public boolean updateBatteryStatus(int status, int pluginType, int level) {
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_BATTERY_INFO);
-        if (rr == null)
-        {
-             Log.e(LOG_TAG, "updateBatteryStatus: rr=NULL");
-             return false;
+        if (rr == null) {
+            Log.w(LOG_TAG, "updateBatteryStatus: rr=NULL");
+            return false;
         }
-        Log.i(LOG_TAG, "UpdateBatteryStatus status=" + status + "pluginType="
-                      + pluginType + "level=" + level);
-
-        rr.mp.writeInt(3); //num of ints that are getting written
+        if (DBG) {
+            Log.i(LOCAL_TAG, "UpdateBatteryStatus status=" + status + " pluginType=" + pluginType
+                    + " level=" + level);
+        }
+        rr.mp.writeInt(3); // num of ints that are getting written
         rr.mp.writeInt(status);
         rr.mp.writeInt(pluginType);
         rr.mp.writeInt(level);
-
         send(rr);
-
         return true;
     }
 
-    public boolean updateWlanStatus(int type, int state, int rssi,
-                                    String ssid, String ipAddr, String timeStamp) {
+    public boolean updateWlanStatus(int type, int state, int rssi, String ssid, String ipAddr,
+            String timeStamp) {
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WLAN_INFO);
-        if (rr == null)
-        {
-             Log.e(LOG_TAG, "updateWlanStatus: rr=NULL - no updated");
-             return false;
+        if (rr == null) {
+            Log.w(LOG_TAG, "updateWlanStatus: rr=NULL - no updated");
+            return false;
         }
 
-        Log.i(LOG_TAG, "UpdateWlanStatus type=" + type + ",state=" + state +
-              ",rssi=" + rssi + ",ssid=" + ssid + ",ipAddr" + ipAddr +
-              ",timeStamp" + timeStamp);
+        if (DBG) {
+            Log.i(LOCAL_TAG, "UpdateWlanStatus type=" + type
+                    + " state=" + state
+                    + " rssi=" + rssi
+                    + " ssid=" + ssid
+                    + " ipAddr" + ipAddr
+                    + " timeStamp" + timeStamp);
+        }
 
         rr.mp.writeInt(type);
         rr.mp.writeInt(state);
@@ -1540,66 +1443,63 @@ public final class CNE
         rr.mp.writeString(ssid);
         rr.mp.writeString(ipAddr);
         rr.mp.writeString(timeStamp);
-
         send(rr);
-
         return true;
     }
-
 
     public boolean updateWlanScanResults(List<ScanResult> scanResults) {
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WLAN_SCAN_RESULTS);
-        if (rr == null)
-        {
-             Log.e(LOG_TAG, "updateWlanScanResults: rr=NULL");
-             return false;
+        if (rr == null) {
+            Log.w(LOG_TAG, "updateWlanScanResults: rr=NULL");
+            return false;
         }
 
-        if (scanResults != null)
-        {
-             Log.i(LOG_TAG, "CNE- updateWlanScanResults: scanResults size = " + scanResults.size());
-             rr.mp.writeInt(scanResults.size());  // write number of elements
-             for (int i = scanResults.size() - 1; i >= 0; i--)
-             {
-                 ScanResult scanResult = scanResults.get(i);
-                 rr.mp.writeInt(scanResult.level);
-                 rr.mp.writeInt(scanResult.frequency);
-                 rr.mp.writeString(scanResult.SSID);
-                 rr.mp.writeString(scanResult.BSSID);
-                 rr.mp.writeString(scanResult.capabilities);
+        if (scanResults != null) {
+            if (DBG) {
+                Log.i(LOCAL_TAG,
+                        "CNE- updateWlanScanResults: scanResults size = " + scanResults.size());
+            }
+            rr.mp.writeInt(scanResults.size()); // write number of elements
+            for (int i = scanResults.size() - 1; i >= 0; i--) {
+                ScanResult scanResult = scanResults.get(i);
+                rr.mp.writeInt(scanResult.level);
+                rr.mp.writeInt(scanResult.frequency);
+                rr.mp.writeString(scanResult.SSID);
+                rr.mp.writeString(scanResult.BSSID);
+                rr.mp.writeString(scanResult.capabilities);
 
-                 // Need to check for empty string before writeString?
-                 //if (TextUtils.isEmpty(scanResult.capabilities)) {
-             }
-
+                // Need to check for empty string before writeString?
+                // if (TextUtils.isEmpty(scanResult.capabilities)) {
+            }
         }
-
         send(rr);
-
         return true;
     }
 
     /** {@hide} */
-    public boolean updateWwanStatus(int type, int state, int rssi, int roaming,
-                                    String ipV4Addr, String timeStamp) {
+    public boolean updateWwanStatus(int type, int state, int rssi, int roaming, String ipV4Addr,
+            String timeStamp) {
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WWAN_INFO);
         if (rr == null) {
-            Log.e(LOG_TAG, "updateWwanStatus: rr=NULL - no updated");
+            Log.w(LOG_TAG, "updateWwanStatus: rr=NULL - no updated");
             return false;
         }
-        Log.i(LOG_TAG, "UpdateWwanStatus type=" + type + ",state=" + state + ",rssi="
-              + rssi + ",roaming=" + roaming + ",ipV4Addr" + ipV4Addr + ",timeStamp"
-              + timeStamp);
-
+        if (DBG) {
+            Log.i(LOCAL_TAG, "UpdateWwanStatus type=" + type
+                    + " state=" + state
+                    + " rssi=" + rssi
+                    + " roaming=" + roaming
+                    + " ipV4Addr" + ipV4Addr
+                    + " timeStamp" + timeStamp);
+        }
         rr.mp.writeInt(type);
         rr.mp.writeInt(state);
         rr.mp.writeInt(rssi);
         rr.mp.writeInt(roaming);
         rr.mp.writeString(ipV4Addr);
         rr.mp.writeString(timeStamp);
-
         send(rr);
         return true;
     }
@@ -1610,94 +1510,87 @@ public final class CNE
         CNERequest rr = CNERequest.obtain(CNE_NOTIFY_RAT_CONNECT_STATUS);
 
         if (rr == null) {
-            Log.e(LOG_TAG, "notifyRatConnectStatus: rr=NULL");
+            Log.w(LOG_TAG, "notifyRatConnectStatus: rr=NULL");
             return false;
         }
-        Log.i(LOG_TAG, "notifyRatConnectStatus ratType=" + type + ",status="
-              + status + ",ipV4Addr=" + ipV4Addr);
-
+        if (DBG) {
+            Log.i(LOCAL_TAG, "notifyRatConnectStatus ratType=" + type
+                    + " status=" + status
+                    + " ipV4Addr=" + ipV4Addr);
+        }
         rr.mp.writeInt(type);
         rr.mp.writeInt(status);
         rr.mp.writeString(ipV4Addr);
-
         send(rr);
         return true;
     }
 
     /** {@hide} */
     public boolean configureIproute2(int command, String ifName, String ipAddr,
-                                     String gatewayAddr) {
+            String gatewayAddr) {
 
-      CNERequest rr = null;
+        CNERequest rr = null;
+        if (DBG) {
+            Log.i(LOCAL_TAG, "configureIproute2: Command=" + command
+                    + " ifName=" + ifName
+                    + " ipAddr=" + ipAddr
+                    + " gatewayAddr=" + gatewayAddr);
+        }
+        if (getFmcObj() != null) {
+            if ((getFmcObj().dsAvail == true)
+                    && (command == CNE_IPROUTE2_ADD_ROUTING
+                            || command == CNE_IPROUTE2_DELETE_ROUTING
+                            || command == CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN
+                            || command == CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN)) {
+                Log.w(LOG_TAG, "configureIproute2: cmd=" + command + " invalid in FMC");
+                return false;
+            }
+        }
 
-      Log.i(LOG_TAG, "configureIproute2: Command=" + command + ",ifName=" + ifName +
-            ",ipAddr=" + ipAddr + ",gatewayAddr=" + gatewayAddr);
+        rr = CNERequest.obtain(CNE_REQUEST_CONFIG_IPROUTE2_CMD);
+        if (rr == null) {
+            Log.w(LOG_TAG, "configureIproute2: rr=NULL");
+            return false;
+        }
 
-      if (getFmcObj() != null) {
-          if ((getFmcObj().dsAvail == true) &&
-              (command == CNE_IPROUTE2_ADD_ROUTING ||
-               command == CNE_IPROUTE2_DELETE_ROUTING ||
-               command == CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN ||
-               command == CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN)) {
-              Log.w(LOG_TAG, "configureIproute2: cmd=" + command + "invalid in FMC");
-              return false;
-          }
-      }
-
-      rr = CNERequest.obtain(CNE_REQUEST_CONFIG_IPROUTE2_CMD);
-      if (rr == null)   {
-          Log.e(LOG_TAG, "configureIproute2: rr=NULL");
-          return false;
-      }
-
-      rr.mp.writeInt(command);
-      rr.mp.writeString(ifName);
-      rr.mp.writeString(ipAddr);
-      rr.mp.writeString(gatewayAddr);
-
-      send(rr);
-      return true;
+        rr.mp.writeInt(command);
+        rr.mp.writeString(ifName);
+        rr.mp.writeString(ipAddr);
+        rr.mp.writeString(gatewayAddr);
+        send(rr);
+        return true;
     }
 
-
-
     /** {@hide} */
-    public void sendDefaultNwPref2Cne(int preference){
+    public void sendDefaultNwPref2Cne(int preference) {
         mNetworkPreference = preference;
     }
 
     /** {@hide} */
-    public void sendDefaultNwPref(int preference){
+    public void sendDefaultNwPref(int preference) {
         CNERequest rr = CNERequest.obtain(CNE_NOTIFY_DEFAULT_NW_PREF);
         if (rr != null) {
-            rr.mp.writeInt(1); //num of ints that are getting written
+            rr.mp.writeInt(1); // num of ints that are getting written
             int rat = CNE_RAT_WLAN;
-            if(preference == ConnectivityManager.TYPE_MOBILE) {
+            if (preference == ConnectivityManager.TYPE_MOBILE) {
                 rat = CNE_RAT_WWAN;
             }
             rr.mp.writeInt(rat);
             send(rr);
-        }
-        else{
-            Log.e(LOG_TAG, "sendDefaultNwPref2Cne: rr=NULL");
+        } else {
+            Log.w(LOG_TAG, "sendDefaultNwPref2Cne: rr=NULL");
         }
         return;
     }
 
-    private boolean sendRegRoleReq
-    (
-        int role,
-        int roleRegId,
-        int fwLinkBw,
-        int revLinkBw
-    ) {
+    private boolean sendRegRoleReq(int role, int roleRegId, int fwLinkBw, int revLinkBw) {
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_REG_ROLE);
         if (rr == null) {
-            Log.e(LOG_TAG, "sendRegRoleReq: rr=NULL");
+            Log.w(LOG_TAG, "sendRegRoleReq: rr=NULL");
             return false;
         }
 
-        rr.mp.writeInt(4); //num of ints that are getting written
+        rr.mp.writeInt(4); // num of ints that are getting written
         rr.mp.writeInt(role);
         rr.mp.writeInt(roleRegId);
         rr.mp.writeInt(fwLinkBw);
@@ -1711,44 +1604,35 @@ public final class CNE
     private boolean sendInitReq() {
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_INIT);
         if (rr == null) {
-            Log.e(LOG_TAG, "sendinitReq: rr=NULL");
+            Log.w(LOG_TAG, "sendinitReq: rr=NULL");
             return false;
         }
         send(rr);
         return true;
     }
 
-
     private boolean sendGetCompatibleNwsReq(int roleRegId) {
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_GET_COMPATIBLE_NWS);
-        if (rr == null)
-        {
-             Log.e(LOG_TAG, "sendGetCompatibleNwsReq: rr=NULL");
-             return false;
+        if (rr == null) {
+            Log.w(LOG_TAG, "sendGetCompatibleNwsReq: rr=NULL");
+            return false;
         }
-        rr.mp.writeInt(1); //num of ints that are getting written
+        rr.mp.writeInt(1); // num of ints that are getting written
         rr.mp.writeInt(roleRegId);
-        Log.d(LOG_TAG, "Sending GetCompatibleNwsReq roleRegId=" + roleRegId);
+        if (DBG) Log.i(LOCAL_TAG, "Sending GetCompatibleNwsReq roleRegId=" + roleRegId);
         send(rr);
         return true;
     }
 
     // change name and params one is added
-    private boolean sendConfirmNwReq
-    (
-        int roleRegId,
-        int ifaceId,
-        int confirmation,
-        int notifyIfBetterNwAvail,
-        int newIfaceId
-    )
-    {
+    private boolean sendConfirmNwReq(int roleRegId, int ifaceId, int confirmation,
+            int notifyIfBetterNwAvail, int newIfaceId) {
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_CONF_NW);
         if (rr == null) {
-            Log.e(LOG_TAG, "sendConfirmNwReq: rr=NULL");
+            Log.w(LOG_TAG, "sendConfirmNwReq: rr=NULL");
             return false;
         }
-        rr.mp.writeInt(5); //num of ints that are getting written
+        rr.mp.writeInt(5); // num of ints that are getting written
         rr.mp.writeInt(roleRegId);
         rr.mp.writeInt(ifaceId);
         rr.mp.writeInt(confirmation);
@@ -1764,24 +1648,23 @@ public final class CNE
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_DEREG_ROLE);
         if (rr == null) {
-             Log.e(LOG_TAG, "sendDeregRoleReq: rr=NULL");
-             return false;
+            Log.w(LOG_TAG, "sendDeregRoleReq: rr=NULL");
+            return false;
         }
-        rr.mp.writeInt(1); //num of ints that are getting written
+        rr.mp.writeInt(1); // num of ints that are getting written
         rr.mp.writeInt(roleRegId);
-        Log.e(LOG_TAG, "sendDeregRoleReq:");
+        if (DBG) Log.i(LOCAL_TAG, "sendDeregRoleReq:");
 
         send(rr);
         return true;
     }
 
-
-    private int getRegId(int pid, int role){
+    private int getRegId(int pid, int role) {
         int regId = CNE_REGID_INVALID;
         Iterator activeRegsIter = activeRegsList.entrySet().iterator();
-        while(activeRegsIter.hasNext()){
-            RegInfo regInfo = (RegInfo)((Map.Entry)activeRegsIter.next()).getValue();
-            if(regInfo.role == role && regInfo.pid == pid){
+        while (activeRegsIter.hasNext()) {
+            RegInfo regInfo = (RegInfo) ((Map.Entry) activeRegsIter.next()).getValue();
+            if (regInfo.role == role && regInfo.pid == pid) {
                 regId = regInfo.regId;
                 break;
             }
@@ -1789,74 +1672,71 @@ public final class CNE
         return regId;
     }
 
-
-    private void handleRegRoleRsp(Parcel p){
+    private void handleRegRoleRsp(Parcel p) {
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleRegRoleRsp called with numInts = "+ numInts +
-              " RoleRegId = "+ roleRegId + " evtStatus = " + evtStatus);
+        if (DBG) {
+            Log.i(LOCAL_TAG, "handleRegRoleRsp called with numInts = " + numInts + " RoleRegId = "
+                    + roleRegId + " evtStatus = " + evtStatus);
+        }
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
-        if(regInfo != null){
-            if(evtStatus == STATUS_SUCCESS){
-                /* register role was success so get the compatible networks */
+        if (regInfo != null) {
+            if (evtStatus == STATUS_SUCCESS) {
+                /*
+                 * register role was success so get the compatible
+                 * networks
+                 */
                 sendGetCompatibleNwsReq(roleRegId);
                 return;
-            }
-            else{
+            } else {
                 IConSvcEventListener listener = regInfo.cbInfo.listener;
-                if(listener != null){
+                if (listener != null) {
                     try {
                         listener.onGetLinkFailure(LinkNotifier.FAILURE_GENERAL);
+                    } catch (RemoteException e) {
+                        Log.w(LOG_TAG, "handleRegRoleRsp listener is null");
                     }
-                    catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleRegRoleRsp listener is null");
-                   }
                 }
             }
-        }
-        else {
-            Log.w(LOG_TAG,"handleRegRoleRsp regId=" + roleRegId + " does not exists");
+        } else {
+            if (DBG) Log.w(LOCAL_TAG, "handleRegRoleRsp regId=" + roleRegId + " does not exists");
             return;
         }
     }
 
-    private void handleGetCompatibleNwsRsp(Parcel p){
+    private void handleGetCompatibleNwsRsp(Parcel p) {
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleGetCompatibleNwsRsp called for roleRegId = "+
-              roleRegId + " evtStatus = " + evtStatus);
+        if (DBG) {
+            Log.i(LOCAL_TAG, "handleGetCompatibleNwsRsp called for roleRegId = " + roleRegId
+                    + " evtStatus = " + evtStatus);
+        }
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
-        if(regInfo != null){
-            if(evtStatus == STATUS_SUCCESS){
+        if (regInfo != null) {
+            if (evtStatus == STATUS_SUCCESS) {
                 /* save the returned info */
                 regInfo.activeRat = p.readInt();
                 /* save the oldCompatibleRatsList */
-                ArrayList<RatInfo> prevCompatibleRatsList =
-                    regInfo.compatibleRatsList;
-                ArrayList<RatInfo> newCompatibleRatsList =
-                    new ArrayList<RatInfo>();
-                for(int i = 0; i< CNE_RAT_MAX; i++){
+                ArrayList<RatInfo> prevCompatibleRatsList = regInfo.compatibleRatsList;
+                ArrayList<RatInfo> newCompatibleRatsList = new ArrayList<RatInfo>();
+                for (int i = 0; i < CNE_RAT_MAX; i++) {
                     int nextRat = p.readInt();
-                    if(nextRat != CNE_RAT_INVALID && nextRat != CNE_RAT_NONE ){
+                    if (nextRat != CNE_RAT_INVALID && nextRat != CNE_RAT_NONE) {
                         RatInfo ratInfo = new RatInfo();
                         ratInfo.rat = nextRat;
-                        if(nextRat == regInfo.activeRat){
+                        if (nextRat == regInfo.activeRat) {
                             ratInfo.status = RatTriedStatus.RAT_STATUS_TRIED;
-                        }
-                        else {
+                        } else {
                             /* try to preserve the old rat status */
                             int index = prevCompatibleRatsList.indexOf(ratInfo);
-                            if(index != -1){
-                                RatInfo oldRatInfo =
-                                    prevCompatibleRatsList.get(index);
+                            if (index != -1) {
+                                RatInfo oldRatInfo = prevCompatibleRatsList.get(index);
                                 ratInfo.status = oldRatInfo.status;
-                            }
-                            else{
-                                ratInfo.status =
-                                    RatTriedStatus.RAT_STATUS_NOT_TRIED;
+                            } else {
+                                ratInfo.status = RatTriedStatus.RAT_STATUS_NOT_TRIED;
                             }
                         }
                         newCompatibleRatsList.add(ratInfo);
@@ -1865,177 +1745,162 @@ public final class CNE
                 String ipAddr = new String(p.readString());
                 int flBwEst = p.readInt();
                 int rlBwEst = p.readInt();
-                Log.v(LOG_TAG,"ipV4Addr = "+ ipAddr + " flBwEst = " + flBwEst +
-                      " rlBwEst = " + rlBwEst);
+                if (DBG) {
+                    Log.i(LOCAL_TAG, "ipV4Addr = " + ipAddr + " flBwEst = " + flBwEst
+                            + " rlBwEst = " + rlBwEst);
+                }
                 prevCompatibleRatsList.clear();
                 regInfo.compatibleRatsList = newCompatibleRatsList;
                 regInfo.dump();
                 /* call the call backs */
-                /* over here the implementation is to use what ever the
-                 * connectivityEngine has passed as the best rat, if
-                 * AndroidConSvc is not satisifed or wants to do give a
-                 * different nw then, it can confirm the bestrat given by
-                 * Cne negative, and do not call the onLinkAvail
-                 * callback yet and request a new one
+                /*
+                 * over here the implementation is to use what ever
+                 * the connectivityEngine has passed as the best rat,
+                 * if AndroidConSvc is not satisifed or wants to do
+                 * give a different nw then, it can confirm the
+                 * bestrat given by Cne negative, and do not call the
+                 * onLinkAvail callback yet and request a new one
                  */
                 IConSvcEventListener listener = regInfo.cbInfo.listener;
-                if(listener != null){
+                if (listener != null) {
                     try {
-                        LinkInfo linkInfo =
-                            new LinkInfo(ipAddr,
-                                         flBwEst,
-                                         rlBwEst,
-                                         regInfo.activeRat);
-                        regInfo.notificationsSent = regInfo.notificationsSent |
-                            CNE_MASK_ON_LINK_AVAIL_SENT;
+                        LinkInfo linkInfo = new LinkInfo(ipAddr, flBwEst, rlBwEst,
+                                regInfo.activeRat);
+                        regInfo.notificationsSent = regInfo.notificationsSent
+                                | CNE_MASK_ON_LINK_AVAIL_SENT;
                         listener.onLinkAvail(linkInfo);
+                    } catch (RemoteException e) {
+                        Log.w(LOG_TAG, "handleGetCompNwsRsp listener is null");
                     }
-                    catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleGetCompNwsRsp listener is null");
-                   }
                 }
                 return;
-            }
-            else{
+            } else {
                 IConSvcEventListener listener = regInfo.cbInfo.listener;
-                if(listener != null){
+                if (listener != null) {
                     try {
-                      listener.onGetLinkFailure(LinkNotifier.FAILURE_NO_LINKS);
+                        listener.onGetLinkFailure(LinkNotifier.FAILURE_NO_LINKS);
+                    } catch (RemoteException e) {
+                        Log.w(LOG_TAG, "handleGetCompNwsRsp listener is null");
                     }
-                    catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleGetCompNwsRsp listener is null");
-                   }
                 }
             }
-        }
-        else {
-            Log.w(LOG_TAG,"handleGetCompatibleNwsRsp role does not exists");
+        } else {
+            if (DBG) Log.w(LOCAL_TAG, "handleGetCompatibleNwsRsp role does not exists");
             return;
         }
 
     }
 
-    private void handleConfNwRsp(Parcel p){
+    private void handleConfNwRsp(Parcel p) {
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleConfNwRsp called with numInts = "+ numInts +
-              " regRoleId = "+ roleRegId + " evtStatus = " + evtStatus);
+        if (DBG) {
+            Log.i(LOCAL_TAG, "handleConfNwRsp called with numInts = " + numInts
+                    + " regRoleId = " + roleRegId + " evtStatus = " + evtStatus);
+        }
     }
 
-    private void handleDeRegRoleRsp(Parcel p){
+    private void handleDeRegRoleRsp(Parcel p) {
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int evtStatus = p.readInt();
-        Log.i(LOG_TAG,"handleDeRegRoleRsp called with numInts = "+ numInts +
-              " roleRegId = "+ roleRegId + " evtStatus = " + evtStatus);
+        if (DBG) {
+            Log.i(LOCAL_TAG, "handleDeRegRoleRsp called with numInts = " + numInts
+                    + " roleRegId = " + roleRegId + " evtStatus = " + evtStatus);
+        }
         /* clean up */
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
-        if(regInfo != null){
+        if (regInfo != null) {
             regInfo.compatibleRatsList.clear();
             activeRegsList.remove(roleRegId);
-        }
-        else {
-            Log.w(LOG_TAG,"handleDeRegRoleRsp role does not exists");
+        } else {
+            Log.w(LOG_TAG, "handleDeRegRoleRsp role does not exists");
             return;
         }
     }
 
-    private void handleMorePrefNwAvailEvent(Parcel p){
+    private void handleMorePrefNwAvailEvent(Parcel p) {
         int roleRegId = p.readInt();
         int betterRat = p.readInt();
         String ipAddr = new String(p.readString());
         int flBwEst = p.readInt();
         int rlBwEst = p.readInt();
-        Log.i(LOG_TAG,"handleMorePrefNwAvailEvent called for roleRegId = "+
-               roleRegId + " betterRat = " + betterRat + " ipAddr = "+ipAddr+
-              " flBwEst = " + flBwEst+ " rlBwEst = "+rlBwEst);
+        if (DBG) {
+            Log.i(LOCAL_TAG, "handleMorePrefNwAvailEvent called for roleRegId = " + roleRegId
+                    + " betterRat = " + betterRat
+                    + " ipAddr = " + ipAddr
+                    + " flBwEst = " + flBwEst
+                    + " rlBwEst = " + rlBwEst);
+        }
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
-        if(regInfo != null){
+        if (regInfo != null) {
             /* save the betterRat info */
             regInfo.betterRat = betterRat;
-                            /* call the call backs */
+            /* call the call backs */
             IConSvcEventListener listener = regInfo.cbInfo.listener;
-            if(listener != null){
+            if (listener != null) {
                 try {
-                    LinkInfo linkInfo =
-                        new LinkInfo(ipAddr,
-                                     flBwEst,
-                                     rlBwEst,
-                                     betterRat);
-                    regInfo.notificationsSent = regInfo.notificationsSent |
-                            CNE_MASK_ON_BETTER_LINK_AVAIL_SENT;
+                    LinkInfo linkInfo = new LinkInfo(ipAddr, flBwEst, rlBwEst, betterRat);
+                    regInfo.notificationsSent
+                            = regInfo.notificationsSent | CNE_MASK_ON_BETTER_LINK_AVAIL_SENT;
                     listener.onBetterLinkAvail(linkInfo);
+                } catch (RemoteException e) {
+                    Log.w(LOG_TAG, "handleMorePrefNwAvailEvt listener is null");
                 }
-                catch ( RemoteException e ) {
-                    Log.w(LOG_TAG,"handleMorePrefNwAvailEvt listener is null");
-               }
             }
-        }
-        else {
-            Log.w(LOG_TAG,"handleMorePrefNwAvailEvent role does not exists");
+        } else {
+            Log.w(LOG_TAG, "handleMorePrefNwAvailEvent role does not exists");
             return;
         }
     }
 
-
-    private void handleRatLostEvent(Parcel p){
+    private void handleRatLostEvent(Parcel p) {
         int numInts = p.readInt();
         int roleRegId = p.readInt();
         int rat = p.readInt();
-        Log.i(LOG_TAG,"handleRatLostEvent called with numInts = "+ numInts +
-              " roleRegId = "+ roleRegId + " rat = " + rat);
+        if (DBG) {
+            Log.i(LOCAL_TAG, "handleRatLostEvent called with numInts = " + numInts
+                    + " roleRegId = " + roleRegId + " rat = " + rat);
+        }
         /* does this role already exists? */
         RegInfo regInfo = activeRegsList.get(roleRegId);
-        if(regInfo != null){
-            if(regInfo.activeRat == rat){
+        if (regInfo != null) {
+            if (regInfo.activeRat == rat) {
                 IConSvcEventListener listener = regInfo.cbInfo.listener;
-                if(listener != null ){
+                if (listener != null) {
                     try {
-                        LinkInfo linkInfo =
-                        new LinkInfo(null,
-                                     LinkInfo.INF_UNSPECIFIED,
-                                     LinkInfo.INF_UNSPECIFIED,
-                                     rat);
+                        LinkInfo linkInfo = new LinkInfo(null, LinkInfo.INF_UNSPECIFIED,
+                                LinkInfo.INF_UNSPECIFIED, rat);
                         listener.onLinkLost(linkInfo);
-                    }
-                    catch ( RemoteException e ) {
-                        Log.w(LOG_TAG,"handleRatLostEvent listener is null");
+                    } catch (RemoteException e) {
+                        Log.w(LOG_TAG, "handleRatLostEvent listener is null");
                     }
                 }
-            }else{
-                Log.d(LOG_TAG,"Rat lost is not for the active rat=" +
-                        regInfo.activeRat);
+            } else {
+                if (DBG)
+                    Log.w(LOCAL_TAG, "Rat lost is not for the active rat=" + regInfo.activeRat);
             }
-        }
-        else {
-            Log.w(LOG_TAG,"handleRatLostEvent role does not exists");
+        } else {
+            if (DBG) Log.w(LOCAL_TAG, "handleRatLostEvent role does not exists");
             return;
         }
     }
 
-
-    private void handleRatDownMsg(Parcel p){
-
+    private void handleRatDownMsg(Parcel p) {
         int ratType = p.readInt();
-
-        Log.i(LOG_TAG,"handleRatDownMsg called ratType = "+ ratType);
-
+        if (DBG) Log.i(LOCAL_TAG, "handleRatDownMsg called ratType = " + ratType);
         if (mService != null) {
-          mService.bringDownRat(ratType);
+            mService.bringDownRat(ratType);
         }
-
         return;
-
     }
 
-    private void handleRatUpMsg(Parcel p){
-
+    private void handleRatUpMsg(Parcel p) {
         int ratType = p.readInt();
-
-        Log.i(LOG_TAG,"handleRatUpMsg called ratType = "+ ratType);
+        if (DBG) Log.i(LOCAL_TAG, "handleRatUpMsg called ratType = " + ratType);
         switch (ratType) {
             case CNE_RAT_WLAN:
                 handleWlanBringUp();
@@ -2044,123 +1909,114 @@ public final class CNE
                 handleWwanBringUp();
                 break;
             default:
-                Log.d(LOG_TAG,"UnHandled Rat Type: "+ratType);
-
+                if (DBG) Log.w(LOCAL_TAG, "UnHandled Rat Type: " + ratType);
         }
         return;
     }
 
-    private void handleWlanBringUp(){
+    private void handleWlanBringUp() {
         try {
-            ConnectivityManager cm = (ConnectivityManager)
-                mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo networkInfo =
-                cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            ConnectivityManager cm = (ConnectivityManager) mContext
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             NetworkInfo.State networkState = networkInfo.getState();
-            if(networkState == NetworkInfo.State.CONNECTED){
+            if (networkState == NetworkInfo.State.CONNECTED) {
                 AddressInfo wlanV4AddrInfo = getWlanAddrInfo(IPVersion.IPV4);
-                notifyRatConnectStatus(CNE_RAT_WLAN,
-                                       NetworkStateToInt(networkState),
-                                       wlanV4AddrInfo.ipAddr);
+                notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState),
+                        wlanV4AddrInfo.ipAddr);
 
             } else {
-              mService.bringUpRat(CNE_RAT_WLAN);
+                mService.bringUpRat(CNE_RAT_WLAN);
             }
-        } catch(NullPointerException e){
+        } catch (NullPointerException e) {
             Log.w(LOG_TAG, "handleWlanBringUp", e);
             e.printStackTrace();
         }
     }
 
-    private void handleWwanBringUp(){
+    private void handleWwanBringUp() {
         try {
-            ConnectivityManager cm = (ConnectivityManager)
-                mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo networkInfo =
-                cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+            ConnectivityManager cm = (ConnectivityManager) mContext
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
             NetworkInfo.State networkState = networkInfo.getState();
-            if(networkState == NetworkInfo.State.CONNECTED){
-                AddressInfo wwanV4AddrInfo = getWwanAddrInfo(
-                DataPhone.APN_TYPE_DEFAULT,IPVersion.IPV4);
-                notifyRatConnectStatus(CNE_RAT_WWAN,
-                                       NetworkStateToInt(networkState),
-                                       wwanV4AddrInfo.ipAddr);
+            if (networkState == NetworkInfo.State.CONNECTED) {
+                AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
+                        IPVersion.IPV4);
+                notifyRatConnectStatus(CNE_RAT_WWAN, NetworkStateToInt(networkState),
+                        wwanV4AddrInfo.ipAddr);
             } else {
-                // tell telephony service to bypass all network checking
+                // tell telephony service to bypass all network
+                // checking
                 if (getFmcObj() != null) {
                     if (getFmcObj().dsAvail == true) {
-                        ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
+                        ITelephony phone =
+                                ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
                         try {
-                            // bypass connectivity and subscription checking, and bring up data call
+                            // bypass connectivity and subscription
+                            // checking, and bring up data call
                             phone.setDataReadinessChecks(false, false, true);
-                        } catch (RemoteException e  ) {
-                            Log.e(LOG_TAG,"remoteException while calling setDataReadinessChecks");
+                        } catch (RemoteException e) {
+                            Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
                         }
                     }
                 }
                 mService.bringUpRat(CNE_RAT_WWAN);
             }
-        } catch(NullPointerException e){
+        } catch (NullPointerException e) {
             Log.w(LOG_TAG, "handleWwanBringUp", e);
             e.printStackTrace();
         }
     }
 
-    private void handleStartScanWlanMsg(Parcel p){
+    private void handleStartScanWlanMsg(Parcel p) {
+        if (DBG) Log.i(LOCAL_TAG, "handleStartScanWlanMsg called");
+        if (!mWifiManager.isWifiEnabled()) return;
+        mWifiManager.startScanActive();
+    }
 
-      Log.i(LOG_TAG,"handleStartScanWlanMsg called");
-
-      if (!mWifiManager.isWifiEnabled())
-          return;
-
-      mWifiManager.startScanActive();
-
+    private void handleNotifyInFlightStatusMsg(Parcel p) {
+        if (DBG) Log.i(LOCAL_TAG, "handleNotifyInFlightStatusMsg called");
+        boolean on;
+        int numInts = p.readInt();
+        int status = p.readInt();
+        if (status == STATUS_INFLIGHT) {
+            on = true;
+        } else {
+            on = false;
+        }
+        Settings.System.putInt(mContext.getContentResolver(), Settings.System.AIRPLANE_MODE_ON,
+                on ? 1 : 0);
+        Intent intent = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+        intent.putExtra("state", on);
+        mContext.sendBroadcast(intent);
 
     }
 
-    private void handleNotifyInFlightStatusMsg(Parcel p){
-
-      Log.i(LOG_TAG,"handleNotifyInFlightStatusMsg called");
-      boolean on;
-      int numInts = p.readInt();
-      int status = p.readInt();
-      if (status == STATUS_INFLIGHT)
-        on = true;
-      else
-        on = false;
-      Settings.System.putInt(
-              mContext.getContentResolver(),
-              Settings.System.AIRPLANE_MODE_ON,
-              on ? 1 : 0);
-      Intent intent = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-      intent.putExtra("state", on);
-      mContext.sendBroadcast(intent);
-
-    }
-
-    private void handleFmcStatusMsg(Parcel p){
+    private void handleFmcStatusMsg(Parcel p) {
         FmcRegInfo rInfo = getFmcObj();
         int numInts = p.readInt();
         int status = p.readInt();
-
-        if (rInfo != null)
-        {
-            Log.i(LOG_TAG,"handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
+        if (rInfo != null) {
+            if (DBG) {
+                Log.i(LOCAL_TAG, "handleFmcStatusMsg fmc_status="
+                        + FmcNotifier.FMC_STATUS_STR[status]);
+            }
             if (status == FmcNotifier.FMC_STATUS_ENABLED) {
                 AddressInfo wwanV4AddrInfo = getWwanAddrInfo(DataPhone.APN_TYPE_DEFAULT,
-                                                             IPVersion.IPV4);
+                        IPVersion.IPV4);
                 configureIproute2(CNE_IPROUTE2_DELETE_HOST_ROUTING, activeWlanIfName, null, null);
-                configureIproute2(CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN, activeWwanV4IfName, null, null);
-                configureIproute2(CNE_IPROUTE2_ADD_HOST_TO_MAIN, activeWlanIfName, hostRoutingIpAddr, activeWlanGatewayAddr);
+                configureIproute2(CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN, activeWwanV4IfName,
+                        null, null);
+                configureIproute2(CNE_IPROUTE2_ADD_HOST_TO_MAIN, activeWlanIfName,
+                        hostRoutingIpAddr, activeWlanGatewayAddr);
                 configureIproute2(CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN,
-                                  wwanV4AddrInfo.ifName,
-                                  wwanV4AddrInfo.ipAddr,
-                                  wwanV4AddrInfo.gatewayAddr);
+                        wwanV4AddrInfo.ifName, wwanV4AddrInfo.ipAddr, wwanV4AddrInfo.gatewayAddr);
                 rInfo.enabled = true;
             } else {
-            if ((status == FmcNotifier.FMC_STATUS_CLOSED) ||
-                    (status == FmcNotifier.FMC_STATUS_FAILURE) ||
-                    (status == FmcNotifier.FMC_STATUS_RETRIED)) {
+                if ((status == FmcNotifier.FMC_STATUS_CLOSED)
+                        || (status == FmcNotifier.FMC_STATUS_FAILURE)
+                        || (status == FmcNotifier.FMC_STATUS_RETRIED)) {
                     rInfo.enabled = false;
                     rInfo.dsAvail = false;
                 }
@@ -2175,66 +2031,59 @@ public final class CNE
             } else {
                 onFmcStatus(status);
             }
-         }
-    }
-
-
-    private void handleHostRoutingIpMsg(Parcel p){
-      String ipAddr = new String(p.readString());
-
-      Log.i(LOG_TAG,"handleHostRoutingIpMsg ip=" + ipAddr);
-      hostRoutingIpAddr = ipAddr;
-      if (getFmcObj() != null) {
-          getFmcObj().dsAvail = true;
-      }
-      return;
-
-    }
-
-    /** {@hide} */
-    public void setDefaultConnectionNwPref(int preference){
-        Log.d(LOG_TAG,"setDefaultConnectionNwPref called with pref = " + preference);
-        /* does this role already exists? */
-        RegInfo regInfo = activeRegsList.get(CNE_DEFAULT_CON_REGID);
-        if(regInfo != null){
-            /* preference can be either wlan or wwan send the confirmNw
-             * with the next best wwan or wlan rat in the compatiblerats list
-             * for this role
-             */
-            if(preference != regInfo.activeRat){
-                sendConfirmNwReq(regInfo.regId,
-                                 regInfo.activeRat,
-                                 0,//notsatisfied with this
-                                 regInfo.cbInfo.isNotifBetterRat ? 1:0,
-                                 preference);
-            }
         }
-        else {
-            Log.w(LOG_TAG,"Default Registration does not exists");
+    }
+
+    private void handleHostRoutingIpMsg(Parcel p) {
+        String ipAddr = new String(p.readString());
+        if (DBG) Log.i(LOCAL_TAG, "handleHostRoutingIpMsg ip=" + ipAddr);
+        hostRoutingIpAddr = ipAddr;
+        if (getFmcObj() != null) {
+            getFmcObj().dsAvail = true;
         }
         return;
     }
 
-    /* the logic of thei function will decide what is the next
-     * rat to try. here we follow the order provided by the
-     * connectivity engine. AndroidConSvc can change this
-     * logic what ever it wants
+    /** {@hide} */
+    public void setDefaultConnectionNwPref(int preference) {
+        if (DBG) Log.i(LOCAL_TAG, "setDefaultConnectionNwPref called with pref = " + preference);
+        /* does this role already exists? */
+        RegInfo regInfo = activeRegsList.get(CNE_DEFAULT_CON_REGID);
+        if (regInfo != null) {
+            /*
+             * preference can be either wlan or wwan send the
+             * confirmNw with the next best wwan or wlan rat in the
+             * compatiblerats list for this role
+             */
+            if (preference != regInfo.activeRat) {
+                sendConfirmNwReq(regInfo.regId, regInfo.activeRat, 0, // not satisfied with this
+                        regInfo.cbInfo.isNotifBetterRat ? 1 : 0, preference);
+            }
+        } else {
+            Log.w(LOG_TAG, "Default Registration does not exists");
+        }
+        return;
+    }
+
+    /*
+     * the logic of the function will decide what is the next rat to
+     * try. here we follow the order provided by the connectivity
+     * engine. AndroidConSvc can change this logic what ever it wants
      */
-    private int getNextRatToTry(ArrayList<RatInfo> ratList){
+    private int getNextRatToTry(ArrayList<RatInfo> ratList) {
         int candidateRat = CNE_RAT_INVALID;
         /* index 0 is the active rat */
-        for(int index = 1; index < ratList.size(); index++){
-            RatInfo ratInfo = (RatInfo)ratList.get(index);
-            if(ratInfo.status == RatTriedStatus.RAT_STATUS_NOT_TRIED){
+        for (int index = 1; index < ratList.size(); index++) {
+            RatInfo ratInfo = (RatInfo) ratList.get(index);
+            if (ratInfo.status == RatTriedStatus.RAT_STATUS_NOT_TRIED) {
                 candidateRat = ratInfo.rat;
                 ratInfo.status = RatTriedStatus.RAT_STATUS_TRIED;
                 break;
             }
         }
-        Log.d(LOG_TAG,"getNextRatToTry called NextRatToTry= " + candidateRat);
+        if (DBG) Log.i(LOCAL_TAG, "getNextRatToTry called NextRatToTry= " + candidateRat);
         return candidateRat;
     }
-
 
     private int parseBwString(String bw) {
         int result = 0;
@@ -2247,7 +2096,6 @@ public final class CNE
                     result = -1;
                     break;
                 }
-
                 String remainder = bw.substring(i);
                 if (remainder.equals("kbps")) {
                     result *= 1000;
@@ -2256,45 +2104,37 @@ public final class CNE
                 } else {
                     result = -1;
                 }
-
                 break;
             }
         }
-
         return result;
     }
 
     /** {@hide} */
-    public boolean getLink
-    (
-      int role,
-      Map<LinkRequirement,String> linkReqs,
-      int pid,
-      IBinder listener
-    ){
-        Log.d(LOG_TAG,"getLink called for role = " + role);
+    public boolean getLink(int role, Map<LinkRequirement, String> linkReqs, int pid,
+            IBinder listener) {
+        if (DBG) Log.i(LOCAL_TAG, "getLink called for role = " + role);
         /* did the app(pid) register for this role already? */
-        if(getRegId(pid,role) != CNE_REGID_INVALID){
-            Log.w(LOG_TAG,"Multpl same role reg's not allowed by single app");
+        if (getRegId(pid, role) != CNE_REGID_INVALID) {
+            Log.w(LOG_TAG, "Multpl same role reg's not allowed by single app");
             return false;
-        }
-        else{
+        } else {
             /* new role registration for this app (pid) */
             RegInfo regInfo = new RegInfo(listener);
             regInfo.role = role;
             regInfo.pid = pid;
-            IConSvcEventListener evtListener = (IConSvcEventListener)
-            IConSvcEventListener.Stub.asInterface(listener);
+            IConSvcEventListener evtListener =
+                    (IConSvcEventListener) IConSvcEventListener.Stub.asInterface(listener);
             regInfo.cbInfo.listener = evtListener;
             regInfo.cbInfo.isNotifBetterRat = false;
-            Log.i(LOG_TAG, "activeRegsList.size before = " + activeRegsList.size());
-            activeRegsList.put(regInfo.regId,regInfo);
-            Log.i(LOG_TAG, "activeRolesList.size after = " + activeRegsList.size());
+            if (DBG) Log.i(LOCAL_TAG, "activeRegsList.size before = " + activeRegsList.size());
+            activeRegsList.put(regInfo.regId, regInfo);
+            if (DBG) Log.i(LOCAL_TAG, "activeRolesList.size after = " + activeRegsList.size());
 
             int fwLinkBwReq = 0;
             int revLinkBwReq = 0;
-            if(linkReqs != null){
-                for (Map.Entry<LinkRequirement,String> e: linkReqs.entrySet()) {
+            if (linkReqs != null) {
+                for (Map.Entry<LinkRequirement, String> e : linkReqs.entrySet()) {
                     LinkRequirement key = e.getKey();
                     String value = e.getValue();
 
@@ -2316,269 +2156,228 @@ public final class CNE
                     }
                 }
             }
-            sendRegRoleReq(role,
-                           regInfo.regId,
-                           fwLinkBwReq,
-                           revLinkBwReq);
+            sendRegRoleReq(role, regInfo.regId, fwLinkBwReq, revLinkBwReq);
             return true;
         }
     }
 
     /** {@hide} */
-    public boolean reportLinkSatisfaction
-    (
-      int role,
-      int pid,
-      LinkInfo info,
-      boolean isSatisfied,
-      boolean isNotifyBetterLink
-    ){
-        Log.d(LOG_TAG,"reporting connection satisfaction role = " + role +
-              "isSatisfied = " + isSatisfied + "isNotifyBetterLink" +
-              isNotifyBetterLink);
-        int regId = getRegId(pid,role);
+    public boolean reportLinkSatisfaction(int role, int pid, LinkInfo info, boolean isSatisfied,
+            boolean isNotifyBetterLink) {
+        if (DBG) {
+            Log.i(LOCAL_TAG, "reporting connection satisfaction role = " + role + "isSatisfied = "
+                    + isSatisfied + "isNotifyBetterLink" + isNotifyBetterLink);
+        }
+        int regId = getRegId(pid, role);
         RegInfo regInfo = activeRegsList.get(regId);
-        if( regInfo != null){
-            if((regInfo.notificationsSent & CNE_MASK_ON_LINK_AVAIL_SENT) ==
-               CNE_MASK_ON_LINK_AVAIL_SENT){
+        if (regInfo != null) {
+            if ((regInfo.notificationsSent
+                    & CNE_MASK_ON_LINK_AVAIL_SENT) == CNE_MASK_ON_LINK_AVAIL_SENT) {
                 regInfo.cbInfo.isNotifBetterRat = isNotifyBetterLink;
                 int ratToTry = CNE_RAT_NONE;
-                if(!isSatisfied){
+                if (!isSatisfied) {
                     ratToTry = getNextRatToTry(regInfo.compatibleRatsList);
                 }
-                sendConfirmNwReq(regInfo.regId,
-                                 info==null? regInfo.activeRat:info.getNwId(),
-                                 isSatisfied ? 1:0,
-                                 isNotifyBetterLink ? 1:0,
-                                 ratToTry);
-                /* if the app was not satisfied and ratToTry was CNE_RAT_INVALID
-                 * then call back the app saying connection not possible
+                sendConfirmNwReq(regInfo.regId, info == null ? regInfo.activeRat : info.getNwId(),
+                        isSatisfied ? 1 : 0, isNotifyBetterLink ? 1 : 0, ratToTry);
+                /*
+                 * if the app was not satisfied and ratToTry was
+                 * CNE_RAT_INVALID then call back the app saying
+                 * connection not possible
                  */
-                if(!isSatisfied && ratToTry == CNE_RAT_INVALID){
-                    //call the callback
+                if (!isSatisfied && ratToTry == CNE_RAT_INVALID) {
+                    // call the callback
                     try {
                         IConSvcEventListener evtListener = regInfo.cbInfo.listener;
-                        if( evtListener != null){
-                          evtListener.onGetLinkFailure(LinkNotifier.FAILURE_NO_LINKS);
+                        if (evtListener != null) {
+                            evtListener.onGetLinkFailure(LinkNotifier.FAILURE_NO_LINKS);
                         }
                         return true;
-                    }
-                    catch ( RemoteException e ) {
-                        Log.e(LOG_TAG,"remoteException while calling onConnectionComplete");
+                    } catch (RemoteException e) {
+                        Log.w(LOG_TAG, "remoteException while calling onConnectionComplete");
                         return false;
                     }
                 }
                 return true;
-            }
-            else{
-                Log.w(LOG_TAG,"OnLinkAvail notification was not sent yet.");
+            } else {
+                Log.w(LOG_TAG, "OnLinkAvail notification was not sent yet.");
                 return false;
             }
-        }
-        else{
-            Log.w(LOG_TAG,"App did not register for this role");
+        } else {
+            Log.w(LOG_TAG, "App did not register for this role");
             return false;
         }
     }
 
     /** {@hide} */
-    public boolean releaseLink(int role,int pid){
-        Log.d(LOG_TAG,"releasing link for role = " + role);
-        int regId = getRegId(pid,role);
+    public boolean releaseLink(int role, int pid) {
+        if (DBG) Log.i(LOCAL_TAG, "releasing link for role = " + role);
+        int regId = getRegId(pid, role);
         RegInfo regInfo = activeRegsList.get(regId);
-        if( regInfo != null){
+        if (regInfo != null) {
             sendDeregRoleReq(regInfo.regId);
             /* clean up */
-            try{
+            try {
                 regInfo.mBinder.unlinkToDeath(regInfo, 0);
-            } catch (NoSuchElementException exp){
-                Log.w(LOG_TAG,"bindrLinkToDeatch was not registered");
+            } catch (NoSuchElementException exp) {
+                Log.w(LOG_TAG, "bindrLinkToDeatch was not registered");
             }
             regInfo.compatibleRatsList.clear();
             activeRegsList.remove(regId);
             return true;
-        }
-        else{
-            Log.w(LOG_TAG,"App did not register for this role");
+        } else {
+            Log.w(LOG_TAG, "App did not register for this role");
             return false;
         }
     }
 
     /** {@hide} */
-    public boolean switchLink(int role,
-                              int pid,
-                              LinkInfo info,
-                              boolean isNotifyBetterLink){
-        Log.d(LOG_TAG,"switch link for role = " + role);
-        int regId = getRegId(pid,role);
+    public boolean switchLink(int role, int pid, LinkInfo info, boolean isNotifyBetterLink) {
+        if (DBG) Log.i(LOCAL_TAG, "switch link for role = " + role);
+        int regId = getRegId(pid, role);
         RegInfo regInfo = activeRegsList.get(regId);
-        if( regInfo != null){
-            if((regInfo.notificationsSent & CNE_MASK_ON_BETTER_LINK_AVAIL_SENT) ==
-               CNE_MASK_ON_BETTER_LINK_AVAIL_SENT){
-                regInfo.activeRat = info==null? regInfo.betterRat:info.getNwId();
-                sendConfirmNwReq(regInfo.regId,
-                                 regInfo.activeRat,
-                                 CNE_LINK_SATISFIED,
-                                 isNotifyBetterLink ? 1:0,
-                                 CNE_RAT_NONE);
+        if (regInfo != null) {
+            if ((regInfo.notificationsSent & CNE_MASK_ON_BETTER_LINK_AVAIL_SENT)
+                    == CNE_MASK_ON_BETTER_LINK_AVAIL_SENT) {
+                regInfo.activeRat = info == null ? regInfo.betterRat : info.getNwId();
+                sendConfirmNwReq(regInfo.regId, regInfo.activeRat, CNE_LINK_SATISFIED,
+                        isNotifyBetterLink ? 1 : 0, CNE_RAT_NONE);
                 return true;
-            }
-            else{
-                Log.w(LOG_TAG,"OnBetterLinkAvail notification was not sent yet.");
+            } else {
+                Log.w(LOG_TAG, "OnBetterLinkAvail notification was not sent yet.");
                 return false;
             }
-        }
-        else{
-            Log.w(LOG_TAG,"App did not register for this role");
+        } else {
+            Log.w(LOG_TAG, "App did not register for this role");
             return false;
         }
     }
 
     /** {@hide} */
-    public boolean rejectSwitch(int role,
-                                int pid,
-                                LinkInfo info,
-                                boolean isNotifyBetterLink){
-        Log.d(LOG_TAG,"rejectSwitch for role = " + role);
-        int regId = getRegId(pid,role);
+    public boolean rejectSwitch(int role, int pid, LinkInfo info, boolean isNotifyBetterLink) {
+        if (DBG) Log.i(LOCAL_TAG, "rejectSwitch for role = " + role);
+        int regId = getRegId(pid, role);
         RegInfo regInfo = activeRegsList.get(regId);
-        if( regInfo != null){
-            if((regInfo.notificationsSent & CNE_MASK_ON_BETTER_LINK_AVAIL_SENT) ==
-               CNE_MASK_ON_BETTER_LINK_AVAIL_SENT){
-                sendConfirmNwReq(regInfo.regId,
-                                 info==null? regInfo.betterRat:info.getNwId(),
-                                 CNE_LINK_NOT_SATISFIED,
-                                 isNotifyBetterLink ? 1:0,
-                                 CNE_RAT_NONE);
+        if (regInfo != null) {
+            if ((regInfo.notificationsSent & CNE_MASK_ON_BETTER_LINK_AVAIL_SENT)
+                    == CNE_MASK_ON_BETTER_LINK_AVAIL_SENT) {
+                sendConfirmNwReq(regInfo.regId, info == null ? regInfo.betterRat : info.getNwId(),
+                        CNE_LINK_NOT_SATISFIED, isNotifyBetterLink ? 1 : 0, CNE_RAT_NONE);
                 return true;
-            }
-            else{
-                Log.w(LOG_TAG,"OnBetterLinkAvail notification was not sent yet.");
+            } else {
+                Log.w(LOG_TAG, "OnBetterLinkAvail notification was not sent yet.");
                 return false;
             }
-        }
-        else{
-            Log.w(LOG_TAG,"App did not register for this role");
+        } else {
+            Log.w(LOG_TAG, "App did not register for this role");
             return false;
         }
     }
 
     /** {@hide} */
-    public static boolean configureSsid ( String newStr)
-    {
-     try
-     {
-
-         boolean strMatched = false;
-         File file = new File("/data/ssidconfig.txt");
-         if (file == null)
-         {
-             Log.e(LOG_TAG, "configureSsid: Config File not found");
-             return false;
-         }
-         // Read file to buffer
-         BufferedReader reader = new BufferedReader(new FileReader(file));
-         String line = "";
-         String oldtext = "";
-         String oldStr = "";
-         // Get token of new string
-         StringTokenizer newst = new StringTokenizer(newStr, ":");
-         String newToken = newst.nextToken();
-
-         Log.i(LOG_TAG, "configureSsid: newToken: " + newToken);
-
-         while((line = reader.readLine()) != null)
-         {
-             oldtext += line + "\r\n";
-             StringTokenizer oldst = new StringTokenizer(line, ":");
-             while(oldst.hasMoreTokens())
-             {
-                 String oldToken = oldst.nextToken();
-                 Log.i(LOG_TAG, "configureSsid: oldToken: " + oldToken);
-                 if (newToken.equals(oldToken))
-                 {
-                       Log.i(LOG_TAG, "configSsid entry matched");
-                       // Save string to be replaced
-                       oldStr = line;
-                       strMatched = true;
-                 }
-
-             }
-         }
-         if (!strMatched) {
-             Log.i(LOG_TAG, "configSsid entry not matched");
-             return false;
-         }
-         // To replace new text in file
-         String newtext = oldtext.replaceAll(oldStr, newStr);
-         reader.close();
-         FileWriter writer = new FileWriter("/data/ssidconfig.txt");
-         writer.write(newtext);
-         writer.close();
-         return true;
-
-     }
-     catch (IOException ioe)
-     {
+    public static boolean configureSsid(String newStr) {
+        try {
+            boolean strMatched = false;
+            File file = new File("/data/ssidconfig.txt");
+            if (file == null) {
+                Log.e(LOG_TAG, "configureSsid: Config File not found");
+                return false;
+            }
+            // Read file to buffer
+            BufferedReader reader = new BufferedReader(new FileReader(file));
+            String line = "";
+            String oldtext = "";
+            String oldStr = "";
+            // Get token of new string
+            StringTokenizer newst = new StringTokenizer(newStr, ":");
+            String newToken = newst.nextToken();
+            if (DBG) Log.i(LOCAL_TAG, "configureSsid: newToken: " + newToken);
+            while ((line = reader.readLine()) != null) {
+                oldtext += line + "\r\n";
+                StringTokenizer oldst = new StringTokenizer(line, ":");
+                while (oldst.hasMoreTokens()) {
+                    String oldToken = oldst.nextToken();
+                    if (DBG) Log.i(LOCAL_TAG, "configureSsid: oldToken: " + oldToken);
+                    if (newToken.equals(oldToken)) {
+                        if (DBG) Log.i(LOCAL_TAG, "configSsid entry matched");
+                        // Save string to be replaced
+                        oldStr = line;
+                        strMatched = true;
+                    }
+                }
+            }
+            if (!strMatched) {
+                if (DBG) Log.i(LOCAL_TAG, "configSsid entry not matched");
+                return false;
+            }
+            // To replace new text in file
+            String newtext = oldtext.replaceAll(oldStr, newStr);
+            reader.close();
+            FileWriter writer = new FileWriter("/data/ssidconfig.txt");
+            writer.write(newtext);
+            writer.close();
+            return true;
+        } catch (IOException ioe) {
             ioe.printStackTrace();
-     }
-     return true;
+        }
+        return true;
     }
 
     /** {@hide} */
-    public void notifyDefaultNwChange(int nwId){
-        Log.i(LOG_TAG, "notifyDefaultNwChange: nwId: " + nwId + ",activeWwanV4Ifname:"
-              + activeWwanV4IfName + ",activeWwanV6Ifname:" + activeWwanV6IfName +
-              ",activeWlanIfname:" + activeWlanIfName);
+    public void notifyDefaultNwChange(int nwId) {
+        if (DBG) {
+            Log.i(LOCAL_TAG, "notifyDefaultNwChange - nwId: " + nwId
+                    + " activeWwanV4Ifname:" + activeWwanV4IfName
+                    + " activeWwanV6Ifname:" + activeWwanV6IfName
+                    + " activeWlanIfname:" + activeWlanIfName);
+        }
         mDefaultNetwork = nwId;
         // Change default network interface in main table to new one
-        if (( nwId == ConnectivityManager.TYPE_WIFI) && ( activeWlanIfName != null) ) {
+        if ((nwId == ConnectivityManager.TYPE_WIFI) && (activeWlanIfName != null)) {
             // Need to delete the host entry
-            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN,
-                              activeWlanIfName, null, null);
+            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWlanIfName, null,
+                    null);
             if (mRemoveHostEntry) {
                 mRemoveHostEntry = false;
-                Log.i(LOG_TAG, "notifyDefaultNwChange: CNE_IPROUTE2_DELETE_HOST_IN_MAIN");
+                if (DBG) {
+                    Log.i(LOCAL_TAG, "notifyDefaultNwChange: CNE_IPROUTE2_DELETE_HOST_IN_MAIN");
+                }
                 configureIproute2(CNE_IPROUTE2_DELETE_HOST_IN_MAIN, activeWlanIfName, null, null);
             }
-        } else if (( nwId == ConnectivityManager.TYPE_MOBILE) && ( activeWwanV4IfName != null) ){
-            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN,
-                              activeWwanV4IfName, null, null);
+        } else if ((nwId == ConnectivityManager.TYPE_MOBILE) && (activeWwanV4IfName != null)) {
+            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWwanV4IfName, null,
+                    null);
         }
         return;
     }
 
-
-
-    /*           Fmc Related               */
+    /* Fmc Related */
     private FmcRegInfo fmcRegInfo = null;
 
     /** {@hide} */
     private class FmcRegInfo implements IBinder.DeathRecipient {
-        protected boolean enabled;         // true when FMC is enabled
-        protected boolean actionStop;      // when stop got pushed
-        protected boolean dsAvail;         // DS is available
-        protected int     lastSendStatus;  // last send status to OEM
-        protected String  ssid;            // CT AP
+        protected boolean enabled; // true when FMC is enabled
+        protected boolean actionStop; // when stop got pushed
+        protected boolean dsAvail; // DS is available
+        protected int lastSendStatus; // last send status to OEM
+        protected String ssid; // CT AP
         private IBinder mBinder;
         IFmcEventListener mListener;
 
         /* constructor */
-        public FmcRegInfo(IBinder binder){
-            mBinder   = binder;
+        public FmcRegInfo(IBinder binder) {
+            mBinder = binder;
             mListener = null;
-            enabled   = false;
+            enabled = false;
             actionStop = false;
-            dsAvail    = false;
-            ssid       = "";
+            dsAvail = false;
+            ssid = "";
             lastSendStatus = -1;
-
-            Log.d(LOG_TAG,"FmcRegInfo - binder="+ mBinder);
-            if(mBinder != null){
-                mListener = (IFmcEventListener)
-                IFmcEventListener.Stub.asInterface(binder);
+            if (DBG) Log.i(LOCAL_TAG, "FmcRegInfo - binder=" + mBinder);
+            if (mBinder != null) {
+                mListener = (IFmcEventListener) IFmcEventListener.Stub.asInterface(binder);
                 try {
-                    Log.d(LOG_TAG,"FmcRegInfo: linking binder to death");
+                    if (DBG) Log.i(LOCAL_TAG, "FmcRegInfo: linking binder to death");
                     mBinder.linkToDeath(this, 0);
                 } catch (RemoteException e) {
                     binderDied();
@@ -2589,103 +2388,101 @@ public final class CNE
 
         public void binderDied() {
             mListener = null;
-            Log.d(LOG_TAG, "CNE@FmcRegInfo: RemoteException.");
+            if (DBG) Log.i(LOCAL_TAG, "CNE@FmcRegInfo: RemoteException.");
         }
     }
 
-    /** {@hide}
-     * return: true when send out status successfully
+    /**
+     * {@hide} return: true when send out status successfully
      */
     private void onFmcStatus(int status) {
         FmcRegInfo rInfo;
-
         rInfo = getFmcObj();
-        if(rInfo != null){
+        if (rInfo != null) {
             rInfo.lastSendStatus = status;
-            if ((rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_CLOSED) ||
-                (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_FAILURE) ||
-                (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
+            if ((rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_CLOSED)
+                    || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_FAILURE)
+                    || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
                 mRemoveHostEntry = true;
-
                 ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
                 try {
-                    // tell telephony service to do all necessary network checking, no data call
+                    // tell telephony service to do all necessary
+                    // network checking, no data call
                     phone.setDataReadinessChecks(true, true, false);
-                } catch (RemoteException e  ) {
-                    Log.e(LOG_TAG,"remoteException while calling setDataReadinessChecks");
+                } catch (RemoteException e) {
+                    Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
                 }
             }
-            Log.i(LOG_TAG,"onFmcStatus: mRemoveHostEntry=" + mRemoveHostEntry);
+            if (DBG) Log.i(LOCAL_TAG, "onFmcStatus: mRemoveHostEntry=" + mRemoveHostEntry);
             if (rInfo.mListener != null) {
                 try {
                     // Check status and send to OEM
-                    Log.i(LOG_TAG,"onFmcStatus: fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
+                    if (DBG) {
+                        Log.i(LOCAL_TAG,
+                                "onFmcStatus: fmc_status=" + FmcNotifier.FMC_STATUS_STR[status]);
+                    }
                     rInfo.mListener.onFmcStatus(status);
                 } catch (RemoteException e) {
-                    Log.e(LOG_TAG, "onFmcStatus: exception onFmcStatus");
+                    Log.w(LOG_TAG, "onFmcStatus: exception onFmcStatus");
                 }
             }
         } else {
-            Log.e(LOG_TAG, "onFmcStatus: regInfo = null");
+            Log.w(LOG_TAG, "onFmcStatus: regInfo = null");
         }
     }
 
     /** {@hide} */
-    private FmcRegInfo getFmcObj(){
+    private FmcRegInfo getFmcObj() {
         return fmcRegInfo;
     }
 
     /** {@hide} */
-    private void setFmcObj(FmcRegInfo obj){
+    private void setFmcObj(FmcRegInfo obj) {
         fmcRegInfo = obj;
     }
 
     /** {@hide} */
     private FmcRegInfo reestablishBinder(FmcRegInfo rSrc, IBinder binder) {
         FmcRegInfo r = null;
-
         if (binder != rSrc.mBinder) {
-            Log.d(LOG_TAG,"reestablishBinder: new binder");
+            if (DBG) Log.i(LOCAL_TAG, "reestablishBinder: new binder");
             r = new FmcRegInfo(binder);
-            r.ssid    = rSrc.ssid;
+            r.ssid = rSrc.ssid;
             r.enabled = rSrc.enabled;
             r.dsAvail = rSrc.dsAvail;
             r.lastSendStatus = rSrc.lastSendStatus;
             setFmcObj(r);
         } else {
-            Log.d(LOG_TAG,"reestablishBinder: existing binder");
+            if (DBG) Log.i(LOCAL_TAG, "reestablishBinder: existing binder");
             r = rSrc;
         }
         return r;
     }
 
     /** {@hide} */
-    public boolean startFmc(IBinder binder){
+    public boolean startFmc(IBinder binder) {
         boolean ok = true;
         boolean reqToStart = true;
         FmcRegInfo rInfo = getFmcObj();
-
-        Log.d(LOG_TAG,"startFmc: ");
-        if(rInfo != null){
+        if (DBG) Log.i(LOCAL_TAG, "startFmc: ");
+        if (rInfo != null) {
             rInfo = reestablishBinder(rInfo, binder);
-            if (rInfo.enabled) {                // already enabled
+            if (rInfo.enabled) { // already enabled
                 onFmcStatus(FmcNotifier.FMC_STATUS_ENABLED);
                 reqToStart = false;
             } else if (rInfo.lastSendStatus != -1) {
-                onFmcStatus(rInfo.lastSendStatus);  // re-send last status
+                onFmcStatus(rInfo.lastSendStatus); // re-send last status
             }
-          } else { /* new OEM registration for this app  */
+        } else { /* new OEM registration for this app */
             setFmcObj(new FmcRegInfo(binder));
         }
         if (reqToStart) {
-
             onFmcStatus(FmcNotifier.FMC_STATUS_INITIALIZED);
-
             // send enableFMC to Cnd
             CNERequest rr = CNERequest.obtain(CNE_REQUEST_START_FMC_CMD);
             if (rr == null) {
                 ok = false;
-                Log.e(LOG_TAG, "startFmc: rr=NULL.");
+                Log.w(LOG_TAG, "startFmc: rr=NULL.");
                 onFmcStatus(FmcNotifier.FMC_STATUS_FAILURE);
             } else {
                 WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
@@ -2698,46 +2495,38 @@ public final class CNE
         return ok;
     }
 
-
     /** {@hide} */
-    public boolean stopFmc(IBinder binder){
+    public boolean stopFmc(IBinder binder) {
         boolean ok = true;
         FmcRegInfo rInfo = getFmcObj();
-
-        Log.d(LOG_TAG,"stopFmc");
-
-        if(rInfo != null) {
+        if (DBG) Log.i(LOCAL_TAG, "stopFmc");
+        if (rInfo != null) {
             rInfo.actionStop = true;
-                onFmcStatus(FmcNotifier.FMC_STATUS_SHUTTING_DOWN);
-
-                // Send stopFMC to cnd
-                CNERequest rr = CNERequest.obtain(CNE_REQUEST_STOP_FMC_CMD);
-                if (rr == null) {
-                    Log.e(LOG_TAG, "stopFmc: rr=NULL.");
-                    ok = false;
-                } else {
-                    send(rr);
-                }
+            onFmcStatus(FmcNotifier.FMC_STATUS_SHUTTING_DOWN);
+            // Send stopFMC to cnd
+            CNERequest rr = CNERequest.obtain(CNE_REQUEST_STOP_FMC_CMD);
+            if (rr == null) {
+                Log.w(LOG_TAG, "stopFmc: rr=NULL.");
+                ok = false;
+            } else {
+                send(rr);
             }
-
+        }
         return ok;
     }
 
     /** {@hide} */
-    public boolean getFmcStatus(IBinder binder){
+    public boolean getFmcStatus(IBinder binder) {
         boolean ok = false;
         FmcRegInfo rInfo = getFmcObj();
-
-        Log.d(LOG_TAG,"getFmcStatus: ");
-        if(rInfo != null){
+        if (DBG) Log.i(LOCAL_TAG, "getFmcStatus: ");
+        if (rInfo != null) {
             rInfo = reestablishBinder(rInfo, binder);
             if (rInfo.lastSendStatus != -1) {
-                onFmcStatus(rInfo.lastSendStatus);  // re-send last status
+                onFmcStatus(rInfo.lastSendStatus); // re-send last status
                 ok = true;
             }
         }
-
         return ok;
     }
-
-    }
+}
