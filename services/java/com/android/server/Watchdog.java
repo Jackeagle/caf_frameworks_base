@@ -862,6 +862,18 @@ public class Watchdog extends Thread {
 
             mActivity.addErrorToDropBox("watchdog", null, null, null, name, null, stack, null);
 
+            // Generate tombstone file for system server
+            if (!Debug.isDebuggerConnected()) {
+                // first SIGABRT is meant for system_server to get attached to debuggerd
+                Process.sendSignal(Process.myPid(), 6);
+                // Sleep for two seconds for debuggerd to attach to system_server
+                SystemClock.sleep(2000);
+                // second SIGABRT is meant for debuggerd to collect stack trace of attached
+                // system_server's threads and to save them in a tombstone file.
+                Process.sendSignal(Process.myPid(), 6);
+                SystemClock.sleep(2000);
+            }
+
             // Only kill the process if the debugger is not attached.
             if (!Debug.isDebuggerConnected()) {
                 Slog.w(TAG, "*** WATCHDOG KILLING SYSTEM PROCESS: " + name);
