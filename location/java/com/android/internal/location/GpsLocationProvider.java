@@ -454,7 +454,17 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (info != null && info.getType() == ConnectivityManager.TYPE_MOBILE_SUPL
                 && mAGpsDataConnectionState == AGPS_DATA_CONNECTION_OPENING) {
             String apnName = info.getExtraInfo();
-            if (mNetworkAvailable && apnName != null && apnName.length() > 0) {
+            if (mNetworkAvailable) {
+                if (apnName == null) {
+                    /*  Assign a dummy value in the case of CDMA as otherwise we
+                        will have a runtime exception in the following call to 
+                        native_agps_data_conn_open.This code path gets exercised
+                        only in the CDMA case as we will get a valid apnName in
+                        the case of UMTS call flows.Also, in the CDMA case the
+                        dummy apn value passed down to lower layers is discarded
+                     */
+                    apnName = "dummy-apn";
+                }
                 mAGpsApn = apnName;
                 if (DEBUG) Log.d(TAG, "call native_agps_data_conn_open");
                 native_agps_data_conn_open(apnName);
