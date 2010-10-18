@@ -73,27 +73,23 @@ class DMMControl {
         if (flag) {
             if(mState == DMM_MEM_STATE.DISABLED) {
                 if(mDMM_DPD){
-                    Log.w(TAG, "Activate Unstable Memrory !");
+                    Log.w(TAG, "Activate Unstable Memory");
                     if(Power.SetUnstableMemoryState(flag) < 0)
                         Log.e(TAG, "Activating Unstable Memory: Failed !");
                     else
                         mState = DMM_MEM_STATE.ACTIVE;
                 }
             }
-            else
-                Log.e(TAG, "Unstable Memory is already in ACTIVE state !!!");
         } else {
             if(mState == DMM_MEM_STATE.ACTIVE) {
                 if(mDMM_DPD){
-                    Log.w(TAG, "DISABLE Unstable memory !");
+                    Log.w(TAG, "De-Activate Unstable Memory");
                     if(Power.SetUnstableMemoryState(flag) < 0)
-                        Log.e(TAG, "Disabling Unstable memory: Failed !");
+                        Log.e(TAG, "Disabling Unstable Memory: Failed !");
                     else
                         mState = DMM_MEM_STATE.DISABLED;
                 }
             }
-            else
-                Log.e(TAG, "Unstable Memory is already in DISABLED state !!!");
         }
         return 0;
     }

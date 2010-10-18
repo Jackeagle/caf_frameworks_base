@@ -1284,6 +1284,8 @@ class PowerManagerService extends IPowerManager.Stub
                 EventLog.writeEvent(EventLogTags.POWER_SCREEN_BROADCAST_DONE, 1,
                         SystemClock.uptimeMillis() - mScreenOnStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
+                if(mDMMAvailable)
+                    mDMMController.enableUnstableMemory(true);
             }
         }
     };
@@ -1296,8 +1298,7 @@ class PowerManagerService extends IPowerManager.Stub
                         SystemClock.uptimeMillis() - mScreenOffStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
                 if(mDMMAvailable)
-                    if(mDMMController.enableUnstableMemory(false) != 0)
-                        Log.e(TAG, "Deactivating Unstable memory failed.");
+                    mDMMController.enableUnstableMemory(false);
             }
         }
     };
@@ -1568,11 +1569,6 @@ class PowerManagerService extends IPowerManager.Stub
                         reallyTurnScreenOn = false;
                     }
                     if (reallyTurnScreenOn) {
-                        if(mDMMAvailable) {
-                            Log.i(TAG, "Activate Unstable memory");
-                            mDMMController.enableUnstableMemory(true);
-                        }
-
                         err = setScreenStateLocked(true);
                         long identity = Binder.clearCallingIdentity();
                         try {
