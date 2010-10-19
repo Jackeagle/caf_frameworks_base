@@ -955,16 +955,23 @@ public class CDMAPhone extends PhoneBase {
 
             case EVENT_GET_CDMA_SUBSCRIPTION_SOURCE:
                 ar = (AsyncResult) msg.obj;
-                int newSubscriptionSource = ((int[]) ar.result)[0];
+                if (ar.exception == null) {
+                    int newSubscriptionSource = ((int[]) ar.result)[0];
 
-                if (newSubscriptionSource != mCdmaSubscriptionSource) {
-                    Log.v(LOG_TAG, "Subscription Source Changed : " + mCdmaSubscriptionSource
-                            + " >> " + newSubscriptionSource);
-                    mCdmaSubscriptionSource = newSubscriptionSource;
-                    if (newSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
-                        // NV is ready when subscription source is NV
-                        sendMessage(obtainMessage(EVENT_NV_READY));
+                    if (newSubscriptionSource != mCdmaSubscriptionSource) {
+                        Log.v(LOG_TAG, "Subscription Source Changed : " + mCdmaSubscriptionSource
+                                + " >> " + newSubscriptionSource);
+                        mCdmaSubscriptionSource = newSubscriptionSource;
+                        if (newSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
+                            // NV is ready when subscription source is NV
+                            sendMessage(obtainMessage(EVENT_NV_READY));
+                        }
                     }
+                } else {
+                    // GET_CDMA_SUBSCRIPTION is returning Failure. Probably because modem
+                    // created GSM Phone. If modem created GSMPhone, then PhoneProxy will
+                    // trigger a change in Phone objects and this object will be destroyed.
+                    Log.w(LOG_TAG, "Unable to get CDMA Subscription Source " + ar.exception);
                 }
                 break;
 
