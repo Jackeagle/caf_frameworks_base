@@ -357,6 +357,9 @@ private:
                 int32_t                     mFreezeCount;
                 nsecs_t                     mFreezeDisplayTime;
 
+                // Has orientation changed - used for HDMI
+                bool                        mOrientationChanged;
+
                 // don't use a lock for these, we don't care
                 int                         mDebugRegion;
                 int                         mDebugBackground;
