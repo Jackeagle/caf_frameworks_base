@@ -102,6 +102,12 @@ public class StkCmdMessage implements Parcelable {
             mTextMsg = params.textMsg;
             break;
         case OPEN_CHANNEL:
+        case CLOSE_CHANNEL:
+        case RECEIVE_DATA:
+        case SEND_DATA:
+        case GET_CHANNEL_STATUS:
+            mTextMsg = ((CallSetupParams) cmdParams).confirmMsg;
+            break;
         case SET_UP_CALL:
             mCallSettings = new CallSettings();
             mCallSettings.confirmMsg = ((CallSetupParams) cmdParams).confirmMsg;
