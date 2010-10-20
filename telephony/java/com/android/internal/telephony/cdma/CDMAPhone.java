@@ -981,6 +981,8 @@ public class CDMAPhone extends PhoneBase {
             case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:{
                 Log.d(LOG_TAG, "EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED");
                 mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+                // Get the new device identity
+                mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
             }
             break;
 
