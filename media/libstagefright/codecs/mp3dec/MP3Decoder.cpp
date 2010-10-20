@@ -409,6 +409,7 @@ status_t MP3Decoder::read(
 
         mNumSamplesOutput = 0;
         seekSource = true;
+        pvmp3_resetDecoder(mDecoderBuf);
 
         if (mInputBuffer) {
             mInputBuffer->release();
