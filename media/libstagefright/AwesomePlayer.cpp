@@ -960,6 +960,10 @@ void AwesomePlayer::onVideoEvent() {
                     postStreamDoneEvent_l(err);
                 else
                 {
+                    //Seek audio in case we happened reach video EOS
+                    //and audio hasn't had a chance to seek
+                    seekAudioIfNecessary_l();
+
                     //Post a video event to start polling
                     //if video EOS went away due to seek
                     postVideoEvent_l();
