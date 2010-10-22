@@ -123,6 +123,7 @@ public class StatusBarPolicy {
 
     //***** Signal strength icons
     private IconData[] mPhoneData;
+    private boolean isInAirplaneMode = false;
     //GSM/UMTS
     private static final int[] sSignalImages = new int[] {
         com.android.internal.R.drawable.stat_sys_signal_0,
@@ -1099,6 +1100,12 @@ public class StatusBarPolicy {
             return false;
         }
     }
+
+    private final void updateIcon(int sub, int signal) {
+        mPhoneData[sub].iconId = signal;
+        mService.updateIcon(mPhoneIcon[sub], mPhoneData[sub], null);
+    }
+
     private final void updateSignalStrength(int subscription) {
         int iconLevel = -1;
         int[] iconList;
@@ -1109,13 +1116,28 @@ public class StatusBarPolicy {
         if ((mSignalStrength[subscription] == null) || (mServiceState[subscription] == null) ||
            (!hasService(subscription) && !mServiceState[subscription].isEmergencyOnly())){
             //Slog.d(TAG, "updateSignalStrength: no service");
+            int numPhones = TelephonyManager.getPhoneCount();
             if (Settings.System.getInt(mContext.getContentResolver(),
                     Settings.System.AIRPLANE_MODE_ON, 0) == 1) {
-                mPhoneData[subscription].iconId = com.android.internal.R.drawable.stat_sys_signal_flightmode;
+                /*
+                 * To display single airplane annuciator for both the subscriptions,
+                 * while in  Airplane Mode.
+                 */
+                isInAirplaneMode = true;
+                updateIcon(0, com.android.internal.R.drawable.stat_sys_signal_flightmode);
+                for (int sub=1; sub < numPhones; sub++) {
+                    updateIcon(sub, 0);
+                }
             } else {
-                mPhoneData[subscription].iconId = com.android.internal.R.drawable.stat_sys_signal_null;
+                if (isInAirplaneMode == true) {
+                    for (int i=0; i < numPhones; i++) {
+                        updateIcon(i, com.android.internal.R.drawable.stat_sys_signal_null);
+                    }
+                    isInAirplaneMode = false;
+                } else {
+                    updateIcon(subscription, com.android.internal.R.drawable.stat_sys_signal_null);
+                }
             }
-            mService.updateIcon(mPhoneIcon[subscription], mPhoneData[subscription], null);
             return;
         }
 
