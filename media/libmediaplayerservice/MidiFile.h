@@ -63,6 +63,8 @@ private:
 
     Mutex               mMutex;
     Condition           mCondition;
+    Mutex               mStartLock;
+    Condition           mStartCond;
     EAS_DATA_HANDLE     mEasData;
     EAS_HANDLE          mEasHandle;
     EAS_PCM*            mAudioBuffer;

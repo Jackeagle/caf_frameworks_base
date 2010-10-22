@@ -214,6 +214,10 @@ status_t MidiFile::start()
 
     // resuming after pause?
     if (mPaused) {
+        if(mRender && (mState == EAS_STATE_PAUSED)) {
+            Mutex::Autolock lock(mStartLock);
+            mStartCond.wait(mStartLock);
+        }
         if (EAS_Resume(mEasData, mEasHandle) != EAS_SUCCESS) {
             return ERROR_EAS_FAILURE;
         }
@@ -539,6 +543,7 @@ int MidiFile::render() {
             mAudioSink->stop();
             audioStarted = false;
             mRender = false;
+            mStartCond.signal();
         }
     }
 
