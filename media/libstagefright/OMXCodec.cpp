@@ -214,6 +214,8 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_AC3, "OMX.qcom.audio.decoder.ac3" },
     { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
     { MEDIA_MIMETYPE_VIDEO_VP6,"OMX.qcom.video.decoder.vp"},
+    { MEDIA_MIMETYPE_AUDIO_WMA, "OMX.qcom.audio.decoder.wma"},
+    { MEDIA_MIMETYPE_VIDEO_WMV, "OMX.qcom.video.decoder.vc1"},
 };
 
 static const CodecInfo kEncoderInfo[] = {
@@ -784,6 +786,30 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
          }
      }
 
+    if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_WMA, mMIME)) {
+        setWMAFormat(meta);
+    }
+    if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mMIME)) {
+        OMX_QCOM_PARAM_PORTDEFINITIONTYPE portdef;
+        portdef.nSize = sizeof(OMX_QCOM_PARAM_PORTDEFINITIONTYPE);
+        portdef.nPortIndex = 0; //Input port.
+        portdef.nMemRegion = OMX_QCOM_MemRegionInvalid;
+        portdef.nCacheAttr = OMX_QCOM_CacheAttrNone;
+        portdef.nFramePackingFormat = OMX_QCOM_FramePacking_OnlyOneCompleteFrame;
+        char value[PROPERTY_VALUE_MAX];
+        status_t err = mOMX->setParameter(mNode, (OMX_INDEXTYPE)OMX_QcomIndexPortDefn, &portdef, sizeof(OMX_QCOM_PARAM_PORTDEFINITIONTYPE));
+        if (!property_get("ro.product.device", value, "1")
+            || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa")
+            || !strcmp(value, "msm7627_7x_surf") || !strcmp(value, "msm7627_7x_ffa")
+            || !strcmp(value, "msm7625_surf") || !strcmp(value, "msm7625_ffa"))
+        {
+            LOGE("OMX_QCOM_FramePacking_OnlyOneCompleteFrame not supported by component err: %d", err);
+        }
+        else
+            if(err!=OK){
+               return err;
+            }
+    }
     if (!strncasecmp(mMIME, "video/", 6)) {
 
         if (mThumbnailMode) {
@@ -1111,6 +1137,8 @@ void OMXCodec::setVideoInputFormat(
         compressionFormat = OMX_VIDEO_CodingH263;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime)){
         compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mime)){
+        compressionFormat = OMX_VIDEO_CodingWMV;
     } else {
         LOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
@@ -1561,6 +1589,8 @@ status_t OMXCodec::setVideoOutputFormat(
     compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingSpark;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_VP6, mime)) {
         compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingVp;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mime)){
+        compressionFormat = OMX_VIDEO_CodingWMV;
     } else {
         LOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
@@ -3352,6 +3382,47 @@ void OMXCodec::setAC3Format(int32_t /*numChannels*/, int32_t /*sampleRate*/) {
     err = mOMX->setParameter(mNode, indexTypeAC3PP, &profileAC3PP, sizeof(profileAC3PP));
     CHECK_EQ(err, OK);
 */
+}
+void OMXCodec::setWMAFormat(const sp<MetaData> &meta)
+{
+    if (mIsEncoder) {
+        CODEC_LOGE("WMA encoding not supported");
+    } else {
+        OMX_AUDIO_PARAM_WMATYPE paramWMA;
+        int32_t numChannels;
+        int32_t bitRate;
+        int32_t sampleRate;
+        int32_t encodeOptions;
+        int32_t blockAlign;
+
+        InitOMXParams(&paramWMA);
+        paramWMA.nPortIndex = kPortIndexInput;
+        CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
+        CHECK(meta->findInt32(kKeyBitRate, &bitRate));
+        CHECK(meta->findInt32(kKeyWMAEncodeOpt, &encodeOptions));
+        CHECK(meta->findInt32(kKeyWMABlockAlign, &blockAlign));
+        CODEC_LOGV("Channels: %d, SampleRate: %d, BitRate; %d"
+                   "EncodeOptions: %d, blockAlign: %d", numChannels,
+                   sampleRate, bitRate, encodeOptions, blockAlign);
+
+        status_t err = mOMX->getParameter(
+                mNode, OMX_IndexParamAudioWma, &paramWMA, sizeof(paramWMA));
+        CHECK_EQ(err, OK);
+
+        paramWMA.nChannels = numChannels;
+        paramWMA.nSamplingRate = sampleRate;
+        paramWMA.nEncodeOptions = encodeOptions;
+        paramWMA.nBitRate = bitRate;
+        //paramWMA.eFormat = eFormat;
+        //paramWMA.eProfile = eProfile;
+        paramWMA.nBlockAlign = blockAlign;
+        //paramWMA.nSuperBlockAlign = superBlockAlign;
+
+        err = mOMX->setParameter(
+                mNode, OMX_IndexParamAudioWma, &paramWMA, sizeof(paramWMA));
+        CHECK_EQ(err, OK);
+    }
 }
 
 void OMXCodec::setImageOutputFormat(

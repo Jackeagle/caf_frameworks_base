@@ -107,6 +107,8 @@ enum {
     kKeyDivXVersion       = 'DivX',  // int32_t
     kKeyWriteCtts         = 'ctts',  // int32_t (bool)
     kKeyIsBFrame          = 'bfrm',  // int32_t (bool)
+    kKeyWMAEncodeOpt      = 'eopt',  // int32_t
+    kKeyWMABlockAlign     = 'blka',  // int32_t
 };
 
 enum {

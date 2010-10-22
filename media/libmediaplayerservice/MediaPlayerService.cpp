@@ -732,7 +732,9 @@ player_type getPlayerType(int fd, int64_t offset, int64_t length)
     if (ident == 0x75b22630) {
         // The magic number for .asf files, i.e. wmv and wma content.
         // These are not currently supported through stagefright.
+#if 0
         return PV_PLAYER;
+#endif
     }
 #endif
 
