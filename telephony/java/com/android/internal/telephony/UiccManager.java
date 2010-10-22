@@ -253,10 +253,10 @@ public class UiccManager extends Handler{
 
     //Gets current application based on slotId and appId
     public synchronized UiccCardApplication getApplication(int slotId, int appId) {
-        if (slotId >= 0 && slotId < mUiccCards.length &&
-            appId >= 0 && appId < mUiccCards.length) {
+        if (slotId >= 0 && slotId < mUiccCards.length) {
             UiccCard c = mUiccCards[slotId];
-            if (c != null && c.getCardState() == CardState.PRESENT) {
+            if (c != null && (c.getCardState() == CardState.PRESENT) &&
+                (appId >= 0 && appId < c.getNumApplications())) {
                 UiccCardApplication app = c.getUiccCardApplication(appId);
                 return app;
             }
