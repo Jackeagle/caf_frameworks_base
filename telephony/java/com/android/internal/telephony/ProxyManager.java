@@ -328,11 +328,6 @@ public class ProxyManager extends Handler {
                     Message callback = Message.obtain(this, EVENT_SET_DATA_SUBSCRIPTION_DONE, str);
                     Log.d(LOG_TAG, "Set DDS to " + queuedDds
                           + " Calling cmd interface setDataSubscription");
-                    try {
-                        Thread.sleep(15000);
-                    } catch (Exception e) {
-                        Log.e(LOG_TAG, "Exception occured in sleep!");
-                    }
                     mCi[queuedDds].setDataSubscription(callback);
                 }
                 break;
