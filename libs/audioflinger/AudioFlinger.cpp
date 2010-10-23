@@ -507,8 +507,6 @@ status_t AudioFlinger::setStreamVolume(int stream, float value, int output)
     if( (mLPAOutput != NULL) &&
         (mLPAStreamType == stream) ) {
         mLPAOutput->setVolume(value, value);
-        mStreamTypes[stream].volume = value;
-        return NO_ERROR;
     }
 
     PlaybackThread *thread = NULL;
