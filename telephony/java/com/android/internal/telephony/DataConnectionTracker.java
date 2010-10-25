@@ -374,10 +374,16 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
                 case CONNECTED:
                 case DISCONNECTING:
+                    /* If Call state is not IDLE, look to see if the call
+                     * is on the same radio tech as the data call and supports CSS
+                     */
                     if (TelephonyManager.getDefault().getCallState() != TelephonyManager.CALL_STATE_IDLE
+                            && TelephonyManager.getDefault().getNetworkType() == getDataServiceState().getRadioTechnology()
                             && !isConcurrentVoiceAndData()) {
+                        Log.d(LOG_TAG, "connectioned moved to SUSPENDED, ds:" + ds);
                         ret = DataState.SUSPENDED;
                     } else {
+                        Log.d(LOG_TAG, "connectioned moved to CONNECTED, ds:" + ds);
                         ret = DataState.CONNECTED;
                     }
                     break;
