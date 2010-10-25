@@ -58,8 +58,6 @@ public:
     virtual status_t read(
             MediaBuffer **buffer, const ReadOptions *options = NULL);
 
-    virtual void logTrackStatistics();
-
 protected:
     virtual ~MPEG4Source();
 
@@ -89,6 +87,7 @@ private:
     uint32_t mNumSamplesReadError;
     bool mStatistics;
     void logExpectedFrames();
+    void logTrackStatistics();
 
     size_t parseNALSize(const uint8_t *data) const;
 
@@ -1513,6 +1512,9 @@ status_t MPEG4Source::stop() {
 
     CHECK(mStarted);
 
+    if (mStatistics)
+        logTrackStatistics();
+
     if (mBuffer != NULL) {
         mBuffer->release();
         mBuffer = NULL;
@@ -1750,10 +1752,15 @@ status_t MPEG4Source::read(
 
 void MPEG4Source::logTrackStatistics()
 {
-    LOGW("Total number of samples in track: %lu",mSampleTable->countSamples());
-    LOGW("Number of key samples: %lu",mSampleTable->getNumSyncSamples());
-    LOGW("Number of corrupt samples: %lu",mNumSamplesReadError ?
+    const char *mime;
+    mFormat->findCString(kKeyMIMEType, &mime);
+    LOGW("=====================================================");
+    LOGW("Mime Type: %s",mime);
+    LOGW("Total number of samples in track: %u",mSampleTable->countSamples());
+    LOGW("Number of key samples: %u",mSampleTable->getNumSyncSamples());
+    LOGW("Number of corrupt samples: %u",mNumSamplesReadError ?
            mNumSamplesReadError-1 : mNumSamplesReadError); //last sample reads error for EOS
+    LOGW("=====================================================");
 }
 
 
@@ -1766,7 +1773,7 @@ void MPEG4Source::logExpectedFrames()
     LOGW("=====================================================");
     LOGW("Mime type: %s",mime);
     LOGW("Track duration: %lld",durationUs/1000);
-    LOGW("Total number of samples in track: %lu",mSampleTable->countSamples());
+    LOGW("Total number of samples in track: %u",mSampleTable->countSamples());
     LOGW("Expected frames per second: %.2f",((float)mSampleTable->countSamples()*1000)/((float)durationUs/1000));
     LOGW("=====================================================");
 }
