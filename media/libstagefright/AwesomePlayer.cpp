@@ -377,9 +377,6 @@ void AwesomePlayer::reset_l() {
     }
     mPrefetcher.clear();
 
-    mAudioTrack.clear();
-    mVideoTrack.clear();
-
     // Shutdown audio first, so that the respone to the reset request
     // appears to happen instantaneously as far as the user is concerned
     // If we did this later, audio would continue playing while we
@@ -417,6 +414,10 @@ void AwesomePlayer::reset_l() {
     mVideoQueueSize  = 0;
 
     if (mVideoSource != NULL) {
+        if (mStatistics) {
+            logStatistics();
+            logSyncLoss();
+        }
         mVideoSource->stop();
 
         // The following hack is necessary to ensure that the OMX
@@ -429,6 +430,9 @@ void AwesomePlayer::reset_l() {
         }
         IPCThreadState::self()->flushCommands();
     }
+
+    mAudioTrack.clear();
+    mVideoTrack.clear();
 
     mDurationUs = -1;
     mFlags = 0;
@@ -506,6 +510,10 @@ void AwesomePlayer::onStreamDone() {
 
         if (mVideoSource != NULL) {
             postVideoEvent_l();
+            if (mStatistics) {
+                logStatistics();
+                logSyncLoss();
+            }
         }
     } else {
         if (mStreamDoneStatus == ERROR_END_OF_STREAM) {
@@ -1399,10 +1407,6 @@ void AwesomePlayer::onPrepareAsyncEvent() {
 status_t AwesomePlayer::suspend() {
     LOGV("suspend");
     Mutex::Autolock autoLock(mLock);
-    if (mStatistics) {
-        logStatistics();
-        logSyncLoss();
-    }
 
     if (mSuspensionState != NULL) {
         if (mVideoBuffer[mVideoQueueLastRendered] == NULL) {
@@ -1640,15 +1644,14 @@ status_t AwesomePlayer::setParameters(const String8& params) {
 
 //Statistics profiling
 void AwesomePlayer::logStatistics() {
-    String8 mimeType;
-    float confidence;
-    if (mFileSource!=NULL) mFileSource->sniff(&mimeType, &confidence);
+    const char *mime;
+    mVideoTrack->getFormat()->findCString(kKeyMIMEType, &mime);
     LOGW("=====================================================");
-    LOGW("MimeType: %s",mimeType.string());
+    if (mFlags & LOOPING) {LOGW("Looping Update");}
+    LOGW("Mime Type: %s",mime);
     LOGW("Clip duration: %lld ms",mDurationUs/1000);
-    if (mVideoTrack!=NULL) mVideoTrack->logTrackStatistics();
-    LOGW("Number of frames dropped: %lu",mFramesDropped);
-    LOGW("Number of frames rendered: %lu",mTotalFrames);
+    LOGW("Number of frames dropped: %u",mFramesDropped);
+    LOGW("Number of frames rendered: %u",mTotalFrames);
     LOGW("=====================================================");
 }
 
@@ -1675,7 +1678,6 @@ inline void AwesomePlayer::logPause() {
 inline void AwesomePlayer::logCatchUp(int64_t ts, int64_t clock, int64_t delta)
 {
     if (mConsecutiveFramesDropped > 0) {
-        LOGW("Frames dropped before catching up: %lu, Timestamp: %lld, Clock: %lld, Delta: %lld", mConsecutiveFramesDropped, ts/1000, clock/1000, delta/1000);
         mNumTimesSyncLoss++;
         if (mMaxTimeSyncLoss < (clock - mCatchupTimeStart) && clock > 0 && ts > 0) {
             mMaxTimeSyncLoss = clock - mCatchupTimeStart;
@@ -1685,7 +1687,6 @@ inline void AwesomePlayer::logCatchUp(int64_t ts, int64_t clock, int64_t delta)
 
 inline void AwesomePlayer::logLate(int64_t ts, int64_t clock, int64_t delta)
 {
-    LOGW("Video behind. Timestamp: %lld, Clock: %lld, Delta: %lld",ts/1000,clock/1000,delta/1000);
     if (mMaxLateDelta < delta && clock > 0 && ts > 0) {
         mMaxLateDelta = delta;
     }
@@ -1695,7 +1696,6 @@ inline void AwesomePlayer::logOnTime(int64_t ts, int64_t clock, int64_t delta)
 {
     logCatchUp(ts, clock, delta);
     if (delta <= 0) {
-        LOGW("Video ahead. Timestamp: %lld, Clock: %lld, Delta: %lld",ts/1000,clock/1000,-delta/1000);
         if ((-delta) > (-mMaxEarlyDelta) && clock > 0 && ts > 0) {
             mMaxEarlyDelta = delta;
         }
@@ -1706,10 +1706,10 @@ inline void AwesomePlayer::logOnTime(int64_t ts, int64_t clock, int64_t delta)
 void AwesomePlayer::logSyncLoss()
 {
     LOGW("=====================================================");
-    LOGW("Number of times AV Sync Losses = %lu", mNumTimesSyncLoss);
-    LOGW("Max Video Ahead time delta = %lu", -mMaxEarlyDelta/1000);
-    LOGW("Max Video Behind time delta = %lu", mMaxLateDelta/1000);
-    LOGW("Max Time sync loss = %lu",mMaxTimeSyncLoss/1000);
+    LOGW("Number of times AV Sync Losses = %u", mNumTimesSyncLoss);
+    LOGW("Max Video Ahead time delta = %u", -mMaxEarlyDelta/1000);
+    LOGW("Max Video Behind time delta = %u", mMaxLateDelta/1000);
+    LOGW("Max Time sync loss = %u",mMaxTimeSyncLoss/1000);
     LOGW("=====================================================");
 
 }
