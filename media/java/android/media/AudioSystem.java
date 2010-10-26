@@ -253,9 +253,9 @@ public class AudioSystem
     public static final int DEVICE_IN_AMBIENT = 0x20000;
     public static final int DEVICE_IN_BUILTIN_MIC1 = 0x40000;
     public static final int DEVICE_IN_BUILTIN_MIC2 = 0x80000;
-    public static final int DEVICE_IN_MIC_ARRAY = 0x100000;
+    public static final int DEVICE_IN_MIC_ARRAY = 0x400000;
     public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = 0x200000;
-    public static final int DEVICE_IN_WIRED_HEADSET = 0x400000;
+    public static final int DEVICE_IN_WIRED_HEADSET = 0x100000;
     public static final int DEVICE_IN_AUX_DIGITAL = 0x800000;
     public static final int DEVICe_IN_FM_RX = 0x1000000;
     public static final int DEVICe_IN_FM_RXA2DP = 0x2000000;
