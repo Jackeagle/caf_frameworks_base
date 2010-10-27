@@ -1525,7 +1525,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         // suspended. This allows the applications an
                         // opportunity to handle DISCONNECTED and SUSPENDED
                         // differently, or not.
-                        handleDisconnect(info);
+                        // IRAT Handover: do not treat SUSPENDED as DISCONNECTED
+                        // handleDisconnect(info);
                     } else if (state == NetworkInfo.State.CONNECTED) {
                         handleConnect(info);
                     }
