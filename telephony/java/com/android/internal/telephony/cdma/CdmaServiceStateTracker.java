@@ -46,6 +46,7 @@ import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.MccTable;
+import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.RegStateResponse;
 import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyIntents;
@@ -78,7 +79,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
     UiccCardApplication m3gpp2Application = null;
     RuimRecords mRuimRecords = null;
 
-    int mCdmaSubscriptionSource = VoicePhone.CDMA_SUBSCRIPTION_NV;
+    int mCdmaSubscriptionSource = VoicePhone.CDMA_SUBSCRIPTION_NONE;
 
      /** if time between NTIZ updates is less than mNitzUpdateSpacing the update may be ignored. */
     private static final int NITZ_UPDATE_SPACING_DEFAULT = 1000 * 60 * 10;
@@ -167,6 +168,9 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         cellLoc = new CdmaCellLocation();
         newCellLoc = new CdmaCellLocation();
         mSignalStrength = new SignalStrength();
+
+        mCdmaSubscriptionSource = Settings.Secure.getInt(cr,
+                Settings.Secure.CDMA_SUBSCRIPTION_MODE, RILConstants.PREFERRED_CDMA_SUBSCRIPTION);
 
         PowerManager powerManager =
                 (PowerManager)phone.getContext().getSystemService(Context.POWER_SERVICE);
