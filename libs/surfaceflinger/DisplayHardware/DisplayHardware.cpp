@@ -401,3 +401,12 @@ void DisplayHardware::enableHDMIOutput(int enable) const
     mNativeWindow->enableHDMIOutput(enable);
 }
 
+void DisplayHardware::setActionSafeWidthRatio(float asWidthRatio) const
+{
+  mNativeWindow->setActionSafeWidthRatio(asWidthRatio);
+}
+
+void DisplayHardware::setActionSafeHeightRatio(float asHeightRatio) const
+{
+  mNativeWindow->setActionSafeHeightRatio(asHeightRatio);
+}

@@ -1332,6 +1332,16 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
     hw.enableHDMIOutput(enable);
 }
 
+void SurfaceFlinger::setActionSafeWidthRatio(float asWidthRatio){
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    hw.setActionSafeWidthRatio(asWidthRatio);
+}
+
+void SurfaceFlinger::setActionSafeHeightRatio(float asHeightRatio){
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    hw.setActionSafeHeightRatio(asHeightRatio);
+}
+
 sp<ISurface> SurfaceFlinger::createSurface(ClientID clientId, int pid,
         const String8& name, ISurfaceFlingerClient::surface_data_t* params,
         DisplayID d, uint32_t w, uint32_t h, PixelFormat format,

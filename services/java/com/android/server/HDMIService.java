@@ -184,10 +184,18 @@ class HDMIService extends IHDMIService.Stub {
                 /* NOTE: this can be done from the UI, the 'changeDisplayMode'
                  * can be called at any point to dynamically switch the display
                  * mode to any other supported mode. */
-                int mode = getBestMode();
-                mListener.changeDisplayMode(mode);
+                  int mode = getBestMode();
+                  mListener.changeDisplayMode(mode);
             }
         }
+    }
+
+    public void setActionsafeWidthRatio(float asWidthRatio){
+        mListener.setActionsafeWidthRatio(asWidthRatio);
+    }
+
+    public void setActionsafeHeightRatio(float asHeightRatio){
+        mListener.setActionsafeHeightRatio(asHeightRatio);
     }
 
     public boolean getHDMIUserOption() {
