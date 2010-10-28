@@ -60,7 +60,7 @@ static const int QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka = 0x7FA30C01;
 static const int QOMX_VIDEO_CodingDivx = 0x7FA30C02;
 static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
 static const int QOMX_INTERLACE_FLAG = 0x49283654;
-
+static const int QOMX_3D_VIDEO_FLAG = 0x23784238;
 
 struct CodecInfo {
     const char *mime;
@@ -1013,6 +1013,19 @@ status_t OMXCodec::setVideoOutputFormat(
         const char *mime, OMX_U32 width, OMX_U32 height) {
     CODEC_LOGV("setVideoOutputFormat width=%ld, height=%ld", width, height);
 
+    //Enable decoder to report if there is any SEI data
+    QOMX_ENABLETYPE enable_sei_reporting;
+    enable_sei_reporting.bEnable = OMX_TRUE;
+
+    status_t err = mOMX->setParameter(
+            mNode, (OMX_INDEXTYPE)OMX_QcomIndexParamFrameInfoExtraData,
+            &enable_sei_reporting, (size_t)sizeof(enable_sei_reporting));
+
+    if (err != OK) {
+        return err;
+    }
+
+
     OMX_VIDEO_CODINGTYPE compressionFormat = OMX_VIDEO_CodingUnused;
     if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime)) {
         compressionFormat = OMX_VIDEO_CodingAVC;
@@ -1027,7 +1040,7 @@ status_t OMXCodec::setVideoOutputFormat(
         CHECK(!"Should not be here. Not a supported video mime type.");
     }
 
-    status_t err = setVideoPortFormatType(
+    err = setVideoPortFormatType(
             kPortIndexInput, compressionFormat, OMX_COLOR_FormatUnused);
 
     if (err != OK) {
@@ -1185,7 +1198,8 @@ OMXCodec::OMXCodec(
       mThumbnailMode(false),
       mLeftOverBuffer(NULL),
       mPmemInfo(NULL),
-      mInterlaceFormatDetected(false) {
+      mInterlaceFormatDetected(false),
+      m3DVideoDetected(false) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
@@ -1483,10 +1497,12 @@ void OMXCodec::on_message(const omx_message &msg) {
                  msg.u.extended_buffer_data.timestamp / 1E6);
 
             if(mOMXLivesLocally
-               && (flags & OMX_BUFFERFLAG_EXTRADATA)
                && msg.u.extended_buffer_data.range_length > 0) {
               CODEC_LOGV("Calling processExtraDataOfbuffer");
-              processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer),flags);
+              processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer), flags);
+
+              CODEC_LOGV("Calling processSEIData");
+              processSEIData(static_cast<OMX_BUFFERHEADERTYPE *>(buffer), flags);
             }
 
             Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
@@ -3380,16 +3396,16 @@ status_t QueryCodecs(
     }
 }
 
-status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer,OMX_U32 flags) {
+status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags) {
     CODEC_LOGV("In ProcessExtraDataBlocksOfBuffer for interlace, buffer = %p, flags = %p",aBuffer,flags);
 
     if (!mInterlaceFormatDetected) {
         if (flags & OMX_BUFFERFLAG_EXTRADATA) {
             OMX_OTHER_EXTRADATATYPE *pExtra;
             OMX_STREAMINTERLACEFORMAT *pInterlaceFormat;
-            OMX_U8 *pTmp = aBuffer->pBuffer + aBuffer->nOffset + aBuffer->nFilledLen + 3;
+            OMX_U8 *pTmp = aBuffer->pBuffer + aBuffer->nOffset + aBuffer->nFilledLen;
 
-            pExtra = (OMX_OTHER_EXTRADATATYPE *)(((OMX_U32)pTmp) & ~3);
+            pExtra = (OMX_OTHER_EXTRADATATYPE *)(((OMX_U32)(pTmp + 3)) & ~3);
             while((pExtra->eType != OMX_ExtraDataNone) && (pExtra->eType != OMX_ExtraDataInterlaceFormat))
             {
                 pExtra = (OMX_OTHER_EXTRADATATYPE *) (((OMX_U8 *) pExtra) + pExtra->nSize);
@@ -3442,6 +3458,39 @@ status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer,
                 }
             }
             mInterlaceFormatDetected = true;
+        }
+    }
+    return OK;
+}
+
+status_t OMXCodec::processSEIData(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags)
+{
+    CODEC_LOGV("Processing SEI data");
+    if (!m3DVideoDetected)
+    {
+        //We don't want to continue checking every buffer, so we mark as 3D detected
+        //regardless. We only take action by xoring the 3d flag when cancel_flag is set
+        m3DVideoDetected = true;
+
+
+        OMX_QCOM_FRAME_PACK_ARRANGEMENT arrangementInfo;
+        arrangementInfo.cancel_flag = 1; //Need to initialize to 1, because the core doesn't touch this
+                                         //struct if video is not H264
+        status_t err = mOMX->getConfig(mNode, (OMX_INDEXTYPE)OMX_QcomIndexConfigVideoFramePackingArrangement,
+                                       &arrangementInfo, (size_t)sizeof(arrangementInfo));
+
+        int oldColorFormat, newColorFormat;
+        mOutputFormat->findInt32(kKeyColorFormat, &oldColorFormat);
+
+        if (arrangementInfo.cancel_flag == 1)
+        {
+            //nothing to do here
+        }
+        else
+        {
+            newColorFormat = oldColorFormat ^ QOMX_3D_VIDEO_FLAG;
+            mOutputFormat->setInt32(kKeyColorFormat, newColorFormat);
+            CODEC_LOGV("This is a 3d video...assuming side by side");
         }
     }
 

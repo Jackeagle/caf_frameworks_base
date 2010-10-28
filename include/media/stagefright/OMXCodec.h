@@ -162,6 +162,7 @@ private:
     Condition mBufferFilled;
 
     bool mInterlaceFormatDetected;
+    bool m3DVideoDetected;
 
     OMXCodec(const sp<IOMX> &omx, IOMX::node_id node, uint32_t quirks,
              bool isEncoder, const char *mime, const char *componentName,
@@ -252,7 +253,7 @@ private:
     void parseFlags(uint32_t flags);
 
     status_t processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags);
-
+    status_t processSEIData(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags);
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
