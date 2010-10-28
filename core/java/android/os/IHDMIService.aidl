@@ -25,6 +25,7 @@ package android.os;
 interface IHDMIService
 {
     boolean isHDMIConnected();
-
     void setHDMIOutput(boolean enableHDMI);
+    void setActionsafeWidthRatio(float asWidthRatio);
+    void setActionsafeHeightRatio(float asHeightRatio);
 }
