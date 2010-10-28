@@ -46,6 +46,7 @@ import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.MccTable;
+import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.RegStateResponse;
 import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyIntents;
@@ -165,6 +166,9 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         cellLoc = new CdmaCellLocation();
         newCellLoc = new CdmaCellLocation();
         mSignalStrength = new SignalStrength();
+
+        mCdmaSubscriptionSource = Settings.Secure.getInt(cr,
+                Settings.Secure.CDMA_SUBSCRIPTION_MODE, RILConstants.PREFERRED_CDMA_SUBSCRIPTION);
 
         PowerManager powerManager =
                 (PowerManager)phone.getContext().getSystemService(Context.POWER_SERVICE);
