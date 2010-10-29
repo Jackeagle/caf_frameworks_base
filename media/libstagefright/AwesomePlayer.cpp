@@ -1302,6 +1302,7 @@ void AwesomePlayer::onVideoEvent() {
         mVideoTimeUs = timeUs;
     }
 
+    bool wasSeeking = mSeeking;
     finishSeekIfNecessary(timeUs);
 
     TimeSource *ts = (mFlags & AUDIO_AT_EOS) ? &mSystemTimeSource : mTimeSource;
@@ -1321,6 +1322,11 @@ void AwesomePlayer::onVideoEvent() {
     int64_t nowUs = ts->getRealTimeUs() - mTimeSourceDeltaUs;
 
     int64_t latenessUs = nowUs - timeUs;
+
+    if (wasSeeking) {
+        // Let's display the first frame after seeking right away.
+        latenessUs = 0;
+    }
 
     if (mRTPSession != NULL) {
         // We'll completely ignore timestamps for gtalk videochat
