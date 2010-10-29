@@ -250,9 +250,6 @@ class PowerManagerService extends IPowerManager.Stub
     private static final boolean mDebugProximitySensor = (true || mSpew);
     private static final boolean mDebugLightSensor = (false || mSpew);
 
-    private boolean mDMMAvailable = false;
-    DMMControl mDMMController;
-
     /*
     static PrintStream mLog;
     static {
@@ -467,15 +464,6 @@ class PowerManagerService extends IPowerManager.Stub
         mButtonLight = lights.getLight(LightsService.LIGHT_ID_BUTTONS);
         mKeyboardLight = lights.getLight(LightsService.LIGHT_ID_KEYBOARD);
         mAttentionLight = lights.getLight(LightsService.LIGHT_ID_ATTENTION);
-
-        Log.w(TAG, "DMM: ro.dev.dmm = " + SystemProperties.getInt("ro.dev.dmm", 0));
-
-        if(SystemProperties.getInt("ro.dev.dmm", 0) == 1) {
-            mDMMAvailable = true;
-            mDMMController =  new DMMControl(mContext);
-        }
-        else
-            Log.w(TAG, "DMM disabled. DMMController will not be initialized.");
 
         mHandlerThread = new HandlerThread("PowerManagerService") {
             @Override
@@ -1284,8 +1272,6 @@ class PowerManagerService extends IPowerManager.Stub
                 EventLog.writeEvent(EventLogTags.POWER_SCREEN_BROADCAST_DONE, 1,
                         SystemClock.uptimeMillis() - mScreenOnStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
-                if(mDMMAvailable)
-                    mDMMController.enableUnstableMemory(true);
             }
         }
     };
@@ -1297,8 +1283,6 @@ class PowerManagerService extends IPowerManager.Stub
                 EventLog.writeEvent(EventLogTags.POWER_SCREEN_BROADCAST_DONE, 0,
                         SystemClock.uptimeMillis() - mScreenOffStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
-                if(mDMMAvailable)
-                    mDMMController.enableUnstableMemory(false);
             }
         }
     };
