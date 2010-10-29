@@ -437,6 +437,13 @@ status_t AudioPolicyService::onTransact(
 
 // ----------------------------------------------------------------------------
 void AudioPolicyService::instantiate() {
+    //getService can take up to 5 secs to finish
+    while (defaultServiceManager()->checkService(String16("media.audio_policy")) != NULL)
+    {
+        LOGW("waiting for media.audio_policy to die...");
+        usleep(200000);
+    }
+
     defaultServiceManager()->addService(
             String16("media.audio_policy"), new AudioPolicyService());
 }
