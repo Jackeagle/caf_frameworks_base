@@ -130,9 +130,12 @@ public abstract class SMSDispatcher extends Handler {
     /** Uicc Event */
     static final protected int EVENT_ICC_CHANGED = 16;
 
-    static final protected int EVENT_NEW_ICC_SMS = 17;
+    static final protected int EVENT_UPDATE_ICC_MWI = 17;
 
-    static final protected int EVENT_UPDATE_ICC_MWI = 18;
+    /** Class2 SMS  */
+    static final protected int EVENT_SMS_ON_ICC = 18;
+
+    static final protected int EVENT_GET_ICC_SMS_DONE = 19;
 
     /** Must be static as they are referenced by 3 derived instances, Ims/Cdma/GsmSMSDispatcher */
     /** true if IMS is registered, false otherwise.*/
@@ -460,11 +463,6 @@ public abstract class SMSDispatcher extends Handler {
             updateIccAvailability();
             break;
 
-        case EVENT_NEW_ICC_SMS:
-            ar = (AsyncResult)msg.obj;
-            dispatchMessage((SmsMessageBase)ar.result);
-            break;
-
         case EVENT_UPDATE_ICC_MWI:
             ar = (AsyncResult) msg.obj;
             if ( ar == null)
@@ -473,6 +471,14 @@ public abstract class SMSDispatcher extends Handler {
                 Log.v(TAG, " MWI update on card failed " + ar.exception );
                 storeVoiceMailCount();
             }
+            break;
+
+        case EVENT_SMS_ON_ICC:
+            handleSmsOnIcc((AsyncResult) msg.obj);
+            break;
+
+        case EVENT_GET_ICC_SMS_DONE:
+            handleGetIccSmsDone((AsyncResult) msg.obj);
             break;
         }
     }
@@ -518,6 +524,17 @@ public abstract class SMSDispatcher extends Handler {
      *           be a String representing the status report PDU, as ASCII hex.
      */
     protected abstract void handleStatusReport(AsyncResult ar);
+
+    /**
+     * Called when Class2 SMS is retrieved from SIM.
+     */
+    protected abstract void handleGetIccSmsDone(AsyncResult ar);
+
+
+    /**
+     * Called when SMS is received on SIM.
+     */
+    protected abstract void handleSmsOnIcc(AsyncResult ar);
 
     /**
      * Called when SMS send completes. Broadcasts a sentIntent on success.
@@ -633,7 +650,6 @@ public abstract class SMSDispatcher extends Handler {
      *         to applications
      */
     protected abstract int dispatchMessage(SmsMessageBase sms);
-
 
     /**
      * If this is the last part send the parts out to the application, otherwise

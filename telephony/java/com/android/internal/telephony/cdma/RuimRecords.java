@@ -58,11 +58,6 @@ public final class RuimRecords extends UiccApplicationRecords {
     private static final int EVENT_GET_CDMA_SUBSCRIPTION_DONE = 10;
     private static final int EVENT_UPDATE_DONE = 14;
     private static final int EVENT_GET_SST_DONE = 17;
-    private static final int EVENT_GET_ALL_SMS_DONE = 18;
-    private static final int EVENT_MARK_SMS_READ_DONE = 19;
-
-    private static final int EVENT_SMS_ON_RUIM = 21;
-    private static final int EVENT_GET_SMS_DONE = 22;
 
     private static final int EVENT_RUIM_REFRESH = 31;
 
@@ -77,7 +72,6 @@ public final class RuimRecords extends UiccApplicationRecords {
         // recordsToLoad is set to 0 because no requests are made yet
         recordsToLoad = 0;
 
-        // NOTE the EVENT_SMS_ON_RUIM is not registered
         mCi.setOnIccRefresh(this, EVENT_RUIM_REFRESH, null);
 
         // Start off by setting empty state
@@ -223,13 +217,6 @@ public final class RuimRecords extends UiccApplicationRecords {
                     Log.i(LOG_TAG, "RuimRecords update failed", ar.exception);
                 }
             break;
-
-            case EVENT_GET_ALL_SMS_DONE:
-            case EVENT_MARK_SMS_READ_DONE:
-            case EVENT_SMS_ON_RUIM:
-            case EVENT_GET_SMS_DONE:
-                Log.w(LOG_TAG, "Event not supported: " + msg.what);
-                break;
 
             // TODO: probably EF_CST should be read instead
             case EVENT_GET_SST_DONE:

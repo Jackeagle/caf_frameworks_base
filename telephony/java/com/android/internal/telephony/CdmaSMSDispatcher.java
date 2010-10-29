@@ -84,6 +84,25 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         Log.d(TAG, "handleStatusReport is a special GSM function, should never be called in CDMA!");
     }
 
+    /**
+     * Called when a Class2 SMS is  received.
+     *
+     * @param ar AsyncResult passed to this functioni. ar.result should
+     *           be representing the INDEX of SMS on SIM.
+     */
+    protected void handleSmsOnIcc(AsyncResult ar) {
+        Log.d(TAG, "handleSmsOnIcc function is not applicable for CDMA");
+    }
+
+    /**
+     * Called when a SMS on SIM is retrieved.
+     *
+     * @param ar AsyncResult passed to this function.
+     */
+    protected void handleGetIccSmsDone(AsyncResult ar) {
+        Log.d(TAG, "handleGetIccSmsDone function is not applicable for CDMA");
+    }
+
     private void handleCdmaStatusReport(SmsMessage sms) {
         for (int i = 0, count = deliveryPendingList.size(); i < count; i++) {
             SmsTracker tracker = deliveryPendingList.get(i);

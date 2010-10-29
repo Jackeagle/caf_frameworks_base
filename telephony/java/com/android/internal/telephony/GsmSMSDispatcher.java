@@ -46,6 +46,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
         super(phone, cm);
         Log.d(TAG, "Register for EVENT_NEW_SMS");
         mCm.setOnNewSMS(this, EVENT_NEW_SMS, null);
+        mCm.setOnSmsOnSim(this, EVENT_SMS_ON_ICC, null);
         mCm.setOnSmsStatus(this, EVENT_NEW_SMS_STATUS_REPORT, null);
     }
 
@@ -408,7 +409,6 @@ final class GsmSMSDispatcher extends SMSDispatcher {
             if (mApplication != null) {
                 Log.d(TAG, "Removing stale 3gpp Application.");
                 if (mRecords != null) {
-                    mRecords.unregisterForNewSms(this);
                     mRecords = null;
                 }
                 mApplication = null;
@@ -417,7 +417,6 @@ final class GsmSMSDispatcher extends SMSDispatcher {
                 Log.d(TAG, "New 3gpp application found");
                 mApplication = newApplication;
                 mRecords = mApplication.getApplicationRecords();
-                mRecords.registerForNewSms(this, EVENT_NEW_ICC_SMS, null);
             }
         }
     }
@@ -443,4 +442,55 @@ final class GsmSMSDispatcher extends SMSDispatcher {
         }
     }
 
+
+    /**
+     * Called when a Class2 SMS is  received.
+     *
+     * @param ar AsyncResult passed to this functioni. ar.result should
+     *           be representing the INDEX of SMS on SIM.
+     */
+    protected void handleSmsOnIcc(AsyncResult ar) {
+        int[] index = (int[])ar.result;
+
+        if (ar.exception != null || index.length != 1) {
+            Log.e(TAG, " Error on SMS_ON_SIM with exp "
+                   + ar.exception + " length " + index.length);
+        } else {
+            Log.d(TAG, "READ EF_SMS RECORD index=" + index[0]);
+            mApplication.getIccFileHandler().loadEFLinearFixed(IccConstants.EF_SMS,index[0],
+                   obtainMessage(EVENT_GET_ICC_SMS_DONE));
+        }
+    }
+
+
+    /**
+     * Called when a SMS on SIM is retrieved.
+     *
+     * @param ar AsyncResult passed to this function.
+     */
+    protected void handleGetIccSmsDone(AsyncResult ar) {
+        byte[] ba;
+
+        if (ar.exception == null) {
+            ba = (byte[])ar.result;
+            if (ba[0] != 0)
+                Log.d(TAG, "status : " + ba[0]);
+
+            // 3GPP TS 51.011 v5.0.0 (20011-12)  10.5.3
+            // 3 == "received by MS from network; message to be read"
+            if (ba[0] == 3) {
+                int n = ba.length;
+
+                // Note: Data may include trailing FF's.  That's OK; message
+                // should still parse correctly.
+                byte[] pdu = new byte[n - 1];
+                System.arraycopy(ba, 1, pdu, 0, n - 1);
+                SmsMessage message = SmsMessage.createFromPdu(pdu);
+                dispatchMessage((SmsMessageBase) message);
+            } else {
+                Log.e(TAG, "Error on GET_SMS with exp "
+                    + ar.exception);
+            }
+        }
+    }
 }
