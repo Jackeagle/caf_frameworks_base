@@ -84,6 +84,27 @@ interface IIccPhoneBook {
      * This is useful for iteration the whole ADN file, such as write the whole
      * phone book or erase/format the whole phonebook
      *
+     * @param subscription user preferred subscription
+     * @param efid must be one among EF_ADN, EF_FDN, and EF_SDN
+     * @param newTag adn tag to be stored
+     * @param newPhoneNumber adn number to be stored
+     *        Set both newTag and newPhoneNubmer to "" means to replace the old
+     *        record with empty one, aka, delete old record
+     * @param index is 1-based adn record index to be updated
+     * @param pin2 required to update EF_FDN, otherwise must be null
+     * @return true for success
+     */
+    boolean updateAdnRecordsInEfBySearchOnSubscription(int subscription, int efid,
+            String oldTag, String oldPhoneNumber,
+            String newTag, String newPhoneNumber,
+            String pin2);
+
+    /**
+     * Update an ADN-like EF record by record index
+     *
+     * This is useful for iteration the whole ADN file, such as write the whole
+     * phone book or erase/format the whole phonebook
+     *
      * @param efid must be one among EF_ADN, EF_FDN, and EF_SDN
      * @param newTag adn tag to be stored
      * @param newPhoneNumber adn number to be stored
