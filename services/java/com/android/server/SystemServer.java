@@ -88,6 +88,7 @@ class ServerThread extends Thread {
 
         LightsService lights = null;
         PowerManagerService power = null;
+        DMMControl dmm = null;
         BatteryService battery = null;
         ConnectivityService connectivity = null;
         IPackageManager pm = null;
@@ -200,6 +201,9 @@ class ServerThread extends Thread {
                     bluetooth.enable();
                 }
             }
+
+            Slog.i(TAG, "Dynamic Memory Manager");
+            dmm = new DMMControl(context);
 
         } catch (RuntimeException e) {
             Slog.e("System", "Failure starting core service", e);

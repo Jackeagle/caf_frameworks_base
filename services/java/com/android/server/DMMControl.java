@@ -28,52 +28,95 @@
 
 package com.android.server;
 
-import android.os.SystemProperties;
 import android.os.Power;
 import android.os.PowerManager;
-import android.util.Log;
-import android.os.Process;
+import android.os.SystemProperties;
 
-import android.content.pm.ApplicationInfo;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.app.ActivityManager;
-import android.app.ListActivity;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
 
+import android.util.Log;
 
 class DMMControl {
     private final String TAG = "DMMControl";
     private Context mContext;
     private boolean mDMM_DPD=false;
+    private boolean AlarmSet=false;
     private enum DMM_MEM_STATE {ACTIVE, DISABLED}
     private DMM_MEM_STATE mState;
+    private AlarmManager mAlarmManager;
+    private Intent mIdleIntent;
+    private PendingIntent mPendingIntent;
+    private long triggerDelay;
+    private static final String ACTION_DMM_TRIGGER =
+        "com.android.server.DMMControl.action.DMM_TRIGGER";
 
     public DMMControl(Context context) {
         mContext = context;
 
-        Log.w(TAG, "ro.dev.dmm.dpd.start_address = " + SystemProperties.get("ro.dev.dmm.dpd.start_address", "0"));
-        if((SystemProperties.get("ro.dev.dmm.dpd.start_address", "0")).compareTo("0") != 0)
-            mDMM_DPD = true;
+        Log.w(TAG, "ro.dev.dmm = "
+                + SystemProperties.getInt("ro.dev.dmm", 0));
+        Log.w(TAG, "ro.dev.dmm.dpd.start_address = "
+                + SystemProperties.get("ro.dev.dmm.dpd.start_address", "0"));
 
-        mState = DMM_MEM_STATE.ACTIVE;
+        if((SystemProperties.getInt("ro.dev.dmm", 0) == 1) &&
+           (SystemProperties.get("ro.dev.dmm.dpd.start_address", "0").compareTo("0") != 0)) {
+                registerForBroadcasts();
+                mIdleIntent = new Intent(ACTION_DMM_TRIGGER, null);
+                mPendingIntent = PendingIntent.getBroadcast(mContext, 0, mIdleIntent, 0);
+                mDMM_DPD = true;
+                mState = DMM_MEM_STATE.ACTIVE;
+                Log.w(TAG, "Dynamic Memory Management Initialized");
+        }
+        else
+            Log.w(TAG, "Dynamic Memory Management Disabled.");
+    }
 
-        Log.w(TAG, "Initializing DMMControl complete");
+    private void registerForBroadcasts() {
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Intent.ACTION_BOOT_COMPLETED);
+        intentFilter.addAction(Intent.ACTION_SCREEN_ON);
+        intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        intentFilter.addAction(ACTION_DMM_TRIGGER);
+        mContext.registerReceiver(mReceiver, intentFilter);
     }
 
     protected void finalize() {
-        Log.w(TAG, "De-Initializing DMMControl");
+        Log.w(TAG, "DMMControl Finalize");
     }
 
-    public int enableUnstableMemory(boolean flag) {
+    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(ACTION_DMM_TRIGGER)) {
+		        enableUnstableMemory(false);
+            }
+            else if(action.equals(Intent.ACTION_BOOT_COMPLETED)) {
+                mAlarmManager = (AlarmManager)mContext.getSystemService(Context.ALARM_SERVICE);
+            }
+            else if(action.equals(Intent.ACTION_SCREEN_ON)) {
+                enableUnstableMemory(true);
+                mAlarmManager.cancel(mPendingIntent);
+            }
+            else if(action.equals(Intent.ACTION_SCREEN_OFF)) {
+                triggerDelay = SystemProperties.getInt("dev.dmm.dpd.trigger_delay", 0);
+                triggerDelay = triggerDelay * 60 * 1000; //in milli seconds.
+                triggerDelay += System.currentTimeMillis();
+                mAlarmManager.set(AlarmManager.RTC_WAKEUP, triggerDelay, mPendingIntent);
+            }
+        }
+    };
+
+    private int enableUnstableMemory(boolean flag) {
         if (flag) {
             if(mState == DMM_MEM_STATE.DISABLED) {
                 if(mDMM_DPD){
-                    Log.w(TAG, "Activate Unstable Memory");
                     if(Power.SetUnstableMemoryState(flag) < 0)
                         Log.e(TAG, "Activating Unstable Memory: Failed !");
                     else
@@ -83,7 +126,6 @@ class DMMControl {
         } else {
             if(mState == DMM_MEM_STATE.ACTIVE) {
                 if(mDMM_DPD){
-                    Log.w(TAG, "De-Activate Unstable Memory");
                     if(Power.SetUnstableMemoryState(flag) < 0)
                         Log.e(TAG, "Disabling Unstable Memory: Failed !");
                     else
