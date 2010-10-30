@@ -163,7 +163,9 @@ class FmRxEventListner {
         // and return from the run() method to stop the thread
         //properly
         Log.d( TAG,  "stopping the Listener\n");
-        mThread.interrupt();
+        if( mThread != null ) {
+         mThread.interrupt();
+        }
     }
 
 }
