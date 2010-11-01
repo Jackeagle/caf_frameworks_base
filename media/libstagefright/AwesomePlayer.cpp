@@ -372,10 +372,18 @@ void AwesomePlayer::reset_l() {
 
     cancelPlayerEvents();
 
+    if (mStatistics && mVideoSource != NULL) {
+        logStatistics();
+        logSyncLoss();
+    }
+
     if (mPrefetcher != NULL) {
         CHECK_EQ(mPrefetcher->getStrongCount(), 1);
     }
     mPrefetcher.clear();
+
+    mAudioTrack.clear();
+    mVideoTrack.clear();
 
     // Shutdown audio first, so that the respone to the reset request
     // appears to happen instantaneously as far as the user is concerned
@@ -414,10 +422,6 @@ void AwesomePlayer::reset_l() {
     mVideoQueueSize  = 0;
 
     if (mVideoSource != NULL) {
-        if (mStatistics) {
-            logStatistics();
-            logSyncLoss();
-        }
         mVideoSource->stop();
 
         // The following hack is necessary to ensure that the OMX
@@ -430,9 +434,6 @@ void AwesomePlayer::reset_l() {
         }
         IPCThreadState::self()->flushCommands();
     }
-
-    mAudioTrack.clear();
-    mVideoTrack.clear();
 
     mDurationUs = -1;
     mFlags = 0;
