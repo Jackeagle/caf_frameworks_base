@@ -55,8 +55,10 @@ namespace android {
 
 static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
 static const int QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka = 0x7FA30C01;
+static const int QOMX_VIDEO_CodingDivx = 0x7FA30C02;
 static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace = 0x7FA30C04;
+static const int QOMX_INTERLACE_FLAG = 0x49283654;
+
 
 struct CodecInfo {
     const char *mime;
@@ -1030,7 +1032,9 @@ status_t OMXCodec::setVideoOutputFormat(
                || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar
                || format.eColorFormat == QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
                || format.eColorFormat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
-               || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace) ;
+               || format.eColorFormat == (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_INTERLACE_FLAG)
+               || format.eColorFormat == (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_INTERLACE_FLAG)
+               || format.eColorFormat == (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_INTERLACE_FLAG)) ;
 
         if (mGPUComposition) {
             LOGV("Set GPU Composition");
@@ -2736,8 +2740,14 @@ static const char *colorFormatString(OMX_COLOR_FORMATTYPE type) {
         return "QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka";
     }else if (type == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) {
         return "QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka";
-    } else if (type ==  OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace) {
-        return "OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace";
+    } else if (type ==  (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_INTERLACE_FLAG)) {
+        return "OMX_QCOM_COLOR_FormatYVU420SemiPlanar(Interlace)";
+    } else if (type == QOMX_VIDEO_CodingDivx) {
+        return "QOMX_VIDEO_CodingDivx";
+    } else if (type == (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_INTERLACE_FLAG)) {
+        return "QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka(Interlace)";
+    } else if (type == (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_INTERLACE_FLAG)) {
+        return "OMX_COLOR_FormatYUV420SemiPlanar(Interlace)";
     } else if (type < 0 || (size_t)type >= numNames) {
         return "UNKNOWN";
     } else {
@@ -3263,10 +3273,19 @@ status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer,
                    if((pInterlaceFormat->nInterlaceFormats == OMX_InterlaceInterleaveFrameTopFieldFirst) ||
                       (pInterlaceFormat->nInterlaceFormats == OMX_InterlaceInterleaveFrameBottomFieldFirst))
                    {
-                       static const int QOMX_COLOR_FormatYVU420SemiPlanarInterlace = 0x7FA30C04;
+                       int oldColorFormat, newColorFormat;
+                       mOutputFormat->findInt32(kKeyColorFormat, &oldColorFormat);
 
-                       LOGV("Setting output color format to QOMX_COLOR_FormatYVU420SemiPlanarInterlace");
-                       mOutputFormat->setInt32(kKeyColorFormat, (OMX_COLOR_FORMATTYPE)QOMX_COLOR_FormatYVU420SemiPlanarInterlace);
+                       if (oldColorFormat == OMX_COLOR_FormatYUV420SemiPlanar || oldColorFormat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka)
+                            newColorFormat = (oldColorFormat ^ QOMX_INTERLACE_FLAG);
+                       else
+                       {
+                            LOGE("Unrecognized colorformat %lx; will stick with old color format", newColorFormat);
+                            newColorFormat = oldColorFormat;
+                        }
+
+                       CODEC_LOGV("Setting output color format from %s to %s", colorFormatString((OMX_COLOR_FORMATTYPE)oldColorFormat), colorFormatString((OMX_COLOR_FORMATTYPE)newColorFormat));
+                       mOutputFormat->setInt32(kKeyColorFormat, newColorFormat);
                    }
                    else
                    {
