@@ -104,6 +104,7 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
     protected static final int EVENT_SET_NETWORK_AUTOMATIC          = 30;
     protected static final int EVENT_ICC_RECORD_EVENTS              = 31;
     protected static final int EVENT_GET_MDN_DONE                   = 32;
+    protected static final int EVENT_ICC_APP_READY                  = 33;
 
     // Key used to read/write current CLIR setting
     public static final String CLIR_KEY = "clir_key";

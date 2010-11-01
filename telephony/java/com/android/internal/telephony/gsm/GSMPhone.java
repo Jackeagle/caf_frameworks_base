@@ -233,6 +233,9 @@ public class GSMPhone extends PhoneBase {
             if(mSIMRecords != null) {
                 unregisterForSimRecordEvents();
             }
+            if (m3gppApplication != null) {    //EVENT_ICC_APP_READY
+                       m3gppApplication.unregisterForReady(this);
+            }
         }
     }
 
@@ -301,6 +304,7 @@ public class GSMPhone extends PhoneBase {
             //Register for Record events once records are available.
             registerForSimRecordEvents();
             mSimPhoneBookIntManager.updateSimRecords(mSIMRecords);
+            m3gppApplication.registerForReady(this, EVENT_ICC_APP_READY, null);
         }
     }
 
@@ -1369,6 +1373,10 @@ public class GSMPhone extends PhoneBase {
                 }
                 String localTemp[] = (String[])ar.result;
                 mMdn = localTemp[0];
+                break;
+
+            case EVENT_ICC_APP_READY:
+                  mCM.getIMEI(obtainMessage(EVENT_GET_IMEI_DONE));
                 break;
 
              default:

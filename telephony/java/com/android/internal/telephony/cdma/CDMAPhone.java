@@ -243,6 +243,9 @@ public class CDMAPhone extends PhoneBase {
             if(mRuimRecords != null) {
                 unregisterForRuimRecordEvents();
             }
+            if (m3gpp2Application != null) {   //EVENT_ICC_APP_READY
+                       m3gpp2Application.unregisterForReady(this);
+            }
         }
     }
 
@@ -305,6 +308,7 @@ public class CDMAPhone extends PhoneBase {
             //Register for Record events once records are available.
             registerForRuimRecordEvents();
             mRuimPhoneBookInterfaceManager.updateRuimRecords(mRuimRecords);
+            m3gpp2Application.registerForReady(this, EVENT_ICC_APP_READY, null);
         }
     }
 
@@ -1046,6 +1050,11 @@ public class CDMAPhone extends PhoneBase {
             case EVENT_EXIT_EMERGENCY_CALLBACK_RESPONSE: {
                 handleExitEmergencyCallbackMode(msg);
             }
+            break;
+
+            case EVENT_ICC_APP_READY:
+                    Log.d(LOG_TAG, "Event EVENT_ICC_APP_READY Received");
+                    mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
             break;
 
             default:{
