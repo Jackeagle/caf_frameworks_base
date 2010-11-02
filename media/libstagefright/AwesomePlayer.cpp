@@ -823,11 +823,21 @@ void AwesomePlayer::initRenderer_l() {
 
         int32_t format;
         const char *component;
-        int32_t decodedWidth, decodedHeight;
+        int32_t decodedWidth = 0, decodedHeight = 0;
         CHECK(meta->findInt32(kKeyColorFormat, &format));
         CHECK(meta->findCString(kKeyDecoderComponent, &component));
-        CHECK(meta->findInt32(kKeyWidth, &decodedWidth));
-        CHECK(meta->findInt32(kKeyHeight, &decodedHeight));
+        //Update width, height stride and slice height from metadata
+        //and use this to create renderer
+        CHECK(meta->findInt32(kKeyWidth, &mVideoWidth));
+        CHECK(meta->findInt32(kKeyHeight, &mVideoHeight));
+        //Software decoder does not use stride and slice height.
+        //Update decode width and height to width and height
+        //if the stride or slice height returned from decoder
+        //is zero.
+        if (!(meta->findInt32(kKeyStride, &decodedWidth)))
+            decodedWidth = mVideoWidth;
+        if(!(meta->findInt32(kKeySliceHeight, &decodedHeight)))
+            decodedHeight = mVideoHeight;
 
         int32_t rotationDegrees;
         if (!mVideoTrack->getFormat()->findInt32(
@@ -1793,13 +1803,21 @@ status_t AwesomePlayer::suspend() {
 
                 sp<MetaData> meta = mVideoSource->getFormat();
                 CHECK(meta->findInt32(kKeyColorFormat, &state->mColorFormat));
-                CHECK(meta->findInt32(kKeyWidth, &state->mDecodedWidth));
-                CHECK(meta->findInt32(kKeyHeight, &state->mDecodedHeight));
+                //Update the decode width and height using stride and slice
+                //height key value pair in metadata. Software decoder does not
+                //use stride and slice height. Update decode width and height
+                //to width and height if the stride or slice height returned
+                //from decoder is zero.
+                if(!(meta->findInt32(kKeyStride, &state->mDecodedWidth)))
+                    state->mDecodedWidth = mVideoWidth;
+                if(!(meta->findInt32(kKeySliceHeight, &state->mDecodedHeight)))
+                    state->mDecodedHeight = mVideoHeight;
+
             } else {
                 LOGV("Unable to save last video frame, we have no access to "
                      "the decoded video data.");
             }
-	    }
+        }
     }
 
     reset_l();
