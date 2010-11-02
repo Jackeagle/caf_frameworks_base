@@ -1542,12 +1542,14 @@ void AwesomePlayer::setNumFramesToHold() {
     property_get("ro.product.device",value1,"0");
     property_get("hw.hdmiON", value2, "0");
 
-    // set value of mNumFramesToHold to 2 for targets 8250,8650A,8660
+    // set value of mNumFramesToHold to 2 for targets 8250,8650A,8660, 7x27
     // set value of mNumFramesToHold to 2 for 7x30 only if HDMI is on and its not 720p playback
     // or if GPU composition is enabled
     if(strcmp("qsd8250_surf",value1) == 0 ||
        strcmp("qsd8250_ffa",value1) == 0  ||
        strcmp("qsd8650a_st1x",value1) == 0||
+       strcmp("msm7627_7x_surf",value1) == 0||
+       strcmp("msm7627_7x_ffa",value1) == 0||
        strncmp("msm8660",value1,strlen("msm8660")) == 0 ||
        (strcmp("msm7630_surf",value1) == 0 &&
            ((atoi(value2) && (!(mVideoWidth == 1280 && mVideoHeight == 720))) ||
