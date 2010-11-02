@@ -787,8 +787,7 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
 }
 
 void AwesomePlayer::seekAudioIfNecessary_l() {
-    if (mSeeking && mAudioPlayer != NULL && !mAudioEOSOccurred
-        && (mVideoSource == NULL || mVideoEOSOccurred)) {
+    if (mSeeking && mAudioPlayer != NULL && !mAudioEOSOccurred) {
         mAudioPlayer->seekTo(mSeekTimeUs);
         mWatchForAudioSeekComplete = true;
         mWatchForAudioEOS = true;
