@@ -803,6 +803,9 @@ public class ProxyManager extends Handler {
                         subResult[phoneIndex] = "DEACTIVATE SUCCESS";
                         prevSubscriptionData.subscription[phoneIndex].subStatus = SUB_DEACTIVATED;
 
+                        if (subscriptionData.subscription[phoneIndex].subStatus == SUB_DEACTIVATE) {
+                            subscriptionData.subscription[phoneIndex].subStatus = SUB_DEACTIVATED;
+                        }
 
                         if (mPendingDeactivateEvents == 0) {
                             processPendingActivateRequests();
