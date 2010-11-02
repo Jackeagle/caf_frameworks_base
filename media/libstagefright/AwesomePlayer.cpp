@@ -637,8 +637,12 @@ void AwesomePlayer::initRenderer_l() {
         int32_t decodedWidth, decodedHeight, rotation = 0;
         CHECK(meta->findInt32(kKeyColorFormat, &format));
         CHECK(meta->findCString(kKeyDecoderComponent, &component));
-        CHECK(meta->findInt32(kKeyWidth, &decodedWidth));
-        CHECK(meta->findInt32(kKeyHeight, &decodedHeight));
+        //Update width, height stride and slice height from metadata
+        //and use this to create renderer
+        CHECK(meta->findInt32(kKeyWidth, &mVideoWidth));
+        CHECK(meta->findInt32(kKeyHeight, &mVideoHeight));
+        CHECK(meta->findInt32(kKeyStride, &decodedWidth));
+        CHECK(meta->findInt32(kKeySliceHeight, &decodedHeight));
 
         if( meta->findInt32(kKeyRotation, &rotation ) == false ){
           LOGV("Rotation information not present in metadata");
@@ -1460,8 +1464,10 @@ status_t AwesomePlayer::suspend() {
 
             sp<MetaData> meta = mVideoSource->getFormat();
             CHECK(meta->findInt32(kKeyColorFormat, &state->mColorFormat));
-            CHECK(meta->findInt32(kKeyWidth, &state->mDecodedWidth));
-            CHECK(meta->findInt32(kKeyHeight, &state->mDecodedHeight));
+            //Update the decode width and height using stride and
+            //slice height key value pair
+            CHECK(meta->findInt32(kKeyStride, &state->mDecodedWidth));
+            CHECK(meta->findInt32(kKeySliceHeight, &state->mDecodedHeight));
         }
     }
 

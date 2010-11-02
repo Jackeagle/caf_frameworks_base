@@ -66,6 +66,9 @@ enum {
     kKeyDate              = 'date',  // cstring
     kKeyWriter            = 'writ',  // cstring
     kKeyRotation          = 'rota',  // int32_t
+    //keymap value for stride and slice height
+    kKeyStride            = 'stri',  // int32_t
+    kKeySliceHeight       = 'slic',  // int32_t
 };
 
 enum {
