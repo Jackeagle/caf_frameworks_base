@@ -3219,10 +3219,12 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
                 mOutputFormat->setInt32(
                         kKeyHeight, (video_def->nFrameHeight + 15) & -16);
             } else {
-                //Update the Stride and Slice Height
-                //Allows creation of Renderer with correct height and width
-                mOutputFormat->setInt32(kKeyWidth, video_def->nStride);
-                mOutputFormat->setInt32(kKeyHeight, video_def->nSliceHeight);
+                //Update the width,height Stride and Slice Height
+                //Allows creation of Renderer with correct parameters
+                mOutputFormat->setInt32(kKeyWidth, video_def->nFrameWidth);
+                mOutputFormat->setInt32(kKeyHeight, video_def->nFrameHeight);
+                mOutputFormat->setInt32(kKeyStride, video_def->nStride);
+                mOutputFormat->setInt32(kKeySliceHeight, video_def->nSliceHeight);
             }
 
             mOutputFormat->setInt32(kKeyColorFormat, video_def->eColorFormat);

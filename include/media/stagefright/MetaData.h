@@ -67,6 +67,9 @@ enum {
     kKeyWriter            = 'writ',  // cstring
     kKeyRotation          = 'rota',  // int32_t
     kKeyRawCodecSpecificData = 'rcsd',  // raw data - added to support mmParser
+    //keymap value for stride and slice height
+    kKeyStride            = 'stri',  // int32_t
+    kKeySliceHeight       = 'slic',  // int32_t
 };
 
 enum {
