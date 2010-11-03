@@ -63,6 +63,7 @@ import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
 import com.android.internal.telephony.ProxyManager.SubscriptionData;
 import com.android.internal.telephony.ProxyManager.Subscription;
+import android.telephony.TelephonyManager;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -219,6 +220,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
      * the vendor ril.
      */
     private static final int DEFAULT_WAKE_LOCK_TIMEOUT = 30000;
+    protected int mInstanceId = 0;
 
     //***** Instance Variables
 
@@ -584,13 +586,14 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     public
     RIL(Context context) {
         this(context, RILConstants.PREFERRED_NETWORK_MODE,
-                RILConstants.PREFERRED_CDMA_SUBSCRIPTION);
+                RILConstants.PREFERRED_CDMA_SUBSCRIPTION, 0);
     }
 
-    public RIL(Context context, int networkMode, int cdmaSubscription) {
+    public RIL(Context context, int networkMode, int cdmaSubscription, int instanceId) {
         super(context);
         mCdmaSubscription  = cdmaSubscription;
         mNetworkMode = networkMode;
+        mInstanceId = instanceId;
         //At startup mPhoneType is first set from networkMode
         switch(networkMode) {
             case RILConstants.NETWORK_MODE_WCDMA_PREF:
@@ -3660,11 +3663,19 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     private void riljLog(String msg) {
-        Log.d(LOG_TAG, msg);
+        if (TelephonyManager.isDsdsEnabled()) {
+            Log.d(LOG_TAG, msg + " [SUB" + mInstanceId + "]");
+        } else {
+            Log.d(LOG_TAG, msg);
+        }
     }
 
     private void riljLogv(String msg) {
-        Log.v(LOG_TAG, msg);
+        if (TelephonyManager.isDsdsEnabled()) {
+            Log.v(LOG_TAG, msg + " [SUB" + mInstanceId + "]");
+        } else {
+            Log.v(LOG_TAG, msg);
+        }
     }
 
     private void unsljLog(int response) {
