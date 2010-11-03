@@ -832,6 +832,9 @@ public class Watchdog extends Thread {
                     ArrayList pids = new ArrayList();
                     pids.add(Process.myPid());
                     File stack = ActivityManagerService.dumpStackTraces(true, pids);
+                    if (RECORD_KERNEL_THREADS) {
+                        dumpKernelStackTraces();
+                    }
                     waitedHalf = true;
                     continue;
                 }
