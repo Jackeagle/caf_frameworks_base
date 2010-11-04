@@ -180,6 +180,8 @@ const char CameraParameters::KEY_LENSSHADE[] = "lensshade";
 const char CameraParameters::KEY_SUPPORTED_LENSSHADE_MODES[] = "lensshade-values";
 const char CameraParameters::KEY_HISTOGRAM[] = "histogram";
 const char CameraParameters::KEY_SUPPORTED_HISTOGRAM_MODES[] = "histogram-values";
+const char CameraParameters::KEY_SKIN_TONE_ENHANCEMENT[] = "skinToneEnhancement";
+const char CameraParameters::KEY_SUPPORTED_SKIN_TONE_ENHANCEMENT_MODES[] = "skinToneEnhancement-values";
 const char CameraParameters::KEY_SHARPNESS[] = "sharpness";
 const char CameraParameters::KEY_MAX_SHARPNESS[] = "max-sharpness";
 const char CameraParameters::KEY_CONTRAST[] = "contrast";
@@ -216,6 +218,10 @@ const char CameraParameters::LENSSHADE_DISABLE[] = "disable";
  //Values for Histogram Shading
 const char CameraParameters::HISTOGRAM_ENABLE[] = "enable";
 const char CameraParameters::HISTOGRAM_DISABLE[] = "disable";
+
+//Values for Skin Tone Enhancement Modes
+const char CameraParameters::SKIN_TONE_ENHANCEMENT_ENABLE[] = "enable";
+const char CameraParameters::SKIN_TONE_ENHANCEMENT_DISABLE[] = "disable";
 
 //Values for Continuous AF
 const char CameraParameters::CONTINUOUS_AF_OFF[] = "caf-off";
