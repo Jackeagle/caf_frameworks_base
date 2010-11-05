@@ -246,7 +246,7 @@ AndroidRuntime::AndroidRuntime()
     // see SkFontHost_android.cpp
 
     // Pre-allocate enough space to hold a fair number of options.
-    mOptions.setCapacity(20);
+    mOptions.setCapacity(21);
 
     assert(gCurRuntime == NULL);        // one per process
     gCurRuntime = this;
@@ -567,6 +567,18 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv)
         executionMode = kEMJitCompiler;
 #endif
     }
+
+#ifdef USE_ASHMEM
+#ifdef SF_MEM_ST1X
+    opt.extraInfo = 0;
+    opt.optionString = "-Dgralloc.ashmem_size=67108864";
+    mOptions.add(opt);
+#else
+    opt.extraInfo = 0;
+    opt.optionString = "-Dgralloc.ashmem_size=24117248";
+    mOptions.add(opt);
+#endif
+#endif
 
     property_get("dalvik.vm.stack-trace-file", stackTraceFileBuf, "");
 
