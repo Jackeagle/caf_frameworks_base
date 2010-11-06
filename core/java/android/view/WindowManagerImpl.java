@@ -236,6 +236,10 @@ public class WindowManagerImpl implements WindowManager {
             return view;
         }
 
+        if (view == null && mViews != null) {
+           Log.e("WindowManager","Requested view is null with mViews[" + index + "] as [" + mViews[index] + "]");
+        }
+
         InputMethodManager imm = InputMethodManager.getInstance(view.getContext());
         if (imm != null) {
             imm.windowDismissed(mViews[index].getWindowToken());
