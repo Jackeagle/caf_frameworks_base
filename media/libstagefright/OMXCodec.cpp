@@ -115,16 +115,16 @@ static sp<MediaSource> InstantiateSoftwareCodec(
 
 static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_IMAGE_JPEG, "OMX.TI.JPEG.decode" },
+    { MEDIA_MIMETYPE_AUDIO_MPEG, "OMX.qcom.audio.decoder.mp3" },
     { MEDIA_MIMETYPE_AUDIO_MPEG, "MP3Decoder" },
 //    { MEDIA_MIMETYPE_AUDIO_MPEG, "OMX.PV.mp3dec" },
-    { MEDIA_MIMETYPE_AUDIO_AMR_NB, "OMX.qcom.audio.decoder.amrnb" },
 //    { MEDIA_MIMETYPE_AUDIO_AMR_NB, "OMX.TI.AMR.decode" },
     { MEDIA_MIMETYPE_AUDIO_AMR_NB, "AMRNBDecoder" },
 //    { MEDIA_MIMETYPE_AUDIO_AMR_NB, "OMX.PV.amrdec" },
-    { MEDIA_MIMETYPE_AUDIO_AMR_WB, "OMX.qcom.audio.decoder.amrwb" },
     { MEDIA_MIMETYPE_AUDIO_AMR_WB, "OMX.TI.WBAMR.decode" },
     { MEDIA_MIMETYPE_AUDIO_AMR_WB, "AMRWBDecoder" },
 //    { MEDIA_MIMETYPE_AUDIO_AMR_WB, "OMX.PV.amrdec" },
+    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.qcom.audio.decoder.aac" },
     { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.TI.AAC.decode" },
     { MEDIA_MIMETYPE_AUDIO_AAC, "AACDecoder" },
 //    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.PV.aacdec" },
