@@ -118,6 +118,24 @@ void DisplayHardware::init(uint32_t dpy)
             LOGW("H/W composition disabled");
             attribs[2] = EGL_CONFIG_CAVEAT;
             attribs[3] = EGL_SLOW_CONFIG;
+        } else {
+            // We have hardware composition enabled. Check the composition type
+            if (property_get("debug.composition.type", property, NULL) > 0) {
+                if(((strncmp(property, "c2d", 3)) == 0) ||
+                   ((strncmp(property, "mdp", 3)) == 0)) {
+                    // We wish to use c2d or mdp composition. Try opening copybit
+                    if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
+                       copybit_device_t* copybit;
+                       copybit_open(module, &copybit);
+                       if(copybit) {
+                           LOGW("C2D or MDP composition");
+                           attribs[2] = EGL_CONFIG_CAVEAT;
+                           attribs[3] = EGL_SLOW_CONFIG;
+                           copybit_close(copybit);
+                       }
+                    }
+                }
+            }
         }
     }
 
