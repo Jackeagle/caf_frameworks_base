@@ -115,7 +115,6 @@ public class PhoneFactory {
                 //DSDS num of phone instance2, non-DSDS it is 1
                 numPhones = TelephonyManager.getPhoneCount();
                 sPhoneNotifier = new DefaultPhoneNotifier();
-                /* TODO DSDS currently one setting is used to create two default phone objects*/
                 //Get preferredNetworkMode from Settings.System
                 int networkMode = Settings.Secure.getInt(context.getContentResolver(),
                     Settings.Secure.PREFERRED_NETWORK_MODE, preferredNetworkMode);
@@ -129,8 +128,7 @@ public class PhoneFactory {
                 sCommandsInterface = new RIL[numPhones];
 
                 for(int i = 0; i < numPhones; i++) {
-                    //reads the system properties and makes commandsinterface
-                    sCommandsInterface[i] = new RIL(context, networkMode, cdmaSubscription);
+                    sCommandsInterface[i] = new RIL(context, networkMode, cdmaSubscription, i);
                 }
 
                 mUiccManager = UiccManager.getInstance(context, sCommandsInterface);
