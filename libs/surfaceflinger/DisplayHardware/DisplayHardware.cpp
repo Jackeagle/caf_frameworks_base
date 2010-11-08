@@ -111,6 +111,8 @@ void DisplayHardware::init(uint32_t dpy)
             EGL_NONE
     };
 
+    mFlags = CACHED_BUFFERS;
+
     // debug: disable h/w rendering
     char property[PROPERTY_VALUE_MAX];
     if (property_get("debug.sf.hw", property, NULL) > 0) {
@@ -118,6 +120,7 @@ void DisplayHardware::init(uint32_t dpy)
             LOGW("H/W composition disabled");
             attribs[2] = EGL_CONFIG_CAVEAT;
             attribs[3] = EGL_SLOW_CONFIG;
+            mFlags |= CPU_COMPOSITION;
         } else {
             // We have hardware composition enabled. Check the composition type
             if (property_get("debug.composition.type", property, NULL) > 0) {
@@ -143,7 +146,6 @@ void DisplayHardware::init(uint32_t dpy)
     EGLint numConfigs=0;
     EGLSurface surface;
     EGLContext context;
-    mFlags = CACHED_BUFFERS;
 
     // TODO: all the extensions below should be queried through
     // eglGetProcAddress().

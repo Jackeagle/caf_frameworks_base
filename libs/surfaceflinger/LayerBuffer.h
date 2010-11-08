@@ -148,8 +148,8 @@ private:
         size_t                          mBufferSize;
         mutable LayerBase::Texture      mTexture;
         mutable NativeBuffer            mTempBuffer;
-        mutable bool                    mUseEGLImageDirectly;
-        bool                            mTargetUsesOverlay;
+        mutable int                     mUseEGLImageDirectly;
+        mutable int                     mNeedConversion;
     };
     
     class OverlaySource : public Source {

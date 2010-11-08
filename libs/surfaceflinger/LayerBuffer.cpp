@@ -344,7 +344,7 @@ bool LayerBuffer::Source::transformed() const {
 LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
         const ISurface::BufferHeap& buffers)
     : Source(layer), mStatus(NO_ERROR), mBufferSize(0),
-      mUseEGLImageDirectly(true), mTargetUsesOverlay(false)
+      mUseEGLImageDirectly(0), mNeedConversion(1)
 {
     if (buffers.heap == NULL) {
         // this is allowed, but in this case, it is illegal to receive
@@ -382,14 +382,29 @@ LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
     const DisplayHardware& hw(mLayer.mFlinger->
                                graphicPlane(0).displayHardware());
     int flags = hw.getFlags();
-    if(flags & DisplayHardware::SLOW_CONFIG)
-       mUseEGLImageDirectly = true;
-    else
-       mUseEGLImageDirectly = false;
+    int hasBlitEngine = 0;
+    char compositionUsed[4];
+    if(flags & DisplayHardware::CPU_COMPOSITION) {
+        snprintf(compositionUsed, 4, "cpu");
+    } else if(flags & DisplayHardware::SLOW_CONFIG) {
+        snprintf(compositionUsed, 4, "mdp");
+    } else {
+        snprintf(compositionUsed, 4, "gpu");
+    }
 
-    overlay_control_device_t* overlay = hw.getOverlayEngine();
-    if(overlay)
-        mTargetUsesOverlay = true;
+    if(mLayer.mBlitEngine) {
+        hasBlitEngine = 1;
+    }
+
+    gralloc_module_t const * module = LayerBuffer::getGrallocModule();
+    if (module && module->perform) {
+        int err = module->perform(module,GRALLOC_MODULE_PERFORM_DECIDE_PUSH_BUFFER_HANDLING,
+                  buffers.format, compositionUsed, hasBlitEngine, &mNeedConversion,
+                  &mUseEGLImageDirectly);
+        if(err != NO_ERROR) {
+            LOGE("module,GRALLOC_MODULE_PERFORM_DECIDE_PUSH_BUFFER_HANDLING returned an error");
+        }
+    }
 
     mBufferHeap = buffers;
     mLayer.setNeedsBlending((info.h_alpha - info.l_alpha) > 0);    
@@ -529,22 +544,6 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool cle
     return INVALID_OPERATION;
 }
 
-bool LayerBuffer::BufferSource::useCopybitToDraw(int format) const
-{
-    if(mTargetUsesOverlay) {
-        // If we use surface flinger to render push buffers on targets which
-        // use overlay, send the buffers to the GPU for now.
-        return false;
-    } else if ((format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED)
-                || (format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO)) {
-        // The MDP version of copybit does not support these color formats
-        // Use the GPU
-        return false;
-    }else {
-        return true;
-    }
-}
-
 void LayerBuffer::BufferSource::onDraw(const Region& clip) const 
 {
     sp<Buffer> ourBuffer(getBuffer());
@@ -559,32 +558,20 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     const Rect transformedBounds(mLayer.getTransformedBounds());
 
     if (UNLIKELY(mTexture.name == -1LU)) {
-        mTexture.name = mLayer.createTexture(src.img.format);
+        if(mNeedConversion)
+            mTexture.name = mLayer.createTexture(HAL_PIXEL_FORMAT_RGB_565);
+        else
+            mTexture.name = mLayer.createTexture(src.img.format);
     }
 
 #if defined(EGL_ANDROID_image_native_buffer)
     if (mLayer.mFlags & DisplayHardware::DIRECT_TEXTURE) {
         err = INVALID_OPERATION;
-        if (useCopybitToDraw(src.img.format)) {
+        if (mNeedConversion) {
 
             // there are constraints on buffers used by the GPU and these may not
             // be honored here. We need to change the API so the buffers
             // are allocated with gralloc. For now disable this code-path
-
-            // First, try to use the buffer as an EGLImage directly
-            if (mUseEGLImageDirectly) {
-                // NOTE: Assume the buffer is allocated with the proper USAGE flags
-
-                sp<GraphicBuffer> buffer = new  GraphicBuffer(
-                        src.img.w, src.img.h, src.img.format,
-                        GraphicBuffer::USAGE_HW_TEXTURE,
-                        src.img.w, src.img.handle, false);
-
-                err = mLayer.initializeEglImage(buffer, &mTexture);
-                if (err != NO_ERROR) {
-                    mUseEGLImageDirectly = false;
-                }
-            }
 
             copybit_device_t* copybit = mLayer.mBlitEngine;
             if (copybit && err != NO_ERROR) {
@@ -604,8 +591,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                     }
                 }
             }
-        } else if((src.img.format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) ||
-                  (src.img.format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO)) {
+        } else if (mUseEGLImageDirectly) {
                sp<GraphicBuffer> mTempGraphicBuffer = new GraphicBuffer(src.img.w,
                            src.img.h, src.img.format,
                            GraphicBuffer::USAGE_HW_TEXTURE, src.img.w,
@@ -635,7 +621,10 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     }
 
     mTexture.transform = mBufferHeap.transform;
-    mLayer.drawWithOpenGL(clip, mTexture, src.img.format);
+    if(mNeedConversion)
+        mLayer.drawWithOpenGL(clip, mTexture, HAL_PIXEL_FORMAT_RGB_565);
+    else
+        mLayer.drawWithOpenGL(clip, mTexture, src.img.format);
 }
 
 status_t LayerBuffer::BufferSource::initTempBuffer() const
