@@ -45,7 +45,7 @@ final class HDMIListener implements Runnable {
     private static final String HDMI_CMD_ENABLE_HDMI = "enable_hdmi";
     private static final String HDMI_CMD_DISABLE_HDMI = "disable_hdmi";
     private static final String HDMI_CMD_CHANGE_MODE = "change_mode: ";
-
+    private static final String HDMI_CMD_MIRROR = "hdmi_mirror: ";
     // hdmi events
     private static final String HDMI_EVT_CONNECTED = "hdmi_connected";
     private static final String HDMI_EVT_DISCONNECTED = "hdmi_disconnected";
@@ -200,5 +200,10 @@ final class HDMIListener implements Runnable {
 
     public void changeDisplayMode(int mode) {
         writeCommand(HDMI_CMD_CHANGE_MODE, new Integer(mode).toString());
+    }
+
+    public void enableHDMIMirroring(boolean enable) {
+        int value = enable ? 1 : 0;
+        writeCommand(HDMI_CMD_MIRROR, new Integer(value).toString());
     }
 }

@@ -57,6 +57,7 @@ namespace android {
 #define HDMI_CMD_ENABLE_HDMI    "enable_hdmi"
 #define HDMI_CMD_DISABLE_HDMI   "disable_hdmi"
 #define HDMI_CMD_CHANGE_MODE    "change_mode: "
+#define HDMI_CMD_MIRROR         "hdmi_mirror: "
 
 #define SYSFS_CONNECTED         DEVICE_ROOT "/" DEVICE_NODE "/connected"
 #define SYSFS_EDID_MODES        DEVICE_ROOT "/" DEVICE_NODE "/edid_modes"
@@ -545,6 +546,18 @@ int HDMIDaemon::processFrameworkCommand()
         ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
         close(fd1);
         fd1 = -1;
+    } else if (!strncmp(buffer, HDMI_CMD_MIRROR, strlen(HDMI_CMD_MIRROR))) {
+        int mode;
+        int ret = sscanf(buffer, HDMI_CMD_MIRROR "%d", &mode);
+        if (ret == 1) {
+            LOGD(HDMI_CMD_MIRROR "%d", mode);
+            SurfaceComposerClient::enableHDMIOutput(mode);
+            if(mode){
+                 property_set("hw.hdmiON", "1");
+            } else {
+                 property_set("hw.hdmiON", "0");
+            }
+        }
     } else {
         int mode;
         int ret = sscanf(buffer, HDMI_CMD_CHANGE_MODE "%d", &mode);
