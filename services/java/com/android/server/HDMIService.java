@@ -216,6 +216,7 @@ class HDMIService extends IHDMIService.Stub {
             Log.d(TAG, "notifyHDMIConnected ... Broadcasting On" );
             broadcastEvent(HDMIONEvent, mHDMIModes);
             mListener.enableHDMIOutput(true);
+            mListener.enableHDMIMirroring(true);
 
             /* NOTE: this can be done from the UI, the 'changeDisplayMode'
              * can be called at any point to dynamically switch the display
@@ -231,6 +232,7 @@ class HDMIService extends IHDMIService.Stub {
          if (getHDMIUserOption()){
             Log.d(TAG, "notifyHDMIDisconnected ... Broadcasting Off" );
             broadcastEvent(HDMIOFFEvent);
+            mListener.enableHDMIMirroring(false);
          }
     }
 }
