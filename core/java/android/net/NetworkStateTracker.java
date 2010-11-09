@@ -289,11 +289,6 @@ public abstract class NetworkStateTracker extends Handler {
                 stringToFile(prefix + "wmem_min", values[3]);
                 stringToFile(prefix + "wmem_def", values[4]);
                 stringToFile(prefix + "wmem_max", values[5]);
-
-                // Set the threhold values for the max read/write values
-                final String threshPrefix = "/proc/sys/net/core/";
-                stringToFile(threshPrefix + "rmem_max", values[2]);
-                stringToFile(threshPrefix + "wmem_max", values[5]);
             } else {
                 Log.e(TAG, "Invalid buffersize string: " + bufferSizes);
             }
