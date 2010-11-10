@@ -826,30 +826,37 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
                 Transform finalTransform = Transform(mOrientation) *
                         Transform(mLayer.getOrientation());
 
-                 const DisplayHardware& hw(mLayer.mFlinger->
+                const DisplayHardware& hw(mLayer.mFlinger->
                                    graphicPlane(0).displayHardware());
-                 int ovWidth = hw.getWidth();
-                 int ovHeight = hw.getHeight();
-                 /* Get the maximum scale factor from the overlay */
-                 int maxScale = overlay_dev->get(overlay_dev, OVERLAY_MAGNIFICATION_LIMIT);
-                 /*  Set the max scale size based on Hardware Overlay Scale Factor */
-                 if((w > ((maxScale-1) * mWidth)) || (h > ((maxScale-1) * mHeight))){
-                     int tmp = 0;
-                     int srcW = mWidth; int srcH = mHeight;
-                     // IF Rotation is 90 or 270, swap width and height
-                     if(finalTransform.getOrientation() == 0x00000004 || finalTransform.getOrientation() == 0x0000007) {
-                         tmp = w; w = h; h = tmp;
-                         tmp = srcW; srcW = srcH ; srcH = tmp;
-                         tmp = x; x=y; y=tmp;
-                     }
-                     w = ((maxScale-1) * srcW);
-                     x = (ovWidth - w )/2;
-                     h = ((maxScale-1) * srcH);
-                     y = (ovHeight - h)/2;
-                 }
-                overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
+                int ovWidth = hw.getWidth();
+                int ovHeight = hw.getHeight();
+                /* Get the maximum scale factor from the overlay */
+                int maxScale = overlay_dev->get(overlay_dev, OVERLAY_MAGNIFICATION_LIMIT);
+                /* If clip is rotated and displayed, its width will be along
+                Display's height*/
+                int srcW = mWidth;
+                int srcH = mHeight;
+                if(finalTransform.getOrientation() == Transform::ROT_90
+                  || finalTransform.getOrientation() == Transform::ROT_270){
+                  int tmp = srcW;
+                  srcW = srcH;
+                  srcH = tmp;
+                }
+                if(h > ((maxScale - 1) * srcH)){
+                  h = (maxScale - 1) * srcH;
+                  y = (ovHeight - h)/2;
+                }
+                if(w > ((maxScale - 1) * srcW)){
+                  w = (maxScale - 1) * srcW;
+                  x = (ovWidth - w)/2;
+                }
+
+                /* Send Parameters first so that rotation information is sent
+                before the Positions, since positions are calculated taking into
+                consideration the rotations, if any */
                 overlay_dev->setParameter(overlay_dev, mOverlay,
-                        OVERLAY_TRANSFORM, finalTransform.getOrientation());
+                  OVERLAY_TRANSFORM, finalTransform.getOrientation());
+                overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 overlay_dev->commit(overlay_dev, mOverlay);
             }
         }
