@@ -166,7 +166,7 @@ void AudioPlayer::pause() {
     CHECK(mStarted);
 
     if (mAudioSink.get() != NULL) {
-        mAudioSink->pause();
+        mAudioSink->stop();
     } else {
         mAudioTrack->stop();
     }
