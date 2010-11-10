@@ -20,7 +20,7 @@ package com.android.internal.telephony;
 import android.os.Handler;
 import android.telephony.ServiceState;
 import com.android.internal.telephony.ProxyManager.Subscription;
-
+import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 
 /**
  * Internal interface used to control the phone; SDK developers cannot
@@ -45,10 +45,9 @@ public interface Phone extends DataPhone, VoicePhone {
 
     /**
      * Updates the phoneproxy with new voice phone object
-     * when phone object changes in case of DSDS.
+     * when phone object/radio technology changes.
      */
-    public void updatePhoneProxy(VoicePhone phone);
-
+    public void updatePhoneObject(RadioTechnologyFamily newRadioTech, int subscription);
     /**
      * Sets the radio power on/off state (off is sometimes
      * called "airplane mode"). Current state can be gotten via

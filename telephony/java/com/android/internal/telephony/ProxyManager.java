@@ -37,6 +37,7 @@ import com.android.internal.telephony.UiccConstants.AppType;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 import android.os.Message;
 import android.os.Handler;
 import android.os.AsyncResult;
@@ -612,24 +613,15 @@ public class ProxyManager extends Handler {
                     (!sProxyPhone[i].getPhoneName().equals("GSM"))) {
 
                     Log.d(LOG_TAG, "gets New GSM phone" );
-                    sProxyPhone[i].updatePhoneProxy(PhoneFactory.getGsmPhone(i));
+                    sProxyPhone[i].updatePhoneObject(RadioTechnologyFamily.RADIO_TECH_3GPP, i);
                     mIccSmsInterfaceManager.updatePhoneObject(sProxyPhone[i].getVoicePhone(),i);
-                    //when the phone object is re-created broadcast an intent so that PhoneApp is aware of it
-                    Intent intent = new Intent(TelephonyIntents.ACTION_PHONE_CHANGED);
-                    intent.putExtra(Phone.PHONE_SUBSCRIPTION, i);
-                    ActivityManagerNative.broadcastStickyIntent(intent, null);
-
                 } else if (((cardSub.appType.equals("RUIM")) ||
                           (cardSub.appType.equals("CSIM"))) &&
                           (!sProxyPhone[i].getPhoneName().equals("CDMA")) ) {
 
                      Log.d(LOG_TAG, "gets New CDMA phone" );
-                     sProxyPhone[i].updatePhoneProxy(PhoneFactory.getCdmaPhone(i));
+                     sProxyPhone[i].updatePhoneObject(RadioTechnologyFamily.RADIO_TECH_3GPP2, i);
                      mIccSmsInterfaceManager.updatePhoneObject(sProxyPhone[i].getVoicePhone(),i);
-                     //when the phone object is re-created broadcast an intent so that PhoneApp is aware of it
-                     Intent intent = new Intent(TelephonyIntents.ACTION_PHONE_CHANGED);
-                     intent.putExtra(Phone.PHONE_SUBSCRIPTION, i);
-                     ActivityManagerNative.broadcastStickyIntent(intent, null);
 
                 }
             }

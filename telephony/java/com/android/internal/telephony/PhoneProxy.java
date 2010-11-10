@@ -71,37 +71,6 @@ public class PhoneProxy extends Handler implements Phone {
 
     private static final String LOG_TAG = "PHONE";
 
-     public void updatePhoneProxy(VoicePhone phone) {
-         Log.v(LOG_TAG, "updatePhoneProxy ");
-         if (mActiveVoicePhone instanceof GSMPhone) {
-              ((GSMPhone) mActiveVoicePhone).dispose();
-         } else if (mActiveVoicePhone instanceof CDMAPhone) {
-             ((CDMAPhone) mActiveVoicePhone).dispose();
-         }
-
-         VoicePhone oldPhone = mActiveVoicePhone;
-
-         // Give the garbage collector a hint to start the garbage collection
-         // asap NOTE this has been disabled since radio technology change could
-         // happen during e.g. a multimedia playing and could slow the system.
-         // Tests needs to be done to see the effects of the GC call here when
-         // system is busy.
-         // System.gc();
-
-         mActiveVoicePhone = phone;
-         if (oldPhone.getPhoneType() == VoicePhone.PHONE_TYPE_GSM) {
-             if (null != oldPhone) {
-                 ((GSMPhone) oldPhone).removeReferences();
-             }
-         } else if (oldPhone.getPhoneType() == VoicePhone.PHONE_TYPE_CDMA) {
-              if (null != oldPhone) {
-                 ((CDMAPhone) oldPhone).removeReferences();
-              }
-         }
-
-         oldPhone = null;
-
-     }
     public PhoneProxy(VoicePhone voicePhone, DataPhone dataPhone) {
 
         mActiveVoicePhone = voicePhone;
@@ -179,7 +148,7 @@ public class PhoneProxy extends Handler implements Phone {
                 if (ar.exception == null) {
                     RadioTechnologyFamily newVoiceTech =
                             RadioTechnologyFamily.getRadioTechFamilyFromInt(((int[]) ar.result)[0]);
-                    updatePhoneObject(newVoiceTech);
+                    updatePhoneObject(newVoiceTech, getSubscription());
                 } else {
                     loge("Voice Radio Technology query failed!");
                 }
@@ -199,7 +168,7 @@ public class PhoneProxy extends Handler implements Phone {
         }
     }
 
-    private void updatePhoneObject(RadioTechnologyFamily newVoiceRadioTech) {
+    public void updatePhoneObject(RadioTechnologyFamily newVoiceRadioTech, int subscription) {
 
         if (mActiveVoicePhone != null
                 && ((newVoiceRadioTech.isCdma() && mActiveVoicePhone.getPhoneType() == PHONE_TYPE_CDMA))
@@ -230,7 +199,7 @@ public class PhoneProxy extends Handler implements Phone {
 
         mActiveVoicePhone.unregisterForVoiceServiceStateChanged(this);
 
-        deleteAndCreatePhone(newVoiceRadioTech);
+        deleteAndCreatePhone(newVoiceRadioTech, subscription);
 
         if (mResetModemOnRadioTechnologyChange) { // restore power state
             logd("Resetting Radio");
@@ -257,10 +226,10 @@ public class PhoneProxy extends Handler implements Phone {
 
     }
 
-    private void deleteAndCreatePhone(RadioTechnologyFamily newVoiceRadioTech) {
+    private void deleteAndCreatePhone(RadioTechnologyFamily newVoiceRadioTech, int subscription) {
 
         String mOutgoingPhoneName = "Unknown";
-        Subscription subscription = null;
+        Subscription subscriptionData = null;
         logd("Delete And CreatePhone function");
 
         if (mActiveVoicePhone != null) {
@@ -272,9 +241,7 @@ public class PhoneProxy extends Handler implements Phone {
 
         if (mActiveVoicePhone != null) {
             Log.v(LOG_TAG, "Disposing old phone..");
-            if (TelephonyManager.isDsdsEnabled()) {
-                subscription = mActiveVoicePhone.getSubscriptionInfo();
-            }
+            subscriptionData = mActiveVoicePhone.getSubscriptionInfo();
             if (mActiveVoicePhone instanceof GSMPhone) {
                 ((GSMPhone) mActiveVoicePhone).dispose();
             } else if (mActiveVoicePhone instanceof CDMAPhone) {
@@ -292,40 +259,22 @@ public class PhoneProxy extends Handler implements Phone {
         // System.gc();
 
         if (newVoiceRadioTech.isCdma()) {
-            if (TelephonyManager.isDsdsEnabled()) {
-                /* Gets CDMA/GSM phone object with proper command interface attached */
-                if (subscription != null) {
-                    mActiveVoicePhone = PhoneFactory.getCdmaPhone(subscription.subNum);
-                    setSubscriptionInfo(subscription);
-                } else {
-                    Log.v(LOG_TAG, "Subscription is null..Creating default phone");
-                    mActiveVoicePhone = PhoneFactory.getCdmaPhone();
-                    mActiveVoicePhone.setSubscription(0);
-                }
-            } else {
-                mActiveVoicePhone = PhoneFactory.getCdmaPhone();
-                mActiveVoicePhone.setSubscription(0);
-            }
+            /* Gets CDMA/GSM phone object with proper command interface attached */
+            mActiveVoicePhone = PhoneFactory.getCdmaPhone(subscription);
             if (null != oldPhone) {
                 ((GSMPhone) oldPhone).removeReferences();
             }
         } else if (newVoiceRadioTech.isGsm()) {
-            if (TelephonyManager.isDsdsEnabled()) {
-                if (subscription != null) {
-                    mActiveVoicePhone = PhoneFactory.getGsmPhone(subscription.subNum);
-                    setSubscriptionInfo(subscription);
-                } else {
-                    Log.v(LOG_TAG, "Subscription is null..Creating default phone");
-                    mActiveVoicePhone = PhoneFactory.getGsmPhone();
-                    mActiveVoicePhone.setSubscription(0);
-                }
-            } else {
-                mActiveVoicePhone = PhoneFactory.getGsmPhone();
-                mActiveVoicePhone.setSubscription(0);
-            }
+            mActiveVoicePhone = PhoneFactory.getGsmPhone(subscription);
             if (null != oldPhone) {
                 ((CDMAPhone) oldPhone).removeReferences();
             }
+        }
+        mActiveVoicePhone.setSubscription(subscription);
+        if (subscriptionData != null) {
+            setSubscriptionInfo(subscriptionData);
+        } else {
+            Log.v(LOG_TAG, "deleteAndCreatePhone: Subscription Info is null");
         }
 
         oldPhone = null;
