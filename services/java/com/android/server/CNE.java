@@ -312,7 +312,7 @@ public final class CNE {
     private String activeWwanV4IfName = null;
     private String activeWwanV6IfName = null;
     private String activeWlanGatewayAddr = null;
-    private String activeWwanGatewayAddr = null;
+    private String activeWwanV4GatewayAddr = null;
     private String activeWwanIpAddr = null;
     private String hostRoutingIpAddr = null;
     private static boolean mRemoveHostEntry = false;
@@ -566,6 +566,7 @@ public final class CNE {
                     if (netState == NetworkInfo.State.CONNECTED) {
                         if (ipv == IPVersion.IPV4) {
                             activeWwanV4IfName = wwanV4AddrInfo.ifName;
+                            activeWwanV4GatewayAddr = wwanV4AddrInfo.gatewayAddr;
                         }
                         if (DBG) Log.i(LOCAL_TAG, "onDataConnectionStateChanged ADD IPROUTE2");
                         // add network interface to main table and
@@ -2334,9 +2335,9 @@ public final class CNE {
         mDefaultNetwork = nwId;
         // Change default network interface in main table to new one
         if ((nwId == ConnectivityManager.TYPE_WIFI) && (activeWlanIfName != null)) {
+             configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWlanIfName, null,
+                               activeWlanGatewayAddr);
             // Need to delete the host entry
-            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWlanIfName, null,
-                    null);
             if (mRemoveHostEntry) {
                 mRemoveHostEntry = false;
                 if (DBG) {
@@ -2346,7 +2347,7 @@ public final class CNE {
             }
         } else if ((nwId == ConnectivityManager.TYPE_MOBILE) && (activeWwanV4IfName != null)) {
             configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWwanV4IfName, null,
-                    null);
+                              activeWwanV4GatewayAddr);
         }
         return;
     }
@@ -2470,9 +2471,7 @@ public final class CNE {
             if (rInfo.enabled) { // already enabled
                 onFmcStatus(FmcNotifier.FMC_STATUS_ENABLED);
                 reqToStart = false;
-            } else if (rInfo.lastSendStatus != -1) {
-                onFmcStatus(rInfo.lastSendStatus); // re-send last status
-            }
+            } 
         } else { /* new OEM registration for this app */
             setFmcObj(new FmcRegInfo(binder));
         }
@@ -2511,6 +2510,8 @@ public final class CNE {
             } else {
                 send(rr);
             }
+        } else {
+            onFmcStatus(FmcNotifier.FMC_STATUS_NOT_YET_STARTED);
         }
         return ok;
     }
