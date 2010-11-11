@@ -862,10 +862,23 @@ status_t AwesomePlayer::initAudioDecoder() {
     if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW)) {
         mAudioSource = mAudioTrack;
     } else {
+        uint32_t flags = 0;
+        if(mVideoTrack != NULL) {
+             const char *videoMimeType;
+             sp<MetaData> videoMeta = mVideoTrack->getFormat();
+
+             CHECK(videoMeta->findCString(kKeyMIMEType, &videoMimeType));
+
+             //use software audio decoder for DIVX/AVI+MP3 format
+             if ((!strcasecmp(videoMimeType, MEDIA_MIMETYPE_CONTAINER_AVI) ||
+                  !strcasecmp(videoMimeType, MEDIA_MIMETYPE_VIDEO_DIVX)) &&
+                  !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG))
+                  flags = OMXCodec::kPreferSoftwareCodecs;
+        }
         mAudioSource = OMXCodec::Create(
                 mClient.interface(), mAudioTrack->getFormat(),
                 false, // createEncoder
-                mAudioTrack, NULL, mCodecFlags);
+                mAudioTrack, NULL, mCodecFlags | flags);
     }
 
     if (mAudioSource != NULL) {
