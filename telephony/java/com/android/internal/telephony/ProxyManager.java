@@ -76,6 +76,8 @@ public class ProxyManager extends Handler {
     static public final String INTENT_VALUE_SUBSCR_INFO_1 = "SUBSCR INFO 01";
     static public final String INTENT_VALUE_SUBSCR_INFO_2 = "SUBSCR INFO 02";
 
+    static public final int DEFAULT_SUB = 0;
+
 
     // Class Variables
     static private Phone sProxyPhone[] = null;      //phoneproxy instances
@@ -100,10 +102,6 @@ public class ProxyManager extends Handler {
     static int currentDds;
     static boolean disableDdsInProgress = false;
     static Message mSetDdsCompleteMsg;
-    static private int defaultSubscription = 0;
-    static private int voiceSubscription = 0;
-    static private int dataSubscription = 0;
-    static private int smsSubscription = 0;
 
     private int mPendingIccidRequest = 0;
     private boolean setSubscriptionMode = true;
@@ -159,15 +157,15 @@ public class ProxyManager extends Handler {
             mContext.registerReceiver(mReceiver, intentFilter);
 
             // get the current active dds
-            currentDds = PhoneFactory.getDataSubscription(context);
+            currentDds = PhoneFactory.getDataSubscription();
             Log.d(LOG_TAG, "In ProxyManager constructor current active dds is:" + currentDds);
         }
     }
 
     /*
-     *  This function will read from the User Prefered Subscription from the
+     *  This function will read from the User Preferred Subscription from the
      *  system property, parse and populate the member variable mUserPrefSubs.
-     *  User Prefered Subscription is stored in the system property string as
+     *  User Preferred Subscription is stored in the system property string as
      *    iccId,appType,appId,activationStatus,subIndex
      *  If the the property is not set already, then set it to the default values
      *  for appType to USIM and activationStatus to ACTIVATED.
@@ -241,7 +239,7 @@ public class ProxyManager extends Handler {
         }
     }
 
-    public void saveUserPreferedSubscription(SubscriptionData userPrefSubData) {
+    public void saveUserPreferredSubscription(SubscriptionData userPrefSubData) {
         Subscription userPrefSub;
         String userSub;
 
@@ -257,8 +255,8 @@ public class ProxyManager extends Handler {
                       Integer.toString(userPrefSub.subStatus) + "," +
                       Integer.toString(userPrefSub.subIndex);
 
-            Log.d(LOG_TAG, "saveUserPreferedSubscription: userPrefSub = " + userPrefSub.toString());
-            Log.d(LOG_TAG, "saveUserPreferedSubscription: userSub = " + userSub);
+            Log.d(LOG_TAG, "saveUserPreferredSubscription: userPrefSub = " + userPrefSub.toString());
+            Log.d(LOG_TAG, "saveUserPreferredSubscription: userSub = " + userSub);
 
             // Construct the string and store in Settings data base at index.
             //update the user pref settings so that next time user is not prompted of the subscriptions
@@ -274,6 +272,36 @@ public class ProxyManager extends Handler {
         return str;
     }
 
+    void updateSubPreferences(SubscriptionData subData) {
+        int activSubCount = 0;
+        Subscription activeSub = null;
+
+        for(Subscription sub : subData.subscription) {
+            if (sub != null && sub.subStatus == SUB_ACTIVATED) {
+                activSubCount++;
+                activeSub = sub;
+            }
+        }
+
+        // If there is only one active subscription, set user prefered settings
+        // for voice/sms/data subscription to this subscription.
+        if (activSubCount == 1) {
+            Log.d(LOG_TAG, "updateSubPreferences: only SUB:" + activeSub.subNum
+                    + " is Active.  Update the default/voice/sms and data subscriptions");
+            PhoneFactory.setVoiceSubscription(activeSub.subNum);
+            PhoneFactory.setSMSSubscription(activeSub.subNum);
+
+            Log.d(LOG_TAG, "updateSubPreferences: current defaultSub = " + PhoneFactory.getDefaultSubscription());
+            Log.d(LOG_TAG, "updateSubPreferences: current currentDds = " + currentDds);
+            if (PhoneFactory.getDefaultSubscription() != activeSub.subNum) {
+                PhoneFactory.setDefaultSubscription(activeSub.subNum);
+            }
+
+            if (currentDds != activeSub.subNum) {
+                setDataSubscription(activeSub.subNum, null);
+            }
+        }
+    }
 
     @Override
     public void handleMessage(Message msg) {
@@ -816,7 +844,7 @@ public class ProxyManager extends Handler {
                         // Disable the data connectivity if the phone is not the
                         // Designated Data Subscription.
                         // Data should be active only on DDS.
-                        currentDds = PhoneFactory.getDataSubscription(mContext);
+                        currentDds = PhoneFactory.getDataSubscription();
                         Log.d(LOG_TAG, "SET_UICC_SUBSCRIPTION_DONE : currentDds = "
                                 + currentDds + " currentPhone.getSubscription() = "
                                 + currentPhone.getSubscription());
@@ -837,8 +865,10 @@ public class ProxyManager extends Handler {
 
                     // Store the User prefered Subscription once all
                     // the set uicc subscription is done.
-                    saveUserPreferedSubscription(subscriptionData);
+                    saveUserPreferredSubscription(subscriptionData);
                     prevSubscriptionData.copyFrom(subscriptionData);
+
+                    updateSubPreferences(subscriptionData);
 
                     SupplySubscription.this.notifyAll();
                 }
@@ -1119,21 +1149,42 @@ public class ProxyManager extends Handler {
     }
 
     /* Gets the default subscriptions for VOICE/SMS/DATA */
-    public static void getDefaultProperties(Context context) {
-        try{
-            voiceSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_VOICE_CALL);
-            dataSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL);
-            smsSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_SMS);
+    public void getDefaultProperties(Context context) {
+        boolean resetToDefault = true;
 
-            Log.d(LOG_TAG,"Dual Sim Settings from Settings Provider -----");
-            Log.d(LOG_TAG,"Voice_val = " + voiceSubscription + " Data_val = " + dataSubscription + " Sms_val = " + smsSubscription);
+        if (TelephonyManager.isDsdsEnabled()) {
+            try {
+                int voiceSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.DUAL_SIM_VOICE_CALL);
+                int dataSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.DUAL_SIM_DATA_CALL);
+                int smsSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.DUAL_SIM_SMS);
+                int defaultSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.DEFAULT_SUBSCRIPTION);
+                Log.d(LOG_TAG,"Dual Sim Settings from Settings Provider :");
+                Log.d(LOG_TAG,"voiceSubscription = " + voiceSubscription
+                        + " dataSubscription = " + dataSubscription
+                        + " smsSubscription = " + smsSubscription
+                        + " defaultSubscription = " + defaultSubscription);
+                resetToDefault = false;
+            } catch (SettingNotFoundException snfe) {
+                Log.e(LOG_TAG, "Settings Exception Reading Voice/Sms/Data/Default Subscriptions", snfe);
+            }
+        }
 
-        } catch (SettingNotFoundException snfe) {
-            Log.e(LOG_TAG, "Settings Exception Reading Dual Sim SMS Call Values", snfe);
-            /* Incase of exception setting default values to 0 */
-            Settings.System.putInt(context.getContentResolver(),Settings.System.DUAL_SIM_VOICE_CALL, 0);
-            Settings.System.putInt(context.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL, 0);
-            Settings.System.putInt(context.getContentResolver(),Settings.System.DUAL_SIM_SMS, 0);
+        // Reset the Voice/Sms/Data/Default Subscriptions to default values
+        // if the dsds is not enabled or if there is any exception occured
+        // while reading the system properties.
+        if (resetToDefault) {
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.DUAL_SIM_VOICE_CALL, DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.DUAL_SIM_DATA_CALL, DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.DUAL_SIM_SMS, DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.DEFAULT_SUBSCRIPTION, DEFAULT_SUB);
         }
     }
 

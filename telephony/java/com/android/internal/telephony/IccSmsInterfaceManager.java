@@ -194,9 +194,11 @@ public class IccSmsInterfaceManager extends ISms.Stub {
     }
 
     /**
-       Gets Default SMS subscription */
-    public int getDefaultSMSSubscription() {
-        return PhoneFactory.getDefaultSubscription();
+     * Gets User Preferred SMS subscription
+     * @hide
+     */
+    public int getPreferredSmsSubscription() {
+        return PhoneFactory.getSMSSubscription();
     }
 
     /**
@@ -212,7 +214,8 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      */
     public boolean
     updateMessageOnIccEf(int index, int status, byte[] pdu) {
-        return updateMessageOnIccEfOnSubscription(index, status, pdu, getDefaultSMSSubscription());
+        return updateMessageOnIccEfOnSubscription(index, status, pdu,
+                 getPreferredSmsSubscription());
     }
 
     public boolean
@@ -265,7 +268,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      *
      */
     public boolean copyMessageToIccEf(int status, byte[] pdu, byte[] smsc) {
-        return copyMessageToIccEfOnSubscription(status, pdu, smsc, getDefaultSMSSubscription());
+        return copyMessageToIccEfOnSubscription(status, pdu, smsc, getPreferredSmsSubscription());
     }
 
     public boolean copyMessageToIccEfOnSubscription(int status, byte[] pdu, byte[] smsc, int subscription) {
@@ -301,7 +304,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      * @return list of SmsRawData of all sms on UIcc
      */
     public List<SmsRawData> getAllMessagesFromIccEf() {
-        return getAllMessagesFromIccEfOnSubscription(getDefaultSMSSubscription());
+        return getAllMessagesFromIccEfOnSubscription(getPreferredSmsSubscription());
     }
 
     public List<SmsRawData> getAllMessagesFromIccEfOnSubscription(int subscription) {
@@ -360,7 +363,8 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      */
     public void sendData(String destAddr, String scAddr, int destPort,
             byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent) {
-      sendDataOnSubscription(destAddr, scAddr, destPort, data, sentIntent, deliveryIntent, getDefaultSMSSubscription());
+        sendDataOnSubscription(destAddr, scAddr, destPort, data, sentIntent,
+                deliveryIntent, getPreferredSmsSubscription());
     }
 
     public void sendDataOnSubscription(String destAddr, String scAddr, int destPort,
@@ -402,8 +406,10 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      */
     public void sendText(String destAddr, String scAddr,
             String text, PendingIntent sentIntent, PendingIntent deliveryIntent) {
-        sendTextOnSubscription(destAddr, scAddr, text, sentIntent, deliveryIntent, getDefaultSMSSubscription() );
+        sendTextOnSubscription(destAddr, scAddr, text, sentIntent,
+                deliveryIntent, getPreferredSmsSubscription() );
     }
+
     public void sendTextOnSubscription(String destAddr, String scAddr,
             String text, PendingIntent sentIntent, PendingIntent deliveryIntent, int subscription) {
         mContext[subscription].enforceCallingPermission(
@@ -446,8 +452,11 @@ public class IccSmsInterfaceManager extends ISms.Stub {
     public void sendMultipartText(String destAddr, String scAddr, List<String> parts,
             List<PendingIntent> sentIntents, List<PendingIntent> deliveryIntents) {
         sendMultipartTextOnSubscription(destAddr, scAddr, (ArrayList<String>) parts,
-                (ArrayList<PendingIntent>) sentIntents, (ArrayList<PendingIntent>) deliveryIntents, getDefaultSMSSubscription() );
+                (ArrayList<PendingIntent>) sentIntents,
+                (ArrayList<PendingIntent>) deliveryIntents,
+                getPreferredSmsSubscription() );
     }
+
     public void sendMultipartTextOnSubscription(String destAddr, String scAddr, List<String> parts,
             List<PendingIntent> sentIntents, List<PendingIntent> deliveryIntents, int subscription) {
         mContext[subscription].enforceCallingPermission(

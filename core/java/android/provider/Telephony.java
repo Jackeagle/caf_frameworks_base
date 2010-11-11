@@ -37,7 +37,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import com.android.internal.telephony.PhoneFactory;
+import android.telephony.SmsManager;
 
 /**
  * The Telephony provider contains data related to phone operation.
@@ -283,7 +283,8 @@ public final class Telephony {
                 Uri uri, String address, String body, String subject,
                 Long date, boolean read, boolean deliveryReport, long threadId) {
             return addMessageToUri(resolver, uri, address, body, subject, date, read,
-                       deliveryReport, threadId, PhoneFactory.getDefaultSubscription());
+                       deliveryReport, threadId,
+                       SmsManager.getDefault().getPreferredSmsSubscription());
         }
 
         /**
@@ -373,7 +374,8 @@ public final class Telephony {
                     String address, String body, String subject, Long date,
                     boolean read) {
                 return addMessageToUri(resolver, CONTENT_URI, address, body,
-                        subject, date, read, false, PhoneFactory.getDefaultSubscription());
+                        subject, date, read, false,
+                        SmsManager.getDefault().getPreferredSmsSubscription());
             }
 
             /**
@@ -424,7 +426,8 @@ public final class Telephony {
             public static Uri addMessage(ContentResolver resolver,
                     String address, String body, String subject, Long date) {
                 return addMessageToUri(resolver, CONTENT_URI, address, body,
-                        subject, date, true, false, PhoneFactory.getDefaultSubscription());
+                        subject, date, true, false,
+                        SmsManager.getDefault().getPreferredSmsSubscription());
             }
 
             /**
@@ -473,7 +476,8 @@ public final class Telephony {
             public static Uri addMessage(ContentResolver resolver,
                     String address, String body, String subject, Long date) {
                 return addMessageToUri(resolver, CONTENT_URI, address, body,
-                        subject, date, true, false, PhoneFactory.getDefaultSubscription());
+                        subject, date, true, false,
+                        SmsManager.getDefault().getPreferredSmsSubscription());
             }
 
             /**
@@ -540,7 +544,8 @@ public final class Telephony {
                     String address, String body, String subject, Long date,
                     boolean deliveryReport, long threadId) {
                 return addMessageToUri(resolver, CONTENT_URI, address, body, subject, date,
-                        true, deliveryReport, threadId, PhoneFactory.getDefaultSubscription());
+                        true, deliveryReport, threadId,
+                        SmsManager.getDefault().getPreferredSmsSubscription());
             }
 
             /**

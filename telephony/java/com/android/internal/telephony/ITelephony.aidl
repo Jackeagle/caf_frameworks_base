@@ -547,5 +547,23 @@ interface ITelephony {
                boolean checkSubscription, boolean tryDataCalls, int subscription);
 
     boolean isSimPukLockedOnSubscription(int subscription);
+
+    /*
+     * get default subscription
+     * @return subscription id
+     */
+    int getDefaultSubscription();
+
+    /*
+     * get user prefered voice subscription
+     * @return subscription id
+     */
+    int getPreferredVoiceSubscription();
+
+    /*
+     * get user prefered data subscription
+     * @return subscription id
+     */
+    int getPreferredDataSubscription();
 }
 

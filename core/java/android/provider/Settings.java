@@ -1582,6 +1582,12 @@ public final class Settings {
           */
         public static final String DUAL_SIM_SMS = "dual_sim_sms";
 
+        /**
+          * Default subscription. The supported values are 0 = SUB1 and 1 = SUB2.
+          * @hide
+          */
+        public static final String DEFAULT_SUBSCRIPTION = "default_subscription";
+
         /** User preferred subscriptions for one and two i.e. sub1 preferred, sub2 preferred
           * @hide
           */

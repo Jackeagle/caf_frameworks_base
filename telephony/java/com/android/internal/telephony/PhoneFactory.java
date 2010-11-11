@@ -50,19 +50,12 @@ public class PhoneFactory {
     static private Looper sLooper;
     static private Context sContext;
     static private int numPhones = 1;
-    static private int defaultSubscription = 0;
-    static private int voiceSubscription = 0;
-    static private int dataSubscription = 0;
-    static private int smsSubscription = 0;
-
-
-    static final int NORMAL_PHONE = 1;
-    static final int DSDS_PHONE = 2;
-
 
     static final int preferredNetworkMode = RILConstants.PREFERRED_NETWORK_MODE;
 
     static final int preferredCdmaSubscription = RILConstants.PREFERRED_CDMA_SUBSCRIPTION;
+
+    static final String SUBSCRIPTION_KEY = "phone_subscription";
 
     //***** Class Methods
     public static void makeDefaultPhones(Context context) {
@@ -192,7 +185,15 @@ public class PhoneFactory {
      * are active the first instance "0" is set as default subscription
      */
     public static void setDefaultSubscription(int subscription) {
-       defaultSubscription = subscription;
+        Settings.System.putInt(sContext.getContentResolver(),
+                                       Settings.System.DEFAULT_SUBSCRIPTION, subscription);
+        // Broadcast an Intent for default sub change
+        Intent intent = new Intent(TelephonyIntents.ACTION_DEFAULT_SUBSCRIPTION_CHANGED);
+        intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+        intent.putExtra(SUBSCRIPTION_KEY, subscription);
+        Log.d(LOG_TAG, "setDefaultSubscription : " + subscription
+                + " Broadcasting Default Subscription Changed...");
+        sContext.sendStickyBroadcast(intent);
     }
 
     public static Phone getDefaultPhone() {
@@ -203,7 +204,7 @@ public class PhoneFactory {
         if (!sMadeDefaults) {
             throw new IllegalStateException("Default phones haven't been made yet!");
         }
-       return sProxyPhone[defaultSubscription];
+       return sProxyPhone[getDefaultSubscription()];
     }
 
     public static Phone getPhone(int subscription) {
@@ -262,60 +263,77 @@ public class PhoneFactory {
 
     /* Gets the default subscription */
     public static int getDefaultSubscription() {
-        return defaultSubscription;
-    }
+        int subscription = 0;
 
-     static public void setVoiceSubscription(int subscription) {
-        Log.d(LOG_TAG, "setVoiceSubscription setting subscription to: " + subscription);
-        Settings.System.putInt(sContext.getContentResolver(),Settings.System.DUAL_SIM_VOICE_CALL, subscription);
-        voiceSubscription = subscription;
-        Log.d(LOG_TAG, "setVoiceSubscription voiceSubscription: " + voiceSubscription);
-    }
+        try {
+            subscription = Settings.System.getInt(sContext.getContentResolver(),
+                    Settings.System.DEFAULT_SUBSCRIPTION);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Settings Exception Reading Default Subscription", snfe);
+        }
 
-    static public void setDataSubscription(int subscription) {
-        Settings.System.putInt(sContext.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL, subscription);
-        dataSubscription = subscription;
-        Log.d(LOG_TAG, "-----: setDataSubscription: " + dataSubscription);
-    }
-
-    static public void setSMSSubscription(int subscription) {
-        Log.d(LOG_TAG, "setSMSSubscription setting subscription to: " + subscription);
-        Settings.System.putInt(sContext.getContentResolver(),Settings.System.DUAL_SIM_SMS, subscription);
-        smsSubscription = subscription;
-        Intent intent = new Intent("com.android.mms.transaction.SEND_MESSAGE");
-        sContext.sendBroadcast(intent);
-        Log.d(LOG_TAG, "setSMSSubscription set subscription value: " + smsSubscription);
+        return subscription;
     }
 
     /* Gets User preferred Voice subscription setting*/
-    public static int getVoiceSubscription(Context context) {
+    public static int getVoiceSubscription() {
+        int subscription = 0;
+
         try {
-            voiceSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_VOICE_CALL);
-            Log.d(LOG_TAG, "getVoiceSubscription voiceSubscription: " + voiceSubscription);
+            subscription = Settings.System.getInt(sContext.getContentResolver(),
+                    Settings.System.DUAL_SIM_VOICE_CALL);
         } catch (SettingNotFoundException snfe) {
             Log.e(LOG_TAG, "Settings Exception Reading Dual Sim Voice Call Values", snfe);
         }
-        return voiceSubscription;
+
+        return subscription;
     }
 
     /* Gets User preferred Data subscription setting*/
-    public static int getDataSubscription(Context context) {
+    public static int getDataSubscription() {
+        int subscription = 0;
+
         try {
-            dataSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_DATA_CALL);
+            subscription = Settings.System.getInt(sContext.getContentResolver(),
+                    Settings.System.DUAL_SIM_DATA_CALL);
         } catch (SettingNotFoundException snfe) {
             Log.e(LOG_TAG, "Settings Exception Reading Dual Sim Data Call Values", snfe);
         }
-        return dataSubscription;
+
+        return subscription;
     }
 
     /* Gets User preferred SMS subscription setting*/
-    public static int getSMSSubscription(Context context) {
+    public static int getSMSSubscription() {
+        int subscription = 0;
         try {
-            smsSubscription = Settings.System.getInt(context.getContentResolver(),Settings.System.DUAL_SIM_SMS);
-            Log.d(LOG_TAG, "getSMSSubscription 1: " + smsSubscription);
-            } catch (SettingNotFoundException snfe) {
-                Log.e(LOG_TAG, "Settings Exception Reading Dual Sim SMS Values", snfe);
-            }
-        return smsSubscription;
+            subscription = Settings.System.getInt(sContext.getContentResolver(),
+                    Settings.System.DUAL_SIM_SMS);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Settings Exception Reading Dual Sim SMS Values", snfe);
+        }
+
+        return subscription;
+    }
+
+    static public void setVoiceSubscription(int subscription) {
+        Settings.System.putInt(sContext.getContentResolver(),
+                Settings.System.DUAL_SIM_VOICE_CALL, subscription);
+        Log.d(LOG_TAG, "setVoiceSubscription : " + subscription);
+    }
+
+    static public void setDataSubscription(int subscription) {
+        Settings.System.putInt(sContext.getContentResolver(),
+                Settings.System.DUAL_SIM_DATA_CALL, subscription);
+        Log.d(LOG_TAG, "setDataSubscription: " + subscription);
+    }
+
+    static public void setSMSSubscription(int subscription) {
+        Settings.System.putInt(sContext.getContentResolver(),
+                Settings.System.DUAL_SIM_SMS, subscription);
+
+        Intent intent = new Intent("com.android.mms.transaction.SEND_MESSAGE");
+        sContext.sendBroadcast(intent);
+        Log.d(LOG_TAG, "setSMSSubscription : " + subscription);
     }
 }

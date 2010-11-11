@@ -565,7 +565,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
     void notifyDataConnection(DataServiceType ds, IPVersion ipv, String reason) {
         // Notify the Data Connection state only if this is the active DDS.
-        if (getSubscription() == TelephonyManager.getDataSubscription(mContext)) {
+        if (getSubscription() == PhoneFactory.getDataSubscription()) {
             mNotifier.notifyDataConnection(this, ds.toApnTypeString(), ipv, reason);
         } else {
             Log.d(LOG_TAG, "[DCT" + getSubscription() +
@@ -585,7 +585,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     // notify data connection as failed - applicable for default type only?
     void notifyDataConnectionFail(String reason) {
         // Notify the Data Connection failed only if this is the active DDS.
-        if (getSubscription() == TelephonyManager.getDataSubscription(mContext)) {
+        if (getSubscription() == PhoneFactory.getDataSubscription()) {
             mNotifier.notifyDataConnectionFailed(this, reason);
         } else {
             Log.d(LOG_TAG, "[DCT" + getSubscription() +

@@ -27,6 +27,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.IPhoneStateListener;
 import com.android.internal.telephony.PhoneFactory;
+import android.telephony.TelephonyManager;
 
 /**
  * A listener class for monitoring changes in specific telephony states
@@ -156,7 +157,7 @@ public class PhoneStateListener {
 
     public PhoneStateListener() {
         // If subscription is not passed set the default subscription.
-        mSubscription = PhoneFactory.getDefaultSubscription();
+        mSubscription = TelephonyManager.getDefaultSubscription();
     }
 
     /**

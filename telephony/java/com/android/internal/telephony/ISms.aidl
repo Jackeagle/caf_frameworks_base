@@ -269,4 +269,9 @@ interface ISms {
             in List<String> parts, in List<PendingIntent> sentIntents,
             in List<PendingIntent> deliveryIntents, in int subscriptionId);
 
+    /*
+     * get user prefered sms subscription
+     * @return subscription id
+     */
+    int getPreferredSmsSubscription();
 }
