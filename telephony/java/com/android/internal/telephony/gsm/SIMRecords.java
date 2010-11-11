@@ -499,7 +499,10 @@ public final class SIMRecords extends UiccApplicationRecords {
                 ar = (AsyncResult)msg.obj;
 
                 if (ar.exception != null) {
-                    Log.e(LOG_TAG, "Exception querying IMSI, Exception:" + ar.exception);
+                    Log.e(LOG_TAG, "Exception querying IMSI, Received exception:" + ar.exception);
+                    mCi.getIMSI(mParentApp.getCard().getSlotId(), mParentApp.getAid(),obtainMessage(EVENT_GET_IMSI_DONE));
+                    recordsToLoad++;
+                    Log.e(LOG_TAG, "Retrying again! for IMSI");
                     break;
                 }
 
