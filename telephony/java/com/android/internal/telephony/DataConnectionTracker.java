@@ -358,11 +358,16 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
          * on either IPV4 or IPV6.
          */
         DataState ret = DataState.DISCONNECTED;
+        /* IRAT handover with loss of signal scenario. Do not act on loss
+           of service as an indication for state 'DISCONNECTED'
+
         if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
             // If we're out of service, open TCP sockets may still work
             // but no data will flow
             ret = DataState.DISCONNECTED;
-        } else {
+        } else  */
+        Log.d(LOG_TAG, "IRAT > ServiceState(overall):" + getDataServiceState().getState());
+        {
             /*
              * TODO: we do not keep global data connection state in DCT now.
              * Instead, state is associated with <apn type, ipv>. The following
@@ -389,11 +394,16 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
         State dsState = mDpt.getState(ds, ipv);
 
+        /* IRAT handover with loss of signal scenario. Do not act on loss
+           of service as an indication for state 'DISCONNECTED'
         if (mCheckForConnectivity && getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
             // If we're out of service, open TCP sockets may still work
             // but no data will flow
             ret = DataState.DISCONNECTED;
-        } else {
+        } else
+        */
+        Log.d(LOG_TAG, "IRAT > ServiceState:" + getDataServiceState().getState());
+        {
             switch (dsState) {
                 case FAILED:
                 case IDLE:
