@@ -500,9 +500,10 @@ public final class SIMRecords extends UiccApplicationRecords {
 
                 if (ar.exception != null) {
                     Log.e(LOG_TAG, "Exception querying IMSI, Received exception:" + ar.exception);
+                    // TODO: retry IMSI to be removed
                     mCi.getIMSI(mParentApp.getCard().getSlotId(), mParentApp.getAid(),obtainMessage(EVENT_GET_IMSI_DONE));
                     recordsToLoad++;
-                    Log.e(LOG_TAG, "Retrying again! for IMSI");
+                    Log.i(LOG_TAG, "Retrying again for IMSI");
                     break;
                 }
 
