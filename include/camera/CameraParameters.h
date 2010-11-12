@@ -167,6 +167,8 @@ public:
     static const char KEY_SUPPORTED_LENSSHADE_MODES[] ;
     static const char KEY_HISTOGRAM[] ;
     static const char KEY_SUPPORTED_HISTOGRAM_MODES[] ;
+    static const char KEY_SKIN_TONE_ENHANCEMENT[] ;
+    static const char KEY_SUPPORTED_SKIN_TONE_ENHANCEMENT_MODES[] ;
     static const char KEY_SHARPNESS[];
     static const char KEY_MAX_SHARPNESS[];
     static const char KEY_CONTRAST[];
@@ -408,6 +410,9 @@ public:
     static const char HISTOGRAM_ENABLE[] ;
     static const char HISTOGRAM_DISABLE[] ;
 
+    // Values for SKIN TONE ENHANCEMENT
+    static const char SKIN_TONE_ENHANCEMENT_ENABLE[] ;
+    static const char SKIN_TONE_ENHANCEMENT_DISABLE[] ;
 
     // Values for Continuous AF
     static const char CONTINUOUS_AF_OFF[] ;

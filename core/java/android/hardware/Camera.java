@@ -839,6 +839,7 @@ public class Camera {
         private static final String KEY_ISO_MODE = "iso";
         private static final String KEY_LENSSHADE = "lensshade";
         private static final String KEY_HISTOGRAM = "histogram";
+        private static final String KEY_SKIN_TONE_ENHANCEMENT = "skinToneEnhancement";
         private static final String KEY_FOCAL_LENGTH = "focal-length";
         private static final String KEY_HORIZONTAL_VIEW_ANGLE = "horizontal-view-angle";
         private static final String KEY_VERTICAL_VIEW_ANGLE = "vertical-view-angle";
@@ -919,6 +920,8 @@ public class Camera {
         public static final String HISTOGRAM_ENABLE = "enable";
         public static final String HISTOGRAM_DISABLE= "disable";
 
+        public static final String SKIN_TONE_ENHANCEMENT_ENABLE = "enable";
+        public static final String SKIN_TONE_ENHANCEMENT_DISABLE= "disable";
 
         // Values for flash mode settings.
         /**
@@ -2306,6 +2309,16 @@ public class Camera {
             return split(str);
         }
 
+         /**
+         * Gets the supported Skin Tone Enhancement modes.
+         *
+         * @return a List of SKIN_TONE_ENHANCEMENT_XXX string constants. null if skin tone enhancement
+         *         setting is not supported.
+         */
+        public List<String> getSupportedSkinToneEnhancementModes() {
+            String str = get(KEY_SKIN_TONE_ENHANCEMENT + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+        }
 
          /**
          * Gets the current auto exposure setting.
