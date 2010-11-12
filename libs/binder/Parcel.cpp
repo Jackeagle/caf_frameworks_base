@@ -419,6 +419,9 @@ status_t Parcel::appendFrom(Parcel *parcel, size_t offset, size_t len)
                 // new Parcel now owns its own fd, and can declare that we
                 // officially know we have fds.
                 flat->handle = dup(flat->handle);
+                if(flat->handle < 0) {
+                   LOGE("Parcel::appendFrom failed to dup file descriptor [%d]!",errno);
+                }
                 flat->cookie = (void*)1;
                 mHasFds = mFdsKnown = true;
             }
@@ -672,6 +675,9 @@ status_t Parcel::writeDupFileDescriptor(int fd)
     obj.type = BINDER_TYPE_FD;
     obj.flags = 0x7f | FLAT_BINDER_FLAG_ACCEPTS_FDS;
     obj.handle = dup(fd);
+    if(obj.handle < 0) {
+       LOGE("Parcel::writeDupFileDescriptor failed to dup file descriptor [%d]!",errno);
+    }
     obj.cookie = (void*)1;
     return writeObject(obj, true);
 }
