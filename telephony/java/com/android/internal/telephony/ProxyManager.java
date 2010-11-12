@@ -72,6 +72,8 @@ public class ProxyManager extends Handler {
     static final int EVENT_SET_SUBSCRIPTION_MODE_DONE = 6;
     static final int EVENT_DISABLE_DATA_CONNECTION_DONE = 7;
     static final int EVENT_GET_ICCID_DONE = 8;
+    static final int EVENT_RADIO_OFF_OR_NOT_AVAILABLE = 9;
+    static final int EVENT_RADIO_ON = 10;
 
     static public final String INTENT_VALUE_SUBSCR_INFO_1 = "SUBSCR INFO 01";
     static public final String INTENT_VALUE_SUBSCR_INFO_2 = "SUBSCR INFO 02";
@@ -146,6 +148,8 @@ public class ProxyManager extends Handler {
             mCi = ci;
 
             mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
+            mCi[0].registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_NOT_AVAILABLE, null);
+            mCi[0].registerForOn(this, EVENT_RADIO_ON, null);
             getUserPreferredSubs();
             supplySubscription = this.new SupplySubscription(mContext);
 
@@ -312,6 +316,24 @@ public class ProxyManager extends Handler {
         String strCardIndex;
 
         switch(msg.what) {
+            case EVENT_RADIO_OFF_OR_NOT_AVAILABLE: {
+                //unregistering for card status indication when radio state becomes OFF or UNAVAILABLE.
+                mUiccManager.unregisterForIccChanged(mProxyManager);
+                mUiccSubSet = true; //flag which takes care of processing/Handling of card status
+                                    //card status is processed only the first time
+                break;
+            }
+
+            case EVENT_RADIO_ON: {
+                //registering for card status indication when radio state becomes ON.
+                mUiccManager.registerForIccChanged(mProxyManager, EVENT_ICC_CHANGED, null);
+                setSubscriptionMode = true;
+                mUiccSubSet = false;
+                mReadIccid = true;
+                mDdsSet = false;
+                break;
+            }
+
             case EVENT_ICC_CHANGED: {
                 Log.d(LOG_TAG, "ProxyManager EVENT_ICC_CHANGED");
                 for (int i = 0; i < UiccConstants.RIL_MAX_CARDS; i++) {
@@ -1057,23 +1079,7 @@ public class ProxyManager extends Handler {
        public void onReceive(Context context, Intent intent) {
            String action = intent.getAction();
             Log.v(LOG_TAG,"Action intent recieved : " + action);
-            if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
-                //When airplane mode is enabled/disabled from settings
-                boolean enabled = intent.getBooleanExtra("state",false);
-                if (enabled) {
-                    //unregistering for card status indication when moved to airplane mode
-                    mUiccManager.unregisterForIccChanged(mProxyManager);
-                    mUiccSubSet = true; //flag which takes care of processing/Handling of card status
-                                                  //card status is processed only the first time
-                    setSubscriptionMode = true;
-                } else {
-                    //registering for card status indication when moved out of airplane mode to get card status once again
-                    mUiccManager.registerForIccChanged(mProxyManager, EVENT_ICC_CHANGED, null);
-                    mUiccSubSet = false;
-                    mReadIccid = true;
-                    mDdsSet = false;
-                }
-            } else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
+            if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
                 int subscription = intent.getIntExtra(IccCard.INTENT_KEY_SUBSCRIPTION, 0);
                 String state = intent.getStringExtra(IccCard.INTENT_KEY_ICC_STATE);
                 Log.v(LOG_TAG,"subscription = " + subscription + " state = " + state);
