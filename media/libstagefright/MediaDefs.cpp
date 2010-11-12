@@ -39,5 +39,7 @@ const char *MEDIA_MIMETYPE_CONTAINER_OGG = "application/ogg";
 
 const char *MEDIA_MIMETYPE_CONTAINER_AVI = "video/avi";
 const char *MEDIA_MIMETYPE_VIDEO_DIVX = "video/divx";
+const char *MEDIA_MIMETYPE_VIDEO_SPARK = "video/spark";
+const char *MEDIA_MIMETYPE_VIDEO_VP6 = "video/vp6";
 
 }  // namespace android
