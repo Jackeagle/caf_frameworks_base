@@ -1684,25 +1684,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         if (ratType == CNE.CNE_RAT_WLAN){
           networkType = ConnectivityManager.TYPE_WIFI;
-          return reconnect(networkType);
         } else if (ratType == CNE.CNE_RAT_WWAN) {
             networkType = ConnectivityManager.TYPE_MOBILE;
-            /* right now we are only considering default wwan
-             * not the special networks(like MMS). If any of the special
-             * connection is up request to default network connection
-             * will override it and may cause ping pong connection between
-             * special feature nw and the default one.
-             */
-             if(mFeatureUsers.size() == 0){
-                 return reconnect(networkType);
-             } else{
-                 Slog.d(TAG,"Specail network features in use not" +
-                       "reconnecting to wwan!!");
-             }
         } else{
             Slog.d(TAG, "Unknown RatType = " + ratType);
+            return false;
         }
-        return false;
+        return reconnect(networkType);
     }
 
     private boolean reconnect(int networkType){
