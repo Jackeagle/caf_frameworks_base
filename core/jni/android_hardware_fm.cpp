@@ -60,10 +60,12 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
         (JNIEnv* env, jobject thiz, jstring path)
 {
     int fd;
-    int i, retval=0;
+    int i, retval=0, err;
     char value = 0;
+    char versionStr[40];
     int init_success = 0;
     jboolean isCopy;
+    v4l2_capability cap;
     const char* radio_path = env->GetStringUTFChars(path, &isCopy);
     if(radio_path == NULL){
         return FM_JNI_FAILURE;
@@ -75,7 +77,20 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
     if(fd < 0){
         return FM_JNI_FAILURE;
     }
+    //Read the driver verions
+    err = ioctl(fd, VIDIOC_QUERYCAP, &cap);
 
+
+    LOGD("VIDIOC_QUERYCAP returns :%d: version: %d \n", err , cap.version );
+
+    if( err >= 0 ) {
+	LOGD("Driver Version(Same as ChipId): %x \n",  cap.version );
+	/*Conver the integer to string */
+	sprintf(versionStr, "%d", cap.version );
+	property_set("hw.fm.version", versionStr);
+    } else {
+	return FM_JNI_FAILURE;
+    }
     property_set("ctl.start", "fm_dl");
     sleep(1);
     for(i=0;i<6;i++) {
