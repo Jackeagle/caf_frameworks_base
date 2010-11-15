@@ -29,6 +29,7 @@ import com.android.internal.telephony.gsm.GSMPhone;
 import com.android.internal.telephony.UiccManager;
 import com.android.internal.telephony.ProxyManager;
 import android.provider.Settings.SettingNotFoundException;
+import android.content.Intent;
 
 /**
  * {@hide}
@@ -281,6 +282,8 @@ public class PhoneFactory {
         Log.d(LOG_TAG, "setSMSSubscription setting subscription to: " + subscription);
         Settings.System.putInt(sContext.getContentResolver(),Settings.System.DUAL_SIM_SMS, subscription);
         smsSubscription = subscription;
+        Intent intent = new Intent("com.android.mms.transaction.SEND_MESSAGE");
+        sContext.sendBroadcast(intent);
         Log.d(LOG_TAG, "setSMSSubscription set subscription value: " + smsSubscription);
     }
 
