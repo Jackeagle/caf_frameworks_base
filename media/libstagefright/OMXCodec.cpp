@@ -1757,16 +1757,25 @@ void OMXCodec::onCmdComplete(OMX_COMMANDTYPE cmd, OMX_U32 data) {
 
             CODEC_LOGV("FLUSH_DONE(%ld)", portIndex);
 
-            CHECK_EQ(mPortStatus[portIndex], SHUTTING_DOWN);
-            mPortStatus[portIndex] = ENABLED;
+            if (portIndex == -1) {
+                CHECK_EQ(mPortStatus[kPortIndexInput], SHUTTING_DOWN);
+                mPortStatus[kPortIndexInput] = ENABLED;
 
-            CHECK_EQ(countBuffersWeOwn(mPortBuffers[portIndex]),
+                CHECK_EQ(mPortStatus[kPortIndexOutput], SHUTTING_DOWN);
+                mPortStatus[kPortIndexOutput] = ENABLED;
+            } else {
+                CHECK_EQ(mPortStatus[portIndex], SHUTTING_DOWN);
+                mPortStatus[portIndex] = ENABLED;
+
+                CHECK_EQ(countBuffersWeOwn(mPortBuffers[portIndex]),
                      mPortBuffers[portIndex].size());
+            }
 
             if(mState == ERROR) {
-              CODEC_LOGE("Ignoring OMX_CommandFlush in ERROR state");
-              break;
+                CODEC_LOGE("Ignoring OMX_CommandFlush in ERROR state");
+                break;
             }
+
             if (mState == RECONFIGURING) {
                 CHECK_EQ(portIndex, kPortIndexOutput);
 
@@ -1973,20 +1982,25 @@ bool OMXCodec::flushPortAsync(OMX_U32 portIndex) {
     CHECK(mState == EXECUTING || mState == RECONFIGURING
             || mState == EXECUTING_TO_IDLE);
 
-    CODEC_LOGV("flushPortAsync(%ld): we own %d out of %d buffers already.",
-         portIndex, countBuffersWeOwn(mPortBuffers[portIndex]),
-         mPortBuffers[portIndex].size());
+    if ( portIndex == -1 ) {
+        mPortStatus[kPortIndexInput] = SHUTTING_DOWN;
+        mPortStatus[kPortIndexOutput] = SHUTTING_DOWN;
+    } else {
+        CODEC_LOGV("flushPortAsync(%ld): we own %d out of %d buffers already.",
+             portIndex, countBuffersWeOwn(mPortBuffers[portIndex]),
+             mPortBuffers[portIndex].size());
 
-    CHECK_EQ(mPortStatus[portIndex], ENABLED);
-    mPortStatus[portIndex] = SHUTTING_DOWN;
+        CHECK_EQ(mPortStatus[portIndex], ENABLED);
+        mPortStatus[portIndex] = SHUTTING_DOWN;
 
-    if ((mQuirks & kRequiresFlushCompleteEmulation)
-        && countBuffersWeOwn(mPortBuffers[portIndex])
-                == mPortBuffers[portIndex].size()) {
-        // No flush is necessary and this component fails to send a
-        // flush-complete event in this case.
+        if ((mQuirks & kRequiresFlushCompleteEmulation)
+            && countBuffersWeOwn(mPortBuffers[portIndex])
+                    == mPortBuffers[portIndex].size()) {
+            // No flush is necessary and this component fails to send a
+            // flush-complete event in this case.
 
-        return false;
+            return false;
+        }
     }
 
     status_t err =
@@ -2593,7 +2607,9 @@ status_t OMXCodec::stop() {
             if (mQuirks & kRequiresFlushBeforeShutdown) {
                 CODEC_LOGV("This component requires a flush before transitioning "
                      "from EXECUTING to IDLE...");
-
+         //Commenting code to send Flush on input and output ports one after
+         //the other and adding code to send flush on both ports together
+#if 0
                 bool emulateInputFlushCompletion =
                     !flushPortAsync(kPortIndexInput);
 
@@ -2606,6 +2622,12 @@ status_t OMXCodec::stop() {
 
                 if (emulateOutputFlushCompletion) {
                     onCmdComplete(OMX_CommandFlush, kPortIndexOutput);
+                }
+#endif
+
+                bool emulateFlushCompletion = !flushPortAsync(kPortIndexBoth);
+                if (emulateFlushCompletion) {
+                    onCmdComplete(OMX_CommandFlush, kPortIndexBoth);
                 }
             } else {
                 mPortStatus[kPortIndexInput] = SHUTTING_DOWN;
@@ -2696,7 +2718,9 @@ status_t OMXCodec::read(
         mFilledBuffers.clear();
 
         CHECK_EQ(mState, EXECUTING);
-
+         //Commenting Code to send Flush on input and output ports one after
+         //the other and adding code to send flush on both ports together
+#if 0
         bool emulateInputFlushCompletion = !flushPortAsync(kPortIndexInput);
         bool emulateOutputFlushCompletion = !flushPortAsync(kPortIndexOutput);
 
@@ -2707,7 +2731,11 @@ status_t OMXCodec::read(
         if (emulateOutputFlushCompletion) {
             onCmdComplete(OMX_CommandFlush, kPortIndexOutput);
         }
-
+#endif
+        bool emulateFlushCompletion = !flushPortAsync(kPortIndexBoth);
+        if (emulateFlushCompletion) {
+            onCmdComplete(OMX_CommandFlush, kPortIndexBoth);
+        }
         while (mState != ERROR && mSeekTimeUs >= 0) {
             mBufferFilled.wait(mLock);
         }

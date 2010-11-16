@@ -82,6 +82,7 @@ private:
     };
 
     enum {
+        kPortIndexBoth   = -1,
         kPortIndexInput  = 0,
         kPortIndexOutput = 1
     };
