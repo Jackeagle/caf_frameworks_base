@@ -21,6 +21,14 @@ endif
 
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 
+ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
+LOCAL_CFLAGS += -DUSE_ASHMEM
+endif
+
+ifeq ($(TARGET_PRODUCT),qsd8650a_st1x)
+LOCAL_CFLAGS += -DSF_MEM_ST1X
+endif
+
 LOCAL_SRC_FILES:= \
 	ActivityManager.cpp \
 	AndroidRuntime.cpp \
