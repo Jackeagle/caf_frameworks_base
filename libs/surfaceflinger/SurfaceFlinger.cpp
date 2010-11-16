@@ -193,7 +193,7 @@ SurfaceFlinger::SurfaceFlinger()
         mConsoleSignals(0),
         mSecureFrameBuffer(0),
         mHDMIOutput(false),
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
         mOverlayOpt(true),
 #else
         mOverlayOpt(false),
@@ -964,6 +964,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 
         }
 
+#if defined(SF_BYPASS)
         if ((compcount == 1) && (ovLayerIndex != -1)) {
             Region::const_iterator it = prevClip.begin();
             const DisplayHardware& hw(graphicPlane(0).displayHardware());
@@ -991,6 +992,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
             mFullScreen = true;
             return;
         }
+#endif
     }
     mFullScreen = false;
     if (mOverlayUsed && layerbuffercount != 1) {
@@ -1007,7 +1009,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         if (!visibleRegion.isEmpty())  {
             const Region clip(dirty.intersect(visibleRegion));
             if (!clip.isEmpty()) {
-                if ((layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
+                if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
                     if (layer->drawWithOverlay(clip, true) != NO_ERROR) {
                         layer->draw(clip);
                     }
@@ -1324,7 +1326,7 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
 {
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     mHDMIOutput = enable;
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     enableOverlayOpt(!enable);
 #endif
     hw.enableHDMIOutput(enable);
@@ -1812,7 +1814,7 @@ status_t SurfaceFlinger::onTransact(
 
 void SurfaceFlinger::enableOverlayOpt(bool start) const
 {
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     if (mHDMIOutput || (!start)) {
         const DisplayHardware& hw(graphicPlane(0).displayHardware());
         overlay::Overlay* temp = hw.getOverlayObject();
