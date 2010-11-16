@@ -148,7 +148,7 @@ void LayerBuffer::onDraw(const Region& clip) const
 
 status_t LayerBuffer::drawWithOverlay(const Region& clip, bool clear) const
 {
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     sp<Source> source(getSource());
     if (LIKELY(source != 0)) {
         return source->drawWithOverlay(clip, clear);
@@ -477,7 +477,7 @@ bool LayerBuffer::BufferSource::transformed() const
 
 status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool clear) const
 {
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     sp<Buffer> ourBuffer(getBuffer());
     if (UNLIKELY(ourBuffer == 0))  {
         // nothing to do, we don't have a buffer
