@@ -38,7 +38,7 @@
 #include "Layer.h"
 #include "Tokenizer.h"
 
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
 #include "overlayLib.h"
 #endif
 

@@ -27,7 +27,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
 #include "overlayLib.h"
 #endif
 
@@ -90,7 +90,7 @@ public:
     uint32_t getPageFlipCount() const;
     EGLDisplay getEGLDisplay() const { return mDisplay; }
     overlay_control_device_t* getOverlayEngine() const { return mOverlayEngine; }
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     overlay::Overlay* getOverlayObject() const { return mOverlayLibObject; }
 #endif
     
@@ -122,7 +122,7 @@ private:
     
     sp<FramebufferNativeWindow> mNativeWindow;
     overlay_control_device_t* mOverlayEngine;
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     overlay::Overlay* mOverlayLibObject;
 #endif
 };

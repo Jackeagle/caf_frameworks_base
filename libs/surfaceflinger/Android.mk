@@ -48,6 +48,10 @@ LOCAL_C_INCLUDES += hardware/libhardware/modules/gralloc
 
 ifeq ($(TARGET_USES_SF_BYPASS),true)
 LOCAL_CFLAGS += -DSF_BYPASS
+endif
+
+ifneq (, $(filter msm7630_surf msm7630_1x msm8660_surf msm8660_csfb msm7630_fusion, $(QCOM_TARGET_PRODUCT)))
+LOCAL_CFLAGS += -DTARGET_USES_OVERLAY
 LOCAL_SHARED_LIBRARIES += liboverlay
 LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
 endif
