@@ -97,11 +97,7 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                 TelephonyManager.getDefault().getNetworkType(), tag,
                 TelephonyManager.getDefault().getNetworkTypeName());
         mApnType = networkTypeToApnType(netType);
-        if (TextUtils.equals(mApnType, Phone.APN_TYPE_HIPRI)) {
-            mApnTypeToWatchFor = Phone.APN_TYPE_DEFAULT;
-        } else {
-            mApnTypeToWatchFor = mApnType;
-        }
+        mApnTypeToWatchFor = mApnType;
 
         mPhoneService = null;
         if(netType == ConnectivityManager.TYPE_MOBILE) {
