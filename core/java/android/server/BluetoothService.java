@@ -146,6 +146,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static String mDockAddress;
     private String mDockPin;
     private boolean mDUNenable = false;
+    private boolean mFTPenable = false;
 
     private static class RemoteService {
         public String address;
@@ -431,6 +432,9 @@ public class BluetoothService extends IBluetooth.Stub {
         if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.dun", false)) {
             mDUNenable = true;
         }
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.ftp", false)) {
+            mFTPenable = true;
+        }
         setBluetoothState(BluetoothAdapter.STATE_TURNING_ON);
         mEnableThread = new EnableThread(saveSetting);
         mEnableThread.start();
@@ -509,6 +513,14 @@ public class BluetoothService extends IBluetooth.Stub {
                     if (mDUNenable == true) {
                         Log.d(TAG, "Registering dun record");
                         SystemService.start("dund");
+                    }
+                    mHandler.sendMessageDelayed(
+                           mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 6, -1), 500);
+                    break;
+                case 6:
+                    if (mFTPenable == true) {
+                        Log.d(TAG, "Registering ftp record");
+                        SystemService.start("ftp");
                     }
                     break;
                 }
