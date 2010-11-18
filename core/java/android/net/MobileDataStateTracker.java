@@ -286,9 +286,9 @@ public class MobileDataStateTracker extends NetworkStateTracker {
             newInfo.mApnName = intent.getStringExtra(Phone.DATA_APN_KEY);
             newInfo.mInterfaceName = intent.getStringExtra(Phone.DATA_IFACE_NAME_KEY);
             try {
-                newInfo.mIpAddress = InetAddress.getByName(intent
+                newInfo.mIpAddress = convertIpStringToInetAddress(intent
                         .getStringExtra(Phone.DATA_IP_ADDRESS_KEY));
-                newInfo.mGateway = InetAddress.getByName(intent
+                newInfo.mGateway = convertIpStringToInetAddress(intent
                         .getStringExtra(Phone.DATA_GW_ADDRESS_KEY));
             } catch (UnknownHostException e) {
                 loge("interface connected with invalid parameters : ip=" + newInfo.mIpAddress
