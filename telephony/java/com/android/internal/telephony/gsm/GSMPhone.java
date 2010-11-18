@@ -390,11 +390,6 @@ public class GSMPhone extends PhoneBase {
         mNotifier.notifyCellLocation(this);
     }
 
-    /*package*/ void
-    notifySignalStrength() {
-        mNotifier.notifySignalStrength(this);
-    }
-
     public void
     notifyCallForwardingIndicator() {
         mNotifier.notifyCallForwardingChanged(this);

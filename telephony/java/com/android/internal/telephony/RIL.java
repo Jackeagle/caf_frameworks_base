@@ -3399,7 +3399,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
     private Object
     responseSignalStrength(Parcel p) {
-        int numInts = 7;
+        int numInts = 10;
         int response[];
 
         /* TODO: Add SignalStrength class to match RIL_SignalStrength */

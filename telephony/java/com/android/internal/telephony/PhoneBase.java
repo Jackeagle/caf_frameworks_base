@@ -546,6 +546,11 @@ public abstract class PhoneBase extends Handler implements VoicePhone {
         mNotifier.notifyVoiceServiceState(this);
     }
 
+    /*package*/ void
+    notifySignalStrength() {
+        mNotifier.notifySignalStrength(this);
+    }
+
     // Inherited documentation suffices.
     public SimulatedRadioControl getSimulatedRadioControl() {
         return mSimulatedRadioControl;
