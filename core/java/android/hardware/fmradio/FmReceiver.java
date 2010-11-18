@@ -1110,7 +1110,6 @@ public class FmReceiver extends FmTransceiver
       int piHigher = 0;
 
       FmReceiverJNI.getBufferNative(sFd, buff, 3);
-      String rdsStr = new String(buff);
       /* byte is signed ;(
       *  knock down signed bits
       */
@@ -1122,7 +1121,8 @@ public class FmReceiver extends FmTransceiver
       int numOfPs = (int)(buff[0] & 0x0F);
       try
       {
-         rdsStr = rdsStr.substring(5, (int )((numOfPs*8) + 5) );
+
+	 String rdsStr = new String(buff, 5, numOfPs*8 );
          mRdsData.setPrgmServices (rdsStr);
 
       } catch (StringIndexOutOfBoundsException x)
