@@ -72,6 +72,8 @@ public:
     void   setIsResume(bool set) { mIsResume = set; }
     bool   getIsResume()         { return mIsResume; }
 
+    void   setIsPlaying(bool set) { mIsPlaying = set; }
+    bool   getIsPlaying()         { return mIsPlaying; }
 private:
     static void         do_nothing(status_t s, void *cookie, bool cancelled) { }
     static void         run_init(status_t s, void *cookie, bool cancelled);
