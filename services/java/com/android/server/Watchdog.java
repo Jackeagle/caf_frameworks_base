@@ -867,6 +867,17 @@ public class Watchdog extends Thread {
 
             // Generate tombstone file for system server
             if (!Debug.isDebuggerConnected()) {
+                // Generate tombstone of mediaserver
+                // Mediaserver hosts media.audio_flinger
+                int pid = ServiceManager.getServicePid("media.audio_flinger");
+
+                if( pid > 0) {
+                    Process.sendSignal(pid, 6);
+                    SystemClock.sleep(2000);
+                    Process.sendSignal(pid, 6);
+                    SystemClock.sleep(2000);
+                }
+
                 // first SIGABRT is meant for system_server to get attached to debuggerd
                 Process.sendSignal(Process.myPid(), 6);
                 // Sleep for two seconds for debuggerd to attach to system_server
