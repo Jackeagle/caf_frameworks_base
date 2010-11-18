@@ -302,11 +302,7 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     private void updateStateProperty() {
-        if (mUiccCard == null) {
-            SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, CardState.ABSENT.toString());
-        } else {
-            SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, mUiccCard.getCardState().toString());
-        }
+        SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, getState().toString());
     }
 
     /* why do external apps need to use this? */
