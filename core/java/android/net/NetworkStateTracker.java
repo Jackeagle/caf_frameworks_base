@@ -23,6 +23,9 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import org.apache.harmony.luni.platform.INetworkSystem;
+import org.apache.harmony.luni.platform.Platform;
+
 import com.android.internal.telephony.DataPhone.IPVersion;
 
 import android.net.NetworkInfo.DetailedState;
@@ -137,6 +140,17 @@ public abstract class NetworkStateTracker extends Handler {
         return dnsAddresses;
     }
 
+    private final static INetworkSystem NETIMPL = Platform.getNetworkSystem();
+
+    protected InetAddress convertIpStringToInetAddress(String ipAddress) throws UnknownHostException {
+        if (ipAddress == null) {
+            throw new UnknownHostException();
+        }
+        // dont call getByName() as this might trigger a DNS lookup which might
+        // timeout and restart the android system!
+        byte[] ret = NETIMPL.ipStringToByteArray(ipAddress);
+        return InetAddress.getByAddress(ret);
+    }
 
     boolean mPrivateDnsRouteSet[] = new boolean[] {false, false};
 
@@ -153,7 +167,7 @@ public abstract class NetworkStateTracker extends Handler {
             for (String addrString : getNameServers()) {
                 if (addrString != null) {
                     try {
-                        InetAddress inetAddress = InetAddress.getByName(addrString);
+                        InetAddress inetAddress = convertIpStringToInetAddress(addrString);
                         if (ipv == IPVersion.IPV4 && inetAddress instanceof Inet4Address) {
                             Log.v(TAG, "adding ipv4 dns " + addrString + " through "
                                     + interfaceName);
