@@ -70,6 +70,9 @@ private:
 
     static status_t verifyTrack(Track *track);
 
+    status_t updateVideoTrackInfoFromESDS_MPEG4Video(
+            const void *esds_data, size_t esds_size);
+
     MPEG4Extractor(const MPEG4Extractor &);
     MPEG4Extractor &operator=(const MPEG4Extractor &);
 };

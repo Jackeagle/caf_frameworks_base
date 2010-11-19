@@ -1008,6 +1008,15 @@ status_t MPEG4Extractor::parseChunk(sfoff_t *offset, int depth) {
                 goto esds_parse_fail;
             }
 
+            if (mPath.size() >= 2
+                    && mPath[mPath.size() - 2] == FOURCC('m', 'p', '4', 'v')) {
+
+                err = updateVideoTrackInfoFromESDS_MPEG4Video(
+                        &buffer[4], chunk_data_size - 4);
+                if(err != OK) {
+                    goto esds_parse_fail;
+                }
+            }
             mLastTrack->meta->setData(
                     kKeyESDS, kTypeESDS, &buffer[4], chunk_data_size - 4);
 
@@ -1806,5 +1815,16 @@ bool SniffMPEG4(
     return false;
 }
 
+status_t MPEG4Extractor::updateVideoTrackInfoFromESDS_MPEG4Video(
+        const void *esds_data, size_t esds_size) {
+    ESDS esds(esds_data, esds_size);
+    const uint8_t *csd;
+    size_t csd_size;
+    if (esds.getCodecSpecificInfo(
+                (const void **)&csd, &csd_size) != OK) {
+        return ERROR_MALFORMED;
+    }
+    return OK;
+}
 }  // namespace android
 
