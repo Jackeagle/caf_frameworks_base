@@ -120,7 +120,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         mContext = context;
         mBatteryStats = BatteryStatsService.getService();
         // Initialize default subscription to be used for single standby.
-        mDefaultSubscription = PhoneFactory.getDefaultSubscription();
+        mDefaultSubscription = TelephonyManager.getDefaultSubscription();
 
         int numPhones = TelephonyManager.getPhoneCount();
         mCallState = new int[numPhones];

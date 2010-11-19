@@ -26,13 +26,10 @@ import com.android.internal.telephony.EncodeException;
 import com.android.internal.telephony.ISms;
 import com.android.internal.telephony.IccConstants;
 import com.android.internal.telephony.SmsRawData;
-import com.android.internal.telephony.PhoneFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import android.telephony.TelephonyManager;
 
 /*
  * TODO(code review): Curious question... Why are a lot of these
@@ -47,6 +44,7 @@ import android.telephony.TelephonyManager;
  */
 public final class SmsManager {
     private static SmsManager sInstance;
+    private final int DEFAULT_SUB = 0;
 
     /**
      * Send a text based SMS.
@@ -130,7 +128,7 @@ public final class SmsManager {
             String destinationAddress, String scAddress, String text,
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
         sendTextMessage(destinationAddress, scAddress, text, sentIntent,
-              deliveryIntent, getDefaultSubscription());
+              deliveryIntent, getPreferredSmsSubscription());
     }
 
     /**
@@ -252,7 +250,7 @@ public final class SmsManager {
             String destinationAddress, String scAddress, ArrayList<String> parts,
             ArrayList<PendingIntent> sentIntents, ArrayList<PendingIntent> deliveryIntents) {
         sendMultipartTextMessage(destinationAddress, scAddress, parts, sentIntents,
-              deliveryIntents, getDefaultSubscription());
+              deliveryIntents, getPreferredSmsSubscription());
     }
 
 
@@ -343,16 +341,25 @@ public final class SmsManager {
             String destinationAddress, String scAddress, short destinationPort,
             byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent) {
         sendDataMessage(destinationAddress, scAddress, destinationPort,
-                data, sentIntent, deliveryIntent, getDefaultSubscription());
+                data, sentIntent, deliveryIntent, getPreferredSmsSubscription());
     }
 
     /**
-     * Get the default sms subscription
+     * Get the prefered sms subscription
      *
-     * @return the default subscription
+     * @return the prefered subscription
+     * @hide
      */
-    private int getDefaultSubscription() {
-            return PhoneFactory.getDefaultSubscription();
+    public int getPreferredSmsSubscription() {
+        ISms iccISms = null;
+        try {
+            iccISms = ISms.Stub.asInterface(ServiceManager.getService("isms"));
+            return iccISms.getPreferredSmsSubscription();
+        } catch (RemoteException ex) {
+            return DEFAULT_SUB;
+        } catch (NullPointerException ex) {
+            return DEFAULT_SUB;
+        }
     }
 
     /**
@@ -416,7 +423,7 @@ public final class SmsManager {
      * {@hide}
      */
     public boolean copyMessageToIcc(byte[] smsc, byte[] pdu, int status) {
-        return copyMessageToIcc(smsc, pdu, status, getDefaultSubscription());
+        return copyMessageToIcc(smsc, pdu, status, getPreferredSmsSubscription());
     }
 
     /**
@@ -461,7 +468,7 @@ public final class SmsManager {
      */
     public boolean
     deleteMessageFromIcc(int messageIndex) {
-        return deleteMessageFromIcc(messageIndex, getDefaultSubscription());
+        return deleteMessageFromIcc(messageIndex, getPreferredSmsSubscription());
     }
 
     /**
@@ -511,7 +518,7 @@ public final class SmsManager {
      * {@hide}
      */
     public boolean updateMessageOnIcc(int messageIndex, int newStatus, byte[] pdu) {
-        return updateMessageOnIcc(messageIndex, newStatus, pdu, getDefaultSubscription());
+        return updateMessageOnIcc(messageIndex, newStatus, pdu, getPreferredSmsSubscription());
     }
 
     /**
@@ -550,7 +557,7 @@ public final class SmsManager {
      * {@hide}
      */
     public ArrayList<SmsMessage> getAllMessagesFromIcc() {
-        return getAllMessagesFromIcc(getDefaultSubscription());
+        return getAllMessagesFromIcc(getPreferredSmsSubscription());
     }
 
     /**

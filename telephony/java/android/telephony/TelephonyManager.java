@@ -70,6 +70,8 @@ public class TelephonyManager {
     private static int mPhoneCount = 1; // Phone count is set to 1 by default(Single Standby).
     /** @hide */
     private static final int MAX_PHONE_COUNT_DS = 2; // No. of phones for Dual Subscription.
+    /** @hide */
+    private static final int DEFAULT_SUB = 0;
 
     /** @hide */
     public TelephonyManager(Context context) {
@@ -108,25 +110,6 @@ public class TelephonyManager {
          //returns the property value if set, otherwise initialized to false.
          return SystemProperties.getBoolean("persist.dsds.enabled", false);
      }
-
-    /**
-     * Returns the designated data subscription.
-     *
-     * @hide
-     */
-    public static int getDataSubscription(Context context) {
-        int dataSubscription = 0;
-
-        try {
-            dataSubscription = Settings.System.getInt(context.getContentResolver(),
-                                        Settings.System.DUAL_SIM_DATA_CALL);
-        } catch (SettingNotFoundException snfe) {
-            Log.e(TAG, "Settings Exception Reading Dual Sim Data Call Values", snfe);
-        }
-
-        return dataSubscription;
-    }
-
 
     //
     // Broadcast Intent actions
@@ -451,11 +434,54 @@ public class TelephonyManager {
     }
 
     /**
-     * Gets the default subscription.
-     * Returns 0 for single standby.
+     * Returns Default subscription.
+     *
+     * @hide
      */
-    private int getDefaultSubscription() {
-        return PhoneFactory.getDefaultSubscription();
+    public static int getDefaultSubscription() {
+        ITelephony iTelephony = null;
+        try {
+            iTelephony = ITelephony.Stub.asInterface(ServiceManager.getService(Context.TELEPHONY_SERVICE));
+            return iTelephony.getDefaultSubscription();
+        } catch (RemoteException ex) {
+            return DEFAULT_SUB;
+        } catch (NullPointerException ex) {
+            return DEFAULT_SUB;
+        }
+    }
+
+    /**
+     * Returns the designated data subscription.
+     *
+     * @hide
+     */
+    public static int getPreferredDataSubscription() {
+        ITelephony iTelephony = null;
+        try {
+            iTelephony = ITelephony.Stub.asInterface(ServiceManager.getService(Context.TELEPHONY_SERVICE));
+            return iTelephony.getPreferredDataSubscription();
+        } catch (RemoteException ex) {
+            return DEFAULT_SUB;
+        } catch (NullPointerException ex) {
+            return DEFAULT_SUB;
+        }
+    }
+
+    /**
+     * Returns the preferred voice subscription.
+     *
+     * @hide
+     */
+    public static int getPreferredVoiceSubscription() {
+        ITelephony iTelephony = null;
+        try {
+            iTelephony = ITelephony.Stub.asInterface(ServiceManager.getService(Context.TELEPHONY_SERVICE));
+            return iTelephony.getPreferredVoiceSubscription();
+        } catch (RemoteException ex) {
+            return DEFAULT_SUB;
+        } catch (NullPointerException ex) {
+            return DEFAULT_SUB;
+        }
     }
 
     private int getPhoneTypeFromProperty() {
