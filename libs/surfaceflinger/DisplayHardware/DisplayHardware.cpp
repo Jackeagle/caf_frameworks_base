@@ -211,7 +211,7 @@ void DisplayHardware::init(uint32_t dpy)
 
     eglQuerySurface(display, surface, EGL_WIDTH,  &mWidth);
     eglQuerySurface(display, surface, EGL_HEIGHT, &mHeight);
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     mOverlayLibObject = new overlay::Overlay();
 #endif
 
