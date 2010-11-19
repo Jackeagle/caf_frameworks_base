@@ -327,7 +327,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     return;
                 }
                 ar = (AsyncResult) msg.obj;
-                onSignalStrengthResult(ar);
+                onSignalStrengthResult(ar, phone, true);
                 queueNextSignalStrengthPoll();
 
                 break;
@@ -393,7 +393,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 // we don't have to ask it
                 dontPollSignalStrength = true;
 
-                onSignalStrengthResult(ar);
+                onSignalStrengthResult(ar, phone, true);
                 break;
 
             case EVENT_SIM_RECORDS_LOADED:
@@ -657,7 +657,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     }
 
     private void setSignalStrengthDefaultValues() {
-        mSignalStrength = new SignalStrength(99, -1, -1, -1, -1, -1, -1, true);
+        mSignalStrength = new SignalStrength(99, -1, -1, -1, -1, -1, -1, 99, -1, -1, true);
     }
 
     /**
@@ -1017,44 +1017,6 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
 
         // TODO Done't poll signal strength if screen is off
         sendMessageDelayed(msg, POLL_PERIOD_MILLIS);
-    }
-
-    /**
-     *  send signal-strength-changed notification if changed
-     *  Called both for solicited and unsolicited signal stength updates
-     */
-    private void onSignalStrengthResult(AsyncResult ar) {
-        SignalStrength oldSignalStrength = mSignalStrength;
-        int rssi = 99;
-
-        if (ar.exception != null) {
-            // -1 = unknown
-            // most likely radio is resetting/disconnected
-            setSignalStrengthDefaultValues();
-        } else {
-            int[] ints = (int[])ar.result;
-
-            // bug 658816 seems to be a case where the result is 0-length
-            if (ints.length != 0) {
-                rssi = ints[0];
-            } else {
-                Log.e(LOG_TAG, "Bogus signal strength response");
-                rssi = 99;
-            }
-        }
-
-        mSignalStrength = new SignalStrength(rssi, -1, -1, -1,
-                -1, -1, -1, true);
-
-        if (!mSignalStrength.equals(oldSignalStrength)) {
-            try { // This takes care of delayed EVENT_POLL_SIGNAL_STRENGTH (scheduled after
-                  // POLL_PERIOD_MILLIS) during Radio Technology Change)
-                phone.notifySignalStrength();
-           } catch (NullPointerException ex) {
-                log("onSignalStrengthResult() Phone already destroyed: " + ex
-                        + "SignalStrength not notified");
-           }
-        }
     }
 
     /**

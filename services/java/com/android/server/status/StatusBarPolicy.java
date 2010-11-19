@@ -116,6 +116,12 @@ public class StatusBarPolicy {
     private static final boolean SHOW_LOW_BATTERY_WARNING = true;
     private static final boolean SHOW_BATTERY_WARNINGS_IN_CALL = true;
 
+    private static final int LTE = 1;
+    private static final int GSM = 2;
+    private static final int CDMA = 3;
+    private static final int EVDO = 4;
+    private static final int INVALID_DATA_RADIO = 5;
+
     // phone
     private TelephonyManager mPhone;
     private IBinder mPhoneIcon;
@@ -979,56 +985,39 @@ public class StatusBarPolicy {
         updateDataIcon();
     }
 
-    private boolean isDataGsm() {
+    private int dataRadio() {
+
         if (mServiceState == null) {
+
             Slog.e(TAG, "Service state not updated");
-            return false;
+            return INVALID_DATA_RADIO;
         }
-        /*find out radio technology by looking at service state */
-        switch(mServiceState.getRadioTechnology()){
+
+        /* find out radio technology by looking at service state */
+        switch (mServiceState.getRadioTechnology()) {
+            case ServiceState.RADIO_TECHNOLOGY_LTE:
+                return LTE;
+            case ServiceState.RADIO_TECHNOLOGY_EVDO_0:
+            case ServiceState.RADIO_TECHNOLOGY_EVDO_A:
+            case ServiceState.RADIO_TECHNOLOGY_EVDO_B:
+            case ServiceState.RADIO_TECHNOLOGY_EHRPD:
+                return EVDO;
+            case ServiceState.RADIO_TECHNOLOGY_IS95A:
+            case ServiceState.RADIO_TECHNOLOGY_IS95B:
+            case ServiceState.RADIO_TECHNOLOGY_1xRTT:
+                return CDMA;
+
             case ServiceState.RADIO_TECHNOLOGY_GPRS:
             case ServiceState.RADIO_TECHNOLOGY_EDGE:
             case ServiceState.RADIO_TECHNOLOGY_UMTS:
             case ServiceState.RADIO_TECHNOLOGY_HSDPA:
             case ServiceState.RADIO_TECHNOLOGY_HSUPA:
             case ServiceState.RADIO_TECHNOLOGY_HSPA:
-            case ServiceState.RADIO_TECHNOLOGY_LTE:
-                 return true;
-            default:
-                return false;
-        }
-    }
 
-    private boolean isDataCdma() {
-        if (mServiceState == null) {
-            Slog.e(TAG, "Service state not updated");
-            return false;
-        }
-        /*find out radio technology by looking at service state */
-        switch(mServiceState.getRadioTechnology()){
-            case ServiceState.RADIO_TECHNOLOGY_IS95A:
-            case ServiceState.RADIO_TECHNOLOGY_IS95B:
-            case ServiceState.RADIO_TECHNOLOGY_1xRTT:
-                return true;
-            default:
-                return false;
-        }
-    }
+                return GSM;
 
-    private boolean isDataEvdo() {
-        if (mServiceState == null) {
-            Slog.e(TAG, "Service state not updated");
-            return false;
-        }
-        /*find out radio technology by looking at service state */
-        switch(mServiceState.getRadioTechnology()){
-            case ServiceState.RADIO_TECHNOLOGY_EVDO_0:
-            case ServiceState.RADIO_TECHNOLOGY_EVDO_A:
-            case ServiceState.RADIO_TECHNOLOGY_EVDO_B:
-            case ServiceState.RADIO_TECHNOLOGY_EHRPD:
-                return true;
             default:
-                return false;
+                return INVALID_DATA_RADIO;
         }
     }
 
@@ -1051,6 +1040,7 @@ public class StatusBarPolicy {
         int[] iconList;
 
         updateCdmaRoamingIcon();
+
         // Display signal strength while in "emergency calls only" mode
         if ((mSignalStrength == null) || (mServiceState == null)
                 || (!hasService() && !mServiceState.isEmergencyOnly())) {
@@ -1092,16 +1082,21 @@ public class StatusBarPolicy {
             }
             mPhoneData.iconId = iconList[iconLevel];
         }
+
         mService.updateIcon(mPhoneIcon, mPhoneData, null);
         return;
     }
 
     private int getIconLevel() {
         int iconLevel = -1;
-        if (mPhoneState != TelephonyManager.CALL_STATE_IDLE) {
+        int radio = dataRadio();
+        if ((mPhoneState != TelephonyManager.CALL_STATE_IDLE)
+                || (radio == INVALID_DATA_RADIO))
+        {
             /*
-             * phone is in voice call , display voice tech signal isGsm has
-             * voice tech. For GSM - isGSM flag is on. For CDMA 1x -isGSM flag
+             * phone is in voice call or voice only network
+             * display voice tech signal. isGsm has voice tech.
+             * For GSM - isGSM flag is on. For CDMA 1x -isGSM flag
              * is off
              */
             if (mSignalStrength.isGsm()) { // Gsm voice call
@@ -1115,19 +1110,24 @@ public class StatusBarPolicy {
              * looking at service state. If data radio tech is not available ,
              * display voice radio signal by looking at signal strength
              */
-            if (isDataGsm()) {
-                /* 3GPP GSM data tech */
-                iconLevel = getGsmLevel();
-            } else if (isDataEvdo()) {
-                /* 3GPP2 EVDO data tech */
-                iconLevel = getEvdoLevel();
-            } else if (isDataCdma() || (!mSignalStrength.isGsm())) {
-                /* 3GPP2 CDMA data or CDMA voice only */
-                iconLevel = getCdmaLevel();
-            } else {
-                /* 3GPP GSM voice only */
-                iconLevel = getGsmLevel();
-            }
+            switch (radio) {
+                case LTE:
+                    /* LTE data tech */
+                    iconLevel = getLteLevel();
+                    break;
+                case GSM:
+                    /* 3GPP GSM data tech */
+                    iconLevel = getGsmLevel();
+                    break;
+                case EVDO:
+                    /* 3GPP2 EVDO data tech or EHRPD */
+                    iconLevel = getEvdoLevel();
+                    break;
+                case CDMA:
+                    iconLevel = getCdmaLevel();
+                    break;
+            } // end of switch
+
         }// end of CALL_STATE_IDLE
         return iconLevel;
     }
@@ -1145,12 +1145,31 @@ public class StatusBarPolicy {
         else if (asu >= 8)  iconLevel = 3;
         else if (asu >= 5)  iconLevel = 2;
         else iconLevel = 1;
+
+        return iconLevel;
+    }
+
+    private int getLteLevel() {
+        // TBD - comply with standards
+        // TS 36.214 Physical Layer Section 5.1.3
+        // TS 36.331 RRC
+        int rssi = mSignalStrength.getLteRssi();
+        int rsrp = mSignalStrength.getLteRsrp();
+        int iconLevel = -1;
+
+        if (rssi <= 2 || rssi == 99) iconLevel = 0;
+        else if (rssi >= 12) iconLevel = 4;
+        else if (rssi >= 8)  iconLevel = 3;
+        else if (rssi >= 5)  iconLevel = 2;
+        else iconLevel = 1;
+
         return iconLevel;
     }
 
     private int getCdmaLevel() {
         final int cdmaDbm = mSignalStrength.getCdmaDbm();
         final int cdmaEcio = mSignalStrength.getCdmaEcio();
+
         int levelDbm = 0;
         int levelEcio = 0;
 
@@ -1166,7 +1185,6 @@ public class StatusBarPolicy {
         else if (cdmaEcio >= -130) levelEcio = 2;
         else if (cdmaEcio >= -150) levelEcio = 1;
         else levelEcio = 0;
-
         return (levelDbm < levelEcio) ? levelDbm : levelEcio;
     }
 
@@ -1187,7 +1205,6 @@ public class StatusBarPolicy {
         else if (evdoSnr >= 3) levelEvdoSnr = 2;
         else if (evdoSnr >= 1) levelEvdoSnr = 1;
         else levelEvdoSnr = 0;
-
         return (levelEvdoDbm < levelEvdoSnr) ? levelEvdoDbm : levelEvdoSnr;
     }
 
@@ -1237,7 +1254,9 @@ public class StatusBarPolicy {
             mSimState != IccCard.State.READY && mSimState != IccCard.State.UNKNOWN) {
             mDataData.iconId = com.android.internal.R.drawable.stat_sys_no_sim;
             mService.updateIcon(mDataIcon, mDataData, null);
-        } else if (isDataGsm()) {
+        } else if ((dataRadio() == GSM) ||
+                        (dataRadio() == LTE)) {
+
             // GSM case, we have to check also the sim state
             if (mSimState == IccCard.State.READY || mSimState == IccCard.State.UNKNOWN) {
                 if (hasService() && mDataState == TelephonyManager.DATA_CONNECTED) {
