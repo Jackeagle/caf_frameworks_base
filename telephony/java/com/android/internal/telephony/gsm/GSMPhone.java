@@ -167,6 +167,7 @@ public class GSMPhone extends PhoneBase {
         mCM.setOnUSSD(this, EVENT_USSD, null);
         mCM.setOnSuppServiceNotification(this, EVENT_SSN, null);
         mSST.registerForNetworkAttach(this, EVENT_REGISTERED_TO_NETWORK, null);
+        mCM.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
 
         if (false) {
             try {
@@ -218,6 +219,7 @@ public class GSMPhone extends PhoneBase {
             mSST.unregisterForNetworkAttach(this); //EVENT_REGISTERED_TO_NETWORK
             mCM.unSetOnUSSD(this);
             mCM.unSetOnSuppServiceNotification(this);
+            mCM.unregisterForSubscriptionReady(this);
 
             mPendingMMIs.clear();
 
@@ -232,9 +234,6 @@ public class GSMPhone extends PhoneBase {
             mUiccManager.unregisterForIccChanged(this);
             if(mSIMRecords != null) {
                 unregisterForSimRecordEvents();
-            }
-            if (m3gppApplication != null) {    //EVENT_ICC_APP_READY
-                       m3gppApplication.unregisterForReady(this);
             }
         }
     }
@@ -304,7 +303,6 @@ public class GSMPhone extends PhoneBase {
             //Register for Record events once records are available.
             registerForSimRecordEvents();
             mSimPhoneBookIntManager.updateSimRecords(mSIMRecords);
-            m3gppApplication.registerForReady(this, EVENT_ICC_APP_READY, null);
         }
     }
 
@@ -1375,8 +1373,9 @@ public class GSMPhone extends PhoneBase {
                 mMdn = localTemp[0];
                 break;
 
-            case EVENT_ICC_APP_READY:
-                  mCM.getIMEI(obtainMessage(EVENT_GET_IMEI_DONE));
+            case EVENT_SUBSCRIPTION_READY:
+                Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY received");
+                mCM.getIMEI(obtainMessage(EVENT_GET_IMEI_DONE));
                 break;
 
              default:

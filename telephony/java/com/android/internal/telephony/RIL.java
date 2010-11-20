@@ -2507,6 +2507,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_CDMA_PRL_CHANGED: ret =  responseVoid(p); break;
             case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: ret =  responseVoid(p); break;
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: ret =  responseInts(p); break;
+            case RIL_UNSOL_SUBSCRIPTION_READY: ret =  responseVoid(p); break;
+
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
             //break; (implied)
@@ -2853,6 +2855,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                     mResendIncallMuteRegistrants.notifyRegistrants(
                                         new AsyncResult (null, ret, null));
                 }
+                break;
+
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED:
                 if (RILJ_LOGD) unsljLogvRet(response, ret);
                 if (mTetheredModeStateRegistrants != null) {
@@ -2865,6 +2869,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 }
                 break;
 
+            case RIL_UNSOL_SUBSCRIPTION_READY:
+                if (RILJ_LOGD) unsljLogRet(response, ret);
+
+                if (mSubscriptionReadyRegistrants != null) {
+                    mSubscriptionReadyRegistrants.notifyRegistrants(
+                                        new AsyncResult (null, ret, null));
+                }
         }
     }
 
@@ -3707,6 +3718,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_CDMA_PRL_CHANGED: return "UNSOL_CDMA_PRL_CHANGED";
             case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: return "RIL_UNSOL_TETHERED_MODE_STATE_CHANGED";
+            case RIL_UNSOL_SUBSCRIPTION_READY: return "RIL_UNSOL_SUBSCRIPTION_READY";
             default: return "<unknown reponse>";
         }
     }

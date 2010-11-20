@@ -175,6 +175,7 @@ public class CDMAPhone extends PhoneBase {
         mSST.registerForNetworkAttach(this, EVENT_REGISTERED_TO_NETWORK, null);
         mCM.setEmergencyCallbackMode(this, EVENT_EMERGENCY_CALLBACK_MODE, null);
         mCM.registerForCdmaSubscriptionSourceChanged(this, EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
+        mCM.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
 
         mUiccManager = UiccManager.getInstance(getContext(), mCM);
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
@@ -228,6 +229,7 @@ public class CDMAPhone extends PhoneBase {
             mSST.unregisterForNetworkAttach(this); //EVENT_REGISTERED_TO_NETWORK
             mCM.unSetOnSuppServiceNotification(this);
             mCM.unregisterForCdmaSubscriptionSourceChanged(this);
+            mCM.unregisterForSubscriptionReady(this);
 
             mPendingMmis.clear();
 
@@ -240,11 +242,8 @@ public class CDMAPhone extends PhoneBase {
 
             //cleanup icc stuff
             mUiccManager.unregisterForIccChanged(this);
-            if(mRuimRecords != null) {
+            if (mRuimRecords != null) {
                 unregisterForRuimRecordEvents();
-            }
-            if (m3gpp2Application != null) {   //EVENT_ICC_APP_READY
-                       m3gpp2Application.unregisterForReady(this);
             }
         }
     }
@@ -308,7 +307,6 @@ public class CDMAPhone extends PhoneBase {
             //Register for Record events once records are available.
             registerForRuimRecordEvents();
             mRuimPhoneBookInterfaceManager.updateRuimRecords(mRuimRecords);
-            m3gpp2Application.registerForReady(this, EVENT_ICC_APP_READY, null);
         }
     }
 
@@ -1052,9 +1050,10 @@ public class CDMAPhone extends PhoneBase {
             }
             break;
 
-            case EVENT_ICC_APP_READY:
-                    Log.d(LOG_TAG, "Event EVENT_ICC_APP_READY Received");
-                    mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
+            case EVENT_SUBSCRIPTION_READY: {
+                Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY Received");
+                mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
+            }
             break;
 
             default:{
