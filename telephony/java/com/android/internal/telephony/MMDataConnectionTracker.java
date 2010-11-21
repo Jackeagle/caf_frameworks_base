@@ -279,31 +279,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                     Settings.System.SOCKET_DATA_CALL_ENABLE, 1) > 0;
         }
 
-        /* On startup, check with ConnectivityService(CS) if mobile data has
-         * been disabled from the phone settings.  CS processes this setting on
-         * startup and disables all service types via the
-         * PhoneInterfaceManager. In some cases the PhoneInterfaceManager is
-         * not started in time for CS to disable the service types, so, double
-         * checking here.
-         */
-        IBinder b = ServiceManager.getService(Context.CONNECTIVITY_SERVICE);
-        IConnectivityManager service = IConnectivityManager.Stub.asInterface(b);
-
-        try {
-            if (service.getMobileDataEnabled() == false) {
-                // Disable all data profiles
-                for (DataServiceType ds : DataServiceType.values()) {
-                    if (mDpt.isServiceTypeEnabled(ds)) {
-                        mDpt.setServiceTypeEnabled(ds, false);
-                        logd("Disabling ds" + ds);
-                    }
-                }
-            }
-        } catch(RemoteException e) {
-            // Could not find ConnectivityService, nothing to do, continue.
-            logw("Could not access Connectivity Service." + e);
-        }
-
         //used in CDMA+NV case.
         mCdmaHomeOperatorNumeric = SystemProperties.get("ro.cdma.home.operator.numeric");
     }
@@ -1196,7 +1171,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     private boolean isReadyForData() {
 
-        boolean isDataEnabled = isDataConnectivityEnabled();
+        boolean isDataEnabled = getMobileDataEnabled()
+                                    && isDataConnectivityEnabled();
 
         if (mCheckForConnectivity) {
             boolean roaming = mDsst.getDataServiceState().getRoaming();
@@ -1277,6 +1253,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 .append("/"+mDsst.mRuimRecords.getRUIMOperatorNumeric());
         sb.append(", checks = ").append(mCheckForConnectivity).append("/")
                 .append(mCheckForSubscription);
+        sb.append(", Mobile Data Enabled  = ").append(getMobileDataEnabled());
         sb.append("]");
         return sb.toString();
     }
@@ -1405,6 +1382,20 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     protected void stopNetStatPoll() {
         mPollNetStat.setEnablePoll(false);
         removeCallbacks(mPollNetStat);
+    }
+
+    // Retrieve the mobile data enabled from ConnectivityManager
+    public boolean getMobileDataEnabled() {
+        IBinder b = ServiceManager.getService(Context.CONNECTIVITY_SERVICE);
+        IConnectivityManager service = IConnectivityManager.Stub.asInterface(b);
+        int index = (mSubscriptionData != null) ? mSubscriptionData.subNum : 0;
+
+        try {
+            return service.getMobileDataEnabledOnSubscription(index);
+        } catch(RemoteException e) {
+            logw("Could not access Connectivity Service." + e);
+            return true;
+        }
     }
 
     // Retrieve the data roaming setting from the shared preferences.
