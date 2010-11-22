@@ -45,8 +45,6 @@ import android.os.Registrant;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Looper;
-import android.content.BroadcastReceiver;
-import android.content.IntentFilter;
 import android.telephony.TelephonyManager;
 import java.util.regex.PatternSyntaxException;
 import java.lang.Exception;
@@ -74,6 +72,7 @@ public class ProxyManager extends Handler {
     static final int EVENT_GET_ICCID_DONE = 8;
     static final int EVENT_RADIO_OFF_OR_NOT_AVAILABLE = 9;
     static final int EVENT_RADIO_ON = 10;
+    static final int EVENT_SUBSCRIPTION_READY = 11;
 
     static public final String INTENT_VALUE_SUBSCR_INFO_1 = "SUBSCR INFO 01";
     static public final String INTENT_VALUE_SUBSCR_INFO_2 = "SUBSCR INFO 02";
@@ -98,7 +97,6 @@ public class ProxyManager extends Handler {
     private boolean mUiccSubSet = false;
     private boolean mDdsSet = false;
     SupplySubscription supplySubscription;
-    PhoneAppBroadcastReceiver mReceiver;
 
     static int queuedDds;
     static int currentDds;
@@ -153,12 +151,11 @@ public class ProxyManager extends Handler {
             getUserPreferredSubs();
             supplySubscription = this.new SupplySubscription(mContext);
 
-            // Register for intent broadcasts.
-            IntentFilter intentFilter = new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-            mReceiver = new PhoneAppBroadcastReceiver();
-            mContext.registerReceiver(mReceiver, intentFilter);
-            intentFilter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
-            mContext.registerReceiver(mReceiver, intentFilter);
+            // register for Subscription ready event for both the subscriptions.
+            for (int i = 0; i < mCi.length; i++) {
+                Integer sub = new Integer(i);
+                mCi[i].registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, sub);
+            }
 
             // get the current active dds
             currentDds = PhoneFactory.getDataSubscription();
@@ -343,6 +340,34 @@ public class ProxyManager extends Handler {
                     checkCardStatus();
                 }
                 break;
+            }
+
+            case EVENT_SUBSCRIPTION_READY: {
+                ar = (AsyncResult)msg.obj;
+                Integer subscription = (Integer)ar.userObj;
+                int sub = subscription.intValue();
+                Log.d(LOG_TAG, "SUBSCRIPTION READY event" + sub);
+
+                if (!mDdsSet) {
+                    // Set Data Subscription Source only when subscription becomes READY.
+                    if (sub == currentDds) {
+                        // Set data sub only if the sub is activated.
+                        if (getCurrentSubscriptions()
+                                .subscription[currentDds].subStatus == SUB_ACTIVATED) {
+                            String str = Integer.toString(currentDds);
+                            Message callback = Message.obtain(supplySubscription.mHandler,
+                                                       EVENT_SET_DATA_SUBSCRIPTION_DONE, str);
+                            // Set Data Subscription preference at RIL
+                            Log.d(LOG_TAG, "setDataSubscription on " + currentDds);
+                            mCi[currentDds].setDataSubscription(callback);
+                            mDdsSet = true;
+                        } else {
+                            Log.d(LOG_TAG, "User prefered data subsciption " + currentDds +
+                                   " is not ACTIVATED");
+                        }
+                   }
+               }
+               break;
             }
 
             case EVENT_GET_ICCID_DONE:
@@ -1073,43 +1098,8 @@ public class ProxyManager extends Handler {
         }
     }
 
-   private class PhoneAppBroadcastReceiver extends BroadcastReceiver {
-
-       @Override
-       public void onReceive(Context context, Intent intent) {
-           String action = intent.getAction();
-            Log.v(LOG_TAG,"Action intent recieved : " + action);
-            if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
-                int subscription = intent.getIntExtra(IccCard.INTENT_KEY_SUBSCRIPTION, 0);
-                String state = intent.getStringExtra(IccCard.INTENT_KEY_ICC_STATE);
-                Log.v(LOG_TAG,"subscription = " + subscription + " state = " + state);
-                if (!mDdsSet) {
-                    // Set Data Subscription Source only when App state becomes READY.
-                    if (IccCard.INTENT_VALUE_ICC_READY.equals(state)) {
-                        if (subscription == currentDds) {
-                            // Set data sub only if the sub is activated.
-                            if (getCurrentSubscriptions()
-                                    .subscription[currentDds].subStatus == SUB_ACTIVATED) {
-                                String str = Integer.toString(currentDds);
-                                Message callback = Message.obtain(supplySubscription.mHandler,
-                                                           EVENT_SET_DATA_SUBSCRIPTION_DONE, str);
-                                // Set Data Subscription preference at RIL
-                                Log.d(LOG_TAG, "setDataSubscription on " + currentDds);
-                                mCi[currentDds].setDataSubscription(callback);
-                                mDdsSet = true;
-                            } else {
-                                Log.d(LOG_TAG, "User prefered data subsciption " + currentDds +
-                                       " is not ACTIVATED");
-                            }
-                        }
-                    }
-                }
-            }
-        }
-   }
-
-   public void setDataSubscription(int subscription, Message onCompleteMsg) {
-       Log.d(LOG_TAG, " setDataSubscription: currentDds = "
+    public void setDataSubscription(int subscription, Message onCompleteMsg) {
+        Log.d(LOG_TAG, " setDataSubscription: currentDds = "
              + currentDds + " new subscription = " + subscription);
 
         mSetDdsCompleteMsg = onCompleteMsg;

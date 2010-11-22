@@ -642,6 +642,17 @@ public interface CommandsInterface {
     void unregisterForCallReestablishInd(Handler h);
 
     /**
+     * Handlers for subscription ready indications.
+     *
+     * @param h Handler for subscription ready messages.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void registerForSubscriptionReady(Handler h, int what, Object obj);
+    void unregisterForSubscriptionReady(Handler h);
+
+
+    /**
      * Supply the ICC PIN to the ICC card
      *
      *  returned message
