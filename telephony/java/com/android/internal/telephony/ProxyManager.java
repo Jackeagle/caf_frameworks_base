@@ -48,6 +48,7 @@ import android.os.Looper;
 import android.telephony.TelephonyManager;
 import java.util.regex.PatternSyntaxException;
 import java.lang.Exception;
+import com.android.internal.telephony.SimRefreshResponse;
 
 public class ProxyManager extends Handler {
     static final String LOG_TAG = "PROXY";
@@ -73,6 +74,7 @@ public class ProxyManager extends Handler {
     static final int EVENT_RADIO_OFF_OR_NOT_AVAILABLE = 9;
     static final int EVENT_RADIO_ON = 10;
     static final int EVENT_SUBSCRIPTION_READY = 11;
+    static final int EVENT_SIM_REFRESH = 12;
 
     static public final String INTENT_VALUE_SUBSCR_INFO_1 = "SUBSCR INFO 01";
     static public final String INTENT_VALUE_SUBSCR_INFO_2 = "SUBSCR INFO 02";
@@ -106,6 +108,7 @@ public class ProxyManager extends Handler {
     private int mPendingIccidRequest = 0;
     private boolean setSubscriptionMode = true;
     private boolean mReadIccid = true;
+    private boolean mSetSubOnSimRefresh = false;
     private String[] mIccIds;
     // The subscription information of all the cards
     SubscriptionData[] mCardSubData = null;
@@ -155,6 +158,11 @@ public class ProxyManager extends Handler {
             for (int i = 0; i < mCi.length; i++) {
                 Integer sub = new Integer(i);
                 mCi[i].registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, sub);
+            }
+
+            //Registering for Instances
+            for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
+                mCi[i].registerForIccRefresh(this, EVENT_SIM_REFRESH, null);
             }
 
             // get the current active dds
@@ -417,6 +425,14 @@ public class ProxyManager extends Handler {
                 }
                 break;
 
+            case EVENT_SIM_REFRESH:
+                Log.d(LOG_TAG, "SIM refresh EVENT_SIM_REFRESH");
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception == null) {
+                    setSubscriptionAfterSIMReset(ar);
+                }
+                break;
+
             case EVENT_SET_DATA_SUBSCRIPTION_DONE:
                 Log.d(LOG_TAG, "EVENT_SET_DATA_SUBSCRIPTION_DONE");
 
@@ -645,6 +661,14 @@ public class ProxyManager extends Handler {
                         matchedSub.subscription[i].copyFrom(userSub);
                         // Set the activate state
                         matchedSub.subscription[i].subStatus = SUB_ACTIVATE;
+
+                        if (mSetSubOnSimRefresh) {
+                            //In case of sim refresh, only affected subscriptions are activated wrt slotID.
+                            if (supplySubscription.prevSubscriptionData.subscription[i].subStatus == SUB_ACTIVATED) {
+                                matchedSub.subscription[i].subStatus = SUB_ACTIVATED;
+                                Log.d(LOG_TAG,"matchSubscriptions : current SubStatus is set to SUB_ACTIVATED");
+                            }
+                        }
                         matchedSub.subscription[i].subNum = i;
                         // Set the slot id, sub index and appLabel from mCardSubData
                         matchedSub.subscription[i].slotId = cardSub.slotId;
@@ -676,6 +700,38 @@ public class ProxyManager extends Handler {
         } else {
             setSubscription(matchedSub, null);
             mUiccSubSet = true;
+        }
+    }
+
+    private void setSubscriptionAfterSIMReset(AsyncResult ar) {
+
+        SimRefreshResponse state = (SimRefreshResponse)ar.result;
+        if (state == null) {
+            Log.e(LOG_TAG, "setSubscriptionAfterSIMReset received without input");
+            return;
+        }
+
+        if (state.refreshResult == SimRefreshResponse.Result.SIM_RESET) {
+
+            Log.d(LOG_TAG, "setSubscriptionAfterSIMReset :refreshResult" + state.refreshResult);
+            int currentSlotId = state.slot;
+            Log.d(LOG_TAG, "setSubscriptionAfterSIMReset :currentSlotId" + currentSlotId);
+            //subscription in mUserPrefSubs
+            for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
+                if (mUserPrefSubs.subscription[i].slotId == currentSlotId) {
+                    Log.d(LOG_TAG, " setSubscriptionAfterSIMReset mUserPrefSubs.slotId"
+                            + mUserPrefSubs.subscription[i].slotId);
+                    //By changing the status of prevSubscriptionData,
+                    //we can activate individual subscriptions.
+                    supplySubscription.prevSubscriptionData.subscription[i].subStatus = SUB_DEACTIVATED;
+                    mUiccSubSet = false;
+                    mReadIccid = true;
+                    if (mUserPrefSubs.subscription[i].subIndex == currentDds) {
+                        mDdsSet = false;
+                    }
+                }
+            }
+            mSetSubOnSimRefresh = true;
         }
     }
 
@@ -952,6 +1008,7 @@ public class ProxyManager extends Handler {
                         mPendingActivateEvents++;
                         mCi[i].setUiccSubscription(subscriptionData.subscription[i], callback);
                         subscriptionData.subscription[i].subStatus = SUB_ACTIVATING;
+                        mSetSubOnSimRefresh = false;
                     } else {
                         subResult[i] = "ACTIVATE FAILED";
                         // Fall back to the previous subscription.

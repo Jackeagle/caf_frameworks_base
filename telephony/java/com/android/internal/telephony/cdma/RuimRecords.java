@@ -35,6 +35,7 @@ import com.android.internal.telephony.MccTable;
 //import com.android.internal.telephony.gsm.VoiceMailConstants;
 import com.android.internal.telephony.IccException;
 import com.android.internal.telephony.IccUtils;
+import com.android.internal.telephony.SimRefreshResponse;
 
 
 /**
@@ -72,7 +73,7 @@ public final class RuimRecords extends UiccApplicationRecords {
         // recordsToLoad is set to 0 because no requests are made yet
         recordsToLoad = 0;
 
-        mCi.setOnIccRefresh(this, EVENT_RUIM_REFRESH, null);
+        mCi.registerForIccRefresh(this, EVENT_RUIM_REFRESH, null);
 
         // Start off by setting empty state
         resetRecords();
@@ -83,7 +84,7 @@ public final class RuimRecords extends UiccApplicationRecords {
         Log.d(LOG_TAG, "Disposing RuimRecords " + this);
         //Unregister for all events
         mCi.unregisterForOffOrNotAvailable( this);
-        mCi.unSetOnIccRefresh(this);
+        mCi.unregisterForIccRefresh(this);
         resetRecords();
     }
 
@@ -227,7 +228,7 @@ public final class RuimRecords extends UiccApplicationRecords {
                 isRecordLoadResponse = false;
                 ar = (AsyncResult)msg.obj;
                 if (ar.exception == null) {
-                    handleRuimRefresh((int[])(ar.result));
+                    handleRuimRefresh(ar);
                 }
                 break;
 
@@ -298,25 +299,28 @@ public final class RuimRecords extends UiccApplicationRecords {
         Log.d(LOG_TAG, "RuimRecords:setVoiceMessageWaiting - NOP for CDMA");
     }
 
-    private void handleRuimRefresh(int[] result) {
-        if (result == null || result.length == 0) {
-            if (DBG) log("handleRuimRefresh without input");
+    private void handleRuimRefresh(AsyncResult ar){
+
+        SimRefreshResponse state = (SimRefreshResponse)ar.result;
+        if (state == null) {
+            if (DBG) log("handleRuimRefresh received without input");
             return;
         }
 
-        switch ((result[0])) {
-            case CommandsInterface.SIM_REFRESH_FILE_UPDATED:
-                if (DBG) log("handleRuimRefresh with SIM_REFRESH_FILE_UPDATED");
+        switch (state.refreshResult) {
+
+            case SIM_FILE_UPDATE:
+                if (DBG) log("handleRuimRefresh with SIM_FILE_UPDATED");
                 adnCache.reset();
                 fetchRuimRecords();
                 break;
-            case CommandsInterface.SIM_REFRESH_INIT:
-                if (DBG) log("handleRuimRefresh with SIM_REFRESH_INIT");
+            case SIM_INIT:
+                if (DBG) log("handleRuimRefresh with SIM_INIT");
                 // need to reload all files (that we care about)
                 fetchRuimRecords();
                 break;
-            case CommandsInterface.SIM_REFRESH_RESET:
-                if (DBG) log("handleRuimRefresh with SIM_REFRESH_RESET");
+            case SIM_RESET:
+                if (DBG) log("handleRuimRefresh with SIM_RESET");
                 onIccRefreshReset();
                 break;
             default:
