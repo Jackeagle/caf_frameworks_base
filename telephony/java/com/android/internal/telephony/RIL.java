@@ -367,6 +367,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                             rr.onError(GENERIC_FAILURE, null);
                             rr.release();
                         }
+                    } finally {
+                        releaseWakeLockIfDone();
                     }
 
                     if (!alreadySubtracted) {
