@@ -1284,7 +1284,11 @@ status_t OMXCodec::init() {
     }
 
     err = allocateBuffers();
-    CHECK_EQ(err, OK);
+    if(err != OK) {
+        LOGE("Allocate Buffer failed - error = %d",err);
+        setState(ERROR);
+        return NO_MEMORY;
+    }
 
     if (mQuirks & kRequiresLoadedToIdleAfterAllocation) {
         err = mOMX->sendCommand(mNode, OMX_CommandStateSet, OMX_StateIdle);
@@ -1726,7 +1730,10 @@ void OMXCodec::onCmdComplete(OMX_COMMANDTYPE cmd, OMX_U32 data) {
                 enablePortAsync(portIndex);
 
                 status_t err = allocateBuffersOnPort(portIndex);
-                CHECK_EQ(err, OK);
+                if(err != OK) {
+                    LOGE("Allocate Buffer failed for portindex = %d - error = %d",portIndex,err);
+                    setState(ERROR);
+                }
             }
             break;
         }
