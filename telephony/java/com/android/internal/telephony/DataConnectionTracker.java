@@ -141,6 +141,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     protected static final String REASON_DATA_NETWORK_DETACH = "dataNetworkDetached";
     protected static final String REASON_DATA_PROFILE_LIST_CHANGED = "dataProfileDbChanged";
     protected static final String REASON_CDMA_SUBSCRIPTION_SOURCE_CHANGED = "cdmaSubscriptionSourceChanged";
+    protected static final String REASON_DATA_CONN_PROP_CHANGED = "dataConnectionPropertyChanged";
 
     /**
      * Default constructor
