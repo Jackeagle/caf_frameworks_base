@@ -222,6 +222,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
             mMediaPlayer.setOnCompletionListener(mCompletionListener);
             mMediaPlayer.setOnErrorListener(mErrorListener);
             mMediaPlayer.setOnBufferingUpdateListener(mBufferingUpdateListener);
+            mMediaPlayer.setOnSeekCompleteListener(mSeekCompleteListener);
             mCurrentBufferPercentage = 0;
             mMediaPlayer.setDataSource(mContext, mUri, mHeaders);
             mMediaPlayer.setDisplay(mSurfaceHolder);
@@ -413,6 +414,15 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
         new MediaPlayer.OnBufferingUpdateListener() {
         public void onBufferingUpdate(MediaPlayer mp, int percent) {
             mCurrentBufferPercentage = percent;
+        }
+    };
+
+    private MediaPlayer.OnSeekCompleteListener mSeekCompleteListener =
+        new MediaPlayer.OnSeekCompleteListener() {
+        public void onSeekComplete(MediaPlayer mp){
+            if (mMediaController != null) {
+                mMediaController.show();
+            }
         }
     };
 
