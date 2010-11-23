@@ -927,7 +927,13 @@ status_t MPEG4Extractor::parseChunk(sfoff_t *offset, int depth) {
             }
 
             size_t max_size;
-            CHECK_EQ(mLastTrack->sampleTable->getMaxSampleSize(&max_size), OK);
+            err =
+            mLastTrack->sampleTable->getMaxSampleSize(&max_size);
+
+            if (err != OK) {
+                LOGE("SampleTable not Proper\n");
+                return err;
+            }
 
             // Assume that a given buffer only contains at most 10 fragments,
             // each fragment originally prefixed with a 2 byte length will

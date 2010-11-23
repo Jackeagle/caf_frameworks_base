@@ -341,6 +341,10 @@ status_t SampleTable::getMaxSampleSize(size_t *max_size) {
         if (err != OK) {
             return err;
         }
+        if((ssize_t)sample_size < 0) {
+           LOGE("Sample Size Can't be negetive value \n");
+           return ERROR_MALFORMED;
+        }
 
         if (sample_size > *max_size) {
             *max_size = sample_size;
