@@ -195,14 +195,13 @@ status_t LayerBuffer::registerBuffers(const ISurface::BufferHeap& buffers)
  * This creates an "overlay" source for this surface
  */
 sp<OverlayRef> LayerBuffer::createOverlay(uint32_t w, uint32_t h, int32_t f,
-        int32_t orientation)
+        int32_t orientation, int32_t format3D)
 {
     sp<OverlayRef> result;
     Mutex::Autolock _l(mLock);
     if (mSource != 0)
         return result;
-
-    sp<OverlaySource> source = new OverlaySource(*this, &result, w, h, f, orientation);
+    sp<OverlaySource> source = new OverlaySource(*this, &result, w, h, f, orientation, format3D);
     if (result != 0) {
         mSource = source;
     }
@@ -261,11 +260,11 @@ void LayerBuffer::SurfaceLayerBuffer::unregisterBuffers()
 }
 
 sp<OverlayRef> LayerBuffer::SurfaceLayerBuffer::createOverlay(
-        uint32_t w, uint32_t h, int32_t format, int32_t orientation) {
+        uint32_t w, uint32_t h, int32_t format, int32_t orientation, int32_t format3D) {
     sp<OverlayRef> result;
     sp<LayerBuffer> owner(getOwner());
     if (owner != 0)
-        result = owner->createOverlay(w, h, format, orientation);
+        result = owner->createOverlay(w, h, format, orientation, format3D);
     return result;
 }
 
@@ -718,10 +717,11 @@ void LayerBuffer::BufferSource::clearTempBufferImage() const
 // ---------------------------------------------------------------------------
 
 LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
-        sp<OverlayRef>* overlayRef, 
-        uint32_t w, uint32_t h, int32_t format, int32_t orientation)
+        sp<OverlayRef>* overlayRef,
+        uint32_t w, uint32_t h, int32_t format, int32_t orientation, int32_t format3D)
     : Source(layer), mVisibilityChanged(false),
-    mOverlay(0), mOverlayHandle(0), mOverlayDevice(0), mOrientation(orientation)
+    mOverlay(0), mOverlayHandle(0), mOverlayDevice(0),
+    mOrientation(orientation), mFormat3D(format3D)
 {
     overlay_control_device_t* overlay_dev = mLayer.mFlinger->getOverlayEngine();
     if (overlay_dev == NULL) {
@@ -734,7 +734,7 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
                                graphicPlane(0).displayHardware());
     hw.videoOverlayStarted(true);
     mLayer.mFlinger->enableOverlayOpt(false);
-    overlay_t* overlay = overlay_dev->createOverlay(overlay_dev, w, h, format);
+    overlay_t* overlay = overlay_dev->createOverlay(overlay_dev, w, h, format, format3D);
     if (overlay == NULL) {
         // couldn't create the overlay (no memory? no more overlays?)
         return;
@@ -745,7 +745,6 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     // enable dithering...
     overlay_dev->setParameter(overlay_dev, overlay, 
             OVERLAY_DITHER, OVERLAY_ENABLE);
-
     mOverlay = overlay;
     mFormat = overlay->format; 
     mWidthStride = overlay->w_stride;
@@ -757,7 +756,7 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     sp<OverlayChannel> channel = new OverlayChannel( &layer );
 
     *overlayRef = new OverlayRef(mOverlayHandle, channel,
-            mWidth, mHeight, mFormat, mWidthStride, mHeightStride);
+            mWidth, mHeight, mFormat, mWidthStride, mHeightStride, format3D);
     mLayer.mFlinger->signalEvent();
 }
 

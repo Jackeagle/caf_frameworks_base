@@ -116,7 +116,7 @@ public:
     }
 
     virtual sp<OverlayRef> createOverlay(
-             uint32_t w, uint32_t h, int32_t format, int32_t orientation)
+             uint32_t w, uint32_t h, int32_t format, int32_t orientation, int32_t format3D)
     {
         Parcel data, reply;
         data.writeInterfaceToken(ISurface::getInterfaceDescriptor());
@@ -124,6 +124,7 @@ public:
         data.writeInt32(h);
         data.writeInt32(format);
         data.writeInt32(orientation);
+        data.writeInt32(format3D);
         remote()->transact(CREATE_OVERLAY, data, &reply);
         return OverlayRef::readFromParcel(reply);
     }
@@ -178,7 +179,8 @@ status_t BnSurface::onTransact(
             int h = data.readInt32();
             int f = data.readInt32();
             int orientation = data.readInt32();
-            sp<OverlayRef> o = createOverlay(w, h, f, orientation);
+            int format3D = data.readInt32();
+            sp<OverlayRef> o = createOverlay(w, h, f, orientation, format3D);
             return OverlayRef::writeToParcel(reply, o);
         } break;
         default:

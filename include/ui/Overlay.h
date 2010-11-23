@@ -42,7 +42,7 @@ class OverlayRef : public LightRefBase<OverlayRef>
 {
 public:
     OverlayRef(overlay_handle_t, const sp<IOverlay>&,
-            uint32_t w, uint32_t h, int32_t f, uint32_t ws, uint32_t hs);
+            uint32_t w, uint32_t h, int32_t f, uint32_t ws, uint32_t hs, int32_t format3D = 0);
 
     static sp<OverlayRef> readFromParcel(const Parcel& data);
     static status_t writeToParcel(Parcel* reply, const sp<OverlayRef>& o);    
@@ -59,6 +59,7 @@ private:
     uint32_t mWidth;
     uint32_t mHeight;
     int32_t  mFormat;
+    int32_t  mFormat3D;
     int32_t  mWidthStride;
     int32_t  mHeightStride;
     bool mOwnHandle;
