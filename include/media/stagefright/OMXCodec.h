@@ -174,6 +174,7 @@ private:
 
     void setAMRFormat(bool isWAMR);
     void setAACFormat(int32_t numChannels, int32_t sampleRate);
+    void setAC3Format(int32_t numChannels, int32_t sampleRate);
 
     status_t setVideoPortFormatType(
             OMX_U32 portIndex,
