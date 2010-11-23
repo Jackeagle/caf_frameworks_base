@@ -75,7 +75,9 @@ public interface IccCard {
     /*
       UNKNOWN is a transient state, for example, after uesr inputs ICC pin under
       PIN_REQUIRED state, the query for ICC status returns UNKNOWN before it
-      turns to READY
+      turns to READY.
+      Values of this enum have to match exactly values used in
+      TelephonyManager.getSimState()
      */
     public enum State {
         UNKNOWN,
