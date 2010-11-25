@@ -628,6 +628,11 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         setMinBufferSize(kPortIndexOutput, 8192);  // XXX
     }
 
+    if(mState == ERROR) {
+        LOGE("Configure Codec failed with BAD_VALUE");
+        return BAD_VALUE;
+    }
+
     initOutputFormat(meta);
     if (!strncasecmp(mMIME, "audio/", 6)) {
         OMX_PARAM_SUSPENSIONPOLICYTYPE suspensionPolicy;
@@ -668,7 +673,11 @@ void OMXCodec::setMinBufferSize(OMX_U32 portIndex, OMX_U32 size) {
 
     err = mOMX->setParameter(
             mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
-    CHECK_EQ(err, OK);
+    if(err != OK) {
+        LOGE("Set Buffer Size Failed - error = %d",err);
+        setState(ERROR);
+        return;
+    }
 
     err = mOMX->getParameter(
             mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
