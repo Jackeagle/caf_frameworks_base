@@ -212,7 +212,7 @@ status_t AudioTrack::set(
             if (notificationFrames > frameCount/2) {
                 notificationFrames = frameCount/2;
             }
-            if (frameCount < minFrameCount) {
+            if ((frameCount < minFrameCount) || (minFrameCount == 0)) {
               LOGE("Invalid buffer size: minFrameCount %d, frameCount %d", minFrameCount, frameCount);
               return BAD_VALUE;
             }
