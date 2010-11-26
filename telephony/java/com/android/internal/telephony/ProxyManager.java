@@ -299,7 +299,16 @@ public class ProxyManager extends Handler {
             }
 
             if (currentDds != activeSub.subNum) {
-                setDataSubscription(activeSub.subNum, null);
+                // If the DDS is not set to the modem yet, update the currentDds and the system
+                // property. Once the SUBSCRIPTION READY event receives, it will set the DDS
+                // properly. This scenario occures on powerup with single subscription and the
+                // DDS was set to the other subscription.
+                if (!mDdsSet) {
+                    currentDds = activeSub.subNum;
+                    PhoneFactory.setDataSubscription(currentDds);
+                } else {
+                    setDataSubscription(activeSub.subNum, null);
+                }
             }
         }
     }
