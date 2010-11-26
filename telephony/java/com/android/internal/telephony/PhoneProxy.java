@@ -271,11 +271,6 @@ public class PhoneProxy extends Handler implements Phone {
             }
         }
         mActiveVoicePhone.setSubscription(subscription);
-        if (subscriptionData != null) {
-            setSubscriptionInfo(subscriptionData);
-        } else {
-            Log.v(LOG_TAG, "deleteAndCreatePhone: Subscription Info is null");
-        }
 
         oldPhone = null;
     }
