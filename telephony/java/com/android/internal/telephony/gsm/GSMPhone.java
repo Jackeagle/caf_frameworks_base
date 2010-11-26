@@ -95,6 +95,7 @@ public class GSMPhone extends PhoneBase {
     public static final String CIPHERING_KEY = "ciphering_key";
     // Key used to read/write voice mail number
     public static final String VM_NUMBER = "vm_number_key";
+    public String mVmNumGsmKey = null;
     // Key used to read/write the SIM IMSI used for storing the voice mail
     public static final String VM_SIM_IMSI = "vm_sim_imsi_key";
 
@@ -148,6 +149,7 @@ public class GSMPhone extends PhoneBase {
             mSimulatedRadioControl = (SimulatedRadioControl) ci;
         }
 
+        mVmNumGsmKey = VM_NUMBER;
         mUiccManager = UiccManager.getInstance(context, mCM);
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
@@ -309,6 +311,7 @@ public class GSMPhone extends PhoneBase {
     //sets subscription SUB0("0") or SUB1("1)
     public void setSubscription(int subNum) {
         mSubscription = subNum;
+        mVmNumGsmKey = VM_NUMBER + mSubscription;
     }
 
     //gets subscription SUB0("0") or SUB1("1")
@@ -774,7 +777,7 @@ public class GSMPhone extends PhoneBase {
     private void storeVoiceMailNumber(String number) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         SharedPreferences.Editor editor = sp.edit();
-        editor.putString(VM_NUMBER, number);
+        editor.putString(mVmNumGsmKey, number);
         editor.commit();
         setVmSimImsi(getSubscriberId());
     }
@@ -786,7 +789,7 @@ public class GSMPhone extends PhoneBase {
             number = mSIMRecords.getVoiceMailNumber();
         if (TextUtils.isEmpty(number)) {
             SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
-            number = sp.getString(VM_NUMBER, null);
+            number = sp.getString(mVmNumGsmKey, null);
         }
         return number;
     }

@@ -95,6 +95,7 @@ public class CDMAPhone extends PhoneBase {
     private static final int DEFAULT_ECM_EXIT_TIMER_VALUE = 300000;
 
     private static final String VM_NUMBER_CDMA = "vm_number_key_cdma";
+    private String mVmNumCdmaKey = null;
     private String mVmNumber = null;
 
     static final int RESTART_ECM_TIMER = 0; // restart Ecm timer
@@ -162,6 +163,7 @@ public class CDMAPhone extends PhoneBase {
         mCT = new CdmaCallTracker(this);
         mSST = new CdmaServiceStateTracker (this);
 
+        mVmNumCdmaKey = VM_NUMBER_CDMA;
         //TODO: fusion move RuimPhoneBookInterfaceManager functionality to IccPhoneBookIntManager
         mRuimPhoneBookInterfaceManager = new RuimPhoneBookInterfaceManager(this);
         mSubInfo = new PhoneSubInfo(this);
@@ -317,6 +319,7 @@ public class CDMAPhone extends PhoneBase {
 
     public void setSubscription(int subNum) {
         mSubscription = subNum;
+        mVmNumCdmaKey = VM_NUMBER_CDMA + mSubscription;
     }
 
     public int getSubscription() {
@@ -679,7 +682,7 @@ public class CDMAPhone extends PhoneBase {
         String number = null;
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         // TODO: The default value of voicemail number should be read from a system property
-        number = sp.getString(VM_NUMBER_CDMA, "*86");
+        number = sp.getString(mVmNumCdmaKey, "*86");
         return number;
     }
 
@@ -1393,7 +1396,7 @@ public class CDMAPhone extends PhoneBase {
         // Update the preference value of voicemail number
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         SharedPreferences.Editor editor = sp.edit();
-        editor.putString(VM_NUMBER_CDMA, number);
+        editor.putString(mVmNumCdmaKey, number);
         editor.commit();
     }
 
