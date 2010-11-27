@@ -65,6 +65,7 @@ import com.android.internal.telephony.ProxyManager.SubscriptionData;
 import com.android.internal.telephony.ProxyManager.Subscription;
 import android.telephony.TelephonyManager;
 import com.android.internal.telephony.DataProfileOmh;
+import com.android.internal.telephony.SimRefreshResponse;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -2489,7 +2490,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_STK_EVENT_NOTIFY: ret = responseString(p); break;
             case RIL_UNSOL_STK_CALL_SETUP: ret = responseInts(p); break;
             case RIL_UNSOL_SIM_SMS_STORAGE_FULL: ret =  responseVoid(p); break;
-            case RIL_UNSOL_SIM_REFRESH: ret =  responseInts(p); break;
+            case RIL_UNSOL_SIM_REFRESH: ret =  responseSimRefresh(p); break;
             case RIL_UNSOL_CALL_RING: ret =  responseCallRing(p); break;
             case RIL_UNSOL_RESTRICTED_STATE_CHANGED: ret = responseInts(p); break;
             case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:  ret =  responseVoid(p); break;
@@ -2717,9 +2718,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
             case RIL_UNSOL_SIM_REFRESH:
                 if (RILJ_LOGD) unsljLogRet(response, ret);
-
-                if (mIccRefreshRegistrant != null) {
-                    mIccRefreshRegistrant.notifyRegistrant(
+                if (mIccRefreshRegistrants != null) {
+                    mIccRefreshRegistrants.notifyRegistrants(
                             new AsyncResult (null, ret, null));
                 }
                 break;
@@ -3188,6 +3188,19 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             }
         }
         return r;
+    }
+
+    private Object
+    responseSimRefresh(Parcel p) {
+        SimRefreshResponse response = new SimRefreshResponse();
+
+        response.refreshResult = SimRefreshResponse.refreshResultFromRIL(p.readInt());
+        response.slot   = p.readInt();
+        response.aidPtr = p.readString();
+        response.efId   = p.readInt();
+
+        Log.d(LOG_TAG, "responseSimRefresh response for slot" + response.slot);
+        return response;
     }
 
     private Object
