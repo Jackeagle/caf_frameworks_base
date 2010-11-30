@@ -53,6 +53,7 @@ class DataProfileOmh extends DataProfile {
     enum DataProfileTypeModem {
         /* Static mapping of OMH profiles to Android Service Types */
         PROFILE_TYPE_UNSPECIFIED(0x00000001, DataServiceType.SERVICE_TYPE_DEFAULT),
+        PROFILE_TYPE_MMS(0x00000002, DataServiceType.SERVICE_TYPE_MMS),
         PROFILE_TYPE_LBS(0x00000020, DataServiceType.SERVICE_TYPE_SUPL),
         PROFILE_TYPE_TETHERED(0x00000040, DataServiceType.SERVICE_TYPE_DUN);
 
