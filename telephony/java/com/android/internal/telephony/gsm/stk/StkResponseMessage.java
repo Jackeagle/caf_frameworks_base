@@ -28,7 +28,7 @@ public class StkResponseMessage {
         boolean includeAdditionalInfo = false;
         int additionalInfo = 0;
         int eventValue = -1;
-        byte[] addedInfo = new byte[MAX_ADDED_EVENT_DOWNLOAD_LEN];
+        byte[] addedInfo = null;
 
         public StkResponseMessage(StkCmdMessage cmdMsg) {
             this.cmdDet = cmdMsg.mCmdDet;
@@ -61,6 +61,7 @@ public class StkResponseMessage {
 
         public void setAdditionalInfo(boolean addInfoReq,int addInfoCode) {
             this.includeAdditionalInfo = addInfoReq;
+            this.addedInfo = new byte[(addedInfo.length)];
             this.additionalInfo = addInfoCode;
         }
 

@@ -53,9 +53,6 @@ public class StkCmdMessage implements Parcelable {
         public static final int BROWSING_STATUS_EVENT        = 0x0F;
         public static final int USER_TERMINATION             = 0x00;
         public static final int ERROR_TERMINATION            = 0x01;
-
-        //This value is not standard defined
-        public static final int MAX_ADDED_EVENT_DOWNLOAD_LEN = 0x0A;
     }
 
     public class SetupEventListSettings {
