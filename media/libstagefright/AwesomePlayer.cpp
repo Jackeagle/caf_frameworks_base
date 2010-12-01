@@ -1565,6 +1565,7 @@ void AwesomePlayer::setNumFramesToHold() {
        strcmp("qsd8250_ffa",value1) == 0  ||
        strcmp("qsd8650a_st1x",value1) == 0||
        strcmp("msm8660_surf",value1) == 0 ||
+       strcmp("msm7630_1x",value1) == 0 ||
        (strcmp("msm7630_surf",value1) == 0 &&
            ((atoi(value2) && (!(mVideoWidth == 1280 && mVideoHeight == 720))) ||
                (mCodecFlags & OMXCodec::kEnableGPUComposition))))
