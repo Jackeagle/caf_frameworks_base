@@ -1,6 +1,7 @@
 /* //device/java/android/android/os/INetworkManagementService.aidl
 **
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -207,4 +208,54 @@ interface INetworkManagementService
      */
     int getInterfaceTxThrottle(String iface);
 
+   /**
+    ** Routing
+    **/
+
+   /**
+    * Replaces a source policy route for the given iface and protocol family AF_INET
+    * in a custom routing table, if it already exists. Adds a new route if it did not exist.
+    */
+   void replaceV4SrcRoute(String iface, String ipAddr, String gatewayAddr, int routeId);
+
+   /**
+    * Replaces a source policy route for the given iface and protocol family AF_INET6
+    * in a custom routing table, if it already exists. Adds a new route if it did not exist.
+    */
+   void replaceV6SrcRoute(String iface, String ipAddr, String gatewayAddr, int routeId);
+
+   /**
+    * Deletes a source policy route for the given route identifier
+    * and protocol family AF_INET from a custom routing table
+    */
+   void delV4SrcRoute(int routeId);
+
+   /**
+    * Deletes a source policy route for the given route identifier
+    * and protocol family AF_INET6 from a custom routing table
+    */
+   void delV6SrcRoute(int routeId);
+
+   /**
+    * Replaces the default route in main table for a given iface
+    * and protocol family AF_INET
+    */
+   void replaceV4DefaultRoute(String iface, String gatewayAddr);
+
+   /**
+    * Replaces the default route in main table for a given iface
+    * and protocol family AF_INET6
+    */
+   void replaceV6DefaultRoute(String iface, String gatewayAddr);
+
+   /**
+    * Adds a route to the given destination host via the specified
+    * interface in the main table
+    */
+   void addDstRoute(String iface, String ipAddr, String gatewayAddr);
+
+   /**
+    * Deletes the route to the destination host from the main table
+    */
+   void delDstRoute(String ipAddr);
 }
