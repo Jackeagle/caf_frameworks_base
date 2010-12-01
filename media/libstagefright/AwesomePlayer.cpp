@@ -1554,7 +1554,6 @@ uint32_t AwesomePlayer::flags() const {
 }
 
 void AwesomePlayer::setNumFramesToHold() {
-#if 0
     char value1[128],value2[128];
     property_get("ro.product.device",value1,"0");
     property_get("hw.hdmiON", value2, "0");
@@ -1572,10 +1571,6 @@ void AwesomePlayer::setNumFramesToHold() {
         mNumFramesToHold = 2;
     else
         mNumFramesToHold = 1;
-#endif
-    //Number of frames to hold made to 2 to resolve flicker during
-    //multiple instances of video playback
-    mNumFramesToHold = 2;
 }
 
 // Trim both leading and trailing whitespace from the given string.
