@@ -1057,10 +1057,8 @@ status_t OMXCodec::setVideoOutputFormat(
             mNode, (OMX_INDEXTYPE)OMX_QcomIndexParamFrameInfoExtraData,
             &enable_sei_reporting, (size_t)sizeof(enable_sei_reporting));
 
-    if (err != OK) {
-        return err;
-    }
-
+    if (err != OK)
+       LOGV("Not supported parameter OMX_QcomIndexParamFrameInfoExtraData");
 
     OMX_VIDEO_CODINGTYPE compressionFormat = OMX_VIDEO_CodingUnused;
     if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime)) {
@@ -3522,6 +3520,12 @@ status_t OMXCodec::processSEIData(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags)
                                          //struct if video is not H264
         status_t err = mOMX->getConfig(mNode, (OMX_INDEXTYPE)OMX_QcomIndexConfigVideoFramePackingArrangement,
                                        &arrangementInfo, (size_t)sizeof(arrangementInfo));
+
+        if (err != OK)
+        {
+            LOGV("Not supported config OMX_QcomIndexConfigVideoFramePackingArrangement");
+            return OK;
+        }
 
         int oldColorFormat, newColorFormat;
         mOutputFormat->findInt32(kKeyColorFormat, &oldColorFormat);
