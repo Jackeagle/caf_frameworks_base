@@ -504,7 +504,7 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool cle
     overlay::Overlay* temp = hw.getOverlayObject();
     if (!temp->setSource(src.hor_stride, src.ver_stride, src.img.format, mLayer.getOrientation()))
         return INVALID_OPERATION;
-    if (!temp->setCrop(0, 0, src.img.w, src.img.h))
+    if (!temp->setCrop(0, 0, src.crop.r, src.crop.b))
         return INVALID_OPERATION;
     const Rect bounds(mLayer.mTransformedBounds);
     int x = bounds.left;
