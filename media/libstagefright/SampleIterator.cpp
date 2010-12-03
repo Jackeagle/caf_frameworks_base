@@ -41,7 +41,8 @@ SampleIterator::SampleIterator(SampleTable *table)
       mCompositionTimeToSampleIndex(0),
       mCompositionTTSSampleIndex(0),
       mCompositionTTSCount(0),
-      mCompositionTTSDuration(0) {
+      mCompositionTTSDuration(0),
+      mCurrentSampleTime(0) {
     reset();
 }
 
@@ -299,7 +300,7 @@ status_t SampleIterator::getSampleSizeDirect(
 }
 
 status_t SampleIterator::findSampleTime(
-        uint32_t sampleIndex, uint32_t *time) {
+        uint32_t sampleIndex, uint64_t *time) {
     if (sampleIndex >= mTable->mNumSampleSizes) {
         return ERROR_OUT_OF_RANGE;
     }
