@@ -591,10 +591,13 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                 }
             }
         } else if (mUseEGLImageDirectly) {
-               sp<GraphicBuffer> mTempGraphicBuffer = new GraphicBuffer(src.img.w,
-                           src.img.h, src.img.format,
+               sp<GraphicBuffer> mTempGraphicBuffer = new GraphicBuffer(
+                           src.crop.r, src.crop.b, src.img.format,
                            GraphicBuffer::USAGE_HW_TEXTURE, src.img.w,
                            src.img.handle, false);
+
+               mTempGraphicBuffer->setVerticalStride(src.img.h);
+
                err = mLayer.initializeEglImage(mTempGraphicBuffer, &mTexture);
         } else {
                err = INVALID_OPERATION;
