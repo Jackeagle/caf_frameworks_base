@@ -65,6 +65,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
         INITING,
         CONNECTING,
         SCANNING,
+        WAITING_ALARM,
         CONNECTED,
         DISCONNECTING,
         FAILED
@@ -430,6 +431,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
                 case INITING:
                 case CONNECTING:
                 case SCANNING:
+                case WAITING_ALARM:
                     ret = DataState.CONNECTING;
                     break;
             }
