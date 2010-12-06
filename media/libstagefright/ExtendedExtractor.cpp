@@ -43,22 +43,32 @@
 #include "include/ExtendedExtractor.h"
 
 static const char* MM_PARSER_LIB = "libmmparser.so";
+static const char* MM_PARSER_LITE_LIB = "libmmparser_lite.so";
 
 namespace android {
 
 void* MmParserLib() {
     static void* mmParserLib = NULL;
-    static bool alreadyTriedToOpenMmParser = false;
+    static bool alreadyTriedToOpenMmParsers = false;
 
-    if(alreadyTriedToOpenMmParser) {
+    if(alreadyTriedToOpenMmParsers) {
         return mmParserLib;
     }
 
-    mmParserLib = ::dlopen(MM_PARSER_LIB, RTLD_LAZY);
-    alreadyTriedToOpenMmParser = true;
+    alreadyTriedToOpenMmParsers = true;
 
-    if (mmParserLib == NULL) {
-        LOGE("Failed to open MM_PARSER_LIB, dlerror = %s \n", dlerror());
+    mmParserLib = ::dlopen(MM_PARSER_LIB, RTLD_LAZY);
+
+    if(mmParserLib != NULL) {
+        return mmParserLib;
+    }
+
+    LOGV("Failed to open MM_PARSER_LIB, dlerror = %s \n", dlerror());
+
+    mmParserLib = ::dlopen(MM_PARSER_LITE_LIB, RTLD_LAZY);
+
+    if(mmParserLib == NULL) {
+        LOGV("Failed to open MM_PARSER_LITE_LIB, dlerror = %s \n", dlerror());
     }
 
     return mmParserLib;
