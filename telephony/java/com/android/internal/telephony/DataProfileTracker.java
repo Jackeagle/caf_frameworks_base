@@ -336,6 +336,7 @@ public class DataProfileTracker extends Handler {
 
     void setServiceTypeAsActive(DataServiceType ds, DataConnection dc, IPVersion ipv) {
         dsMap.get(ds).setDataServiceTypeAsActive(dc, ipv);
+        getRetryManager(ds, ipv).resetRetryCount();
 
         /* preferred APN handling */
         if (ds == DataServiceType.SERVICE_TYPE_DEFAULT
@@ -391,8 +392,8 @@ public class DataProfileTracker extends Handler {
         return dsMap.get(ds).getState(ipv);
     }
 
-    RetryManager getRetryManager(DataServiceType ds) {
-        return dsMap.get(ds).getRetryManager();
+    RetryManager getRetryManager(DataServiceType ds, IPVersion ipv) {
+        return dsMap.get(ds).getRetryManager(ipv);
     }
 
     void registerForDataProfileDbChanged(Handler h, int what, Object obj) {
