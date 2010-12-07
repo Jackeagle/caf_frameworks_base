@@ -116,7 +116,7 @@ public class PhoneFactory {
 
                 //Get preferredNetworkMode from Settings.System
                 int cdmaSubscription = Settings.Secure.getInt(context.getContentResolver(),
-                    Settings.Secure.PREFERRED_CDMA_SUBSCRIPTION, preferredCdmaSubscription);
+                        Settings.Secure.CDMA_SUBSCRIPTION_MODE, preferredCdmaSubscription);
                 Log.i(LOG_TAG, "Cdma Subscription set to " + Integer.toString(cdmaSubscription));
                 sProxyPhone = new PhoneProxy[numPhones];
                 sCommandsInterface = new RIL[numPhones];
