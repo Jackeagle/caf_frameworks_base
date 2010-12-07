@@ -51,7 +51,6 @@ struct OMXCodec : public MediaSource,
 
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
-    virtual status_t pause();
 
     virtual sp<MetaData> getFormat();
 
@@ -257,6 +256,8 @@ private:
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
+public:
+    virtual status_t pause();
 };
 
 struct CodecProfileLevel {
