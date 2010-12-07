@@ -586,6 +586,8 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
                 mIWindowManager.removeWindowToken(mWallpaperConnection.mToken);
             } catch (RemoteException e) {
             }
+            mWallpaperConnection.mService = null;
+            mWallpaperConnection.mEngine = null;
             mWallpaperConnection = null;
         }
     }
