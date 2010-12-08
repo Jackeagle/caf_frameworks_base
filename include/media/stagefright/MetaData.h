@@ -70,11 +70,19 @@ enum {
     //keymap value for stride and slice height
     kKeyStride            = 'stri',  // int32_t
     kKeySliceHeight       = 'slic',  // int32_t
+    kKeyDivXVersion       = 'DivX',  // int32_t
 };
 
 enum {
     kTypeESDS        = 'esds',
     kTypeAVCC        = 'avcc',
+};
+
+enum {
+    kTypeDivXVer_3_11,
+    kTypeDivXVer_4,
+    kTypeDivXVer_5,
+    kTypeDivXVer_6,
 };
 
 class MetaData : public RefBase {
