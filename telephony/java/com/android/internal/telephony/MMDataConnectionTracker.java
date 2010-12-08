@@ -970,10 +970,30 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
-    /* disconnect exactly one data call whos priority is lower than serviceType */
+    /* disconnect exactly one data call whose priority is lower than serviceType
+     * In OMH scenario disconnect one data call whose priority is lower than or
+     * equal to the serviceType.
+     */
     private boolean disconnectOneLowPriorityDataCall(DataServiceType serviceType, String reason) {
         for (DataServiceType ds : DataServiceType.values()) {
-            if (ds.isLowerPriorityThan(serviceType) && mDpt.isServiceTypeEnabled(ds)
+            /* In OMH case, disconnect a call whose priority is lower than (or)
+             *  equal to the serviceType. In the case of OMH two service types
+             *  of same priority , we consider the existing serviceType to be
+             *  lower in priority when compared to the newly requested
+             *  service type.
+             */
+            boolean arbitrationCheck = false;
+
+            if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
+                if(serviceType != ds) {
+                    /* arbitration needed */
+                    arbitrationCheck = (ds.isLowerPriorityThan(serviceType) || ds.isEqualPriority(serviceType));
+                }
+            } else {
+                    arbitrationCheck = ds.isLowerPriorityThan(serviceType);
+            }
+
+            if ( arbitrationCheck && mDpt.isServiceTypeEnabled(ds)
                     && mDpt.isServiceTypeActive(ds)) {
                 // we are clueless as to whether IPV4/IPV6 are on same network PDP or
                 // different, so disconnect both.
@@ -992,6 +1012,20 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 if (disconnectDone) {
                     return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    /*
+     * Check if higher priority data call is active whose priority is greater
+     * than the specified service type.
+     */
+    private boolean isHigherPriorityDataCallActive(DataServiceType serviceType) {
+        for (DataServiceType ds : DataServiceType.values()) {
+            if (ds.isHigherPriorityThan(serviceType) && mDpt.isServiceTypeEnabled(ds)
+                    && mDpt.isServiceTypeActive(ds)) {
+                return true;
             }
         }
         return false;
@@ -1257,6 +1291,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     private RadioTechnology getRadioTechnology() {
+
+
         if (mCheckForConnectivity) {
             return RadioTechnology.getRadioTechFromInt(mDsst.getDataServiceState()
                     .getRadioTechnology());
@@ -1318,6 +1354,17 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             notifyDataConnection(ds, ipv, reason);
             return false;
         }
+       if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
+           // If the call indeed got disconnected return, otherwise pass through
+           if(disconnectOneLowPriorityDataCall(ds, reason)) {
+               logw("[OMH] Lower/Equal priority call disconnected.");
+               return true;
+           }
+           if(isHigherPriorityDataCallActive(ds)) {
+               logw("[OMH] Higher priority call active. Ignoring setup data call request.");
+               return false;
+           }
+        }
         DataConnection dc = findFreeDataCall();
         if (dc == null) {
             // if this happens, it probably means that our data call list is not
@@ -1373,7 +1420,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         } else if (r.isGsm()) {
             type = DataProfileType.PROFILE_TYPE_3GPP_APN;
         } else {
-            if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+            if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
                 type = DataProfileType.PROFILE_TYPE_3GPP2_OMH;
             } else {
                 type = DataProfileType.PROFILE_TYPE_3GPP2_NAI;

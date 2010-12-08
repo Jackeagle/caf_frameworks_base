@@ -86,7 +86,7 @@ public class MMDataConnection extends DataConnection {
                     .toString(cp.ipv == IPVersion.IPV6 ? 1 : 0),
                     obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE, cp));
         } else if (cp.dp.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP2_OMH) {
-            if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+            if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
                 DataProfileOmh dp = (DataProfileOmh) cp.dp;
 
                 // Offset by DATA_PROFILE_OEM_BASE as this is modem provided profile id

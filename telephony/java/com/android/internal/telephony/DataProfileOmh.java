@@ -72,6 +72,31 @@ class DataProfileOmh extends DataProfile {
         public DataServiceType getDataServiceType() {
             return serviceType;
         }
+
+        public static DataProfileTypeModem getDataProfileTypeModem(DataServiceType dst) {
+            DataProfileTypeModem  dptModem = PROFILE_TYPE_UNSPECIFIED;
+            switch (dst) {
+                case SERVICE_TYPE_DEFAULT:
+                    dptModem = PROFILE_TYPE_UNSPECIFIED;
+                    break;
+                case SERVICE_TYPE_MMS:
+                    dptModem = PROFILE_TYPE_MMS;
+                    break;
+                case SERVICE_TYPE_SUPL:
+                    dptModem = PROFILE_TYPE_LBS;
+                    break;
+                case SERVICE_TYPE_DUN:
+                    dptModem = PROFILE_TYPE_TETHERED;
+                    break;
+                 default:
+                     /*
+                      * TODO: What do we do for spl. service types such as HIPRI and VERIZON?
+                      */
+                     dptModem = PROFILE_TYPE_UNSPECIFIED;
+                     break;
+            }
+            return dptModem;
+        }
     }
 
     private int DATA_PROFILE_OMH_PRIORITY_LOWEST = 255;
@@ -79,6 +104,8 @@ class DataProfileOmh extends DataProfile {
     private int DATA_PROFILE_OMH_PRIORITY_HIGHEST = 0;
 
     private DataProfileTypeModem mDataProfileModem;
+
+    private int serviceTypeMasks = 0;
 
     /* ID of the profile in the modem */
     private int mProfileId = 0;
@@ -98,7 +125,8 @@ class DataProfileOmh extends DataProfile {
 
     @Override
     boolean canHandleServiceType(DataServiceType type) {
-        return type == mDataProfileModem.getDataServiceType();
+        return ( 0 != (serviceTypeMasks & DataProfileTypeModem.
+                getDataProfileTypeModem(type).getid()));
     }
 
     @Override
@@ -176,5 +204,9 @@ class DataProfileOmh extends DataProfile {
 
     public int getPriority() {
         return mPriority;
+    }
+
+    public void addServiceType(DataProfileTypeModem modemProfile) {
+        serviceTypeMasks |= modemProfile.getid();
     }
 }

@@ -162,4 +162,14 @@ public interface TelephonyProperties
 
     /** The delay between sms sending retries */
     static final String PROPERTY_SMS_RETRY_DELAY = "persist.radio.sms_retry_delay";
+
+    static final String PROPERTY_OMH_ENABLED = "persist.omh.enabled";
+
+    /**
+     * Priorities associated with different data services (apn types). These
+     * priorities will be used to determine which data profiles (apns) need to
+     * be used when network is not known to support multiple PDN.
+     * Priorities.
+     */
+    static final String PROPERTY_DATA_SERVICE_PRIORITIES = "persist.telephony.ds.priorities";
 }

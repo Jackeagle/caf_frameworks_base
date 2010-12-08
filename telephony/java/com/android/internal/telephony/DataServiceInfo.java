@@ -155,15 +155,15 @@ public class DataServiceInfo {
      */
     DataProfile getNextArbitratedProfile(DataProfileType profileType, IPVersion ipv) {
 
-        if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
-            logi("Looking at OMH profiles");
+        if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
+            logi("[OMH] Looking at OMH profiles");
             DataProfile profile = null;
             for (DataProfile dp : mDataProfileList) {
                 if (dp.getDataProfileType() == profileType && dp.isWorking(ipv) == true
                         && dp.canSupportIpVersion(ipv)) {
 
                     if (!((DataProfileOmh)dp).isValidPriority()) {
-                        logi("Invalid priority, skipping profile...");
+                        logi("[OMH] Invalid priority, skipping profile...");
                         continue;
                     }
 
@@ -184,7 +184,7 @@ public class DataServiceInfo {
     /* Search through the android profiles for a match */
     DataProfile getNextWorkingAndroidProfile(DataProfileType profileType, IPVersion ipv) {
 
-        if (SystemProperties.getBoolean("persist.omh.modemDataProfiles", false)) {
+        if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
             // If we have reached here, then there are no OMH profiles available
             // falling back to CDMA NAI profiles
             logi("No suitable OMH profiles found, fallback to CDMA NAI");
