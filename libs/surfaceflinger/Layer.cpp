@@ -546,10 +546,13 @@ void Layer::setDrawingSize(uint32_t w, uint32_t h) {
 void Layer::lockPageFlip(bool& recomputeVisibleRegions)
 {
     ssize_t buf = lcblk->retireAndLock();
+    mNothingToUpdate = false;
+
     if (buf < NO_ERROR) {
         //LOGW("nothing to retire (%s)", strerror(-buf));
         // NOTE: here the buffer is locked because we will used 
         // for composition later in the loop
+        mNothingToUpdate = true;
         return;
     }
 
