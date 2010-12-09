@@ -113,6 +113,8 @@ public:
     virtual void signal() const = 0;
 
     virtual void enableHDMIOutput(int enable) = 0;
+    virtual void setActionSafeWidthRatio(float asWidthRatio) = 0;
+    virtual void setActionSafeHeightRatio(float asHeightRatio) = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -132,7 +134,9 @@ public:
         FREEZE_DISPLAY,
         UNFREEZE_DISPLAY,
         SIGNAL,
-	ENABLE_HDMI_OUTPUT
+        ENABLE_HDMI_OUTPUT,
+        SET_ACTIONSAFE_WIDTH_RATIO,
+        SET_ACTIONSAFE_HEIGHT_RATIO
     };
 
     virtual status_t    onTransact( uint32_t code,

@@ -644,5 +644,14 @@ void SurfaceComposerClient::enableHDMIOutput(int enable)
     return sm->enableHDMIOutput(enable);
 }
 
+void SurfaceComposerClient::setActionSafeWidthRatio(float asWidthRatio){
+    sp<ISurfaceComposer> sm(getComposerService());
+    return sm->setActionSafeWidthRatio(asWidthRatio);
+}
+void SurfaceComposerClient::setActionSafeHeightRatio(float asHeightRatio){
+    sp<ISurfaceComposer> sm(getComposerService());
+    return sm->setActionSafeHeightRatio(asHeightRatio);
+}
+
 }; // namespace android
 

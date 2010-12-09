@@ -86,6 +86,8 @@ public:
     void        orientationChanged(int orientation) const;
     void        videoOverlayStarted(bool started) const;
     void        enableHDMIOutput(int enable) const;
+    void        setActionSafeWidthRatio(float asWidthRatio) const;
+    void        setActionSafeHeightRatio(float asHeightRatio) const;
 
     uint32_t getPageFlipCount() const;
     EGLDisplay getEGLDisplay() const { return mDisplay; }

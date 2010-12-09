@@ -58,6 +58,8 @@ namespace android {
 #define HDMI_CMD_DISABLE_HDMI   "disable_hdmi"
 #define HDMI_CMD_CHANGE_MODE    "change_mode: "
 #define HDMI_CMD_MIRROR         "hdmi_mirror: "
+#define HDMI_CMD_SET_ASWIDTH    "set_aswidth: "
+#define HDMI_CMD_SET_ASHEIGHT   "set_asheight: "
 
 #define SYSFS_CONNECTED         DEVICE_ROOT "/" DEVICE_NODE "/connected"
 #define SYSFS_EDID_MODES        DEVICE_ROOT "/" DEVICE_NODE "/edid_modes"
@@ -557,6 +559,18 @@ int HDMIDaemon::processFrameworkCommand()
             } else {
                  property_set("hw.hdmiON", "0");
             }
+        }
+    } else if (!strncmp(buffer, HDMI_CMD_SET_ASWIDTH, strlen(HDMI_CMD_SET_ASWIDTH))) {
+        float asWidthRatio;
+        int ret = sscanf(buffer, HDMI_CMD_SET_ASWIDTH "%f", &asWidthRatio);
+        if(ret==1) {
+            SurfaceComposerClient::setActionSafeWidthRatio(asWidthRatio);
+        }
+    } else if (!strncmp(buffer, HDMI_CMD_SET_ASHEIGHT, strlen(HDMI_CMD_SET_ASHEIGHT))) {
+        float asHeightRatio;
+        int ret = sscanf(buffer, HDMI_CMD_SET_ASHEIGHT "%f", &asHeightRatio);
+        if(ret==1) {
+            SurfaceComposerClient::setActionSafeHeightRatio(asHeightRatio);
         }
     } else {
         int mode;
