@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +68,9 @@ class HTML5VideoViewProxy extends Handler
     private static final int PAUSE               = 102;
     private static final int ERROR               = 103;
     private static final int LOAD_DEFAULT_POSTER = 104;
+    private static final int SUSPEND             = 105;
+    private static final int RESUME              = 106;
+
 
     // Message Ids to be handled on the WebCore thread
     private static final int PREPARED          = 200;
@@ -142,6 +146,15 @@ class HTML5VideoViewProxy extends Handler
                     }
                     mLayout = null;
                 }
+
+                public void onCustomViewSuspend() {
+                    suspend( mCurrentProxy );
+                }
+
+                public void onCustomViewResume() {
+                    resume( mCurrentProxy );
+                }
+
             };
 
         public static void play(String url, int time, HTML5VideoViewProxy proxy,
@@ -220,6 +233,30 @@ class HTML5VideoViewProxy extends Handler
             }
         }
 
+        public static void suspend(HTML5VideoViewProxy proxy) {
+            if (mCurrentProxy == proxy && mVideoView != null) {
+                mTimer.cancel();
+                mTimer = null;
+                mVideoView.suspend();
+                if (mProgressView != null) {
+                    mLayout.removeView(mProgressView);
+                    mProgressView = null;
+                }
+            }
+        }
+
+        public static void resume(HTML5VideoViewProxy proxy) {
+            if (mCurrentProxy == proxy && mVideoView != null) {
+                mVideoView.resume();
+                mTimer = new Timer();
+                if (mTimer != null )
+                {
+                    mTimer.schedule(new TimeupdateTask(mCurrentProxy), TIMEUPDATE_PERIOD, TIMEUPDATE_PERIOD);
+                }
+                mLayout.setVisibility(View.VISIBLE);
+            }
+        }
+
         public static void onPrepared() {
             if (mProgressView == null || mLayout == null) {
                 return;
@@ -288,6 +325,14 @@ class HTML5VideoViewProxy extends Handler
             }
             case PAUSE: {
                 VideoPlayer.pause(this);
+                break;
+            }
+            case SUSPEND: {
+                VideoPlayer.suspend(this);
+                break;
+            }
+            case RESUME: {
+                VideoPlayer.resume(this);
                 break;
             }
             case ENDED:
