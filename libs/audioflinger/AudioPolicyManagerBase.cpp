@@ -1455,6 +1455,9 @@ uint32_t AudioPolicyManagerBase::getDeviceForStrategy(routing_strategy strategy,
             if (device) break;
             device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET;
             if (device) break;
+            if (mPhoneState == AudioSystem::MODE_RINGTONE)
+                device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
+            if (device) break;
             device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_EARPIECE;
             if (device == 0) {
                 LOGE("getDeviceForStrategy() earpiece device not found");
