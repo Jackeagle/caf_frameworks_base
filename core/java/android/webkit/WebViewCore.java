@@ -203,7 +203,7 @@ final class WebViewCore {
         // WebCore thread handler.
         mEventHub.transferMessages();
 
-        DnsResolver.createDnsResolver();
+        DnsResolver.createDnsResolver(mContext);
 
         // Send a message back to WebView to tell it that we have set up the
         // WebCore thread.

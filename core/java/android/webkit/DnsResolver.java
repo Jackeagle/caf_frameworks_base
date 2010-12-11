@@ -42,6 +42,7 @@ import java.util.concurrent.Semaphore;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import android.content.Context;
 
 final class DnsResolver {
 
@@ -60,6 +61,8 @@ final class DnsResolver {
 
     private volatile boolean mShutDownInProgress = false;
 
+    private final Context mContext;
+
     private static DnsResolver sDnsResolver;
 
     private HashMap mHostNamesToBeResolved;
@@ -71,11 +74,15 @@ final class DnsResolver {
     /* Lock to synchronize the access to threadpool */
     private static Object mThreadPoolLock = new Object();
 
-    public static synchronized DnsResolver createDnsResolver() {
+    public static synchronized DnsResolver createDnsResolver(Context context) {
+        if(context == null) {
+            Log.e(LOGTAG, "Could not create DNS Resolver: NULL context");
+            return null;
+        }
         if (DebugFlags.WEB_VIEW_CORE)
             Log.v(LOGTAG, "Creating DNS resolver");
         if (sDnsResolver == null) {
-            sDnsResolver = new DnsResolver();
+            sDnsResolver = new DnsResolver(context);
         }
         ++mDnsResolverRefCount;
         return sDnsResolver;
@@ -85,8 +92,20 @@ final class DnsResolver {
         return sDnsResolver;
     }
 
-    private DnsResolver() {
+    private DnsResolver(Context context) {
+        mContext = context;
         createDnsResolverThreadPool();
+    }
+
+    private boolean shouldPerformDnsPrefetch() {
+        boolean status = true;
+        /* DNS prefetch should not be started if proxy is setup */
+        if(Network.getInstance(mContext) != null) {
+            status = !Network.getInstance(mContext).isValidProxySet();
+            if (DebugFlags.WEB_VIEW_CORE && !status)
+                Log.v(LOGTAG, "DNS prefetch not started because proxy is set");
+        }
+        return status;
     }
 
     private void createDnsResolverThreadPool() {
@@ -171,6 +190,9 @@ final class DnsResolver {
         if(hostName == null) {
             return;
         }
+        if(!shouldPerformDnsPrefetch())
+            return;
+
         synchronized(mHostNamesToBeResolved) {
             if(mHostNamesToBeResolved.size() > 0 ) {
                 return;
@@ -184,6 +206,9 @@ final class DnsResolver {
         if(hostMap == null) {
             return;
         }
+        if(!shouldPerformDnsPrefetch())
+            return;
+
         synchronized (mHostNamesToBeResolved) {
             mHostNamesToBeResolved.putAll(hostMap);
         }
