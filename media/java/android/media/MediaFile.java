@@ -49,13 +49,14 @@ public class MediaFile {
     public static final int FILE_TYPE_QCP     = 8;
     public static final int FILE_TYPE_AAC     = 9;
     public static final int FILE_TYPE_3GPA    = 10;
+    public static final int FILE_TYPE_AC3     = 11;
     private static final int FIRST_AUDIO_FILE_TYPE = FILE_TYPE_MP3;
-    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_3GPA;
+    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_AC3;
 
     // MIDI file types
-    public static final int FILE_TYPE_MID     = 11;
-    public static final int FILE_TYPE_SMF     = 12;
-    public static final int FILE_TYPE_IMY     = 13;
+    public static final int FILE_TYPE_MID     = 12;
+    public static final int FILE_TYPE_SMF     = 13;
+    public static final int FILE_TYPE_IMY     = 14;
     private static final int FIRST_MIDI_FILE_TYPE = FILE_TYPE_MID;
     private static final int LAST_MIDI_FILE_TYPE = FILE_TYPE_IMY;
    
@@ -178,6 +179,7 @@ public class MediaFile {
         addFileType("M3U", FILE_TYPE_M3U, "audio/x-mpegurl");
         addFileType("PLS", FILE_TYPE_PLS, "audio/x-scpls");
         addFileType("WPL", FILE_TYPE_WPL, "application/vnd.ms-wpl");
+        addFileType("AC3", FILE_TYPE_AC3, "audio/ac3");
 
         // compute file extensions list for native Media Scanner
         StringBuilder builder = new StringBuilder();
