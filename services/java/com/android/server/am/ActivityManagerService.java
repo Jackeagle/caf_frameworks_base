@@ -11431,6 +11431,14 @@ public final class ActivityManagerService extends ActivityManagerNative implemen
             if (DEBUG_SERVICE) Slog.v(
                 TAG, "Removed service that is not running: " + r.shortName);
         }
+
+        if(r.bindings.size() > 0) {
+           r.bindings.clear();
+        }
+
+        if(r.restarter instanceof ServiceRestarter) {
+          ((ServiceRestarter)r.restarter).setService(null);
+        }
     }
 
     ComponentName startServiceLocked(IApplicationThread caller,
