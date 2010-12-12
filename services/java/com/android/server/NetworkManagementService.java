@@ -653,7 +653,7 @@ class NetworkManagementService extends INetworkManagementService.Stub {
         return getInterfaceThrottle(iface, false);
     }
 
-    public void replaceV4SrcRoute(String iface, String ipAddr, String gatewayAddr, int routeId) {
+    public boolean replaceV4SrcRoute(String iface, String ipAddr, String gatewayAddr, int routeId) {
         try {
             String cmd;
             if ((gatewayAddr == null) ||
@@ -671,22 +671,25 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NullPointerException npe) {
             Slog.e(TAG, "Null pointer exception while trying to add src route");
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to set route %s: for iface [%s] ip [%s] rid [%d]",
                                   nde, iface, ipAddr, routeId));
         }
-        return;
+        return false;
     }
 
-    public void replaceV6SrcRoute(String iface, String ipAddr, String gatewayAddr, int routeId) {
+    public boolean replaceV6SrcRoute(String iface, String ipAddr, String gatewayAddr, int routeId) {
         try {
             String cmd;
             if ((gatewayAddr == null) || (gatewayAddr.startsWith("0"))
@@ -704,22 +707,25 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NullPointerException npe) {
             Slog.e(TAG, "Null pointer exception while trying to add src route");
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to set route %s: for iface [%s] ip [%s] rid [%d]",
                                   nde, iface, ipAddr, routeId));
         }
-        return;
+        return false;
     }
 
-    public void delV4SrcRoute(int routeId) {
+    public boolean delV4SrcRoute(int routeId) {
         try {
             String cmd = String.format("route del src v4 %d", routeId);
             String rsp = mConnector.doCommand(cmd).get(0);
@@ -730,19 +736,22 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to del src route %s: for rid [%d]", nde, routeId));
         }
-        return;
+        return false;
     }
 
-    public void delV6SrcRoute(int routeId) {
+    public boolean delV6SrcRoute(int routeId) {
         try {
             String cmd = String.format("route del src v6 %d", routeId);
             String rsp = mConnector.doCommand(cmd).get(0);
@@ -753,19 +762,22 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to del src route %s: for rid [%d]", nde, routeId));
         }
-        return;
+        return false;
     }
 
-    public void replaceV4DefaultRoute(String iface, String gatewayAddr) {
+    public boolean replaceV4DefaultRoute(String iface, String gatewayAddr) {
         try {
             String cmd;
             if ((gatewayAddr == null) || (gatewayAddr.startsWith("0")) || (gatewayAddr.length() == 0)) {
@@ -781,22 +793,25 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NullPointerException npe) {
             Slog.e(TAG, "Null pointer exception while trying to replace def route");
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to replace default route %s: for iface [%s]",
                                   nde, iface));
         }
-        return;
+        return false;
     }
 
-    public void replaceV6DefaultRoute(String iface, String gatewayAddr) {
+    public boolean replaceV6DefaultRoute(String iface, String gatewayAddr) {
         try {
             String cmd;
             if ((gatewayAddr == null) || (gatewayAddr.startsWith("0"))
@@ -813,22 +828,25 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NullPointerException npe) {
             Slog.e(TAG, "Null pointer exception while trying to replace def route");
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to replace default route %s: for iface [%s]",
                                   nde, iface));
         }
-        return;
+        return false;
     }
 
-    public void addDstRoute(String iface, String ipAddr, String gatewayAddr) {
+    public boolean addDstRoute(String iface, String ipAddr, String gatewayAddr) {
         try {
             String ipver = (ipAddr.contains(":")) ? "v6" : "v4";
             String cmd;
@@ -847,22 +865,25 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NullPointerException npe) {
             Slog.e(TAG, "Null pointer exception while trying to add dst route, check ipAddr");
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to add dst route %s: for iface [%s] ip [%s]",
                                   nde, iface, ipAddr));
         }
-        return;
+        return false;
     }
 
-    public void delDstRoute(String ipAddr) {
+    public boolean delDstRoute(String ipAddr) {
         try {
             String ipver = (ipAddr.contains(":")) ? "v6" : "v4";
             String cmd = String.format("route del dst %s %s", ipver, ipAddr);
@@ -874,16 +895,20 @@ class NetworkManagementService extends INetworkManagementService.Stub {
                 code = Integer.parseInt(tok[0]);
             } catch (NumberFormatException nfe) {
                 Slog.e(TAG, String.format("Error parsing code %s", tok[0]));
-                return;
+                return false;
             }
-            if (code == NetdResponseCode.CommandOkay)
+            if (code == NetdResponseCode.CommandOkay) {
                 Slog.d(TAG, rsp);
-            else Slog.e(TAG, rsp);
-
+                return true;
+            } else {
+                Slog.e(TAG, rsp);
+                return false;
+            }
         } catch (NullPointerException npe) {
             Slog.e(TAG, "Null pointer exception while trying to del dst route, check ipAddr");
         } catch (NativeDaemonConnectorException nde) {
             Slog.e(TAG, String.format("Failed to del dst route %s: for ip [%s]", nde, ipAddr));
         }
+        return false;
     }
 }
