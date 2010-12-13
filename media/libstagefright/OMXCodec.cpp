@@ -52,7 +52,6 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <OMX_Component.h>
 
 #include <OMX_QCOMExtns.h>
-#include <QOMX_AudioExtensions.h>
 
 namespace android {
 
@@ -603,10 +602,11 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         }
     }
     if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_AC3, mMIME)) {
-        int32_t numChannels, sampleRate;
+        return BAD_TYPE;
+        /*int32_t numChannels, sampleRate;
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
-        setAC3Format(numChannels, sampleRate);
+        setAC3Format(numChannels, sampleRate);*/
     }
     if (!strncasecmp(mMIME, "video/", 6)) {
         int32_t width, height;
@@ -2496,7 +2496,8 @@ void OMXCodec::setAACFormat(int32_t numChannels, int32_t sampleRate) {
     }
 }
 
-void OMXCodec::setAC3Format(int32_t numChannels, int32_t sampleRate) {
+void OMXCodec::setAC3Format(int32_t /*numChannels*/, int32_t /*sampleRate*/) {
+/*
     QOMX_AUDIO_PARAM_AC3TYPE profileAC3;
     QOMX_AUDIO_PARAM_AC3PP profileAC3PP;
     OMX_INDEXTYPE indexTypeAC3;
@@ -2570,6 +2571,7 @@ void OMXCodec::setAC3Format(int32_t numChannels, int32_t sampleRate) {
     profileAC3PP.eChannelRouting[1] =  OMX_AUDIO_AC3_CHANNEL_RIGHT;
     err = mOMX->setParameter(mNode, indexTypeAC3PP, &profileAC3PP, sizeof(profileAC3PP));
     CHECK_EQ(err, OK);
+*/
 }
 
 void OMXCodec::setImageOutputFormat(
