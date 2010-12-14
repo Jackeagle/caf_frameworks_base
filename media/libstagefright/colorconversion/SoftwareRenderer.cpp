@@ -63,7 +63,9 @@ SoftwareRenderer::SoftwareRenderer(
             mMemoryHeap);
 
     status_t err = mISurface->registerBuffers(bufferHeap);
-    CHECK_EQ(err, OK);
+    if(err != OK) {
+        LOGE("Register Buffer failed = %d",err);
+    }
 }
 
 SoftwareRenderer::~SoftwareRenderer() {
