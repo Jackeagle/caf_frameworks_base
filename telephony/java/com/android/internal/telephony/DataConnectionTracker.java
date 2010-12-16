@@ -588,7 +588,20 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     void notifyDataConnectionFail(String reason) {
         // Notify the Data Connection failed only if this is the active DDS.
         if (getSubscription() == PhoneFactory.getDataSubscription()) {
-            mNotifier.notifyDataConnectionFailed(this, reason);
+            /*
+             * Notify data connection fail ONLY if no other data call is active and
+             * we give up on DEFAULT, or this will cause route deletion issues in
+             * network state trackers.
+             */
+            boolean isAnyServiceActive = false;
+            for (DataServiceType ds : DataServiceType.values()) {
+                if (mDpt.isServiceTypeActive(ds)) {
+                    isAnyServiceActive = true;
+                }
+            }
+            if (isAnyServiceActive == false) {
+                mNotifier.notifyDataConnectionFailed(this, reason);
+            }
         } else {
             Log.d(LOG_TAG, "[DCT" + getSubscription() +
                            "] notifyDataConnectionFail: Not the active DDS");
