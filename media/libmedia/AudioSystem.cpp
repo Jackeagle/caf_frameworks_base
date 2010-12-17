@@ -583,6 +583,7 @@ audio_io_handle_t AudioSystem::getOutput(stream_type stream,
     // to the first use case we want to cover (Voice Recognition and Voice Dialer over
     // Bluetooth SCO
     if ((flags & AudioSystem::OUTPUT_FLAG_DIRECT) == 0 &&
+        (stream != AudioSystem::FM ) &&
         ((stream != AudioSystem::VOICE_CALL && stream != AudioSystem::BLUETOOTH_SCO) ||
          channels != AudioSystem::CHANNEL_OUT_MONO ||
          (samplingRate != 8000 && samplingRate != 16000))) {
