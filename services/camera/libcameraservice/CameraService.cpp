@@ -537,8 +537,8 @@ status_t CameraService::Client::registerPreviewBuffers() {
     /* Check for the preview format requested by the application and pass
      * the same information while registering */
     const char * previewFormat = params.get(CameraParameters::KEY_PREVIEW_FORMAT);
-    if(!strcmp(previewFormat, CameraParameters::PIXEL_FORMAT_YUV420SP_ADRENO))
-        mPixelFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO;
+    //if(!strcmp(previewFormat, CameraParameters::PIXEL_FORMAT_YUV420SP_ADRENO))
+    //    mPixelFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO;
     LOGI("registerPreviewBuffers: previewFormat = %s and PixelFormat = %d",
                                                    previewFormat, mPixelFormat);
 
