@@ -1757,7 +1757,7 @@ status_t AwesomePlayer::suspend() {
         size_t size = mVideoBuffer[mVideoQueueLastRendered]->range_length();
         if (size) {
             int32_t unreadable;
-            if (!mVideoBuffer[mVideoQueueBack]->meta_data()->findInt32(
+            if (!mVideoBuffer[mVideoQueueLastRendered]->meta_data()->findInt32(
                         kKeyIsUnreadable, &unreadable)
                     || unreadable == 0) {
                 state->mLastVideoFrameSize = size;
