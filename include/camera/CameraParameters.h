@@ -347,9 +347,13 @@ public:
     static const char KEY_CONTINUOUS_AF[];
     static const char KEY_SUPPORTED_CONTINUOUS_AF[];
 
-    //Continuous AF.
+    //Selectable zone AF.
     static const char KEY_SELECTABLE_ZONE_AF[];
     static const char KEY_SUPPORTED_SELECTABLE_ZONE_AF[];
+
+    //Face Detection
+    static const char KEY_FACE_DETECTION[];
+    static const char KEY_SUPPORTED_FACE_DETECTION[];
 
     // Values for white balance settings.
     static const char WHITE_BALANCE_AUTO[];
@@ -506,6 +510,10 @@ public:
     static const char SELECTABLE_ZONE_AF_SPOT_METERING[];
     static const char SELECTABLE_ZONE_AF_CENTER_WEIGHTED[];
     static const char SELECTABLE_ZONE_AF_FRAME_AVERAGE[];
+
+    // Values for Face Detection settings.
+    static const char FACE_DETECTION_OFF[];
+    static const char FACE_DETECTION_ON[];
 
     enum {
         CAMERA_ORIENTATION_UNKNOWN = 0,

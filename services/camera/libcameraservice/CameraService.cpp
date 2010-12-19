@@ -924,6 +924,17 @@ status_t CameraService::Client::sendCommand(int32_t cmd, int32_t arg1, int32_t a
         case CAMERA_CMD_HISTOGRAM_SEND_DATA:
              break;
 
+        case CAMERA_CMD_FACE_DETECTION_ON:
+             mHardware->enableMsgType(CAMERA_MSG_META_DATA);
+             break;
+
+        case CAMERA_CMD_FACE_DETECTION_OFF:
+             mHardware->disableMsgType(CAMERA_MSG_META_DATA);
+             break;
+
+        case CAMERA_CMD_SEND_META_DATA:
+             break;
+
     }
     return mHardware->sendCommand(cmd, arg1, arg2);
 }
