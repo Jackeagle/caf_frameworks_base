@@ -145,6 +145,7 @@ enum media_recorder_info_type {
     MEDIA_RECORDER_INFO_COMPLETION_STATUS         = 802,
     MEDIA_RECORDER_INFO_PROGRESS_FRAME_STATUS     = 803,
     MEDIA_RECORDER_INFO_PROGRESS_TIME_STATUS      = 804,
+    MEDIA_RECORDER_UNSUPPORTED_RESOLUTION         = 805,
 };
 
 // ----------------------------------------------------------------------------

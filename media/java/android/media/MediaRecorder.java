@@ -633,6 +633,10 @@ public class MediaRecorder
      * @see android.media.MediaRecorder.OnInfoListener
      */
     public static final int MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED = 801;
+    /** Unsupported resolution according to target.
+     * @see android.media.MediaRecorder.OnInfoListener
+     */
+    public static final int MEDIA_RECORDER_UNSUPPORTED_RESOLUTION = 805;
 
     /**
      * Interface definition for a callback to be invoked when an error
