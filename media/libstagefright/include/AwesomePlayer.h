@@ -185,10 +185,11 @@ private:
     status_t play_l();
 
     MediaBuffer **mVideoBuffer;
-    int mVideoQueueFront;
-    int mVideoQueueBack;
-    int mVideoQueueSize;
-    int mNumFramesToHold;
+    int32_t mVideoQueueFront;
+    int32_t mVideoQueueBack;
+    int32_t mVideoQueueLastRendered;
+    int32_t mVideoQueueSize;
+    int32_t mNumFramesToHold;
 
     sp<NuHTTPDataSource> mConnectingDataSource;
     sp<NuCachedSource2> mCachedSource;

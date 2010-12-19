@@ -257,6 +257,7 @@ AwesomePlayer::AwesomePlayer()
 
     mVideoQueueFront = 0;
     mVideoQueueBack  = 0;
+    mVideoQueueLastRendered = 0;
     mVideoQueueSize  = 0;
 
     reset();
@@ -463,6 +464,7 @@ void AwesomePlayer::reset_l() {
     }
     mVideoQueueFront = 0;
     mVideoQueueBack  = 0;
+    mVideoQueueLastRendered = 0;
     mVideoQueueSize  = 0;
 
     if (mRTSPController != NULL) {
@@ -1171,6 +1173,7 @@ void AwesomePlayer::onVideoEvent() {
 
         mVideoQueueFront = 0;
         mVideoQueueBack  = 0;
+        mVideoQueueLastRendered = 0;
         mVideoQueueSize  = 0;
     }
 
@@ -1288,6 +1291,7 @@ void AwesomePlayer::onVideoEvent() {
         mVideoRenderer->render(mVideoBuffer[mVideoQueueBack]);
     }
 
+    mVideoQueueLastRendered = mVideoQueueBack;
     mVideoQueueBack = (++mVideoQueueBack)%(BUFFER_QUEUE_CAPACITY);
     mVideoQueueSize++;
     if (mVideoQueueSize > mNumFramesToHold) {
@@ -1714,7 +1718,7 @@ status_t AwesomePlayer::suspend() {
     Mutex::Autolock autoLock(mLock);
 
     if (mSuspensionState != NULL) {
-        if (mVideoBuffer[mVideoQueueBack] == NULL) {
+        if (mVideoBuffer[mVideoQueueLastRendered] == NULL) {
             //go into here if video is suspended again
             //after resuming without being played between
             //them
@@ -1749,8 +1753,8 @@ status_t AwesomePlayer::suspend() {
     state->mFlags = mFlags & (PLAYING | AUTO_LOOPING | LOOPING | AT_EOS);
     getPosition(&state->mPositionUs);
 
-    if (mVideoBuffer[mVideoQueueBack] != NULL) {
-        size_t size = mVideoBuffer[mVideoQueueBack]->range_length();
+    if (mVideoBuffer[mVideoQueueLastRendered] != NULL) {
+        size_t size = mVideoBuffer[mVideoQueueLastRendered]->range_length();
         if (size) {
             int32_t unreadable;
             if (!mVideoBuffer[mVideoQueueBack]->meta_data()->findInt32(
@@ -1759,8 +1763,8 @@ status_t AwesomePlayer::suspend() {
                 state->mLastVideoFrameSize = size;
                 state->mLastVideoFrame = malloc(size);
                 memcpy(state->mLastVideoFrame,
-                       (const uint8_t *)mVideoBuffer[mVideoQueueBack]->data()
-                            + mVideoBuffer[mVideoQueueBack]->range_offset(),
+                       (const uint8_t *)mVideoBuffer[mVideoQueueLastRendered]->data()
+                            + mVideoBuffer[mVideoQueueLastRendered]->range_offset(),
                        size);
 
                 state->mVideoWidth = mVideoWidth;
@@ -1774,7 +1778,7 @@ status_t AwesomePlayer::suspend() {
                 LOGV("Unable to save last video frame, we have no access to "
                      "the decoded video data.");
             }
-	}
+	    }
     }
 
     reset_l();
