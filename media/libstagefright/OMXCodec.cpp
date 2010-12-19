@@ -60,6 +60,8 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 
 #include <OMX_QCOMExtns.h>
 
+#define OMX_COMPONENT_CAPABILITY_TYPE_INDEX 0xFF7A347
+
 namespace android {
 
 static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
@@ -3784,6 +3786,27 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
 		CHECK( success );
 		mOutputFormat->setInt32(kKeyWidth, width );
 	        mOutputFormat->setInt32(kKeyHeight, height );
+
+		/*Do dummy call for capability type index so that
+                  the component knows we are using pmem!!, we dont use it!!!
+		*/
+
+                typedef struct OMXComponentCapabilityFlagsType
+                {
+                  OMX_BOOL iIsOMXComponentMultiThreaded;
+                  OMX_BOOL iOMXComponentSupportsExternalOutputBufferAlloc;
+                  OMX_BOOL iOMXComponentSupportsExternalInputBufferAlloc;
+                  OMX_BOOL iOMXComponentSupportsMovableInputBuffers;
+                  OMX_BOOL iOMXComponentSupportsPartialFrames;
+                  OMX_BOOL iOMXComponentUsesNALStartCodes;
+                  OMX_BOOL iOMXComponentCanHandleIncompleteFrames;
+                  OMX_BOOL iOMXComponentUsesFullAVCFrames;
+                } OMXComponentCapabilityFlagsType;
+
+                OMXComponentCapabilityFlagsType junk;
+                mOMX->getParameter( mNode, (OMX_INDEXTYPE) OMX_COMPONENT_CAPABILITY_TYPE_INDEX,
+                                    &junk, sizeof(junk) );
+
 	      }
 	      else {
 	        LOGV("video_def->nStride = %d, video_def->nSliceHeight = %d", video_def->nStride,
