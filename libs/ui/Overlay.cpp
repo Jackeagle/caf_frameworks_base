@@ -89,6 +89,12 @@ int32_t Overlay::getBufferCount() const
     return mOverlayData->getBufferCount(mOverlayData);
 }
 
+status_t Overlay::setFd(int fd)
+{
+    if (mStatus != NO_ERROR) return mStatus;
+    return mOverlayData->setFd(mOverlayData, fd);
+}
+
 void* Overlay::getBufferAddress(overlay_buffer_t buffer)
 {
     if (mStatus != NO_ERROR) return NULL;
