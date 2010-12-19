@@ -29,6 +29,7 @@
 #include <camera/CameraParameters.h>
 #include <utils/String8.h>
 #include <cutils/properties.h>
+#include <media/mediarecorder.h>
 
 namespace android {
 
@@ -60,6 +61,18 @@ CameraSourceListener::~CameraSourceListener() {
 
 void CameraSourceListener::notify(int32_t msgType, int32_t ext1, int32_t ext2) {
     LOGV("notify(%d, %d, %d)", msgType, ext1, ext2);
+    switch( msgType ) {
+    case CAMERA_MSG_ERROR: {
+      LOGE("notify: msgType - CAMERA_MSG_ERROR");
+      sp<CameraSource> source = mSource.promote();
+      if (source.get() != NULL) {
+        source->errorCallback( );
+      }
+      break;
+    }
+    default:
+      break;
+    }
 }
 
 void CameraSourceListener::postData(int32_t msgType, const sp<IMemory> &dataPtr) {
@@ -365,6 +378,14 @@ void CameraSource::dataCallbackTimestamp(int64_t timestampUs,
     LOGV("initial delay: %lld, current time stamp: %lld",
         mStartTimeUs, timeUs);
     mFrameAvailableCondition.signal();
+}
+
+void CameraSource::errorCallback( ){
+  LOGV("errorCallback E");
+  Mutex::Autolock autoLock(mLock);
+  if( mListener != NULL ){
+    mListener->notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_RESOURCE, 0 );
+  }
 }
 
 status_t CameraSource::getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize)

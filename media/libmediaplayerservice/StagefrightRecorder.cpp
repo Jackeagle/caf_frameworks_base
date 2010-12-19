@@ -999,6 +999,7 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
     if (err != OK) return err;
 
     sp<CameraSource> cameraSource = CameraSource::CreateFromCamera(mCamera);
+    cameraSource->setListener( mListener );
     CHECK(cameraSource != NULL);
 
     sp<MetaData> enc_meta = new MetaData;

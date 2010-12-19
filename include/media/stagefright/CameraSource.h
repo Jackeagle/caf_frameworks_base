@@ -24,6 +24,8 @@
 #include <utils/RefBase.h>
 #include <utils/threads.h>
 
+#include <media/IMediaRecorderClient.h>
+
 namespace android {
 
 class ICamera;
@@ -49,6 +51,11 @@ public:
 
 	virtual status_t getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize);
 
+    //this function is not virtual.
+    void setListener(const sp<IMediaRecorderClient>& listener) {
+        mListener = listener;
+    }
+
 private:
     friend class CameraSourceListener;
 
@@ -73,11 +80,14 @@ private:
     bool mCollectStats;
     bool mStarted;
 
+    sp<IMediaRecorderClient> mListener;
+
     CameraSource(const sp<Camera> &camera);
 
     void dataCallbackTimestamp(
             int64_t timestampUs, int32_t msgType, const sp<IMemory> &data);
 
+    void errorCallback( );
     void releaseQueuedFrames();
     void releaseOneRecordingFrame(const sp<IMemory>& frame);
 
