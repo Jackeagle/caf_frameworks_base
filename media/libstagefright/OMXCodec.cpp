@@ -1851,8 +1851,12 @@ void OMXCodec::on_message(const omx_message &msg) {
                  msg.u.extended_buffer_data.timestamp,
                  msg.u.extended_buffer_data.timestamp / 1E6);
 
-            CODEC_LOGV("Calling processExtraDataOfbuffer");
-            processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer),flags);
+            if(mOMXLivesLocally
+               && (flags & OMX_BUFFERFLAG_EXTRADATA)
+               && msg.u.extended_buffer_data.range_length > 0) {
+              CODEC_LOGV("Calling processExtraDataOfbuffer");
+              processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer),flags);
+            }
 
             Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
             size_t i = 0;
@@ -3889,7 +3893,7 @@ status_t QueryCodecs(
 }
 
 status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer,OMX_U32 flags) {
-    LOGV("In ProcessExtraDataBlocksOfBuffer for interlace, buffer = %p, flags = %p",aBuffer,flags);
+    CODEC_LOGV("In ProcessExtraDataBlocksOfBuffer for interlace, buffer = %p, flags = %p",aBuffer,flags);
 
     if (!mInterlaceFormatDetected) {
         if (flags & OMX_BUFFERFLAG_EXTRADATA) {
