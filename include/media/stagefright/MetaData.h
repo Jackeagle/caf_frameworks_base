@@ -102,6 +102,8 @@ enum {
 
     kKeyValidSamples      = 'valD',  // int32_t
 
+    kKeyEditOffset        = 'edof',  // bool (int64_t)
+
     kKeyIsUnreadable      = 'unre',  // bool (int32_t)
 };
 
