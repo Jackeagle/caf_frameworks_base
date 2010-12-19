@@ -745,11 +745,11 @@ int main(int argc, char **argv) {
                 rtspController = new ARTSPController(looper);
                 status_t err = rtspController->connect(filename);
                 if (err != OK) {
-                    fprintf(stderr, "could not connect to rtsp server.\n");
-                    return -1;
+		  fprintf(stderr, "could not connect to rtsp server.\n");
+                  return -1;
                 }
 
-                extractor = rtspController.get();
+		extractor = rtspController.get();
 
                 syncInfoPresent = false;
             } else if (!strncasecmp("httplive://", filename, 11)) {
@@ -850,11 +850,11 @@ int main(int argc, char **argv) {
         }
 
         if (rtspController != NULL) {
-            rtspController->disconnect();
-            rtspController.clear();
+	  rtspController->disconnect();
+	  rtspController.clear();
 
-            sleep(3);
-        }
+	  sleep(3);
+	}
     }
 
     client.disconnect();

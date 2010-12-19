@@ -650,14 +650,14 @@ void AwesomePlayer::partial_reset_l() {
 
     mVideoRenderer.clear();
 
-    if (mLastVideoBuffer) {
-        mLastVideoBuffer->release();
-        mLastVideoBuffer = NULL;
+    if( mVideoBuffer[mVideoQueueBack] ){
+      mVideoBuffer[mVideoQueueBack]->release( );
+      mVideoBuffer[mVideoQueueBack] = NULL;
     }
-
-    if (mVideoBuffer) {
-        mVideoBuffer->release();
-        mVideoBuffer = NULL;
+    
+    if ( mVideoBuffer[mVideoQueueFront] ){
+      mVideoBuffer[mVideoQueueFront]->release();
+      mVideoBuffer[mVideoQueueFront] = NULL;
     }
 
     {
@@ -2069,3 +2069,4 @@ status_t AwesomePlayer::setParameters(const String8& params) {
 }
 }  // namespace android
 
+}   // namespace android
