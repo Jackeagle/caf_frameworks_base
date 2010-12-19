@@ -483,6 +483,15 @@ public:
     static const char CONTINUOUS_AF_OFF[] ;
     static const char CONTINUOUS_AF_ON[] ;
 
+    enum {
+        CAMERA_ORIENTATION_UNKNOWN = 0,
+        CAMERA_ORIENTATION_PORTRAIT = 1,
+        CAMERA_ORIENTATION_LANDSCAPE = 2,
+    };
+    int getOrientation() const;
+    void setOrientation(int orientation);
+
+
 private:
     DefaultKeyedVector<String8,String8>    mMap;
 };

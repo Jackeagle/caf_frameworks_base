@@ -210,6 +210,27 @@ const char CameraParameters::KEY_MAX_CONTRAST[] = "max-contrast";
 const char CameraParameters::KEY_SATURATION[] = "saturation";
 const char CameraParameters::KEY_MAX_SATURATION[] = "max-saturation";
 
+
+static const char* portrait = "portrait";
+static const char* landscape = "landscape";
+
+int CameraParameters::getOrientation() const
+{
+    const char* orientation = get("orientation");
+    if (orientation && !strcmp(orientation, portrait))
+        return CAMERA_ORIENTATION_PORTRAIT;
+    return CAMERA_ORIENTATION_LANDSCAPE;
+}
+void CameraParameters::setOrientation(int orientation)
+{
+    if (orientation == CAMERA_ORIENTATION_PORTRAIT) {
+        set("orientation", portrait);
+    } else {
+         set("orientation", landscape);
+    }
+}
+
+
 CameraParameters::CameraParameters()
                 : mMap()
 {
