@@ -185,6 +185,10 @@ public:
     // header.
     // Example value: "21.0" or "-5". Write only.
     static const char KEY_GPS_ALTITUDE[];
+
+    static const char KEY_SKIN_TONE_ENHANCEMENT[] ;
+    static const char KEY_SUPPORTED_SKIN_TONE_ENHANCEMENT_MODES[] ;
+
     // GPS timestamp (UTC in seconds since January 1, 1970). This should be
     // stored in JPEG EXIF header.
     // Example value: "1251192757". Write only.
@@ -485,6 +489,9 @@ public:
     static const char HISTOGRAM_ENABLE[] ;
     static const char HISTOGRAM_DISABLE[] ;
 
+    // Values for SKIN TONE ENHANCEMENT
+    static const char SKIN_TONE_ENHANCEMENT_ENABLE[] ;
+    static const char SKIN_TONE_ENHANCEMENT_DISABLE[] ;
 
     // Values for Continuous AF
     static const char CONTINUOUS_AF_OFF[] ;

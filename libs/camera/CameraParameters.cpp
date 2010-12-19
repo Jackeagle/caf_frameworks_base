@@ -175,7 +175,11 @@ const char CameraParameters::FOCUS_MODE_EDOF[] = "edof";
 const char CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO[] = "continuous-video";
 const char CameraParameters::FOCUS_MODE_NORMAL[] = "normal";
 
- // Values for ISO Settings
+
+const char CameraParameters::KEY_SKIN_TONE_ENHANCEMENT[] = "skinToneEnhancement";
+const char CameraParameters::KEY_SUPPORTED_SKIN_TONE_ENHANCEMENT_MODES[] = "skinToneEnhancement-values";
+
+// Values for ISO Settings
 const char CameraParameters::ISO_AUTO[] = "auto";
 const char CameraParameters::ISO_HJR[] = "ISO_HJR";
 const char CameraParameters::ISO_100[] = "ISO100";
@@ -204,6 +208,10 @@ const char CameraParameters::KEY_SUPPORTED_HISTOGRAM_MODES[] = "histogram-values
 //Values for Histogram Shading
 const char CameraParameters::HISTOGRAM_ENABLE[] = "enable";
 const char CameraParameters::HISTOGRAM_DISABLE[] = "disable";
+
+//Values for Skin Tone Enhancement Modes
+const char CameraParameters::SKIN_TONE_ENHANCEMENT_ENABLE[] = "enable";
+const char CameraParameters::SKIN_TONE_ENHANCEMENT_DISABLE[] = "disable";
 
 //Values for Continuous AF
 const char CameraParameters::CONTINUOUS_AF_OFF[] = "caf-off";
