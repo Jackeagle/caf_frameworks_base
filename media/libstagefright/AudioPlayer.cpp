@@ -340,6 +340,9 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
             Mutex::Autolock autoLock(mLock);
 
             if (err != OK) {
+                if (mObserver && !mReachedEOS) {
+                    mObserver->postAudioEOS();
+                }
                 if (err == INFO_FORMAT_CHANGED) {
 
                     sp<MetaData> format = mSource->getFormat();
