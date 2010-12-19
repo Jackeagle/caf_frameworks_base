@@ -1024,7 +1024,7 @@ void CameraService::Client::dataCallbackTimestamp(nsecs_t timestamp,
 // "size" is the width and height of yuv picture for registerBuffer.
 // If it is NULL, use the picture size from parameters.
 void CameraService::Client::handleShutter(image_rect_type *size) {
-//    mCameraService->playSound(SOUND_SHUTTER);
+    mCameraService->playSound(SOUND_SHUTTER);
 
     // Screen goes black after the buffer is unregistered.
     if (mSurface != 0 && !mUseOverlay) {
