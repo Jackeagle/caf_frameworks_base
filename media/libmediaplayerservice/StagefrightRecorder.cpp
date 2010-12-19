@@ -620,6 +620,11 @@ status_t StagefrightRecorder::setListener(const sp<IMediaRecorderClient> &listen
     return OK;
 }
 
+status_t StagefrightRecorder::setCameraParameters(const String8 &params) {
+    return OK;
+}
+
+
 status_t StagefrightRecorder::prepare() {
     return OK;
 }
