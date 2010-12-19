@@ -26,6 +26,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MediaErrors.h>
 
 #include "include/AwesomePlayer.h"
 
@@ -339,13 +340,41 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
             Mutex::Autolock autoLock(mLock);
 
             if (err != OK) {
-                if (mObserver && !mReachedEOS) {
-                    mObserver->postAudioEOS();
-                }
+                if (err == INFO_FORMAT_CHANGED) {
 
-                mReachedEOS = true;
-                mFinalStatus = err;
-                break;
+                    sp<MetaData> format = mSource->getFormat();
+                    const char *mime;
+                    bool success = format->findCString(kKeyMIMEType, &mime);
+                    CHECK(success);
+                    CHECK(!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW));
+
+                    success = format->findInt32(kKeySampleRate, &mSampleRate);
+                    CHECK(success);
+
+                    int32_t numChannels;
+                    success = format->findInt32(kKeyChannelCount, &numChannels);
+                    CHECK(success);
+
+                    mAudioSink->stop();
+                    mAudioSink->close();
+                    status_t err = mAudioSink->open(
+                            mSampleRate, numChannels, AudioSystem::PCM_16_BIT,
+                            DEFAULT_AUDIOSINK_BUFFERCOUNT,
+                            &AudioPlayer::AudioSinkCallback, this);
+                    if (err != OK) {
+                        mSource->stop();
+                        return err;
+                    }
+                    mLatencyUs = (int64_t)mAudioSink->latency() * 1000;
+                    mFrameSize = mAudioSink->frameSize();
+                    mAudioSink->start();
+                    break;
+                }
+                else {
+                     mReachedEOS = true;
+                     mFinalStatus = err;
+                     break;
+                }
             }
 
             CHECK(mInputBuffer->meta_data()->findInt64(
