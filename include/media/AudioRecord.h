@@ -142,9 +142,9 @@ public:
      */
 
      enum record_flags {
-         RECORD_AGC_ENABLE = AGC_ENABLE,
-         RECORD_NS_ENABLE  = NS_ENABLE,
-         RECORD_IIR_ENABLE = TX_IIR_ENABLE
+         RECORD_AGC_ENABLE = 1,
+         RECORD_NS_ENABLE  = 2,
+         RECORD_IIR_ENABLE = 4
      };
 
                         AudioRecord(int inputSource,

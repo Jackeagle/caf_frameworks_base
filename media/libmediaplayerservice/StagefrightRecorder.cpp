@@ -43,6 +43,8 @@
 
 #include "ARTPWriter.h"
 
+#include <cutils/properties.h>
+
 namespace android {
 
 StagefrightRecorder::StagefrightRecorder()
@@ -623,9 +625,9 @@ status_t StagefrightRecorder::setListener(const sp<IMediaRecorderClient> &listen
 status_t StagefrightRecorder::setCameraParameters(const String8 &params) {
 
     CameraParameters cp(params);
-    mRotation = cp.getInt("rotation"); //todo zoom and pass the parameters to
+    mRotationDegrees = cp.getInt("rotation"); //todo zoom and pass the parameters to
                                      //camera source
-    LOGV("Got rotation %d", mRotation );
+    LOGV("Got rotation %d", mRotationDegrees );
     cp.set("rotation", 0 ); //no source rotation
    
     int64_t token = IPCThreadState::self()->clearCallingIdentity();
@@ -644,7 +646,7 @@ status_t StagefrightRecorder::setCameraParameters(const String8 &params) {
         cp.set("rotation", value );
      }
 
-     mRotation = cp.getInt("rotation"); //todo zoom and pass the parameters to
+     mRotationDegrees = cp.getInt("rotation"); //todo zoom and pass the parameters to
                                         //camera source
     //zoom can be tested from the app now
     return OK;

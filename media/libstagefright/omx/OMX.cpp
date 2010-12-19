@@ -533,10 +533,9 @@ sp<IOMXRenderer> OMX::createRenderer(
                 impl = (*func)(surface, componentName, colorFormat,
                         displayWidth, displayHeight, encodedWidth, encodedHeight,
                         (size_t)rotationDegrees, 0);
+            } else {
+                LOGE("Couldnt resolve symbol \n");
             }
-        }
-        else {
-          LOGE("Couldnt resolve symbol");
         }
 
         if (impl) {
