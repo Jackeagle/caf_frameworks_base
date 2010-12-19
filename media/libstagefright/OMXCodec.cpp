@@ -41,6 +41,7 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
 #include <binder/ProcessState.h>
+#include <binder/MemoryBase.h>
 #include <media/IMediaPlayerService.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
@@ -1686,17 +1687,23 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
     size_t totalSize = def.nBufferCountActual * ((def.nBufferSize + 31) & (~31));
     mDealer[portIndex] = new MemoryDealer(totalSize, "OMXCodec");
 
-    sp<IMemory> *pFrame = NULL;
+    sp<IMemoryHeap> pFrameHeap = NULL;
     size_t alignedSize = 0;
+    size_t size = 0;
     if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
     {
-        mSource->getBufferInfo(&pFrame, &alignedSize);
+        sp<IMemory> pFrame = NULL;
+        ssize_t offset = 0;
+
+        mSource->getBufferInfo(pFrame, &alignedSize);
         if( pFrame == NULL )
         {
-            LOGE("Should not happen");
+            LOGE("pFrame==NULL");
             exit(0);
         }
-     }
+        pFrameHeap = pFrame->getMemory(&offset, &size);
+    }
+
 
     for (OMX_U32 i = 0; i < def.nBufferCountActual; ++i) {
         sp<IMemory> mem = mDealer[portIndex]->allocate(def.nBufferSize);
@@ -1732,14 +1739,16 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                         mNode, portIndex, mem, &buffer);
             }
         } else {
-            if(pFrame[i] != NULL && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames)) {
-                ssize_t temp_offset;
-                size_t temp_size;
-                sp<IMemoryHeap> heap = pFrame[i]->getMemory(&temp_offset, &temp_size);
+            if(pFrameHeap != NULL && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames)) {
+                ssize_t temp_offset = i * alignedSize;
+                size_t temp_size = size;
+                sp<IMemory> pFrame = NULL;
+                sp<MemoryBase> pFrameBase = new MemoryBase(pFrameHeap, temp_offset, temp_size);
+                pFrame = pFrameBase;
                 LOGI("getParametersSync: pmem_fd = %d, base = %p, temp_offset %d," \
-                       " temp_size %d, alignedSize = %d, pointer %p, Total Size = %d", heap->getHeapID(), heap->base(), temp_offset,
-                       temp_size, alignedSize, pFrame[i]->pointer(), heap->getSize());
-                err = mOMX->useBuffer(mNode, portIndex, pFrame[i], &buffer);
+                       " temp_size %d, alignedSize = %d, pointer %p, Total Size = %d", pFrameHeap->getHeapID(), pFrameHeap->base(), temp_offset,
+                       temp_size, alignedSize, pFrame->pointer(), pFrameHeap->getSize());
+                err = mOMX->useBuffer(mNode, portIndex, pFrame, &buffer);
             }
             else {
                 err = mOMX->useBuffer(mNode, portIndex, mem, &buffer);

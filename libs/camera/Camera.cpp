@@ -192,7 +192,7 @@ status_t Camera::setPreviewDisplay(const sp<ISurface>& surface)
     return c->setPreviewDisplay(surface);
 }
 
-status_t Camera::getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize)
+status_t Camera::getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize)
 {
     LOGV("getBufferInfo");
     sp <ICamera> c = mCamera;

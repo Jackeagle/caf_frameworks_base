@@ -179,8 +179,7 @@ public:
             status_t    setPreviewDisplay(const sp<ISurface>& surface);
 
             // query the recording buffer information from HAL layer.
-            //status_t    getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
-            status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize);
+            status_t    getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
 
             //encode the YUV data
             void        encodeData();

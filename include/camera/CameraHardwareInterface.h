@@ -131,8 +131,7 @@ public:
      * This is needed because the opencore expects the buffer
      * information before starting the recording.
      */
-    //virtual status_t    getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize) = 0;
-    virtual status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize) = 0;
+    virtual status_t    getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize) = 0;
 
     /**
      * Encode the YUV data.

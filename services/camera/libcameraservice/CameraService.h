@@ -90,7 +90,8 @@ private:
         virtual status_t        setPreviewDisplay(const sp<ISurface>& surface);
         virtual void            setPreviewCallbackFlag(int flag);
         // get the recording buffers information from HAL Layer.
-        virtual status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize);
+        virtual status_t        getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
+
         // encode the YUV data
         virtual void            encodeData();
 

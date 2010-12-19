@@ -53,8 +53,7 @@ public:
     virtual void            setPreviewCallbackFlag(int flag) = 0;
 
     // get the recording buffer information from HAL layer.
-    //virtual status_t        getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize) = 0;
-    virtual status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize) = 0;
+    virtual status_t        getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize) = 0;
 
     //encode the YUV data
     virtual void            encodeData() = 0;

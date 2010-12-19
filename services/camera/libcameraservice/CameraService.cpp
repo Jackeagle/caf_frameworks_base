@@ -630,12 +630,12 @@ void CameraService::Client::setPreviewCallbackFlag(int callback_flag) {
     }
 }
 
-status_t CameraService::Client::getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize)
+status_t CameraService::Client::getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize)
 {
     LOGD(" getBufferInfo : E");
     if (mHardware == NULL) {
         LOGE("mHardware is NULL, returning.");
-        *Frame = NULL;
+        Frame = NULL;
         return INVALID_OPERATION;
     }
     return mHardware->getBufferInfo(Frame, alignedSize);

@@ -49,7 +49,7 @@ public:
 
     virtual void signalBufferReturned(MediaBuffer* buffer);
 
-	virtual status_t getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize);
+    virtual status_t getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
 
     //this function is not virtual.
     void setListener(const sp<IMediaRecorderClient>& listener) {

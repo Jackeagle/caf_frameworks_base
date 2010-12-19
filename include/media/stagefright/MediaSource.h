@@ -59,7 +59,9 @@ struct MediaSource : public RefBase {
     virtual status_t read(
             MediaBuffer **buffer, const ReadOptions *options = NULL) = 0;
 
-    virtual status_t getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize);
+
+    virtual status_t getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
+
 
     // Options that modify read() behaviour. The default is to
     // a) not request a seek

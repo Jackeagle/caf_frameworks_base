@@ -388,9 +388,10 @@ void CameraSource::errorCallback( ){
   }
 }
 
-status_t CameraSource::getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize)
+status_t CameraSource::getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize)
 {
-    return mCamera->getBufferInfo(pFrame, alignedSize);
+    return mCamera->getBufferInfo(Frame, alignedSize);
 }
+
 
 }  // namespace android
