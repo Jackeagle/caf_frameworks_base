@@ -192,6 +192,13 @@ status_t Camera::setPreviewDisplay(const sp<ISurface>& surface)
     return c->setPreviewDisplay(surface);
 }
 
+status_t Camera::getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize)
+{
+    LOGV("getBufferInfo");
+    sp <ICamera> c = mCamera;
+    if (c == 0) return NO_INIT;
+    return c->getBufferInfo(Frame, alignedSize);
+}
 
 // start preview mode
 status_t Camera::startPreview()
@@ -326,6 +333,7 @@ void Camera::setPreviewCallbackFlags(int flag)
 // callback from camera service
 void Camera::notifyCallback(int32_t msgType, int32_t ext1, int32_t ext2)
 {
+    LOGE("msgType = %d", msgType);
     sp<CameraListener> listener;
     {
         Mutex::Autolock _l(mLock);

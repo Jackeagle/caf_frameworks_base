@@ -407,4 +407,12 @@ extern "C" sp<CameraHardwareInterface> HAL_openCameraHardware(int cameraId)
     return CameraHardwareStub::createInstance();
 }
 
+status_t CameraHardwareStub::getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize) {
+    /* No Support for this API in STUB Camera. Just return NULL */
+    *Frame = NULL;
+    if( alignedSize != NULL)
+        *alignedSize = 0;
+    return UNKNOWN_ERROR;
+}
+
 }; // namespace android

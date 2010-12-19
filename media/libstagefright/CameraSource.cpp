@@ -148,7 +148,7 @@ CameraSource::CameraSource(const sp<Camera> &camera)
         mGlitchDurationThresholdUs = glitchDurationUs;
     }
 
-    const char *colorFormatStr = params.get(CameraParameters::KEY_VIDEO_FRAME_FORMAT);
+    const char *colorFormatStr = "yuv420sp";//params.get(CameraParameters::KEY_VIDEO_FRAME_FORMAT);
     CHECK(colorFormatStr != NULL);
     int32_t colorFormat = getColorFormat(colorFormatStr);
 
@@ -365,6 +365,11 @@ void CameraSource::dataCallbackTimestamp(int64_t timestampUs,
     LOGV("initial delay: %lld, current time stamp: %lld",
         mStartTimeUs, timeUs);
     mFrameAvailableCondition.signal();
+}
+
+status_t CameraSource::getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize)
+{
+    return mCamera->getBufferInfo(pFrame, alignedSize);
 }
 
 }  // namespace android

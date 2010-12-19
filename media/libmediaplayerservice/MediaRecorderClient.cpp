@@ -295,7 +295,9 @@ MediaRecorderClient::MediaRecorderClient(const sp<MediaPlayerService>& service, 
     mPid = pid;
 
     char value[PROPERTY_VALUE_MAX];
-    if (!property_get("media.stagefright.enable-record", value, NULL)
+	//changing default to stagefright by setting it as 1, if want to fallback, please change
+	//it to NULL
+    if (!property_get("media.stagefright.enable-record", value, "1")
         || !strcmp(value, "1") || !strcasecmp(value, "true")) {
         mRecorder = new StagefrightRecorder;
     } else

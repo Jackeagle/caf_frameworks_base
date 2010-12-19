@@ -519,7 +519,9 @@ public class Camera {
                 return;
 
             case CAMERA_MSG_RAW_IMAGE:
+               Log.e(TAG, "in handlemessage for CAMERA_MSG_RAW_IMAGE:");
                 if (mRawImageCallback != null) {
+                    Log.e(TAG, "in handlemessage giving onPictureTaken");
                     mRawImageCallback.onPictureTaken((byte[])msg.obj, mCamera);
                 }
                 return;
@@ -555,7 +557,9 @@ public class Camera {
                 return;
 
             case CAMERA_MSG_FOCUS:
+                Log.e(TAG, "CAMERA_MSG_FOCUS: E");
                 if (mAutoFocusCallback != null) {
+                    Log.e(TAG,"calling onAutoFocus");
                     mAutoFocusCallback.onAutoFocus(msg.arg1 == 0 ? false : true, mCamera);
                 }
                 return;

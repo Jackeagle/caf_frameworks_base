@@ -276,7 +276,7 @@ VideoFrame *StagefrightMetadataRetriever::captureFrame() {
         LOGV("Software decoder failed to extract thumbnail, "
              "trying hardware decoder.");
 
-        frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, 0);
+        //frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, 0);
     }
 
     return frame;

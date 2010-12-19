@@ -45,6 +45,7 @@ enum {
     STOP_RECORDING,
     RECORDING_ENABLED,
     RELEASE_RECORDING_FRAME,
+	GET_BUFFER_INFO,
 };
 
 class BpCamera: public BpInterface<ICamera>
@@ -84,6 +85,20 @@ public:
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
         data.writeInt32(flag);
         remote()->transact(SET_PREVIEW_CALLBACK_FLAG, data, &reply);
+    }
+
+   // get the recording buffer information.
+   status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize)
+   {
+        status_t ret;
+        LOGV("getBufferInfo");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        data.writeStrongBinder((**Frame)->asBinder());
+        remote()->transact(GET_BUFFER_INFO, data, &reply);
+        ret = reply.readInt32();
+        *alignedSize = reply.readInt32();
+        return ret;
     }
 
     // start preview mode, must call setPreviewDisplay first
@@ -267,6 +282,16 @@ status_t BnCamera::onTransact(
             CHECK_INTERFACE(ICamera, data, reply);
             int callback_flag = data.readInt32();
             setPreviewCallbackFlag(callback_flag);
+            return NO_ERROR;
+        } break;
+        case GET_BUFFER_INFO:{
+            LOGV("GET_BUFFER_INFO");
+            CHECK_INTERFACE(ICamera, data, reply);
+            sp<IMemory> Frame = interface_cast<IMemory>(data.readStrongBinder());
+            sp<IMemory> *bFrame = &Frame;
+            size_t alignedSize;
+            reply->writeInt32(getBufferInfo(&bFrame, &alignedSize));
+            reply->writeInt32(alignedSize);
             return NO_ERROR;
         } break;
         case START_PREVIEW: {

@@ -22,6 +22,11 @@ MediaSource::MediaSource() {}
 
 MediaSource::~MediaSource() {}
 
+status_t MediaSource::getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize) {
+    //do nothing, since it is virtual, need dummy implementation
+    return OK;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 MediaSource::ReadOptions::ReadOptions() {

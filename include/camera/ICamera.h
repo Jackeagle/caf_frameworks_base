@@ -52,6 +52,10 @@ public:
     // preview are handled.
     virtual void            setPreviewCallbackFlag(int flag) = 0;
 
+    // get the recording buffer information from HAL layer.
+    //virtual status_t        getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize) = 0;
+    virtual status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize) = 0;
+
     // start preview mode, must call setPreviewDisplay first
     virtual status_t        startPreview() = 0;
 

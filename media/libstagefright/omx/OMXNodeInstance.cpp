@@ -240,6 +240,14 @@ status_t OMXNodeInstance::setConfig(
     return StatusFromOMXError(err);
 }
 
+typedef struct OMX_QCOM_PLATFORM_PRIVATE_PMEM_INFO
+{
+    /** pmem file descriptor */
+    OMX_U32 pmem_fd;
+    /** Offset from pmem device base address */
+    OMX_U32 offset;
+}OMX_QCOM_PLATFORM_PRIVATE_PMEM_INFO;
+
 status_t OMXNodeInstance::useBuffer(
         OMX_U32 portIndex, const sp<IMemory> &params,
         OMX::buffer_id *buffer) {
@@ -249,8 +257,15 @@ status_t OMXNodeInstance::useBuffer(
 
     OMX_BUFFERHEADERTYPE *header;
 
+    OMX_QCOM_PLATFORM_PRIVATE_PMEM_INFO pmem_info;
+    ssize_t offset;
+    size_t size;
+    sp<IMemoryHeap> heap = params->getMemory(&offset, &size);
+    pmem_info.pmem_fd =  heap->getHeapID();
+    pmem_info.offset = offset;
+
     OMX_ERRORTYPE err = OMX_UseBuffer(
-            mHandle, &header, portIndex, buffer_meta,
+            mHandle, &header, portIndex, /*tbd - buffer_meta*/ &pmem_info,
             params->size(), static_cast<OMX_U8 *>(params->pointer()));
 
     if (err != OMX_ErrorNone) {
@@ -263,6 +278,8 @@ status_t OMXNodeInstance::useBuffer(
 
         return UNKNOWN_ERROR;
     }
+
+    header->pAppPrivate = buffer_meta;
 
     CHECK_EQ(header->pAppPrivate, buffer_meta);
 

@@ -22,6 +22,7 @@
 
 #include <media/stagefright/MediaErrors.h>
 #include <utils/RefBase.h>
+#include <binder/IMemory.h>
 
 namespace android {
 
@@ -57,6 +58,8 @@ struct MediaSource : public RefBase {
     // but should be prepared for buffers of the new configuration.
     virtual status_t read(
             MediaBuffer **buffer, const ReadOptions *options = NULL) = 0;
+
+    virtual status_t getBufferInfo(sp<IMemory> **pFrame, size_t *alignedSize);
 
     // Options that modify read() behaviour. The default is to
     // a) not request a seek

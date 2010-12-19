@@ -166,18 +166,18 @@ static const CodecInfo kDecoderInfo[] = {
 //    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.PV.aacdec" },
     { MEDIA_MIMETYPE_AUDIO_G711_ALAW, "G711Decoder" },
     { MEDIA_MIMETYPE_AUDIO_G711_MLAW, "G711Decoder" },
-    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.7x30.video.decoder.mpeg4" },
+//    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.7x30.video.decoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.video.decoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.TI.Video.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.SEC.MPEG4.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "M4vH263Decoder" },
 //    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.PV.mpeg4dec" },
-    { MEDIA_MIMETYPE_VIDEO_H263, "OMX.qcom.7x30.video.decoder.h263" },
+//    { MEDIA_MIMETYPE_VIDEO_H263, "OMX.qcom.7x30.video.decoder.h263" },
     { MEDIA_MIMETYPE_VIDEO_H263, "OMX.qcom.video.decoder.h263" },
     { MEDIA_MIMETYPE_VIDEO_H263, "OMX.SEC.H263.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_H263, "M4vH263Decoder" },
 //    { MEDIA_MIMETYPE_VIDEO_H263, "OMX.PV.h263dec" },
-    { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.7x30.video.decoder.avc" },
+//    { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.7x30.video.decoder.avc" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.video.decoder.avc" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.TI.Video.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.SEC.AVC.Decoder" },
@@ -195,19 +195,19 @@ static const CodecInfo kEncoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.TI.AAC.encode" },
     { MEDIA_MIMETYPE_AUDIO_AAC, "AACEncoder" },
 //    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.PV.aacenc" },
-    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.7x30.video.encoder.mpeg4" },
+//    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.7x30.video.encoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.video.encoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.TI.Video.encoder" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.SEC.MPEG4.Encoder" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "M4vH263Encoder" },
 //    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.PV.mpeg4enc" },
-    { MEDIA_MIMETYPE_VIDEO_H263, "OMX.qcom.7x30.video.encoder.h263" },
+//    { MEDIA_MIMETYPE_VIDEO_H263, "OMX.qcom.7x30.video.encoder.h263" },
     { MEDIA_MIMETYPE_VIDEO_H263, "OMX.qcom.video.encoder.h263" },
     { MEDIA_MIMETYPE_VIDEO_H263, "OMX.TI.Video.encoder" },
     { MEDIA_MIMETYPE_VIDEO_H263, "OMX.SEC.H263.Encoder" },
     { MEDIA_MIMETYPE_VIDEO_H263, "M4vH263Encoder" },
 //    { MEDIA_MIMETYPE_VIDEO_H263, "OMX.PV.h263enc" },
-    { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.7x30.video.encoder.avc" },
+//    { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.7x30.video.encoder.avc" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.video.encoder.avc" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.TI.Video.encoder" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.SEC.AVC.Encoder" },
@@ -364,8 +364,9 @@ uint32_t OMXCodec::getComponentQuirks(
     }
     if (!strncmp(componentName, "OMX.qcom.video.encoder.", 23)) {
         quirks |= kRequiresLoadedToIdleAfterAllocation;
-        quirks |= kRequiresAllocateBufferOnInputPorts;
+        //quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
+		quirks |= kAvoidMemcopyInputRecordingFrames;
         if (!strncmp(componentName, "OMX.qcom.video.encoder.avc", 26)) {
 
             // The AVC encoder advertises the size of output buffers
@@ -373,7 +374,7 @@ uint32_t OMXCodec::getComponentQuirks(
             // the worst/least compression ratio is 0.5. It is found that
             // sometimes, the output buffer size is larger than
             // size advertised by the encoder.
-            quirks |= kRequiresLargerEncoderOutputBuffer;
+            //quirks |= kRequiresLargerEncoderOutputBuffer;
         }
     }
     if (!strncmp(componentName, "OMX.qcom.7x30.video.encoder.", 28)) {
@@ -1597,6 +1598,18 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
     size_t totalSize = def.nBufferCountActual * def.nBufferSize;
     mDealer[portIndex] = new MemoryDealer(totalSize, "OMXCodec");
 
+    sp<IMemory> *pFrame = NULL;
+    size_t alignedSize = 0;
+    if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
+    {
+        mSource->getBufferInfo(&pFrame, &alignedSize);
+        if( pFrame == NULL )
+        {
+            LOGE("Should not happen");
+            exit(0);
+        }
+     }
+
     for (OMX_U32 i = 0; i < def.nBufferCountActual; ++i) {
         sp<IMemory> mem = mDealer[portIndex]->allocate(def.nBufferSize);
         CHECK(mem.get() != NULL);
@@ -1631,7 +1644,18 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                         mNode, portIndex, mem, &buffer);
             }
         } else {
-            err = mOMX->useBuffer(mNode, portIndex, mem, &buffer);
+            if(pFrame[i] != NULL && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames)) {
+                ssize_t temp_offset;
+                size_t temp_size;
+                sp<IMemoryHeap> heap = pFrame[i]->getMemory(&temp_offset, &temp_size);
+                LOGI("getParametersSync: pmem_fd = %d, base = %p, temp_offset %d," \
+                       " temp_size %d, alignedSize = %d, pointer %p, Total Size = %d", heap->getHeapID(), heap->base(), temp_offset,
+                       temp_size, alignedSize, pFrame[i]->pointer(), heap->getSize());
+                err = mOMX->useBuffer(mNode, portIndex, pFrame[i], &buffer);
+            }
+            else {
+                err = mOMX->useBuffer(mNode, portIndex, mem, &buffer);
+            }
         }
 
         if (err != OK) {
@@ -1710,6 +1734,13 @@ void OMXCodec::on_message(const omx_message &msg) {
                     info->mMediaBuffer->release();
                     info->mMediaBuffer = NULL;
                 }
+            }
+
+            if( (NULL != (*buffers)[i].mMediaBuffer) && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
+            {
+                 CODEC_LOGV("EBD: %x %d", (*buffers)[i].mMediaBuffer, (*buffers)[i].mMediaBuffer->refcount() );
+                 (*buffers)[i].mMediaBuffer->release();
+                 buffers->editItemAt(i).mMediaBuffer = NULL;
             }
 
             if (mPortStatus[kPortIndexInput] == DISABLING) {
@@ -2324,6 +2355,11 @@ void OMXCodec::drainInputBuffers() {
 
     Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexInput];
     for (size_t i = 0; i < buffers->size(); ++i) {
+		//we need do this since camera holds 3 buffer + 1 is for index starts from 0
+		//if we don't do this it will be a deadlock since we will be waiting for camera to be done
+		//and camera will not give any more unless we give release
+        if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames) && (i == 4) )
+            break;
         drainInputBuffer(&buffers->editItemAt(i));
     }
 }
@@ -2478,7 +2514,9 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
 
         offset += srcBuffer->range_length();
 
-        if (releaseBuffer) {
+        if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames)) {
+            info->mMediaBuffer = srcBuffer;
+        } else if (releaseBuffer) {
             srcBuffer->release();
             srcBuffer = NULL;
         }
@@ -3599,8 +3637,8 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
                 mOutputFormat->setInt32(
                         kKeyHeight, (video_def->nFrameHeight + 15) & -16);
             } else {
-                mOutputFormat->setInt32(kKeyWidth, video_def->nFrameWidth);
-                mOutputFormat->setInt32(kKeyHeight, video_def->nFrameHeight);
+                mOutputFormat->setInt32(kKeyWidth, video_def->nStride);
+                mOutputFormat->setInt32(kKeyHeight, video_def->nSliceHeight);
             }
 
             mOutputFormat->setInt32(kKeyColorFormat, video_def->eColorFormat);

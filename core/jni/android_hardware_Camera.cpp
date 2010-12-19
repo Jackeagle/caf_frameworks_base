@@ -139,7 +139,7 @@ void JNICameraContext::copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int 
         ssize_t offset;
         size_t size;
         sp<IMemoryHeap> heap = dataPtr->getMemory(&offset, &size);
-        LOGV("postData: off=%d, size=%d", offset, size);
+        LOGE("postData: off=%d, size=%d", offset, size);
         uint8_t *heapBase = (uint8_t*)heap->base();
 
         if (heapBase != NULL) {
@@ -201,6 +201,7 @@ void JNICameraContext::copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int 
 
 void JNICameraContext::postData(int32_t msgType, const sp<IMemory>& dataPtr)
 {
+    LOGE("%s E", __FUNCTION__);
     // VM pointer will be NULL if object is released
     Mutex::Autolock _l(mLock);
     JNIEnv *env = AndroidRuntime::getJNIEnv();
@@ -216,13 +217,13 @@ void JNICameraContext::postData(int32_t msgType, const sp<IMemory>& dataPtr)
         break;
     // don't return raw data to Java
     case CAMERA_MSG_RAW_IMAGE:
-        LOGV("rawCallback");
+        LOGE("rawCallback");
         env->CallStaticVoidMethod(mCameraJClass, fields.post_event,
                 mCameraJObjectWeak, msgType, 0, 0, NULL);
         break;
     default:
         // TODO: Change to LOGV
-        LOGV("dataCallback(%d, %p)", msgType, dataPtr.get());
+        LOGE("dataCallback(%d, %p)", msgType, dataPtr.get());
         copyAndPost(env, dataPtr, msgType);
         break;
     }

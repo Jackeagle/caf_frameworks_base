@@ -399,15 +399,22 @@ MediaProfiles::createDefaultH263VideoEncoderCap()
 MediaProfiles::createDefaultM4vVideoEncoderCap()
 {
     return new MediaProfiles::VideoEncoderCap(
-        VIDEO_ENCODER_MPEG_4_SP, 192000, 420000, 176, 352, 144, 288, 1, 20);
+        VIDEO_ENCODER_MPEG_4_SP, 192000, 10 * 1000 * 1000, 176, 1280, 144, 720, 1, 30);
 }
 
+/*static*/ MediaProfiles::VideoEncoderCap*
+MediaProfiles::createDefaultH264VideoEncoderCap()
+{
+    return new MediaProfiles::VideoEncoderCap(
+        VIDEO_ENCODER_H264, 192000, 10 * 1000 * 1000, 176, 1280, 144, 720, 1, 30);
+}
 
 /*static*/ void
 MediaProfiles::createDefaultVideoEncoders(MediaProfiles *profiles)
 {
     profiles->mVideoEncoders.add(createDefaultH263VideoEncoderCap());
     profiles->mVideoEncoders.add(createDefaultM4vVideoEncoderCap());
+    profiles->mVideoEncoders.add(createDefaultH264VideoEncoderCap());
 }
 
 /*static*/ MediaProfiles::CamcorderProfile*
@@ -457,6 +464,7 @@ MediaProfiles::createDefaultCamcorderProfiles(MediaProfiles *profiles)
 MediaProfiles::createDefaultAudioEncoders(MediaProfiles *profiles)
 {
     profiles->mAudioEncoders.add(createDefaultAmrNBEncoderCap());
+    profiles->mAudioEncoders.add(createDefaultAacEncoderCap());
 }
 
 /*static*/ void
@@ -489,6 +497,13 @@ MediaProfiles::createDefaultAmrNBEncoderCap()
 {
     return new MediaProfiles::AudioEncoderCap(
         AUDIO_ENCODER_AMR_NB, 5525, 12200, 8000, 8000, 1, 1);
+}
+
+/*static*/ MediaProfiles::AudioEncoderCap*
+MediaProfiles::createDefaultAacEncoderCap()
+{
+    return new MediaProfiles::AudioEncoderCap(
+        AUDIO_ENCODER_AAC, 5525, 128000, 8000, 48000, 1, 1);
 }
 
 /*static*/ void

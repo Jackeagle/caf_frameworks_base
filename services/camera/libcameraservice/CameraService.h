@@ -89,6 +89,8 @@ private:
         virtual status_t        unlock();
         virtual status_t        setPreviewDisplay(const sp<ISurface>& surface);
         virtual void            setPreviewCallbackFlag(int flag);
+        // get the recording buffers information from HAL Layer.
+        virtual status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize);
         virtual status_t        startPreview();
         virtual void            stopPreview();
         virtual bool            previewEnabled();
@@ -165,6 +167,7 @@ private:
         sp<CameraHardwareInterface>     mHardware;       // cleared after disconnect()
         bool                            mUseOverlay;     // immutable after constructor
         sp<OverlayRef>                  mOverlayRef;
+        sp<Overlay>                 mOverlay;
         int                             mOverlayW;
         int                             mOverlayH;
         int                             mPreviewCallbackFlag;

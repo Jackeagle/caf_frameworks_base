@@ -467,9 +467,14 @@ void CameraService::Client::disconnect() {
     // Release the hardware resources.
     mHardware->release();
     // Release the held overlay resources.
-    if (mUseOverlay) {
+    if (mUseOverlay)
+    {
+        /* Release previous overlay handle */
+        if( mOverlay != NULL)
+            mOverlay->destroy();
         mOverlayRef = 0;
     }
+
     mHardware.clear();
 
     mCameraService->removeClient(mCameraClient);
@@ -510,9 +515,10 @@ status_t CameraService::Client::setPreviewDisplay(const sp<ISurface>& surface) {
     mOverlayRef = 0;
     // If preview has been already started, set overlay or register preview
     // buffers now.
-    if (mHardware->previewEnabled()) {
+    if (mHardware->previewEnabled() || mUseOverlay) {
         if (mUseOverlay) {
-            result = setOverlay();
+            if( mSurface != NULL)
+                result = setOverlay();
         } else if (mSurface != 0) {
             result = registerPreviewBuffers();
         }
@@ -551,6 +557,8 @@ status_t CameraService::Client::setOverlay() {
         mHardware->setOverlay(dummy);
         mOverlayRef = 0;
         mOrientationChanged = false;
+        if(mOverlay != NULL)
+            mOverlay->destroy();
     }
 
     status_t result = NO_ERROR;
@@ -565,7 +573,7 @@ status_t CameraService::Client::setOverlay() {
             // wait in the createOverlay call if the previous overlay is in the
             // process of being destroyed.
             for (int retry = 0; retry < 50; ++retry) {
-                mOverlayRef = mSurface->createOverlay(w, h, OVERLAY_FORMAT_DEFAULT,
+                mOverlayRef = mSurface->createOverlay(w, h,OVERLAY_FORMAT_YCbCr_420_SP,/* OVERLAY_FORMAT_DEFAULT,*/
                                                       mOrientation);
                 if (mOverlayRef != 0) break;
                 LOGW("Overlay create failed - retrying");
@@ -575,7 +583,10 @@ status_t CameraService::Client::setOverlay() {
                 LOGE("Overlay Creation Failed!");
                 return -EINVAL;
             }
-            result = mHardware->setOverlay(new Overlay(mOverlayRef));
+            LOGE("OVERLAY CREATED....");
+            mOverlay = new Overlay(mOverlayRef);
+            result = mHardware->setOverlay(mOverlay);
+            //result = mHardware->setOverlay(new Overlay(mOverlayRef));
         }
     }
     if (result != NO_ERROR) {
@@ -608,6 +619,17 @@ void CameraService::Client::setPreviewCallbackFlag(int callback_flag) {
             disableMsgType(CAMERA_MSG_PREVIEW_FRAME);
         }
     }
+}
+
+status_t CameraService::Client::getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize)
+{
+    LOGD(" getBufferInfo : E");
+    if (mHardware == NULL) {
+        LOGE("mHardware is NULL, returning.");
+        *Frame = NULL;
+        return INVALID_OPERATION;
+    }
+    return mHardware->getBufferInfo(Frame, alignedSize);
 }
 
 // start preview mode
@@ -657,12 +679,14 @@ status_t CameraService::Client::startPreviewMode() {
     }
 
     if (mUseOverlay) {
+        result = mHardware->startPreview();
+        if (result != NO_ERROR) return result;
         // If preview display has been set, set overlay now.
         if (mSurface != 0) {
             result = setOverlay();
         }
-        if (result != NO_ERROR) return result;
-        result = mHardware->startPreview();
+//       if (result != NO_ERROR) return result;
+//        result = mHardware->startPreview();
     } else {
         enableMsgType(CAMERA_MSG_PREVIEW_FRAME);
         result = mHardware->startPreview();
@@ -716,6 +740,9 @@ void CameraService::Client::stopPreview() {
 
     if (mSurface != 0 && !mUseOverlay) {
         mSurface->unregisterBuffers();
+    } else {
+        mOverlayW = 0;
+        mOverlayH = 0;
     }
 
     mPreviewBuffer.clear();
@@ -856,20 +883,21 @@ void CameraService::Client::disableMsgType(int32_t msgType) {
 #define CHECK_MESSAGE_INTERVAL 10 // 10ms
 bool CameraService::Client::lockIfMessageWanted(int32_t msgType) {
     int sleepCount = 0;
+    LOGE("CameraService::Client::lockIfMessageWanted E");
     while (mMsgEnabled & msgType) {
         if (mLock.tryLock() == NO_ERROR) {
             if (sleepCount > 0) {
-                LOG1("lockIfMessageWanted(%d): waited for %d ms",
+                LOGE("lockIfMessageWanted(%d): waited for %d ms",
                     msgType, sleepCount * CHECK_MESSAGE_INTERVAL);
             }
             return true;
         }
         if (sleepCount++ == 0) {
-            LOG1("lockIfMessageWanted(%d): enter sleep", msgType);
+            LOGE("lockIfMessageWanted(%d): enter sleep", msgType);
         }
         usleep(CHECK_MESSAGE_INTERVAL * 1000);
     }
-    LOGW("lockIfMessageWanted(%d): dropped unwanted message", msgType);
+    LOGE("lockIfMessageWanted(%d): dropped unwanted message", msgType);
     return false;
 }
 
@@ -944,7 +972,7 @@ void CameraService::Client::notifyCallback(int32_t msgType, int32_t ext1,
 
 void CameraService::Client::dataCallback(int32_t msgType,
         const sp<IMemory>& dataPtr, void* user) {
-    LOG2("dataCallback(%d)", msgType);
+    LOGE("dataCallback(%d)", msgType);
 
     sp<Client> client = getClientFromCookie(user);
     if (client == 0) return;
@@ -996,7 +1024,7 @@ void CameraService::Client::dataCallbackTimestamp(nsecs_t timestamp,
 // "size" is the width and height of yuv picture for registerBuffer.
 // If it is NULL, use the picture size from parameters.
 void CameraService::Client::handleShutter(image_rect_type *size) {
-    mCameraService->playSound(SOUND_SHUTTER);
+//    mCameraService->playSound(SOUND_SHUTTER);
 
     // Screen goes black after the buffer is unregistered.
     if (mSurface != 0 && !mUseOverlay) {
@@ -1103,7 +1131,7 @@ void CameraService::Client::handlePostview(const sp<IMemory>& mem) {
 // picture callback - raw image ready
 void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
     disableMsgType(CAMERA_MSG_RAW_IMAGE);
-
+    LOGE("%s E", __FUNCTION__);
     ssize_t offset;
     size_t size;
     sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
@@ -1116,8 +1144,10 @@ void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
     sp<ICameraClient> c = mCameraClient;
     mLock.unlock();
     if (c != 0) {
+        LOGE("%s data Callback E", __FUNCTION__);
         c->dataCallback(CAMERA_MSG_RAW_IMAGE, mem);
     }
+    LOGE("%s X", __FUNCTION__);
 }
 
 // picture callback - compressed picture ready
@@ -1135,8 +1165,11 @@ void CameraService::Client::handleCompressedPicture(const sp<IMemory>& mem) {
 void CameraService::Client::handleGenericNotify(int32_t msgType,
     int32_t ext1, int32_t ext2) {
     sp<ICameraClient> c = mCameraClient;
+    
+    LOGE("CameraService::Client::handleGenericNotify: msgType = CAMERA_MSG_FOCUS");
     mLock.unlock();
     if (c != 0) {
+    LOGE("CameraService::Client::handleGenericNotify: callback");
         c->notifyCallback(msgType, ext1, ext2);
     }
 }
