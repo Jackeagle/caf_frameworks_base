@@ -79,6 +79,8 @@ const char CameraParameters::KEY_LENSSHADE[] = "lensshade";
 const char CameraParameters::KEY_SUPPORTED_LENSSHADE_MODES[] = "lensshade-values";
 const char CameraParameters::KEY_AUTO_EXPOSURE[] = "auto-exposure";
 const char CameraParameters::KEY_SUPPORTED_AUTO_EXPOSURE[] = "auto-exposure-values";
+const char CameraParameters::KEY_CONTINUOUS_AF[] = "continuous-af";
+const char CameraParameters::KEY_SUPPORTED_CONTINUOUS_AF[] = "continuous-af-values";
 
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
@@ -177,6 +179,10 @@ const char CameraParameters::KEY_GPS_LONGITUDE_REF[] = "gps-longitude-ref";
 const char CameraParameters::KEY_GPS_ALTITUDE_REF[] = "gps-altitude-ref";
 const char CameraParameters::KEY_GPS_STATUS[] = "gps-status";
 const char CameraParameters::KEY_EXIF_DATETIME[] = "exif-datetime";
+
+//Values for Continuous AF
+const char CameraParameters::CONTINUOUS_AF_OFF[] = "caf-off";
+const char CameraParameters::CONTINUOUS_AF_ON[] = "caf-on";
 
 const char CameraParameters::KEY_SHARPNESS[] = "sharpness";
 const char CameraParameters::KEY_MAX_SHARPNESS[] = "max-sharpness";

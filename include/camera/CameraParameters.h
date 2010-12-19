@@ -314,6 +314,10 @@ public:
     // Value for KEY_FOCUS_DISTANCES.
     static const char FOCUS_DISTANCE_INFINITY[];
 
+    //Continuous AF.
+    static const char KEY_CONTINUOUS_AF[];
+    static const char KEY_SUPPORTED_CONTINUOUS_AF[];
+
     // Values for white balance settings.
     static const char WHITE_BALANCE_AUTO[];
     static const char WHITE_BALANCE_INCANDESCENT[];
@@ -441,6 +445,9 @@ public:
     static const char KEY_SATURATION[];
     static const char KEY_MAX_SATURATION[];
 
+    // Values for Continuous AF
+    static const char CONTINUOUS_AF_OFF[] ;
+    static const char CONTINUOUS_AF_ON[] ;
 
 private:
     DefaultKeyedVector<String8,String8>    mMap;
