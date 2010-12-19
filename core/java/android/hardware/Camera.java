@@ -1351,6 +1351,7 @@ public class Camera {
         // Formats for setPreviewFormat and setPictureFormat.
         private static final String PIXEL_FORMAT_YUV422SP = "yuv422sp";
         private static final String PIXEL_FORMAT_YUV420SP = "yuv420sp";
+        private static final String PIXEL_FORMAT_YUV420SP_ADRENO = "yuv420sp-adreno";
         private static final String PIXEL_FORMAT_YUV422I = "yuv422i-yuyv";
         private static final String PIXEL_FORMAT_RGB565 = "rgb565";
         private static final String PIXEL_FORMAT_JPEG = "jpeg";
@@ -1836,6 +1837,7 @@ public class Camera {
             switch(pixel_format) {
             case ImageFormat.NV16:      return PIXEL_FORMAT_YUV422SP;
             case ImageFormat.NV21:      return PIXEL_FORMAT_YUV420SP;
+            case ImageFormat.NV21_ADRENO: return PIXEL_FORMAT_YUV420SP_ADRENO;
             case ImageFormat.YUY2:      return PIXEL_FORMAT_YUV422I;
             case ImageFormat.RGB_565:   return PIXEL_FORMAT_RGB565;
             case ImageFormat.JPEG:      return PIXEL_FORMAT_JPEG;
@@ -1852,6 +1854,9 @@ public class Camera {
 
             if (format.equals(PIXEL_FORMAT_YUV420SP))
                 return ImageFormat.NV21;
+
+            if (format.equals(PIXEL_FORMAT_YUV420SP_ADRENO))
+                return ImageFormat.NV21_ADRENO;
 
             if (format.equals(PIXEL_FORMAT_YUV422I))
                 return ImageFormat.YUY2;

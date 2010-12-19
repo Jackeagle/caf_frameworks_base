@@ -170,6 +170,7 @@ private:
         sp<Overlay>                 mOverlay;
         int                             mOverlayW;
         int                             mOverlayH;
+        int                             mPixelFormat;
         int                             mPreviewCallbackFlag;
         int                             mOrientation;     // Current display orientation
         // True if display orientation has been changed. This is only used in overlay.

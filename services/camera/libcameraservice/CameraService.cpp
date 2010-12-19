@@ -320,6 +320,8 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
     mOverlayW = 0;
     mOverlayH = 0;
 
+    mPixelFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP;
+
     // Callback is disabled by default
     mPreviewCallbackFlag = FRAME_CALLBACK_FLAG_NOOP;
     mOrientation = getOrientation(0, mCameraFacing == CAMERA_FACING_FRONT);
@@ -532,9 +534,16 @@ status_t CameraService::Client::registerPreviewBuffers() {
     CameraParameters params(mHardware->getParameters());
     params.getPreviewSize(&w, &h);
 
-    // FIXME: don't use a hardcoded format here.
+    /* Check for the preview format requested by the application and pass
+     * the same information while registering */
+    const char * previewFormat = params.get(CameraParameters::KEY_PREVIEW_FORMAT);
+    if(!strcmp(previewFormat, CameraParameters::PIXEL_FORMAT_YUV420SP_ADRENO))
+        mPixelFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO;
+    LOGI("registerPreviewBuffers: previewFormat = %s and PixelFormat = %d",
+                                                   previewFormat, mPixelFormat);
+
     ISurface::BufferHeap buffers(w, h, w, h,
-                                 HAL_PIXEL_FORMAT_YCrCb_420_SP,
+                                 mPixelFormat,
                                  mOrientation,
                                  0,
                                  mHardware->getPreviewHeap());
@@ -830,6 +839,31 @@ status_t CameraService::Client::setParameters(const String8& params) {
     if (result != NO_ERROR) return result;
 
     CameraParameters p(params);
+    if(mUseOverlay) {
+        const char *str = p.get("strtextures");
+        if( (str != NULL) &&
+             (!strncmp(str, "on", 2) || !strncmp(str, "ON", 2))){
+            LOGI("strtextures is ON");
+            /* destroy any overlay created */
+            if( mOverlay != NULL) {
+                LOGI("Destroying Overlay");
+                mOverlay->destroy();
+            }
+            mOverlayRef = 0;
+
+            /* register preview buffers if mSurface is valid
+             * This check will make sure whether setPreviewDisplay has been
+             * executed or not */
+            if(mSurface != NULL) {
+                registerPreviewBuffers();
+            }
+
+            /* reset the mUseoverlay flag */
+            LOGI("Resetting mUseOverlay to false");
+            mUseOverlay = false;
+        }
+    }
+
     return mHardware->setParameters(p);
 }
 
@@ -1056,7 +1090,7 @@ void CameraService::Client::handleShutter(image_rect_type *size) {
         }
         // FIXME: don't use hardcoded format constants here
         ISurface::BufferHeap buffers(w, h, w, h,
-            HAL_PIXEL_FORMAT_YCrCb_420_SP, mOrientation, 0,
+            mPixelFormat, mOrientation, 0,
             mHardware->getRawHeap());
 
         mSurface->registerBuffers(buffers);
