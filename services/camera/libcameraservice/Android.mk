@@ -52,6 +52,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libsurfaceflinger_client
 
 LOCAL_MODULE:= libcameraservice
+LOCAL_C_INCLUDES += hardware/msm7k/libgralloc-qsd8k
 
 ifeq ($(TARGET_SIMULATOR),true)
 LOCAL_CFLAGS += -DSINGLE_PROCESS

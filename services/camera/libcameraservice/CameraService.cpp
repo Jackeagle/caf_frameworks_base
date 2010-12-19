@@ -36,7 +36,7 @@
 #include <utils/String16.h>
 
 #include "CameraService.h"
-
+#include <gralloc_priv.h>
 namespace android {
 
 // ----------------------------------------------------------------------------
@@ -584,7 +584,7 @@ status_t CameraService::Client::setOverlay() {
             // wait in the createOverlay call if the previous overlay is in the
             // process of being destroyed.
             for (int retry = 0; retry < 50; ++retry) {
-                mOverlayRef = mSurface->createOverlay(w, h,OVERLAY_FORMAT_YCbCr_420_SP,/* OVERLAY_FORMAT_DEFAULT,*/
+                mOverlayRef = mSurface->createOverlay(w, h, HAL_PIXEL_FORMAT_YCbCr_420_SP,/* OVERLAY_FORMAT_DEFAULT,*/
                                                       mOrientation);
                 if (mOverlayRef != 0) break;
                 LOGW("Overlay create failed - retrying");
