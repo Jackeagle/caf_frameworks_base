@@ -18,6 +18,8 @@
 #define LOG_TAG "StagefrightMetadataRetriever"
 #include <utils/Log.h>
 
+#include <cutils/properties.h>
+
 #include "include/StagefrightMetadataRetriever.h"
 
 #include <media/stagefright/ColorConverter.h>
@@ -277,6 +279,16 @@ VideoFrame *StagefrightMetadataRetriever::captureFrame() {
              "trying hardware decoder.");
 
         //frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, 0);
+
+        char value[PROPERTY_VALUE_MAX];
+        if (property_get("ro.product.device", value, "0")
+            && (!strcmp(value, "qsd8250_ffa") || !strcmp(value, "qsd8250_surf"))) {
+	  //            frame = extractVideoFrameWithCodecFlags(
+          //          &mClient, trackMeta, source, OMXCodec::kEnableThumbnailMode);
+        }
+        else {
+	  //frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, 0);
+        }
     }
 
     return frame;

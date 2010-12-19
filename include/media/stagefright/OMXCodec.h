@@ -35,13 +35,13 @@ struct CodecProfileLevel;
 struct OMXCodec : public MediaSource,
                   public MediaBufferObserver {
     enum CreationFlags {
-
         kPreferSoftwareCodecs    = 1,
         kIgnoreCodecSpecificData = 2,
         // The client wants to access the output buffer's video
         // data for example for thumbnail extraction.
         kClientNeedsFramebuffer  = 4,
         kEnableGPUComposition = 8,
+        kEnableThumbnailMode = 16,
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,
@@ -160,6 +160,7 @@ private:
     int64_t mSkipTimeUs;
 
     bool mGPUComposition;
+    bool mThumbnailMode;
 
     MediaBuffer *mLeftOverBuffer;
 
