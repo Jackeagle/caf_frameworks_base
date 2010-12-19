@@ -479,6 +479,13 @@ public:
     static const char KEY_SATURATION[];
     static const char KEY_MAX_SATURATION[];
 
+    static const char KEY_HISTOGRAM[] ;
+    static const char KEY_SUPPORTED_HISTOGRAM_MODES[] ;
+    // Values for HISTOGRAM
+    static const char HISTOGRAM_ENABLE[] ;
+    static const char HISTOGRAM_DISABLE[] ;
+
+
     // Values for Continuous AF
     static const char CONTINUOUS_AF_OFF[] ;
     static const char CONTINUOUS_AF_ON[] ;

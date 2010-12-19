@@ -898,22 +898,33 @@ status_t CameraService::Client::sendCommand(int32_t cmd, int32_t arg1, int32_t a
     status_t result = checkPidAndHardware();
     if (result != NO_ERROR) return result;
 
-    if (cmd == CAMERA_CMD_SET_DISPLAY_ORIENTATION) {
-        // The orientation cannot be set during preview.
-        if (mHardware->previewEnabled()) {
-            return INVALID_OPERATION;
-        }
-        // Mirror the preview if the camera is front-facing.
-        orientation = getOrientation(arg1, mCameraFacing == CAMERA_FACING_FRONT);
-        if (orientation == -1) return BAD_VALUE;
+    switch(cmd) {
+        case CAMERA_CMD_SET_DISPLAY_ORIENTATION:
+            // The orientation cannot be set during preview.
+            if (mHardware->previewEnabled()) {
+                return INVALID_OPERATION;
+            }
+            // Mirror the preview if the camera is front-facing.
+            orientation = getOrientation(arg1, mCameraFacing == CAMERA_FACING_FRONT);
+            if (orientation == -1) return BAD_VALUE;
 
-        if (mOrientation != orientation) {
-            mOrientation = orientation;
-            if (mOverlayRef != 0) mOrientationChanged = true;
-        }
-        return OK;
+            if (mOrientation != orientation) {
+                mOrientation = orientation;
+                if (mOverlayRef != 0) mOrientationChanged = true;
+            }
+            return OK;
+
+        case CAMERA_CMD_HISTOGRAM_ON:
+             mHardware->enableMsgType(CAMERA_MSG_STATS_DATA);
+             break;
+
+        case CAMERA_CMD_HISTOGRAM_OFF:
+             mHardware->disableMsgType(CAMERA_MSG_STATS_DATA);
+             break;
+        case CAMERA_CMD_HISTOGRAM_SEND_DATA:
+             break;
+
     }
-
     return mHardware->sendCommand(cmd, arg1, arg2);
 }
 

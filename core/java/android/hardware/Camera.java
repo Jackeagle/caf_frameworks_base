@@ -124,7 +124,8 @@ public class Camera {
     private static final int CAMERA_MSG_POSTVIEW_FRAME   = 0x040;
     private static final int CAMERA_MSG_RAW_IMAGE        = 0x080;
     private static final int CAMERA_MSG_COMPRESSED_IMAGE = 0x100;
-    private static final int CAMERA_MSG_ALL_MSGS         = 0x1FF;
+    private static final int CAMERA_MSG_STATS_DATA = 0x200;
+    private static final int CAMERA_MSG_ALL_MSGS         = 0x3FF;
 
     private int mNativeContext; // accessed by native methods
     private EventHandler mEventHandler;
@@ -134,6 +135,7 @@ public class Camera {
     private PreviewCallback mPreviewCallback;
     private PictureCallback mPostviewCallback;
     private AutoFocusCallback mAutoFocusCallback;
+    private CameraDataCallback mCameraDataCallback;
     private OnZoomChangeListener mZoomListener;
     private ErrorCallback mErrorCallback;
     private boolean mOneShot;
@@ -245,6 +247,7 @@ public class Camera {
         mPreviewCallback = null;
         mPostviewCallback = null;
         mZoomListener = null;
+        mCameraDataCallback = null;
 
         Looper looper;
         if ((looper = Looper.myLooper()) != null) {
@@ -550,6 +553,13 @@ public class Camera {
                 }
                 return;
 
+            case CAMERA_MSG_STATS_DATA:
+                if (mCameraDataCallback != null) {
+                    mCameraDataCallback.onCameraData((int[])msg.obj, mCamera);
+                }
+                return;
+
+
             case CAMERA_MSG_POSTVIEW_FRAME:
                 if (mPostviewCallback != null) {
                     mPostviewCallback.onPictureTaken((byte[])msg.obj, mCamera);
@@ -691,6 +701,43 @@ public class Camera {
          */
         void onShutter();
     }
+    /**
+     * Handles the callback for when Camera Data is available.
+     * data is read from the camera.
+     */
+    public interface CameraDataCallback {
+        /**
+         * Callback for when camera data is available.
+         *
+         * @param data   a int array of the camera data
+         * @param camera the Camera service object
+         */
+        void onCameraData(int[] data, Camera camera);
+    };
+
+    /**
+     * Set camera histogram mode and registers a callback function to run.
+     *  Only valid after startPreview() has been called.
+     *
+     * @param cb the callback to run
+     */
+    public final void setHistogramMode(CameraDataCallback cb)
+    {
+        mCameraDataCallback = cb;
+        native_setHistogramMode(cb!=null);
+    }
+    private native final void native_setHistogramMode(boolean mode);
+
+    /**
+     * Set camera histogram command to send data.
+     *
+     */
+    public final void sendHistogramData()
+    {
+        native_sendHistogramData();
+    }
+    private native final void native_sendHistogramData();
+
 
     /**
      * Callback interface used to supply image data from a photo capture.
@@ -1069,6 +1116,7 @@ public class Camera {
         private static final String KEY_FOCUS_MODE = "focus-mode";
         private static final String KEY_ISO_MODE = "iso";
         private static final String KEY_LENSSHADE = "lensshade";
+        private static final String KEY_HISTOGRAM = "histogram";
         private static final String KEY_FOCAL_LENGTH = "focal-length";
         private static final String KEY_HORIZONTAL_VIEW_ANGLE = "horizontal-view-angle";
         private static final String KEY_VERTICAL_VIEW_ANGLE = "vertical-view-angle";
@@ -1147,6 +1195,8 @@ public class Camera {
         public static final String LENSSHADE_ENABLE = "enable";
         public static final String LENSSHADE_DISABLE= "disable";
 
+        public static final String HISTOGRAM_ENABLE = "enable";
+        public static final String HISTOGRAM_DISABLE= "disable";
 
         // Values for flash mode settings.
         /**
@@ -2759,6 +2809,18 @@ public class Camera {
             String str = get(KEY_LENSSHADE + SUPPORTED_VALUES_SUFFIX);
             return split(str);
         }
+
+         /**
+         * Gets the supported Histogram modes.
+         *
+         * @return a List of HISTOGRAM_XXX string constants. null if histogram mode
+         *         setting is not supported.
+         */
+        public List<String> getSupportedHistogramModes() {
+            String str = get(KEY_HISTOGRAM + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+        }
+
 
          /**
          * Gets the current auto exposure setting.
