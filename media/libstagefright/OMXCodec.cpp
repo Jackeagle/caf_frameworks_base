@@ -553,7 +553,7 @@ sp<MediaSource> OMXCodec::Create(
 
             codec->parseFlags(flags);
 
-            err = codec->configureCodec(meta);
+            err = codec->configureCodec(meta, flags);
 
             if (err == OK) {
                 return codec;
@@ -1822,13 +1822,6 @@ void OMXCodec::on_message(const omx_message &msg) {
                     info->mMediaBuffer->release();
                     info->mMediaBuffer = NULL;
                 }
-            }
-
-            if( (NULL != (*buffers)[i].mMediaBuffer) && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
-            {
-                 CODEC_LOGV("EBD: %x %d", (*buffers)[i].mMediaBuffer, (*buffers)[i].mMediaBuffer->refcount() );
-                 (*buffers)[i].mMediaBuffer->release();
-                 buffers->editItemAt(i).mMediaBuffer = NULL;
             }
 
             if( (NULL != (*buffers)[i].mMediaBuffer) && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
