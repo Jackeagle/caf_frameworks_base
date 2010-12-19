@@ -1342,7 +1342,7 @@ status_t OMXCodec::setVideoOutputFormat(
         // supported color formats by the OMX component. If OMX codec is
         // being run in a sepparate process, then pick the second iterated
         // color format.
-#if 0
+#if 1
         if (!strncmp(mComponentName, "OMX.qcom",8)) {
             OMX_U32 index;
 	    
