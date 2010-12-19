@@ -46,6 +46,7 @@
 #include <media/stagefright/OMXCodec.h>
 
 #include <surfaceflinger/ISurface.h>
+#include <cutils/properties.h>
 
 #include <media/stagefright/foundation/ALooper.h>
 
@@ -229,9 +230,12 @@ AwesomePlayer::AwesomePlayer()
       mAudioPlayer(NULL),
       mFlags(0),
       mExtractorFlags(0),
-      mLastVideoBuffer(NULL),
-      mVideoBuffer(NULL),
       mSuspensionState(NULL) {
+
+    mVideoBuffer = new MediaBuffer*[BUFFER_QUEUE_CAPACITY];
+    for(int i=0;i<BUFFER_QUEUE_CAPACITY;i++)
+        mVideoBuffer[i] = NULL;
+
     CHECK_EQ(mClient.connect(), OK);
 
     DataSource::RegisterDefaultSniffers();
@@ -248,6 +252,10 @@ AwesomePlayer::AwesomePlayer()
 
     mAudioStatusEventPending = false;
 
+    mVideoQueueFront = 0;
+    mVideoQueueBack  = 0;
+    mVideoQueueSize  = 0;
+
     reset();
 }
 
@@ -257,6 +265,7 @@ AwesomePlayer::~AwesomePlayer() {
     }
 
     reset();
+    delete [] mVideoBuffer;
 
     mClient.disconnect();
 }
@@ -443,15 +452,15 @@ void AwesomePlayer::reset_l() {
 
     mVideoRenderer.clear();
 
-    if (mLastVideoBuffer) {
-        mLastVideoBuffer->release();
-        mLastVideoBuffer = NULL;
+    for (int i=0;i<BUFFER_QUEUE_CAPACITY;i++) {
+        if (mVideoBuffer[i] != NULL) {
+            mVideoBuffer[i]->release();
+            mVideoBuffer[i] = NULL;
+        }
     }
-
-    if (mVideoBuffer) {
-        mVideoBuffer->release();
-        mVideoBuffer = NULL;
-    }
+    mVideoQueueFront = 0;
+    mVideoQueueBack  = 0;
+    mVideoQueueSize  = 0;
 
     if (mRTSPController != NULL) {
         mRTSPController->disconnect();
@@ -1133,14 +1142,11 @@ void AwesomePlayer::onVideoEvent() {
     mVideoEventPending = false;
 
     if (mSeeking) {
-        if (mLastVideoBuffer) {
-            mLastVideoBuffer->release();
-            mLastVideoBuffer = NULL;
-        }
-
-        if (mVideoBuffer) {
-            mVideoBuffer->release();
-            mVideoBuffer = NULL;
+        for(int i=0;i<BUFFER_QUEUE_CAPACITY;i++){
+            if (mVideoBuffer[i] != NULL) {
+                mVideoBuffer[i]->release();
+                mVideoBuffer[i] = NULL;
+            }
         }
 
         if (mCachedSource != NULL && mAudioSource != NULL) {
@@ -1157,9 +1163,13 @@ void AwesomePlayer::onVideoEvent() {
             }
             mAudioSource->pause();
         }
+
+        mVideoQueueFront = 0;
+        mVideoQueueBack  = 0;
+        mVideoQueueSize  = 0;
     }
 
-    if (!mVideoBuffer) {
+    if (mVideoBuffer[mVideoQueueBack] == NULL) {
         MediaSource::ReadOptions options;
         if (mSeeking) {
             LOGV("seeking to %lld us (%.2f secs)", mSeekTimeUs, mSeekTimeUs / 1E6);
@@ -1168,11 +1178,11 @@ void AwesomePlayer::onVideoEvent() {
                     mSeekTimeUs, MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);
         }
         for (;;) {
-            status_t err = mVideoSource->read(&mVideoBuffer, &options);
+            status_t err = mVideoSource->read(&mVideoBuffer[mVideoQueueBack], &options);
             options.clearSeekTo();
 
             if (err != OK) {
-                CHECK_EQ(mVideoBuffer, NULL);
+                CHECK_EQ(mVideoBuffer[mVideoQueueBack], NULL);
 
                 if (err == INFO_FORMAT_CHANGED) {
                     LOGV("VideoSource signalled format change.");
@@ -1197,12 +1207,12 @@ void AwesomePlayer::onVideoEvent() {
                 return;
             }
 
-            if (mVideoBuffer->range_length() == 0) {
+            if (mVideoBuffer[mVideoQueueBack]->range_length() == 0) {
                 // Some decoders, notably the PV AVC software decoder
                 // return spurious empty buffers that we just want to ignore.
 
-                mVideoBuffer->release();
-                mVideoBuffer = NULL;
+                mVideoBuffer[mVideoQueueBack]->release();
+                mVideoBuffer[mVideoQueueBack] = NULL;
                 continue;
             }
 
@@ -1211,7 +1221,7 @@ void AwesomePlayer::onVideoEvent() {
     }
 
     int64_t timeUs;
-    CHECK(mVideoBuffer->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(mVideoBuffer[mVideoQueueBack]->meta_data()->findInt64(kKeyTime, &timeUs));
 
     {
         Mutex::Autolock autoLock(mMiscStateLock);
@@ -1226,6 +1236,7 @@ void AwesomePlayer::onVideoEvent() {
         mFlags &= ~FIRST_FRAME;
 
         mTimeSourceDeltaUs = ts->getRealTimeUs() - timeUs;
+        setNumFramesToHold();
     }
 
     int64_t realTimeUs, mediaTimeUs;
@@ -1248,8 +1259,8 @@ void AwesomePlayer::onVideoEvent() {
         // We're more than 200ms late.
         LOGV("we're late by %lld us (%.2f secs)", latenessUs, latenessUs / 1E6);
 
-        mVideoBuffer->release();
-        mVideoBuffer = NULL;
+        mVideoBuffer[mVideoQueueBack]->release();
+        mVideoBuffer[mVideoQueueBack] = NULL;
 
         postVideoEvent_l();
         return;
@@ -1269,15 +1280,17 @@ void AwesomePlayer::onVideoEvent() {
     }
 
     if (mVideoRenderer != NULL) {
-        mVideoRenderer->render(mVideoBuffer);
+        mVideoRenderer->render(mVideoBuffer[mVideoQueueBack]);
     }
 
-    if (mLastVideoBuffer) {
-        mLastVideoBuffer->release();
-        mLastVideoBuffer = NULL;
+    mVideoQueueBack = (++mVideoQueueBack)%(BUFFER_QUEUE_CAPACITY);
+    mVideoQueueSize++;
+    if (mVideoQueueSize > mNumFramesToHold) {
+        mVideoBuffer[mVideoQueueFront]->release();
+        mVideoBuffer[mVideoQueueFront] = NULL;
+        mVideoQueueFront = (++mVideoQueueFront)%(BUFFER_QUEUE_CAPACITY);
+        mVideoQueueSize--;
     }
-    mLastVideoBuffer = mVideoBuffer;
-    mVideoBuffer = NULL;
 
     postVideoEvent_l();
 }
@@ -1696,7 +1709,7 @@ status_t AwesomePlayer::suspend() {
     Mutex::Autolock autoLock(mLock);
 
     if (mSuspensionState != NULL) {
-        if (mLastVideoBuffer == NULL) {
+        if (mVideoBuffer[mVideoQueueBack] == NULL) {
             //go into here if video is suspended again
             //after resuming without being played between
             //them
@@ -1731,19 +1744,18 @@ status_t AwesomePlayer::suspend() {
     state->mFlags = mFlags & (PLAYING | AUTO_LOOPING | LOOPING | AT_EOS);
     getPosition(&state->mPositionUs);
 
-    if (mLastVideoBuffer) {
-        size_t size = mLastVideoBuffer->range_length();
-
+    if (mVideoBuffer[mVideoQueueBack] != NULL) {
+        size_t size = mVideoBuffer[mVideoQueueBack]->range_length();
         if (size) {
             int32_t unreadable;
-            if (!mLastVideoBuffer->meta_data()->findInt32(
+            if (!mVideoBuffer[mVideoQueueBack]->meta_data()->findInt32(
                         kKeyIsUnreadable, &unreadable)
                     || unreadable == 0) {
                 state->mLastVideoFrameSize = size;
                 state->mLastVideoFrame = malloc(size);
                 memcpy(state->mLastVideoFrame,
-                       (const uint8_t *)mLastVideoBuffer->data()
-                            + mLastVideoBuffer->range_offset(),
+                       (const uint8_t *)mVideoBuffer[mVideoQueueBack]->data()
+                            + mVideoBuffer[mVideoQueueBack]->range_offset(),
                        size);
 
                 state->mVideoWidth = mVideoWidth;
@@ -1839,6 +1851,23 @@ void AwesomePlayer::postAudioEOS() {
 
 void AwesomePlayer::postAudioSeekComplete() {
     postCheckAudioStatusEvent_l();
+}
+
+void AwesomePlayer::setNumFramesToHold() {
+    char value1[128],value2[128];
+    property_get("ro.product.device",value1,"0");
+    property_get("hw.hdmiON", value2, "0");
+
+    // set value of mNumFramesToHold to 2 for targets 8250,8650A,8660
+    // set value of mNumFramesToHold to 2 for 7x30 only if HDMI is on and its not 720p playback
+    if(strcmp("qsd8250_surf",value1) == 0 ||
+       strcmp("qsd8250_ffa",value1) == 0  ||
+       strcmp("qsd8650a_st1x",value1) == 0||
+       strcmp("msm8660_surf",value1) == 0 ||
+       (strcmp("msm7630_surf",value1) == 0 && atoi(value2) && (!(mVideoWidth == 1280 && mVideoHeight == 720))))
+        mNumFramesToHold = 2;
+    else
+        mNumFramesToHold = 1;
 }
 
 }  // namespace android

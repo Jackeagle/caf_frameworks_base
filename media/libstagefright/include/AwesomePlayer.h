@@ -26,6 +26,7 @@
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/TimeSource.h>
 #include <utils/threads.h>
+#define BUFFER_QUEUE_CAPACITY 3
 
 namespace android {
 
@@ -178,8 +179,11 @@ private:
     void postCheckAudioStatusEvent_l();
     status_t play_l();
 
-    MediaBuffer *mLastVideoBuffer;
-    MediaBuffer *mVideoBuffer;
+    MediaBuffer **mVideoBuffer;
+    int mVideoQueueFront;
+    int mVideoQueueBack;
+    int mVideoQueueSize;
+    int mNumFramesToHold;
 
     sp<NuHTTPDataSource> mConnectingDataSource;
     sp<NuCachedSource2> mCachedSource;
@@ -252,6 +256,7 @@ private:
     status_t finishSetDataSource_l();
 
     static bool ContinuePreparation(void *cookie);
+    void setNumFramesToHold();
 
     static void OnRTSPSeekDoneWrapper(void *cookie);
     void onRTSPSeekDone();
