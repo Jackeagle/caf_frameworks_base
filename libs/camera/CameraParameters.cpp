@@ -73,6 +73,10 @@ const char CameraParameters::KEY_ZOOM_SUPPORTED[] = "zoom-supported";
 const char CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED[] = "smooth-zoom-supported";
 const char CameraParameters::KEY_FOCUS_DISTANCES[] = "focus-distances";
 const char CameraParameters::KEY_VIDEO_FRAME_FORMAT[] = "video-frame-format";
+const char CameraParameters::KEY_ISO_MODE[] = "iso";
+const char CameraParameters::KEY_SUPPORTED_ISO_MODES[] = "iso-values";
+const char CameraParameters::KEY_LENSSHADE[] = "lensshade";
+const char CameraParameters::KEY_SUPPORTED_LENSSHADE_MODES[] = "lensshade-values";
 
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
@@ -143,6 +147,20 @@ const char CameraParameters::FOCUS_MODE_MACRO[] = "macro";
 const char CameraParameters::FOCUS_MODE_FIXED[] = "fixed";
 const char CameraParameters::FOCUS_MODE_EDOF[] = "edof";
 const char CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO[] = "continuous-video";
+
+ // Values for ISO Settings
+const char CameraParameters::ISO_AUTO[] = "auto";
+const char CameraParameters::ISO_HJR[] = "ISO_HJR";
+const char CameraParameters::ISO_100[] = "ISO100";
+const char CameraParameters::ISO_200[] = "ISO200";
+const char CameraParameters::ISO_400[] = "ISO400";
+const char CameraParameters::ISO_800[] = "ISO800";
+const char CameraParameters::ISO_1600[] = "ISO1600";
+
+ //Values for Lens Shading
+const char CameraParameters::LENSSHADE_ENABLE[] = "enable";
+const char CameraParameters::LENSSHADE_DISABLE[] = "disable";
+
 
 CameraParameters::CameraParameters()
                 : mMap()

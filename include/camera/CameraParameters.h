@@ -293,6 +293,13 @@ public:
     // Example value: "yuv420sp" or PIXEL_FORMAT_XXX constants. Read only.
     static const char KEY_VIDEO_FRAME_FORMAT[];
 
+
+    static const char KEY_ISO_MODE[];
+    static const char KEY_SUPPORTED_ISO_MODES[];
+    static const char KEY_LENSSHADE[] ;
+    static const char KEY_SUPPORTED_LENSSHADE_MODES[] ;
+
+
     // Value for KEY_ZOOM_SUPPORTED or KEY_SMOOTH_ZOOM_SUPPORTED.
     static const char TRUE[];
 
@@ -395,6 +402,18 @@ public:
     // CameraHardwareInterface.autoFocus in this mode. To stop continuous focus,
     // applications should change the focus mode to other modes.
     static const char FOCUS_MODE_CONTINUOUS_VIDEO[];
+
+    static const char ISO_AUTO[];
+    static const char ISO_HJR[] ;
+    static const char ISO_100[];
+    static const char ISO_200[] ;
+    static const char ISO_400[];
+    static const char ISO_800[];
+    static const char ISO_1600[];
+    // Values for Lens Shading
+    static const char LENSSHADE_ENABLE[] ;
+    static const char LENSSHADE_DISABLE[] ;
+
 
 private:
     DefaultKeyedVector<String8,String8>    mMap;
