@@ -399,7 +399,7 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
         quirks |= kDefersOutputBufferAllocation;
-        //quirks |= kDoesNotRequireMemcpyOnOutputPort;
+        quirks |= kDoesNotRequireMemcpyOnOutputPort;
     }
     if (!strncmp(componentName, "OMX.qcom.7x30.video.decoder.", 28)) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
@@ -1915,7 +1915,7 @@ void OMXCodec::on_message(const omx_message &msg) {
                             "advertised size in FILL_BUFFER_DONE!");
 		}
                 
-		if(mPmemInfo != NULL && buffer != NULL) {
+                if(!mOMXLivesLocally && mPmemInfo != NULL && buffer != NULL) {
                     OMX_U8* base = (OMX_U8*)mPmemInfo->getBase();
                     OMX_U8* data = base + msg.u.extended_buffer_data.pmem_offset;
                     buffer->setData(data);
