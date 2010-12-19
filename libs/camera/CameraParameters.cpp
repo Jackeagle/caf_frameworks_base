@@ -91,6 +91,8 @@ const char CameraParameters::KEY_AUTO_EXPOSURE[] = "auto-exposure";
 const char CameraParameters::KEY_SUPPORTED_AUTO_EXPOSURE[] = "auto-exposure-values";
 const char CameraParameters::KEY_CONTINUOUS_AF[] = "continuous-af";
 const char CameraParameters::KEY_SUPPORTED_CONTINUOUS_AF[] = "continuous-af-values";
+const char CameraParameters::KEY_SELECTABLE_ZONE_AF[] = "selectable-zone-af";
+const char CameraParameters::KEY_SUPPORTED_SELECTABLE_ZONE_AF[] = "selectable-zone-af-values";
 
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
@@ -224,6 +226,11 @@ const char CameraParameters::KEY_MAX_CONTRAST[] = "max-contrast";
 const char CameraParameters::KEY_SATURATION[] = "saturation";
 const char CameraParameters::KEY_MAX_SATURATION[] = "max-saturation";
 
+// Values for selectable zone af Settings
+const char CameraParameters::SELECTABLE_ZONE_AF_AUTO[] = "auto";
+const char CameraParameters::SELECTABLE_ZONE_AF_SPOT_METERING[] = "spot-metering";
+const char CameraParameters::SELECTABLE_ZONE_AF_CENTER_WEIGHTED[] = "center-weighted";
+const char CameraParameters::SELECTABLE_ZONE_AF_FRAME_AVERAGE[] = "frame-average";
 
 static const char* portrait = "portrait";
 static const char* landscape = "landscape";

@@ -1139,6 +1139,7 @@ public class Camera {
         private static final String KEY_SATURATION = "saturation";
         private static final String KEY_MAX_SATURATION = "max-saturation";
         private static final String KEY_CONTINUOUS_AF = "continuous-af";
+        private static final String KEY_SELECTABLE_ZONE_AF = "selectable-zone-af";
 
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
@@ -1420,6 +1421,12 @@ public class Camera {
 
         public static final String CONTINUOUS_AF_OFF = "caf-off";
         public static final String CONTINUOUS_AF_ON = "caf-on";
+
+        // Values for selectable zone af settings.
+        public static final String SELECTABLE_ZONE_AF_AUTO = "auto";
+        public static final String SELECTABLE_ZONE_AF_SPOTMETERING = "spot-metering";
+        public static final String SELECTABLE_ZONE_AF_CENTER_WEIGHTED = "center-weighted";
+        public static final String SELECTABLE_ZONE_AF_FRAME_AVERAGE = "frame-average";
 
         private HashMap<String, String> mMap;
 
@@ -2932,6 +2939,36 @@ public class Camera {
          */
         public List<String> getSupportedContinuousAfModes() {
             String str = get(KEY_CONTINUOUS_AF + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+        }
+
+         /**
+         * Gets the current selectable zone af setting.
+         *
+         * @return one of SELECTABLE_ZONE_AF_XXX string constant. null if selectable zone af
+         *         setting is not supported.
+         */
+        public String getSelectableZoneAf() {
+            return get(KEY_SELECTABLE_ZONE_AF);
+        }
+
+        /**
+         * Sets the current selectable zone af setting.
+         *
+         * @param value SELECTABLE_ZONE_AF_XXX string constants.
+         */
+        public void setSelectableZoneAf(String value) {
+            set(KEY_SELECTABLE_ZONE_AF, value);
+        }
+
+       /**
+         * Gets the supported selectable zone af setting.
+         *
+         * @return a List of SELECTABLE_ZONE_AF_XXX string constants. null if selectable zone af
+         *         setting is not supported.
+         */
+        public List<String> getSupportedSelectableZoneAf() {
+            String str = get(KEY_SELECTABLE_ZONE_AF + SUPPORTED_VALUES_SUFFIX);
             return split(str);
         }
 
