@@ -145,7 +145,7 @@ private:
         // convert client from cookie
         static sp<Client>       getClientFromCookie(void* user);
         // handlers for messages
-        void                    handleShutter(image_rect_type *size);
+        void                    handleShutter(image_rect_type *size, bool playShutterSound);
         void                    handlePreviewData(const sp<IMemory>& mem);
         void                    handlePostview(const sp<IMemory>& mem);
         void                    handleRawPicture(const sp<IMemory>& mem);

@@ -1009,7 +1009,7 @@ void CameraService::Client::notifyCallback(int32_t msgType, int32_t ext1,
     switch (msgType) {
         case CAMERA_MSG_SHUTTER:
             // ext1 is the dimension of the yuv picture.
-            client->handleShutter((image_rect_type *)ext1);
+            client->handleShutter((image_rect_type *)ext1, (bool)ext2);
             break;
         default:
             client->handleGenericNotify(msgType, ext1, ext2);
@@ -1070,22 +1070,29 @@ void CameraService::Client::dataCallbackTimestamp(nsecs_t timestamp,
 // snapshot taken callback
 // "size" is the width and height of yuv picture for registerBuffer.
 // If it is NULL, use the picture size from parameters.
-void CameraService::Client::handleShutter(image_rect_type *size) {
-    mCameraService->playSound(SOUND_SHUTTER);
+void CameraService::Client::handleShutter(image_rect_type *size,
+    bool playShutterSoundOnly) {
+
+    if(playShutterSoundOnly) {
+        mCameraService->playSound(SOUND_SHUTTER);
+        sp<ICameraClient> c = mCameraClient;
+        if (c != 0) {
+            mLock.unlock();
+            c->notifyCallback(CAMERA_MSG_SHUTTER, 0, 0);
+            //Following method was used to get the lock after callback
+            //With shutter sound change acquiring lock is performed in caller
+            //if (!lockIfMessageWanted(CAMERA_MSG_SHUTTER)) return;
+        }
+        return;
+    }
 
     // Screen goes black after the buffer is unregistered.
     if (mSurface != 0 && !mUseOverlay) {
         mSurface->unregisterBuffers();
     }
 
-    sp<ICameraClient> c = mCameraClient;
-    if (c != 0) {
-        mLock.unlock();
-        c->notifyCallback(CAMERA_MSG_SHUTTER, 0, 0);
-        if (!lockIfMessageWanted(CAMERA_MSG_SHUTTER)) return;
-    }
-    disableMsgType(CAMERA_MSG_SHUTTER);
 
+    disableMsgType(CAMERA_MSG_SHUTTER);
     // It takes some time before yuvPicture callback to be called.
     // Register the buffer for raw image here to reduce latency.
     if (mSurface != 0 && !mUseOverlay) {
