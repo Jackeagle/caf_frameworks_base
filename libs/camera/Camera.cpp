@@ -200,6 +200,14 @@ status_t Camera::getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize)
     return c->getBufferInfo(Frame, alignedSize);
 }
 
+void Camera::encodeData()
+{
+    LOGV("encodeData");
+    sp <ICamera> c = mCamera;
+    if (c == 0) return;
+    c->encodeData();
+}
+
 // start preview mode
 status_t Camera::startPreview()
 {

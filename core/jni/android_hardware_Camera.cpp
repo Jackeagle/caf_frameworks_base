@@ -449,6 +449,15 @@ static void android_hardware_Camera_addCallbackBuffer(JNIEnv *env, jobject thiz,
     }
 }
 
+static void android_hardware_Camera_encodeData(JNIEnv *env, jobject thiz) {
+    LOGE("android_hardware_Camera_encodeData");
+    JNICameraContext* context;
+    sp<Camera> c = get_native_camera(env, thiz, &context);
+    if (c == 0) return;
+
+    c->encodeData();
+}
+
 static void android_hardware_Camera_autoFocus(JNIEnv *env, jobject thiz)
 {
     LOGV("autoFocus");
@@ -622,6 +631,9 @@ static JNINativeMethod camMethods[] = {
   { "native_autoFocus",
     "()V",
     (void *)android_hardware_Camera_autoFocus },
+  { "native_encodeData",
+    "()V",
+    (void *)android_hardware_Camera_encodeData },
   { "native_cancelAutoFocus",
     "()V",
     (void *)android_hardware_Camera_cancelAutoFocus },

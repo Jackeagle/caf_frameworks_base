@@ -174,6 +174,9 @@ public:
             //status_t    getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
             status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize);
 
+            //encode the YUV data
+            void        encodeData();
+
             // start preview mode, must call setPreviewDisplay first
             status_t    startPreview();
 

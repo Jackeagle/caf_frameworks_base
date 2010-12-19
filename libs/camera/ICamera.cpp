@@ -45,7 +45,8 @@ enum {
     STOP_RECORDING,
     RECORDING_ENABLED,
     RELEASE_RECORDING_FRAME,
-	GET_BUFFER_INFO,
+    GET_BUFFER_INFO,
+    ENCODE_YUV_DATA,
 };
 
 class BpCamera: public BpInterface<ICamera>
@@ -99,6 +100,15 @@ public:
         ret = reply.readInt32();
         *alignedSize = reply.readInt32();
         return ret;
+    }
+
+    // encode the YUV data.
+    void encodeData()
+    {
+        LOGV("encodeData");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        remote()->transact(ENCODE_YUV_DATA, data, &reply);
     }
 
     // start preview mode, must call setPreviewDisplay first
@@ -292,6 +302,12 @@ status_t BnCamera::onTransact(
             size_t alignedSize;
             reply->writeInt32(getBufferInfo(&bFrame, &alignedSize));
             reply->writeInt32(alignedSize);
+            return NO_ERROR;
+        } break;
+        case ENCODE_YUV_DATA:{
+            LOGV("ENCODE_YUV_DATA");
+            CHECK_INTERFACE(ICamera, data, reply);
+            encodeData();
             return NO_ERROR;
         } break;
         case START_PREVIEW: {

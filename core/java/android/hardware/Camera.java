@@ -669,6 +669,12 @@ public class Camera {
     }
     private native final void native_cancelAutoFocus();
 
+    public final void encodeData()
+    {
+        native_encodeData();
+    }
+    private native final void native_encodeData();
+
     /**
      * Callback interface used to signal the moment of actual image capture.
      *

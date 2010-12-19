@@ -135,6 +135,11 @@ public:
     virtual status_t getBufferInfo(sp<IMemory>** Frame, size_t *alignedSize) = 0;
 
     /**
+     * Encode the YUV data.
+     */
+    virtual void        encodeData() = 0;
+
+    /**
      * Only used if overlays are used for camera preview.
      */
     virtual bool         useOverlay() {return false;}
