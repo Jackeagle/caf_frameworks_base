@@ -1197,6 +1197,8 @@ public class Camera {
          * Capture the naturally warm color of scenes lit by candles.
          */
         public static final String SCENE_MODE_CANDLELIGHT = "candlelight";
+        public static final String SCENE_MODE_BACKLIGHT = "backlight";
+        public static final String SCENE_MODE_FLOWERS = "flowers";
 
         /**
          * Applications are looking for a barcode. Camera driver will be
