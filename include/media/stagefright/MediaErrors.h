@@ -40,6 +40,9 @@ enum {
     // Not technically an error.
     INFO_FORMAT_CHANGED    = MEDIA_ERROR_BASE - 12,
     INFO_DISCONTINUITY     = MEDIA_ERROR_BASE - 13,
+
+    //Custom Error for corrupt NAL
+    ERROR_CORRUPT_NAL      = MEDIA_ERROR_BASE - 99,
 };
 
 }  // namespace android
