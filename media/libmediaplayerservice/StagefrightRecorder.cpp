@@ -621,6 +621,28 @@ status_t StagefrightRecorder::setListener(const sp<IMediaRecorderClient> &listen
 }
 
 status_t StagefrightRecorder::setCameraParameters(const String8 &params) {
+
+    CameraParameters cp(params);
+
+    int64_t token = IPCThreadState::self()->clearCallingIdentity();
+    mCamera->setParameters( params);
+    IPCThreadState::self()->restoreCallingIdentity(token);
+
+    /*
+     * TODO -
+     * Providing temporary option to set rotation value
+     * value from command line. Needs to be removed once
+     * the app can send rotation values.
+     * the value must be one of 0,90,180,270
+     */
+     char value[PROPERTY_VALUE_MAX];
+     if (property_get("cam.video.rotation", value, 0) > 0 && atoi(value) >= 0) {
+        cp.set("rotation", value );
+     }
+
+     mRotation = cp.getInt("rotation"); //todo zoom and pass the parameters to
+                                     //camera source
+    //zoom can be tested from the app now
     return OK;
 }
 
