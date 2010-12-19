@@ -45,10 +45,11 @@ LOCAL_SRC_FILES:=                         \
         string.cpp
 
 LOCAL_C_INCLUDES:= \
-	$(JNI_H_INCLUDE) \
+        $(JNI_H_INCLUDE) \
         $(TOP)/frameworks/base/include/media/stagefright/openmax \
         $(TOP)/external/tremolo \
-        $(TOP)/frameworks/base/media/libstagefright/rtsp
+        $(TOP)/frameworks/base/media/libstagefright/rtsp \
+        $(TOP)/vendor/qcom/opensource/omx/mm-core/omxcore/inc
 
 LOCAL_SHARED_LIBRARIES := \
         libbinder         \

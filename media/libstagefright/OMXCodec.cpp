@@ -54,10 +54,14 @@
 
 #include "include/ThreadedSource.h"
 
+#include <OMX_QCOMExtns.h>
+
 namespace android {
 
 static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
+static const int QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka = 0x7FA30C01;
 static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
+static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace = 0x7FA30C04;
 
 struct CodecInfo {
     const char *mime;
@@ -1372,16 +1376,13 @@ status_t OMXCodec::setVideoOutputFormat(
         CHECK_EQ(err, OK);
         CHECK_EQ(format.eCompressionFormat, OMX_VIDEO_CodingUnused);
 
-        static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
-        static const int QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka = 0x7FA30C01;
-        static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-
         CHECK(format.eColorFormat == OMX_COLOR_FormatYUV420Planar
                || format.eColorFormat == OMX_COLOR_FormatYUV420SemiPlanar
                || format.eColorFormat == OMX_COLOR_FormatCbYCrY
                || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar
                || format.eColorFormat == QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
-               || format.eColorFormat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka);
+               || format.eColorFormat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+               || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace) ;
 
         if (mGPUComposition) {
             LOGV("Set GPU Composition");
@@ -1483,7 +1484,8 @@ OMXCodec::OMXCodec(
       mPaused(false),
       mGPUComposition(false),
       mLeftOverBuffer(NULL),
-      mPmemInfo(NULL){
+      mPmemInfo(NULL),
+      mInterlaceFormatDetected(false) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
@@ -1817,6 +1819,9 @@ void OMXCodec::on_message(const omx_message &msg) {
                  flags,
                  msg.u.extended_buffer_data.timestamp,
                  msg.u.extended_buffer_data.timestamp / 1E6);
+
+            CODEC_LOGV("Calling processExtraDataOfbuffer");
+            processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer),flags);
 
             Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
             size_t i = 0;
@@ -3305,8 +3310,12 @@ static const char *colorFormatString(OMX_COLOR_FORMATTYPE type) {
 
     if (type == OMX_QCOM_COLOR_FormatYVU420SemiPlanar) {
         return "OMX_QCOM_COLOR_FormatYVU420SemiPlanar";
-    } else if (type == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) {
+    } else if (type == QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka) {
+        return "QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka";
+    }else if (type == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) {
         return "QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka";
+    } else if (type ==  OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace) {
+        return "OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace";
     } else if (type < 0 || (size_t)type >= numNames) {
         return "UNKNOWN";
     } else {
@@ -3798,6 +3807,65 @@ status_t QueryCodecs(
 
         CHECK_EQ(omx->freeNode(node), OK);
     }
+}
+
+status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer,OMX_U32 flags) {
+    LOGV("In ProcessExtraDataBlocksOfBuffer for interlace, buffer = %p, flags = %p",aBuffer,flags);
+
+    if (!mInterlaceFormatDetected) {
+        if (flags & OMX_BUFFERFLAG_EXTRADATA) {
+            OMX_OTHER_EXTRADATATYPE *pExtra;
+            OMX_STREAMINTERLACEFORMAT *pInterlaceFormat;
+            OMX_U8 *pTmp = aBuffer->pBuffer + aBuffer->nOffset + aBuffer->nFilledLen + 3;
+
+            pExtra = (OMX_OTHER_EXTRADATATYPE *)(((OMX_U32)pTmp) & ~3);
+            while((pExtra->eType != OMX_ExtraDataNone) && (pExtra->eType != OMX_ExtraDataInterlaceFormat))
+            {
+                pExtra = (OMX_OTHER_EXTRADATATYPE *) (((OMX_U8 *) pExtra) + pExtra->nSize);
+            }
+
+            if(pExtra->eType == OMX_ExtraDataInterlaceFormat)
+            {
+                pInterlaceFormat = (OMX_STREAMINTERLACEFORMAT *)pExtra->data;
+
+                if(pInterlaceFormat->bInterlaceFormat == OMX_TRUE)
+                {
+                   if(pInterlaceFormat->nInterlaceFormats == OMX_InterlaceFrameProgressive)
+                       LOGV("ProcessExtraDataBlocksOfBuffer: Interlace Type %s","Progressive");
+                   else if(pInterlaceFormat->nInterlaceFormats == OMX_InterlaceInterleaveFrameTopFieldFirst)
+                       LOGV("ProcessExtraDataBlocksOfBuffer: Interlace Type %s","InterleaveFrameTopFieldFirst");
+                   else if(pInterlaceFormat->nInterlaceFormats == OMX_InterlaceInterleaveFrameBottomFieldFirst)
+                       LOGV("ProcessExtraDataBlocksOfBuffer: Interlace Type %s","InterleaveFrameBottomFieldFirst");
+                   else if(pInterlaceFormat->nInterlaceFormats == OMX_InterlaceFrameTopFieldFirst)
+                       LOGV("ProcessExtraDataBlocksOfBuffer: Interlace Type %s","FrameTopFieldFirst");
+                   else if(pInterlaceFormat->nInterlaceFormats == OMX_InterlaceFrameBottomFieldFirst)
+                       LOGV("ProcessExtraDataBlocksOfBuffer: Interlace Type %s","FrameBottomFieldFirst");
+                   else
+                   {
+                       LOGE("ProcessExtraDataBlocksOfBuffer:Unrecognized interlace format");
+                       return ERROR_UNSUPPORTED;
+                   }
+
+                   if((pInterlaceFormat->nInterlaceFormats == OMX_InterlaceInterleaveFrameTopFieldFirst) ||
+                      (pInterlaceFormat->nInterlaceFormats == OMX_InterlaceInterleaveFrameBottomFieldFirst))
+                   {
+                       static const int QOMX_COLOR_FormatYVU420SemiPlanarInterlace = 0x7FA30C04;
+
+                       LOGV("Setting output color format to QOMX_COLOR_FormatYVU420SemiPlanarInterlace");
+                       mOutputFormat->setInt32(kKeyColorFormat, (OMX_COLOR_FORMATTYPE)QOMX_COLOR_FormatYVU420SemiPlanarInterlace);
+                   }
+                   else
+                   {
+                       LOGE("ProcessExtraDataBlocksOfBuffer:Unsupported interlace format");
+                       return ERROR_UNSUPPORTED;
+                   }
+                }
+            }
+            mInterlaceFormatDetected = true;
+        }
+    }
+
+    return OK;
 }
 
 }  // namespace android
