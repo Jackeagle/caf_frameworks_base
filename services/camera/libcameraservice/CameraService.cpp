@@ -761,6 +761,16 @@ void CameraService::Client::stopPreview() {
     Mutex::Autolock lock(mLock);
     if (checkPidAndHardware() != NO_ERROR) return;
 
+    LOGV("stopPreview :Destroying any previous overlay");
+    /*Force the destruction of any previous overlay
+      so that display will not refer to a buffer that
+      will be  deallocated when hardware is stopped below */
+    sp<Overlay> dummy;
+    mHardware->setOverlay( dummy );
+    mOverlayRef = 0;
+    if(mOverlay != NULL)
+        mOverlay->destroy();
+
     disableMsgType(CAMERA_MSG_PREVIEW_FRAME);
     mHardware->stopPreview();
 
