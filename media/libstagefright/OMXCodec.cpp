@@ -396,7 +396,7 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
         quirks |= kDefersOutputBufferAllocation;
-        quirks |= kDoesNotRequireMemcpyOnOutputPort;
+        //quirks |= kDoesNotRequireMemcpyOnOutputPort;
     }
     if (!strncmp(componentName, "OMX.qcom.7x30.video.decoder.", 28)) {
         quirks |= kRequiresAllocateBufferOnInputPorts;

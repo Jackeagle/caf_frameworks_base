@@ -386,6 +386,7 @@ OMX_ERRORTYPE OMX::OnFillBufferDone(
     msg.u.extended_buffer_data.platform_private = pBuffer->pPlatformPrivate;
     msg.u.extended_buffer_data.data_ptr = pBuffer->pBuffer;
 
+#if 0
     PLATFORM_PRIVATE_LIST *pPlatfromList = (PLATFORM_PRIVATE_LIST *)pBuffer->pPlatformPrivate;
     PLATFORM_PRIVATE_ENTRY *pPlatformEntry;
     PLATFORM_PRIVATE_PMEM_INFO *pPMEMInfo;
@@ -403,8 +404,8 @@ OMX_ERRORTYPE OMX::OnFillBufferDone(
 	  }
       }
     }
-
     msg.u.extended_buffer_data.pmem_offset = offset;
+#endif
     
     findDispatcher(node)->post(msg);
     
