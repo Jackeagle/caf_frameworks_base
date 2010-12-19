@@ -502,7 +502,9 @@ sp<IOMXRenderer> OMX::createRenderer(
                 const char *componentName,
                 OMX_COLOR_FORMATTYPE colorFormat,
                 size_t displayWidth, size_t displayHeight,
-                size_t decodedWidth, size_t decodedHeight);
+                size_t decodedWidth, size_t decodedHeight,
+                size_t rotation, size_t flags ); //fallback to existing rotation function.
+                                                 //check against libstagefrighthw.
 
         CreateRendererWithRotationFunc funcWithRotation =
             (CreateRendererWithRotationFunc)dlsym(
@@ -520,12 +522,16 @@ sp<IOMXRenderer> OMX::createRenderer(
                 (CreateRendererFunc)dlsym(
                         libHandle,
                         "_Z14createRendererRKN7android2spINS_8ISurfaceEEEPKc20"
-                        "OMX_COLOR_FORMATTYPEjjjj");
+                        "OMX_COLOR_FORMATTYPEjjjjjj"); //check mangled name against libstagefrighthw
 
             if (func) {
                 impl = (*func)(surface, componentName, colorFormat,
-                        displayWidth, displayHeight, encodedWidth, encodedHeight);
+                        displayWidth, displayHeight, encodedWidth, encodedHeight,
+                        (size_t)rotationDegrees, 0);
             }
+        }
+        else {
+          LOGE("Couldnt resolve symbol");
         }
 
         if (impl) {
@@ -537,6 +543,9 @@ sp<IOMXRenderer> OMX::createRenderer(
             dlclose(libHandle);
             libHandle = NULL;
         }
+    }
+    else {
+      LOGE("Couldnt get libhandle");
     }
 
     if (!impl) {

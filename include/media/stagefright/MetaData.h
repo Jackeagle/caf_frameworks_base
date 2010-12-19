@@ -98,6 +98,8 @@ enum {
     // Ogg files can be tagged to be automatically looping...
     kKeyAutoLoop          = 'autL',  // bool (int32_t)
 
+    kKeyRotation          = 'rota',  // int32_t
+
     kKeyValidSamples      = 'valD',  // int32_t
 
     kKeyIsUnreadable      = 'unre',  // bool (int32_t)

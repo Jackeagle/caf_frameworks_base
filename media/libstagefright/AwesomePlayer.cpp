@@ -181,7 +181,8 @@ void AwesomeLocalRenderer::init(
                     const char *componentName,
                     OMX_COLOR_FORMATTYPE colorFormat,
                     size_t displayWidth, size_t displayHeight,
-                    size_t decodedWidth, size_t decodedHeight);
+                    size_t decodedWidth, size_t decodedHeight,
+                    size_t rotation );
 
             CreateRendererWithRotationFunc funcWithRotation =
                 (CreateRendererWithRotationFunc)dlsym(
@@ -1079,7 +1080,8 @@ void AwesomePlayer::setVideoSource(sp<MediaSource> source) {
 }
 
 status_t AwesomePlayer::initVideoDecoder(uint32_t flags) {
-    flags |= mCodecFlags;
+    flags |= mCodecFlags; //or whatever was added to mCodecFlags
+                          //from setParameter calls to the flags
     mVideoSource = OMXCodec::Create(
             mClient.interface(), mVideoTrack->getFormat(),
             false, // createEncoder
@@ -1772,7 +1774,7 @@ status_t AwesomePlayer::suspend() {
                 LOGV("Unable to save last video frame, we have no access to "
                      "the decoded video data.");
             }
-        }
+	}
     }
 
     reset_l();
@@ -1846,6 +1848,109 @@ status_t AwesomePlayer::resume() {
 
 uint32_t AwesomePlayer::flags() const {
     return mExtractorFlags;
+}
+
+void AwesomePlayer::setNumFramesToHold() {
+    char value1[128],value2[128];
+    property_get("ro.product.device",value1,"0");
+    property_get("hw.hdmiON", value2, "0");
+
+    // set value of mNumFramesToHold to 2 for targets 8250,8650A,8660
+    // set value of mNumFramesToHold to 2 for 7x30 only if HDMI is on and its not 720p playback
+    if(strcmp("qsd8250_surf",value1) == 0 ||
+       strcmp("qsd8250_ffa",value1) == 0  ||
+       strcmp("qsd8650a_st1x",value1) == 0||
+       strcmp("msm8660_surf",value1) == 0 ||
+       (strcmp("msm7630_surf",value1) == 0 && atoi(value2) && (!(mVideoWidth == 1280 && mVideoHeight == 720))))
+        mNumFramesToHold = 2;
+    else
+        mNumFramesToHold = 1;
+}
+
+// Trim both leading and trailing whitespace from the given string.
+static void TrimString(String8 *s) {
+    size_t num_bytes = s->bytes();
+    const char *data = s->string();
+
+    size_t leading_space = 0;
+    while (leading_space < num_bytes && isspace(data[leading_space])) {
+        ++leading_space;
+    }
+
+    size_t i = num_bytes;
+    while (i > leading_space && isspace(data[i - 1])) {
+        --i;
+    }
+
+    s->setTo(String8(&data[leading_space], i - leading_space));
+}
+
+status_t AwesomePlayer::setParameter(const String8& key, const String8& value) {
+    if (key == "gpu-composition") {
+        LOGV("setParameter : gpu-composition : key = %s value = %s\n", key.string(), value.string());
+        int enableGPU = 0;
+        enableGPU = atoi(value.string());
+        LOGV("setParameter : gpu-composition : %d \n", enableGPU);
+        if (enableGPU) {
+            mCodecFlags |= OMXCodec::kEnableGPUComposition;
+            LOGV("GPU composition flag set");
+        }
+    }
+    return OK;
+}
+
+status_t AwesomePlayer::setParameters(const String8& params) {
+    LOGV("setParameters(%s)", params.string());
+    status_t ret = OK;
+    const char *key_start = params;
+    for (;;) {
+        const char *equal_pos = strchr(key_start, '=');
+        if (equal_pos == NULL) {
+            // This key is missing a value.
+            ret = UNKNOWN_ERROR;
+            break;
+        }
+
+        String8 key(key_start, equal_pos - key_start);
+        TrimString(&key);
+
+        if (key.length() == 0) {
+            ret = UNKNOWN_ERROR;
+            break;
+        }
+        LOGV("setParameters key = %s\n", key.string());
+
+        const char *value_start = equal_pos + 1;
+        const char *semicolon_pos = strchr(value_start, ';');
+        String8 value;
+        if (semicolon_pos == NULL) {
+            value.setTo(value_start);
+            LOGV("setParameters value = %s\n", value.string());
+        } else {
+            value.setTo(value_start, semicolon_pos - value_start);
+            LOGV("setParameters semicolon value = %s\n", value.string());
+        }
+
+        ret = setParameter(key, value);
+
+        if (ret != OK) {
+           LOGE("setParameter(%s = %s) failed with result %d",
+                 key.string(), value.string(), ret);
+           break;
+        }
+
+        if (semicolon_pos == NULL) {
+            break;
+        }
+
+        key_start = semicolon_pos + 1;
+    }
+
+    if (ret != OK) {
+        LOGE("Ln %d setParameters(\"%s\") error", __LINE__, params.string());
+    }
+
+    return ret;
 }
 
 void AwesomePlayer::postAudioEOS() {
@@ -1958,6 +2063,5 @@ status_t AwesomePlayer::setParameters(const String8& params) {
 
     return ret;
 }
-
 }  // namespace android
 

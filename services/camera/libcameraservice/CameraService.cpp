@@ -565,6 +565,8 @@ status_t CameraService::Client::setOverlay() {
         sp<Overlay> dummy;
         mHardware->setOverlay(dummy);
         mOverlayRef = 0;
+        if(mOverlay != NULL)
+            mOverlay->destroy();
         mOrientationChanged = false;
         if(mOverlay != NULL)
             mOverlay->destroy();

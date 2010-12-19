@@ -93,6 +93,8 @@ struct AwesomePlayer {
     // This is a mask of MediaExtractor::Flags.
     uint32_t flags() const;
 
+    status_t setParameters(const String8& params);
+
     void postAudioEOS();
     void postAudioSeekComplete();
 

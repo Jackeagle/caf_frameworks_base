@@ -52,6 +52,7 @@
 #include <OMX_Audio.h>
 #include <OMX_Component.h>
 
+#include <OMX_QCOMExtns.h>
 #include "include/ThreadedSource.h"
 
 #include <OMX_QCOMExtns.h>
@@ -1783,6 +1784,13 @@ void OMXCodec::on_message(const omx_message &msg) {
                     info->mMediaBuffer->release();
                     info->mMediaBuffer = NULL;
                 }
+            }
+
+            if( (NULL != (*buffers)[i].mMediaBuffer) && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
+            {
+                 CODEC_LOGV("EBD: %x %d", (*buffers)[i].mMediaBuffer, (*buffers)[i].mMediaBuffer->refcount() );
+                 (*buffers)[i].mMediaBuffer->release();
+                 buffers->editItemAt(i).mMediaBuffer = NULL;
             }
 
             if( (NULL != (*buffers)[i].mMediaBuffer) && mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
@@ -3721,6 +3729,18 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
             break;
         }
     }
+
+#if 0
+    //set the rotation value too
+    int32_t rotation = 0;
+    if( inputFormat->findInt32(kKeyRotation, &rotation ) ){
+      LOGV("Setting rotation in output format to %d", rotation );
+      mOutputFormat->setInt32( kKeyRotation, rotation );
+    }
+    else {
+      LOGV("InputFormat did not contain any rotation information");
+    }
+#endif
 }
 
 status_t OMXCodec::pause() {

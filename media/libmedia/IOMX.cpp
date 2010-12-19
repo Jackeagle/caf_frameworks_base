@@ -45,7 +45,7 @@ sp<IOMXRenderer> IOMX::createRenderer(
             surface->getISurface(),
             componentName, colorFormat, encodedWidth, encodedHeight,
             displayWidth, displayHeight,
-            rotationDegrees);
+            rotationDegrees); //missing flags - verify against libstagefrighthw
 }
 
 sp<IOMXRenderer> IOMX::createRendererFromJavaSurface(

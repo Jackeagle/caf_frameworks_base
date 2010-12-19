@@ -111,6 +111,8 @@ public:
             const char *parameter_name,
             OMX_INDEXTYPE *index) = 0;
 
+    /* missing flags in below functions */
+
     virtual sp<IOMXRenderer> createRenderer(
             const sp<ISurface> &surface,
             const char *componentName,
