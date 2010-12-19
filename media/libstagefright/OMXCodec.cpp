@@ -1027,7 +1027,15 @@ void OMXCodec::setVideoInputFormat(
 
     video_def->nFrameWidth = width;
     video_def->nFrameHeight = height;
-    video_def->xFramerate = 0;      // No need for output port
+
+   /*
+    * TODO - why is this not needed?
+    * instead, they are setting nPFrames to the
+    * product of frame rate and iframeinterval.
+    * Should the encoder work with that? 
+    */
+
+    video_def->xFramerate = (frameRate << 16);       // No need for output port
     video_def->nBitrate = bitRate;  // Q16 format
     video_def->eCompressionFormat = compressionFormat;
     video_def->eColorFormat = OMX_COLOR_FormatUnused;
@@ -1151,7 +1159,10 @@ status_t OMXCodec::getVideoProfileLevel(
                 mNode, OMX_IndexParamVideoProfileLevelQuerySupported,
                 &param, sizeof(param));
 
-        if (err != OK) break;
+        if (err != OK) { 
+            LOGW("getParameter with index OMX_IndexParamVideoProfileLevelQuerySupported failed");
+            break;
+        }
 
         int32_t supportedProfile = static_cast<int32_t>(param.eProfile);
         int32_t supportedLevel = static_cast<int32_t>(param.eLevel);

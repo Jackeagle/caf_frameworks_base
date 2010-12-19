@@ -515,11 +515,13 @@ sp<IOMXRenderer> OMX::createRenderer(
                     "ISurfaceEEEPKc20OMX_COLOR_FORMATTYPEjjjji");
 
         if (funcWithRotation) {
+            LOGV("Got function with rotation handle");
             impl = (*funcWithRotation)(
                     surface, componentName, colorFormat,
                     displayWidth, displayHeight, encodedWidth, encodedHeight,
                     rotationDegrees);
         } else {
+            LOGI("Trying to get legacy function handle");
             CreateRendererFunc func =
                 (CreateRendererFunc)dlsym(
                         libHandle,
@@ -527,6 +529,7 @@ sp<IOMXRenderer> OMX::createRenderer(
                         "OMX_COLOR_FORMATTYPEjjjjjj"); //check mangled name against libstagefrighthw
 
             if (func) {
+                LOGI("Got legacy function handle");
                 impl = (*func)(surface, componentName, colorFormat,
                         displayWidth, displayHeight, encodedWidth, encodedHeight,
                         (size_t)rotationDegrees, 0);
