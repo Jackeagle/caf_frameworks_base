@@ -652,7 +652,22 @@ status_t StagefrightRecorder::setCameraParameters(const String8 &params) {
 
 
 status_t StagefrightRecorder::prepare() {
-    return OK;
+  LOGV(" %s E", __func__ );
+
+  /* add check for unsupported resolution */
+  if( mVideoWidth == 1280 && mVideoHeight == 720 ){
+    if( mVideoEncoder == VIDEO_ENCODER_H263 ){
+      //unsupported resolution.
+      if( mListener != NULL ){
+	LOGW("Unsupported resolution, notify application");
+	mListener->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_UNSUPPORTED_RESOLUTION, 0 );
+	LOGW("Unsupported resolution notification complete");
+      }
+    }
+  }
+
+  LOGV(" %s X", __func__ );
+  return OK;
 }
 
 status_t StagefrightRecorder::start() {
