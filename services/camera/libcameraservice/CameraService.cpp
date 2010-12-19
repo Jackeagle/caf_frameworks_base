@@ -568,8 +568,6 @@ status_t CameraService::Client::setOverlay() {
         if(mOverlay != NULL)
             mOverlay->destroy();
         mOrientationChanged = false;
-        if(mOverlay != NULL)
-            mOverlay->destroy();
     }
 
     status_t result = NO_ERROR;
