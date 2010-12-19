@@ -555,4 +555,8 @@ threadExit:
     return result;
 }
 
+status_t MidiFile::setParameters(const String8& params) {
+    return NO_ERROR;
+}
+
 } // end namespace android

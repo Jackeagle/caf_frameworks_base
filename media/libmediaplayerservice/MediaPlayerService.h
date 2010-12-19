@@ -293,6 +293,7 @@ private:
 #if CALLBACK_ANTAGONIZER
                     Antagonizer*                mAntagonizer;
 #endif
+        virtual status_t        setParameters(const String8& params);
     };
 
 // ----------------------------------------------------------------------------

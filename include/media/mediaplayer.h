@@ -176,6 +176,7 @@ public:
             status_t        setAuxEffectSendLevel(float level);
             status_t        attachAuxEffect(int effectId);
             status_t        setVideoSurface(const sp<ISurface>& surface);
+            status_t        setParameters(const String8& params);
 private:
             void            clear_l();
             status_t        seekTo_l(int msec);

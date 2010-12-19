@@ -38,6 +38,7 @@ struct OMXCodec : public MediaSource,
         // The client wants to access the output buffer's video
         // data for example for thumbnail extraction.
         kClientNeedsFramebuffer  = 4,
+        kEnableGPUComposition = 8,
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,
@@ -155,6 +156,8 @@ private:
     int64_t mTargetTimeUs;
     int64_t mSkipTimeUs;
 
+    bool mGPUComposition;
+
     MediaBuffer *mLeftOverBuffer;
 
     Mutex mLock;
@@ -266,6 +269,8 @@ private:
             bool createEncoder, const char *matchComponentName,
             uint32_t flags,
             Vector<String8> *matchingCodecs);
+
+    void parseFlags(uint32_t flags);
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);

@@ -96,6 +96,8 @@ struct AwesomePlayer {
     void postAudioEOS();
     void postAudioSeekComplete();
 
+    status_t setParameters(const String8& params);
+
 private:
     friend struct AwesomeEvent;
 
@@ -144,6 +146,7 @@ private:
 
     uint32_t mFlags;
     uint32_t mExtractorFlags;
+    uint32_t mCodecFlags;
 
     int32_t mVideoWidth, mVideoHeight;
     int64_t mTimeSourceDeltaUs;
@@ -264,6 +267,8 @@ private:
     bool getBitrate(int64_t *bitrate);
 
     void finishSeekIfNecessary(int64_t videoTimeUs);
+
+    status_t setParameter(const String8& key, const String8& value);
 
     AwesomePlayer(const AwesomePlayer &);
     AwesomePlayer &operator=(const AwesomePlayer &);

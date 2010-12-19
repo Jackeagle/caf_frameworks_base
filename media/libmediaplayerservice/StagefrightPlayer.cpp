@@ -187,4 +187,9 @@ status_t StagefrightPlayer::getMetadata(
     return OK;
 }
 
+status_t StagefrightPlayer::setParameters(const String8& params) {
+    LOGV("setParameters(%s)", params.string());
+    return mPlayer->setParameters(params);
+}
+
 }  // namespace android

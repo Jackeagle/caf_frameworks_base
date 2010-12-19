@@ -80,6 +80,12 @@ public:
     virtual status_t        getMetadata(bool update_only,
                                         bool apply_filter,
                                         Parcel *metadata) = 0;
+
+    // Sets the given parameters for the player. Parameters are in 'key=value'
+    // format.
+    // @param params Key/value pairs of parameters to set for the player.
+    // @return OK if the invocation was made successfully.
+    virtual status_t        setParameters(const String8& params) = 0;
 };
 
 // ----------------------------------------------------------------------------

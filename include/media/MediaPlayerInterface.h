@@ -146,6 +146,8 @@ public:
 
     virtual void        sendEvent(int msg, int ext1=0, int ext2=0) { if (mNotify) mNotify(mCookie, msg, ext1, ext2); }
 
+    virtual status_t    setParameters(const String8& params) = 0;
+
 protected:
     void*               mCookie;
     notify_callback_f   mNotify;

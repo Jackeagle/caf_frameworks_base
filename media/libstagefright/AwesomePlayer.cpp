@@ -18,6 +18,7 @@
 #define LOG_TAG "AwesomePlayer"
 #include <utils/Log.h>
 
+#include <ctype.h>
 #include <dlfcn.h>
 
 #include "include/ARTSPController.h"
@@ -230,6 +231,7 @@ AwesomePlayer::AwesomePlayer()
       mAudioPlayer(NULL),
       mFlags(0),
       mExtractorFlags(0),
+      mCodecFlags(0),
       mSuspensionState(NULL) {
 
     mVideoBuffer = new MediaBuffer*[BUFFER_QUEUE_CAPACITY];
@@ -1042,7 +1044,7 @@ status_t AwesomePlayer::initAudioDecoder() {
         mAudioSource = OMXCodec::Create(
                 mClient.interface(), mAudioTrack->getFormat(),
                 false, // createEncoder
-                mAudioTrack);
+                mAudioTrack, NULL, mCodecFlags);
     }
 
     if (mAudioSource != NULL) {
@@ -1077,6 +1079,7 @@ void AwesomePlayer::setVideoSource(sp<MediaSource> source) {
 }
 
 status_t AwesomePlayer::initVideoDecoder(uint32_t flags) {
+    flags |= mCodecFlags;
     mVideoSource = OMXCodec::Create(
             mClient.interface(), mVideoTrack->getFormat(),
             false, // createEncoder
@@ -1868,6 +1871,92 @@ void AwesomePlayer::setNumFramesToHold() {
         mNumFramesToHold = 2;
     else
         mNumFramesToHold = 1;
+}
+
+// Trim both leading and trailing whitespace from the given string.
+static void TrimString(String8 *s) {
+    size_t num_bytes = s->bytes();
+    const char *data = s->string();
+
+    size_t leading_space = 0;
+    while (leading_space < num_bytes && isspace(data[leading_space])) {
+        ++leading_space;
+    }
+
+    size_t i = num_bytes;
+    while (i > leading_space && isspace(data[i - 1])) {
+        --i;
+    }
+
+    s->setTo(String8(&data[leading_space], i - leading_space));
+}
+
+status_t AwesomePlayer::setParameter(const String8& key, const String8& value) {
+    if (key == "gpu-composition") {
+        LOGV("setParameter : gpu-composition : key = %s value = %s\n", key.string(), value.string());
+        int enableGPU = 0;
+        enableGPU = atoi(value.string());
+        LOGV("setParameter : gpu-composition : %d \n", enableGPU);
+        if (enableGPU) {
+            mCodecFlags |= OMXCodec::kEnableGPUComposition;
+            LOGV("GPU composition flag set");
+        }
+    }
+    return OK;
+}
+
+status_t AwesomePlayer::setParameters(const String8& params) {
+    LOGV("setParameters(%s)", params.string());
+    status_t ret = OK;
+    const char *key_start = params;
+    for (;;) {
+        const char *equal_pos = strchr(key_start, '=');
+        if (equal_pos == NULL) {
+            // This key is missing a value.
+            ret = UNKNOWN_ERROR;
+            break;
+        }
+
+        String8 key(key_start, equal_pos - key_start);
+        TrimString(&key);
+
+        if (key.length() == 0) {
+            ret = UNKNOWN_ERROR;
+            break;
+        }
+        LOGV("setParameters key = %s\n", key.string());
+
+        const char *value_start = equal_pos + 1;
+        const char *semicolon_pos = strchr(value_start, ';');
+        String8 value;
+        if (semicolon_pos == NULL) {
+            value.setTo(value_start);
+            LOGV("setParameters value = %s\n", value.string());
+        } else {
+            value.setTo(value_start, semicolon_pos - value_start);
+            LOGV("setParameters semicolon value = %s\n", value.string());
+        }
+
+        ret = setParameter(key, value);
+
+        if (ret != OK) {
+           LOGE("setParameter(%s = %s) failed with result %d",
+                 key.string(), value.string(), ret);
+           break;
+        }
+
+        if (semicolon_pos == NULL) {
+            break;
+        }
+
+        key_start = semicolon_pos + 1;
+    }
+
+    if (ret != OK) {
+        LOGE("Ln %d setParameters(\"%s\") error", __LINE__, params.string());
+    }
+
+    return ret;
 }
 
 }  // namespace android

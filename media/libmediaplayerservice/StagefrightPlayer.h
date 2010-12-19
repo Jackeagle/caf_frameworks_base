@@ -55,6 +55,7 @@ public:
 
     virtual status_t getMetadata(
             const media::Metadata::Filter& ids, Parcel *records);
+    virtual status_t setParameters(const String8& params);
 
 private:
     AwesomePlayer *mPlayer;

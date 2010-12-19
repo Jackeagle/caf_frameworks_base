@@ -723,6 +723,7 @@ android_media_MediaPlayer_setAuxEffectSendLevel(JNIEnv *env, jobject thiz, jfloa
         jniThrowException(env, "java/lang/IllegalStateException", NULL);
         return;
     }
+
     process_media_player_call( env, thiz, mp->setAuxEffectSendLevel(level), NULL, NULL );
 }
 
@@ -733,7 +734,27 @@ static void android_media_MediaPlayer_attachAuxEffect(JNIEnv *env,  jobject thiz
         jniThrowException(env, "java/lang/IllegalStateException", NULL);
         return;
     }
+ 
     process_media_player_call( env, thiz, mp->attachAuxEffect(effectId), NULL, NULL );
+}
+
+static void
+android_media_MediaPlayer_setParameters(JNIEnv *env, jobject thiz, jstring params)
+{
+    LOGV("setParameters(%s)", env->GetStringUTFChars(params, NULL));
+    sp<MediaPlayer> mp = getMediaPlayer(env, thiz);
+    if (mp == NULL ) {
+        jniThrowException(env, "java/lang/IllegalStateException", NULL);
+        return;
+    }
+
+    const char *paramsStr = env->GetStringUTFChars(params, NULL);
+    if (paramsStr == NULL) {  // Out of memory
+        jniThrowException(env, "java/lang/RuntimeException", "Out of memory");
+        return;
+    }
+
+    process_media_player_call(env, thiz, mp->setParameters(String8(paramsStr)), NULL, NULL);
 }
 
 // ----------------------------------------------------------------------------
@@ -772,6 +793,7 @@ static JNINativeMethod gMethods[] = {
     {"setAudioSessionId",   "(I)V",                             (void *)android_media_MediaPlayer_set_audio_session_id},
     {"setAuxEffectSendLevel", "(F)V",                           (void *)android_media_MediaPlayer_setAuxEffectSendLevel},
     {"attachAuxEffect",     "(I)V",                             (void *)android_media_MediaPlayer_attachAuxEffect},
+    {"setParameters",       "(Ljava/lang/String;)V",            (void *)android_media_MediaPlayer_setParameters}
 };
 
 static const char* const kClassPathName = "android/media/MediaPlayer";

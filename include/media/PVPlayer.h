@@ -60,6 +60,7 @@ public:
     virtual status_t    getMetadata(
         const SortedVector<media::Metadata::Type>& ids,
         Parcel *records);
+    virtual status_t    setParameters(const String8& params) { return NO_ERROR; }
 
     // make available to PlayerDriver
     void        sendEvent(int msg, int ext1=0, int ext2=0) { MediaPlayerBase::sendEvent(msg, ext1, ext2); }

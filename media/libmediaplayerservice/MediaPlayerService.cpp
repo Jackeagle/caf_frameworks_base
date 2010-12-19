@@ -1159,6 +1159,15 @@ void MediaPlayerService::Client::addNewMetadataUpdate(media::Metadata::Type meta
     }
 }
 
+
+status_t MediaPlayerService::Client::setParameters(const String8& params)
+{
+    LOGV("setParameters(%s)", params.string());
+    sp<MediaPlayerBase> p = getPlayer();
+    if (p == 0) return UNKNOWN_ERROR;
+    return p->setParameters(params);
+}
+
 #if CALLBACK_ANTAGONIZER
 const int Antagonizer::interval = 10000; // 10 msecs
 

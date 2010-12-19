@@ -52,6 +52,7 @@ public:
     virtual status_t    invoke(const Parcel& request, Parcel *reply) {
         return INVALID_OPERATION;
     }
+    virtual status_t    setParameters(const String8& params);
 
 private:
             status_t    createOutputTrack();

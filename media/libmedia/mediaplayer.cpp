@@ -696,4 +696,18 @@ status_t MediaPlayer::setVideoSurface(const sp<ISurface>& surface) {
     return  mPlayer->setVideoSurface(surface);
 }
 
+status_t MediaPlayer::setParameters(const String8& params)
+{
+    LOGV("MediaPlayer::setParameters(%s)", params.string());
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == 0) return NO_INIT;
+
+    status_t ret = mPlayer->setParameters(params);
+    if (OK != ret) {
+        LOGE("MediaPlayer::setParameters(%s) returned with error %d", params.string(), ret);
+    }
+
+    return ret;
+}
+
 }; // namespace android
