@@ -77,6 +77,8 @@ const char CameraParameters::KEY_ISO_MODE[] = "iso";
 const char CameraParameters::KEY_SUPPORTED_ISO_MODES[] = "iso-values";
 const char CameraParameters::KEY_LENSSHADE[] = "lensshade";
 const char CameraParameters::KEY_SUPPORTED_LENSSHADE_MODES[] = "lensshade-values";
+const char CameraParameters::KEY_AUTO_EXPOSURE[] = "auto-exposure";
+const char CameraParameters::KEY_SUPPORTED_AUTO_EXPOSURE[] = "auto-exposure-values";
 
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
@@ -161,6 +163,10 @@ const char CameraParameters::ISO_1600[] = "ISO1600";
 const char CameraParameters::LENSSHADE_ENABLE[] = "enable";
 const char CameraParameters::LENSSHADE_DISABLE[] = "disable";
 
+// Values for auto exposure settings.
+const char CameraParameters::AUTO_EXPOSURE_FRAME_AVG[] = "frame-average";
+const char CameraParameters::AUTO_EXPOSURE_CENTER_WEIGHTED[] = "center-weighted";
+const char CameraParameters::AUTO_EXPOSURE_SPOT_METERING[] = "spot-metering";
 
 CameraParameters::CameraParameters()
                 : mMap()

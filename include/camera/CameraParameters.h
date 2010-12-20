@@ -299,6 +299,9 @@ public:
     static const char KEY_LENSSHADE[] ;
     static const char KEY_SUPPORTED_LENSSHADE_MODES[] ;
 
+    static const char KEY_AUTO_EXPOSURE[];
+    static const char KEY_SUPPORTED_AUTO_EXPOSURE[];
+
 
     // Value for KEY_ZOOM_SUPPORTED or KEY_SMOOTH_ZOOM_SUPPORTED.
     static const char TRUE[];
@@ -413,6 +416,11 @@ public:
     // Values for Lens Shading
     static const char LENSSHADE_ENABLE[] ;
     static const char LENSSHADE_DISABLE[] ;
+
+    // Values for auto exposure settings.
+    static const char AUTO_EXPOSURE_FRAME_AVG[];
+    static const char AUTO_EXPOSURE_CENTER_WEIGHTED[];
+    static const char AUTO_EXPOSURE_SPOT_METERING[];
 
 
 private:
