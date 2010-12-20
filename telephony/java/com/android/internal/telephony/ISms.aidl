@@ -198,4 +198,25 @@ interface ISms {
      */
     boolean disableCellBroadcastRange(int startMessageId, int endMessageId);
 
+    /**
+     * SMS over IMS is supported if IMS is registered and SMS is supported
+     * on IMS.
+     *
+     * @return true if SMS over IMS is supported, false otherwise
+     *
+     * @see #getImsSmsFormat()
+     */
+    boolean isImsSmsSupported();
+
+    /**
+     * Gets SMS format supported on IMS.  SMS over IMS format is
+     * either 3GPP or 3GPP2.
+     *
+     * @return android.telephony.SmsMessage.FORMAT_3GPP,
+     *         android.telephony.SmsMessage.FORMAT_3GPP2
+     *      or android.telephony.SmsMessage.FORMAT_UNKNOWN
+     *
+     * @see #isImsSmsSupported()
+     */
+    String getImsSmsFormat();
 }

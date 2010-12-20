@@ -354,6 +354,16 @@ class UsimDataDownloadCommands extends BaseCommands {
     }
 
     @Override
+    public void sendImsGsmSms (String smscPDU, String pdu,
+            int retry, int messageRef, Message response) {
+    }
+
+    @Override
+    public void sendImsCdmaSms(byte[] pdu, int retry, int messageRef,
+            Message response) {
+    }
+
+    @Override
     public void deleteSmsOnSim(int index, Message response) {
     }
 
@@ -542,6 +552,10 @@ class UsimDataDownloadCommands extends BaseCommands {
 
     @Override
     public void getCDMASubscription(Message response) {
+    }
+
+    @Override
+    public void getImsRegistrationState (Message result) {
     }
 
     @Override

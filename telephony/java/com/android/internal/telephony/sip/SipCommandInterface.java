@@ -175,6 +175,17 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
     public void sendCdmaSms(byte[] pdu, Message result) {
     }
 
+    public void sendImsGsmSms (String smscPDU, String pdu,
+            int retry, int messageRef, Message response) {
+    }
+
+    public void sendImsCdmaSms(byte[] pdu, int retry, int messageRef,
+            Message response) {
+    }
+
+    public void getImsRegistrationState (Message result) {
+    }
+
     public void deleteSmsOnSim(int index, Message response) {
     }
 

@@ -1526,4 +1526,18 @@ public final class SimulatedCommands extends BaseCommands
     public void getDataCallProfile(int appType, Message response){
         unimplemented(response);
     }
+
+    public void getImsRegistrationState(Message response) {
+        unimplemented(response);
+    }
+
+    public void sendImsCdmaSms(byte[] pdu, int retry, int messageRef,
+            Message response){
+        unimplemented(response);
+    }
+
+    public void sendImsGsmSms(String smscPDU, String pdu,
+            int retry, int messageRef, Message response){
+        unimplemented(response);
+    }
 }
