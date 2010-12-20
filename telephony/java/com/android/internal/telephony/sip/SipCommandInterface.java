@@ -147,6 +147,9 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
     public void getRegistrationState (Message result) {
     }
 
+    public void getDataRegistrationState (Message response) {
+    }
+
     public void getGPRSRegistrationState (Message result) {
     }
 
@@ -193,6 +196,7 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
 
     public void setupDataCall(String radioTechnology, String profile,
             String apn, String user, String password, String authType,
+            String ipVersion,
             Message result) {
     }
 
