@@ -60,10 +60,20 @@ public:
     virtual status_t    getMetadata(
         const SortedVector<media::Metadata::Type>& ids,
         Parcel *records);
-    virtual status_t    setParameters(const String8& params) { return NO_ERROR; }
+    virtual status_t    suspend();
+    virtual status_t    resume();
+    virtual status_t    setParameters(const String8& params);
 
     // make available to PlayerDriver
     void        sendEvent(int msg, int ext1=0, int ext2=0) { MediaPlayerBase::sendEvent(msg, ext1, ext2); }
+    static status_t     usePVPlayer(const char *filename);
+    static status_t     usePVPlayer(int fd, int64_t offset, int64_t length);
+
+    void   setIsResume(bool set) { mIsResume = set; }
+    bool   getIsResume()         { return mIsResume; }
+
+    void   setIsPlaying(bool set) { mIsPlaying = set; }
+    bool   getIsPlaying()         { return mIsPlaying; }
 
 private:
     static void         do_nothing(status_t s, void *cookie, bool cancelled) { }
@@ -80,6 +90,9 @@ private:
     int                         mSharedFd;
     status_t                    mInit;
     int                         mDuration;
+    int                         mPositionWhenSuspend;
+    bool                        mIsPlaying;
+    bool                        mIsResume;
 
 #ifdef MAX_OPENCORE_INSTANCES
     static volatile int32_t     sNumInstances;

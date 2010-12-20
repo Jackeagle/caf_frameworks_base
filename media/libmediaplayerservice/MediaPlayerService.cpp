@@ -1386,6 +1386,37 @@ status_t MediaPlayerService::AudioOutput::getPosition(uint32_t *position)
     return mTrack->getPosition(position);
 }
 
+status_t MediaPlayerService::AudioOutput::openSession(
+        int format, int sessionId)
+{
+    uint32_t flags = 0;
+    mCallback = NULL;
+    mCallbackCookie = NULL;
+    if (mSession) close();
+    mSession = NULL;
+
+    flags |= AudioSystem::OUTPUT_FLAG_DIRECT;
+
+#if 0
+// TODO commenting to compile
+    AudioTrack *t = new AudioTrack(
+                mStreamType,
+                format,
+                flags,
+                sessionId);
+    LOGV("openSession: AudioTrack created successfully track(%p)",t);
+    if ((t == 0) || (t->initCheck() != NO_ERROR)) {
+        LOGE("Unable to create audio track");
+        delete t;
+        return NO_INIT;
+    }
+    LOGV("openSession: Out");
+    mSession = t;
+#endif
+    return NO_ERROR;
+}
+
+
 status_t MediaPlayerService::AudioOutput::open(
         uint32_t sampleRate, int channelCount, int format, int bufferCount,
         AudioCallback cb, void *cookie)
@@ -1506,6 +1537,32 @@ void MediaPlayerService::AudioOutput::close()
     delete mTrack;
     mTrack = 0;
 }
+
+void MediaPlayerService::AudioOutput::closeSession()
+{
+    LOGV("closeSession");
+    if(mSession != NULL) {
+        delete mSession;
+        mSession = 0;
+    }
+}
+
+void MediaPlayerService::AudioOutput::pauseSession()
+{
+    LOGV("pauseSession");
+    if(mSession != NULL) {
+        mSession->pause();
+    }
+}
+
+void MediaPlayerService::AudioOutput::resumeSession()
+{
+    LOGV("resumeSession");
+    if(mSession != NULL) {
+        mSession->start();
+    }
+}
+
 
 void MediaPlayerService::AudioOutput::setVolume(float left, float right)
 {
