@@ -405,6 +405,10 @@ public:
     // CameraHardwareInterface.autoFocus in this mode. To stop continuous focus,
     // applications should change the focus mode to other modes.
     static const char FOCUS_MODE_CONTINUOUS_VIDEO[];
+    // Normal focus mode. Applications should call
+    // CameraHardwareInterface.autoFocus to start the focus in this mode.
+    static const char FOCUS_MODE_NORMAL[];
+
 
     static const char ISO_AUTO[];
     static const char ISO_HJR[] ;

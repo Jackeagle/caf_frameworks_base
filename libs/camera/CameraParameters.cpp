@@ -149,6 +149,7 @@ const char CameraParameters::FOCUS_MODE_MACRO[] = "macro";
 const char CameraParameters::FOCUS_MODE_FIXED[] = "fixed";
 const char CameraParameters::FOCUS_MODE_EDOF[] = "edof";
 const char CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO[] = "continuous-video";
+const char CameraParameters::FOCUS_MODE_NORMAL[] = "normal";
 
  // Values for ISO Settings
 const char CameraParameters::ISO_AUTO[] = "auto";

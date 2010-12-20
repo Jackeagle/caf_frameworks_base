@@ -1221,6 +1221,14 @@ public class Camera {
          */
         public static final String FOCUS_MODE_FIXED = "fixed";
 
+
+        /**
+         * Normal focus mode. Applications should call
+         * {@link #autoFocus(AutoFocusCallback)} to start the focus in this
+         * mode.
+         */
+        public static final String FOCUS_MODE_NORMAL = "normal";
+
         /**
          * Extended depth of field (EDOF). Focusing is done digitally and
          * continuously. Applications should not call {@link
