@@ -77,6 +77,11 @@ public:
     void        makeCurrent() const;
     uint32_t    getMaxTextureSize() const;
     uint32_t    getMaxViewportDims() const;
+    void        orientationChanged(int orientation) const;
+    void        videoOverlayStarted(bool started) const;
+    void        enableHDMIOutput(int enable) const;
+    void        setActionSafeWidthRatio(float asWidthRatio) const;
+    void        setActionSafeHeightRatio(float asHeightRatio) const;
 
     uint32_t getPageFlipCount() const;
     EGLDisplay getEGLDisplay() const { return mDisplay; }

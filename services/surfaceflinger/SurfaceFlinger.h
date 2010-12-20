@@ -193,6 +193,9 @@ public:
     virtual status_t                    freezeDisplay(DisplayID dpy, uint32_t flags);
     virtual status_t                    unfreezeDisplay(DisplayID dpy, uint32_t flags);
     virtual int                         setOrientation(DisplayID dpy, int orientation, uint32_t flags);
+    virtual void                        enableHDMIOutput(int enable);
+    virtual void                        setActionSafeWidthRatio(float asWidthRatio);
+    virtual void                        setActionSafeHeightRatio(float asHeightRatio);
     virtual void                        signal() const;
     virtual status_t                    captureScreen(DisplayID dpy,
                                                       sp<IMemoryHeap>* heap,
@@ -400,6 +403,8 @@ private:
                 nsecs_t                     mFreezeDisplayTime;
                 Vector< sp<LayerBase> >     mVisibleLayersSortedByZ;
 
+                // Has orientation changed - used for HDMI
+                bool                        mOrientationChanged;
 
                 // don't use a lock for these, we don't care
                 int                         mDebugRegion;
@@ -422,6 +427,7 @@ private:
 
    // only written in the main thread, only read in other threads
    volatile     int32_t                     mSecureFrameBuffer;
+   bool mHDMIOutput;
 };
 
 // ---------------------------------------------------------------------------

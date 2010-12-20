@@ -83,6 +83,7 @@ SurfaceFlinger::SurfaceFlinger()
         mElectronBeamAnimationMode(0),
         mFreezeCount(0),
         mFreezeDisplayTime(0),
+        mOrientationChanged(false),
         mDebugRegion(0),
         mDebugBackground(0),
         mDebugInSwapBuffers(0),
@@ -91,6 +92,7 @@ SurfaceFlinger::SurfaceFlinger()
         mLastTransactionTime(0),
         mBootFinished(false),
         mConsoleSignals(0),
+        mHDMIOutput(false),
         mSecureFrameBuffer(0)
 {
     init();
@@ -406,7 +408,14 @@ void SurfaceFlinger::postFramebuffer()
     if (!mInvalidRegion.isEmpty()) {
         const DisplayHardware& hw(graphicPlane(0).displayHardware());
         const nsecs_t now = systemTime();
+        const GraphicPlane& plane(graphicPlane(0));
+        const Transform& planeTransform(plane.transform());
         mDebugInSwapBuffers = now;
+        //If orientation has changed, inform gralloc for HDMI mirroring
+        if(mOrientationChanged) {
+             mOrientationChanged = false;
+             hw.orientationChanged(planeTransform.getOrientation());
+        }
         hw.flip(mInvalidRegion);
         mLastSwapBufferTime = systemTime() - now;
         mDebugInSwapBuffers = 0;
@@ -513,6 +522,7 @@ void SurfaceFlinger::handleTransactionLocked(
             const uint32_t type = mCurrentState.orientationType;
             GraphicPlane& plane(graphicPlane(dpy));
             plane.setOrientation(orientation);
+            mOrientationChanged = true;
 
             // update the shared control block
             const DisplayHardware& hw(plane.displayHardware());
@@ -1120,6 +1130,23 @@ int SurfaceFlinger::setOrientation(DisplayID dpy,
         }
     }
     return orientation;
+}
+
+void SurfaceFlinger::enableHDMIOutput(int enable)
+{
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    mHDMIOutput = enable;
+    hw.enableHDMIOutput(enable);
+}
+
+void SurfaceFlinger::setActionSafeWidthRatio(float asWidthRatio){
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    hw.setActionSafeWidthRatio(asWidthRatio);
+}
+
+void SurfaceFlinger::setActionSafeHeightRatio(float asHeightRatio){
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    hw.setActionSafeHeightRatio(asHeightRatio);
 }
 
 sp<ISurface> SurfaceFlinger::createSurface(const sp<Client>& client, int pid,

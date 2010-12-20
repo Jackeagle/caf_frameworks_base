@@ -639,6 +639,9 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     }
 
     mOverlayDevice = overlay_dev;
+    const DisplayHardware& hw(mLayer.mFlinger->
+                               graphicPlane(0).displayHardware());
+    hw.videoOverlayStarted(true);
     overlay_t* overlay = overlay_dev->createOverlay(overlay_dev, w, h, format);
     if (overlay == NULL) {
         // couldn't create the overlay (no memory? no more overlays?)
@@ -671,6 +674,9 @@ LayerBuffer::OverlaySource::~OverlaySource()
     if (mOverlay && mOverlayDevice) {
         overlay_control_device_t* overlay_dev = mOverlayDevice;
         overlay_dev->destroyOverlay(overlay_dev, mOverlay);
+        const DisplayHardware& hw(mLayer.mFlinger->
+                                   graphicPlane(0).displayHardware());
+        hw.videoOverlayStarted(false);
     }
 }
 
@@ -737,6 +743,9 @@ void LayerBuffer::OverlaySource::destroy()
         overlay_control_device_t* overlay_dev = mOverlayDevice;
         overlay_dev->destroyOverlay(overlay_dev, mOverlay);
         mOverlay = 0;
+        const DisplayHardware& hw(mLayer.mFlinger->
+                                   graphicPlane(0).displayHardware());
+        hw.videoOverlayStarted(false);
     }
 }
 

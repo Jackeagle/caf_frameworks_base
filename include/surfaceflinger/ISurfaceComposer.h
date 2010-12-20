@@ -130,6 +130,9 @@ public:
      * This is an ASYNCHRONOUS call.
      */
     virtual void signal() const = 0;
+    virtual void enableHDMIOutput(int enable) = 0;
+    virtual void setActionSafeWidthRatio(float asWidthRatio) = 0;
+    virtual void setActionSafeHeightRatio(float asHeightRatio) = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -150,9 +153,12 @@ public:
         FREEZE_DISPLAY,
         UNFREEZE_DISPLAY,
         SIGNAL,
+        ENABLE_HDMI_OUTPUT,
         CAPTURE_SCREEN,
         TURN_ELECTRON_BEAM_OFF,
-        TURN_ELECTRON_BEAM_ON
+        TURN_ELECTRON_BEAM_ON,
+        SET_ACTIONSAFE_WIDTH_RATIO,
+        SET_ACTIONSAFE_HEIGHT_RATIO
     };
 
     virtual status_t    onTransact( uint32_t code,

@@ -137,6 +137,9 @@ public:
 
     status_t linkToComposerDeath(const sp<IBinder::DeathRecipient>& recipient,
             void* cookie = NULL, uint32_t flags = 0);
+    static void enableHDMIOutput(int enable);
+    static void setActionSafeWidthRatio(float asWidthRatio);
+    static void setActionSafeHeightRatio(float asHeightRatio);
 
     status_t    hide(SurfaceID id);
     status_t    show(SurfaceID id, int32_t layer = -1);
