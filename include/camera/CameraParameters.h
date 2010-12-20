@@ -432,6 +432,13 @@ public:
     static const char AUTO_EXPOSURE_CENTER_WEIGHTED[];
     static const char AUTO_EXPOSURE_SPOT_METERING[];
 
+    static const char KEY_SHARPNESS[];
+    static const char KEY_MAX_SHARPNESS[];
+    static const char KEY_CONTRAST[];
+    static const char KEY_MAX_CONTRAST[];
+    static const char KEY_SATURATION[];
+    static const char KEY_MAX_SATURATION[];
+
 
 private:
     DefaultKeyedVector<String8,String8>    mMap;

@@ -176,6 +176,12 @@ const char CameraParameters::KEY_GPS_ALTITUDE_REF[] = "gps-altitude-ref";
 const char CameraParameters::KEY_GPS_STATUS[] = "gps-status";
 const char CameraParameters::KEY_EXIF_DATETIME[] = "exif-datetime";
 
+const char CameraParameters::KEY_SHARPNESS[] = "sharpness";
+const char CameraParameters::KEY_MAX_SHARPNESS[] = "max-sharpness";
+const char CameraParameters::KEY_CONTRAST[] = "contrast";
+const char CameraParameters::KEY_MAX_CONTRAST[] = "max-contrast";
+const char CameraParameters::KEY_SATURATION[] = "saturation";
+const char CameraParameters::KEY_MAX_SATURATION[] = "max-saturation";
 
 CameraParameters::CameraParameters()
                 : mMap()
