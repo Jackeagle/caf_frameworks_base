@@ -131,7 +131,8 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 new Intent(Intent.ACTION_TIME_TICK).addFlags(
                         Intent.FLAG_RECEIVER_REGISTERED_ONLY), 0);
         Intent intent = new Intent(Intent.ACTION_DATE_CHANGED);
-        intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+	intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+	intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
         mDateChangeSender = PendingIntent.getBroadcast(context, 0, intent, 0);
         
         // now that we have initied the driver schedule the alarm
@@ -654,6 +655,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     mClockReceiver.scheduleTimeTickEvent();
                     Intent intent = new Intent(Intent.ACTION_TIME_CHANGED);
                     intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+		    intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
                     mContext.sendBroadcast(intent);
                 }
                 
