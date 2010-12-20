@@ -1,3 +1,4 @@
+ifneq ($(BUILD_TINY_ANDROID), true)
 # Build the unit tests.
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
@@ -42,4 +43,5 @@ $(foreach file,$(test_src_files), \
     $(eval include $(BUILD_EXECUTABLE)) \
 )
 
+endif
 endif
