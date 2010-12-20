@@ -100,9 +100,6 @@ private:
     public:
         Buffer(const ISurface::BufferHeap& buffers,
                 ssize_t offset, size_t bufferSize);
-        inline bool supportsCopybit() const {
-            return mSupportsCopybit;
-        }
         inline status_t getStatus() const {
             return mBufferHeap.heap!=0 ? NO_ERROR : NO_INIT;
         }
@@ -117,7 +114,6 @@ private:
     private:
         ISurface::BufferHeap    mBufferHeap;
         NativeBuffer            mNativeBuffer;
-        bool                    mSupportsCopybit;
     };
 
     class BufferSource : public Source {
@@ -144,6 +140,8 @@ private:
         mutable Texture                 mTexture;
         mutable NativeBuffer            mTempBuffer;
         mutable TextureManager          mTextureManager;
+        mutable int                     mUseEGLImageDirectly;
+        mutable int                     mNeedConversion;
     };
     
     class OverlaySource : public Source {

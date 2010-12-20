@@ -129,6 +129,7 @@ void DisplayHardware::init(uint32_t dpy)
             LOGW("H/W composition disabled");
             attribs[2] = EGL_CONFIG_CAVEAT;
             attribs[3] = EGL_SLOW_CONFIG;
+            mFlags |= CPU_COMPOSITION;
         }
     }
 

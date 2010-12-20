@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -266,7 +267,7 @@ sp<OverlayRef> LayerBuffer::SurfaceLayerBuffer::createOverlay(
 
 LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
         ssize_t offset, size_t bufferSize)
-    : mBufferHeap(buffers), mSupportsCopybit(false)
+    : mBufferHeap(buffers)
 {
     NativeBuffer& src(mNativeBuffer);
     src.crop.l = 0;
@@ -288,8 +289,6 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
                 offset, buffers.heap->base(),
                 &src.img.handle);
 
-        // we can fail here is the passed buffer is purely software
-        mSupportsCopybit = (err == NO_ERROR);
     }
  }
 
@@ -329,7 +328,8 @@ void LayerBuffer::Source::unregisterBuffers() {
 
 LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
         const ISurface::BufferHeap& buffers)
-    : Source(layer), mStatus(NO_ERROR), mBufferSize(0)
+    : Source(layer), mStatus(NO_ERROR), mBufferSize(0),
+      mUseEGLImageDirectly(0), mNeedConversion(1)
 {
     if (buffers.heap == NULL) {
         // this is allowed, but in this case, it is illegal to receive
@@ -346,14 +346,49 @@ LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
         mStatus = err;
         return;
     }
-    
-    PixelFormatInfo info;
-    err = getPixelFormatInfo(buffers.format, &info);
-    if (err != NO_ERROR) {
-        LOGE("LayerBuffer::BufferSource: invalid format %d (%s)",
-                buffers.format, strerror(err));
+
+
+    const DisplayHardware& hw(mLayer.mFlinger->
+                               graphicPlane(0).displayHardware());
+    int flags = hw.getFlags();
+    int hasBlitEngine = 0;
+    char compositionUsed[4];
+    if(flags & DisplayHardware::CPU_COMPOSITION) {
+        snprintf(compositionUsed, 4, "cpu");
+    } else if(flags & DisplayHardware::SLOW_CONFIG) {
+        snprintf(compositionUsed, 4, "mdp");
+    } else {
+        snprintf(compositionUsed, 4, "gpu");
+    }
+
+    if(mLayer.mBlitEngine) {
+        hasBlitEngine = 1;
+    }
+
+    gralloc_module_t const * module = LayerBuffer::getGrallocModule();
+    if (module && module->perform) {
+        int err = module->perform (module,GRALLOC_MODULE_PERFORM_DECIDE_PUSH_BUFFER_HANDLING,
+                  buffers.format, buffers.w, buffers.h, compositionUsed, hasBlitEngine,
+                  &mNeedConversion, &mUseEGLImageDirectly, &mBufferSize);
+        if(err != NO_ERROR) {
+            LOGE("module,GRALLOC_MODULE_PERFORM_DECIDE_PUSH_BUFFER_HANDLING returned an error");
+        }
+    }
+
+    if(buffers.format >= 0x100) {
+        mLayer.setNeedsBlending(false);
         mStatus = err;
-        return;
+    } else {
+        PixelFormatInfo info;
+        err = getPixelFormatInfo(buffers.format, &info);
+        if (err != NO_ERROR) {
+            LOGE("LayerBuffer::BufferSource: invalid format %d (%s)",
+                    buffers.format, strerror(err));
+            mStatus = err;
+            return;
+        }
+        mLayer.setNeedsBlending((info.h_alpha - info.l_alpha) > 0);
+        mBufferSize = info.getScanlineSize(buffers.hor_stride)*buffers.ver_stride;
     }
 
     if (buffers.hor_stride<0 || buffers.ver_stride<0) {
@@ -365,8 +400,6 @@ LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
     }
 
     mBufferHeap = buffers;
-    mLayer.setNeedsBlending((info.h_alpha - info.l_alpha) > 0);    
-    mBufferSize = info.getScanlineSize(buffers.hor_stride)*buffers.ver_stride;
     mLayer.forceVisibilityTransaction();
 }
 
@@ -459,7 +492,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
 #if defined(EGL_ANDROID_image_native_buffer)
     if (GLExtensions::getInstance().haveDirectTexture()) {
         err = INVALID_OPERATION;
-        if (ourBuffer->supportsCopybit()) {
+        if (mNeedConversion) {
             copybit_device_t* copybit = mLayer.mBlitEngine;
             if (copybit && err != NO_ERROR) {
                 // create our EGLImageKHR the first time
@@ -478,6 +511,16 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                     }
                 }
             }
+        } else if (mUseEGLImageDirectly) {
+               sp<GraphicBuffer> mTempGraphicBuffer = new GraphicBuffer(
+                           src.crop.r, src.crop.b, src.img.format,
+                           GraphicBuffer::USAGE_HW_TEXTURE, src.img.w,
+                           src.img.handle, false);
+
+               EGLDisplay dpy(getFlinger()->graphicPlane(0).getEGLDisplay());
+               err = mTextureManager.initEglImage(&mTexture, dpy, mTempGraphicBuffer);
+        } else {
+               err = INVALID_OPERATION;
         }
     }
 #endif
