@@ -302,6 +302,11 @@ public:
     static const char KEY_AUTO_EXPOSURE[];
     static const char KEY_SUPPORTED_AUTO_EXPOSURE[];
 
+    static const char KEY_GPS_LATITUDE_REF[];
+    static const char KEY_GPS_LONGITUDE_REF[];
+    static const char KEY_GPS_ALTITUDE_REF[];
+    static const char KEY_GPS_STATUS[];
+    static const char KEY_EXIF_DATETIME[];
 
     // Value for KEY_ZOOM_SUPPORTED or KEY_SMOOTH_ZOOM_SUPPORTED.
     static const char TRUE[];

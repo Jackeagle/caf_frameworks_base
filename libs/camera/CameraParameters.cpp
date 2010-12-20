@@ -170,6 +170,13 @@ const char CameraParameters::AUTO_EXPOSURE_FRAME_AVG[] = "frame-average";
 const char CameraParameters::AUTO_EXPOSURE_CENTER_WEIGHTED[] = "center-weighted";
 const char CameraParameters::AUTO_EXPOSURE_SPOT_METERING[] = "spot-metering";
 
+const char CameraParameters::KEY_GPS_LATITUDE_REF[] = "gps-latitude-ref";
+const char CameraParameters::KEY_GPS_LONGITUDE_REF[] = "gps-longitude-ref";
+const char CameraParameters::KEY_GPS_ALTITUDE_REF[] = "gps-altitude-ref";
+const char CameraParameters::KEY_GPS_STATUS[] = "gps-status";
+const char CameraParameters::KEY_EXIF_DATETIME[] = "exif-datetime";
+
+
 CameraParameters::CameraParameters()
                 : mMap()
 {
