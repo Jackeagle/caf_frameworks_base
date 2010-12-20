@@ -833,12 +833,12 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
                   srcW = srcH;
                   srcH = tmp;
                 }
-                if(h > ((maxScale - 1) * srcH)){
-                  h = (maxScale - 1) * srcH;
+                if(h > ((maxScale) * srcH)){
+                  h = (maxScale) * srcH;
                   y = (ovHeight - h)/2;
                 }
-                if(w > ((maxScale - 1) * srcW)){
-                  w = (maxScale - 1) * srcW;
+                if(w > ((maxScale) * srcW)){
+                  w = (maxScale) * srcW;
                   x = (ovWidth - w)/2;
                 }
 
