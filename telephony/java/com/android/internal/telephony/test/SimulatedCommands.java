@@ -1473,4 +1473,13 @@ public final class SimulatedCommands extends BaseCommands
     public void getGsmBroadcastConfig(Message response) {
         unimplemented(response);
     }
+
+    public void getCdmaSubscriptionSource(Message response) {
+        unimplemented(response);
+    }
+
+    public void getCdmaPrlVersion(Message response) {
+        unimplemented(response);
+    }
+
 }
