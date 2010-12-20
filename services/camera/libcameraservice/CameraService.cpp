@@ -555,10 +555,15 @@ status_t CameraService::Client::registerPreviewBuffers() {
     return result;
 }
 
-status_t CameraService::Client::setOverlay() {
+status_t CameraService::Client::setOverlay(int pw, int ph) {
     int w, h;
     CameraParameters params(mHardware->getParameters());
-    params.getPreviewSize(&w, &h);
+    if(pw == 0 && ph == 0)
+        params.getPreviewSize(&w, &h);
+    else {
+        w = pw;
+        h = ph;
+    }
 
     if (w != mOverlayW || h != mOverlayH || mOrientationChanged) {
         // Force the destruction of any previous overlay
@@ -1115,20 +1120,23 @@ void CameraService::Client::handleShutter(image_rect_type *size,
 
 
     disableMsgType(CAMERA_MSG_SHUTTER);
+
+    int w, h;
+    CameraParameters params(mHardware->getParameters());
+    if (size == NULL) {
+        params.getPictureSize(&w, &h);
+    } else {
+        w = size->width;
+        h = size->height;
+        w &= ~1;
+        h &= ~1;
+    }
+    LOG1("Snapshot image width=%d, height=%d", w, h);
+
     // It takes some time before yuvPicture callback to be called.
     // Register the buffer for raw image here to reduce latency.
     if (mSurface != 0 && !mUseOverlay) {
-        int w, h;
-        CameraParameters params(mHardware->getParameters());
-        if (size == NULL) {
-            params.getPictureSize(&w, &h);
-        } else {
-            w = size->width;
-            h = size->height;
-            w &= ~1;
-            h &= ~1;
-            LOG1("Snapshot image width=%d, height=%d", w, h);
-        }
+
         // FIXME: don't use hardcoded format constants here
         ISurface::BufferHeap buffers(w, h, w, h,
             mPixelFormat, mOrientation, 0,
@@ -1137,6 +1145,9 @@ void CameraService::Client::handleShutter(image_rect_type *size,
         mSurface->registerBuffers(buffers);
         IPCThreadState::self()->flushCommands();
     }
+
+    if (mUseOverlay)
+        setOverlay(w, h);
 
     mLock.unlock();
 }

@@ -127,7 +127,7 @@ private:
 
         // these are internal functions used to set up preview buffers
         status_t                registerPreviewBuffers();
-        status_t                setOverlay();
+        status_t                setOverlay(int w = 0, int h = 0);
 
         // camera operation mode
         enum camera_mode {
