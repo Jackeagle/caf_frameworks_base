@@ -198,6 +198,7 @@ SurfaceFlinger::SurfaceFlinger()
 #else
         mOverlayOpt(false),
 #endif
+        mLastCompCount(-1),
         mFullScreen(false),
         mOverlayUsed(false),
         mOverlayUsedVideo(false)
@@ -944,7 +945,14 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     const size_t count = drawingLayers.size();
     sp<LayerBase> const* const layers = drawingLayers.array();
     int compcount = 0, ovLayerIndex = -1, layerbuffercount = 0, layerbufferIndex = -1;
+    int layersNotUpdatingCount = 0;
+    bool compositionStateChanged = false;
     Region prevClip;
+    Region layerBufferClip;
+    Region drawClip;
+    bool canUseOverlayToDraw = false;
+
+
     if (mOverlayOpt) {
         for (size_t i = 0; ((i < count)  && (compcount <= 1 || layerbuffercount <= 1)); ++i) {
             const sp<LayerBase>& layer = layers[i];
@@ -955,35 +963,74 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     compcount++;
                     prevClip = clip;
                     ovLayerIndex = i;
+
+                    if(layer->isNothingToUpdate()) {
+                        layersNotUpdatingCount++;
+                    }
+
                     if (layer->getLayerInitFlags() & ePushBuffers) {
                         layerbuffercount++;
                         layerbufferIndex = i;
+                        layerBufferClip = clip;
                     }
                 }
             }
-
         }
 
-#if defined(SF_BYPASS)
-        if ((compcount == 1) && (ovLayerIndex != -1)) {
+        if(layerbuffercount == 1) {
+            if (compcount != mLastCompCount)
+                compositionStateChanged = true;
+            mLastCompCount = compcount;
+        }
+        else
+            mLastCompCount = -1;
+
+        if(getOverlayEngine()) {
+            if(layerbuffercount == 1) {
+                if(compcount == 1) {
+                   canUseOverlayToDraw = true;
+                } else if ((compcount == 2) && (layersNotUpdatingCount == 1) && !compositionStateChanged) {
+                   canUseOverlayToDraw = true;
+                }
+                drawClip = layerBufferClip;
+            }
+#ifdef SF_BYPASS
+            else if(compcount == 1) {
+                canUseOverlayToDraw = true;
+                drawClip = prevClip;
+            }
+#endif
+        }
+
+        if (canUseOverlayToDraw && (ovLayerIndex != -1)) {
             Region::const_iterator it = prevClip.begin();
             const DisplayHardware& hw(graphicPlane(0).displayHardware());
             const Rect& r = *it++;
             if (((r.right - r.left) == hw.getWidth() && (r.bottom - r.top) == hw.getHeight()) ||
                           layerbuffercount) {
-                const sp<LayerBase>& layer = layers[ovLayerIndex];
                 bool clear = !mOverlayUsed;
-                if (layerbuffercount && mOverlayUsedVideo) {
-                    clear = true;
-                    mOverlayUsedVideo = false;
+#ifdef SF_BYPASS
+                int drawLayerIndex;
+                if(layerbuffercount == 1) {
+                   drawLayerIndex = layerbufferIndex;
+                } else {
+                   drawLayerIndex = ovLayerIndex;
                 }
-                if (layer->drawWithOverlay(prevClip, clear) == NO_ERROR) {
+                const sp<LayerBase>& layer = layers[drawLayerIndex];
+                if (layer->drawWithOverlay(drawClip, clear) == NO_ERROR) {
+#else
+                const sp<LayerBase>& layer = layers[layerbufferIndex];
+                if (layer->drawWithOverlay(drawClip, clear) == NO_ERROR) {
+#endif
                     if (clear)
                         mFullScreen = false;
                     else
                         mFullScreen = true;
                     mOverlayUsed = true;
                     return;
+                }
+                else {
+                    LOGE("Draw with overlay failed");
                 }
             }
         }
@@ -992,7 +1039,6 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
             mFullScreen = true;
             return;
         }
-#endif
     }
     mFullScreen = false;
     if (mOverlayUsed && layerbuffercount != 1) {

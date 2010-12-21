@@ -70,6 +70,7 @@ public:
     virtual bool needsBlending() const      { return mNeedsBlending; }
     virtual bool needsDithering() const     { return mNeedsDithering; }
     virtual bool isSecure() const           { return mSecure; }
+    virtual bool isNothingToUpdate() const  { return mNothingToUpdate; }
     virtual sp<Surface> createSurface() const;
     virtual status_t ditch();
     
@@ -114,6 +115,7 @@ private:
             int32_t         mFrontBufferIndex;
             bool            mNeedsBlending;
             bool            mNeedsDithering;
+            bool            mNothingToUpdate;
             Region          mPostedDirtyRegion;
             sp<FreezeLock>  mFreezeLock;
             PixelFormat     mFormat;
