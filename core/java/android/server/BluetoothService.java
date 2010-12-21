@@ -49,6 +49,7 @@ import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemService;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.Pair;
@@ -106,6 +107,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int MESSAGE_UUID_INTENT = 3;
     private static final int MESSAGE_DISCOVERABLE_TIMEOUT = 4;
     private static final int MESSAGE_AUTO_PAIRING_FAILURE_ATTEMPT_DELAY = 5;
+    private static final int MESSAGE_START_DUN_SERVER = 6;
 
     // The time (in millisecs) to delay the pairing attempt after the first
     // auto pairing attempt fails. We use an exponential delay with
@@ -143,6 +145,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
     private static String mDockAddress;
     private String mDockPin;
+    private boolean mDUNenable = false;
 
     private static class RemoteService {
         public String address;
@@ -338,6 +341,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
         setBluetoothState(BluetoothAdapter.STATE_TURNING_OFF);
         mHandler.removeMessages(MESSAGE_REGISTER_SDP_RECORDS);
+        mHandler.removeMessages(MESSAGE_START_DUN_SERVER);
 
         // Allow 3 seconds for profiles to gracefully disconnect
         // TODO: Introduce a callback mechanism so that each profile can notify
@@ -352,6 +356,12 @@ public class BluetoothService extends IBluetooth.Stub {
         if (mBluetoothState != BluetoothAdapter.STATE_TURNING_OFF) {
             return;
         }
+
+        if (mDUNenable == true) {
+            Log.d(TAG, "Stopping BT-DUN server");
+            SystemService.stop("bt-dun");
+        }
+
         mEventLoop.stop();
         tearDownNativeDataNative();
         disableNative();
@@ -417,6 +427,9 @@ public class BluetoothService extends IBluetooth.Stub {
         }
         if (mEnableThread != null && mEnableThread.isAlive()) {
             return false;
+        }
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.dun", false)) {
+            mDUNenable = true;
         }
         setBluetoothState(BluetoothAdapter.STATE_TURNING_ON);
         mEnableThread = new EnableThread(saveSetting);
@@ -489,6 +502,14 @@ public class BluetoothService extends IBluetooth.Stub {
                 case 4:
                     Log.d(TAG, "Registering pbap record");
                     SystemService.start("pbap");
+                    mHandler.sendMessageDelayed(
+                            mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 5, -1), 500);
+                    break;
+                case 5:
+                    if (mDUNenable == true) {
+                        Log.d(TAG, "Registering dun record");
+                        SystemService.start("dund");
+                    }
                     break;
                 }
                 break;
@@ -509,6 +530,11 @@ public class BluetoothService extends IBluetooth.Stub {
                     // This is ok for now, because we only use
                     // CONNECTABLE and CONNECTABLE_DISCOVERABLE
                     setScanMode(BluetoothAdapter.SCAN_MODE_CONNECTABLE, -1);
+                }
+            case MESSAGE_START_DUN_SERVER:
+                if (mDUNenable == true) {
+                    Log.d(TAG, "Starting BT-DUN server");
+                    SystemService.start("bt-dun");
                 }
                 break;
             case MESSAGE_AUTO_PAIRING_FAILURE_ATTEMPT_DELAY:
@@ -568,6 +594,12 @@ public class BluetoothService extends IBluetooth.Stub {
                 mBondState.readAutoPairingData();
                 mBondState.loadBondState();
                 initProfileState();
+
+                if (mDUNenable == true) {
+                    mHandler.sendMessage(
+                            mHandler.obtainMessage(MESSAGE_START_DUN_SERVER));
+                }
+
                 mHandler.sendMessageDelayed(
                         mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 1, -1), 3000);
 
