@@ -854,6 +854,9 @@ public class ProxyManager extends Handler {
                                         mPendingActivateEvents++;
                                         mCi[index].setUiccSubscription(
                                                subscriptionData.subscription[index], callback);
+                                    } else {
+                                        // This subscription is not in use.  Mark as INVALID.
+                                        subscriptionData.subscription[index].subStatus = SUB_INVALID;
                                     }
                                 }
                                 break;
@@ -997,7 +1000,8 @@ public class ProxyManager extends Handler {
 
             for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
                 if (subscriptionData.subscription[i].subStatus == SUB_ACTIVATE &&
-                        prevSubscriptionData.subscription[i].subStatus == SUB_DEACTIVATED) {
+                        (prevSubscriptionData.subscription[i].subStatus == SUB_INVALID ||
+                         prevSubscriptionData.subscription[i].subStatus == SUB_DEACTIVATED)) {
                     if (!isSubscriptionInUse(subscriptionData.subscription[i])) {
                         Log.d(LOG_TAG, "Activating subscriptionData on SUB:" + i);
 
@@ -1106,6 +1110,11 @@ public class ProxyManager extends Handler {
                             prevSubscriptionData.subscription[i].subStatus = SUB_DEACTIVATING;
                             done = false;
                             mPendingDeactivateEvents++;
+                        } else if (prevSubscriptionData.subscription[i].subStatus == SUB_DEACTIVATED
+                                && subscriptionData.subscription[i].subStatus == SUB_DEACTIVATE) {
+                            // This subscription is already in deactivated state.
+                            // Update the status properly.
+                            subscriptionData.subscription[i].subStatus = SUB_DEACTIVATED;
                         }
                     }
                 }
