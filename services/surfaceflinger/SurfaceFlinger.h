@@ -38,6 +38,10 @@
 #include "Barrier.h"
 #include "Layer.h"
 
+#if defined(TARGET_USES_OVERLAY)
+#include "overlayLib.h"
+#endif
+
 #include "MessageQueue.h"
 
 namespace android {
@@ -211,6 +215,7 @@ public:
             void                        screenAcquired(DisplayID dpy);
 
             overlay_control_device_t* getOverlayEngine() const;
+            void enableOverlayOpt(bool start) const;
 
     status_t removeLayer(const sp<LayerBase>& layer);
     status_t addLayer(const sp<LayerBase>& layer);
@@ -428,6 +433,10 @@ private:
    // only written in the main thread, only read in other threads
    volatile     int32_t                     mSecureFrameBuffer;
    bool mHDMIOutput;
+   mutable bool mOverlayOpt;
+   bool mFullScreen;
+   bool mOverlayUsed;
+   bool mOverlayUsedVideo;
 };
 
 // ---------------------------------------------------------------------------

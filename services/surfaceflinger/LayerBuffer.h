@@ -42,6 +42,7 @@ class LayerBuffer : public LayerBaseClient
         Source(LayerBuffer& layer);
         virtual ~Source();
         virtual void onDraw(const Region& clip) const;
+        virtual status_t drawWithOverlay(const Region& clip, bool clear) const;
         virtual void onTransaction(uint32_t flags);
         virtual void onVisibilityResolved(const Transform& planeTransform);
         virtual void onvalidateVisibility(const Transform& globalTransform) { }
@@ -66,6 +67,7 @@ public:
     virtual status_t ditch();
     virtual void onDraw(const Region& clip) const;
     virtual void drawForSreenShot() const;
+    virtual status_t drawWithOverlay(const Region& clip, bool clear) const;
     virtual uint32_t doTransaction(uint32_t flags);
     virtual void unlockPageFlip(const Transform& planeTransform, Region& outDirtyRegion);
     virtual void validateVisibility(const Transform& globalTransform);
@@ -89,6 +91,8 @@ private:
     struct NativeBuffer {
         copybit_image_t   img;
         copybit_rect_t    crop;
+        int hor_stride;
+        int ver_stride;
     };
 
     static gralloc_module_t const* sGrallocModule;
@@ -126,6 +130,7 @@ private:
         void setBuffer(const sp<Buffer>& buffer);
 
         virtual void onDraw(const Region& clip) const;
+        virtual status_t drawWithOverlay(const Region& clip, bool clear) const;
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual void destroy() { }

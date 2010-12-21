@@ -29,6 +29,10 @@
 
 #include <pixelflinger/pixelflinger.h>
 
+#if defined(TARGET_USES_OVERLAY)
+#include "overlayLib.h"
+#endif
+
 #include "GLExtensions.h"
 
 #include "DisplayHardware/DisplayHardwareBase.h"
@@ -86,6 +90,9 @@ public:
     uint32_t getPageFlipCount() const;
     EGLDisplay getEGLDisplay() const { return mDisplay; }
     overlay_control_device_t* getOverlayEngine() const { return mOverlayEngine; }
+#if defined(TARGET_USES_OVERLAY)
+    overlay::Overlay* getOverlayObject() const { return mOverlayLibObject; }
+#endif
     
     status_t compositionComplete() const;
     
@@ -118,6 +125,9 @@ private:
     
     sp<FramebufferNativeWindow> mNativeWindow;
     overlay_control_device_t* mOverlayEngine;
+#if defined(TARGET_USES_OVERLAY)
+    overlay::Overlay* mOverlayLibObject;
+#endif
 };
 
 }; // namespace android

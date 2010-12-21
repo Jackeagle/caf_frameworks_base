@@ -168,6 +168,10 @@ void DisplayHardware::init(uint32_t dpy)
     eglQuerySurface(display, surface, EGL_WIDTH,  &mWidth);
     eglQuerySurface(display, surface, EGL_HEIGHT, &mHeight);
 
+#if defined(TARGET_USES_OVERLAY)
+    mOverlayLibObject = new overlay::Overlay();
+#endif
+
     if (mFlags & PARTIAL_UPDATES) {
         // if we have partial updates, we definitely don't need to
         // preserve the backbuffer, which may be costly.

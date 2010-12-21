@@ -93,7 +93,15 @@ SurfaceFlinger::SurfaceFlinger()
         mBootFinished(false),
         mConsoleSignals(0),
         mHDMIOutput(false),
-        mSecureFrameBuffer(0)
+        mSecureFrameBuffer(0),
+#if defined(TARGET_USES_OVERLAY)
+        mOverlayOpt(true),
+#else
+        mOverlayOpt(false),
+#endif
+        mFullScreen(false),
+        mOverlayUsed(false),
+        mOverlayUsedVideo(false)
 {
     init();
 }
@@ -369,6 +377,7 @@ bool SurfaceFlinger::threadLoop()
             handleTransaction(transactionFlags);
         }
     }
+    mFullScreen = false;
 
     // post surfaces (if needed)
     handlePageFlip();
@@ -385,17 +394,27 @@ bool SurfaceFlinger::threadLoop()
 
         // inform the h/w that we're done compositing
         logger.log(GraphicLog::SF_COMPOSITION_COMPLETE, index);
-        hw.compositionComplete();
+        if (!mFullScreen)
+            hw.compositionComplete();
 
         // release the clients before we flip ('cause flip might block)
         logger.log(GraphicLog::SF_UNLOCK_CLIENTS, index);
         unlockClients();
 
         logger.log(GraphicLog::SF_SWAP_BUFFERS, index);
-        postFramebuffer();
+        if (!mFullScreen) {
+            postFramebuffer();
+        }
+        else {
+            // Do we need to throttle?
+        }
 
         logger.log(GraphicLog::SF_REPAINT_DONE, index);
     } else {
+        if (mOverlayOpt) {
+            enableOverlayOpt(false);
+            enableOverlayOpt(true);
+        }
         // pretend we did the post
         unlockClients();
         usleep(16667); // 60 fps period
@@ -829,11 +848,79 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     }
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
     const size_t count = layers.size();
+    int compcount = 0, ovLayerIndex = -1, layerbuffercount = 0,   layerbufferIndex = -1;
+    Region prevClip;
+    if (mOverlayOpt) {
+        for (size_t i = 0; ((i < count)  && (compcount <= 1 || layerbuffercount <= 1)); ++i) {
+            const sp<LayerBase>& layer = layers[i];
+            const Region& visibleRegion(layer->visibleRegionScreen);
+            if (!visibleRegion.isEmpty())  {
+                const Region clip(dirty.intersect(visibleRegion));
+                if (!clip.isEmpty()) {
+                    compcount++;
+                    prevClip = clip;
+                    ovLayerIndex = i;
+                    if (layer->getLayerInitFlags() & ePushBuffers) {
+                        layerbuffercount++;
+                        layerbufferIndex = i;
+                    }
+                }
+            }
+
+        }
+
+#if defined(SF_BYPASS)
+        if ((compcount == 1) && (ovLayerIndex != -1)) {
+            Region::const_iterator it = prevClip.begin();
+            const DisplayHardware& hw(graphicPlane(0).displayHardware());
+            const Rect& r = *it++;
+            if (((r.right - r.left) == hw.getWidth() && (r.bottom - r.top) == hw.getHeight()) ||
+                          layerbuffercount) {
+                const sp<LayerBase>& layer = layers[ovLayerIndex];
+                bool clear = !mOverlayUsed;
+                if (layerbuffercount && mOverlayUsedVideo) {
+                    clear = true;
+                    mOverlayUsedVideo = false;
+                }
+                if (layer->drawWithOverlay(prevClip, clear) == NO_ERROR) {
+                    if (clear)
+                        mFullScreen = false;
+                    else
+                        mFullScreen = true;
+                    mOverlayUsed = true;
+                    return;
+                }
+            }
+        }
+
+        if (!compcount) {
+            mFullScreen = true;
+            return;
+        }
+#endif
+    }
+    mFullScreen = false;
+    if (mOverlayUsed && layerbuffercount != 1) {
+        mOverlayUsed = false;
+        if (mOverlayOpt) {
+            enableOverlayOpt(false);
+            enableOverlayOpt(true);
+        }
+    }
+
     for (size_t i=0 ; i<count ; ++i) {
         const sp<LayerBase>& layer(layers[i]);
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
-            layer->draw(clip);
+                if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
+                    if (layer->drawWithOverlay(clip, true) != NO_ERROR) {
+                        layer->draw(clip);
+                    }
+                    mOverlayUsed = true;
+                    mOverlayUsedVideo = true;
+                }
+                else
+                    layer->draw(clip);
         }
     }
 }
@@ -1136,6 +1223,9 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
 {
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     mHDMIOutput = enable;
+#if defined(TARGET_USES_OVERLAY)
+    enableOverlayOpt(!enable);
+#endif
     hw.enableHDMIOutput(enable);
 }
 
@@ -1634,6 +1724,21 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(DisplayID dpy,
     *uOut = u;
     *vOut = v;
     return NO_ERROR;
+}
+
+void SurfaceFlinger::enableOverlayOpt(bool start) const
+{
+#if defined(TARGET_USES_OVERLAY)
+    if (mHDMIOutput || (!start)) {
+        const DisplayHardware& hw(graphicPlane(0).displayHardware());
+        overlay::Overlay* temp = hw.getOverlayObject();
+        temp->closeChannel();
+    }
+    if (mHDMIOutput)
+        mOverlayOpt = false;
+    else
+        mOverlayOpt = start;
+#endif
 }
 
 // ---------------------------------------------------------------------------
