@@ -703,25 +703,26 @@ public class WallpaperManager {
         targetRect.left = targetRect.top = 0;
         targetRect.right = bm.getWidth();
         targetRect.bottom = bm.getHeight();
-        
-        int deltaw = width - targetRect.right;
-        int deltah = height - targetRect.bottom;
-        
-        if (deltaw > 0 || deltah > 0) {
+
+        int deltaw = 0;
+        int deltah = 0;
+
+        if(targetRect.right > 0 && targetRect.bottom > 0) {
             // We need to scale up so it covers the entire
             // area.
-            float scale = 1.0f;
-            if (deltaw > deltah) {
-                scale = width / (float)targetRect.right;
+            float xScale = width / (float)targetRect.right;
+            float yScale = height / (float)targetRect.bottom;
+            if(xScale > yScale) {
+                targetRect.right = (int)((float)targetRect.right * xScale);
+                targetRect.bottom = (int)((float)targetRect.bottom * xScale);
             } else {
-                scale = height / (float)targetRect.bottom;
+                targetRect.right = (int)((float)targetRect.right * yScale);
+                targetRect.bottom = (int)((float)targetRect.bottom * yScale);
             }
-            targetRect.right = (int)(targetRect.right*scale);
-            targetRect.bottom = (int)(targetRect.bottom*scale);
             deltaw = width - targetRect.right;
             deltah = height - targetRect.bottom;
         }
-        
+
         targetRect.offset(deltaw/2, deltah/2);
         Paint paint = new Paint();
         paint.setFilterBitmap(true);
