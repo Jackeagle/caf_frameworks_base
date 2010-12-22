@@ -674,8 +674,44 @@ void MediaPlayerService::Client::disconnect()
     IPCThreadState::self()->flushCommands();
 }
 
-static player_type getDefaultPlayerType() {
-    return STAGEFRIGHT_PLAYER;
+static player_type getDefaultPlayerType(const char *url) {
+    char value[PROPERTY_VALUE_MAX];
+    if (property_get("media.stagefright.enable-player", value, "0")
+        && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
+        if (PVPlayer::usePVPlayer(url)==OK) {
+            LOGV("usePVPlayer: asking for PVPlayer to play qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGI("Returning PV_PLAYER*************************");
+            return PV_PLAYER;
+        }
+        else {
+            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGI("The Default player that is returned is STAGEFRIGHT**************");
+            return STAGEFRIGHT_PLAYER;
+        }
+    }
+
+    LOGI("The Default Player is PV_PLAYER***********************");
+    return PV_PLAYER;
+}
+
+static player_type getDefaultPlayerType(int fd, int64_t offset, int64_t length) {
+    char value[PROPERTY_VALUE_MAX];
+    if (property_get("media.stagefright.enable-player", value, "0")
+        && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
+        if (PVPlayer::usePVPlayer(fd,offset,length)==OK) {
+            LOGV("usePVPlayer: asking for PVPlayer to play qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGI("Returning PV_PLAYER*************************");
+            return PV_PLAYER;
+        }
+        else {
+            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGI("The Default player that is returned is STAGEFRIGHT**************");
+            return STAGEFRIGHT_PLAYER;
+        }
+    }
+
+    LOGI("The Default Player is PV_PLAYER***********************");
+    return PV_PLAYER;
 }
 
 player_type getPlayerType(int fd, int64_t offset, int64_t length)
@@ -716,7 +752,7 @@ player_type getPlayerType(int fd, int64_t offset, int64_t length)
         EAS_Shutdown(easdata);
     }
 
-    return getDefaultPlayerType();
+    return getDefaultPlayerType(fd,offset,length);
 }
 
 player_type getPlayerType(const char* url)
@@ -739,7 +775,7 @@ player_type getPlayerType(const char* url)
 
     if (!strncasecmp(url, "rtsp://", 7)) {
         char value[PROPERTY_VALUE_MAX];
-        if (property_get("media.stagefright.enable-rtsp", value, NULL)
+        if (property_get("media.stagefright.enable-rtsp", value, "0")
             && (strcmp(value, "1") && strcasecmp(value, "true"))) {
             // For now, we're going to use PV for rtsp-based playback
             // by default until we can clear up a few more issues.
@@ -747,7 +783,7 @@ player_type getPlayerType(const char* url)
         }
     }
 
-    return getDefaultPlayerType();
+    return getDefaultPlayerType(url);
 }
 
 static sp<MediaPlayerBase> createPlayer(player_type playerType, void* cookie,
