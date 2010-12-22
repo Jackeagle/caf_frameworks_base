@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright (C) 2008, The Android Open Source Project
+** Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -625,9 +626,11 @@ status_t CameraService::Client::setOverlay(int pw, int ph) {
             // should make the destroy call block, or possibly specify that we can
             // wait in the createOverlay call if the previous overlay is in the
             // process of being destroyed.
+            int ovFormat;
+            ovFormat = params.getInt("overlay-format");
+            if(ovFormat == -1) ovFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP;
             for (int retry = 0; retry < 50; ++retry) {
-                mOverlayRef = mSurface->createOverlay(w, h, HAL_PIXEL_FORMAT_YCbCr_420_SP,/* OVERLAY_FORMAT_DEFAULT,*/
-                                                      mOrientation);
+                mOverlayRef = mSurface->createOverlay(w, h, ovFormat, mOrientation);
                 if (mOverlayRef != 0) break;
                 LOGW("Overlay create failed - retrying");
                 usleep(20000);
@@ -637,6 +640,11 @@ status_t CameraService::Client::setOverlay(int pw, int ph) {
                 return -EINVAL;
             }
             mOverlay = new Overlay(mOverlayRef);
+            /* Setting up the width and height of cropping for
+             * 3D usecase. For non-3D case, this won't
+             * cause any effect
+             */
+            mOverlay->setCrop(0, 0, w, h);
             result = mHardware->setOverlay(mOverlay);
             //result = mHardware->setOverlay(new Overlay(mOverlayRef));
         }
