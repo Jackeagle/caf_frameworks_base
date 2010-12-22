@@ -1026,9 +1026,13 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
         mForceUse[i] = AudioSystem::FORCE_NONE;
     }
 
+    uint32_t defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_EARPIECE;
     // devices available by default are speaker, ear piece and microphone
-    mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE |
-                        AudioSystem::DEVICE_OUT_SPEAKER;
+    mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE;
+#ifndef HW_NO_SPEAKER
+    mAvailableOutputDevices |= AudioSystem::DEVICE_OUT_SPEAKER;
+    defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_SPEAKER;
+#endif
     mAvailableInputDevices = AudioSystem::DEVICE_IN_BUILTIN_MIC;
 
 #ifdef WITH_A2DP
@@ -1040,7 +1044,8 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
 
     // open hardware output
     AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor();
-    outputDesc->mDevice = (uint32_t)AudioSystem::DEVICE_OUT_SPEAKER;
+    outputDesc->mDevice = defaultDevice;
+    //outputDesc->mDevice = (uint32_t)AudioSystem::DEVICE_OUT_SPEAKER;
     mHardwareOutput = mpClientInterface->openOutput(&outputDesc->mDevice,
                                     &outputDesc->mSamplingRate,
                                     &outputDesc->mFormat,
@@ -1053,7 +1058,9 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
                 outputDesc->mSamplingRate, outputDesc->mFormat, outputDesc->mChannels);
     } else {
         addOutput(mHardwareOutput, outputDesc);
-        setOutputDevice(mHardwareOutput, (uint32_t)AudioSystem::DEVICE_OUT_SPEAKER, true);
+        //setOutputDevice(mHardwareOutput, (uint32_t)AudioSystem::DEVICE_OUT_SPEAKER, true);
+        setOutputDevice(mHardwareOutput, defaultDevice, true);
+
         //TODO: configure audio effect output stage here
     }
 
