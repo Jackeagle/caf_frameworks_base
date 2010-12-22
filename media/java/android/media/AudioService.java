@@ -162,7 +162,8 @@ public class AudioService extends IAudioService.Stub {
         15, // STREAM_BLUETOOTH_SCO
         7,  // STREAM_SYSTEM_ENFORCED
         15, // STREAM_DTMF
-        15  // STREAM_TTS
+        15,  // STREAM_TTS
+        15 // STREAM_FM
     };
     /* STREAM_VOLUME_ALIAS[] indicates for each stream if it uses the volume settings
      * of another stream: This avoids multiplying the volume settings for hidden
@@ -178,7 +179,8 @@ public class AudioService extends IAudioService.Stub {
         AudioSystem.STREAM_BLUETOOTH_SCO, // STREAM_BLUETOOTH_SCO
         AudioSystem.STREAM_SYSTEM,  // STREAM_SYSTEM_ENFORCED
         AudioSystem.STREAM_VOICE_CALL, // STREAM_DTMF
-        AudioSystem.STREAM_MUSIC  // STREAM_TTS
+        AudioSystem.STREAM_MUSIC,  // STREAM_TTS
+        AudioSystem.STREAM_FM
     };
 
     private AudioSystem.ErrorCallback mAudioSystemCallback = new AudioSystem.ErrorCallback() {
@@ -305,6 +307,9 @@ public class AudioService extends IAudioService.Stub {
         intentFilter.addAction(BluetoothHeadset.ACTION_STATE_CHANGED);
         intentFilter.addAction(Intent.ACTION_DOCK_EVENT);
         intentFilter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
+        intentFilter.addAction("HDMI_CONNECTED");
+        intentFilter.addAction("HDMI_DISCONNECTED");
+        intentFilter.addAction(Intent.ACTION_FM);
         context.registerReceiver(mReceiver, intentFilter);
 
         // Register for media button intent broadcasts.
@@ -373,6 +378,7 @@ public class AudioService extends IAudioService.Stub {
         mMuteAffectedStreams = System.getInt(cr,
                 System.MUTE_STREAMS_AFFECTED,
                 ((1 << AudioSystem.STREAM_MUSIC)|(1 << AudioSystem.STREAM_RING)|(1 << AudioSystem.STREAM_SYSTEM)));
+        mMuteAffectedStreams |= (1 << AudioSystem.STREAM_FM);
 
         mNotificationsUseRingVolume = System.getInt(cr,
                 Settings.System.NOTIFICATIONS_USE_RING_VOLUME, 1);
@@ -1212,6 +1218,9 @@ public class AudioService extends IAudioService.Stub {
         } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC)) {
             // Log.v(TAG, "getActiveStreamType: Forcing STREAM_MUSIC...");
             return AudioSystem.STREAM_MUSIC;
+        } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_FM)) {
+            // Log.v(TAG, "getActiveStreamType: Forcing STREAM_FM...");
+            return AudioSystem.STREAM_FM;
         } else if (suggestedStreamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
             // Log.v(TAG, "getActiveStreamType: Forcing STREAM_RING...");
             return AudioSystem.STREAM_RING;
@@ -1943,6 +1952,33 @@ public class AudioService extends IAudioService.Stub {
                             mContext.sendStickyBroadcast(newIntent);
                         }
                     }
+                }
+            } else if (action.equals("HDMI_CONNECTED")) {
+                Log.v(TAG, "HDMI connected");
+                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_HDMI,
+                                                     AudioSystem.DEVICE_STATE_AVAILABLE,
+                                                     "");
+                mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_AUX_HDMI), "");
+            } else if (action.equals("HDMI_DISCONNECTED")) {
+                Log.v(TAG, "HDMI disconnected");
+                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_HDMI,
+                                                     AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                                                     "");
+                mConnectedDevices.remove(AudioSystem.DEVICE_OUT_AUX_HDMI);
+            } else if (action.equals(Intent.ACTION_FM)){
+               Log.v(TAG, "FM Intent received");
+               int state = intent.getIntExtra("state", 0);
+               boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_FM);
+               if(state == 1 && !isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
+                            AudioSystem.DEVICE_STATE_AVAILABLE,
+                            "");
+                    mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_FM), "");
+                }else if(state == 0 && isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
+                            AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                            "");
+                    mConnectedDevices.remove(AudioSystem.DEVICE_OUT_FM);
                 }
             }
         }

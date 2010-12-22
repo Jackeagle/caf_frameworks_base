@@ -129,7 +129,7 @@ static bool settingsAllowed() {
 
 AudioFlinger::AudioFlinger()
     : BnAudioFlinger(),
-        mAudioHardware(0), mMasterVolume(1.0f), mMasterMute(false), mNextUniqueId(1)
+        mAudioHardware(0), mMasterVolume(1.0f), mMasterMute(false), mNextUniqueId(1), mFmOn(false)
 {
     mHardwareStatus = AUDIO_HW_IDLE;
 
@@ -624,6 +624,9 @@ bool AudioFlinger::isStreamActive(int stream) const
             return true;
         }
     }
+    if (mFmOn) {
+        return true;
+    }
     return false;
 }
 
@@ -661,6 +664,16 @@ status_t AudioFlinger::setParameters(int ioHandle, const String8& keyValuePairs)
     }
 #endif
 
+    AudioParameter param = AudioParameter(keyValuePairs);
+    String8 key = String8(AudioParameter::keyRouting);
+    int device;
+    if (param.getInt(key, device) == NO_ERROR) {
+        if((device & AudioSystem::DEVICE_OUT_FM) && mFmOn == false){
+            mFmOn=true;
+         } else if (mFmOn == true && !(device & AudioSystem::DEVICE_OUT_FM)){
+            mFmOn=false;
+         }
+    }
     // ioHandle == 0 means the parameters are global to the audio hardware interface
     if (ioHandle == 0) {
         AutoMutex lock(mHardwareLock);
@@ -766,6 +779,22 @@ status_t AudioFlinger::getRenderPosition(uint32_t *halFrames, uint32_t *dspFrame
     }
 
     return BAD_VALUE;
+}
+
+
+status_t AudioFlinger::setFmVolume(float value)
+{
+    // check calling permissions
+    if (!settingsAllowed()) {
+        return PERMISSION_DENIED;
+    }
+
+    AutoMutex lock(mHardwareLock);
+    mHardwareStatus = AUDIO_SET_FM_VOLUME;
+    status_t ret = mAudioHardware->setFmVolume(value);
+    mHardwareStatus = AUDIO_HW_IDLE;
+
+    return ret;
 }
 
 void AudioFlinger::registerClient(const sp<IAudioFlingerClient>& client)
