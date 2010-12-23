@@ -613,15 +613,9 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv)
     }
 
 #ifdef USE_ASHMEM
-#ifdef SF_MEM_ST1X
     opt.extraInfo = 0;
-    opt.optionString = "-Dgralloc.ashmem_size=67108864";
+    opt.optionString = SF_MEM_SIZE;
     mOptions.add(opt);
-#else
-    opt.extraInfo = 0;
-    opt.optionString = "-Dgralloc.ashmem_size=24117248";
-    mOptions.add(opt);
-#endif
 #endif
 
     property_get("dalvik.vm.stack-trace-file", stackTraceFileBuf, "");
