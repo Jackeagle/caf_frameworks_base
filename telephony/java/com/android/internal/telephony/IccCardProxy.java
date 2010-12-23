@@ -54,13 +54,14 @@ public class IccCardProxy extends Handler implements IccCard {
     private static final int EVENT_RADIO_ON = 2;
     private static final int EVENT_ICC_CHANGED = 3;
     private static final int EVENT_ICC_ABSENT = 4;
-    private static final int EVENT_ICC_LOCKED = 5;
-    private static final int EVENT_APP_READY = 6;
-    private static final int EVENT_RECORDS_LOADED = 7;
-    private static final int EVENT_IMSI_READY = 8;
-    private static final int EVENT_PERSO_LOCKED = 9;
-    private static final int EVENT_GET_CDMA_SUBSCRIPTION_SOURCE = 10;
-    private static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 11;
+    private static final int EVENT_ICC_IO_ERROR = 5;
+    private static final int EVENT_ICC_LOCKED = 6;
+    private static final int EVENT_APP_READY = 7;
+    private static final int EVENT_RECORDS_LOADED = 8;
+    private static final int EVENT_IMSI_READY = 9;
+    private static final int EVENT_PERSO_LOCKED = 10;
+    private static final int EVENT_GET_CDMA_SUBSCRIPTION_SOURCE = 11;
+    private static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 12;
 
     private Context mContext;
     private CommandsInterface cm;
@@ -159,6 +160,9 @@ public class IccCardProxy extends Handler implements IccCard {
             case EVENT_ICC_ABSENT:
                 mAbsentRegistrants.notifyRegistrants();
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                break;
+            case EVENT_ICC_IO_ERROR:
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
                 break;
             case EVENT_ICC_LOCKED:
                 processLockedState();
@@ -288,6 +292,7 @@ public class IccCardProxy extends Handler implements IccCard {
         mApplication.unregisterForLocked(this);
         mApplication.unregisterForPersoSubstate(this);
         mUiccCard.unregisterForAbsent(this);
+        mUiccCard.unregisterForError(this);
         mAppRecords.unregisterForImsiReady(this);
         mAppRecords.unregisterForRecordsLoaded(this);
     }
@@ -297,6 +302,7 @@ public class IccCardProxy extends Handler implements IccCard {
         mApplication.registerForLocked(this, EVENT_ICC_LOCKED, null);
         mApplication.registerForPersoSubstate(this, EVENT_PERSO_LOCKED, null);
         mUiccCard.registerForAbsent(this, EVENT_ICC_ABSENT, null);
+        mUiccCard.registerForError(this, EVENT_ICC_IO_ERROR, null);
         mAppRecords.registerForImsiReady(this, EVENT_IMSI_READY, null);
         mAppRecords.registerForRecordsLoaded(this, EVENT_RECORDS_LOADED, null);
     }
