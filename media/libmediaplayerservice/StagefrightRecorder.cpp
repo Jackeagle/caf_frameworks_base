@@ -49,7 +49,8 @@ namespace android {
 
 StagefrightRecorder::StagefrightRecorder()
     : mWriter(NULL),
-      mOutputFd(-1) {
+      mOutputFd(-1),
+      mDisableAudio(false) {
 
     LOGV("Constructor");
     reset();
@@ -872,6 +873,10 @@ status_t StagefrightRecorder::startMPEG2TSRecording() {
 
     sp<MediaWriter> writer = new MPEG2TSWriter(dup(mOutputFd));
 
+    if (mDisableAudio) {
+        LOGW("Audio encoding disabled");
+        mAudioSource = AUDIO_SOURCE_LIST_END;
+    }
     if (mAudioSource != AUDIO_SOURCE_LIST_END) {
         if (mAudioEncoder != AUDIO_ENCODER_AAC) {
             return ERROR_UNSUPPORTED;
@@ -1133,6 +1138,10 @@ status_t StagefrightRecorder::startMPEG4Recording() {
     status_t err = OK;
     sp<MediaWriter> writer = new MPEG4Writer(dup(mOutputFd));
 
+    if (mDisableAudio) {
+        LOGW("Audio encoding disabled");
+        mAudioSource = AUDIO_SOURCE_LIST_END;
+    }
     // Add audio source first if it exists
     if (mAudioSource != AUDIO_SOURCE_LIST_END) {
         err = setupAudioEncoder(writer);
@@ -1260,6 +1269,11 @@ status_t StagefrightRecorder::reset() {
 
     mOutputFd = -1;
     mFlags = 0;
+
+    // Disable Audio Encoding
+    char value[PROPERTY_VALUE_MAX];
+    property_get("camcorder.debug.disableaudio", value, "0");
+    if(atoi(value)) mDisableAudio = true;
 
     return OK;
 }
