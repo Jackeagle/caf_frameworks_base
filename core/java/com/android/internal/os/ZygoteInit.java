@@ -508,15 +508,33 @@ public class ZygoteInit {
     private static boolean startSystemServer()
             throws MethodAndArgsCaller, RuntimeException {
         /* Hardcoded command line to start the system server */
-        String args[] = {
-            "--setuid=1000",
-            "--setgid=1000",
-            "--setgroups=1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,3001,3002,3003,3006",
-            "--capabilities=130104352,130104352",
-            "--runtime-init",
-            "--nice-name=system_server",
-            "com.android.server.SystemServer",
-        };
+        String args[];
+        String ashmem_size = System.getProperty("gralloc.ashmem_size");
+        if ((null != ashmem_size) && (0 != ashmem_size.length())) {
+            args = new String[] {
+                "--setuid=1000",
+                "--setgid=1000",
+                "--setgroups=1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,3001,3002,3003,3006",
+                "--capabilities=130104352,130104352",
+                "--rlimit=8,",
+                "--runtime-init",
+                "--nice-name=system_server",
+                "com.android.server.SystemServer",
+            };
+            args[4] = args[4].concat(ashmem_size);
+            args[4] = args[4].concat(",");
+            args[4] = args[4].concat(ashmem_size);
+        } else {
+            args = new String[] {
+                "--setuid=1000",
+                "--setgid=1000",
+                "--setgroups=1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,3001,3002,3003,3006",
+                "--capabilities=130104352,130104352",
+                "--runtime-init",
+                "--nice-name=system_server",
+                "com.android.server.SystemServer",
+            };
+        }
         ZygoteConnection.Arguments parsedArgs = null;
 
         int pid;
@@ -533,10 +551,17 @@ public class ZygoteInit {
             if ("1".equals(SystemProperties.get("ro.debuggable")))
                 debugFlags |= Zygote.DEBUG_ENABLE_DEBUGGER;
 
+            int[][] rlimits = new int[0][0];
+
+            if (parsedArgs.rlimits != null) {
+                rlimits = parsedArgs.rlimits.toArray(rlimits);
+            }
+
+
             /* Request to fork the system server process */
             pid = Zygote.forkSystemServer(
                     parsedArgs.uid, parsedArgs.gid,
-                    parsedArgs.gids, debugFlags, null,
+                    parsedArgs.gids, debugFlags, rlimits,
                     parsedArgs.permittedCapabilities,
                     parsedArgs.effectiveCapabilities);
         } catch (IllegalArgumentException ex) {
