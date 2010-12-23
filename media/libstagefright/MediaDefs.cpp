@@ -36,5 +36,6 @@ const char *MEDIA_MIMETYPE_AUDIO_RAW = "audio/raw";
 const char *MEDIA_MIMETYPE_CONTAINER_MPEG4 = "video/mpeg4";
 const char *MEDIA_MIMETYPE_CONTAINER_WAV = "audio/wav";
 const char *MEDIA_MIMETYPE_CONTAINER_OGG = "application/ogg";
-
+const char *MEDIA_MIMETYPE_VIDEO_SPARK = "video/spark";
+const char *MEDIA_MIMETYPE_VIDEO_VP6 = "video/vp6";
 }  // namespace android
