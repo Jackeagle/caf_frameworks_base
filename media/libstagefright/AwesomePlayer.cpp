@@ -416,6 +416,19 @@ void AwesomePlayer::reset() {
     reset_l();
 }
 
+void AwesomePlayer::releaseAllVideoBuffersHeld() {
+    for(int i=0;i<BUFFER_QUEUE_CAPACITY;i++){
+        if (mVideoBuffer[i] != NULL) {
+            mVideoBuffer[i]->release();
+            mVideoBuffer[i] = NULL;
+        }
+    }
+    mVideoQueueFront = 0;
+    mVideoQueueBack  = 0;
+    mVideoQueueLastRendered = 0;
+    mVideoQueueSize  = 0;
+}
+
 void AwesomePlayer::reset_l() {
     if (mFlags & PREPARING) {
         mFlags |= PREPARE_CANCELLED;
@@ -455,16 +468,7 @@ void AwesomePlayer::reset_l() {
 
     mVideoRenderer.clear();
 
-    for (int i=0;i<BUFFER_QUEUE_CAPACITY;i++) {
-        if (mVideoBuffer[i] != NULL) {
-            mVideoBuffer[i]->release();
-            mVideoBuffer[i] = NULL;
-        }
-    }
-    mVideoQueueFront = 0;
-    mVideoQueueBack  = 0;
-    mVideoQueueLastRendered = 0;
-    mVideoQueueSize  = 0;
+    releaseAllVideoBuffersHeld();
 
     if (mRTSPController != NULL) {
         mRTSPController->disconnect();
@@ -1171,12 +1175,7 @@ void AwesomePlayer::onVideoEvent() {
     mVideoEventPending = false;
 
     if (mSeeking) {
-        for(int i=0;i<BUFFER_QUEUE_CAPACITY;i++){
-            if (mVideoBuffer[i] != NULL) {
-                mVideoBuffer[i]->release();
-                mVideoBuffer[i] = NULL;
-            }
-        }
+        releaseAllVideoBuffersHeld();
 
         if (mCachedSource != NULL && mAudioSource != NULL) {
             // We're going to seek the video source first, followed by
@@ -1192,11 +1191,6 @@ void AwesomePlayer::onVideoEvent() {
             }
             mAudioSource->pause();
         }
-
-        mVideoQueueFront = 0;
-        mVideoQueueBack  = 0;
-        mVideoQueueLastRendered = 0;
-        mVideoQueueSize  = 0;
     }
 
     if (mVideoBuffer[mVideoQueueBack] == NULL) {
@@ -1221,6 +1215,7 @@ void AwesomePlayer::onVideoEvent() {
                         mVideoRendererIsPreview = false;
                         initRenderer_l();
                     }
+                    releaseAllVideoBuffersHeld();
                     continue;
                 }
 
