@@ -87,6 +87,8 @@ extern int register_android_media_ToneGenerator(JNIEnv *env);
 extern int register_android_message_digest_sha1(JNIEnv *env);
 
 extern int register_android_util_FloatMath(JNIEnv* env);
+extern int register_android_hardware_fm_fmradio(JNIEnv* env);
+
 
 namespace android {
 
@@ -1295,6 +1297,7 @@ static const RegJNIRec gRegJNI[] = {
 
     REG_JNI(register_android_content_res_ObbScanner),
     REG_JNI(register_android_content_res_Configuration),
+    REG_JNI(register_android_hardware_fm_fmradio),
 };
 
 /*

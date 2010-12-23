@@ -153,7 +153,8 @@ LOCAL_SRC_FILES:= \
 	android_backup_FileBackupHelperBase.cpp \
 	android_backup_BackupHelperDispatcher.cpp \
 	android_content_res_ObbScanner.cpp \
-    android_content_res_Configuration.cpp
+    android_content_res_Configuration.cpp \
+    android_hardware_fm.cpp
 
 LOCAL_C_INCLUDES += \
 	$(JNI_H_INCLUDE) \

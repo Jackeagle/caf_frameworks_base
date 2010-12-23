@@ -145,6 +145,7 @@ class PackageManagerService extends IPackageManager.Stub {
     private static final int RADIO_UID = Process.PHONE_UID;
     private static final int LOG_UID = Process.LOG_UID;
     private static final int NFC_UID = Process.NFC_UID;
+    private static final int FM_RADIO_UID = Process.FM_RADIO_UID;
     private static final int FIRST_APPLICATION_UID =
         Process.FIRST_APPLICATION_UID;
     private static final int MAX_APPLICATION_UIDS = 1000;
@@ -745,6 +746,12 @@ class PackageManagerService extends IPackageManager.Stub {
                 MULTIPLE_APPLICATION_UIDS
                         ? NFC_UID : FIRST_APPLICATION_UID,
                 ApplicationInfo.FLAG_SYSTEM);
+
+        mSettings.addSharedUserLP("android.uid.fm_radio",
+                MULTIPLE_APPLICATION_UIDS
+                        ? FM_RADIO_UID : FIRST_APPLICATION_UID,
+                ApplicationInfo.FLAG_SYSTEM);
+
 
         String separateProcesses = SystemProperties.get("debug.separate_processes");
         if (separateProcesses != null && separateProcesses.length() > 0) {

@@ -86,6 +86,11 @@ public class Process {
     public static final int WIFI_UID = 1010;
 
     /**
+     * Defines the UID/GID for the FM supplicant process.
+     * @hide
+     */
+    public static final int FM_RADIO_UID = 1019;
+    /**
      * Defines the UID/GID for the NFC service process.
      * @hide
      */
