@@ -194,6 +194,11 @@ public class MediaRecorder
 
         /** @hide H.264/AAC data encapsulated in MPEG2/TS */
         public static final int OUTPUT_FORMAT_MPEG2TS = 8;
+
+        /** QCP file format */
+        public static final int QCP = 9;
+        /** 3GPP2 media file format*/
+        public static final int THREE_GPP2 = 10;
     };
 
     /**
