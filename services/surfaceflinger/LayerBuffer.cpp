@@ -660,7 +660,7 @@ status_t LayerBuffer::BufferSource::initTempBuffer() const
     sp<GraphicBuffer> buffer = new GraphicBuffer(
             w, h, HAL_PIXEL_FORMAT_RGB_565,
             GraphicBuffer::USAGE_HW_TEXTURE |
-            GraphicBuffer::USAGE_HW_2D);
+            GraphicBuffer::USAGE_HW_2D | GRALLOC_USAGE_PRIVATE_1);
 
     status_t err = buffer->initCheck();
     if (err == NO_ERROR) {
