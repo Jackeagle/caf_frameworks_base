@@ -24,6 +24,7 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <media/IOMX.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaSource.h>
+#include <media/stagefright/HardwareExtractor.h>
 #include <utils/threads.h>
 
 namespace android {
@@ -122,6 +123,7 @@ private:
     };
 
     sp<IOMX> mOMX;
+    sp<HardwareExtractor> mHardwareExtractor;
     bool mOMXLivesLocally;
     IOMX::node_id mNode;
     uint32_t mQuirks;

@@ -450,6 +450,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
     uint32_t type;
     const void *data;
     size_t size;
+    mHardwareExtractor = new HardwareExtractor();
     if (meta->findData(kKeyESDS, &type, &data, &size)) {
         ESDS esds((const char *)data, size);
         CHECK_EQ(esds.InitCheck(), OK);
@@ -496,6 +497,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
             CHECK(size >= length);
 
             addCodecSpecificData(ptr, length);
+            mHardwareExtractor->updateCodecSpecificData(ptr, length, mMIME);
 
             ptr += length;
             size -= length;
@@ -573,6 +575,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         paramVp.eFormat =  QOMX_VIDEO_VPFormat6;
         paramVp.eProfile = QOMX_VIDEO_VPProfileAdvanced;
 
+        mHardwareExtractor->updateCodecSpecificData(NULL, 0, mMIME);
         status_t err = mOMX->setParameter(mNode,
                           (OMX_INDEXTYPE)OMX_QcomIndexParamVideoVp,
                           &paramVp, sizeof(paramVp));
@@ -585,6 +588,16 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         bool success = meta->findInt32(kKeyWidth, &width);
         success = success && meta->findInt32(kKeyHeight, &height);
         CHECK(success);
+        LOGV("height %d and width %d\n",height,width);
+        if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_VP6, mMIME))
+        {
+           /*Checking the Height and Width , HW Supports  FWVGA (854 x 480) at max*/
+           if(width > 854 || height > 480)
+           {
+               LOGE("Unsupported resolutions(%d X %d) max Supported FWVGA",width,height);
+               return BAD_VALUE;
+           }
+        }
 
         if (mThumbnailMode) {
             LOGV("Enabling thumbnail mode.");
@@ -779,7 +792,7 @@ void OMXCodec::setVideoInputFormat(
         compressionFormat = OMX_VIDEO_CodingMPEG4;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_H263, mime)) {
         compressionFormat = OMX_VIDEO_CodingH263;
-    } else {
+   }  else {
         LOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
     }
@@ -1012,11 +1025,11 @@ status_t OMXCodec::setVideoOutputFormat(
         compressionFormat = OMX_VIDEO_CodingMPEG4;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_H263, mime)) {
         compressionFormat = OMX_VIDEO_CodingH263;
-    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mime)){
+    }else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mime)){
         compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingSpark;
-    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_VP6, mime)){
+   } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_VP6, mime)){
         compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingVp;
-    } else {
+   } else {
         LOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
     }
@@ -1173,7 +1186,8 @@ OMXCodec::OMXCodec(
       mThumbnailMode(false),
       mLeftOverBuffer(NULL),
       mPmemInfo(NULL),
-      mInterlaceFormatDetected(false) {
+      mInterlaceFormatDetected(false),
+      mHardwareExtractor(NULL) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
@@ -1276,6 +1290,11 @@ status_t OMXCodec::init() {
     CHECK_EQ(mState, LOADED);
 
     status_t err;
+    if(!mOMXLivesLocally && false == mHardwareExtractor->canHWSupportThisInst()) {
+      LOGE("Hardware cannot suport this instance");
+      return ERROR;
+    }
+
     if (!(mQuirks & kRequiresLoadedToIdleAfterAllocation)) {
         err = mOMX->sendCommand(mNode, OMX_CommandStateSet, OMX_StateIdle);
         CHECK_EQ(err, OK);

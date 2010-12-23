@@ -41,7 +41,8 @@ LOCAL_SRC_FILES +=                \
         TimeSource.cpp            \
         TimedEventQueue.cpp       \
         WAVExtractor.cpp          \
-        string.cpp
+        string.cpp                \
+        HardwareExtractor.cpp
 
 LOCAL_CFLAGS += -DBUILD_WITH_FULL_STAGEFRIGHT
 endif
@@ -100,6 +101,11 @@ endif
 
 ifeq ($(TARGET_OS)-$(TARGET_SIMULATOR),linux-true)
         LOCAL_LDLIBS += -lpthread
+endif
+
+
+ifneq (, $(filter qsd8250_ffa qsd8250_surf qsd8650a_st1x, $(QCOM_TARGET_PRODUCT)))
+LOCAL_CFLAGS += -DHW_8x50
 endif
 
 LOCAL_CFLAGS += -Wno-multichar
