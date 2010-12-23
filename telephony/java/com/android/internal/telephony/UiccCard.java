@@ -45,6 +45,8 @@ public class UiccCard extends Handler{
     private int[] mSubscription3gpp2AppIndex;    /* value < RIL_CARD_MAX_APPS */
     private RegistrantList mUnavailableRegistrants = new RegistrantList();
     private RegistrantList mAbsentRegistrants = new RegistrantList();
+    private RegistrantList mErrorRegistrants = new RegistrantList();
+
     private boolean mDestroyed = false; //set to true once this card is commanded to be disposed of.
     private Context mContext;
     private CommandsInterface mCi;
@@ -79,8 +81,10 @@ public class UiccCard extends Handler{
             Log.e(mLogTag, "Updated after destroyed! Fix me!");
             return;
         }
-        //TODO: Fusion - If state changed - notify registrants
-        mCardState = ics.card_state;
+        if (mCardState != ics.card_state) {
+            mCardState = ics.card_state;
+            notifyCardStatesRegistrants();
+        }
         mUniversalPinState = ics.universal_pin_state;
         mSubscription3gppAppIndex = ics.subscription_3gpp_app_index;
         mSubscription3gpp2AppIndex = ics.subscription_3gpp2_app_index;
@@ -198,6 +202,23 @@ public class UiccCard extends Handler{
         mAbsentRegistrants.remove(h);
     }
 
+    /**
+     * Notifies handler of any transition into State.ERROR
+     */
+    public void registerForError(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+
+        mErrorRegistrants.add(r);
+
+        if (getCardState() == CardState.ERROR) {
+            r.notifyRegistrant();
+        }
+    }
+
+    public void unregisterForError(Handler h) {
+        mErrorRegistrants.remove(h);
+    }
+
 
     /**
      * Returns service provider name stored in ICC card.
@@ -225,6 +246,17 @@ public class UiccCard extends Handler{
             }
         }
         return false;
+    }
+
+    private void notifyCardStatesRegistrants() {
+        switch (mCardState) {
+            case ABSENT:
+                mAbsentRegistrants.notifyRegistrants();
+                break;
+            case ERROR:
+                mErrorRegistrants.notifyRegistrants();
+                break;
+        }
     }
 
     private void log(String msg) {
