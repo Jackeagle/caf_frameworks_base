@@ -1680,20 +1680,15 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
         return err;
     }
 
-    CODEC_LOGI("allocating %lu buffers of size %lu on %s port",
-            def.nBufferCountActual, def.nBufferSize,
-            portIndex == kPortIndexInput ? "input" : "output");
-
-    size_t totalSize = def.nBufferCountActual * ((def.nBufferSize + 31) & (~31));
-    mDealer[portIndex] = new MemoryDealer(totalSize, "OMXCodec");
-
     sp<IMemoryHeap> pFrameHeap = NULL;
     size_t alignedSize = 0;
     size_t size = 0;
-    if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames))
+    if (mIsEncoder && (portIndex == kPortIndexInput) &&
+        (mQuirks & kAvoidMemcopyInputRecordingFrames))
     {
         sp<IMemory> pFrame = NULL;
         ssize_t offset = 0;
+        size_t nBuffers = 0;
 
         mSource->getBufferInfo(pFrame, &alignedSize);
         if( pFrame == NULL )
@@ -1702,8 +1697,31 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
             exit(0);
         }
         pFrameHeap = pFrame->getMemory(&offset, &size);
+        nBuffers = pFrameHeap->getSize( )/alignedSize;
+
+        //update OMX with new buffer count.
+        if( nBuffers < def.nBufferCountMin || size < def.nBufferSize ) {
+            LOGE("Buffer count/size less than minimum required");
+            return UNKNOWN_ERROR;
+        }
+
+        def.nBufferCountActual = nBuffers;
+
+        status_t err = mOMX->setParameter(
+                mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+
+        if (err != OK) {
+            LOGE("Updating buffer count failed");
+            return err;
+        }
     }
 
+    CODEC_LOGI("allocating %lu buffers of size %lu on %s port",
+            def.nBufferCountActual, def.nBufferSize,
+            portIndex == kPortIndexInput ? "input" : "output");
+
+    size_t totalSize = def.nBufferCountActual * ((def.nBufferSize + 31) & (~31));
+    mDealer[portIndex] = new MemoryDealer(totalSize, "OMXCodec");
 
     for (OMX_U32 i = 0; i < def.nBufferCountActual; ++i) {
         sp<IMemory> mem = mDealer[portIndex]->allocate(def.nBufferSize);
