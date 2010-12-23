@@ -160,8 +160,6 @@ class HDMIService extends IHDMIService.Stub {
     }
 
     public boolean isHDMIConnected() {
-        if (mListener == null)
-            return false;
         return mListener.isHDMIConnected();
     }
 
@@ -170,23 +168,13 @@ class HDMIService extends IHDMIService.Stub {
             "HDMI_USEROPTION", enableHDMI ? "HDMI_ON" : "HDMI_OFF");
         mHDMIUserOption = enableHDMI;
 
-        if (mListener != null){
-            if(enableHDMI && isHDMIConnected()){
-                /* HDMI Cable is connected, broadcast cable connected */
-                broadcastEvent(HDMIONEvent, mHDMIModes);
-                broadcastEvent(HDMICableConnectedEvent);
-            }
-            else
+        synchronized(mListener) {
+            if(enableHDMI == false) {
+                mListener.enableHDMIOutput(false);
                 broadcastEvent(HDMIOFFEvent);
-            mListener.enableHDMIOutput(enableHDMI);
-
-            if (enableHDMI) {
-                /* NOTE: this can be done from the UI, the 'changeDisplayMode'
-                 * can be called at any point to dynamically switch the display
-                 * mode to any other supported mode. */
-                int mode = getBestMode();
-                mListener.changeDisplayMode(mode);
+                broadcastEvent(HDMICableDisconnectedEvent);
             }
+            mListener.setHPD(getHDMIUserOption());
         }
     }
 
@@ -220,27 +208,25 @@ class HDMIService extends IHDMIService.Stub {
     public void notifyHDMIConnected(int[] modes) {
         mHDMIModes = modes;
         broadcastEvent(HDMICableConnectedEvent);
-        if (getHDMIUserOption()) {
-            Log.d(TAG, "notifyHDMIConnected ... Broadcasting On" );
+        if(getHDMIUserOption()) {
             broadcastEvent(HDMIONEvent, mHDMIModes);
-            mListener.enableHDMIOutput(true);
-            mListener.enableHDMIMirroring(true);
-
-            /* NOTE: this can be done from the UI, the 'changeDisplayMode'
-             * can be called at any point to dynamically switch the display
-             * mode to any other supported mode. */
-            int mode = getBestMode();
-            mListener.changeDisplayMode(mode);
+            synchronized(mListener) {
+                mListener.enableHDMIOutput(true);
+                mListener.changeDisplayMode(getBestMode());
+            }
         }
     }
 
     public void notifyHDMIDisconnected() {
-         mHDMIModes = null;
-         broadcastEvent(HDMICableDisconnectedEvent);
-         if (getHDMIUserOption()){
-            Log.d(TAG, "notifyHDMIDisconnected ... Broadcasting Off" );
+        mHDMIModes = null;
+        broadcastEvent(HDMICableDisconnectedEvent);
+        if(getHDMIUserOption()) {
             broadcastEvent(HDMIOFFEvent);
-            mListener.enableHDMIMirroring(false);
-         }
+            synchronized(mListener) {
+                mListener.enableHDMIOutput(false);
+                mListener.setHPD(getHDMIUserOption());
+            }
+        }
+
     }
 }
