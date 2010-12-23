@@ -519,5 +519,11 @@ interface ITelephony {
      * @return subscription id
      */
     int getPreferredDataSubscription();
+
+    /*
+     * Set user prefered data subscription
+     * @return true if success
+     */
+    boolean setPreferredDataSubscription(int subscription);
 }
 

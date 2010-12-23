@@ -474,6 +474,23 @@ public class TelephonyManager {
     }
 
     /**
+     * Sets the designated data subscription.
+     *
+     * @hide
+     */
+    public static boolean setPreferredDataSubscription(int subscription) {
+        ITelephony iTelephony = null;
+        try {
+            iTelephony = ITelephony.Stub.asInterface(ServiceManager.getService(Context.TELEPHONY_SERVICE));
+            return iTelephony.setPreferredDataSubscription(subscription);
+        } catch (RemoteException ex) {
+            return false;
+        } catch (NullPointerException ex) {
+            return false;
+        }
+    }
+
+    /**
      * Returns the preferred voice subscription.
      *
      * @hide
