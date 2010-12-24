@@ -151,6 +151,13 @@ public class PhoneSubInfoProxy extends IPhoneSubInfo.Stub {
     }
 
     /**
+     * Retrieves the complete voice mail number on the specified subscription
+     */
+    public String getCompleteVoiceMailNumberOnSubscription(int subscription) {
+        return getPhoneSubInfo(subscription).getCompleteVoiceMailNumber();
+    }
+
+    /**
      * Retrieves the alpha identifier associated with the voice mail number.
      */
     public String getVoiceMailAlphaTag() {

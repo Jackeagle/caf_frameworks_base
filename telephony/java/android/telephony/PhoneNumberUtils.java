@@ -129,6 +129,7 @@ public class PhoneNumberUtils
 
         Uri uri = intent.getData();
         String scheme = uri.getScheme();
+        int subscription = intent.getIntExtra("subId",0);
 
         if (scheme.equals("tel")) {
             return uri.getSchemeSpecificPart();
@@ -137,7 +138,7 @@ public class PhoneNumberUtils
         // TODO: We don't check for SecurityException here (requires
         // CALL_PRIVILEGED permission).
         if (scheme.equals("voicemail")) {
-            return TelephonyManager.getDefault().getCompleteVoiceMailNumber();
+            return TelephonyManager.getDefault().getCompleteVoiceMailNumber(subscription);
         }
 
         if (context == null) {

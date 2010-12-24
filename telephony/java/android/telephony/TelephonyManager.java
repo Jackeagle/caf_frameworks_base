@@ -1192,6 +1192,25 @@ public class TelephonyManager {
     }
 
     /**
+     * Returns the complete voice mail number on specified subscription. Return null if it is unavailable.
+     * <p>
+     * Requires Permission:
+     * {@link android.Manifest.permission#CALL_PRIVILEGED CALL_PRIVILEGED}
+     *
+     * @hide
+     */
+     public String getCompleteVoiceMailNumber(int subscription) {
+         try {
+             return getSubscriberInfo().getCompleteVoiceMailNumberOnSubscription(subscription);
+         } catch (RemoteException ex) {
+             return null;
+         } catch (NullPointerException ex) {
+             // This could happen before phone restarts due to crashing
+             return null;
+         }
+     }
+
+    /**
      * Returns the voice mail count. Return 0 if unavailable.
      * <p>
      * Requires Permission:
