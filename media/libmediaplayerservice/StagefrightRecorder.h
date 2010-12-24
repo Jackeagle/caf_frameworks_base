@@ -100,6 +100,8 @@ private:
 
     MediaProfiles *mEncoderProfiles;
 
+    bool mDisableAudio;
+
     status_t startMPEG4Recording();
     status_t startAMRRecording();
     status_t startAACRecording();
