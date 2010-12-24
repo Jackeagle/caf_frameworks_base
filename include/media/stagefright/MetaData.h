@@ -104,11 +104,19 @@ enum {
 
     kKeyIsUnreadable      = 'unre',  // bool (int32_t)
     kKeyRawCodecSpecificData = 'rcsd',  // raw data - added to support mmParser
+    kKeyDivXVersion       = 'DivX',  // int32_t
 };
 
 enum {
     kTypeESDS        = 'esds',
     kTypeAVCC        = 'avcc',
+};
+
+enum {
+    kTypeDivXVer_3_11,
+    kTypeDivXVer_4,
+    kTypeDivXVer_5,
+    kTypeDivXVer_6,
 };
 
 class MetaData : public RefBase {

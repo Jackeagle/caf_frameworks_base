@@ -672,10 +672,42 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         }
     }
 
+    if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mMIME)) {
+        LOGV("Setting the QOMX_VIDEO_PARAM_DIVXTYPE params ");
+        QOMX_VIDEO_PARAM_DIVXTYPE paramDivX;
+        InitOMXParams(&paramDivX);
+        paramDivX.nPortIndex = mIsEncoder ? kPortIndexOutput : kPortIndexInput;
+        int32_t DivxVersion = 0;
+        CHECK(meta->findInt32(kKeyDivXVersion,&DivxVersion));
+        CODEC_LOGV("Divx Version Type %d\n",DivxVersion);
+
+        if(DivxVersion == kTypeDivXVer_3_11 ){
+            paramDivX.eFormat = QOMX_VIDEO_DIVXFormat311;
+        } else if(DivxVersion == kTypeDivXVer_4) {
+            paramDivX.eFormat = QOMX_VIDEO_DIVXFormat4;
+        } else if(DivxVersion == kTypeDivXVer_5) {
+            paramDivX.eFormat = QOMX_VIDEO_DIVXFormat5;
+        } else if(DivxVersion == kTypeDivXVer_6) {
+            paramDivX.eFormat = QOMX_VIDEO_DIVXFormat6;
+        } else {
+            paramDivX.eFormat = QOMX_VIDEO_DIVXFormatUnused;
+        }
+
+        paramDivX.eProfile = (QOMX_VIDEO_DIVXPROFILETYPE)0;//Not used for now.
+
+        status_t err =  mOMX->setParameter(mNode,
+                         (OMX_INDEXTYPE)OMX_QcomIndexParamVideoDivx,
+                         &paramDivX, sizeof(paramDivX));
+        if(err!=OK) {
+            return err;
+        }
+    }
+
     int32_t bitRate = 0;
     if (mIsEncoder) {
         CHECK(meta->findInt32(kKeyBitRate, &bitRate));
     }
+
     if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_AMR_NB, mMIME)) {
         setAMRFormat(false /* isWAMR */, bitRate);
     }
