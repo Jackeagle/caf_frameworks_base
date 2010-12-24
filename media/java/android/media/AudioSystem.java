@@ -45,14 +45,15 @@ public class AudioSystem
     public static final int STREAM_NOTIFICATION = 5;
     /* @hide The audio stream for phone calls when connected on bluetooth */
     public static final int STREAM_BLUETOOTH_SCO = 6;
-    /* @hide The audio stream for enforced system sounds in certain countries (e.g camera in Japan) */
-    public static final int STREAM_SYSTEM_ENFORCED = 7;
+    /* @hide The audio stream for FM */
+    public static final int STREAM_FM = 7;
     /* @hide The audio stream for DTMF tones */
     public static final int STREAM_DTMF = 8;
     /* @hide The audio stream for text to speech (TTS) */
     public static final int STREAM_TTS = 9;
-    /* @hide The audio stream for FM */
-    public static final int STREAM_FM = 10;
+    /* @hide The audio stream for enforced system sounds in certain countries (e.g camera in Japan) */
+    public static final int STREAM_SYSTEM_ENFORCED = 10;
+
     /**
      * @deprecated Use {@link #numStreamTypes() instead}
      */
