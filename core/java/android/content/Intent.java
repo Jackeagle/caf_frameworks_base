@@ -513,6 +513,7 @@ import java.util.Set;
  *     <li> {@link #ACTION_POWER_CONNECTED}
  *     <li> {@link #ACTION_POWER_DISCONNECTED}
  *     <li> {@link #ACTION_SHUTDOWN}
+ *     <li> {@link #ACTION_CAMERA_PIC_FORMAT}
  * </ul>
  *
  * <h3>Standard Categories</h3>
@@ -1538,6 +1539,14 @@ public class Intent implements Parcelable, Cloneable {
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_SHUTDOWN = "android.intent.action.ACTION_SHUTDOWN";
+
+   /**
+     * Broadcast Action: Camera picture format settigs has changed (jpeg/raw).
+     * This intent is broacasted when the camera format settings are changed.
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_CAMERA_PIC_FORMAT = "android.intent.action.PIC_FORMAT";
+
     /**
      * Activity Action:  Start this activity to request system shutdown.
      * The optional boolean extra field {@link #EXTRA_KEY_CONFIRM} can be set to true
