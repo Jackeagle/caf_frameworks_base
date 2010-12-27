@@ -136,7 +136,13 @@ status_t MetadataRetrieverClient::setDataSource(const char *url)
     if (url == NULL) {
         return UNKNOWN_ERROR;
     }
-    player_type playerType = getPlayerType(url);
+    player_type playerType;
+    char value[PROPERTY_VALUE_MAX];
+    if (!property_get("ro.product.device", value, "1")
+        || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa"))
+    playerType = PV_PLAYER;
+    else
+    playerType = getPlayerType(url);
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
     if (p == NULL) return NO_INIT;
@@ -173,8 +179,13 @@ status_t MetadataRetrieverClient::setDataSource(int fd, int64_t offset, int64_t 
         length = sb.st_size - offset;
         LOGV("calculated length = %lld", length);
     }
-
-    player_type playerType = getPlayerType(fd, offset, length);
+    player_type playerType;
+    char value[PROPERTY_VALUE_MAX];
+    if (!property_get("ro.product.device", value, "1")
+        || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa"))
+    playerType = PV_PLAYER;
+    else
+    playerType = getPlayerType(fd, offset, length);
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
     if (p == NULL) {
