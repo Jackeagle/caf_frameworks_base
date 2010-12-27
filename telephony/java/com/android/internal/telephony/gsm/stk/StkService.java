@@ -855,8 +855,13 @@ public class StkService extends Handler implements AppInterface {
                     mCurrntCmd = null;
                     return;
                 case SET_UP_EVENT_LIST:
-                    eventDownload(resMsg.eventValue, DEV_ID_DISPLAY, DEV_ID_UICC,
-                            resMsg.addedInfo, false);
+                    if (IDLE_SCREEN_AVAILABLE_EVENT == resMsg.eventValue) {
+                        eventDownload(resMsg.eventValue, DEV_ID_DISPLAY, DEV_ID_UICC,
+                                resMsg.addedInfo, false);
+                    } else {
+                        eventDownload(resMsg.eventValue, DEV_ID_TERMINAL, DEV_ID_UICC,
+                                resMsg.addedInfo, false);
+                    }
                     // No need to send the terminal response after event download.
                     mCurrntCmd = null;
                     return;
