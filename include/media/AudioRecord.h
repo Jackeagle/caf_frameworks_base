@@ -381,6 +381,7 @@ private:
     uint32_t                mFlags;
     uint32_t                mChannels;
     audio_io_handle_t       mInput;
+    bool                    mFirstread;
     int                     mSessionId;
 };
 
