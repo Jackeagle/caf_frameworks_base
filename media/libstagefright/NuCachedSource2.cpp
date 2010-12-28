@@ -438,10 +438,11 @@ ssize_t NuCachedSource2::readInternal(off64_t offset, void *data, size_t size) {
             return mFinalStatus;
         }
 
-        size_t avail = mCache->totalSize() - delta;
-        mCache->copy(delta, data, avail);
-
-        return avail;
+        if(mFinalStatus != ERROR_END_OF_STREAM) {
+            size_t avail = mCache->totalSize() - delta;
+            mCache->copy(delta, data, avail);
+            return avail;
+        }
     }
 
     if (offset + size <= mCacheOffset + mCache->totalSize()) {
