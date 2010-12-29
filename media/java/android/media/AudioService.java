@@ -309,6 +309,7 @@ public class AudioService extends IAudioService.Stub {
         intentFilter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         intentFilter.addAction("HDMI_CONNECTED");
         intentFilter.addAction("HDMI_DISCONNECTED");
+        intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
         intentFilter.addAction(Intent.ACTION_FM);
         context.registerReceiver(mReceiver, intentFilter);
 
