@@ -49,13 +49,14 @@ public class MediaFile {
     public static final int FILE_TYPE_MKA     = 9;
     public static final int FILE_TYPE_3GPA    = 10;
     public static final int FILE_TYPE_AC3     = 11;
+    public static final int FILE_TYPE_QCP     = 12;
     private static final int FIRST_AUDIO_FILE_TYPE = FILE_TYPE_MP3;
-    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_AC3;
+    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_QCP;
 
     // MIDI file types
-    public static final int FILE_TYPE_MID     = 12;
-    public static final int FILE_TYPE_SMF     = 13;
-    public static final int FILE_TYPE_IMY     = 14;
+    public static final int FILE_TYPE_MID     = 13;
+    public static final int FILE_TYPE_SMF     = 14;
+    public static final int FILE_TYPE_IMY     = 15;
     private static final int FIRST_MIDI_FILE_TYPE = FILE_TYPE_MID;
     private static final int LAST_MIDI_FILE_TYPE = FILE_TYPE_IMY;
    
@@ -138,6 +139,7 @@ public class MediaFile {
         if (isWMAEnabled()) {
             addFileType("WMA", FILE_TYPE_WMA, "audio/x-ms-wma");
         }
+        addFileType("QCP", FILE_TYPE_QCP, "audio/qcp");
         addFileType("OGG", FILE_TYPE_OGG, "application/ogg");
         addFileType("OGA", FILE_TYPE_OGG, "application/ogg");
         addFileType("AAC", FILE_TYPE_AAC, "audio/aac");
