@@ -182,18 +182,20 @@ status_t AudioRecord::set(
     // Change for Codec type
     int frameSizeInBytes = 0;
     if (format == AudioSystem::AMR_NB) {
-        frameSizeInBytes = channelCount * 32; // Full rate framesize
+      frameSizeInBytes = channelCount * 32; // Full rate framesize
     } else if (format == AudioSystem::EVRC) {
-        frameSizeInBytes = channelCount * 23; // Full rate framesize
+      frameSizeInBytes = channelCount * 23; // Full rate framesize
     } else if (format == AudioSystem::QCELP) {
-        frameSizeInBytes = channelCount * 35; // Full rate framesize
+      frameSizeInBytes = channelCount * 35; // Full rate framesize
+    } else if (format == AudioSystem::AAC) {
+      frameSizeInBytes = 2048;
     } else if ((format == AudioSystem::PCM_16_BIT) || (format == AudioSystem::PCM_8_BIT)) {
-               if (AudioSystem::isLinearPCM(format)) {
-                   frameSizeInBytes = channelCount * (format == AudioSystem::PCM_16_BIT ? sizeof(int16_t) : sizeof(int8_t));
-               } else {
-                  frameSizeInBytes = sizeof(int8_t);
-               }
-               mFirstread = true;
+      if (AudioSystem::isLinearPCM(format)) {
+        frameSizeInBytes = channelCount * (format == AudioSystem::PCM_16_BIT ? sizeof(int16_t) : sizeof(int8_t));
+      } else {
+        frameSizeInBytes = sizeof(int8_t);
+      }
+      mFirstread = true;
     }
 
     // We use 2* size of input buffer for ping pong use of record buffer.
@@ -287,6 +289,10 @@ int AudioRecord::frameSize() const
         return channelCount() * 23; // Full rate framesize
     } else if (format() == AudioSystem::QCELP) {
         return channelCount() * 35; // Full rate framesize
+    } else if (format() == AudioSystem::AAC) {
+        // Not actual framsize but for variable frame rate AAC encoding,
+        // buffer size is treated as a frame size
+        return 2048;
     }
     if (AudioSystem::isLinearPCM(mFormat)) {
         return channelCount()*((format() == AudioSystem::PCM_8_BIT) ? sizeof(uint8_t) : sizeof(int16_t));
@@ -567,10 +573,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     audioBuffer->channelCount= mChannelCount;
     audioBuffer->format      = mFormat;
     audioBuffer->frameCount  = framesReq;
-    if (framesReq >= 10)
-        audioBuffer->size        = framesReq*cblk->frameSize;
-    else
-        audioBuffer->size = 0;
+    audioBuffer->size        = framesReq*cblk->frameSize;
     audioBuffer->raw         = (int8_t*)cblk->buffer(u);
     active = mActive;
     return active ? status_t(NO_ERROR) : status_t(STOPPED);

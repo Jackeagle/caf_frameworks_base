@@ -361,7 +361,7 @@ private:
     uint32_t                mFrameCount;
 
     audio_track_cblk_t*     mCblk;
-    uint8_t                 mFormat;
+    int32_t                 mFormat;
     uint8_t                 mChannelCount;
     uint8_t                 mInputSource;
     uint8_t                 mReserved;

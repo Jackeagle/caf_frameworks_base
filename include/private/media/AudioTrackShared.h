@@ -74,7 +74,8 @@ struct audio_track_cblk_t
                 // 8 bit PCM data: in this case,  mCblk->frameSize is based on a sample size of
                 // 16 bit because data is converted to 16 bit before being stored in buffer
 
-                uint8_t     frameSize;
+                uint32_t    frameSize;
+                uint8_t     padding;
                 uint8_t     channelCount;
                 uint16_t    flags;
 
