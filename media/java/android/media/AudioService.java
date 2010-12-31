@@ -449,12 +449,6 @@ public class AudioService extends IAudioService.Stub {
         // If stream is muted, adjust last audible index only
         int index;
         if (streamState.muteCount() != 0) {
-            if (adjustVolume) {
-                streamState.adjustLastAudibleIndex(direction);
-                // Post a persist volume msg
-                sendMsg(mAudioHandler, MSG_PERSIST_VOLUME, streamType,
-                        SENDMSG_REPLACE, 0, 1, streamState, PERSIST_DELAY);
-            }
             index = streamState.mLastAudibleIndex;
         } else {
             if (adjustVolume && streamState.adjustIndex(direction)) {

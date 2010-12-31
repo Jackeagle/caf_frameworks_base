@@ -624,7 +624,7 @@ bool AudioFlinger::isStreamActive(int stream) const
             return true;
         }
     }
-    if (mFmOn) {
+    if (mFmOn && stream == AudioSystem::FM) {
         return true;
     }
     return false;
