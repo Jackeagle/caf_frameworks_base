@@ -70,18 +70,47 @@ enum DataServiceType {
     }
 
     /*
+     * Check if THIS service has the same Android Configured DEFAULT priority
+     * as the service specified (ds)
+     */
+    public boolean isEqualDefaultPriority(DataServiceType ds) {
+        return getServicePriorityFromProperty() == ds.getServicePriorityFromProperty();
+    }
+
+    /*
      * Check if THIS service has a higher priority than the service specified
      * (ds)
      */
     public boolean isHigherPriorityThan(DataServiceType ds) {
-        return priority > ds.priority;
+        if (isEqualPriority(ds))
+            return getServicePriorityFromProperty() > ds.getServicePriorityFromProperty();
+        else
+            return priority > ds.priority;
+    }
+
+    /*
+     * Check if THIS service has a higher Android Configured DEFAULT priority
+     * than the service specified (ds)
+     */
+    public boolean isHigherDefaultPriorityThan(DataServiceType ds) {
+        return getServicePriorityFromProperty() > ds.getServicePriorityFromProperty();
     }
 
     /* Check if THIS service has a lower priority than the service specified
      * (ds)
      */
     public boolean isLowerPriorityThan(DataServiceType ds) {
-        return priority < ds.priority;
+        if (isEqualPriority(ds))
+            return getServicePriorityFromProperty() < ds.getServicePriorityFromProperty();
+        else
+            return priority < ds.priority;
+    }
+
+    /* Check if THIS service has a lower Andriod Configured DEFAULT priority
+     * than the service specified (ds)
+     */
+    public boolean isLowerDefaultPriorityThan(DataServiceType ds) {
+        return getServicePriorityFromProperty() < ds.getServicePriorityFromProperty();
     }
 
     public void setPriority(int priority) {
@@ -128,7 +157,15 @@ enum DataServiceType {
     private static class ServicePriorityComparator implements Comparator<DataServiceType>
     {
         public int compare(DataServiceType ds1, DataServiceType ds2) {
-            return ds2.priority - ds1.priority; //descending
+           int secondPriority = ds2.priority;
+           int firstPriority = ds1.priority;
+
+           // if the priorities are equal, compare their default configured priorities
+           if (secondPriority == firstPriority) {
+              secondPriority = ds2.getServicePriorityFromProperty();
+              firstPriority = ds1.getServicePriorityFromProperty();
+           }
+            return secondPriority - firstPriority; //descending
         }
     };
 

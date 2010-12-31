@@ -971,29 +971,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     /* disconnect exactly one data call whose priority is lower than serviceType
-     * In OMH scenario disconnect one data call whose priority is lower than or
-     * equal to the serviceType.
      */
     private boolean disconnectOneLowPriorityDataCall(DataServiceType serviceType, String reason) {
         for (DataServiceType ds : DataServiceType.values()) {
-            /* In OMH case, disconnect a call whose priority is lower than (or)
-             *  equal to the serviceType. In the case of OMH two service types
-             *  of same priority , we consider the existing serviceType to be
-             *  lower in priority when compared to the newly requested
-             *  service type.
-             */
-            boolean arbitrationCheck = false;
-
-            if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
-                if(serviceType != ds) {
-                    /* arbitration needed */
-                    arbitrationCheck = (ds.isLowerPriorityThan(serviceType) || ds.isEqualPriority(serviceType));
-                }
-            } else {
-                    arbitrationCheck = ds.isLowerPriorityThan(serviceType);
-            }
-
-            if ( arbitrationCheck && mDpt.isServiceTypeEnabled(ds)
+            if (ds.isLowerPriorityThan(serviceType) && mDpt.isServiceTypeEnabled(ds)
                     && mDpt.isServiceTypeActive(ds)) {
                 // we are clueless as to whether IPV4/IPV6 are on same network PDP or
                 // different, so disconnect both.
