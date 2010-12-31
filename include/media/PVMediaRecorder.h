@@ -62,7 +62,6 @@ private:
 
     PVMediaRecorder(const PVMediaRecorder &);
     PVMediaRecorder &operator=(const PVMediaRecorder &);
-    int mOutputFd;
 };
 
 }; // namespace android
