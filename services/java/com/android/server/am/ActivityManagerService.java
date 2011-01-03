@@ -3678,9 +3678,11 @@ public final class ActivityManagerService extends ActivityManagerNative
                 String[] pkgs = intent.getStringArrayExtra(Intent.EXTRA_PACKAGES);
                 if (pkgs != null) {
                     for (String pkg : pkgs) {
-                        if (forceStopPackageLocked(pkg, -1, false, false, false)) {
-                            setResultCode(Activity.RESULT_OK);
-                            return;
+                        synchronized (ActivityManagerService.this) {
+                         if (forceStopPackageLocked(pkg, -1, false, false, false)) {
+                             setResultCode(Activity.RESULT_OK);
+                             return;
+                         }
                         }
                     }
                 }
@@ -9092,6 +9094,14 @@ public final class ActivityManagerService extends ActivityManagerNative
         } else {
             if (DEBUG_SERVICE) Slog.v(
                 TAG, "Removed service that is not running: " + r);
+        }
+
+        if (r.bindings.size() > 0) {
+            r.bindings.clear();
+        }
+
+        if (r.restarter instanceof ServiceRestarter) {
+           ((ServiceRestarter)r.restarter).setService(null);
         }
     }
 
