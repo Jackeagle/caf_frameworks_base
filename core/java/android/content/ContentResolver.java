@@ -1396,7 +1396,7 @@ public abstract class ContentResolver {
         protected void finalize() throws Throwable {
             try {
                 if(!mCloseFlag) {
-                    ContentResolver.this.releaseProvider(mContentProvider);
+                    this.close();
                 }
             } finally {
                 super.finalize();
