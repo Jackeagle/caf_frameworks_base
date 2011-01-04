@@ -50,7 +50,6 @@ public class UiccCardApplication {
     protected boolean mDbg;
 
     private UiccCard mUiccCard; //parent
-    private int mSlotId; //Icc slot number of the Icc this app resides on
     private AppState      mAppState;
     private AppType       mAppType;
     private PersoSubState mPersoSubState;
@@ -80,7 +79,6 @@ public class UiccCardApplication {
 
     UiccCardApplication(UiccCard uiccCard, UiccCardStatusResponse.CardStatus.AppStatus as, UiccRecords ur, Context c, CommandsInterface ci) {
         Log.d(mLogTag, "Creating UiccApp: " + as);
-        mSlotId = uiccCard.getSlotId();
         mUiccCard = uiccCard;
         mAppState = as.app_state;
         mAppType = as.app_type;
@@ -156,13 +154,13 @@ public class UiccCardApplication {
     private IccFileHandler createUiccFileHandler(AppType type) {
         switch (type) {
             case APPTYPE_SIM:
-                return new SIMFileHandler(this, mSlotId, mAid, mCi);
+                return new SIMFileHandler(this, mAid, mCi);
             case APPTYPE_RUIM:
-                return new RuimFileHandler(this, mSlotId, mAid, mCi);
+                return new RuimFileHandler(this, mAid, mCi);
             case APPTYPE_USIM:
-                return new UsimFileHandler(this, mSlotId, mAid, mCi);
+                return new UsimFileHandler(this, mAid, mCi);
             case APPTYPE_CSIM:
-                return new CsimFileHandler(this, mSlotId, mAid, mCi);
+                return new CsimFileHandler(this, mAid, mCi);
             default:
                 return null;
         }
@@ -403,21 +401,21 @@ public class UiccCardApplication {
      */
 
     public void supplyPin (String pin, Message onComplete) {
-        mCi.supplyIccPin(mSlotId, mAid, pin, mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
+        mCi.supplyIccPin(mAid, pin, mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
     }
 
     public void supplyPuk (String puk, String newPin, Message onComplete) {
-        mCi.supplyIccPuk(mSlotId, mAid, puk, newPin,
+        mCi.supplyIccPuk(mAid, puk, newPin,
                 mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
     }
 
     public void supplyPin2 (String pin2, Message onComplete) {
-        mCi.supplyIccPin2(mSlotId, mAid, pin2,
+        mCi.supplyIccPin2(mAid, pin2,
                 mHandler.obtainMessage(EVENT_PIN2PUK2_DONE, onComplete));
     }
 
     public void supplyPuk2 (String puk2, String newPin2, Message onComplete) {
-        mCi.supplyIccPuk2(mSlotId, mAid, puk2, newPin2,
+        mCi.supplyIccPuk2(mAid, puk2, newPin2,
                 mHandler.obtainMessage(EVENT_PIN2PUK2_DONE, onComplete));
     }
 
@@ -488,7 +486,7 @@ public class UiccCardApplication {
                  CommandsInterface.SERVICE_CLASS_DATA +
                  CommandsInterface.SERVICE_CLASS_FAX;
 
-         mCi.setFacilityLock(mSlotId, mAid, CommandsInterface.CB_FACILITY_BA_SIM,
+         mCi.setFacilityLock(mAid, CommandsInterface.CB_FACILITY_BA_SIM,
                  enabled, password, serviceClassX,
                  mHandler.obtainMessage(EVENT_CHANGE_FACILITY_LOCK_DONE, onComplete));
      }
@@ -513,7 +511,7 @@ public class UiccCardApplication {
                  CommandsInterface.SERVICE_CLASS_FAX +
                  CommandsInterface.SERVICE_CLASS_SMS;
 
-         mCi.setFacilityLock(mSlotId, mAid, CommandsInterface.CB_FACILITY_BA_FD,
+         mCi.setFacilityLock(mAid, CommandsInterface.CB_FACILITY_BA_FD,
                  enabled, password, serviceClassX,
                  mHandler.obtainMessage(EVENT_CHANGE_FACILITY_FDN_DONE, onComplete));
      }
@@ -532,7 +530,7 @@ public class UiccCardApplication {
      public void changeIccLockPassword(String oldPassword, String newPassword,
              Message onComplete) {
          if(mDbg) log("Change Pin1 old: " + oldPassword + " new: " + newPassword);
-         mCi.changeIccPin(mSlotId, mAid, oldPassword, newPassword,
+         mCi.changeIccPin(mAid, oldPassword, newPassword,
                  mHandler.obtainMessage(EVENT_CHANGE_PIN1_DONE, onComplete));
 
      }
@@ -551,7 +549,7 @@ public class UiccCardApplication {
      public void changeIccFdnPassword(String oldPassword, String newPassword,
              Message onComplete) {
          if(mDbg) log("Change Pin2 old: " + oldPassword + " new: " + newPassword);
-         mCi.changeIccPin2(mSlotId, mAid, oldPassword, newPassword,
+         mCi.changeIccPin2(mAid, oldPassword, newPassword,
                  mHandler.obtainMessage(EVENT_CHANGE_PIN2_DONE, onComplete));
 
      }
@@ -582,7 +580,7 @@ public class UiccCardApplication {
         serviceClassX = CommandsInterface.SERVICE_CLASS_VOICE +
                         CommandsInterface.SERVICE_CLASS_DATA +
                         CommandsInterface.SERVICE_CLASS_FAX;
-        mCi.queryFacilityLock (mSlotId, mAid,
+        mCi.queryFacilityLock (mAid,
                 CommandsInterface.CB_FACILITY_BA_FD, "", serviceClassX,
                 mHandler.obtainMessage(EVENT_QUERY_FACILITY_FDN_DONE));
     }

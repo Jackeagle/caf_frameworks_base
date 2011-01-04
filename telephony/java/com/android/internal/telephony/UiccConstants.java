@@ -80,7 +80,6 @@ public class UiccConstants {
         PINSTATE_ENABLED_PERM_BLOCKED
     }
 
-    static final int RIL_MAX_CARDS = 2;
     static final int RIL_CARD_MAX_APPS = 8;
 
 }

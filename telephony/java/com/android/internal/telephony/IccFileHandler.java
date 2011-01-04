@@ -95,7 +95,6 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
      // member variables
     protected CommandsInterface mCi;
     protected UiccCardApplication mApplication;
-    protected int mSlotId;
     protected String mAid;
 
     static class LoadLinearFixedContext {
@@ -126,9 +125,8 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
     /**
      * Default constructor
      */
-    protected IccFileHandler(UiccCardApplication app, int slotId, String aid, CommandsInterface ci) {
+    protected IccFileHandler(UiccCardApplication app, String aid, CommandsInterface ci) {
         mApplication = app;
-        mSlotId = slotId;
         mAid = aid;
         mCi = ci;
     }
@@ -153,7 +151,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
             = obtainMessage(EVENT_GET_RECORD_SIZE_DONE,
                         new LoadLinearFixedContext(fileid, recordNum, onLoaded));
 
-        mCi.iccIO(mSlotId, mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
+        mCi.iccIO(mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
                         0, 0, GET_RESPONSE_EF_SIZE_BYTES, null, null, response);
     }
 
@@ -172,7 +170,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                         onLoaded));
 
         // TODO(): Verify when path changes are done.
-        mCi.iccIO(mSlotId, mAid, COMMAND_GET_RESPONSE, IccConstants.EF_IMG, "img",
+        mCi.iccIO(mAid, COMMAND_GET_RESPONSE, IccConstants.EF_IMG, "img",
                 recordNum, READ_RECORD_MODE_ABSOLUTE,
                 GET_RESPONSE_EF_IMG_SIZE_BYTES, null, null, response);
     }
@@ -190,7 +188,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
         Message response
                 = obtainMessage(EVENT_GET_EF_LINEAR_RECORD_SIZE_DONE,
                         new LoadLinearFixedContext(fileid, onLoaded));
-        mCi.iccIO(mSlotId, mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
+        mCi.iccIO(mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
                     0, 0, GET_RESPONSE_EF_SIZE_BYTES, null, null, response);
     }
 
@@ -207,7 +205,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
         Message response = obtainMessage(EVENT_GET_RECORD_SIZE_DONE,
                         new LoadLinearFixedContext(fileid,onLoaded));
 
-        mCi.iccIO(mSlotId, mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
+        mCi.iccIO(mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
                         0, 0, GET_RESPONSE_EF_SIZE_BYTES, null, null, response);
     }
 
@@ -225,7 +223,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
         Message response = obtainMessage(EVENT_GET_BINARY_SIZE_DONE,
                         fileid, 0, onLoaded);
 
-        mCi.iccIO(mSlotId, mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
+        mCi.iccIO(mAid, COMMAND_GET_RESPONSE, fileid, getEFPath(fileid),
                         0, 0, GET_RESPONSE_EF_SIZE_BYTES, null, null, response);
     }
 
@@ -248,7 +246,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                + fileid + " highOffset = " + highOffset + " lowOffset = "
                + lowOffset + " length = " + length);
 
-        mCi.iccIO(mSlotId, mAid, COMMAND_READ_BINARY, fileid, "img", highOffset, lowOffset,
+        mCi.iccIO(mAid, COMMAND_READ_BINARY, fileid, "img", highOffset, lowOffset,
                 length, null, null, response);
     }
 
@@ -263,7 +261,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
      */
     public void updateEFLinearFixed(int fileid, int recordNum, byte[] data,
             String pin2, Message onComplete) {
-        mCi.iccIO(mSlotId, mAid, COMMAND_UPDATE_RECORD, fileid, getEFPath(fileid),
+        mCi.iccIO(mAid, COMMAND_UPDATE_RECORD, fileid, getEFPath(fileid),
                         recordNum, READ_RECORD_MODE_ABSOLUTE, data.length,
                         IccUtils.bytesToHexString(data), pin2, onComplete);
     }
@@ -274,7 +272,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
      * @param data must be exactly as long as the EF
      */
     public void updateEFTransparent(int fileid, byte[] data, Message onComplete) {
-        mCi.iccIO(mSlotId, mAid, COMMAND_UPDATE_BINARY, fileid, getEFPath(fileid),
+        mCi.iccIO(mAid, COMMAND_UPDATE_BINARY, fileid, getEFPath(fileid),
                         0, 0, data.length,
                         IccUtils.bytesToHexString(data), null, onComplete);
     }
@@ -352,7 +350,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 }
 
                 logd("IccFileHandler: read EF IMG");
-                mCi.iccIO(mSlotId, mAid, COMMAND_READ_RECORD, IccConstants.EF_IMG,
+                mCi.iccIO(mAid, COMMAND_READ_RECORD, IccConstants.EF_IMG,
                         getEFPath(IccConstants.EF_IMG), lc.recordNum,
                         READ_RECORD_MODE_ABSOLUTE, lc.recordSize, null, null,
                         obtainMessage(EVENT_READ_IMG_DONE, IccConstants.EF_IMG,
@@ -446,7 +444,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                      lc.results = new ArrayList<byte[]>(lc.countRecords);
                  }
 
-                 mCi.iccIO(mSlotId, mAid, COMMAND_READ_RECORD, lc.efid, getEFPath(lc.efid),
+                 mCi.iccIO(mAid, COMMAND_READ_RECORD, lc.efid, getEFPath(lc.efid),
                          lc.recordNum,
                          READ_RECORD_MODE_ABSOLUTE,
                          lc.recordSize, null, null,
@@ -475,7 +473,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                 size = ((data[RESPONSE_DATA_FILE_SIZE_1] & 0xff) << 8)
                        + (data[RESPONSE_DATA_FILE_SIZE_2] & 0xff);
 
-                mCi.iccIO(mSlotId, mAid, COMMAND_READ_BINARY, fileid, getEFPath(fileid),
+                mCi.iccIO(mAid, COMMAND_READ_BINARY, fileid, getEFPath(fileid),
                                 0, 0, size, null, null,
                                 obtainMessage(EVENT_READ_BINARY_DONE,
                                               fileid, 0, response));
@@ -502,7 +500,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
                     if (lc.recordNum > lc.countRecords) {
                         sendResult(response, lc.results, null);
                     } else {
-                        mCi.iccIO(mSlotId, mAid, COMMAND_READ_RECORD, lc.efid, getEFPath(lc.efid),
+                        mCi.iccIO(mAid, COMMAND_READ_RECORD, lc.efid, getEFPath(lc.efid),
                                     lc.recordNum,
                                     READ_RECORD_MODE_ABSOLUTE,
                                     lc.recordSize, null, null,

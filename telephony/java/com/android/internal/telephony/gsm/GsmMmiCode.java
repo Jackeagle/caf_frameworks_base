@@ -692,10 +692,10 @@ public final class GsmMmiCode extends Handler implements MmiCode {
                 String facility = scToBarringFacility(sc);
 
                 if (isInterrogate()) {
-                    phone.mCM.queryFacilityLock(0, "", facility, password,
+                    phone.mCM.queryFacilityLock("", facility, password,
                             serviceClass, obtainMessage(EVENT_QUERY_COMPLETE, this));
                 } else if (isActivate() || isDeactivate()) {
-                    phone.mCM.setFacilityLock(0, "", facility, isActivate(), password,
+                    phone.mCM.setFacilityLock("", facility, isActivate(), password,
                             serviceClass, obtainMessage(EVENT_SET_COMPLETE, this));
                 } else {
                     throw new RuntimeException ("Invalid or Unsupported MMI Code");

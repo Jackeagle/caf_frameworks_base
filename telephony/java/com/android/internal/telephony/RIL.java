@@ -722,14 +722,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    supplyIccPin(int slot, String aid, String pin, Message result) {
+    supplyIccPin(String aid, String pin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PIN, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
         rr.mp.writeString(pin);
 
@@ -737,14 +736,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    supplyIccPuk(int slot, String aid, String puk, String newPin, Message result) {
+    supplyIccPuk(String aid, String puk, String newPin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PUK, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
         rr.mp.writeString(puk);
         rr.mp.writeString(newPin);
@@ -753,14 +751,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    supplyIccPin2(int slot, String aid, String pin, Message result) {
+    supplyIccPin2(String aid, String pin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PIN2, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
         rr.mp.writeString(pin);
 
@@ -768,14 +765,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    supplyIccPuk2(int slot, String aid, String puk, String newPin2, Message result) {
+    supplyIccPuk2(String aid, String puk, String newPin2, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_ENTER_SIM_PUK2, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
         rr.mp.writeString(puk);
         rr.mp.writeString(newPin2);
@@ -784,14 +780,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    changeIccPin(int slot, String aid, String oldPin, String newPin, Message result) {
+    changeIccPin(String aid, String oldPin, String newPin, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_CHANGE_SIM_PIN, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
         rr.mp.writeString(oldPin);
         rr.mp.writeString(newPin);
@@ -800,14 +795,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    changeIccPin2(int slot, String aid, String oldPin2, String newPin2, Message result) {
+    changeIccPin2(String aid, String oldPin2, String newPin2, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_CHANGE_SIM_PIN2, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
         rr.mp.writeString(oldPin2);
         rr.mp.writeString(newPin2);
@@ -889,16 +883,14 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    getIMSI(int slot, String aid, Message result) {
+    getIMSI(String aid, Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_IMSI, result);
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
 
         if (RILJ_LOGD) riljLog(rr.serialString() +
                               "> getIMSI:RIL_REQUEST_GET_IMSI " +
                               RIL_REQUEST_GET_IMSI +
-                              " slot: " + slot +
                               " aid: " + aid +
                               " " + requestToString(rr.mRequest));
 
@@ -1523,14 +1515,13 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
 
     public void
-    iccIO (int slot, String aid, int command, int fileid, String path, int p1, int p2, int p3,
+    iccIO (String aid, int command, int fileid, String path, int p1, int p2, int p3,
             String data, String pin2, Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SIM_IO, result);
 
-        rr.mp.writeInt(slot);
         rr.mp.writeString(aid);
         rr.mp.writeInt(command);
         rr.mp.writeInt(fileid);
@@ -1542,7 +1533,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         rr.mp.writeString(pin2);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> iccIO: "
-                + " slot: " + slot
                 + " aid: " + aid + " "
                 + requestToString(rr.mRequest)
                 + " 0x" + Integer.toHexString(command)
@@ -1716,17 +1706,16 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    queryFacilityLock (int slot, String aid, String facility, String password, int serviceClass,
+    queryFacilityLock (String aid, String facility, String password, int serviceClass,
                             Message response) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_QUERY_FACILITY_LOCK, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
-                + " slot: " + slot + " aid: " + aid + " facility: " + facility);
+                + " aid: " + aid + " facility: " + facility);
 
         // count strings
-        rr.mp.writeInt(5);
+        rr.mp.writeInt(4);
 
-        rr.mp.writeString(Integer.toString(slot));
         rr.mp.writeString(aid);
 
         rr.mp.writeString(facility);
@@ -1738,20 +1727,19 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    setFacilityLock (int slot, String aid, String facility, boolean lockState, String password,
+    setFacilityLock (String aid, String facility, boolean lockState, String password,
                         int serviceClass, Message response) {
         String lockString;
          RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SET_FACILITY_LOCK, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
-                + " slot: " + slot + " aid: " + aid + " facility: " + facility
+                + " aid: " + aid + " facility: " + facility
                 + " lockstate: " + lockState);
 
         // count strings
-        rr.mp.writeInt(6);
+        rr.mp.writeInt(5);
 
-        rr.mp.writeString(Integer.toString(slot));
         rr.mp.writeString(aid);
 
         rr.mp.writeString(facility);
@@ -3100,43 +3088,39 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     private Object
     responseIccCardStatus(Parcel p) {
         UiccCardStatusResponse r = new UiccCardStatusResponse();
-        int num_cards = p.readInt();
-        r.cards = new UiccCardStatusResponse.CardStatus[num_cards];
-        for (int i = 0; i < num_cards; i ++) {
-            r.cards[i] = r.new CardStatus();
-            UiccCardStatusResponse.CardStatus cs = r.cards[i];
-            cs.card_state = UiccConstants.CardState.values()[p.readInt()];
-            cs.universal_pin_state = UiccConstants.PinState.values()[p.readInt()];
-            int num_current_3gpp_indexes = p.readInt();
-            cs.subscription_3gpp_app_index = new int[num_current_3gpp_indexes];
-            for (int j = 0; j < num_current_3gpp_indexes; j++) {
-                cs.subscription_3gpp_app_index[j] = p.readInt();
-            }
-            int num_current_3gpp2_indexes = p.readInt();
-            cs.subscription_3gpp2_app_index = new int[num_current_3gpp2_indexes];
-            for (int j = 0; j < num_current_3gpp2_indexes; j++) {
-                cs.subscription_3gpp2_app_index[j] = p.readInt();
-            }
-            int num_applications = p.readInt();
+        r.card = r.new CardStatus();
+        UiccCardStatusResponse.CardStatus cs = r.card;
+        cs.card_state = UiccConstants.CardState.values()[p.readInt()];
+        cs.universal_pin_state = UiccConstants.PinState.values()[p.readInt()];
+        int num_current_3gpp_indexes = p.readInt();
+        cs.subscription_3gpp_app_index = new int[num_current_3gpp_indexes];
+        for (int j = 0; j < num_current_3gpp_indexes; j++) {
+            cs.subscription_3gpp_app_index[j] = p.readInt();
+        }
+        int num_current_3gpp2_indexes = p.readInt();
+        cs.subscription_3gpp2_app_index = new int[num_current_3gpp2_indexes];
+        for (int j = 0; j < num_current_3gpp2_indexes; j++) {
+            cs.subscription_3gpp2_app_index[j] = p.readInt();
+        }
+        int num_applications = p.readInt();
 
-            if (num_applications > UiccConstants.RIL_CARD_MAX_APPS) {
-                num_applications = UiccConstants.RIL_CARD_MAX_APPS;
+        if (num_applications > UiccConstants.RIL_CARD_MAX_APPS) {
+            num_applications = UiccConstants.RIL_CARD_MAX_APPS;
         }
 
-            cs.applications = new UiccCardStatusResponse.CardStatus.AppStatus[num_applications];
-            for (int j = 0 ; j < num_applications ; j++) {
-                UiccCardStatusResponse.CardStatus.AppStatus ca;
-                ca = r.cards[i].new AppStatus();
-                ca.app_type       = UiccConstants.AppType.values()[p.readInt()];
-                ca.app_state      = UiccConstants.AppState.values()[p.readInt()];
-                ca.perso_substate = UiccConstants.PersoSubState.values()[p.readInt()];
-                ca.aid            = p.readString();
-                ca.app_label      = p.readString();
-                ca.pin1_replaced  = p.readInt();
-                ca.pin1           = UiccConstants.PinState.values()[p.readInt()];
-                ca.pin2           = UiccConstants.PinState.values()[p.readInt()];
-                r.cards[i].applications[j] = ca;
-            }
+        cs.applications = new UiccCardStatusResponse.CardStatus.AppStatus[num_applications];
+        for (int i = 0 ; i < num_applications ; i++) {
+            UiccCardStatusResponse.CardStatus.AppStatus ca;
+            ca = r.card.new AppStatus();
+            ca.app_type       = UiccConstants.AppType.values()[p.readInt()];
+            ca.app_state      = UiccConstants.AppState.values()[p.readInt()];
+            ca.perso_substate = UiccConstants.PersoSubState.values()[p.readInt()];
+            ca.aid            = p.readString();
+            ca.app_label      = p.readString();
+            ca.pin1_replaced  = p.readInt();
+            ca.pin1           = UiccConstants.PinState.values()[p.readInt()];
+            ca.pin2           = UiccConstants.PinState.values()[p.readInt()];
+            r.card.applications[i] = ca;
         }
         return r;
     }

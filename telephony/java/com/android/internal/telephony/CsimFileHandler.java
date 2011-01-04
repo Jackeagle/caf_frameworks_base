@@ -31,8 +31,8 @@ import com.android.internal.telephony.UiccCardApplication;
 public final class CsimFileHandler extends IccFileHandler implements IccConstants {
     static final String LOG_TAG = "RIL_CsimFH";
 
-    public CsimFileHandler(UiccCardApplication app, int slotId, String aid, CommandsInterface ci) {
-        super(app, slotId, aid, ci);
+    public CsimFileHandler(UiccCardApplication app, String aid, CommandsInterface ci) {
+        super(app, aid, ci);
     }
 
     protected void finalize() {
