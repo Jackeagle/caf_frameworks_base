@@ -109,7 +109,7 @@ endif
 LOCAL_SHARED_LIBRARIES += libcutils libutils libEGL libGLESv1_CM libGLESv2 libui libacc
 LOCAL_LDLIBS := -lpthread -ldl
 LOCAL_MODULE:= libRS
-LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_TAGS := eng
 
 include $(BUILD_SHARED_LIBRARY)
 
