@@ -32,6 +32,7 @@
 #include "android_runtime/AndroidRuntime.h"
 
 #include <media/stagefright/StagefrightMediaScanner.h>
+#include <pvmediascanner.h>
 
 // ----------------------------------------------------------------------------
 
@@ -280,10 +281,21 @@ android_media_MediaScanner_native_init(JNIEnv *env)
     }
 }
 
+static MediaScanner *createMediaScanner() {
+    char value[PROPERTY_VALUE_MAX];
+
+    if (property_get("media.stagefright.enable-scan", value, NULL)
+    && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
+        return new StagefrightMediaScanner;
+    }
+    else
+        return new PVMediaScanner();
+}
+
 static void
 android_media_MediaScanner_native_setup(JNIEnv *env, jobject thiz)
 {
-    MediaScanner *mp = new StagefrightMediaScanner;
+    MediaScanner *mp = createMediaScanner();
 
     if (mp == NULL) {
         jniThrowException(env, "java/lang/RuntimeException", "Out of memory");
