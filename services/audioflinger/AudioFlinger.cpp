@@ -132,6 +132,9 @@ AudioFlinger::AudioFlinger()
         mAudioHardware(0), mMasterVolume(1.0f), mMasterMute(false), mNextUniqueId(1), mFmOn(false)
 {
     mHardwareStatus = AUDIO_HW_IDLE;
+    mLPAOutput = NULL;
+    mLPAHandle = -1;
+    mLPAStreamIsActive = false;
 
     mAudioHardware = AudioHardwareInterface::create();
 
@@ -161,6 +164,10 @@ AudioFlinger::~AudioFlinger()
     while (!mPlaybackThreads.isEmpty()) {
         // closeOutput() will remove first entry from mPlaybackThreads
         closeOutput(mPlaybackThreads.keyAt(0));
+    }
+    if (mLPAOutput) {
+        // Close the Output
+        closeSession(mLPAHandle);
     }
     if (mAudioHardware) {
         delete mAudioHardware;
@@ -546,6 +553,14 @@ status_t AudioFlinger::setStreamVolume(int stream, float value, int output)
     }
 
     AutoMutex lock(mLock);
+
+    if( (mLPAOutput != NULL) &&
+        (mLPAStreamType == stream) ) {
+        mLPAOutput->setVolume(value, value);
+        mStreamTypes[stream].volume = value;
+        return NO_ERROR;
+    }
+
     PlaybackThread *thread = NULL;
     if (output) {
         thread = checkPlaybackThread_l(output);
@@ -624,6 +639,9 @@ bool AudioFlinger::isStreamActive(int stream) const
             return true;
         }
     }
+    if (mLPAStreamIsActive && mLPAOutput && mLPAStreamType == stream) {
+        return true;
+    }
     if (mFmOn && stream == AudioSystem::FM) {
         return true;
     }
@@ -688,6 +706,14 @@ status_t AudioFlinger::setParameters(int ioHandle, const String8& keyValuePairs)
         return result;
     }
 
+    // Ensure that the routing to LPA is invoked only when the LPA stream is
+    // active. Otherwise if there is a input routing request and if there is a
+    // Valid LPA handle, routing gets applied for the output descriptor rather
+    // than to the input descriptor.
+    if ( mLPAOutput && mLPAStreamIsActive && mLPAHandle == ioHandle ) {
+        result = mLPAOutput->setParameters(keyValuePairs);
+        return result;
+    }
     // hold a strong ref on thread in case closeOutput() or closeInput() is called
     // and the thread is exited once the lock is released
     sp<ThreadBase> thread;
@@ -4463,6 +4489,88 @@ int AudioFlinger::openOutput(uint32_t *pDevices,
     }
 
     return 0;
+}
+
+int AudioFlinger::openSession(uint32_t *pDevices,
+                                   uint32_t *pFormat,
+                                   uint32_t flags,
+                                   int32_t  streamType,
+                                   int32_t  sessionId)
+{
+    status_t status;
+    mHardwareStatus = AUDIO_HW_OUTPUT_OPEN;
+    uint32_t format = pFormat ? *pFormat : 0;
+
+    LOGV("openSession(), Device %x, Format %d, flags %x sessionId %x",
+            pDevices ? *pDevices : 0,
+            format,
+            flags,
+            sessionId);
+
+    if (pDevices == NULL || *pDevices == 0) {
+        return 0;
+    }
+    Mutex::Autolock _l(mLock);
+
+    AudioStreamOut *output = mAudioHardware->openOutputSession(*pDevices,
+                                                             (int *)&format,
+                                                             &status,sessionId);
+    LOGV("openSession() openOutputSession returned output %p, Format %d, status %d",
+            output,
+            format,
+            status);
+
+    mHardwareStatus = AUDIO_HW_IDLE;
+    if (output != 0) {
+        int id = nextUniqueId();
+        id++;
+        mLPAOutput = output;
+        mLPAHandle = id;
+        mLPAStreamType = streamType;
+        mLPAStreamIsActive = true;
+        if (pFormat) *pFormat = format;
+        return id;
+    }
+
+    return 0;
+}
+
+status_t AudioFlinger::pauseSession(int output, int32_t  streamType)
+{
+    if (output == mLPAHandle && streamType == mLPAStreamType ) {
+        mLPAStreamIsActive = false;
+    }
+
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::resumeSession(int output, int32_t  streamType)
+{
+    if (output == mLPAHandle && streamType == mLPAStreamType ) {
+        mLPAStreamIsActive = true;
+    }
+
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::closeSession(int output)
+{
+    Mutex::Autolock _l(mLock);
+    LOGV("closeSession() %d", output);
+
+    // Is this required?
+    //AudioSystem::stopOutput(output, (AudioSystem::stream_type)mStreamType);
+
+    // Delete the Audio session
+    if(mLPAOutput) {
+        mLPAOutput->standby();
+        delete mLPAOutput;
+        mLPAOutput = NULL;
+        mLPAHandle = -1;
+        mLPAStreamIsActive = false;
+    }
+
+    return NO_ERROR;
 }
 
 int AudioFlinger::openDuplicateOutput(int output1, int output2)

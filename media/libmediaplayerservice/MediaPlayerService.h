@@ -95,7 +95,6 @@ class MediaPlayerService : public BnMediaPlayerService
         virtual void            pauseSession();
         virtual void            resumeSession();
         virtual void            close();
-
         virtual void            closeSession();
                 void            setAudioStreamType(int streamType) { mStreamType = streamType; }
                 void            setVolume(float left, float right);
