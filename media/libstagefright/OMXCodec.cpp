@@ -52,6 +52,7 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <media/stagefright/OMXCodec.h>
 #include <media/stagefright/Utils.h>
 #include <utils/Vector.h>
+#include <cutils/properties.h>
 
 #include <OMX_Audio.h>
 #include <OMX_Component.h>
@@ -2576,13 +2577,21 @@ void OMXCodec::fillOutputBuffers() {
 
 void OMXCodec::drainInputBuffers() {
     CHECK(mState == EXECUTING || mState == RECONFIGURING);
-
+    size_t CAMERA_BUFFERS = 0;
     Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexInput];
     for (size_t i = 0; i < buffers->size(); ++i) {
 		//we need do this since camera holds 3 buffer + 1 is for index starts from 0
 		//if we don't do this it will be a deadlock since we will be waiting for camera to be done
 		//and camera will not give any more unless we give release
-        if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames) && (i == 4) )
+        char value[PROPERTY_VALUE_MAX];
+        if (!property_get("ro.product.device", value, "1")
+            || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa")
+            || !strcmp(value, "msm7625_surf") || !strcmp(value, "msm7625_ffa"))
+           CAMERA_BUFFERS = 1;
+        else
+           CAMERA_BUFFERS = 4;
+
+        if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames) && (i == CAMERA_BUFFERS) )
             break;
         drainInputBuffer(&buffers->editItemAt(i));
     }
