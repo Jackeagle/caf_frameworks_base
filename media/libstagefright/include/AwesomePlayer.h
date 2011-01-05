@@ -273,6 +273,7 @@ private:
 
     AwesomePlayer(const AwesomePlayer &);
     AwesomePlayer &operator=(const AwesomePlayer &);
+    void releaseAllVideoBuffersHeld();
 };
 
 }  // namespace android

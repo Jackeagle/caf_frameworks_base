@@ -284,6 +284,7 @@ private:
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
+    void freeOutputBuffer(BufferInfo *info);
 };
 
 struct CodecProfileLevel {
