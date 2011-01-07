@@ -434,6 +434,7 @@ private:
    volatile     int32_t                     mSecureFrameBuffer;
    bool mHDMIOutput;
    mutable bool mOverlayOpt;
+   int  mLastCompCount;
    bool mFullScreen;
    bool mOverlayUsed;
    bool mOverlayUsedVideo;

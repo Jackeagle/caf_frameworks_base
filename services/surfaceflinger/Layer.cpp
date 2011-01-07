@@ -536,10 +536,13 @@ void Layer::lockPageFlip(bool& recomputeVisibleRegions)
     }
 
     ssize_t buf = lcblk->retireAndLock();
+    mNothingToUpdate = false;
+
     if (buf == NOT_ENOUGH_DATA) {
         // NOTE: This is not an error, it simply means there is nothing to
         // retire. The buffer is locked because we will use it
         // for composition later in the loop
+        mNothingToUpdate = true;
         return;
     }
 
