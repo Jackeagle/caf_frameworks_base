@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2010, 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1580,7 +1581,7 @@ public class BluetoothService extends IBluetooth.Stub {
         boolean ret;
         // Just do the SDP if the device is already  created and UUIDs are not
         // NULL, else create the device and then do SDP.
-        if (isRemoteDeviceInCache(address) && getRemoteUuids(address) != null) {
+        if (isRemoteDeviceInCache(address) && getRemoteUuids(address) != null && findDeviceNative(address) != null) {
             String path = getObjectPathFromAddress(address);
             if (path == null) return false;
 
@@ -2290,4 +2291,5 @@ public class BluetoothService extends IBluetooth.Stub {
             short channel);
     private native boolean removeServiceRecordNative(int handle);
     private native boolean setLinkTimeoutNative(String path, int num_slots);
+    private native String findDeviceNative(String address);
 }
