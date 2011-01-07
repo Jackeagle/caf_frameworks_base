@@ -61,7 +61,6 @@ public class StkResponseMessage {
 
         public void setAdditionalInfo(boolean addInfoReq,int addInfoCode) {
             this.includeAdditionalInfo = addInfoReq;
-            this.addedInfo = new byte[(addedInfo.length)];
             this.additionalInfo = addInfoCode;
         }
 
