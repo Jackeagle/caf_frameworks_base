@@ -1536,6 +1536,9 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 case DATAINANDOUT:
                     ret = DataActivityState.DATAINANDOUT;
                     break;
+                case DORMANT:
+                    ret = DataActivityState.DORMANT;
+                    break;
             }
         }
         return ret;
