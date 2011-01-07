@@ -308,6 +308,7 @@ status_t WAVSource::read(
     }
 
     mCurrentPos += n;
+    ssize_t bytesReadFromFile = n;
 
     buffer->set_range(0, n);
 
@@ -352,11 +353,19 @@ status_t WAVSource::read(
 
     size_t bytesPerSample = mBitsPerSample >> 3;
 
-    buffer->meta_data()->setInt64(
+    if ( (mCurrentPos - mOffset - bytesReadFromFile) > 0 )
+    {
+        LOGV("kKeyTime is %llu", 1000000LL * (mCurrentPos - mOffset - bytesReadFromFile)/(mNumChannels * bytesPerSample) / mSampleRate);
+        buffer->meta_data()->setInt64(
             kKeyTime,
-            1000000LL * (mCurrentPos - mOffset)
+            1000000LL * (mCurrentPos - mOffset - bytesReadFromFile )
                 / (mNumChannels * bytesPerSample) / mSampleRate);
-
+    }
+    else
+    {
+        LOGV("kKeyTime is  0");
+        buffer->meta_data()->setInt64(kKeyTime, 0);
+    }
 
     *out = buffer;
 
