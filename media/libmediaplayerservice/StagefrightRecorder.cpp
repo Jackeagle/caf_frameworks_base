@@ -1253,7 +1253,7 @@ status_t StagefrightRecorder::reset() {
     mInterleaveDurationUs = 0;
     mIFramesIntervalSec = 1;
     mAudioSourceNode = 0;
-    mUse64BitFileOffset = false;
+    mUse64BitFileOffset = true;
     mMovieTimeScale  = -1;
     mAudioTimeScale  = -1;
     mVideoTimeScale  = -1;
