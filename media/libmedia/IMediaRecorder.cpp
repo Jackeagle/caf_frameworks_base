@@ -384,7 +384,7 @@ status_t BnMediaRecorder::onTransact(
             int fd = dup(data.readFileDescriptor());
             int64_t offset = data.readInt64();
             int64_t length = data.readInt64();
-            reply->writeInt32(setOutputFile(fd, offset, length));
+            reply->writeInt32(setOutputFile(dup(fd), offset, length));
             ::close(fd);
             return NO_ERROR;
         } break;
