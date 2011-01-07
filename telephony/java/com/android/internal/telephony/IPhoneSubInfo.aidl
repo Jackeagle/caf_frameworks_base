@@ -86,4 +86,6 @@ interface IPhoneSubInfo {
     String getVoiceMailNumberOnSubscription(int subscription);
 
     String getVoiceMailAlphaTagOnSubscription(int subscription);
+
+    String getCompleteVoiceMailNumberOnSubscription(int subscription);
 }
