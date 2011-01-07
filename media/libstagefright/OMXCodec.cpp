@@ -319,6 +319,7 @@ uint32_t OMXCodec::getComponentQuirks(const char *componentName) {
         quirks |= kRequiresAllocateBufferOnOutputPorts;
         quirks |= kDefersOutputBufferAllocation;
         quirks |= kDoesNotRequireMemcpyOnOutputPort;
+        quirks |= kNeedsFlushBeforeDisable;
     }
 
     if (!strncmp(componentName, "OMX.TI.", 7)) {
@@ -1683,15 +1684,6 @@ void OMXCodec::onCmdComplete(OMX_COMMANDTYPE cmd, OMX_U32 data) {
             if (mState == RECONFIGURING) {
                 CHECK_EQ(portIndex, kPortIndexOutput);
 
-                sp<MetaData> oldOutputFormat = mOutputFormat;
-                initOutputFormat(mSource->getFormat());
-
-                // Don't notify clients if the output port settings change
-                // wasn't of importance to them, i.e. it may be that just the
-                // number of buffers has changed and nothing else.
-                mOutputPortSettingsHaveChanged =
-                    formatHasNotablyChanged(oldOutputFormat, mOutputFormat);
-
                 enablePortAsync(portIndex);
 
                 status_t err = allocateBuffersOnPort(portIndex);
@@ -1881,7 +1873,7 @@ status_t OMXCodec::freeBuffersOnPort(
     for (size_t i = buffers->size(); i-- > 0;) {
         BufferInfo *info = &buffers->editItemAt(i);
 
-        if (onlyThoseWeOwn && info->mOwnedByComponent) {
+        if (onlyThoseWeOwn && info->mOwnedByComponent || (info->mMediaBuffer && (info->mMediaBuffer->refcount() != 0)) ) {
             continue;
         }
 
@@ -1908,7 +1900,11 @@ status_t OMXCodec::freeBuffersOnPort(
         buffers->removeAt(i);
     }
 
-    CHECK(onlyThoseWeOwn || buffers->isEmpty());
+    //CHECK(onlyThoseWeOwn || buffers->isEmpty());  /commenting this assert
+    //since it is very much possible to have not freed all buffers as they
+    //might be held by renderer at this point. We free buffers held by us
+    //only and let renderer free buffers held by it.
+
 
     return stickyErr;
 }
@@ -1961,6 +1957,15 @@ void OMXCodec::disablePortAsync(OMX_U32 portIndex) {
 
     CHECK_EQ(mPortStatus[portIndex], ENABLED);
     mPortStatus[portIndex] = DISABLING;
+
+    sp<MetaData> oldOutputFormat = mOutputFormat;
+    initOutputFormat(mSource->getFormat());
+
+    // Don't notify clients if the output port settings change
+    // wasn't of importance to them, i.e. it may be that just the
+    // number of buffers has changed and nothing else.
+    mOutputPortSettingsHaveChanged =
+        formatHasNotablyChanged(oldOutputFormat, mOutputFormat);
 
     status_t err =
         mOMX->sendCommand(mNode, OMX_CommandPortDisable, portIndex);
@@ -2632,12 +2637,18 @@ status_t OMXCodec::read(
         }
     }
 
-    while (mState != ERROR && !mNoMoreOutputData && mFilledBuffers.empty()) {
+    while (mState != ERROR && !mNoMoreOutputData && !mOutputPortSettingsHaveChanged && mFilledBuffers.empty()) {
         mBufferFilled.wait(mLock);
     }
 
     if (mState == ERROR) {
         return UNKNOWN_ERROR;
+    }
+
+     if (mOutputPortSettingsHaveChanged) {
+        mOutputPortSettingsHaveChanged = false;
+        mFilledBuffers.clear();
+        return INFO_FORMAT_CHANGED;
     }
 
     if (mFilledBuffers.empty()) {
@@ -2660,6 +2671,22 @@ status_t OMXCodec::read(
     return OK;
 }
 
+void OMXCodec::freeOutputBuffer(BufferInfo *info) {
+    CHECK_EQ(info->mOwnedByComponent, false);
+
+    status_t err =
+        mOMX->freeBuffer(mNode, kPortIndexOutput, info->mBuffer);
+    CHECK_EQ(err, OK);
+
+    if (info->mMediaBuffer != NULL) {
+        info->mMediaBuffer->setObserver(NULL);
+
+        CHECK_EQ(info->mMediaBuffer->refcount(), 0);
+
+        info->mMediaBuffer->release();
+    }
+}
+
 void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
     Mutex::Autolock autoLock(mLock);
 
@@ -2668,8 +2695,13 @@ void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
         BufferInfo *info = &buffers->editItemAt(i);
 
         if (info->mMediaBuffer == buffer) {
-            CHECK_EQ(mPortStatus[kPortIndexOutput], ENABLED);
-            fillOutputBuffer(info);
+            CHECK((mPortStatus[kPortIndexOutput] == ENABLED) || (mPortStatus[kPortIndexOutput] == DISABLING));
+             if(mPortStatus[kPortIndexOutput] == ENABLED)
+                 fillOutputBuffer(info);
+             else if(mPortStatus[kPortIndexOutput] == DISABLING) {
+                 freeOutputBuffer(info);
+                 buffers->removeAt(i);
+             }
             return;
         }
     }
