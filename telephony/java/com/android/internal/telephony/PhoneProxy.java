@@ -984,8 +984,8 @@ public class PhoneProxy extends Handler implements Phone {
         return mActiveVoicePhone.getSubscription();
     }
 
-    public void updateCurrentCarrierInProvider() {
-        mActiveDataPhone.updateCurrentCarrierInProvider();
+    public boolean updateCurrentCarrierInProvider() {
+        return mActiveVoicePhone.updateCurrentCarrierInProvider();
     }
 
     public int disableApnType(String apnType) {

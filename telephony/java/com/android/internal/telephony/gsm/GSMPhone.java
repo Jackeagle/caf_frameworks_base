@@ -17,11 +17,8 @@
 
 package com.android.internal.telephony.gsm;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.SQLException;
-import android.net.Uri;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
@@ -29,7 +26,6 @@ import android.os.Registrant;
 import android.os.RegistrantList;
 import android.os.SystemProperties;
 import android.preference.PreferenceManager;
-import android.provider.Telephony;
 import android.telephony.CellLocation;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
@@ -1185,6 +1181,7 @@ public class GSMPhone extends PhoneBase {
                 break;
 
             case EVENT_SIM_RECORDS_LOADED:
+                updateCurrentCarrierInProvider();
 
                 // Check if this is a different SIM than the previous one. If so unset the
                 // voice mail number.
@@ -1571,6 +1568,17 @@ public class GSMPhone extends PhoneBase {
             Log.d(LOG_TAG, "Voice Mail Count from preference = " + countVoiceMessages );
         }
         return countVoiceMessages;
+    }
+
+    /**
+     * @return operator numeric.
+     */
+    public String getOperatorNumeric() {
+        String operatorNumeric = null;
+        if (mSIMRecords != null) {
+            operatorNumeric = mSIMRecords.getSIMOperatorNumeric();
+        }
+        return operatorNumeric;
     }
 
 }

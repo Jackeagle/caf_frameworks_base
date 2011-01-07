@@ -79,7 +79,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
     UiccCardApplication m3gpp2Application = null;
     RuimRecords mRuimRecords = null;
 
-    int mCdmaSubscriptionSource = VoicePhone.CDMA_SUBSCRIPTION_NONE;
+    int mCdmaSubscriptionSource = VoicePhone.CDMA_SUBSCRIPTION_NV;
 
      /** if time between NTIZ updates is less than mNitzUpdateSpacing the update may be ignored. */
     private static final int NITZ_UPDATE_SPACING_DEFAULT = 1000 * 60 * 10;
@@ -190,6 +190,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
 
         phone.registerForEriFileLoaded(this, EVENT_ERI_FILE_LOADED, null);
         cm.registerForCdmaOtaProvision(this,EVENT_OTA_PROVISION_STATUS_CHANGE, null);
+        cm.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
 
         cr.registerContentObserver(
                 Settings.System.getUriFor(Settings.System.AUTO_TIME), true,
@@ -211,6 +212,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         cr.unregisterContentObserver(this.mAutoTimeObserver);
         cm.unregisterForCdmaSubscriptionSourceChanged(this);
         cm.unregisterForCdmaPrlChanged(this);
+        cm.unregisterForSubscriptionReady(this);
 
         //cleanup icc stuff
         mUiccManager.unregisterForIccChanged(this);
@@ -543,6 +545,13 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                     cm.getCDMASubscription( obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
                 }
             }
+            break;
+
+        case EVENT_SUBSCRIPTION_READY:
+            // In case of multi-SIM, framework should wait for the subscription ready
+            // to send any request to RIL.  Otherwise it will return failure.
+            Log.d(LOG_TAG, "EVENT_SUBSCRIPTION_READY: get CDMA Subscription");
+            cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
             break;
 
         default:

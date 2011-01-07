@@ -19,11 +19,8 @@ package com.android.internal.telephony.cdma;
 
 import android.app.ActivityManagerNative;
 import android.content.Context;
-import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.database.SQLException;
-import android.net.Uri;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
@@ -33,7 +30,6 @@ import android.os.Registrant;
 import android.os.RegistrantList;
 import android.os.SystemProperties;
 import android.preference.PreferenceManager;
-import android.provider.Telephony;
 import android.telephony.CellLocation;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
@@ -964,6 +960,7 @@ public class CDMAPhone extends PhoneBase {
 
             case EVENT_RUIM_RECORDS_LOADED:{
                 Log.d(LOG_TAG, "Event EVENT_RUIM_RECORDS_LOADED Received");
+                updateCurrentCarrierInProvider();
             }
             break;
 
@@ -975,6 +972,7 @@ public class CDMAPhone extends PhoneBase {
             case EVENT_RADIO_ON:{
                 Log.d(LOG_TAG, "Event EVENT_RADIO_ON Received");
                 mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+                updateCurrentCarrierInProvider();
             }
             break;
 
@@ -1010,6 +1008,7 @@ public class CDMAPhone extends PhoneBase {
                             // NV is ready when subscription source is NV
                             sendMessage(obtainMessage(EVENT_NV_READY));
                         }
+                        updateCurrentCarrierInProvider();
                     }
                 } else {
                     Log.w(LOG_TAG, "Error in parsing CDMA_SUBSCRIPTION_SOURCE:" +ar.exception);
@@ -1051,6 +1050,9 @@ public class CDMAPhone extends PhoneBase {
             case EVENT_SUBSCRIPTION_READY: {
                 Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY Received");
                 mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
+                // In case of multi-SIM, framework should wait for the subscription ready
+                // to send any request to RIL.  Otherwise it will return failure.
+                mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
             }
             break;
 
@@ -1438,6 +1440,26 @@ public class CDMAPhone extends PhoneBase {
         countVoiceMessages = sp.getInt(VM_COUNT, 0);
         Log.d(LOG_TAG, "Voice Mail Count from preference = " + countVoiceMessages );
         return countVoiceMessages;
+    }
+
+    /**
+     * @return operator numeric.
+     */
+    public String getOperatorNumeric() {
+        String operatorNumeric = null;
+
+        if (mCdmaSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
+            operatorNumeric = SystemProperties.get("ro.cdma.home.operator.numeric");
+        } else if (mCdmaSubscriptionSource == CDMA_SUBSCRIPTION_RUIM_SIM
+                && mRuimRecords != null) {
+            operatorNumeric = mRuimRecords.getRUIMOperatorNumeric();
+        } else {
+            Log.e(LOG_TAG, "getOperatorNumeric: Cannot retrieve operatorNumeric:"
+                    + " mCdmaSubscriptionSource = " + mCdmaSubscriptionSource + " mRuimRecords = "
+                    + (mRuimRecords != null ? mRuimRecords.getRecordsLoaded() : null));
+        }
+
+        return operatorNumeric;
     }
 
 }
