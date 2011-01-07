@@ -21,7 +21,8 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libsurfaceflinger_client \
     libstagefright \
-    libcamera_client
+    libcamera_client \
+    libopencore_player
 
 LOCAL_STATIC_LIBRARIES :=
 
@@ -32,6 +33,7 @@ LOCAL_C_INCLUDES += \
     frameworks/base/media/libstagefright/codecs/amrnb/enc/src \
     frameworks/base/media/libstagefright/codecs/amrnb/common \
     frameworks/base/media/libstagefright/codecs/amrnb/common/include \
+    external/opencore/android \
     $(PV_INCLUDES) \
     $(JNI_H_INCLUDE) \
     $(call include-path-for, corecg graphics)
