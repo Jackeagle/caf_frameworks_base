@@ -794,13 +794,13 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
             Mutex::Autolock _l(mOverlaySourceLock);
             if (mOverlay) {
                 overlay_control_device_t* overlay_dev = mOverlayDevice;
-                overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 // we need to combine the layer orientation and the
                 // user-requested orientation.
                 Transform finalTransform(Transform(mLayer.getOrientation()) *
                         Transform(mOrientation));
                 overlay_dev->setParameter(overlay_dev, mOverlay,
                         OVERLAY_TRANSFORM, finalTransform.getOrientation());
+                overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 overlay_dev->commit(overlay_dev, mOverlay);
             }
         }
