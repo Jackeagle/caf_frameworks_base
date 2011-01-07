@@ -1335,17 +1335,25 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             notifyDataConnection(ds, ipv, reason);
             return false;
         }
-       if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
-           // If the call indeed got disconnected return, otherwise pass through
-           if(disconnectOneLowPriorityDataCall(ds, reason)) {
-               logw("[OMH] Lower/Equal priority call disconnected.");
-               return true;
-           }
-           if(isHigherPriorityDataCallActive(ds)) {
-               logw("[OMH] Higher priority call active. Ignoring setup data call request.");
-               return false;
-           }
+
+        /* For OMH arbitration, check if there is an existing OMH profile.
+         *
+         * If there is at least one, then we assume that the device is working in the
+         * OMH enabled mode and has one or more OMH profile(s) and needs arbitration.
+         * If not, we allow the device to operate using other non OMH profiles.
+         */
+        if(mDpt.isAnyDataProfileAvailable(DataProfileType.PROFILE_TYPE_3GPP2_OMH)) {
+            // If the call indeed got disconnected return, otherwise pass through
+            if (disconnectOneLowPriorityDataCall(ds, reason)) {
+                logw("[OMH] Lower/Equal priority call disconnected.");
+                return true;
+            }
+            if(isHigherPriorityDataCallActive(ds)) {
+                logw("[OMH] Higher priority call active. Ignoring setup data call request.");
+                return false;
+            }
         }
+
         DataConnection dc = findFreeDataCall();
         if (dc == null) {
             // if this happens, it probably means that our data call list is not

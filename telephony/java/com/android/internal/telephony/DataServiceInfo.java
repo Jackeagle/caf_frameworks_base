@@ -155,7 +155,8 @@ public class DataServiceInfo {
      */
     DataProfile getNextArbitratedProfile(DataProfileType profileType, IPVersion ipv) {
 
-        if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
+        if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)
+                && profileType == DataProfileType.PROFILE_TYPE_3GPP2_OMH) {
             logi("[OMH] Looking at OMH profiles");
             DataProfile profile = null;
             for (DataProfile dp : mDataProfileList) {
@@ -184,11 +185,12 @@ public class DataServiceInfo {
     /* Search through the android profiles for a match */
     DataProfile getNextWorkingAndroidProfile(DataProfileType profileType, IPVersion ipv) {
 
-        if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)) {
-            // If we have reached here, then there are no OMH profiles available
-            // falling back to CDMA NAI profiles
-            logi("No suitable OMH profiles found, fallback to CDMA NAI");
-            profileType = DataProfileType.PROFILE_TYPE_3GPP2_NAI;
+        if (SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false)
+                && profileType == DataProfileType.PROFILE_TYPE_3GPP2_OMH) {
+                // If we have reached here, then there are no OMH profiles available
+                // falling back to CDMA NAI profiles (if OMH profile was requested)
+                logi("No suitable OMH profiles found, fallback to CDMA NAI");
+                profileType = DataProfileType.PROFILE_TYPE_3GPP2_NAI;
         }
 
         for (DataProfile dp : mDataProfileList) {
