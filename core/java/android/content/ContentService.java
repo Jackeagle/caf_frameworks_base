@@ -160,6 +160,7 @@ public final class ContentService extends IContentService.Stub {
                     }
                 }
             }
+            calls.clear();
             if (syncToNetwork) {
                 SyncManager syncManager = getSyncManager();
                 if (syncManager != null) {
