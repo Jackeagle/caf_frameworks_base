@@ -1064,8 +1064,14 @@ void OMXCodec::setVideoInputFormat(
             mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
     CHECK_EQ(err, OK);
 
-    def.nBufferSize = getFrameSize(colorFormat,
-            stride > 0? stride: -stride, sliceHeight);
+    // Qualcomm codecs calculate the buffer size internally, and expect
+    // that the size value set is the same as the one provided on getParameter.
+    // So buffer size will be calculated here only when using third
+    // party codecs.
+    if (strncmp(mComponentName, "OMX.qcom",8) != 0) {
+        def.nBufferSize = getFrameSize(colorFormat,
+                stride > 0? stride: -stride, sliceHeight);
+    }
 
     CHECK_EQ(def.eDomain, OMX_PortDomainVideo);
 
