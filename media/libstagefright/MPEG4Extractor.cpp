@@ -1593,7 +1593,9 @@ status_t MPEG4Source::start(MetaData *params) {
     mGroup = new MediaBufferGroup;
 
     int32_t max_size;
-    CHECK(mFormat->findInt32(kKeyMaxInputSize, &max_size));
+
+    if (!(mFormat->findInt32(kKeyMaxInputSize, &max_size)))
+        return ERROR_MALFORMED;
 
     mGroup->add_buffer(new MediaBuffer(max_size));
 
