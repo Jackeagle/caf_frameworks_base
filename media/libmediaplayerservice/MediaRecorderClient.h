@@ -62,6 +62,21 @@ private:
     Mutex                       mLock;
     MediaRecorderBase           *mRecorder;
     sp<MediaPlayerService>      mMediaPlayerService;
+
+    audio_source mAudioSource;
+    audio_encoder mAudioEncoder;
+
+    video_source mVideoSource;
+    video_encoder mVideoEncoder;
+
+    String8 mParams;
+
+    output_format mOutputFormat;
+    String8 mPath;
+    int mFd;
+    int64_t mOffset;
+    int64_t mLength;
+
 };
 
 }; // namespace android

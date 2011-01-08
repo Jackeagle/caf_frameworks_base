@@ -92,6 +92,7 @@ status_t MediaRecorderClient::setVideoSource(int vs)
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mVideoSource = (video_source)vs;
     return mRecorder->setVideoSource((video_source)vs);
 }
 
@@ -106,6 +107,7 @@ status_t MediaRecorderClient::setAudioSource(int as)
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mAudioSource = (audio_source)as;
     return mRecorder->setAudioSource((audio_source)as);
 }
 
@@ -117,6 +119,7 @@ status_t MediaRecorderClient::setOutputFormat(int of)
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mOutputFormat = (output_format)of;
     return mRecorder->setOutputFormat((output_format)of);
 }
 
@@ -128,6 +131,7 @@ status_t MediaRecorderClient::setVideoEncoder(int ve)
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mVideoEncoder = (video_encoder)ve;
     return mRecorder->setVideoEncoder((video_encoder)ve);
 }
 
@@ -139,6 +143,7 @@ status_t MediaRecorderClient::setAudioEncoder(int ae)
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mAudioEncoder = (audio_encoder)ae;
     return mRecorder->setAudioEncoder((audio_encoder)ae);
 }
 
@@ -150,6 +155,7 @@ status_t MediaRecorderClient::setOutputFile(const char* path)
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mPath = path;
     return mRecorder->setOutputFile(path);
 }
 
@@ -161,6 +167,9 @@ status_t MediaRecorderClient::setOutputFile(int fd, int64_t offset, int64_t leng
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mFd = ::dup(fd);
+    mOffset = offset;
+    mLength = length;
     return mRecorder->setOutputFile(fd, offset, length);
 }
 
@@ -193,6 +202,7 @@ status_t MediaRecorderClient::setParameters(const String8& params) {
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+    mParams = params;
     return mRecorder->setParameters(params);
 }
 
@@ -214,6 +224,29 @@ status_t MediaRecorderClient::prepare()
         LOGE("recorder is not initialized");
         return NO_INIT;
     }
+
+    if( mVideoSource == VIDEO_SOURCE_LIST_END &&
+        mVideoEncoder == VIDEO_ENCODER_LIST_END ) {
+
+        if(mAudioSource == AUDIO_SOURCE_LIST_END ||
+           mAudioEncoder == AUDIO_ENCODER_LIST_END ){
+            return BAD_VALUE;
+        }
+
+        if( mAudioEncoder == AUDIO_ENCODER_EVRC ||
+            mAudioEncoder == AUDIO_ENCODER_QCELP ){
+            LOGW("QCELP/EVRC recording, switching to OC");
+            MediaRecorderBase * sfRecorder = mRecorder;
+            mRecorder = new PVMediaRecorder( );
+            mRecorder->init( );
+            mRecorder->setAudioSource( mAudioSource );
+            mRecorder->setOutputFormat( mOutputFormat );
+            mRecorder->setAudioEncoder( mAudioEncoder );
+            mRecorder->setOutputFile( mFd, mOffset, mLength );
+            delete sfRecorder;
+        }
+    }
+
     return mRecorder->prepare();
 }
 
@@ -322,12 +355,27 @@ MediaRecorderClient::MediaRecorderClient(const sp<MediaPlayerService>& service, 
 #endif
 
     mMediaPlayerService = service;
+
+    mAudioSource = AUDIO_SOURCE_LIST_END;
+    mVideoSource = VIDEO_SOURCE_LIST_END;
+
+    mAudioEncoder = AUDIO_ENCODER_LIST_END;
+    mVideoEncoder = VIDEO_ENCODER_LIST_END;
+
+    mOutputFormat = OUTPUT_FORMAT_LIST_END;
+
+    mFd = -1;
+    mOffset = 0;
+    mLength = 0;
 }
 
 MediaRecorderClient::~MediaRecorderClient()
 {
     LOGV("Client destructor");
     release();
+    if( mFd != -1 ){
+        ::close( mFd );
+    }
 }
 
 status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listener)
