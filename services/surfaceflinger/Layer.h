@@ -79,6 +79,7 @@ public:
     virtual bool needsDithering() const     { return mNeedsDithering; }
     virtual bool needsFiltering() const;
     virtual bool isSecure() const           { return mSecure; }
+    virtual bool isNothingToUpdate() const  { return mNothingToUpdate; }
     virtual sp<Surface> createSurface() const;
     virtual status_t ditch();
     virtual void onRemoved();
@@ -212,7 +213,7 @@ private:
     const GLExtensions& mGLExtensions;
     bool mNeedsBlending;
     bool mNeedsDithering;
-
+    bool mNothingToUpdate;
     // page-flip thread (currently main thread)
     bool mSecure;
     Region mPostedDirtyRegion;
