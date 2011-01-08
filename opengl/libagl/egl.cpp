@@ -28,7 +28,7 @@
 
 #include <cutils/log.h>
 #include <cutils/atomic.h>
-
+#include <cutils/properties.h>
 #include <utils/threads.h>
 
 #include <EGL/egl.h>
@@ -364,8 +364,15 @@ egl_window_surface_v2_t::egl_window_surface_v2_t(EGLDisplay dpy,
     hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &pModule);
     module = reinterpret_cast<gralloc_module_t const*>(pModule);
 
-    if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &pModule) == 0) {
-        copybit_open(pModule, &blitengine);
+    char property[PROPERTY_VALUE_MAX];
+    if (property_get("debug.sf.hw", property, NULL) > 0) {
+        if (atoi(property) == 1) {
+            // Open the copybit module only if debug.sf.hw is set to 1
+            // i.e hardware composition is used
+            if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &pModule) == 0) {
+                copybit_open(pModule, &blitengine);
+            }
+        }
     }
 
     pixelFormatTable = gglGetPixelFormatTable();

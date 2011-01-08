@@ -27,6 +27,7 @@
 #include "texture.h"
 #include "BufferObjectManager.h"
 #include "TextureObjectManager.h"
+#include <cutils/properties.h>
 
 #ifdef LIBAGL_USE_GRALLOC_COPYBITS
 #include <hardware/copybit.h>
@@ -107,6 +108,14 @@ ogles_context_t *ogles_init(size_t extra)
     c->copybits.drawSurfaceBuffer = 0;
 
 #ifdef LIBAGL_USE_GRALLOC_COPYBITS
+    char property[PROPERTY_VALUE_MAX];
+    if (property_get("debug.sf.hw", property, NULL) > 0) {
+        if (atoi(property) == 0) {
+            // We are using software composition. Do not open copybit
+            return c;
+        }
+    }
+
     hw_module_t const* module;
     if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
         struct copybit_device_t* copyBits;
