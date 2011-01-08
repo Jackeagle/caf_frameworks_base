@@ -233,7 +233,7 @@ status_t StagefrightRecorder::setOutputFile(int fd, int64_t offset, int64_t leng
     if (mOutputFd >= 0) {
         ::close(mOutputFd);
     }
-    mOutputFd = fd;
+    mOutputFd = dup(fd);
 
     return OK;
 }
