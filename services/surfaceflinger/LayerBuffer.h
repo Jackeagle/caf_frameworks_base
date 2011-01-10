@@ -188,6 +188,7 @@ private:
         int32_t mWidthStride;
         int32_t mHeightStride;
         int32_t mOrientation;
+        int32_t mFlip;
         mutable Mutex mOverlaySourceLock;
         bool mInitialized;
     };

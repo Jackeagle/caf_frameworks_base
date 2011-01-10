@@ -700,7 +700,7 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
         sp<OverlayRef>* overlayRef, 
         uint32_t w, uint32_t h, int32_t format, int32_t orientation)
     : Source(layer), mVisibilityChanged(false),
-    mOverlay(0), mOverlayHandle(0), mOverlayDevice(0), mOrientation(orientation)
+    mOverlay(0), mOverlayHandle(0), mOverlayDevice(0)
 {
     overlay_control_device_t* overlay_dev = getFlinger()->getOverlayEngine();
     if (overlay_dev == NULL) {
@@ -717,6 +717,18 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     if (overlay == NULL) {
         // couldn't create the overlay (no memory? no more overlays?)
         return;
+    }
+
+    // Separate the actual orientation from the flip information
+    if(orientation & HAL_TRANSFORM_FLIP_SRC_H) {
+        mFlip = HAL_TRANSFORM_FLIP_SRC_H;
+        mOrientation = orientation & HAL_TRANSFORM_ROT_MASK;
+    } else if (orientation & HAL_TRANSFORM_FLIP_SRC_V) {
+        mFlip = HAL_TRANSFORM_FLIP_SRC_V;
+        mOrientation = orientation & HAL_TRANSFORM_ROT_MASK;
+    } else {
+        mOrientation = orientation;
+        mFlip = 0;
     }
 
     // enable dithering...
@@ -799,7 +811,7 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
                 Transform finalTransform(Transform(mLayer.getOrientation()) *
                         Transform(mOrientation));
                 overlay_dev->setParameter(overlay_dev, mOverlay,
-                        OVERLAY_TRANSFORM, finalTransform.getOrientation());
+                        OVERLAY_TRANSFORM, finalTransform.getOrientation() | mFlip);
                 overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 overlay_dev->commit(overlay_dev, mOverlay);
             }
