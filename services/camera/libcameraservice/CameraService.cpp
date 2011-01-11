@@ -948,21 +948,21 @@ status_t CameraService::Client::sendCommand(int32_t cmd, int32_t arg1, int32_t a
             return OK;
 
         case CAMERA_CMD_HISTOGRAM_ON:
-             mHardware->enableMsgType(CAMERA_MSG_STATS_DATA);
+             enableMsgType(CAMERA_MSG_STATS_DATA);
              break;
 
         case CAMERA_CMD_HISTOGRAM_OFF:
-             mHardware->disableMsgType(CAMERA_MSG_STATS_DATA);
+             disableMsgType(CAMERA_MSG_STATS_DATA);
              break;
         case CAMERA_CMD_HISTOGRAM_SEND_DATA:
              break;
 
         case CAMERA_CMD_FACE_DETECTION_ON:
-             mHardware->enableMsgType(CAMERA_MSG_META_DATA);
+             enableMsgType(CAMERA_MSG_META_DATA);
              break;
 
         case CAMERA_CMD_FACE_DETECTION_OFF:
-             mHardware->disableMsgType(CAMERA_MSG_META_DATA);
+             disableMsgType(CAMERA_MSG_META_DATA);
              break;
 
         case CAMERA_CMD_SEND_META_DATA:
