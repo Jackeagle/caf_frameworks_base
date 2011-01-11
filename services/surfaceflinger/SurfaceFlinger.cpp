@@ -1273,6 +1273,7 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
     enableOverlayOpt(!enable);
 #endif
     hw.enableHDMIOutput(enable);
+    signalEvent();
 }
 
 void SurfaceFlinger::setActionSafeWidthRatio(float asWidthRatio){

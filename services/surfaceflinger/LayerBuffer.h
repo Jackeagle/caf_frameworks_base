@@ -189,6 +189,7 @@ private:
         int32_t mHeightStride;
         int32_t mOrientation;
         int32_t mFlip;
+        int32_t mHDMIEnabled;
         mutable Mutex mOverlaySourceLock;
         bool mInitialized;
     };
