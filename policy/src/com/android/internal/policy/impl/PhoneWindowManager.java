@@ -1696,6 +1696,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     /**
+    * @return Whether FM is being played right now.
+    */
+    boolean isFMActive() {
+        final AudioManager am = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) {
+            Log.w(TAG, "isFMActive: couldn't get AudioManager reference");
+            return false;
+        }
+        return am.isFMActive();
+    }
+
+    /**
      * Tell the audio service to adjust the volume appropriate to the event.
      * @param keycode
      */
@@ -1790,6 +1802,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             handleVolumeKey(AudioManager.STREAM_VOICE_CALL, keyCode);
                         } else if (isMusicActive()) {
                             handleVolumeKey(AudioManager.STREAM_MUSIC, keyCode);
+                        }
+                        else if (isFMActive()) {
+                            handleVolumeKey(AudioManager.STREAM_FM, keyCode);
                         }
                     }
                 }
