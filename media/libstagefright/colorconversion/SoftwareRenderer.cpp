@@ -41,6 +41,14 @@ SoftwareRenderer::SoftwareRenderer(
       mDecodedHeight(decodedHeight),
       mFrameSize(mDecodedWidth * mDecodedHeight * 2),  // RGB565
       mIndex(0) {
+    size_t alignedDecodedWidth  = ((decodedWidth + 31) & -32);
+    if ((mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar ) &&
+            (alignedDecodedWidth != mDecodedWidth)) {
+        mFrameSize = (alignedDecodedWidth * mDecodedHeight * 2);
+    }
+    else {
+        alignedDecodedWidth = decodedWidth;
+    }
     mMemoryHeap = new MemoryHeapBase("/dev/pmem_adsp", 2 * mFrameSize);
     if (mMemoryHeap->heapID() < 0) {
         LOGI("Creating physical memory heap failed, reverting to regular heap.");
@@ -56,6 +64,7 @@ SoftwareRenderer::SoftwareRenderer(
     CHECK(mDecodedHeight > 0);
     CHECK(mMemoryHeap->heapID() >= 0);
     CHECK(mConverter.isValid());
+    CHECK(alignedDecodedWidth > 0);
 
     uint32_t orientation;
     switch (rotationDegrees) {
@@ -68,7 +77,7 @@ SoftwareRenderer::SoftwareRenderer(
 
     ISurface::BufferHeap bufferHeap(
             mDisplayWidth, mDisplayHeight,
-            mDecodedWidth, mDecodedHeight,
+            alignedDecodedWidth, mDecodedHeight,
             PIXEL_FORMAT_RGB_565,
             orientation, 0,
             mMemoryHeap);
