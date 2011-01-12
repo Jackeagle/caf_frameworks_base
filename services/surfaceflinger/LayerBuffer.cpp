@@ -582,6 +582,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                 }
             }
         } else if (mUseEGLImageDirectly) {
+               clearTempBufferImage();
                sp<GraphicBuffer> mTempGraphicBuffer = new GraphicBuffer(
                            src.crop.r, src.crop.b, src.img.format,
                            GraphicBuffer::USAGE_HW_TEXTURE, src.img.w,
