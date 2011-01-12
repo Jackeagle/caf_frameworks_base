@@ -54,6 +54,8 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <utils/Vector.h>
 #include <cutils/properties.h>
 
+#include <cutils/properties.h>
+
 #include <OMX_Audio.h>
 #include <OMX_Component.h>
 
@@ -454,6 +456,14 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
     }
+
+    //if 7x30, we always want to use NV12 tile
+    char curr_target[128] = {0};
+    char target[] = "msm7630_";
+    property_get("ro.product.device", curr_target, "0");
+
+    if (!strncmp(target, curr_target, sizeof(target) - 1))
+        quirks |= kForceNV12TileColorFormat;
 
     return quirks;
 }
@@ -1476,7 +1486,13 @@ status_t OMXCodec::setVideoOutputFormat(
 	      }
             }
             if(mOMXLivesLocally)
-              format.nIndex = 0;
+            {
+                //force NV12 tile if needed; assuming NV12 is index 1
+                if (mQuirks & kForceNV12TileColorFormat)
+                    format.nIndex = 1;
+                else
+                    format.nIndex = 0;
+            }
         } else
           format.nIndex = 0;
 #else

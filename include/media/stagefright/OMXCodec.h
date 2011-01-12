@@ -115,7 +115,8 @@ private:
         kRequiresLargerEncoderOutputBuffer    = 4096,
         kOutputBuffersAreUnreadable           = 8192,
         kStoreMetaDataInInputVideoBuffers     = 16384,
-        kDoesNotRequireMemcpyOnOutputPort     = 32768
+        kDoesNotRequireMemcpyOnOutputPort     = 32768,
+        kForceNV12TileColorFormat             = 65536,
     };
 
     struct BufferInfo {
