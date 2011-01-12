@@ -1346,6 +1346,7 @@ MediaPlayerService::AudioOutput::AudioOutput(int sessionId)
       mSessionId(sessionId) {
     LOGV("AudioOutput(%d)", sessionId);
     mTrack = 0;
+    mSession = 0;
     mStreamType = AudioSystem::MUSIC;
     mLeftVolume = 1.0;
     mRightVolume = 1.0;
@@ -1359,6 +1360,7 @@ MediaPlayerService::AudioOutput::AudioOutput(int sessionId)
 MediaPlayerService::AudioOutput::~AudioOutput()
 {
     close();
+    closeSession();
 }
 
 void MediaPlayerService::AudioOutput::setMinBufferCount()
@@ -1433,8 +1435,6 @@ status_t MediaPlayerService::AudioOutput::openSession(
 
     flags |= AudioSystem::OUTPUT_FLAG_DIRECT;
 
-#if 0
-// TODO commenting to compile
     AudioTrack *t = new AudioTrack(
                 mStreamType,
                 format,
@@ -1448,7 +1448,6 @@ status_t MediaPlayerService::AudioOutput::openSession(
     }
     LOGV("openSession: Out");
     mSession = t;
-#endif
     return NO_ERROR;
 }
 
@@ -1570,8 +1569,10 @@ void MediaPlayerService::AudioOutput::pause()
 void MediaPlayerService::AudioOutput::close()
 {
     LOGV("close");
-    delete mTrack;
-    mTrack = 0;
+    if(mTrack != NULL) {
+        delete mTrack;
+        mTrack = 0;
+    }
 }
 
 void MediaPlayerService::AudioOutput::closeSession()
@@ -1599,7 +1600,6 @@ void MediaPlayerService::AudioOutput::resumeSession()
     }
 }
 
-
 void MediaPlayerService::AudioOutput::setVolume(float left, float right)
 {
     LOGV("setVolume(%f, %f)", left, right);
@@ -1609,6 +1609,7 @@ void MediaPlayerService::AudioOutput::setVolume(float left, float right)
         mTrack->setVolume(left, right);
     }
 }
+
 
 status_t MediaPlayerService::AudioOutput::setAuxEffectSendLevel(float level)
 {
