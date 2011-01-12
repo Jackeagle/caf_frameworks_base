@@ -342,7 +342,6 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
             // but no data will flow
             ret = DataState.DISCONNECTED;
         } else  */
-        Log.d(LOG_TAG, "IRAT > ServiceState(overall):" + getDataServiceState().getState());
         {
             /*
              * TODO: we do not keep global data connection state in DCT now.
@@ -378,7 +377,6 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
             ret = DataState.DISCONNECTED;
         } else
         */
-        Log.d(LOG_TAG, "IRAT > ServiceState:" + getDataServiceState().getState());
         {
             switch (dsState) {
                 case FAILED:
@@ -539,12 +537,10 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
         mNotifier.notifyDataConnection(this, ds.toApnTypeString(), ipv, reason);
     }
 
-    protected void notifyAllEnabledDataServiceTypes(String reason) {
+    protected void notifyAllDataServiceTypes(String reason) {
         for (DataServiceType ds : DataServiceType.values()) {
-            if (mDpt.isServiceTypeEnabled(ds)) {
-                notifyDataConnection(ds, IPVersion.IPV4, reason);
-                notifyDataConnection(ds, IPVersion.IPV6, reason);
-            }
+            notifyDataConnection(ds, IPVersion.IPV4, reason);
+            notifyDataConnection(ds, IPVersion.IPV6, reason);
         }
     }
 
