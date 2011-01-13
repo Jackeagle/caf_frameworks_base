@@ -218,6 +218,7 @@ status_t MediaRecorderClient::setCameraParameters(const String8& params) {
 
 status_t MediaRecorderClient::prepare()
 {
+    char value[PROPERTY_VALUE_MAX];
     LOGV("prepare");
     Mutex::Autolock lock(mLock);
     if (mRecorder == NULL) {
@@ -233,9 +234,16 @@ status_t MediaRecorderClient::prepare()
             return BAD_VALUE;
         }
 
-        if( mAudioEncoder == AUDIO_ENCODER_EVRC ||
-            mAudioEncoder == AUDIO_ENCODER_QCELP ){
-            LOGW("QCELP/EVRC recording, switching to OC");
+        // For 7627 target switch to OC for voice call recording
+        property_get("ro.product.device",value,"0");
+        if(((mAudioSource ==  AUDIO_SOURCE_VOICE_CALL ||
+             mAudioSource ==  AUDIO_SOURCE_VOICE_DOWNLINK) &&
+            (strcmp("msm7627_surf",value) == 0 ||
+             strcmp("msm7627_ffa",value) == 0))  ||
+            (mAudioEncoder == AUDIO_ENCODER_EVRC ||
+            mAudioEncoder == AUDIO_ENCODER_QCELP)) {
+            LOGW("QCELP/EVRC recording or voice call \
+                  recording, switching to OC");
             MediaRecorderBase * sfRecorder = mRecorder;
             mRecorder = new PVMediaRecorder( );
             mRecorder->init( );
