@@ -241,8 +241,9 @@ status_t MediaRecorderClient::prepare()
             (strcmp("msm7627_surf",value) == 0 ||
              strcmp("msm7627_ffa",value) == 0))  ||
             (mAudioEncoder == AUDIO_ENCODER_EVRC ||
-            mAudioEncoder == AUDIO_ENCODER_QCELP)) {
-            LOGW("QCELP/EVRC recording or voice call \
+            mAudioEncoder == AUDIO_ENCODER_QCELP)||
+            mAudioSource == AUDIO_SOURCE_FM_RX_A2DP ){
+            LOGW("QCELP/EVRC/FM_A2DP recording or voice call \
                   recording, switching to OC");
             MediaRecorderBase * sfRecorder = mRecorder;
             mRecorder = new PVMediaRecorder( );
