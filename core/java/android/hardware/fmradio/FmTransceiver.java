@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -450,5 +450,21 @@ public class FmTransceiver
       mControl.setStation(sFd);
 
       return true;
+   }
+
+   /*==============================================================
+   FUNCTION:  SetNotchFilter
+   ==============================================================*/
+   /**
+    *    Sets the desired notch filter for WAN avoidance.
+    *    <p>
+    *    This method sets the required Notch filter based on the current
+    *    WAN band frequency to achieve the FM-WAN concurrency.
+    *    Application should listen to Data call events and call the function
+    *    on every data call connection set-u, to achieve the FM-WAN concurrency.
+    *
+    */
+   public void setNotchFilter(boolean value) {
+	FmReceiverJNI.setNotchFilterNative(value);
    }
 }
