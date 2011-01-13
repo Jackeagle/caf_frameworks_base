@@ -423,8 +423,7 @@ status_t AVCDecoder::read(
         default:
         {
             LOGE("Should not be here, unknown nalType %d", nalType);
-            CHECK(!"Should not be here");
-            break;
+            return ERROR_UNSUPPORTED;
         }
     }
 
