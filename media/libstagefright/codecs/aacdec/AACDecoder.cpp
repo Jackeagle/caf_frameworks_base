@@ -229,6 +229,13 @@ status_t AACDecoder::read(
     }
 
     if (decoderErr != MP4AUDEC_SUCCESS) {
+
+        if (decoderErr == -1) {
+           LOGW("AAC decoder returned error %d, return", decoderErr);
+           err = BAD_VALUE;
+           return err;
+        }
+
         LOGW("AAC decoder returned error %d, substituting silence", decoderErr);
 
         memset(buffer->data(), 0, numOutBytes);
