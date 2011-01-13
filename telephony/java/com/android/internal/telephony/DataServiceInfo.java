@@ -171,8 +171,17 @@ public class DataServiceInfo {
                     if (profile == null) {
                         profile = dp; // first hit
                     } else {
-                        // Choose the profile with higher priority
-                        profile = ((DataProfileOmh)dp).isPriorityHigher(((DataProfileOmh)profile).getPriority()) ? dp : profile;
+                        if (mServiceType == DataServiceType.SERVICE_TYPE_SUPL) {
+                            // Choose the profile with lower priority for SUPL (for OMH)
+                            profile =
+                                ((DataProfileOmh)dp).isPriorityLower(((DataProfileOmh)profile).getPriority())
+                                ? dp : profile;
+                        } else {
+                            // Choose the profile with higher priority
+                            profile =
+                                ((DataProfileOmh)dp).isPriorityHigher(((DataProfileOmh)profile).getPriority())
+                                ? dp : profile;
+                        }
                     }
                 }
             }
