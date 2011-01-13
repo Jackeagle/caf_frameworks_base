@@ -158,6 +158,8 @@ public:
 
     virtual status_t getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames, int output);
 
+    virtual status_t deregisterClient(const sp<IAudioFlingerClient>& client);
+
     virtual int newAudioSessionId();
 
     virtual status_t loadEffectLibrary(const char *libPath, int *handle);

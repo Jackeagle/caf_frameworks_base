@@ -453,6 +453,7 @@ status_t AudioFlinger::setMasterVolume(float value)
         value = 1.0f;
     }
     mHardwareStatus = AUDIO_HW_IDLE;
+    mA2DPHandle = -1;
 
     mMasterVolume = value;
     for (uint32_t i = 0; i < mPlaybackThreads.size(); i++)
@@ -850,6 +851,26 @@ void AudioFlinger::registerClient(const sp<IAudioFlingerClient>& client)
             mRecordThreads.valueAt(i)->sendConfigEvent(AudioSystem::INPUT_OPENED);
         }
     }
+
+    // Send the notification to the client only once.
+    if (mA2DPHandle != -1) {
+        LOGV("A2DP active. Notifying the registered client");
+        client->ioConfigChanged(AudioSystem::A2DP_OUTPUT_STATE, mA2DPHandle, NULL);
+    }
+}
+
+status_t AudioFlinger::deregisterClient(const sp<IAudioFlingerClient>& client)
+{
+    LOGV("deregisterClient() %p, tid %d, calling tid %d", client.get(), gettid(), IPCThreadState::self()->getCallingPid());
+    Mutex::Autolock _l(mLock);
+
+    int pid = IPCThreadState::self()->getCallingPid();
+    int index = mNotificationClients.indexOfKey(pid);
+    if (index >= 0) {
+        mNotificationClients.removeItemsAt(index);
+        return true;
+    }
+    return false;
 }
 
 void AudioFlinger::removeNotificationClient(pid_t pid)
@@ -1422,7 +1443,13 @@ void AudioFlinger::PlaybackThread::audioConfigChanged_l(int event, int param) {
     default:
         break;
     }
-    mAudioFlinger->audioConfigChanged_l(event, mId, param2);
+    if (event != AudioSystem::A2DP_OUTPUT_STATE) {
+       mAudioFlinger->audioConfigChanged_l(event, mId, param2);
+    }
+    else
+    {
+        mAudioFlinger->audioConfigChanged_l(event, param, NULL);
+    }
 }
 
 void AudioFlinger::PlaybackThread::readOutputParameters()
@@ -4483,6 +4510,12 @@ int AudioFlinger::openOutput(uint32_t *pDevices,
         if (pChannels) *pChannels = channels;
         if (pLatencyMs) *pLatencyMs = thread->latency();
 
+        // if the device is a A2DP, then this is an A2DP Output
+        if ( true == AudioSystem::isA2dpDevice((AudioSystem::audio_devices) *pDevices) )
+        {
+            mA2DPHandle = id;
+            LOGV("A2DP device activated. The handle is set to %d", mA2DPHandle);
+        }
         // notify client processes of the new output creation
         thread->audioConfigChanged_l(AudioSystem::OUTPUT_OPENED);
         return id;
@@ -4618,6 +4651,13 @@ status_t AudioFlinger::closeOutput(int output)
         void *param2 = 0;
         audioConfigChanged_l(AudioSystem::OUTPUT_CLOSED, output, param2);
         mPlaybackThreads.removeItem(output);
+
+        if (mA2DPHandle == output)
+        {
+            mA2DPHandle = -1;
+            LOGV("A2DP OutputClosed Notifying Client");
+            audioConfigChanged_l(AudioSystem::A2DP_OUTPUT_STATE, mA2DPHandle, param2);
+        }
     }
     thread->exit();
 
@@ -4771,6 +4811,11 @@ status_t AudioFlinger::setStreamOutput(uint32_t stream, int output)
             MixerThread *srcThread = (MixerThread *)thread;
             srcThread->invalidateTracks(stream);
         }
+    }
+
+    if ( mA2DPHandle == output ) {
+        LOGV("A2DP Activated and hence notifying the client");
+        dstThread->sendConfigEvent(AudioSystem::A2DP_OUTPUT_STATE, mA2DPHandle);
     }
 
     return NO_ERROR;
