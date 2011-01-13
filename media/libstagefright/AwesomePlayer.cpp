@@ -1897,6 +1897,7 @@ void AwesomePlayer::postAudioSeekComplete() {
 }
 
 void AwesomePlayer::setNumFramesToHold() {
+#if 0
     char value1[128],value2[128];
     property_get("ro.product.device",value1,"0");
     property_get("hw.hdmiON", value2, "0");
@@ -1907,10 +1908,15 @@ void AwesomePlayer::setNumFramesToHold() {
        strcmp("qsd8250_ffa",value1) == 0  ||
        strcmp("qsd8650a_st1x",value1) == 0||
        strcmp("msm8660_surf",value1) == 0 ||
+       strcmp("msm7630_1x",value1) == 0 ||
        (strcmp("msm7630_surf",value1) == 0 && atoi(value2) && (!(mVideoWidth == 1280 && mVideoHeight == 720))))
         mNumFramesToHold = 2;
     else
         mNumFramesToHold = 1;
+#endif
+    //Always set number of frames to hold to 2 in order to resolve
+    //flicker for multiple video instance playback
+    mNumFramesToHold = 2;
 }
 
 // Trim both leading and trailing whitespace from the given string.
