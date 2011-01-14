@@ -2830,20 +2830,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
     private Object
     responseRegState(Parcel p) {
-        int num;
-        String regstates[][] = new String [RIL_MAX_NETWORKS][];
-
-        for (int i = 0; i < RIL_MAX_NETWORKS; ++i) {
-            num = p.readInt();
-            if (num == 0) {
-                regstates[i] = null;
-            } else {
-                regstates[i] = new String[num];
-                for (int j = 0; j < num; j++) {
-                    regstates[i][j] = p.readString();
-                }
-            }
-        }
+        String regstates[] =  p.readStringArray();
 
         RegStateResponse response = new RegStateResponse(regstates);
 

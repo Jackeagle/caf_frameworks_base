@@ -19,53 +19,34 @@ package com.android.internal.telephony;
 
 public class RegStateResponse {
 
-    private String mRegStates[][];
+    private String mRegStates[];
 
-    public int getNumRecords() {
-        if (mRegStates != null)
-            return mRegStates.length;
-        return 0;
+    public String[] getValues() {
+        return mRegStates;
     }
 
-    public String[] getRecord(int index) {
-        if (index >= getNumRecords()) {
-            return null;
-        }
-        return mRegStates[index];
-    }
-
-    public RegStateResponse(String regstates[][]) {
+    public RegStateResponse(String regstates[]) {
         this.mRegStates = regstates;
     }
 
     public String toString() {
-        StringBuilder sb = new StringBuilder("{ ");
-        int numRecs = getNumRecords();
-        sb.append("NumRecords:" + numRecs + ",");
-
-        for (int rec = 0; rec < numRecs; rec++) {
-            String[] strings = getRecord(rec);
-            sb.append("{");
-            if (null != strings) {
-                for (int i = 0; i < strings.length; i++) {
-                    if (null != strings[i]) {
-                        sb.append(strings[i]);
-                    } else {
-                        sb.append("null");
-                    }
-                    if (i < strings.length - 1) {
-                        sb.append(",");
-                    }
+        StringBuilder sb = new StringBuilder("{");
+        String[] strings = getValues();
+        if (null != strings) {
+            for (int i = 0; i < strings.length; i++) {
+                if (null != strings[i]) {
+                    sb.append(strings[i]);
+                } else {
+                    sb.append("null");
                 }
-            } else {
-                sb.append("null");
+                if (i < strings.length - 1) {
+                    sb.append(",");
+                }
             }
-            sb.append("}");
-            if (rec < numRecs - 1) {
-                sb.append(",");
-            }
+        } else {
+            sb.append("null");
         }
-        sb.append(" }");
+        sb.append("}");
         return sb.toString();
     }
 }
