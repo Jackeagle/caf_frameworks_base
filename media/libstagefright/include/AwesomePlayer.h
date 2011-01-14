@@ -142,7 +142,7 @@ private:
     sp<MediaSource> mAudioTrack;
     sp<MediaSource> mAudioSource;
     AudioPlayer *mAudioPlayer;
-    int64_t mDurationUs;
+    int64_t mDurationUs, mVideoDurationUs, mAudioDurationUs;
 
     uint32_t mFlags;
     uint32_t mExtractorFlags;
