@@ -1462,6 +1462,7 @@ static void android_os_Parcel_destroy(JNIEnv* env, jobject clazz)
     if (own) {
         Parcel* parcel = parcelForJavaObject(env, clazz);
         env->SetIntField(clazz, gParcelOffsets.mObject, 0);
+        env->SetIntField(clazz, gParcelOffsets.mOwnObject, 0);
         //LOGI("Destroying obj %p: deleting C++ Parcel %p\n", clazz, parcel);
         delete parcel;
     } else {
