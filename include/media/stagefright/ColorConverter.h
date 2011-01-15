@@ -83,6 +83,12 @@ private:
         const uint8_t *blockUV, size_t blockWidth,
         size_t blockHeight, size_t dstSkip);
 
+    void convertYUV420SemiPlanar32Aligned(
+            size_t width, size_t height,
+            const void *srcBits, size_t srcSkip,
+            void *dstBits, size_t dstSkip,
+            size_t alignedWidth);
+
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);
 };
