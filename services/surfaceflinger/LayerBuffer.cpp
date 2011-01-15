@@ -701,7 +701,7 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
         sp<OverlayRef>* overlayRef, 
         uint32_t w, uint32_t h, int32_t format, int32_t orientation)
     : Source(layer), mVisibilityChanged(false),
-    mOverlay(0), mOverlayHandle(0), mOverlayDevice(0)
+    mOverlay(0), mOverlayHandle(0), mOverlayDevice(0), mHDMIEnabled(0)
 {
     overlay_control_device_t* overlay_dev = getFlinger()->getOverlayEngine();
     if (overlay_dev == NULL) {
@@ -794,6 +794,11 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
     // this code-path must be as tight as possible, it's called each time
     // the screen is composited.
     if (UNLIKELY(mOverlay != 0)) {
+        if(mOverlayDevice && (mHDMIEnabled != (mLayer.mFlinger->mHDMIOutput))) {
+            overlay_control_device_t* ov_dev = mOverlayDevice;
+            ov_dev->setParameter(ov_dev, mOverlay, OVERLAY_HDMI_ENABLE, mLayer.mFlinger->mHDMIOutput);
+            mHDMIEnabled =  mLayer.mFlinger->mHDMIOutput;
+        }
         if (mVisibilityChanged || !mInitialized) {
             mVisibilityChanged = false;
             mInitialized = true;
