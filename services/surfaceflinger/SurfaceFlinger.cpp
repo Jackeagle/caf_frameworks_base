@@ -102,7 +102,7 @@ SurfaceFlinger::SurfaceFlinger()
         mLastCompCount(-1),
         mFullScreen(false),
         mOverlayUsed(false),
-        mOverlayUsedVideo(false)
+        mOverlayUseChanged(false)
 {
     init();
 }
@@ -400,21 +400,30 @@ bool SurfaceFlinger::threadLoop()
 
         // release the clients before we flip ('cause flip might block)
         logger.log(GraphicLog::SF_UNLOCK_CLIENTS, index);
-        unlockClients();
+        if (!mOverlayUseChanged)
+            unlockClients();
 
         logger.log(GraphicLog::SF_SWAP_BUFFERS, index);
         if (!mFullScreen) {
             postFramebuffer();
+            if (mOverlayOpt && mOverlayUseChanged) {
+                enableOverlayOpt(false);
+                enableOverlayOpt(true);
+                mOverlayUseChanged = false;
+                unlockClients();
+                freeBypassBuffers();
+            }
         }
-        else {
-            // Do we need to throttle?
-        }
+        ditchOverlayLayers();
 
         logger.log(GraphicLog::SF_REPAINT_DONE, index);
     } else {
-        if (mOverlayOpt) {
+        if ((mHDMIOutput || mOverlayOpt) && !(hw.canDraw())) {
             enableOverlayOpt(false);
             enableOverlayOpt(true);
+            const DisplayHardware& hw(graphicPlane(0).displayHardware());
+            if (mHDMIOutput)
+                hw.videoOverlayStarted(false);
         }
         // pretend we did the post
         unlockClients();
@@ -476,6 +485,16 @@ void SurfaceFlinger::handleConsoleEvents()
     mDirtyRegion.set(hw.bounds());
 }
 
+void SurfaceFlinger::ditchOverlayLayers()
+{
+#ifdef SF_BYPASS
+    const size_t count = mOverlayDitchedLayers.size();
+    for (size_t i=0 ; i<count ; i++)
+        mOverlayDitchedLayers[i]->ditch();
+    mOverlayDitchedLayers.clear();
+#endif
+}
+
 void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
 {
     Vector< sp<LayerBase> > ditchedLayers;
@@ -501,8 +520,12 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
     const size_t count = ditchedLayers.size();
     for (size_t i=0 ; i<count ; i++) {
         if (ditchedLayers[i] != 0) {
-            //LOGD("ditching layer %p", ditchedLayers[i].get());
-            ditchedLayers[i]->ditch();
+#ifdef SF_BYPASS
+            if (ditchedLayers[i]->isOverlayUsed())
+                mOverlayDitchedLayers.add(ditchedLayers[i]);
+            else
+#endif
+                ditchedLayers[i]->ditch();
         }
     }
 }
@@ -843,6 +866,19 @@ void SurfaceFlinger::handleRepaint()
     mDirtyRegion.clear();
 }
 
+void SurfaceFlinger::freeBypassBuffers()
+{
+#ifdef SF_BYPASS
+    const LayerVector& drawingLayers(mDrawingState.layersSortedByZ);
+    const size_t count = drawingLayers.size();
+    sp<LayerBase> const* const layers = drawingLayers.array();
+    for (size_t i=0 ; i<count ; ++i) {
+        const sp<LayerBase>& layer(layers[i]);
+        layer->freeBypassBuffers();
+    }
+#endif
+}
+
 void SurfaceFlinger::composeSurfaces(const Region& dirty)
 {
     if (UNLIKELY(!mWormholeRegion.isEmpty())) {
@@ -852,37 +888,40 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     }
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
     const size_t count = layers.size();
-    int compcount = 0, ovLayerIndex = -1, layerbuffercount = 0,   layerbufferIndex = -1;
-    int layersNotUpdatingCount = 0;
+    int compcount = 0, ovLayerIndex = -1,
+               layerbuffercount = 0,   layerbufferIndex = -1;
+    int layersNotUpdatingCount = 0, drawLayerIndex = -1;
     bool compositionStateChanged = false;
     Region prevClip;
     Region layerBufferClip;
     Region drawClip;
     bool canUseOverlayToDraw = false;
 
-
-    for (size_t i = 0; ((i < count)  && (compcount <= 1 || layerbuffercount <= 1)); ++i) {
+#if defined(TARGET_USES_OVERLAY)
+    for (size_t i = 0; ((i < count)  &&
+          (compcount <= 1 || layerbuffercount <= 1)); ++i) {
         const sp<LayerBase>& layer = layers[i];
         const Region& visibleRegion(layer->visibleRegionScreen);
-        if (!visibleRegion.isEmpty())  {
+        if (!visibleRegion.isEmpty()) {
             const Region clip(dirty.intersect(visibleRegion));
             if (!clip.isEmpty()) {
                 compcount++;
                 prevClip = clip;
                 ovLayerIndex = i;
 
-            if(layer->isNothingToUpdate()) {
-                layersNotUpdatingCount++;
-            }
+                if(layer->isNothingToUpdate()) {
+                    layersNotUpdatingCount++;
+                }
 
-            if (layer->getLayerInitFlags() & ePushBuffers) {
-                layerbuffercount++;
-                layerbufferIndex = i;
-                layerBufferClip = clip;
+                if (layer->getLayerInitFlags() & ePushBuffers) {
+                    layerbuffercount++;
+                    layerbufferIndex = i;
+                    layerBufferClip = clip;
                 }
             }
         }
     }
+#endif
 
     if (mOverlayOpt) {
         if(layerbuffercount == 1) {
@@ -893,67 +932,55 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         else
             mLastCompCount = -1;
 
+        const DisplayHardware& hw(graphicPlane(0).displayHardware());
         if(getOverlayEngine()) {
             if(layerbuffercount == 1) {
-                if(compcount == 1) {
-                   canUseOverlayToDraw = true;
-                } else if (((compcount-1) == layersNotUpdatingCount) && !compositionStateChanged) {
+                if ((compcount == 1 && !compositionStateChanged)
+                     || (((compcount - 1) == layersNotUpdatingCount)
+                          && !compositionStateChanged)) {
                    canUseOverlayToDraw = true;
                 }
                 drawClip = layerBufferClip;
+                drawLayerIndex = layerbufferIndex;
             }
 #ifdef SF_BYPASS
-            else if(compcount == 1) {
+            else if(hw.isOverlayUIEnabled() && compcount == 1) {
                 canUseOverlayToDraw = true;
                 drawClip = prevClip;
+                drawLayerIndex = ovLayerIndex;
             }
 #endif
         }
 
         if (canUseOverlayToDraw && (ovLayerIndex != -1)) {
             Region::const_iterator it = prevClip.begin();
-            const DisplayHardware& hw(graphicPlane(0).displayHardware());
             const Rect& r = *it++;
             if (((r.right - r.left) == hw.getWidth() && (r.bottom - r.top) == hw.getHeight()) ||
                           layerbuffercount) {
-                bool clear = !mOverlayUsed;
-                if(layerbuffercount == 1 && compcount == 1 && compositionStateChanged)
-                   clear = true;
-#ifdef SF_BYPASS
-                int drawLayerIndex;
-                if(layerbuffercount == 1) {
-                   drawLayerIndex = layerbufferIndex;
-                } else {
-                   drawLayerIndex = ovLayerIndex;
-                }
                 const sp<LayerBase>& layer = layers[drawLayerIndex];
-                if (layer->drawWithOverlay(drawClip, clear, mHDMIOutput) == NO_ERROR) {
-#else
-                const sp<LayerBase>& layer = layers[layerbufferIndex];
-                if (layer->drawWithOverlay(drawClip, clear, mHDMIOutput) == NO_ERROR) {
-#endif
-                    if (clear)
-                        mFullScreen = false;
-                    else
-                        mFullScreen = true;
+                status_t err = NO_ERROR;
+                if ((err = layer->drawWithOverlay(drawClip, mHDMIOutput))
+                            == NO_ERROR) {
+                    mFullScreen = true;
                     mOverlayUsed = true;
+                    layer->setBufferInUse();
                     return;
+                }
+                else if (err != NO_INIT) {
+                    if (!mOverlayUsed) {
+                        enableOverlayOpt(false);
+                        enableOverlayOpt(true);
+                    }
+                    LOGE("Draw with overlay failed");
                 }
             }
         }
-
-        if (!compcount) {
-            mFullScreen = true;
-            return;
-        }
     }
+
     mFullScreen = false;
     if (mOverlayUsed && layerbuffercount != 1) {
         mOverlayUsed = false;
-        if (mOverlayOpt) {
-            enableOverlayOpt(false);
-            enableOverlayOpt(true);
-        }
+        mOverlayUseChanged = true;
     }
 
     for (size_t i=0 ; i<count ; ++i) {
@@ -961,11 +988,12 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
                 if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
-                    if (layer->drawWithOverlay(clip, true, mHDMIOutput) != NO_ERROR) {
+                    if (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR) {
                         layer->draw(clip);
+                        mOverlayUseChanged = true;
                     }
-                    mOverlayUsed = true;
-                    mOverlayUsedVideo = true;
+                    else
+                        mOverlayUsed = true;
                 }
                 else
                     layer->draw(clip);

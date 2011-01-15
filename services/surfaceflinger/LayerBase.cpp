@@ -51,7 +51,8 @@ LayerBase::LayerBase(SurfaceFlinger* flinger, DisplayID display)
       mLeft(0), mTop(0),
       mTransactionFlags(0),
       mPremultipliedAlpha(true), mName("unnamed"), mDebug(false),
-      mInvalidate(0)
+      mInvalidate(0),
+      mOverlayUsed(false)
 {
     const DisplayHardware& hw(flinger->graphicPlane(0).displayHardware());
     mFlags = hw.getFlags();
@@ -309,11 +310,6 @@ void LayerBase::drawRegion(const Region& reg) const
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4); 
         }
     }
-}
-
-status_t LayerBase::drawWithOverlay(const Region& inClip, bool clear, bool hdmiConnected) const
-{
-    return INVALID_OPERATION;
 }
 
 void LayerBase::draw(const Region& clip) const

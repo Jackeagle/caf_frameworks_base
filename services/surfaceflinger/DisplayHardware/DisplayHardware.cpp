@@ -188,6 +188,10 @@ void DisplayHardware::init(uint32_t dpy)
 
 #if defined(TARGET_USES_OVERLAY)
     mOverlayLibObject = new overlay::Overlay();
+    mOverlayUIEnable = false;
+    property_get("debug.overlayui.enable", property, "0");
+    if (atoi(property))
+        mOverlayUIEnable = true;
 #endif
 
     if (mFlags & PARTIAL_UPDATES) {
@@ -314,13 +318,6 @@ void DisplayHardware::fini()
 void DisplayHardware::releaseScreen() const
 {
     DisplayHardwareBase::releaseScreen();
-    videoOverlayStarted(false);
-#if defined(TARGET_USES_OVERLAY)
-    overlay::Overlay* temp = getOverlayObject();
-    if (temp) {
-        temp->closeChannel();
-    }
-#endif
 }
 
 void DisplayHardware::acquireScreen() const

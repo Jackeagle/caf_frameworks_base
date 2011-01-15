@@ -60,7 +60,8 @@ Layer::Layer(SurfaceFlinger* flinger,
         mSecure(false),
         mTextureManager(),
         mBufferManager(mTextureManager),
-        mWidth(0), mHeight(0), mFixedSize(false)
+        mWidth(0), mHeight(0), mFixedSize(false),
+        mOverlay(false)
 {
 }
 
@@ -81,8 +82,16 @@ Layer::~Layer()
 status_t Layer::setToken(const sp<UserClient>& userClient,
         SharedClient* sharedClient, int32_t token)
 {
+    int numbuffers = mBufferManager.getDefaultBufferCount();
+#if defined(SF_BYPASS)
+    if (getLayerInitFlags() & ISurfaceComposer::eFullScreen) {
+        numbuffers = 3;
+        mBufferManager.resize(numbuffers);
+    }
+#endif
+
     sp<SharedBufferServer> lcblk = new SharedBufferServer(
-            sharedClient, token, mBufferManager.getDefaultBufferCount(),
+            sharedClient, token, numbuffers,
             getIdentity());
 
     status_t err = mUserClientRef.setToken(userClient, lcblk, token);
@@ -228,12 +237,62 @@ void Layer::drawForSreenShot() const
     const_cast<Layer*>(this)->mNeedsBlending = currentBlending;
 }
 
-status_t Layer::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const
+status_t Layer::freeBypassBuffers() const
+{
+    if (!isOverlayUsed())
+        return NO_ERROR;
+    ClientRef::Access sharedClient(mUserClientRef);
+    SharedBufferServer* lcblk(sharedClient.get());
+    if (lcblk)
+        lcblk->setInUseBypass(-1);
+    setOverlayUsed(false);
+    return NO_ERROR;
+}
+
+status_t Layer::setBufferInUse() const
+{
+    Texture tex(mBufferManager.getActiveTexture());
+    if (tex.image == EGL_NO_IMAGE_KHR)
+        return INVALID_OPERATION;
+
+    GLuint textureName = tex.name;
+    if (UNLIKELY(textureName == -1LU)) {
+        return INVALID_OPERATION;
+    }
+
+    ClientRef::Access sharedClient(mUserClientRef);
+    SharedBufferServer* lcblk(sharedClient.get());
+    if (lcblk) {
+        int buf = mBufferManager.getActiveBufferIndex();
+        if (buf >= 0)
+            lcblk->setInUseBypass(buf);
+    }
+
+    return NO_ERROR;
+}
+
+status_t Layer::drawWithOverlay(const Region& clip,
+                    bool hdmiConnected, bool ignoreFB) const
 {
 #if defined(SF_BYPASS)
+    if (mBufferManager.getNumBuffers()
+                   <= mBufferManager.getDefaultBufferCount())
+        return NO_INIT;
+
+    Texture tex(mBufferManager.getActiveTexture());
+    if (tex.image == EGL_NO_IMAGE_KHR)
+        return INVALID_OPERATION;
+
+    GLuint textureName = tex.name;
+    if (UNLIKELY(textureName == -1LU)) {
+        return INVALID_OPERATION;
+    }
+
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     overlay::Overlay* temp = hw.getOverlayObject();
-    if (!temp->setSource(mWidth, mHeight, mFormat, getOrientation(), hdmiConnected))
+    if (!temp->setSource(mWidth, mHeight, mFormat,
+                           getOrientation(), hdmiConnected,
+                           ignoreFB, mBufferManager.getNumBuffers()))
         return INVALID_OPERATION;
     const Rect bounds(mTransformedBounds);
     int x = bounds.left;
@@ -262,22 +321,16 @@ status_t Layer::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnect
     if (!ret)
         return INVALID_OPERATION;
 
-    Texture tex(mBufferManager.getActiveTexture());
-    if (tex.image == EGL_NO_IMAGE_KHR)
-        return INVALID_OPERATION;
-
-    GLuint textureName = tex.name;
-    if (UNLIKELY(textureName == -1LU)) {
-        return INVALID_OPERATION;
-    }
 
     sp<GraphicBuffer> buffer(mBufferManager.getActiveBuffer());
     buffer_handle_t handle = (buffer->getNativeBuffer())->handle;
     ret = temp->queueBuffer(handle);
     if (!ret)
         return INVALID_OPERATION;
-    if (clear)
+    if (!ignoreFB)
         clearWithOpenGL(clip);
+    setOverlayUsed(true);
+    mOverlay = true;
     return NO_ERROR;
 #endif
     return INVALID_OPERATION;
@@ -285,6 +338,8 @@ status_t Layer::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnect
 
 void Layer::onDraw(const Region& clip) const
 {
+    mOverlay = false;
+
     Texture tex(mBufferManager.getActiveTexture());
     if (tex.name == -1LU) {
         // the texture has not been created yet, this Layer has
@@ -659,6 +714,11 @@ void Layer::finishPageFlip()
     ClientRef::Access sharedClient(mUserClientRef);
     SharedBufferServer* lcblk(sharedClient.get());
     if (lcblk) {
+        if (isOverlayUsed() && !mOverlay) {
+            lcblk->setInUseBypass(-1);
+            setOverlayUsed(false);
+        }
+
         int buf = mBufferManager.getActiveBufferIndex();
         if (buf >= 0) {
             status_t err = lcblk->unlock( buf );

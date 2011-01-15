@@ -40,6 +40,8 @@ import android.util.Log;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.concurrent.locks.ReentrantLock;
+import static android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN;
+import android.content.res.TypedArray;
 
 /**
  * Provides a dedicated drawing surface embedded inside of a view hierarchy.
@@ -465,6 +467,13 @@ public class SurfaceView extends View {
                               ;
                 if (!getContext().getResources().getCompatibilityInfo().supportsScreen()) {
                     mLayout.flags |= WindowManager.LayoutParams.FLAG_COMPATIBLE_WINDOW;
+                }
+
+                TypedArray a = getContext().obtainStyledAttributes(com.android.internal.R.styleable.Window);
+                if ((a != null
+                      && a.getBoolean(com.android.internal.R.styleable.Window_windowFullscreen, false))
+                      || mAttachInfo.mFullScreen) {
+                    mLayout.flags |= WindowManager.LayoutParams.FLAG_FULLSCREEN;
                 }
 
                 mLayout.memoryType = mRequestedType;
