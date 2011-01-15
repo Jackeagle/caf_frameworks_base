@@ -86,6 +86,10 @@ public class Surface implements Parcelable {
      * play back.
      */
     public static final int PUSH_BUFFERS        = 0x00000200;
+    /**
+     * @hide
+    */
+    public static final int FULL_SCREEN         = 0x00000400;
     
     /** Creates a normal surface. This is the default */
     public static final int FX_SURFACE_NORMAL   = 0x00000000;

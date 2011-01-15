@@ -119,8 +119,11 @@ public:
      */
     virtual void draw(const Region& clip) const;
     virtual void drawForSreenShot() const;
-    virtual status_t drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const;
-    
+    virtual status_t drawWithOverlay(const Region& clip,
+                  bool hdmiConnected, bool ignoreFB = true) const
+                          { return INVALID_OPERATION; }
+    virtual status_t setBufferInUse() const { return INVALID_OPERATION; };
+    virtual status_t freeBypassBuffers() const { return INVALID_OPERATION; };
     /**
      * onDraw - draws the surface.
      */
@@ -272,6 +275,11 @@ protected:
 
 private:
     LayerBase(const LayerBase& rhs);
+private:
+    mutable bool mOverlayUsed;
+public:
+    bool isOverlayUsed() const { return mOverlayUsed; }
+    void setOverlayUsed(bool val) const { mOverlayUsed = val; }
 };
 
 

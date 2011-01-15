@@ -92,6 +92,7 @@ public:
     overlay_control_device_t* getOverlayEngine() const { return mOverlayEngine; }
 #if defined(TARGET_USES_OVERLAY)
     overlay::Overlay* getOverlayObject() const { return mOverlayLibObject; }
+    bool isOverlayUIEnabled() const { return mOverlayUIEnable; }
 #endif
     
     status_t compositionComplete() const;
@@ -127,6 +128,7 @@ private:
     overlay_control_device_t* mOverlayEngine;
 #if defined(TARGET_USES_OVERLAY)
     overlay::Overlay* mOverlayLibObject;
+    bool mOverlayUIEnable;
 #endif
 };
 
