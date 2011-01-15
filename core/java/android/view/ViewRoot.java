@@ -59,6 +59,7 @@ import java.util.ArrayList;
 import javax.microedition.khronos.egl.*;
 import javax.microedition.khronos.opengles.*;
 import static javax.microedition.khronos.opengles.GL10.*;
+import static android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN;
 
 /**
  * The top of a view hierarchy, implementing the needed protocol between View
@@ -760,6 +761,7 @@ public final class ViewRoot extends Handler implements ViewParent,
             attachInfo.mWindowVisibility = viewVisibility;
             attachInfo.mRecomputeGlobalAttributes = false;
             attachInfo.mKeepScreenOn = false;
+            attachInfo.mFullScreen = ((lp.flags & FLAG_FULLSCREEN) != 0);
             viewVisibilityChanged = false;
             mLastConfiguration.setTo(host.getResources().getConfiguration());
             host.dispatchAttachedToWindow(attachInfo, 0);

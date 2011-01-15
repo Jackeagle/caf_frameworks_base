@@ -35,6 +35,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
+import static android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN;
 
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.policy.PolicyManager;
@@ -6273,6 +6274,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 int flags = 0;
                 if (mAttrs.memoryType == MEMORY_TYPE_PUSH_BUFFERS) {
                     flags |= Surface.PUSH_BUFFERS;
+                }
+
+                if (((mAttrs.flags & FLAG_FULLSCREEN) != 0)
+                         && mAppToken.appFullscreen) {
+                    flags |= Surface.FULL_SCREEN;
                 }
 
                 if ((mAttrs.flags&WindowManager.LayoutParams.FLAG_SECURE) != 0) {

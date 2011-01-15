@@ -2144,11 +2144,7 @@ void OMXCodec::on_message(const omx_message &msg) {
             if (mPortStatus[kPortIndexOutput] == DISABLING) {
                 CODEC_LOGV("Port is disabled, freeing buffer %p", buffer);
 
-                status_t err =
-                    mOMX->freeBuffer(mNode, kPortIndexOutput, buffer);
-                CHECK_EQ(err, OK);
-
-                buffers->removeAt(i);
+                freeBuffersOnOutPortIfAllAreWithUs();
 #if 0
             } else if (mPortStatus[kPortIndexOutput] == ENABLED
                        && (flags & OMX_BUFFERFLAG_EOS)) {
@@ -2617,6 +2613,31 @@ size_t OMXCodec::countBuffersWeOwn(const Vector<BufferInfo> &buffers) {
     return n;
 }
 
+/*Qualcomm Video driver has issues when buffers
+ * are freed one by one, so freeing them together
+ */
+status_t OMXCodec::freeBuffersOnOutPortIfAllAreWithUs() {
+    if((countBuffersWeOwn(mPortBuffers[kPortIndexOutput]) != mPortBuffers[kPortIndexOutput].size())) {
+        CODEC_LOGV("Some Buffers are with component");
+        return OK;
+    }
+    bool weOwnAllBuffers = true;
+    Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
+    for (size_t i = 0; i < buffers->size(); ++i) {
+        BufferInfo *info = &buffers->editItemAt(i);
+        if(info->mMediaBuffer && info->mMediaBuffer->refcount() != 0){
+            CODEC_LOGV("Some Buffers are with renderer");
+            weOwnAllBuffers = false;
+            break;
+        }
+    }
+    if(weOwnAllBuffers == false) {
+        CODEC_LOGV("We dont own all buffers yet");
+        return OK;
+    }
+    return freeBuffersOnPort(kPortIndexOutput,true);
+}
+
 status_t OMXCodec::freeBuffersOnPort(
         OMX_U32 portIndex, bool onlyThoseWeOwn) {
     Vector<BufferInfo> *buffers = &mPortBuffers[portIndex];
@@ -2626,7 +2647,7 @@ status_t OMXCodec::freeBuffersOnPort(
     for (size_t i = buffers->size(); i-- > 0;) {
         BufferInfo *info = &buffers->editItemAt(i);
 
-        if (onlyThoseWeOwn && info->mOwnedByComponent || (info->mMediaBuffer && (info->mMediaBuffer->refcount() != 0)) ) {
+        if (onlyThoseWeOwn && info->mOwnedByComponent) {
             continue;
         }
 
@@ -2654,11 +2675,7 @@ status_t OMXCodec::freeBuffersOnPort(
         buffers->removeAt(i);
     }
 
-    //CHECK(onlyThoseWeOwn || buffers->isEmpty());  /commenting this assert
-    //since it is very much possible to have not freed all buffers as they
-    //might be held by renderer at this point. We free buffers held by us
-    //only and let renderer free buffers held by it.
-
+    CHECK(onlyThoseWeOwn || buffers->isEmpty());
 
     return stickyErr;
 }
@@ -2730,7 +2747,11 @@ void OMXCodec::disablePortAsync(OMX_U32 portIndex) {
         mOMX->sendCommand(mNode, OMX_CommandPortDisable, portIndex);
     CHECK_EQ(err, OK);
 
-    freeBuffersOnPort(portIndex, true);
+    if(portIndex == kPortIndexInput) {
+        freeBuffersOnPort(portIndex, true);
+    } else {
+        freeBuffersOnOutPortIfAllAreWithUs();
+    }
 }
 
 void OMXCodec::enablePortAsync(OMX_U32 portIndex) {
@@ -3764,22 +3785,6 @@ status_t OMXCodec::read(
     return OK;
 }
 
-void OMXCodec::freeOutputBuffer(BufferInfo *info) {
-    CHECK_EQ(info->mOwnedByComponent, false);
-
-    status_t err =
-        mOMX->freeBuffer(mNode, kPortIndexOutput, info->mBuffer);
-    CHECK_EQ(err, OK);
-
-    if (info->mMediaBuffer != NULL) {
-        info->mMediaBuffer->setObserver(NULL);
-
-        CHECK_EQ(info->mMediaBuffer->refcount(), 0);
-
-        info->mMediaBuffer->release();
-    }
-}
-
 void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
     Mutex::Autolock autoLock(mLock);
 
@@ -3792,8 +3797,7 @@ void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
              if(mPortStatus[kPortIndexOutput] == ENABLED)
                  fillOutputBuffer(info);
              else if(mPortStatus[kPortIndexOutput] == DISABLING) {
-                 freeOutputBuffer(info);
-                 buffers->removeAt(i);
+                 freeBuffersOnOutPortIfAllAreWithUs();
              }
             return;
         }
