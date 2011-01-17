@@ -95,6 +95,13 @@ public final class ShutdownThread extends Thread {
             }
         }
 
+        boolean isDebuggableMonkeyBuild =
+                                SystemProperties.getBoolean("ro.monkey", false);
+        if (isDebuggableMonkeyBuild) {
+            Log.d(TAG, "Rejected shutdown as monkey is detected to be running.");
+            return;
+        }
+
         Log.d(TAG, "Notifying thread to start radio shutdown");
 
         if (confirm) {
