@@ -35,6 +35,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.BatteryStats;
+import android.os.BatteryManager;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -46,6 +47,7 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.provider.Settings.SettingNotFoundException;
 import android.provider.Settings;
 import android.util.EventLog;
@@ -525,6 +527,15 @@ class PowerManagerService extends IPowerManager.Stub
         } else {
             // turn everything on
             setPowerState(ALL_BRIGHT);
+        }
+
+        // Set wake lock if hw.nopm option is true. Also set SCREEN_ON_BIT, because 
+        // setPowerState() may exit before the mPowerState is updated
+        String hwNoPMStr = SystemProperties.get("hw.nopm");
+        boolean hwNoPM = Boolean.parseBoolean(hwNoPMStr);
+        if (hwNoPM) {
+            setStayOnSetting(BatteryManager.BATTERY_PLUGGED_AC | BatteryManager.BATTERY_PLUGGED_USB);
+            mPowerState |= SCREEN_ON_BIT;
         }
 
         synchronized (mHandlerThread) {
@@ -2085,9 +2096,12 @@ class PowerManagerService extends IPowerManager.Stub
      */
     public void goToSleep(long time)
     {
-        mContext.enforceCallingOrSelfPermission(android.Manifest.permission.DEVICE_POWER, null);
-        synchronized (mLocks) {
-            goToSleepLocked(time, WindowManagerPolicy.OFF_BECAUSE_OF_USER);
+        // Check for STAY_ON_WHILE_PLUGGED_IN to prevent skiping of input events when ENDCALL button was pressed
+        if (mStayOnConditions == 0) {
+            mContext.enforceCallingOrSelfPermission(android.Manifest.permission.DEVICE_POWER, null);
+            synchronized (mLocks) {
+                goToSleepLocked(time, WindowManagerPolicy.OFF_BECAUSE_OF_USER);
+            }
         }
     }
     
