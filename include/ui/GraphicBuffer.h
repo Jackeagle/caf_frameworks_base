@@ -94,6 +94,10 @@ public:
     void setIndex(int index);
     int getIndex() const;
 
+    void setVerticalStride(uint32_t vstride);
+    uint32_t getVerticalStride() const;
+
+
 private:
     virtual ~GraphicBuffer();
 
@@ -136,6 +140,7 @@ private:
 
     GraphicBufferMapper& mBufferMapper;
     ssize_t mInitCheck;
+    uint32_t mVStride;
     int mIndex;
 };
 
