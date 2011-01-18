@@ -392,7 +392,6 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
                      * is on the same radio tech as the data call and supports CSS
                      */
                     if (TelephonyManager.getDefault().getCallState() != TelephonyManager.CALL_STATE_IDLE
-                            && TelephonyManager.getDefault().getNetworkType() == getDataServiceState().getRadioTechnology()
                             && !isConcurrentVoiceAndData()) {
                         Log.d(LOG_TAG, "connectioned moved to SUSPENDED, ds:" + ds);
                         ret = DataState.SUSPENDED;
