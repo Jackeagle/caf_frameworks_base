@@ -32,6 +32,7 @@ ifeq ($(TARGET_HAVE_TSLIB),true)
 	LOCAL_C_INCLUDES += external/tslib/src
 endif
 
+LOCAL_C_INCLUDES += hardware/msm7k/libgralloc-qsd8k
 LOCAL_MODULE:= libui
 
 ifeq ($(TARGET_SIMULATOR),true)

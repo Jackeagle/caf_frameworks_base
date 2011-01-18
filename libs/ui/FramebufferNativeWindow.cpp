@@ -37,7 +37,7 @@
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
-
+#include <gralloc_priv.h>
 #include <private/ui/android_natives_priv.h>
 
 // ----------------------------------------------------------------------------
@@ -95,27 +95,22 @@ FramebufferNativeWindow::FramebufferNativeWindow()
         mUpdateOnDemand = (fbDev->setUpdateRect != 0);
         
         // initialize the buffer FIFO
-        mNumBuffers = 2;
-        mNumFreeBuffers = 2;
-        mBufferHead = mNumBuffers-1;
-        buffers[0] = new NativeBuffer(
+        private_module_t const* m = (const private_module_t*)(module);
+        mNumBuffers = m->numBuffers;
+        mNumFreeBuffers = m->numBuffers;
+        mBufferHead = 0;
+        LOGE("mNumBuffers = %d", mNumBuffers);
+        for(int i = 0; i < mNumBuffers; i++) {
+            buffers[i] = new NativeBuffer(
                 fbDev->width, fbDev->height, fbDev->format, GRALLOC_USAGE_HW_FB);
-        buffers[1] = new NativeBuffer(
-                fbDev->width, fbDev->height, fbDev->format, GRALLOC_USAGE_HW_FB);
-        
-        err = grDev->alloc(grDev,
+
+            err = grDev->alloc(grDev,
                 fbDev->width, fbDev->height, fbDev->format, 
-                GRALLOC_USAGE_HW_FB, &buffers[0]->handle, &buffers[0]->stride);
+                GRALLOC_USAGE_HW_FB, &buffers[i]->handle, &buffers[i]->stride);
 
-        LOGE_IF(err, "fb buffer 0 allocation failed w=%d, h=%d, err=%s",
-                fbDev->width, fbDev->height, strerror(-err));
-
-        err = grDev->alloc(grDev,
-                fbDev->width, fbDev->height, fbDev->format, 
-                GRALLOC_USAGE_HW_FB, &buffers[1]->handle, &buffers[1]->stride);
-
-        LOGE_IF(err, "fb buffer 1 allocation failed w=%d, h=%d, err=%s",
-                fbDev->width, fbDev->height, strerror(-err));
+            LOGE_IF(err, "fb buffer %d allocation failed w=%d, h=%d, err=%s",
+                i, fbDev->width, fbDev->height, strerror(-err));
+        }
 
         const_cast<uint32_t&>(android_native_window_t::flags) = fbDev->flags; 
         const_cast<float&>(android_native_window_t::xdpi) = fbDev->xdpi;
@@ -139,10 +134,11 @@ FramebufferNativeWindow::FramebufferNativeWindow()
 FramebufferNativeWindow::~FramebufferNativeWindow() 
 {
     if (grDev) {
-        if (buffers[0] != NULL)
-            grDev->free(grDev, buffers[0]->handle);
-        if (buffers[1] != NULL)
-            grDev->free(grDev, buffers[1]->handle);
+        for(int i = 0; i < mNumBuffers; i++) {
+            if (buffers[i] != NULL) {
+                grDev->free(grDev, buffers[i]->handle);
+            }
+        }
         gralloc_close(grDev);
     }
 
@@ -178,16 +174,27 @@ int FramebufferNativeWindow::dequeueBuffer(android_native_window_t* window,
         android_native_buffer_t** buffer)
 {
     FramebufferNativeWindow* self = getSelf(window);
-    Mutex::Autolock _l(self->mutex);
     framebuffer_device_t* fb = self->fbDev;
 
-    // wait for a free buffer
-    while (!self->mNumFreeBuffers) {
-        self->mCondition.wait(self->mutex);
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+            fb->common.module);
+
+    /* This is the buffer we need to wait for to be AVL */
+    int index = self->mBufferHead;
+
+    pthread_mutex_lock(&(m->avail[index].lock));
+    while (m->avail[index].state != AVL) {
+        pthread_cond_wait(&(m->avail[index].cond),
+                         &(m->avail[index].lock));
     }
+    pthread_mutex_unlock(&(m->avail[index].lock));
+
+    /* The buffer is available, return it */
+    Mutex::Autolock _l(self->mutex);
+
     // get this buffer
     self->mNumFreeBuffers--;
-    int index = self->mBufferHead++;
+    self->mBufferHead++;
     if (self->mBufferHead >= self->mNumBuffers)
         self->mBufferHead = 0;
 
