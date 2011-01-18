@@ -493,7 +493,7 @@ void AwesomePlayer::reset_l() {
         IPCThreadState::self()->flushCommands();
     }
 
-    mDurationUs = -1;
+    mDurationUs = mVideoDurationUs = mAudioDurationUs = -1;
     mFlags = 0;
     mExtractorFlags = 0;
     mVideoWidth = mVideoHeight = -1;
@@ -955,13 +955,12 @@ status_t AwesomePlayer::getDuration(int64_t *durationUs) {
 status_t AwesomePlayer::getPosition(int64_t *positionUs) {
     if (mRTSPController != NULL) {
         *positionUs = mRTSPController->getNormalPlayTimeUs();
-    }
-    else if (mSeeking) {
+    } else if (mSeeking) {
         *positionUs = mSeekTimeUs;
-    } else if (mVideoSource != NULL) {
+    } else if (mVideoSource != NULL && !(mFlags & VIDEO_AT_EOS)) {
         Mutex::Autolock autoLock(mMiscStateLock);
         *positionUs = mVideoTimeUs;
-    } else if (mAudioPlayer != NULL) {
+    } else if (mAudioPlayer != NULL && !(mFlags & AUDIO_AT_EOS)) {
         *positionUs = mAudioPlayer->getMediaTimeUs();
     } else {
         *positionUs = 0;
@@ -1003,7 +1002,16 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
     mSeeking = true;
     mSeekNotificationSent = false;
     mSeekTimeUs = timeUs;
-    mFlags &= ~(AT_EOS | AUDIO_AT_EOS | VIDEO_AT_EOS);
+
+    //Clear the VIDEO and AUDIO EOS flags only conditionally
+    //for better performance; but clear AT_EOS unconditionally
+    if (timeUs < mVideoDurationUs)
+        mFlags &= ~VIDEO_AT_EOS;
+
+    if (timeUs < mAudioDurationUs)
+        mFlags &= ~AUDIO_AT_EOS;
+
+    mFlags &= ~AT_EOS;
 
     seekAudioIfNecessary_l();
 
@@ -1019,7 +1027,9 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
 }
 
 void AwesomePlayer::seekAudioIfNecessary_l() {
-    if (mSeeking && mVideoSource == NULL && mAudioPlayer != NULL) {
+    if (mSeeking
+        && (mVideoSource == NULL || (mFlags & VIDEO_AT_EOS))
+        && mAudioPlayer != NULL) {
         mAudioPlayer->seekTo(mSeekTimeUs);
 
         mWatchForAudioSeekComplete = true;
@@ -1083,6 +1093,7 @@ status_t AwesomePlayer::initAudioDecoder() {
             if (mDurationUs < 0 || durationUs > mDurationUs) {
                 mDurationUs = durationUs;
             }
+            mAudioDurationUs = durationUs;
         }
 
         status_t err = mAudioSource->start();
@@ -1123,6 +1134,7 @@ status_t AwesomePlayer::initVideoDecoder(uint32_t flags) {
             if (mDurationUs < 0 || durationUs > mDurationUs) {
                 mDurationUs = durationUs;
             }
+            mVideoDurationUs = durationUs;
         }
 
         CHECK(mVideoTrack->getFormat()->findInt32(kKeyWidth, &mVideoWidth));
@@ -1228,6 +1240,7 @@ void AwesomePlayer::onVideoEvent() {
                 finishSeekIfNecessary(-1);
 
                 mFlags |= VIDEO_AT_EOS;
+                mVideoDurationUs = mVideoTimeUs;
                 postStreamDoneEvent_l(err);
                 return;
             }
