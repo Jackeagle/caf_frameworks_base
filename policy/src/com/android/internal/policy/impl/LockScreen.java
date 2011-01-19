@@ -127,7 +127,12 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
         /**
          * The sim card is locked.
          */
-        SimLocked(true);
+        SimLocked(true),
+
+        /**
+         * The sim card is faulty.
+         */
+        SimIOError(true);
 
         private final boolean mShowStatusLines;
 
@@ -493,6 +498,8 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 return Status.Normal;
             case UNKNOWN:
                 return Status.SimMissing;
+            case CARD_IO_ERROR:
+                return Status.SimIOError;
         }
         return Status.SimMissing;
     }
@@ -585,6 +592,16 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 mScreenLocked.setVisibility(View.VISIBLE);
                 mSelector.setVisibility(View.GONE); // cannot unlock
                 mEmergencyCallText.setVisibility(View.VISIBLE);
+                mEmergencyCallButton.setVisibility(View.VISIBLE);
+                break;
+            case SimIOError:
+                // text
+                mCarrier.setText(R.string.lockscreen_sim_error_message_short);
+                mScreenLocked.setText(R.string.lockscreen_instructions_when_pattern_disabled);
+
+                // layout
+                mScreenLocked.setVisibility(View.INVISIBLE);
+                mSelector.setVisibility(View.VISIBLE);
                 mEmergencyCallButton.setVisibility(View.VISIBLE);
                 break;
         }
