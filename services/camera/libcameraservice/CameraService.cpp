@@ -488,6 +488,7 @@ void CameraService::Client::disconnect() {
         if( mOverlay != NULL){
             mOverlay->destroy();
             mOverlay = NULL;
+            mHardware->setOverlay(NULL);
         }
         mOverlayRef = 0;
     }
@@ -588,6 +589,7 @@ status_t CameraService::Client::setOverlay(int pw, int ph) {
         if(mOverlay != NULL) {
             mOverlay->destroy();
             mOverlay = NULL;
+            mHardware->setOverlay(NULL);
         }
         mOrientationChanged = false;
     }
@@ -787,6 +789,7 @@ void CameraService::Client::stopPreview() {
     mOverlayRef = 0;
     if(mOverlay != NULL){
         mOverlay->destroy();
+        mHardware->setOverlay(NULL);
         mOverlay = NULL;
     }
 
@@ -894,6 +897,8 @@ status_t CameraService::Client::setParameters(const String8& params) {
             if( mOverlay != NULL) {
                 LOGI("Destroying Overlay");
                 mOverlay->destroy();
+                if(mHardware != NULL)
+                    mHardware->setOverlay(NULL);
                 mOverlay = NULL;
             }
             mOverlayRef = 0;
