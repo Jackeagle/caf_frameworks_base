@@ -117,6 +117,8 @@ private:
         kStoreMetaDataInInputVideoBuffers     = 16384,
         kDoesNotRequireMemcpyOnOutputPort     = 32768,
         kForceNV12TileColorFormat             = 65536,
+        kBFrameFlagInExtensions               = 131072,
+        kRequiresEOSMessage                   = 262144,
     };
 
     struct BufferInfo {
@@ -176,6 +178,7 @@ private:
 
     bool mInterlaceFormatDetected;
     bool m3DVideoDetected;
+    bool mSendEOS;
 
     OMXCodec(const sp<IOMX> &omx, IOMX::node_id node, uint32_t quirks,
              bool isEncoder, const char *mime, const char *componentName,
@@ -287,6 +290,7 @@ private:
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
     void freeOutputBuffer(BufferInfo *info);
+    status_t sendEOSToOMXComponent( );
 };
 
 struct CodecProfileLevel {

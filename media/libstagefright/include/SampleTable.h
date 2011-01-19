@@ -110,7 +110,7 @@ private:
 
     //ctts
     uint32_t mCompositionTimeToSampleCount;
-    uint32_t *mCompositionTimeToSample;
+    int32_t *mCompositionTimeToSample;
 
     off64_t mSyncSampleOffset;
 
