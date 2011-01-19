@@ -28,15 +28,11 @@ import android.os.Registrant;
 import android.os.RegistrantList;
 import android.os.SystemProperties;
 import android.telephony.ServiceState;
-import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
-import com.android.internal.telephony.cdma.CdmaRoamingInfoHelper;
-import com.android.internal.telephony.cdma.CdmaSubscriptionInfo;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
-import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.telephony.cdma.RuimRecords;
 import com.android.internal.telephony.gsm.RestrictedState;
 import com.android.internal.telephony.gsm.SIMRecords;
@@ -67,10 +63,7 @@ public class DataServiceStateTracker extends Handler {
     private static final int EVENT_ICC_CHANGED = 10;
 
     /* cdma only */
-    private static final int EVENT_GET_CDMA_SUBSCRIPTION_INFO = 14;
-    private static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 16;
-    private static final int EVENT_GET_CDMA_PRL_VERSION = 17;
-    private static final int EVENT_CDMA_PRL_VERSION_CHANGED = 18;
+    private static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 15;
 
     /* gsm only */
     private static final int EVENT_RESTRICTED_STATE_CHANGED = 20;
@@ -118,13 +111,13 @@ public class DataServiceStateTracker extends Handler {
 
     /* cdma only stuff */
     public int mCdmaSubscriptionSource = Phone.CDMA_SUBSCRIPTION_NV; /* assume NV */
-    private CdmaSubscriptionInfo mCdmaSubscriptionInfo;
-    private CdmaRoamingInfoHelper mCdmaRoamingInfo;
     private CdmaSubscriptionSourceManager mCdmaSSM = null;
+    private boolean mCdmaRoaming = false;
 
     /* gsm only stuff */
     private RestrictedState mRs;
     private boolean mGsmRoaming = false;
+
     private PhoneNotifier mNotifier;
 
     public DataServiceStateTracker(DataConnectionTracker dct, Context context, PhoneNotifier notifier,
@@ -141,8 +134,6 @@ public class DataServiceStateTracker extends Handler {
         mNewSS = new ServiceState();
 
         /* stores cdma stuff */
-        mCdmaSubscriptionInfo = new CdmaSubscriptionInfo();
-        mCdmaRoamingInfo = new CdmaRoamingInfoHelper();
         mCdmaSSM = CdmaSubscriptionSourceManager.getInstance(context, ci, new Registrant(this,
                 EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null));
 
@@ -156,7 +147,7 @@ public class DataServiceStateTracker extends Handler {
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
         //cdma only
-        cm.registerForCdmaPrlChanged(this, EVENT_CDMA_PRL_VERSION_CHANGED, null);
+        cm.registerForCdmaSubscriptionSourceChanged(this, EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
     }
 
     @Override
@@ -169,8 +160,6 @@ public class DataServiceStateTracker extends Handler {
                 pollState("radio state changed");
                 if (cm.getRadioState().isOn()) {
                     handleCdmaSubscriptionSource();
-                    cm.getCDMASubscription( obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_INFO));
-                    cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
                 }
                 break;
 
@@ -184,14 +173,10 @@ public class DataServiceStateTracker extends Handler {
                 break;
 
             case EVENT_RUIM_READY:
-                cm.getCDMASubscription(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_INFO));
-                cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
                 pollState("ruim ready");
                 break;
 
             case EVENT_NV_READY:
-                cm.getCDMASubscription(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_INFO));
-                cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
                 pollState("nv ready");
                 break;
 
@@ -213,26 +198,6 @@ public class DataServiceStateTracker extends Handler {
             case EVENT_POLL_STATE_REGISTRATION:
                 ar = (AsyncResult) msg.obj;
                 handlePollStateResult(msg.what, ar);
-                break;
-
-            case EVENT_GET_CDMA_SUBSCRIPTION_INFO:
-                ar = (AsyncResult) msg.obj;
-                if (ar.exception != null) {
-                    Log.e(LOG_TAG, "Error parsing CDMA subscription information!");
-                } else {
-                    mCdmaSubscriptionInfo.populateSubscriptionInfoFromRegistrationState((String[]) ar.result);
-                }
-                break;
-
-            case EVENT_CDMA_PRL_VERSION_CHANGED:
-                cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
-                break;
-
-            case EVENT_GET_CDMA_PRL_VERSION:
-                ar = (AsyncResult) msg.obj;
-                if (ar.exception == null) {
-                    mCdmaSubscriptionInfo.setPrlVersion((String) ar.result);
-                }
                 break;
 
             case EVENT_RESTRICTED_STATE_CHANGED:
@@ -327,79 +292,43 @@ public class DataServiceStateTracker extends Handler {
             }
         } else try {
             switch (what) {
-            case EVENT_POLL_STATE_REGISTRATION: // Handle RIL_REQUEST_REGISTRATION_STATE.
+            case EVENT_POLL_STATE_REGISTRATION: // Handle RIL_REQUEST_DATA_REGISTRATION_STATE.
                 RegStateResponse r = (RegStateResponse)ar.result;
-                String states[] =  r.getRecord(0);
+                String states[] =  r.getValues();
 
                 int registrationState = 4;     //[0] registrationState
                 int radioTechnology = -1;      //[3] radioTechnology
-                int cssIndicator = 0;          //[7] init with 0, because it is treated as a boolean
-                int systemId = 0;              //[8] systemId
-                int networkId = 0;             //[9] networkId
-                int roamingIndicator = -1;     //[10] Roaming indicator
-                int systemIsInPrl = 0;         //[11] Indicates if current system is in PRL
-                int defaultRoamingIndicator = 0;  //[12] Is default roaming indicator from PRL
-                int reasonForDenial = 0;       //[13] Denial reason if registrationState = 3
+                int reasonForDenial = 0;       //[4] Denial reason if registrationState = 3
 
-                if (states.length != 14) {
+                if (states.length != 6) {
                     throw new RuntimeException(
                             "Warning! Wrong number of parameters returned from "
-                            + "RIL_REQUEST_REGISTRATION_STATE: expected 14 got "
+                            + "RIL_REQUEST_DATA_REGISTRATION_STATE: expected 6 got "
                             + states.length);
                 }
 
                 try {
-                    if (states[0] != null) {
+                    if (states[0] != null && states[0].length() > 0) {
                         registrationState = Integer.parseInt(states[0]);
                     }
-                    if (states[3] != null) {
+                    if (states[3] != null && states[3].length() > 0) {
                         radioTechnology = Integer.parseInt(states[3]);
                     }
-                    if (states[7] != null) {
-                        cssIndicator = Integer.parseInt(states[7]);
+                    if (states[4] != null&& states[4].length() > 0) {
+                        reasonForDenial = Integer.parseInt(states[4]);
                     }
-                    if (RadioTechnology.getRadioTechFromInt(radioTechnology).isCdma()) {
-                        if (states[8] != null) {
-                            systemId = Integer.parseInt(states[8]);
-                        }
-                        if (states[9] != null) {
-                            networkId = Integer.parseInt(states[9]);
-                        }
-                        if (states[10] != null) {
-                            roamingIndicator = Integer.parseInt(states[10]);
-                        }
-                        if (states[11] != null) {
-                            systemIsInPrl = Integer.parseInt(states[11]);
-                        }
-                        if (states[12] != null) {
-                            defaultRoamingIndicator = Integer.parseInt(states[12]);
-                        }
-                    }
-                    if (states[13] != null) {
-                        reasonForDenial = Integer.parseInt(states[13]);
-                    }
+
                 } catch (NumberFormatException ex) {
                     Log.w(LOG_TAG, "error parsing RegistrationState: " + ex);
                 }
 
                 mNewSS.setState(regCodeToServiceState(registrationState));
                 mNewSS.setRadioTechnology(radioTechnology);
-                mNewSS.setCssIndicator(cssIndicator);
 
                 this.mNewDataConnectionState = regCodeToServiceState(registrationState);
 
                 if (RadioTechnology.getRadioTechFromInt(radioTechnology).isCdma()) {
-                    mNewSS.setSystemAndNetworkId(systemId, networkId);
-
-                    // When registration state is roaming and TSB58
-                    // roaming indicator is not in the carrier-specified
-                    // list of ERIs for home system, mCdmaRoaming is
-                    // true.
-
-                    mCdmaRoamingInfo.mCdmaRoaming = regCodeIsRoaming(registrationState) && !isRoamIndForHomeSystem(states[10]);
-                    mCdmaRoamingInfo.mRoamingIndicator = roamingIndicator;
-                    mCdmaRoamingInfo.mIsSystemInPrl = (systemIsInPrl == 0) ? false : true;
-                    mCdmaRoamingInfo.mDefaultRoamingIndicator = defaultRoamingIndicator;
+                    mCdmaRoaming = regCodeIsRoaming(registrationState);
                 }
 
                 if (RadioTechnology.getRadioTechFromInt(radioTechnology).isGsm()) {
@@ -436,8 +365,7 @@ public class DataServiceStateTracker extends Handler {
 
         if (mPollingContext[0] == 0) {
             if (RadioTechnology.getRadioTechFromInt(mNewSS.getRadioTechnology()).isCdma()) {
-                /* update the new service state with cdma roaming indicators */
-                updateCdmaRoamingInfoInServiceState(mCdmaRoamingInfo, mCdmaSubscriptionSource, mCdmaSubscriptionInfo, mNewSS);
+                updateCdmaRoamingInfoInServiceState(mCdmaRoaming, mCdmaSubscriptionSource, mNewSS);
             }
             if (RadioTechnology.getRadioTechFromInt(mNewSS.getRadioTechnology()).isGsm()) {
                 updateGsmRoamingInfoInServiceState(mGsmRoaming, mNewSS);
@@ -710,33 +638,6 @@ public class DataServiceStateTracker extends Handler {
     }
 
     /**
-     * Determine whether a roaming indicator is in the carrier-specified list of ERIs for
-     * home system
-     *
-     * @param roamInd roaming indicator in String
-     * @return true if the roamInd is in the carrier-specified list of ERIs for home network
-     */
-    private boolean isRoamIndForHomeSystem(String roamInd) {
-        // retrieve the carrier-specified list of ERIs for home system
-        String homeRoamIndcators = SystemProperties.get("ro.cdma.homesystem");
-
-        if (!TextUtils.isEmpty(homeRoamIndcators)) {
-            // searches through the comma-separated list for a match,
-            // return true if one is found.
-            for (String homeRoamInd : homeRoamIndcators.split(",")) {
-                if (homeRoamInd.equals(roamInd)) {
-                    return true;
-                }
-            }
-            // no matches found against the list!
-            return false;
-        }
-
-        // no system property found for the roaming indicators for home system
-        return false;
-    }
-
-    /**
      * Set roaming state when cdmaRoaming is true and ons is different from spn
      *
      * @param cdmaRoaming TS 27.007 7.2 CREG registered roaming
@@ -797,51 +698,13 @@ public class DataServiceStateTracker extends Handler {
         ss.setRoaming(roaming);
     }
 
-    public void updateCdmaRoamingInfoInServiceState(CdmaRoamingInfoHelper cdmaRoamingInfo, int cdmaSubscriptionSource,
-            CdmaSubscriptionInfo cdmaSubscriptionInfo, ServiceState ss) {
-
-        boolean namMatch = false;
-        if (!cdmaSubscriptionInfo.isSidsAllZeros()
-                && cdmaSubscriptionInfo.isHomeSid(ss.getSystemId())) {
-            namMatch = true;
-        }
-
+    public void updateCdmaRoamingInfoInServiceState(Boolean roaming, int cdmaSubscriptionSource,
+            ServiceState ss) {
         // Setting SS Roaming (general)
         if (cdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_RUIM_SIM) {
-            ss.setRoaming(isCdmaRoamingBetweenOperators(cdmaRoamingInfo.mCdmaRoaming, ss));
+            ss.setRoaming(isCdmaRoamingBetweenOperators(roaming, ss));
         } else {
-            ss.setRoaming(cdmaRoamingInfo.mCdmaRoaming);
-        }
-
-        // Setting SS CdmaRoamingIndicator and CdmaDefaultRoamingIndicator
-        ss.setCdmaDefaultRoamingIndicator(cdmaRoamingInfo.mDefaultRoamingIndicator);
-        ss.setCdmaRoamingIndicator(cdmaRoamingInfo.mRoamingIndicator);
-
-        boolean isPrlLoaded = true;
-        if (cdmaSubscriptionInfo != null && TextUtils.isEmpty(cdmaSubscriptionInfo.mPrlVersion)) {
-            isPrlLoaded = false;
-        }
-
-        if (!isPrlLoaded) {
-            ss.setCdmaRoamingIndicator(EriInfo.ROAMING_INDICATOR_FLASH);
-        } else if (!cdmaSubscriptionInfo.isSidsAllZeros()) {
-            if (!namMatch && !cdmaRoamingInfo.mIsSystemInPrl) {
-                // Use default
-                ss.setCdmaRoamingIndicator(cdmaRoamingInfo.mDefaultRoamingIndicator);
-            } else if (namMatch && !cdmaRoamingInfo.mIsSystemInPrl) {
-                ss.setCdmaRoamingIndicator(EriInfo.ROAMING_INDICATOR_FLASH);
-            } else if (!namMatch && cdmaRoamingInfo.mIsSystemInPrl) {
-                // Use the one from PRL/ERI
-                ss.setCdmaRoamingIndicator(cdmaRoamingInfo.mRoamingIndicator);
-            } else {
-                // It means namMatch && mIsInPrl
-                if ((cdmaRoamingInfo.mRoamingIndicator <= 2)) {
-                    ss.setCdmaRoamingIndicator(EriInfo.ROAMING_INDICATOR_OFF);
-                } else {
-                    // Use the one from PRL/ERI
-                    ss.setCdmaRoamingIndicator(cdmaRoamingInfo.mRoamingIndicator);
-                }
-            }
+            ss.setRoaming(roaming);
         }
     }
 

@@ -379,7 +379,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
 
             if (ar.exception == null) {
                 RegStateResponse r = (RegStateResponse)ar.result;
-                String states[] = r.getRecord(0);
+                String states[] = r.getValues();
                 int baseStationId = -1;
                 int baseStationLatitude = CdmaCellLocation.INVALID_LAT_LONG;
                 int baseStationLongitude = CdmaCellLocation.INVALID_LAT_LONG;
@@ -388,13 +388,13 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
 
                 if (states.length > 9) {
                     try {
-                        if (states[4] != null) {
+                        if (states[4] != null && states[4].length() > 0) {
                             baseStationId = Integer.parseInt(states[4]);
                         }
-                        if (states[5] != null) {
+                        if (states[5] != null && states[5].length() > 0) {
                             baseStationLatitude = Integer.parseInt(states[5]);
                         }
-                        if (states[6] != null) {
+                        if (states[6] != null && states[6].length() > 0) {
                             baseStationLongitude = Integer.parseInt(states[6]);
                         }
                         // Some carriers only return lat-lngs of 0,0
@@ -402,10 +402,10 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                             baseStationLatitude  = CdmaCellLocation.INVALID_LAT_LONG;
                             baseStationLongitude = CdmaCellLocation.INVALID_LAT_LONG;
                         }
-                        if (states[8] != null) {
+                        if (states[8] != null && states[8].length() > 0) {
                             systemId = Integer.parseInt(states[8]);
                         }
-                        if (states[9] != null) {
+                        if (states[9] != null && states[9].length() > 0) {
                             networkId = Integer.parseInt(states[9]);
                         }
                     } catch (NumberFormatException ex) {
@@ -652,7 +652,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             switch (what) {
             case EVENT_POLL_STATE_REGISTRATION_CDMA: // Handle RIL_REQUEST_REGISTRATION_STATE.
                 RegStateResponse r = (RegStateResponse)ar.result;
-                states = r.getRecord(0);
+                states = r.getValues();
 
                 int registrationState = 4;     //[0] registrationState
                 int radioTechnology = -1;      //[3] radioTechnology
@@ -669,21 +669,21 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                 int defaultRoamingIndicator = 0;  //[12] Is default roaming indicator from PRL
                 int reasonForDenial = 0;       //[13] Denial reason if registrationState = 3
 
-                if (states.length == 14) {
+                if (states.length >= 14) {
                     try {
-                        if (states[0] != null) {
+                        if (states[0] != null && states[0].length() > 0) {
                             registrationState = Integer.parseInt(states[0]);
                         }
-                        if (states[3] != null) {
+                        if (states[3] != null && states[3].length() > 0) {
                             radioTechnology = Integer.parseInt(states[3]);
                         }
-                        if (states[4] != null) {
+                        if (states[4] != null && states[4].length() > 0) {
                             baseStationId = Integer.parseInt(states[4]);
                         }
-                        if (states[5] != null) {
+                        if (states[5] != null && states[5].length() > 0) {
                             baseStationLatitude = Integer.parseInt(states[5]);
                         }
-                        if (states[6] != null) {
+                        if (states[6] != null && states[6].length() > 0) {
                             baseStationLongitude = Integer.parseInt(states[6]);
                         }
                         // Some carriers only return lat-lngs of 0,0
@@ -691,25 +691,25 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                             baseStationLatitude  = CdmaCellLocation.INVALID_LAT_LONG;
                             baseStationLongitude = CdmaCellLocation.INVALID_LAT_LONG;
                         }
-                        if (states[7] != null) {
+                        if (states[7] != null && states[7].length() > 0) {
                             cssIndicator = Integer.parseInt(states[7]);
                         }
-                        if (states[8] != null) {
+                        if (states[8] != null && states[8].length() > 0) {
                             systemId = Integer.parseInt(states[8]);
                         }
-                        if (states[9] != null) {
+                        if (states[9] != null && states[9].length() > 0) {
                             networkId = Integer.parseInt(states[9]);
                         }
-                        if (states[10] != null) {
+                        if (states[10] != null && states[10].length() > 0) {
                             roamingIndicator = Integer.parseInt(states[10]);
                         }
-                        if (states[11] != null) {
+                        if (states[11] != null && states[11].length() > 0) {
                             systemIsInPrl = Integer.parseInt(states[11]);
                         }
-                        if (states[12] != null) {
+                        if (states[12] != null && states[12].length() > 0) {
                             defaultRoamingIndicator = Integer.parseInt(states[12]);
                         }
-                        if (states[13] != null) {
+                        if (states[13] != null && states[13].length() > 0) {
                             reasonForDenial = Integer.parseInt(states[13]);
                         }
                     } catch (NumberFormatException ex) {
