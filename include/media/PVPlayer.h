@@ -75,6 +75,9 @@ public:
     void   setIsPlaying(bool set) { mIsPlaying = set; }
     bool   getIsPlaying()         { return mIsPlaying; }
 
+    bool    isNotPaused();
+    int     getCurrentPlayerState();
+
 private:
     static void         do_nothing(status_t s, void *cookie, bool cancelled) { }
     static void         run_init(status_t s, void *cookie, bool cancelled);
