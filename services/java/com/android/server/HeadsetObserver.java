@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
  *
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -44,10 +46,18 @@ class HeadsetObserver extends UEventObserver {
     private static final int BIT_HEADSET = (1 << 0);
     private static final int BIT_HEADSET_SPEAKER_ONLY = (1 << 1);
     private static final int BIT_HEADSET_MIC_ONLY = (1 << 2);
-    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_SPEAKER_ONLY|BIT_HEADSET_MIC_ONLY);
+    private static final int BIT_ANCHEADSET = (1 << 3);
+    private static final int BIT_ANCHEADSET_SPEAKER_ONLY = (1 << 4);
+    private static final int BIT_ANCHEADSET_MIC_ONLY = (1 << 5);
+    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_SPEAKER_ONLY|BIT_HEADSET_MIC_ONLY |
+                                                   BIT_ANCHEADSET|BIT_ANCHEADSET_SPEAKER_ONLY|BIT_ANCHEADSET_MIC_ONLY );
     private static final int HEADSETS_WITH_MIC_AND_SPEAKER = BIT_HEADSET;
     private static final int HEADSETS_WITH_SPEAKER_ONLY = BIT_HEADSET_SPEAKER_ONLY;
     private static final int HEADSETS_WITH_MIC_ONLY = BIT_HEADSET_MIC_ONLY;
+
+    private static final int ANCHEADSETS_WITH_MIC_AND_SPEAKER = BIT_ANCHEADSET;
+    private static final int ANCHEADSETS_WITH_SPEAKER_ONLY = BIT_ANCHEADSET_SPEAKER_ONLY;
+    private static final int ANCHEADSETS_WITH_MIC_ONLY = BIT_ANCHEADSET_MIC_ONLY;
 
     private int mHeadsetState;
     private int mPrevHeadsetState;
@@ -170,6 +180,7 @@ class HeadsetObserver extends UEventObserver {
             int state = 0;
             int microphone = 0;
             int speaker = 0;
+            int anc = 0;
 
             if ((headset & HEADSETS_WITH_SPEAKER_ONLY) != 0) {
                 speaker = 1;
@@ -184,6 +195,22 @@ class HeadsetObserver extends UEventObserver {
                 microphone = 1;
             }
 
+            if ((headset & ANCHEADSETS_WITH_SPEAKER_ONLY) != 0) {
+                speaker = 1;
+                anc = 1;
+            }
+
+            if ((headset & ANCHEADSETS_WITH_MIC_AND_SPEAKER) != 0) {
+                microphone = 1;
+                speaker = 1;
+                anc = 1;
+            }
+
+            if ((headset & ANCHEADSETS_WITH_MIC_ONLY) != 0) {
+                microphone = 1;
+                anc = 1;
+            }
+
             if ((headsetState & headset) != 0) {
                 state = 1;
             }
@@ -191,8 +218,9 @@ class HeadsetObserver extends UEventObserver {
             intent.putExtra("name", headsetName);
             intent.putExtra("microphone", microphone);
             intent.putExtra("speaker", speaker);
+            intent.putExtra("anc", anc);
 
-            if (LOG) Slog.v(TAG, "Intent.ACTION_HEADSET_PLUG: state: "+state+" name: "+headsetName+" mic: "+microphone+" speaker: "+speaker);
+            if (LOG) Slog.v(TAG, "Intent.ACTION_HEADSET_PLUG: state: "+state+" name: "+headsetName+" mic: "+microphone+" speaker: "+speaker + "anc: " + anc);
             // TODO: Should we require a permission?
             ActivityManagerNative.broadcastStickyIntent(intent, null);
         }

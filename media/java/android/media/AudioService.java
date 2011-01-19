@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
  *
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -1898,52 +1900,95 @@ public class AudioService extends IAudioService.Stub {
                     mBluetoothHeadsetConnected = true;
                 }
             } else if (action.equals(Intent.ACTION_HEADSET_PLUG)) {
-                int state = intent.getIntExtra("state", 0);
+                int state      = intent.getIntExtra("state", 0);
                 int microphone = intent.getIntExtra("microphone", 0);
-                int speaker = intent.getIntExtra("speaker", 0);
+                int speaker    = intent.getIntExtra("speaker", 0);
+                int anc        = intent.getIntExtra("anc", 0);
+                String name    = intent.getStringExtra("name");
                 // Handling plug/unplug of microphone and speaker together
                 if ((microphone != 0) && (speaker  != 0) ) {
                     boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_WIRED_HEADSET);
-                    if (state == 0 && isConnected) {
+                    boolean isancConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_ANC_HEADSET);
+                    if (state == 0 && isConnected && !isancConnected) {
                         AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADSET,
                                 AudioSystem.DEVICE_STATE_UNAVAILABLE,
                                 "");
                         mConnectedDevices.remove(AudioSystem.DEVICE_OUT_WIRED_HEADSET);
-                    } else if (state == 1 && !isConnected)  {
-                        AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADSET,
-                                AudioSystem.DEVICE_STATE_AVAILABLE,
+                    } else if (state == 0 && isancConnected) {
+                        AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_ANC_HEADSET,
+                                AudioSystem.DEVICE_STATE_UNAVAILABLE,
                                 "");
-                        mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_WIRED_HEADSET), "");
+                        mConnectedDevices.remove(AudioSystem.DEVICE_OUT_ANC_HEADSET);
+                    }else if (state == 1 && !isConnected && !isancConnected)  {
+                        if(name.equalsIgnoreCase("Headset") && anc == 1 ){
+                            AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_ANC_HEADSET,
+                                    AudioSystem.DEVICE_STATE_AVAILABLE,
+                                    "");
+                            mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_ANC_HEADSET), "");
+                        } else if(name.equalsIgnoreCase("Headset") && anc == 0) {
+                            AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADSET,
+                                    AudioSystem.DEVICE_STATE_AVAILABLE,
+                                    "");
+                            mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_WIRED_HEADSET), "");
+                        }
                     }
                 }
                 // Handling plug/unplug of microphone
                 if ((microphone != 0) && (speaker == 0)) {
                     boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_IN_WIRED_HEADSET);
+                    boolean isancConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_IN_ANC_HEADSET);
                     if (state == 0 && isConnected) {
                         AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_IN_WIRED_HEADSET,
                                 AudioSystem.DEVICE_STATE_UNAVAILABLE,
                                 "");
                         mConnectedDevices.remove(AudioSystem.DEVICE_IN_WIRED_HEADSET);
-                    } else if (state == 1 && !isConnected)  {
-                        AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_IN_WIRED_HEADSET,
-                                AudioSystem.DEVICE_STATE_AVAILABLE,
+                    } else if (state == 0 && isancConnected) {
+                        AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_IN_ANC_HEADSET,
+                                AudioSystem.DEVICE_STATE_UNAVAILABLE,
                                 "");
-                        mConnectedDevices.put( new Integer(AudioSystem.DEVICE_IN_WIRED_HEADSET), "");
+                        mConnectedDevices.remove(AudioSystem.DEVICE_IN_ANC_HEADSET);
+                    }else if (state == 1 && !isConnected && !isancConnected)  {
+                        if(name.equalsIgnoreCase("Headset") && anc == 1){
+                            AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_IN_ANC_HEADSET,
+                                    AudioSystem.DEVICE_STATE_AVAILABLE,
+                                    "");
+                            mConnectedDevices.put( new Integer(AudioSystem.DEVICE_IN_ANC_HEADSET), "");
+                       }else if (name.equalsIgnoreCase("Headset") && anc == 0){
+                            AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_IN_WIRED_HEADSET,
+                                    AudioSystem.DEVICE_STATE_AVAILABLE,
+                                    "");
+                            mConnectedDevices.put( new Integer(AudioSystem.DEVICE_IN_WIRED_HEADSET), "");
+                        }
                     }
                 }
                 // Handling plug/unplug of speaker
                 if ((microphone == 0) && (speaker != 0)) {
                     boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE);
-                    if (state == 0 && isConnected) {
+                    boolean isancConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_ANC_HEADPHONE);
+                    if (state == 0 && isConnected && !isancConnected) {
+                        Log.e(TAG,"if (state == 0 && isConnected && !isancConnected) {");
                         AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE,
                                 AudioSystem.DEVICE_STATE_UNAVAILABLE,
                                 "");
                         mConnectedDevices.remove(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE);
-                    } else if (state == 1 && !isConnected)  {
-                        AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE,
-                                AudioSystem.DEVICE_STATE_AVAILABLE,
+                    } else if (state == 0 && isancConnected) {
+                        Log.e(TAG,"} else if (state == 0 && isancConnected) {");
+                        AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_ANC_HEADPHONE,
+                                AudioSystem.DEVICE_STATE_UNAVAILABLE,
                                 "");
-                        mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE), "");
+                        mConnectedDevices.remove(AudioSystem.DEVICE_OUT_ANC_HEADPHONE);
+                    }else if (state == 1 && !isConnected && !isancConnected)  {
+                        if(name.equalsIgnoreCase("Headset") && anc ==1 ){
+                            AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_ANC_HEADPHONE,
+                                    AudioSystem.DEVICE_STATE_AVAILABLE,
+                                    "");
+                            mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_ANC_HEADPHONE), "");
+                        } else if(name.equalsIgnoreCase("Headset") && anc == 0 ) {
+                            AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE,
+                                    AudioSystem.DEVICE_STATE_AVAILABLE,
+                                    "");
+                            mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE), "");
+                        }
                     }
                 }
             } else if (action.equals(TtyIntent.TTY_ENABLED_CHANGE_ACTION)) {
