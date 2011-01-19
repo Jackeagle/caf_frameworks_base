@@ -25,6 +25,8 @@
 #include <sys/resource.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <regex.h>
+
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MetaData.h>
@@ -131,6 +133,71 @@ private:
     };
     List<SttsTableEntry> mSttsTableEntries;
 
+    size_t        mNumCttsTableEntries;
+    struct CttsTableEntry {
+
+        CttsTableEntry(uint32_t count, int32_t offsetUs) //note - int32_t for level 1
+            : sampleCount(count), sampleOffsetUs(offsetUs) {}
+
+        uint32_t sampleCount;
+        int32_t  sampleOffsetUs;
+    };
+    List<CttsTableEntry> mCttsTableEntries;
+
+    typedef enum {
+        I_FRAME,
+        P_FRAME,
+        B_FRAME
+    } FrameType;
+
+    size_t        mNumPendingFrames;
+
+    struct Frame {
+        int64_t ts;
+        FrameType type;
+    };
+
+    List<Frame> mPendingFrames;
+
+    size_t mNumDecodeTimes;
+    List<int64_t> mDecodeTimes;
+
+    regex_t mRegIP;
+    regex_t mRegB;
+
+    char _input[32];
+    size_t _end;
+
+    struct CommitDuration {
+        CommitDuration( ) { }
+
+        CommitDuration(int64_t t, int64_t ticks)
+            : durationUs(t), durationTicks(ticks) {}
+
+        int64_t durationUs;
+        int64_t durationTicks;
+    };
+
+    int64_t mLastDuration;
+    int64_t mLastDurationTicks;
+    size_t  mSttsCount;
+    size_t  mNumSttsCommitted;
+
+    struct CommitOffset {
+        CommitOffset( ) { }
+
+        CommitOffset(int64_t o, int64_t ticks)
+            : offsetUs(o), offsetTicks(ticks) {}
+
+        int64_t offsetUs;
+        int64_t offsetTicks;
+    };
+
+    int64_t mLastOffset;
+    int64_t mLastOffsetTicks;
+    size_t  mCttsCount;
+    size_t  mNumCttsCommitted;
+
     // Sequence parameter set or picture parameter set
     struct AVCParamSet {
         AVCParamSet(uint16_t length, const uint8_t *data)
@@ -205,11 +272,24 @@ private:
     // Simple validation on the codec specific data
     status_t checkCodecSpecificData() const;
     int32_t mRotation;
+    bool    mWriteCtts;
 
     void updateTrackSizeEstimate();
     void addOneStscTableEntry(size_t chunkId, size_t sampleId);
     void addOneStssTableEntry(size_t sampleId);
     void addOneSttsTableEntry(size_t sampleCount, int64_t durationUs);
+
+    void addOneCttsTableEntry(size_t sampleCount, int64_t offsetUs);
+    void updateSttsCtts( const sp<MetaData>& meta_data, int64_t timeStampUs );
+    void addOnePendingFrame( int64_t timeStampUs, FrameType ft );
+    void reorderDecodingTimes( int64_t timeStampUs );
+    void commitIP( int64_t ts, FrameType ft );
+    void commitB( int64_t ts, FrameType ft );
+    void commitSttsEntry( const CommitDuration &cd );
+    void commitCttsEntry( const CommitOffset &co );
+    int64_t timeDiffInTicks( int64_t t1, int64_t t2 );
+    void consumeInput( Frame * f, int64_t * decodeTs );
+    void commitPending( );
 
     Track(const Track &);
     Track &operator=(const Track &);
@@ -943,7 +1023,8 @@ MPEG4Writer::Track::Track(
       mCodecSpecificDataSize(0),
       mGotAllCodecSpecificData(false),
       mReachedEOS(false),
-      mRotation(0) {
+      mRotation(0),
+      mWriteCtts(false) {
     getCodecSpecificDataFromInputFormatIfPossible();
 
     const char *mime;
@@ -995,6 +1076,14 @@ void MPEG4Writer::Track::addOneSttsTableEntry(
     SttsTableEntry sttsEntry(sampleCount, durationUs);
     mSttsTableEntries.push_back(sttsEntry);
     ++mNumSttsTableEntries;
+}
+
+void MPEG4Writer::Track::addOneCttsTableEntry(
+        size_t sampleCount, int64_t offsetUs) {
+
+    CttsTableEntry cttsEntry(sampleCount, offsetUs);
+    mCttsTableEntries.push_back(cttsEntry);
+    ++mNumCttsTableEntries;
 }
 
 void MPEG4Writer::Track::addChunkOffset(off64_t offset) {
@@ -1062,6 +1151,11 @@ MPEG4Writer::Track::~Track() {
         free(mCodecSpecificData);
         mCodecSpecificData = NULL;
     }
+
+    if ( !mIsAudio && mWriteCtts ) {
+        regfree( &mRegIP );
+        regfree( &mRegB );
+    }
 }
 
 void MPEG4Writer::Track::initTrackingProgressStatus(MetaData *params) {
@@ -1076,6 +1170,296 @@ void MPEG4Writer::Track::initTrackingProgressStatus(MetaData *params) {
             mTrackEveryTimeDurationUs = timeUs;
             mTrackingProgressStatus = true;
         }
+    }
+}
+
+void MPEG4Writer::Track::updateSttsCtts( const sp<MetaData>& meta_data, int64_t timeStampUs) {
+    int ret;
+    regmatch_t match[1];
+
+    int32_t isSync = false;
+    int32_t isBFrame = false;
+    char c ='P';
+    FrameType type = P_FRAME;
+
+    meta_data->findInt32(kKeyIsSyncFrame, &isSync);
+    meta_data->findInt32(kKeyIsBFrame, &isBFrame);
+
+    if ( isBFrame ) {
+        c = 'B';
+        type = B_FRAME;
+    }
+    else if ( isSync ) {
+        c = 'I';
+        type = I_FRAME;
+    }
+
+    _input[ _end ] = c;
+    ++_end;
+
+    if ( ( ret = regexec( &mRegB,
+                          _input, 1,
+                          match, 1 ) ) == 0 ) {
+        LOGV("Match B");
+        commitB( timeStampUs, type );
+    }
+    else if ( ( ret = ::regexec( &mRegIP,
+                                 _input, 1,
+                                 match, 1 ) ) == 0 ) {
+        LOGV("Match I/P");
+        commitIP( timeStampUs, type );
+    }
+    else
+        LOGV("No Match");
+
+    addOnePendingFrame( timeStampUs, type);
+    reorderDecodingTimes( timeStampUs );
+}
+
+void MPEG4Writer::Track::addOnePendingFrame( int64_t timeStampUs, FrameType ft ) {
+    Frame f;
+    f.ts = timeStampUs;
+    f.type = ft;
+    mPendingFrames.push_back( f );
+    ++mNumPendingFrames;
+}
+
+void MPEG4Writer::Track::reorderDecodingTimes( int64_t timeStampUs ) {
+    LOGV("Reorder %lld", timeStampUs );
+    if ( mNumDecodeTimes == 0 ) {
+        mDecodeTimes.push_back( timeStampUs );
+    }
+    else {
+        int64_t lastDecodeTime = *(--mDecodeTimes.end());
+        if ( timeStampUs >= lastDecodeTime ) {
+            mDecodeTimes.push_back( timeStampUs );
+        }
+        else {
+            List<int64_t>::iterator it = --mDecodeTimes.end();
+            mDecodeTimes.insert( it, timeStampUs );
+        }
+    }
+    ++mNumDecodeTimes;
+}
+
+void MPEG4Writer::Track::commitIP( int64_t ts, FrameType ft ) {
+
+    Frame ipFrame;
+    int64_t ipDecodeTime;
+
+    consumeInput( &ipFrame, &ipDecodeTime );
+
+    int64_t durationUs = 0;
+    int64_t durationTicks = 0;
+    if ( ft == B_FRAME ) {
+        durationUs = ts - ipFrame.ts;
+        durationTicks = timeDiffInTicks(ts,ipFrame.ts);
+    }
+    else {
+        durationUs = mPendingFrames.begin( )->ts - ipFrame.ts;
+        durationTicks = timeDiffInTicks(mPendingFrames.begin()->ts,ipFrame.ts);
+    }
+
+    CommitDuration cd( durationUs, durationTicks );
+    LOGV("Stts for ipFrame, ts = %lld, decode time %lld  = %lld",
+         ipFrame.ts, ipDecodeTime, durationUs);
+    commitSttsEntry( cd );
+
+    int64_t offsetUs = ipFrame.ts - ipDecodeTime;
+    int64_t offsetTicks = timeDiffInTicks( ipFrame.ts, ipDecodeTime );
+    LOGV("Ctts for ipFrame, ts = %lld, decode time %lld  = %lld",
+         ipFrame.ts, ipDecodeTime, offsetUs);
+    CommitOffset co( offsetUs, offsetTicks );
+    commitCttsEntry( co );
+}
+
+void MPEG4Writer::Track::commitB( int64_t ts, FrameType ft ) {
+    Vector<CommitDuration> tempStts;
+    Vector<CommitOffset> tempCtts;
+
+    Frame ipFrame;
+    int64_t ipDecodeTime;
+
+    consumeInput( &ipFrame, &ipDecodeTime );
+
+    Frame bFrame;
+    int64_t bDecodeTime;
+
+    consumeInput( &bFrame, &bDecodeTime );
+
+    while ( mPendingFrames.begin( )->type == B_FRAME ) {
+        Frame nextBFrame;
+        int64_t nextBDecodeTime;
+
+        consumeInput( &nextBFrame, &nextBDecodeTime );
+        int64_t durationUs = nextBFrame.ts - bFrame.ts;
+        int64_t durationTicks = timeDiffInTicks(nextBFrame.ts,bFrame.ts);
+        CommitDuration cd( durationUs, durationTicks );
+        tempStts.add( cd );
+        int64_t offsetUs = bFrame.ts - bDecodeTime;
+        int64_t offsetTicks = timeDiffInTicks(bFrame.ts, bDecodeTime);
+        CommitOffset co( offsetUs, offsetTicks );
+        tempCtts.add( co );
+
+        bFrame = nextBFrame;
+        bDecodeTime = nextBDecodeTime;
+    }
+
+    //duration of last B frame w.r.t P frame.
+    int64_t durationUs = ipFrame.ts - bFrame.ts;
+    int64_t durationTicks = timeDiffInTicks(ipFrame.ts,bFrame.ts);
+    CommitDuration cd( durationUs, durationTicks );
+    tempStts.add( cd );
+
+    int64_t offsetUs = bFrame.ts - bDecodeTime;
+    int64_t offsetTicks = timeDiffInTicks( bFrame.ts, bDecodeTime );
+    CommitOffset co( offsetUs, offsetTicks );
+    tempCtts.add( co );
+    LOGV("Stts for last b-frame = %lld", durationUs );
+    LOGV("Ctts for last b-frame = %lld", offsetUs );
+
+    //first commit stts and ctts for the p frame.
+    if ( ft == B_FRAME ) {
+        durationUs = ts - ipFrame.ts;
+        durationTicks = timeDiffInTicks(ts,ipFrame.ts);
+    }
+    else {
+        durationUs = mPendingFrames.begin()->ts - ipFrame.ts;
+        durationTicks = timeDiffInTicks(mPendingFrames.begin()->ts,ipFrame.ts);
+    }
+
+    cd.durationUs = durationUs;
+    cd.durationTicks = durationTicks;
+
+    offsetUs = ipFrame.ts - ipDecodeTime;
+    LOGV("Stts for closing p-frame ts = %lld, decode time = %lld = %lld",
+         ipFrame.ts, ipDecodeTime, durationUs );
+    LOGV("Ctts for closing p-frame ts = %lld, decode time = %lld = %lld",
+         ipFrame.ts, ipDecodeTime, offsetUs );
+    offsetTicks = timeDiffInTicks( ipFrame.ts, ipDecodeTime );
+    co.offsetUs = offsetUs;
+    co.offsetTicks = offsetTicks;
+
+    commitSttsEntry( cd ); //copied in call
+    commitCttsEntry( co );
+
+    for (size_t i = 0; i < tempStts.size( ); i++ ) {
+        commitSttsEntry( tempStts[i] );
+    }
+
+    for (size_t i = 0 ; i < tempCtts.size( ); i++ ) {
+        commitCttsEntry( tempCtts[i] );
+    }
+}
+
+void MPEG4Writer::Track::commitSttsEntry( const CommitDuration &cd ){
+    ++mNumSttsCommitted;
+    int64_t durationTicks = 0;
+    int64_t durationUs = 0;
+
+    durationUs = cd.durationUs;
+    durationTicks = cd.durationTicks;
+
+    if ( mNumSttsCommitted > 1 ) {
+        if ( durationTicks != mLastDurationTicks ) {
+            addOneSttsTableEntry( mSttsCount, mLastDuration );
+            mSttsCount = 1;
+        }
+        else {
+            ++mSttsCount;
+        }
+    }
+    mLastDuration = durationUs;
+    mLastDurationTicks = durationTicks;
+}
+
+void MPEG4Writer::Track::commitCttsEntry( const CommitOffset &co ){
+    ++mNumCttsCommitted;
+    int64_t offsetUs = 0;
+    int64_t offsetTicks = 0;
+    offsetUs = co.offsetUs;
+    offsetTicks = co.offsetTicks;
+
+    if ( mNumCttsCommitted > 1 ) {
+        if ( offsetUs != mLastOffset ) {
+            addOneCttsTableEntry( mCttsCount, mLastOffset );
+            mCttsCount = 1;
+        }
+        else {
+            ++mCttsCount;
+        }
+    }
+    mLastOffset = offsetUs;
+    mLastOffsetTicks = offsetTicks;
+}
+
+/* return t1 - t2 */
+int64_t MPEG4Writer::Track::timeDiffInTicks( int64_t t1, int64_t t2 ){
+    int64_t diff;
+
+    diff = ((t1 * mTimeScale + 500000LL) / 1000000LL -
+     (t2 * mTimeScale + 500000LL) / 1000000LL);
+
+    return diff;
+}
+
+void MPEG4Writer::Track::consumeInput( Frame * f, int64_t * decodeTs ) {
+    CHECK( _end >= 1 );
+    CHECK( mNumPendingFrames > 0 );
+    CHECK( mNumDecodeTimes > 0 );
+
+    if ( _end > 1 ) {
+        memmove( &_input[0], &_input[1], _end - 1);
+    }
+
+    _input[ _end - 1 ] = '\0';
+    _end--;
+
+    List<Frame>::iterator it = mPendingFrames.begin( );
+    f->ts = it->ts;
+    f->type = it->type;
+
+    mPendingFrames.erase( mPendingFrames.begin( ) );
+    --mNumPendingFrames;
+    *decodeTs = *(mDecodeTimes.begin( ));
+    mDecodeTimes.erase( mDecodeTimes.begin( ) );
+    --mNumDecodeTimes;
+}
+
+void MPEG4Writer::Track::commitPending( ){
+    //sending two fake I Frames to commit all pending
+    //frames.
+    sp<MetaData> temp_meta;
+    temp_meta = new MetaData;
+    temp_meta->setInt32( kKeyIsSyncFrame, true );
+
+    int64_t lastFrameTs = *(--mDecodeTimes.end( ));
+    bool sendTwo = false;
+
+    List<Frame>::iterator it = --mPendingFrames.end( );
+    if ( it->type == B_FRAME ) {
+        sendTwo = true;
+    }
+
+    updateSttsCtts( temp_meta, lastFrameTs + mLastDuration );
+    if ( sendTwo ) {
+        //i.e current input stopped at PB
+        updateSttsCtts( temp_meta, lastFrameTs + 2*mLastDuration );
+        CommitOffset co( 0, -1 );
+        commitCttsEntry( co );
+        CommitDuration cd( mLastDuration + 1, 0 );
+        commitSttsEntry( cd );
+    }
+    else {
+        //input stopped at PBP, PBI
+        CommitOffset co( 0, -1 );
+        commitCttsEntry( co );
+        co.offsetTicks = 0;
+        commitCttsEntry( co );
+        CommitDuration cd( mLastDuration + 1, 0 );
+        commitSttsEntry( cd );
+        cd.durationTicks = -1;
+        commitSttsEntry( cd );
     }
 }
 
@@ -1249,6 +1633,11 @@ status_t MPEG4Writer::Track::start(MetaData *params) {
         }
     }
 
+    int32_t isCttsPresent;
+    if (!mIsAudio && params && params->findInt32(kKeyWriteCtts, &isCttsPresent)) {
+        mWriteCtts = (isCttsPresent == 1);
+    }
+
     initTrackingProgressStatus(params);
 
     sp<MetaData> meta = new MetaData;
@@ -1278,6 +1667,27 @@ status_t MPEG4Writer::Track::start(MetaData *params) {
     mPrevMediaTimeAdjustSample = 0;
     mTotalDriftTimeToAdjustUs = 0;
     mPrevTotalAccumDriftTimeUs = 0;
+
+    if ( mWriteCtts ) {
+        mNumPendingFrames = 0;
+        mNumDecodeTimes = 0;
+        mNumCttsTableEntries = 0;
+
+        regcomp( &mRegB, "(P|I)B+(P|I)(P|I|B)", REG_EXTENDED );
+        regcomp( &mRegIP, "(P|I)(P|I)(P|I|B)", REG_EXTENDED );
+        memset( _input, 0, 32 );
+        _end = 0;
+
+        mLastDuration = 0;
+        mLastDurationTicks = 0;
+        mSttsCount = 1;
+        mNumSttsCommitted = 0;
+
+        mLastOffset = 0;
+        mLastOffsetTicks = 0;
+        mCttsCount = 1;
+        mNumCttsCommitted = 0;
+    }
 
     pthread_create(&mThread, &attr, ThreadWrapper, this);
     pthread_attr_destroy(&attr);
@@ -1481,6 +1891,9 @@ status_t MPEG4Writer::Track::parseAVCCodecSpecificData(
     }
 
     {
+        //Ref ITU-T H.264 - section 7.3.2
+        LOGI("Skipping extensions, assume default");
+#if 0
         // Check on the profiles
         // These profiles requires additional parameter set extensions
         if (mProfileIdc == 100 || mProfileIdc == 110 ||
@@ -1488,6 +1901,7 @@ status_t MPEG4Writer::Track::parseAVCCodecSpecificData(
             LOGE("Sorry, no support for profile_idc: %d!", mProfileIdc);
             return BAD_VALUE;
         }
+#endif
     }
 
     return OK;
@@ -1871,7 +2285,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         }
 
         CHECK(timestampUs >= 0);
-        if (mNumSamples > 1) {
+        if (mNumSamples > 1 && !mWriteCtts) {
             if (timestampUs <= lastTimestampUs) {
                 LOGW("Frame arrives too late!");
                 // Don't drop the late frame, since dropping a frame may cause
@@ -1895,6 +2309,11 @@ status_t MPEG4Writer::Track::threadEntry() {
 
         mSampleSizes.push_back(sampleSize);
         ++mNumSamples;
+
+        if ( !mIsAudio && mWriteCtts ) {
+            updateSttsCtts(meta_data, timestampUs);
+        }
+        else
         if (mNumSamples > 2) {
             // We need to use the time scale based ticks, rather than the
             // timestamp itself to determine whether we have to use a new
@@ -1989,7 +2408,15 @@ status_t MPEG4Writer::Track::threadEntry() {
     } else {
         ++sampleCount;  // Count for the last sample
     }
-    addOneSttsTableEntry(sampleCount, lastDurationUs);
+
+    if (!mIsAudio && mWriteCtts ) {
+        commitPending( );
+        lastDurationUs = mLastDuration;
+    }
+    else {
+        addOneSttsTableEntry(sampleCount, lastDurationUs);
+    }
+
     mTrackDurationUs += lastDurationUs;
     mReachedEOS = true;
     LOGI("Received total/0-length (%d/%d) buffers and encoded %d frames. - %s",
@@ -2420,6 +2847,7 @@ void MPEG4Writer::Track::writeTrackHeader(
                 mOwner->endBox();  // mp4v, s263 or avc1
             }
           mOwner->endBox();  // stsd
+          int32_t sttsCount = 0;
 
           mOwner->beginBox("stts");
             mOwner->writeInt32(0);  // version=0, flags=0
@@ -2427,6 +2855,7 @@ void MPEG4Writer::Track::writeTrackHeader(
             int64_t prevTimestampUs = 0;
             for (List<SttsTableEntry>::iterator it = mSttsTableEntries.begin();
                  it != mSttsTableEntries.end(); ++it) {
+                sttsCount += it->sampleCount;
                 mOwner->writeInt32(it->sampleCount);
 
                 // Make sure that we are calculating the sample duration the exactly
@@ -2438,7 +2867,26 @@ void MPEG4Writer::Track::writeTrackHeader(
 
                 mOwner->writeInt32(dur);
             }
+            LOGV("sttsCount = %d", sttsCount );
           mOwner->endBox();  // stts
+
+          if (!mIsAudio && mWriteCtts ) {
+              mOwner->beginBox("ctts");
+                mOwner->writeInt32(0x10000);  // version=1, flags=0
+                mOwner->writeInt32(mNumCttsTableEntries);
+                LOGV("mNumCttsTableEntries - %u", mNumCttsTableEntries );
+                int64_t prevOffsetUs = 0;
+                for (List<CttsTableEntry>::iterator it = mCttsTableEntries.begin();
+                     it != mCttsTableEntries.end(); ++it) {
+                    mOwner->writeInt32(it->sampleCount);
+                    int64_t currOffsetUs = prevOffsetUs + it->sampleOffsetUs;
+                    int32_t off = ((currOffsetUs * mTimeScale + 500000LL) / 1000000LL -
+                                   (prevOffsetUs * mTimeScale + 500000LL) / 1000000LL);
+                    prevOffsetUs += (it->sampleCount * it->sampleOffsetUs);
+                    mOwner->writeInt32(off);
+                }
+              mOwner->endBox();  // ctts
+          }
 
           if (!mIsAudio) {
             mOwner->beginBox("stss");
@@ -2459,6 +2907,7 @@ void MPEG4Writer::Track::writeTrackHeader(
             } else {
                 mOwner->writeInt32(0);
             }
+            LOGV("mNumSamples - %u", mNumSamples );
             mOwner->writeInt32(mNumSamples);
             if (!mSamplesHaveSameSize) {
                 for (List<size_t>::iterator it = mSampleSizes.begin();

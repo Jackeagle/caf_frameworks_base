@@ -397,6 +397,9 @@ uint32_t OMXCodec::getComponentQuirks(
         //quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
 		quirks |= kAvoidMemcopyInputRecordingFrames;
+        quirks |= kBFrameFlagInExtensions;
+        quirks |= kRequiresEOSMessage;
+
         if (!strncmp(componentName, "OMX.qcom.video.encoder.avc", 26)) {
 
             // The AVC encoder advertises the size of output buffers
@@ -1405,6 +1408,10 @@ status_t OMXCodec::setupMPEG4EncoderParameters(const sp<MetaData>& meta) {
     mpeg4type.eProfile = static_cast<OMX_VIDEO_MPEG4PROFILETYPE>(profileLevel.mProfile);
     mpeg4type.eLevel = static_cast<OMX_VIDEO_MPEG4LEVELTYPE>(profileLevel.mLevel);
 
+    if (mpeg4type.eProfile == OMX_VIDEO_MPEG4ProfileAdvancedSimple) {
+        mpeg4type.nBFrames = 1;
+    }
+
     err = mOMX->setParameter(
             mNode, OMX_IndexParamVideoMpeg4, &mpeg4type, sizeof(mpeg4type));
     CHECK_EQ(err, OK);
@@ -1434,7 +1441,7 @@ status_t OMXCodec::setupAVCEncoderParameters(const sp<MetaData>& meta) {
         OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
 
     h264type.nSliceHeaderSpacing = 0;
-    h264type.nBFrames = 0;   // No B frames support yet
+    h264type.nBFrames = 0;   // hardcoding B-Frame support to 1
     h264type.nPFrames = setPFramesSpacing(iFramesInterval, frameRate);
     if (h264type.nPFrames == 0) {
         h264type.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI;
@@ -1460,6 +1467,10 @@ status_t OMXCodec::setupAVCEncoderParameters(const sp<MetaData>& meta) {
         h264type.bDirect8x8Inference = OMX_FALSE;
         h264type.bDirectSpatialTemporal = OMX_FALSE;
         h264type.nCabacInitIdc = 0;
+    }
+
+    if (h264type.eProfile > OMX_VIDEO_AVCProfileBaseline) {
+        h264type.nBFrames = 1;
     }
 
     if (h264type.nBFrames != 0) {
@@ -1675,7 +1686,8 @@ OMXCodec::OMXCodec(
       mLeftOverBuffer(NULL),
       mPmemInfo(NULL),
       mInterlaceFormatDetected(false),
-      m3DVideoDetected(false) {
+      m3DVideoDetected(false),
+      mSendEOS(false){
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
@@ -2069,6 +2081,19 @@ void OMXCodec::on_message(const omx_message &msg) {
 
             info->mOwnedByComponent = false;
 
+#if 0
+            {
+                //temporary - will be removed
+                OMX_BUFFERHEADERTYPE *header = (OMX_BUFFERHEADERTYPE *) info->mBuffer;
+                CODEC_LOGE("FILL BUFFER DONE buffer %p, hdr %p, len = %u",
+                           info->mBuffer, (OMX_U8 *)header->pBuffer, msg.u.extended_buffer_data.range_length);
+                if (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_EOS) {
+                    CODEC_LOGE("EOS done message received from encoder");
+                    mNoMoreOutputData = true;
+                }
+            }
+#endif
+
             if (mPortStatus[kPortIndexOutput] == DISABLING) {
                 CODEC_LOGV("Port is disabled, freeing buffer %p", buffer);
 
@@ -2112,7 +2137,7 @@ void OMXCodec::on_message(const omx_message &msg) {
                             "Codec lied about its buffer size requirements, "
                             "sending a buffer larger than the originally "
                             "advertised size in FILL_BUFFER_DONE!");
-		}
+                }
                 
                 if(!mOMXLivesLocally && mPmemInfo != NULL && buffer != NULL) {
                     OMX_U8* base = (OMX_U8*)mPmemInfo->getBase();
@@ -2132,6 +2157,11 @@ void OMXCodec::on_message(const omx_message &msg) {
                 if (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_SYNCFRAME) {
                     buffer->meta_data()->setInt32(kKeyIsSyncFrame, true);
                 }
+                else if ( msg.u.extended_buffer_data.flags &
+                         QOMX_VIDEO_BUFFERFLAG_BFRAME ) {
+                        buffer->meta_data()->setInt32(kKeyIsBFrame, true);
+                }
+
                 if (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_CODECCONFIG) {
                     buffer->meta_data()->setInt32(kKeyIsCodecConfig, true);
                 }
@@ -2149,7 +2179,7 @@ void OMXCodec::on_message(const omx_message &msg) {
                         msg.u.extended_buffer_data.buffer);
 
                 if (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_EOS) {
-                    CODEC_LOGV("No more output data.");
+                    CODEC_LOGV("No more output data");
                     mNoMoreOutputData = true;
                 }
 
@@ -2884,8 +2914,20 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
 
     OMX_U32 flags = OMX_BUFFERFLAG_ENDOFFRAME;
 
+    if (mIsEncoder && mSendEOS) {
+        LOGI("drainInputBuffer instructed to send EOS to component");
+        signalEOS = true;
+        mSignalledEOS = true;
+        mFinalStatus = err;
+    }
+
     if (signalEOS) {
         flags |= OMX_BUFFERFLAG_EOS;
+        if ( mIsEncoder ) {
+            size_t off = info->mMediaBuffer->range_offset();
+            info->mMediaBuffer->set_range( 0, 0 );
+            offset = 0;
+        }
     } else if (mThumbnailMode) {
         // Because we don't get an EOS after getting the first frame, we
         // need to notify the component with OMX_BUFFERFLAG_EOS, set
@@ -2900,7 +2942,7 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
         mNoMoreOutputData = false;
     }
 
-    CODEC_LOGV("Calling emptyBuffer on buffer %p (length %d), "
+    CODEC_LOGV("Calling emptyBuffer on buffer %p, (length %d), "
                "timestamp %lld us (%.2f secs)",
                info->mBuffer, offset,
                timestampUs, timestampUs / 1E6);
@@ -3462,10 +3504,14 @@ status_t OMXCodec::stop() {
         case PAUSED:
         case EXECUTING:
         {
+            //send EOS to h/w encoders.
+            if ( mIsEncoder && kRequiresEOSMessage ) {
+                sendEOSToOMXComponent( ); //TODO - will this adversely affect 7x27?
+            }
             setState(EXECUTING_TO_IDLE);
 
             if (mQuirks & kRequiresFlushBeforeShutdown) {
-                CODEC_LOGV("This component requires a flush before transitioning "
+                CODEC_LOGE("This component requires a flush before transitioning "
                      "from EXECUTING to IDLE...");
 
                 bool emulateInputFlushCompletion =
@@ -4400,6 +4446,37 @@ status_t OMXCodec::processSEIData(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags)
         }
     }
 
+    return OK;
+}
+
+//very specific to qcom h/w encoders
+//needs a valid buffer to be given
+//for EOS, just setting EOS flag
+//is not enough
+status_t OMXCodec::sendEOSToOMXComponent( ) {
+
+    if (mState != EXECUTING) {
+        LOGE("EOS send command in wrong state (%d)", mState);
+        return INVALID_OPERATION;
+    }
+
+    LOGI("Sending EOS to OMX Component");
+
+    Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexInput];
+    //get free buffer
+    BufferInfo *freeInfo = NULL;
+    for ( size_t i = 0; i < buffers->size( ); i++ ) {
+        BufferInfo *info = &buffers->editItemAt(i);
+        if ( info->mOwnedByComponent == false ) {
+            freeInfo = info;
+            break;
+        }
+    }
+
+    CHECK( freeInfo != NULL );
+    mSendEOS = true;
+    drainInputBuffer( freeInfo );
+    CHECK( mState != ERROR );
     return OK;
 }
 

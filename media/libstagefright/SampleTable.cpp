@@ -279,13 +279,14 @@ status_t SampleTable::setCompositionTimeToSampleParams(
         return ERROR_IO;
     }
 
-    if (U32_AT(header) != 0) {
-        // Expected version = 0, flags = 0.
+    if (U32_AT(header) != 0 &&
+        U32_AT(header) != 0x10000 ) {
+        // Expected version = 0 or 1, flags = 0
         return ERROR_MALFORMED;
     }
 
     mCompositionTimeToSampleCount = U32_AT(&header[4]);
-    mCompositionTimeToSample = new uint32_t[mCompositionTimeToSampleCount * 2];
+    mCompositionTimeToSample = new int32_t[mCompositionTimeToSampleCount * 2];
 
     size_t size = sizeof(uint32_t) * mCompositionTimeToSampleCount * 2;
     if (mDataSource->readAt(
