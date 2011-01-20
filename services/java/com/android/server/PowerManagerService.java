@@ -53,6 +53,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.WorkSource;
+import android.os.SystemProperties;
 import android.provider.Settings.SettingNotFoundException;
 import android.provider.Settings;
 import android.util.EventLog;
@@ -71,6 +72,11 @@ import static android.provider.Settings.System.TRANSITION_ANIMATION_SCALE;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.BufferedReader;
+import java.io.FileFilter;
+import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Observable;
@@ -264,6 +270,8 @@ class PowerManagerService extends IPowerManager.Stub
     private native void nativeInit();
     private native void nativeSetPowerState(boolean screenOn, boolean screenBright);
     private native void nativeStartSurfaceFlingerAnimation(int mode);
+
+    private PowerManagerService.SamplingRateAdjuster mSamplingRateAdjuster;
 
     /*
     static PrintStream mLog;
@@ -1437,6 +1445,201 @@ class PowerManagerService extends IPowerManager.Stub
         }
     };
 
+    private static class SamplingRateAdjuster {
+        private static final String CPU_DIR_PATH = "/sys/devices/system/cpu";
+        private static final String REL_SAMPLING_RATE_PATH = "cpufreq/ondemand/sampling_rate";
+        private static final String DEFAULT_RAMP_UP_SAMPLING_RATE = "500000";
+        private HashMap<File, String> mSamplingRateTable = null;
+        private HashMap<File, PrintWriter> mPrintWriterTable = null;
+
+        /**
+         * Checks if the sampling rate files are still readable and writable.
+         */
+        private boolean checkSamplingRateTableValidity () {
+            Iterator<File> samplingRateFileIterator = mSamplingRateTable.keySet().iterator();
+
+            while (samplingRateFileIterator.hasNext()) {
+                try{
+                    File samplingRateFile = samplingRateFileIterator.next();
+
+                    if (!(samplingRateFile.canRead() && samplingRateFile.canWrite())) {
+                        return false;
+                    }
+                } catch (Exception exception) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /**
+         * Increases sampling rates for all cores. Sets them to the default ramp up rate.
+         */
+        public void increaseSamplingRate () {
+            if (SystemProperties.getInt("dev.pm.dyn_samplingrate", 0) == 0) {
+                return;
+            }
+
+            if (mSamplingRateTable == null) {
+                populateSamplingRateTable();
+            }
+
+            if (mSamplingRateTable != null) {
+                if (!checkSamplingRateTableValidity()) {
+                    mSamplingRateTable = null;
+
+                    return;
+                }
+
+                Iterator<File> samplingRateFileIterator = mSamplingRateTable.keySet().iterator();
+
+                while (samplingRateFileIterator.hasNext()) {
+                    try{
+                        File samplingRateFile = samplingRateFileIterator.next();
+                        PrintWriter printWriter = mPrintWriterTable.get(samplingRateFile);
+
+                        printWriter.print(DEFAULT_RAMP_UP_SAMPLING_RATE);
+                        printWriter.flush();
+                        Log.i(TAG, "Increasing sampling rate.");
+                    } catch (Exception exception) {
+                        Log.e(TAG, exception.getMessage());
+
+                        mSamplingRateTable = null;
+                    }
+                }
+            }
+        }
+
+        /**
+         * Decreases sampling rates for all cores. Sets them to the saved rates.
+         */
+        public void decreaseSamplingRate () {
+            if (SystemProperties.getInt("dev.pm.dyn_samplingrate", 0) == 0) {
+                return;
+            }
+
+            if (mSamplingRateTable != null) {
+                if (!checkSamplingRateTableValidity()) {
+                    mSamplingRateTable = null;
+
+                    return;
+                }
+
+                Iterator<File> samplingRateFileIterator = mSamplingRateTable.keySet().iterator();
+
+                while (samplingRateFileIterator.hasNext()) {
+                    try{
+                        File samplingRateFile = samplingRateFileIterator.next();
+                        String samplingRate = mSamplingRateTable.get(samplingRateFile);
+                        PrintWriter printWriter = mPrintWriterTable.get(samplingRateFile);
+
+                        printWriter.print(samplingRate);
+                        printWriter.flush();
+                        Log.i(TAG, "Decreasing sampling rate.");
+                    } catch (Exception exception) {
+                        Log.e(TAG, exception.getMessage());
+                    }
+                }
+            }
+        }
+
+        /**
+         * Populates the sampling rate table.
+         */
+        private void populateSamplingRateTable () {
+            // Get a list of all directories in CPU_DIR_PATH
+            File dirCPU = new File(CPU_DIR_PATH);
+
+            if (!dirCPU.isDirectory()) {
+                Log.e(TAG, "populateSamplingRateTable failed.. doesn't exist.");
+                return;
+            }
+
+            File[] dirCPUCores = dirCPU.listFiles(new CPUFreqDirFileFilter());
+
+            if (dirCPUCores.length == 0) {
+                Log.e(TAG, "No CPUFreq directories found.");
+                return;
+            }
+
+            // Check to make sure all sampling rate files are readable and writable.
+            int dirCPUCoresOffset;
+
+            try{
+                for (dirCPUCoresOffset = 0; dirCPUCoresOffset < dirCPUCores.length; dirCPUCoresOffset++) {
+                    File fileSamplingRate = new File(dirCPUCores[dirCPUCoresOffset].getPath() + "/" + REL_SAMPLING_RATE_PATH);
+
+                    if (fileSamplingRate.canRead() && fileSamplingRate.canWrite()) {
+                        BufferedReader samplingRateReader = new BufferedReader(new FileReader(fileSamplingRate));
+
+                        if (mSamplingRateTable == null) {
+                            mSamplingRateTable = new HashMap<File, String> ();
+                            mPrintWriterTable = new HashMap<File, PrintWriter>();
+                        }
+
+                        mSamplingRateTable.put(fileSamplingRate, samplingRateReader.readLine());
+                        mPrintWriterTable.put(fileSamplingRate, new PrintWriter(fileSamplingRate));
+                        samplingRateReader.close();
+                    }
+                }
+            } catch (Exception exception) {
+                // If any failure happens, make the sampling rate reference null.
+                Log.e(TAG, "Failed to get current sampling rates. " + exception.getMessage());
+
+                mSamplingRateTable = null;
+
+                return;
+            }
+        }
+
+        /**
+         * Closes open files.
+         */
+        protected void finalize () throws Throwable {
+            try {
+                if (mSamplingRateTable != null) {
+                    Iterator<File> samplingRateFileIterator = mSamplingRateTable.keySet().iterator();
+
+                    while (samplingRateFileIterator.hasNext()) {
+                        File samplingRateFile = samplingRateFileIterator.next();
+                        PrintWriter printWriter = mPrintWriterTable.get(samplingRateFile);
+
+                        printWriter.close();
+                    }
+                }
+            } catch (Exception exception) {
+                Log.e(TAG, "Error occurred while closing files.");
+            } finally {
+                super.finalize();
+            }
+        }
+
+        private static class CPUFreqDirFileFilter implements FileFilter {
+            private static final String PREFIX = "cpu";
+
+            public boolean accept (File file) {
+                // Check if the directory name is "cpux" where x is a number
+                String filename = file.getName();
+
+                if (filename.startsWith(PREFIX) && filename.length() > PREFIX.length()) {
+                    String suffix = filename.substring(PREFIX.length());
+
+                    try {
+                        Integer.parseInt(suffix);
+                    } catch (NumberFormatException numberFormatException) {
+                        return false;
+                    }
+
+                    // All characters in the suffix are integers.
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+    }
+
     long mScreenOffStart;
     private BroadcastReceiver mScreenOffBroadcastDone = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -1444,6 +1647,15 @@ class PowerManagerService extends IPowerManager.Stub
                 EventLog.writeEvent(EventLogTags.POWER_SCREEN_BROADCAST_DONE, 0,
                         SystemClock.uptimeMillis() - mScreenOffStart, mBroadcastWakeLock.mCount);
                 mBroadcastWakeLock.release();
+
+                if ((mPowerState & SCREEN_ON_BIT) == 0) {
+                    // Increase sampling rate here.
+                    if (mSamplingRateAdjuster == null) {
+                        mSamplingRateAdjuster = new PowerManagerService.SamplingRateAdjuster();
+                    }
+
+                    mSamplingRateAdjuster.increaseSamplingRate();
+                }
             }
         }
     };
@@ -1714,6 +1926,13 @@ class PowerManagerService extends IPowerManager.Stub
                         reallyTurnScreenOn = false;
                     }
                     if (reallyTurnScreenOn) {
+                        // Increase sampling rate here.
+                        if (mSamplingRateAdjuster == null) {
+                            mSamplingRateAdjuster = new PowerManagerService.SamplingRateAdjuster();
+                        }
+
+                        mSamplingRateAdjuster.decreaseSamplingRate();
+
                         err = setScreenStateLocked(true);
                         long identity = Binder.clearCallingIdentity();
                         try {
