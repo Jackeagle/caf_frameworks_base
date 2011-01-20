@@ -258,6 +258,11 @@ interface ITelephony {
     boolean setRadioOnSubscription(boolean turnOn, int subscription);
 
     /**
+     * Sets the ril power off
+     */
+    void setRilPowerOff();
+
+    /**
      * Request to update location information in service state
      */
     void updateServiceLocation();

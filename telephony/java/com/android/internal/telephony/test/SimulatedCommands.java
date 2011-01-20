@@ -1518,5 +1518,7 @@ public final class SimulatedCommands extends BaseCommands
         unimplemented(response);
     }
 
-
+    public void setRilPowerOff(Message result) {
+        return;
+    }
 }
