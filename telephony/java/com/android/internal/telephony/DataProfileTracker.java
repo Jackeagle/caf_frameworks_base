@@ -261,18 +261,15 @@ public class DataProfileTracker extends Handler {
                     allDataProfiles.add(dp);
                 }
             }
-        } else {
-            /* Only if modem profiles are not being read, create a catch-all
-             * CDMA profile that supports all service types. i.e. non OMH case.
-             *
-             * For supporting CDMA, for now, we just create a Data profile of TYPE NAI that
-             * supports all service types and add it to all DataProfiles.
-             * TODO: this information should be read from apns-conf.xml / carriers db.
-             */
-            CdmaNAI cdmaNaiProfile = new CdmaNAI();
-            allDataProfiles.add(cdmaNaiProfile);
         }
 
+        /*
+         * For supporting CDMA, for now, we just create a Data profile of TYPE NAI that
+         * supports all service types and add it to all DataProfiles.
+         * TODO: this information should be read from apns-conf.xml / carriers db.
+         */
+        CdmaNAI cdmaNaiProfile = new CdmaNAI();
+        allDataProfiles.add(cdmaNaiProfile);
 
         /*
          * clear the data profile list associated with each service type and
