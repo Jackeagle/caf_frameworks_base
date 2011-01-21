@@ -38,7 +38,6 @@
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
-
 #include <private/ui/android_natives_priv.h>
 
 // ----------------------------------------------------------------------------
@@ -96,27 +95,21 @@ FramebufferNativeWindow::FramebufferNativeWindow()
         mUpdateOnDemand = (fbDev->setUpdateRect != 0);
         
         // initialize the buffer FIFO
-        mNumBuffers = 2;
-        mNumFreeBuffers = 2;
-        mBufferHead = mNumBuffers-1;
-        buffers[0] = new NativeBuffer(
+        mNumBuffers = fbDev->numFramebuffers;
+        mNumFreeBuffers = mNumBuffers;
+        mBufferHead = 0;
+        LOGD("mNumBuffers = %d", mNumBuffers);
+        for(int i = 0; i < mNumBuffers; i++) {
+            buffers[i] = new NativeBuffer(
                 fbDev->width, fbDev->height, fbDev->format, GRALLOC_USAGE_HW_FB);
-        buffers[1] = new NativeBuffer(
-                fbDev->width, fbDev->height, fbDev->format, GRALLOC_USAGE_HW_FB);
-        
-        err = grDev->alloc(grDev,
+
+            err = grDev->alloc(grDev,
                 fbDev->width, fbDev->height, fbDev->format, 
-                GRALLOC_USAGE_HW_FB, &buffers[0]->handle, &buffers[0]->stride);
+                GRALLOC_USAGE_HW_FB, &buffers[i]->handle, &buffers[i]->stride);
 
-        LOGE_IF(err, "fb buffer 0 allocation failed w=%d, h=%d, err=%s",
-                fbDev->width, fbDev->height, strerror(-err));
-
-        err = grDev->alloc(grDev,
-                fbDev->width, fbDev->height, fbDev->format, 
-                GRALLOC_USAGE_HW_FB, &buffers[1]->handle, &buffers[1]->stride);
-
-        LOGE_IF(err, "fb buffer 1 allocation failed w=%d, h=%d, err=%s",
-                fbDev->width, fbDev->height, strerror(-err));
+            LOGE_IF(err, "fb buffer %d allocation failed w=%d, h=%d, err=%s",
+                i, fbDev->width, fbDev->height, strerror(-err));
+        }
 
         const_cast<uint32_t&>(ANativeWindow::flags) = fbDev->flags; 
         const_cast<float&>(ANativeWindow::xdpi) = fbDev->xdpi;
@@ -140,10 +133,11 @@ FramebufferNativeWindow::FramebufferNativeWindow()
 FramebufferNativeWindow::~FramebufferNativeWindow() 
 {
     if (grDev) {
-        if (buffers[0] != NULL)
-            grDev->free(grDev, buffers[0]->handle);
-        if (buffers[1] != NULL)
-            grDev->free(grDev, buffers[1]->handle);
+        for(int i = 0; i < mNumBuffers; i++) {
+            if (buffers[i] != NULL) {
+                grDev->free(grDev, buffers[i]->handle);
+            }
+        }
         gralloc_close(grDev);
     }
 
@@ -187,20 +181,36 @@ int FramebufferNativeWindow::dequeueBuffer(ANativeWindow* window,
         android_native_buffer_t** buffer)
 {
     FramebufferNativeWindow* self = getSelf(window);
-    Mutex::Autolock _l(self->mutex);
     framebuffer_device_t* fb = self->fbDev;
 
-    int index = self->mBufferHead++;
-    if (self->mBufferHead >= self->mNumBuffers)
-        self->mBufferHead = 0;
+    int index = self->mBufferHead;
 
     GraphicLog& logger(GraphicLog::getInstance());
     logger.log(GraphicLog::SF_FB_DEQUEUE_BEFORE, index);
 
-    // wait for a free buffer
-    while (!self->mNumFreeBuffers) {
-        self->mCondition.wait(self->mutex);
+    /* This function is supposed to check whether there is atleast
+       one free buffer available.
+       fb->dequeueBuffer will check for the BufferHead being
+       available, which needs to be checked explicitly for
+       more than 2 buffer case, because in that case, fb_post
+       is not going to wait for BufferHead to be available, it will
+       wait just for the next buffer to be available.
+
+       For 2 framebuffers, there will always
+       be at least one buffer free. BufferHead being available
+       is already being checked in lockBuffer function.
+    */
+    if (fb->numFramebuffers > 2) {
+        fb->dequeueBuffer(fb, index);
     }
+
+    /* The buffer is available, return it */
+    Mutex::Autolock _l(self->mutex);
+
+    self->mBufferHead++;
+    if (self->mBufferHead >= self->mNumBuffers)
+        self->mBufferHead = 0;
+
     // get this buffer
     self->mNumFreeBuffers--;
     self->mCurrentBufferIndex = index;
