@@ -1200,7 +1200,7 @@ status_t StagefrightRecorder::stop() {
     status_t err = OK;
     if (mWriter != NULL) {
         err = mWriter->stop();
-        mWriter.clear();
+        mWriter = NULL;
     }
 
     if (mCamera != 0) {
