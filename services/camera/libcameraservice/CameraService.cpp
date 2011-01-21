@@ -1086,8 +1086,11 @@ void CameraService::Client::dataCallback(int32_t msgType,
     sp<Client> client = getClientFromCookie(user);
     if (client == 0) return;
     if (!client->lockIfMessageWanted(msgType)) return;
-
-    if (dataPtr == 0) {
+    //In case of CAMERA_MSG_COMPRESSED_IMAGE dataCallback,
+    //when native_get_picture fails at driver, we need to
+    //send the callback with null data to application to recover
+    //into preview mode for next operations.
+    if ((dataPtr == 0) && (msgType != CAMERA_MSG_COMPRESSED_IMAGE)) {
         LOGE("Null data returned in data callback");
         client->handleGenericNotify(CAMERA_MSG_ERROR, UNKNOWN_ERROR, 0);
         return;
