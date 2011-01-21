@@ -1531,10 +1531,7 @@ public final class Telephony {
              * which streams the captured image to the uri. Internally we write the media content
              * to this file. It's named '.temp.jpg' so Gallery won't pick it up.
              */
-            public static final String SCRAP_FILE_PATH_JPEG = "/sdcard/mms/scrapSpace/.temp.jpg";
-
-            // Path for non supported formats
-            public static final String SCRAP_FILE_PATH = "/sdcard/mms/scrapSpace/.file";
+            public static final String SCRAP_FILE_PATH = "/sdcard/mms/scrapSpace/.temp.jpg";
         }
 
         public static final class Intents {
