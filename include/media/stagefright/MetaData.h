@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2010-2011 Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,6 +117,9 @@ enum {
     kKeyWMAFormatTag      = 'fmtt',  // int64_t
     kKeyWMABitspersample  = 'bsps',  // int64_t
     kKeyWMAVirPktSize     = 'vpks',  // int64_t
+
+    // 3D Video Flag
+    kKey3D                = '3Dvf',  // bool (int32_t)
 };
 
 enum {

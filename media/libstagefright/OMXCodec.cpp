@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2010-2011 Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1305,6 +1306,52 @@ void OMXCodec::setVideoInputFormat(
             CHECK(!"Support for this compressionFormat to be implemented.");
             break;
     }
+
+    //If compression is AVC and 3D encoding is requested, we'll inform the encoder
+    int32_t want3D = 0;
+    if (meta->findInt32(kKey3D, &want3D) && want3D)
+    {
+        if (compressionFormat == OMX_VIDEO_CodingAVC)
+        {
+            OMX_QCOM_FRAME_PACK_ARRANGEMENT fpa;
+
+            fpa.id = 0;
+            fpa.cancel_flag = 0;
+            fpa.type = 3; //Left-Right arrangement
+            fpa.quincunx_sampling_flag = 0;
+            fpa.content_interpretation_type = 0;
+            fpa.spatial_flipping_flag = 0;
+            fpa.frame0_flipped_flag = 0;
+            fpa.field_views_flag = 0;
+            fpa.current_frame_is_frame0_flag = 0;
+            fpa.frame0_self_contained_flag = 0;
+            fpa.frame1_self_contained_flag = 0;
+            fpa.frame0_grid_position_x = 0;
+            fpa.frame0_grid_position_y = 0;
+            fpa.frame1_grid_position_x = 0;
+            fpa.frame1_grid_position_y = 0;
+            fpa.reserved_byte = 0;
+            fpa.repetition_period = 0;
+            fpa.extension_flag = 0;
+
+            err = mOMX->setConfig(mNode,
+                    (OMX_INDEXTYPE)OMX_QcomIndexConfigVideoFramePackingArrangement,
+                    &fpa, (size_t)sizeof(fpa));
+        }
+        else
+        {
+            LOGE("Only H264 supports SEI info, setting 3d failed");
+            err = ERROR_UNSUPPORTED;
+        }
+
+        if (err != OMX_ErrorNone)
+        {
+            CHECK(!"Enabling 3d failed");
+        }
+        else
+            LOGI("Enabled 3d");
+
+    }
 }
 
 static OMX_U32 setPFramesSpacing(int32_t iFramesInterval, int32_t frameRate) {
@@ -1626,17 +1673,6 @@ status_t OMXCodec::setVideoOutputFormat(
         const char *mime, OMX_U32 width, OMX_U32 height) {
     CODEC_LOGV("setVideoOutputFormat width=%ld, height=%ld", width, height);
 
-    //Enable decoder to report if there is any SEI data
-    QOMX_ENABLETYPE enable_sei_reporting;
-    enable_sei_reporting.bEnable = OMX_TRUE;
-
-    status_t err = mOMX->setParameter(
-            mNode, (OMX_INDEXTYPE)OMX_QcomIndexParamFrameInfoExtraData,
-            &enable_sei_reporting, (size_t)sizeof(enable_sei_reporting));
-
-    if (err != OK)
-       LOGV("Not supported parameter OMX_QcomIndexParamFrameInfoExtraData");
-
     OMX_VIDEO_CODINGTYPE compressionFormat = OMX_VIDEO_CodingUnused;
     if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime)) {
         compressionFormat = OMX_VIDEO_CodingAVC;
@@ -1657,11 +1693,26 @@ status_t OMXCodec::setVideoOutputFormat(
         CHECK(!"Should not be here. Not a supported video mime type.");
     }
 
-    err = setVideoPortFormatType(
+    status_t err = setVideoPortFormatType(
             kPortIndexInput, compressionFormat, OMX_COLOR_FormatUnused);
 
     if (err != OK) {
         return err;
+    }
+
+    //Enable decoder to report if there is any SEI data
+    //(supported only by H264)
+    if (compressionFormat == OMX_VIDEO_CodingAVC)
+    {
+        QOMX_ENABLETYPE enable_sei_reporting;
+        enable_sei_reporting.bEnable = OMX_TRUE;
+
+        err = mOMX->setParameter(
+                mNode, (OMX_INDEXTYPE)OMX_QcomIndexParamFrameInfoExtraData,
+                &enable_sei_reporting, (size_t)sizeof(enable_sei_reporting));
+
+        if (err != OK)
+            LOGV("Not supported parameter OMX_QcomIndexParamFrameInfoExtraData");
     }
 
 #if 1
@@ -1999,11 +2050,8 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
         size_t nBuffers = 0;
 
         mSource->getBufferInfo(pFrame, &alignedSize);
-        if( pFrame == NULL )
-        {
-            LOGE("pFrame==NULL");
-            exit(0);
-        }
+        CHECK(pFrame != NULL);
+
         pFrameHeap = pFrame->getMemory(&offset, &size);
         nBuffers = pFrameHeap->getSize( )/alignedSize;
 
