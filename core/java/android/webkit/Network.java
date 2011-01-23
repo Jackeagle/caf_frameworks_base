@@ -27,6 +27,7 @@ import android.util.Log;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.LinkedList;
 
 import junit.framework.Assert;
 
@@ -360,7 +361,31 @@ class Network {
     public void stopTiming() {
         mRequestQueue.stopTiming();
     }
+
     public void setPageFinished(boolean done) {
         mRequestQueue.setPageFinished(done);    
+    }
+
+    public int requestNetworkConnections(PreConnectionManager preConnectionMgr, LinkedList<Subhost> subhosts)
+    {
+        if (null != subhosts) {
+            return mRequestQueue.handleConnectionRequest(preConnectionMgr, subhosts);
+        }
+
+        return -1;
+    }
+
+    public void stopNetworkConnections(int preConnectionThreadId)
+    {
+        mRequestQueue.stopConnectionRequest(preConnectionThreadId);
+
+        return;
+    }
+
+    public void cleanPreConnectionThreadEntry(int preConnectionThreadId)
+    {
+        mRequestQueue.cleanPreConnectionThreadEntry(preConnectionThreadId);
+
+        return;
     }
 }

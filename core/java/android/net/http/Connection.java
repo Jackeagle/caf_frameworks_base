@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -107,6 +108,8 @@ abstract class Connection {
      */
     private byte[] mBuf;
 
+    private boolean mIsTcpPreConnect;
+
     protected Connection(Context context, HttpHost host,
                          RequestFeeder requestFeeder) {
         mContext = context;
@@ -116,6 +119,8 @@ abstract class Connection {
         mCanPersist = false;
         mHttpContext = new BasicHttpContext(null);
         mConnectionThread = null;
+
+        mIsTcpPreConnect = false;
     }
 
     HttpHost getHost() {
@@ -566,6 +571,17 @@ abstract class Connection {
     byte[] getBuf() {
         if (mBuf == null) mBuf = new byte[8192];
         return mBuf;
+    }
+
+    public void setTcpPreConnect(boolean isTcpPreConnect)
+    {
+        mIsTcpPreConnect = isTcpPreConnect;
+        return;
+    }
+
+    public boolean getTcpPreConnect()
+    {
+        return mIsTcpPreConnect;
     }
 
 }
