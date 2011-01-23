@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.ListIterator;
 import java.util.Map.Entry;
 
 import android.content.ContentValues;
@@ -45,7 +48,7 @@ public class WebViewDatabase {
     // log tag
     protected static final String LOGTAG = "webviewdatabase";
 
-    private static final int DATABASE_VERSION = 10;
+    private static final int DATABASE_VERSION = 11;
     // 2 -> 3 Modified Cache table to allow cache of redirects
     // 3 -> 4 Added Oma-Downloads table
     // 4 -> 5 Modified Cache table to support persistent contentLength
@@ -55,6 +58,7 @@ public class WebViewDatabase {
     // 7 -> 8 Move cache to its own db
     // 8 -> 9 Store both scheme and host when storing passwords
     // 9 -> 10 Update httpauth table UNIQUE
+    // 10 -> 11 Added subhosts history table for tcp pre connection
     private static final int CACHE_DATABASE_VERSION = 5;
     // 1 -> 2 Add expires String
     // 2 -> 3 Add content-disposition
@@ -71,9 +75,10 @@ public class WebViewDatabase {
     private final Object mPasswordLock = new Object();
     private final Object mFormLock = new Object();
     private final Object mHttpAuthLock = new Object();
+    private final Object mTcpPreConnectionLock = new Object();
 
     private static final String mTableNames[] = {
-        "cookies", "password", "formurl", "formdata", "httpauth"
+        "cookies", "password", "formurl", "formdata", "httpauth", "tcppreconnection"
     };
 
     // Table ids (they are index to mTableNames)
@@ -86,6 +91,8 @@ public class WebViewDatabase {
     private static final int TABLE_FORMDATA_ID = 3;
 
     private static final int TABLE_HTTPAUTH_ID = 4;
+
+    private static final int TABLE_TCPPRECONNECTION_ID = 5;
 
     // column id strings for "_id" which can be used by any table
     private static final String ID_COL = "_id";
@@ -165,6 +172,17 @@ public class WebViewDatabase {
     private static final String HTTPAUTH_USERNAME_COL = "username";
 
     private static final String HTTPAUTH_PASSWORD_COL = "password";
+
+    // column id strings for "tcppreconnection" table
+    private static final String TCPPRECONNECTION_MAIN_URL_COL = "mainurl";
+
+    private static final String TCPPRECONNECTION_MAIN_URL_USECOUNT_COL = "mainurlusecount";
+
+    private static final String TCPPRECONNECTION_SUBHOST_COL = "subhost";
+
+    private static final String TCPPRECONNECTION_SUBHOST_USECOUNT_COL = "subhostusecount";
+
+    private static final String TCPPRECONNECTION_SUBHOST_WEIGHT_COL = "subhostweight";
 
     // use InsertHelper to improve insert performance by 40%
     private static DatabaseUtils.InsertHelper mCacheInserter;
@@ -408,6 +426,20 @@ public class WebViewDatabase {
         }
         boolean justPasswords = 8 == oldVersion && 9 == DATABASE_VERSION;
         boolean justAuth = 9 == oldVersion && 10 == DATABASE_VERSION;
+        boolean justTcpPreConn = 10 ==  oldVersion && 11 == DATABASE_VERSION;
+        if(justTcpPreConn) {
+            mDatabase.execSQL("DROP TABLE IF EXISTS "
+                    + mTableNames[TABLE_TCPPRECONNECTION_ID]);
+            mDatabase.execSQL("CREATE TABLE " + mTableNames[TABLE_TCPPRECONNECTION_ID]
+                + " (" + ID_COL + " INTEGER PRIMARY KEY, "
+                + TCPPRECONNECTION_MAIN_URL_COL + " TEXT, "
+                + TCPPRECONNECTION_MAIN_URL_USECOUNT_COL + " INTEGER, "
+                + TCPPRECONNECTION_SUBHOST_COL + " TEXT,"
+                + TCPPRECONNECTION_SUBHOST_USECOUNT_COL + " INTEGER, "
+                + TCPPRECONNECTION_SUBHOST_WEIGHT_COL + " REAL" + ");");
+            return;
+        }
+
         if (justAuth) {
             mDatabase.execSQL("DROP TABLE IF EXISTS "
                     + mTableNames[TABLE_HTTPAUTH_ID]);
@@ -431,6 +463,8 @@ public class WebViewDatabase {
                     + mTableNames[TABLE_FORMDATA_ID]);
             mDatabase.execSQL("DROP TABLE IF EXISTS "
                     + mTableNames[TABLE_HTTPAUTH_ID]);
+            mDatabase.execSQL("DROP TABLE IF EXISTS "
+                    + mTableNames[TABLE_TCPPRECONNECTION_ID]);
         }
         mDatabase.execSQL("DROP TABLE IF EXISTS "
                 + mTableNames[TABLE_PASSWORD_ID]);
@@ -469,6 +503,16 @@ public class WebViewDatabase {
                     + HTTPAUTH_PASSWORD_COL + " TEXT," + " UNIQUE ("
                     + HTTPAUTH_HOST_COL + ", " + HTTPAUTH_REALM_COL
                     + ") ON CONFLICT REPLACE);");
+
+            // pre connection historys
+            Log.v(LOGTAG, "TCP pre connection: creating table in database");
+            mDatabase.execSQL("CREATE TABLE " + mTableNames[TABLE_TCPPRECONNECTION_ID]
+                + " (" + ID_COL + " INTEGER PRIMARY KEY, "
+                + TCPPRECONNECTION_MAIN_URL_COL + " TEXT, "
+                + TCPPRECONNECTION_MAIN_URL_USECOUNT_COL + " INTEGER, "
+                + TCPPRECONNECTION_SUBHOST_COL + " TEXT,"
+                + TCPPRECONNECTION_SUBHOST_USECOUNT_COL + " INTEGER, "
+                + TCPPRECONNECTION_SUBHOST_WEIGHT_COL + " REAL" + ");");
         }
         // passwords
         mDatabase.execSQL("CREATE TABLE " + mTableNames[TABLE_PASSWORD_ID]
@@ -887,6 +931,10 @@ public class WebViewDatabase {
         mCacheDatabase.delete("cache", null, null);
         synchronized (mCacheStatLock) {
             mCacheStat.clear();
+        }
+
+        synchronized (mTcpPreConnectionLock) {
+            mDatabase.delete(mTableNames[TABLE_TCPPRECONNECTION_ID], null, null);
         }
     }
 
@@ -1338,6 +1386,129 @@ public class WebViewDatabase {
         synchronized (mFormLock) {
             mDatabase.delete(mTableNames[TABLE_FORMURL_ID], null, null);
             mDatabase.delete(mTableNames[TABLE_FORMDATA_ID], null, null);
+        }
+    }
+
+    //
+    // tcp pre connection functions
+    //
+
+    /**
+     * Write learnt history to db
+     */
+    public void setSubhostsData(SubResourcesHistory subResourcesHistory)
+    {
+        if (null == subResourcesHistory || null == mDatabase) {
+            return;
+        }
+
+        // save new data
+        Set mainUrls;
+        synchronized (SubResourcesHistory.mSubResourcesHistoryLock) {
+            mainUrls = new HashSet(subResourcesHistory.getMainUrls());
+        }
+
+        if (mainUrls.isEmpty ()) {
+            return;
+        }
+
+        Iterator mainUrlsIterator = mainUrls.iterator();
+
+        while (mainUrlsIterator.hasNext()) {
+            //
+            String mainUrl = (String)(mainUrlsIterator.next());
+            int mainUrlUseCount = subResourcesHistory.getUseCount(mainUrl);
+
+            //
+            LinkedList<Subhost> subHosts = subResourcesHistory.getSubHosts(mainUrl);
+            if (null != subHosts) {
+
+                ListIterator subHostsIterator;
+                synchronized (SubResourcesHistory.mSubResourcesHistoryLock) {
+                    subHostsIterator = ((LinkedList<Subhost>)(subHosts.clone())).listIterator();
+                }
+
+                while (subHostsIterator.hasNext()) {
+                    Subhost subhost = (Subhost)subHostsIterator.next();
+                    String subHostUrl = subhost.getHost();
+                    int subHostUseCount = subhost.getNumberOfReferences();
+                    double subHostWeight = subhost.getWeight();
+
+                    synchronized (mTcpPreConnectionLock) {
+
+                        final ContentValues conValues = new ContentValues();
+                        conValues.put(TCPPRECONNECTION_MAIN_URL_COL, mainUrl);
+                        conValues.put(TCPPRECONNECTION_MAIN_URL_USECOUNT_COL, mainUrlUseCount);
+                        conValues.put(TCPPRECONNECTION_SUBHOST_COL, subHostUrl);
+                        conValues.put(TCPPRECONNECTION_SUBHOST_USECOUNT_COL, subHostUseCount);
+                        conValues.put(TCPPRECONNECTION_SUBHOST_WEIGHT_COL, subHostWeight);
+
+                        try {
+                            mDatabase.insert(mTableNames[TABLE_TCPPRECONNECTION_ID],
+                                             TCPPRECONNECTION_SUBHOST_USECOUNT_COL, conValues);
+                        } catch (Exception e) {
+                            Log.e(LOGTAG, "setTcpPreConnection", e);
+                        }
+                    }
+                }
+            }
+
+        }
+
+        return;
+    }
+
+    /**
+     *
+     */
+    public void getSubhostsData(SubResourcesHistory subResourcesHistory)
+    {
+        if (null == subResourcesHistory || null == mDatabase) {
+            return;
+        }
+
+        synchronized (mTcpPreConnectionLock) {
+            final String[] columns = new String[] {
+                                                      TCPPRECONNECTION_MAIN_URL_COL,
+                                                      TCPPRECONNECTION_MAIN_URL_USECOUNT_COL,
+                                                      TCPPRECONNECTION_SUBHOST_COL,
+                                                      TCPPRECONNECTION_SUBHOST_USECOUNT_COL,
+                                                      TCPPRECONNECTION_SUBHOST_WEIGHT_COL
+                                                  };
+
+            Cursor cursor = null;
+
+            try {
+                cursor = mDatabase.query(mTableNames[TABLE_TCPPRECONNECTION_ID],
+                                         columns, null, null, null, null, null);
+                if (cursor.moveToFirst()) {
+                    int mainUrlCol = cursor.getColumnIndex(TCPPRECONNECTION_MAIN_URL_COL);
+                    int mainUrlUseCountCol = cursor.getColumnIndex(TCPPRECONNECTION_MAIN_URL_USECOUNT_COL);
+                    int subhostCol = cursor.getColumnIndex(TCPPRECONNECTION_SUBHOST_COL);
+                    int subhostUseCountCol = cursor.getColumnIndex(TCPPRECONNECTION_SUBHOST_USECOUNT_COL);
+                    int subhostWeightCol = cursor.getColumnIndex(TCPPRECONNECTION_SUBHOST_WEIGHT_COL);
+
+                    do {
+                        String subhostUrl = cursor.getString(subhostCol);
+                        int subhostUseCount = cursor.getInt(subhostUseCountCol);
+                        double subhostWeight = cursor.getDouble(subhostWeightCol);
+                        String mainUrl = cursor.getString(mainUrlCol);
+                        int mainUrlUseCount = cursor.getInt(mainUrlUseCountCol);
+
+                        Subhost subhost = new Subhost(subhostUrl, subhostUseCount, subhostWeight);
+                        subResourcesHistory.addSubHost(mainUrl, subhost);
+                        subResourcesHistory.setUseCount(mainUrl, mainUrlUseCount);
+                    } while (cursor.moveToNext());
+
+                    subResourcesHistory.updateSubhostsToConnect();
+                }
+            } catch (IllegalStateException e) {
+                Log.e(LOGTAG, "IllegalStateException", e);
+            } finally {
+                if (cursor != null) cursor.close();
+            }
+
+            return;
         }
     }
 }

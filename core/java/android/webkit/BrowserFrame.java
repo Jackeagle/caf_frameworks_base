@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,6 +109,8 @@ class BrowserFrame extends Handler {
     // Static instance of a JWebCoreJavaBridge to handle timer and cookie
     // requests from WebCore.
     static JWebCoreJavaBridge sJavaBridge;
+
+    private final PreConnectionManager mTcpPreConnectionManager;
 
     private static class ConfigCallback implements ComponentCallbacks {
         private final ArrayList<WeakReference<Handler>> mHandlers =
@@ -223,6 +225,8 @@ class BrowserFrame extends Handler {
         mCallbackProxy = proxy;
         mDatabase = WebViewDatabase.getInstance(appContext);
         mWebViewCore = w;
+
+        mTcpPreConnectionManager = new PreConnectionManager(appContext);
 
         AssetManager am = context.getAssets();
         nativeCreateFrame(w, am, proxy.getBackForwardList());
@@ -380,6 +384,13 @@ class BrowserFrame extends Handler {
             mLoadType = loadType;
 
             if (isMainFrame) {
+
+                // Extracting host from url, main host will be saved
+                WebAddress uri = new WebAddress(url);
+                if (uri.mScheme.equals("http")) {
+                    mTcpPreConnectionManager.onLoadStarted(uri.mHost);
+                }
+
                 // Call onPageStarted for main frames.
                 mCallbackProxy.onPageStarted(url, favicon);
                 // as didFirstLayout() is only called for the main frame, reset 
@@ -432,6 +443,8 @@ class BrowserFrame extends Handler {
                 resetLoadingStates();
                 mCallbackProxy.switchOutDrawHistory();
                 mCallbackProxy.onPageFinished(url);
+
+                mTcpPreConnectionManager.onLoadFinished();
             }
         }
     }
@@ -456,6 +469,8 @@ class BrowserFrame extends Handler {
         nativeDestroyFrame();
         mBlockMessages = true;
         removeCallbacksAndMessages(null);
+
+        mTcpPreConnectionManager.onDestroy();
     }
 
     /**
@@ -730,6 +745,17 @@ class BrowserFrame extends Handler {
 
         // is this resource the main-frame top-level page?
         boolean isMainFramePage = mIsMainFrame;
+
+        if(!mainResource) {
+            WebAddress uri = new WebAddress(url);
+            if (uri.mScheme.equals("http")) {
+                mTcpPreConnectionManager.onResourceLoad(uri.mHost);
+            }else {
+                if (uri.mScheme.equals("")) {
+                    mTcpPreConnectionManager.onResourceLoad("");
+                }
+            }
+        }
 
         if (DebugFlags.BROWSER_FRAME) {
             Log.v(LOGTAG, "startLoadingResource: url=" + url + ", method="

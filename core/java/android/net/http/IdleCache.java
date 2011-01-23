@@ -26,6 +26,7 @@ import org.apache.http.HttpHost;
 import android.net.http.RequestQueue;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import java.io.IOException;
 
 /**
  * {@hide}
@@ -140,16 +141,29 @@ class IdleCache {
         }
     }
 
+    synchronized void clearTcpConnections() {
+        for (int i = 0; i < IDLE_CACHE_MAX; i++) {
+            Entry entry = mEntries[i];
+            if (entry.mHost != null) {
+                if (entry.mConnection.getTcpPreConnect()) {
+                    entry.mConnection.setTcpPreConnect(false);
+                }
+            }
+        }
+    }
+
     private synchronized void clearIdle() {
         if (mCount > 0) {
             long time = SystemClock.uptimeMillis();
             for (int i = 0; (mCount > 0) && (i < IDLE_CACHE_MAX); i++) {
                 Entry entry = mEntries[i];
                 if (entry.mHost != null && time > entry.mTimeout) {
-                    entry.mHost = null;
-                    entry.mConnection.closeConnection();
-                    entry.mConnection = null;
-                    mCount--;
+                    if (!entry.mConnection.getTcpPreConnect()) {
+                        entry.mHost = null;
+                        entry.mConnection.closeConnection();
+                        entry.mConnection = null;
+                        mCount--;
+                    }
                 }
             }
         }
@@ -173,6 +187,11 @@ class IdleCache {
                         IdleCache.this.wait(CHECK_INTERVAL);
                     } catch (InterruptedException ex) {
                     }
+
+                    if(pageFinished) {
+                        clearTcpConnections();
+                    }
+
                     if(mShutdownOnPageFinish && pageFinished && (ConnectionThread.sRunning.get() == 0)) {
                         clear();
                         break;
