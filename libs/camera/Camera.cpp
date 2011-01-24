@@ -341,7 +341,6 @@ void Camera::setPreviewCallbackFlags(int flag)
 // callback from camera service
 void Camera::notifyCallback(int32_t msgType, int32_t ext1, int32_t ext2)
 {
-    LOGE("msgType = %d", msgType);
     sp<CameraListener> listener;
     {
         Mutex::Autolock _l(mLock);
