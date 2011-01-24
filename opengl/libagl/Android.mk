@@ -48,7 +48,8 @@ ifneq ($(TARGET_SIMULATOR),true)
     ifeq ($(TARGET_ARCH)-$(ARCH_ARM_HAVE_TLS_REGISTER),arm-true)
         LOCAL_CFLAGS += -DHAVE_ARM_TLS_REGISTER
     endif
-    LOCAL_C_INCLUDES += bionic/libc/private
+    LOCAL_C_INCLUDES += bionic/libc/private \
+			hardware/msm7k/libgralloc-qsd8k
 endif
 
 ifeq ($(LIBAGL_USE_GRALLOC_COPYBITS),1)
