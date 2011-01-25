@@ -28,6 +28,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.DataOutputStream;
 import java.net.Socket;
 
 /**
@@ -45,9 +46,9 @@ final class HDMIListener implements Runnable {
     private static final String HDMI_CMD_ENABLE_HDMI = "enable_hdmi";
     private static final String HDMI_CMD_DISABLE_HDMI = "disable_hdmi";
     private static final String HDMI_CMD_CHANGE_MODE = "change_mode: ";
-    private static final String HDMI_CMD_MIRROR = "hdmi_mirror: ";
     private static final String HDMI_CMD_SET_ASWIDTH = "set_aswidth: ";
     private static final String HDMI_CMD_SET_ASHEIGHT = "set_asheight: ";
+    private static final String HDMI_CMD_HPDOPTION = "hdmi_hpd: ";
 
     // hdmi events
     private static final String HDMI_EVT_CONNECTED = "hdmi_connected";
@@ -55,7 +56,7 @@ final class HDMIListener implements Runnable {
     private static final String HDMI_EVT_START = "hdmi_listner_started";
 
     private HDMIService mService;
-    private OutputStream mOutputStream;
+    private DataOutputStream mOutputStream;
     private boolean mHDMIConnected = false;
     private boolean mHDMIEnabled = false;
     private int[] mEDIDs = new int[0];
@@ -98,6 +99,7 @@ final class HDMIListener implements Runnable {
 
                 try {
                     mOutputStream.write(builder.toString().getBytes());
+                    mOutputStream.flush();
                     Log.e(TAG, "writeCommand: '"
                         + builder.toString().substring(0, builder.length()-1) + "'");
                 } catch (IOException ex) {
@@ -105,6 +107,7 @@ final class HDMIListener implements Runnable {
                 }
             }
         }
+        Thread.yield();
     }
 
     private void listenToSocket() {
@@ -118,7 +121,7 @@ final class HDMIListener implements Runnable {
             socket.connect(address);
 
             InputStream inputStream = socket.getInputStream();
-            mOutputStream = socket.getOutputStream();
+            mOutputStream = new DataOutputStream(socket.getOutputStream());
 
             /*
              * All available messages in the socket are read into the buffer.
@@ -205,10 +208,6 @@ final class HDMIListener implements Runnable {
         writeCommand(HDMI_CMD_CHANGE_MODE, new Integer(mode).toString());
     }
 
-    public void enableHDMIMirroring(boolean enable) {
-        int value = enable ? 1 : 0;
-        writeCommand(HDMI_CMD_MIRROR, new Integer(value).toString());
-    }
     public void setActionsafeWidthRatio(float asWidthRatio){
         writeCommand(HDMI_CMD_SET_ASWIDTH, new Float(asWidthRatio).toString());
     }
@@ -217,4 +216,7 @@ final class HDMIListener implements Runnable {
         writeCommand(HDMI_CMD_SET_ASHEIGHT, new Float(asHeightRatio).toString());
     }
 
+    public void setHPD(boolean hpdOption) {
+        writeCommand(HDMI_CMD_HPDOPTION, new Integer(hpdOption ? 1 : 0).toString());
+    }
 }

@@ -57,12 +57,12 @@ namespace android {
 #define HDMI_CMD_ENABLE_HDMI    "enable_hdmi"
 #define HDMI_CMD_DISABLE_HDMI   "disable_hdmi"
 #define HDMI_CMD_CHANGE_MODE    "change_mode: "
-#define HDMI_CMD_MIRROR         "hdmi_mirror: "
 #define HDMI_CMD_SET_ASWIDTH    "set_aswidth: "
 #define HDMI_CMD_SET_ASHEIGHT   "set_asheight: "
-
+#define HDMI_CMD_HPDOPTION      "hdmi_hpd: "
 #define SYSFS_CONNECTED         DEVICE_ROOT "/" DEVICE_NODE "/connected"
 #define SYSFS_EDID_MODES        DEVICE_ROOT "/" DEVICE_NODE "/edid_modes"
+#define SYSFS_HPD               DEVICE_ROOT "/" DEVICE_NODE "/hpd"
 
 HDMIDaemon::HDMIDaemon() : Thread(false),
            mFrameworkSock(-1), mAcceptedConnection(-1), mUeventSock(-1),
@@ -199,7 +199,7 @@ bool HDMIDaemon::threadLoop()
 
             if (!mDriverOnline) {
                 LOGE("threadLoop: driver not online; use state-file");
-                sendCommandToFramework(cableConnected());
+                sendCommandToFramework(cableConnected(false));
             }
         }
 
@@ -548,18 +548,6 @@ int HDMIDaemon::processFrameworkCommand()
         ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
         close(fd1);
         fd1 = -1;
-    } else if (!strncmp(buffer, HDMI_CMD_MIRROR, strlen(HDMI_CMD_MIRROR))) {
-        int mode;
-        int ret = sscanf(buffer, HDMI_CMD_MIRROR "%d", &mode);
-        if (ret == 1) {
-            LOGD(HDMI_CMD_MIRROR "%d", mode);
-            SurfaceComposerClient::enableHDMIOutput(mode);
-            if(mode){
-                 property_set("hw.hdmiON", "1");
-            } else {
-                 property_set("hw.hdmiON", "0");
-            }
-        }
     } else if (!strncmp(buffer, HDMI_CMD_SET_ASWIDTH, strlen(HDMI_CMD_SET_ASWIDTH))) {
         float asWidthRatio;
         int ret = sscanf(buffer, HDMI_CMD_SET_ASWIDTH "%f", &asWidthRatio);
@@ -572,11 +560,18 @@ int HDMIDaemon::processFrameworkCommand()
         if(ret==1) {
             SurfaceComposerClient::setActionSafeHeightRatio(asHeightRatio);
         }
+    } else if (!strncmp(buffer, HDMI_CMD_HPDOPTION, strlen(HDMI_CMD_HPDOPTION))) {
+        int option;
+        int ret = sscanf(buffer, HDMI_CMD_HPDOPTION "%d", &option);
+        if (ret == 1) {
+            LOGD(HDMI_CMD_HPDOPTION ": %d", option);
+            writeHPDOption(option);
+        }
     } else {
         int mode;
         int ret = sscanf(buffer, HDMI_CMD_CHANGE_MODE "%d", &mode);
         if (ret == 1) {
-            LOGE(HDMI_CMD_CHANGE_MODE);
+            LOGD(HDMI_CMD_CHANGE_MODE);
 
             /* To change the resolution */
             char prop_val[PROPERTY_VALUE_MAX];
@@ -620,9 +615,32 @@ bool HDMIDaemon::sendCommandToFramework(bool connected)
         strncpy(message, HDMI_EVT_DISCONNECTED, sizeof(message));
 
     int result = write(mAcceptedConnection, message, strlen(message) + 1);
-    LOGE("sendCommandToFramework: '%s' %s", message, result >= 0 ? "successful" : "failed");
+    LOGD("sendCommandToFramework: '%s' %s", message, result >= 0 ? "successful" : "failed");
     return result >= 0;
 }
+
+bool HDMIDaemon::writeHPDOption(int userOption) const
+{
+    bool ret = true;
+    int hdmiHPDFile = open(SYSFS_HPD,O_RDWR, 0);
+    if (hdmiHPDFile < 0) {
+        LOGE("writeHPDOption: state file '%s' not found", SYSFS_HPD);
+        ret = false;
+    } else {
+        int err = -1;
+        if(userOption)
+            err = write(hdmiHPDFile, "1", 2);
+        else
+            err = write(hdmiHPDFile, "0" , 2);
+        if (err <= 0) {
+            LOGE("writeHPDOption: file write failed '%s'", SYSFS_HPD);
+            ret = false;
+        }
+        close(hdmiHPDFile);
+    }
+    return ret;
+}
+
 
 // ---------------------------------------------------------------------------
 
