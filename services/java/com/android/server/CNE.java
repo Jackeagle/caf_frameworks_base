@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -239,6 +240,8 @@ public final class CNE {
     static final int CNE_NOTIFY_TIMER_EXPIRED_CMD = 15;
     static final int CNE_REQUEST_START_FMC_CMD = 16;
     static final int CNE_REQUEST_STOP_FMC_CMD = 17;
+    static final int CNE_REQUEST_UPDATE_WWAN_DORMANCY_INFO = 18;
+    static final int CNE_REQUEST_UPDATE_DEFAULT_NETWORK_INFO = 19;
 
     /* UNSOL Responses - corresponding to cnd_unsol_messages.h */
     static final int CNE_RESPONSE_REG_ROLE = 1;
@@ -314,6 +317,8 @@ public final class CNE {
     private String activeWwanIpAddr = null;
     private String hostRoutingIpAddr = null;
     private static boolean mRemoveHostEntry = false;
+
+    private static boolean isWwanDormant = false;
 
     private class AddressInfo {
         String ipAddr;
@@ -412,10 +417,12 @@ public final class CNE {
 
             if (action.equals(Intent.ACTION_BATTERY_CHANGED)) {
                 if (DBG) Log.i(LOCAL_TAG, "CNE received action: " + action);
-                int level = intent.getIntExtra("level", 0);
-                int pluginType = intent.getIntExtra("plugged", 0);
-                int status = intent.getIntExtra("status", 0);
-                updateBatteryStatus(level, pluginType, status);
+                double level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+                double scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 1);
+                int pluginType = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+                int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
+                int normalizedLevel = (int)((level/scale) * 100);
+                updateBatteryStatus(status, pluginType, normalizedLevel);
 
             } else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
                 if (DBG) Log.i(LOCAL_TAG, "CNE received action RSSI Changed events: " + action);
@@ -1127,8 +1134,10 @@ public final class CNE {
                 .getSystemService(mContext.TELEPHONY_SERVICE);
 
         // register for phone state notifications.
-        ((TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE)).listen(
-                mPhoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+        TelephonyManager tm = (TelephonyManager) mContext
+                .getSystemService(Context.TELEPHONY_SERVICE);
+        tm.listen(mPhoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
+                + PhoneStateListener.LISTEN_DATA_ACTIVITY);
 
         mReceiver = new CNEReceiver();
         mReceiverThread = new Thread(mReceiver, "CNEReceiver");
@@ -1307,6 +1316,24 @@ public final class CNE {
                         wwanV4AddrInfo.ipAddr, tsStr);
             } else {
                 Log.w(LOG_TAG, "onSignalStrengthsChanged null TelephonyManager");
+            }
+        }
+
+        @Override
+        public void onDataActivity(int activity) {
+            // update dormancy status if necessary
+            if (activity == TelephonyManager.DATA_ACTIVITY_DORMANT) {
+                // only update if needed, isWwanDormant should be true
+                if (isWwanDormant == false) {
+                    isWwanDormant = true;
+                    updateWwanDormancyStatus();
+                }
+            } else {
+                // only update if needed, isWwanDormant should be false
+                if (isWwanDormant == true) {
+                    isWwanDormant = false;
+                    updateWwanDormancyStatus();
+                }
             }
         }
     };
@@ -1499,6 +1526,42 @@ public final class CNE {
         rr.mp.writeInt(roaming);
         rr.mp.writeString(ipV4Addr);
         rr.mp.writeString(timeStamp);
+        send(rr);
+        return true;
+    }
+
+    /** {@hide} */
+    private boolean updateWwanDormancyStatus() {
+        // send isWwanDormant to cnd
+
+        CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WWAN_DORMANCY_INFO);
+        if (rr == null) {
+            Log.w(LOG_TAG, "updateWwanDormancyStatus: rr=NULL - not updated");
+            return false;
+        }
+        if (DBG) {
+            Log.i(LOCAL_TAG, "updateWwanDormancyStatus dormancy=" + isWwanDormant);
+        }
+
+        rr.mp.writeInt(isWwanDormant ? 1 : 0);
+        send(rr);
+        return true;
+    }
+
+    /** {@hide} */
+    private boolean updateDefaultNetwork() {
+        // notify cnd which network is the default
+
+        CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_DEFAULT_NETWORK_INFO);
+        if (rr == null) {
+            Log.w(LOG_TAG, "updateDefaultNetwork: rr=NULL - not updated");
+            return false;
+        }
+        if (DBG) {
+            Log.i(LOCAL_TAG, "updateDefaultNetwork default = " + mDefaultNetwork);
+        }
+
+        rr.mp.writeInt(mDefaultNetwork);
         send(rr);
         return true;
     }
@@ -2348,6 +2411,7 @@ public final class CNE {
             configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWwanV4IfName, null,
                               activeWwanV4GatewayAddr);
         }
+        updateDefaultNetwork();
         return;
     }
 
