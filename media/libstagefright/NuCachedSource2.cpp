@@ -180,7 +180,9 @@ NuCachedSource2::NuCachedSource2(const sp<DataSource> &source)
       mLastAccessPos(0),
       mFetching(true),
       mLastFetchTimeUs(-1),
-      mSuspended(false) {
+      mSuspended(false),
+      mHighWaterThreshold(kMinHighWaterThreshold),
+      mLowWaterThreshold(kMinLowWaterThreshold) {
     mLooper->setName("NuCachedSource2");
     mLooper->registerHandler(mReflector);
     mLooper->start();
@@ -207,6 +209,43 @@ status_t NuCachedSource2::getSize(off64_t *size) {
 
 uint32_t NuCachedSource2::flags() {
     return (mSource->flags() & ~kWantsPrefetching) | kIsCachingDataSource;
+}
+
+void NuCachedSource2::setThresholds(size_t lowWaterThreshold,
+        size_t highWaterThreshold) {
+    Mutex::Autolock autoLock(mLock);
+    if (highWaterThreshold <= 0 || lowWaterThreshold <= 0 || highWaterThreshold
+            < lowWaterThreshold) {
+        LOGE("Invalid values for thresholds. low: %u, high: %u", lowWaterThreshold, highWaterThreshold);
+        return;
+    }
+
+    if (highWaterThreshold < kMinHighWaterThreshold) {
+        //New highWaterThreshold is less than the minimum required, setting it to minimum
+        mHighWaterThreshold = kMinHighWaterThreshold;
+    } else if (highWaterThreshold > kMaxHighWaterThreshold){
+        //New highWaterThreshold is more than the maximum allowed, setting it to maximum
+        mHighWaterThreshold = kMaxHighWaterThreshold;
+    } else {
+        mHighWaterThreshold = highWaterThreshold;
+    }
+
+    if (lowWaterThreshold < kMinLowWaterThreshold) {
+        //New lowWaterThreshold is less than the minimum required, setting it to minimum
+        mLowWaterThreshold = kMinLowWaterThreshold;
+    } else if (lowWaterThreshold > kMaxLowWaterThreshold){
+        //New lowWaterThreshold is more than the maximum allowed, setting it to maximum
+        mLowWaterThreshold = kMaxLowWaterThreshold;
+    } else {
+        mLowWaterThreshold = lowWaterThreshold;
+    }
+}
+
+void NuCachedSource2::getThresholds(size_t& lowWaterThreshold,
+        size_t& highWaterThreshold) {
+    Mutex::Autolock autoLock(mLock);
+    highWaterThreshold = mHighWaterThreshold;
+    lowWaterThreshold = mLowWaterThreshold;
 }
 
 void NuCachedSource2::onMessageReceived(const sp<AMessage> &msg) {
@@ -283,7 +322,7 @@ void NuCachedSource2::onFetch() {
 
         mLastFetchTimeUs = ALooper::GetNowUs();
 
-        if (mFetching && mCache->totalSize() >= kHighWaterThreshold) {
+        if (mFetching && mCache->totalSize() >= mHighWaterThreshold) {
             LOGI("Cache full, done prefetching for now");
             mFetching = false;
         }
@@ -333,7 +372,7 @@ void NuCachedSource2::restartPrefetcherIfNecessary_l() {
     }
 
     if (mCacheOffset + mCache->totalSize() - mLastAccessPos
-            >= kLowWaterThreshold) {
+            >= mLowWaterThreshold) {
         return;
     }
 

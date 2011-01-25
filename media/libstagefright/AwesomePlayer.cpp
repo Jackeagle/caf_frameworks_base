@@ -55,6 +55,7 @@ namespace android {
 
 static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs
 static int64_t kHighWaterMarkUs = 10000000ll;  // 10secs
+static float kThresholdPaddingFactor = 0.1f;   // 10%
 
 struct AwesomeEvent : public TimedEventQueue::Event {
     AwesomeEvent(
@@ -598,6 +599,14 @@ void AwesomePlayer::onBufferingUpdate() {
         } else {
             int64_t bitrate;
             if (getBitrate(&bitrate)) {
+                LOGV("onBufferingUpdate: bitrate: %lld", bitrate);
+                size_t lowWaterThreshold = (size_t) ((bitrate * kLowWaterMarkUs
+                        * (1.0f + kThresholdPaddingFactor)) / 8000000ll);
+                size_t highWaterThreshold = (size_t) ((bitrate
+                        * kHighWaterMarkUs * (1.0f + kThresholdPaddingFactor))
+                        / 8000000ll);
+                mCachedSource->setThresholds(lowWaterThreshold,
+                        highWaterThreshold);
                 size_t cachedSize = mCachedSource->cachedSize();
                 int64_t cachedDurationUs = cachedSize * 8000000ll / bitrate;
 
