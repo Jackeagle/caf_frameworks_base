@@ -508,26 +508,6 @@ public class ZygoteInit {
     private static void handleSystemServerProcess(
             ZygoteConnection.Arguments parsedArgs)
             throws ZygoteInit.MethodAndArgsCaller {
-        /*
-         * First, set the capabilities if necessary
-         */
-
-        if (parsedArgs.uid != 0) {
-            /*
-             * If the Process belong to AID_RADIO(1001) or AID_SYSTEM(1000)
-             * then add CAP_SYS_TIME (1<<25) Capability.
-             */
-            if(parsedArgs.uid == 1000 || parsedArgs.uid == 1001 ) {
-                parsedArgs.permittedCapabilities |= (1<<25);
-                parsedArgs.effectiveCapabilities |= (1<<25);
-            }
-            try {
-                setCapabilities(parsedArgs.permittedCapabilities,
-                                parsedArgs.effectiveCapabilities);
-            } catch (IOException ex) {
-                Log.e(TAG, "Error setting capabilities", ex);
-            }
-        }
 
         closeServerSocket();
 
@@ -573,7 +553,9 @@ public class ZygoteInit {
             /* Request to fork the system server process */
             pid = Zygote.forkSystemServer(
                     parsedArgs.uid, parsedArgs.gid,
-                    parsedArgs.gids, debugFlags, null);
+                    parsedArgs.gids, debugFlags, null,
+                    parsedArgs.permittedCapabilities,
+                    parsedArgs.effectiveCapabilities);
         } catch (IllegalArgumentException ex) {
             throw new RuntimeException(ex);
         }
