@@ -38,7 +38,6 @@ public class UiccCard extends Handler{
     private UiccManager mUiccManager; //parent
     private UiccCardApplication[] mUiccApplications;
     private UiccRecords mUiccRecords;
-    private int mSlotId;
     private CardState mCardState;
     private PinState mUniversalPinState;
     private int[] mSubscription3gppAppIndex;     /* value < RIL_CARD_MAX_APPS */
@@ -51,9 +50,8 @@ public class UiccCard extends Handler{
     private CatService mCatService;
 
 
-    UiccCard(UiccManager uiccManager, int slotId, UiccCardStatusResponse.CardStatus ics, Context c, CommandsInterface ci) {
+    UiccCard(UiccManager uiccManager, UiccCardStatusResponse.CardStatus ics, Context c, CommandsInterface ci) {
         mUiccManager = uiccManager;
-        mSlotId = slotId;
         mCardState = ics.card_state;
         mUniversalPinState = ics.universal_pin_state;
         mSubscription3gppAppIndex = ics.subscription_3gpp_app_index;
@@ -143,10 +141,6 @@ public class UiccCard extends Handler{
             }
         }
         return count;
-    }
-
-    public int getSlotId() {
-        return mSlotId;
     }
 
     public synchronized UiccCardApplication getUiccCardApplication(int appIndex) {

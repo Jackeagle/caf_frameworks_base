@@ -40,8 +40,8 @@ public final class RuimFileHandler extends IccFileHandler {
     //***** Instance Variables
 
     //***** Constructor
-    public RuimFileHandler(UiccCardApplication app,int slotId, String aid, CommandsInterface ci) {
-        super(app, slotId, aid, ci);
+    public RuimFileHandler(UiccCardApplication app, String aid, CommandsInterface ci) {
+        super(app, aid, ci);
     }
 
     public void dispose() {
@@ -59,7 +59,7 @@ public final class RuimFileHandler extends IccFileHandler {
         Message response = obtainMessage(EVENT_READ_ICON_DONE, fileid, 0,
                 onLoaded);
 
-        mCi.iccIO(mSlotId, mAid, COMMAND_GET_RESPONSE, fileid, "img", 0, 0,
+        mCi.iccIO(mAid, COMMAND_GET_RESPONSE, fileid, "img", 0, 0,
                 GET_RESPONSE_EF_IMG_SIZE_BYTES, null, null, response);
     }
 

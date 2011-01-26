@@ -35,8 +35,8 @@ public final class SIMFileHandler extends IccFileHandler implements IccConstants
 
     //***** Constructor
 
-    public SIMFileHandler(UiccCardApplication app, int slotId, String aid, CommandsInterface ci) {
-        super(app, slotId, aid, ci);
+    public SIMFileHandler(UiccCardApplication app, String aid, CommandsInterface ci) {
+        super(app, aid, ci);
     }
 
     public void dispose() {
