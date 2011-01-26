@@ -466,13 +466,16 @@ public final class UsageStatsService extends IUsageStats.Stub {
 
     private void writeStatsFLOCK(File file) throws IOException {
         FileOutputStream stream = new FileOutputStream(file);
+        Parcel out = null;
         try {
-            Parcel out = Parcel.obtain();
+            out = Parcel.obtain();
             writeStatsToParcelFLOCK(out);
             stream.write(out.marshall());
-            out.recycle();
             stream.flush();
         } finally {
+            if (out != null) {
+                out.recycle();
+            }
             FileUtils.sync(stream);
             stream.close();
         }
@@ -674,6 +677,9 @@ public final class UsageStatsService extends IUsageStats.Stub {
             return;
         }
         Collections.sort(fileList);
+
+        mFileLeaf = getCurrentDateStr(FILE_PREFIX);
+
         for (String file : fileList) {
             if (deleteAfterPrint && file.equalsIgnoreCase(mFileLeaf)) {
                 // In this mode we don't print the current day's stats, since
@@ -682,8 +688,9 @@ public final class UsageStatsService extends IUsageStats.Stub {
             }
             File dFile = new File(mDir, file);
             String dateStr = file.substring(FILE_PREFIX.length());
+            Parcel in = null;
             try {
-                Parcel in = getParcelForFile(dFile);
+                in = getParcelForFile(dFile);
                 collectDumpInfoFromParcelFLOCK(in, pw, dateStr, isCompactOutput,
                         packages);
                 if (deleteAfterPrint) {
@@ -695,7 +702,12 @@ public final class UsageStatsService extends IUsageStats.Stub {
                 return;
             } catch (IOException e) {
                 Slog.w(TAG, "Failed with "+e+" when collecting dump info from file : "+file);
-            }      
+            }
+            finally {
+                if (in != null) {
+                    in.recycle();
+                }
+            }
         }
     }
     
