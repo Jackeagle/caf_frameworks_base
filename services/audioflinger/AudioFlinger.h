@@ -258,7 +258,7 @@ private:
     public:
                             NotificationClient(const sp<AudioFlinger>& audioFlinger,
                                                 const sp<IAudioFlingerClient>& client,
-                                                pid_t pid);
+                                                sp<IBinder> binder);
         virtual             ~NotificationClient();
 
                 sp<IAudioFlingerClient>    client() { return mClient; }
@@ -271,7 +271,7 @@ private:
                             NotificationClient& operator = (const NotificationClient&);
 
         sp<AudioFlinger>        mAudioFlinger;
-        pid_t                   mPid;
+        sp<IBinder>             mBinder;
         sp<IAudioFlingerClient> mClient;
     };
 
@@ -833,7 +833,7 @@ private:
 
 
                 void        removeClient_l(pid_t pid);
-                void        removeNotificationClient(pid_t pid);
+                void        removeNotificationClient(sp<IBinder> binder);
 
 
     // record thread
@@ -1201,7 +1201,7 @@ private:
 
                 DefaultKeyedVector< int, sp<RecordThread> >    mRecordThreads;
 
-                DefaultKeyedVector< pid_t, sp<NotificationClient> >    mNotificationClients;
+                DefaultKeyedVector< sp<IBinder>, sp<NotificationClient> >    mNotificationClients;
                 volatile int32_t                    mNextUniqueId;
 #ifdef LVMX
                 int mLifeVibesClientPid;
