@@ -616,7 +616,6 @@ status_t CameraService::Client::setOverlay(int pw, int ph) {
                 LOGE("Overlay Creation Failed!");
                 return -EINVAL;
             }
-            LOGE("OVERLAY CREATED....");
             mOverlay = new Overlay(mOverlayRef);
             result = mHardware->setOverlay(mOverlay);
             //result = mHardware->setOverlay(new Overlay(mOverlayRef));
@@ -992,21 +991,20 @@ void CameraService::Client::disableMsgType(int32_t msgType) {
 #define CHECK_MESSAGE_INTERVAL 10 // 10ms
 bool CameraService::Client::lockIfMessageWanted(int32_t msgType) {
     int sleepCount = 0;
-    LOGE("CameraService::Client::lockIfMessageWanted E");
     while (mMsgEnabled & msgType) {
         if (mLock.tryLock() == NO_ERROR) {
             if (sleepCount > 0) {
-                LOGE("lockIfMessageWanted(%d): waited for %d ms",
+                LOG1("lockIfMessageWanted(%d): waited for %d ms",
                     msgType, sleepCount * CHECK_MESSAGE_INTERVAL);
             }
             return true;
         }
         if (sleepCount++ == 0) {
-            LOGE("lockIfMessageWanted(%d): enter sleep", msgType);
+            LOG1("lockIfMessageWanted(%d): enter sleep", msgType);
         }
         usleep(CHECK_MESSAGE_INTERVAL * 1000);
     }
-    LOGE("lockIfMessageWanted(%d): dropped unwanted message", msgType);
+    LOGW("lockIfMessageWanted(%d): dropped unwanted message", msgType);
     return false;
 }
 
@@ -1081,7 +1079,7 @@ void CameraService::Client::notifyCallback(int32_t msgType, int32_t ext1,
 
 void CameraService::Client::dataCallback(int32_t msgType,
         const sp<IMemory>& dataPtr, void* user) {
-    LOGE("dataCallback(%d)", msgType);
+    LOG2("dataCallback(%d)", msgType);
 
     sp<Client> client = getClientFromCookie(user);
     if (client == 0) return;
@@ -1256,7 +1254,6 @@ void CameraService::Client::handlePostview(const sp<IMemory>& mem) {
 // picture callback - raw image ready
 void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
     disableMsgType(CAMERA_MSG_RAW_IMAGE);
-    LOGE("%s E", __FUNCTION__);
     ssize_t offset;
     size_t size;
     sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
@@ -1269,10 +1266,8 @@ void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
     sp<ICameraClient> c = mCameraClient;
     mLock.unlock();
     if (c != 0) {
-        LOGE("%s data Callback E", __FUNCTION__);
         c->dataCallback(CAMERA_MSG_RAW_IMAGE, mem);
     }
-    LOGE("%s X", __FUNCTION__);
 }
 
 // picture callback - compressed picture ready
@@ -1291,10 +1286,8 @@ void CameraService::Client::handleGenericNotify(int32_t msgType,
     int32_t ext1, int32_t ext2) {
     sp<ICameraClient> c = mCameraClient;
     
-    LOGE("CameraService::Client::handleGenericNotify: msgType = CAMERA_MSG_FOCUS");
     mLock.unlock();
     if (c != 0) {
-    LOGE("CameraService::Client::handleGenericNotify: callback");
         c->notifyCallback(msgType, ext1, ext2);
     }
 }

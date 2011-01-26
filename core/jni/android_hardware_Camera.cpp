@@ -141,7 +141,7 @@ void JNICameraContext::copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int 
         ssize_t offset;
         size_t size;
         sp<IMemoryHeap> heap = dataPtr->getMemory(&offset, &size);
-        LOGE("postData: off=%d, size=%d", offset, size);
+        LOGV("postData: off=%d, size=%d", offset, size);
         uint8_t *heapBase = (uint8_t*)heap->base();
 
         if (heapBase != NULL) {
@@ -268,8 +268,7 @@ void JNICameraContext::postData(int32_t msgType, const sp<IMemory>& dataPtr)
         break;
 
     default:
-        // TODO: Change to LOGV
-        LOGE("dataCallback(%d, %p)", msgType, dataPtr.get());
+        LOGV("dataCallback(%d, %p)", msgType, dataPtr.get());
         copyAndPost(env, dataPtr, msgType);
         break;
     }
