@@ -311,7 +311,7 @@ void LayerBase::drawRegion(const Region& reg) const
     }
 }
 
-status_t LayerBase::drawWithOverlay(const Region& inClip, bool clear) const
+status_t LayerBase::drawWithOverlay(const Region& inClip, bool clear, bool hdmiConnected) const
 {
     return INVALID_OPERATION;
 }

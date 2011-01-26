@@ -314,6 +314,13 @@ void DisplayHardware::fini()
 void DisplayHardware::releaseScreen() const
 {
     DisplayHardwareBase::releaseScreen();
+    videoOverlayStarted(false);
+#if defined(TARGET_USES_OVERLAY)
+    overlay::Overlay* temp = getOverlayObject();
+    if (temp) {
+        temp->closeChannel();
+    }
+#endif
 }
 
 void DisplayHardware::acquireScreen() const

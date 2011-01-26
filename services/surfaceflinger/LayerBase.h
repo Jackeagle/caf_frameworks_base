@@ -119,7 +119,7 @@ public:
      */
     virtual void draw(const Region& clip) const;
     virtual void drawForSreenShot() const;
-    virtual status_t drawWithOverlay(const Region& clip, bool clear) const;
+    virtual status_t drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const;
     
     /**
      * onDraw - draws the surface.
