@@ -69,17 +69,6 @@ Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 
 namespace android {
 
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
-static const int QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka = 0x7FA30C01;
-static const int QOMX_VIDEO_CodingDivx = 0x7FA30C02;
-static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-static const int QOMX_INTERLACE_FLAG = 0x49283654;
-static const int QOMX_3D_LEFT_RIGHT_VIDEO_FLAG = 0x23784238;
-static const int QOMX_3D_TOP_BOTTOM_VIDEO_FLAG = 0x4678239b;
-static const int QOMX_VIDEO_CodingSpark = 0x7FA30C03;
-static const int QOMX_VIDEO_CodingVp = 0x7FA30C04;
-
-
 struct CodecInfo {
     const char *mime;
     const char *codec;
@@ -1872,7 +1861,8 @@ OMXCodec::OMXCodec(
       mPmemInfo(NULL),
       mInterlaceFormatDetected(false),
       m3DVideoDetected(false),
-      mSendEOS(false){
+      mSendEOS(false),
+      mForce3D(0) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
@@ -4632,6 +4622,13 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
 void OMXCodec::parseFlags(uint32_t flags) {
     mGPUComposition = ((flags & kEnableGPUComposition) ? true : false);
     mThumbnailMode = ((flags & kEnableThumbnailMode) ? true : false);
+
+    { //Deal with the 3D flags
+        //Only one or the other can be set, but it's OK if neither are set (non-3d video)
+        CHECK(!((flags & kForce3DTopDown) && (flags & kForce3DLeftRight)));
+        mForce3D = ((flags & kForce3DTopDown) ? QOMX_3D_TOP_BOTTOM_VIDEO_FLAG : 0);
+        mForce3D = ((flags & kForce3DLeftRight) ? QOMX_3D_LEFT_RIGHT_VIDEO_FLAG : 0);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4799,25 +4796,28 @@ status_t OMXCodec::processSEIData()
 
         int oldColorFormat, newColorFormat;
         mOutputFormat->findInt32(kKeyColorFormat, &oldColorFormat);
+        newColorFormat = oldColorFormat;
 
-        if (arrangementInfo.cancel_flag == 1)
+        if (arrangementInfo.cancel_flag == 1) //not a 3d video
         {
-            //nothing to do here
+            if (mForce3D)
+                newColorFormat ^= mForce3D;
         }
         else
         {
             if (arrangementInfo.type == 3) //side by side
-                newColorFormat = oldColorFormat ^ QOMX_3D_LEFT_RIGHT_VIDEO_FLAG;
+                newColorFormat ^= QOMX_3D_LEFT_RIGHT_VIDEO_FLAG;
             else if (arrangementInfo.type == 4) //top bottom
-                newColorFormat = oldColorFormat ^ QOMX_3D_TOP_BOTTOM_VIDEO_FLAG;
+                newColorFormat ^= QOMX_3D_TOP_BOTTOM_VIDEO_FLAG;
             else
             {
                 LOGE("This is supposedly a 3d video but the frame arragement [%d] is not supported", (int)arrangementInfo.type);
                 return ERROR_UNSUPPORTED;
             }
-            mOutputFormat->setInt32(kKeyColorFormat, newColorFormat);
             CODEC_LOGV("This is a 3d video...assuming side by side");
         }
+
+        mOutputFormat->setInt32(kKeyColorFormat, newColorFormat);
     }
 
     return OK;

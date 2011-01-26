@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum
+ * Copyright (c) 2010-2011, Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,9 @@
 
 #include <media/stagefright/ColorConverter.h>
 #include <media/stagefright/MediaDebug.h>
+#include <media/stagefright/Utils.h>
 
 namespace android {
-
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
-static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-static const int QOMX_INTERLACE_FLAG = 0x49283654;
 
 static const size_t NV12TILE_BLOCK_WIDTH = 64;
 static const size_t NV12TILE_BLOCK_HEIGHT = 32;
@@ -46,19 +43,17 @@ bool ColorConverter::isValid() const {
         return false;
     }
 
-    switch (mSrcFormat) {
+    int baseColorFormat, temp1, temp2;
+    GET_BASE_COLOR_FORMAT(mSrcFormat, baseColorFormat, temp1, temp2);
+    switch (baseColorFormat) {
         case OMX_COLOR_FormatYUV420Planar:
         case OMX_COLOR_FormatCbYCrY:
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
         case OMX_COLOR_FormatYUV420SemiPlanar:
         case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
-        case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_INTERLACE_FLAG):
-        case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_INTERLACE_FLAG):
-        case (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_INTERLACE_FLAG):
-            return true;
-
+           return true;
         default:
-            return false;
+           return false;
     }
 }
 
@@ -69,7 +64,9 @@ void ColorConverter::convert(
     CHECK_EQ(mDstFormat, OMX_COLOR_Format16bitRGB565);
     size_t alignedWidth = ((width + 31) & -32);
 
-    switch (mSrcFormat) {
+    int baseColorFormat, temp1, temp2;
+    GET_BASE_COLOR_FORMAT(mSrcFormat, baseColorFormat, temp1, temp2);
+    switch (baseColorFormat) {
         case OMX_COLOR_FormatYUV420Planar:
             convertYUV420Planar(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
@@ -80,13 +77,11 @@ void ColorConverter::convert(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
             break;
 
-        case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_INTERLACE_FLAG):
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
             convertQCOMYUV420SemiPlanar(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
             break;
 
-        case (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_INTERLACE_FLAG):
         case OMX_COLOR_FormatYUV420SemiPlanar:
             if(alignedWidth != width) {
                 convertYUV420SemiPlanar32Aligned(
@@ -98,7 +93,6 @@ void ColorConverter::convert(
             }
             break;
 
-        case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_INTERLACE_FLAG):
         case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
             convertNV12Tile(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);

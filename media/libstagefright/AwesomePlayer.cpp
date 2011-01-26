@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2010-2011 Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +46,7 @@
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/OMXCodec.h>
+#include <media/stagefright/Utils.h>
 
 #include <surfaceflinger/ISurface.h>
 #include <cutils/properties.h>
@@ -1975,6 +1977,30 @@ status_t AwesomePlayer::resume() {
     mSuspensionState = NULL;
 
     status_t err;
+
+    //Need to set codec and source flags before
+    //setDataSource() or play()
+
+    //Check if the video was known to be 3D, if so
+    //tell decoder to 3D format (decoder might not
+    //recogize 3D sometimes if clip is played from
+    //middle as is case in suspend/resume)
+    uint32_t colorFormat = state->mColorFormat;
+    int format3D;
+    GET_3D_FORMAT(colorFormat, format3D);
+    switch (format3D)
+    {
+        case QOMX_3D_TOP_BOTTOM_VIDEO_FLAG:
+            mCodecFlags |= OMXCodec::kForce3DTopDown;
+            break;
+        case QOMX_3D_LEFT_RIGHT_VIDEO_FLAG:
+            mCodecFlags |= OMXCodec::kForce3DLeftRight;
+            break;
+        default:
+            //not a 3D colorformat; move along
+            break;
+    }
+
     if (state->mFileSource != NULL) {
         err = setDataSource_l(state->mFileSource);
 

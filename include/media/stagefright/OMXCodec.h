@@ -35,14 +35,19 @@ struct CodecProfileLevel;
 
 struct OMXCodec : public MediaSource,
                   public MediaBufferObserver {
+
+#define CREATION_FLAGS_MAX (1U<<31)
     enum CreationFlags {
         kPreferSoftwareCodecs    = 1,
         kIgnoreCodecSpecificData = 2,
         // The client wants to access the output buffer's video
         // data for example for thumbnail extraction.
         kClientNeedsFramebuffer  = 4,
-        kEnableGPUComposition = 8,
-        kEnableThumbnailMode = 16,
+        //Qualcomm specific, use higher values
+        kEnableGPUComposition    = CREATION_FLAGS_MAX,
+        kEnableThumbnailMode     = CREATION_FLAGS_MAX>>1,
+        kForce3DTopDown          = CREATION_FLAGS_MAX>>2,
+        kForce3DLeftRight        = CREATION_FLAGS_MAX>>3,
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,
@@ -173,6 +178,7 @@ private:
 
     bool mGPUComposition;
     bool mThumbnailMode;
+    uint32_t mForce3D;
 
     MediaBuffer *mLeftOverBuffer;
 

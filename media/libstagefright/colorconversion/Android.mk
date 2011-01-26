@@ -9,14 +9,16 @@ LOCAL_SRC_FILES:=                     \
         SoftwareRenderer.cpp
 
 LOCAL_C_INCLUDES := \
-        $(TOP)/frameworks/base/include/media/stagefright/openmax
+        $(TOP)/frameworks/base/include/media/stagefright/openmax \
+        $(TOP)/frameworks/base/include/media/stagefright         \
+        $(TOP)/hardware/msm7k/libgralloc-qsd8k                   \
 
 LOCAL_SHARED_LIBRARIES :=       \
         libbinder               \
         libmedia                \
         libutils                \
         libui                   \
-        libcutils				\
+        libcutils               \
         libsurfaceflinger_client\
         libcamera_client
 

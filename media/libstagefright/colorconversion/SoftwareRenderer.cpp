@@ -19,11 +19,12 @@
 #include <utils/Log.h>
 
 #include "../include/SoftwareRenderer.h"
-
 #include <binder/MemoryHeapBase.h>
 #include <binder/MemoryHeapPmem.h>
 #include <media/stagefright/MediaDebug.h>
+#include <media/stagefright/Utils.h>
 #include <surfaceflinger/ISurface.h>
+#include "gralloc_priv.h"
 
 #ifdef OUTPUT_RGB565_LOGGING
 FILE *outputRGBFile;
@@ -31,7 +32,6 @@ char outputRGBFilename [] = "/data/RGBoutput.rgb";
 #endif
 
 namespace android {
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
 SoftwareRenderer::SoftwareRenderer(
         OMX_COLOR_FORMATTYPE colorFormat,
         const sp<ISurface> &surface,
@@ -83,10 +83,25 @@ SoftwareRenderer::SoftwareRenderer(
         default: orientation = ISurface::BufferHeap::ROT_0; break;
     }
 
+    uint32_t flags3D;
+    int format3D;
+    GET_3D_FORMAT(mColorFormat, format3D);
+    switch (format3D) {
+        case QOMX_3D_LEFT_RIGHT_VIDEO_FLAG:
+            flags3D = HAL_3D_OUT_SIDE_BY_SIDE | HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R;
+            break;
+        case QOMX_3D_TOP_BOTTOM_VIDEO_FLAG:
+            flags3D = HAL_3D_OUT_TOP_BOTTOM | HAL_3D_IN_TOP_BOTTOM;
+            break;
+        default: //not a 3D colorformat
+            flags3D = 0;
+            break;
+    }
+
     ISurface::BufferHeap bufferHeap(
             mDisplayWidth, mDisplayHeight,
             alignedDecodedWidth, mDecodedHeight,
-            PIXEL_FORMAT_RGB_565,
+            PIXEL_FORMAT_RGB_565 | flags3D,
             orientation, 0,
             mMemoryHeap);
 
