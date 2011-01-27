@@ -914,6 +914,8 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
             if (((r.right - r.left) == hw.getWidth() && (r.bottom - r.top) == hw.getHeight()) ||
                           layerbuffercount) {
                 bool clear = !mOverlayUsed;
+                if(layerbuffercount == 1 && compcount == 1 && compositionStateChanged)
+                   clear = true;
 #ifdef SF_BYPASS
                 int drawLayerIndex;
                 if(layerbuffercount == 1) {
