@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,10 @@
 
 package android.telephony;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.util.Log;
+
 import com.android.internal.telephony.GsmAlphabet;
 import com.android.internal.telephony.gsm.SmsCbHeader;
 
@@ -26,7 +31,7 @@ import java.io.UnsupportedEncodingException;
  *
  * {@hide}
  */
-public class SmsCbMessage {
+public class SmsCbMessage implements Parcelable {
 
     /**
      * Cell wide immediate geographical scope
@@ -89,6 +94,13 @@ public class SmsCbMessage {
     private SmsCbMessage(byte[] pdu) throws IllegalArgumentException {
         mHeader = new SmsCbHeader(pdu);
         parseBody(pdu);
+    }
+
+    // copy constructor for SmsCbMessage
+    public SmsCbMessage(SmsCbMessage other) {
+        this.mHeader = other.mHeader;
+        this.mBody = other.mBody;
+        this.mLanguage = other.mLanguage;
     }
 
     /**
@@ -255,7 +267,8 @@ public class SmsCbMessage {
         if (mBody != null) {
             // Remove trailing carriage return
             for (int i = mBody.length() - 1; i >= 0; i--) {
-                if (mBody.charAt(i) != CARRIAGE_RETURN) {
+                if (mBody.charAt(i) != CARRIAGE_RETURN
+                        && mBody.charAt(i) != '@') {
                     mBody = mBody.substring(0, i + 1);
                     break;
                 }
@@ -264,4 +277,39 @@ public class SmsCbMessage {
             mBody = "";
         }
     }
+
+    private SmsCbMessage(Parcel in) {
+        readFromParcel(in);
+    }
+
+    @Override
+    public String toString() {
+        return ("SmsCbMessage: " + mHeader.toString() + " " + mBody);
+    }
+
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeParcelable(mHeader, 0);
+        dest.writeString(mBody);
+        dest.writeString(mLanguage);
+    }
+
+    private void readFromParcel(Parcel in) {
+        mHeader = in.readParcelable(SmsCbHeader.class.getClassLoader());
+        mBody = in.readString();
+        mLanguage = in.readString();
+    }
+
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Parcelable.Creator<SmsCbMessage> CREATOR = new Parcelable.Creator<SmsCbMessage>() {
+        public SmsCbMessage createFromParcel(Parcel in) {
+            return new SmsCbMessage(in);
+        }
+
+        public SmsCbMessage[] newArray(int size) {
+            return new SmsCbMessage[size];
+        }
+    };
 }

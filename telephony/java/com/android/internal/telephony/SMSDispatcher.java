@@ -1114,7 +1114,7 @@ public abstract class SMSDispatcher extends Handler {
     protected abstract void handleBroadcastSms(AsyncResult ar);
 
     protected void dispatchBroadcastPdus(byte[][] pdus) {
-        Intent intent = new Intent("android.provider.telephony.SMS_CB_RECEIVED");
+        Intent intent = new Intent(Intents.CB_SMS_RECEIVED_ACTION);
         intent.putExtra("pdus", pdus);
 
         if (Config.LOGD)
