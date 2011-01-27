@@ -55,6 +55,10 @@ private:
         kPageSize            = 65536,
         kHighWaterThreshold  = 5 * 1024 * 1024,
         kLowWaterThreshold   = 512 * 1024,
+        kMaxHighWaterThreshold  = 5 * 1024 * 1024,
+        kMinHighWaterThreshold  = 4 * 1024 * 1024,
+        kMaxLowWaterThreshold   = 4 * 1024 * 1024,
+        kMinLowWaterThreshold   = 512 * 1024,
 
         // Read data after a 15 sec timeout whether we're actively
         // fetching or not.
@@ -97,6 +101,14 @@ private:
     void restartPrefetcherIfNecessary_l();
 
     DISALLOW_EVIL_CONSTRUCTORS(NuCachedSource2);
+
+public:
+    void setThresholds(size_t lowWaterThreshold, size_t highWaterThreshold);
+    void getThresholds(size_t& lowWaterThreshold, size_t& highWaterThreshold);
+
+private:
+    size_t mHighWaterThreshold;
+    size_t mLowWaterThreshold;
 };
 
 }  // namespace android
