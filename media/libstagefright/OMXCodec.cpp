@@ -4283,7 +4283,7 @@ status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer,
                             newColorFormat = (oldColorFormat ^ QOMX_INTERLACE_FLAG);
                        else
                        {
-                            LOGE("Unrecognized colorformat %lx; will stick with old color format", newColorFormat);
+                            LOGE("Unrecognized colorformat %lx; will stick with old color format", oldColorFormat);
                             newColorFormat = oldColorFormat;
                         }
 
