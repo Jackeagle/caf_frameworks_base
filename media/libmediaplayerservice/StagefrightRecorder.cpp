@@ -131,6 +131,12 @@ status_t StagefrightRecorder::setAudioEncoder(audio_encoder ae) {
         mAudioEncoder = ae;
     }
 
+    /* If the encoder format is AAC, set appropriate values */
+    if(mAudioEncoder == AUDIO_ENCODER_AAC) {
+        mSampleRate    = 48000;
+        mAudioChannels = 2;
+        mAudioBitRate  = 156000;
+    }
     return OK;
 }
 
