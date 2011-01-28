@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +61,7 @@ public abstract class WindowOrientationListener {
      * @param context for the WindowOrientationListener.
      * @param rate at which sensor events are processed (see also
      * {@link android.hardware.SensorManager SensorManager}). Use the default
-     * value of {@link android.hardware.SensorManager#SENSOR_DELAY_NORMAL 
+     * value of {@link android.hardware.SensorManager#SENSOR_DELAY_NORMAL
      * SENSOR_DELAY_NORMAL} for simple screen orientation change detection.
      *
      * This constructor is private since no one uses it and making it public would complicate
@@ -178,12 +179,10 @@ public abstract class WindowOrientationListener {
         // and then ROTATION_180.
         // ROTATE_TO defines the orientation each threshold range transitions to, and must be kept
         // in sync with this.
-        // We generally transition about the halfway point between two states with a swing of 30
-        // degrees for hysteresis.
         private static final int[][][] THRESHOLDS = new int[][][] {
-                {{60, 180}, {180, 300}},
-                {{0, 30}, {195, 315}, {315, 360}},
-                {{0, 45}, {45, 165}, {330, 360}},
+                {{45, 180}, {180, 315}},
+                {{0, 45}, {195, 315}, {315, 360}},
+                {{0, 45}, {45, 165}, {315, 360}},
 
                 // Handle situation where we are currently doing 180 rotation
                 // but that is no longer allowed.
@@ -242,7 +241,7 @@ public abstract class WindowOrientationListener {
         // turned on may result in (0, 0, 0).
         private static final float MIN_ABS_ACCELERATION = 1.5f;
 
-        // Actual sampling period corresponding to SensorManager.SENSOR_DELAY_NORMAL.  There's no
+        // Actual sampling period corresponding to SensorManager.SENSOR_DELAY_NORMAL. There's no
         // way to get this information from SensorManager.
         // Note the actual period is generally 3-30ms larger than this depending on the device, but
         // that's not enough to significantly skew our results.

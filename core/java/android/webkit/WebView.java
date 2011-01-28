@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.DataSetObserver;
 import android.graphics.Bitmap;
@@ -56,6 +57,7 @@ import android.util.AttributeSet;
 import android.util.EventLog;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -64,13 +66,18 @@ import android.view.ScaleGestureDetector;
 import android.view.SoundEffectConstants;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.OvershootInterpolator;
+import android.view.animation.RotateAnimation;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+import android.view.WindowManager;
 import android.webkit.WebTextView.AutoCompleteAdapter;
 import android.webkit.WebViewCore.EventHub;
 import android.webkit.WebViewCore.TouchEventData;
@@ -315,6 +322,12 @@ public class WebView extends AbsoluteLayout
     private boolean mAutoRedraw;
 
     static final String LOGTAG = "webview";
+
+    private final float TO_DEGREES = 0.0f;
+    private final float PIVOT_X_VALUE = 0.5f;
+    private final float PIVOT_Y_VALUE = 0.5f;
+    private final float OVERSHOOT_TENSION = 3.0f;
+    private final long  ANIMATION_DURATION = 1000;
 
     private static class ExtendedZoomControls extends FrameLayout {
         public ExtendedZoomControls(Context context, AttributeSet attrs) {
@@ -908,6 +921,9 @@ public class WebView extends AbsoluteLayout
     private float mZoomCenterX;
     private float mZoomCenterY;
 
+    // smooth rotate
+    private int mOrientation;
+
     private ZoomButtonsController.OnZoomListener mZoomListener =
             new ZoomButtonsController.OnZoomListener() {
 
@@ -983,6 +999,12 @@ public class WebView extends AbsoluteLayout
         mScroller = new OverScroller(context);
 
         updateMultiTouchSupport(context);
+
+        //smooth rotate
+        Display display = ((WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+        int orientation = display.getRotation();
+        mOrientation = orientation * 90;
+
     }
 
     void updateMultiTouchSupport(Context context) {
@@ -7850,7 +7872,52 @@ public class WebView extends AbsoluteLayout
     /* package */ void updateCachedTextfield(String updatedText) {
         // Also place our generation number so that when we look at the cache
         // we recognize that it is up to date.
-        nativeUpdateCachedTextfield(updatedText, mTextGeneration);
+       nativeUpdateCachedTextfield(updatedText, mTextGeneration);
+    }
+
+    protected void onConfigurationChanged (Configuration newConfig) {
+
+         super.onConfigurationChanged(newConfig);
+
+         int preRotateWidth;
+         int preRotateHeight;
+
+         Display display = ((WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+         preRotateWidth = display.getWidth();
+         preRotateHeight = display.getHeight();
+         int orientation = display.getRotation();
+         orientation = orientation * 90;
+
+         if (orientation != mOrientation)
+         {
+             float angle = (float)(mOrientation - orientation);
+             if (angle > 180.0f)
+             {
+                 angle -= 360.0f;
+             }
+             else if (angle < -180.0f)
+             {
+                 angle += 360.0f;
+             }
+             //smooth rotate
+             RotateAnimation anim = new RotateAnimation(angle, TO_DEGREES,
+                       Animation.RELATIVE_TO_PARENT, PIVOT_X_VALUE, Animation.RELATIVE_TO_PARENT, PIVOT_Y_VALUE);
+             OvershootInterpolator interp = new OvershootInterpolator(OVERSHOOT_TENSION);
+             anim.setDuration(ANIMATION_DURATION);
+             anim.setFillEnabled(true);
+             anim.initialize(preRotateWidth,preRotateHeight,preRotateWidth,preRotateHeight);
+             anim.setInterpolator(interp);
+             ViewParent parent = getParent();
+             // Find the parent view so that, if it is a View class (it can be ViewRoot class), then it's
+             // preferable to start the animation on the parent because the parent View can cache its children
+             // during animation. If Webview has no parent View, then the animation will be done by itself -
+             // meaning that it will have to do the rotation and will be slow.
+             if (parent instanceof View)
+                 ((View)parent).startAnimation(anim);
+             else
+                 startAnimation(anim);
+             mOrientation = orientation;
+         }
     }
 
     /* package */ ViewManager getViewManager() {
