@@ -16,8 +16,8 @@
 
 package com.android.internal.telephony;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.Phone;
-import com.android.internal.telephony.Phone.IPVersion;
 
 /**
  * This class represents a apn setting for create PDP link
@@ -141,9 +141,9 @@ public class ApnSetting extends DataProfile {
 
     @Override
     boolean canSupportIpVersion(IPVersion ipv) {
-        if (ipv == IPVersion.IPV6) {
+        if (ipv == IPVersion.INET6) {
             return supportsIPv6;
-        } else if (ipv == IPVersion.IPV4) {
+        } else if (ipv == IPVersion.INET) {
             return supportsIPv4;
         }
         return false;

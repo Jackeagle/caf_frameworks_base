@@ -38,9 +38,9 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.R;
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.Phone.DataState;
-import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.ProxyManager.Subscription;
 

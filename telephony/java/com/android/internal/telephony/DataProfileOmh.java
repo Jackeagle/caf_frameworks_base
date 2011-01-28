@@ -29,7 +29,7 @@
 
 package com.android.internal.telephony;
 
-import com.android.internal.telephony.Phone.IPVersion;
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.DataServiceType;
 
 class DataProfileOmh extends DataProfile {
@@ -131,7 +131,7 @@ class DataProfileOmh extends DataProfile {
 
     @Override
     boolean canSupportIpVersion(IPVersion ipv) {
-        if (ipv == IPVersion.IPV4 || ipv == IPVersion.IPV6)
+        if (ipv == IPVersion.INET || ipv == IPVersion.INET6)
             return true;
         else
             return false;

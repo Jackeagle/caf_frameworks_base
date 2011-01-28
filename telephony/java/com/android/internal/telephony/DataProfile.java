@@ -16,9 +16,10 @@
 
 package com.android.internal.telephony;
 
+import com.android.internal.net.IPVersion;
+
 import android.util.Log;
 
-import com.android.internal.telephony.Phone.IPVersion;
 
 public abstract class DataProfile {
 
@@ -54,38 +55,38 @@ public abstract class DataProfile {
     private DataConnection ipv6Dc = null;
 
     /* package */boolean isWorking(IPVersion ipv) {
-        return (ipv == IPVersion.IPV6) ? worksWithIpv6 : worksWithIpv4;
+        return (ipv == IPVersion.INET6) ? worksWithIpv6 : worksWithIpv4;
     }
 
     /* package */void setWorking(boolean working, IPVersion ipv) {
-        if (ipv == IPVersion.IPV4)
+        if (ipv == IPVersion.INET)
             this.worksWithIpv4 = working;
-        else if (ipv == IPVersion.IPV6)
+        else if (ipv == IPVersion.INET6)
             this.worksWithIpv6 = working;
     }
 
     /* package */ boolean isActive(IPVersion ipv) {
-        if (ipv == IPVersion.IPV4) {
+        if (ipv == IPVersion.INET) {
             return ipv4Dc != null;
-        } else if (ipv == IPVersion.IPV6) {
+        } else if (ipv == IPVersion.INET6) {
             return ipv6Dc != null;
         }
         return false;
     }
 
     /* package */ boolean isActive() {
-      return isActive(IPVersion.IPV4) || isActive(IPVersion.IPV6);
+      return isActive(IPVersion.INET) || isActive(IPVersion.INET6);
     }
 
     /* package */void setAsActive(IPVersion ipv, DataConnection dc) {
-        if (ipv == IPVersion.IPV4) {
+        if (ipv == IPVersion.INET) {
             // ASSERT: ipv4Dc == null
             if (ipv4Dc != null) {
                 Log.e(LOG_TAG, "data profile already active on ipv4 : " + "[dp = "
                         + this.toString() + ", dc = " + dc.toString() + "]");
             }
             ipv4Dc = dc;
-        } else if (ipv == IPVersion.IPV6) {
+        } else if (ipv == IPVersion.INET6) {
             // ASSERT: ipv6Dc == null
             if (ipv6Dc != null) {
                 Log.e(LOG_TAG, "data profile already active on ipv6 : " + "[dp = "
@@ -96,9 +97,9 @@ public abstract class DataProfile {
     }
 
     /* package */void setAsInactive(IPVersion ipv) {
-        if (ipv == IPVersion.IPV4)
+        if (ipv == IPVersion.INET)
             ipv4Dc = null;
-        else if (ipv == IPVersion.IPV6)
+        else if (ipv == IPVersion.INET6)
             ipv6Dc = null;
     }
 

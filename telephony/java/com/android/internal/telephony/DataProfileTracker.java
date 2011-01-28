@@ -34,8 +34,8 @@ import android.os.SystemProperties;
 import android.provider.Telephony;
 import android.util.Log;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.DataConnectionTracker.State;
-import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.DataProfile;
 import com.android.internal.telephony.DataProfile.DataProfileType;
 import com.android.internal.telephony.DataProfileOmh.DataProfileTypeModem;
@@ -541,8 +541,8 @@ public class DataProfileTracker extends Handler {
     public void resetAllProfilesAsWorking() {
         if (mAllDataProfilesList != null) {
             for (DataProfile dp : mAllDataProfilesList) {
-              dp.setWorking(true, IPVersion.IPV4);
-              dp.setWorking(true, IPVersion.IPV6);
+              dp.setWorking(true, IPVersion.INET);
+              dp.setWorking(true, IPVersion.INET6);
             }
         }
     }
@@ -636,7 +636,7 @@ public class DataProfileTracker extends Handler {
 
         /* preferred APN handling */
         if (ds == DataServiceType.SERVICE_TYPE_DEFAULT
-                && ipv == IPVersion.IPV4
+                && ipv == IPVersion.INET
                 && dc.getDataProfile().getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN) {
             ApnSetting apnUsed = (ApnSetting) dc.getDataProfile();
             if (isApnDifferent(mPreferredDefaultApn, apnUsed) == true) {
@@ -669,10 +669,10 @@ public class DataProfileTracker extends Handler {
          */
         if (dpt == DataProfileType.PROFILE_TYPE_3GPP_APN
                 && ds == DataServiceType.SERVICE_TYPE_DEFAULT
-                && ipv == IPVersion.IPV4) {
+                && ipv == IPVersion.INET) {
             if (mPreferredDefaultApn != null
-                    && mPreferredDefaultApn.isWorking(IPVersion.IPV4)
-                    && mPreferredDefaultApn.canSupportIpVersion(IPVersion.IPV4)) {
+                    && mPreferredDefaultApn.isWorking(IPVersion.INET)
+                    && mPreferredDefaultApn.canSupportIpVersion(IPVersion.INET)) {
                 return mPreferredDefaultApn;
             }
         }

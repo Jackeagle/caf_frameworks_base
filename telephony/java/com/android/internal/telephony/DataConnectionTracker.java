@@ -33,9 +33,9 @@ import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.Phone.DataState;
-import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.DataProfile.DataProfileType;
 import com.android.internal.telephony.ProxyManager.Subscription;
 
@@ -271,8 +271,8 @@ public abstract class DataConnectionTracker extends Handler {
             // APN_REQUEST_STARTED?
 
             /* send out disconnected notifications - no harm doing this */
-            notifyDataConnection(serviceType, IPVersion.IPV4, REASON_SERVICE_TYPE_DISABLED);
-            notifyDataConnection(serviceType, IPVersion.IPV6, REASON_SERVICE_TYPE_DISABLED);
+            notifyDataConnection(serviceType, IPVersion.INET, REASON_SERVICE_TYPE_DISABLED);
+            notifyDataConnection(serviceType, IPVersion.INET6, REASON_SERVICE_TYPE_DISABLED);
 
             return Phone.APN_REQUEST_FAILED;
         }
@@ -304,8 +304,8 @@ public abstract class DataConnectionTracker extends Handler {
 
             // service type is already active, send out notifications!
 
-            notifyDataConnection(serviceType, IPVersion.IPV4, REASON_SERVICE_TYPE_ENABLED);
-            notifyDataConnection(serviceType, IPVersion.IPV6, REASON_SERVICE_TYPE_ENABLED);
+            notifyDataConnection(serviceType, IPVersion.INET, REASON_SERVICE_TYPE_ENABLED);
+            notifyDataConnection(serviceType, IPVersion.INET6, REASON_SERVICE_TYPE_ENABLED);
 
             /*
              * do an update data connections, just in case it was active only on
@@ -377,12 +377,12 @@ public abstract class DataConnectionTracker extends Handler {
             ret = DataState.DISCONNECTED;
         } else {
             for (DataServiceType ds : DataServiceType.values()) {
-                if (getDataConnectionState(ds, IPVersion.IPV4) == DataState.CONNECTED
-                        || getDataConnectionState(ds, IPVersion.IPV6) == DataState.CONNECTED) {
+                if (getDataConnectionState(ds, IPVersion.INET) == DataState.CONNECTED
+                        || getDataConnectionState(ds, IPVersion.INET6) == DataState.CONNECTED) {
                     ret = DataState.CONNECTED;
                     break;
-                } else if (getDataConnectionState(ds, IPVersion.IPV4) == DataState.SUSPENDED
-                        || getDataConnectionState(ds, IPVersion.IPV6) == DataState.SUSPENDED) {
+                } else if (getDataConnectionState(ds, IPVersion.INET) == DataState.SUSPENDED
+                        || getDataConnectionState(ds, IPVersion.INET6) == DataState.SUSPENDED) {
                     ret = DataState.SUSPENDED;
                     //dont break
                 }
@@ -439,7 +439,7 @@ public abstract class DataConnectionTracker extends Handler {
     }
 
     public String getActiveApn() {
-        return getActiveApn(Phone.APN_TYPE_DEFAULT, IPVersion.IPV4);
+        return getActiveApn(Phone.APN_TYPE_DEFAULT, IPVersion.INET);
     }
 
     public String getActiveApn(String apnType, IPVersion ipv) {
@@ -493,7 +493,7 @@ public abstract class DataConnectionTracker extends Handler {
     }
 
     public String[] getDnsServers(String apnType) {
-        return getDnsServers(apnType, IPVersion.IPV4);
+        return getDnsServers(apnType, IPVersion.INET);
     }
 
     public String[] getDnsServers(String apnType, IPVersion ipv) {
@@ -510,7 +510,7 @@ public abstract class DataConnectionTracker extends Handler {
     }
 
     public String getGateway(String apnType) {
-        return getGateway(apnType, IPVersion.IPV4);
+        return getGateway(apnType, IPVersion.INET);
     }
 
     public String getGateway(String apnType, IPVersion ipv) {
@@ -527,7 +527,7 @@ public abstract class DataConnectionTracker extends Handler {
     }
 
     public String getInterfaceName(String apnType) {
-        return getInterfaceName(apnType, IPVersion.IPV4);
+        return getInterfaceName(apnType, IPVersion.INET);
     }
 
     public String getInterfaceName(String apnType, IPVersion ipv) {
@@ -544,7 +544,7 @@ public abstract class DataConnectionTracker extends Handler {
     }
 
     public String getIpAddress(String apnType) {
-        return getIpAddress(apnType, IPVersion.IPV4);
+        return getIpAddress(apnType, IPVersion.INET);
     }
 
     public String getIpAddress(String apnType, IPVersion ipv) {
@@ -576,8 +576,8 @@ public abstract class DataConnectionTracker extends Handler {
 
     protected void notifyAllDataServiceTypes(String reason) {
         for (DataServiceType ds : DataServiceType.values()) {
-            notifyDataConnection(ds, IPVersion.IPV4, reason);
-            notifyDataConnection(ds, IPVersion.IPV6, reason);
+            notifyDataConnection(ds, IPVersion.INET, reason);
+            notifyDataConnection(ds, IPVersion.INET6, reason);
         }
     }
 

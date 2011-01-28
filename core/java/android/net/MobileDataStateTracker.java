@@ -32,11 +32,11 @@ import android.os.ServiceManager;
 import android.os.IBinder;
 import android.os.INetworkManagementService;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.Phone.DataState;
-import com.android.internal.telephony.Phone.IPVersion;
 
 import android.net.NetworkInfo.DetailedState;
 import android.telephony.TelephonyManager;
@@ -121,8 +121,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                 + ", mApnTypeToWatchFor=" + mApnTypeToWatchFor);
 
         mMobileInfo= new HashMap<IPVersion, MobileInfo>();
-        mMobileInfo.put(IPVersion.IPV4, new MobileInfo());
-        mMobileInfo.put(IPVersion.IPV6, new MobileInfo());
+        mMobileInfo.put(IPVersion.INET, new MobileInfo());
+        mMobileInfo.put(IPVersion.INET6, new MobileInfo());
     }
 
     /**
@@ -150,8 +150,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
             mMobileInfo.get(ipv).mState = getMobileDataState(intent);
         }
 
-        logv("initial state. v4=" + mMobileInfo.get(IPVersion.IPV4).mState +
-                ", v6=" + mMobileInfo.get(IPVersion.IPV6).mState);
+        logv("initial state. v4=" + mMobileInfo.get(IPVersion.INET).mState +
+                ", v6=" + mMobileInfo.get(IPVersion.INET6).mState);
     }
 
     private Phone.DataState getMobileDataState(Intent intent) {
@@ -248,20 +248,20 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                      * is connected. It doesn't matter which apnName is used though!
                      */
                     DataState state = getMobileDataState(intent);
-                    if (mMobileInfo.get(IPVersion.IPV4).mState == DataState.CONNECTED
-                            || mMobileInfo.get(IPVersion.IPV6).mState == DataState.CONNECTED) {
+                    if (mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTED
+                            || mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTED) {
                         state = DataState.CONNECTED;
-                    } else if (mMobileInfo.get(IPVersion.IPV4).mState == DataState.SUSPENDED
-                            || mMobileInfo.get(IPVersion.IPV6).mState == DataState.SUSPENDED) {
+                    } else if (mMobileInfo.get(IPVersion.INET).mState == DataState.SUSPENDED
+                            || mMobileInfo.get(IPVersion.INET6).mState == DataState.SUSPENDED) {
                         state = DataState.SUSPENDED;
-                    } else if (mMobileInfo.get(IPVersion.IPV4).mState == DataState.CONNECTING
-                            || mMobileInfo.get(IPVersion.IPV6).mState == DataState.CONNECTING) {
+                    } else if (mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTING
+                            || mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTING) {
                         state = DataState.CONNECTING;
                     }
 
                     String extraInfo = null;
-                    if (mMobileInfo.get(IPVersion.IPV4).mState == DataState.CONNECTED) {
-                        extraInfo = mMobileInfo.get(IPVersion.IPV4).mApnName;
+                    if (mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTED) {
+                        extraInfo = mMobileInfo.get(IPVersion.INET).mApnName;
                     }
 
                     if (needDetailedStateUpdate) {
@@ -283,8 +283,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                             case CONNECTED:
                                 setDetailedState(
                                         DetailedState.CONNECTED,
-                                        mMobileInfo.get(IPVersion.IPV4).mState == DataState.CONNECTED,
-                                        mMobileInfo.get(IPVersion.IPV6).mState == DataState.CONNECTED,
+                                        mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTED,
+                                        mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTED,
                                         reason, extraInfo);
                                 break;
                         }
@@ -297,8 +297,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                     logi("Received " + intent.getAction() + " broadcast" +
                             reason == null ? "" : "(" + reason + ")");
                     setDetailedState(DetailedState.FAILED,
-                            mMobileInfo.get(IPVersion.IPV4).mState == DataState.CONNECTED,
-                            mMobileInfo.get(IPVersion.IPV6).mState == DataState.CONNECTED, reason, apnName);
+                            mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTED,
+                            mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTED, reason, apnName);
                 }
                 TelephonyManager tm = TelephonyManager.getDefault();
                 setRoamingStatus(tm.isNetworkRoaming());
@@ -483,8 +483,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
          * Following will force a connectivity action event to be send, even if
          * state change has not occurred.
          */
-        mMobileInfo.get(IPVersion.IPV4).mState = DataState.CONNECTING;
-        mMobileInfo.get(IPVersion.IPV6).mState = DataState.CONNECTING;
+        mMobileInfo.get(IPVersion.INET).mState = DataState.CONNECTING;
+        mMobileInfo.get(IPVersion.INET6).mState = DataState.CONNECTING;
 
         switch (setEnableApn(mApnType, true)) {
             case Phone.APN_ALREADY_ACTIVE:
@@ -606,9 +606,9 @@ public class MobileDataStateTracker extends NetworkStateTracker {
     public boolean requestRouteToHost(InetAddress hostAddress) {
         String interfaceName = null;
         if (hostAddress instanceof Inet4Address) {
-            interfaceName = getInterfaceName(IPVersion.IPV4);
+            interfaceName = getInterfaceName(IPVersion.INET);
         } else if (hostAddress instanceof Inet6Address) {
-            interfaceName = getInterfaceName(IPVersion.IPV6);
+            interfaceName = getInterfaceName(IPVersion.INET6);
         }
 
         logv("Requested host route to " + hostAddress.getHostAddress() +
@@ -650,10 +650,10 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                 "net.ppp0.dns1",
                 "net.ppp0.dns2",
                 /* dynamic */
-                "net." + getInterfaceName(IPVersion.IPV4) + ".dns1",
-                "net." + getInterfaceName(IPVersion.IPV4) + ".dns2",
-                "net." + getInterfaceName(IPVersion.IPV6) + ".dns1",
-                "net." + getInterfaceName(IPVersion.IPV6) + ".dns2"
+                "net." + getInterfaceName(IPVersion.INET) + ".dns1",
+                "net." + getInterfaceName(IPVersion.INET) + ".dns2",
+                "net." + getInterfaceName(IPVersion.INET6) + ".dns1",
+                "net." + getInterfaceName(IPVersion.INET6) + ".dns2"
             };
         return getNameServerList(dnsPropNames);
     }
@@ -676,9 +676,9 @@ public class MobileDataStateTracker extends NetworkStateTracker {
     @Override
     public String toString() {
         StringBuffer sb = new StringBuffer("Mobile data state: IPV4=");
-        sb.append(mMobileInfo.get(IPVersion.IPV4));
+        sb.append(mMobileInfo.get(IPVersion.INET));
         sb.append(", IPV6=");
-        sb.append(mMobileInfo.get(IPVersion.IPV6));
+        sb.append(mMobileInfo.get(IPVersion.INET6));
         return sb.toString();
     }
 

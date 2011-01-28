@@ -23,7 +23,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-import com.android.internal.telephony.Phone.IPVersion;
+import com.android.internal.net.IPVersion;
 
 import android.net.NetworkInfo.DetailedState;
 import android.os.Handler;
@@ -154,13 +154,13 @@ public abstract class NetworkStateTracker extends Handler {
     boolean mPrivateDnsRouteSet[] = new boolean[] {false, false};
 
     public void addPrivateDnsRoutes() {
-        addPrivateDnsRoutes(IPVersion.IPV4);
-        addPrivateDnsRoutes(IPVersion.IPV6);
+        addPrivateDnsRoutes(IPVersion.INET);
+        addPrivateDnsRoutes(IPVersion.INET6);
     }
 
     public void addPrivateDnsRoutes(IPVersion ipv) {
         String interfaceName = getInterfaceName(ipv);
-        int index = ipv == IPVersion.IPV4 ? 0 : 1;
+        int index = ipv == IPVersion.INET ? 0 : 1;
 
         if (interfaceName != null && mPrivateDnsRouteSet[index] == false) {
             for (String addrString : getNameServers()) {
@@ -172,10 +172,10 @@ public abstract class NetworkStateTracker extends Handler {
                             Log.w(TAG, "could not acquire NetworkManagementService.");
                             return;
                         } else {
-                            if (ipv == IPVersion.IPV4 && inetAddress instanceof Inet4Address) {
+                            if (ipv == IPVersion.INET && inetAddress instanceof Inet4Address) {
                                 Log.v(TAG, "adding ipv4 dns " + addrString + " through "
                                         + interfaceName);
-                            } else if (ipv == IPVersion.IPV6 && inetAddress instanceof Inet6Address) {
+                            } else if (ipv == IPVersion.INET6 && inetAddress instanceof Inet6Address) {
                                 Log.v(TAG, "adding ipv6 dns " + addrString + " through "
                                         + interfaceName);
                             }
@@ -193,8 +193,8 @@ public abstract class NetworkStateTracker extends Handler {
     }
 
     public void removePrivateDnsRoutes() {
-        removePrivateDnsRoutes(IPVersion.IPV4);
-        removePrivateDnsRoutes(IPVersion.IPV6);
+        removePrivateDnsRoutes(IPVersion.INET);
+        removePrivateDnsRoutes(IPVersion.INET6);
     }
 
     public void removePrivateDnsRoutes(IPVersion ipv) {
@@ -202,7 +202,7 @@ public abstract class NetworkStateTracker extends Handler {
         // support this yet - must remove all. No worse than before
 
         String interfaceName = getInterfaceName(ipv);
-        int index = ipv == IPVersion.IPV4 ? 0 : 1;
+        int index = ipv == IPVersion.INET ? 0 : 1;
 
         if (interfaceName != null && mPrivateDnsRouteSet[index]) {
             Log.v(TAG, "remove " + ipv + " dns routes for " + mNetworkInfo.getTypeName() + " ("
@@ -213,15 +213,15 @@ public abstract class NetworkStateTracker extends Handler {
     }
 
     public void addDefaultRoute() {
-        addDefaultRoute(IPVersion.IPV4);
-        addDefaultRoute(IPVersion.IPV6);
+        addDefaultRoute(IPVersion.INET);
+        addDefaultRoute(IPVersion.INET6);
     }
 
     public void addDefaultRoute(IPVersion ipv) {
 
         String interfaceName = getInterfaceName(ipv);
         InetAddress gateway = getGateway(ipv);
-        int index = ipv == IPVersion.IPV4 ? 0 : 1;
+        int index = ipv == IPVersion.INET ? 0 : 1;
         String gwString = (gateway == null) ? "0" : gateway.getHostAddress();
 
         if (interfaceName != null) {

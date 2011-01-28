@@ -44,7 +44,6 @@ import com.android.internal.telephony.IPhoneStateListener;
 import com.android.internal.telephony.DefaultPhoneNotifier;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
-import com.android.internal.telephony.Phone.IPVersion;
 import com.android.server.am.BatteryStatsService;
 
 /**
