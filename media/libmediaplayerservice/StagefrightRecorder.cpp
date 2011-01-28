@@ -707,6 +707,40 @@ status_t StagefrightRecorder::start() {
 }
 
 sp<MediaSource> StagefrightRecorder::createAudioSource() {
+
+    bool tunneledSource = false;
+    const char *tunnelMime;
+    {
+        AudioParameter param;
+        String8 key("tunneled-input-formats");
+        param.add( key, String8("get") );
+        String8 valueStr = AudioSystem::getParameters( 0, param.toString());
+
+        AudioParameter result(valueStr);
+        int value;
+        if ( mAudioEncoder == AUDIO_ENCODER_AMR_NB &&
+             result.getInt(String8("AMR"),value) == NO_ERROR ) {
+            tunneledSource = true;
+            tunnelMime = MEDIA_MIMETYPE_AUDIO_AMR_NB;
+        }
+    }
+
+    if ( tunneledSource ) {
+        sp<AudioSource> audioSource = NULL;
+
+        sp<MetaData> meta = new MetaData;
+        meta->setInt32(kKeyChannelCount, mAudioChannels);
+        meta->setInt32(kKeySampleRate, mSampleRate);
+        meta->setInt32(kKeyBitRate, mAudioBitRate);
+        if (mAudioTimeScale > 0) {
+            meta->setInt32(kKeyTimeScale, mAudioTimeScale);
+        }
+        meta->setCString( kKeyMIMEType, tunnelMime );
+
+        audioSource = new AudioSource( mAudioSource, meta);
+        return audioSource->initCheck( ) == OK ? audioSource : NULL;
+    }
+
     sp<AudioSource> audioSource =
         new AudioSource(
                 mAudioSource,
@@ -722,6 +756,8 @@ sp<MediaSource> StagefrightRecorder::createAudioSource() {
 
     sp<MetaData> encMeta = new MetaData;
     const char *mime;
+
+    //must be extended for non-tunnel qcp/evrc
     switch (mAudioEncoder) {
         case AUDIO_ENCODER_AMR_NB:
         case AUDIO_ENCODER_DEFAULT:
@@ -1173,6 +1209,7 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
             client.interface(), enc_meta,
             true /* createEncoder */, cameraSource);
     if (encoder == NULL) {
+        LOGE("OMXCodec::Create returned NULL");
         return UNKNOWN_ERROR;
     }
 
@@ -1221,7 +1258,10 @@ status_t StagefrightRecorder::startMPEG4Recording() {
             || mVideoSource == VIDEO_SOURCE_CAMERA) {
         sp<MediaSource> encoder;
         err = setupVideoEncoder(&encoder);
-        if (err != OK) return err;
+        if (err != OK) {
+            LOGE("setupVideoEncoder failed");
+            return err;
+        }
         writer->addSource(encoder);
         totalBitRate += mVideoBitRate;
     }

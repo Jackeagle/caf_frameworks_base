@@ -141,6 +141,7 @@ private:
     StagefrightRecorder &operator=(const StagefrightRecorder &);
 };
 
+
 }  // namespace android
 
 #endif  // STAGEFRIGHT_RECORDER_H_
