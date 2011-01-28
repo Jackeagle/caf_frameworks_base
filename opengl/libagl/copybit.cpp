@@ -362,6 +362,7 @@ static bool copybit(GLint x, GLint y,
             tmp_dst.h = tmp_h;
             tmp_dst.format = tempBitmap->format;
             tmp_dst.handle = (native_handle_t*)tempBitmap->getNativeBuffer()->handle;
+            tmp_dst.padding = cbSurface.stride - cbSurface.width;
             tmp_rect.l = 0;
             tmp_rect.t = 0;
             tmp_rect.r = tmp_dst.w;
@@ -400,6 +401,7 @@ static bool copybit(GLint x, GLint y,
         tmpCbImg.h = h;
         tmpCbImg.format = tempCb->format;
         tmpCbImg.handle = (native_handle_t*)tempCb->getNativeBuffer()->handle;
+        tmpCbImg.padding = cbSurface.stride - cbSurface.width;
         tmpCbRect.l = 0;
         tmpCbRect.t = 0;
 
