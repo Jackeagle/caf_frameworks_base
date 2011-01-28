@@ -343,10 +343,6 @@ public:
     // Value for KEY_FOCUS_DISTANCES.
     static const char FOCUS_DISTANCE_INFINITY[];
 
-    //Continuous AF.
-    static const char KEY_CONTINUOUS_AF[];
-    static const char KEY_SUPPORTED_CONTINUOUS_AF[];
-
     //Selectable zone AF.
     static const char KEY_SELECTABLE_ZONE_AF[];
     static const char KEY_SUPPORTED_SELECTABLE_ZONE_AF[];
@@ -500,10 +496,6 @@ public:
     // Values for SKIN TONE ENHANCEMENT
     static const char SKIN_TONE_ENHANCEMENT_ENABLE[] ;
     static const char SKIN_TONE_ENHANCEMENT_DISABLE[] ;
-
-    // Values for Continuous AF
-    static const char CONTINUOUS_AF_OFF[] ;
-    static const char CONTINUOUS_AF_ON[] ;
 
     // Values for auto exposure settings.
     static const char SELECTABLE_ZONE_AF_AUTO[];

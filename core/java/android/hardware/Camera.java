@@ -1177,7 +1177,6 @@ public class Camera {
         private static final String KEY_MAX_CONTRAST = "max-contrast";
         private static final String KEY_SATURATION = "saturation";
         private static final String KEY_MAX_SATURATION = "max-saturation";
-        private static final String KEY_CONTINUOUS_AF = "continuous-af";
         private static final String KEY_SELECTABLE_ZONE_AF = "selectable-zone-af";
         private static final String KEY_FACE_DETECTION = "face-detection";
 
@@ -1456,11 +1455,6 @@ public class Camera {
         private static final String PIXEL_FORMAT_YUV422I = "yuv422i-yuyv";
         private static final String PIXEL_FORMAT_RGB565 = "rgb565";
         private static final String PIXEL_FORMAT_JPEG = "jpeg";
-
-        //Values for Continuous AF
-
-        public static final String CONTINUOUS_AF_OFF = "caf-off";
-        public static final String CONTINUOUS_AF_ON = "caf-on";
 
         // Values for selectable zone af settings.
         public static final String SELECTABLE_ZONE_AF_AUTO = "auto";
@@ -2952,38 +2946,6 @@ public class Camera {
                         "output must be an float array with three elements.");
             }
             splitFloat(get(KEY_FOCUS_DISTANCES), output);
-        }
-
-       /**
-         * Gets the current Continuous AF setting.
-         *
-         * @return one of CONTINUOUS_AF_XXX string constant. null if continuous AF
-         *         setting is not supported.
-         *
-         */
-        public String getContinuousAf() {
-            return get(KEY_CONTINUOUS_AF);
-        }
-
-        /**
-         * Sets the current Continuous AF mode.
-         * @param value CONTINUOUS_AF_XXX string constants.
-         *
-         */
-        public void setContinuousAf(String value) {
-            set(KEY_CONTINUOUS_AF, value);
-        }
-
-        /**
-         * Gets the supported Continuous AF modes.
-         *
-         * @return a List of CONTINUOUS_AF_XXX string constant. null if continuous AF
-         *         setting is not supported.
-         *
-         */
-        public List<String> getSupportedContinuousAfModes() {
-            String str = get(KEY_CONTINUOUS_AF + SUPPORTED_VALUES_SUFFIX);
-            return split(str);
         }
 
          /**
