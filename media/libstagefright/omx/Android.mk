@@ -10,6 +10,10 @@ endif
 
 LOCAL_C_INCLUDES += $(JNI_H_INCLUDE)
 
+ifeq ($(TARGET_BOARD_PLATFORM),omap3)
+LOCAL_CFLAGS += -DOMX_FIX
+endif
+
 LOCAL_SRC_FILES:=                     \
 	OMX.cpp                       \
         OMXComponentBase.cpp          \

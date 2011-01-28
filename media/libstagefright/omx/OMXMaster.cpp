@@ -87,7 +87,11 @@ void OMXMaster::addPlugin(OMXPluginBase *plugin) {
 
         mPluginByComponentName.add(name8, plugin);
     }
+
+    //Temporary fix to be able to use overlay with s/w codecs
+#ifndef OMX_FIX
     CHECK_EQ(err, OMX_ErrorNoMore);
+#endif
 }
 
 void OMXMaster::clearPlugins() {
