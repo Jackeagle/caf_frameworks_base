@@ -39,6 +39,7 @@ import android.os.IBinder;
 import android.os.storage.IMountService;
 import android.os.storage.StorageManager;
 import android.os.storage.StorageEventListener;
+import android.os.SystemProperties;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.widget.ImageView;
@@ -238,6 +239,12 @@ public class UsbStorageActivity extends Activity
     }
 
     private void switchUsbMassStorage(final boolean on) {
+
+	if(SystemProperties.getBoolean("ro.monkey", false)) {
+	    Log.d(TAG,"Monkey Running: Switching to UsbMassStorage disabled");
+            return;
+        }
+
         // things to do on the UI thread
         mUIHandler.post(new Runnable() {
             @Override
