@@ -123,6 +123,12 @@ protected:
 private:
     MediaSource(const MediaSource &);
     MediaSource &operator=(const MediaSource &);
+
+public:
+    virtual status_t isPaused(){return mIsPaused;}
+
+protected:
+    bool mIsPaused;
 };
 
 }  // namespace android
