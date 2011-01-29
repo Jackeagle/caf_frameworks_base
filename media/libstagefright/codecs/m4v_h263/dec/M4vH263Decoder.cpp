@@ -132,8 +132,15 @@ status_t M4vH263Decoder::start(MetaData *) {
     }
 
     MP4DecodingMode actualMode = PVGetDecBitstreamMode(mHandle);
-    CHECK_EQ(mode, actualMode);
-
+    if(mode != actualMode){
+        if((mode == MPEG4_MODE && actualMode == H263_MODE )){
+            LOGI("MPEG4 with Short Header is in use");
+        }
+        else{
+            LOGI("Mode Mismatch,mode from meta is %d,actualmode is %d", mode,actualMode);
+            CHECK_EQ(mode, actualMode);
+        }
+    }
     PVSetPostProcType((VideoDecControls *) mHandle, 0);
 
     int32_t width, height;
@@ -259,7 +266,6 @@ status_t M4vH263Decoder::read(
             mTargetTimeUs = -1;
         }
     }
-
     if (skipFrame) {
         *out = new MediaBuffer(0);
     } else {
