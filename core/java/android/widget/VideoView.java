@@ -478,6 +478,9 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                    && mTargetState == STATE_RESUME) {
                 mMediaPlayer.setDisplay(mSurfaceHolder);
                 resume();
+            } else if (mMediaPlayer != null && mCurrentState == STATE_SUSPEND
+                   && mTargetState == STATE_SUSPEND) {
+                mMediaPlayer.setDisplay(mSurfaceHolder);
             } else {
                 openVideo();
             }
