@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +17,10 @@
 
 package com.android.internal.telephony.gsm;
 
-public class SmsCbHeader {
+import android.os.Parcel;
+import android.os.Parcelable;
+
+public class SmsCbHeader implements Parcelable {
     public static final int PDU_HEADER_LENGTH = 6;
 
     public final int geographicalScope;
@@ -38,14 +42,14 @@ public class SmsCbHeader {
             throw new IllegalArgumentException("Illegal PDU");
         }
 
-        geographicalScope = (pdu[0] & 0xc0) >> 6;
-        messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >> 4);
+        geographicalScope = (pdu[0] & 0xc0) >>> 6;
+        messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >>> 4);
         updateNumber = pdu[1] & 0x0f;
-        messageIdentifier = (pdu[2] << 8) | pdu[3];
+        messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
         dataCodingScheme = pdu[4];
 
         // Check for invalid page parameter
-        int pageIndex = (pdu[5] & 0xf0) >> 4;
+        int pageIndex = (pdu[5] & 0xf0) >>> 4;
         int nrOfPages = pdu[5] & 0x0f;
 
         if (pageIndex == 0 || nrOfPages == 0 || pageIndex > nrOfPages) {
@@ -55,5 +59,57 @@ public class SmsCbHeader {
 
         this.pageIndex = pageIndex;
         this.nrOfPages = nrOfPages;
+    }
+
+    // Copy constructor for CB Header
+    public SmsCbHeader(SmsCbHeader other) {
+        this.dataCodingScheme = other.dataCodingScheme;
+        this.geographicalScope = other.geographicalScope;
+        this.messageCode = other.messageCode;
+        this.messageIdentifier = other.messageIdentifier;
+        this.nrOfPages = other.nrOfPages;
+        this.pageIndex = other.pageIndex;
+        this.updateNumber = other.updateNumber;
+    }
+
+    @Override
+    public String toString() {
+        return ("[Id = " + messageIdentifier + " Code = " + messageCode
+                + " Coding Scheme = " + dataCodingScheme + " Gs = "
+                + geographicalScope + " Update Number = " + updateNumber + "]");
+    }
+
+    public int describeContents() {
+        return 0;
+    }
+
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(geographicalScope);
+        dest.writeInt(messageCode);
+        dest.writeInt(updateNumber);
+        dest.writeInt(messageIdentifier);
+        dest.writeInt(dataCodingScheme);
+        dest.writeInt(pageIndex);
+        dest.writeInt(nrOfPages);
+    }
+
+    public static final Parcelable.Creator<SmsCbHeader> CREATOR = new Parcelable.Creator<SmsCbHeader>() {
+        public SmsCbHeader createFromParcel(Parcel in) {
+            return new SmsCbHeader(in);
+        }
+
+        public SmsCbHeader[] newArray(int size) {
+            return new SmsCbHeader[size];
+        }
+    };
+
+    private SmsCbHeader(Parcel in) {
+        geographicalScope = in.readInt();
+        messageCode = in.readInt();
+        updateNumber = in.readInt();
+        messageIdentifier = in.readInt();
+        dataCodingScheme = in.readInt();
+        pageIndex = in.readInt();
+        nrOfPages = in.readInt();
     }
 }
