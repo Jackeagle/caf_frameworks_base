@@ -23,6 +23,7 @@ import android.content.IntentFilter;
 import android.os.Message;
 import android.server.BluetoothA2dpService;
 import android.server.BluetoothService;
+import android.os.SystemProperties;
 import android.util.Log;
 
 import com.android.internal.util.HierarchicalState;
@@ -76,6 +77,7 @@ public final class BluetoothDeviceProfileState extends HierarchicalStateMachine 
 
     private static final int AUTO_CONNECT_DELAY = 6000; // 6 secs
 
+    private boolean mAutoConnectSupported = true; // by default it is supported
     private BondedDevice mBondedDevice = new BondedDevice();
     private OutgoingHandsfree mOutgoingHandsfree = new OutgoingHandsfree();
     private IncomingHandsfree mIncomingHandsfree = new IncomingHandsfree();
@@ -132,7 +134,11 @@ public final class BluetoothDeviceProfileState extends HierarchicalStateMachine 
             } else if (action.equals(BluetoothDevice.ACTION_ACL_CONNECTED)) {
                 Message msg = new Message();
                 msg.what = AUTO_CONNECT_PROFILES;
-                sendMessageDelayed(msg, AUTO_CONNECT_DELAY);
+                if (mAutoConnectSupported) {
+                    sendMessageDelayed(msg, AUTO_CONNECT_DELAY);
+                } else {
+                    Log.e(TAG,"Auto connect is disabled");
+                }
             } else if (action.equals(BluetoothDevice.ACTION_ACL_DISCONNECTED)) {
                 // This is technically not needed, but we can get stuck sometimes.
                 // For example, if incoming A2DP fails, we are not informed by Bluez
@@ -182,6 +188,8 @@ public final class BluetoothDeviceProfileState extends HierarchicalStateMachine 
 
         HeadsetServiceListener l = new HeadsetServiceListener();
         PbapServiceListener p = new PbapServiceListener();
+        mAutoConnectSupported =
+           SystemProperties.getBoolean("ro.bluetooth.remote.autoconnect",true);
     }
 
     private class HeadsetServiceListener implements BluetoothHeadset.ServiceListener {
@@ -268,6 +276,7 @@ public final class BluetoothDeviceProfileState extends HierarchicalStateMachine 
                     } else if (!mHeadsetServiceConnected) {
                         deferMessage(message);
                     } else {
+                        Log.i(TAG, "Auto Connect Profiles is initiated");
                         if (mHeadsetService.getPriority(mDevice) ==
                               BluetoothHeadset.PRIORITY_AUTO_CONNECT &&
                               !mHeadsetService.isConnected(mDevice)) {
@@ -774,7 +783,11 @@ public final class BluetoothDeviceProfileState extends HierarchicalStateMachine 
                     Message msg = new Message();
                     msg.what = CONNECT_OTHER_PROFILES;
                     msg.arg1 = CONNECT_A2DP_OUTGOING;
-                    sendMessageDelayed(msg, AUTO_CONNECT_DELAY);
+                    if (mAutoConnectSupported) {
+                        sendMessageDelayed(msg, AUTO_CONNECT_DELAY);
+                    } else {
+                        Log.e(TAG,"Auto connect is disabled");
+                    }
                 }
                 break;
             case CONNECT_A2DP_INCOMING:
@@ -785,7 +798,11 @@ public final class BluetoothDeviceProfileState extends HierarchicalStateMachine 
                     Message msg = new Message();
                     msg.what = CONNECT_OTHER_PROFILES;
                     msg.arg1 = CONNECT_HFP_OUTGOING;
-                    sendMessageDelayed(msg, AUTO_CONNECT_DELAY);
+                    if (mAutoConnectSupported) {
+                        sendMessageDelayed(msg, AUTO_CONNECT_DELAY);
+                    } else {
+                        Log.e(TAG,"Auto connect is disabled");
+                    }
                 }
                 break;
             default:
