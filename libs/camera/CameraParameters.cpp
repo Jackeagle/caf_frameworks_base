@@ -89,8 +89,6 @@ const char CameraParameters::KEY_LENSSHADE[] = "lensshade";
 const char CameraParameters::KEY_SUPPORTED_LENSSHADE_MODES[] = "lensshade-values";
 const char CameraParameters::KEY_AUTO_EXPOSURE[] = "auto-exposure";
 const char CameraParameters::KEY_SUPPORTED_AUTO_EXPOSURE[] = "auto-exposure-values";
-const char CameraParameters::KEY_CONTINUOUS_AF[] = "continuous-af";
-const char CameraParameters::KEY_SUPPORTED_CONTINUOUS_AF[] = "continuous-af-values";
 const char CameraParameters::KEY_SELECTABLE_ZONE_AF[] = "selectable-zone-af";
 const char CameraParameters::KEY_SUPPORTED_SELECTABLE_ZONE_AF[] = "selectable-zone-af-values";
 const char CameraParameters::KEY_FACE_DETECTION[] = "face-detection";
@@ -216,10 +214,6 @@ const char CameraParameters::HISTOGRAM_DISABLE[] = "disable";
 //Values for Skin Tone Enhancement Modes
 const char CameraParameters::SKIN_TONE_ENHANCEMENT_ENABLE[] = "enable";
 const char CameraParameters::SKIN_TONE_ENHANCEMENT_DISABLE[] = "disable";
-
-//Values for Continuous AF
-const char CameraParameters::CONTINUOUS_AF_OFF[] = "caf-off";
-const char CameraParameters::CONTINUOUS_AF_ON[] = "caf-on";
 
 const char CameraParameters::KEY_SHARPNESS[] = "sharpness";
 const char CameraParameters::KEY_MAX_SHARPNESS[] = "max-sharpness";
