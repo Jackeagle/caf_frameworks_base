@@ -567,6 +567,13 @@ public final class SIMRecords extends UiccApplicationRecords {
                 break;
             case EVENT_GET_CPHS_MAILBOX_DONE:
             case EVENT_GET_MBDN_DONE:
+                //Resetting the voice mail number and voice mail tag to null
+                //as these should be updated from the data read from EF_MBDN.
+                //If they are not reset, incase of invalid data/exception these
+                //variables are retaining their previous values and are
+                //causing invalid voice mailbox info display to user.
+                voiceMailNum = null;
+                voiceMailTag = null;
                 isRecordLoadResponse = true;
 
                 ar = (AsyncResult)msg.obj;
@@ -1116,6 +1123,24 @@ public final class SIMRecords extends UiccApplicationRecords {
                 Log.i(LOG_TAG,"CSP: SIM Refresh called for EF_CSP_CPHS");
                 mFh.loadEFTransparent(IccConstants.EF_CSP_CPHS,
                         obtainMessage(EVENT_GET_CSP_CPHS_DONE));
+                break;
+             case IccConstants.EF_MSISDN:
+                recordsToLoad++;
+                Log.i(LOG_TAG,"SIM Refresh called for EF_MSISDN");
+                new AdnRecordLoader(mFh).loadFromEF(IccConstants.EF_MSISDN, IccConstants.EF_EXT1, 1,
+                      obtainMessage(EVENT_GET_MSISDN_DONE));
+                break;
+            case IccConstants.EF_CFIS:
+                recordsToLoad++;
+                Log.i(LOG_TAG,"SIM Refresh called for EF_CFIS");
+                mFh.loadEFLinearFixed(IccConstants.EF_CFIS,
+                      1, obtainMessage(EVENT_GET_CFIS_DONE));
+                break;
+            case IccConstants.EF_CFF_CPHS:
+                recordsToLoad++;
+                Log.i(LOG_TAG,"SIM Refresh called for EF_CFF_CPHS");
+                mFh.loadEFTransparent(IccConstants.EF_CFF_CPHS,
+                      obtainMessage(EVENT_GET_CFF_DONE));
                 break;
             case IccConstants.EF_OPL:
                 if (DBG) log("[EONS] SIM Refresh for EF_OPL");
