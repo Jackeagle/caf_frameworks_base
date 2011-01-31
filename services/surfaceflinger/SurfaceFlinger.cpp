@@ -859,7 +859,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 
 
     if (mOverlayOpt) {
-        for (size_t i = 0; ((i < count)  && (compcount <= 1 || layerbuffercount <= 1)); ++i) {
+        for (size_t i = 0; ((i < count) && (compcount <= 1 || layerbuffercount <= 1)); ++i) {
             const sp<LayerBase>& layer = layers[i];
             const Region& visibleRegion(layer->visibleRegionScreen);
             if (!visibleRegion.isEmpty())  {
@@ -894,7 +894,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
             if(layerbuffercount == 1) {
                 if(compcount == 1) {
                    canUseOverlayToDraw = true;
-                } else if ((compcount == 2) && (layersNotUpdatingCount == 1) && !compositionStateChanged) {
+                } else if (((compcount-1) == layersNotUpdatingCount) && !compositionStateChanged) {
                    canUseOverlayToDraw = true;
                 }
                 drawClip = layerBufferClip;
@@ -935,9 +935,6 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                         mFullScreen = true;
                     mOverlayUsed = true;
                     return;
-                }
-                else {
-                    LOGE("Draw with overlay failed");
                 }
             }
         }
