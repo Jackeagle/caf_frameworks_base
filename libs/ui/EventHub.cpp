@@ -108,6 +108,9 @@ EventHub::EventHub(void)
     , mOpeningDevices(0), mClosingDevices(0)
     , mDevices(0), mFDs(0), mFDCount(0), mOpened(false), mNeedToSendFinishedDeviceScan(false)
     , mInputBufferIndex(0), mInputBufferCount(0), mInputDeviceIndex(0)
+#ifdef HAVE_TSLIB
+    , mTS(), numOfEventsSent(0), tsSamp()
+#endif
 {
     acquire_wake_lock(PARTIAL_WAKE_LOCK, WAKE_LOCK_ID);
 #ifdef EV_SW
@@ -348,6 +351,9 @@ bool EventHub::getEvent(RawEvent* outEvent)
     outEvent->value = 0;
     outEvent->when = 0;
 
+    status_t err;
+    LOGV("EventHub::getEvent() E\n");
+
     // Note that we only allow one caller to getEvent(), so don't need
     // to do locking here...  only when adding/removing devices.
 
@@ -399,15 +405,80 @@ bool EventHub::getEvent(RawEvent* outEvent)
             return true;
         }
 
-        // Grab the next input event.
+
+        // Grab the next input event for device mDevices[mInputDeviceIndex].
         for (;;) {
-            // Consume buffered input events, if any.
+
+#ifdef HAVE_TSLIB
+		//Checks if we have to send any more TS events read by input-raw plugin
+        //else we process other events
+
+        if (tsSamp.total_events) {
+				LOGV("Processing TS Event \n");
+				outEvent->deviceId = mDevices[tsSamp.tsIndex]->id;
+				outEvent->type = tsSamp.ev[numOfEventsSent].type;
+				outEvent->scanCode = tsSamp.ev[numOfEventsSent].code;
+				outEvent->keyCode = tsSamp.ev[numOfEventsSent].code;
+				outEvent->value = tsSamp.ev[numOfEventsSent].value;
+				outEvent->when = systemTime(SYSTEM_TIME_MONOTONIC);
+
+				switch (outEvent->type) {
+
+					case EV_KEY:
+						//not required to get the keycode for touchscreen device
+/*					 err = mDevices[tsSamp.tsIndex]->layoutMap->map(
+							tsSamp.ev[numOfEventsSent].code, &outEvent->keyCode,
+							&outEvent->flags);
+
+					LOGV("tsSamp.ev[numOfEventsSent].code=%d mapped to keyCode=%d\n",
+										tsSamp.ev[numOfEventsSent].code, outEvent->keyCode);
+					if (err != 0) {
+						LOGV("EV_KEY event, error (%d) accessing device layout map \n",err);
+*/						outEvent->keyCode = AKEYCODE_UNKNOWN;
+						outEvent->flags = 0;
+//					}
+					break;
+
+					case EV_ABS:
+					switch (outEvent->scanCode) {
+						case ABS_X:
+						outEvent->value = tsSamp.x;
+						break;
+						case ABS_Y:
+						outEvent->value = tsSamp.y;
+						break;
+						case ABS_PRESSURE:
+						outEvent->value = tsSamp.pressure;
+						break;
+					}
+					break;
+
+				}
+
+				if (++numOfEventsSent == tsSamp.total_events)
+								tsSamp.total_events = 0;
+
+				LOGV("%s (id: 0x%x) got: t0=%d, t1=%d, type=%d, code=%d, v=%d, keyCode=%d, flags=0x%08x",
+						mDevices[tsSamp.tsIndex]->path.string(),
+						outEvent->deviceId, (int) tsSamp.tv.tv_sec,
+						(int) tsSamp.tv.tv_usec, outEvent->type,
+						outEvent->scanCode, outEvent->value,outEvent->keyCode,outEvent->flags);
+
+				LOGV("numOfEventsSent: %d, tsSamp.total_events: %d, tsSamp.tsIndex: %d\n",
+						numOfEventsSent, tsSamp.total_events, tsSamp.tsIndex);
+
+				LOGV("EventHub::getEvent() X \n");
+				return true;
+			}
+
+#endif
+			// Consume buffered input events, if any.
             if (mInputBufferIndex < mInputBufferCount) {
                 const struct input_event& iev = mInputBufferData[mInputBufferIndex++];
                 const device_t* device = mDevices[mInputDeviceIndex];
 
-                LOGV("%s got: t0=%d, t1=%d, type=%d, code=%d, v=%d", device->path.string(),
-                     (int) iev.time.tv_sec, (int) iev.time.tv_usec, iev.type, iev.code, iev.value);
+                LOGV("%s (id: 0x%x) got: t0=%d, t1=%d, type=%d, code=%d, v=%d", device->path.string(),
+                		device->id,(int) iev.time.tv_sec, (int) iev.time.tv_usec, iev.type, iev.code, iev.value);
                 if (device->id == mFirstKeyboardId) {
                     outEvent->deviceId = 0;
                 } else {
@@ -416,23 +487,24 @@ bool EventHub::getEvent(RawEvent* outEvent)
                 outEvent->type = iev.type;
                 outEvent->scanCode = iev.code;
                 if (iev.type == EV_KEY) {
-                    status_t err = device->layoutMap->map(iev.code,
-                            & outEvent->keyCode, & outEvent->flags);
-                    LOGV("iev.code=%d keyCode=%d flags=0x%08x err=%d\n",
-                        iev.code, outEvent->keyCode, outEvent->flags, err);
+                    err = device->layoutMap->map(iev.code,& outEvent->keyCode, & outEvent->flags);
+
                     if (err != 0) {
+                      LOGV("EV_KEY event, error (%d) accessing device layout map \n",err);
                         outEvent->keyCode = AKEYCODE_UNKNOWN;
                         outEvent->flags = 0;
                     }
                 } else {
                     outEvent->keyCode = iev.code;
-                }
+                }                
+                LOGV("iev.code=%d keyCode=%d flags=0x%08x \n",iev.code, outEvent->keyCode, outEvent->flags);                
                 outEvent->value = iev.value;
 
                 // Use an event timestamp in the same timebase as
                 // java.lang.System.nanoTime() and android.os.SystemClock.uptimeMillis()
                 // as expected by the rest of the system.
                 outEvent->when = systemTime(SYSTEM_TIME_MONOTONIC);
+                LOGV("EventHub::getEvent() X \n");
                 return true;
             }
 
@@ -442,32 +514,66 @@ bool EventHub::getEvent(RawEvent* outEvent)
             // Since mFDs[0] is used for inotify, we process regular events starting at index 1.
             mInputDeviceIndex += 1;
             if (mInputDeviceIndex >= mFDCount) {
-                break;
+              LOGV("Done processing events received in last poll for all devices.");
+              break;
             }
 
             const struct pollfd& pfd = mFDs[mInputDeviceIndex];
-            if (pfd.revents & POLLIN) {
-                int32_t readSize = read(pfd.fd, mInputBufferData,
-                        sizeof(struct input_event) * INPUT_BUFFER_SIZE);
-                if (readSize < 0) {
-                    if (errno != EAGAIN && errno != EINTR) {
-                        LOGW("could not get event (errno=%d)", errno);
-                    }
-                } else if ((readSize % sizeof(struct input_event)) != 0) {
-                    LOGE("could not get event (wrong size: %d)", readSize);
-                } else {
-                    mInputBufferCount = readSize / sizeof(struct input_event);
-                    mInputBufferIndex = 0;
-                }
-            }
-        }
 
+            if (pfd.revents & POLLIN) {
+#ifdef HAVE_TSLIB
+				LOGV("Reading events from device. id: 0x%x , mInputDeviceIndex: %d, fd: %d, mTS->fd: %d",
+						mDevices[mInputDeviceIndex]->id,mInputDeviceIndex, mFDs[mInputDeviceIndex].fd, mTS->fd);
+
+				if (mTS != NULL) {
+					if (mFDs[mInputDeviceIndex].fd != mTS->fd ) {
+#endif
+						int32_t readSize = read(pfd.fd, mInputBufferData, sizeof(struct input_event) * INPUT_BUFFER_SIZE);
+
+						if (readSize < 0) {
+								if (errno != EAGAIN && errno != EINTR) {
+									LOGW("could not get event (errno=%d)", errno);
+								}
+							} else if ((readSize % sizeof(struct input_event)) != 0) {
+								LOGE("could not get event (wrong size: %d)", readSize);
+							} else {
+								mInputBufferCount = readSize / sizeof(struct input_event);
+								mInputBufferIndex = 0;
+								LOGV("Buffered %d events from device", mInputBufferCount);
+							}
+#ifdef HAVE_TSLIB
+					}
+					else{
+
+						int res = ts_read(mTS, &tsSamp, 1);
+
+						if (res < 0) {
+							LOGE("[EventHub::after poll] Error in ts_read()\n");
+						}
+						else {
+							numOfEventsSent = 0;
+							tsSamp.tsIndex = mInputDeviceIndex;
+							LOGV("After ts_read call: tsSamp[total_events: %d, tsIndex: %d]\n",tsSamp.total_events,tsSamp.tsIndex);
+							//we have read a TS event, we want to process this now.
+							//break;
+						}
+					}
+				}
+				else {
+					LOGE("EventHub:: ERROR in setup of mTS: mTS is NULL!\n");
+				}
+#endif
+            }//end of if (pfd.revents & POLLIN)
+        }//end of for(;;) get next input event
+
+        
 #if HAVE_INOTIFY
         // readNotify() will modify mFDs and mFDCount, so this must be done after
         // processing all other events.
         if(mFDs[0].revents & POLLIN) {
             readNotify(mFDs[0].fd);
             mFDs[0].revents = 0;
+            LOGV("After readNotify()");
             continue; // report added or removed devices immediately
         }
 #endif
@@ -484,7 +590,11 @@ bool EventHub::getEvent(RawEvent* outEvent)
         // pending or currently being processed.
         release_wake_lock(WAKE_LOCK_ID);
 
+        LOGV("Calling Poll() \n");
+        
         int pollResult = poll(mFDs, mFDCount, -1);
+        
+        LOGV("After calling Poll() \n");
 
         acquire_wake_lock(PARTIAL_WAKE_LOCK, WAKE_LOCK_ID);
 
@@ -493,9 +603,9 @@ bool EventHub::getEvent(RawEvent* outEvent)
                 LOGW("poll failed (errno=%d)\n", errno);
                 usleep(100000);
             }
-        }
-    }
-}
+        }    
+    }//end of for(;;)
+}//end of getEvent()
 
 /*
  * Open the platform-specific input device.
@@ -505,6 +615,17 @@ bool EventHub::openPlatformInput(void)
     /*
      * Open platform-specific input device(s).
      */
+#ifdef HAVE_TSLIB
+    mTS = (tsdev*)malloc(sizeof(struct tsdev));
+    if(mTS == NULL)
+    {
+          LOGE("No Memory");
+          return(false);
+    }
+    memset(mTS, 0, sizeof(struct tsdev));
+#endif
+
+
     int res;
 
     mFDCount = 1;
@@ -738,6 +859,17 @@ int EventHub::openDevice(const char *deviceName) {
         } else if (test_bit(BTN_TOUCH, key_bitmask)
                 && test_bit(ABS_X, abs_bitmask) && test_bit(ABS_Y, abs_bitmask)) {
             device->classes |= INPUT_DEVICE_CLASS_TOUCHSCREEN;
+#ifdef HAVE_TSLIB
+                mTS->fd = fd;
+
+                //Configure here
+                LOGV("Device name = %s, fd = %d", deviceName,fd);
+                LOGV("tslib: calling ts_config from eventhub\n");
+                if(ts_config(mTS)) {
+                    LOGE("Error in Configuring tslib. Device Name = %s \n", deviceName);
+                }
+#endif
+	    
         }
     }
 

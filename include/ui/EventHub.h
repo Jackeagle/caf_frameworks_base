@@ -28,6 +28,12 @@
 
 #include <linux/input.h>
 
+//uncomment to diable TS_LIB
+//#undef HAVE_TSLIB
+
+#ifdef HAVE_TSLIB
+    #include "tslib-private.h"
+#endif
 /* These constants are not defined in linux/input.h but they are part of the multitouch
  * input protocol. */
 
@@ -280,6 +286,15 @@ private:
     bool            mOpened;
     bool            mNeedToSendFinishedDeviceScan;
     List<String8>   mExcludedDevices;
+
+    //tslib
+#ifdef HAVE_TSLIB
+    struct tsdev *mTS;
+    //Keeps track of number of events sent to the upper layer
+    //out of total number of events raw read by input-raw plugin
+    int numOfEventsSent;
+    struct ts_sample tsSamp;
+#endif
 
     // device ids that report particular switches.
 #ifdef EV_SW
