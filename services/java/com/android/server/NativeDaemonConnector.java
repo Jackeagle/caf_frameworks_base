@@ -286,6 +286,10 @@ final class NativeDaemonConnector implements Runnable {
                         }
                     }
                     return rdata;
+                } else if (code == NativeDaemonConnector.ResponseCode.UnsolicitedInformational) {
+                    if (LOCAL_LOGD)
+                        Slog.d(TAG, String.format("Received unsolicited informational response: {%s}", line));
+                    continue;
                 } else {
                     throw new NativeDaemonConnectorException(
                             String.format("Expected list response %d, but got %d",
