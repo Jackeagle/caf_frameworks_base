@@ -980,6 +980,20 @@ status_t StagefrightRecorder::setupCameraSource() {
     // Set the actual video recording frame size
     CameraParameters params(mCamera->getParameters());
     params.setPreviewSize(mVideoWidth, mVideoHeight);
+
+    char mDeviceName[100];
+    property_get("ro.product.device",mDeviceName,"0");
+    if( !strncmp(mDeviceName, "msm7627_", 8)) {
+        if ((mVideoEncoder == VIDEO_ENCODER_H264) && (mFrameRate > 15) &&
+            (((mVideoWidth * mVideoHeight) >> 8) >= (40 * 30))) {
+            LOGW("msm7x27 supports upto 15 fps only with h264 "
+                 "for resolutions greater than or equal "
+                 "to VGA resolutions");
+            LOGW("so setting frame rate to 15 fps");
+            mFrameRate = 15;
+        }
+    }
+
     params.setPreviewFrameRate(mFrameRate);
     String8 s = params.flatten();
     if (OK != mCamera->setParameters(s)) {
