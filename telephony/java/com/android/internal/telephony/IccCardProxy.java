@@ -227,13 +227,31 @@ public class IccCardProxy extends Handler implements IccCard {
         }
     }
 
+    boolean isCardFaulty() {
+        UiccCard[] cards = mUiccManager.getIccCards();
+
+
+        for (UiccCard c: cards) {
+            if (c != null && c.getCardState() == CardState.ERROR) {
+                Log.w(LOG_TAG, "Has faulty card.");
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     void updateIccAvailability() {
 
         UiccCardApplication newApplication = mUiccManager.getCurrentApplication(mCurrentAppType);
 
         if (mFirstRun) {
             if (newApplication == null) {
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                if (isCardFaulty()) {
+                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
+                } else {
+                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                }
             }
             mFirstRun = false;
         }
@@ -248,7 +266,11 @@ public class IccCardProxy extends Handler implements IccCard {
             }
             if (newApplication == null) {
                 if (mRadioOn) {
-                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                    if (isCardFaulty()) {
+                        broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
+                    } else {
+                        broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                    }
                 } else {
                     broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
                 }
