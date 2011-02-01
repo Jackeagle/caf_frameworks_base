@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -84,18 +84,21 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
     LOGD("VIDIOC_QUERYCAP returns :%d: version: %d \n", err , cap.version );
 
     if( err >= 0 ) {
-	LOGD("Driver Version(Same as ChipId): %x \n",  cap.version );
-	/*Conver the integer to string */
-	sprintf(versionStr, "%d", cap.version );
-	property_set("hw.fm.version", versionStr);
+       LOGD("Driver Version(Same as ChipId): %x \n",  cap.version );
+       /*Conver the integer to string */
+       sprintf(versionStr, "%d", cap.version );
+       property_set("hw.fm.version", versionStr);
     } else {
-	return FM_JNI_FAILURE;
+       return FM_JNI_FAILURE;
     }
+    /*Set the mode for soc downloader*/
+    property_set("hw.fm.mode", "normal");
+
     property_set("ctl.start", "fm_dl");
     sleep(1);
     for(i=0;i<6;i++) {
         property_get("hw.fm.init", &value, NULL);
-	if(value == '1') {
+       if(value == '1') {
             init_success = 1;
             break;
         } else {
@@ -105,12 +108,12 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
     LOGE("init_success:%d after %d seconds \n", init_success, i);
     if(!init_success) {
         property_set("ctl.stop", "fm_dl");
-	// close the fd(power down)
+       // close the fd(power down)
 
-	close(fd);
+       close(fd);
         return FM_JNI_FAILURE;
     }
-
+    property_set("ctl.stop", "fm_dl");
     return fd;
 }
 
@@ -121,31 +124,6 @@ static jint android_hardware_fmradio_FmReceiverJNI_closeFdNative
     int i = 0;
     int cleanup_success = 0;
     char value = 0, retval =0;
-
-    property_set("ctl.stop", "fm_dl");
-    /*
-	Start the fm_dl service in disable mode, so that
-	the wan concurrency manger will be disabled properly.
-	This will result in running the patch downloade in disable
-	mode, which disables the wan concurrency manager
-    */
-    property_set("ctl.start", "fm_dl");
-    sleep(1);
-    for(i=0;i<3;i++) {
-        property_get("hw.fm.init", &value, NULL);
-        if(value == '1') {
-            cleanup_success = 1;
-            break;
-        } else {
-            sleep(1);
-        }
-    }
-    LOGE("cleanup_success:%d after %d seconds \n", cleanup_success, i);
-    if(!cleanup_success) {
-        property_set("ctl.stop", "fm_dl");
-	close(fd);
-        return FM_JNI_FAILURE;
-    }
 
     property_set("ctl.stop", "fm_dl");
     close(fd);
@@ -365,6 +343,29 @@ static jint android_hardware_fmradio_FmReceiverJNI_getRawRdsNative
 
 }
 
+/* native interface */
+static void android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative(JNIEnv * env, jobject thiz, jboolean aValue)
+{
+    int i = 0;
+    char value = 0;
+    int init_success = 0;
+
+    /*Enable/Disable the WAN avoidance*/
+    if (aValue)
+       property_set("hw.fm.mode", "wa_enable");
+    else
+       property_set("hw.fm.mode", "wa_disable");
+
+    property_set("ctl.start", "fm_dl");
+    sleep(1);
+    property_get("hw.fm.init", &value, NULL);
+    if(value == '1') {
+            init_success = 1;
+    }
+    LOGE("init_success:%d after %d seconds \n", init_success, i);
+}
+
+
 /*
  * JNI registration.
  */
@@ -398,6 +399,8 @@ static JNINativeMethod gMethods[] = {
             (void*)android_hardware_fmradio_FmReceiverJNI_setMonoStereoNative},
         { "getRawRdsNative", "(I[BI)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_getRawRdsNative},
+       { "setNotchFilterNative", "(Z)V",
+            (void*)android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative},
 };
 
 int register_android_hardware_fm_fmradio(JNIEnv* env)
