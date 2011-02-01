@@ -75,6 +75,9 @@ static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30
 static const int QOMX_INTERLACE_FLAG = 0x49283654;
 static const int QOMX_3D_LEFT_RIGHT_VIDEO_FLAG = 0x23784238;
 static const int QOMX_3D_TOP_BOTTOM_VIDEO_FLAG = 0x4678239b;
+static const int QOMX_VIDEO_CodingSpark = 0x7FA30C03;
+static const int QOMX_VIDEO_CodingVp = 0x7FA30C04;
+
 
 struct CodecInfo {
     const char *mime;
@@ -209,6 +212,8 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_VIDEO_VPX, "VPXDecoder" },
     { MEDIA_MIMETYPE_VIDEO_DIVX, "OMX.qcom.video.decoder.divx"},
     { MEDIA_MIMETYPE_AUDIO_AC3, "OMX.qcom.audio.decoder.ac3" },
+    { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
+    { MEDIA_MIMETYPE_VIDEO_VP6,"OMX.qcom.video.decoder.vp"},
 };
 
 static const CodecInfo kEncoderInfo[] = {
@@ -745,6 +750,39 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
         setAC3Format(numChannels, sampleRate);*/
     }
+
+     if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mMIME)) {
+         LOGV("Setting the QOMX_VIDEO_PARAM_SPARKTYPE params ");
+         QOMX_VIDEO_PARAM_SPARKTYPE paramSpark;
+
+         InitOMXParams(&paramSpark);
+         paramSpark.nPortIndex = kPortIndexInput;
+         paramSpark.eFormat = QOMX_VIDEO_SparkFormat1;
+
+         status_t err = mOMX->setParameter(mNode,
+                          (OMX_INDEXTYPE)OMX_QcomIndexParamVideoSpark,
+                          &paramSpark, sizeof(paramSpark));
+         if (err != OK) {
+              return err;
+         }
+     }
+     if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_VP6, mMIME)) {
+         LOGV("Setting the QOMX_VIDEO_PARAM_VPTYPE params ");
+         QOMX_VIDEO_PARAM_VPTYPE paramVp;
+
+         InitOMXParams(&paramVp);
+         paramVp.nPortIndex = kPortIndexInput;
+         /*Right now Supporting only VP6 and Advanced Profile*/
+         paramVp.eFormat =  QOMX_VIDEO_VPFormat6;
+         paramVp.eProfile = QOMX_VIDEO_VPProfileAdvanced;
+
+          status_t err = mOMX->setParameter(mNode,
+                           (OMX_INDEXTYPE)OMX_QcomIndexParamVideoVp,
+                           &paramVp, sizeof(paramVp));
+         if (err != OK) {
+             return err;
+         }
+     }
 
     if (!strncasecmp(mMIME, "video/", 6)) {
 
@@ -1519,6 +1557,10 @@ status_t OMXCodec::setVideoOutputFormat(
         compressionFormat = OMX_VIDEO_CodingH263;
     } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime)) {
         compressionFormat = (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
+    } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mime)) {
+    compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingSpark;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_VP6, mime)) {
+        compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingVp;
     } else {
         LOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
