@@ -291,7 +291,6 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
 
     private void getSubscriptionInfoAndStartPollingThreads() {
         cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
-        cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
 
         // Get Registration Information
         pollState();
@@ -313,7 +312,6 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         case EVENT_RADIO_ON:
             handleCdmaSubscriptionSource();
             cm.getCDMASubscription( obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
-            cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
 
             // Signal strength polling stops when radio is off.
             queueNextSignalStrengthPoll();
@@ -342,14 +340,12 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             break;
 
         case EVENT_CDMA_PRL_VERSION_CHANGED :
-            cm.getCdmaPrlVersion(obtainMessage(EVENT_GET_CDMA_PRL_VERSION));
-            break;
-
-        case EVENT_GET_CDMA_PRL_VERSION :
-            ar = (AsyncResult) msg.obj;
+            ar = (AsyncResult)msg.obj;
             if (ar.exception == null) {
-                mPrlVersion = (String) ar.result;
+                ints = (int[]) ar.result;
+                mPrlVersion = Integer.toString(ints[0]);
             }
+
             break;
 
         case EVENT_RADIO_STATE_CHANGED:
