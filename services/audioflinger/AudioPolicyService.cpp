@@ -80,7 +80,7 @@ AudioPolicyService::AudioPolicyService()
     // if running in emulation - use the emulator driver
     if (property_get("ro.kernel.qemu", value, 0)) {
         LOGV("Running in emulation - using generic audio policy");
-        //mpPolicyManager = new AudioPolicyManagerBase(this);
+        mpPolicyManager = new AudioPolicyManagerBase(this);
     }
     else {
         LOGV("Using hardware specific audio policy");
