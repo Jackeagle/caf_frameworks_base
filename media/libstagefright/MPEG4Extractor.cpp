@@ -1457,6 +1457,12 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         return OK;
     }
 
+    if (objectTypeIndication == 0x6b) {
+        // This is mp3, set mimetype to mpeg
+        mLastTrack->meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
+        return OK;
+    }
+
     const uint8_t *csd;
     size_t csd_size;
     if (esds.getCodecSpecificInfo(
