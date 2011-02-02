@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +68,7 @@ import com.android.internal.telephony.UiccCardApplication;
 import com.android.internal.telephony.UiccManager;
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 /**
  * {@hide}
@@ -192,7 +194,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         cm.setOnSignalStrengthUpdate(this, EVENT_SIGNAL_STRENGTH_UPDATE, null);
         cm.registerForRestrictedStateChanged(this, EVENT_RESTRICTED_STATE_CHANGED, null);
 
-        mUiccManager = UiccManager.getInstance(phone.getContext(), this.cm);
+        mUiccManager = UiccManager.getInstance();
+
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
         cr = phone.getContext().getContentResolver();
@@ -468,6 +471,10 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             int rule = curSpnRule;
             String pnn = null;
 
+            if (mSIMRecords != null) {
+                rule = mSIMRecords.getDisplayRule(ss.getOperatorNumeric());
+            }
+
             String spn = null;
             String plmn = ss.getOperatorAlphaLong();
 
@@ -489,7 +496,6 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
 
                 boolean showSpn = !mEmergencyOnly
                     && (rule & SIMRecords.SPN_RULE_SHOW_SPN) == SIMRecords.SPN_RULE_SHOW_SPN
-                    && (rule & SIMRecords.SPN_RULE_SHOW_SPN) == SIMRecords.SPN_RULE_SHOW_SPN
                     && (ss.getState() == ServiceState.STATE_IN_SERVICE);
                 boolean showPlmn =
                     (rule & SIMRecords.SPN_RULE_SHOW_PLMN) == SIMRecords.SPN_RULE_SHOW_PLMN;
@@ -500,6 +506,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 intent.putExtra(Intents.EXTRA_SPN, spn);
                 intent.putExtra(Intents.EXTRA_SHOW_PLMN, showPlmn);
                 intent.putExtra(Intents.EXTRA_PLMN, plmn);
+                intent.putExtra(Intents.EXTRA_SUBSCRIPTION, phone.getSubscription());
+                Log.d(LOG_TAG, "updateSpnDisplay sending on sub :" + phone.getSubscription());
                 phone.getContext().sendStickyBroadcast(intent);
             }
 
@@ -545,7 +553,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     err != CommandException.Error.OP_NOT_ALLOWED_BEFORE_REG_NW) {
                 Log.e(LOG_TAG,
                         "RIL implementation has returned an error where it must succeed" +
-                        ar.exception);
+                        ar.exception+"event id=:"+what);
             }
         } else try {
             switch (what) {
@@ -696,7 +704,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
 
     private void pollStateDone() {
         if (DBG) {
-            Log.d(LOG_TAG, "Poll ServiceState done: " +
+            Log.d(LOG_TAG, "[SUB: " +phone.getSubscription()
+                + "] Poll ServiceState done: " +
                 " oldSS=[" + ss + "] newSS=[" + newSS +
                 "] ");
         }
@@ -867,10 +876,20 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         }
     }
 
-    void updateIccAvailability() {
+    //Gets Application records and register for record events
+    public void updateRecords() {
+        updateIccAvailability();
+    }
 
-        UiccCardApplication new3gppApplication = mUiccManager
-                .getCurrentApplication(AppFamily.APP_FAM_3GPP);
+    void updateIccAvailability() {
+        UiccCardApplication new3gppApplication = null;
+        Subscription subscriptionData = phone.getSubscriptionInfo();
+        if(subscriptionData != null) {
+            new3gppApplication = mUiccManager
+                    .getApplication(subscriptionData.slotId, subscriptionData.m3gppIndex);
+        } else {
+            return ;
+        }
 
         if (m3gppApplication != new3gppApplication) {
             if (m3gppApplication != null) {
@@ -1082,7 +1101,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
      * @return true for roaming state set
      */
     private boolean isRoamingBetweenOperators(boolean gsmRoaming, ServiceState s) {
-        String spn = SystemProperties.get(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, "empty");
+        String spn = phone.getSystemProperty
+                (TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, "empty");
 
         String onsl = s.getOperatorAlphaLong();
         String onss = s.getOperatorAlphaShort();
@@ -1090,8 +1110,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         boolean equalsOnsl = onsl != null && spn.equals(onsl);
         boolean equalsOnss = onss != null && spn.equals(onss);
 
-        String simNumeric = SystemProperties.get(
-                TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, "");
+        String simNumeric = phone.getSystemProperty
+                (TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, "");
         String  operatorNumeric = s.getOperatorNumeric();
 
         boolean equalsMcc = true;
@@ -1218,7 +1238,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 zone = TimeZone.getTimeZone( tzname );
             }
 
-            String iso = SystemProperties.get(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY);
+            String iso = phone.getSystemProperty
+                    (TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY, null);
 
             if (zone == null) {
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.telephony.CellLocation;
 import android.telephony.ServiceState;
-import android.telephony.SignalStrength;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -42,6 +42,7 @@ import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.Phone.DataState;
 import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.test.SimulatedRadioControl;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.util.List;
 import java.util.Locale;
@@ -107,6 +108,7 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected static final int EVENT_SET_NETWORK_AUTOMATIC          = 30;
     protected static final int EVENT_ICC_RECORD_EVENTS              = 31;
     protected static final int EVENT_GET_MDN_DONE                   = 32;
+    protected static final int EVENT_SUBSCRIPTION_READY             = 33;
 
     // Key used to read/write current CLIR setting
     public static final String CLIR_KEY = "clir_key";
@@ -131,13 +133,23 @@ public abstract class PhoneBase extends Handler implements Phone {
      * Set a system property, unless we're in unit test mode
      */
     public void
-    setSystemProperty(String property, String value) {
+    setSystemProperty(String property, String value, int subscription) {
         if(getUnitTestMode()) {
             return;
         }
-        SystemProperties.set(property, value);
+        TelephonyManager.setTelephonyProperty(property, subscription, value);
     }
 
+    /**
+     * Gets the system property, unless we're in unit test mode
+     */
+    public String
+    getSystemProperty(String property, String defValue, int subscription) {
+        if(getUnitTestMode()) {
+            return null;
+        }
+        return TelephonyManager.getTelephonyProperty(property, subscription, defValue);
+    }
 
     protected final RegistrantList mPreciseCallStateRegistrants
             = new RegistrantList();
@@ -342,7 +354,6 @@ public abstract class PhoneBase extends Handler implements Phone {
     public void registerForNewRingingConnection(
             Handler h, int what, Object obj) {
         checkCorrectThread(h);
-
         mNewRingingConnectionRegistrants.addUnique(h, what, obj);
     }
 
@@ -791,6 +802,12 @@ public abstract class PhoneBase extends Handler implements Phone {
 
     public abstract int getPhoneType();
 
+    public abstract void setSubscriptionInfo(Subscription subData);
+
+    public abstract Subscription getSubscriptionInfo();
+
+    public abstract int getSubscription();
+
     /** @hide */
     /** @return number of voicemails */
     public int getVoiceMessageCount() {
@@ -1093,8 +1110,16 @@ public abstract class PhoneBase extends Handler implements Phone {
         return mDataConnection.disableDataConnectivity();
     }
 
+    public boolean disableDataConnectivity(Message onCompleteMsg) {
+        return mDataConnection.disableDataConnectivity(onCompleteMsg);
+    }
+
     public boolean enableDataConnectivity() {
         return mDataConnection.enableDataConnectivity();
+    }
+
+    public boolean enableDataConnectivity(Message onCompleteMsg) {
+        return mDataConnection.enableDataConnectivity(onCompleteMsg);
     }
 
     public String getActiveApn(String type, IPVersion ipv) {
@@ -1147,6 +1172,10 @@ public abstract class PhoneBase extends Handler implements Phone {
 
     public void setDataRoamingEnabled(boolean enable) {
         mDataConnection.setDataRoamingEnabled(enable);
+    }
+
+    public void updateCurrentCarrierInProvider() {
+        mDataConnection.updateCurrentCarrierInProvider();
     }
 
     @Override

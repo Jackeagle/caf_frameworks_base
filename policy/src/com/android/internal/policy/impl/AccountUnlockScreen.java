@@ -333,7 +333,7 @@ public class AccountUnlockScreen extends RelativeLayout implements KeyguardScree
 
     }
 
-    public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn) {
+    public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn, int subscription) {
 
     }
 

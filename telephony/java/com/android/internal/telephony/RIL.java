@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import static android.telephony.TelephonyManager.NETWORK_TYPE_UMTS;
 import static android.telephony.TelephonyManager.NETWORK_TYPE_HSDPA;
 import static android.telephony.TelephonyManager.NETWORK_TYPE_HSUPA;
 import static android.telephony.TelephonyManager.NETWORK_TYPE_HSPA;
+import android.telephony.TelephonyManager;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -62,6 +63,10 @@ import com.android.internal.telephony.RegStateResponse;
 import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
 import com.android.internal.telephony.DataProfileOmh;
+import com.android.internal.telephony.ProxyManager.SubscriptionData;
+import com.android.internal.telephony.ProxyManager.Subscription;
+import com.android.internal.telephony.SimRefreshResponse;
+
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -218,6 +223,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
      * the vendor ril.
      */
     private static final int DEFAULT_WAKE_LOCK_TIMEOUT = 30000;
+    protected int mInstanceId = 0;
 
     //***** Instance Variables
 
@@ -588,13 +594,14 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     public
     RIL(Context context) {
         this(context, RILConstants.PREFERRED_NETWORK_MODE,
-                RILConstants.PREFERRED_CDMA_SUBSCRIPTION);
+                RILConstants.PREFERRED_CDMA_SUBSCRIPTION, 0);
     }
 
-    public RIL(Context context, int networkMode, int cdmaSubscription) {
+    public RIL(Context context, int networkMode, int cdmaSubscription, int instanceId) {
         super(context);
         mCdmaSubscription  = cdmaSubscription;
         mNetworkMode = networkMode;
+        mInstanceId = instanceId;
         //At startup mPhoneType is first set from networkMode
         switch(networkMode) {
             case RILConstants.NETWORK_MODE_WCDMA_PREF:
@@ -706,8 +713,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
-    public void
-    getDataCallProfile(int appType, Message result) {
+    public void  getDataCallProfile(int appType, Message result) {
         RILRequest rr = RILRequest.obtain(
                 RILConstants.RIL_REQUEST_GET_DATA_CALL_PROFILE, result);
 
@@ -720,6 +726,43 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         send(rr);
     }
+
+
+    public void setUiccSubscription(int slotId, int appIndex, int subId, int subStatus, Message result) {
+        //Note: This RIL request is also valid for SIM and RUIM (ICC card)
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE, result);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " slot: " + slotId + " appIndex: " + appIndex
+                + " subId: " + subId + " subStatus: " + subStatus);
+
+        rr.mp.writeInt(slotId);
+        rr.mp.writeInt(appIndex);
+        rr.mp.writeInt(subId);
+        rr.mp.writeInt(subStatus);
+
+        send(rr);
+    }
+
+    public void setSubscriptionMode(int subscriptionMode, Message result) {
+        /* Sets the subscription mode Single SIM mode or Dual SIM mode
+         * This request does not come into picture in Single SIM mode.
+         */
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_SUBSCRIPTION_MODE, result);
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " subscriptionMode: " + subscriptionMode);
+        rr.mp.writeInt(1);
+        rr.mp.writeInt(subscriptionMode);
+        send(rr);
+    }
+
+    public void setDataSubscription(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE, result);
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
+
 
     public void
     supplyIccPin(String aid, String pin, Message result) {
@@ -2325,6 +2368,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
             case RIL_REQUEST_IMS_SEND_SMS: ret =  responseSMS(p); break;
             case RIL_REQUEST_GET_DATA_CALL_PROFILE: ret = responseGetDataCallProfile(p); break;
+            case RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE: ret = responseVoid(p); break;
+            case RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE: ret = responseVoid(p); break;
+            case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: ret = responseUiccSubscription(p); break;
+            case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: ret = responseInts(p); break;
+            case RIL_REQUEST_SET_SUBSCRIPTION_MODE: ret = responseVoid(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -2453,7 +2501,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_STK_EVENT_NOTIFY: ret = responseString(p); break;
             case RIL_UNSOL_STK_CALL_SETUP: ret = responseInts(p); break;
             case RIL_UNSOL_SIM_SMS_STORAGE_FULL: ret =  responseVoid(p); break;
-            case RIL_UNSOL_SIM_REFRESH: ret =  responseInts(p); break;
+            case RIL_UNSOL_SIM_REFRESH: ret =  responseSimRefresh(p); break;
             case RIL_UNSOL_CALL_RING: ret =  responseCallRing(p); break;
             case RIL_UNSOL_RESTRICTED_STATE_CHANGED: ret = responseInts(p); break;
             case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:  ret =  responseVoid(p); break;
@@ -2472,6 +2520,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: ret =  responseVoid(p); break;
             case RIL_UNSOL_CDMA_PRL_CHANGED: ret =  responseVoid(p); break;
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: ret =  responseInts(p); break;
+            case RIL_UNSOL_SUBSCRIPTION_READY: ret =  responseVoid(p); break;
+
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
             //break; (implied)
@@ -2678,9 +2728,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
             case RIL_UNSOL_SIM_REFRESH:
                 if (RILJ_LOGD) unsljLogRet(response, ret);
-
-                if (mIccRefreshRegistrant != null) {
-                    mIccRefreshRegistrant.notifyRegistrant(
+                if (mIccRefreshRegistrants != null) {
+                    mIccRefreshRegistrants.notifyRegistrants(
                             new AsyncResult (null, ret, null));
                 }
                 break;
@@ -2818,6 +2867,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                     mResendIncallMuteRegistrants.notifyRegistrants(
                                         new AsyncResult (null, ret, null));
                 }
+                break;
+
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED:
                 if (RILJ_LOGD) unsljLogvRet(response, ret);
                 if (mTetheredModeStateRegistrants != null) {
@@ -2830,6 +2881,14 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 }
                 break;
 
+            case RIL_UNSOL_SUBSCRIPTION_READY:
+                if (RILJ_LOGD) unsljLogRet(response, ret);
+
+                if (mSubscriptionReadyRegistrants != null) {
+                    mSubscriptionReadyRegistrants.notifyRegistrants(
+                                        new AsyncResult (null, ret, null));
+                }
+                break;
         }
     }
 
@@ -2838,7 +2897,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         String regstates[] =  p.readStringArray();
 
         RegStateResponse response = new RegStateResponse(regstates);
-
         return response;
     }
 
@@ -3126,6 +3184,19 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     private Object
+    responseSimRefresh(Parcel p) {
+        SimRefreshResponse response = new SimRefreshResponse();
+
+        response.refreshResult = SimRefreshResponse.refreshResultFromRIL(p.readInt());
+        response.slot   = p.readInt();
+        response.aidPtr = p.readString();
+        response.efId   = p.readInt();
+
+        Log.d(LOG_TAG, "responseSimRefresh response for slot" + response.slot);
+        return response;
+    }
+
+    private Object
     responseCallList(Parcel p) {
         int num;
         int voiceSettings;
@@ -3405,6 +3476,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         return response;
     }
 
+
     private ArrayList<DataProfile>
     responseGetDataCallProfile(Parcel p) {
         int nProfiles = p.readInt();
@@ -3421,6 +3493,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         }
 
         return response;
+    }
+    private Object
+    responseUiccSubscription(Parcel p) {
+        //TODO MultiSIM functionality
+        //currently data subscripton is not queried from RIL.
+        return null;
     }
 
     private void
@@ -3588,6 +3666,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_IMS_REGISTRATION_STATE: return "RIL_REQUEST_IMS_REGISTRATION_STATE";
             case RIL_REQUEST_IMS_SEND_SMS: return "RIL_REQUEST_IMS_SEND_SMS";
             case RIL_REQUEST_GET_DATA_CALL_PROFILE: return "RIL_REQUEST_GET_DATA_CALL_PROFILE";
+            case RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_SET_SUBSCRIPTION_MODE: return "RIL_REQUEST_SET_SUBSCRIPTION_MODE";
+
             default: return "<unknown request>";
         }
     }
@@ -3639,16 +3723,25 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: return "UNSOL_VOICE_RADIO_TECH_CHANGED";
             case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: return "RIL_UNSOL_TETHERED_MODE_STATE_CHANGED";
+            case RIL_UNSOL_SUBSCRIPTION_READY: return "RIL_UNSOL_SUBSCRIPTION_READY";
             default: return "<unknown reponse>";
         }
     }
 
     private void riljLog(String msg) {
-        Log.d(LOG_TAG, msg);
+        if (TelephonyManager.isMultiSimEnabled()) {
+            Log.d(LOG_TAG, msg + " [SUB" + mInstanceId + "]");
+        } else {
+            Log.d(LOG_TAG, msg);
+        }
     }
 
     private void riljLogv(String msg) {
-        Log.v(LOG_TAG, msg);
+        if (TelephonyManager.isMultiSimEnabled()) {
+            Log.v(LOG_TAG, msg + " [SUB" + mInstanceId + "]");
+        } else {
+            Log.v(LOG_TAG, msg);
+        }
     }
 
     private void unsljLog(int response) {

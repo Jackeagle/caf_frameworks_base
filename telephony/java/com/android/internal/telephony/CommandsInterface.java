@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@
 
 package com.android.internal.telephony;
 
-import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
-
 import android.os.Message;
 import android.os.Handler;
 import android.util.Log;
 
+import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 /**
  * {@hide}
@@ -171,11 +171,6 @@ public interface CommandsInterface {
     // by messages sent to setOnUSSD handler
     static final int USSD_MODE_NOTIFY       = 0;
     static final int USSD_MODE_REQUEST      = 1;
-
-    // SIM Refresh results, passed up from RIL.
-    static final int SIM_REFRESH_FILE_UPDATED   = 0;  // Single file updated
-    static final int SIM_REFRESH_INIT           = 1;  // SIM initialized; reload all
-    static final int SIM_REFRESH_RESET          = 2;  // SIM reset; may be locked
 
     // GSM SMS fail cause for acknowledgeLastIncomingSMS. From TS 23.040, 9.2.3.22.
     static final int GSM_SMS_FAIL_CAUSE_MEMORY_CAPACITY_EXCEEDED    = 0xD3;
@@ -377,15 +372,14 @@ public interface CommandsInterface {
     void unSetOnIccSmsFull(Handler h);
 
     /**
-     * Sets the handler for SIM Refresh notifications.
-     * Unlike the register* methods, there's only one notification handler
+     * Registers handler for SIM Refresh notifications.
      *
      * @param h Handler for notification message.
      * @param what User-defined message code.
      * @param obj User object.
      */
-    void setOnIccRefresh(Handler h, int what, Object obj);
-    void unSetOnIccRefresh(Handler h);
+    void registerForIccRefresh(Handler h, int what, Object obj);
+    void unregisterForIccRefresh(Handler h);
 
     /**
      * Sets the handler for RING notifications.
@@ -605,6 +599,17 @@ public interface CommandsInterface {
      */
     void registerForCallReestablishInd(Handler h, int what, Object obj);
     void unregisterForCallReestablishInd(Handler h);
+
+    /**
+     * Handlers for subscription ready indications.
+     *
+     * @param h Handler for subscription ready messages.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void registerForSubscriptionReady(Handler h, int what, Object obj);
+    void unregisterForSubscriptionReady(Handler h);
+
 
     /**
      * Supply the ICC PIN to the ICC card
@@ -1493,4 +1498,37 @@ public interface CommandsInterface {
      *          Callback message
      */
     public void getDataCallProfile(int appType, Message result);
+
+   /** 
+     * Sets user selected subscription at Modem.
+     * @param slotId
+                Slot.
+     * @param appIndex
+                Application index in the card.
+     * @param subId
+                Indicates subscription 0 or subscription 1.
+     * @param subStatus
+                Activation status, 0 = activate and 1 = deactivate.
+     * @param result
+     *          Callback message contains the information of SUCCESS/FAILURE.
+    */
+    public void setUiccSubscription(int slotId, int appIndex, int subId, int subStatus,
+            Message result);
+
+    /**
+     * Set DataSubscription preference at Modem.
+     * @param result
+     *          Callback message contains the information of SUCCESS/FAILURE.
+    */
+    public void setDataSubscription (Message result);
+
+    /**
+     * Sets SingleStandByMode or DualStandBy mode at Modem.
+     * @param subscriptionMode
+                1 for SingleStandBy (Single SIM functionality)
+                2 for DualStandBy (Dual SIM functionality)
+     * @param result
+     *          Callback message contains the information of SUCCESS/FAILURE.
+    */
+    public void setSubscriptionMode (int subscriptionMode, Message result);
 }

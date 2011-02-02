@@ -1,5 +1,6 @@
 /*
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -46,6 +47,16 @@ interface IIccPhoneBook {
     List<AdnRecord> getAdnRecordsInEf(int efid);
 
     /**
+     * Loads the AdnRecords in efid and returns them as a
+     * List of AdnRecords of a subscription
+     *
+     * @param efid the EF id of a ADN-like SIM
+     * @param subscription user preferred subscription
+     * @return List of AdnRecord
+     */
+    List<AdnRecord> getAdnRecordsInEfOnSubscription(int efid, int subscription);
+
+    /**
      * Replace oldAdn with newAdn in ADN-like record in EF
      *
      * getAdnRecordsInEf must be called at least once before this function,
@@ -67,6 +78,27 @@ interface IIccPhoneBook {
             String oldTag, String oldPhoneNumber,
             String newTag, String newPhoneNumber,
             String pin2);
+
+    /**
+     * Update an ADN-like EF record by record index of a subscription
+     *
+     * This is useful for iteration the whole ADN file, such as write the whole
+     * phone book or erase/format the whole phonebook
+     *
+     * @param subscription user preferred subscription
+     * @param efid must be one among EF_ADN, EF_FDN, and EF_SDN
+     * @param newTag adn tag to be stored
+     * @param newPhoneNumber adn number to be stored
+     *        Set both newTag and newPhoneNubmer to "" means to replace the old
+     *        record with empty one, aka, delete old record
+     * @param index is 1-based adn record index to be updated
+     * @param pin2 required to update EF_FDN, otherwise must be null
+     * @return true for success
+     */
+    boolean updateAdnRecordsInEfBySearchOnSubscription(int efid,
+            String oldTag, String oldPhoneNumber,
+            String newTag, String newPhoneNumber,
+            String pin2, int subscription);
 
     /**
      * Update an ADN-like EF record by record index

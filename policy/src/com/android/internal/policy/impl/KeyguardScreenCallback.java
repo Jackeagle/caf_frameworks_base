@@ -35,6 +35,13 @@ public interface KeyguardScreenCallback extends KeyguardViewCallback {
     void goToUnlockScreen();
 
     /**
+     * User dismissed the PIN dialog by clicking cancel.Update
+     * the subscription for which the dialog was dismissed.The
+     * dialog will not be prompted again for that subscription.
+     */
+    void updatePinUnlockCancel(int subscription);
+
+    /**
      * The user reported that they forgot their pattern (or not, when they want to back out of the
      * forgot pattern screen).
      *

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ContentValues;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
@@ -28,8 +29,17 @@ import android.os.Registrant;
 import android.os.RegistrantList;
 import android.os.SystemProperties;
 import android.telephony.ServiceState;
+import android.text.TextUtils;
 import android.util.Log;
+import android.provider.Telephony;
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
+import android.net.Uri;
+import android.database.SQLException;
+import android.telephony.TelephonyManager;
 
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
@@ -38,6 +48,8 @@ import com.android.internal.telephony.gsm.RestrictedState;
 import com.android.internal.telephony.gsm.SIMRecords;
 
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
+import com.android.internal.telephony.ProxyManager.Subscription;
+import com.android.internal.telephony.UiccConstants.AppType;
 
 /**
  * {@hide}
@@ -110,7 +122,7 @@ public class DataServiceStateTracker extends Handler {
     RuimRecords mRuimRecords = null;
 
     /* cdma only stuff */
-    public int mCdmaSubscriptionSource = Phone.CDMA_SUBSCRIPTION_NV; /* assume NV */
+    public int mCdmaSubscriptionSource = Phone.CDMA_SUBSCRIPTION_NONE; /* Initialize to NONE */
     private CdmaSubscriptionSourceManager mCdmaSSM = null;
     private boolean mCdmaRoaming = false;
 
@@ -126,8 +138,7 @@ public class DataServiceStateTracker extends Handler {
         this.cm = ci;
         this.mContext = context;
         this.mNotifier = notifier;
-
-        this.mUiccManager = UiccManager.getInstance(context, this.cm);
+        this.mUiccManager = UiccManager.getInstance();
 
         /* initialize */
         mSs = new ServiceState();
@@ -178,6 +189,7 @@ public class DataServiceStateTracker extends Handler {
 
             case EVENT_NV_READY:
                 pollState("nv ready");
+                updateCurrentCarrierInProvider();
                 break;
 
             case EVENT_SIM_READY:
@@ -188,6 +200,7 @@ public class DataServiceStateTracker extends Handler {
             case EVENT_RUIM_RECORDS_LOADED:
                 mRecordsLoadedRegistrants.notifyRegistrants();
                 pollState("records loaded");
+                updateCurrentCarrierInProvider();
                 break;
 
 
@@ -491,12 +504,12 @@ public class DataServiceStateTracker extends Handler {
 
 
     private void notifyDataServiceStateChanged(ServiceState ss) {
-        mNotifier.notifyServiceState(mDct.mPhone);
-        AsyncResult ar = new AsyncResult(null, ss, null);
-        //notify those who registered with DSST
-        mDataServiceStateRegistrants.notifyRegistrants(ar);
-        //notify those who registered for service state changed with phone.
-        ((PhoneBase)mDct.mPhone).notifyServiceStateChangedP(ss);
+        if (mDct.getSubscriptionInfo() != null) {
+            AsyncResult ar = new AsyncResult(null, ss, null);
+            mDataServiceStateRegistrants.notifyRegistrants(ar);
+            //notify those who registered for service state changed with phone.
+            ((PhoneBase)mDct.mPhone).notifyServiceStateChangedP(ss);
+        }
     }
 
     /** Cancel a pending (if any) pollState() operation */
@@ -547,12 +560,54 @@ public class DataServiceStateTracker extends Handler {
         return (mSs.getCssIndicator() == 1);
     }
 
+    void updateRecords() {
+        logv(" DSST update Records function");
+
+        Subscription subscriptionData = mDct.getSubscriptionInfo();
+
+        if (subscriptionData != null) {
+            logv("slot id:" + subscriptionData.slotId
+                    + ", 3gppapp_index:" + subscriptionData.m3gppIndex
+                    + ", 3gpp2app_index:" + subscriptionData.m3gpp2Index);
+            UiccCardApplication cardApp;
+            cardApp = mUiccManager.getApplication(subscriptionData.slotId,
+                                                     subscriptionData.getAppIndex());
+            if (cardApp != null) {
+                AppType appType = cardApp.getType();
+
+                if ((appType == AppType.APPTYPE_USIM) || (appType == AppType.APPTYPE_SIM)) {
+                    m3gppApp = cardApp;
+                    m3gppApp.registerForReady(this, EVENT_SIM_READY, null);
+                    mSimRecords = (SIMRecords) m3gppApp.getApplicationRecords();
+
+                    if (mSimRecords != null) {
+                        mSimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
+                    }
+                } else if ((appType == AppType.APPTYPE_RUIM) || (appType == AppType.APPTYPE_CSIM)) {
+                    m3gpp2App = cardApp;
+                    m3gpp2App.registerForReady(this, EVENT_RUIM_READY, null);
+                    mRuimRecords = (RuimRecords) m3gpp2App.getApplicationRecords();
+
+                    if (mRuimRecords != null) {
+                        mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
+                    }
+                }
+            }
+        }
+    }
+
 
     /* Poll ICC Cards/Application/Application Records and update everything */
     void updateIccAvailability() {
 
         /* 3GPP case */
-        UiccCardApplication new3gppApp = mUiccManager.getCurrentApplication(AppFamily.APP_FAM_3GPP);
+        UiccCardApplication new3gppApp = null;
+        Subscription subscriptionData = mDct.getSubscriptionInfo();
+
+        if (subscriptionData != null) {
+            new3gppApp = mUiccManager.getApplication(subscriptionData.slotId,
+                        subscriptionData.m3gppIndex);
+        }
 
         if (m3gppApp != new3gppApp) {
             if (m3gppApp != null) {
@@ -564,10 +619,13 @@ public class DataServiceStateTracker extends Handler {
                     mSimRecords = null;
                 }
             }
+
             if (new3gppApp != null) {
                 logv("New 3gpp application found");
+
                 new3gppApp.registerForReady(this, EVENT_SIM_READY, null);
                 mSimRecords = (SIMRecords) new3gppApp.getApplicationRecords();
+
                 if (mSimRecords != null) {
                     mSimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
                 }
@@ -576,8 +634,12 @@ public class DataServiceStateTracker extends Handler {
         }
 
         /* 3GPP2 case */
-        UiccCardApplication new3gpp2App = mUiccManager
-                .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        UiccCardApplication new3gpp2App = null;
+
+        if (subscriptionData != null) {
+            new3gpp2App = mUiccManager.getApplication(subscriptionData.slotId,
+                        subscriptionData.m3gpp2Index);
+        }
 
         if (m3gpp2App != new3gpp2App) {
             if (m3gpp2App != null) {
@@ -589,10 +651,13 @@ public class DataServiceStateTracker extends Handler {
                     mRuimRecords = null;
                 }
             }
+
             if (new3gpp2App != null) {
                 logv("New 3gpp2 application found");
+
                 new3gpp2App.registerForReady(this, EVENT_RUIM_READY, null);
                 mRuimRecords = (RuimRecords) new3gpp2App.getApplicationRecords();
+
                 if (mRuimRecords != null) {
                     logv("New ruim application records found");
                     mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
@@ -652,8 +717,8 @@ public class DataServiceStateTracker extends Handler {
      */
     private boolean isCdmaRoamingBetweenOperators(boolean cdmaRoaming, ServiceState s) {
 
-        String spn = SystemProperties.get(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, "empty");
-
+        String spn = TelephonyManager.getTelephonyProperty(
+                    PROPERTY_ICC_OPERATOR_ALPHA, mDct.getSubscriptionInfo().subId, "empty");
         // NOTE: in case of RUIM we should completely ignore the ERI data file
         // and mOperatorAlphaLong is set from RIL_REQUEST_OPERATOR response 0
         // (alpha ONS)
@@ -675,16 +740,17 @@ public class DataServiceStateTracker extends Handler {
      * @return true for roaming state set
      */
     private boolean isGsmRoamingBetweenOperators(boolean gsmRoaming, ServiceState s) {
-        String spn = SystemProperties.get(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, "empty");
 
+        String spn = TelephonyManager.getTelephonyProperty(
+                PROPERTY_ICC_OPERATOR_ALPHA, mDct.getSubscriptionInfo().subId, "empty");
         String onsl = s.getOperatorAlphaLong();
         String onss = s.getOperatorAlphaShort();
 
         boolean equalsOnsl = onsl != null && spn.equals(onsl);
         boolean equalsOnss = onss != null && spn.equals(onss);
 
-        String simNumeric = SystemProperties.get(
-                TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, "");
+        String simNumeric = TelephonyManager.getTelephonyProperty(
+                PROPERTY_ICC_OPERATOR_NUMERIC, mDct.getSubscriptionInfo().subId, "");
         String  operatorNumeric = s.getOperatorNumeric();
 
         boolean equalsMcc = true;
@@ -820,6 +886,39 @@ public class DataServiceStateTracker extends Handler {
         }
 
         mUiccManager = null;
+    }
+
+    public void update(CommandsInterface ci) {
+        logd("update()");
+        // 1. Unregister for all events
+        dispose();
+
+        // 2. Clear the member variables
+        // These will be updated properly when RADIO_STATE_CHANGED event receives.
+        mSs = new ServiceState();
+        mNewSS = new ServiceState();
+
+        // This will get updated when RESTRICTED_STATE_CHANGED receives.
+        mRs = new RestrictedState();
+
+        // 3. Re-register for all events on new commands interface.
+        cm = ci;
+        cm.registerForRadioStateChanged(this,
+                EVENT_RADIO_STATE_CHANGED, null);
+        cm.registerForDataNetworkStateChanged(this,
+                EVENT_DATA_NETWORK_STATE_CHANGED, null);
+        cm.registerForRestrictedStateChanged(this,
+                EVENT_RESTRICTED_STATE_CHANGED, null);
+        cm.registerForCdmaSubscriptionSourceChanged(this,
+                EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
+
+        // 4. Update Uicc Manager and register for events.
+        mUiccManager = UiccManager.getInstance();
+        mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
+
+        // 5. Update Uicc Card Application and SIM/RUIM Records.
+        logd("Need to update the SIM/RUIM records.  Calling updateIccAvailability");
+        updateIccAvailability();
     }
 
 
@@ -983,27 +1082,81 @@ public class DataServiceStateTracker extends Handler {
         mDataServiceStateRegistrants.remove(h);
     }
 
+    /**
+     * Set the respective profiles as current which matches the
+     * MCC/MNC.
+     * @param void
+     */
+    public void updateCurrentCarrierInProvider() {
+        String operatorNumeric;
+        int currentDds = 0;
+
+        if (mSimRecords != null &&
+            mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NONE) {
+            operatorNumeric = mSimRecords.getSIMOperatorNumeric();
+        } else if (mRuimRecords != null  &&
+                   mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_RUIM_SIM) {
+            operatorNumeric = mRuimRecords.getRUIMOperatorNumeric();
+        } else if (mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV) {
+            operatorNumeric = SystemProperties.get("ro.cdma.home.operator.numeric");
+        } else {
+            Log.e(LOG_TAG, "Not valid");
+            return;
+        }
+
+        try {
+            currentDds = Settings.System.getInt(mContext.getContentResolver(),
+                            Settings.System.MULTI_SIM_DATA_CALL);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Exception Reading Dual Sim Data Subscription Value.", snfe);
+        }
+
+        if (!TextUtils.isEmpty(operatorNumeric) &&
+             (mDct.getSubscription() == currentDds)) {
+            try {
+                Uri uri = Uri.withAppendedPath(Telephony.Carriers.CONTENT_URI, "current");
+                ContentValues map = new ContentValues();
+                map.put(Telephony.Carriers.NUMERIC, operatorNumeric);
+                mContext.getContentResolver().insert(uri, map);
+                return;
+            } catch (SQLException e) {
+                Log.e(LOG_TAG, "Can't store current operator", e);
+            }
+        }
+        return;
+    }
+
     void logd(String logString) {
         if (DBG) {
-            Log.d(LOG_TAG, "[DSST] " + logString);
+            Log.d(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                      "(" + mDct.getSubscriptionInfo().subId + ")" : "")
+                                   + "] " + logString);
         }
     }
 
     void logv(String logString) {
         if (DBG) {
-            Log.d(LOG_TAG, "[DSST] " + logString);
+            Log.d(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                      "(" + mDct.getSubscriptionInfo().subId + ")" : "")
+                                   + "] " + logString);
         }
     }
 
     void logi(String logString) {
-        Log.i(LOG_TAG, "[DSST] " + logString);
+        Log.i(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                  "(" + mDct.getSubscriptionInfo().subId + ")" : "")
+                               + "] " + logString);
     }
 
     void logw(String logString) {
-        Log.w(LOG_TAG, "[DSST] " + logString);
+        Log.w(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                  "(" + mDct.getSubscriptionInfo().subId + ")" : "")
+                               + "] " + logString);
     }
 
     void loge(String logString) {
-        Log.e(LOG_TAG, "[DSST] " + logString);
+        Log.e(LOG_TAG, "[DSST" + (mDct.getSubscriptionInfo() != null ?
+                                  "(" + mDct.getSubscriptionInfo().subId + ")" : "")
+                               + "] " + logString);
     }
 }

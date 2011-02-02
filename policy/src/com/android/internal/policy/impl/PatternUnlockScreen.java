@@ -36,6 +36,8 @@ import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.LockPatternView;
 import com.android.internal.widget.LockPatternView.Cell;
 
+import android.telephony.TelephonyManager;
+
 import java.util.List;
 import java.util.Date;
 
@@ -77,7 +79,7 @@ class PatternUnlockScreen extends LinearLayoutWithDefaultTouchRecepient
 
     private String mDateFormatString;
 
-    private TextView mCarrier;
+    private TextView[] mCarrier;
     private TextView mDate;
 
     // are we showing battery information?
@@ -102,6 +104,7 @@ class PatternUnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     private ViewGroup mFooterNormal;
     private ViewGroup mFooterForgotPattern;
 
+    private int[] mResId = {R.id.carrier, R.id.carrier_sub2};
     /**
      * Keeps track of the last time we poked the wake lock during dispatching
      * of the touch event, initalized to something gauranteed to make us
@@ -186,7 +189,11 @@ class PatternUnlockScreen extends LinearLayoutWithDefaultTouchRecepient
             inflater.inflate(R.layout.keyguard_screen_unlock_landscape, this, true);
         }
 
-        mCarrier = (TextView) findViewById(R.id.carrier);
+        int numPhones = TelephonyManager.getPhoneCount();
+        mCarrier = new TextView[numPhones];
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            mCarrier[i] = (TextView) findViewById(mResId[i]);
+        }
         mDate = (TextView) findViewById(R.id.date);
 
         mDateFormatString = getContext().getString(R.string.full_wday_month_day_no_year);
@@ -250,14 +257,15 @@ class PatternUnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         setFocusableInTouchMode(true);
 
         // Required to get Marquee to work.
-        mCarrier.setSelected(true);
-        mCarrier.setTextColor(0xffffffff);
-
-        // until we get an update...
-        mCarrier.setText(
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            mCarrier[i].setSelected(true);
+            mCarrier[i].setTextColor(0xffffffff);
+            // until we get an update...
+            mCarrier[i].setText(
                 LockScreen.getCarrierString(
-                        mUpdateMonitor.getTelephonyPlmn(),
-                        mUpdateMonitor.getTelephonySpn()));
+                        mUpdateMonitor.getTelephonyPlmn(i),
+                        mUpdateMonitor.getTelephonySpn(i)));
+        }
     }
 
     private void refreshEmergencyButtonText() {
@@ -383,8 +391,8 @@ class PatternUnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     }
 
     /** {@inheritDoc} */
-    public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn) {
-        mCarrier.setText(LockScreen.getCarrierString(plmn, spn));
+    public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn, int subscription) {
+        mCarrier[subscription].setText(LockScreen.getCarrierString(plmn, spn));
     }
 
     /** {@inheritDoc} */
@@ -395,7 +403,7 @@ class PatternUnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     // ---------- SimStateCallback
 
     /** {@inheritDoc} */
-    public void onSimStateChanged(IccCard.State simState) {
+    public void onSimStateChanged(IccCard.State simState, int subscription) {
     }
 
     @Override

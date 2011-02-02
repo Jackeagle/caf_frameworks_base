@@ -435,6 +435,14 @@ public abstract class NetworkStateTracker extends Handler {
         }
     }
 
+    protected void notifySubtypeChanged(int subtype, int oldSubtype) {
+        if (mNetworkInfo.isConnected() && (subtype != oldSubtype)) {
+            Message msg = mTarget.obtainMessage(
+                    EVENT_NETWORK_SUBTYPE_CHANGED, oldSubtype, 0, mNetworkInfo);
+            msg.sendToTarget();
+        }
+    }
+
     public abstract void startMonitoring();
 
     /**

@@ -202,6 +202,7 @@ public class WapPushOverSms {
         intent.putExtra("pduType", pduType);
         intent.putExtra("header", header);
         intent.putExtra("data", data);
+        intent.putExtra("sub_id", mSmsDispatcher.mPhone.getSubscription());
 
         mSmsDispatcher.dispatch(intent, "android.permission.RECEIVE_WAP_PUSH");
     }
@@ -217,6 +218,7 @@ public class WapPushOverSms {
         intent.putExtra("pduType", pduType);
         intent.putExtra("header", header);
         intent.putExtra("data", pdu);
+        intent.putExtra("sub_id", mSmsDispatcher.mPhone.getSubscription());
 
         mSmsDispatcher.dispatch(intent, "android.permission.RECEIVE_WAP_PUSH");
     }
@@ -235,6 +237,7 @@ public class WapPushOverSms {
         intent.putExtra("pduType", pduType);
         intent.putExtra("header", header);
         intent.putExtra("data", data);
+        intent.putExtra("sub_id", mSmsDispatcher.mPhone.getSubscription());
 
         mSmsDispatcher.dispatch(intent, "android.permission.RECEIVE_MMS");
     }

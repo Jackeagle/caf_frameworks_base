@@ -24,7 +24,7 @@ import android.os.Binder;
 import android.telephony.PhoneNumberUtils;
 import android.util.Log;
 
-public class PhoneSubInfo extends IPhoneSubInfo.Stub {
+public class PhoneSubInfo {
     static final String LOG_TAG = "PHONE";
     private Phone mPhone;
     private Context mContext;

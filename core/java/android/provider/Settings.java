@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- *
+ * Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
+
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -1023,7 +1024,7 @@ public final class Settings {
         public static boolean hasInterestingConfigurationChanges(int changes) {
             return (changes&ActivityInfo.CONFIG_FONT_SCALE) != 0;
         }
-        
+
         public static boolean getShowGTalkServiceStatus(ContentResolver cr) {
             return getInt(cr, SHOW_GTALK_SERVICE_STATUS, 0) != 0;
         }
@@ -1248,7 +1249,7 @@ public final class Settings {
         public static final String LOCK_PATTERN_VISIBLE = "lock_pattern_visible_pattern";
 
         /**
-         * @deprecated Use 
+         * @deprecated Use
          * {@link android.provider.Settings.Secure#LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED}
          * instead
          */
@@ -1594,6 +1595,35 @@ public final class Settings {
           * 10 sec, 15 sec and -1 (for disabling).
           */
         public static final String AUTO_ANSWER_TIMEOUT = "auto_answer";
+
+        /**
+          * Multi Sim Selected Value for Voice Call. The supported values are 0 = SUB1,
+          * 1 = SUB2.
+          */
+        public static final String MULTI_SIM_VOICE_CALL = "multi_sim_voice_call";
+
+        /**
+          * Multi Sim Selected Value for Data Call. The supported values are 0 = SUB1,
+          * 1 = SUB2.
+          */
+        public static final String MULTI_SIM_DATA_CALL = "multi_sim_data_call";
+
+        /**
+          * Multi Sim Selected Value for SMS. The supported values are 0 = SUB1,
+          * 1 = SUB2.
+          */
+        public static final String MULTI_SIM_SMS = "multi_sim_sms";
+
+        /**
+          * Default subscription. The supported values are 0 = SUB1 and 1 = SUB2.
+          * @hide
+          */
+        public static final String DEFAULT_SUBSCRIPTION = "default_subscription";
+
+        /** User preferred subscriptions for one and two i.e. sub1 preferred, sub2 preferred
+          * @hide
+          */
+        public static final String [] USER_PREFERRED_SUBS = {"user_preferred_sub1", "user_preferred_sub2"};
 
         /**
          * CDMA only settings
@@ -2166,6 +2196,26 @@ public final class Settings {
         }
 
         /**
+         * @hide
+         */
+        public static int getIntAtIndex(ContentResolver cr, String name, int index)
+                throws SettingNotFoundException {
+            String v = getString(cr, name);
+            if (v != null) {
+                String valArray[] = v.split(",");
+                if ((index >= 0) && (index < valArray.length) && (valArray[index] != null)) {
+                    try {
+                        return Integer.parseInt(valArray[index]);
+                    } catch (NumberFormatException e) {
+                        Log.e(TAG, "Exception while parsing Integer: ", e);
+                    }
+                }
+            }
+            throw new SettingNotFoundException(name);
+        }
+
+
+        /**
          * Convenience function for updating a single settings value as an
          * integer. This will either create a new entry in the table if the
          * given name does not exist, or modify the value of the existing row
@@ -2180,6 +2230,38 @@ public final class Settings {
          */
         public static boolean putInt(ContentResolver cr, String name, int value) {
             return putString(cr, name, Integer.toString(value));
+        }
+
+        /**
+         * @hide
+         */
+        public static boolean putIntAtIndex(ContentResolver cr, String name, int index, int value) {
+            String data = "";
+            String valArray[] = null;
+            String v = getString(cr, name);
+
+            if (v != null) {
+                valArray = v.split(",");
+            }
+
+            // Copy the elements from valArray till index
+            for (int i = 0; i < index; i++) {
+                String str = "";
+                if ((valArray != null) && (i < valArray.length)) {
+                    str = valArray[i];
+                }
+                data = data + str + ",";
+            }
+
+            data = data + value;
+
+            // Copy the remaining elements from valArray if any.
+            if (valArray != null) {
+                for (int i = index+1; i < valArray.length; i++) {
+                    data = data + "," + valArray[i];
+                }
+            }
+            return putString(cr, name, data);
         }
 
         /**
@@ -2736,8 +2818,8 @@ public final class Settings {
                 = "allowed_geolocation_origins";
 
         /**
-         * Whether mobile data connections are allowed by the user.  See
-         * ConnectivityManager for more info.
+         * Whether mobile data connections are allowed by the user.
+         * See ConnectivityManager for more info.
          * @hide
          */
         public static final String MOBILE_DATA = "mobile_data";

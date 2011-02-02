@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,16 +49,16 @@ import android.telephony.ServiceState;
 import android.util.Config;
 import android.util.Log;
 import android.view.WindowManager;
+import android.telephony.TelephonyManager;
 
 import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 import com.android.internal.util.HexDump;
+import com.android.internal.R;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
-
-import com.android.internal.R;
 
 import static android.telephony.SmsManager.RESULT_ERROR_GENERIC_FAILURE;
 import static android.telephony.SmsManager.RESULT_ERROR_NO_SERVICE;
@@ -128,16 +129,20 @@ public abstract class SMSDispatcher extends Handler {
     /** Uicc Event */
     static final protected int EVENT_ICC_CHANGED = 16;
 
-    static final protected int EVENT_NEW_ICC_SMS = 17;
+    static final protected int EVENT_UPDATE_ICC_MWI = 17;
 
-    static final protected int EVENT_UPDATE_ICC_MWI = 18;
+    /** Class2 SMS  */
+    static final protected int EVENT_SMS_ON_ICC = 18;
+
+    static final protected int EVENT_GET_ICC_SMS_DONE = 19;
 
     /** Must be static as they are referenced by 3 derived instances, Ims/Cdma/GsmSMSDispatcher */
     /** true if IMS is registered, false otherwise.*/
     static protected boolean mIms = false;
     static protected RadioTechnologyFamily mImsSmsEncoding = RadioTechnologyFamily.RADIO_TECH_UNKNOWN;
     static protected Registrant mSendRetryRegistrant;
-    static protected Phone mPhone;
+    //DSDS static cannot be used
+    protected Phone mPhone;
 
     /** New broadcast SMS */
     static final protected int EVENT_NEW_BROADCAST_SMS = 13;
@@ -275,8 +280,7 @@ public abstract class SMSDispatcher extends Handler {
         filter.addAction(Intent.ACTION_DEVICE_STORAGE_FULL);
         filter.addAction(Intent.ACTION_DEVICE_STORAGE_NOT_FULL);
         mContext.registerReceiver(mResultReceiver, filter);
-
-        mUiccManager = UiccManager.getInstance(mContext, mCm);
+        mUiccManager = UiccManager.getInstance();
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
     }
 
@@ -318,6 +322,7 @@ public abstract class SMSDispatcher extends Handler {
         switch (msg.what) {
         case EVENT_NEW_SMS:
             // A new SMS has been received by the device
+            Log.d(TAG, "EVENT_NEW_SMS phone id :" + mPhone.getSubscription());
             if (Config.LOGD) {
                 Log.d(TAG, "New SMS Message Received");
             }
@@ -440,9 +445,12 @@ public abstract class SMSDispatcher extends Handler {
             updateIccAvailability();
             break;
 
-        case EVENT_NEW_ICC_SMS:
-            ar = (AsyncResult)msg.obj;
-            dispatchMessage((SmsMessageBase)ar.result);
+        case EVENT_SMS_ON_ICC:
+            handleSmsOnIcc((AsyncResult) msg.obj);
+            break;
+
+        case EVENT_GET_ICC_SMS_DONE:
+            handleGetIccSmsDone((AsyncResult) msg.obj);
             break;
 
         case EVENT_UPDATE_ICC_MWI:
@@ -498,6 +506,17 @@ public abstract class SMSDispatcher extends Handler {
      *           be a String representing the status report PDU, as ASCII hex.
      */
     protected abstract void handleStatusReport(AsyncResult ar);
+
+    /**
+     * Called when Class2 SMS is retrieved from SIM.
+     */
+    protected abstract void handleGetIccSmsDone(AsyncResult ar);
+
+
+    /**
+     * Called when SMS is received on SIM.
+     */
+    protected abstract void handleSmsOnIcc(AsyncResult ar);
 
     /**
      * Called when SMS send completes. Broadcasts a sentIntent on success.
@@ -604,7 +623,6 @@ public abstract class SMSDispatcher extends Handler {
      *         to applications
      */
     protected abstract int dispatchMessage(SmsMessageBase sms);
-
 
     /**
      * If this is the last part send the parts out to the application, otherwise
@@ -721,6 +739,7 @@ public abstract class SMSDispatcher extends Handler {
         Intent intent = new Intent(Intents.SMS_RECEIVED_ACTION);
         intent.putExtra("pdus", pdus);
         intent.putExtra("encoding", getEncoding());
+        intent.putExtra("sub_id", mPhone.getSubscription()); //Subscription information to be passed in an intent
         dispatch(intent, "android.permission.RECEIVE_SMS");
     }
 
@@ -735,6 +754,7 @@ public abstract class SMSDispatcher extends Handler {
         Intent intent = new Intent(Intents.DATA_SMS_RECEIVED_ACTION, uri);
         intent.putExtra("pdus", pdus);
         intent.putExtra("encoding", getEncoding());
+        intent.putExtra("sub_id", mPhone.getSubscription()); //Subscription information to be passed in an intent
         dispatch(intent, "android.permission.RECEIVE_SMS");
     }
 

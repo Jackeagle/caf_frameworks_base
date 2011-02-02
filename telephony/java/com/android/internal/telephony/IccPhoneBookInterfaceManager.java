@@ -29,7 +29,7 @@ import java.util.List;
  * SimPhoneBookInterfaceManager to provide an inter-process communication to
  * access ADN-like SIM records.
  */
-public abstract class IccPhoneBookInterfaceManager extends IIccPhoneBook.Stub {
+public abstract class IccPhoneBookInterfaceManager {
     protected static final boolean DBG = true;
 
     protected PhoneBase phone;
@@ -96,11 +96,6 @@ public abstract class IccPhoneBookInterfaceManager extends IIccPhoneBook.Stub {
     }
 
     public void dispose() {
-    }
-
-    protected void publish() {
-        //NOTE service "simphonebook" added by IccSmsInterfaceManagerProxy
-        ServiceManager.addService("simphonebook", this);
     }
 
     protected abstract void logd(String msg);

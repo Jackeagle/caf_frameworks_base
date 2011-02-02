@@ -73,6 +73,14 @@ class GsmCall extends Call {
         return owner.phone;
     }
 
+    /**
+     * Returns the subscription associated with the call/phone object.
+     */
+    public int
+    getSubscription() {
+        return owner.phone.getSubscription();
+    }
+
     public boolean
     isMultiparty() {
         return connections.size() > 1;

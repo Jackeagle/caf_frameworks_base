@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1157,7 +1158,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Set the preferred network mode to 0 = Global, CDMA default
             int type = SystemProperties.getInt("ro.telephony.default_network",
                     RILConstants.PREFERRED_NETWORK_MODE);
-            loadSetting(stmt, Settings.Secure.PREFERRED_NETWORK_MODE, type);
+            String val = type + "," + type ;
+            loadSetting(stmt, Settings.Secure.PREFERRED_NETWORK_MODE, val);
     
             // Enable or disable Cell Broadcast SMS
             loadSetting(stmt, Settings.Secure.CDMA_CELL_BROADCAST_SMS,

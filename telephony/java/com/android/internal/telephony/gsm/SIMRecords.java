@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +17,6 @@
 
 package com.android.internal.telephony.gsm;
 
-import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
-import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
-import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
 import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Message;
@@ -40,17 +38,15 @@ import com.android.internal.telephony.UiccCardApplication;
 import com.android.internal.telephony.UiccRecords;
 import com.android.internal.telephony.UiccConstants.AppType;
 import com.android.internal.telephony.gsm.Eons.CphsType;
+import com.android.internal.telephony.SimRefreshResponse;
 
 import java.util.ArrayList;
-
-
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 /**
  * {@hide}
  */
 public final class SIMRecords extends UiccApplicationRecords {
     static final String LOG_TAG = "GSM";
-
-    private static final boolean CRASH_RIL = false;
 
     private static final boolean DBG = true;
 
@@ -134,11 +130,7 @@ public final class SIMRecords extends UiccApplicationRecords {
     private static final int EVENT_UPDATE_DONE = 14;
     private static final int EVENT_GET_PNN_DONE = 15;
     private static final int EVENT_GET_SST_DONE = 17;
-    private static final int EVENT_GET_ALL_SMS_DONE = 18;
-    private static final int EVENT_MARK_SMS_READ_DONE = 19;
     private static final int EVENT_SET_MBDN_DONE = 20;
-    private static final int EVENT_SMS_ON_SIM = 21;
-    private static final int EVENT_GET_SMS_DONE = 22;
     private static final int EVENT_GET_CFF_DONE = 24;
     private static final int EVENT_SET_CPHS_MAILBOX_DONE = 25;
     private static final int EVENT_GET_INFO_CPHS_DONE = 26;
@@ -171,8 +163,7 @@ public final class SIMRecords extends UiccApplicationRecords {
         // recordsToLoad is set to 0 because no requests are made yet
         recordsToLoad = 0;
 
-        mCi.setOnSmsOnSim(this, EVENT_SMS_ON_SIM, null);
-        mCi.setOnIccRefresh(this, EVENT_SIM_REFRESH, null);
+        mCi.registerForIccRefresh(this, EVENT_SIM_REFRESH, null);
 
         // Start off by setting empty state
         resetRecords();
@@ -183,7 +174,7 @@ public final class SIMRecords extends UiccApplicationRecords {
         Log.d(LOG_TAG, "Disposing SIMRecords " + this);
         //Unregister for all events
         mCi.unregisterForOffOrNotAvailable( this);
-        mCi.unSetOnIccRefresh(this);
+        mCi.unregisterForIccRefresh(this);
         resetRecords();
     }
 
@@ -206,10 +197,6 @@ public final class SIMRecords extends UiccApplicationRecords {
 
         adnCache.reset();
         mEons.reset();
-
-        SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, null);
-        SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, null);
-        SystemProperties.set(PROPERTY_ICC_OPERATOR_ISO_COUNTRY, null);
 
         // recordsRequested is set to false indicating that the SIM
         // read requests made so far are not valid. This is set to
@@ -465,6 +452,15 @@ public final class SIMRecords extends UiccApplicationRecords {
         return mImsi.substring(0, 3 + mncLength);
     }
 
+    /** Returns the country code associated with the SIM
+     * i.e the first 3 digits of IMSI.
+     */
+     public String getCountryCode() {
+         if (mImsi == null) {
+             return null;
+         }
+         return (mImsi.substring(0,3));
+     }
     // ***** Overridden from Handler
     public void handleMessage(Message msg) {
         AsyncResult ar;
@@ -845,48 +841,6 @@ public final class SIMRecords extends UiccApplicationRecords {
                 }
             break;
 
-            case EVENT_GET_ALL_SMS_DONE:
-                isRecordLoadResponse = true;
-
-                ar = (AsyncResult)msg.obj;
-                if (ar.exception != null)
-                    break;
-
-                handleSmses((ArrayList) ar.result);
-                break;
-
-            case EVENT_MARK_SMS_READ_DONE:
-                Log.i("ENF", "marked read: sms " + msg.arg1);
-                break;
-
-
-            case EVENT_SMS_ON_SIM:
-                isRecordLoadResponse = false;
-
-                ar = (AsyncResult)msg.obj;
-
-                int[] index = (int[])ar.result;
-
-                if (ar.exception != null || index.length != 1) {
-                    Log.e(LOG_TAG, "[SIMRecords] Error on SMS_ON_SIM with exp "
-                            + ar.exception + " length " + index.length);
-                } else {
-                    Log.d(LOG_TAG, "READ EF_SMS RECORD index=" + index[0]);
-                    mFh.loadEFLinearFixed(IccConstants.EF_SMS,index[0],
-                            obtainMessage(EVENT_GET_SMS_DONE));
-                }
-                break;
-
-            case EVENT_GET_SMS_DONE:
-                isRecordLoadResponse = false;
-                ar = (AsyncResult)msg.obj;
-                if (ar.exception == null) {
-                    handleSms((byte[])ar.result);
-                } else {
-                    Log.e(LOG_TAG, "[SIMRecords] Error on GET_SMS with exp "
-                            + ar.exception);
-                }
-                break;
             case EVENT_GET_SST_DONE:
                 isRecordLoadResponse = true;
 
@@ -976,9 +930,9 @@ public final class SIMRecords extends UiccApplicationRecords {
             case EVENT_SIM_REFRESH:
                 isRecordLoadResponse = false;
                 ar = (AsyncResult)msg.obj;
-		if (DBG) log("Sim REFRESH with exception: " + ar.exception);
+                if (DBG) log("Sim REFRESH with exception: " + ar.exception);
                 if (ar.exception == null) {
-                    handleSimRefresh((int[])(ar.result));
+                    handleSimRefresh(ar);
                 }
                 break;
             case EVENT_GET_CFIS_DONE:
@@ -1182,27 +1136,28 @@ public final class SIMRecords extends UiccApplicationRecords {
         }
     }
 
-    private void handleSimRefresh(int[] result) {
-        if (result == null || result.length == 0) {
-	    if (DBG) log("handleSimRefresh without input");
+    private void handleSimRefresh(AsyncResult ar){
+
+        SimRefreshResponse state = (SimRefreshResponse)ar.result;
+        if (state == null) {
+            if (DBG) log("handleSimRefresh received without input");
             return;
         }
 
-        switch ((result[0])) {
-            case CommandsInterface.SIM_REFRESH_FILE_UPDATED:
- 		if (DBG) log("handleSimRefresh with SIM_REFRESH_FILE_UPDATED");
-                // result[1] contains the EFID of the updated file.
-                int efid = result[1];
-                handleFileUpdate(efid);
+        switch (state.refreshResult) {
+
+            case SIM_FILE_UPDATE:
+                if (DBG) log("handleSimRefresh with SIM_FILE_UPDATED");
+                handleFileUpdate(state.efId);
                 break;
-            case CommandsInterface.SIM_REFRESH_INIT:
-                log("handleSimRefresh with SIM_REFRESH_INIT, Delay SIM IO until SIM_READY");
-                // need to reload all files (that we care about after
-                // SIM_READY)
+            case SIM_INIT:
+                if (DBG) log("handleSimRefresh with SIM_INIT, Delay SIM IO until SIM_READY");
+                // need to reload all files (that we care about after SIM_READY)
                 adnCache.reset();
                 break;
-            case CommandsInterface.SIM_REFRESH_RESET:
-		if (DBG) log("handleSimRefresh with SIM_REFRESH_RESET");
+            case SIM_RESET:
+                if (DBG) log("handleSimRefresh with SIM_RESET");
+                adnCache.reset();
                 mCi.setRadioPower(false, null);
                 /* Note: no need to call setRadioPower(true).  Assuming the desired
                 * radio power state is still ON (as tracked by ServiceStateTracker),
@@ -1214,64 +1169,8 @@ public final class SIMRecords extends UiccApplicationRecords {
                 break;
             default:
                 // unknown refresh operation
-		if (DBG) log("handleSimRefresh with unknown operation");
+                if (DBG) log("handleSimRefresh with unknown operation");
                 break;
-        }
-    }
-
-    private void handleSms(byte[] ba) {
-        if (ba[0] != 0)
-            Log.d("ENF", "status : " + ba[0]);
-
-        // 3GPP TS 51.011 v5.0.0 (20011-12)  10.5.3
-        // 3 == "received by MS from network; message to be read"
-        if (ba[0] == 3) {
-            int n = ba.length;
-
-            // Note: Data may include trailing FF's.  That's OK; message
-            // should still parse correctly.
-            byte[] pdu = new byte[n - 1];
-            System.arraycopy(ba, 1, pdu, 0, n - 1);
-            SmsMessage message = SmsMessage.createFromPdu(pdu);
-
-            mNewSmsRegistrants.notifyResult(message);
-        }
-    }
-
-
-    private void handleSmses(ArrayList messages) {
-        int count = messages.size();
-
-        for (int i = 0; i < count; i++) {
-            byte[] ba = (byte[]) messages.get(i);
-
-            if (ba[0] != 0)
-                Log.i("ENF", "status " + i + ": " + ba[0]);
-
-            // 3GPP TS 51.011 v5.0.0 (20011-12)  10.5.3
-            // 3 == "received by MS from network; message to be read"
-
-            if (ba[0] == 3) {
-                int n = ba.length;
-
-                // Note: Data may include trailing FF's.  That's OK; message
-                // should still parse correctly.
-                byte[] pdu = new byte[n - 1];
-                System.arraycopy(ba, 1, pdu, 0, n - 1);
-                SmsMessage message = SmsMessage.createFromPdu(pdu);
-
-                mNewSmsRegistrants.notifyResult(message);
-
-                // 3GPP TS 51.011 v5.0.0 (20011-12)  10.5.3
-                // 1 == "received by MS from network; message read"
-
-                ba[0] = 1;
-
-                if (false) { // XXX writing seems to crash RdoServD
-                    mFh.updateEFLinearFixed(IccConstants.EF_SMS,
-                            i, ba, null, obtainMessage(EVENT_MARK_SMS_READ_DONE, i));
-                }
-            }
         }
     }
 
@@ -1293,17 +1192,6 @@ public final class SIMRecords extends UiccApplicationRecords {
         Log.d(LOG_TAG, "SIMRecords: record load complete");
 
         String operator = getSIMOperatorNumeric();
-
-        // Some fields require more than one SIM record to set
-        SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
-
-        if (mImsi != null) {
-            SystemProperties.set(PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
-                    MccTable.countryCodeForMcc(Integer.parseInt(mImsi.substring(0,3))));
-        }
-        else {
-            Log.e("SIM", "[SIMRecords] onAllRecordsLoaded: imsi is NULL!");
-        }
 
         setVoiceMailByCountry(operator);
         setSpnFromConfig(operator);
@@ -1409,24 +1297,6 @@ public final class SIMRecords extends UiccApplicationRecords {
         mFh.loadEFTransparent(IccConstants.EF_CSP_CPHS,obtainMessage(EVENT_GET_CSP_CPHS_DONE));
         recordsToLoad++;
 
-        // XXX should seek instead of examining them all
-        if (false) { // XXX
-            mFh.loadEFLinearFixedAll(IccConstants.EF_SMS, obtainMessage(EVENT_GET_ALL_SMS_DONE));
-            recordsToLoad++;
-        }
-
-        if (CRASH_RIL) {
-            String sms = "0107912160130310f20404d0110041007030208054832b0120"
-                         + "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-                         + "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-                         + "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-                         + "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-                         + "ffffffffffffffffffffffffffffff";
-            byte[] ba = IccUtils.hexStringToBytes(sms);
-
-            mFh.updateEFLinearFixed(IccConstants.EF_SMS, 1, ba, null,
-                            obtainMessage(EVENT_MARK_SMS_READ_DONE, 1));
-        }
         Log.d(LOG_TAG, "SIMRecords:fetchSimRecords " + recordsToLoad + " requested: " + recordsRequested);
 
     }
@@ -1527,7 +1397,6 @@ public final class SIMRecords extends UiccApplicationRecords {
 
                     if (DBG) log("Load EF_SPN: " + spn
                             + " spnDisplayCondition: " + spnDisplayCondition);
-                    SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, spn);
 
                     spnState = Get_Spn_Fsm_State.IDLE;
                 } else {
@@ -1549,7 +1418,6 @@ public final class SIMRecords extends UiccApplicationRecords {
                             data, 0, data.length - 1 );
 
                     if (DBG) log("Load EF_SPN_CPHS: " + spn);
-                    SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, spn);
 
                     spnState = Get_Spn_Fsm_State.IDLE;
                 } else {
@@ -1567,7 +1435,7 @@ public final class SIMRecords extends UiccApplicationRecords {
                             data, 0, data.length - 1);
 
                     if (DBG) log("Load EF_SPN_SHORT_CPHS: " + spn);
-                    SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, spn);
+                    mRecordsEventsRegistrants.notifyResult(EVENT_SPN);
                 }else {
                     if (DBG) log("No SPN loaded in either CHPS or 3GPP");
                 }

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,32 +17,19 @@
 
 package com.android.internal.telephony;
 
-import android.content.pm.PackageManager;
-import android.os.AsyncResult;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
-import android.os.ServiceManager;
-import android.telephony.PhoneNumberUtils;
-import android.util.Log;
-
-import java.util.ArrayList;
 import java.util.List;
-
+import android.os.RemoteException;
 
 /**
  * SimPhoneBookInterfaceManager to provide an inter-process communication to
  * access ADN-like SIM records.
  */
-public class IccPhoneBookInterfaceManagerProxy extends IIccPhoneBook.Stub {
+public class IccPhoneBookInterfaceManagerProxy {
     private IccPhoneBookInterfaceManager mIccPhoneBookInterfaceManager;
 
     public IccPhoneBookInterfaceManagerProxy(IccPhoneBookInterfaceManager
             iccPhoneBookInterfaceManager) {
         mIccPhoneBookInterfaceManager = iccPhoneBookInterfaceManager;
-        if(ServiceManager.getService("simphonebook") == null) {
-            ServiceManager.addService("simphonebook", this);
-        }
     }
 
     public void setmIccPhoneBookInterfaceManager(

@@ -76,13 +76,19 @@ public interface TelephonyProperties
 
     //****** SIM Card
     /**
-     * One of <code>"UNKNOWN"</code> <code>"ABSENT"</code> <code>"PIN_REQUIRED"</code>
-     * <code>"PUK_REQUIRED"</code> <code>"NETWORK_LOCKED"</code> or <code>"READY"</code>
+     * One of <code>"UNKNOWN"</code> <code>"ABSENT"</code> <code>"PRESENT"</code>
      */
     static String PROPERTY_SIM_STATE = "gsm.sim.state";
 
+    //****** SIM Subscription
+    /**
+     * One of <code>"PIN_REQUIRED"</code> <code>"PUK_REQUIRED"</code>
+     * <code>"NETWORK_LOCKED"</code> or <code>"READY"</code>
+     */
+    static String PROPERTY_SIM_SUB_STATE = "gsm.sim.sub.state";
+
     /** The MCC+MNC (mobile country code+mobile network code) of the
-     *  provider of the SIM. 5 or 6 decimal digits.
+     *  provider of a particular subscription. 5 or 6 decimal digits.
      *  Availablity: SIM state must be "READY"
      */
     static String PROPERTY_ICC_OPERATOR_NUMERIC = "gsm.sim.operator.numeric";

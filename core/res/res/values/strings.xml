@@ -3,6 +3,7 @@
 /* //device/apps/common/assets/res/any/strings.xml
 **
 ** Copyright 2006, The Android Open Source Project
+** Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -1448,6 +1449,10 @@
     <!-- Instructions telling the user to enter their SIM PIN to unlock the keyguard.
          Displayed in one line in a large font.  -->
     <string name="keyguard_password_enter_pin_code">Enter PIN code</string>
+
+    <!-- Instructions telling the user to enter their SIM PIN to unlock the keyguard
+         for a particular subscription. Displayed in one line in a large font.  -->
+    <string name="keyguard_password_enter_pin_code_for_subscription">Enter PIN code for Subscription</string>
 
     <!-- Instructions telling the user to enter their PIN password to unlock the keyguard.
          Displayed in one line in a large font.  -->

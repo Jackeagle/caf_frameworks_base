@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +72,8 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mCallReestablishIndRegistrants = new RegistrantList();
     protected RegistrantList mRestrictedStateRegistrants = new RegistrantList();
     protected RegistrantList mTetheredModeStateRegistrants = new RegistrantList();
+    protected RegistrantList mSubscriptionReadyRegistrants = new RegistrantList();
+    protected RegistrantList mIccRefreshRegistrants = new RegistrantList();
 
     protected Registrant mSMSRegistrant;
     protected Registrant mCdmaSMSRegistrant;
@@ -87,7 +89,6 @@ public abstract class BaseCommands implements CommandsInterface {
     protected Registrant mCatCallSetUpRegistrant;
     protected Registrant mIccSmsFullRegistrant;
     protected Registrant mEmergencyCallbackModeRegistrant;
-    protected Registrant mIccRefreshRegistrant;
     protected Registrant mRingRegistrant;
     protected Registrant mGsmBroadcastSmsRegistrant;
 
@@ -392,16 +393,17 @@ public abstract class BaseCommands implements CommandsInterface {
         mIccSmsFullRegistrant.clear();
     }
 
-    public void setOnIccRefresh(Handler h, int what, Object obj) {
-        mIccRefreshRegistrant = new Registrant (h, what, obj);
+    public void registerForIccRefresh(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mIccRefreshRegistrants.add(r);
+    }
+
+    public void unregisterForIccRefresh(Handler h) {
+        mIccRefreshRegistrants.remove(h);
     }
 
     public void setEmergencyCallbackMode(Handler h, int what, Object obj) {
         mEmergencyCallbackModeRegistrant = new Registrant (h, what, obj);
-    }
-
-    public void unSetOnIccRefresh(Handler h) {
-        mIccRefreshRegistrant.clear();
     }
 
     public void setOnCallRing(Handler h, int what, Object obj) {
@@ -552,6 +554,15 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForTetheredModeStateChanged(Handler h) {
         mTetheredModeStateRegistrants.remove(h);
+    }
+
+    public void registerForSubscriptionReady(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mSubscriptionReadyRegistrants.add(r);
+    }
+
+    public void unregisterForSubscriptionReady(Handler h) {
+        mSubscriptionReadyRegistrants.remove(h);
     }
 
     public void registerForResendIncallMute(Handler h, int what, Object obj) {

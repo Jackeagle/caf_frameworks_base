@@ -2,6 +2,7 @@
 <!--
 **
 ** Copyright 2008, The Android Open Source Project
+** Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License")
 ** you may not use this file except in compliance with the License.
@@ -42,6 +43,22 @@
             android:layout_alignParentRight="true"
             android:layout_marginRight="8dip"
             android:layout_toRightOf="@+id/time"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:gravity="right|bottom"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            />
+
+        <!-- Carrier info for second subscription-->
+        <TextView
+            android:id="@+id/carrier_sub2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/carrier"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="36dip"
+            android:layout_alignParentRight="true"
+            android:layout_marginRight="8dip"
             android:singleLine="true"
             android:ellipsize="marquee"
             android:gravity="right|bottom"

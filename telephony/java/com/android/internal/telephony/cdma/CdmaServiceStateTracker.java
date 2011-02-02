@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ import com.android.internal.telephony.UiccManager;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccManager.AppFamily;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.util.Arrays;
 import java.util.Calendar;
@@ -185,7 +186,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         cm.setOnSignalStrengthUpdate(this, EVENT_SIGNAL_STRENGTH_UPDATE, null);
         cm.registerForCdmaPrlChanged(this, EVENT_CDMA_PRL_VERSION_CHANGED, null);
 
-        mUiccManager = UiccManager.getInstance(phone.getContext(), this.cm);
+        mUiccManager = UiccManager.getInstance();
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
         phone.registerForEriFileLoaded(this, EVENT_ERI_FILE_LOADED, null);
@@ -603,6 +604,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             intent.putExtra(Intents.EXTRA_SPN, spn);
             intent.putExtra(Intents.EXTRA_SHOW_PLMN, showPlmn);
             intent.putExtra(Intents.EXTRA_PLMN, plmn);
+            intent.putExtra(Intents.EXTRA_SUBSCRIPTION, phone.getSubscription());
             phone.getContext().sendStickyBroadcast(intent);
         }
 
@@ -1021,8 +1023,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                     Log.w(LOG_TAG, "countryCodeForMcc error" + ex);
                 }
 
-                phone.setSystemProperty(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY,
-                        isoCountryCode);
+                phone.setSystemProperty(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY, isoCountryCode);
                 mGotCountryCode = true;
                 if (mNeedFixZone) {
                     fixTimeZone(isoCountryCode);
@@ -1049,10 +1050,21 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         }
     }
 
+    //Gets Application records and register for record events
+    public void updateRecords() {
+        updateIccAvailability();
+
+    }
+
     void updateIccAvailability() {
 
-        UiccCardApplication new3gpp2Application = mUiccManager
-                .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        UiccCardApplication new3gpp2Application = null;
+
+        Subscription subscriptionData = phone.getSubscriptionInfo();
+        if(subscriptionData != null) {
+            new3gpp2Application = mUiccManager
+                       .getApplication(subscriptionData.slotId, subscriptionData.m3gpp2Index);
+        }
 
         if (m3gpp2Application != new3gpp2Application) {
             if (m3gpp2Application != null) {
@@ -1197,7 +1209,8 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
      */
     private
     boolean isRoamingBetweenOperators(boolean cdmaRoaming, ServiceState s) {
-        String spn = SystemProperties.get(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, "empty");
+        String spn = phone.getSystemProperty
+                (TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, "empty");
 
         // NOTE: in case of RUIM we should completely ignore the ERI data file and
         // mOperatorAlphaLong is set from RIL_REQUEST_OPERATOR response 0 (alpha ONS)
@@ -1281,7 +1294,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
                 zone = TimeZone.getTimeZone( tzname );
             }
 
-            String iso = SystemProperties.get(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY);
+            String iso = phone.getSystemProperty(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY, "");
 
             if (zone == null) {
 
@@ -1494,8 +1507,8 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
      */
     String getImsi() {
         // TODO: When RUIM is enabled, IMSI will come from RUIM not build-time props.
-        String operatorNumeric = SystemProperties.get(
-                TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, "");
+        String operatorNumeric = phone.getSystemProperty
+                (TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, "");
 
         if (!TextUtils.isEmpty(operatorNumeric) && getCdmaMin() != null) {
             return (operatorNumeric + getCdmaMin());

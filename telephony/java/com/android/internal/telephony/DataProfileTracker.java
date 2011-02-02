@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,6 +73,7 @@ public class DataProfileTracker extends Handler {
     private RegistrantList mDataDataProfileDbChangedRegistrants = new RegistrantList();
     private ArrayList<DataProfile> mAllDataProfilesList = new ArrayList<DataProfile>();
 
+
     /* NOTE: Assumption is that the modem profiles will not change without
      * requiring a reboot. Modifications over the air is not supported.
      * Modified or new RUIM cards inserted will require a reboot
@@ -97,6 +98,9 @@ public class DataProfileTracker extends Handler {
                             TelephonyProperties.PROPERTY_OMH_ENABLED, false);
 
     private static final int OMH_MAX_PRIORITY = 255;
+
+    private int mSubId = 0;
+
 
     private static final int EVENT_DATA_PROFILE_DB_CHANGED = 1;
     private static final int EVENT_READ_MODEM_PROFILES = 2;
@@ -152,6 +156,7 @@ public class DataProfileTracker extends Handler {
         // TODO Auto-generated method stub
     }
 
+
     public int mapOmhPriorityToAndroidPriority(DataServiceType t, boolean isOmhProfileProvisioned) {
         /*
          * Per spec, for the OMH profiles, the value 'OMH_MAX_PRIORITY : 255' attributes
@@ -197,6 +202,11 @@ public class DataProfileTracker extends Handler {
             }
         }
         return ((DataProfileOmh) profile).getPriority();
+    }
+    
+    public void update(CommandsInterface ci, int subId) {
+        mSubId = subId;
+        reloadAllDataProfiles("update dpt");
     }
 
     public void handleMessage(Message msg) {
@@ -524,6 +534,10 @@ public class DataProfileTracker extends Handler {
         reloadAllDataProfiles(reason);
     }
 
+    public void setSubscription(int subId) {
+        mSubId = subId;
+    }
+
     public void resetAllProfilesAsWorking() {
         if (mAllDataProfilesList != null) {
             for (DataProfile dp : mAllDataProfilesList) {
@@ -774,18 +788,18 @@ public class DataProfileTracker extends Handler {
     }
 
     private void logv(String msg) {
-        Log.v(LOG_TAG, "[DPT] " + msg);
+        Log.v(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 
     private void logd(String msg) {
-        Log.d(LOG_TAG, "[DPT] " + msg);
+        Log.d(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 
     private void logw(String msg) {
-        Log.w(LOG_TAG, "[DPT] " + msg);
+        Log.w(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 
     private void loge(String msg) {
-        Log.e(LOG_TAG, "[DPT] " + msg);
+        Log.e(LOG_TAG, "[DPT(" + mSubId + ")] " + msg);
     }
 }

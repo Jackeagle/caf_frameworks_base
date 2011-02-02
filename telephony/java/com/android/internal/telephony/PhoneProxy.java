@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,14 +32,17 @@ import android.provider.Settings;
 import android.telephony.CellLocation;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 import com.android.internal.telephony.cdma.CDMAPhone;
 import com.android.internal.telephony.gsm.GSMPhone;
+import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 public class PhoneProxy extends Handler implements Phone {
     public final static Object lockForRadioTechnologyChange = new Object();
@@ -55,6 +58,8 @@ public class PhoneProxy extends Handler implements Phone {
 
     private boolean mResetModemOnRadioTechnologyChange = false;
     private int mVoiceTechQueryContext = 0;
+
+    private int mPhoneSubscription = 0;
 
     private boolean mDesiredPowerState;
 
@@ -72,32 +77,32 @@ public class PhoneProxy extends Handler implements Phone {
 
         mResetModemOnRadioTechnologyChange = SystemProperties.getBoolean(
                 TelephonyProperties.PROPERTY_RESET_ON_RADIO_TECH_CHANGE, false);
+        mCi = ((PhoneBase) mActivePhone).mCM;
+        mIccSmsInterfaceManager = new IccSmsInterfaceManager(this.mActivePhone, mCi);
         mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(phone
                 .getIccPhoneBookInterfaceManager());
         mPhoneSubInfoProxy = new PhoneSubInfoProxy(phone.getPhoneSubInfo());
 
-        mCi = ((PhoneBase) mActivePhone).mCM;
         mCi.registerForRadioStateChanged(this, EVENT_RADIO_STATE_CHANGED, null);
         mCi.registerForVoiceRadioTechChanged(this, EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED, null);
 
-        mIccSmsInterfaceManager = new IccSmsInterfaceManager(this.mActivePhone, mCi);
-
         mDct = ((PhoneBase) mActivePhone).mDataConnection;
 
-        mIccProxy = new IccCardProxy(mActivePhone.getContext(), mCi);
+        mIccProxy = new IccCardProxy(phone.getContext(), mCi);
         mIccProxy.setVoiceRadioTech(
                 mActivePhone.getPhoneType() == Phone.PHONE_TYPE_CDMA ?
                         RadioTechnologyFamily.RADIO_TECH_3GPP2
                         : RadioTechnologyFamily.RADIO_TECH_3GPP);
-
         // system setting property AIRPLANE_MODE_ON is set in Settings.
         int airplaneMode = Settings.System.getInt(mActivePhone.getContext().getContentResolver(),
                 Settings.System.AIRPLANE_MODE_ON, 0);
         mDesiredPowerState = !(airplaneMode > 0);
-        ((DataConnectionTracker) mDct).setDataConnectionAsDesired(
-                mDesiredPowerState, null);
 
-        UiccManager.getInstance(mActivePhone.getContext(), mCi);
+        // TODO: DSDS - Do setDataConnectionAsDesired and egisterForDataServiceStateChanged
+        // only if this is the current DDS.
+        logv("Calling setDataConnectionAsDesired on DCT");
+        mDct.setDataConnectionAsDesired(mDesiredPowerState, null);
+
     }
 
     @Override
@@ -126,6 +131,7 @@ public class PhoneProxy extends Handler implements Phone {
                 break;
 
             case EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED:
+                logv("EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED:" );
                 mVoiceTechQueryContext++;
                 mCi.getVoiceRadioTechnology(this
                         .obtainMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE, mVoiceTechQueryContext));
@@ -136,30 +142,29 @@ public class PhoneProxy extends Handler implements Phone {
 
                 if ((Integer)ar.userObj != mVoiceTechQueryContext) return;
 
-                if (ar.exception == null) { 
-                    RadioTechnologyFamily newVoiceTech = 
-                            RadioTechnologyFamily.getRadioTechFamilyFromInt(((int[]) ar.result)[0]); 
-                    updatePhoneObject(newVoiceTech); 
+                if (ar.exception == null) {
+                    RadioTechnologyFamily newVoiceTech =
+                            RadioTechnologyFamily.getRadioTechFamilyFromInt(((int[]) ar.result)[0]);
+                    updatePhoneObject(newVoiceTech, getSubscription());
                 } else {
                     loge("Voice Radio Technology query failed!");
                 }
                 break;
 
             default:
-                Log.e(LOG_TAG,
-                        "Error! This handler was not registered for this message type. Message: "
+                loge("Error! This handler was not registered for this message type. Message: "
                                 + msg.what);
                 break;
         }
     }
 
-    private void updatePhoneObject(RadioTechnologyFamily newVoiceRadioTech) {
+    public void updatePhoneObject(RadioTechnologyFamily newVoiceRadioTech, int subscription) {
 
         if (mActivePhone != null
                 && ((newVoiceRadioTech.isCdma() && mActivePhone.getPhoneType() == PHONE_TYPE_CDMA))
                 || ((newVoiceRadioTech.isGsm() && mActivePhone.getPhoneType() == PHONE_TYPE_GSM))) {
             // Nothing changed. Keep phone as it is.
-            Log.v(LOG_TAG, "Ignoring voice radio technology changed message. newVoiceRadioTech = "
+            logv("Ignoring voice radio technology changed message. newVoiceRadioTech = "
                     + newVoiceRadioTech + "Active Phone = " + mActivePhone.getPhoneName());
             return;
         }
@@ -167,9 +172,8 @@ public class PhoneProxy extends Handler implements Phone {
         if (newVoiceRadioTech.isUnknown()) {
             // We need some voice phone object to be active always, so never
             // delete the phone without anything to replace it with!
-            Log.i(LOG_TAG,
-                    "Ignoring voice radio technology changed message. newVoiceRadioTech = Unknown."
-                            + "Active Phone = " + mActivePhone.getPhoneName());
+            logi("Ignoring voice radio technology changed message. newVoiceRadioTech = Unknown."
+                   + "Active Phone = " + mActivePhone.getPhoneName());
             return;
         }
 
@@ -185,7 +189,7 @@ public class PhoneProxy extends Handler implements Phone {
 
         CallManager.getInstance().unregisterPhone(mActivePhone);
 
-        deleteAndCreatePhone(newVoiceRadioTech);
+        deleteAndCreatePhone(newVoiceRadioTech, subscription);
 
         CallManager.getInstance().registerPhone(mActivePhone);
 
@@ -209,19 +213,21 @@ public class PhoneProxy extends Handler implements Phone {
 
     }
 
-    private void deleteAndCreatePhone(RadioTechnologyFamily newVoiceRadioTech) {
+    private void deleteAndCreatePhone(RadioTechnologyFamily newVoiceRadioTech, int subscription) {
 
         String mOutgoingPhoneName = "Unknown";
+        Subscription subscriptionData = null;
 
         if (mActivePhone != null) {
             mOutgoingPhoneName = ((PhoneBase) mActivePhone).getPhoneName();
         }
 
-        Log.i(LOG_TAG, "Switching Voice Phone : " + mOutgoingPhoneName + " >>> "
+        logi("Switching Voice Phone : " + mOutgoingPhoneName + " >>> "
                 + (newVoiceRadioTech.isGsm() ? "GSM" : "CDMA"));
 
         if (mActivePhone != null) {
-            Log.v(LOG_TAG, "Disposing old phone..");
+            logv("Disposing old phone..");
+            subscriptionData = mActivePhone.getSubscriptionInfo();
             if (mActivePhone instanceof GSMPhone) {
                 ((GSMPhone) mActivePhone).dispose();
             } else if (mActivePhone instanceof CDMAPhone) {
@@ -239,34 +245,66 @@ public class PhoneProxy extends Handler implements Phone {
         // System.gc();
 
         if (newVoiceRadioTech.isCdma()) {
-            mActivePhone = PhoneFactory.getCdmaPhone(mDct);
+             /* Gets CDMA/GSM phone object with proper command interface attached */
+            mActivePhone = PhoneFactory.getCdmaPhone(mDct, subscription);
             if (null != oldPhone) {
                 ((GSMPhone) oldPhone).removeReferences();
             }
         } else if (newVoiceRadioTech.isGsm()) {
-            mActivePhone = PhoneFactory.getGsmPhone(mDct);
+            mActivePhone = PhoneFactory.getGsmPhone(mDct, subscription);
             if (null != oldPhone) {
                 ((CDMAPhone) oldPhone).removeReferences();
             }
         }
+        mActivePhone.setSubscription(subscription);
 
         oldPhone = null;
     }
 
+    public void updateDataConnectionTracker() {
+        logd("Updating Data Connection Tracker with subscription " + getSubscriptionInfo()
+             + " and CommandsInterface");
+        mDct.update(mCi, getSubscriptionInfo());
+    }
+
     private void logv(String msg) {
-        Log.v(LOG_TAG, "[PhoneProxy] " + msg);
+        if (TelephonyManager.isMultiSimEnabled()) {
+            Log.v(LOG_TAG, "[PhoneProxy(" + mPhoneSubscription + ")] " + msg);
+        } else {
+            Log.v(LOG_TAG, "[PhoneProxy]" + msg);
+        }
     }
 
     private void logd(String msg) {
-        Log.d(LOG_TAG, "[PhoneProxy] " + msg);
+        if (TelephonyManager.isMultiSimEnabled()) {
+            Log.d(LOG_TAG, "[PhoneProxy(" + mPhoneSubscription + ")] " + msg);
+        } else {
+            Log.d(LOG_TAG, "[PhoneProxy]" + msg);
+        }
     }
 
     private void logw(String msg) {
-        Log.w(LOG_TAG, "[PhoneProxy] " + msg);
+        if (TelephonyManager.isMultiSimEnabled()) {
+            Log.w(LOG_TAG, "[PhoneProxy(" + mPhoneSubscription + ")] " + msg);
+        } else {
+            Log.w(LOG_TAG, "[PhoneProxy]" + msg);
+        }
     }
 
     private void loge(String msg) {
-        Log.e(LOG_TAG, "[PhoneProxy] " + msg);
+        if (TelephonyManager.isMultiSimEnabled()) {
+            Log.e(LOG_TAG, "[PhoneProxy(" + mPhoneSubscription + ")] " + msg);
+        } else {
+            Log.e(LOG_TAG, "[PhoneProxy]" + msg);
+        }
+    }
+
+    private void logi(String msg) {
+        if (TelephonyManager.isMultiSimEnabled()) {
+            Log.i(LOG_TAG, "[PhoneProxy(" + mPhoneSubscription + ")] " + msg);
+        } else {
+            Log.i(LOG_TAG, "[PhoneProxy]" + msg);
+        }
     }
 
     public ServiceState getServiceState() {
@@ -283,10 +321,6 @@ public class PhoneProxy extends Handler implements Phone {
 
     public DataState getDataConnectionState(String type, IPVersion ipv) {
         return mActivePhone.getDataConnectionState(type, ipv);
-    }
-
-    public DataActivityState getDataActivityState() {
-        return mActivePhone.getDataActivityState();
     }
 
     public Context getContext() {
@@ -394,11 +428,11 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void registerForServiceStateChanged(Handler h, int what, Object obj) {
-        mActivePhone.registerForServiceStateChanged(h, what, obj);
+        mServiceStateRegistrants.add(h, what, obj);
     }
 
     public void unregisterForServiceStateChanged(Handler h) {
-        mActivePhone.unregisterForServiceStateChanged(h);
+        mServiceStateRegistrants.remove(h);
     }
 
     public void registerForSuppServiceNotification(Handler h, int what, Object obj) {
@@ -574,17 +608,29 @@ public class PhoneProxy extends Handler implements Phone {
         logv("setPowerStateToDesired : mDesiredPowerState = " + mDesiredPowerState
                 + ", getRadioState() = " + mCi.getRadioState());
 
+        int currentDds = PhoneFactory.getDataSubscription();
         // If we want it on and it's off, turn it on
         if (mDesiredPowerState
                 && mCi.getRadioState() == CommandsInterface.RadioState.RADIO_OFF) {
             mCi.setRadioPower(true, null);
-            mDct.setDataConnectionAsDesired(mDesiredPowerState, null);
+            if (mPhoneSubscription == currentDds) {
+                mDct.setDataConnectionAsDesired(mDesiredPowerState, null);
+            }
         } else if (!mDesiredPowerState && mCi.getRadioState().isOn()) {
             Message powerOffMsg = obtainMessage(EVENT_SET_RADIO_POWER, mDesiredPowerState);
             // we want it off, but might need data to be disconnected.
-            mDct.setDataConnectionAsDesired(mDesiredPowerState, powerOffMsg);
+            // If this phone proxy corresponds to the DDS, then we need to disconnect
+            // the data before set the radio power off.  If this is non-DSDS, then
+            // send the message to itself to continue with the radio power off.
+            if (mPhoneSubscription == currentDds) {
+                logv("setPowerStateToDesired: DDS case: disconnect data");
+                mDct.setDataConnectionAsDesired(mDesiredPowerState, powerOffMsg);
+            } else {
+                logv("setPowerStateToDesired: non-DDS case: send message to self");
+                powerOffMsg.sendToTarget();
+            }
         }
-     }
+    }
 
     public boolean getMessageWaitingIndicator() {
         return mActivePhone.getMessageWaitingIndicator();
@@ -792,11 +838,13 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public boolean enableDataConnectivity() {
+        logd("enableDataConnectivity");
         return mActivePhone.enableDataConnectivity();
     }
 
-    public boolean disableDataConnectivity() {
-        return mActivePhone.disableDataConnectivity();
+    public boolean enableDataConnectivity(Message onCompleteMsg) {
+        logd("enableDataConnectivity(Message onCompleteMsg)");
+        return mActivePhone.enableDataConnectivity(onCompleteMsg);
     }
 
     public int enableApnType(String type) {
@@ -823,8 +871,16 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.getIpAddress(apnType);
     }
 
+    public String getIpAddress(String apnType, IPVersion ipv) {
+        return mActivePhone.getIpAddress(apnType, ipv);
+    }
+
     public String getGateway(String apnType) {
         return mActivePhone.getGateway(apnType);
+    }
+
+    public String getGateway(String apnType, IPVersion ipv) {
+        return mActivePhone.getGateway(apnType, ipv);
     }
 
     public String[] getDnsServers(String apnType) {
@@ -835,16 +891,8 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.getDnsServers(apnType, ipv);
     }
 
-    public String getGateway(String apnType, IPVersion ipv) {
-        return mActivePhone.getGateway(apnType, ipv);
-    }
-
     public String getInterfaceName(String apnType, IPVersion ipv) {
         return mActivePhone.getInterfaceName(apnType, ipv);
-    }
-
-    public String getIpAddress(String apnType, IPVersion ipv) {
-        return mActivePhone.getIpAddress(apnType, ipv);
     }
 
     public String getDeviceId() {
@@ -874,9 +922,21 @@ public class PhoneProxy extends Handler implements Phone {
     public PhoneSubInfo getPhoneSubInfo(){
         return mActivePhone.getPhoneSubInfo();
     }
-    
+
+    public PhoneSubInfoProxy getPhoneSubInfoProxy(){
+        return mPhoneSubInfoProxy;
+    }
+
     public IccPhoneBookInterfaceManager getIccPhoneBookInterfaceManager(){
         return mActivePhone.getIccPhoneBookInterfaceManager();
+    }
+
+    public IccPhoneBookInterfaceManagerProxy getIccPhoneBookInterfaceManagerProxy() {
+        return mIccPhoneBookInterfaceManagerProxy;
+    }
+
+    public IccSmsInterfaceManager getIccSmsInterfaceManager() {
+        return mIccSmsInterfaceManager;
     }
 
     public void setTTYMode(int ttyMode, Message onComplete) {
@@ -1015,9 +1075,52 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.invokeDepersonalization(pin, type, response);
     }
 
+    public void setSubscriptionInfo(Subscription subscription) {
+        logd("setSubscriptionInfo sub= " + subscription);
+        mActivePhone.setSubscriptionInfo(subscription);
+        mIccProxy.setSubscriptionInfo(subscription);
+        mIccSmsInterfaceManager.updateRecords();
+        setSubscription(subscription.subId);
+    }
+
+    public Subscription getSubscriptionInfo() {
+        return mActivePhone.getSubscriptionInfo();
+    }
+
+    public void setSubscription(int subscription) {
+        mPhoneSubscription = subscription;
+    }
+
+    public int getSubscription() {
+        return mActivePhone.getSubscription();
+    }
+
+    public void updateCurrentCarrierInProvider() {
+        mActivePhone.updateCurrentCarrierInProvider();
+    }
+
+    public boolean disableDataConnectivity() {
+        logd("disableDataConnectivity");
+        return mActivePhone.disableDataConnectivity();
+    }
+
+    public boolean disableDataConnectivity(Message onCompleteMsg) {
+        logd("disableDataConnectivity(Message onCompleteMsg)");
+        return mActivePhone.disableDataConnectivity(onCompleteMsg);
+    }
+
     public boolean isCspPlmnEnabled() {
         return mActivePhone.isCspPlmnEnabled();
     }
 
+    public DataActivityState getDataActivityState() {
+        return mActivePhone.getDataActivityState();
+    }
+
+    protected final RegistrantList mServiceStateRegistrants = new RegistrantList();
+
+    public Phone getVoicePhone() {
+        return mActivePhone;
+    }
 }
 

@@ -35,6 +35,7 @@ import com.android.internal.telephony.MccTable;
 //import com.android.internal.telephony.gsm.VoiceMailConstants;
 import com.android.internal.telephony.IccException;
 import com.android.internal.telephony.IccUtils;
+import com.android.internal.telephony.SimRefreshResponse;
 
 
 /**
@@ -58,11 +59,6 @@ public final class RuimRecords extends UiccApplicationRecords {
     private static final int EVENT_GET_CDMA_SUBSCRIPTION_DONE = 10;
     private static final int EVENT_UPDATE_DONE = 14;
     private static final int EVENT_GET_SST_DONE = 17;
-    private static final int EVENT_GET_ALL_SMS_DONE = 18;
-    private static final int EVENT_MARK_SMS_READ_DONE = 19;
-
-    private static final int EVENT_SMS_ON_RUIM = 21;
-    private static final int EVENT_GET_SMS_DONE = 22;
 
     private static final int EVENT_RUIM_REFRESH = 31;
 
@@ -78,7 +74,7 @@ public final class RuimRecords extends UiccApplicationRecords {
         recordsToLoad = 0;
 
         // NOTE the EVENT_SMS_ON_RUIM is not registered
-        mCi.setOnIccRefresh(this, EVENT_RUIM_REFRESH, null);
+        mCi.registerForIccRefresh(this, EVENT_RUIM_REFRESH, null);
 
         // Start off by setting empty state
         resetRecords();
@@ -89,7 +85,7 @@ public final class RuimRecords extends UiccApplicationRecords {
         Log.d(LOG_TAG, "Disposing RuimRecords " + this);
         //Unregister for all events
         mCi.unregisterForOffOrNotAvailable( this);
-        mCi.unSetOnIccRefresh(this);
+        mCi.unregisterForIccRefresh(this);
         resetRecords();
     }
 
@@ -230,13 +226,6 @@ public final class RuimRecords extends UiccApplicationRecords {
                 }
             break;
 
-            case EVENT_GET_ALL_SMS_DONE:
-            case EVENT_MARK_SMS_READ_DONE:
-            case EVENT_SMS_ON_RUIM:
-            case EVENT_GET_SMS_DONE:
-                Log.w(LOG_TAG, "Event not supported: " + msg.what);
-                break;
-
             // TODO: probably EF_CST should be read instead
             case EVENT_GET_SST_DONE:
                 Log.d(LOG_TAG, "Event EVENT_GET_SST_DONE Received");
@@ -246,7 +235,7 @@ public final class RuimRecords extends UiccApplicationRecords {
                 isRecordLoadResponse = false;
                 ar = (AsyncResult)msg.obj;
                 if (ar.exception == null) {
-                    handleRuimRefresh((int[])(ar.result));
+                    handleRuimRefresh(ar);
                 }
                 break;
 
@@ -318,25 +307,28 @@ public final class RuimRecords extends UiccApplicationRecords {
         Log.d(LOG_TAG, "RuimRecords:setVoiceMessageWaiting - NOP for CDMA");
     }
 
-    private void handleRuimRefresh(int[] result) {
-        if (result == null || result.length == 0) {
-            if (DBG) log("handleRuimRefresh without input");
+    private void handleRuimRefresh(AsyncResult ar){
+
+        SimRefreshResponse state = (SimRefreshResponse)ar.result;
+        if (state == null) {
+            if (DBG) log("handleRuimRefresh received without input");
             return;
         }
 
-        switch ((result[0])) {
-            case CommandsInterface.SIM_REFRESH_FILE_UPDATED:
-                if (DBG) log("handleRuimRefresh with SIM_REFRESH_FILE_UPDATED");
+        switch (state.refreshResult) {
+
+            case SIM_FILE_UPDATE:
+                if (DBG) log("handleRuimRefresh with SIM_FILE_UPDATED");
                 adnCache.reset();
                 fetchRuimRecords();
                 break;
-            case CommandsInterface.SIM_REFRESH_INIT:
-                if (DBG) log("handleRuimRefresh with SIM_REFRESH_INIT");
+            case SIM_INIT:
+                if (DBG) log("handleRuimRefresh with SIM_INIT");
                 // need to reload all files (that we care about)
                 fetchRuimRecords();
                 break;
-            case CommandsInterface.SIM_REFRESH_RESET:
-                if (DBG) log("handleRuimRefresh with SIM_REFRESH_RESET");
+            case SIM_RESET:
+                if (DBG) log("handleRuimRefresh with SIM_RESET");
                 onIccRefreshReset();
                 break;
             default:

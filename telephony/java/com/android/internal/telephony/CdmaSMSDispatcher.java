@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +36,8 @@ import android.telephony.SmsManager;
 import android.telephony.SmsMessage.MessageClass;
 import android.util.Config;
 import android.util.Log;
+
+import com.android.internal.telephony.ProxyManager.Subscription;
 import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 import com.android.internal.telephony.SmsMessageBase.TextEncodingDetails;
 import com.android.internal.telephony.UiccManager.AppFamily;
@@ -62,6 +65,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         mCm.setOnNewCdmaSMS(this, EVENT_NEW_SMS, null);
     }
 
+    public void updatePhoneObject(Phone phone) {
+
+        super.updatePhoneObject(phone);
+    }
+
     public void dispose() {
         //TODO: fusion - who should call this now?
         super.dispose();
@@ -78,6 +86,25 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
      */
     protected void handleStatusReport(AsyncResult ar) {
         Log.d(TAG, "handleStatusReport is a special GSM function, should never be called in CDMA!");
+    }
+
+    /**
+     * Called when a Class2 SMS is  received.
+     *
+     * @param ar AsyncResult passed to this function. "ar.result" should
+     *           be representing the INDEX of SMS on SIM.
+     */
+    protected void handleSmsOnIcc(AsyncResult ar) {
+        Log.d(TAG, "handleSmsOnIcc function is not applicable for CDMA");
+    }
+
+    /**
+     * Called when a SMS on SIM is retrieved.
+     *
+     * @param ar AsyncResult passed to this function.
+     */
+    protected void handleGetIccSmsDone(AsyncResult ar) {
+        Log.d(TAG, "handleGetIccSmsDone function is not applicable for CDMA");
     }
 
     private void handleCdmaStatusReport(SmsMessage sms) {
@@ -510,8 +537,12 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
     }
 
     protected void updateIccAvailability() {
-        UiccCardApplication newApplication = mUiccManager
-                .getCurrentApplication(AppFamily.APP_FAM_3GPP2);
+        Subscription subData = mPhone.getSubscriptionInfo();
+        UiccCardApplication newApplication = null;
+        if (subData != null) {
+            newApplication = mUiccManager
+                .getApplication(subData.slotId, subData.m3gpp2Index);
+        }
 
         if (mApplication != newApplication) {
             if (mApplication != null) {

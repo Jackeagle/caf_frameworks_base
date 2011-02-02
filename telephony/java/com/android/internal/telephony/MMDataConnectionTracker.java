@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,10 @@ import android.telephony.gsm.GsmCellLocation;
 import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.Log;
+import android.os.IBinder;
+import android.os.ServiceManager;
+import android.net.IConnectivityManager;
+import android.os.RemoteException;
 
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
@@ -59,6 +63,7 @@ import com.android.internal.telephony.DataProfile.DataProfileType;
 import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 /*
  * Definitions:
@@ -320,7 +325,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                     }
                 }
             }
-        } catch(RemoteException e) {
+        } catch (RemoteException e) {
             // Could not find ConnectivityService, nothing to do, continue.
             logw("Could not access Connectivity Service." + e);
         }
@@ -332,6 +337,40 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         logv("SUPPORT_IPV6 = " + SUPPORT_IPV6);
         logv("SUPPORT_SERVICE_ARBITRATION = " + SUPPORT_SERVICE_ARBITRATION);
         logv("SUPPORT_OMH = " + mDpt.isOmhEnabled());
+    }
+
+    public void update(CommandsInterface ci, Subscription subData) {
+        // Update only if DDS
+        if (subData.subId == PhoneFactory.getDataSubscription()) {
+            //super.update(ci, subData);
+            // 1. Update the subscription data
+            mSubscriptionData = subData;
+
+            // 2. Unregister for the events on Commands Interface.
+            mCm.unregisterForOn(this);
+            mCm.unregisterForOffOrNotAvailable(this);
+            mCm.unregisterForDataStateChanged(this);
+            mCm.unregisterForCdmaOtaProvision(this);
+
+            // 3. Re-register for the events on new Commands Interface.
+            mCm = ci;
+            mCm.registerForOn(this, EVENT_RADIO_ON, null);
+            mCm.registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_NOT_AVAILABLE, null);
+            mCm.registerForDataStateChanged(this, EVENT_DATA_CALL_LIST_CHANGED, null);
+            mCm.registerForCdmaOtaProvision(this, EVENT_CDMA_OTA_PROVISION, null);
+
+            // 4. Update all the elments
+            mDpt.update(ci, subData.subId);
+            mDsst.update(ci);
+
+            // 5. Update Data Call List
+            destroyDataCallList();
+            createDataCallList();
+
+            // 6. Restart NetStat Poll
+            stopNetStatPoll();
+            startNetStatPoll();
+        }
     }
 
     public void dispose() {
@@ -1160,6 +1199,13 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 mPendingPowerOffCompleteMsg.sendToTarget();
                 mPendingPowerOffCompleteMsg = null;
             }
+
+            //check for pending data disabled message
+            if (mPendingDataDisableCompleteMsg != null) {
+                logd("onUpdateDataConnections: All the Data Connections are down! Notifying the caller");
+                mPendingDataDisableCompleteMsg.sendToTarget();
+                mPendingDataDisableCompleteMsg = null;
+            }
         }
 
         // Check for data readiness!
@@ -1545,23 +1591,53 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         mDsst.unregisterForServiceStateChanged(h);
     }
 
+    public void setSubscriptionInfo(Subscription subData) {
+        // Update the subscription info only if this is the DDS.
+        if (subData.subId == PhoneFactory.getDataSubscription()) {
+            mSubscriptionData = subData;
+            mDsst.updateRecords();
+            mDpt.setSubscription(mSubscriptionData.subId);
+        }
+    }
+
+    public Subscription getSubscriptionInfo() {
+        return mSubscriptionData;
+    }
+
+    public int getSubscription() {
+        if (mSubscriptionData != null) {
+           return mSubscriptionData.subId;
+        }
+
+        return TelephonyManager.DEFAULT_SUB;
+    }
+
+    public void updateCurrentCarrierInProvider() {
+        mDsst.updateCurrentCarrierInProvider();
+    }
+
     void loge(String string) {
-        Log.e(LOG_TAG, "[DCT] " + string);
+        Log.e(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subId+")" : "")
+                              + " ] " + string);
     }
 
     void logw(String string) {
-        Log.w(LOG_TAG, "[DCT] " + string);
+        Log.w(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subId+")" : "")
+                              + " ] " + string);
     }
 
     void logd(String string) {
-        Log.d(LOG_TAG, "[DCT] " + string);
+        Log.d(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subId+")" : "")
+                              + " ] " + string);
     }
 
     void logv(String string) {
-        Log.v(LOG_TAG, "[DCT] " + string);
+        Log.v(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subId+")" : "")
+                              + " ] " + string);
     }
 
     void logi(String string) {
-        Log.i(LOG_TAG, "[DCT] " + string);
+        Log.i(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subId+")" : "")
+                              + " ] " + string);
     }
 }

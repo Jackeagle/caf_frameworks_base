@@ -190,6 +190,9 @@ public class MobileDataStateTracker extends NetworkStateTracker {
         ConnectivityManager mConnectivityManager;
         public void onReceive(Context context, Intent intent) {
             synchronized(this) {
+                int subtype = TelephonyManager.getDefault().getNetworkType();
+                int oldSubtype = mNetworkInfo.getSubtype();
+
                 if (intent.getAction().equals(TelephonyIntents.
                         ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)) {
 
@@ -199,6 +202,13 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                     // set this regardless of the apnTypeList or IpVersion. It's
                     // all the same radio/network underneath
                     mNetworkInfo.setIsAvailable(!unavailable);
+
+                    if (subtype != oldSubtype) {
+                        logd("subType changed, oldSubtype = " + oldSubtype
+                                + "new subtype = " + subtype);
+                        mNetworkInfo.setSubtype(subtype,
+                                TelephonyManager.getDefault().getNetworkTypeName());
+                    }
 
                     if (isApnTypeIncluded(apnTypeList) == false)
                         return; //not what we are looking for.
@@ -292,7 +302,10 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                 }
                 TelephonyManager tm = TelephonyManager.getDefault();
                 setRoamingStatus(tm.isNetworkRoaming());
-                setSubtype(tm.getNetworkType(), tm.getNetworkTypeName());
+
+                if (subtype != oldSubtype) {
+                    notifySubtypeChanged(subtype, oldSubtype);
+                }
             }
         }
     }

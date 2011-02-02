@@ -55,8 +55,9 @@ import java.util.List;
 public final class CallManager {
 
     private static final String LOG_TAG ="CallManager";
+    //TODO GB
     private static final boolean DBG = true;
-    private static final boolean VDBG = false;
+    private static final boolean VDBG = true;
 
     private static final int EVENT_DISCONNECT = 100;
     private static final int EVENT_PRECISE_CALL_STATE_CHANGED = 101;
@@ -367,6 +368,22 @@ public final class CallManager {
         return getFirstActiveRingingCall().getPhone();
     }
 
+    /**
+     * @return the phone associated with any call
+     */
+    public Phone getPhoneInCall() {
+        Phone phone = null;
+        if (!getFirstActiveRingingCall().isIdle()) {
+            phone = getFirstActiveRingingCall().getPhone();
+        } else if (!getActiveFgCall().isIdle()) {
+            phone = getActiveFgCall().getPhone();
+        } else {
+            // If BG call is idle, we return default phone
+            phone = getFirstActiveBgCall().getPhone();
+        }
+        return phone;
+    }
+
     public void setAudioMode() {
         Context context = getContext();
         if (context == null) return;
@@ -415,8 +432,9 @@ public final class CallManager {
         phone.registerForDisplayInfo(mHandler, EVENT_DISPLAY_INFO, null);
         phone.registerForSignalInfo(mHandler, EVENT_SIGNAL_INFO, null);
         phone.registerForResendIncallMute(mHandler, EVENT_RESEND_INCALL_MUTE, null);
-        phone.registerForMmiInitiate(mHandler, EVENT_MMI_INITIATE, null);
-        phone.registerForMmiComplete(mHandler, EVENT_MMI_COMPLETE, null);
+        //TODO GB
+        phone.registerForMmiInitiate(mHandler, EVENT_MMI_INITIATE, phone);
+        phone.registerForMmiComplete(mHandler, EVENT_MMI_COMPLETE, phone);
         phone.registerForSuppServiceFailed(mHandler, EVENT_SUPP_SERVICE_FAILED, null);
         phone.registerForServiceStateChanged(mHandler, EVENT_SERVICE_STATE_CHANGED, null);
 

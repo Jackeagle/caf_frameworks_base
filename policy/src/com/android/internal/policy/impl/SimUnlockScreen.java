@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +24,7 @@ import android.content.res.Configuration;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 
+import android.telephony.TelephonyManager;
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.widget.LockPatternUtils;
 
@@ -35,7 +37,6 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.android.internal.R;
-
 /**
  * Displays a dialer like interface to unlock the SIM PIN.
  */
@@ -66,11 +67,13 @@ public class SimUnlockScreen extends LinearLayout implements KeyguardScreen, Vie
 
     private int mKeyboardHidden;
 
+    private int mSubscription = 0;
+
     private static final char[] DIGITS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
 
     public SimUnlockScreen(Context context, Configuration configuration,
             KeyguardUpdateMonitor updateMonitor, KeyguardScreenCallback callback,
-            LockPatternUtils lockpatternutils) {
+            LockPatternUtils lockpatternutils, int subscription) {
         super(context);
         mUpdateMonitor = updateMonitor;
         mCallback = callback;
@@ -96,7 +99,14 @@ public class SimUnlockScreen extends LinearLayout implements KeyguardScreen, Vie
         mLockPatternUtils.updateEmergencyCallButtonState(mEmergencyCallButton);
         mOkButton = (TextView) findViewById(R.id.ok);
 
-        mHeaderText.setText(R.string.keyguard_password_enter_pin_code);
+        mSubscription = subscription;
+        if (TelephonyManager.isMultiSimEnabled()) {
+            String displayText = getContext().getString(R.string.keyguard_password_enter_pin_code_for_subscription)
+                    + (mSubscription + 1);
+            mHeaderText.setText(displayText);
+        } else {
+            mHeaderText.setText(R.string.keyguard_password_enter_pin_code);
+        }
         mPinText.setFocusable(false);
 
         mEmergencyCallButton.setOnClickListener(this);
@@ -118,7 +128,13 @@ public class SimUnlockScreen extends LinearLayout implements KeyguardScreen, Vie
     /** {@inheritDoc} */
     public void onResume() {
         // start fresh
-        mHeaderText.setText(R.string.keyguard_password_enter_pin_code);
+        if (TelephonyManager.isMultiSimEnabled()) {
+            String displayText = getContext().getString(R.string.keyguard_password_enter_pin_code_for_subscription)
+                    + (mSubscription + 1);
+            mHeaderText.setText(displayText);
+        } else {
+            mHeaderText.setText(R.string.keyguard_password_enter_pin_code);
+        }
 
         // make sure that the number of entered digits is consistent when we
         // erase the SIM unlock code, including orientation changes.
@@ -156,7 +172,7 @@ public class SimUnlockScreen extends LinearLayout implements KeyguardScreen, Vie
         public void run() {
             try {
                 final boolean result = ITelephony.Stub.asInterface(ServiceManager
-                        .checkService("phone")).supplyPin(mPin);
+                        .checkService("phone")).supplyPinOnSubscription(mPin, mSubscription);
                 post(new Runnable() {
                     public void run() {
                         onSimLockChangedResponse(result);
@@ -228,7 +244,7 @@ public class SimUnlockScreen extends LinearLayout implements KeyguardScreen, Vie
                 if (success) {
                     // before closing the keyguard, report back that
                     // the sim is unlocked so it knows right away
-                    mUpdateMonitor.reportSimPinUnlocked();
+                    mUpdateMonitor.reportSimPinUnlocked(mSubscription);
                     mCallback.goToUnlockScreen();
                 } else {
                     mHeaderText.setText(R.string.keyguard_password_wrong_pin_code);
@@ -363,6 +379,9 @@ public class SimUnlockScreen extends LinearLayout implements KeyguardScreen, Vie
 
         public void onClick(View v) {
             if (v == mCancelButton) {
+                if (TelephonyManager.isMultiSimEnabled()) {
+                    mCallback.updatePinUnlockCancel(mSubscription);
+                }
                 mCallback.goToLockScreen();
                 return;
             }
@@ -409,7 +428,7 @@ public class SimUnlockScreen extends LinearLayout implements KeyguardScreen, Vie
 
     }
 
-    public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn) {
+    public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn, int subscription) {
 
     }
 

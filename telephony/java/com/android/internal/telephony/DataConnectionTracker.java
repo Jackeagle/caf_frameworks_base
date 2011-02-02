@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +37,7 @@ import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.Phone.DataState;
 import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.DataProfile.DataProfileType;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 /**
  * {@hide}
@@ -149,6 +151,9 @@ public abstract class DataConnectionTracker extends Handler {
     protected static final String REASON_TETHERED_MODE_STATE_CHANGED = "tetheredModeStateChanged";
     protected static final String REASON_DATA_CONN_PROP_CHANGED = "dataConnectionPropertyChanged";
 
+    protected Message mPendingDataDisableCompleteMsg;
+    Subscription mSubscriptionData;
+
     /**
      * Default constructor
      */
@@ -243,6 +248,11 @@ public abstract class DataConnectionTracker extends Handler {
     abstract public DataActivityState getDataActivityState();
     abstract public ServiceState getDataServiceState();
     abstract public boolean isDataConnectivityPossible();
+    abstract public int getSubscription();
+    abstract public Subscription getSubscriptionInfo();
+    abstract public void setSubscriptionInfo(Subscription subData);
+    abstract public void update(CommandsInterface ci, Subscription subData);
+    abstract public void updateCurrentCarrierInProvider();
 
     synchronized public int disableApnType(String type) {
 
@@ -322,6 +332,13 @@ public abstract class DataConnectionTracker extends Handler {
         return true;
     }
 
+    public boolean disableDataConnectivity(Message onCompleteMsg) {
+        mMasterDataEnabled = false;
+        sendMessage(obtainMessage(EVENT_MASTER_DATA_DISABLED));
+        mPendingDataDisableCompleteMsg = onCompleteMsg;
+        return true;
+    }
+
     public boolean enableDataConnectivity() {
         boolean inEcm =
             SystemProperties.getBoolean(TelephonyProperties.PROPERTY_INECM_MODE, false);
@@ -331,6 +348,16 @@ public abstract class DataConnectionTracker extends Handler {
 
         mMasterDataEnabled = true;
         sendMessage(obtainMessage(EVENT_MASTER_DATA_ENABLED));
+        return true;
+    }
+
+    public boolean enableDataConnectivity(Message onCompleteMsg) {
+        mMasterDataEnabled = true;
+        sendMessage(obtainMessage(EVENT_MASTER_DATA_ENABLED));
+
+        if (onCompleteMsg != null) {
+            onCompleteMsg.sendToTarget();
+        }
         return true;
     }
 
@@ -459,7 +486,7 @@ public abstract class DataConnectionTracker extends Handler {
     public boolean getDataRoamingEnabled() {
         try {
             return Settings.Secure.getInt(mContext.getContentResolver(),
-                    Settings.Secure.DATA_ROAMING) > 0;
+                Settings.Secure.DATA_ROAMING) > 0;
         } catch (SettingNotFoundException snfe) {
             return false;
         }
@@ -534,7 +561,13 @@ public abstract class DataConnectionTracker extends Handler {
     }
 
     void notifyDataConnection(DataServiceType ds, IPVersion ipv, String reason) {
-        mNotifier.notifyDataConnection(mPhone, ds.toApnTypeString(), ipv, reason);
+        // Notify the Data Connection state only if this is the active DDS.
+        if (getSubscription() == PhoneFactory.getDataSubscription()) {
+            mNotifier.notifyDataConnection(mPhone, ds.toApnTypeString(), ipv, reason);
+        } else {
+            Log.d(LOG_TAG, "[DCT" + getSubscription() +
+                           "] notifyDataConnection: Not the active DDS");
+        }
     }
 
     public void notifyDataActivity() {
@@ -562,7 +595,13 @@ public abstract class DataConnectionTracker extends Handler {
             }
         }
         if (isAnyServiceActive == false) {
-            mNotifier.notifyDataConnectionFailed(mPhone, reason);
+            // Notify the Data Connection failed only if this is the active DDS.
+            if (getSubscription() == PhoneFactory.getDataSubscription()) {
+                mNotifier.notifyDataConnectionFailed(mPhone, reason);
+            } else {
+                Log.d(LOG_TAG, "[DCT" + getSubscription() +
+                        "] notifyDataConnectionFail: Not the active DDS");
+            }
         }
     }
 

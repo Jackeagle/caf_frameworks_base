@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,10 @@ import android.os.Message;
 public interface IccCard {
     /* The extra data for broacasting intent INTENT_ICC_STATE_CHANGE */
     static public final String INTENT_KEY_ICC_STATE = "ss";
+    /* The extra data for broacasting intent INTENT_ICC_STATE_CHANGE holding subscription info */
+    static public final String INTENT_KEY_SUBSCRIPTION = "phone_subscription";
+    /* UNUSED means the ICC state not used (eg, nv ready) */
+    static public final String INTENT_VALUE_ICC_UNUSED = "UNUSED";
     /* NOT_READY means the ICC interface is not ready (eg, radio is off or powering on) */
     static public final String INTENT_VALUE_ICC_NOT_READY = "NOT_READY";
     /* ABSENT means ICC is missing */
@@ -35,7 +39,7 @@ public interface IccCard {
     static public final String INTENT_VALUE_ICC_CARD_IO_ERROR = "CARD_IO_ERROR";
     /* LOCKED means ICC is locked by pin or by network */
     static public final String INTENT_VALUE_ICC_LOCKED = "LOCKED";
-    /* READY means ICC is ready to access */
+    /* READY means ICC subscription is ready to access */
     static public final String INTENT_VALUE_ICC_READY = "READY";
     /* IMSI means ICC IMSI is ready in property */
     static public final String INTENT_VALUE_ICC_IMSI = "IMSI";

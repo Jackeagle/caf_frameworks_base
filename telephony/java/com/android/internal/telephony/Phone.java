@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ import android.telephony.SignalStrength;
 import com.android.internal.telephony.DataConnection;
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
+import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.util.List;
 
@@ -214,6 +216,7 @@ public interface Phone {
     // Used for CDMA subscription mode
     static final int CDMA_SUBSCRIPTION_RUIM_SIM = 0; // RUIM/SIM (default)
     static final int CDMA_SUBSCRIPTION_NV       = 1; // NV -> non-volatile memory
+    static final int CDMA_SUBSCRIPTION_NONE     = 2; // NONE
 
     static final int PREFERRED_CDMA_SUBSCRIPTION = CDMA_SUBSCRIPTION_NV;
 
@@ -1388,6 +1391,18 @@ public interface Phone {
     boolean enableDataConnectivity();
 
     /**
+     * Allow mobile data connections.
+     * @param onCompleteMsg message to sent back to the caller
+     * @return {@code true} if the operation started successfully
+     * <br/>{@code false} if it
+     * failed immediately.<br/>
+     * Even in the {@code true} case, it may still fail later
+     * during setup, in which case an asynchronous indication will
+     * be supplied.
+     */
+    boolean enableDataConnectivity(Message onCompleteMsg);
+
+    /**
      * Disallow mobile data connections, and terminate any that
      * are in progress.
      * @return {@code true} if the operation started successfully
@@ -1398,6 +1413,20 @@ public interface Phone {
      * be supplied.
      */
     boolean disableDataConnectivity();
+
+    /**
+     * Disallow mobile data connections, and terminate any that
+     * are in progress.
+     * @param onCompleteMsg message to sent back to the caller once
+     * all the data connections are disconnected.
+     * @return {@code true} if the operation started successfully
+     * <br/>{@code false} if it
+     * failed immediately.<br/>
+     * Even in the {@code true} case, it may still fail later
+     * during setup, in which case an asynchronous indication will
+     * be supplied.
+     */
+    boolean disableDataConnectivity(Message onCompleteMsg);
 
     /**
      * Report the current state of data connectivity (enabled or disabled)
@@ -1823,5 +1852,30 @@ public interface Phone {
      * false otherwise
      */
     boolean isCspPlmnEnabled();
+
+    /**
+     * Set the subscription info.
+     */
+    public void setSubscriptionInfo(Subscription subscription);
+
+    /**
+     * Returns the subscription info.
+     */
+    public Subscription getSubscriptionInfo();
+
+    /**
+     * Returns the subscription id.
+     */
+    public int getSubscription();
+
+    /* Sets the subscription
+     * @param subscription id
+     */
+    public void setSubscription(int subscripton);
+
+    /* Sets active SIM/RUIM related profiles as current
+     * @param void
+     */
+    public void updateCurrentCarrierInProvider();
 
 }

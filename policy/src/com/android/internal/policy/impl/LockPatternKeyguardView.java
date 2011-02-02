@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,6 +66,9 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
 
     // time after launching EmergencyDialer before the screen goes blank.
     private static final int EMERGENCY_CALL_TIMEOUT = 10000;
+
+    private static final int SUB1 = 0;
+    private static final int SUB2 = 1;
 
     // intent action for launching emergency dialer activity.
     static final String ACTION_EMERGENCY_DIAL = "com.android.phone.EmergencyDialer.DIAL";
@@ -163,14 +167,20 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
      */
     private Configuration mConfiguration;
 
+    private boolean[] isPinUnlockCancelled = {false, false};
     /**
      * @return Whether we are stuck on the lock screen because the sim is
      *   missing.
      */
     private boolean stuckOnLockScreenBecauseSimMissing() {
-        return mRequiresSim
-                && (!mUpdateMonitor.isDeviceProvisioned())
-                && (mUpdateMonitor.getSimState() == IccCard.State.ABSENT);
+        boolean result = mRequiresSim && !mUpdateMonitor.isDeviceProvisioned();
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            //In case of dual subscription, stuck on lock screen
+            //only when SIM is absent on both subscriptions.
+            result = result && (getSimState(i) == IccCard.State.ABSENT);
+            if (!result) break;
+        }
+        return result;
     }
 
     /**
@@ -185,8 +195,8 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
             KeyguardUpdateMonitor updateMonitor,
             LockPatternUtils lockPatternUtils,
             KeyguardWindowController controller) {
-        super(context);
 
+        super(context);
         mConfiguration = context.getResources().getConfiguration();
         mEnableFallback = false;
 
@@ -214,9 +224,14 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
             }
 
             public void goToUnlockScreen() {
-                final IccCard.State simState = mUpdateMonitor.getSimState();
+                boolean isPukRequired = true;
+                for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+                    isPukRequired = isPukRequired && isSimPukLocked(i);
+                    if (!isPukRequired) break;
+                }
+
                 if (stuckOnLockScreenBecauseSimMissing()
-                         || (simState == IccCard.State.PUK_REQUIRED)){
+                         || isPukRequired) {
                     // stuck on lock screen when sim missing or puk'd
                     return;
                 }
@@ -224,6 +239,32 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
                     getCallback().keyguardDone(true);
                 } else {
                     updateScreen(Mode.UnlockScreen);
+                }
+            }
+
+            /**
+             * SimUnlockScreen invokes this method when user dismisses the
+             * PIN dialog for any of the subscription.PIN Dialog will not be
+             * prompted again for that subscription if the other subscription
+             * is in ready state.
+             * In case, the other subscription is PUK-Locked, user is not
+             * allowed to dismiss the PIN dialog.
+             */
+            public void updatePinUnlockCancel(int subscription) {
+                Log.d(TAG, "updatePinUnlockCancel sub :" + subscription);
+                boolean canCancelUnlock = false;
+                if ((subscription == SUB1) &&
+                        (!isPinUnlockCancelled[SUB2]) && (!isSimPukLocked(SUB2))) {
+                    canCancelUnlock = true;
+                } else if ((subscription == SUB2) && (!isSimPukLocked(SUB1))) {
+                    canCancelUnlock = true;
+                    // Cannot cancel both subs, so enable PIN dialog for SUB1.
+                    isPinUnlockCancelled[SUB1] = false;
+                } else {
+                    Log.d(TAG, "Cannot cancel PIN Dialog");
+                }
+                if (canCancelUnlock) {
+                    isPinUnlockCancelled[subscription] = true;
                 }
             }
 
@@ -462,11 +503,48 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         updateScreen(mMode);
     }
 
+    /**
+     * Get the subscription that is PIN-Locked.
+     * Return '0' if SUB1 is PIN-Locked and,
+     * PIN dialog for SUB1 was not dismissed by user.
+     * Return '1' if SUB2 is PIN-Locked and,
+     * PIN dialog for SUB2 was not dismissed by user.
+     */
+    private int getPinLockedSubscription() {
+        int subscription = SUB1;
+
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            if (isSimPinLocked(i) && !isPinUnlockCancelled[i]) {
+                subscription = i;
+                break;
+            }
+        }
+        return subscription;
+    }
+
+    private IccCard.State getSimState(int subscription) {
+        return mUpdateMonitor.getSimState(subscription);
+    }
+
+    private boolean isSimPinLocked(int subscription) {
+        return (getSimState(subscription) == IccCard.State.PIN_REQUIRED);
+    }
+
+    private boolean isSimPukLocked(int subscription) {
+        return (getSimState(subscription) == IccCard.State.PUK_REQUIRED);
+    }
+
     @Override
     public void wakeWhenReadyTq(int keyCode) {
         if (DEBUG) Log.d(TAG, "onWakeKey");
+        boolean isPukRequired = true;
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            isPukRequired = isPukRequired && isSimPukLocked(i);
+            if (!isPukRequired) break;
+        }
+
         if (keyCode == KeyEvent.KEYCODE_MENU && isSecure() && (mMode == Mode.LockScreen)
-                && (mUpdateMonitor.getSimState() != IccCard.State.PUK_REQUIRED)) {
+                && !isPukRequired) {
             if (DEBUG) Log.d(TAG, "switching screens to unlock screen because wake key was MENU");
             updateScreen(Mode.UnlockScreen);
             getCallback().pokeWakelock();
@@ -507,8 +585,12 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
                 secure = mLockPatternUtils.isLockPatternEnabled();
                 break;
             case SimPin:
-                secure = mUpdateMonitor.getSimState() == IccCard.State.PIN_REQUIRED
-                            || mUpdateMonitor.getSimState() == IccCard.State.PUK_REQUIRED;
+                for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+                    // Check if subscription is PIN/PUK locked.
+                    // isPinLocked returns true if the state is PIN_REQUIRED/PUK_REQUIRED.
+                    secure = secure || getSimState(i).isPinLocked();
+                    if (secure) break;
+                }
                 break;
             case Account:
                 secure = true;
@@ -531,7 +613,8 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
 
         // Re-create the unlock screen if necessary. This is primarily required to properly handle
         // SIM state changes. This typically happens when this method is called by reset()
-        if (mode == Mode.UnlockScreen && mCurrentUnlockMode != getUnlockMode()) {
+        if ((mode == Mode.UnlockScreen && mCurrentUnlockMode != getUnlockMode()) ||
+                (getUnlockMode() == UnlockMode.SimPin)) {
             recreateUnlockScreen();
         }
 
@@ -590,12 +673,14 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
             view.setEnableFallback(mEnableFallback);
             unlockView = view;
         } else if (unlockMode == UnlockMode.SimPin) {
+            int subscription = getPinLockedSubscription();
+            Log.d(TAG, "Display SimUnlockScreen for sub :" + subscription);
             unlockView = new SimUnlockScreen(
                     mContext,
                     mConfiguration,
                     mUpdateMonitor,
                     mKeyguardScreenCallback,
-                    mLockPatternUtils);
+                    mLockPatternUtils, subscription);
         } else if (unlockMode == UnlockMode.Account) {
             try {
                 unlockView = new AccountUnlockScreen(
@@ -638,8 +723,12 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
      * the lock screen (lock or unlock).
      */
     private Mode getInitialMode() {
-        final IccCard.State simState = mUpdateMonitor.getSimState();
-        if (stuckOnLockScreenBecauseSimMissing() || (simState == IccCard.State.PUK_REQUIRED)) {
+        boolean isPukRequired = false;
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            isPukRequired = isPukRequired || isSimPukLocked(i);
+            if (isPukRequired) break;
+        }
+        if (stuckOnLockScreenBecauseSimMissing() || isPukRequired) {
             return Mode.LockScreen;
         } else {
             // Show LockScreen first for any screen other than Pattern unlock.
@@ -657,9 +746,24 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
      * Given the current state of things, what should the unlock screen be?
      */
     private UnlockMode getUnlockMode() {
-        final IccCard.State simState = mUpdateMonitor.getSimState();
+        boolean isPinLocked = false, isPukLocked = false, isPinRequired = false;
+        boolean allSubsPukLocked = true, simPinMode;
+        // In case of multi SIM mode,
+        // Set the unlock mode to "SimPin" in any of these cases.
+        // 1. SUB1 is PIN-Locked and user has not cancelled PIN entry
+        // 2. SUB2 is PIN-Locked and user has not cancelled PIN entry
+        // 3. One of the SUB is PUK-Locked and the other SUB is PIN-Locked.
+        // 4. Both SUBs are PUK-Locked.
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            isPinRequired = isPinRequired || (isSimPinLocked(i) && !isPinUnlockCancelled[i]);
+            isPinLocked = isPinLocked || isSimPinLocked(i);
+            isPukLocked = isPukLocked || isSimPukLocked(i);
+            allSubsPukLocked = allSubsPukLocked && isSimPukLocked(i);
+        }
+        simPinMode = isPinRequired || (isPukLocked && isPinLocked) || allSubsPukLocked;
         UnlockMode currentMode;
-        if (simState == IccCard.State.PIN_REQUIRED || simState == IccCard.State.PUK_REQUIRED) {
+        if (simPinMode) {
+            // SimUnlockScreen is displayed when the unlock mode is set to SimPin.
             currentMode = UnlockMode.SimPin;
         } else {
             final int mode = mLockPatternUtils.getKeyguardStoredPasswordQuality();

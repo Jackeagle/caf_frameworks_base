@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +21,7 @@ import com.android.internal.widget.LockPatternUtils;
 
 import android.content.Context;
 import com.android.internal.telephony.IccCard;
-
+import android.telephony.TelephonyManager;
 /**
  * Knows how to create a lock pattern keyguard view, and answer questions about
  * it (even if it hasn't been created, per the interface specs).
@@ -54,9 +55,19 @@ public class LockPatternKeyguardViewProperties implements KeyguardViewProperties
     }
 
     private boolean isSimPinSecure() {
-        final IccCard.State simState = mUpdateMonitor.getSimState();
-        return (simState == IccCard.State.PIN_REQUIRED || simState == IccCard.State.PUK_REQUIRED
-            || simState == IccCard.State.ABSENT);
+        final IccCard.State[] simState;
+        boolean isSimPinSecure = false;
+
+        int numPhones = TelephonyManager.getPhoneCount();
+        simState = new IccCard.State[numPhones];
+        for (int i = 0; i < numPhones; i++) {
+            simState[i] = mUpdateMonitor.getSimState(i);
+            // isPinLocked returns true if SIM is PIN/PUK Locked.
+            isSimPinSecure = isSimPinSecure || (simState[i].isPinLocked()
+                    || simState[i] == IccCard.State.ABSENT);
+            if (isSimPinSecure) break;
+        }
+        return isSimPinSecure;
     }
 
 }

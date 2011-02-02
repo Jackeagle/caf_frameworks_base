@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1500,7 +1500,23 @@ public final class SimulatedCommands extends BaseCommands
         unimplemented(response);
     }
 
+
     public void getDataCallProfile(int appType, Message result){
         unimplemented(result);
     }
+
+    public void setUiccSubscription(int slotId, int appIndex, int subId, int subStatus,
+            Message response) {
+        unimplemented(response);
+    }
+
+    public void setDataSubscription (Message response) {
+        unimplemented(response);
+    }
+
+    public void setSubscriptionMode(int subscriptionMode, Message response) {
+        unimplemented(response);
+    }
+
+
 }

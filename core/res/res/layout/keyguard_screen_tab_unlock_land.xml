@@ -2,6 +2,7 @@
 <!--
 **
 ** Copyright 2009, The Android Open Source Project
+** Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License")
 ** you may not use this file except in compliance with the License.
@@ -48,13 +49,28 @@
             android:textAppearance="?android:attr/textAppearanceMedium"
             />
 
+        <!-- Carrier info for second subscription-->
+        <TextView
+            android:id="@+id/carrier_sub2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/carrier"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="50dip"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:gravity="right|bottom"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textSize="22sp"
+            />
+
         <!-- "emergency calls only" shown when sim is missing or PUKd -->
         <TextView
             android:id="@+id/emergencyCallText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
-            android:layout_marginTop="20dip"
+            android:layout_marginTop="7dip"
             android:text="@string/emergency_calls_only"
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="@color/white"
@@ -63,7 +79,7 @@
         <com.android.internal.widget.DigitalClock android:id="@+id/time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@id/carrier"
+            android:layout_below="@id/carrier_sub2"
             android:layout_marginTop="56dip"
             android:layout_marginBottom="8dip"
             >

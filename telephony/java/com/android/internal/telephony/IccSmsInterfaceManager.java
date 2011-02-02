@@ -23,7 +23,6 @@ import android.os.AsyncResult;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.Message;
-import android.os.ServiceManager;
 import android.util.Log;
 
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
@@ -44,7 +43,7 @@ import static android.telephony.SmsManager.STATUS_ON_ICC_UNREAD;
  * IccSmsInterfaceManager to provide an inter-process communication to
  * access Sms in Icc.
  */
-public class IccSmsInterfaceManager extends ISms.Stub {
+public class IccSmsInterfaceManager {
     static final String LOG_TAG = "RIL_IccSms";
     static final boolean DBG = true;
 
@@ -144,9 +143,6 @@ public class IccSmsInterfaceManager extends ISms.Stub {
         mContext = phone.getContext();
         mCm = cm;
         mDispatcher = new ImsSMSDispatcher(phone, cm);
-        if(ServiceManager.getService("isms") == null) {
-            ServiceManager.addService("isms", this);
-        }
     }
 
     public void dispose() {
@@ -155,6 +151,10 @@ public class IccSmsInterfaceManager extends ISms.Stub {
 
     protected void finalize() {
         if(DBG) Log.d(LOG_TAG, "IccSmsInterfaceManager finalized");
+    }
+
+    protected void updateRecords() {
+        ((ImsSMSDispatcher)mDispatcher).updateRecords();
     }
 
     protected void updatePhoneObject(Phone phone) {

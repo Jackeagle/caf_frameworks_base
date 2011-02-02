@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,23 @@ final class ImsSMSDispatcher extends SMSDispatcher {
 
         mCm.registerForImsNetworkStateChanged(this, EVENT_IMS_STATE_CHANGED, null);
         registerSendRetry(this, EVENT_PROCESS_SEND_RETRY, null);
+    }
+
+    /* Updates the voice phoneobject when there is a change in a phone object*/
+    @Override
+    public void updatePhoneObject(Phone phone) {
+      Log.d(TAG, "In IMS updatePhoneObject ");
+      super.updatePhoneObject(phone);
+      mCdmaDispatcher.updatePhoneObject(phone);
+      mGsmDispatcher.updatePhoneObject(phone);
+    }
+
+    public void updateRecords() {
+        Log.d(TAG, "In IMS updateRecords ");
+        //subscriptionInfo is not there for 
+        updateIccAvailability();
+        mCdmaDispatcher.updateIccAvailability();
+        mGsmDispatcher.updateIccAvailability();
     }
 
     public void dispose() {
@@ -292,6 +309,25 @@ final class ImsSMSDispatcher extends SMSDispatcher {
         mApplication = (Phone.PHONE_TYPE_CDMA == mPhone.getPhoneType()) ?
                 mCdmaDispatcher.mApplication :
                         mGsmDispatcher.mApplication;
+    }
+
+    /**
+     * Called when a Class2 SMS is  received.
+     *
+     * @param ar AsyncResult passed to this function. ar.result should
+     *           be representing the INDEX of SMS on SIM.
+     */
+    protected void handleSmsOnIcc(AsyncResult ar) {
+        Log.d(TAG, "handleSmsOnIcc function is not applicable for IMS");
+    }
+
+    /**
+     * Called when a SMS on SIM is retrieved.
+     *
+     * @param ar AsyncResult passed to this function.
+     */
+    protected void handleGetIccSmsDone(AsyncResult ar) {
+        Log.d(TAG, "handleGetIccSmsDone function is not applicable for IMS");
     }
 
    /* Returns the ICC filehandler  */
