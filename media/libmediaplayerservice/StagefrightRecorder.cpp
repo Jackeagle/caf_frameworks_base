@@ -660,6 +660,14 @@ status_t StagefrightRecorder::prepare() {
     }
   }
 
+  if(mVideoHeight && mVideoWidth &&             /*Video recording*/
+         (mMaxFileDurationUs <=0 ||             /*Max duration is not set*/
+         (mVideoHeight * mVideoWidth <= 720 * 1280 && mMaxFileDurationUs > 30*60*1000*1000) ||
+         (mVideoHeight * mVideoWidth > 720 * 1280 && mMaxFileDurationUs > 10*60*1000*1000))) {
+    /*Above Check can be further optimized for lower resolutions to reduce file size*/
+    LOGV("File is huge so setting 64 bit file offsets");
+    setParam64BitFileOffset(true);
+  }
   LOGV(" %s X", __func__ );
   return OK;
 }
@@ -1334,7 +1342,7 @@ status_t StagefrightRecorder::reset() {
     mInterleaveDurationUs = 0;
     mIFramesIntervalSec = 1;
     mAudioSourceNode = 0;
-    mUse64BitFileOffset = true;
+    mUse64BitFileOffset = false;
     mMovieTimeScale  = -1;
     mAudioTimeScale  = -1;
     mVideoTimeScale  = -1;
