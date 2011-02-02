@@ -573,7 +573,9 @@ public class ZygoteInit {
             /* Request to fork the system server process */
             pid = Zygote.forkSystemServer(
                     parsedArgs.uid, parsedArgs.gid,
-                    parsedArgs.gids, debugFlags, null);
+                    parsedArgs.gids, debugFlags, null,
+                    parsedArgs.permittedCapabilities,
+                    parsedArgs.effectiveCapabilities);
         } catch (IllegalArgumentException ex) {
             throw new RuntimeException(ex);
         }
