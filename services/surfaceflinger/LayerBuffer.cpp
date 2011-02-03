@@ -56,6 +56,10 @@ LayerBuffer::~LayerBuffer()
     if (mBlitEngine) {
         copybit_close(mBlitEngine);
     }
+
+    const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
+    hw.videoOverlayStarted(false);
+    mFlinger->enableOverlayOpt(true);
 }
 
 void LayerBuffer::onFirstRef()
@@ -157,12 +161,12 @@ void LayerBuffer::onDraw(const Region& clip) const
     }
 }
 
-status_t LayerBuffer::drawWithOverlay(const Region& clip, bool clear) const
+status_t LayerBuffer::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const
 {
 #if defined(TARGET_USES_OVERLAY)
     sp<Source> source(getSource());
     if (LIKELY(source != 0)) {
-        return source->drawWithOverlay(clip, clear);
+        return source->drawWithOverlay(clip, clear, hdmiConnected);
     }
 #endif
     return INVALID_OPERATION;
@@ -327,7 +331,7 @@ LayerBuffer::Source::~Source() {
 }
 void LayerBuffer::Source::onDraw(const Region& clip) const {
 }
-status_t LayerBuffer::Source::drawWithOverlay(const Region& clip, bool clear) const {
+status_t LayerBuffer::Source::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const {
     return INVALID_OPERATION;
 }
 void LayerBuffer::Source::onTransaction(uint32_t flags) {
@@ -492,7 +496,7 @@ void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer>& buffer)
     mBuffer = buffer;
 }
 
-status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool clear) const
+status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const
 {
 #if defined(TARGET_USES_OVERLAY)
     sp<Buffer> ourBuffer(getBuffer());
@@ -504,8 +508,9 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool cle
     NativeBuffer src(ourBuffer->getBuffer());
     const DisplayHardware& hw(mLayer.mFlinger->
                                graphicPlane(0).displayHardware());
+    hw.videoOverlayStarted(true);
     overlay::Overlay* temp = hw.getOverlayObject();
-    if (!temp->setSource(src.hor_stride, src.ver_stride, src.img.format, mLayer.getOrientation()))
+    if (!temp->setSource(src.hor_stride, src.ver_stride, src.img.format, mLayer.getOrientation(), hdmiConnected))
         return INVALID_OPERATION;
     if (!temp->setCrop(0, 0, src.crop.r, src.crop.b))
         return INVALID_OPERATION;

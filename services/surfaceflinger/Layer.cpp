@@ -228,12 +228,12 @@ void Layer::drawForSreenShot() const
     const_cast<Layer*>(this)->mNeedsBlending = currentBlending;
 }
 
-status_t Layer::drawWithOverlay(const Region& clip, bool clear) const
+status_t Layer::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const
 {
 #if defined(SF_BYPASS)
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     overlay::Overlay* temp = hw.getOverlayObject();
-    if (!temp->setSource(mWidth, mHeight, mFormat, getOrientation()))
+    if (!temp->setSource(mWidth, mHeight, mFormat, getOrientation(), hdmiConnected))
         return INVALID_OPERATION;
     const Rect bounds(mTransformedBounds);
     int x = bounds.left;

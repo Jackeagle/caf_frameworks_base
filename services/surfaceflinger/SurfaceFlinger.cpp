@@ -858,30 +858,30 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     bool canUseOverlayToDraw = false;
 
 
-    if (mOverlayOpt) {
-        for (size_t i = 0; ((i < count) && (compcount <= 1 || layerbuffercount <= 1)); ++i) {
-            const sp<LayerBase>& layer = layers[i];
-            const Region& visibleRegion(layer->visibleRegionScreen);
-            if (!visibleRegion.isEmpty())  {
-                const Region clip(dirty.intersect(visibleRegion));
-                if (!clip.isEmpty()) {
-                    compcount++;
-                    prevClip = clip;
-                    ovLayerIndex = i;
+    for (size_t i = 0; ((i < count)  && (compcount <= 1 || layerbuffercount <= 1)); ++i) {
+        const sp<LayerBase>& layer = layers[i];
+        const Region& visibleRegion(layer->visibleRegionScreen);
+        if (!visibleRegion.isEmpty())  {
+            const Region clip(dirty.intersect(visibleRegion));
+            if (!clip.isEmpty()) {
+                compcount++;
+                prevClip = clip;
+                ovLayerIndex = i;
 
-                    if(layer->isNothingToUpdate()) {
-                        layersNotUpdatingCount++;
-                    }
+            if(layer->isNothingToUpdate()) {
+                layersNotUpdatingCount++;
+            }
 
-                    if (layer->getLayerInitFlags() & ePushBuffers) {
-                        layerbuffercount++;
-                        layerbufferIndex = i;
-                        layerBufferClip = clip;
-                    }
+            if (layer->getLayerInitFlags() & ePushBuffers) {
+                layerbuffercount++;
+                layerbufferIndex = i;
+                layerBufferClip = clip;
                 }
             }
         }
+    }
 
+    if (mOverlayOpt) {
         if(layerbuffercount == 1) {
             if (compcount != mLastCompCount)
                 compositionStateChanged = true;
@@ -924,10 +924,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                    drawLayerIndex = ovLayerIndex;
                 }
                 const sp<LayerBase>& layer = layers[drawLayerIndex];
-                if (layer->drawWithOverlay(drawClip, clear) == NO_ERROR) {
+                if (layer->drawWithOverlay(drawClip, clear, mHDMIOutput) == NO_ERROR) {
 #else
                 const sp<LayerBase>& layer = layers[layerbufferIndex];
-                if (layer->drawWithOverlay(drawClip, clear) == NO_ERROR) {
+                if (layer->drawWithOverlay(drawClip, clear, mHDMIOutput) == NO_ERROR) {
 #endif
                     if (clear)
                         mFullScreen = false;
@@ -958,7 +958,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
                 if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
-                    if (layer->drawWithOverlay(clip, true) != NO_ERROR) {
+                    if (layer->drawWithOverlay(clip, true, mHDMIOutput) != NO_ERROR) {
                         layer->draw(clip);
                     }
                     mOverlayUsed = true;
