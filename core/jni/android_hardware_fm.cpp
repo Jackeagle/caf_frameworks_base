@@ -53,6 +53,7 @@ enum search_dir_t {
     SCAN_DN
 };
 
+
 using namespace android;
 
 /* native interface */
@@ -365,6 +366,180 @@ static void android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative(JNIEnv *
     LOGE("init_success:%d after %d seconds \n", init_success, i);
 }
 
+/*
+ * Interfaces added for Tx
+*/
+
+/*native interface */
+static jint android_hardware_fmradio_FmReceiverJNI_setPTYNative
+    (JNIEnv * env, jobject thiz, jint fd, jint pty)
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_setPTYNative\n");
+    struct v4l2_control control;
+
+    control.id = V4L2_CID_RDS_TX_PTY;
+    control.value = pty & MASK_PTY;
+
+    int err;
+    err = ioctl(fd, VIDIOC_S_CTRL,&control );
+    if(err < 0){
+            return FM_JNI_FAILURE;
+    }
+    return FM_JNI_SUCCESS;
+}
+
+static jint android_hardware_fmradio_FmReceiverJNI_setPINative
+    (JNIEnv * env, jobject thiz, jint fd, jint pi)
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_setPINative\n");
+
+    struct v4l2_control control;
+
+    control.id = V4L2_CID_RDS_TX_PI;
+    control.value = pi & MASK_PI;
+
+    int err;
+    err = ioctl(fd, VIDIOC_S_CTRL,&control );
+    if(err < 0){
+		LOGE("->pty native failed");
+            return FM_JNI_FAILURE;
+    }
+
+    return FM_JNI_SUCCESS;
+}
+
+static jint android_hardware_fmradio_FmReceiverJNI_startRTNative
+    (JNIEnv * env, jobject thiz, jint fd, jstring radio_text, jint count )
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_startRTNative\n");
+
+    struct v4l2_control control;
+    struct v4l2_ext_control ext_ctl;
+    ext_ctl.id = V4L2_CID_RDS_TX_RADIO_TEXT;
+
+    jboolean isCopy;
+    char* rt_string = (char*)env->GetStringUTFChars(radio_text, &isCopy);
+    if(rt_string == NULL){
+        return FM_JNI_FAILURE;
+    }
+
+    ext_ctl.string = rt_string;
+    ext_ctl.reserved2[0] = count;
+    //ext_ctl.value = 0;
+
+
+    //form the ctrls data struct
+    struct v4l2_ext_controls v4l2_ctls;
+
+    v4l2_ctls.ctrl_class = V4L2_CTRL_CLASS_FM_TX,
+    v4l2_ctls.count      = 1,
+    v4l2_ctls.controls   = &ext_ctl;
+
+
+    LOGE("jbArray: %s", rt_string );
+
+    int err;
+    err = ioctl(fd, VIDIOC_S_EXT_CTRLS, &v4l2_ctls );
+
+    LOGE("VIDIOC_S_EXT_CTRLS for start RT returned : %d\n", err);
+    LOGE( "ErrorNo: %d\n", errno );
+    if(err < 0){
+
+         return FM_JNI_FAILURE;
+    }
+
+
+    return FM_JNI_SUCCESS;
+}
+static jint android_hardware_fmradio_FmReceiverJNI_stopRTNative
+    (JNIEnv * env, jobject thiz, jint fd )
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_stopRTNative\n");
+    int err;
+    struct v4l2_control control;
+    control.id = V4L2_CID_PRIVATE_TAVARUA_STOP_RDS_TX_RT;
+
+    err = ioctl(fd, VIDIOC_S_CTRL , &control);
+    if(err < 0){
+            return FM_JNI_FAILURE;
+    }
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_stopRTNative is SUCCESS\n");
+    return FM_JNI_SUCCESS;
+}
+
+static jint android_hardware_fmradio_FmReceiverJNI_startPSNative
+    (JNIEnv * env, jobject thiz, jint fd, jstring buff, jint count )
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_startPSNative\n");
+    LOGE("PS Pointer : %d -> String: %s", buff, buff);
+    struct v4l2_control control;
+    struct v4l2_ext_control ext_ctl;
+    ext_ctl.id = V4L2_CID_RDS_TX_PS_NAME;
+
+    jboolean isCopy;
+    char* ps_string = (char*)env->GetStringUTFChars(buff, &isCopy);
+    if(ps_string == NULL){
+        return FM_JNI_FAILURE;
+    }
+
+    ext_ctl.string = ps_string;
+    ext_ctl.reserved2[0] = count;
+
+    //form the ctrls data struct
+    struct v4l2_ext_controls v4l2_ctls;
+
+    v4l2_ctls.ctrl_class = V4L2_CTRL_CLASS_FM_TX,
+    v4l2_ctls.count      = 1,
+    v4l2_ctls.controls   = &ext_ctl;
+
+    int err;
+    err = ioctl(fd, VIDIOC_S_EXT_CTRLS, &v4l2_ctls );
+
+    LOGE("VIDIOC_S_EXT_CTRLS for Start PS returned : %d\n", err);
+    LOGE( "ErrorNo: %d\n", errno );
+
+    if(err < 0){
+            return FM_JNI_FAILURE;
+    }
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_startPSNative is SUCCESS\n");
+    return FM_JNI_SUCCESS;
+}
+static jint android_hardware_fmradio_FmReceiverJNI_stopPSNative
+    (JNIEnv * env, jobject thiz, jint fd)
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_stopPSNative\n");
+    struct v4l2_control control;
+    control.id = V4L2_CID_PRIVATE_TAVARUA_STOP_RDS_TX_PS_NAME;
+
+    int err;
+    err = ioctl(fd, VIDIOC_S_CTRL , &control);
+    if(err < 0){
+            return FM_JNI_FAILURE;
+    }
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_stopPSNative is SUCCESS\n");
+    return FM_JNI_SUCCESS;
+}
+
+static jint android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative
+    (JNIEnv * env, jobject thiz, jint fd, jint repCount)
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative\n");
+
+    struct v4l2_control control;
+
+    control.id = V4L2_CID_PRIVATE_TAVARUA_TX_SETPSREPEATCOUNT;
+    control.value = repCount & MASK_TXREPCOUNT;
+
+    int err;
+    err = ioctl(fd, VIDIOC_S_CTRL,&control );
+    if(err < 0){
+            return FM_JNI_FAILURE;
+    }
+
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative is SUCCESS\n");
+    return FM_JNI_SUCCESS;
+}
+
 
 /*
  * JNI registration.
@@ -401,6 +576,21 @@ static JNINativeMethod gMethods[] = {
             (void*)android_hardware_fmradio_FmReceiverJNI_getRawRdsNative},
        { "setNotchFilterNative", "(Z)V",
             (void*)android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative},
+        { "startRTNative", "(ILjava/lang/String;I)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_startRTNative},
+        { "stopRTNative", "(I)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_stopRTNative},
+        { "startPSNative", "(ILjava/lang/String;I)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_startPSNative},
+        { "stopPSNative", "(I)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_stopPSNative},
+        { "setPTYNative", "(II)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_setPTYNative},
+        { "setPINative", "(II)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_setPINative},
+        { "setPSRepeatCountNative", "(II)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative},
+
 };
 
 int register_android_hardware_fm_fmradio(JNIEnv* env)
