@@ -29,6 +29,8 @@
 #include <stdlib.h>
 
 #define AMR_FRAMESIZE 32
+#define QCELP_FRAMESIZE 35
+#define EVRC_FRAMESIZE 23
 
 // AAC silence frame size which includes size of the frame also
 #define AAC_MONO_SILENCE_FRAME_SIZE         12 // this includes the length of silence frame
@@ -108,6 +110,16 @@ AudioSource::AudioSource( int inputSource, const sp<MetaData>& meta )
         mFormat = AudioSystem::AMR_NB;
         frameSize = AMR_FRAMESIZE;
         mMaxBufferSize = AMR_FRAMESIZE*10;
+    }
+    else if ( !strcasecmp( mime, MEDIA_MIMETYPE_AUDIO_QCELP ) ) {
+        mFormat = AudioSystem::QCELP;
+        frameSize = 35;
+        mMaxBufferSize = 350;
+    }
+    else if ( !strcasecmp( mime, MEDIA_MIMETYPE_AUDIO_EVRC ) ) {
+        mFormat = AudioSystem::EVRC;
+        frameSize = 23;
+        mMaxBufferSize = 230;
     }
     else {
         CHECK(0);
@@ -496,6 +508,12 @@ int64_t AudioSource::bufferDurationUs( ssize_t n ) {
     int64_t dataDurationMs = 0;
     if (mFormat == AudioSystem::AMR_NB) {
         dataDurationMs = (n/AMR_FRAMESIZE) * 20; //ms
+    }
+    else if (mFormat == AudioSystem::EVRC) {
+        dataDurationMs = (n/EVRC_FRAMESIZE) * 20; //ms
+    }
+    else if (mFormat == AudioSystem::QCELP) {
+        dataDurationMs = (n/QCELP_FRAMESIZE) * 20; //ms
     }
     else
         CHECK(0);

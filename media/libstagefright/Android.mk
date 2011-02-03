@@ -43,7 +43,8 @@ LOCAL_SRC_FILES:=                         \
         Utils.cpp                         \
         WAVExtractor.cpp                  \
         avc_utils.cpp                     \
-        string.cpp
+        string.cpp                        \
+        ExtendedWriter.cpp
 
 LOCAL_C_INCLUDES:= \
         $(JNI_H_INCLUDE) \
