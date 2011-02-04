@@ -73,7 +73,8 @@ static const int QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka = 0x7FA30C01;
 static const int QOMX_VIDEO_CodingDivx = 0x7FA30C02;
 static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
 static const int QOMX_INTERLACE_FLAG = 0x49283654;
-static const int QOMX_3D_VIDEO_FLAG = 0x23784238;
+static const int QOMX_3D_LEFT_RIGHT_VIDEO_FLAG = 0x23784238;
+static const int QOMX_3D_TOP_BOTTOM_VIDEO_FLAG = 0x4678239b;
 
 struct CodecInfo {
     const char *mime;
@@ -4484,7 +4485,15 @@ status_t OMXCodec::processSEIData(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags)
         }
         else
         {
-            newColorFormat = oldColorFormat ^ QOMX_3D_VIDEO_FLAG;
+            if (arrangementInfo.type == 3) //side by side
+                newColorFormat = oldColorFormat ^ QOMX_3D_LEFT_RIGHT_VIDEO_FLAG;
+            else if (arrangementInfo.type == 4) //top bottom
+                newColorFormat = oldColorFormat ^ QOMX_3D_TOP_BOTTOM_VIDEO_FLAG;
+            else
+            {
+                LOGE("This is supposedly a 3d video but the frame arragement [%d] is not supported", (int)arrangementInfo.type);
+                return ERROR_UNSUPPORTED;
+            }
             mOutputFormat->setInt32(kKeyColorFormat, newColorFormat);
             CODEC_LOGV("This is a 3d video...assuming side by side");
         }
