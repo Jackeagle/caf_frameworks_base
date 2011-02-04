@@ -1431,7 +1431,7 @@ status_t MediaPlayerService::AudioOutput::openSession(
     uint32_t flags = 0;
     mCallback = NULL;
     mCallbackCookie = NULL;
-    if (mSession) close();
+    if (mSession) closeSession();
     mSession = NULL;
 
     flags |= AudioSystem::OUTPUT_FLAG_DIRECT;
