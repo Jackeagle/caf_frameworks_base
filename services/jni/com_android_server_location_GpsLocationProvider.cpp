@@ -318,6 +318,16 @@ static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject o
     if (!sGpsDebugInterface)
        sGpsDebugInterface = (const GpsDebugInterface*)interface->get_extension(GPS_DEBUG_INTERFACE);
 
+    //Initialize the interface for AGPS NI call flow at this point as NI call backs may come in
+    //anytime after the main native GPS itnerface is initialized
+    if (!sGpsNiInterface) {
+       sGpsNiInterface = (const GpsNiInterface*)interface->get_extension(GPS_NI_INTERFACE);
+        if (sGpsNiInterface)
+        {
+            sGpsNiInterface->init(&sGpsNiCallbacks);
+        }
+    }
+
     return true;
 }
 
