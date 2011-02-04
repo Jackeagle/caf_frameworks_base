@@ -56,11 +56,14 @@ class LayerBase : public RefBase
 {
     static int32_t sSequence;
     int mLayerInitFlags;
+    int mS3DFormat;
 
 public:
     virtual int getLayerInitFlags() const { return mLayerInitFlags; }
             LayerBase(SurfaceFlinger* flinger, DisplayID display);
 
+    virtual status_t setStereoscopic3DFormat(int format) { mS3DFormat = format; return 0; }
+    virtual int getStereoscopic3DFormat() { return mS3DFormat; }
     DisplayID           dpy;
     mutable bool        contentDirty;
             Region      visibleRegionScreen;
@@ -318,6 +321,7 @@ public:
         virtual sp<GraphicBuffer> requestBuffer(int bufferIdx,
                 uint32_t w, uint32_t h, uint32_t format, uint32_t usage);
         virtual status_t setBufferCount(int bufferCount);
+        virtual status_t setStereoscopic3DFormat(int format);
 
         virtual status_t registerBuffers(const ISurface::BufferHeap& buffers); 
         virtual void postBuffer(ssize_t offset);

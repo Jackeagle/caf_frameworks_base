@@ -1006,6 +1006,15 @@ status_t Layer::SurfaceLayer::setBufferCount(int bufferCount)
     return err;
 }
 
+status_t Layer::SurfaceLayer::setStereoscopic3DFormat(int format)
+{
+    sp<Layer> owner(getOwner());
+    if (owner != 0) {
+        owner->setStereoscopic3DFormat(format);
+    }
+
+    return 0;
+}
 // ---------------------------------------------------------------------------
 
 

@@ -318,7 +318,13 @@ public class Surface implements Parcelable {
         return lockCanvasNative(dirty);
     }
 
+    public void setStereoscopic3DFormat(int format) {
+        setStereoscopic3DFormatNative(format);
+    }
+
     private native Canvas lockCanvasNative(Rect dirty);
+    private native void setStereoscopic3DFormatNative(int format);
+
 
     /** unlock the surface and asks a page flip */
     public native   void unlockCanvasAndPost(Canvas canvas);

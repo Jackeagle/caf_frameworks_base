@@ -1043,6 +1043,14 @@ int Surface::getBufferIndex(const sp<GraphicBuffer>& buffer) const
     return buffer->getIndex();
 }
 
+status_t Surface::setStereoscopic3DFormat(int format)
+{
+    sp<ISurface> s(mSurface);
+    if (s == 0) return NO_INIT;
+
+    return s->setStereoscopic3DFormat(format);
+}
+
 status_t Surface::getBufferLocked(int index,
         uint32_t w, uint32_t h, uint32_t format, uint32_t usage)
 {

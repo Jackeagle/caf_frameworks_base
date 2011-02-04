@@ -48,6 +48,7 @@ protected:
         CREATE_OVERLAY,
         REQUEST_BUFFER,
         SET_BUFFER_COUNT,
+        SET_STEREOSCOPIC_3D_FORMAT,
     };
 
 public: 
@@ -66,7 +67,8 @@ public:
      * sets the number of buffers dequeuable for this surface.
      */
     virtual status_t setBufferCount(int bufferCount) = 0;
-    
+    virtual status_t setStereoscopic3DFormat(int format) = 0;
+
     // ------------------------------------------------------------------------
     // Deprecated...
     // ------------------------------------------------------------------------
