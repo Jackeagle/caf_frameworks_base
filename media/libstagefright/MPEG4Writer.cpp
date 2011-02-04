@@ -688,7 +688,6 @@ status_t MPEG4Writer::stop() {
 
     // Do not write out movie header on error.
     if (err != OK) {
-        ::fsync(mFd);
         ::close(mFd);
         mFd = -1;
         mStarted = false;
@@ -770,7 +769,6 @@ status_t MPEG4Writer::stop() {
 
     CHECK(mBoxes.empty());
 
-    ::fsync(mFd);
     ::close(mFd);
     mFd = -1;
     mStarted = false;
