@@ -664,15 +664,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
-    public void getCdmaPrlVersion(Message result) {
-        RILRequest rr = RILRequest.obtain(RIL_REQUEST_CDMA_PRL_VERSION, result);
-
-        if (RILJ_LOGD)
-            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
-
-        send(rr);
-    }
-
     public void getImsRegistrationState(Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_IMS_REGISTRATION_STATE, result);
 
@@ -2321,7 +2312,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: ret = responseVoid(p); break;
             case RIL_REQUEST_VOICE_RADIO_TECH: ret = responseInts(p); break;
             case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE: ret = responseInts(p); break;
-            case RIL_REQUEST_CDMA_PRL_VERSION: ret = responseString(p); break;
             case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
             case RIL_REQUEST_IMS_SEND_SMS: ret =  responseSMS(p); break;
             case RIL_REQUEST_GET_DATA_CALL_PROFILE: ret = responseGetDataCallProfile(p); break;
@@ -2469,8 +2459,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_RINGBACK_TONE: ret = responseInts(p); break;
             case RIL_UNSOL_RESEND_INCALL_MUTE: ret = responseVoid(p); break;
             case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: ret =  responseVoid(p); break;
-            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: ret =  responseVoid(p); break;
-            case RIL_UNSOL_CDMA_PRL_CHANGED: ret =  responseVoid(p); break;
+            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: ret =  responseInts(p); break;
+            case RIL_UNSOL_CDMA_PRL_CHANGED: ret =  responseInts(p); break;
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: ret =  responseInts(p); break;
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -2497,15 +2487,21 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 break;
             case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
                 if (RILJ_LOGD) unsljLog(response);
+                int [] ssource = (int[])ret;
 
-                mCdmaSubscriptionSourceChangedRegistrants
-                    .notifyRegistrants(new AsyncResult(null, null, null));
+                if(mCdmaSubscriptionSourceChangedRegistrants != null) {
+                    mCdmaSubscriptionSourceChangedRegistrants.notifyRegistrants(
+                          new AsyncResult(null, ssource, null));
+                }
                 break;
             case RIL_UNSOL_CDMA_PRL_CHANGED:
                 if (RILJ_LOGD) unsljLog(response);
+                int [] prlv = (int [])ret;
 
-                mCdmaPrlChangedRegistrants
-                    .notifyRegistrants(new AsyncResult(null, null, null));
+                if(mCdmaPrlChangedRegistrants != null) {
+                    mCdmaPrlChangedRegistrants.notifyRegistrants(
+                          new AsyncResult(null, prlv, null));
+                }
                 break;
             case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED:
                 if (RILJ_LOGD) unsljLog(response);
@@ -3584,7 +3580,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: return "RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING";
             case RIL_REQUEST_VOICE_RADIO_TECH: return "RIL_REQUEST_VOICE_RADIO_TECH";
             case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE";
-            case RIL_REQUEST_CDMA_PRL_VERSION: return "RIL_REQUEST_CDMA_PRL_VERSION";
             case RIL_REQUEST_IMS_REGISTRATION_STATE: return "RIL_REQUEST_IMS_REGISTRATION_STATE";
             case RIL_REQUEST_IMS_SEND_SMS: return "RIL_REQUEST_IMS_SEND_SMS";
             case RIL_REQUEST_GET_DATA_CALL_PROFILE: return "RIL_REQUEST_GET_DATA_CALL_PROFILE";

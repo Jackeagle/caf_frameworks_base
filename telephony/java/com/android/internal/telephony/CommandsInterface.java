@@ -193,7 +193,6 @@ public interface CommandsInterface {
 
     void getVoiceRadioTechnology(Message result);
     void getCdmaSubscriptionSource(Message result);
-    void getCdmaPrlVersion(Message result);
 
     /**
      * response.obj.result is an int[2]
