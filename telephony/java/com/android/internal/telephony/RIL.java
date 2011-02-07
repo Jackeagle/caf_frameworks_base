@@ -258,6 +258,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     static final int RESPONSE_UNSOLICITED = 1;
 
     static final String SOCKET_NAME_RIL = "rild";
+    static final String SOCKET_NAME_RIL1 = "rild1";
 
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
 
@@ -481,14 +482,23 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         public void
         run() {
             int retryCount = 0;
+            String rilSocket = "rild";
 
             try {for (;;) {
                 LocalSocket s = null;
                 LocalSocketAddress l;
 
+                boolean multiRild = SystemProperties.getBoolean("ro.multi.rild", false);
+
+                if (mInstanceId == 0 || multiRild == false) {
+                    rilSocket = SOCKET_NAME_RIL;
+                } else {
+                    rilSocket = SOCKET_NAME_RIL1;
+                }
+
                 try {
                     s = new LocalSocket();
-                    l = new LocalSocketAddress(SOCKET_NAME_RIL,
+                    l = new LocalSocketAddress(rilSocket,
                             LocalSocketAddress.Namespace.RESERVED);
                     s.connect(l);
                 } catch (IOException ex){
@@ -505,12 +515,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
                     if (retryCount == 8) {
                         Log.e (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_RIL
+                            "Couldn't find '" + rilSocket
                             + "' socket after " + retryCount
                             + " times, continuing to retry silently");
                     } else if (retryCount > 0 && retryCount < 8) {
                         Log.i (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_RIL
+                            "Couldn't find '" + rilSocket
                             + "' socket; retrying after timeout");
                     }
 
@@ -526,7 +536,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 retryCount = 0;
 
                 mSocket = s;
-                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
+                Log.i(LOG_TAG, "Connected to '" + rilSocket + "' socket");
 
                 int length = 0;
                 try {
@@ -552,14 +562,14 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                         p.recycle();
                     }
                 } catch (java.io.IOException ex) {
-                    Log.i(LOG_TAG, "'" + SOCKET_NAME_RIL + "' socket closed",
+                    Log.i(LOG_TAG, "'" + rilSocket + "' socket closed",
                           ex);
                 } catch (Throwable tr) {
                     Log.e(LOG_TAG, "Uncaught exception read length=" + length +
                         "Exception:" + tr.toString());
                 }
 
-                Log.i(LOG_TAG, "Disconnected from '" + SOCKET_NAME_RIL
+                Log.i(LOG_TAG, "Disconnected from '" + rilSocket
                       + "' socket");
 
                 setRadioState (RadioState.RADIO_UNAVAILABLE);
