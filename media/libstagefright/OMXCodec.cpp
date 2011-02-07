@@ -820,6 +820,25 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
 
     initOutputFormat(meta);
 
+    if (!strncasecmp(mMIME, "audio/", 6)) {
+        OMX_PARAM_SUSPENSIONPOLICYTYPE suspensionPolicy;
+        // Suspension policy for the OMX component to honor the Power collapse (TCXO shutdown)
+        // Whenever there is a power collapse, OMX component releases the hardware
+        // resources and hence enabling TCXO shutdown, reducing power consumption.
+        // Return value is ignored, since this is not mandated for all the OMX components.
+        memset(&suspensionPolicy,0,sizeof(suspensionPolicy));
+        suspensionPolicy.ePolicy = OMX_SuspensionEnabled;
+
+        status_t err = mOMX->setParameter(mNode,
+            OMX_IndexParamSuspensionPolicy, &suspensionPolicy, sizeof(suspensionPolicy));
+        if ( err != OMX_ErrorNone ) {
+            CODEC_LOGV("OMXCodec::configureCodec Problem setting suspension"
+                "policy parameters in output port ");
+        } else {
+            CODEC_LOGV("OMXCodec::configureCodec SUCCESS setting suspension "
+                "policy parameters in output port ");
+        }
+     }
     if ((flags & kClientNeedsFramebuffer)
             && !strncmp(mComponentName, "OMX.SEC.", 8)) {
         OMX_INDEXTYPE index;
@@ -2473,7 +2492,15 @@ void OMXCodec::onStateChange(OMX_STATETYPE newState) {
             setState(LOADED);
             break;
         }
+        case OMX_StatePause:
+        {
+           CODEC_LOGV("Now paused.");
 
+           CHECK_EQ(mState, EXECUTING_TO_IDLE);
+
+           setState(PAUSED);
+           break;
+        }
         case OMX_StateInvalid:
         {
             setState(ERROR);
@@ -3340,8 +3367,24 @@ void OMXCodec::clearCodecSpecificData() {
 }
 
 status_t OMXCodec::start(MetaData *meta) {
+    CODEC_LOGV("OMXCodec::start ");
     Mutex::Autolock autoLock(mLock);
-
+    if(mIsPaused) {
+        while (isIntermediateState(mState)) {
+            mAsyncCompletion.wait(mLock);
+        }
+        CHECK_EQ(mState, PAUSED);
+        status_t err = mOMX->sendCommand(mNode,
+        OMX_CommandStateSet, OMX_StateExecuting);
+        CHECK_EQ(err, OK);
+        setState(IDLE_TO_EXECUTING);
+        mIsPaused = false;
+        mPaused = false;
+        while (mState != EXECUTING && mState != ERROR) {
+            mAsyncCompletion.wait(mLock);
+        }
+        return mState == ERROR ? UNKNOWN_ERROR : OK;
+    }
     if (mState != LOADED) {
         return UNKNOWN_ERROR;
     }
@@ -3378,6 +3421,31 @@ status_t OMXCodec::start(MetaData *meta) {
     return init();
 }
 
+status_t OMXCodec::pause() {
+   CODEC_LOGV("pause mState=%d", mState);
+
+   Mutex::Autolock autoLock(mLock);
+
+   if (mState != EXECUTING) {
+       return UNKNOWN_ERROR;
+   }
+
+   while (isIntermediateState(mState)) {
+       mAsyncCompletion.wait(mLock);
+   }
+   status_t err = mOMX->sendCommand(mNode,
+       OMX_CommandStateSet, OMX_StatePause);
+   CHECK_EQ(err, OK);
+   setState(EXECUTING_TO_IDLE);
+
+   mIsPaused = true;
+   mPaused = true;
+   while (mState != PAUSED && mState != ERROR) {
+       mAsyncCompletion.wait(mLock);
+   }
+   return mState == ERROR ? UNKNOWN_ERROR : OK;
+}
+
 status_t OMXCodec::stop() {
     CODEC_LOGV("stop mState=%d", mState);
 
@@ -3391,7 +3459,7 @@ status_t OMXCodec::stop() {
         case LOADED:
         case ERROR:
             break;
-
+        case PAUSED:
         case EXECUTING:
         {
             setState(EXECUTING_TO_IDLE);
@@ -4148,13 +4216,6 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
 #endif
 }
 
-status_t OMXCodec::pause() {
-    Mutex::Autolock autoLock(mLock);
-
-    mPaused = true;
-
-    return OK;
-}
 
 void OMXCodec::parseFlags(uint32_t flags) {
     mGPUComposition = ((flags & kEnableGPUComposition) ? true : false);

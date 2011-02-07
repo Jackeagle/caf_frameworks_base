@@ -182,10 +182,17 @@ void AudioPlayer::pause(bool playPendingSamples) {
             mAudioTrack->pause();
         }
     }
+    CHECK(mSource != NULL);
+    mSource->pause();
+
 }
 
 void AudioPlayer::resume() {
     CHECK(mStarted);
+    if (mSource->isPaused()==true) {
+        CHECK(mSource != NULL);
+        mSource->start();
+    }
 
     if (mAudioSink.get() != NULL) {
         mAudioSink->start();
