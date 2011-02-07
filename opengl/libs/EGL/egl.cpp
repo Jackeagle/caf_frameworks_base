@@ -1,5 +1,6 @@
 /* 
  ** Copyright 2007, The Android Open Source Project
+ ** Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  **
  ** Licensed under the Apache License, Version 2.0 (the "License"); 
  ** you may not use this file except in compliance with the License. 
@@ -216,7 +217,7 @@ struct egl_context_t : public egl_object_t
     
     egl_context_t(EGLDisplay dpy, EGLContext context, EGLConfig config,
             int impl, egl_connection_t const* cnx, int version) 
-    : dpy(dpy), context(context), read(0), draw(0), impl(impl), cnx(cnx),
+    : dpy(dpy), context(context), config(config), read(0), draw(0), impl(impl), cnx(cnx),
       version(version)
     {
     }
