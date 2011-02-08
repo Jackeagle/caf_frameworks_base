@@ -44,14 +44,16 @@ LOCAL_SRC_FILES:=                         \
         WAVExtractor.cpp                  \
         avc_utils.cpp                     \
         string.cpp                        \
-        ExtendedWriter.cpp
+        ExtendedWriter.cpp                \
+        NativeBuffer.cpp
 
 LOCAL_C_INCLUDES:= \
         $(JNI_H_INCLUDE) \
         $(TOP)/frameworks/base/include/media/stagefright/openmax \
         $(TOP)/external/tremolo \
         $(TOP)/frameworks/base/media/libstagefright/rtsp \
-        $(TOP)/vendor/qcom/opensource/omx/mm-core/omxcore/inc
+        $(TOP)/vendor/qcom/opensource/omx/mm-core/omxcore/inc \
+        $(TOP)/hardware/msm7k/libgralloc-qsd8k
 
 LOCAL_SHARED_LIBRARIES := \
         libbinder         \

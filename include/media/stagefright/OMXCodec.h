@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /*--------------------------------------------------------------------------
-Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 --------------------------------------------------------------------------*/
 
 #ifndef OMX_CODEC_H_
@@ -24,6 +24,7 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <media/IOMX.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaSource.h>
+#include <media/stagefright/NativeBuffer.h>
 #include <utils/threads.h>
 
 namespace android {
@@ -131,6 +132,7 @@ private:
         size_t mSize;
         void *mData;
         MediaBuffer *mMediaBuffer;
+        sp<NativeBuffer> mNativeBuffer;
     };
 
     struct CodecSpecificData {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /*--------------------------------------------------------------------------
-Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 --------------------------------------------------------------------------*/
 
 //#define LOG_NDEBUG 0
@@ -2249,6 +2249,16 @@ void OMXCodec::on_message(const omx_message &msg) {
                             msg.u.extended_buffer_data.data_ptr,
                             info->mSize);
                     info->mMediaBuffer->setObserver(this);
+                  if(!mOMXLivesLocally && mPmemInfo != NULL && buffer != NULL) {
+                    uint32_t base = (uint32_t)mPmemInfo->getBase();
+                    uint32_t fd = (uint32_t)mPmemInfo->getHeapID();
+                    uint32_t offset = msg.u.extended_buffer_data.pmem_offset;
+                    int32_t width, height, colorFormat;
+                    mOutputFormat->findInt32(kKeyWidth, &width);
+                    mOutputFormat->findInt32(kKeyHeight, &height);
+                    mOutputFormat->findInt32(kKeyColorFormat, &colorFormat);
+                    info->mNativeBuffer = new NativeBuffer(width, height, colorFormat, fd, info->mSize, offset, base);
+                  }
                 }
 
                 MediaBuffer *buffer = info->mMediaBuffer;
@@ -2293,9 +2303,15 @@ void OMXCodec::on_message(const omx_message &msg) {
                     buffer->meta_data()->setInt32(kKeyIsUnreadable, true);
                 }
 
-                buffer->meta_data()->setPointer(
-                        kKeyPlatformPrivate,
-                        msg.u.extended_buffer_data.platform_private);
+                if(!mOMXLivesLocally && (info->mNativeBuffer != NULL)) {
+                  buffer->meta_data()->setPointer(
+                      kKeyPlatformPrivate,
+                      (void*)(info->mNativeBuffer->getNativeBuffer()));
+                } else {
+                  buffer->meta_data()->setPointer(
+                      kKeyPlatformPrivate,
+                      msg.u.extended_buffer_data.platform_private);
+                }
 
                 buffer->meta_data()->setPointer(
                         kKeyBufferID,
