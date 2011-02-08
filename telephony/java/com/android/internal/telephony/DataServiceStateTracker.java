@@ -560,43 +560,6 @@ public class DataServiceStateTracker extends Handler {
         return (mSs.getCssIndicator() == 1);
     }
 
-    void updateRecords() {
-        logv(" DSST update Records function");
-
-        Subscription subscriptionData = mDct.getSubscriptionInfo();
-
-        if (subscriptionData != null) {
-            logv("slot id:" + subscriptionData.slotId
-                    + ", 3gppapp_index:" + subscriptionData.m3gppIndex
-                    + ", 3gpp2app_index:" + subscriptionData.m3gpp2Index);
-            UiccCardApplication cardApp;
-            cardApp = mUiccManager.getApplication(subscriptionData.slotId,
-                                                     subscriptionData.getAppIndex());
-            if (cardApp != null) {
-                AppType appType = cardApp.getType();
-
-                if ((appType == AppType.APPTYPE_USIM) || (appType == AppType.APPTYPE_SIM)) {
-                    m3gppApp = cardApp;
-                    m3gppApp.registerForReady(this, EVENT_SIM_READY, null);
-                    mSimRecords = (SIMRecords) m3gppApp.getApplicationRecords();
-
-                    if (mSimRecords != null) {
-                        mSimRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
-                    }
-                } else if ((appType == AppType.APPTYPE_RUIM) || (appType == AppType.APPTYPE_CSIM)) {
-                    m3gpp2App = cardApp;
-                    m3gpp2App.registerForReady(this, EVENT_RUIM_READY, null);
-                    mRuimRecords = (RuimRecords) m3gpp2App.getApplicationRecords();
-
-                    if (mRuimRecords != null) {
-                        mRuimRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
-                    }
-                }
-            }
-        }
-    }
-
-
     /* Poll ICC Cards/Application/Application Records and update everything */
     void updateIccAvailability() {
 
