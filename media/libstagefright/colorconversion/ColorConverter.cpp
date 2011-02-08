@@ -72,7 +72,7 @@ void ColorConverter::convert(
     switch (mSrcFormat) {
         case OMX_COLOR_FormatYUV420Planar:
             convertYUV420Planar(
-                    width, height, srcBits, srcSkip, dstBits, 2 * alignedWidth);
+                    width, height, srcBits, srcSkip, dstBits, dstSkip);
             break;
 
         case OMX_COLOR_FormatCbYCrY:
@@ -82,9 +82,9 @@ void ColorConverter::convert(
 
         case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_INTERLACE_FLAG):
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
-            //convertQCOMYUV420SemiPlanar(
-            //        width, height, srcBits, srcSkip, dstBits, dstSkip);
-            //break;
+            convertQCOMYUV420SemiPlanar(
+                    width, height, srcBits, srcSkip, dstBits, dstSkip);
+            break;
 
         case (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_INTERLACE_FLAG):
         case OMX_COLOR_FormatYUV420SemiPlanar:
@@ -352,14 +352,14 @@ void ColorConverter::convertYUV420SemiPlanar(
             signed r2 = (tmp2 + v_r) / 256;
 
             uint32_t rgb1 =
-                ((kAdjustedClip[r1] >> 3) << 11)
+                ((kAdjustedClip[b1] >> 3) << 11)
                 | ((kAdjustedClip[g1] >> 2) << 5)
-                | (kAdjustedClip[b1] >> 3);
+                | (kAdjustedClip[r1] >> 3);
 
             uint32_t rgb2 =
-                ((kAdjustedClip[r2] >> 3) << 11)
+                ((kAdjustedClip[b2] >> 3) << 11)
                 | ((kAdjustedClip[g2] >> 2) << 5)
-                | (kAdjustedClip[b2] >> 3);
+                | (kAdjustedClip[r2] >> 3);
 
             dst_ptr[x / 2] = (rgb2 << 16) | rgb1;
         }
@@ -610,7 +610,9 @@ void ColorConverter::convertYUV420SemiPlanar32Aligned(
         (const uint8_t *)src_y + width * height;
 
     for (size_t y = 0; y < height; ++y) {
-        for (size_t x = 0; x < width; x += 2) {
+        for (size_t x = 0; x < alignedWidth; x += 2) {
+            if(x > width)
+                continue;
             signed y1 = (signed)src_y[x] - 16;
             signed y2 = (signed)src_y[x + 1] - 16;
 
@@ -633,14 +635,14 @@ void ColorConverter::convertYUV420SemiPlanar32Aligned(
             signed r2 = (tmp2 + v_r) / 256;
 
             uint32_t rgb1 =
-                ((kAdjustedClip[r1] >> 3) << 11)
+                ((kAdjustedClip[b1] >> 3) << 11)
                 | ((kAdjustedClip[g1] >> 2) << 5)
-                | (kAdjustedClip[b1] >> 3);
+                | (kAdjustedClip[r1] >> 3);
 
             uint32_t rgb2 =
-                ((kAdjustedClip[r2] >> 3) << 11)
+                ((kAdjustedClip[b2] >> 3) << 11)
                 | ((kAdjustedClip[g2] >> 2) << 5)
-                | (kAdjustedClip[b2] >> 3);
+                | (kAdjustedClip[r2] >> 3);
 
             dst_ptr[x / 2] = (rgb2 << 16) | rgb1;
         }
