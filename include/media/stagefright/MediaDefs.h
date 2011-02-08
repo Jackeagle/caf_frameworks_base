@@ -46,7 +46,8 @@ extern const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS;
 extern const char *MEDIA_MIMETYPE_CONTAINER_AVI;
 extern const char *MEDIA_MIMETYPE_VIDEO_DIVX;
 extern const char *MEDIA_MIMETYPE_AUDIO_AC3;
-
+extern const char *MEDIA_MIMETYPE_VIDEO_SPARK;
+extern const char *MEDIA_MIMETYPE_VIDEO_VP6;
 }  // namespace android
 
 #endif  // MEDIA_DEFS_H_
