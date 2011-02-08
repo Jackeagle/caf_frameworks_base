@@ -9451,6 +9451,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
          */
         final ArrayList<View> mFocusablesTempList = new ArrayList<View>(24);
 
+        boolean mFullScreen;
+
         /**
          * Creates a new set of attachment information with the specified
          * events handler and thread.
@@ -9464,6 +9466,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback, Accessibility
             mWindowToken = window.asBinder();
             mHandler = handler;
             mRootCallbacks = effectPlayer;
+            mFullScreen = false;
         }
     }
 

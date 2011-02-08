@@ -437,7 +437,11 @@ private:
    int  mLastCompCount;
    bool mFullScreen;
    bool mOverlayUsed;
-   bool mOverlayUsedVideo;
+   bool mOverlayUseChanged;
+   Vector< sp<LayerBase> > mOverlayDitchedLayers;
+public:
+   void ditchOverlayLayers();
+   void freeBypassBuffers();
 };
 
 // ---------------------------------------------------------------------------

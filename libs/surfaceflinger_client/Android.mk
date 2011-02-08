@@ -23,4 +23,8 @@ ifeq ($(TARGET_SIMULATOR),true)
     LOCAL_LDLIBS += -lpthread
 endif
 
+ifeq ($(TARGET_USES_SF_BYPASS),true)
+LOCAL_CFLAGS += -DSF_BYPASS
+endif
+
 include $(BUILD_SHARED_LIBRARY)

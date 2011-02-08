@@ -429,14 +429,21 @@ void Surface::init()
     mSwapRectangle.makeInvalid();
     mNextBufferCrop = Rect(0,0);
     // two buffers by default
-    mBuffers.setCapacity(2);
-    mBuffers.insertAt(0, 2);
+    int numbuffers = 2;
+#if defined(SF_BYPASS)
+    if (mFlags & ISurfaceComposer::eFullScreen) {
+        numbuffers = 3;
+        LOGD("Surface is full screen");
+    }
+#endif
+    mBuffers.setCapacity(numbuffers);
+    mBuffers.insertAt(0, numbuffers);
 
     if (mSurface != 0 && mClient.initCheck() == NO_ERROR) {
         int32_t token = mClient.getTokenForSurface(mSurface);
         if (token >= 0) {
             mSharedBufferClient = new SharedBufferClient(
-                    mClient.getSharedClient(), token, 2, mIdentity);
+                    mClient.getSharedClient(), token, numbuffers, mIdentity);
             mInitCheck = mClient.getSharedClient()->validate(token);
         }
     }
@@ -959,10 +966,21 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
             // given by the user (as opposed to the one *we* return to the
             // user).
             mDirtyRegion = newDirtyRegion;
+            int backBufIdx = backBuffer->getIndex();
 
             if (canCopyBack) {
                 // copy the area that is invalid and not repainted this round
-                const Region copyback(mOldDirtyRegion.subtract(newDirtyRegion));
+                Region temp;
+                int size = mBuffers.size();
+                if (size > 2) {
+                    for (int i = 0; i < size; i++)
+                        temp.orSelf(mOldDirtyRegion[i]);
+                }
+                else {
+                    int frontBufIdx = frontBuffer->getIndex();
+                    temp.orSelf(mOldDirtyRegion[frontBufIdx]);
+                }
+                const Region copyback(temp.subtract(newDirtyRegion));
                 if (!copyback.isEmpty())
                     copyBlt(backBuffer, frontBuffer, copyback);
             } else {
@@ -973,7 +991,7 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
 
             // keep track of the are of the buffer that is "clean"
             // (ie: that will be redrawn)
-            mOldDirtyRegion = newDirtyRegion;
+            mOldDirtyRegion[backBufIdx] = newDirtyRegion;
 
             void* vaddr;
             status_t res = backBuffer->lock(

@@ -261,8 +261,8 @@ bool SharedBufferClient::LockCondition::operator()() const {
     // NOTE: if stack.head is messed up, we could crash the client
     // or cause some drawing artifacts. This is okay, as long as it is
     // limited to the client.
-    return (buf != stack.index[stack.head] ||
-            (stack.queued > 0 && stack.inUse != buf));
+    return (!(stack.reserved != -1 && buf == stack.index[stack.reserved]) && (buf != stack.index[stack.head] ||
+            (stack.queued > 0 && stack.inUse != buf)));
 }
 
 // ----------------------------------------------------------------------------
@@ -308,6 +308,15 @@ ssize_t SharedBufferServer::UnlockUpdate::operator()() {
         return BAD_VALUE;
     }
     android_atomic_write(-1, &stack.inUse);
+    return NO_ERROR;
+}
+
+SharedBufferServer::BypassUpdate::BypassUpdate(
+        SharedBufferBase* sbb, int lockedBuffer)
+    : UpdateBase(sbb), lockedBuffer(lockedBuffer) {
+}
+ssize_t SharedBufferServer::BypassUpdate::operator()() {
+    android_atomic_write(lockedBuffer, &stack.reserved);
     return NO_ERROR;
 }
 
@@ -514,6 +523,7 @@ SharedBufferServer::SharedBufferServer(SharedClient* sharedClient,
     mSharedStack->available = num;
     mSharedStack->queued = 0;
     mSharedStack->reallocMask = 0;
+    mSharedStack->reserved = -1;
     memset(mSharedStack->buffers, 0, sizeof(mSharedStack->buffers));
     for (int i=0 ; i<num ; i++) {
         mBufferList.add(i);
@@ -545,6 +555,17 @@ ssize_t SharedBufferServer::retireAndLock()
 status_t SharedBufferServer::unlock(int buf)
 {
     UnlockUpdate update(this, buf);
+    status_t err = updateCondition( update );
+    LOGD_IF(DEBUG_ATOMICS, "unlock=%d, %s",
+            int(buf), dump("").string());
+    return err;
+}
+
+status_t SharedBufferServer::setInUseBypass(int buf)
+{
+    LOGD_IF(DEBUG_ATOMICS, "buf=%d, %s",
+            int(buf), dump("").string());
+    BypassUpdate update(this, buf);
     status_t err = updateCondition( update );
     return err;
 }

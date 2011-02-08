@@ -285,6 +285,7 @@ public:
     uint32_t getTransform(int buffer) const;
 
     status_t resize(int newNumBuffers);
+    status_t setInUseBypass(int buffer);
 
     SharedBufferStack::Statistics getStats() const;
     
@@ -361,6 +362,12 @@ private:
     struct StatusUpdate : public UpdateBase {
         const status_t status;
         inline StatusUpdate(SharedBufferBase* sbb, status_t status);
+        inline ssize_t operator()();
+    };
+
+    struct BypassUpdate : public UpdateBase {
+        const int lockedBuffer;
+        inline BypassUpdate(SharedBufferBase* sbb, int lockedBuffer);
         inline ssize_t operator()();
     };
 };

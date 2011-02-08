@@ -58,8 +58,8 @@ LayerBuffer::~LayerBuffer()
     }
 
     const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
-    hw.videoOverlayStarted(false);
     mFlinger->enableOverlayOpt(true);
+    hw.videoOverlayStarted(false);
 }
 
 void LayerBuffer::onFirstRef()
@@ -161,12 +161,13 @@ void LayerBuffer::onDraw(const Region& clip) const
     }
 }
 
-status_t LayerBuffer::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const
+status_t LayerBuffer::drawWithOverlay(const Region& clip, 
+                                  bool hdmiConnected, bool ignoreFB) const
 {
 #if defined(TARGET_USES_OVERLAY)
     sp<Source> source(getSource());
     if (LIKELY(source != 0)) {
-        return source->drawWithOverlay(clip, clear, hdmiConnected);
+        return source->drawWithOverlay(clip, hdmiConnected, ignoreFB);
     }
 #endif
     return INVALID_OPERATION;
@@ -331,7 +332,8 @@ LayerBuffer::Source::~Source() {
 }
 void LayerBuffer::Source::onDraw(const Region& clip) const {
 }
-status_t LayerBuffer::Source::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const {
+status_t LayerBuffer::Source::drawWithOverlay(const Region& clip, 
+                        bool hdmiConnected, bool ignoreFB) const {
     return INVALID_OPERATION;
 }
 void LayerBuffer::Source::onTransaction(uint32_t flags) {
@@ -496,7 +498,8 @@ void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer>& buffer)
     mBuffer = buffer;
 }
 
-status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool clear, bool hdmiConnected) const
+status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, 
+                              bool hdmiConnected, bool ignoreFB) const
 {
 #if defined(TARGET_USES_OVERLAY)
     sp<Buffer> ourBuffer(getBuffer());
@@ -510,7 +513,9 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool cle
                                graphicPlane(0).displayHardware());
     hw.videoOverlayStarted(true);
     overlay::Overlay* temp = hw.getOverlayObject();
-    if (!temp->setSource(src.hor_stride, src.ver_stride, src.img.format, mLayer.getOrientation(), hdmiConnected))
+    if (!temp->setSource(src.hor_stride, src.ver_stride, 
+                          src.img.format, mLayer.getOrientation(),
+                          hdmiConnected, ignoreFB))
         return INVALID_OPERATION;
     if (!temp->setCrop(0, 0, src.crop.r, src.crop.b))
         return INVALID_OPERATION;
@@ -544,7 +549,7 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool cle
     if (!ret)
         return INVALID_OPERATION;
 
-    if (clear)
+    if (!ignoreFB)
         mLayer.clearWithOpenGL(clip);
     return NO_ERROR;
 #endif
