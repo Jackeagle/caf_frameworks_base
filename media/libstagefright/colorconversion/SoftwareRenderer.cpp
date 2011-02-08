@@ -25,7 +25,6 @@
 #include <surfaceflinger/ISurface.h>
 
 namespace android {
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
 
 SoftwareRenderer::SoftwareRenderer(
         OMX_COLOR_FORMATTYPE colorFormat,
@@ -43,10 +42,8 @@ SoftwareRenderer::SoftwareRenderer(
       mFrameSize(mDecodedWidth * mDecodedHeight * 2),  // RGB565
       mIndex(0) {
     size_t alignedDecodedWidth  = ((decodedWidth + 31) & -32);
-    if (((mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar )||
-         (mColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar)||
-         (mColorFormat == OMX_COLOR_FormatYUV420Planar))&&
-         (alignedDecodedWidth != mDecodedWidth)) {
+    if ((mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar ) &&
+            (alignedDecodedWidth != mDecodedWidth)) {
         mFrameSize = (alignedDecodedWidth * mDecodedHeight * 2);
     }
     else {
