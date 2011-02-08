@@ -21,6 +21,7 @@ import android.content.Context;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.MmiCode;
 import com.android.internal.telephony.UiccCardApplication;
+import com.android.internal.telephony.UiccConstants;
 import com.android.internal.telephony.Phone;
 
 import android.os.AsyncResult;
@@ -45,8 +46,11 @@ public final class CdmaMmiCode  extends Handler implements MmiCode {
     // From TS 22.030 6.5.2
     static final String ACTION_REGISTER = "**";
 
-    // Supp Service codes from TS 22.030 Annex B
+    // PIN/PIN2/PUK/PUK2
+    static final String SC_PIN          = "04";
+    static final String SC_PIN2         = "042";
     static final String SC_PUK          = "05";
+    static final String SC_PUK2         = "052";
 
     // Event Constant
 
@@ -183,8 +187,9 @@ public final class CdmaMmiCode  extends Handler implements MmiCode {
     /**
      * @return true if the Service Code is PIN/PIN2/PUK/PUK2-related
      */
-    boolean isPukCommand() {
-        return sc != null && sc.equals(SC_PUK);
+    boolean isPinCommand() {
+        return sc != null && (sc.equals(SC_PIN) || sc.equals(SC_PIN2)
+                              || sc.equals(SC_PUK) || sc.equals(SC_PUK2));
      }
 
     boolean isRegister() {
@@ -200,8 +205,8 @@ public final class CdmaMmiCode  extends Handler implements MmiCode {
     void
     processCode () {
         try {
-            if (isPukCommand()) {
-                // sia = old PUK
+            if (isPinCommand()) {
+                // sia = old PIN or PUK
                 // sib = new PIN
                 // sic = new PIN
                 String oldPinOrPuk = sia;
@@ -214,10 +219,29 @@ public final class CdmaMmiCode  extends Handler implements MmiCode {
                     } else if (pinLen < 4 || pinLen > 8 ) {
                         // invalid length
                         handlePasswordError(com.android.internal.R.string.invalidPin);
+                    } else if (sc.equals(SC_PIN)
+                            && phone.m3gpp2Application != null
+                            && phone.m3gpp2Application.getState() == UiccConstants.AppState.APPSTATE_PUK) {
+                        // Sim is puk-locked
+                        handlePasswordError(com.android.internal.R.string.needPuk);
                     } else {
-                        if (mUiccApp != null) {
-                            mUiccApp.supplyPuk(oldPinOrPuk, newPin,
-                                obtainMessage(EVENT_SET_COMPLETE, this));
+                        // pre-checks OK
+                        if (sc.equals(SC_PIN)) {
+                            if (mUiccApp != null)
+                                mUiccApp.changeIccLockPassword(oldPinOrPuk, newPin,
+                                        obtainMessage(EVENT_SET_COMPLETE, this));
+                        } else if (sc.equals(SC_PIN2)) {
+                            if (mUiccApp != null)
+                                mUiccApp.changeIccFdnPassword(oldPinOrPuk, newPin,
+                                        obtainMessage(EVENT_SET_COMPLETE, this));
+                        } else if (sc.equals(SC_PUK)) {
+                            if (mUiccApp != null)
+                                mUiccApp.supplyPuk(oldPinOrPuk, newPin,
+                                        obtainMessage(EVENT_SET_COMPLETE, this));
+                        } else if (sc.equals(SC_PUK2)) {
+                            if (mUiccApp != null)
+                                mUiccApp.supplyPuk2(oldPinOrPuk, newPin,
+                                        obtainMessage(EVENT_SET_COMPLETE, this));
                         }
                     }
                 } else {
@@ -257,7 +281,7 @@ public final class CdmaMmiCode  extends Handler implements MmiCode {
 
     private CharSequence getScString() {
         if (sc != null) {
-            if (isPukCommand()) {
+            if (isPinCommand()) {
                 return context.getText(com.android.internal.R.string.PinMmi);
             }
         }
@@ -275,7 +299,7 @@ public final class CdmaMmiCode  extends Handler implements MmiCode {
             if (ar.exception instanceof CommandException) {
                 CommandException.Error err = ((CommandException)(ar.exception)).getCommandError();
                 if (err == CommandException.Error.PASSWORD_INCORRECT) {
-                    if (isPukCommand()) {
+                    if (isPinCommand()) {
                         sb.append(context.getText(
                                 com.android.internal.R.string.badPuk));
                     } else {
