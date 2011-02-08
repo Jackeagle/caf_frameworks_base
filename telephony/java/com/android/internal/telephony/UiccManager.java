@@ -183,29 +183,25 @@ public class UiccManager extends Handler{
         }
 
         UiccCardStatusResponse status = (UiccCardStatusResponse)ar.result;
-        boolean cardStatusChanged = false;
 
-        if (mUiccCards[index] != null && status.card != null) {
         //Update already existing card
-            if (mUiccCards[index].getCardState() != status.card.card_state) {
-                cardStatusChanged = true;
-            }
+        if (mUiccCards[index] != null && status.card != null) {
             mUiccCards[index].update(status.card, mContext, mCi[index]);
-        } else if (mUiccCards[index] != null && status.card == null) {
-            //Dispose of removed card
+        }
+
+        //Dispose of removed card
+        if (mUiccCards[index] != null && status.card == null) {
             mUiccCards[index].dispose();
             mUiccCards[index] = null;
-            cardStatusChanged = true;
-        } else if (mUiccCards[index] == null && status.card != null) {
-            //Create new card
-            mUiccCards[index] = new UiccCard(this, status.card, mContext, mCi[index]);
-            cardStatusChanged = true;
         }
 
-        if (cardStatusChanged) {
-            Log.d(mLogTag, "Notifying IccChangedRegistrants");
-            mIccChangedRegistrants.notifyRegistrants();
+        //Create new card
+        if (mUiccCards[index] == null && status.card != null) {
+            mUiccCards[index] = new UiccCard(this, status.card, mContext, mCi[index]);
         }
+
+        Log.d(mLogTag, "Notifying IccChangedRegistrants");
+        mIccChangedRegistrants.notifyRegistrants();
     }
 
     private synchronized void disposeCard(int index) {
