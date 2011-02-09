@@ -109,6 +109,12 @@ enum {
     kKeyIsBFrame          = 'bfrm',  // int32_t (bool)
     kKeyWMAEncodeOpt      = 'eopt',  // int32_t
     kKeyWMABlockAlign     = 'blka',  // int32_t
+    kKeyWMAVersion        = 'wmav',  // int32_t
+    kKeyWMAAdvEncOpt1     = 'ade1',   // int16_t
+    kKeyWMAAdvEncOpt2     = 'ade2',  // int32_t
+    kKeyWMAFormatTag      = 'fmtt',  // int64_t
+    kKeyWMABitspersample  = 'bsps',  // int64_t
+    kKeyWMAVirPktSize     = 'vpks',  // int64_t
 };
 
 enum {
@@ -121,6 +127,12 @@ enum {
     kTypeDivXVer_4,
     kTypeDivXVer_5,
     kTypeDivXVer_6,
+};
+
+enum {
+    kTypeWMA,
+    kTypeWMAPro,
+    kTypeWMAProPlus,
 };
 
 class MetaData : public RefBase {

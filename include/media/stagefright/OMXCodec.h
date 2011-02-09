@@ -121,6 +121,7 @@ private:
         kForceNV12TileColorFormat             = 65536,
         kBFrameFlagInExtensions               = 131072,
         kRequiresEOSMessage                   = 262144,
+        kRequiresWMAProComponent              = 524288,
     };
 
     struct BufferInfo {
