@@ -388,6 +388,8 @@ static int CompareSoftwareCodecsFirst(
 uint32_t OMXCodec::getComponentQuirks(
         const char *componentName, bool isEncoder) {
     uint32_t quirks = 0;
+    char mDeviceName[128];
+    property_get("ro.product.device",mDeviceName,"0");
 
     if (!strcmp(componentName, "OMX.PV.avcdec")) {
         quirks |= kWantsNALFragments;
@@ -405,10 +407,12 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresLoadedToIdleAfterAllocation;
         //quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
-		quirks |= kAvoidMemcopyInputRecordingFrames;
-        quirks |= kBFrameFlagInExtensions;
-        quirks |= kRequiresEOSMessage;
+        quirks |= kAvoidMemcopyInputRecordingFrames;
 
+        if (strncmp(mDeviceName, "msm7627_", 8)) {
+            quirks |= kBFrameFlagInExtensions;
+            quirks |= kRequiresEOSMessage;
+        }
         if (!strncmp(componentName, "OMX.qcom.video.encoder.avc", 26)) {
 
             // The AVC encoder advertises the size of output buffers
@@ -3716,7 +3720,7 @@ status_t OMXCodec::stop() {
         case EXECUTING:
         {
             //send EOS to h/w encoders.
-            if ( mIsEncoder && kRequiresEOSMessage ) {
+            if ( mIsEncoder && ( mQuirks & kRequiresEOSMessage )) {
                 sendEOSToOMXComponent( ); //TODO - will this adversely affect 7x27?
             }
             setState(EXECUTING_TO_IDLE);
