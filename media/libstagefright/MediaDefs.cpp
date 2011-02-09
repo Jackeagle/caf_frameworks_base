@@ -50,6 +50,8 @@ const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS = "video/mp2ts";
 const char *MEDIA_MIMETYPE_CONTAINER_AAC = "audio/aac";
 
 const char *MEDIA_MIMETYPE_CONTAINER_AVI = "video/avi";
+const char *MEDIA_MIMETYPE_CONTAINER_QCP = "audio/vnd.qcelp";
+
 const char *MEDIA_MIMETYPE_CONTAINER_ASF = "video/x-ms-asf";
 const char *MEDIA_MIMETYPE_VIDEO_DIVX = "video/divx";
 const char *MEDIA_MIMETYPE_VIDEO_DIVX311 = "video/divx311";
