@@ -1379,7 +1379,7 @@ void MPEG4Writer::Track::commitCttsEntry( const CommitOffset &co ){
     offsetTicks = co.offsetTicks;
 
     if ( mNumCttsCommitted > 1 ) {
-        if ( offsetUs != mLastOffset ) {
+        if ( offsetTicks != mLastOffsetTicks ) {
             addOneCttsTableEntry( mCttsCount, mLastOffset );
             mCttsCount = 1;
         }
