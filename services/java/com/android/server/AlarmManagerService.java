@@ -651,10 +651,12 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 
                 if ((result & TIME_CHANGED_MASK) != 0) {
                     remove(mTimeTickSender);
+/*
                     mClockReceiver.scheduleTimeTickEvent();
                     Intent intent = new Intent(Intent.ACTION_TIME_CHANGED);
                     intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
                     mContext.sendBroadcast(intent);
+*/
                 }
                 
                 synchronized (mLock) {
