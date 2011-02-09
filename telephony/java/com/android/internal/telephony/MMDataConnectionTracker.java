@@ -1595,7 +1595,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         // Update the subscription info only if this is the DDS.
         if (subData.subId == PhoneFactory.getDataSubscription()) {
             mSubscriptionData = subData;
-            mDsst.updateRecords();
+            mDsst.updateIccAvailability();
             mDpt.setSubscription(mSubscriptionData.subId);
         }
     }
