@@ -222,7 +222,6 @@ private:
     ClientRef mUserClientRef;
 
     // constants
-    sp<Surface> mSurface;
     PixelFormat mFormat;
     const GLExtensions& mGLExtensions;
     bool mNeedsBlending;
