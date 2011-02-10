@@ -334,7 +334,8 @@ public final class VelocityTracker implements Poolable<VelocityTracker> {
      * @return The previously computed X velocity.
      */
     public float getXVelocity() {
-        Pointer pointer = getPointer(0);
+        //Assumption: mPointerListHead contains id of the first touch input
+        Pointer pointer = mPointerListHead;
         return pointer != null ? pointer.xVelocity : 0;
     }
     
@@ -345,7 +346,8 @@ public final class VelocityTracker implements Poolable<VelocityTracker> {
      * @return The previously computed Y velocity.
      */
     public float getYVelocity() {
-        Pointer pointer = getPointer(0);
+        //Assumption: mPointerListHead contains id of the first touch input
+        Pointer pointer = mPointerListHead;
         return pointer != null ? pointer.yVelocity : 0;
     }
     
