@@ -55,6 +55,8 @@ namespace android {
 enum uevent_action { action_add, action_remove, action_change,
                                   action_online, action_offline };
 const int ueventParamMax = 32;
+enum { HDMIOUT_DISABLE = 0, HDMIOUT_ENABLE, HDMIFB_OPEN, HDMIHPD_ON, HDMIHPD_OFF };
+
 struct uevent {
     char *path;
     enum uevent_action action;

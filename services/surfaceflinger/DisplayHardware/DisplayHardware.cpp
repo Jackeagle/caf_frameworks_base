@@ -189,9 +189,12 @@ void DisplayHardware::init(uint32_t dpy)
 #if defined(TARGET_USES_OVERLAY)
     mOverlayLibObject = new overlay::Overlay();
     mOverlayUIEnable = false;
+    mOverlayUIEnablePropVal = false;
     property_get("debug.overlayui.enable", property, "0");
-    if (atoi(property))
+    if (atoi(property)) {
         mOverlayUIEnable = true;
+        mOverlayUIEnablePropVal= true;
+    }
 #endif
 
     if (mFlags & PARTIAL_UPDATES) {
