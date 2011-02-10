@@ -62,4 +62,8 @@ LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
 endif
 LOCAL_MODULE:= libsurfaceflinger
 
+ifeq ($(TARGET_USES_16BPPSURFACE_FOR_OPAQUE),true)
+LOCAL_CFLAGS += -DUSE_16BPPSURFACE_FOR_OPAQUE
+endif
+
 include $(BUILD_SHARED_LIBRARY)
