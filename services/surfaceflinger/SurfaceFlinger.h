@@ -197,6 +197,8 @@ public:
     virtual status_t                    freezeDisplay(DisplayID dpy, uint32_t flags);
     virtual status_t                    unfreezeDisplay(DisplayID dpy, uint32_t flags);
     virtual int                         setOrientation(DisplayID dpy, int orientation, uint32_t flags);
+
+    enum { HDMIOUT_DISABLE = 0, HDMIOUT_ENABLE, HDMIFB_OPEN, HDMIHPD_ON, HDMIHPD_OFF };
     virtual void                        enableHDMIOutput(int enable);
     virtual void                        setActionSafeWidthRatio(float asWidthRatio);
     virtual void                        setActionSafeHeightRatio(float asHeightRatio);

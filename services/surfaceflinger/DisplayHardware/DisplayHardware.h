@@ -93,6 +93,10 @@ public:
 #if defined(TARGET_USES_OVERLAY)
     overlay::Overlay* getOverlayObject() const { return mOverlayLibObject; }
     bool isOverlayUIEnabled() const { return mOverlayUIEnable; }
+    void setOverlayUIEnabled(bool enable) const {
+                              if (mOverlayUIEnablePropVal)
+                                  mOverlayUIEnable = enable;
+                           }
 #endif
     
     status_t compositionComplete() const;
@@ -128,7 +132,8 @@ private:
     overlay_control_device_t* mOverlayEngine;
 #if defined(TARGET_USES_OVERLAY)
     overlay::Overlay* mOverlayLibObject;
-    bool mOverlayUIEnable;
+    mutable bool mOverlayUIEnable;
+    bool mOverlayUIEnablePropVal;
 #endif
 };
 
