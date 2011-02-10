@@ -408,4 +408,7 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
 
     public void setDataSubscription(Message result) {
     }
+
+    public void setRilPowerOff(Message result) {
+    }
 }
