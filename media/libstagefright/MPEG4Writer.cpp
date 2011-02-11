@@ -2214,10 +2214,12 @@ status_t MPEG4Writer::Track::threadEntry() {
         updateTrackSizeEstimate();
 
         if (mOwner->exceedsFileSizeLimit()) {
+            LOGE("notify FileSizeLimit exceeded");
             mOwner->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED, 0);
             break;
         }
         if (mOwner->exceedsFileDurationLimit()) {
+            LOGE("notify FileDurationLimit exceeded");
             mOwner->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_MAX_DURATION_REACHED, 0);
             break;
         }
@@ -2453,6 +2455,7 @@ void MPEG4Writer::trackProgressStatus(
     // Error notification
     // Do not consider ERROR_END_OF_STREAM an error
     if (err != OK && err != ERROR_END_OF_STREAM) {
+        LOGE("notify Error:%d track%d", err, trackNum);
         notify(MEDIA_RECORDER_EVENT_ERROR,
                trackNum | MEDIA_RECORDER_ERROR_UNKNOWN,
                err);
@@ -2461,6 +2464,7 @@ void MPEG4Writer::trackProgressStatus(
 
     if (timeUs == -1) {
         // Send completion notification
+        LOGW("notify Completion track:%d", trackNum);
         notify(MEDIA_RECORDER_EVENT_INFO,
                trackNum | MEDIA_RECORDER_INFO_COMPLETION_STATUS,
                err);

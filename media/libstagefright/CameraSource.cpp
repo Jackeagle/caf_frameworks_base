@@ -63,7 +63,7 @@ void CameraSourceListener::notify(int32_t msgType, int32_t ext1, int32_t ext2) {
     LOGV("notify(%d, %d, %d)", msgType, ext1, ext2);
     switch( msgType ) {
     case CAMERA_MSG_ERROR: {
-      LOGE("notify: msgType - CAMERA_MSG_ERROR");
+      LOGE("notify: msgType - CAMERA_MSG_ERROR, %d, %d", ext1, ext2);
       sp<CameraSource> source = mSource.promote();
       if (source.get() != NULL) {
         source->errorCallback( );
