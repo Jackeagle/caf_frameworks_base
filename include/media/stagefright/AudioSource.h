@@ -86,6 +86,17 @@ private:
 
     AudioSource(const AudioSource &);
     AudioSource &operator=(const AudioSource &);
+
+    //additions for tunnel source
+public:
+    AudioSource(
+        int inputSource, const sp<MetaData>& meta );
+
+private:
+    int32_t mFormat;
+    String8 mMime;
+    int32_t mMaxBufferSize;
+    int64_t bufferDurationUs( ssize_t n );
 };
 
 }  // namespace android
