@@ -631,25 +631,11 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
             case SimMissing:
                 // text
                 mCarrier[subscription].setText(R.string.lockscreen_missing_sim_message_short);
+                mScreenLocked.setText(R.string.lockscreen_missing_sim_instructions);
 
-               // layout
-               boolean disableUnlockScreen = true;
-               for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
-                    disableUnlockScreen = disableUnlockScreen
-                            && ((mUpdateMonitor.getSimState(i) == IccCard.State.ABSENT)
-                            || (mUpdateMonitor.getSimState(i) == IccCard.State.PUK_REQUIRED));
-                    if (!disableUnlockScreen) break;
-                }
-                // User should be allowed to unlock the screen if sim is present on either of the subscriptions.
-                if (disableUnlockScreen) {
-                    mScreenLocked.setText(R.string.lockscreen_missing_sim_instructions);
-                    mSelector.setVisibility(View.GONE); // cannot unlock
-                    mEmergencyCallText.setVisibility(View.VISIBLE);
-                    mEmergencyCallButton.setVisibility(View.VISIBLE);
-                } else {
-                    mSelector.setVisibility(View.VISIBLE);
-                }
+                // layout
                 mScreenLocked.setVisibility(View.VISIBLE);
+                mSelector.setVisibility(View.VISIBLE);
                 mEmergencyCallText.setVisibility(View.VISIBLE);
                 // do not need to show the e-call button; user may unlock
                 break;
@@ -660,23 +646,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                                 mUpdateMonitor.getTelephonyPlmn(subscription),
                                 getContext().getText(R.string.lockscreen_missing_sim_message_short)));
 
-                // layout
-                disableUnlockScreen = true;
-                for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
-                     disableUnlockScreen = disableUnlockScreen
-                             && ((mUpdateMonitor.getSimState(i) == IccCard.State.ABSENT)
-                             || (mUpdateMonitor.getSimState(i) == IccCard.State.PUK_REQUIRED));
-                     if (!disableUnlockScreen) break;
-                 }
-                 // User should be allowed to unlock the screen if sim is present on either of the subscriptions.
-                 if (disableUnlockScreen) {
-                     mScreenLocked.setText(R.string.lockscreen_missing_sim_instructions);
-                     mSelector.setVisibility(View.GONE); // cannot unlock
-                     mEmergencyCallText.setVisibility(View.VISIBLE);
-                     mEmergencyCallButton.setVisibility(View.VISIBLE);
-                 } else {
-                     mSelector.setVisibility(View.VISIBLE);
-                 }
+                disableUnlockScreen(R.string.lockscreen_missing_sim_instructions);
                 break;
             case SimLocked:
                 // text
@@ -697,25 +667,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                                 mUpdateMonitor.getTelephonyPlmn(subscription),
                                 getContext().getText(R.string.lockscreen_sim_puk_locked_message)));
 
-                // layout
-                mScreenLocked.setVisibility(View.VISIBLE);
-                disableUnlockScreen = true;
-                for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
-                     disableUnlockScreen = disableUnlockScreen
-                             && (mUpdateMonitor.getSimState(i) == IccCard.State.PUK_REQUIRED
-                             || mUpdateMonitor.getSimState(i) == IccCard.State.ABSENT);
-                     if (!disableUnlockScreen) break;
-                 }
-                 // Show PUK Locked screen only when both subscriptions are PUK-Locked.
-                 // User should be allowed to unlock the screen if only one subscription is PUK-Locked.
-                 if (disableUnlockScreen) {
-                     mScreenLocked.setText(R.string.lockscreen_sim_puk_locked_instructions);
-                     mSelector.setVisibility(View.GONE); // cannot unlock
-                     mEmergencyCallText.setVisibility(View.VISIBLE);
-                     mEmergencyCallButton.setVisibility(View.VISIBLE);
-                 } else {
-                     mSelector.setVisibility(View.VISIBLE);
-                 }
+                disableUnlockScreen(R.string.lockscreen_sim_puk_locked_instructions);
                 break;
             case SimIOError:
                 // text
@@ -777,6 +729,25 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 mCarrier[subscription].setText(R.string.lockscreen_ruim_ruim_locked_message);
                 updateLayoutForPersoText();
                 break;
+        }
+    }
+
+    private void disableUnlockScreen(int resId) {
+        // layout
+        boolean disableUnlockScreen = true;
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            disableUnlockScreen = disableUnlockScreen
+                    && (mStatus[i] == Status.SimMissingLocked ||
+                    mStatus[i] == Status.SimPukLocked);
+            if (!disableUnlockScreen) break;
+        }
+        if (disableUnlockScreen) {
+             mScreenLocked.setText(resId);
+             mSelector.setVisibility(View.GONE); // cannot unlock
+             mEmergencyCallText.setVisibility(View.VISIBLE);
+             mEmergencyCallButton.setVisibility(View.VISIBLE);
+        } else {
+             mSelector.setVisibility(View.VISIBLE);
         }
     }
 
