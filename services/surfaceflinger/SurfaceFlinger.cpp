@@ -1294,13 +1294,27 @@ int SurfaceFlinger::setOrientation(DisplayID dpy,
 
 void SurfaceFlinger::enableHDMIOutput(int enable)
 {
-    const DisplayHardware& hw(graphicPlane(0).displayHardware());
-    mHDMIOutput = enable;
 #if defined(TARGET_USES_OVERLAY)
-    enableOverlayOpt(!enable);
-#endif
-    hw.enableHDMIOutput(enable);
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    switch(enable) {
+        case HDMIFB_OPEN:
+        case HDMIHPD_ON:
+            hw.setOverlayUIEnabled(false);
+        break;
+        case HDMIHPD_OFF:
+            hw.setOverlayUIEnabled(true);
+        break;
+        case HDMIOUT_ENABLE:
+        case HDMIOUT_DISABLE:
+        {
+            mHDMIOutput = enable;
+            enableOverlayOpt(!enable);
+            hw.setOverlayUIEnabled(!enable);
+            hw.enableHDMIOutput(enable);
+        }
+    }
     signalEvent();
+#endif
 }
 
 void SurfaceFlinger::setActionSafeWidthRatio(float asWidthRatio){

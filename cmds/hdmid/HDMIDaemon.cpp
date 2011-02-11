@@ -489,7 +489,7 @@ void HDMIDaemon::setResolution(int ID)
         if (cur->video_format == ID)
             mode = cur;
     }
-    SurfaceComposerClient::enableHDMIOutput(0);
+    SurfaceComposerClient::enableHDMIOutput(HDMIOUT_DISABLE);
     struct fb_var_screeninfo info;
     ioctl(fd1, FBIOGET_VSCREENINFO, &info);
     LOGD("GET Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>",
@@ -505,7 +505,7 @@ void HDMIDaemon::setResolution(int ID)
         info.pixclock/1000/1000);
     info.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
     ioctl(fd1, FBIOPUT_VSCREENINFO, &info);
-    SurfaceComposerClient::enableHDMIOutput(1);
+    SurfaceComposerClient::enableHDMIOutput(HDMIOUT_ENABLE);
     mCurrentID = ID;
 }
 
@@ -524,6 +524,7 @@ int HDMIDaemon::processFrameworkCommand()
     buffer[ret] = 0;
 
     if (!strcmp(buffer, HDMI_CMD_ENABLE_HDMI)) {
+        SurfaceComposerClient::enableHDMIOutput(HDMIFB_OPEN);
         if (!openFramebuffer())
             return -1;
         struct fb_var_screeninfo info;
@@ -535,7 +536,7 @@ int HDMIDaemon::processFrameworkCommand()
         property_set("hw.hdmiON", "1");
         int en = 1;
         ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
-        SurfaceComposerClient::enableHDMIOutput(1);
+        SurfaceComposerClient::enableHDMIOutput(HDMIOUT_ENABLE);
     } else if (!strcmp(buffer, HDMI_CMD_DISABLE_HDMI)) {
         LOGD(HDMI_CMD_DISABLE_HDMI);
 
@@ -544,7 +545,7 @@ int HDMIDaemon::processFrameworkCommand()
         int en = 0;
         ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
         property_set("hw.hdmiON", "0");
-        SurfaceComposerClient::enableHDMIOutput(0);
+        SurfaceComposerClient::enableHDMIOutput(HDMIOUT_DISABLE);
         ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
         close(fd1);
         fd1 = -1;
@@ -565,6 +566,10 @@ int HDMIDaemon::processFrameworkCommand()
         int ret = sscanf(buffer, HDMI_CMD_HPDOPTION "%d", &option);
         if (ret == 1) {
             LOGD(HDMI_CMD_HPDOPTION ": %d", option);
+            if (option)
+                SurfaceComposerClient::enableHDMIOutput(HDMIHPD_ON);
+            else
+                SurfaceComposerClient::enableHDMIOutput(HDMIHPD_OFF);
             writeHPDOption(option);
         }
     } else {
