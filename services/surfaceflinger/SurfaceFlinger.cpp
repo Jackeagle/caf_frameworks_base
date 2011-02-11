@@ -957,7 +957,11 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         const sp<LayerBase>& layer(layers[i]);
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
+#ifdef DISABLE_HDMI_VIDEO_BYPASS
+                if (mOverlayOpt && (getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
+#else
                 if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
+#endif
                     if (layer->drawWithOverlay(clip, true, mHDMIOutput) != NO_ERROR) {
                         layer->draw(clip);
                     }

@@ -60,6 +60,10 @@ LOCAL_CFLAGS += -DTARGET_USES_OVERLAY
 LOCAL_SHARED_LIBRARIES += liboverlay
 LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
 endif
-LOCAL_MODULE:= libsurfaceflinger
 
+ifeq "$(findstring msm7630,$(QCOM_TARGET_PRODUCT))" "msm7630"
+LOCAL_CFLAGS += -DDISABLE_HDMI_VIDEO_BYPASS
+endif
+
+LOCAL_MODULE:= libsurfaceflinger
 include $(BUILD_SHARED_LIBRARY)
