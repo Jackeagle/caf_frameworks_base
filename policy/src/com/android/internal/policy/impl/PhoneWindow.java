@@ -1176,6 +1176,10 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                 }
             case KeyEvent.KEYCODE_MUTE:
             case KeyEvent.KEYCODE_HEADSETHOOK:
+                if (event.getRepeatCount()>0){
+                    Log.i(TAG, "KEY Down KEYCODE_HEADSETHOOK TIMEOUT");
+                    break;
+               }
             case KeyEvent.KEYCODE_MEDIA_STOP:
             case KeyEvent.KEYCODE_MEDIA_NEXT:
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
