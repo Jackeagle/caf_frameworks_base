@@ -433,6 +433,7 @@ private:
    // only written in the main thread, only read in other threads
    volatile     int32_t                     mSecureFrameBuffer;
    bool mHDMIOutput;
+   bool mHDMIStateChanged;
    mutable bool mOverlayOpt;
    int  mLastCompCount;
    bool mFullScreen;
