@@ -58,10 +58,10 @@ import android.os.ServiceManager;
 import android.net.IConnectivityManager;
 import android.os.RemoteException;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.DataProfile.DataProfileType;
-import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
 import com.android.internal.telephony.ProxyManager.Subscription;
@@ -273,8 +273,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         IntentFilter filter = new IntentFilter();
         for (DataServiceType ds : DataServiceType.values()) {
-            filter.addAction(getAlarmIntentName(ds, IPVersion.IPV4));
-            filter.addAction(getAlarmIntentName(ds, IPVersion.IPV6));
+            filter.addAction(getAlarmIntentName(ds, IPVersion.INET));
+            filter.addAction(getAlarmIntentName(ds, IPVersion.INET6));
         }
         filter.addAction(Intent.ACTION_SCREEN_ON);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
@@ -797,8 +797,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                  * again.
                  */
                 for (DataServiceType ds : DataServiceType.values()) {
-                    mDpt.getRetryManager(ds, IPVersion.IPV4).resetRetryCount();
-                    mDpt.getRetryManager(ds, IPVersion.IPV6).resetRetryCount();
+                    mDpt.getRetryManager(ds, IPVersion.INET).resetRetryCount();
+                    mDpt.getRetryManager(ds, IPVersion.INET6).resetRetryCount();
                 }
                 updateDataConnections(REASON_TETHERED_MODE_STATE_CHANGED);
             break;
@@ -1084,12 +1084,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 // different, so disconnect both.
                 boolean disconnectDone = false;
                 DataConnection dc;
-                dc = mDpt.getActiveDataConnection(ds, IPVersion.IPV4);
+                dc = mDpt.getActiveDataConnection(ds, IPVersion.INET);
                 if (dc != null) {
                     tryDisconnectDataCall(dc, reason);
                     disconnectDone = true;
                 }
-                dc = mDpt.getActiveDataConnection(ds, IPVersion.IPV6);
+                dc = mDpt.getActiveDataConnection(ds, IPVersion.INET6);
                 if (dc != null) {
                     tryDisconnectDataCall(dc, reason);
                     disconnectDone = true;
@@ -1159,13 +1159,13 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                  * through this inactive DC.
                  */
                 for (DataServiceType ds : DataServiceType.values()) {
-                    if (mDpt.getActiveDataConnection(ds, IPVersion.IPV4) == dc) {
-                        mDpt.setServiceTypeAsInactive(ds, IPVersion.IPV4);
-                        notifyDataConnection(ds, IPVersion.IPV4, reason);
+                    if (mDpt.getActiveDataConnection(ds, IPVersion.INET) == dc) {
+                        mDpt.setServiceTypeAsInactive(ds, IPVersion.INET);
+                        notifyDataConnection(ds, IPVersion.INET, reason);
                     }
-                    if (mDpt.getActiveDataConnection(ds, IPVersion.IPV6) == dc) {
-                        mDpt.setServiceTypeAsInactive(ds, IPVersion.IPV6);
-                        notifyDataConnection(ds, IPVersion.IPV6, reason);
+                    if (mDpt.getActiveDataConnection(ds, IPVersion.INET6) == dc) {
+                        mDpt.setServiceTypeAsInactive(ds, IPVersion.INET6);
+                        notifyDataConnection(ds, IPVersion.INET6, reason);
                     }
                 }
             } else if (dc.isActive()
@@ -1280,18 +1280,18 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
                 //IPV4
                 if (SUPPORT_IPV4
-                        && mDpt.isServiceTypeActive(ds, IPVersion.IPV4) == false
-                        && mDpt.getState(ds, IPVersion.IPV4) != State.WAITING_ALARM) {
-                    boolean setupDone = trySetupDataCall(ds, IPVersion.IPV4, reason);
+                        && mDpt.isServiceTypeActive(ds, IPVersion.INET) == false
+                        && mDpt.getState(ds, IPVersion.INET) != State.WAITING_ALARM) {
+                    boolean setupDone = trySetupDataCall(ds, IPVersion.INET, reason);
                     if (setupDone)
                         return; //one at a time, in order of priority
                 }
 
                 //IPV6
                 if (SUPPORT_IPV6
-                        && mDpt.isServiceTypeActive(ds, IPVersion.IPV6) == false
-                        && mDpt.getState(ds, IPVersion.IPV6) != State.WAITING_ALARM) {
-                    boolean setupDone = trySetupDataCall(ds, IPVersion.IPV6, reason);
+                        && mDpt.isServiceTypeActive(ds, IPVersion.INET6) == false
+                        && mDpt.getState(ds, IPVersion.INET6) != State.WAITING_ALARM) {
+                    boolean setupDone = trySetupDataCall(ds, IPVersion.INET6, reason);
                     if (setupDone)
                         return; //one at a time, in order of priority
                 }
@@ -1427,14 +1427,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             sb.append("ds= " + ds);
             sb.append(", enabled = "+mDpt.isServiceTypeEnabled(ds));
             sb.append(", active = v4:")
-            .append(mDpt.getState(ds, IPVersion.IPV4));
-            if (mDpt.isServiceTypeActive(ds, IPVersion.IPV4)) {
-                sb.append("("+mDpt.getActiveDataConnection(ds, IPVersion.IPV4).cid+")");
+            .append(mDpt.getState(ds, IPVersion.INET));
+            if (mDpt.isServiceTypeActive(ds, IPVersion.INET)) {
+                sb.append("("+mDpt.getActiveDataConnection(ds, IPVersion.INET).cid+")");
             }
             sb.append(" v6:")
-            .append(mDpt.getState(ds, IPVersion.IPV6));
-            if (mDpt.isServiceTypeActive(ds, IPVersion.IPV6)) {
-                sb.append("("+mDpt.getActiveDataConnection(ds, IPVersion.IPV6).cid+")");
+            .append(mDpt.getState(ds, IPVersion.INET6));
+            if (mDpt.isServiceTypeActive(ds, IPVersion.INET6)) {
+                sb.append("("+mDpt.getActiveDataConnection(ds, IPVersion.INET6).cid+")");
             }
             logv(sb.toString());
         }

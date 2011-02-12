@@ -23,8 +23,8 @@ import android.content.Context;
 import android.os.SystemProperties;
 import android.util.Log;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.DataConnectionTracker.State;
-import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.DataProfile.DataProfileType;
 
 /*
@@ -81,9 +81,9 @@ public class DataServiceInfo {
         mDataProfileList = new ArrayList<DataProfile>();
 
         /* Two retry managers as v4 and v6 could be tried in parallel */
-        mRetryMgr = new HashMap<Phone.IPVersion, RetryManager>();
-        mRetryMgr.put(IPVersion.IPV4, createRetryManager(serviceType));
-        mRetryMgr.put(IPVersion.IPV6, createRetryManager(serviceType));
+        mRetryMgr = new HashMap<IPVersion, RetryManager>();
+        mRetryMgr.put(IPVersion.INET, createRetryManager(serviceType));
+        mRetryMgr.put(IPVersion.INET6, createRetryManager(serviceType));
 
         clear();
     }
@@ -123,11 +123,11 @@ public class DataServiceInfo {
 
     void resetServiceConnectionState() {
         if (ipv4State == State.FAILED || ipv4State == State.WAITING_ALARM)
-            setState(State.IDLE, IPVersion.IPV4);
+            setState(State.IDLE, IPVersion.INET);
         if (ipv6State == State.FAILED || ipv6State == State.WAITING_ALARM)
-            setState(State.IDLE, IPVersion.IPV6);
-        mRetryMgr.get(IPVersion.IPV4).resetRetryCount();
-        mRetryMgr.get(IPVersion.IPV6).resetRetryCount();
+            setState(State.IDLE, IPVersion.INET6);
+        mRetryMgr.get(IPVersion.INET).resetRetryCount();
+        mRetryMgr.get(IPVersion.INET6).resetRetryCount();
     }
 
     RetryManager getRetryManager(IPVersion ipv) {
@@ -238,9 +238,9 @@ public class DataServiceInfo {
         logi("Service is active on " + ipv);
         logv(" dc : " + dc.toString());
 
-        if (ipv == IPVersion.IPV6) {
+        if (ipv == IPVersion.INET6) {
             this.activeIpv6Dc = dc;
-        } else if (ipv == IPVersion.IPV4) {
+        } else if (ipv == IPVersion.INET) {
             this.activeIpv4Dc = dc;
         }
         setState(State.CONNECTED, ipv);
@@ -250,49 +250,49 @@ public class DataServiceInfo {
 
         logi("Service is inactive on " + ipv);
 
-        if (ipv == IPVersion.IPV6) {
+        if (ipv == IPVersion.INET6) {
             this.activeIpv6Dc = null;
-        } else if (ipv == IPVersion.IPV4) {
+        } else if (ipv == IPVersion.INET) {
             this.activeIpv4Dc = null;
         }
         setState(State.IDLE, ipv);
     }
 
     DataConnection getActiveDataConnection(IPVersion ipv) {
-        if (ipv == IPVersion.IPV4)
+        if (ipv == IPVersion.INET)
             return activeIpv4Dc;
-        else if (ipv == IPVersion.IPV6)
+        else if (ipv == IPVersion.INET6)
             return activeIpv6Dc;
         return null;
     }
 
     boolean isServiceTypeActive(IPVersion ipVersion) {
-        if (ipVersion == IPVersion.IPV6) {
+        if (ipVersion == IPVersion.INET6) {
             return ipv6State == State.CONNECTED;
-        } else if (ipVersion == IPVersion.IPV4) {
+        } else if (ipVersion == IPVersion.INET) {
             return ipv4State == State.CONNECTED;
         }
         return false;
     }
 
     boolean isServiceTypeActive() {
-        return isServiceTypeActive(IPVersion.IPV4) || isServiceTypeActive(IPVersion.IPV6);
+        return isServiceTypeActive(IPVersion.INET) || isServiceTypeActive(IPVersion.INET6);
     }
 
     public synchronized void setState(State newState, IPVersion ipv) {
-        State oldState = ipv == IPVersion.IPV4 ? ipv4State : ipv6State;
+        State oldState = ipv == IPVersion.INET ? ipv4State : ipv6State;
 
         if (newState != oldState) {
-            if (ipv == IPVersion.IPV6) {
+            if (ipv == IPVersion.INET6) {
                 ipv6State = newState;
-            } else if (ipv == IPVersion.IPV4) {
+            } else if (ipv == IPVersion.INET) {
                 ipv4State = newState;
             }
         }
     }
 
     public State getState(IPVersion ipv) {
-        if (ipv == IPVersion.IPV4)
+        if (ipv == IPVersion.INET)
             return ipv4State;
         else
             return ipv6State;

@@ -29,6 +29,7 @@ import android.provider.Settings.SettingNotFoundException;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.IPhoneSubInfo;
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.ITelephonyRegistry;
@@ -36,7 +37,6 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.TelephonyProperties;
-import com.android.internal.telephony.Phone.IPVersion;
 
 import java.util.List;
 

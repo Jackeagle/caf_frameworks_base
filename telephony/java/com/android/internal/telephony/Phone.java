@@ -27,6 +27,7 @@ import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.DataConnection;
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
@@ -95,9 +96,6 @@ public interface Phone {
       UNKNOWN, SWITCH, SEPARATE, TRANSFER, CONFERENCE, REJECT, HANGUP;
     };
 
-    public enum IPVersion {
-        IPV4, IPV6
-    }
     static final String STATE_KEY = "state";
     static final String PHONE_NAME_KEY = "phoneName";
 

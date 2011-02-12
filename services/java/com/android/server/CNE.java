@@ -17,8 +17,6 @@
 package com.android.server;
 
 import java.io.*;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -36,8 +34,8 @@ import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.NoSuchElementException;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.Phone;
-import com.android.internal.telephony.Phone.IPVersion;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.TelephonyIntents;
@@ -333,7 +331,7 @@ public final class CNE {
         AddressInfo wlanAddrInfo = new AddressInfo();
         String ipAddr = null;
         String gatewayAddr = null;
-        if (version == IPVersion.IPV4) {
+        if (version == IPVersion.INET) {
             try {
                 DhcpInfo dhcpInfo = mWifiManager.getDhcpInfo();
                 int ipAddressInt = dhcpInfo.ipAddress;
@@ -363,14 +361,14 @@ public final class CNE {
             } catch (UnknownHostException uexp) {
                 Log.w(LOG_TAG, "Invalid host name" + ipAddr);
             }
-        } else if (version == IPVersion.IPV6) {
+        } else if (version == IPVersion.INET6) {
             /*
              * currently wifistate tracker is not supporting V6
              * address, without this if V6 interface is brought up by
              * kernel, we can get the V6 address info if we have a
              * valid v4 address.
              */
-            AddressInfo v4Addr = getWlanAddrInfo(IPVersion.IPV4);
+            AddressInfo v4Addr = getWlanAddrInfo(IPVersion.INET);
             try {
                 InetAddress inet4Addr = InetAddress.getByName(v4Addr.ipAddr);
                 NetworkInterface netIface = NetworkInterface.getByInetAddress(inet4Addr);
@@ -429,7 +427,7 @@ public final class CNE {
                     NetworkInfo.State networkState = (networkInfo
                             == null ? NetworkInfo.State.UNKNOWN : networkInfo.getState());
                     if (networkState == NetworkInfo.State.CONNECTED) {
-                        ipV4Addr = (getWlanAddrInfo(IPVersion.IPV4)).ipAddr;
+                        ipV4Addr = (getWlanAddrInfo(IPVersion.INET)).ipAddr;
                     }
                     WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
                     String ssid = wifiInfo.getSSID();
@@ -460,7 +458,7 @@ public final class CNE {
                 }
 
                 if (mWifiManager != null) {
-                    AddressInfo wlanV4Addr = getWlanAddrInfo(IPVersion.IPV4);
+                    AddressInfo wlanV4Addr = getWlanAddrInfo(IPVersion.INET);
                     NetworkInfo.State networkState = NetworkInfo.State.UNKNOWN;
                     if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
                         NetworkInfo networkInfo = (NetworkInfo) intent
@@ -545,14 +543,14 @@ public final class CNE {
                 String apnType = intent.getStringExtra(Phone.DATA_APN_TYPES_KEY);
                 if (apnType.equals(Phone.APN_TYPE_DEFAULT)) {
                     AddressInfo wwanV4AddrInfo = getWwanAddrInfo(Phone.APN_TYPE_DEFAULT,
-                            IPVersion.IPV4);
-                    IPVersion ipv = IPVersion.IPV4;
+                            IPVersion.INET);
+                    IPVersion ipv = IPVersion.INET;
                     String str = intent.getStringExtra(Phone.DATA_IPVERSION_KEY);
                     if (str != null) {
                         ipv = Enum.valueOf(IPVersion.class, str);
                     }
                     AddressInfo wwanAddrInfo;
-                    if (ipv == IPVersion.IPV4) {
+                    if (ipv == IPVersion.INET) {
                         wwanAddrInfo = wwanV4AddrInfo;
                     } else {
                         Log.w(LOG_TAG, "IPV6 is not supported by CNE");
@@ -564,7 +562,7 @@ public final class CNE {
                         netState = convertToNetworkState(Enum.valueOf(Phone.DataState.class, str));
                     }
                     if (netState == NetworkInfo.State.CONNECTED) {
-                        if (ipv == IPVersion.IPV4) {
+                        if (ipv == IPVersion.INET) {
                             activeWwanV4IfName = wwanV4AddrInfo.ifName;
                             activeWwanV4GatewayAddr = wwanV4AddrInfo.gatewayAddr;
                         }
@@ -586,7 +584,7 @@ public final class CNE {
                                     wwanAddrInfo.ifName, null, null);
                         }
                     } else if (netState == NetworkInfo.State.DISCONNECTED) {
-                        if (ipv == IPVersion.IPV4) {
+                        if (ipv == IPVersion.INET) {
                             configureIproute2(CNE_IPROUTE2_DELETE_ROUTING, activeWwanV4IfName,
                                     null, null);
                             if (DBG) {
@@ -1289,7 +1287,7 @@ public final class CNE {
                 NetworkInfo.State networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN
                         : networkInfo.getState());
                 AddressInfo wwanV4AddrInfo = getWwanAddrInfo(Phone.APN_TYPE_DEFAULT,
-                        IPVersion.IPV4);
+                        IPVersion.INET);
                 int roaming = (int) (mTelephonyManager.isNetworkRoaming() ? 1 : 0);
                 int type = networkInfo.getSubtype();
                 int rssi = getSignalStrength(type);
@@ -1922,7 +1920,7 @@ public final class CNE {
             NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             NetworkInfo.State networkState = networkInfo.getState();
             if (networkState == NetworkInfo.State.CONNECTED) {
-                AddressInfo wlanV4AddrInfo = getWlanAddrInfo(IPVersion.IPV4);
+                AddressInfo wlanV4AddrInfo = getWlanAddrInfo(IPVersion.INET);
                 notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState),
                         wlanV4AddrInfo.ipAddr);
 
@@ -1943,7 +1941,7 @@ public final class CNE {
             NetworkInfo.State networkState = networkInfo.getState();
             if (networkState == NetworkInfo.State.CONNECTED) {
                 AddressInfo wwanV4AddrInfo = getWwanAddrInfo(Phone.APN_TYPE_DEFAULT,
-                        IPVersion.IPV4);
+                        IPVersion.INET);
                 notifyRatConnectStatus(CNE_RAT_WWAN, NetworkStateToInt(networkState),
                         wwanV4AddrInfo.ipAddr);
             } else {
@@ -2006,7 +2004,7 @@ public final class CNE {
             }
             if (status == FmcNotifier.FMC_STATUS_ENABLED) {
                 AddressInfo wwanV4AddrInfo = getWwanAddrInfo(Phone.APN_TYPE_DEFAULT,
-                        IPVersion.IPV4);
+                        IPVersion.INET);
                 configureIproute2(CNE_IPROUTE2_DELETE_HOST_ROUTING, activeWlanIfName, null, null);
                 configureIproute2(CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN, activeWwanV4IfName,
                         null, null);

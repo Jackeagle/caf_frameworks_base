@@ -22,7 +22,7 @@ import android.os.SystemProperties;
 import android.util.Log;
 import android.util.Patterns;
 
-import com.android.internal.telephony.Phone.IPVersion;
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.DataProfile.DataProfileType;
 
 /**
@@ -79,14 +79,14 @@ public class MMDataConnection extends DataConnection {
             this.mCM.setupDataCall(
                     Integer.toString(radioTech),
                     Integer.toString(0), apn.apn, apn.user, apn.password, Integer.toString(authType),
-                    Integer.toString(cp.ipv == IPVersion.IPV6 ? 1 : 0),
+                    Integer.toString(cp.ipv == IPVersion.INET6 ? 1 : 0),
                     obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE, cp));
         } else if (cp.dp.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP2_NAI) {
             this.mCM.setupDataCall(
                     Integer.toString(radioTech),
                     Integer.toString(0), null, null, null, Integer
                     .toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP), Integer
-                    .toString(cp.ipv == IPVersion.IPV6 ? 1 : 0),
+                    .toString(cp.ipv == IPVersion.INET6 ? 1 : 0),
                     obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE, cp));
         } else if (cp.dp.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP2_OMH) {
             if (mOmhEnabled) {
@@ -99,7 +99,7 @@ public class MMDataConnection extends DataConnection {
                         Integer.toString(radioTech),
                         profileId, null, null, null, Integer
                         .toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP), Integer
-                        .toString(cp.ipv == IPVersion.IPV6 ? 1 : 0),
+                        .toString(cp.ipv == IPVersion.INET6 ? 1 : 0),
                         obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE, cp));
             }
         }

@@ -16,7 +16,8 @@
 
 package com.android.internal.telephony;
 
-import com.android.internal.telephony.Phone.IPVersion;
+import com.android.internal.net.IPVersion;
+
 
 /**
  * {@hide}

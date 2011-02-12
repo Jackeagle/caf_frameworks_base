@@ -23,9 +23,9 @@ import android.os.ServiceManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
+import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.ITelephonyRegistry;
 import com.android.internal.telephony.Phone.DataState;
-import com.android.internal.telephony.Phone.IPVersion;
 
 /**
  * broadcast intents
