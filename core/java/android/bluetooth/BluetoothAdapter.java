@@ -687,6 +687,7 @@ public final class BluetoothAdapter {
      */
     private static class RfcommChannelPicker {
         private static final int[] RESERVED_RFCOMM_CHANNELS =  new int[] {
+             1,  // DUN
             10,  // HFAG
             11,  // HSAG
             12,  // OPUSH
