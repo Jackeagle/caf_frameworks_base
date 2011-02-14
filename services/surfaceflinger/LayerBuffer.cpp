@@ -508,9 +508,7 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, bool cle
     NativeBuffer src(ourBuffer->getBuffer());
     const DisplayHardware& hw(mLayer.mFlinger->
                                graphicPlane(0).displayHardware());
-#ifndef DISABLE_HDMI_VIDEO_BYPASS
     hw.videoOverlayStarted(true);
-#endif
     overlay::Overlay* temp = hw.getOverlayObject();
     if (!temp->setSource(src.hor_stride, src.ver_stride, src.img.format, mLayer.getOrientation(), hdmiConnected))
         return INVALID_OPERATION;

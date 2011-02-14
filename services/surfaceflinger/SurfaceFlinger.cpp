@@ -93,7 +93,6 @@ SurfaceFlinger::SurfaceFlinger()
         mBootFinished(false),
         mConsoleSignals(0),
         mHDMIOutput(false),
-        mHDMIStateChanged(false),
         mSecureFrameBuffer(0),
 #if defined(TARGET_USES_OVERLAY)
         mOverlayOpt(true),
@@ -918,9 +917,8 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
             if (((r.right - r.left) == hw.getWidth() && (r.bottom - r.top) == hw.getHeight()) ||
                           layerbuffercount) {
                 bool clear = !mOverlayUsed;
-                if((mHDMIStateChanged) || (layerbuffercount == 1 && compcount == 1 && compositionStateChanged))
+                if(layerbuffercount == 1 && compcount == 1 && compositionStateChanged)
                    clear = true;
-                mHDMIStateChanged = false;
 #ifdef SF_BYPASS
                 int drawLayerIndex;
                 if(layerbuffercount == 1) {
@@ -929,18 +927,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                    drawLayerIndex = ovLayerIndex;
                 }
                 const sp<LayerBase>& layer = layers[drawLayerIndex];
-#ifdef DISABLE_HDMI_VIDEO_BYPASS
-                if (layer->drawWithOverlay(drawClip, clear, false) == NO_ERROR) {
-#else
                 if (layer->drawWithOverlay(drawClip, clear, mHDMIOutput) == NO_ERROR) {
-#endif
 #else
                 const sp<LayerBase>& layer = layers[layerbufferIndex];
-#ifdef DISABLE_HDMI_VIDEO_BYPASS
-                if (layer->drawWithOverlay(drawClip, clear, false) == NO_ERROR) {
-#else
                 if (layer->drawWithOverlay(drawClip, clear, mHDMIOutput) == NO_ERROR) {
-#endif
 #endif
                     if (clear)
                         mFullScreen = false;
@@ -972,11 +962,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         if (!clip.isEmpty()) {
 #ifdef DISABLE_HDMI_VIDEO_BYPASS
                 if (mOverlayOpt && (getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
-                    if (layer->drawWithOverlay(clip, true, false) != NO_ERROR) {
 #else
                 if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
-                    if (layer->drawWithOverlay(clip, true, mHDMIOutput) != NO_ERROR) {
 #endif
+                    if (layer->drawWithOverlay(clip, true, mHDMIOutput) != NO_ERROR) {
                         layer->draw(clip);
                     }
                     mOverlayUsed = true;
@@ -1286,7 +1275,6 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
 {
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     mHDMIOutput = enable;
-    mHDMIStateChanged = !enable;
 #if defined(TARGET_USES_OVERLAY)
     enableOverlayOpt(!enable);
 #endif
