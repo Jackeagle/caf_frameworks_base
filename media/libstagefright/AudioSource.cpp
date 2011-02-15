@@ -30,6 +30,29 @@
 
 #define AMR_FRAMESIZE 32
 
+// AAC silence frame size which includes size of the frame also
+#define AAC_MONO_SILENCE_FRAME_SIZE         12 // this includes the length of silence frame
+#define AAC_STEREO_SILENCE_FRAME_SIZE       13 // this includes the length of silence frame
+#define SILENCE_INSERTION_TIME_PERIOD_USEC  800000
+#define AMR_NB_FRAME_DURATION_USEC          20000 // One AMR-NB frame = 20msec
+
+//AMR-NB silence frame size
+#define AMR_NB_SILENCE_FRAME_SIZE 32
+
+//AMR-NB silence frame data
+static const uint8_t  AMR_NB_SILENCE_FRAME[] = {
+    0x3C,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+//AAC silence frame data
+// First two bytes indicate the length of silence frame
+static const uint8_t  AAC_MONO_SILENCE_FRAME_WITH_SIZE[] = {
+    0x0A, 0x00, 0x01, 0x40, 0x20, 0x06, 0x4F, 0xDE, 0x02, 0x70, 0x0C, 0x1C
+};
+static const uint8_t  AAC_STEREO_SILENCE_FRAME_WITH_SIZE[] = {
+    0x0B, 0x00, 0x21, 0x10, 0x05, 0x00, 0xA0, 0x19, 0x33, 0x87, 0xC0, 0x00, 0x7E
+};
+
 namespace android {
 
 AudioSource::AudioSource(
@@ -50,6 +73,7 @@ AudioSource::AudioSource(
                      AudioRecord::RECORD_IIR_ENABLE;
 
     mMaxBufferSize = kMaxBufferSize;
+    mNumChannels   = channels;
     mRecord = new AudioRecord(
                 inputSource, sampleRate, AudioSystem::PCM_16_BIT,
                 channels > 1? AudioSystem::CHANNEL_IN_STEREO: AudioSystem::CHANNEL_IN_MONO,
@@ -79,6 +103,7 @@ AudioSource::AudioSource( int inputSource, const sp<MetaData>& meta )
 
     int32_t frameSize = -1;
 
+    mNumChannels = channels;
     if ( !strcasecmp( mime, MEDIA_MIMETYPE_AUDIO_AMR_NB ) ) {
         mFormat = AudioSystem::AMR_NB;
         frameSize = AMR_FRAMESIZE;
@@ -347,6 +372,42 @@ status_t AudioSource::read(
         }
         else {
             recordDurationUs = bufferDurationUs( n );
+            if( timestampUs < SILENCE_INSERTION_TIME_PERIOD_USEC ) {
+                if( mFormat == android::AudioSystem::AMR_NB ) {
+                    int frameCount = recordDurationUs/AMR_NB_FRAME_DURATION_USEC; // 20000us is duration of one amr-nb frame
+                    uint8_t* dataPtr = (uint8_t*)buffer->data();
+                    n = 0;
+                    while(frameCount > 0) {
+                        memcpy(dataPtr,AMR_NB_SILENCE_FRAME,AMR_NB_SILENCE_FRAME_SIZE);
+                        dataPtr += AMR_NB_SILENCE_FRAME_SIZE;
+                        n += AMR_NB_SILENCE_FRAME_SIZE;
+                        frameCount--;
+                    }
+                }
+                // The below code is required if in future AAC tunnel mode is supported
+#if 0
+                if(mFormat == android::AudioSystem::AAC) {
+                    int frameCount = numFrames,silenceFrameSize = 0;
+                    uint8_t* dataPtr = data + 6; // dataPtr points to size of first frame
+                    const uint8_t* silenceFrameData = NULL;
+                    n = 0;
+                    if(mNumChannels > 1) {
+                        silenceFrameData = AAC_STEREO_SILENCE_FRAME_WITH_SIZE;
+                        silenceFrameSize = AAC_STEREO_SILENCE_FRAME_SIZE;
+                    }
+                    else {
+                        silenceFrameData = AAC_MONO_SILENCE_FRAME_WITH_SIZE;
+                        silenceFrameSize = AAC_MONO_SILENCE_FRAME_SIZE;
+                    }
+                    while(frameCount > 0) {
+                        memcpy(dataPtr,silenceFrameData,silenceFrameSize);
+                        dataPtr += silenceFrameSize;
+                        n += silenceFrameSize - 2;
+                        frameCount--;
+                    }
+                }
+#endif
+            }
         }
 
         timestampUs += recordDurationUs;
