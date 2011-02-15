@@ -7192,6 +7192,11 @@ public final class ActivityManagerService extends ActivityManagerNative
                     + android.Manifest.permission.DUMP);
             return;
         }
+
+        Slog.e(TAG, "dump invoked by pid [" + Binder.getCallingPid() + "] with following args");
+        for(int i=0; i < args.length; i++) {
+            Slog.e(TAG, "args[" + i + "] : " + args[i]);
+        }
         
         boolean dumpAll = false;
         
