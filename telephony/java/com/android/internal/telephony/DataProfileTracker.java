@@ -205,8 +205,18 @@ public class DataProfileTracker extends Handler {
     }
     
     public void update(CommandsInterface ci, int subId) {
+        logd("update()");
+        mCm = ci;
         mSubId = subId;
-        reloadAllDataProfiles("update dpt");
+
+        // Reset member variables
+        mPreferredDefaultApn = null;
+        mCanSetDefaultPreferredApn = false;
+        mOperatorNumeric = null;
+        mOmhDataProfilesList.clear();
+
+        // Reload all the data profiles
+        reloadAllDataProfiles("update DataProfileTracker");
     }
 
     public void handleMessage(Message msg) {

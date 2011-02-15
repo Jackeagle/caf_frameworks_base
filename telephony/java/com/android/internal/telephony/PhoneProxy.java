@@ -282,8 +282,10 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void updateDataConnectionTracker() {
-        logd("Updating Data Connection Tracker with subscription " + getSubscriptionInfo()
-             + " and CommandsInterface");
+        logd("Updating Data Connection Tracker with subscription " + getSubscriptionInfo());
+        // Set the proper phone in the DCT
+        mDct.setPhone(mActivePhone);
+        // Update DCT with new subscription info
         mDct.update(mCi, getSubscriptionInfo());
     }
 

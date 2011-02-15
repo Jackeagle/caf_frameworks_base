@@ -337,32 +337,45 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     public void update(CommandsInterface ci, Subscription subData) {
+        if (subData == null) {
+            loge("update(): Supplied subscription info is null");
+            return;
+        }
+
+        int currentDds = PhoneFactory.getDataSubscription();
+
+        logd("update(): subData.subId = " + subData.subId + " currentDds = " + currentDds);
+
         // Update only if DDS
-        if (subData.subId == PhoneFactory.getDataSubscription()) {
-            //super.update(ci, subData);
+        if (subData.subId == currentDds) {
             // 1. Update the subscription data
             mSubscriptionData = subData;
 
-            // 2. Unregister for the events on Commands Interface.
+            // 2. Reset Data Connections List
+            if (mDataConnectionList != null) {
+                for (DataConnection dc: mDataConnectionList) {
+                    // All data connections will be in inactive state.
+                    // Call reset to make sure those are in inactive state.
+                    dc.reset(null);
+                }
+            }
+
+            // 3. Unregister for the events on Commands Interface.
             mCm.unregisterForOn(this);
             mCm.unregisterForOffOrNotAvailable(this);
             mCm.unregisterForDataStateChanged(this);
             mCm.unregisterForCdmaOtaProvision(this);
 
-            // 3. Re-register for the events on new Commands Interface.
+            // 4. Re-register for the events on new Commands Interface.
             mCm = ci;
             mCm.registerForOn(this, EVENT_RADIO_ON, null);
             mCm.registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_NOT_AVAILABLE, null);
             mCm.registerForDataStateChanged(this, EVENT_DATA_CALL_LIST_CHANGED, null);
             mCm.registerForCdmaOtaProvision(this, EVENT_CDMA_OTA_PROVISION, null);
 
-            // 4. Update all the elments
+            // 5. Update all the elments
             mDpt.update(ci, subData.subId);
             mDsst.update(ci);
-
-            // 5. Update Data Call List
-            destroyDataConnectionList();
-            createDataConnectionList();
 
             // 6. Restart NetStat Poll
             stopNetStatPoll();
