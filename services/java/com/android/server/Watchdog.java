@@ -452,6 +452,18 @@ public class Watchdog extends Thread {
 
             mActivity.addErrorToDropBox("watchdog", null, null, null, name, null, stack, null);
 
+            if (!Debug.isDebuggerConnected()) {
+            // Generate tombstone of zygote
+            // zygote forks system_server
+                 int zygotePid = Process.getPpid();
+                 if (zygotePid > 0) {
+                     Process.sendSignal(zygotePid, 6);
+                     SystemClock.sleep(2000);
+                     Process.sendSignal(zygotePid, 6);
+                     SystemClock.sleep(2000);
+                 }
+            }
+
             // Only kill the process if the debugger is not attached.
             if (!Debug.isDebuggerConnected()) {
                 Slog.w(TAG, "*** WATCHDOG KILLING SYSTEM PROCESS: " + name);
