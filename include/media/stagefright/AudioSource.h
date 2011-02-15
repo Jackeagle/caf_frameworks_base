@@ -96,6 +96,7 @@ private:
     int32_t mFormat;
     String8 mMime;
     int32_t mMaxBufferSize;
+    int32_t mNumChannels;
     int64_t bufferDurationUs( ssize_t n );
 };
 
