@@ -626,7 +626,10 @@ public class ProxyManager extends Handler {
     }
 
     private void fillAppIndex(Subscription cardSub, int appIndex) {
-        if (cardSub.appType.equals("SIM") || cardSub.appType.equals("USIM")) {
+        if (cardSub.appType == null) {
+            cardSub.m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
+            cardSub.m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
+        } else if (cardSub.appType.equals("SIM") || cardSub.appType.equals("USIM")) {
             cardSub.m3gppIndex = appIndex;
             cardSub.m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
         } else if (cardSub.appType.equals("RUIM") || cardSub.appType.equals("CSIM")) {
