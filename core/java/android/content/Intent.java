@@ -1820,8 +1820,21 @@ public class Intent implements Parcelable, Cloneable {
     public static final String ACTION_HEADSET_PLUG =
             "android.intent.action.HEADSET_PLUG";
 
+    /**
+     * Intents indicating the FM Rx and FM Tx swithing on or off
+     * <p>The intent will have the following extra values:
+     * <ul>
+     *   <li><em>state</em> - 0 for switched off, 1 for switched on. </li>
+     * </ul>
+     * </ul>
+     */
+
     public static final String ACTION_FM =
-	        "android.intent.action.FM";
+            "android.intent.action.FM";
+
+    public static final String ACTION_FM_TX =
+            "android.intent.action.FMTX";
+
     /**
      * Broadcast Action: An outgoing call is about to be placed.
      *

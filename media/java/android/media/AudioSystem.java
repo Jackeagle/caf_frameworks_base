@@ -250,7 +250,8 @@ public class AudioSystem
     public static final int DEVICE_OUT_FM                       = 0x1000;
     public static final int DEVICE_OUT_ANC_HEADSET              = 0x2000;
     public static final int DEVICE_OUT_ANC_HEADPHONE            = 0x4000;
-    public static final int DEVICE_OUT_DEFAULT                  = 0x8000;
+    public static final int DEVICE_OUT_FM_TX                    = 0x8000;
+    public static final int DEVICE_OUT_DEFAULT                  = 0x10000;
     // input devices
     public static final int DEVICE_IN_COMMUNICATION         = 0x10000;
     public static final int DEVICE_IN_AMBIENT               = 0x20000;

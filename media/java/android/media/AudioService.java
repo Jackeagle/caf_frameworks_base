@@ -316,6 +316,7 @@ public class AudioService extends IAudioService.Stub {
         intentFilter.addAction("HDMI_DISCONNECTED");
         intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
         intentFilter.addAction(Intent.ACTION_FM);
+        intentFilter.addAction(Intent.ACTION_FM_TX);
         context.registerReceiver(mReceiver, intentFilter);
 
         // Register for media button intent broadcasts.
@@ -2059,6 +2060,21 @@ public class AudioService extends IAudioService.Stub {
                             AudioSystem.DEVICE_STATE_UNAVAILABLE,
                             "");
                     mConnectedDevices.remove(AudioSystem.DEVICE_OUT_FM);
+                }
+            }else if (action.equals(Intent.ACTION_FM_TX)){
+               int state = intent.getIntExtra("state", 0);
+               Log.v(TAG, "FM Tx Intent received "+state);
+               boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_FM_TX);
+               if(state == 1 && !isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM_TX,
+                            AudioSystem.DEVICE_STATE_AVAILABLE,
+                            "");
+                    mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_FM_TX), "");
+                }else if(state == 0 && isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM_TX,
+                            AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                            "");
+                    mConnectedDevices.remove(AudioSystem.DEVICE_OUT_FM_TX);
                 }
             }
         }
