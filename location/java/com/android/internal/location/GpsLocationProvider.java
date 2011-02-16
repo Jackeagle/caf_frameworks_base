@@ -185,7 +185,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final long RECENT_FIX_TIMEOUT = 10;
     
     // number of fixes to receive before disabling GPS
-    private static final int MIN_FIX_COUNT = 10;
+    private static final int MIN_FIX_COUNT = 1;
 
     // stop trying if we do not receive a fix within 60 seconds
     private static final int NO_FIX_TIMEOUT = 60;
@@ -1083,7 +1083,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
             updateStatus(LocationProvider.AVAILABLE, mSvCount);
         }
 
-        if (mFixCount++ >= MIN_FIX_COUNT && mFixInterval > 1) {
+        if (++mFixCount >= MIN_FIX_COUNT && mFixInterval > 1) {
             if (DEBUG) Log.d(TAG, "exceeded MIN_FIX_COUNT");
             hibernate();
         }
