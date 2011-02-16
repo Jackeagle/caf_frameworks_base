@@ -1333,12 +1333,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         mDesiredPowerState = desiredPowerState;
 
-        /*
-         * TODO: fix this workaround. For 1x, we should not disconnect data call
-         * before powering off.
-         */
-
-        if (mDesiredPowerState == false && getRadioTechnology() != RadioTechnology.RADIO_TECH_1xRTT) {
+        if (mDesiredPowerState == false) {
             disconnectAllConnections(Phone.REASON_RADIO_TURNED_OFF, onCompleteMsg);
             return;
         }
@@ -1477,7 +1472,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         c.dc = dc;
         c.reason = reason;
 
-        dc.disconnect(obtainMessage(EVENT_DISCONNECT_DONE, c));
+        int dcReason = 0;
+        // Set the reason. Currently indicating explicit powerdown reasons only
+        if (Phone.REASON_RADIO_TURNED_OFF.equals(reason))
+            dcReason = DEACTIVATE_REASON_RADIO_OFF;
+        else
+            dcReason = DEACTIVATE_REASON_NONE;
+
+        dc.disconnect(obtainMessage(EVENT_DISCONNECT_DONE, dcReason, 0, c));
         return true;
     }
 
