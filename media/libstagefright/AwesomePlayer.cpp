@@ -189,6 +189,7 @@ AwesomePlayer::AwesomePlayer()
       mVideoEOSOccurred(false),
       mVideoDurationUs(0),
       mAudioDurationUs(0),
+      mPauseAudioTillSync(false),
       mVideoRendererIsPreview(false),
       mAudioPlayer(NULL),
       mFlags(0),
@@ -574,6 +575,11 @@ status_t AwesomePlayer::play_l() {
                     mFlags &= ~(PLAYING | FIRST_FRAME);
 
                     return err;
+                }
+                if( mVideoSource != NULL && mSeeking){
+                   LOGV("play_l() Pause AudioPlayer till video reaches a sync frame");
+                   mAudioPlayer->pause();
+                   mPauseAudioTillSync = true;
                 }
 
                 delete mTimeSource;
@@ -1016,6 +1022,13 @@ void AwesomePlayer::onVideoEvent() {
                     //and audio hasn't had a chance to seek
                     seekAudioIfNecessary_l();
 
+                    //Check if audio was paused and resume
+                    if( mAudioPlayer != NULL && mPauseAudioTillSync ) {
+                        LOGV("onVideoEvent, video eos occured, resume paused audio");
+                        mAudioPlayer->resume();
+                        mPauseAudioTillSync = false;
+                    }
+
                     //Post a video event to start polling
                     //if video EOS went away due to seek
                     postVideoEvent_l();
@@ -1061,6 +1074,12 @@ void AwesomePlayer::onVideoEvent() {
         mSeeking = false;
         mSeekNotificationSent = false;
         if (mStatistics) logSeek();
+    }
+    //Check if audio was paused and resume
+    if( mAudioPlayer != NULL && mPauseAudioTillSync ) {
+        LOGV("onVideoEvent, resume paused audio at video sync");
+        mAudioPlayer->resume();
+        mPauseAudioTillSync = false;
     }
 
     if (mFlags & FIRST_FRAME) {
