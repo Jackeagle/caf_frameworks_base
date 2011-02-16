@@ -255,7 +255,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     void resetProperties() {
-        if (mSubscriptionData != null) {
+        if (mSubscriptionData != null
+                && mCurrentAppType == AppFamily.APP_FAM_3GPP) {
             TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_NUMERIC, mSubscriptionData.subId,"" );
             TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_ISO_COUNTRY, mSubscriptionData.subId, "");
             TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_ALPHA, mSubscriptionData.subId, "");

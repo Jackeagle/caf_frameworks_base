@@ -214,7 +214,6 @@ public interface Phone {
     // Used for CDMA subscription mode
     static final int CDMA_SUBSCRIPTION_RUIM_SIM = 0; // RUIM/SIM (default)
     static final int CDMA_SUBSCRIPTION_NV       = 1; // NV -> non-volatile memory
-    static final int CDMA_SUBSCRIPTION_NONE     = 2; // NONE
 
     static final int PREFERRED_CDMA_SUBSCRIPTION = CDMA_SUBSCRIPTION_NV;
 
@@ -1864,9 +1863,11 @@ public interface Phone {
      */
     public void setSubscription(int subscripton);
 
-    /* Sets active SIM/RUIM related profiles as current
-     * @param void
+    /**
+     * Sets the "current" field in the telephony provider according to the operator numeric.
+     *
+     * @return true for success; false otherwise.
      */
-    public void updateCurrentCarrierInProvider();
+    public boolean updateCurrentCarrierInProvider();
 
 }

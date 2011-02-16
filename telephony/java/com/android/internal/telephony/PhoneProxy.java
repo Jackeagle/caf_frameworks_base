@@ -273,7 +273,10 @@ public class PhoneProxy extends Handler implements Phone {
                 ((CDMAPhone) oldPhone).removeReferences();
             }
         }
-        mActivePhone.setSubscription(subscription);
+
+        if (subscriptionData != null) {
+            mActivePhone.setSubscriptionInfo(subscriptionData);
+        }
 
         oldPhone = null;
     }
@@ -1128,8 +1131,8 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.getSubscription();
     }
 
-    public void updateCurrentCarrierInProvider() {
-        mActivePhone.updateCurrentCarrierInProvider();
+    public boolean updateCurrentCarrierInProvider() {
+        return mActivePhone.updateCurrentCarrierInProvider();
     }
 
     public boolean disableDataConnectivity() {
