@@ -1436,10 +1436,12 @@ public interface CommandsInterface {
      *
      * @param cid
      *            The connection ID
+     * @param reason
+     *            Reason for deactivating the call
      * @param result
      *            Callback message is empty on completion
      */
-    public void deactivateDataCall(int cid, Message result);
+    public void deactivateDataCall(int cid, int reason, Message result);
 
     /**
      * Activate or deactivate cell broadcast SMS for CDMA.

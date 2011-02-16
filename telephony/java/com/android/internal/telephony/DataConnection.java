@@ -234,7 +234,9 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     private void tearDownData(Object o) {
         if (mCM.getRadioState().isOn()) {
             if (DBG) log("tearDownData radio is on, call deactivateDataCall");
-            mCM.deactivateDataCall(cid, obtainMessage(EVENT_DEACTIVATE_DONE, o));
+            mCM.deactivateDataCall(cid,
+                        ((DisconnectParams)o).onCompletedMsg.arg1, // reason
+                        obtainMessage(EVENT_DEACTIVATE_DONE, o));
         } else {
             if (DBG) log("tearDownData radio is off sendMessage EVENT_DEACTIVATE_DONE immediately");
             AsyncResult ar = new AsyncResult(o, null, null);

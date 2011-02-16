@@ -144,6 +144,10 @@ cat include/telephony/ril.h | \
     int RIL_TETHERED_MODE_ON = 1;
     int RIL_TETHERED_MODE_OFF = 0;
 
+    /** Deactivate data call reasons */
+    int DEACTIVATE_REASON_NONE      = 0;
+    int DEACTIVATE_REASON_RADIO_OFF = 1;
+
     int RIL_REQUEST_GET_SIM_STATUS = 1;
     int RIL_REQUEST_ENTER_SIM_PIN = 2;
     int RIL_REQUEST_ENTER_SIM_PUK = 3;

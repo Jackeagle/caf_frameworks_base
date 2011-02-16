@@ -206,7 +206,7 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
             Message result) {
     }
 
-    public void deactivateDataCall(int cid, Message result) {
+    public void deactivateDataCall(int cid, int reason, Message result) {
     }
 
     public void setRadioPower(boolean on, Message result) {

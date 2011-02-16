@@ -967,7 +967,7 @@ public final class SimulatedCommands extends BaseCommands
         unimplemented(result);
     }
 
-    public void deactivateDataCall(int cid, Message result) {unimplemented(result);}
+    public void deactivateDataCall(int cid, int reason, Message result) {unimplemented(result);}
 
     /**
      * @deprecated

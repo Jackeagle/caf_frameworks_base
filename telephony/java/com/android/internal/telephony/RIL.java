@@ -1407,7 +1407,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
      */
     public void
     deactivateDefaultPDP(int cid, Message result) {
-        deactivateDataCall(cid, result);
+        deactivateDataCall(cid, DEACTIVATE_REASON_NONE, result);
     }
 
     /**
@@ -1440,15 +1440,16 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
-    deactivateDataCall(int cid, Message result) {
+    deactivateDataCall(int cid, int dcReason, Message result) {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_DEACTIVATE_DATA_CALL, result);
 
-        rr.mp.writeInt(1);
+        rr.mp.writeInt(2);
         rr.mp.writeString(Integer.toString(cid));
+        rr.mp.writeString(Integer.toString(dcReason));
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " +
-                requestToString(rr.mRequest) + " " + cid);
+                requestToString(rr.mRequest) + " " + cid + " " + dcReason);
 
         send(rr);
     }

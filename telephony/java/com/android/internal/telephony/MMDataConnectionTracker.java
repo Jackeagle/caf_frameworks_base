@@ -1262,12 +1262,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         mDesiredPowerState = desiredPowerState;
         mPendingPowerOffCompleteMsg = null;
 
-        /*
-         * TODO: fix this workaround. For 1x, we should not disconnect data call
-         * before powering off.
-         */
-
-        if (mDesiredPowerState == false && getRadioTechnology() != RadioTechnology.RADIO_TECH_1xRTT) {
+        if (mDesiredPowerState == false) {
             mPendingPowerOffCompleteMsg = onCompleteMsg;
             disconnectAllConnections(Phone.REASON_RADIO_TURNED_OFF);
             return;
@@ -1392,18 +1387,26 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
-    private boolean tryDisconnectDataCall(DataConnection dc, String reason) {
-        logv("tryDisconnectDataCall : dc=" + dc + ", reason=" + reason);
-        dc.disconnect(obtainMessage(EVENT_DISCONNECT_DONE, reason));
-        return true;
-    }
-
     class CallbackData {
         DataConnection dc;
         DataProfile dp;
         IPVersion ipv;
         String reason;
         DataServiceType ds;
+    }
+
+    private boolean tryDisconnectDataCall(DataConnection dc, String reason) {
+        logv("tryDisconnectDataCall : dc=" + dc + ", reason=" + reason);
+
+        int dcReason = 0;
+        // Set the reason. Currently indicating explicit powerdown reasons only
+        if (Phone.REASON_RADIO_TURNED_OFF.equals(reason))
+            dcReason = DEACTIVATE_REASON_RADIO_OFF;
+        else
+            dcReason = DEACTIVATE_REASON_NONE;
+
+        dc.disconnect(obtainMessage(EVENT_DISCONNECT_DONE, dcReason, 0, reason));
+        return true;
     }
 
     private boolean trySetupDataCall(DataServiceType ds, IPVersion ipv, String reason) {
