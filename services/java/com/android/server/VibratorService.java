@@ -269,6 +269,9 @@ public class VibratorService extends IVibratorService.Stub {
             Vibration vib = iter.next();
             if (vib.mToken == token) {
                 iter.remove();
+                // Death notification requested only for vibrate request with
+                // patterns.
+                token.unlinkToDeath(vib, 0);
                 return vib;
             }
         }
@@ -355,6 +358,7 @@ public class VibratorService extends IVibratorService.Stub {
                 if (!mDone) {
                     // If this vibration finished naturally, start the next
                     // vibration.
+                    mVibration.mToken.unlinkToDeath(mVibration, 0);
                     mVibrations.remove(mVibration);
                     startNextVibrationLocked();
                 }
@@ -367,6 +371,13 @@ public class VibratorService extends IVibratorService.Stub {
             if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
                 synchronized (mVibrations) {
                     doCancelVibrateLocked();
+
+                    int size = mVibrations.size();
+                    for(int i = 0; i < size; i++) {
+                      final Vibration vib = mVibrations.get(i);
+                      vib.mToken.unlinkToDeath(vib, 0);
+                    }
+
                     mVibrations.clear();
                 }
             }
