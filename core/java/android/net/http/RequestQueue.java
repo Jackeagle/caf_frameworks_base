@@ -142,9 +142,26 @@ public class RequestQueue implements RequestFeeder {
             HttpLog.v(dump.toString());
         }
 
-
         public HttpHost getProxyHost() {
             return mProxyHost;
+        }
+
+        void checkPageFinished() {
+            if (mIdleCache.pageFinished) {
+                int active = ConnectionThread.sRunning.get();
+                if (active == 0) {
+                    mIdleCache.wakeup();
+                }
+            }
+        }
+
+        void setPageFinished(boolean done) {
+            mIdleCache.pageFinished = done;
+            checkPageFinished();
+        }
+
+        void setShutdownFeature(boolean isOn) {
+            mIdleCache.setShutdownFeature(isOn);
         }
 
         /**
@@ -184,6 +201,7 @@ public class RequestQueue implements RequestFeeder {
             }
             return con;
         }
+
         public boolean recycleConnection(Connection connection) {
             return mIdleCache.cacheConnection(connection.getHost(), connection);
         }
@@ -330,6 +348,8 @@ public class RequestQueue implements RequestFeeder {
                 mProxyHost = new HttpHost(host, Proxy.getPort(mContext), "http");
             }
         }
+        mActivePool.setShutdownFeature((info != null) && 
+                (info.getType() == ConnectivityManager.TYPE_MOBILE));
     }
 
     /**
@@ -401,8 +421,6 @@ public class RequestQueue implements RequestFeeder {
         queueRequest(req, false, commit);
 
         mActivePool.mTotalRequest++;
-
-        // dump();
         mActivePool.startConnectionThread();
 
         return new RequestHandle(
@@ -639,6 +657,14 @@ public class RequestQueue implements RequestFeeder {
 
     public void stopTiming() {
         mActivePool.stopTiming();
+    }
+
+    public void setPageFinished(boolean done) {
+        mActivePool.setPageFinished(done);
+    }
+
+    public void checkPageFinished() {
+        mActivePool.checkPageFinished();
     }
 
     /* helper */

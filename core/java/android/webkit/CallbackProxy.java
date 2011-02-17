@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -841,6 +842,7 @@ class CallbackProxy extends Handler {
             // un-comment this if PERF_PROBE is true
 //            Looper.myQueue().setWaitCallback(mIdleCallback);
         }
+        Network.getInstance(mContext).setPageFinished(false);
         Message msg = obtainMessage(PAGE_STARTED);
         msg.obj = favicon;
         msg.getData().putString("url", url);
@@ -857,6 +859,7 @@ class CallbackProxy extends Handler {
                     + " ms and idled " + mWebCoreIdleTime + " ms");
             Network.getInstance(mContext).stopTiming();
         }
+        Network.getInstance(mContext).setPageFinished(true);
         Message msg = obtainMessage(PAGE_FINISHED, url);
         sendMessage(msg);
     }
