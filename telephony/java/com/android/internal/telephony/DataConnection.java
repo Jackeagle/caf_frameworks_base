@@ -26,7 +26,6 @@ import com.android.internal.util.HierarchicalStateMachine;
 
 import android.content.Context;
 import android.os.AsyncResult;
-import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
 import android.os.SystemProperties;
@@ -207,7 +206,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 
    //***** Constructor
     protected DataConnection(Context context, CommandsInterface ci, String name) {
-        super(name, Looper.getMainLooper());
+        super(name);
         if (DBG) log("DataConnection constructor E");
         this.mCM = ci;
         this.mContext = context;
