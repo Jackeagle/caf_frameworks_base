@@ -97,6 +97,7 @@ public:
 
     uint32_t getPageFlipCount() const;
     EGLDisplay getEGLDisplay() const { return mDisplay; }
+    EGLContext getEGLContext() const { return mContext; }
     overlay_control_device_t* getOverlayEngine() const { return mOverlayEngine; }
 #if defined(TARGET_USES_OVERLAY)
     overlay::Overlay* getOverlayObject() const { return mOverlayLibObject; }

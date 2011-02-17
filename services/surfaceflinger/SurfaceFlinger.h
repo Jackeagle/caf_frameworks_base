@@ -152,6 +152,7 @@ public:
         DisplayHardware&        editDisplayHardware();
         const Transform&        transform() const;
         EGLDisplay              getEGLDisplay() const;
+        EGLContext              getEGLContext() const;
         
 private:
                                 GraphicPlane(const GraphicPlane&);
