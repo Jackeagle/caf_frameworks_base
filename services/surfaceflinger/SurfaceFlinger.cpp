@@ -460,6 +460,7 @@ void SurfaceFlinger::handleConsoleEvents()
     int what = android_atomic_and(0, &mConsoleSignals);
     if (what & eConsoleAcquired) {
         hw.acquireScreen();
+        hw.enableHDMIOutput(mHDMIOutput);
         // this is a temporary work-around, eventually this should be called
         // by the power-manager
         SurfaceFlinger::turnElectronBeamOn(mElectronBeamAnimationMode);
@@ -469,11 +470,13 @@ void SurfaceFlinger::handleConsoleEvents()
         // We got the release signal before the acquire signal
         mDeferReleaseConsole = false;
         hw.releaseScreen();
+        hw.enableHDMIOutput(false);
     }
 
     if (what & eConsoleReleased) {
         if (hw.isScreenAcquired()) {
             hw.releaseScreen();
+            hw.enableHDMIOutput(false);
         } else {
             mDeferReleaseConsole = true;
         }
