@@ -2996,6 +2996,11 @@ EGLDisplay GraphicPlane::getEGLDisplay() const {
     return mHw->getEGLDisplay();
 }
 
+EGLContext GraphicPlane::getEGLContext() const {
+    return mHw->getEGLContext();
+}
+
+
 // ---------------------------------------------------------------------------
 
 }; // namespace android
