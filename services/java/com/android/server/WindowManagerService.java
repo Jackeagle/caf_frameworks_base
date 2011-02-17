@@ -36,6 +36,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
 import static android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA_OVERLAY;
 
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.policy.PolicyManager;
@@ -2462,7 +2463,9 @@ public class WindowManagerService extends IWindowManager.Stub
                             if (mInputMethodWindow == win) {
                                 mInputMethodWindow = null;
                             }
-                            win.destroySurfaceLocked();
+                            /* if it is wallpaper preview, do not destroy the surface*/
+                            if (win.getAttrs().type != TYPE_APPLICATION_MEDIA_OVERLAY && win.mAttrs.windowAnimations != com.android.internal.R.style.Animation_Wallpaper)
+                                win.destroySurfaceLocked();
                         }
                     }
                 }
@@ -9591,7 +9594,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 if (win == mWallpaperTarget) {
                     wallpaperDestroyed = true;
                 }
-                win.destroySurfaceLocked();
+                /*if it is wallpaper preview, do not destroy the surface*/
+                if (win.getAttrs().type != TYPE_APPLICATION_MEDIA_OVERLAY &&  win.mAttrs.windowAnimations != com.android.internal.R.style.Animation_Wallpaper)
+                    win.destroySurfaceLocked();
             } while (i > 0);
             mDestroySurface.clear();
         }
