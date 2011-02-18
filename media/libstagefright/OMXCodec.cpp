@@ -227,6 +227,7 @@ static const CodecInfo kEncoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.TI.AAC.encode" },
     { MEDIA_MIMETYPE_AUDIO_AAC, "AACEncoder" },
 //    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.PV.aacenc" },
+    { MEDIA_MIMETYPE_AUDIO_EVRC,   "OMX.qcom.audio.encoder.evrc" },
 //    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.7x30.video.encoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.video.encoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.TI.Video.encoder" },
@@ -403,6 +404,13 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresFlushCompleteEmulation;
         quirks |= kSupportsMultipleFramesPerInputBuffer;
     }
+
+    if (!strcmp(componentName, "OMX.qcom.audio.encoder.evrc")) {
+        quirks |= kRequiresAllocateBufferOnInputPorts;
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+        quirks |= kRequiresEOSMessage;
+    }
+
     if (!strncmp(componentName, "OMX.qcom.video.encoder.", 23)) {
         quirks |= kRequiresLoadedToIdleAfterAllocation;
         //quirks |= kRequiresAllocateBufferOnInputPorts;
@@ -776,6 +784,12 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         setAC3Format(numChannels, sampleRate);*/
     }
 
+    if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_EVRC, mMIME)) {
+        int32_t numChannels, sampleRate;
+        CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
+        setEVRCFormat(numChannels, sampleRate, bitRate);
+    }
      if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mMIME)) {
          LOGV("Setting the QOMX_VIDEO_PARAM_SPARKTYPE params ");
          QOMX_VIDEO_PARAM_SPARKTYPE paramSpark;
@@ -1809,6 +1823,8 @@ void OMXCodec::setComponentRole(
             "audio_decoder.amrwb", "audio_encoder.amrwb" },
         { MEDIA_MIMETYPE_AUDIO_AAC,
             "audio_decoder.aac", "audio_encoder.aac" },
+        { MEDIA_MIMETYPE_AUDIO_EVRC,
+            "audio_encoder.evrc", NULL },
         { MEDIA_MIMETYPE_VIDEO_AVC,
             "video_decoder.avc", "video_encoder.avc" },
         { MEDIA_MIMETYPE_VIDEO_MPEG4,
@@ -3163,6 +3179,7 @@ void OMXCodec::setRawAudioFormat(
     OMX_PARAM_PORTDEFINITIONTYPE def;
     InitOMXParams(&def);
     def.nPortIndex = portIndex;
+    def.format.audio.cMIMEType = NULL;
     status_t err = mOMX->getParameter(
             mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
     CHECK_EQ(err, OK);
@@ -4401,6 +4418,16 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
                 mOutputFormat->setInt32(kKeyChannelCount, numChannels);
                 mOutputFormat->setInt32(kKeySampleRate, sampleRate);
                 mOutputFormat->setInt32(kKeyBitRate, bitRate);
+            } else if (audio_def->eEncoding == OMX_AUDIO_CodingEVRC ) {
+                mOutputFormat->setCString(
+                        kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_EVRC);
+                int32_t numChannels, sampleRate, bitRate;
+                inputFormat->findInt32(kKeyChannelCount, &numChannels);
+                inputFormat->findInt32(kKeySampleRate, &sampleRate);
+                inputFormat->findInt32(kKeyBitRate, &bitRate);
+                mOutputFormat->setInt32(kKeyChannelCount, numChannels);
+                mOutputFormat->setInt32(kKeySampleRate, sampleRate);
+                mOutputFormat->setInt32(kKeyBitRate, bitRate);
             } else {
                 CHECK(!"Should not be here. Unknown audio encoding.");
             }
@@ -4712,21 +4739,69 @@ status_t OMXCodec::sendEOSToOMXComponent( ) {
     LOGI("Sending EOS to OMX Component");
 
     Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexInput];
-    //get free buffer
-    BufferInfo *freeInfo = NULL;
-    for ( size_t i = 0; i < buffers->size( ); i++ ) {
-        BufferInfo *info = &buffers->editItemAt(i);
-        if ( info->mOwnedByComponent == false ) {
-            freeInfo = info;
+    //Check if all buffers are with IL client (SF)
+    BufferInfo *info = NULL;
+    size_t i = 0;
+    for (i = 0; i < buffers->size( ); i++ ) {
+        info = &buffers->editItemAt(i);
+        if ( info->mOwnedByComponent == true ) {
             break;
         }
     }
-
-    CHECK( freeInfo != NULL );
     mSendEOS = true;
-    drainInputBuffer( freeInfo );
+    if (i == buffers->size( )) {
+        LOGE("all buffers with IL client,sending EOS from here");
+        drainInputBuffer(info);
+    }
     CHECK( mState != ERROR );
     return OK;
 }
 
+void OMXCodec::setEVRCFormat(int32_t numChannels, int32_t sampleRate, int32_t bitRate) {
+    CHECK(numChannels == 1);
+    CHECK(mIsEncoder == true );
+    if (mIsEncoder) {
+        //////////////// input port ////////////////////
+        setRawAudioFormat(kPortIndexInput, sampleRate, numChannels);
+        //////////////// output port ////////////////////
+        // format
+        OMX_AUDIO_PARAM_PORTFORMATTYPE format;
+        format.nPortIndex = kPortIndexOutput;
+        format.nIndex = 0;
+        status_t err = OMX_ErrorNone;
+        while (OMX_ErrorNone == err) {
+            CHECK_EQ(mOMX->getParameter(mNode, OMX_IndexParamAudioPortFormat,
+                    &format, sizeof(format)), OK);
+            if (format.eEncoding == OMX_AUDIO_CodingEVRC) {
+                break;
+            }
+            format.nIndex++;
+        }
+        CHECK_EQ(OK, err);
+        CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamAudioPortFormat,
+                &format, sizeof(format)), OK);
+
+        // port definition
+        OMX_PARAM_PORTDEFINITIONTYPE def;
+        InitOMXParams(&def);
+        def.nPortIndex = kPortIndexOutput;
+        def.format.audio.cMIMEType = NULL;
+        CHECK_EQ(mOMX->getParameter(mNode, OMX_IndexParamPortDefinition,
+                &def, sizeof(def)), OK);
+        def.format.audio.bFlagErrorConcealment = OMX_TRUE;
+        def.format.audio.eEncoding = OMX_AUDIO_CodingEVRC;
+        CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamPortDefinition,
+                &def, sizeof(def)), OK);
+
+        // profile
+        OMX_AUDIO_PARAM_EVRCTYPE profile;
+        InitOMXParams(&profile);
+        profile.nPortIndex = kPortIndexOutput;
+        CHECK_EQ(mOMX->getParameter(mNode, OMX_IndexParamAudioEvrc,
+                &profile, sizeof(profile)), OK);
+        profile.nChannels = numChannels;
+        CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamAudioEvrc,
+                &profile, sizeof(profile)), OK);
+    }
+}
 }  // namespace android

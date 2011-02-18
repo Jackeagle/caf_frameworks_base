@@ -783,6 +783,9 @@ sp<MediaSource> StagefrightRecorder::createAudioSource() {
         case AUDIO_ENCODER_AAC:
             mime = MEDIA_MIMETYPE_AUDIO_AAC;
             break;
+        case AUDIO_ENCODER_EVRC:
+            mime = MEDIA_MIMETYPE_AUDIO_EVRC;
+            break;
         default:
             LOGE("Unknown audio encoder: %d", mAudioEncoder);
             return NULL;

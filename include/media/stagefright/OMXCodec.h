@@ -194,6 +194,7 @@ private:
 
     void setAMRFormat(bool isWAMR, int32_t bitRate);
     void setAACFormat(int32_t numChannels, int32_t sampleRate, int32_t bitRate);
+    void setEVRCFormat( int32_t sampleRate, int32_t numChannels, int32_t bitRate);
     void setAC3Format(int32_t numChannels, int32_t sampleRate);
 
     status_t setVideoPortFormatType(
