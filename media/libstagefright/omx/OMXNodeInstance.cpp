@@ -184,7 +184,10 @@ status_t OMXNodeInstance::freeNode(OMXMaster *master) {
             break;
     }
 
-    mObserver->registerBuffers(NULL);
+    if(true == pmem_registered_with_client) {
+      mObserver->registerBuffers(NULL);
+      pmem_registered_with_client = false;
+    }
     OMX_ERRORTYPE err = master->destroyComponentInstance(
             static_cast<OMX_COMPONENTTYPE *>(mHandle));
 
@@ -469,8 +472,10 @@ OMX_ERRORTYPE OMXNodeInstance::OnEvent(
       /*This is needed to clear the reference on pmem fd.
        * If this is skipped then we will see pmem leak.
        */
-      instance->mObserver->registerBuffers(NULL);
-      instance->pmem_registered_with_client = false;
+      if(true == instance->pmem_registered_with_client) {
+        instance->mObserver->registerBuffers(NULL);
+        instance->pmem_registered_with_client = false;
+      }
     }
     return instance->owner()->OnEvent(
             instance->nodeID(), eEvent, nData1, nData2, pEventData);
