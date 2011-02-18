@@ -36,7 +36,7 @@
 #include "Layer.h"
 #include "SurfaceFlinger.h"
 #include "DisplayHardware/DisplayHardware.h"
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
 #include "overlayLib.h"
 #endif
 
@@ -76,6 +76,13 @@ Layer::~Layer()
     sp<UserClient> ourClient(mUserClientRef.getUserClientUnsafe());
     if (ourClient != 0) {
         ourClient->detachLayer(this);
+    }
+
+    int s3dFormat = const_cast<Layer*>(this)->getStereoscopic3DFormat();
+    if (s3dFormat) {
+        const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
+        hw.videoOverlayStarted(false);
+        mFlinger->enableOverlayOpt(true);
     }
 }
 
@@ -274,7 +281,7 @@ status_t Layer::setBufferInUse() const
 status_t Layer::drawWithOverlay(const Region& clip,
                     bool hdmiConnected, bool ignoreFB) const
 {
-#if defined(SF_BYPASS)
+#if defined(TARGET_USES_OVERLAY)
     if (mBufferManager.getNumBuffers()
                    <= mBufferManager.getDefaultBufferCount())
         return NO_INIT;
@@ -290,10 +297,18 @@ status_t Layer::drawWithOverlay(const Region& clip,
 
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     overlay::Overlay* temp = hw.getOverlayObject();
-    if (!temp->setSource(mWidth, mHeight, mFormat,
+    int s3dFormat = const_cast<Layer*>(this)->getStereoscopic3DFormat();
+    if (s3dFormat) {
+        hw.videoOverlayStarted(true);
+    }
+    if (!temp->setSource(mWidth, mHeight, mFormat|s3dFormat,
                            getOrientation(), hdmiConnected,
                            ignoreFB, mBufferManager.getNumBuffers()))
         return INVALID_OPERATION;
+
+    if (s3dFormat && !temp->setCrop(0, 0, mWidth, mHeight))
+        return INVALID_OPERATION;
+
     const Rect bounds(mTransformedBounds);
     int x = bounds.left;
     int y = bounds.top;

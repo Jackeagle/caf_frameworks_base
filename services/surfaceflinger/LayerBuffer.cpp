@@ -513,8 +513,10 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
                                graphicPlane(0).displayHardware());
     hw.videoOverlayStarted(true);
     overlay::Overlay* temp = hw.getOverlayObject();
+    int s3dFormat = mLayer.getStereoscopic3DFormat();
+
     if (!temp->setSource(src.hor_stride, src.ver_stride, 
-                          src.img.format, mLayer.getOrientation(),
+                          src.img.format|s3dFormat, mLayer.getOrientation(),
                           hdmiConnected, ignoreFB))
         return INVALID_OPERATION;
     if (!temp->setCrop(0, 0, src.crop.r, src.crop.b))
