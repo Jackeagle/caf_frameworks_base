@@ -39,6 +39,7 @@ LOCAL_SHARED_LIBRARIES :=       \
 
 ifneq ($(BUILD_WITHOUT_PV),true)
 LOCAL_SHARED_LIBRARIES += \
+		libomx_sharedlibrary \
         libopencore_common
 endif
 

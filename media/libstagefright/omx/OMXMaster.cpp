@@ -35,6 +35,7 @@ OMXMaster::OMXMaster()
     addVendorPlugin();
 
 #ifndef NO_OPENCORE
+    LOGV("adding OMXPVCodecsPlugin...");
     addPlugin(new OMXPVCodecsPlugin);
 #endif
 }
@@ -84,6 +85,7 @@ void OMXMaster::addPlugin(OMXPluginBase *plugin) {
 
             continue;
         }
+        LOGV("Found component '%s'", name8.string());
 
         mPluginByComponentName.add(name8, plugin);
     }
@@ -120,6 +122,7 @@ OMX_ERRORTYPE OMXMaster::makeComponentInstance(
     ssize_t index = mPluginByComponentName.indexOfKey(String8(name));
 
     if (index < 0) {
+        LOGE("makeComponentInstance(): invalid indexOfKey");
         return OMX_ErrorInvalidComponentName;
     }
 
@@ -128,6 +131,7 @@ OMX_ERRORTYPE OMXMaster::makeComponentInstance(
         plugin->makeComponentInstance(name, callbacks, appData, component);
 
     if (err != OMX_ErrorNone) {
+        LOGE("makeComponentInstance(): plugin->makeComponentInstance failed (%d)", err);
         return err;
     }
 
