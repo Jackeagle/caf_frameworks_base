@@ -152,16 +152,41 @@ interface ITelephony {
     boolean isOffhook();
 
     /**
+     * Check if a particular subscription has an active or holding call
+     *
+     * @param subscription user preferred subscription.
+     * @return true if the phone state is OFFHOOK.
+     */
+    boolean isOffhookOnSubscription(int subscription);
+
+    /**
      * Check if an incoming phone call is ringing or call waiting.
      * @return true if the phone state is RINGING.
      */
     boolean isRinging();
 
     /**
+     * Check if an incoming phone call is ringing or call waiting
+     * on a particular subscription.
+     *
+     * @param subscription user preferred subscription.
+     * @return true if the phone state is RINGING.
+     */
+    boolean isRingingOnSubscription(int subscription);
+
+    /**
      * Check if the phone is idle.
      * @return true if the phone state is IDLE.
      */
     boolean isIdle();
+
+    /**
+     * Check if the phone is idle on a particular subscription.
+     *
+     * @param subscription user preferred subscription.
+     * @return true if the phone state is IDLE.
+     */
+    boolean isIdleOnSubscription(int subscription);
 
     /**
      * Check to see if the radio is on or not.
