@@ -228,6 +228,7 @@ static const CodecInfo kEncoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_AAC, "AACEncoder" },
 //    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.PV.aacenc" },
     { MEDIA_MIMETYPE_AUDIO_EVRC,   "OMX.qcom.audio.encoder.evrc" },
+    { MEDIA_MIMETYPE_AUDIO_QCELP,  "OMX.qcom.audio.encoder.qcelp13" },
 //    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.7x30.video.encoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.video.encoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.TI.Video.encoder" },
@@ -406,6 +407,12 @@ uint32_t OMXCodec::getComponentQuirks(
     }
 
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.evrc")) {
+        quirks |= kRequiresAllocateBufferOnInputPorts;
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+        quirks |= kRequiresEOSMessage;
+    }
+
+    if (!strcmp(componentName, "OMX.qcom.audio.encoder.qcelp13")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
         quirks |= kRequiresEOSMessage;
@@ -790,6 +797,14 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
         setEVRCFormat(numChannels, sampleRate, bitRate);
     }
+
+    if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_QCELP, mMIME)) {
+        int32_t numChannels, sampleRate;
+        CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
+        setQCELPFormat(numChannels, sampleRate, bitRate);
+    }
+
      if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mMIME)) {
          LOGV("Setting the QOMX_VIDEO_PARAM_SPARKTYPE params ");
          QOMX_VIDEO_PARAM_SPARKTYPE paramSpark;
@@ -1825,6 +1840,8 @@ void OMXCodec::setComponentRole(
             "audio_decoder.aac", "audio_encoder.aac" },
         { MEDIA_MIMETYPE_AUDIO_EVRC,
             "audio_encoder.evrc", NULL },
+        { MEDIA_MIMETYPE_AUDIO_QCELP,
+            "audio_encoder.qcelp13", NULL },
         { MEDIA_MIMETYPE_VIDEO_AVC,
             "video_decoder.avc", "video_encoder.avc" },
         { MEDIA_MIMETYPE_VIDEO_MPEG4,
@@ -4418,6 +4435,16 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
                 mOutputFormat->setInt32(kKeyChannelCount, numChannels);
                 mOutputFormat->setInt32(kKeySampleRate, sampleRate);
                 mOutputFormat->setInt32(kKeyBitRate, bitRate);
+            } else if (audio_def->eEncoding == OMX_AUDIO_CodingQCELP13 ) {
+                mOutputFormat->setCString(
+                        kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_QCELP);
+                int32_t numChannels, sampleRate, bitRate;
+                inputFormat->findInt32(kKeyChannelCount, &numChannels);
+                inputFormat->findInt32(kKeySampleRate, &sampleRate);
+                inputFormat->findInt32(kKeyBitRate, &bitRate);
+                mOutputFormat->setInt32(kKeyChannelCount, numChannels);
+                mOutputFormat->setInt32(kKeySampleRate, sampleRate);
+                mOutputFormat->setInt32(kKeyBitRate, bitRate);
             } else if (audio_def->eEncoding == OMX_AUDIO_CodingEVRC ) {
                 mOutputFormat->setCString(
                         kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_EVRC);
@@ -4804,4 +4831,55 @@ void OMXCodec::setEVRCFormat(int32_t numChannels, int32_t sampleRate, int32_t bi
                 &profile, sizeof(profile)), OK);
     }
 }
+
+void OMXCodec::setQCELPFormat(int32_t numChannels, int32_t sampleRate, int32_t bitRate) {
+
+    CHECK(numChannels == 1);
+    CHECK(mIsEncoder == true );
+
+    if (mIsEncoder) {
+        //////////////// input port ////////////////////
+        setRawAudioFormat(kPortIndexInput, sampleRate, numChannels);
+        //////////////// output port ////////////////////
+        // format
+        OMX_AUDIO_PARAM_PORTFORMATTYPE format;
+        format.nPortIndex = kPortIndexOutput;
+        format.nIndex = 0;
+        status_t err = OMX_ErrorNone;
+        while (OMX_ErrorNone == err) {
+            CHECK_EQ(mOMX->getParameter(mNode, OMX_IndexParamAudioPortFormat,
+                    &format, sizeof(format)), OK);
+            if (format.eEncoding == OMX_AUDIO_CodingQCELP13) {
+                break;
+            }
+            format.nIndex++;
+        }
+        CHECK_EQ(OK, err);
+        CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamAudioPortFormat,
+                &format, sizeof(format)), OK);
+
+        // port definition
+        OMX_PARAM_PORTDEFINITIONTYPE def;
+        InitOMXParams(&def);
+        def.nPortIndex = kPortIndexOutput;
+        def.format.audio.cMIMEType = NULL;
+        CHECK_EQ(mOMX->getParameter(mNode, OMX_IndexParamPortDefinition,
+                &def, sizeof(def)), OK);
+        def.format.audio.bFlagErrorConcealment = OMX_TRUE;
+        def.format.audio.eEncoding = OMX_AUDIO_CodingQCELP13;
+        CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamPortDefinition,
+                &def, sizeof(def)), OK);
+
+        // profile
+        OMX_AUDIO_PARAM_QCELP13TYPE profile;
+        InitOMXParams(&profile);
+        profile.nPortIndex = kPortIndexOutput;
+        CHECK_EQ(mOMX->getParameter(mNode, OMX_IndexParamAudioQcelp13,
+                &profile, sizeof(profile)), OK);
+        profile.nChannels = numChannels;
+        CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamAudioQcelp13,
+                &profile, sizeof(profile)), OK);
+    }
+}
+
 }  // namespace android
