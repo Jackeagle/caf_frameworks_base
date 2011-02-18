@@ -289,8 +289,8 @@ private:
 
     void parseFlags(uint32_t flags);
 
-    status_t processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags);
-    status_t processSEIData(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags);
+    status_t processExtraDataBlocksOfBuffer(MediaBuffer *aBuffer, OMX_U32 flags);
+    status_t processSEIData();
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
