@@ -292,10 +292,10 @@ private:
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
-    void freeOutputBuffer(BufferInfo *info);
     status_t sendEOSToOMXComponent( );
 
     void setWMAFormat(const sp<MetaData> &inputFormat);
+    status_t freeBuffersOnOutPortIfAllAreWithUs();
 };
 
 struct CodecProfileLevel {
