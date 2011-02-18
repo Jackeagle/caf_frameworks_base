@@ -70,6 +70,8 @@ class FmRxControls
    private static final int V4L2_CID_PRIVATE_TAVARUA_RDSON = V4L2_CID_PRIVATE_BASE + 15;
    private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC = V4L2_CID_PRIVATE_BASE + 16;
    private static final int V4L2_CID_PRIVATE_TAVARUA_LP_MODE = V4L2_CID_PRIVATE_BASE + 17;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC = V4L2_CID_PRIVATE_BASE + 21;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET = V4L2_CID_PRIVATE_BASE + 22;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
    private static final int V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900;
@@ -104,6 +106,24 @@ class FmRxControls
       {
          int err = FmReceiverJNI.setControlNative(fd, V4L2_CID_AUDIO_MUTE, 0 );
       }
+   }
+   /*
+    * Get Interference over channel
+    */
+   public int IovercControl(int fd)
+   {
+      int ioverc = FmReceiverJNI.getControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_IOVERC);
+      Log.d(TAG, "IOVERC value is : "+ioverc);
+      return ioverc;
+   }
+   /*
+    * Get IntDet
+    */
+   public int IntDet(int fd)
+   {
+      int intdet =  FmReceiverJNI.getControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_INTDET);
+      Log.d(TAG, "IOVERC value is : "+intdet);
+      return intdet;
    }
 
    /*
