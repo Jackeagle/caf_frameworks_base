@@ -97,6 +97,16 @@ public:
         return err;
     }
 
+    virtual status_t setStereoscopic3DFormat(int format)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurface::getInterfaceDescriptor());
+        data.writeInt32(format);
+        remote()->transact(SET_STEREOSCOPIC_3D_FORMAT, data, &reply);
+        status_t err = reply.readInt32();
+        return err;
+    }
+
     virtual status_t registerBuffers(const BufferHeap& buffers)
     {
         Parcel data, reply;
@@ -204,6 +214,13 @@ status_t BnSurface::onTransact(
             int orientation = data.readInt32();
             sp<OverlayRef> o = createOverlay(w, h, f, orientation);
             return OverlayRef::writeToParcel(reply, o);
+        } break;
+        case SET_STEREOSCOPIC_3D_FORMAT: {
+            CHECK_INTERFACE(ISurface, data, reply);
+            int format = data.readInt32();
+            status_t err = setStereoscopic3DFormat(format);
+            reply->writeInt32(err);
+            return NO_ERROR;
         } break;
         default:
             return BBinder::onTransact(code, data, reply, flags);

@@ -896,10 +896,11 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     Region layerBufferClip;
     Region drawClip;
     bool canUseOverlayToDraw = false;
+    int s3dLayerCount = 0;
 
 #if defined(TARGET_USES_OVERLAY)
     for (size_t i = 0; ((i < count)  &&
-          (compcount <= 1 || layerbuffercount <= 1)); ++i) {
+          (compcount <= 1 || layerbuffercount <= 1 || s3dLayerCount <= 1)); ++i) {
         const sp<LayerBase>& layer = layers[i];
         const Region& visibleRegion(layer->visibleRegionScreen);
         if (!visibleRegion.isEmpty()) {
@@ -917,6 +918,9 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     layerbuffercount++;
                     layerbufferIndex = i;
                     layerBufferClip = clip;
+                }
+                if (layer->getStereoscopic3DFormat()) {
+                    s3dLayerCount++;
                 }
             }
         }
@@ -971,14 +975,13 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                         enableOverlayOpt(false);
                         enableOverlayOpt(true);
                     }
-                    LOGE("Draw with overlay failed");
                 }
             }
         }
     }
 
     mFullScreen = false;
-    if (mOverlayUsed && layerbuffercount != 1) {
+    if (mOverlayUsed && !s3dLayerCount && layerbuffercount != 1) {
         mOverlayUsed = false;
         mOverlayUseChanged = true;
     }
@@ -987,7 +990,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         const sp<LayerBase>& layer(layers[i]);
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
-                if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
+                if ((getOverlayEngine() != NULL) && layer->getStereoscopic3DFormat()) {
+                    layer->drawWithOverlay(clip, mHDMIOutput, false);
+                    mOverlayUsed = true;
+                } else if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {
                     if (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR) {
                         layer->draw(clip);
                         mOverlayUseChanged = true;
