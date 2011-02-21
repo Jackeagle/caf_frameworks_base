@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2010-2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,9 +50,15 @@ public final class BluetoothUuid {
     public static final ParcelUuid ObexObjectPush =
             ParcelUuid.fromString("00001105-0000-1000-8000-00805f9b34fb");
 
+    public static final ParcelUuid MessageAccessServer =
+            ParcelUuid.fromString("00001132-0000-1000-8000-00805f9b34fb");
+
+    public static final ParcelUuid MessageNotificationServer =
+            ParcelUuid.fromString("00001133-0000-1000-8000-00805f9b34fb");
+
     public static final ParcelUuid[] RESERVED_UUIDS = {
         AudioSink, AudioSource, AdvAudioDist, HSP, Handsfree, AvrcpController, AvrcpTarget,
-        ObexObjectPush};
+        ObexObjectPush, MessageAccessServer, MessageNotificationServer};
 
     public static boolean isAudioSource(ParcelUuid uuid) {
         return uuid.equals(AudioSource);
@@ -80,6 +86,14 @@ public final class BluetoothUuid {
 
     public static boolean isAvrcpTarget(ParcelUuid uuid) {
         return uuid.equals(AvrcpTarget);
+    }
+
+    public static boolean isMessageAccessServer(ParcelUuid uuid) {
+        return uuid.equals(MessageAccessServer);
+    }
+
+    public static boolean isMessageNotificationServer(ParcelUuid uuid) {
+        return uuid.equals(MessageNotificationServer);
     }
 
     /**
