@@ -108,6 +108,12 @@ ifeq ($(TARGET_OS)-$(TARGET_ARCH),linux-x86)
 # This is needed on x86 to bring in dl_iterate_phdr for CallStack.cpp
 LOCAL_SHARED_LIBRARIES += libdl
 endif # linux-x86
+
+ifeq ($(HAVE_QC_TIME_SERVICES),true)
+LOCAL_CFLAGS += -DHAVE_QC_TIME_SERVICES=1
+LOCAL_C_INCLUDES += vendor/qcom/opensource/time-services
+LOCAL_SHARED_LIBRARIES += libtime_genoff
+endif # msm8660
 endif # sim
 
 LOCAL_MODULE:= libutils

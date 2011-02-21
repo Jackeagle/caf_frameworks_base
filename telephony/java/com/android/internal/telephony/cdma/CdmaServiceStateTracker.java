@@ -80,6 +80,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
     RuimRecords mRuimRecords = null;
 
     int mCdmaSubscriptionSource = Phone.CDMA_SUBSCRIPTION_NV;
+    private static final boolean isTimeDaemonEnabled = SystemProperties.getBoolean("persist.timed.enable", false);
     private CdmaSubscriptionSourceManager mCdmaSSM;
 
      /** if time between NTIZ updates is less than mNitzUpdateSpacing the update may be ignored. */
@@ -1410,8 +1411,12 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
     }
 
     private boolean getAutoTime() {
-        // Always returns true for CDMA mode
-        return true;
+        if (isTimeDaemonEnabled) {
+            return Settings.System.getInt(cr, Settings.System.AUTO_TIME, 1) > 0;
+        } else {
+            // Return true for CDMA mode
+            return true;
+        }
     }
 
     private void saveNitzTimeZone(String zoneId) {
@@ -1441,7 +1446,9 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
      * @param time time set by network
      */
     private void setAndBroadcastNetworkSetTime(long time) {
-//        SystemClock.setCurrentTimeMillis(time);
+        if (isTimeDaemonEnabled) {
+            SystemClock.setCurrentTimeMillis(time);
+        }
         Intent intent = new Intent(TelephonyIntents.ACTION_NETWORK_SET_TIME);
         intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
         intent.putExtra("time", time);
