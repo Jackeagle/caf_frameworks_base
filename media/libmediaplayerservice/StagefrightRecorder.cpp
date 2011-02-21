@@ -24,6 +24,7 @@
 #include <media/stagefright/AudioSource.h>
 #include <media/stagefright/AMRWriter.h>
 #include <media/stagefright/CameraSource.h>
+#include <media/stagefright/ExtendedWriter.h>
 #include <media/stagefright/MPEG2TSWriter.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/MediaDebug.h>
@@ -700,6 +701,9 @@ status_t StagefrightRecorder::start() {
         case OUTPUT_FORMAT_MPEG2TS:
             return startMPEG2TSRecording();
 
+        case OUTPUT_FORMAT_QCP:
+            return startExtendedRecording( );
+
         default:
             LOGE("Unsupported output file format: %d", mOutputFormat);
             return UNKNOWN_ERROR;
@@ -722,6 +726,16 @@ sp<MediaSource> StagefrightRecorder::createAudioSource() {
              result.getInt(String8("AMR"),value) == NO_ERROR ) {
             tunneledSource = true;
             tunnelMime = MEDIA_MIMETYPE_AUDIO_AMR_NB;
+        }
+        else if ( mAudioEncoder == AUDIO_ENCODER_QCELP &&
+                  result.getInt(String8("QCELP"),value) == NO_ERROR ) {
+            tunneledSource = true;
+            tunnelMime = MEDIA_MIMETYPE_AUDIO_QCELP;
+        }
+        else if ( mAudioEncoder == AUDIO_ENCODER_EVRC &&
+                  result.getInt(String8("EVRC"),value) == NO_ERROR ) {
+            tunneledSource = true;
+            tunnelMime = MEDIA_MIMETYPE_AUDIO_EVRC;
         }
     }
 
@@ -1491,4 +1505,46 @@ status_t StagefrightRecorder::dump(
     ::write(fd, result.string(), result.size());
     return OK;
 }
+
+status_t StagefrightRecorder::startExtendedRecording() {
+    CHECK(mOutputFormat == OUTPUT_FORMAT_QCP);
+
+    if (mSampleRate != 8000) {
+        LOGE("Invalid sampling rate %d used for recording",
+             mSampleRate);
+        return BAD_VALUE;
+    }
+    if (mAudioChannels != 1) {
+        LOGE("Invalid number of audio channels %d used for recording",
+                mAudioChannels);
+        return BAD_VALUE;
+    }
+
+    if (mAudioSource >= AUDIO_SOURCE_LIST_END) {
+        LOGE("Invalid audio source: %d", mAudioSource);
+        return BAD_VALUE;
+    }
+
+    sp<MediaSource> audioEncoder = createAudioSource();
+
+    if (audioEncoder == NULL) {
+        LOGE("AudioEncoder NULL");
+        return UNKNOWN_ERROR;
+    }
+
+    mWriter = new ExtendedWriter(dup(mOutputFd));
+    mWriter->addSource(audioEncoder);
+
+    if (mMaxFileDurationUs != 0) {
+        mWriter->setMaxFileDuration(mMaxFileDurationUs);
+    }
+    if (mMaxFileSizeBytes != 0) {
+        mWriter->setMaxFileSize(mMaxFileSizeBytes);
+    }
+    mWriter->setListener(mListener);
+    mWriter->start();
+
+    return OK;
+}
+
 }  // namespace android
