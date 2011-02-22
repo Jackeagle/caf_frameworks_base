@@ -1976,26 +1976,18 @@ void AwesomePlayer::postAudioSeekComplete() {
 }
 
 void AwesomePlayer::setNumFramesToHold() {
-#if 0
-    char value1[128],value2[128];
-    property_get("ro.product.device",value1,"0");
-    property_get("hw.hdmiON", value2, "0");
-
-    // set value of mNumFramesToHold to 2 for targets 8250,8650A,8660
-    // set value of mNumFramesToHold to 2 for 7x30 only if HDMI is on and its not 720p playback
-    if(strcmp("qsd8250_surf",value1) == 0 ||
-       strcmp("qsd8250_ffa",value1) == 0  ||
-       strcmp("qsd8650a_st1x",value1) == 0||
-       strcmp("msm8660_surf",value1) == 0 ||
-       strcmp("msm7630_1x",value1) == 0 ||
-       (strcmp("msm7630_surf",value1) == 0 && atoi(value2) && (!(mVideoWidth == 1280 && mVideoHeight == 720))))
+    sp<MetaData> meta = mVideoSource->getFormat();
+    const char *component;
+    CHECK(meta->findCString(kKeyDecoderComponent, &component));
+    if (!strncmp("OMX.", component, 4)) {
+        // Set number of frames to hold to 2 for qcom decoders to 
+        // avoid flicker
         mNumFramesToHold = 2;
-    else
+    } else {
+        // Hold 1 frame for software decoders
         mNumFramesToHold = 1;
-#endif
-    //Always set number of frames to hold to 2 in order to resolve
-    //flicker for multiple video instance playback
-    mNumFramesToHold = 2;
+    }
+    LOGV("Set number of frames to hold = %d \n", mNumFramesToHold);
 }
 
 // Trim both leading and trailing whitespace from the given string.
