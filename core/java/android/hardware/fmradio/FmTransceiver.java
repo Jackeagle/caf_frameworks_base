@@ -102,13 +102,18 @@ public class FmTransceiver
    private final int MUTE_EVENT = 0x04;
    private final int SEEK_COMPLETE_EVENT = 0x03;
 
+   private static final int V4L2_CID_PRIVATE_BASE = 0x8000000;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_ANTENNA   = V4L2_CID_PRIVATE_BASE + 18;
+
    private final String TAG = "FmTransceiver";
+   private final String V4L2_DEVICE = "/dev/radio0";
 
    protected static int sFd;
    protected FmRxControls mControl;
    protected int mPowerMode;
    protected FmRxEventListner mRxEvents;
    protected FmRxRdsData mRdsData;
+   protected FmTxEventListner mTxEvents;
 
    /*==============================================================
    FUNCTION:  acquire
@@ -131,25 +136,29 @@ public class FmTransceiver
    *
    */
    protected boolean acquire(String device){
-      boolean bStatus;
-      if (sFd == 0)
-      {
-         sFd = FmReceiverJNI.acquireFdNative("/dev/radio0");
+      boolean bStatus = true;
+      if( sFd == 0  ) {
+         sFd = FmReceiverJNI.acquireFdNative(V4L2_DEVICE);
 
          if (sFd > 0) {
-           Log.d(TAG, "Opened "+ sFd);
-           bStatus = true;
-	 }
+            Log.d(TAG, "Opened "+ sFd);
+            bStatus = true;
+         }
          else {
-           Log.d(TAG, "Fail to Open "+ sFd);
-	   bStatus = false;
+            Log.d(TAG, "Fail to Open "+ sFd);
+	    bStatus = false;
          }
       }
       else {
-         Log.d(TAG, "Alredy Opened "+ sFd);
-         bStatus = true;
-      }
-
+         Log.d(TAG, "Already Opened:" + sFd);
+         /*This should be case
+          * Where User try to opne the device
+          * secondtime.
+          * Case where Tx and Rx try to
+          * acquire the device
+          */
+         bStatus = false;
+       }
       return (bStatus);
    }
 
@@ -290,11 +299,11 @@ public class FmTransceiver
    *    @see #unregisterTransmitClient
    *
    */
-   public boolean registerTransmitClient(FmRxEvCallbacks callback){
+   public boolean registerTransmitClient( FmTransmitterCallbacks callback){
       boolean bReturnStatus = false;
       if (callback!=null)
       {
-         //mRxEvents.startListner(sFd, callback);
+         mTxEvents.startListner(sFd, callback);
          bReturnStatus = true;
       } else
       {
@@ -320,7 +329,7 @@ public class FmTransceiver
    *
    */
    public boolean unregisterTransmitClient () {
-      //mRxEvents.stopListener();
+      mTxEvents.stopListener();
       return true;
    }
 
@@ -362,7 +371,7 @@ public class FmTransceiver
       if( !acquire("/dev/radio0")){
          return false;
       }
-      Log.d(TAG, "turning on %d" + device);
+      Log.d(TAG, "turning on " + device);
       mControl.fmOn(sFd, device);
 
       Log.d(TAG, "Calling fmConfigure");
@@ -466,5 +475,61 @@ public class FmTransceiver
     */
    public void setNotchFilter(boolean value) {
 	FmReceiverJNI.setNotchFilterNative(value);
+   }
+   /*==============================================================
+   FUNCTION:  getInternalAntenna
+   ==============================================================*/
+   /**
+   *    Returns true if internal FM antenna is available
+   *
+   *    <p>
+   *    This method returns true is internal FM antenna is
+   *    available, false otherwise
+   *
+   *    <p>
+   *    @return    true/false
+   */
+   public boolean getInternalAntenna()
+   {
+
+       int re = FmReceiverJNI.getControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_ANTENNA);
+
+       if (re == 1)
+         return true;
+
+       return false;
+   }
+
+   /*==============================================================
+   FUNCTION:  setInternalAntenna
+   ==============================================================*/
+   /**
+   *    Returns true if successful, false otherwise
+   *
+   *    <p>
+   *    This method sets internal antenna type to true/false
+   *
+   *    @param intAntenna true is Internal antenna is present
+   *
+   *    <p>
+   *    @return    true/false
+   */
+   public boolean setInternalAntenna(boolean intAnt)
+   {
+
+       int iAntenna ;
+
+       if (intAnt)
+          iAntenna = 1;
+       else
+          iAntenna = 0;
+
+
+       int re = FmReceiverJNI.setControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_ANTENNA, iAntenna);
+
+       if (re == 0)
+         return true;
+
+       return false;
    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -27,61 +27,73 @@
  */
 
 package android.hardware.fmradio;
+import android.util.Log;
+
+
 /**
  * This class contains all interfaces and types needed to control the FM transmitter.
  * @hide
  */
 public class FmTransmitter extends FmTransceiver
 {
-   /**
-    *  RAW RDS Groups Transmit Control : PAUSE
+   private final String TAG = "FmTransmitter";
+ /**
+   *  An object that contains the PS Features that SoC supports
+   *
+   *  @see #getPSFeatures
+   */
+    public class FmPSFeatures
+    {
+       public int maxPSCharacters;
+       public int maxPSStringRepeatCount;
+    };
+
+
+  /**
+    *  Command types for the RDS group transmission.
+    *  This is used as argument to #transmitRdsGroupControl to
+    *  control the RDS group transmission.
     *
-    *  @see #RDS_GRPS_TX_RESUME
-    *  @see #RDS_GRPS_TX_STOP
     *  @see #transmitRdsGroupControl
     */
-   public static final int RDS_GRPS_TX_PAUSE=0;
+
+   public static final int RDS_GRPS_TX_PAUSE    =  0;           /* Pauses the Group transmission*/
+
+   public static final int RDS_GRPS_TX_RESUME   =  1;          /* Resumes the Group transmission*/
+
+   public static final int RDS_GRPS_TX_STOP     =  2;        /* Stops and clear the Group transmission */
+
+   public static final int FM_TX_MAX_PS_LEN           =  (96+1);
+   public static final int FM_TX_MAX_RT_LEN           =  (64+1);
+
+   private static final int MAX_PS_CHARS = 97;
+   private static final int MAX_PS_REP_COUNT = 15;
+   private static final int MAX_RDS_GROUP_BUF_SIZE = 62;
+
+   private FmTransmitterCallbacksAdaptor mTxCallbacks;
+   private boolean mPSStarted = false;
+   private boolean mRTStarted = false;
+   private static final int V4L2_CID_PRIVATE_BASE = 0x8000000;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_ANTENNA   = V4L2_CID_PRIVATE_BASE + 18;
 
    /**
-    *  RAW RDS Groups Transmit Control : RESUME
+    * Power settings
     *
-    *  @see #RDS_GRPS_TX_RESUME
-    *  @see #RDS_GRPS_TX_STOP
-    *  @see #transmitRdsGroupControl
+    * @see #setPowerMode
+    * @see #getPowerMode
     */
-   public static final int RDS_GRPS_TX_RESUME=1;
-
-   /**
-    *  RAW RDS Groups Transmit Control : STOP Stop will also clear
-    *  the buffer in the driver.
-    *
-    *  @see #RDS_GRPS_TX_RESUME
-    *  @see #RDS_GRPS_TX_STOP
-    *  @see #transmitRdsGroupControl
-    */
-   public static final int RDS_GRPS_TX_STOP=2;
-
-   /**
-    *  Creates a transmitter object
-    */
-   public FmTransmitter(){
-      mControl = new FmRxControls();
-      mRdsData = new FmRxRdsData(sFd);
-      mRxEvents = new FmRxEventListner();
-   }
+   public static final int FM_TX_NORMAL_POWER_MODE   =0;
+   public static final int FM_TX_LOW_POWER_MODE      =1;
 
    /**
     *  Constructor for the transmitter class that takes path to
-    *  radio and event callback adapter
+    *  radio device and event callback adapter
     */
-   public FmTransmitter(String path, FmRxEvCallbacksAdaptor callbacks){
-   //TODO: Replace this prototype with the correct "Adaptor" when implemented.
-   //  public FmTransmitter(String path, FMTransmitterCallbacksAdaptor adaptor){
-      acquire(path);
-      registerTransmitClient(callbacks);
-      mControl = new FmRxControls();
-      mRdsData = new FmRxRdsData(sFd);
-      mRxEvents = new FmRxEventListner();
+   public FmTransmitter(String path, FmTransmitterCallbacksAdaptor callbacks) throws InstantiationException{
+
+       mTxEvents = new FmTxEventListner();
+       mControl = new FmRxControls();
+       mTxCallbacks = callbacks;
    }
 
    /*==============================================================
@@ -91,12 +103,12 @@ public class FmTransmitter extends FmTransceiver
     *  Enables the FM device in Transmit Mode.
     *  <p>
     *  This is a synchronous method used to initialize the FM
-    *  receiver. If already initialized this function will
-    *  intialize the receiver with default settings. Only after
+    *  device in transmitt mode. If already initialized this function will
+    *  intialize the Fm device with default settings. Only after
     *  successfully calling this function can many of the FM device
     *  interfaces be used.
     *  <p>
-    *  When enabling the receiver, the application must also
+    *  When enabling the transmitter, the application must also
     *  provide the regional settings in which the transmitter will
     *  operate. These settings (included in argument
     *  configSettings) are typically used for setting up the FM
@@ -106,9 +118,8 @@ public class FmTransmitter extends FmTransceiver
     *  #configure}.
     *  <p>
     *  This command can only be issued by the owner of an FM
-    *  receiver.  To issue this command, the application must
-    *  first successfully call {@link #acquire}.
-    *  <p>
+    *  transmitter.
+    *
     *  @param configSettings  the settings to be applied when
     *                           turning on the radio
     *  @return true if Initialization succeeded, false if
@@ -128,8 +139,39 @@ public class FmTransmitter extends FmTransceiver
       status = super.enable(configSettings, FmTransceiver.FM_TX);
 
       /* Do transmitter Specific Enable Stuff here.*/
+      if( status == true ) {
+          registerTransmitClient(mTxCallbacks);
+          mRdsData = new FmRxRdsData(sFd);
 
-      return true;
+      }
+      return status;
+
+   }
+   /*==============================================================
+   FUNCTION:  setRdsOn
+   ==============================================================*/
+   /**
+   *
+   *    This function enables RDSCTRL register for SoC.
+   *
+   *    <p>
+   *    This API enables the ability of the FM driver
+   *    to send Program Service, RadioText  information.
+   *
+   *
+   *    @return true if the command was placed successfully, false
+   *            if command failed.
+   *
+   */
+   public boolean setRdsOn (){
+
+      // Enable RDS
+      int re = mRdsData.rdsOn(true);
+
+      if (re ==0)
+        return true;
+
+      return false;
    }
 
    /*==============================================================
@@ -153,10 +195,108 @@ public class FmTransmitter extends FmTransceiver
     *  @see #registerTransmitClient
     */
    public boolean disable(){
-      boolean status;
+      boolean status = false;
+
+      //Stop all the RDS transmissions if there any
+      if( mPSStarted ){
+         if( !stopPSInfo() ) {
+             Log.d(TAG, "FmTrasmitter:stopPSInfo failed\n");
+	     }
+      }
+      if( mRTStarted ) {
+        if(!stopRTInfo()) {
+		Log.d(TAG, "FmTrasmitter:stopRTInfo failed\n");
+	    }
+      }
+      if(!transmitRdsGroupControl(RDS_GRPS_TX_STOP) ) {
+      			 Log.d(TAG, "FmTrasmitter:transmitRdsGroupControl failed\n");
+      }
+
+      unregisterTransmitClient();
       status = super.disable();
-      return true;
+
+      return status;
    }
+  /*==============================================================
+   FUNCTION:  setStation
+   ==============================================================*/
+   /**
+    *    Tunes the FM device to the specified FM frequency.
+    *    <p>
+    *    This method tunes the FM device to a station specified by the
+    *    provided frequency. Only valid frequencies within the band
+    *    set by enable or configure can be tuned by this function.
+    *    Attempting to tune to frequencies outside of the set band
+    *    will result in an error.
+    *    <p>
+    *    Once tuning to the specified frequency is completed, the
+    *    event callback FmTransmitterCallbacks::onTuneStatusChange will be called.
+    *
+    *    @param frequencyKHz  Frequency (in kHz) to be tuned
+    *                         (Example: 96500 = 96.5Mhz)
+    *   @return true if setStation call was placed successfully,
+    *           false if setStation failed.
+    */
+   public boolean setStation (int frequencyKHz) {
+
+      //Stop  If there is any ongoing RDS transmissions
+      boolean status = false;
+      if( mPSStarted ){
+		  Log.d(TAG,"FmTransmitter:setStation mPSStarted");
+         if( !stopPSInfo() ) return status;
+      }
+      if( mRTStarted ) {
+		  Log.d(TAG,"FmTransmitter:setStation mRTStarted");
+        if(!stopRTInfo()) return status;
+      }
+      if(!transmitRdsGroupControl(RDS_GRPS_TX_STOP) )return status;
+
+      Log.d(TAG, "FmTrasmitter:SetStation\n");
+      status = super.setStation(frequencyKHz);
+
+      return status;
+   }
+   /*==============================================================
+   FUNCTION:  setPowerMode
+   ==============================================================*/
+   /**
+   *    Puts the driver into or out of low power mode.
+   *
+   *    <p>
+   *    This is an synchronous command which can put the FM
+   *    device and driver into and out of low power mode. Low power mode
+   *    should be used when the receiver is tuned to a station and only
+   *    the FM audio is required. The typical scenario for low power mode
+   *    is when the FM application is no longer visible.
+   *
+   *    <p>
+   *    While in low power mode, all normal FM and RDS indications from
+   *    the FM driver will be suppressed. By disabling these indications,
+   *    low power mode can result in fewer interruptions and this may lead
+   *    to a power savings.
+   *
+   *    <p>
+   *    @param powerMode the new driver operating mode.
+   *
+   *    @return true if setPowerMode succeeded, false if
+   *            setPowerMode failed.
+   */
+   public boolean setPowerMode(int powerMode){
+
+      int re;
+
+      if (powerMode == FM_TX_LOW_POWER_MODE) {
+        re = mControl.setLowPwrMode (sFd, true);
+      }
+      else {
+        re = mControl.setLowPwrMode (sFd, false);
+      }
+
+      if (re == 0)
+         return true;
+      return false;
+   }
+
 
    /*==============================================================
    FUNCTION:  getPSFeatures
@@ -196,19 +336,20 @@ public class FmTransmitter extends FmTransceiver
     */
    public FmPSFeatures getPSFeatures(){
       FmPSFeatures psFeatures = new FmPSFeatures();
-      psFeatures.maxPSCharacters = 0;
-      psFeatures.maxPSStringRepeatCount = 0;
+
+      psFeatures.maxPSCharacters = MAX_PS_CHARS;
+      psFeatures.maxPSStringRepeatCount = MAX_PS_REP_COUNT;
       return psFeatures;
    }
 
    /*==============================================================
-   FUNCTION:  setPSInfo
+   FUNCTION:  startPSInfo
    ==============================================================*/
    /**
     *  Continuously transmit RDS/RBDS Program Service information
     *  over an already tuned station.
     *  <p>
-    *  This is a function used to continuously transmit Program
+    *  This is a synchronous function used to continuously transmit Program
     *  Service information over an already tuned station. While
     *  Program Service information can be transmitted using {@link
     *  #transmitRdsGroups} and 0A/0B groups, this function makes
@@ -240,18 +381,16 @@ public class FmTransmitter extends FmTransceiver
     *  how many times each string is repeated before the next string
     *  is transmitted. This command can only be issued by the owner
     *  of an FM transmitter.
-    *
     *  <p>
-    *  Use {@link #setPSRTProgramType} to update the ProgramType to
-    *  be used as part of the PS Information.
-    *
-    *  Note: psStr should contain strings each of 8 characters or
-    *        less. If the string is greater than 8 characters, the
-    *        string will be truncated.
+    *  Maximux Programme service string lenght that can be sent is
+    *  FM_TX_MAX_PS_LEN. If the application sends PS string longer than
+    *  this threshold, string will be truncated to FM_TX_MAX_PS_LEN.
     *
     *  @param psStr the program service strings to transmit
-    *  @param pty the program type to use in the program Service
-    *             information.
+    *  @param pty   the program type to use in the program Service
+    *               information.
+    *  @param pi    the program type to use in the program Service
+    *               information.
     *  @param repeatCount the number of times each 8 char string is
     *                     repeated before next string
     *
@@ -260,48 +399,106 @@ public class FmTransmitter extends FmTransceiver
     *             to the driver.
     *
     *  @see #getPSFeatures
-    *  @see #setPSRTProgramType
     *  @see #stopPSInfo
     */
-   public boolean setPSInfo(String[] psStr, int pty, long repeatCount){
-       boolean bStatus = false;
+   public boolean startPSInfo(String psStr, int pty, int pi, int repeatCount){
 
-       return bStatus;
+       //Set the PTY
+       if((pty < 0) || (pty > 31 )) {
+           Log.d(TAG,"pTy is expected from 0 to 31");
+           return false;
+       }
+
+       int err = FmReceiverJNI.setPTYNative( sFd, pty );
+       if( err < 0 ){
+		   Log.d(TAG,"setPTYNative is failure");
+          return false;
+       }
+
+       if((pi < 0) || (pi > 65535)) {
+           Log.d(TAG,"pi is expected from 0 to 65535");
+           return false;
+       }
+
+       //Set the PI
+       err = FmReceiverJNI.setPINative( sFd, pi );
+       if( err < 0 ){
+		   Log.d(TAG,"setPINative is failure");
+          return false;
+       }
+
+       if((repeatCount < 0) || (repeatCount > 15)) {
+           Log.d(TAG,"repeat count is expected from 0 to 15");
+           return false;
+       }
+
+       err = FmReceiverJNI.setPSRepeatCountNative( sFd, repeatCount );
+       if( err < 0 ){
+		   Log.d(TAG,"setPSRepeatCountNative is failure");
+          return false;
+       }
+
+       if( psStr.length() > FM_TX_MAX_PS_LEN ){
+          /*truncate the PS string to
+          MAX possible length*/
+          psStr = psStr.substring( 0, FM_TX_MAX_PS_LEN );
+
+       }
+
+       err = FmReceiverJNI.startPSNative( sFd, psStr , psStr.length() );
+       Log.d(TAG,"return for startPS is "+err);
+
+       if( err < 0 ){
+           Log.d(TAG, "FmReceiverJNI.startPSNative returned false\n");
+           return false;
+
+       }   else {
+		   Log.d(TAG,"startPSNative is successful");
+          mPSStarted = true;
+          return true;
+       }
    }
 
    /*==============================================================
    FUNCTION:  stopPSInfo
    ==============================================================*/
    /**
-    *  Stop an active Program Service transmission.
+    *  Stops an active Program Service transmission.
     *
     *  <p>
-    *  This is a function used to stop an active Program Service transmission
-    *  started by {@link #setPSInfo}.
+    *  This is a synchrnous function used to stop an active Program Service transmission
+    *  started by {@link #startPSInfo}.
     *
     *  @return true if Stop PS information was successfully sent to
     *             the driver, false if Stop PS information could not
     *             be sent to the driver.
     *
     *  @see #getPSFeatures
-    *  @see #setPSInfo
+    *  @see #startPSInfo
     *
     */
    public boolean stopPSInfo(){
-      boolean bStatus = false;
-
-      return bStatus;
+       int err =0;
+       if( (err =FmReceiverJNI.stopPSNative( sFd )) < 0  ){
+		   Log.d(TAG,"return for startPS is "+err);
+          return false;
+       }    else{
+		   Log.d(TAG,"stopPSNative is successful");
+          mPSStarted = false;
+          return true;
+       }
    }
 
+
    /*==============================================================
-   FUNCTION:  setPSInfo
+   FUNCTION:  startRTInfo
    ==============================================================*/
    /**
     *  Continuously transmit RDS/RBDS RadioText information over an
     *  already tuned station.
     *
     *  <p>
-    *  This is a function used to continuously transmit RadioText
+    *  This is a synchronous function used to continuously transmit RadioText
     *  information over an already tuned station. While RadioText
     *  information can be transmitted using
     *  {@link #transmitRdsGroups} and 2A/2B groups, this function
@@ -320,97 +517,96 @@ public class FmTransmitter extends FmTransceiver
     *  than 64 characters and terminated by a return carriage (0x0D). All strings
     *  passed to this function must be terminated by a null character (0x00).
     *  <p>
-    *  Use {@link #setPSRTProgramType} to update the ProgramType to
-    *  be used as part of the RT Information.
-    *
-    *  Note: rtStr should contain a maximum of 64 characters.
-    *        If the string is greater than 64 characters, the string
-    *        will be truncated to 64 characters.
+    *  <p>
+    *  Maximux Radio Text string length that can be sent is
+    *  FM_TX_MAX_RT_LEN. If the application sends RT string longer than
+    *  this threshold, string will be truncated to FM_TX_MAX_RT_LEN.
     *
     *  @param rtStr the Radio Text string to transmit
+    *  @param pty the program type to use in the Radio text
+    *             transmissions.
+    *  @param pi the program identifier to use in the Radio text
+    *             transmissions.
     *
     *  @return true if RT information String was successfully sent
     *             to the driver, false if RT information string
     *             could not be sent to the driver.
     *
-    *  @see #setPSRTProgramType
     *  @see #stopRTInfo
     */
-   public boolean setRTInfo(String rtStr){
-      boolean bStatus = false;
+   public boolean startRTInfo(String rtStr, int pty, int pi){
 
-      return bStatus;
+       if((pty < 0) || (pty > 31 )) {
+           Log.d(TAG,"pTy is expected from 0 to 31");
+           return false;
+       }
+       //Set the PTY
+       int err = FmReceiverJNI.setPTYNative( sFd, pty );
+       if( err < 0 ){
+		   Log.d(TAG,"setPTYNative is failure");
+          return false;
+       }
+
+       if((pi < 0) || (pi > 65535)) {
+           Log.d(TAG,"pi is expected from 0 to 65535");
+           return false;
+       }
+
+       err = FmReceiverJNI.setPINative( sFd, pi );
+       if( err < 0 ){
+		   Log.d(TAG,"setPINative is failure");
+          return false;
+       }
+
+
+       if( rtStr.length() > FM_TX_MAX_RT_LEN )
+       {
+          //truncate it to max length
+          rtStr = rtStr.substring( 0, FM_TX_MAX_RT_LEN );
+       }
+
+       err = FmReceiverJNI.startRTNative( sFd, rtStr, rtStr.length() );
+
+       if( err < 0 ){
+          Log.d(TAG, "FmReceiverJNI.startRTNative returned false\n");
+          return false;
+       }   else {
+		   Log.d(TAG,"mRTStarted is true");
+          mRTStarted = true;
+          return true;
+       }
    }
 
    /*==============================================================
    FUNCTION:  stopRTInfo
    ==============================================================*/
    /**
-    *  Stop an active Radio Text information transmission.
+    *  Stops an active Radio Text information transmission.
     *
     *  <p>
-    *  This is a function used to stop an active Radio Text
-    *  transmission started by {@link #setRTInfo}.
+    *  This is a synchrnous function used to stop an active Radio Text
+    *  transmission started by {@link #startRTInfo}.
     *
     *  @return true if Stop RT information was successfully sent to
     *             the driver, false if Stop RT information could not
     *             be sent to the driver.
     *
-    *  @see #setRTInfo
+    *  @see #startRTInfo
     *
     */
    public boolean stopRTInfo(){
-      boolean bStatus = false;
 
-      return bStatus;
+      if( FmReceiverJNI.stopRTNative( sFd ) < 0  ){
+		  Log.d(TAG,"stopRTNative is failure");
+          return false;
+       }    else{
+		   Log.d(TAG,"mRTStarted is false");
+          mRTStarted = false;
+          return true;
+       }
    }
 
-   /*==============================================================
-   FUNCTION:  setPSRTProgramType
-   ==============================================================*/
-   /**
-    *  Set the Program Type to be used for Continuously transmit
-    *  RDS/RBDS Program Service information and RDS/RBDS RadioText
-    *  information.
-    *  <p>
-    *  This is a function to set the Program Type to be used while
-    *  transmitting Program Service and Radio Text Information.
-    *  <p>
-    *  Included in the Program Service information is an RDS/RBDS program type (PTY), and
-    *  one or more Program Service strings. The program type (PTY)
-    *  is used to describe the content being transmitted and follows
-    *  the RDS/RBDS program types described in the RDS/RBDS
-    *  specifications.
-    *  <p>
-    *  Included in the RadioText information is an RDS/RBDS program type (PTY),
-    *  and a single string of up to 64 characters. The program type (PTY) is used
-    *  to describe the content being transmitted and follows the RDS/RBDS program
-    *  types described in the RDS/RBDS specifications.
-    *
-    *  Note: If the PS or RT transmission is currently active, the
-    *  PTY change will take effect when the current transmission is
-    *  complete. Typically  setPSRTProgramType should be called
-    *  before {@link #setPSInfo} or {@link #setRTInfo} is started.
-    *
-    *  @param pty the program type to use in the program Service
-    *             information and Radio Text information.
-    *
-    *  @return true if the driver was updated to use the new
-    *             Program Type, false if the driver could not be
-    *             updated.
-    *
-    *  @see #setPSInfo
-    *  @see #setRTInfo
-    *
-    */
-   public boolean setPSRTProgramType(int pty){
-      boolean bStatus = false;
-
-      return bStatus;
-   }
-
-
-   /*==============================================================
+  /*==============================================================
    FUNCTION:  getRdsGroupBufSize
    ==============================================================*/
    /**
@@ -425,7 +621,8 @@ public class FmTransmitter extends FmTransceiver
     *
     */
    public int getRdsGroupBufSize(){
-      return 0;
+
+   return MAX_RDS_GROUP_BUF_SIZE;
    }
 
 
@@ -433,7 +630,11 @@ public class FmTransmitter extends FmTransceiver
    FUNCTION:  transmitRdsGroups
    ==============================================================*/
    /**
-    *  This function will transmit RDS/RBDS groups over an already tuned station.
+    *  This function will transmit RDS/RBDS groups
+    *  over an already tuned station.
+    *  This is an asynchronous function used to transmit RDS/RBDS
+    *  groups over an already tuned station. This functionality is
+    *  is currently unsupported.
     *  <p>
     *  This function accepts a buffer (rdsGroups) containing one or
     *  more RDS groups. When sending this buffer, the application
@@ -449,7 +650,7 @@ public class FmTransmitter extends FmTransceiver
     *  "onRDSGroupsAvailable()" and "onRDSGroupsComplete()" events
     *  callbacks. The "onRDSGroupsAvailable()" callback will
     *  indicate to the application that the FM driver can accept
-    *  additional groups even thoughall groups may not have been
+    *  additional groups even though all groups may not have been
     *  passed to the FM transmitter. The onRDSGroupsComplete()
     *  callback will indicate when the FM driver has a complete
     *  buffer to transmit RDS data. In many cases all data passed to
@@ -486,7 +687,71 @@ public class FmTransmitter extends FmTransceiver
     */
 
    public int transmitRdsGroups(byte[] rdsGroups, long numGroupsToTransmit){
-      return -1;
+      /*
+       * This functionality is currently unsupported
+       */
+
+    return -1;
+   }
+   /*==============================================================
+   FUNCTION:  transmitContRdsGroups
+   ==============================================================*/
+   /**
+    *  This function will continuously transmit RDS/RBDS groups over an already tuned station.
+    *  <p>
+    *  This is an asynchronous function used to continuously
+    *  transmit RDS/RBDS groups over an already tuned station.
+    *  This functionality is currently unsupported.
+    *  <p>
+    *  This function accepts a buffer (rdsGroups) containing one or
+    *  more RDS groups. When sending this buffer, the application
+    *  must also indicate how many groups should be taken from this
+    *  buffer (numGroupsToTransmit). It may be possible that the FM
+    *  driver can not accept the number of group contained in the
+    *  buffer and will indicate how many group were actually
+    *  accepted through the return value.
+    *
+    *  <p>
+    *  Application can send a complete RDS group buffer for the transmission.
+    *  This data will be sent continuously to the driver. Only single RDS
+    *  group can be continuously transmitter at a time. So, application has to
+    *  send the complete RDS buffer it intends to transmit. trying to pass the
+    *  single buffer in two calls will be interprted as two different RDS/RBDS
+    *  groups and hence all the unset groups will be cleared.
+    *  <p>
+    *  As continuous RDS/RBDS group transmission is done over single buffer,
+    *  Application has to wait for the "onContRDSGroupsComplete()" callback
+    *  to initiate the further RDS/RBDS group transmissions. Failure to
+    *  do so may result in no group being consumed by the FM driver.
+    *  <p> It is important to note that switching between continuous
+    *  and non-continuous transmission of RDS groups can only happen
+    *  when no RDS/RBDS group transmission is underway. If an
+    *  RDS/RBDS group transmission is already underway, the
+    *  application must wait for a onRDSGroupsComplete or onContRDSGroupsComplete.
+    *   If the application wishes to switch from continuous to non-continuous (or
+    *  vice-versa) without waiting for the current transmission to
+    *  complete, the application can clear all remaining groups
+    *  using the {@link #transmitRdsGroupControl} command.
+    *  <p>
+    *  Once completed, this command will generate a
+    *  onRDSContGroupsComplete event to all registered applications.
+    *
+    *  @param rdsGroups The RDS/RBDS groups buffer to transmit.
+    *  @param numGroupsToTransmit The number of groups in the buffer
+    *                             to transmit.
+    *
+    *  @return The number of groups the FM driver actually accepted.
+    *          A value >0 indicates the command was successfully
+    *          accepted and a return value of "-1" indicates error.
+    *
+    *  @see #transmitRdsGroupControl
+    */
+
+   public int transmitRdsContGroups(byte[] rdsGroups, long numGroupsToTransmit){
+      /*
+       * This functionality is currently unsupported.
+       */
+     return -1;
    }
 
    /*==============================================================
@@ -496,89 +761,39 @@ public class FmTransmitter extends FmTransceiver
     *  Pause/Resume RDS/RBDS group transmission, or stop and clear
     *  all RDS groups.
     *  <p>
-    *  This is a function used to used to pause/resume RDS/RBDS
+    *  This is a function used to pause/resume RDS/RBDS
     *  group transmission, or stop and clear all RDS groups. This
-    *  function can be used with to control continuous and
-    *  non-continuous RDS/RBDS group transmissions.
+    *  function can be used to control continuous and
+    *  non-continuous RDS/RBDS group transmissions. This functionality
+    *  is currently unsupported.
     *  <p>
-    *  @param ctrlCmd The Tx RDS group control.
+    *  @param ctrlCmd The Tx RDS group control.This should be one of the
+    *                 contants RDS_GRPS_TX_PAUSE/RDS_GRPS_TX_RESUME/RDS_GRPS_TX_STOP
     *
     *  @return true if RDS Group Control command was
     *             successfully sent to the driver, false if RDS
     *             Group Control command could not be sent to the
     *             driver.
     *
+    *  @see #rdsGroupControlCmdType
     *  @see #transmitRdsGroups
     */
    public boolean transmitRdsGroupControl(int ctrlCmd){
-      boolean bStatus = false;
-
+      boolean bStatus = true;
+      /*
+       * This functionality is currently unsupported.
+       */
+      int val = 0;
+      switch( ctrlCmd ) {
+         case RDS_GRPS_TX_PAUSE:break;
+         case RDS_GRPS_TX_RESUME:break;
+         case RDS_GRPS_TX_STOP:break;
+         default:
+                /*Shouldn't reach here*/
+         bStatus = false;
+      }
       return bStatus;
    }
 
-   /*==============================================================
-   FUNCTION:  isAntennaAvailable
-   ==============================================================*/
-   /**
-    *  Read if an internal Antenna is available for the FM
-    *  device.
-    *  <p>
-    *
-    *  This method is available to find that if an internal
-    *  Antenna is present or not
-    *
-    *
-    *  @return true if an internal Antenna is available, false if
-    *          if an internal antenna is not available and an
-    *          external Antenna has to be used.
-    *
-    */
-   boolean isAntennaAvailable()
-   {
-      return true;
-   }
 
-
-   /**
-    *  An object that contains the PS Features as configured using
-    *  {@link #setPSInfo}.
-    *
-    *  @see #setPSInfo
-    *  @see #getPSFeatures
-    */
-   public class FmPSFeatures
-   {
-      public int maxPSCharacters;
-      public int maxPSStringRepeatCount;
-   };
-
-   /**
-    *  The interface that provides the applications to get callback
-    *  for asynchronous events.
-    *  An Adapter that implements this interface needs to be used to
-    *  register to receive the callbacks using {@link
-    *  #registerTransmitClient}
-    *
-    *  @see #registerTransmitClient
-    */
-   public interface TransmitterCallbacks
-   {
-      /**
-       *  The callback indicates that the transmitter is tuned to a
-       *  new frequency Typically received after setStation.
-       */
-      public void onTuneFrequencyChange(int freq);
-
-      /**
-       * The callback to indicate to the application that the FM
-       * driver can accept additional groups even though all groups
-       * may not have been passed to the FM transmitter.
-       */
-      public void onRDSGroupsAvailable();
-      /**
-       *  The callback will indicate when the FM driver has a complete
-       *  buffer to transmit RDS data.
-       */
-      public void onRDSGroupsComplete();
-   };
-}
+};

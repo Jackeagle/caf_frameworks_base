@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -247,7 +247,7 @@ public class FmReceiver extends FmTransceiver
 
    private static final int V4L2_CID_PRIVATE_BASE = 0x8000000;
    private static final int V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH = V4L2_CID_PRIVATE_BASE + 8;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_ANTENNA   = V4L2_CID_PRIVATE_BASE + 18;
+
 
    private static final int TAVARUA_BUF_SRCH_LIST=0;
    private static final int TAVARUA_BUF_EVENTS=1;
@@ -864,8 +864,10 @@ public class FmReceiver extends FmTransceiver
 
       if (bStatus)
       {
-         if ( (mode == FM_RX_SRCHLIST_MODE_STRONGEST) || (mode == FM_RX_SRCHLIST_MODE_WEAKEST) )
+         if ( (mode == FM_RX_SRCHLIST_MODE_STRONGEST) || (mode == FM_RX_SRCHLIST_MODE_WEAKEST) ) {
+            mode = (mode == FM_RX_SRCHLIST_MODE_STRONGEST)? FM_RX_SRCHLIST_MODE_STRONG: FM_RX_SRCHLIST_MODE_WEAK;
            re = mControl.searchStationList(sFd, mode, 0, direction, pty);
+         }
 	 else
            re = mControl.searchStationList(sFd, mode, maximumStations, direction, pty);
       }
@@ -1624,62 +1626,7 @@ public class FmReceiver extends FmTransceiver
        return rssi;
    }
 
-   /*==============================================================
-   FUNCTION:  getInternalAntenna
-   ==============================================================*/
-   /**
-   *    Returns true if internal FM antenna is available
-   *
-   *    <p>
-   *    This method returns true is internal FM antenna is
-   *    available, false otherwise
-   *
-   *    <p>
-   *    @return    true/false
-   */
-   public boolean getInternalAntenna()
-   {
 
-       int re = FmReceiverJNI.getControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_ANTENNA);
-
-       if (re == 1)
-         return true;
-
-       return false;
-   }
-
-   /*==============================================================
-   FUNCTION:  setInternalAntenna
-   ==============================================================*/
-   /**
-   *    Returns true if successful, false otherwise
-   *
-   *    <p>
-   *    This method sets internal antenna type to true/false
-   *
-   *    @param intAntenna true is Internal antenna is present
-   *
-   *    <p>
-   *    @return    true/false
-   */
-   public boolean setInternalAntenna(boolean intAnt)
-   {
-
-       int iAntenna ;
-
-       if (intAnt)
-          iAntenna = 1;
-       else
-          iAntenna = 0;
-
-
-       int re = FmReceiverJNI.setControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_ANTENNA, iAntenna);
-
-       if (re == 0)
-         return true;
-
-       return false;
-   }
 
    /*==============================================================
    FUNCTION:  getRawRDS
