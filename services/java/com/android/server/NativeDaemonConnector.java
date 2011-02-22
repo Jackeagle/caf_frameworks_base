@@ -266,8 +266,7 @@ final class NativeDaemonConnector implements Runnable {
             throws NativeDaemonConnectorException {
 
         ArrayList<String> rsp = doCommand(cmd);
-        String[] rdata = new String[rsp.size()-1];
-        int idx = 0;
+        ArrayList<String> rdata = new ArrayList<String>();
 
         for (int i = 0; i < rsp.size(); i++) {
             String line = rsp.get(i);
@@ -275,7 +274,7 @@ final class NativeDaemonConnector implements Runnable {
                 String[] tok = line.split(" ");
                 int code = Integer.parseInt(tok[0]);
                 if (code == expectedResponseCode) {
-                    rdata[idx++] = line.substring(tok[0].length() + 1);
+                    rdata.add(line.substring(tok[0].length() + 1));
                 } else if (code == NativeDaemonConnector.ResponseCode.CommandOkay) {
                     if (LOCAL_LOGD) Slog.d(TAG, String.format("List terminated with {%s}", line));
                     int last = rsp.size() -1;
@@ -285,7 +284,8 @@ final class NativeDaemonConnector implements Runnable {
                             Slog.w(TAG, String.format("ExtraData <%s>", rsp.get(i)));
                         }
                     }
-                    return rdata;
+                    int len = rdata.size();
+                    return rdata.toArray(new String[len]);
                 } else if (code == NativeDaemonConnector.ResponseCode.UnsolicitedInformational) {
                     if (LOCAL_LOGD)
                         Slog.d(TAG, String.format("Received unsolicited informational response: {%s}", line));
