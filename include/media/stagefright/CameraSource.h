@@ -87,6 +87,9 @@ private:
     void dataCallbackTimestamp(
             int64_t timestampUs, int32_t msgType, const sp<IMemory> &data);
 
+    void dataCallback(
+             int32_t msgType, const sp<IMemory> &data);
+
     void errorCallback( );
     void releaseQueuedFrames();
     void releaseOneRecordingFrame(const sp<IMemory>& frame);

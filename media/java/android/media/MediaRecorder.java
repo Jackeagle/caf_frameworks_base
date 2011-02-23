@@ -85,6 +85,7 @@ public class MediaRecorder
 
     private WakeLock mWakeLock;
     private boolean mUseWakeLock;
+    private PictureCallback mJpegCallback;
 
     /**
      * Default constructor.
@@ -603,6 +604,30 @@ public class MediaRecorder
     }
 
     /**
+    * Handles the callback for when a picture is taken.
+    */
+    public interface PictureCallback {
+        /**
+        * Callback for when a picture is taken.
+        *
+        * @param data  a byte array of the picture data
+        * @param mediarecorder the MediaRecorder service object
+        */
+        void onPictureTaken(byte[] data, MediaRecorder mediarecorder);
+    };
+
+    public boolean takeLiveSnapshot(PictureCallback jpeg) {
+        mJpegCallback = jpeg;
+        if(!native_takeLiveSnapshot()) {
+            mJpegCallback = null;
+            return false;
+        }
+        return true;
+    }
+
+    private native boolean native_takeLiveSnapshot() throws IllegalStateException;
+
+    /**
      * Stops recording. Call this after start(). Once recording is stopped,
      * you will have to configure it again as if it has just been constructed.
      *
@@ -749,6 +774,7 @@ public class MediaRecorder
          */
         private static final int MEDIA_RECORDER_EVENT_ERROR = 1;
         private static final int MEDIA_RECORDER_EVENT_INFO  = 2;
+        private static final int MEDIA_RECORDER_MSG_COMPRESSED_IMAGE = 8;
 
         @Override
         public void handleMessage(Message msg) {
@@ -767,6 +793,12 @@ public class MediaRecorder
                 if (mOnInfoListener != null)
                     mOnInfoListener.onInfo(mMediaRecorder, msg.arg1, msg.arg2);
 
+                return;
+
+            case MEDIA_RECORDER_MSG_COMPRESSED_IMAGE:
+                if (mJpegCallback != null) {
+                    mJpegCallback.onPictureTaken((byte[])msg.obj, mMediaRecorder);
+                }
                 return;
 
             default:

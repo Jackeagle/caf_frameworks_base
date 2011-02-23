@@ -20,6 +20,7 @@
 #include <utils/RefBase.h>
 #include <binder/IInterface.h>
 #include <binder/Parcel.h>
+#include <binder/IMemory.h>
 
 namespace android {
 
@@ -29,6 +30,7 @@ public:
     DECLARE_META_INTERFACE(MediaRecorderClient);
 
     virtual void notify(int msg, int ext1, int ext2) = 0;
+    virtual void dataCallback(int32_t msgType, const sp<IMemory>& imageData) = 0;
 };
 
 // ----------------------------------------------------------------------------

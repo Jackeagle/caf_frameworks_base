@@ -49,7 +49,8 @@ enum {
     SET_CAMERA_PARAMETERS,
     SET_PREVIEW_SURFACE,
     SET_CAMERA,
-    SET_LISTENER
+    SET_LISTENER,
+    TAKELIVESNAPSHOT
 };
 
 class BpMediaRecorder: public BpInterface<IMediaRecorder>
@@ -239,6 +240,15 @@ public:
         return reply.readInt32();
     }
 
+    status_t takeLiveSnapshot()
+    {
+        LOGV("IMediaRecorder - takeLiveSnapshot");
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        remote()->transact(TAKELIVESNAPSHOT, data, &reply);
+        return reply.readInt32();
+    }
+
     status_t stop()
     {
         LOGV("stop");
@@ -318,6 +328,12 @@ status_t BnMediaRecorder::onTransact(
             LOGV("START");
             CHECK_INTERFACE(IMediaRecorder, data, reply);
             reply->writeInt32(start());
+            return NO_ERROR;
+        } break;
+        case TAKELIVESNAPSHOT: {
+            LOGV("IMediaRecorder - TAKELIVESNAPSHOT");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            reply->writeInt32(takeLiveSnapshot());
             return NO_ERROR;
         } break;
         case PREPARE: {
