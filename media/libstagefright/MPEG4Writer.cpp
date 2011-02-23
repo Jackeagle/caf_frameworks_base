@@ -50,6 +50,9 @@ static const uint8_t kNalUnitTypePicParamSet = 0x08;
 // the audio encoding paths
 static const int64_t kVideoMediaTimeAdjustPeriodTimeUs = 600000000LL;  // 10 minutes
 
+static const int64_t kMaxAdjustTimePerFrame = 5000LL;  //5 ms
+static const int32_t kMaxDriftPercentage = 5;
+
 class MPEG4Writer::Track {
 public:
     Track(MPEG4Writer *owner, const sp<MediaSource> &source);
@@ -2049,7 +2052,7 @@ void MPEG4Writer::Track::adjustMediaTime(int64_t *timestampUs) {
         if (adjustTimePerFrameUs < 0) {
             adjustTimePerFrameUs = -adjustTimePerFrameUs;
         }
-        if (adjustTimePerFrameUs >= 5000) {
+        if (adjustTimePerFrameUs >= kMaxAdjustTimePerFrame) {
             LOGE("Adjusted time per video frame is %lld us",
                 adjustTimePerFrameUs);
             CHECK(!"Video frame time adjustment is too large!");
@@ -2063,7 +2066,7 @@ void MPEG4Writer::Track::adjustMediaTime(int64_t *timestampUs) {
         if (driftPercentage < 0) {
             driftPercentage = -driftPercentage;
         }
-        if (driftPercentage > 5) {
+        if (driftPercentage > kMaxDriftPercentage) {
             LOGE("Audio track has time drift %lld us over %lld us",
                 mTotalDriftTimeToAdjustUs,
                 kVideoMediaTimeAdjustPeriodTimeUs);
