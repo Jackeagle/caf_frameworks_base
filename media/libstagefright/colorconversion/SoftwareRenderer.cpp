@@ -25,7 +25,7 @@
 #include <surfaceflinger/ISurface.h>
 
 namespace android {
-
+static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
 SoftwareRenderer::SoftwareRenderer(
         OMX_COLOR_FORMATTYPE colorFormat,
         const sp<ISurface> &surface,
@@ -42,8 +42,9 @@ SoftwareRenderer::SoftwareRenderer(
       mFrameSize(mDecodedWidth * mDecodedHeight * 2),  // RGB565
       mIndex(0) {
     size_t alignedDecodedWidth  = ((decodedWidth + 31) & -32);
-    if ((mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar ) &&
-            (alignedDecodedWidth != mDecodedWidth)) {
+    if ((mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar ) ||
+        (mColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar )  ||
+        (mColorFormat == OMX_COLOR_FormatYUV420Planar )) {
         mFrameSize = (alignedDecodedWidth * mDecodedHeight * 2);
     }
     else {
@@ -96,10 +97,17 @@ void SoftwareRenderer::render(
         const void *data, size_t size, void *platformPrivate) {
     size_t offset = mIndex * mFrameSize;
     void *dst = (uint8_t *)mMemoryHeap->getBase() + offset;
+    size_t dstSkip = mDecodedWidth << 1;
 
+    /* aligning the destination skip width for these color formats */
+    if (((mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar )||
+         (mColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar)||
+         (mColorFormat == OMX_COLOR_FormatYUV420Planar))) {
+            dstSkip = ((mDecodedWidth + 31) & -32) << 1;
+       }
     mConverter.convert(
             mDecodedWidth, mDecodedHeight,
-            data, 0, dst, 2 * mDecodedWidth);
+            data, 0, dst, dstSkip);
 
     mISurface->postBuffer(offset);
     mIndex = 1 - mIndex;
