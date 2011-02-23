@@ -56,6 +56,8 @@ namespace android {
 static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs
 static int64_t kHighWaterMarkUs = 10000000ll;  // 10secs
 static float kThresholdPaddingFactor = 0.1f;   // 10%
+static int64_t kVideoEarlyMarginUs = -50000;   //50 ms
+static int64_t kVideoLateMarginUs = 200000;  //200 ms
 
 struct AwesomeEvent : public TimedEventQueue::Event {
     AwesomeEvent(
@@ -1349,7 +1351,7 @@ void AwesomePlayer::onVideoEvent() {
         latenessUs = 0;
     }
 
-    if (latenessUs > 200000) {
+    if (latenessUs > kVideoLateMarginUs) {
         // We're more than 200ms late.
         LOGV("we're late by %lld us (%.2f secs)", latenessUs, latenessUs / 1E6);
 
@@ -1368,7 +1370,7 @@ void AwesomePlayer::onVideoEvent() {
         return;
     }
 
-    if (latenessUs < -50000) {
+    if (latenessUs < kVideoEarlyMarginUs) {
         // We're more than 50ms early.
 
         if (mStatistics) {
