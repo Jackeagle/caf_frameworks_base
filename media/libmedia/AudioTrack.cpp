@@ -1,6 +1,7 @@
 /* //device/extlibs/pv/android/AudioTrack.cpp
 **
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -472,7 +473,7 @@ void AudioTrack::stop()
                 flush();
             }
             if (t != 0) {
-                t->requestExit();
+                t->requestExitAndWait();
             } else {
                 setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_NORMAL);
             }
