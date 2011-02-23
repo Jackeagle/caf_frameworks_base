@@ -427,9 +427,18 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         if (!checkNotifyPermission("notifyDataConnection()" )) {
             return;
         }
-        Slog.i(TAG, "notifyDataConnection: state=" + state + " isDataConnectivityPossible="
-                + isDataConnectivityPossible + " reason=" + reason
-                + " interfaceName=" + interfaceName + " networkType=" + networkType);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("notifyDataConnection: anyState=").append(anyDataConnectionState);
+        sb.append(",").append(apnType).append("/").append(ipVersion);
+        sb.append(",apnTypeState=").append(state).append(",iface=").append(interfaceName);
+        sb.append(",ip=").append(ipAddress).append(",gw=").append(gwAddress);
+        sb.append(",isDataConnectivityPossible=").append(isDataConnectivityPossible);
+        sb.append(",networkType=").append(networkType);
+        sb.append(",reason=").append(reason);
+
+        Slog.i(TAG, sb.toString());
+
         synchronized (mRecords) {
             /* notify clients only if there is a real change in data connection state */
             if ((mDataConnectionState != anyDataConnectionState)

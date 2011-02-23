@@ -117,10 +117,8 @@ public class DefaultPhoneNotifier implements PhoneNotifier {
          * 5. ipv
          */
 
-        Log.v("DATA", "[DefaultPhoneNotifier] : "
-                + apnType + ", " + ipv + ", " + sender.getDataConnectionState(apnType, ipv));
-
         int subscription = sender.getSubscription();
+
         try {
             mRegistry.notifyDataConnection(
                     convertDataState(sender.getDataConnectionState()),

@@ -880,11 +880,6 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.enableDataConnectivity();
     }
 
-    public boolean enableDataConnectivity(Message onCompleteMsg) {
-        logd("enableDataConnectivity(Message onCompleteMsg)");
-        return mActivePhone.enableDataConnectivity(onCompleteMsg);
-    }
-
     public int enableApnType(String type) {
         return mActivePhone.enableApnType(type);
     }

@@ -1394,18 +1394,6 @@ public interface Phone {
     boolean enableDataConnectivity();
 
     /**
-     * Allow mobile data connections.
-     * @param onCompleteMsg message to sent back to the caller
-     * @return {@code true} if the operation started successfully
-     * <br/>{@code false} if it
-     * failed immediately.<br/>
-     * Even in the {@code true} case, it may still fail later
-     * during setup, in which case an asynchronous indication will
-     * be supplied.
-     */
-    boolean enableDataConnectivity(Message onCompleteMsg);
-
-    /**
      * Disallow mobile data connections, and terminate any that
      * are in progress.
      * @return {@code true} if the operation started successfully

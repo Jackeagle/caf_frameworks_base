@@ -225,18 +225,14 @@ public class DataServiceInfo {
         return this.isEnabled;
     }
 
-    /*
-     * Dc should be valid when this function is called. It can be called even if
-     * service is not enabled. State is set to CONNECTED!
-     */
+    /* Set state of service type on specified ip version */
     void setDataServiceTypeAsActive(DataConnection dc, IPVersion ipv) {
         if (dc == null || ipv == null) {
             loge("service set as active with null parameters!");
             return;
         }
 
-        logi("Service is active on " + ipv);
-        logv(" dc : " + dc.toString());
+        logi("Service is active on " + ipv + " through cid=" + dc.cid);
 
         if (ipv == IPVersion.INET6) {
             this.activeIpv6Dc = dc;

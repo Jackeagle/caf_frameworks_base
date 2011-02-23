@@ -121,6 +121,7 @@ public abstract class DataConnectionTracker extends Handler {
     protected static final int EVENT_PS_RESTRICT_DISABLED = 26;
 
     protected static final int EVENT_RECORDS_LOADED = 30;
+    protected static final int EVENT_DATA_CALL_DROPPED = 31;
 
    /*
      * Reasons for calling updateDataConnections()
@@ -132,7 +133,7 @@ public abstract class DataConnectionTracker extends Handler {
     protected static final String REASON_SERVICE_TYPE_ENABLED = "apnTypeEnabled";
     protected static final String REASON_MASTER_DATA_DISABLED = "masterDataDisabled";
     protected static final String REASON_MASTER_DATA_ENABLED = "masterDataEnabled";
-    protected static final String REASON_ICC_RECORDS_LOADED = "iccRecordsLaded";
+    protected static final String REASON_ICC_RECORDS_LOADED = "iccRecordsLoaded";
     protected static final String REASON_CDMA_OTA_PROVISION = "cdmaOtaPovisioning";
     protected static final String REASON_DEFAULT_DATA_DISABLED = "defaultDataDisabled";
     protected static final String REASON_DEFAULT_DATA_ENABLED = "defaultDataEnabled";
@@ -151,7 +152,6 @@ public abstract class DataConnectionTracker extends Handler {
     protected static final String REASON_TETHERED_MODE_STATE_CHANGED = "tetheredModeStateChanged";
     protected static final String REASON_DATA_CONN_PROP_CHANGED = "dataConnectionPropertyChanged";
 
-    protected Message mPendingDataDisableCompleteMsg;
     Subscription mSubscriptionData;
 
     /**
@@ -202,7 +202,7 @@ public abstract class DataConnectionTracker extends Handler {
                 break;
 
             case EVENT_MASTER_DATA_DISABLED:
-                onMasterDataDisabled();
+                onMasterDataDisabled((Message) msg.obj);
                 break;
 
             case EVENT_MASTER_DATA_ENABLED:
@@ -241,7 +241,7 @@ public abstract class DataConnectionTracker extends Handler {
     abstract protected void onRadioOn();
     abstract protected void onRadioOff();
     abstract protected void onMasterDataEnabled();
-    abstract protected void onMasterDataDisabled();
+    abstract protected void onMasterDataDisabled(Message onCompleteMsg);
     abstract protected boolean isConcurrentVoiceAndData();
     abstract protected void setDataConnectionAsDesired(boolean desiredPowerState, Message onCompleteMsg);
     abstract public List<DataConnection> getCurrentDataConnectionList();
@@ -262,13 +262,9 @@ public abstract class DataConnectionTracker extends Handler {
             return Phone.APN_REQUEST_FAILED;
         }
 
-        /* mark service type as disabled */
-        mDpt.setServiceTypeEnabled(serviceType, false);
-
-        if (mDpt.isServiceTypeActive(serviceType) == false) {
-            // service type is already inactive.
-            // TODO: is APN_REQUEST_FAILED appropriate? or should it be
-            // APN_REQUEST_STARTED?
+        if (mDpt.isServiceTypeEnabled(serviceType) == false
+                || mDpt.isServiceTypeActive(serviceType) == false) {
+            // service type is already inactive or not enabled at all.
 
             /* send out disconnected notifications - no harm doing this */
             notifyDataConnection(serviceType, IPVersion.INET, REASON_SERVICE_TYPE_DISABLED);
@@ -277,6 +273,8 @@ public abstract class DataConnectionTracker extends Handler {
             return Phone.APN_REQUEST_FAILED;
         }
 
+        /* mark service type as disabled */
+        mDpt.setServiceTypeEnabled(serviceType, false);
         sendMessage(obtainMessage(EVENT_SERVICE_TYPE_DISABLED, serviceType));
 
         return Phone.APN_REQUEST_STARTED;
@@ -327,19 +325,17 @@ public abstract class DataConnectionTracker extends Handler {
      * Disable ALL data!
      */
     public boolean disableDataConnectivity() {
-        mMasterDataEnabled = false;
-        sendMessage(obtainMessage(EVENT_MASTER_DATA_DISABLED));
-        return true;
+        return disableDataConnectivity(null);
     }
 
     public boolean disableDataConnectivity(Message onCompleteMsg) {
         mMasterDataEnabled = false;
-        sendMessage(obtainMessage(EVENT_MASTER_DATA_DISABLED));
-        mPendingDataDisableCompleteMsg = onCompleteMsg;
+        sendMessage(obtainMessage(EVENT_MASTER_DATA_DISABLED, onCompleteMsg));
         return true;
     }
 
     public boolean enableDataConnectivity() {
+
         boolean inEcm =
             SystemProperties.getBoolean(TelephonyProperties.PROPERTY_INECM_MODE, false);
 
@@ -348,16 +344,7 @@ public abstract class DataConnectionTracker extends Handler {
 
         mMasterDataEnabled = true;
         sendMessage(obtainMessage(EVENT_MASTER_DATA_ENABLED));
-        return true;
-    }
 
-    public boolean enableDataConnectivity(Message onCompleteMsg) {
-        mMasterDataEnabled = true;
-        sendMessage(obtainMessage(EVENT_MASTER_DATA_ENABLED));
-
-        if (onCompleteMsg != null) {
-            onCompleteMsg.sendToTarget();
-        }
         return true;
     }
 
