@@ -38,7 +38,7 @@ import android.os.Binder;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Looper;
-
+import android.os.SystemProperties;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -137,6 +137,10 @@ public class LinkProvider {
      *         LinkNotifier.
      */
     public boolean getLink() {
+        if(SystemProperties.getBoolean("persist.cne.fmc.mode", false)) {
+            Log.w(LOG_TAG,"getLink: FMC is enabled. This API is invalid.");
+            return false;
+        }
         try {
             if (mHandler == null) {
                 try {

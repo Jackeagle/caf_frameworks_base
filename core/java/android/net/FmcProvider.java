@@ -37,6 +37,7 @@ import android.util.Log;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Looper;
+import android.os.SystemProperties;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -120,6 +121,12 @@ public class FmcProvider
      */
     public boolean startFmc(){
         Log.d(LOG_TAG,"FmcProvider@startFmc");
+
+        if (!SystemProperties.getBoolean("persist.cne.fmc.mode", false)) {
+            Log.w(LOG_TAG, "startFmc: FMC is disabled. This API is invalid.");
+            return false;
+        }
+
         try {
             return mService.startFmc(mListener);
         } catch ( RemoteException e ) {
