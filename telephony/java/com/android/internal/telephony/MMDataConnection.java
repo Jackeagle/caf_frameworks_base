@@ -33,6 +33,12 @@ public class MMDataConnection extends DataConnection {
     boolean DBG = true;
     DataConnectionTracker mDct;
 
+    /*
+     * Set to true, if this instance of DC is available for use by DCT,
+     * false other wise.
+     */
+    private boolean isAvailable = true;
+
     private boolean mOmhEnabled = SystemProperties.getBoolean(
                             TelephonyProperties.PROPERTY_OMH_ENABLED, false);
 
@@ -143,6 +149,17 @@ public class MMDataConnection extends DataConnection {
             return false;
 
         return Patterns.IP_ADDRESS.matcher(((ApnSetting)mDataProfile).mmsProxy).matches();
+    }
+
+    /* Set to true to mark the DC as in Use and set to false to mark the dc
+     * as available for use
+     */
+    void setAvailable(boolean b) {
+        isAvailable = b;
+    }
+
+    boolean isAvailable() {
+        return isAvailable;
     }
 
     void logd(String logString) {

@@ -26,6 +26,7 @@ import com.android.internal.util.HierarchicalStateMachine;
 
 import android.content.Context;
 import android.os.AsyncResult;
+import android.os.Looper;
 import android.os.Message;
 import android.os.SystemProperties;
 import android.util.EventLog;
@@ -205,7 +206,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 
    //***** Constructor
     protected DataConnection(Context context, CommandsInterface ci, String name) {
-        super(name);
+        super(name, Looper.getMainLooper());
         if (DBG) log("DataConnection constructor E");
         this.mCM = ci;
         this.mContext = context;
@@ -716,6 +717,9 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      * Reset the connection and wait for it to complete.
      * TODO: Remove when all callers only need the asynchronous
      * reset defined above.
+     *
+     * WARNING! DataConnection object now share the same looper as
+     * DataConnectionTrackers. This function SHOULD NOT be called!
      */
     public void resetSynchronously() {
         ResetSynchronouslyLock lockObj = new ResetSynchronouslyLock();

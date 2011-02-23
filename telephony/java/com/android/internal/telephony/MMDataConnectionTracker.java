@@ -53,10 +53,6 @@ import android.telephony.gsm.GsmCellLocation;
 import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.Log;
-import android.os.IBinder;
-import android.os.ServiceManager;
-import android.net.IConnectivityManager;
-import android.os.RemoteException;
 
 import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.EventLogTags;
@@ -154,7 +150,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     private boolean mIsPsRestricted = false;
     private boolean mDesiredPowerState = true;
 
-    Message mPendingPowerOffCompleteMsg;
+    /* list of messages that are waiting to be posted, when data call disconnect
+     * is complete
+     */
+    ArrayList <Message> mDisconnectAllCompleteMsgList = new ArrayList<Message>();
 
     private static final boolean SUPPORT_IPV4 = SystemProperties.getBoolean(
             "persist.telephony.support_ipv4", true);
@@ -169,11 +168,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     //used for NV+CDMA
     String mCdmaHomeOperatorNumeric = null;
 
-    /*
-     * warning: if this flag is set then all connections are disconnected when
-     * updatedata connections is called
-     */
-    private boolean mDisconnectAllDataCalls = false;
+    private int mDisconnectPendingCount = 0;
     private boolean mDataCallSetupPending = false;
 
     private CdmaSubscriptionSourceManager mCdmaSSM = null;
@@ -285,7 +280,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         mContext.registerReceiver(mIntentReceiver, filter, null, this);
 
-        createDataCallList();
+        createDataConnectionList();
 
         // This preference tells us 1) initial condition for "dataEnabled",
         // and 2) whether the RIL will setup the baseband to auto-PS
@@ -365,8 +360,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             mDsst.update(ci);
 
             // 5. Update Data Call List
-            destroyDataCallList();
-            createDataCallList();
+            destroyDataConnectionList();
+            createDataConnectionList();
 
             // 6. Restart NetStat Poll
             stopNetStatPoll();
@@ -404,7 +399,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         mDsst.dispose();
         mDsst = null;
 
-        destroyDataCallList();
+        destroyDataConnectionList();
 
         mContext.unregisterReceiver(this.mIntentReceiver);
 
@@ -481,6 +476,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             case EVENT_TETHERED_MODE_STATE_CHANGED:
                 onTetheredModeStateChanged((AsyncResult) msg.obj);
                 break;
+
+            case EVENT_DATA_CALL_DROPPED:
+                onDataCallDropped((AsyncResult)msg.obj);
+                break;
+
             default:
                 super.handleMessage(msg);
                 break;
@@ -519,7 +519,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         mDpt.resetAllProfilesAsWorking();
         mDpt.resetAllServiceStates();
-        disconnectAllConnections(reason);
+        disconnectAllConnections(reason, null);
     }
 
     protected void onRecordsLoaded() {
@@ -623,7 +623,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     @Override
     protected void onRoamingOn() {
         if (getDataOnRoamingEnabled() == false) {
-            disconnectAllConnections(REASON_ROAMING_ON);
+            disconnectAllConnections(REASON_ROAMING_ON, null);
         }
         updateDataConnections(REASON_ROAMING_ON);
     }
@@ -643,9 +643,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     @Override
-    protected void onMasterDataDisabled() {
-        mDisconnectAllDataCalls = true;
-        updateDataConnections(REASON_MASTER_DATA_DISABLED);
+    protected void onMasterDataDisabled(Message onCompleteMsg) {
+        disconnectAllConnections(REASON_MASTER_DATA_DISABLED, onCompleteMsg);
     }
 
     @Override
@@ -656,7 +655,30 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     @Override
-    protected void onServiceTypeDisabled(DataServiceType type) {
+    protected void onServiceTypeDisabled(DataServiceType ds) {
+
+        /* if the dc corresponding to the ds we are disabling is not in use by any other ds;
+         * bring it down. Do this for each ip type.
+         */
+        for (IPVersion ipv : IPVersion.values()) {
+
+            if (mDpt.isServiceTypeActive(ds, ipv) == false)
+                continue;
+
+            DataConnection dc = mDpt.getActiveDataConnection(ds, ipv);
+            boolean tearDownNeeded = true;
+            for (DataServiceType t : DataServiceType.values()) {
+                if (t != ds && mDpt.isServiceTypeEnabled(t)
+                        && mDpt.getActiveDataConnection(t, ipv) == dc) {
+                    tearDownNeeded = false; //dc used by somebody else.
+                }
+            }
+            if (tearDownNeeded) {
+                tryDisconnectDataCall(dc, REASON_SERVICE_TYPE_DISABLED);
+            }
+        }
+
+        //check for something else to do
         updateDataConnections(REASON_SERVICE_TYPE_DISABLED);
     }
 
@@ -694,8 +716,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
         dumpDataCalls();
 
-        boolean needDataConnectionUpdate = false;
-        String dataConnectionUpdateReason = null;
         boolean isDataDormant = true; // will be set to false, if atleast one
                                       // data connection is not dormant.
 
@@ -708,13 +728,13 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             DataCallState activeDC = getDataCallStateByCid(dcStates, dc.cid);
             if (activeDC == null) {
                 logi("DC has disappeared from list : dc = " + dc);
-                dc.resetSynchronously(); //TODO: do this asynchronously
-                // services will be marked as inactive, on data connection
-                // update
-                needDataConnectionUpdate = true;
-                if (dataConnectionUpdateReason == null) {
-                    dataConnectionUpdateReason = REASON_NETWORK_DISCONNECT;
-                }
+
+                CallbackData c = new CallbackData();
+                c.dc = dc;
+                c.reason = REASON_NETWORK_DISCONNECT;
+                //onUpdateDataConnections will be called when async reset returns.
+                dc.reset(obtainMessage(EVENT_DATA_CALL_DROPPED, c));
+
             } else if (activeDC.active == DATA_CONNECTION_ACTIVE_PH_LINK_INACTIVE) {
                 DataConnectionFailCause failCause = DataConnectionFailCause
                         .getDataConnectionDisconnectCause(activeDC.inactiveReason);
@@ -722,11 +742,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 logi("DC is inactive : dc = " + dc);
                 logi("   inactive cause = " + failCause);
 
-                dc.resetSynchronously(); //TODO: do this asynchronously
-                needDataConnectionUpdate = true;
-                if (dataConnectionUpdateReason == null) {
-                    dataConnectionUpdateReason = REASON_NETWORK_DISCONNECT;
-                }
+                CallbackData c = new CallbackData();
+                c.dc = dc;
+                c.reason = REASON_NETWORK_DISCONNECT;
+                //onUpdateDataConnections will be called when async reset returns.
+                dc.reset(obtainMessage(EVENT_DATA_CALL_DROPPED, c));
+
             } else if (isIpAddrChanged(activeDC, dc)) {
                 /*
                 * TODO: Handle Gateway / DNS sever IP changes in a
@@ -755,10 +776,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                                 + activeDC.active);
                 }
             }
-        }
-
-        if (needDataConnectionUpdate) {
-            updateDataConnections(dataConnectionUpdateReason);
         }
 
         if (isDataDormant) {
@@ -844,35 +861,32 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
             logi("--------------------------");
             logi("Data call setup : SUCCESS");
-            logi("  service type  : " + c.ds);
             logi("  data profile  : " + c.dp.toShortString());
+            logi("  service type  : " + c.ds);
             logi("  data call id  : " + c.dc.cid);
             logi("  ip version    : " + c.ipv);
+            logi("  ip address/gw : " + c.dc.getIpAddress()+"/"+c.dc.gatewayAddress);
+            logi("  dns           : " + Arrays.toString(c.dc.getDnsServers()));
             logi("--------------------------");
 
-            //mark requested service type as active through this dc, or else
-            //updateDataConnections() will tear it down.
-            //state is set to CONNECTED internally.
-            mDpt.setServiceTypeAsActive(c.ds, c.dc, c.ipv);
-            notifyDataConnection(c.ds, c.ipv, c.reason);
-
-            if (c.ds == DataServiceType.SERVICE_TYPE_DEFAULT) {
-                SystemProperties.set("gsm.defaultpdpcontext.active", "true");
-            }
+            handleConnectedDc(c.dc, c.reason);
 
             //we might have other things to do, so call update updateDataConnections() again.
             updateDataConnections(c.reason);
+
             return; //done.
         }
 
         //ASSERT: Data call setup has failed.
 
+        freeDataConnection((MMDataConnection)c.dc);
+
         DataConnectionFailCause cause = (DataConnectionFailCause) (ar.result);
 
         logi("--------------------------");
         logi("Data call setup : FAILED");
-        logi("  service type  : " + c.ds);
         logi("  data profile  : " + c.dp.toShortString());
+        logi("  service type  : " + c.ds);
         logi("  ip version    : " + c.ipv);
         logi("  fail cause    : " + cause);
         logi("--------------------------");
@@ -1116,21 +1130,64 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         return false;
     }
 
-    protected void onDisconnectDone(AsyncResult ar) {
-        logv("onDisconnectDone: reason=" + (String) ar.userObj);
-        updateDataConnections((String) ar.userObj);
+    protected void onDataCallDropped(AsyncResult ar) {
+
+        CallbackData c = (CallbackData) ar.userObj;
+
+        logv("onDataCallDropped: dc=" + c.dc + ", reason=" + c.reason);
+
+        handleDisconnectedDc(c.dc, c.reason);
     }
 
-    public void disconnectAllConnections(String reason) {
-        mDisconnectAllDataCalls = true;
-        updateDataConnections(reason);
+    protected synchronized void onDisconnectDone(AsyncResult ar) {
+
+        CallbackData c = (CallbackData) ar.userObj;
+
+        logv("onDisconnectDone: reason=" + c.reason);
+
+        handleDisconnectedDc(c.dc, c.reason);
+
+        if (mDisconnectPendingCount > 0)
+            mDisconnectPendingCount--;
+
+        if (mDisconnectPendingCount == 0) {
+            for (Message m: mDisconnectAllCompleteMsgList) {
+                m.sendToTarget();
+            }
+            mDisconnectAllCompleteMsgList.clear();
+        }
+
+        updateDataConnections(c.reason); //check for something else to do.
     }
 
-    /*
-     * (non-Javadoc)
-     * @seecom.android.internal.telephony.data.DataConnectionTracker#
-     * onServiceTypeEnableDisable() This function does the following:
-     */
+    private synchronized void disconnectAllConnections(String reason,
+            Message disconnectAllCompleteMsg) {
+
+        if (disconnectAllCompleteMsg != null) {
+            mDisconnectAllCompleteMsgList.add(disconnectAllCompleteMsg);
+        }
+
+        if (mDisconnectPendingCount != 0) {
+            logv("disconnect all data connections in progress. queuing.");
+            return;
+        }
+
+        mDisconnectPendingCount = 0;
+        for (DataConnection dc : mDataConnectionList) {
+            if (dc.isInactive() == false ) {
+                tryDisconnectDataCall(dc, reason);
+                mDisconnectPendingCount++;
+            }
+        }
+
+        if (mDisconnectPendingCount == 0) {
+            for (Message m: mDisconnectAllCompleteMsgList) {
+                m.sendToTarget();
+            }
+            mDisconnectAllCompleteMsgList.clear();
+        }
+    }
+
     synchronized protected void onUpdateDataConnections(String reason, int context) {
         if (context != mUpdateDataConnectionsContext) {
             //we have other EVENT_UPDATE_DATA_CONNECTIONS on the way.
@@ -1141,83 +1198,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         logv("onUpdateDataConnections: reason=" + reason);
         dumpDataCalls();
         dumpDataServiceTypes();
-
-        /*
-         * Phase 1:
-         * - Free up any data calls that we don't need.
-         * - Some data calls, may have got inactive, without the data profile tracker
-         *   knowing about it, so update it.
-         *   TODO: we don't really need to run Phase 1 all the time, we can optimize this!
-         */
-
-        boolean wasDcDisconnected = false;
-
-        for (DataConnection dc : mDataConnectionList) {
-            if (dc.isInactive()) {
-                /*
-                 * 1a. Check and fix any services that think they are active
-                 * through this inactive DC.
-                 */
-                for (DataServiceType ds : DataServiceType.values()) {
-                    if (mDpt.getActiveDataConnection(ds, IPVersion.INET) == dc) {
-                        mDpt.setServiceTypeAsInactive(ds, IPVersion.INET);
-                        notifyDataConnection(ds, IPVersion.INET, reason);
-                    }
-                    if (mDpt.getActiveDataConnection(ds, IPVersion.INET6) == dc) {
-                        mDpt.setServiceTypeAsInactive(ds, IPVersion.INET6);
-                        notifyDataConnection(ds, IPVersion.INET6, reason);
-                    }
-                }
-            } else if (dc.isActive()
-                    && mDataCallSetupPending == false) {
-                /*
-                 * 1b. If this active data call is not in use by any enabled
-                 * service, bring it down.
-                 */
-                boolean needsTearDown = true;
-                for (DataServiceType ds : DataServiceType.values()) {
-                    if (mDpt.isServiceTypeEnabled(ds)
-                            && mDpt.getActiveDataConnection(ds, dc.getIpVersion()) == dc) {
-                        needsTearDown = false;
-                        break;
-                    }
-                }
-                if (needsTearDown || mDisconnectAllDataCalls == true) {
-                    wasDcDisconnected = wasDcDisconnected | tryDisconnectDataCall(dc, reason);
-                }
-            }
-        }
-
-        if (wasDcDisconnected == true) {
-            /*
-             * if something was disconnected, then wait for at least one
-             * disconnect to complete, before setting up data calls again.
-             * this will ensure that all possible data connections are freed up
-             * before setting up new ones.
-             */
-            return;
-        }
-
-        if (mDisconnectAllDataCalls) {
-            /*
-             * Someone had requested that all calls be torn down.
-             * Either there is no calls to disconnect, or we have already asked
-             * for all data calls to be disconnected, so reset the flag.
-             */
-            mDisconnectAllDataCalls = false;
-            //check for pending power off message
-            if (mPendingPowerOffCompleteMsg != null) {
-                mPendingPowerOffCompleteMsg.sendToTarget();
-                mPendingPowerOffCompleteMsg = null;
-            }
-
-            //check for pending data disabled message
-            if (mPendingDataDisableCompleteMsg != null) {
-                logd("onUpdateDataConnections: All the Data Connections are down! Notifying the caller");
-                mPendingDataDisableCompleteMsg.sendToTarget();
-                mPendingDataDisableCompleteMsg = null;
-            }
-        }
 
         // Check for data readiness!
         boolean isReadyForData = isReadyForData()
@@ -1247,35 +1227,18 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
+        if (mDisconnectPendingCount > 0) {
+            logi("Data Call disconnect request pending."
+                    + "Not trying to bring up any new data connections.");
+            return;
+        }
+
         /*
-         * Phase 2: Ensure that all requested services are active. Do setup data
-         * call as required in order of decreasing service priority - highest priority
+         * Ensure that all requested services are active. Do setup data call as
+         * required in order of decreasing service priority - highest priority
          * service gets data call setup first!
          */
         for (DataServiceType ds : DataServiceType.getPrioritySortedValues()) {
-            /*
-             * 2a : Poll all data calls and update the latest info.
-             */
-            for (DataConnection dc : mDataConnectionList) {
-                if (dc.isActive()
-                        && dc.getDataProfile().canHandleServiceType(ds)) {
-                    IPVersion ipv = dc.getIpVersion();
-                    if (mDpt.getActiveDataConnection(ds, ipv) == null) {
-                        mDpt.setServiceTypeAsActive(ds, dc, ipv);
-                        /*
-                         * notify only if it is enabled - avoids unnecessary
-                         * notifications
-                         */
-                        if (mDpt.isServiceTypeEnabled(ds)) {
-                            notifyDataConnection(ds, ipv, reason);
-                        }
-                    }
-                }
-            }
-
-            /*
-             * 2b : Bring up data calls as required.
-             */
             if (mDpt.isServiceTypeEnabled(ds) == true) {
 
                 //IPV4
@@ -1299,6 +1262,67 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
+    private void handleDisconnectedDc(DataConnection dc, String reason) {
+
+        logv("handleDisconnectedDc() : " + dc);
+
+        freeDataConnection((MMDataConnection)dc);
+
+        for (DataServiceType ds : DataServiceType.values()) {
+            boolean needUpdate = false;
+
+            if (mDpt.getActiveDataConnection(ds, IPVersion.INET) == dc) {
+                mDpt.setServiceTypeAsInactive(ds, IPVersion.INET);
+                needUpdate = true;
+            }
+            if (mDpt.getActiveDataConnection(ds, IPVersion.INET6) == dc) {
+                mDpt.setServiceTypeAsInactive(ds, IPVersion.INET6);
+                needUpdate = true;
+            }
+            if (needUpdate) {
+                notifyDataConnection(ds, IPVersion.INET, reason);
+                notifyDataConnection(ds, IPVersion.INET6, reason);
+                if (ds == DataServiceType.SERVICE_TYPE_DEFAULT
+                    && mDpt.isServiceTypeActive(DataServiceType.SERVICE_TYPE_DEFAULT) == false) {
+                    SystemProperties.set("gsm.defaultpdpcontext.active", "false");
+                }
+            }
+        }
+    }
+
+    private void handleConnectedDc(DataConnection dc, String reason) {
+
+        logv("handleConnectedDc() : " + dc);
+
+        boolean needsDisconnect = true;
+        for (DataServiceType ds : DataServiceType.values()) {
+
+            if (mDpt.isServiceTypeActive(ds, dc.getIpVersion()) == false
+                    && dc.getDataProfile().canHandleServiceType(ds)) {
+
+                mDpt.setServiceTypeAsActive(ds, dc, dc.getIpVersion());
+                notifyDataConnection(ds, dc.getIpVersion(), reason);
+
+                /*
+                 * of all the services that just got active, at least one of them
+                 * should have be enabled or else this dc is staying up for no
+                 * reason. This can happen for example when the service type
+                 * was disabled by the time setup_data_call response came up.
+                 */
+                if (mDpt.isServiceTypeEnabled(ds) == true) {
+                    needsDisconnect = false;
+                }
+
+                if (ds == DataServiceType.SERVICE_TYPE_DEFAULT) {
+                    SystemProperties.set("gsm.defaultpdpcontext.active", "true");
+                }
+            }
+        }
+        if (needsDisconnect == true) {
+            tryDisconnectDataCall(dc, REASON_SERVICE_TYPE_DISABLED);
+        }
+    }
+
     private boolean getDesiredPowerState() {
         return mDesiredPowerState;
     }
@@ -1308,7 +1332,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             Message onCompleteMsg) {
 
         mDesiredPowerState = desiredPowerState;
-        mPendingPowerOffCompleteMsg = null;
 
         /*
          * TODO: fix this workaround. For 1x, we should not disconnect data call
@@ -1316,8 +1339,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
          */
 
         if (mDesiredPowerState == false && getRadioTechnology() != RadioTechnology.RADIO_TECH_1xRTT) {
-            mPendingPowerOffCompleteMsg = onCompleteMsg;
-            disconnectAllConnections(Phone.REASON_RADIO_TURNED_OFF);
+            disconnectAllConnections(Phone.REASON_RADIO_TURNED_OFF, onCompleteMsg);
             return;
         }
 
@@ -1440,18 +1462,23 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
-    private boolean tryDisconnectDataCall(DataConnection dc, String reason) {
-        logv("tryDisconnectDataCall : dc=" + dc + ", reason=" + reason);
-        dc.disconnect(obtainMessage(EVENT_DISCONNECT_DONE, reason));
-        return true;
-    }
-
     class CallbackData {
         DataConnection dc;
         DataProfile dp;
         IPVersion ipv;
         String reason;
         DataServiceType ds;
+    }
+
+    private boolean tryDisconnectDataCall(DataConnection dc, String reason) {
+        logv("tryDisconnectDataCall : dc=" + dc + ", reason=" + reason);
+
+        CallbackData c = new CallbackData();
+        c.dc = dc;
+        c.reason = reason;
+
+        dc.disconnect(obtainMessage(EVENT_DISCONNECT_DONE, c));
+        return true;
     }
 
     private boolean trySetupDataCall(DataServiceType ds, IPVersion ipv, String reason) {
@@ -1482,7 +1509,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             }
         }
 
-        DataConnection dc = findFreeDataCall();
+        DataConnection dc = getFreeDataConnection();
         if (dc == null) {
             // if this happens, it probably means that our data call list is not
             // big enough!
@@ -1545,30 +1572,42 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         return type;
     }
 
-    private void createDataCallList() {
+    private void createDataConnectionList() {
         mDataConnectionList = new ArrayList<DataConnection>();
         DataConnection dc;
 
         for (int i = 0; i < DATA_CONNECTION_POOL_SIZE; i++) {
             dc = MMDataConnection.makeDataConnection(this);
+            ((MMDataConnection)dc).setAvailable(true);
             mDataConnectionList.add(dc);
         }
     }
 
-    private void destroyDataCallList() {
+    private void destroyDataConnectionList() {
         if (mDataConnectionList != null) {
             mDataConnectionList.removeAll(mDataConnectionList);
         }
     }
 
-    private MMDataConnection findFreeDataCall() {
+    private MMDataConnection getFreeDataConnection() {
         for (DataConnection conn : mDataConnectionList) {
             MMDataConnection dc = (MMDataConnection) conn;
-            if (dc.isInactive()) {
+            if (dc.isAvailable() && dc.isInactive()) {
+                dc.setAvailable(false);
                 return dc;
             }
         }
         return null;
+    }
+
+    private void freeDataConnection(MMDataConnection dc) {
+        if (dc.isInactive() == false) {
+            loge("Assertion failed : Freeing inActive data call!");
+        }
+        if (dc.isAvailable() == true) {
+            loge("Assertion failed : freeDataCall when isAvailable() is already true!");
+        }
+        dc.setAvailable(true);
     }
 
     protected void startNetStatPoll() {

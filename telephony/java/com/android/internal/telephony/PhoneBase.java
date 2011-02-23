@@ -1118,10 +1118,6 @@ public abstract class PhoneBase extends Handler implements Phone {
         return mDataConnection.enableDataConnectivity();
     }
 
-    public boolean enableDataConnectivity(Message onCompleteMsg) {
-        return mDataConnection.enableDataConnectivity(onCompleteMsg);
-    }
-
     public String getActiveApn(String type, IPVersion ipv) {
         return mDataConnection.getActiveApn(type, ipv);
     }
