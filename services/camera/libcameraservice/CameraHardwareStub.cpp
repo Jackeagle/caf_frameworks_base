@@ -388,6 +388,7 @@ sp<CameraHardwareInterface> CameraHardwareStub::createInstance()
 static CameraInfo sCameraInfo[] = {
     {
         CAMERA_FACING_BACK,
+        1,
         90,  /* orientation */
     }
 };
@@ -402,7 +403,7 @@ extern "C" void HAL_getCameraInfo(int cameraId, struct CameraInfo* cameraInfo)
     memcpy(cameraInfo, &sCameraInfo[cameraId], sizeof(CameraInfo));
 }
 
-extern "C" sp<CameraHardwareInterface> HAL_openCameraHardware(int cameraId)
+extern "C" sp<CameraHardwareInterface> HAL_openCameraHardware(int cameraId, int mode)
 {
     return CameraHardwareStub::createInstance();
 }

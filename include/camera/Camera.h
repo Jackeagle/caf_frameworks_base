@@ -118,6 +118,11 @@ enum {
     CAMERA_FACING_FRONT = 1 /* The facing of the camera is the same as that of the screen. */
 };
 
+enum {
+    CAMERA_SUPPORT_MODE_2D = 0x01, /* Camera Sensor supports 2D mode. */
+    CAMERA_SUPPORT_MODE_3D = 0x02 /* Camera Sensor supports 3D mode. */
+};
+
 struct CameraInfo {
 
     /**
@@ -126,6 +131,7 @@ struct CameraInfo {
      */
     int facing;
 
+    int mode;
     /**
      * The orientation of the camera image. The value is the angle that the
      * camera image needs to be rotated clockwise so it shows correctly on
@@ -164,7 +170,7 @@ public:
     static  int32_t     getNumberOfCameras();
     static  status_t    getCameraInfo(int cameraId,
                                       struct CameraInfo* cameraInfo);
-    static  sp<Camera>  connect(int cameraId);
+    static  sp<Camera>  connect(int cameraId, int mode=CAMERA_SUPPORT_MODE_2D);
                         ~Camera();
             void        init();
 

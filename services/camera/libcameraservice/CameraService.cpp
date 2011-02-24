@@ -114,9 +114,9 @@ status_t CameraService::getCameraInfo(int cameraId,
 }
 
 sp<ICamera> CameraService::connect(
-        const sp<ICameraClient>& cameraClient, int cameraId) {
+        const sp<ICameraClient>& cameraClient, int cameraId, int mode) {
     int callingPid = getCallingPid();
-    LOG1("CameraService::connect E (pid %d, id %d)", callingPid, cameraId);
+    LOG1("CameraService::connect E (pid %d, id %d mode %d)", callingPid, cameraId, mode);
 
     sp<Client> client;
     if (cameraId < 0 || cameraId >= mNumberOfCameras) {
@@ -148,7 +148,7 @@ sp<ICamera> CameraService::connect(
         return NULL;
     }
 
-    sp<CameraHardwareInterface> hardware = HAL_openCameraHardware(cameraId);
+    sp<CameraHardwareInterface> hardware = HAL_openCameraHardware(cameraId, mode);
     if (hardware == NULL) {
         LOGE("Fail to open camera hardware (id=%d)", cameraId);
         return NULL;

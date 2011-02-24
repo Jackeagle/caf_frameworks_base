@@ -35,6 +35,7 @@ struct fields_t {
     jfieldID    context;
     jfieldID    surface;
     jfieldID    facing;
+    jfieldID    mode;
     jfieldID    orientation;
     jmethodID   post_event;
 };
@@ -352,14 +353,15 @@ static void android_hardware_Camera_getCameraInfo(JNIEnv *env, jobject thiz,
         return;
     }
     env->SetIntField(info_obj, fields.facing, cameraInfo.facing);
+    env->SetIntField(info_obj, fields.mode, cameraInfo.mode);
     env->SetIntField(info_obj, fields.orientation, cameraInfo.orientation);
 }
 
 // connect to camera service
 static void android_hardware_Camera_native_setup(JNIEnv *env, jobject thiz,
-    jobject weak_this, jint cameraId)
+    jobject weak_this, jint cameraId, jint mode)
 {
-    sp<Camera> camera = Camera::connect(cameraId);
+    sp<Camera> camera = Camera::connect(cameraId, mode);
 
     if (camera == NULL) {
         jniThrowException(env, "java/lang/RuntimeException",
@@ -713,7 +715,7 @@ static JNINativeMethod camMethods[] = {
     "(ILandroid/hardware/Camera$CameraInfo;)V",
     (void*)android_hardware_Camera_getCameraInfo },
   { "native_setup",
-    "(Ljava/lang/Object;I)V",
+    "(Ljava/lang/Object;II)V",
     (void*)android_hardware_Camera_native_setup },
   { "native_release",
     "()V",
@@ -822,6 +824,7 @@ int register_android_hardware_Camera(JNIEnv *env)
         { "android/hardware/Camera", "mNativeContext",   "I", &fields.context },
         { "android/view/Surface",    ANDROID_VIEW_SURFACE_JNI_ID, "I", &fields.surface },
         { "android/hardware/Camera$CameraInfo", "facing",   "I", &fields.facing },
+        { "android/hardware/Camera$CameraInfo", "mode",   "I", &fields.mode },
         { "android/hardware/Camera$CameraInfo", "orientation",   "I", &fields.orientation },
     };
 

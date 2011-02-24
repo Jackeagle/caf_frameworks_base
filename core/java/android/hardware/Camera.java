@@ -175,6 +175,18 @@ public class Camera {
         public int facing;
 
         /**
+         * The mode of sensor: 2D or 3D
+         */
+        public static final int CAMERA_SUPPORT_MODE_2D = 0x01;
+
+        /**
+         * The mode of sensor: 2D or 3D
+         */
+        public static final int CAMERA_SUPPORT_MODE_3D = 0x02;
+
+        public int mode;
+
+        /**
          * The orientation of the camera image. The value is the angle that the
          * camera image needs to be rotated clockwise so it shows correctly on
          * the display in its natural orientation. It should be 0, 90, 180, or 270.
@@ -221,7 +233,11 @@ public class Camera {
      *     example, if the camera is in use by another process).
      */
     public static Camera open(int cameraId) {
-        return new Camera(cameraId);
+        return new Camera(cameraId, CameraInfo.CAMERA_SUPPORT_MODE_2D);
+    }
+
+    public static Camera open(int cameraId, int mode) {
+        return new Camera(cameraId, mode);
     }
 
     /**
@@ -236,13 +252,13 @@ public class Camera {
         for (int i = 0; i < numberOfCameras; i++) {
             getCameraInfo(i, cameraInfo);
             if (cameraInfo.facing == CameraInfo.CAMERA_FACING_BACK) {
-                return new Camera(i);
+                return new Camera(i, CameraInfo.CAMERA_SUPPORT_MODE_2D);
             }
         }
         return null;
     }
 
-    Camera(int cameraId) {
+    Camera(int cameraId, int mode) {
         mShutterCallback = null;
         mRawImageCallback = null;
         mJpegCallback = null;
@@ -261,14 +277,14 @@ public class Camera {
             mEventHandler = null;
         }
 
-        native_setup(new WeakReference<Camera>(this), cameraId);
+        native_setup(new WeakReference<Camera>(this), cameraId, mode);
     }
 
     protected void finalize() {
         native_release();
     }
 
-    private native final void native_setup(Object camera_this, int cameraId);
+    private native final void native_setup(Object camera_this, int cameraId, int mode);
     private native final void native_release();
 
 

@@ -113,13 +113,13 @@ status_t Camera::getCameraInfo(int cameraId,
     return cs->getCameraInfo(cameraId, cameraInfo);
 }
 
-sp<Camera> Camera::connect(int cameraId)
+sp<Camera> Camera::connect(int cameraId, int mode)
 {
     LOGV("connect");
     sp<Camera> c = new Camera();
     const sp<ICameraService>& cs = getCameraService();
     if (cs != 0) {
-        c->mCamera = cs->connect(c, cameraId);
+        c->mCamera = cs->connect(c, cameraId, mode);
     }
     if (c->mCamera != 0) {
         c->mCamera->asBinder()->linkToDeath(c);
