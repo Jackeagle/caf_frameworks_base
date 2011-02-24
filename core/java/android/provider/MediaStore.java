@@ -331,6 +331,8 @@ public final class MediaStore {
                 } else {
                     bitmap = ThumbnailUtils.createImageThumbnail(filePath, kind);
                 }
+            } catch (OutOfMemoryError e) {
+                Log.w(TAG, e);
             } catch (SQLiteException ex) {
                 Log.w(TAG, ex);
             } finally {
