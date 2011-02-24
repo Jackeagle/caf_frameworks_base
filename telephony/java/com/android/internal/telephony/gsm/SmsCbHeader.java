@@ -37,6 +37,11 @@ public class SmsCbHeader implements Parcelable {
     public static final int FORMAT_UMTS = 2;
 
     /**
+     * GSM pdu format, as defined in 3gpp TS 23.041, section 9.4.1.3
+     */
+    public static final int FORMAT_ETWS_PRIMARY = 3;
+
+    /**
      * Message type value as defined in 3gpp TS 25.324, section 11.1.
      */
     private static final int MESSAGE_TYPE_CBS_MESSAGE = 1;
@@ -45,6 +50,11 @@ public class SmsCbHeader implements Parcelable {
      * Length of GSM pdus
      */
     private static final int PDU_LENGTH_GSM = 88;
+
+    /**
+     * Maximum length of ETWS primary message GSM pdus
+     */
+    private static final int PDU_LENGTH_ETWS = 56;
 
     public final int geographicalScope;
 
@@ -62,6 +72,10 @@ public class SmsCbHeader implements Parcelable {
 
     public final int format;
 
+    public final int etwsEmergencyUserAlert;
+
+    public final int etwsPopup;
+
     public SmsCbHeader(byte[] pdu) throws IllegalArgumentException {
         if (pdu == null || pdu.length < PDU_HEADER_LENGTH) {
             throw new IllegalArgumentException("Illegal PDU");
@@ -69,24 +83,39 @@ public class SmsCbHeader implements Parcelable {
 
         if (pdu.length <= PDU_LENGTH_GSM) {
             // GSM pdus are no more than 88 bytes
-            format = FORMAT_GSM;
-            geographicalScope = (pdu[0] & 0xc0) >> 6;
-            messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >> 4);
-            updateNumber = pdu[1] & 0x0f;
-            messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
-            dataCodingScheme = pdu[4] & 0xff;
+            if (pdu.length <= PDU_LENGTH_ETWS) {
+                format = FORMAT_ETWS_PRIMARY;
+                geographicalScope = -1; //not applicable
+                messageCode = -1;
+                updateNumber = -1;
+                messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
+                dataCodingScheme = -1;
+                pageIndex = -1;
+                nrOfPages = -1;
+                etwsEmergencyUserAlert = (pdu[4] & 0x1);
+                etwsPopup = (pdu[5] & 0x8) >> 7;
+            } else {
+                format = FORMAT_GSM;
+                geographicalScope = (pdu[0] & 0xc0) >> 6;
+                messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >> 4);
+                updateNumber = pdu[1] & 0x0f;
+                messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
+                dataCodingScheme = pdu[4] & 0xff;
 
-            // Check for invalid page parameter
-            int pageIndex = (pdu[5] & 0xf0) >> 4;
-            int nrOfPages = pdu[5] & 0x0f;
+                // Check for invalid page parameter
+                int pageIndex = (pdu[5] & 0xf0) >> 4;
+                int nrOfPages = pdu[5] & 0x0f;
 
-            if (pageIndex == 0 || nrOfPages == 0 || pageIndex > nrOfPages) {
-                pageIndex = 1;
-                nrOfPages = 1;
+                if (pageIndex == 0 || nrOfPages == 0 || pageIndex > nrOfPages) {
+                    pageIndex = 1;
+                    nrOfPages = 1;
+                }
+
+                this.pageIndex = pageIndex;
+                this.nrOfPages = nrOfPages;
+                etwsEmergencyUserAlert = -1;
+                etwsPopup = -1;
             }
-
-            this.pageIndex = pageIndex;
-            this.nrOfPages = nrOfPages;
         } else {
             // UMTS pdus are always at least 90 bytes since the payload includes
             // a number-of-pages octet and also one length octet per page
@@ -109,6 +138,8 @@ public class SmsCbHeader implements Parcelable {
             // actual payload may contain several pages.
             pageIndex = 1;
             nrOfPages = 1;
+            etwsEmergencyUserAlert = -1;
+            etwsPopup = -1;
         }
     }
 
@@ -122,6 +153,8 @@ public class SmsCbHeader implements Parcelable {
         this.pageIndex = other.pageIndex;
         this.updateNumber = other.updateNumber;
         this.format = other.format;
+        this.etwsEmergencyUserAlert = other.etwsEmergencyUserAlert;
+        this.etwsPopup = other.etwsPopup;
     }
 
     @Override
@@ -144,6 +177,8 @@ public class SmsCbHeader implements Parcelable {
         dest.writeInt(pageIndex);
         dest.writeInt(nrOfPages);
         dest.writeInt(format);
+        dest.writeInt(etwsEmergencyUserAlert);
+        dest.writeInt(etwsPopup);
     }
 
     public static final Parcelable.Creator<SmsCbHeader> CREATOR = new Parcelable.Creator<SmsCbHeader>() {
@@ -165,5 +200,7 @@ public class SmsCbHeader implements Parcelable {
         pageIndex = in.readInt();
         nrOfPages = in.readInt();
         format = in.readInt();
+        etwsEmergencyUserAlert = in.readInt();
+        etwsPopup = in.readInt();
     }
 }
