@@ -121,6 +121,8 @@ public class ThumbnailUtils {
                 options.inDither = false;
                 options.inPreferredConfig = Bitmap.Config.ARGB_8888;
                 bitmap = BitmapFactory.decodeFileDescriptor(fd, null, options);
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "", e);
             } catch (IOException ex) {
                 Log.e(TAG, "", ex);
             }
