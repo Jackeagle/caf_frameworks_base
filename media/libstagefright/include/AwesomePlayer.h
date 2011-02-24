@@ -145,7 +145,11 @@ private:
                        duration of the video track
     */
     int64_t mAudioDurationUs, mVideoDurationUs;
-
+    /* This variable indicates if AUdioPlayer
+       was paused after a Resume, Audio will be
+       resumed when Video reaches a sync frame
+     */
+    bool mPauseAudioTillSync;
 
     uint32_t mFlags;
     uint32_t mExtractorFlags;
