@@ -114,6 +114,7 @@ LOCAL_SRC_FILES += \
 	core/java/android/content/pm/IPackageStatsObserver.aidl \
 	core/java/android/database/IContentObserver.aidl \
 	core/java/android/net/IConnectivityManager.aidl \
+	core/java/android/net/ILinkSocketMessageHandler.aidl \
 	core/java/android/net/INetworkManagementEventObserver.aidl \
 	core/java/android/net/IThrottleManager.aidl \
 	core/java/android/nfc/ILlcpConnectionlessSocket.aidl \
