@@ -821,10 +821,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                  * all have become unblocked and stand a chance of initiating a call
                  * again.
                  */
-                for (DataServiceType ds : DataServiceType.values()) {
-                    mDpt.getRetryManager(ds, IPVersion.INET).resetRetryCount();
-                    mDpt.getRetryManager(ds, IPVersion.INET6).resetRetryCount();
-                }
+                mDpt.resetAllServiceStates();
                 updateDataConnections(REASON_TETHERED_MODE_STATE_CHANGED);
             break;
             default:
