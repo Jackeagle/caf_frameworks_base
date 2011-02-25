@@ -927,7 +927,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     }
 #endif
 
-    if (mOverlayOpt) {
+    if (mOverlayOpt || (layerbuffercount == 1)) {
         if(layerbuffercount == 1) {
             if (compcount != mLastCompCount)
                 compositionStateChanged = true;
