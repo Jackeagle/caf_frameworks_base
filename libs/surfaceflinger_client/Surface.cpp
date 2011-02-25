@@ -1043,6 +1043,13 @@ status_t Surface::setStereoscopic3DFormat(int format)
     return s->setStereoscopic3DFormat(format);
 }
 
+status_t Surface::useOriginalSurfaceResolution(bool flag)
+{
+     sp<ISurface> s(mSurface);
+     if (s == 0) return NO_INIT;
+     return s->useOriginalSurfaceResolution(flag);
+}
+
 status_t Surface::getBufferLocked(int index,
         uint32_t w, uint32_t h, uint32_t format, uint32_t usage)
 {

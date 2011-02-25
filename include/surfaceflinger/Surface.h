@@ -164,6 +164,7 @@ public:
     status_t    lock(SurfaceInfo* info, Region* dirty, bool blocking = true);
     status_t    unlockAndPost();
     status_t    setStereoscopic3DFormat(int format);
+    status_t    useOriginalSurfaceResolution(bool flag);
     // setSwapRectangle() is intended to be used by GL ES clients
     void        setSwapRectangle(const Rect& r);
 

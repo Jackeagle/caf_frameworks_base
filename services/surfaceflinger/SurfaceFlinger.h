@@ -444,6 +444,8 @@ private:
    bool mOverlayUsed;
    bool mOverlayUseChanged;
    bool mIsLayerBufferPresent;
+   //Flag tracks the absence of surfaces to be displayed in original resolution.
+   bool mOrigResSurfAbsent;
    Vector< sp<LayerBase> > mOverlayDitchedLayers;
 public:
    void ditchOverlayLayers();

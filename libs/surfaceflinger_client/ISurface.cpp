@@ -107,6 +107,16 @@ public:
         return err;
     }
 
+    virtual status_t useOriginalSurfaceResolution(bool flag)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurface::getInterfaceDescriptor());
+        data.writeInt32(flag);
+        remote()->transact(USE_ORIGINAL_SURFACE_RESOLUTION, data, &reply);
+        status_t err = reply.readInt32();
+        return err;
+    }
+
     virtual status_t registerBuffers(const BufferHeap& buffers)
     {
         Parcel data, reply;
@@ -219,6 +229,13 @@ status_t BnSurface::onTransact(
             CHECK_INTERFACE(ISurface, data, reply);
             int format = data.readInt32();
             status_t err = setStereoscopic3DFormat(format);
+            reply->writeInt32(err);
+            return NO_ERROR;
+        } break;
+        case USE_ORIGINAL_SURFACE_RESOLUTION: {
+            CHECK_INTERFACE(ISurface, data, reply);
+            int flag = data.readInt32();
+            status_t err = useOriginalSurfaceResolution(flag);
             reply->writeInt32(err);
             return NO_ERROR;
         } break;

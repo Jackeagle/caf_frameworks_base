@@ -108,7 +108,8 @@ SurfaceFlinger::SurfaceFlinger()
         mFullScreen(false),
         mOverlayUsed(false),
         mOverlayUseChanged(false),
-        mIsLayerBufferPresent(false)
+        mIsLayerBufferPresent(false),
+        mOrigResSurfAbsent(true)
 {
     init();
 }
@@ -888,7 +889,9 @@ void SurfaceFlinger::handleRepaint()
 {
     // compute the invalid region
     mInvalidRegion.orSelf(mDirtyRegion);
-    if (mInvalidRegion.isEmpty()) {
+    //Skip this check for original resolution surface, since MDP is used for display
+    //and we want to ensure UI updates.
+    if (mInvalidRegion.isEmpty() && mOrigResSurfAbsent) {
         // nothing to do
         return;
     }
@@ -903,7 +906,9 @@ void SurfaceFlinger::handleRepaint()
     glLoadIdentity();
 
     uint32_t flags = hw.getFlags();
-    if ((flags & DisplayHardware::SWAP_RECTANGLE && !mIsLayerBufferPresent) ||
+    //Enter block only if original resolution surface absent.
+    //If present, ensures that the entire region is marked dirty.
+    if ((flags & DisplayHardware::SWAP_RECTANGLE && !mIsLayerBufferPresent && mOrigResSurfAbsent) ||
         (flags & DisplayHardware::BUFFER_PRESERVED)) 
     {
         // we can redraw only what's dirty, but since SWAP_RECTANGLE only
@@ -971,6 +976,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     Region drawClip;
     bool canUseOverlayToDraw = false;
     int s3dLayerCount = 0;
+    int origResLayerCount = 0;
 
 #if defined(TARGET_USES_OVERLAY)
     for (size_t i = 0; ((i < count)  &&
@@ -996,11 +1002,15 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                 if (layer->getStereoscopic3DFormat()) {
                     s3dLayerCount++;
                 }
+                if(UNLIKELY(layer->getUseOriginalSurfaceResolution())) {
+                    ++origResLayerCount;
+                }
             }
         }
     }
 #endif
     mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
+    mOrigResSurfAbsent = (0 == origResLayerCount);
 
     if (mOverlayOpt || (layerbuffercount == 1)) {
         if(layerbuffercount == 1) {
@@ -1056,7 +1066,8 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     }
 
     mFullScreen = false;
-    if (mOverlayUsed && !s3dLayerCount && layerbuffercount != 1) {
+    if (mOverlayUsed && !s3dLayerCount && !origResLayerCount
+            && layerbuffercount != 1) {
         mOverlayUsed = false;
         mOverlayUseChanged = true;
     }
@@ -1066,6 +1077,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
                 if ((getOverlayEngine() != NULL) && layer->getStereoscopic3DFormat()) {
+                    layer->drawWithOverlay(clip, mHDMIOutput, false);
+                    mOverlayUsed = true;
+                } else if (UNLIKELY( (getOverlayEngine() != NULL) &&
+                            layer->getUseOriginalSurfaceResolution() )) {
                     layer->drawWithOverlay(clip, mHDMIOutput, false);
                     mOverlayUsed = true;
                 } else if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && layerbuffercount == 1) {

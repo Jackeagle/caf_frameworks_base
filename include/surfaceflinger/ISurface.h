@@ -49,6 +49,7 @@ protected:
         REQUEST_BUFFER,
         SET_BUFFER_COUNT,
         SET_STEREOSCOPIC_3D_FORMAT,
+        USE_ORIGINAL_SURFACE_RESOLUTION,
     };
 
 public: 
@@ -68,6 +69,7 @@ public:
      */
     virtual status_t setBufferCount(int bufferCount) = 0;
     virtual status_t setStereoscopic3DFormat(int format) = 0;
+    virtual status_t useOriginalSurfaceResolution(bool flag) = 0;
 
     // ------------------------------------------------------------------------
     // Deprecated...

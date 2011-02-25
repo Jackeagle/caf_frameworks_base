@@ -717,6 +717,9 @@ public class SurfaceView extends View {
                 case STEREOSCOPIC_3D_FORMAT_INTERLEAVED:
                     mSurface.setStereoscopic3DFormat(format);
                     return;
+                case USE_ORIGINAL_SURFACE_RESOLUTION:
+                    mSurface.useOriginalSurfaceResolution(true);
+                    return;
                 default:
                     break;
             }

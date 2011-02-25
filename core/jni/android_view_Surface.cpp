@@ -485,6 +485,16 @@ static void Surface_setStereoscopic3DFormat(JNIEnv* env, jobject clazz, jint f)
         doThrow(env, "java/lang/IllegalArgumentException", NULL);
 }
 
+static void Surface_useOriginalSurfaceResolution(
+        JNIEnv* env, jobject clazz, jboolean flag)
+{
+    const sp<Surface>& surface(getSurface(env, clazz));
+    if (!Surface::isValid(surface)) return;
+    status_t err = surface->useOriginalSurfaceResolution(flag);
+    if (err<0 && err!=NO_INIT)
+        doThrow(env, "java/lang/IllegalArgumentException", NULL);
+}
+
 static void Surface_hide(
         JNIEnv* env, jobject clazz)
 {
@@ -684,6 +694,7 @@ static JNINativeMethod gSurfaceMethods[] = {
     {"setPosition",         "(II)V",(void*)Surface_setPosition },
     {"setSize",             "(II)V",(void*)Surface_setSize },
     {"setStereoscopic3DFormatNative","(I)V",(void*)Surface_setStereoscopic3DFormat },
+    {"useOriginalSurfaceResolutionNative","(Z)V",(void*)Surface_useOriginalSurfaceResolution },
     {"hide",                "()V",  (void*)Surface_hide },
     {"show",                "()V",  (void*)Surface_show },
     {"freeze",              "()V",  (void*)Surface_freeze },

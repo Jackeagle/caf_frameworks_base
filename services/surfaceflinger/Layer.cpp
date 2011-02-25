@@ -134,6 +134,14 @@ void Layer::onRemoved()
         // wake up the condition
         lcblk->setStatus(NO_INIT);
     }
+    // If original resolution surface, close current VG channels.
+    // Notify gralloc of the end of current playback.
+    if(getUseOriginalSurfaceResolution()) {
+        const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
+        mFlinger->enableOverlayOpt(false);
+        mFlinger->enableOverlayOpt(true);
+        hw.videoOverlayStarted(false);
+    }
 }
 
 sp<LayerBaseClient::Surface> Layer::createSurface() const
@@ -279,9 +287,11 @@ status_t Layer::drawWithOverlay(const Region& clip,
                     bool hdmiConnected, bool ignoreFB) const
 {
 #if defined(TARGET_USES_OVERLAY)
+#if defined(SF_BYPASS)
     if (mBufferManager.getNumBuffers()
                    <= mBufferManager.getDefaultBufferCount())
         return NO_INIT;
+#endif
 
     Texture tex(mBufferManager.getActiveTexture());
     if (tex.image == EGL_NO_IMAGE_KHR)
@@ -295,7 +305,9 @@ status_t Layer::drawWithOverlay(const Region& clip,
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     overlay::Overlay* temp = hw.getOverlayObject();
     int s3dFormat = getStereoscopic3DFormat();
-    if (s3dFormat) {
+    bool originalResolutionFormat = getUseOriginalSurfaceResolution();
+
+    if (s3dFormat || originalResolutionFormat) {
         hw.videoOverlayStarted(true);
     }
     if (!temp->setSource(mWidth, mHeight, mFormat|s3dFormat,
@@ -303,7 +315,7 @@ status_t Layer::drawWithOverlay(const Region& clip,
                            ignoreFB, mBufferManager.getNumBuffers()))
         return INVALID_OPERATION;
 
-    if (s3dFormat && !temp->setCrop(0, 0, mWidth, mHeight))
+    if ((s3dFormat || originalResolutionFormat) && !temp->setCrop(0, 0, mWidth, mHeight))
         return INVALID_OPERATION;
 
     const Rect bounds(mTransformedBounds);
@@ -314,15 +326,22 @@ status_t Layer::drawWithOverlay(const Region& clip,
     int ovpos_x, ovpos_y;
     uint32_t ovpos_w, ovpos_h;
     bool ret;
-    if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
-        if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
-            ret = temp->setPosition(x, y, w, h);
+
+    // Do not set position for original resolution surfaces.
+    // This will default to occupying entire primary screen.
+    // If only a certain portion needs to be occupied, check for surface size exceeding
+    // the framebuffer size. Currently such checks not required.
+    if(LIKELY(!originalResolutionFormat)) {
+        if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
+            if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
+                ret = temp->setPosition(x, y, w, h);
+            }
         }
+        else
+            ret = temp->setPosition(x, y, w, h);
+        if (!ret)
+            return INVALID_OPERATION;
     }
-    else
-        ret = temp->setPosition(x, y, w, h);
-    if (!ret)
-        return INVALID_OPERATION;
     int orientation;
     if (ret = temp->getOrientation(orientation)) {
         if (orientation != getOrientation())
@@ -1095,6 +1114,15 @@ status_t Layer::SurfaceLayer::setStereoscopic3DFormat(int format)
         owner->setStereoscopic3DFormat(format);
     }
 
+    return 0;
+}
+
+status_t Layer::SurfaceLayer::useOriginalSurfaceResolution(bool flag)
+{
+    sp<Layer> owner(getOwner());
+    if (LIKELY(owner != 0)) {
+        owner->useOriginalSurfaceResolution(flag);
+    }
     return 0;
 }
 // ---------------------------------------------------------------------------

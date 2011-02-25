@@ -81,6 +81,11 @@ public interface SurfaceHolder {
     public static final int STEREOSCOPIC_3D_FORMAT_SIDE_BY_SIDE_HALF_R_L = 0x100000;
 
     /**
+     * Original Surface Resolution flag
+     */
+    public static final int USE_ORIGINAL_SURFACE_RESOLUTION = 0x200000;
+
+    /**
      * Exception that is thrown from {@link #lockCanvas} when called on a Surface
      * whose is SURFACE_TYPE_PUSH_BUFFERS.
      */

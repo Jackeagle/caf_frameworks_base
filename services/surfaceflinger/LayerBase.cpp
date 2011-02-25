@@ -90,6 +90,7 @@ void LayerBase::initStates(uint32_t w, uint32_t h, uint32_t flags)
 {
     mLayerInitFlags = flags;
     mS3DFormat = 0;
+    mUseOrigSurfRes = false;
     uint32_t layerFlags = 0;
     if (flags & ISurfaceComposer::eHidden)
         layerFlags = ISurfaceComposer::eLayerHidden;
@@ -633,6 +634,11 @@ sp<GraphicBuffer> LayerBaseClient::Surface::requestBuffer(int bufferIdx,
 }
 
 status_t LayerBaseClient::Surface::setStereoscopic3DFormat(int format)
+{
+    return INVALID_OPERATION;
+}
+
+status_t LayerBaseClient::Surface::useOriginalSurfaceResolution(bool flag)
 {
     return INVALID_OPERATION;
 }

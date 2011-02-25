@@ -119,6 +119,7 @@ private:
         virtual sp<GraphicBuffer> requestBuffer(int bufferIdx,
                 uint32_t w, uint32_t h, uint32_t format, uint32_t usage);
         virtual status_t setStereoscopic3DFormat(int format);
+        virtual status_t useOriginalSurfaceResolution(bool flag);
         virtual status_t setBufferCount(int bufferCount);
         sp<Layer> getOwner() const {
             return static_cast<Layer*>(Surface::getOwner().get());

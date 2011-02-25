@@ -58,6 +58,7 @@ class LayerBase : public RefBase
     static int32_t sSequence;
     int mLayerInitFlags;
     int mS3DFormat;
+    bool mUseOrigSurfRes;
 
 public:
     virtual int getLayerInitFlags() const { return mLayerInitFlags; }
@@ -65,6 +66,12 @@ public:
 
     virtual status_t setStereoscopic3DFormat(int format) { mS3DFormat = format; return 0; }
     virtual int getStereoscopic3DFormat() const { return mS3DFormat; }
+
+    //Marks the layer to be displayed in original resolution.
+    virtual void useOriginalSurfaceResolution(bool flag) { mUseOrigSurfRes = flag; }
+    //Getter to check for original resolution layer.
+    virtual bool getUseOriginalSurfaceResolution() const { return mUseOrigSurfRes; }
+
     DisplayID           dpy;
     mutable bool        contentDirty;
             Region      visibleRegionScreen;
@@ -334,6 +341,7 @@ public:
                 uint32_t w, uint32_t h, uint32_t format, uint32_t usage);
         virtual status_t setBufferCount(int bufferCount);
         virtual status_t setStereoscopic3DFormat(int format);
+        virtual status_t useOriginalSurfaceResolution(bool flag);
 
         virtual status_t registerBuffers(const ISurface::BufferHeap& buffers); 
         virtual void postBuffer(ssize_t offset);
