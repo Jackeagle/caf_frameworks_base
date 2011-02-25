@@ -1,6 +1,9 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
+#Definition to log RGB
+LOCAL_CFLAGS := -UOUTPUT_RGB565_LOGGING
+
 LOCAL_SRC_FILES:=                     \
         ColorConverter.cpp            \
         SoftwareRenderer.cpp

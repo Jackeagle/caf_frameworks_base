@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +24,11 @@
 #include <binder/MemoryHeapPmem.h>
 #include <media/stagefright/MediaDebug.h>
 #include <surfaceflinger/ISurface.h>
+
+#ifdef OUTPUT_RGB565_LOGGING
+FILE *outputRGBFile;
+char outputRGBFilename [] = "/data/RGBoutput.rgb";
+#endif
 
 namespace android {
 static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
@@ -91,10 +97,24 @@ SoftwareRenderer::SoftwareRenderer(
     }
 
     mInitCheck = err;
+
+#ifdef OUTPUT_RGB565_LOGGING
+    outputRGBFile = fopen (outputRGBFilename, "ab");
+    if (!outputRGBFile) {
+        LOGE("RGB Output Buffer Open failed");
+    }
+#endif
 }
 
 SoftwareRenderer::~SoftwareRenderer() {
     mISurface->unregisterBuffers();
+
+#ifdef OUTPUT_RGB565_LOGGING
+    if(outputRGBFile) {
+        fclose (outputRGBFile);
+        outputRGBFile = NULL;
+    }
+#endif
 }
 
 status_t SoftwareRenderer::initCheck() const {
@@ -120,6 +140,16 @@ void SoftwareRenderer::render(
     mConverter.convert(
             mDecodedWidth, mDecodedHeight,
             data, 0, dst, dstSkip);
+
+#ifdef OUTPUT_RGB565_LOGGING
+    if(outputRGBFile) {
+        fwrite (dst, 1, mFrameSize, outputRGBFile);
+        //Comment the fwrite above and uncomment the below
+        //lines to log RGB from FD and offset
+        //void  * testd = mMemoryHeap->getBase() + offset ;
+        //fwrite ((const void *)testd, 1, mFrameSize, outputRGBFile);
+    }
+#endif
 
     mISurface->postBuffer(offset);
     mIndex = 1 - mIndex;
