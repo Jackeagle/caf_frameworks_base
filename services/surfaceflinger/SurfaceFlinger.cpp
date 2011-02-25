@@ -1018,7 +1018,8 @@ status_t SurfaceFlinger::purgatorizeLayer_l(const sp<LayerBase>& layerBase)
     // remove the layer from the main list (through a transaction).
     ssize_t err = removeLayer_l(layerBase);
 
-    layerBase->onRemoved();
+	if(err == NO_ERROR)
+	    layerBase->onRemoved();
 
     // it's possible that we don't find a layer, because it might
     // have been destroyed already -- this is not technically an error
