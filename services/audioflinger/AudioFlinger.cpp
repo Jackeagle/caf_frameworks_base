@@ -1,6 +1,7 @@
 /* //device/include/server/AudioFlinger/AudioFlinger.cpp
 **
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -645,7 +646,7 @@ bool AudioFlinger::isStreamActive(int stream) const
     if (mLPAStreamIsActive && mLPAOutput && mLPAStreamType == stream) {
         return true;
     }
-    if (mFmOn && stream == AudioSystem::FM) {
+    if (stream == AudioSystem::FM) {
         return true;
     }
     return false;
