@@ -421,6 +421,7 @@ bool SurfaceFlinger::threadLoop()
         if ((mHDMIOutput || mOverlayOpt) && !(hw.canDraw())) {
             enableOverlayOpt(false);
             enableOverlayOpt(true);
+            freeBypassBuffers();
             const DisplayHardware& hw(graphicPlane(0).displayHardware());
             if (mHDMIOutput)
                 hw.videoOverlayStarted(false);
