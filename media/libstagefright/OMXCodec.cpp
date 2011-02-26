@@ -2192,15 +2192,6 @@ void OMXCodec::on_message(const omx_message &msg) {
                  msg.u.extended_buffer_data.timestamp,
                  msg.u.extended_buffer_data.timestamp / 1E6);
 
-            if(mOMXLivesLocally
-               && msg.u.extended_buffer_data.range_length > 0) {
-              CODEC_LOGV("Calling processExtraDataOfbuffer");
-              processExtraDataBlocksOfBuffer(static_cast<OMX_BUFFERHEADERTYPE *>(buffer), flags);
-
-              CODEC_LOGV("Calling processSEIData");
-              processSEIData(static_cast<OMX_BUFFERHEADERTYPE *>(buffer), flags);
-            }
-
             Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
             size_t i = 0;
             while (i < buffers->size() && (*buffers)[i].mBuffer != buffer) {
@@ -2309,6 +2300,15 @@ void OMXCodec::on_message(const omx_message &msg) {
                 buffer->meta_data()->setPointer(
                         kKeyBufferID,
                         msg.u.extended_buffer_data.buffer);
+
+                if (buffer->range_length() > 0) {
+                    CODEC_LOGV("Calling processExtraDataOfbuffer");
+                    processExtraDataBlocksOfBuffer(buffer,
+                            msg.u.extended_buffer_data.flags);
+
+                    CODEC_LOGV("Calling processSEIData");
+                    processSEIData();
+                }
 
                 if (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_EOS) {
                     CODEC_LOGV("No more output data");
@@ -4644,14 +4644,14 @@ status_t QueryCodecs(
     }
 }
 
-status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags) {
-    CODEC_LOGV("In ProcessExtraDataBlocksOfBuffer for interlace, buffer = %p, flags = %p",aBuffer,flags);
+status_t OMXCodec::processExtraDataBlocksOfBuffer(MediaBuffer *buffer, OMX_U32 flags) {
+    CODEC_LOGV("In ProcessExtraDataBlocksOfBuffer for interlace, buffer = %p, flags = %p",buffer,flags);
 
     if (!mInterlaceFormatDetected) {
         if (flags & OMX_BUFFERFLAG_EXTRADATA) {
             OMX_OTHER_EXTRADATATYPE *pExtra;
             OMX_STREAMINTERLACEFORMAT *pInterlaceFormat;
-            OMX_U8 *pTmp = aBuffer->pBuffer + aBuffer->nOffset + aBuffer->nFilledLen;
+            OMX_U8 *pTmp = (OMX_U8 *)(buffer->data()) + buffer->range_offset() + buffer->range_length();
 
             pExtra = (OMX_OTHER_EXTRADATATYPE *)(((OMX_U32)(pTmp + 3)) & ~3);
             while((pExtra->eType != OMX_ExtraDataNone) && (pExtra->eType != OMX_ExtraDataInterlaceFormat))
@@ -4711,7 +4711,7 @@ status_t OMXCodec::processExtraDataBlocksOfBuffer(OMX_BUFFERHEADERTYPE *aBuffer,
     return OK;
 }
 
-status_t OMXCodec::processSEIData(OMX_BUFFERHEADERTYPE *aBuffer, OMX_U32 flags)
+status_t OMXCodec::processSEIData()
 {
     CODEC_LOGV("Processing SEI data");
     if (!m3DVideoDetected)
