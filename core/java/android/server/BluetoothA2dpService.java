@@ -61,9 +61,6 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private static final String SINK_STATE_CONNECTING = "connecting";
     private static final String SINK_STATE_CONNECTED = "connected";
     private static final String SINK_STATE_PLAYING = "playing";
-    //intent to pause Music
-    private static final String PAUSE_ACTION =
-          "com.android.music.musicservicecommand.pause";
 
     private static int mSinkCount;
 
@@ -496,12 +493,6 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 mSinkCount ++;
             }
             mAudioDevices.put(device, state);
-            // handling suspend from remote end
-            if( ( BluetoothA2dp.STATE_PLAYING == prevState ) &&
-                ( BluetoothA2dp.STATE_CONNECTED == state) ) {
-                Intent intent = new Intent(PAUSE_ACTION);
-                mContext.sendBroadcast(intent);
-            }
 
             checkSinkSuspendState(state);
             mTargetA2dpState = -1;
