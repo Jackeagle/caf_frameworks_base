@@ -519,7 +519,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         mDpt.resetAllProfilesAsWorking();
         mDpt.resetAllServiceStates();
-        disconnectAllConnections(reason, null);
+
+        /*
+         * if there was something disconnected, updateDataConnections() will be
+         * called after disconnect is done, else we call updateDataConnections()
+         * to see if there is some call to be brought up as a result of apn change.
+         */
+        if (disconnectAllConnections(reason, null) == false) {
+            updateDataConnections(reason);
+        }
     }
 
     protected void onRecordsLoaded() {
@@ -1160,7 +1168,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         updateDataConnections(c.reason); //check for something else to do.
     }
 
-    private synchronized void disconnectAllConnections(String reason,
+    /*
+     * returns true, if disconnect is in progress. returns false if nothing to
+     * disconnect.
+     */
+    private synchronized boolean disconnectAllConnections(String reason,
             Message disconnectAllCompleteMsg) {
 
         if (disconnectAllCompleteMsg != null) {
@@ -1169,7 +1181,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         if (mDisconnectPendingCount != 0) {
             logv("disconnect all data connections in progress. queuing.");
-            return;
+            return true;
         }
 
         mDisconnectPendingCount = 0;
@@ -1185,7 +1197,9 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 m.sendToTarget();
             }
             mDisconnectAllCompleteMsgList.clear();
+            return false;
         }
+        return true;
     }
 
     synchronized protected void onUpdateDataConnections(String reason, int context) {
