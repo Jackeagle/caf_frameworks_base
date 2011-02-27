@@ -170,6 +170,8 @@ public class UiccManager extends Handler{
             mUiccCard.dispose();
             mUiccCard = null;
         }
+        // CatService is disposed so the instance is no longer valid
+        mCatService = null;
     }
 
     public void triggerIccStatusUpdate(Object onComplete) {
