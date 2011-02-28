@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2008, The Android Open Source Project
+ * Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +17,11 @@
 
 package android.net;
 
-import android.net.NetworkInfo;
-import android.os.IBinder;
+import android.net.LinkCapabilities;
 import android.net.LinkInfo;
+import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.os.IBinder;
 
 /**
  * Interface that answers queries about, and allows changing, the
@@ -78,28 +80,30 @@ interface IConnectivityManager
     String[] getTetherableWifiRegexs();
 
     void reportInetCondition(int networkType, int percentage);
-    boolean getLink(int role,
-                    in Map linkReqs,
-                    int mPid,
-                    IBinder listener);
+    /* LinkSocket */
 
-    boolean reportLinkSatisfaction(int role,
-                                   int mPid,
-                                   in LinkInfo info,
-                                   boolean isSatisfied,
-                                   boolean isNotifyBetterCon);
+    int requestLink(in LinkCapabilities capabilities, IBinder callback);
 
-    boolean releaseLink(int role,int mPid);
+    void releaseLink(int id);
 
-    boolean switchLink(int role,
-                       int mPid,
-                       in LinkInfo info,
-                       boolean isSwitch);
+    LinkCapabilities requestCapabilities(int id, in int[] capability_keys);
 
-    boolean rejectSwitch(int role,
-                         int mPid,
-                         in LinkInfo info,
-                         boolean isSwitch);
+    void setTrackedCapabilities(int id, in int[] capabilities);
+
+    /* LinkProvider */
+
+    boolean getLink_LP(int role, in Map linkReqs, int mPid, IBinder listener);
+
+    boolean reportLinkSatisfaction_LP(int role, int mPid, in LinkInfo info, boolean isSatisfied,
+            boolean isNotifyBetterCon);
+
+    boolean releaseLink_LP(int role,int mPid);
+
+    boolean switchLink_LP(int role, int mPid, in LinkInfo info, boolean isSwitch);
+
+    boolean rejectSwitch_LP(int role, int mPid, in LinkInfo info, boolean isSwitch);
+
+    /* FMC */
 
     boolean startFmc(IBinder listener);
 

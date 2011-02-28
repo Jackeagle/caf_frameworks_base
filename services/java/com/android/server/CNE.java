@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved
+ * Copyright (C) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,68 +17,70 @@
 
 package com.android.server;
 
-import java.io.*;
+import com.android.internal.net.IPVersion;
+import com.android.internal.telephony.ITelephony;
+import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.TelephonyIntents;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.ConnectivityManager;
+import android.net.DhcpInfo;
+import android.net.FmcNotifier;
+import android.net.IConSvcEventListener;
+import android.net.IFmcEventListener;
+import android.net.ILinkSocketMessageHandler;
+import android.net.LinkCapabilities;
+import android.net.LinkInfo;
+import android.net.LinkNotifier;
+import android.net.LinkProperties;
+import android.net.LinkProvider;
+import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
+import android.net.NetworkInfo;
+import android.net.LinkProvider.LinkRequirement;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.os.BatteryManager;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.IBinder;
+import android.os.Looper;
+import android.os.Message;
+import android.os.Parcel;
+import android.os.RemoteException;
+import android.os.ServiceManager;
+import android.provider.Settings;
+import android.telephony.PhoneStateListener;
+import android.telephony.ServiceState;
+import android.telephony.SignalStrength;
+import android.telephony.TelephonyManager;
+import android.util.Log;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
 import java.util.Enumeration;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.StringTokenizer;
 import java.util.NoSuchElementException;
-
-import com.android.internal.net.IPVersion;
-import com.android.internal.telephony.Phone;
-import com.android.internal.telephony.Phone;
-import com.android.internal.telephony.PhoneFactory;
-import com.android.internal.telephony.TelephonyIntents;
-import com.android.server.BatteryService;
-
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.pm.PackageManager;
-import android.net.ConnectivityManager;
-import android.net.DhcpInfo;
-import android.net.IConSvcEventListener;
-import android.net.IConnectivityManager;
-import android.net.LinkInfo;
-import android.net.LinkNotifier;
-import android.net.LinkProvider;
-import android.net.LinkProvider.LinkRequirement;
-import android.net.IFmcEventListener;
-import android.net.FmcNotifier;
-import android.net.LocalSocket;
-import android.net.LocalSocketAddress;
-import android.net.NetworkInfo;
-import android.net.NetworkInfo.State;
-import android.net.wifi.ScanResult;
-import android.net.wifi.WifiConfiguration;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
-import android.net.wifi.WifiStateTracker;
-import android.os.*;
-import android.provider.Settings;
-import android.telephony.CellLocation;
-import android.telephony.NeighboringCellInfo;
-import android.telephony.PhoneNumberUtils;
-import android.telephony.PhoneStateListener;
-import android.telephony.ServiceState;
-import android.telephony.SignalStrength;
-import android.telephony.TelephonyManager;
-import android.util.Config;
-import android.util.Log;
-
-import com.android.internal.telephony.ITelephony;
+import java.util.StringTokenizer;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@hide}
@@ -86,7 +88,6 @@ import com.android.internal.telephony.ITelephony;
 class CNERequest {
     static final String LOG_TAG = "CNE";         // global logcat tag
     static final String LOCAL_TAG = "CNE_DEBUG"; // local logcat tag
-    private static final boolean DBG = false;    // enable local logging?
 
     // ***** Class Variables
     static int sNextSerial = 0;
@@ -187,10 +188,10 @@ class CNERequest {
     }
 }
 
-public final class CNE {
+public final class CNE implements ILinkManager {
     static final String LOG_TAG = "CNE";         // global logcat tag
     static final String LOCAL_TAG = "CNE_DEBUG"; // local logcat tag
-    private static final boolean DBG = false;    // enable local logging?
+    private static final boolean DBG = false;     // enable local logging?
 
     // ***** Instance Variables
     LocalSocket mSocket;
@@ -200,10 +201,12 @@ public final class CNE {
     CNEReceiver mReceiver;
     private Context mContext;
     int mRequestMessagesPending;
+    private static int mSocketId = 0;
 
     ArrayList<CNERequest> mRequestsList = new ArrayList<CNERequest>();
 
     /* to do move all the constants to one file */
+
     // ***** Events
 
     static final int EVENT_SEND = 1;
@@ -211,7 +214,6 @@ public final class CNE {
     // ***** Constants
 
     /* CNE feature flag */
-    static final String UseCne = "persist.cne.UseCne";
     static boolean isCndUp = false;
     // match with constant in CNE.cpp
     static final int CNE_MAX_COMMAND_BYTES = (8 * 1024);
@@ -299,14 +301,12 @@ public final class CNE {
     static final int CNE_NET_SUBTYPE_WLAN_G = 21;
 
     private static int mRoleRegId = 0;
-    private BatteryService mBatteryService;
     private WifiManager mWifiManager;
     private TelephonyManager mTelephonyManager;
     private ConnectivityService mService;
     private int mNetworkPreference;
     private int mDefaultNetwork = ConnectivityManager.MAX_NETWORK_TYPE;
 
-    private Phone mPhone;
     private SignalStrength mSignalStrength = new SignalStrength();
     ServiceState mServiceState;
     private String activeWlanIfName = null;
@@ -314,7 +314,6 @@ public final class CNE {
     private String activeWwanV6IfName = null;
     private String activeWlanGatewayAddr = null;
     private String activeWwanV4GatewayAddr = null;
-    private String activeWwanIpAddr = null;
     private String hostRoutingIpAddr = null;
     private static boolean mRemoveHostEntry = false;
 
@@ -330,7 +329,7 @@ public final class CNE {
             gatewayAddr = null;
             ifName = null;
         }
-    };
+    }
 
     AddressInfo getWlanAddrInfo(IPVersion version) {
         AddressInfo wlanAddrInfo = new AddressInfo();
@@ -378,7 +377,7 @@ public final class CNE {
                 InetAddress inet4Addr = InetAddress.getByName(v4Addr.ipAddr);
                 NetworkInterface netIface = NetworkInterface.getByInetAddress(inet4Addr);
                 wlanAddrInfo.ifName = netIface.getName();
-                Enumeration e = netIface.getInetAddresses();
+                Enumeration<InetAddress> e = netIface.getInetAddresses();
                 while (e.hasMoreElements()) {
                     InetAddress inetAddr = (InetAddress) e.nextElement();
                     if (!inetAddr.equals(inet4Addr)) {
@@ -543,7 +542,7 @@ public final class CNE {
             } else if (action.equals(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)) {
                 if (DBG) Log.i(LOCAL_TAG, "CNE received action: " + action);
                 if (mWifiManager != null) {
-                    List<ScanResult> results = mWifiManager.getScanResults();
+                    //List<ScanResult> results = mWifiManager.getScanResults();
                     // updateWlanScanResults(results);
                 }
             } else if (action.equals(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)) {
@@ -697,7 +696,7 @@ public final class CNE {
 
         public void binderDied() {
             if (DBG) Log.i(LOCAL_TAG, "CNE binder died role=" + role + "regId =" + regId);
-            releaseLink(role, pid);
+            releaseLink_LP(role, pid);
         }
 
         public void dump() {
@@ -714,7 +713,7 @@ public final class CNE {
                 }
             }
         }
-    };
+    }
 
     /* regId, RegInfo map */
     private ConcurrentHashMap<Integer, RegInfo> activeRegsList;
@@ -730,20 +729,20 @@ public final class CNE {
         Map<LinkRequirement, String> mLinkReqs;
         MyLinkNotifier mLinkNotifier;
 
-        /* Default constructor initialising linkrequirements to null */
+        /* Default constructor initializing linkrequirements to null */
         public DefaultConnection() {
             mLinkReqs = null;
             mLinkProvider = null;
         }
 
-        /* constructor initialising the linkRequirements */
+        /* constructor initializing the linkRequirements */
         public DefaultConnection(Map<LinkRequirement, String> linkReqs) {
             mLinkReqs = linkReqs;
             mLinkProvider = null;
         }
 
         /*
-         * This fucntion will start the connection with a default
+         * This function will start the connection with a default
          * role.
          */
         public void startConnection() {
@@ -817,7 +816,7 @@ public final class CNE {
             public void onLinkLost(LinkInfo info) {
                 if (DBG) Log.i(LOCAL_TAG, "DefaultConnection Link is lost");
             }
-        };
+        }
     }
 
     private DefaultConnection mDefaultConn;
@@ -994,8 +993,7 @@ public final class CNE {
                                 s.close();
                             }
                         } catch (IOException ex2) {
-                            // ignore failure to close after failure
-                            // to connect
+                            // ignore failure to close after failure to connect
                         }
 
                         // don't print an error message after the the
@@ -1013,7 +1011,9 @@ public final class CNE {
                         try {
                             Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
                         } catch (InterruptedException er) {
-                            // TODO: print error message
+                            if (DBG) {
+                                Log.i(LOCAL_TAG, "cnd socket open retry timer was interrupted");
+                            }
                         }
                         retryCount++;
                         continue;
@@ -1022,7 +1022,7 @@ public final class CNE {
                     mSocket = s;
                     if (DBG) Log.i(LOCAL_TAG, "Connected to '" + SOCKET_NAME_CNE + "' socket");
                     isCndUp = true;
-                    // send the init request to lowerlayer cne
+                    // send the init request to lower layer cne
                     sendInitReq();
 
                     /* wait until CNE gets created */
@@ -1103,9 +1103,6 @@ public final class CNE {
 
     // ***** Constructor
     public CNE(Context context, ConnectivityService conn) {
-        // super(context);
-
-        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         mRequestMessagesPending = 0;
         mContext = context;
         mService = conn;
@@ -1131,7 +1128,7 @@ public final class CNE {
         mDefaultConn = new DefaultConnection(linkReqs);
         mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
         mTelephonyManager = (TelephonyManager) mContext
-                .getSystemService(mContext.TELEPHONY_SERVICE);
+                .getSystemService(Context.TELEPHONY_SERVICE);
 
         // register for phone state notifications.
         TelephonyManager tm = (TelephonyManager) mContext
@@ -1175,7 +1172,6 @@ public final class CNE {
 
     private void processSolicited(Parcel p) {
         int serial, error;
-        boolean found = false;
         serial = p.readInt();
         error = p.readInt();
         CNERequest rr;
@@ -1195,7 +1191,6 @@ public final class CNE {
     private void processUnsolicited(Parcel p) {
         if (DBG) Log.i(LOCAL_TAG, "processUnsolicited called");
         int response;
-        Object ret;
 
         response = p.readInt();
         switch (response) {
@@ -1276,13 +1271,6 @@ public final class CNE {
             }
         }
         return -1;
-    }
-
-    private boolean isEvdo() {
-        return ((mServiceState != null)
-                && ((mServiceState.getRadioTechnology() == ServiceState.RADIO_TECHNOLOGY_EVDO_0)
-                        || (mServiceState.getRadioTechnology()
-                                == ServiceState.RADIO_TECHNOLOGY_EVDO_A)));
     }
 
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
@@ -1378,51 +1366,6 @@ public final class CNE {
                 // return(mSignalStrength.getEvdoSnr());
         }
         return -1;
-    }
-
-    private Object responseInts(Parcel p) {
-        int numInts;
-        int response[];
-        numInts = p.readInt();
-        response = new int[numInts];
-        for (int i = 0; i < numInts; i++) {
-            response[i] = p.readInt();
-        }
-        return response;
-    }
-
-    private Object responseVoid(Parcel p) {
-        return null;
-    }
-
-    private Object responseString(Parcel p) {
-        String response;
-        response = p.readString();
-        return response;
-    }
-
-    private Object responseStrings(Parcel p) {
-        int num;
-        String response[];
-
-        response = p.readStringArray();
-
-        if (false) {
-            num = p.readInt();
-
-            response = new String[num];
-            for (int i = 0; i < num; i++) {
-                response[i] = p.readString();
-            }
-        }
-        return response;
-    }
-
-    private Object responseRaw(Parcel p) {
-        int num;
-        byte response[];
-        response = p.createByteArray();
-        return response;
     }
 
     /* API functions */
@@ -1646,6 +1589,9 @@ public final class CNE {
     }
 
     private boolean sendRegRoleReq(int role, int roleRegId, int fwLinkBw, int revLinkBw) {
+        if (DBG) Log.w(LOCAL_TAG, "sendRegRoleReq(role=" + role + ", roleRegId=" + roleRegId +
+                ", fwLinkBw=" + fwLinkBw + ", revLinkBwBw=" + revLinkBw + ") EX");
+
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_REG_ROLE);
         if (rr == null) {
             Log.w(LOG_TAG, "sendRegRoleReq: rr=NULL");
@@ -1657,7 +1603,6 @@ public final class CNE {
         rr.mp.writeInt(roleRegId);
         rr.mp.writeInt(fwLinkBw);
         rr.mp.writeInt(revLinkBw);
-
         send(rr);
 
         return true;
@@ -1723,9 +1668,9 @@ public final class CNE {
 
     private int getRegId(int pid, int role) {
         int regId = CNE_REGID_INVALID;
-        Iterator activeRegsIter = activeRegsList.entrySet().iterator();
+        Iterator<Entry<Integer, RegInfo>> activeRegsIter = activeRegsList.entrySet().iterator();
         while (activeRegsIter.hasNext()) {
-            RegInfo regInfo = (RegInfo) ((Map.Entry) activeRegsIter.next()).getValue();
+            RegInfo regInfo = activeRegsIter.next().getValue();
             if (regInfo.role == role && regInfo.pid == pid) {
                 regId = regInfo.regId;
                 break;
@@ -2018,9 +1963,8 @@ public final class CNE {
                             // bypass connectivity and subscription
                             // checking, and bring up data call
                             //phone.setDataReadinessChecks(false, false, true);
-                            
                         //} catch (RemoteException e) {
-                            Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
+                            //Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
                         //}
                     }
                 }
@@ -2041,7 +1985,7 @@ public final class CNE {
     private void handleNotifyInFlightStatusMsg(Parcel p) {
         if (DBG) Log.i(LOCAL_TAG, "handleNotifyInFlightStatusMsg called");
         boolean on;
-        int numInts = p.readInt();
+        p.readInt(); // numInts - unused
         int status = p.readInt();
         if (status == STATUS_INFLIGHT) {
             on = true;
@@ -2058,7 +2002,7 @@ public final class CNE {
 
     private void handleFmcStatusMsg(Parcel p) {
         FmcRegInfo rInfo = getFmcObj();
-        int numInts = p.readInt();
+        p.readInt(); // numInts - unused
         int status = p.readInt();
         if (rInfo != null) {
             if (DBG) {
@@ -2148,33 +2092,47 @@ public final class CNE {
         return candidateRat;
     }
 
-    private int parseBwString(String bw) {
-        int result = 0;
-        for (int i = 0; i < bw.length(); i++) {
-            char c = bw.charAt(i);
-            if (Character.isDigit(c)) {
-                result = result * 10 + Character.digit(c, 10);
-            } else {
-                if (i == 0) {
-                    result = -1;
-                    break;
-                }
-                String remainder = bw.substring(i);
-                if (remainder.equals("kbps")) {
-                    result *= 1000;
-                } else if (remainder.equals("Mbps")) {
-                    result *= 1000000;
-                } else {
-                    result = -1;
-                }
+    /**
+     * Convert a data rate string such as "2Mbps" to an integer
+     * representing the data rate in bps. If no data rate is given
+     * then bps will be assumed.
+     * @param rate a data rate string, such as "100kbps" or "2Mbps"
+     * @return the data rate in bps as an integer
+     */
+    private static int parseBwString(String rate) {
+        if (rate == null) return 0;
+
+        int rateMultiple = 1; // defaults to bps
+        if (rate.endsWith("kbps") || rate.endsWith("kbit/s") || rate.endsWith("kb/s")) {
+            rateMultiple = 1000; // 1,000 bps per 1 Mbps
+        } else if (rate.endsWith("Mbps") || rate.endsWith("Mbit/s") || rate.endsWith("Mb/s")) {
+            rateMultiple = 1000000; // 1,000,000 bps per 1 Mbps
+        } else if (rate.endsWith("Gbps") || rate.endsWith("Gbit/s") || rate.endsWith("Gb/s")) {
+            rateMultiple = 1000000000; // 1,000,000,000 bps per 1 Gbps
+        }
+
+        // find first non-numeric character, and trim
+        int trimPosition = rate.length();
+        for (int i = 0; i < rate.length(); i++) {
+            if (rate.charAt(i) <= '0' || rate.charAt(i) >= '9') {
+                trimPosition = i;
                 break;
             }
         }
-        return result;
+        rate = rate.substring(0, trimPosition);
+        if (rate.length() == 0) rate = "0";
+
+        return (Integer.parseInt(rate) * rateMultiple);
+    }
+
+    // generate SocketId's
+    synchronized private static int getNextSocketId() {
+        if (mSocketId == Integer.MAX_VALUE) mSocketId = 0;
+        return mSocketId++;
     }
 
     /** {@hide} */
-    public boolean getLink(int role, Map<LinkRequirement, String> linkReqs, int pid,
+    public boolean getLink_LP(int role, Map<LinkRequirement, String> linkReqs, int pid,
             IBinder listener) {
         if (DBG) Log.i(LOCAL_TAG, "getLink called for role = " + role);
         /* did the app(pid) register for this role already? */
@@ -2200,6 +2158,7 @@ public final class CNE {
                 for (Map.Entry<LinkRequirement, String> e : linkReqs.entrySet()) {
                     LinkRequirement key = e.getKey();
                     String value = e.getValue();
+                    if (value == null) continue;
 
                     switch (key) {
                         case FW_LINK_BW:
@@ -2225,7 +2184,7 @@ public final class CNE {
     }
 
     /** {@hide} */
-    public boolean reportLinkSatisfaction(int role, int pid, LinkInfo info, boolean isSatisfied,
+    public boolean reportLinkSatisfaction_LP(int role, int pid, LinkInfo info, boolean isSatisfied,
             boolean isNotifyBetterLink) {
         if (DBG) {
             Log.i(LOCAL_TAG, "reporting connection satisfaction role = " + role + "isSatisfied = "
@@ -2273,7 +2232,7 @@ public final class CNE {
     }
 
     /** {@hide} */
-    public boolean releaseLink(int role, int pid) {
+    public boolean releaseLink_LP(int role, int pid) {
         if (DBG) Log.i(LOCAL_TAG, "releasing link for role = " + role);
         int regId = getRegId(pid, role);
         RegInfo regInfo = activeRegsList.get(regId);
@@ -2295,7 +2254,7 @@ public final class CNE {
     }
 
     /** {@hide} */
-    public boolean switchLink(int role, int pid, LinkInfo info, boolean isNotifyBetterLink) {
+    public boolean switchLink_LP(int role, int pid, LinkInfo info, boolean isNotifyBetterLink) {
         if (DBG) Log.i(LOCAL_TAG, "switch link for role = " + role);
         int regId = getRegId(pid, role);
         RegInfo regInfo = activeRegsList.get(regId);
@@ -2317,7 +2276,7 @@ public final class CNE {
     }
 
     /** {@hide} */
-    public boolean rejectSwitch(int role, int pid, LinkInfo info, boolean isNotifyBetterLink) {
+    public boolean rejectSwitch_LP(int role, int pid, LinkInfo info, boolean isNotifyBetterLink) {
         if (DBG) Log.i(LOCAL_TAG, "rejectSwitch for role = " + role);
         int regId = getRegId(pid, role);
         RegInfo regInfo = activeRegsList.get(regId);
@@ -2342,10 +2301,7 @@ public final class CNE {
         try {
             boolean strMatched = false;
             File file = new File("/data/ssidconfig.txt");
-            if (file == null) {
-                Log.e(LOG_TAG, "configureSsid: Config File not found");
-                return false;
-            }
+
             // Read file to buffer
             BufferedReader reader = new BufferedReader(new FileReader(file));
             String line = "";
@@ -2473,7 +2429,6 @@ public final class CNE {
                     // tell telephony service to do all necessary
                     // network checking, no data call
                     //phone.setDataReadinessChecks(true, true, false);
-                    
                 //} catch (RemoteException e) {
                 //    Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
                 //}
@@ -2535,7 +2490,7 @@ public final class CNE {
             if (rInfo.enabled) { // already enabled
                 onFmcStatus(FmcNotifier.FMC_STATUS_ENABLED);
                 reqToStart = false;
-            } 
+            }
         } else { /* new OEM registration for this app */
             setFmcObj(new FmcRegInfo(binder));
         }
@@ -2593,5 +2548,145 @@ public final class CNE {
             }
         }
         return ok;
+    }
+
+    /* LinkSocket API Implementations */
+
+    /**
+     * Translate a LinkSocket requestLink to a CNE getLink
+     * @param cap
+     * @param binder
+     * @return socket id
+     */
+    public int requestLink(LinkCapabilities cap, IBinder binder) {
+        ILinkSocketMessageHandler callback = ILinkSocketMessageHandler.Stub.asInterface(binder);
+
+        // translating role strings to integers
+        // hard coded until we figure out what the new XML file is going to look like.
+        int roleInt = 0;
+        String roleString = cap.get(LinkCapabilities.Key.RW_ROLE);
+        if (DBG) Log.v(LOCAL_TAG, "Converting Role: " + roleString);
+        if (roleString == null)  roleInt = 0;
+        else if (roleString.equals(LinkCapabilities.Role.DEFAULT)) roleInt = 0;
+        else if (roleString.equals(LinkCapabilities.Role.VIDEO_STREAMING_1040P)) roleInt = 1;
+        else {
+            Log.d(LOG_TAG, roleString + " is not a known role.");
+        }
+
+        // translate LinkCapabilities into a HashMap
+        if (DBG) Log.v(LOCAL_TAG, "Converting Bandwidth Req's");
+        Map<LinkRequirement, String> reqs = new HashMap<LinkRequirement, String>();
+        reqs.put(LinkRequirement.FW_LINK_BW,
+                cap.get(LinkCapabilities.Key.RW_REQUIRED_FWD_BW) + "kbps");
+        reqs.put(LinkRequirement.REV_LINK_BW,
+                cap.get(LinkCapabilities.Key.RW_REQUIRED_REV_BW) + "kbps");
+
+        // generate a socket id, use it in place of a PID
+        if (DBG) Log.v(LOCAL_TAG, "Generating a SocketID");
+        int id = getNextSocketId();
+
+        // translate the call
+        if (DBG) Log.v(LOCAL_TAG, "Making the call to getLink");
+        this.getLink_LP(roleInt, reqs, id, new CneCallbackAdapter(id, callback));
+
+        return id;
+    }
+
+    /**
+     * Translate a LinkSocket releaseLink to a CNE releaseLink
+     * @param id
+     */
+    public void releaseLink(int id) {
+        this.releaseLink_LP(0, id);
+    }
+
+    /** @hide
+     * Available forward link (download) bandwidth for the socket.
+     * This value is in kilobits per second (kbps).
+     */
+    public int getAvailableForwardBandwidth(int id) {
+        return -1;
+    }
+
+    /** @hide
+     * Available reverse link (upload) bandwidth for the socket.
+     * This value is in kilobits per second (kbps).
+     */
+    public int getAvailableReverseBandwidth(int id) {
+        return -1;
+    }
+
+    /** @hide
+     * Current estimated latency of the socket, in milliseconds.
+     */
+    public int getCurrentLatency(int id) {
+        // Not supported in this version.
+        return 0;
+    }
+
+    /** @hide
+     * An integer representing the network type.
+     * @see ConnectivityManager
+     */
+    public int getNetworkType(int id) {
+        return -1;
+    }
+
+    /** @hide
+     * Adapter class to translates CNE callbacks to LinkSocket callbacks.
+     */
+    public class CneCallbackAdapter extends IConSvcEventListener.Stub {
+
+        protected int mId = 0;
+        protected ILinkSocketMessageHandler mLsmh;
+
+        public CneCallbackAdapter(int id, ILinkSocketMessageHandler lsmh) {
+            mId = id;
+            mLsmh = lsmh;
+        }
+
+        /**
+         * Translate a CNE onLinkAvail to a LinkSocket onLinkAvail.
+         *
+         * A reportLinkSatisfaction event is sent as soon as an
+         * onLinkAvail callback is received because LinkSocket just
+         * assumes that the application is satisfied.
+         */
+        public void onLinkAvail(LinkInfo info) throws RemoteException {
+            android.util.Log.v("CneCallbackAdapter", "onLinkAvail EX");
+            reportLinkSatisfaction_LP(0, mId, info, true, true);
+            LinkProperties prop = new LinkProperties();
+            prop.addAddress(info.getIpAddr());
+            mLsmh.onLinkAvail(prop);
+        }
+
+        /**
+         * Translate a CNE onBetterLinkAvail to a LinkSocket onBetterLinkAvail.
+         *
+         * A rejectSwitch is sent as soon as a onBetterLinkAvail is received
+         * because LinkSocket doesn't have the same concept of a link switch
+         * as CNE.
+         */
+        public void onBetterLinkAvail(LinkInfo info) throws RemoteException {
+            android.util.Log.v("CneCallbackAdapter", "onBetterLinkAvail EX");
+            rejectSwitch_LP(0, mId, info, true);
+            mLsmh.onBetterLinkAvail();
+        }
+
+        /**
+         * Translate a CNE onLinkLost to a LinkSocket onLinkLost.
+         */
+        public void onLinkLost(LinkInfo info) throws RemoteException {
+            android.util.Log.v("CneCallbackAdapter", "onLinkLost EX");
+            mLsmh.onLinkLost();
+        }
+
+        /**
+         * Translate a CNE onGetLinkFailure to a LinkSocket onGetLinkFailure.
+         */
+        public void onGetLinkFailure(int reason) throws RemoteException {
+            android.util.Log.v("CneCallbackAdapter", "onGetLinkFailure EX");
+            mLsmh.onGetLinkFailure(reason);
+        }
     }
 }
