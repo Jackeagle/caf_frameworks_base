@@ -42,8 +42,6 @@ public final class UsimFileHandler extends IccFileHandler implements IccConstant
     protected String getEFPath(int efid) {
         switch(efid) {
         case EF_SMS:
-            return MF_SIM + DF_TELECOM;
-
         case EF_EXT6:
         case EF_MWIS:
         case EF_MBI:
