@@ -98,7 +98,11 @@ public class SmsCbMessage implements Parcelable {
 
     private SmsCbMessage(byte[] pdu) throws IllegalArgumentException {
         mHeader = new SmsCbHeader(pdu);
-        parseBody(pdu);
+        if (mHeader.format == mHeader.FORMAT_ETWS_PRIMARY) {
+            mBody = "ETWS";
+        } else {
+            parseBody(pdu);
+        }
     }
 
     // copy constructor for SmsCbMessage
