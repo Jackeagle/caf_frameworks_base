@@ -124,7 +124,8 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final ParcelUuid[] RFCOMM_UUIDS = {
             BluetoothUuid.Handsfree,
             BluetoothUuid.HSP,
-            BluetoothUuid.ObexObjectPush };
+            BluetoothUuid.ObexObjectPush,
+            BluetoothUuid.MessageNotificationServer };
 
     // TODO(): Optimize all these string handling
     private final Map<String, String> mAdapterProperties;
@@ -510,14 +511,20 @@ public class BluetoothService extends IBluetooth.Stub {
                             mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 5, -1), 500);
                     break;
                 case 5:
+                    Log.d(TAG, "Registering map record");
+                    SystemService.start("map");
+                    mHandler.sendMessageDelayed(
+                            mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 6, -1), 500);
+                    break;
+                case 6:
                     if (mDUNenable == true) {
                         Log.d(TAG, "Registering dun record");
                         SystemService.start("dund");
                     }
                     mHandler.sendMessageDelayed(
-                           mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 6, -1), 500);
+                           mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 7, -1), 500);
                     break;
-                case 6:
+                case 7:
                     if (mFTPenable == true) {
                         Log.d(TAG, "Registering ftp record");
                         SystemService.start("ftp");
