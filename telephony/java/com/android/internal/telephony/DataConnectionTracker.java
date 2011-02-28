@@ -252,7 +252,6 @@ public abstract class DataConnectionTracker extends Handler {
     abstract public Subscription getSubscriptionInfo();
     abstract public void setSubscriptionInfo(Subscription subData);
     abstract public void update(CommandsInterface ci, Subscription subData);
-    abstract public void updateCurrentCarrierInProvider();
 
     synchronized public int disableApnType(String type) {
 

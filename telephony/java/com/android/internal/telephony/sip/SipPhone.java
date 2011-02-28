@@ -926,6 +926,10 @@ public class SipPhone extends SipPhoneBase {
         }
     }
 
+    public String getOperatorNumeric() {
+        return null;
+    }
+
     public void setSubscription(int subscripton) {
     }
 

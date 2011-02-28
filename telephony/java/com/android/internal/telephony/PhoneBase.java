@@ -19,9 +19,12 @@ package com.android.internal.telephony;
 
 import android.app.ActivityManagerNative;
 import android.app.IActivityManager;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.SharedPreferences;
+import android.database.SQLException;
+import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.AsyncResult;
 import android.os.Handler;
@@ -31,6 +34,7 @@ import android.os.RegistrantList;
 import android.os.SystemProperties;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
+import android.provider.Telephony;
 import android.telephony.CellLocation;
 import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
@@ -1170,10 +1174,6 @@ public abstract class PhoneBase extends Handler implements Phone {
         mDataConnection.setDataRoamingEnabled(enable);
     }
 
-    public void updateCurrentCarrierInProvider() {
-        mDataConnection.updateCurrentCarrierInProvider();
-    }
-
     @Override
     public void setRadioPower(boolean power) {
         Log.e(LOG_TAG, "setRadioPower() shouldn't be called here!");
@@ -1181,5 +1181,43 @@ public abstract class PhoneBase extends Handler implements Phone {
 
     public void setRilPowerOff() {
         return;
+    }
+
+    /**
+     * @return operator numeric.
+     */
+    public abstract String getOperatorNumeric();
+
+    /**
+     * Sets the "current" field in the telephony provider according to the operator numeric.
+     *
+     * @return true for success; false otherwise.
+     */
+    public boolean updateCurrentCarrierInProvider() {
+        int currentDds = 0;
+        String operatorNumeric = getOperatorNumeric();
+
+        try {
+            currentDds = Settings.System.getInt(mContext.getContentResolver(),
+                    Settings.System.MULTI_SIM_DATA_CALL);
+        } catch (Settings.SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Exception Reading Dual Sim Data Subscription Value.", snfe);
+        }
+
+        Log.d(LOG_TAG, "updateCurrentCarrierInProvider: mSubscription = " + getSubscription()
+                + " currentDds = " + currentDds + " operatorNumeric = " + operatorNumeric);
+
+        if (!TextUtils.isEmpty(operatorNumeric) && (getSubscription() == currentDds)) {
+            try {
+                Uri uri = Uri.withAppendedPath(Telephony.Carriers.CONTENT_URI, "current");
+                ContentValues map = new ContentValues();
+                map.put(Telephony.Carriers.NUMERIC, operatorNumeric);
+                mContext.getContentResolver().insert(uri, map);
+                return true;
+            } catch (SQLException e) {
+                Log.e(LOG_TAG, "Can't store current operator", e);
+            }
+        }
+        return false;
     }
 }

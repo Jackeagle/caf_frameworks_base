@@ -1714,10 +1714,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         return TelephonyManager.DEFAULT_SUB;
     }
 
-    public void updateCurrentCarrierInProvider() {
-        mDsst.updateCurrentCarrierInProvider();
-    }
-
     void loge(String string) {
         Log.e(LOG_TAG, "[DCT" + (mSubscriptionData!=null ? "("+mSubscriptionData.subId+")" : "")
                               + " ] " + string);

@@ -56,6 +56,8 @@ public class CdmaSubscriptionSourceManager extends Handler {
 
     private static final int EVENT_RADIO_ON = 3;
 
+    private static final int EVENT_SUBSCRIPTION_READY = 4;
+
     // ***** Instance Variables
     static Hashtable<CommandsInterface, CdmaSubscriptionSourceManager> mCdmaSSMInstances =
         new Hashtable<CommandsInterface, CdmaSubscriptionSourceManager>();
@@ -86,6 +88,7 @@ public class CdmaSubscriptionSourceManager extends Handler {
             mCM.registerForCdmaSubscriptionSourceChanged(this,
                     EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
             mCM.registerForOn(this, EVENT_RADIO_ON, null);
+            mCM.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
         }
     }
 
@@ -131,6 +134,7 @@ public class CdmaSubscriptionSourceManager extends Handler {
         if (mRef <= 0) {
             mCM.unregisterForCdmaSubscriptionSourceChanged(this);
             mCM.unregisterForOn(this);
+            mCM.unregisterForSubscriptionReady(this);
             mCdmaSSMInstances.remove(mCM);
         }
     }
@@ -156,6 +160,13 @@ public class CdmaSubscriptionSourceManager extends Handler {
             }
                 break;
             case EVENT_RADIO_ON: {
+                mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+            }
+                break;
+            case EVENT_SUBSCRIPTION_READY: {
+                // In case of multi-SIM, framework should wait for the subscription ready
+                // to send any request to RIL.  Otherwise it will return failure.
+                Log.d(LOG_TAG, "EVENT_SUBSCRIPTION_READY:  get Cdma Subscription Source");
                 mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
             }
                 break;
