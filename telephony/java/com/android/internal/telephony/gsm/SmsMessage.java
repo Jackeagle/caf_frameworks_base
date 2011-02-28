@@ -1253,6 +1253,20 @@ public class SmsMessage extends SmsMessageBase{
      * @hide
      */
     public int getNumOfVoicemails() {
-        return mVoiceMailCount ;
+        /*
+         * Voice mail count for UDH/DCS = >0 , CPHS = -1.
+         * Voice mail clear for UDH/DCS = 0 , CPHS = 0.
+         * Order of priority if multiple indications 1.UDH, 2.DCS, 3.CPHS
+         */
+        if ((!isMwi) && isCphsMwiMessage()) {
+            if (originatingAddress != null
+                    && ((GsmSmsAddress) originatingAddress).isCphsVoiceMessageSet()) {
+                mVoiceMailCount = -1;
+            } else {
+                mVoiceMailCount = 0;
+            }
+            Log.v(LOG_TAG, "CPHS voice mail message");
+        }
+        return mVoiceMailCount;
     }
 }
