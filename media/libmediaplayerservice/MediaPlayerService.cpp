@@ -198,9 +198,6 @@ extmap FILE_EXTS [] =  {
         {".rtx", SONIVOX_PLAYER},
         {".ota", SONIVOX_PLAYER},
 #ifndef NO_OPENCORE
-        {".wma", PV_PLAYER},
-        {".wmv", PV_PLAYER},
-        {".asf", PV_PLAYER},
         {".3g2", PV_PLAYER},
 #endif
 };
