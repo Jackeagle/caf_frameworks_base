@@ -1574,8 +1574,14 @@ public final class SIMRecords extends UiccApplicationRecords {
                      mCspPlmnEnabled = true;
                  } else {
                      mCspPlmnEnabled = false;
-                     // Operator Selection menu should be disabled.
-                     // Operator Selection Mode should be set to Automatic.
+                     /*
+                      * Operator Selection menu should be disabled and set to
+                      * Automatic. request registrants to "set" network mode to
+                      * automatic. Note that it is not "notify after network mode
+                      * is set". Currently GSMPhone is the only registrant.
+                      */
+                     mNetworkSelectionModeAutomaticRegistrants.notifyRegistrants(new AsyncResult(
+                             null, null, null));
                      Log.i(LOG_TAG,"[CSP] Set Automatic Network Selection");
                  }
                  return;
