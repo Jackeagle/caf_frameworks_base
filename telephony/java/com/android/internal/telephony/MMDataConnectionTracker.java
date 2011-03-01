@@ -58,6 +58,7 @@ import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.DataProfile.DataProfileType;
+import com.android.internal.telephony.Phone.BearerType;
 import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
 import com.android.internal.telephony.ProxyManager.Subscription;
@@ -1306,29 +1307,37 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         logv("handleConnectedDc() : " + dc);
 
         boolean needsDisconnect = true;
-        for (DataServiceType ds : DataServiceType.values()) {
+        BearerType b = dc.getBearerType();
 
-            if (mDpt.isServiceTypeActive(ds, dc.getIpVersion()) == false
-                    && dc.getDataProfile().canHandleServiceType(ds)) {
+        for (IPVersion ipv : IPVersion.values()) {
 
-                mDpt.setServiceTypeAsActive(ds, dc, dc.getIpVersion());
-                notifyDataConnection(ds, dc.getIpVersion(), reason);
+            if (b.supportsIpVersion(ipv) == false)
+                continue; //bearer doesn't support ipv.
 
-                /*
-                 * of all the services that just got active, at least one of them
-                 * should have be enabled or else this dc is staying up for no
-                 * reason. This can happen for example when the service type
-                 * was disabled by the time setup_data_call response came up.
-                 */
-                if (mDpt.isServiceTypeEnabled(ds) == true) {
-                    needsDisconnect = false;
+            for (DataServiceType ds : DataServiceType.values()) {
+                if (mDpt.isServiceTypeActive(ds, ipv) == false
+                        && dc.getDataProfile().canHandleServiceType(ds)) {
+
+                    mDpt.setServiceTypeAsActive(ds, dc, ipv);
+                    notifyDataConnection(ds, ipv, reason);
+
+                    /*
+                     * of all the services that just got active, at least one of them
+                     * should have be enabled or else this dc is staying up for no
+                     * reason. This can happen for example when the service type
+                     * was disabled by the time setup_data_call response came up.
+                     */
+                    if (mDpt.isServiceTypeEnabled(ds) == true) {
+                        needsDisconnect = false;
+                    }
+
+                    if (ds == DataServiceType.SERVICE_TYPE_DEFAULT) {
+                        SystemProperties.set("gsm.defaultpdpcontext.active", "true");
+                    }
                 }
+            } //for ds
+        } //for ipv
 
-                if (ds == DataServiceType.SERVICE_TYPE_DEFAULT) {
-                    SystemProperties.set("gsm.defaultpdpcontext.active", "true");
-                }
-            }
-        }
         if (needsDisconnect == true) {
             tryDisconnectDataCall(dc, REASON_SERVICE_TYPE_DISABLED);
         }
@@ -1439,7 +1448,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 StringBuilder sb = new StringBuilder();
                 sb.append("cid = " + dc.cid);
                 sb.append(", state = "+dc.getStateAsString());
-                sb.append(", ipv = "+dc.getIpVersion());
+                sb.append(", bearerType = "+dc.getBearerType());
                 sb.append(", ipaddress = "+dc.getIpAddress());
                 sb.append(", gw="+dc.getGatewayAddress());
                 sb.append(", dns="+ Arrays.toString(dc.getDnsServers()));
@@ -1547,7 +1556,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         c.ds = ds;
         c.ipv = ipv;
         c.reason = reason;
-        dc.connect(getRadioTechnology(), dp, ipv, obtainMessage(EVENT_CONNECT_DONE, c));
+
+        //TODO: handle BearerType.IPV4V6
+        BearerType b = ipv == IPVersion.INET ? BearerType.IP : BearerType.IPV6;
+
+        dc.connect(getRadioTechnology(), dp, b, obtainMessage(EVENT_CONNECT_DONE, c));
         return true;
     }
 

@@ -16,8 +16,8 @@
 
 package com.android.internal.telephony;
 
-import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.Phone.BearerType;
 
 /**
  * This class represents a apn setting for create PDP link
@@ -38,13 +38,12 @@ public class ApnSetting extends DataProfile {
     DataServiceType serviceTypes[];
     int id;
     String numeric;
-    boolean supportsIPv4 = false;
-    boolean supportsIPv6 = false;
+    BearerType bearerType = null;
 
 
     ApnSetting(int id, String numeric, String carrier, String apn, String proxy, String port,
             String mmsc, String mmsProxy, String mmsPort,
-            String user, String password, int authType, String[] types, String ipVersion) {
+            String user, String password, int authType, String[] types, String bearerType) {
         super();
         this.id = id;
         this.numeric = numeric;
@@ -60,19 +59,10 @@ public class ApnSetting extends DataProfile {
         this.authType = authType;
         this.types = types;
 
-        if (ipVersion == null) {
-            this.supportsIPv4 = true;
-        } else {
-            String verList[] = ipVersion.split(",");
-            for (String version : verList) {
-                version = version.trim();
-                if (version.equals("6")) {
-                    this.supportsIPv6 = true;
-                }
-                if (version.equals("4")) {
-                    this.supportsIPv4 = true;
-                }
-            }
+        try {
+            this.bearerType = Enum.valueOf(BearerType.class, bearerType.toUpperCase());
+        } catch (Exception e) {
+            this.bearerType = BearerType.IP;
         }
     }
 
@@ -97,8 +87,7 @@ public class ApnSetting extends DataProfile {
         .append(", ").append(mmsPort)
         .append(", ").append(port)
         .append(", ").append(authType)
-        .append(", ").append(supportsIPv4)
-        .append(", ").append(supportsIPv6)
+        .append(", ").append(bearerType)
         .append(", [");
         for (String t : types) {
             sb.append(", ").append(t);
@@ -140,12 +129,7 @@ public class ApnSetting extends DataProfile {
     }
 
     @Override
-    boolean canSupportIpVersion(IPVersion ipv) {
-        if (ipv == IPVersion.INET6) {
-            return supportsIPv6;
-        } else if (ipv == IPVersion.INET) {
-            return supportsIPv4;
-        }
-        return false;
+    BearerType getBearerType() {
+        return bearerType;
     }
 }

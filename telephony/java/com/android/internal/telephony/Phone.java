@@ -92,6 +92,35 @@ public interface Phone {
          */
         NONE, DATAIN, DATAOUT, DATAINANDOUT, DORMANT;
     };
+
+    enum BearerType {
+        IP, IPV6, IPV4V6;
+
+        @Override
+        public String toString() {
+            switch (this) {
+                case IP:
+                    return "IP";
+                case IPV6:
+                    return "IPV6";
+                case IPV4V6:
+                    return "IPV4V6";
+                default:
+                    return "unknown";
+            }
+        }
+
+        boolean supportsIpVersion(IPVersion ipv) {
+            if (ipv != null && this == BearerType.IPV4V6)
+                return true;
+            if (ipv == IPVersion.INET && this == BearerType.IP)
+                return true;
+            if (ipv == IPVersion.INET6 && this == BearerType.IPV6)
+                return true;
+            return false;
+        }
+    }
+
     enum SuppService {
       UNKNOWN, SWITCH, SEPARATE, TRANSFER, CONFERENCE, REJECT, HANGUP;
     };

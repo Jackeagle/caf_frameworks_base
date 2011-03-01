@@ -17,6 +17,7 @@
 package com.android.internal.telephony;
 
 import com.android.internal.net.IPVersion;
+import com.android.internal.telephony.Phone.BearerType;
 
 import android.util.Log;
 
@@ -112,7 +113,7 @@ public abstract class DataProfile {
 
     public abstract String toShortString();
 
-    /* package */abstract boolean canSupportIpVersion(IPVersion ipv);
+    /* package */abstract BearerType getBearerType();
 
     abstract boolean canHandleServiceType(DataServiceType type);
 

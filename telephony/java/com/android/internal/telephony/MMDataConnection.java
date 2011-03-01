@@ -85,14 +85,14 @@ public class MMDataConnection extends DataConnection {
             this.mCM.setupDataCall(
                     Integer.toString(radioTech),
                     Integer.toString(0), apn.apn, apn.user, apn.password, Integer.toString(authType),
-                    Integer.toString(cp.ipv == IPVersion.INET6 ? 1 : 0),
+                    cp.bearerType.toString(),
                     obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE, cp));
         } else if (cp.dp.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP2_NAI) {
             this.mCM.setupDataCall(
                     Integer.toString(radioTech),
                     Integer.toString(0), null, null, null, Integer
-                    .toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP), Integer
-                    .toString(cp.ipv == IPVersion.INET6 ? 1 : 0),
+                    .toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP),
+                    cp.bearerType.toString(),
                     obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE, cp));
         } else if (cp.dp.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP2_OMH) {
             if (mOmhEnabled) {
@@ -104,8 +104,8 @@ public class MMDataConnection extends DataConnection {
                 this.mCM.setupDataCall(
                         Integer.toString(radioTech),
                         profileId, null, null, null, Integer
-                        .toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP), Integer
-                        .toString(cp.ipv == IPVersion.INET6 ? 1 : 0),
+                        .toString(RILConstants.SETUP_DATA_AUTH_PAP_CHAP),
+                        cp.bearerType.toString(),
                         obtainMessage(EVENT_SETUP_DATA_CONNECTION_DONE, cp));
             }
         }
@@ -183,7 +183,7 @@ public class MMDataConnection extends DataConnection {
     }
 
     public String toString() {
-        return "Cid=" + cid + ", State=" + getStateAsString() + ", ipv=" + mIpv + ", create="
+        return "Cid=" + cid + ", State=" + getStateAsString() + ", bearerType=" + mBearerType + ", create="
                 + createTime + ", lastFail=" + lastFailTime + ", lastFailCause=" + lastFailCause
                 + ", dp=" + mDataProfile;
     }

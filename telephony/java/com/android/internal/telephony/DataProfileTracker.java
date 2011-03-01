@@ -668,11 +668,11 @@ public class DataProfileTracker extends Handler {
          * to work.
          */
         if (dpt == DataProfileType.PROFILE_TYPE_3GPP_APN
-                && ds == DataServiceType.SERVICE_TYPE_DEFAULT
-                && ipv == IPVersion.INET) {
+                && ipv == IPVersion.INET
+                && ds == DataServiceType.SERVICE_TYPE_DEFAULT) {
             if (mPreferredDefaultApn != null
                     && mPreferredDefaultApn.isWorking(IPVersion.INET)
-                    && mPreferredDefaultApn.canSupportIpVersion(IPVersion.INET)) {
+                    && mPreferredDefaultApn.getBearerType().supportsIpVersion(IPVersion.INET)) {
                 return mPreferredDefaultApn;
             }
         }

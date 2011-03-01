@@ -163,7 +163,7 @@ public class DataServiceInfo {
             DataProfile profile = null;
             for (DataProfile dp : mDataProfileList) {
                 if (dp.getDataProfileType() == profileType && dp.isWorking(ipv) == true
-                        && dp.canSupportIpVersion(ipv)) {
+                        && dp.getBearerType().supportsIpVersion(ipv)) {
 
                     if (!((DataProfileOmh)dp).isValidPriority()) {
                         logi("[OMH] Invalid priority, skipping profile...");
@@ -205,7 +205,7 @@ public class DataServiceInfo {
 
         for (DataProfile dp : mDataProfileList) {
             if (dp.getDataProfileType() == profileType && dp.isWorking(ipv) == true
-                    && dp.canSupportIpVersion(ipv)) {
+                    && dp.getBearerType().supportsIpVersion(ipv)) {
                 logi("Data Profile Chosen:" + dp.getDataProfileType());
                 return dp;
             }

@@ -16,11 +16,11 @@
 
 package com.android.internal.telephony;
 
-import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.DataConnectionFailCause;
 import com.android.internal.telephony.DataProfile;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
+import com.android.internal.telephony.Phone.BearerType;
 import com.android.internal.util.HierarchicalState;
 import com.android.internal.util.HierarchicalStateMachine;
 
@@ -129,17 +129,18 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      * Used internally for saving connecting parameters.
      */
     protected static class ConnectionParams {
-        public ConnectionParams(RadioTechnology radioTech, DataProfile dp, IPVersion ipv, Message onCompletedMsg) {
+        public ConnectionParams(RadioTechnology radioTech, DataProfile dp, BearerType bearerType,
+                Message onCompletedMsg) {
             this.radioTech = radioTech;
             this.dp = dp;
-            this.ipv = ipv;
+            this.bearerType = bearerType;
             this.onCompletedMsg = onCompletedMsg;
         }
 
         public int tag;
         public RadioTechnology radioTech;
         public DataProfile dp;
-        public IPVersion ipv;
+        public BearerType bearerType;
         public Message onCompletedMsg;
     }
 
@@ -183,7 +184,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     protected CommandsInterface mCM;
     protected int cid;
     protected DataProfile mDataProfile;
-    protected IPVersion mIpv;
+    protected BearerType mBearerType;
     protected String interfaceName;
     protected String ipAddress;
     protected String gatewayAddress;
@@ -308,7 +309,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         this.lastFailCause = DataConnectionFailCause.NONE;
 
         mDataProfile = null;
-        mIpv = null;
+        mBearerType = null;
         interfaceName = null;
         ipAddress = null;
         gatewayAddress = null;
@@ -361,7 +362,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 // connection is successful, so associate this dc with
                 // ipversion and data profile we used to setup this
                 // dataconnection with.
-                mIpv = cp.ipv;
+                mBearerType = cp.bearerType;
                 mDataProfile = cp.dp;
                 if (response.length > 2) {
                     ipAddress = response[2];
@@ -539,7 +540,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                     switch (result) {
                         case SUCCESS:
                             // All is well
-                            mActiveState.setEnterNotificationParams(cp, DataConnectionFailCause.NONE);
+                            mActiveState.setEnterNotificationParams(cp,
+                                    DataConnectionFailCause.NONE);
                             transitionTo(mActiveState);
                             break;
                         case ERR_BadCommand:
@@ -742,8 +744,10 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      *        With AsyncResult.userObj set to the original msg.obj,
      *        AsyncResult.result = FailCause and AsyncResult.exception = Exception().
      */
-    public void connect(RadioTechnology radioTech, DataProfile dp, IPVersion ipv, Message onCompletedMsg) {
-        sendMessage(obtainMessage(EVENT_CONNECT, new ConnectionParams(radioTech, dp, ipv, onCompletedMsg)));
+    public void connect(RadioTechnology radioTech, DataProfile dp, BearerType bearerType,
+            Message onCompletedMsg) {
+        sendMessage(obtainMessage(EVENT_CONNECT, new ConnectionParams(radioTech, dp, bearerType,
+                onCompletedMsg)));
     }
 
     /**
@@ -784,8 +788,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         return mDataProfile;
     }
 
-    public IPVersion getIpVersion() {
-        return mIpv;
+    public BearerType getBearerType() {
+        return mBearerType;
     }
 
     /**

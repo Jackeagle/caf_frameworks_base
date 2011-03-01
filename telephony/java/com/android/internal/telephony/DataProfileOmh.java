@@ -31,6 +31,7 @@ package com.android.internal.telephony;
 
 import com.android.internal.net.IPVersion;
 import com.android.internal.telephony.DataServiceType;
+import com.android.internal.telephony.Phone.BearerType;
 
 class DataProfileOmh extends DataProfile {
 
@@ -130,11 +131,8 @@ class DataProfileOmh extends DataProfile {
     }
 
     @Override
-    boolean canSupportIpVersion(IPVersion ipv) {
-        if (ipv == IPVersion.INET || ipv == IPVersion.INET6)
-            return true;
-        else
-            return false;
+    BearerType getBearerType() {
+        return BearerType.IPV4V6;
     }
 
     @Override
