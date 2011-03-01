@@ -926,7 +926,12 @@ struct MyHandler : public AHandler {
             // This is a live stream and therefore not seekable.
             return;
         } else {
-            CHECK_EQ(sscanf(val.c_str(), "%f-%f", &npt1, &npt2), 2);
+            //CHECK_EQ(sscanf(val.c_str(), "%f-%f", &npt1, &npt2), 2);
+            if (sscanf(val.c_str(), "%f", &npt1) != 1)
+            {
+                npt1 = 0;
+                LOGE("error in reading NPT range of play response ");
+            }
         }
 
         i = response->mHeaders.indexOfKey("rtp-info");
