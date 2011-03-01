@@ -124,6 +124,7 @@ public:
                           { return INVALID_OPERATION; }
     virtual status_t setBufferInUse() const { return INVALID_OPERATION; };
     virtual status_t freeBypassBuffers() const { return INVALID_OPERATION; };
+    virtual status_t clearFreezeLock() { return INVALID_OPERATION; };
     /**
      * onDraw - draws the surface.
      */

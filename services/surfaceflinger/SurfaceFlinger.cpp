@@ -522,8 +522,10 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
     for (size_t i=0 ; i<count ; i++) {
         if (ditchedLayers[i] != 0) {
 #ifdef SF_BYPASS
-            if (ditchedLayers[i]->isOverlayUsed())
+            if (ditchedLayers[i]->isOverlayUsed()) {
                 mOverlayDitchedLayers.add(ditchedLayers[i]);
+                ditchedLayers[i]->clearFreezeLock();
+            }
             else
 #endif
                 ditchedLayers[i]->ditch();
