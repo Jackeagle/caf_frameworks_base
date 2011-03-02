@@ -424,8 +424,8 @@ static jint android_hardware_fmradio_FmReceiverJNI_startRTNative
     }
 
     ext_ctl.string = rt_string;
-    ext_ctl.reserved2[0] = count;
-    //ext_ctl.value = 0;
+    LOGE("Size is %d",count);
+    ext_ctl.size = count;
 
 
     //form the ctrls data struct
@@ -483,7 +483,8 @@ static jint android_hardware_fmradio_FmReceiverJNI_startPSNative
     }
 
     ext_ctl.string = ps_string;
-    ext_ctl.reserved2[0] = count;
+    LOGE("Size is %d",count);
+    ext_ctl.size = count;
 
     //form the ctrls data struct
     struct v4l2_ext_controls v4l2_ctls;
@@ -540,6 +541,26 @@ static jint android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative
     return FM_JNI_SUCCESS;
 }
 
+static jint android_hardware_fmradio_FmReceiverJNI_setTxPowerLevelNative
+    (JNIEnv * env, jobject thiz, jint fd, jint powLevel)
+{
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_setTxPowerLevelNative\n");
+
+    struct v4l2_control control;
+
+    control.id = V4L2_CID_TUNE_POWER_LEVEL;
+    control.value = powLevel;
+
+    int err;
+    err = ioctl(fd, VIDIOC_S_CTRL,&control );
+    if(err < 0){
+            return FM_JNI_FAILURE;
+    }
+
+    LOGE("->android_hardware_fmradio_FmReceiverJNI_setTxPowerLevelNative is SUCCESS\n");
+    return FM_JNI_SUCCESS;
+}
+
 
 /*
  * JNI registration.
@@ -590,6 +611,9 @@ static JNINativeMethod gMethods[] = {
             (void*)android_hardware_fmradio_FmReceiverJNI_setPINative},
         { "setPSRepeatCountNative", "(II)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative},
+        { "setTxPowerLevelNative", "(II)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_setTxPowerLevelNative},
+
 
 };
 

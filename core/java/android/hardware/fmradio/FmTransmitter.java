@@ -86,6 +86,21 @@ public class FmTransmitter extends FmTransceiver
    public static final int FM_TX_LOW_POWER_MODE      =1;
 
    /**
+    * Transmit Power level settings
+    *
+    * @see #setTxPowerLevel
+    */
+   public static final int FM_TX_PWR_LEVEL_0   =0;
+   public static final int FM_TX_PWR_LEVEL_1   =1;
+   public static final int FM_TX_PWR_LEVEL_2   =2;
+   public static final int FM_TX_PWR_LEVEL_3   =3;
+   public static final int FM_TX_PWR_LEVEL_4   =4;
+   public static final int FM_TX_PWR_LEVEL_5   =5;
+   public static final int FM_TX_PWR_LEVEL_6   =6;
+   public static final int FM_TX_PWR_LEVEL_7   =7;
+
+
+   /**
     *  Constructor for the transmitter class that takes path to
     *  radio device and event callback adapter
     */
@@ -201,15 +216,15 @@ public class FmTransmitter extends FmTransceiver
       if( mPSStarted ){
          if( !stopPSInfo() ) {
              Log.d(TAG, "FmTrasmitter:stopPSInfo failed\n");
-	     }
+         }
       }
       if( mRTStarted ) {
         if(!stopRTInfo()) {
-		Log.d(TAG, "FmTrasmitter:stopRTInfo failed\n");
-	    }
+        Log.d(TAG, "FmTrasmitter:stopRTInfo failed\n");
+        }
       }
       if(!transmitRdsGroupControl(RDS_GRPS_TX_STOP) ) {
-      			 Log.d(TAG, "FmTrasmitter:transmitRdsGroupControl failed\n");
+         Log.d(TAG, "FmTrasmitter:transmitRdsGroupControl failed\n");
       }
 
       unregisterTransmitClient();
@@ -242,11 +257,11 @@ public class FmTransmitter extends FmTransceiver
       //Stop  If there is any ongoing RDS transmissions
       boolean status = false;
       if( mPSStarted ){
-		  Log.d(TAG,"FmTransmitter:setStation mPSStarted");
+          Log.d(TAG,"FmTransmitter:setStation mPSStarted");
          if( !stopPSInfo() ) return status;
       }
       if( mRTStarted ) {
-		  Log.d(TAG,"FmTransmitter:setStation mRTStarted");
+          Log.d(TAG,"FmTransmitter:setStation mRTStarted");
         if(!stopRTInfo()) return status;
       }
       if(!transmitRdsGroupControl(RDS_GRPS_TX_STOP) )return status;
@@ -411,7 +426,7 @@ public class FmTransmitter extends FmTransceiver
 
        int err = FmReceiverJNI.setPTYNative( sFd, pty );
        if( err < 0 ){
-		   Log.d(TAG,"setPTYNative is failure");
+           Log.d(TAG,"setPTYNative is failure");
           return false;
        }
 
@@ -423,7 +438,7 @@ public class FmTransmitter extends FmTransceiver
        //Set the PI
        err = FmReceiverJNI.setPINative( sFd, pi );
        if( err < 0 ){
-		   Log.d(TAG,"setPINative is failure");
+           Log.d(TAG,"setPINative is failure");
           return false;
        }
 
@@ -434,7 +449,7 @@ public class FmTransmitter extends FmTransceiver
 
        err = FmReceiverJNI.setPSRepeatCountNative( sFd, repeatCount );
        if( err < 0 ){
-		   Log.d(TAG,"setPSRepeatCountNative is failure");
+           Log.d(TAG,"setPSRepeatCountNative is failure");
           return false;
        }
 
@@ -453,7 +468,7 @@ public class FmTransmitter extends FmTransceiver
            return false;
 
        }   else {
-		   Log.d(TAG,"startPSNative is successful");
+           Log.d(TAG,"startPSNative is successful");
           mPSStarted = true;
           return true;
        }
@@ -480,10 +495,10 @@ public class FmTransmitter extends FmTransceiver
    public boolean stopPSInfo(){
        int err =0;
        if( (err =FmReceiverJNI.stopPSNative( sFd )) < 0  ){
-		   Log.d(TAG,"return for startPS is "+err);
+           Log.d(TAG,"return for startPS is "+err);
           return false;
        }    else{
-		   Log.d(TAG,"stopPSNative is successful");
+           Log.d(TAG,"stopPSNative is successful");
           mPSStarted = false;
           return true;
        }
@@ -543,7 +558,7 @@ public class FmTransmitter extends FmTransceiver
        //Set the PTY
        int err = FmReceiverJNI.setPTYNative( sFd, pty );
        if( err < 0 ){
-		   Log.d(TAG,"setPTYNative is failure");
+           Log.d(TAG,"setPTYNative is failure");
           return false;
        }
 
@@ -554,7 +569,7 @@ public class FmTransmitter extends FmTransceiver
 
        err = FmReceiverJNI.setPINative( sFd, pi );
        if( err < 0 ){
-		   Log.d(TAG,"setPINative is failure");
+           Log.d(TAG,"setPINative is failure");
           return false;
        }
 
@@ -571,7 +586,7 @@ public class FmTransmitter extends FmTransceiver
           Log.d(TAG, "FmReceiverJNI.startRTNative returned false\n");
           return false;
        }   else {
-		   Log.d(TAG,"mRTStarted is true");
+           Log.d(TAG,"mRTStarted is true");
           mRTStarted = true;
           return true;
        }
@@ -597,10 +612,10 @@ public class FmTransmitter extends FmTransceiver
    public boolean stopRTInfo(){
 
       if( FmReceiverJNI.stopRTNative( sFd ) < 0  ){
-		  Log.d(TAG,"stopRTNative is failure");
+          Log.d(TAG,"stopRTNative is failure");
           return false;
        }    else{
-		   Log.d(TAG,"mRTStarted is false");
+           Log.d(TAG,"mRTStarted is false");
           mRTStarted = false;
           return true;
        }
@@ -795,5 +810,30 @@ public class FmTransmitter extends FmTransceiver
       return bStatus;
    }
 
-
+   /*==============================================================
+   FUNCTION:  setTxPowerLevel
+   ==============================================================*/
+   /**
+    *  Sets the transmitter power level.
+    *
+    *  <p>
+    *  This is a function used for setting the power level of
+    *  Tx device.
+    *  <p>
+    *  @param powLevel The Tx power level value to be set. The value should be
+    *                  in range 0-7.If input is -ve level will be set to 0
+    *                  and if it is above 7 level will be set to max i.e.,7.
+    *
+    *  @return true on success, false on failure.
+    *
+    */
+   public boolean setTxPowerLevel(int powLevel){
+      boolean bStatus = true;
+       int err = FmReceiverJNI.setTxPowerLevelNative( sFd, powLevel );
+       if( err < 0 ){
+           Log.d(TAG,"setTxPowerLevel is failure");
+          return false;
+      }
+      return bStatus;
+   }
 };

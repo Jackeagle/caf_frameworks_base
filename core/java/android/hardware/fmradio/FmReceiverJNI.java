@@ -242,4 +242,13 @@ class FmReceiverJNI {
      *         {@link #FM_JNI_FAILURE}
      */
     static native int setPSRepeatCountNative(int fd, int repeatCount);
+   /**
+     * native method: Sets the power level for the tramsmitter
+     * transmission.
+     * @param fd file descriptor of device
+     * @param powLevel is the level at which transmitter operates.
+     * @return {@link #FM_JNI_SUCCESS}
+     *         {@link #FM_JNI_FAILURE}
+     */
+    static native int setTxPowerLevelNative(int fd, int powLevel);
 }
