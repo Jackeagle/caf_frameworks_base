@@ -170,9 +170,9 @@ class HDMIService extends IHDMIService.Stub {
 
         synchronized(mListener) {
             if(enableHDMI == false) {
-                mListener.enableHDMIOutput(false);
                 broadcastEvent(HDMIOFFEvent);
                 broadcastEvent(HDMICableDisconnectedEvent);
+                mListener.enableHDMIOutput(false);
             }
             mListener.setHPD(getHDMIUserOption());
         }
