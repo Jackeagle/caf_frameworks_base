@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008, The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,6 +60,7 @@ interface IBluetooth
     ParcelUuid[] getRemoteUuids(in String address);
     boolean fetchRemoteUuids(in String address, in ParcelUuid uuid, in IBluetoothCallback callback);
     int getRemoteServiceChannel(in String address, in ParcelUuid uuid);
+    int getRemoteL2capPsm(in String address, in ParcelUuid uuid);
 
     boolean setPin(in String address, in byte[] pin);
     boolean setPasskey(in String address, int passkey);
@@ -76,4 +78,10 @@ interface IBluetooth
     boolean connectHeadset(String address);
     boolean disconnectHeadset(String address);
     boolean notifyIncomingConnection(String address);
+
+    int registerEl2capConnection(in IBluetoothCallback callback, in int ampPolicy);
+    void deregisterEl2capConnection(in int handle);
+    int getEffectiveAmpPolicy(in int policy);
+    boolean setDesiredAmpPolicy(in int handle, in int policy);
+    void setUseWifiForBtTransfers(in boolean useWifi);
 }

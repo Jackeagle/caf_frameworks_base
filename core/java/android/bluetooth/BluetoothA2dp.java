@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -214,6 +215,20 @@ public final class BluetoothA2dp {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
             return null;
+        }
+    }
+
+    /** Check if any A2DP sink is in playing state
+     * @return true if a sink is playing, otherwise false (including error)
+     * @hide
+     */
+    public boolean isPlayingSink() {
+        if (DBG) log("isPlayingSink()");
+        try {
+            return mService.isPlayingSink();
+        } catch (RemoteException e) {
+            Log.e(TAG, "", e);
+            return false;
         }
     }
 

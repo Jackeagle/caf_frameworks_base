@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
@@ -177,6 +178,20 @@ public final class HeaderSet {
      */
     public static final int OBJECT_CLASS = 0x4F;
 
+    /**
+     * Represents the OBEX Single Response Mode (SRM).
+     * <P>
+     * The value of <code>SINGLE_RESPONSE_MODE</code> is 0x97 (151).
+     */
+    public static final int SINGLE_RESPONSE_MODE = 0x97;
+
+    /**
+     * Represents the OBEX Single Response Mode (SRM) Parameter.
+     * <P>
+     * The value of <code>SINGLE_RESPONSE_MODE_PARAMETER</code> is 0x98 (152).
+     */
+    public static final int SINGLE_RESPONSE_MODE_PARAMETER = 0x98;
+
     private Long mCount; // 4 byte unsigned integer
 
     private String mName; // null terminated Unicode text string
@@ -210,6 +225,10 @@ public final class HeaderSet {
     private Long[] mIntegerUserDefined; // 4 byte unsigned integer
 
     private final SecureRandom mRandom;
+
+    private Byte mSingleRespMode; // 1 byte value to setup the OBEX Single Response Mode (SRM)
+
+    private Byte mSingleRespModeParam; // 1 byte value for setting parameters used during the OBEX Single Response Mode (SRM)
 
     /*package*/ byte[] nonce;
 
@@ -370,6 +389,20 @@ public final class HeaderSet {
                     }
                 }
                 break;
+            case SINGLE_RESPONSE_MODE:
+                if ((headerValue != null) && (!(headerValue instanceof Byte))) {
+                    throw new IllegalArgumentException(
+                        "Single Response Mode must be a Byte");
+                }
+                mSingleRespMode = (Byte)headerValue;
+                break;
+            case SINGLE_RESPONSE_MODE_PARAMETER:
+                if ((headerValue != null) && (!(headerValue instanceof Byte))) {
+                    throw new IllegalArgumentException(
+                        "Single Response Mode Parameter must be a Byte");
+                }
+                mSingleRespModeParam = (Byte)headerValue;
+                break;
             default:
                 // Verify that it was not a Unicode String user Defined
                 if ((headerID >= 0x30) && (headerID <= 0x3F)) {
@@ -468,6 +501,10 @@ public final class HeaderSet {
                 return mObjectClass;
             case APPLICATION_PARAMETER:
                 return mAppParam;
+            case SINGLE_RESPONSE_MODE:
+                return mSingleRespMode;
+            case SINGLE_RESPONSE_MODE_PARAMETER:
+                return mSingleRespModeParam;
             default:
                 // Verify that it was not a Unicode String user Defined
                 if ((headerID >= 0x30) && (headerID <= 0x3F)) {
@@ -539,7 +576,12 @@ public final class HeaderSet {
         if (mObjectClass != null) {
             out.write(OBJECT_CLASS);
         }
-
+        if (mSingleRespMode != null) {
+            out.write(SINGLE_RESPONSE_MODE);
+        }
+        if (mSingleRespModeParam != null) {
+            out.write(SINGLE_RESPONSE_MODE_PARAMETER);
+        }
         for (int i = 0x30; i < 0x40; i++) {
             if (mUnicodeUserDefined[i - 0x30] != null) {
                 out.write(i);
