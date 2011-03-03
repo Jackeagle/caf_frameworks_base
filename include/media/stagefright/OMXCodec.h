@@ -75,6 +75,10 @@ protected:
     virtual ~OMXCodec();
 
 private:
+
+    // Make sure mLock is accessible to OMXCodecObserver
+    friend class OMXCodecObserver;
+
     enum State {
         DEAD,
         LOADED,

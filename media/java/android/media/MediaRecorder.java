@@ -145,8 +145,17 @@ public class MediaRecorder
         /** Microphone audio source tuned for voice recognition if available, behaves like
          *  {@link #DEFAULT} otherwise. */
         public static final int VOICE_RECOGNITION = 6;
-        public static final int FM_RX = 7;
-        public static final int FM_RX_A2DP = 8;
+
+        /**
+         * @hide
+         * Microphone audio source tuned for voice communications such as VoIP. It
+         * will for instance take advantage of echo cancellation or automatic gain control
+         * if available. It otherwise behaves like {@link #DEFAULT} if no voice processing
+         * is available.
+         */
+        public static final int VOICE_COMMUNICATION = 7;
+        public static final int FM_RX = 8;
+        public static final int FM_RX_A2DP = 9;
     }
 
     /**
@@ -180,11 +189,12 @@ public class MediaRecorder
 
         /** The following formats are audio only .aac or .amr formats **/
         /** @deprecated  Deprecated in favor of AMR_NB */
-        /** TODO: change link when AMR_NB is exposed. Deprecated in favor of MediaRecorder.OutputFormat.AMR_NB */
+        /** Deprecated in favor of MediaRecorder.OutputFormat.AMR_NB */
+        /** AMR NB file format */
         public static final int RAW_AMR = 3;
-        /** @hide AMR NB file format */
+        /** AMR NB file format */
         public static final int AMR_NB = 3;
-        /** @hide AMR WB file format */
+        /** AMR WB file format */
         public static final int AMR_WB = 4;
         /** @hide AAC ADIF file format */
         public static final int AAC_ADIF = 5;

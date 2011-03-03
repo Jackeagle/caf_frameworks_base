@@ -49,6 +49,11 @@ private:
     off64_t mOffset;
     off64_t mContentLength;
     bool mContentLengthValid;
+    bool mHasChunkedTransferEncoding;
+
+    // The number of data bytes in the current chunk before any subsequent
+    // chunk header (or -1 if no more chunks).
+    ssize_t mChunkDataBytesLeft;
 
     status_t connect(
             const char *uri, const String8 &headers, off64_t offset);
@@ -57,6 +62,9 @@ private:
             const char *host, unsigned port, const char *path,
             const String8 &headers,
             off64_t offset);
+
+    // Read up to "size" bytes of data, respect transfer encoding.
+    ssize_t internalRead(void *data, size_t size);
 
     void applyTimeoutResponse();
 

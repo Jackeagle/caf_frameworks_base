@@ -7853,6 +7853,10 @@ public class WebView extends AbsoluteLayout
         nativeUpdateCachedTextfield(updatedText, mTextGeneration);
     }
 
+    /* package */ ViewManager getViewManager() {
+        return mViewManager;
+    }
+
     private native int nativeCacheHitFramePointer();
     private native Rect nativeCacheHitNodeBounds();
     private native int nativeCacheHitNodePointer();
