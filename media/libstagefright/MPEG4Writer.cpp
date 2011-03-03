@@ -2,6 +2,8 @@
  * Copyright (C) 2009 The Android Open Source Project
  * Copyright (C) 2010-2011 Code Aurora Forum
  *
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -1741,13 +1743,14 @@ status_t MPEG4Writer::Track::stop() {
 
     mDone = true;
 
+    status_t status = mSource->stop();
+
     void *dummy;
     pthread_join(mThread, &dummy);
 
     status_t err = (status_t) dummy;
 
     {
-        status_t status = mSource->stop();
         if (err == OK && status != OK && status != ERROR_END_OF_STREAM) {
             err = status;
         }
