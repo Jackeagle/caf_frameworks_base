@@ -1180,6 +1180,7 @@ public class Camera {
         private static final String KEY_MAX_SATURATION = "max-saturation";
         private static final String KEY_SELECTABLE_ZONE_AF = "selectable-zone-af";
         private static final String KEY_FACE_DETECTION = "face-detection";
+        private static final String KEY_MEMORY_COLOR_ENHANCEMENT = "mce";
 
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
@@ -1242,6 +1243,10 @@ public class Camera {
 
         public static final String SKIN_TONE_ENHANCEMENT_ENABLE = "enable";
         public static final String SKIN_TONE_ENHANCEMENT_DISABLE= "disable";
+
+        // Values for MCE settings.
+        public static final String MCE_ENABLE = "enable";
+        public static final String MCE_DISABLE = "disable";
 
         // Values for flash mode settings.
         /**
@@ -2911,6 +2916,35 @@ public class Camera {
          */
         public List<String> getSupportedAutoexposure() {
             String str = get(KEY_AUTO_EXPOSURE + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+        }
+
+         /**
+         * Gets the current MCE Mode.
+         *
+         * @return MCE value
+         */
+        public String getMemColorEnhance() {
+            return get(KEY_MEMORY_COLOR_ENHANCEMENT);
+        }
+
+        /**
+         * Sets the current MCE Mode.
+         *
+         * @return MCE Mode
+         */
+        public void setMemColorEnhance(String mce) {
+            set(KEY_MEMORY_COLOR_ENHANCEMENT, mce);
+        }
+
+         /**
+         * Gets the supported MCE modes.
+         *
+         * @return a List of MCE_ENABLE/DISABLE string constants. null if MCE mode
+         *         setting is not supported.
+         */
+        public List<String> getSupportedMemColorEnhanceModes() {
+            String str = get(KEY_MEMORY_COLOR_ENHANCEMENT + SUPPORTED_VALUES_SUFFIX);
             return split(str);
         }
 

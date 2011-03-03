@@ -93,6 +93,8 @@ const char CameraParameters::KEY_SELECTABLE_ZONE_AF[] = "selectable-zone-af";
 const char CameraParameters::KEY_SUPPORTED_SELECTABLE_ZONE_AF[] = "selectable-zone-af-values";
 const char CameraParameters::KEY_FACE_DETECTION[] = "face-detection";
 const char CameraParameters::KEY_SUPPORTED_FACE_DETECTION[] = "face-detection-values";
+const char CameraParameters::KEY_MEMORY_COLOR_ENHANCEMENT[] = "mce";
+const char CameraParameters::KEY_SUPPORTED_MEM_COLOR_ENHANCE_MODES[] = "mce-values";
 
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
@@ -231,6 +233,10 @@ const char CameraParameters::SELECTABLE_ZONE_AF_FRAME_AVERAGE[] = "frame-average
 // Values for Face Detection settings.
 const char CameraParameters::FACE_DETECTION_OFF[] = "off";
 const char CameraParameters::FACE_DETECTION_ON[] = "on";
+
+// Values for MCE settings.
+const char CameraParameters::MCE_ENABLE[] = "enable";
+const char CameraParameters::MCE_DISABLE[] = "disable";
 
 static const char* portrait = "portrait";
 static const char* landscape = "landscape";
