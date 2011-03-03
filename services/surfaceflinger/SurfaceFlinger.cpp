@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +107,8 @@ SurfaceFlinger::SurfaceFlinger()
         mLastCompCount(-1),
         mFullScreen(false),
         mOverlayUsed(false),
-        mOverlayUseChanged(false)
+        mOverlayUseChanged(false),
+        mIsLayerBufferPresent(false)
 {
     init();
 }
@@ -904,7 +906,7 @@ void SurfaceFlinger::handleRepaint()
     glLoadIdentity();
 
     uint32_t flags = hw.getFlags();
-    if ((flags & DisplayHardware::SWAP_RECTANGLE && !mOverlayUsed) ||
+    if ((flags & DisplayHardware::SWAP_RECTANGLE && !mIsLayerBufferPresent) ||
         (flags & DisplayHardware::BUFFER_PRESERVED)) 
     {
         // we can redraw only what's dirty, but since SWAP_RECTANGLE only
@@ -997,6 +999,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         }
     }
 #endif
+    mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
 
     if (mOverlayOpt || (layerbuffercount == 1)) {
         if(layerbuffercount == 1) {
