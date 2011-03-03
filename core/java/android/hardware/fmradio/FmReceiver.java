@@ -1618,12 +1618,50 @@ public class FmReceiver extends FmTransceiver
 
        int rssi = FmReceiverJNI.getRSSINative (sFd);
 
-       rssi = rssi + 120;
-
-       if (rssi > 100)
-         return 100;
-
        return rssi;
+   }
+
+   /*==============================================================
+   FUNCTION:  getIoverc
+   ==============================================================*/
+   /**
+   *    Returns the Estimated Interference Over Carrier of the currently tuned station
+   *
+   *    <p>
+   *    This method returns the Estimated Interference Over Carrier of the currently
+   *    tuned station.
+   *
+   *    <p>
+   *    @return    IOVERC of currently tuned station on Success.
+   *		   -1 on failure to retrieve the current IoverC.
+   */
+   public int getIoverc()
+   {
+      int re;
+      re = mControl.IovercControl(sFd);
+      return re;
+   }
+
+   /*==============================================================
+   FUNCTION:  getIntDet
+   ==============================================================*/
+   /**
+   *    Returns the IntDet the currently tuned station
+   *
+   *    <p>
+   *    This method returns the IntDet of the currently
+   *    tuned station.
+   *
+   *    <p>
+   *    @return    IntDet of currently tuned station.
+   *		   -1 on failure to retrieve the current IntDet
+   */
+   public int getIntDet()
+   {
+      int re;
+
+      re = mControl.IntDet(sFd);
+      return re;
    }
 
 
