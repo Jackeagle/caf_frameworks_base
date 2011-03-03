@@ -450,11 +450,11 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void registerForServiceStateChanged(Handler h, int what, Object obj) {
-        mServiceStateRegistrants.add(h, what, obj);
+        mActivePhone.registerForServiceStateChanged(h, what, obj);
     }
 
     public void unregisterForServiceStateChanged(Handler h) {
-        mServiceStateRegistrants.remove(h);
+        mActivePhone.unregisterForServiceStateChanged(h);
     }
 
     public void registerForSuppServiceNotification(Handler h, int what, Object obj) {
@@ -1154,8 +1154,6 @@ public class PhoneProxy extends Handler implements Phone {
     public DataActivityState getDataActivityState() {
         return mActivePhone.getDataActivityState();
     }
-
-    protected final RegistrantList mServiceStateRegistrants = new RegistrantList();
 
     public Phone getVoicePhone() {
         return mActivePhone;
