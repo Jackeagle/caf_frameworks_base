@@ -154,6 +154,26 @@ public final class SIMRecords extends UiccApplicationRecords {
 
     private static final int EVENT_SET_MWIS_DONE = 39;
     private static final int EVENT_SET_CPHS_MWIS_DONE = 40;
+
+    // Lookup table for carriers known to produce SIMs which incorrectly indicate MNC length.
+
+    private static final String[] MCCMNC_CODES_HAVING_3DIGITS_MNC = {
+        "405025", "405026", "405027", "405028", "405029", "405030", "405031", "405032",
+        "405033", "405034", "405035", "405036", "405037", "405038", "405039", "405040",
+        "405041", "405042", "405043", "405044", "405045", "405046", "405047", "405750",
+        "405751", "405752", "405753", "405754", "405755", "405756", "405799", "405800",
+        "405801", "405802", "405803", "405804", "405805", "405806", "405807", "405808",
+        "405809", "405810", "405811", "405812", "405813", "405814", "405815", "405816",
+        "405817", "405818", "405819", "405820", "405821", "405822", "405823", "405824",
+        "405825", "405826", "405827", "405828", "405829", "405830", "405831", "405832",
+        "405833", "405834", "405835", "405836", "405837", "405838", "405839", "405840",
+        "405841", "405842", "405843", "405844", "405845", "405846", "405847", "405848",
+        "405849", "405850", "405851", "405852", "405853", "405875", "405876", "405877",
+        "405878", "405879", "405880", "405881", "405882", "405883", "405884", "405885",
+        "405886", "405908", "405909", "405910", "405911", "405925", "405926", "405927",
+        "405928", "405929", "405932"
+    };
+
     // ***** Constructor
 
     public SIMRecords(UiccCardApplication parent, UiccRecords ur, Context c, CommandsInterface ci) {
@@ -515,6 +535,17 @@ public final class SIMRecords extends UiccApplicationRecords {
 
                 Log.d(LOG_TAG, "IMSI: " + mImsi.substring(0, 6) + "xxxxxxx");
 
+                if (((mncLength == UNKNOWN) || (mncLength == 2)) &&
+                        ((mImsi != null) && (mImsi.length() >= 6))) {
+                    String mccmncCode = mImsi.substring(0, 6);
+                    for (String mccmnc : MCCMNC_CODES_HAVING_3DIGITS_MNC) {
+                        if (mccmnc.equals(mccmncCode)) {
+                            mncLength = 3;
+                            break;
+                        }
+                    }
+                }
+
                 if (mncLength == UNKNOWN) {
                     // the SIM has told us all it knows, but it didn't know the mnc length.
                     // guess using the mcc
@@ -751,6 +782,17 @@ public final class SIMRecords extends UiccApplicationRecords {
                         mncLength = UNKNOWN;
                     }
                 } finally {
+                    if (((mncLength == UNINITIALIZED) || (mncLength == UNKNOWN) ||
+                            (mncLength == 2)) && ((mImsi != null) && (mImsi.length() >= 6))) {
+                        String mccmncCode = mImsi.substring(0, 6);
+                        for (String mccmnc : MCCMNC_CODES_HAVING_3DIGITS_MNC) {
+                            if (mccmnc.equals(mccmncCode)) {
+                                mncLength = 3;
+                                break;
+                            }
+                        }
+                    }
+
                     if (mncLength == UNKNOWN || mncLength == UNINITIALIZED) {
                         if (mImsi != null) {
                             try {

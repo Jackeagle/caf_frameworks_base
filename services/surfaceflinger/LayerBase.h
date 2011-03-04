@@ -36,6 +36,7 @@
 
 #include <pixelflinger/pixelflinger.h>
 
+#include "DisplayHardware/DisplayHardware.h"
 #include "Transform.h"
 
 namespace android {
@@ -126,6 +127,11 @@ public:
     virtual status_t freeBypassBuffers() const { return INVALID_OPERATION; };
     virtual status_t clearFreezeLock() { return INVALID_OPERATION; };
     /**
+     * bypass mode
+     */
+    virtual bool setBypass(bool enable) { return false; }
+
+    /**
      * onDraw - draws the surface.
      */
     virtual void onDraw(const Region& clip) const = 0;
@@ -176,11 +182,6 @@ public:
     virtual void unlockPageFlip(const Transform& planeTransform, Region& outDirtyRegion);
     
     /**
-     * finishPageFlip - called after all surfaces have drawn.
-     */
-    virtual void finishPageFlip();
-    
-    /**
      * needsBlending - true if this surface needs blending
      */
     virtual bool needsBlending() const  { return false; }
@@ -195,7 +196,9 @@ public:
     /**
      * needsLinearFiltering - true if this surface needs filtering
      */
-    virtual bool needsFiltering() const { return mNeedsFiltering; }
+    virtual bool needsFiltering() const {
+        return (!(mFlags & DisplayHardware::SLOW_CONFIG)) && mNeedsFiltering;
+    }
 
     /**
      * isSecure - true if this surface is secure, that is if it prevents
@@ -213,6 +216,7 @@ public:
     
     /** always call base class first */
     virtual void dump(String8& result, char* scratch, size_t size) const;
+    virtual void shortDump(String8& result, char* scratch, size_t size) const;
 
 
     enum { // flags for doTransaction()
@@ -337,6 +341,7 @@ public:
 
 protected:
     virtual void dump(String8& result, char* scratch, size_t size) const;
+    virtual void shortDump(String8& result, char* scratch, size_t size) const;
 
 private:
     mutable Mutex mLock;
