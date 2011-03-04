@@ -804,8 +804,9 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeString(aid);
+        rr.mp.writeInt(2);
         rr.mp.writeString(pin);
+        rr.mp.writeString(aid);
 
         send(rr);
     }
@@ -818,9 +819,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeString(aid);
+        rr.mp.writeInt(3);
         rr.mp.writeString(puk);
         rr.mp.writeString(newPin);
+        rr.mp.writeString(aid);
 
         send(rr);
     }
@@ -833,8 +835,9 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeString(aid);
+        rr.mp.writeInt(2);
         rr.mp.writeString(pin);
+        rr.mp.writeString(aid);
 
         send(rr);
     }
@@ -847,9 +850,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeString(aid);
+        rr.mp.writeInt(3);
         rr.mp.writeString(puk);
         rr.mp.writeString(newPin2);
+        rr.mp.writeString(aid);
 
         send(rr);
     }
@@ -862,9 +866,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeString(aid);
+        rr.mp.writeInt(3);
         rr.mp.writeString(oldPin);
         rr.mp.writeString(newPin);
+        rr.mp.writeString(aid);
 
         send(rr);
     }
@@ -877,9 +882,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        rr.mp.writeString(aid);
+        rr.mp.writeInt(3);
         rr.mp.writeString(oldPin2);
         rr.mp.writeString(newPin2);
+        rr.mp.writeString(aid);
 
         send(rr);
     }
@@ -961,13 +967,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     getIMSI(String aid, Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_IMSI, result);
 
+        rr.mp.writeInt(1);
         rr.mp.writeString(aid);
 
         if (RILJ_LOGD) riljLog(rr.serialString() +
-                              "> getIMSI:RIL_REQUEST_GET_IMSI " +
-                              RIL_REQUEST_GET_IMSI +
-                              " aid: " + aid +
-                              " " + requestToString(rr.mRequest));
+                              "> getIMSI: " + requestToString(rr.mRequest)
+                              + " aid: " + aid);
 
         send(rr);
     }
@@ -1610,7 +1615,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SIM_IO, result);
 
-        rr.mp.writeString(aid);
         rr.mp.writeInt(command);
         rr.mp.writeInt(fileid);
         rr.mp.writeString(path);
@@ -1619,14 +1623,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         rr.mp.writeInt(p3);
         rr.mp.writeString(data);
         rr.mp.writeString(pin2);
+        rr.mp.writeString(aid);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> iccIO: "
-                + " aid: " + aid + " "
                 + requestToString(rr.mRequest)
                 + " 0x" + Integer.toHexString(command)
                 + " 0x" + Integer.toHexString(fileid) + " "
                 + " path: " + path + ","
-                + p1 + "," + p2 + "," + p3);
+                + p1 + "," + p2 + "," + p3
+                + " aid: " + aid);
 
         send(rr);
     }
@@ -1799,17 +1804,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_QUERY_FACILITY_LOCK, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
-                + " aid: " + aid + " facility: " + facility);
+                + " facility: " + facility + " aid: " + aid);
 
         // count strings
         rr.mp.writeInt(4);
 
-        rr.mp.writeString(aid);
-
         rr.mp.writeString(facility);
         rr.mp.writeString(password);
-
         rr.mp.writeString(Integer.toString(serviceClass));
+        rr.mp.writeString(aid);
 
         send(rr);
     }
@@ -1822,19 +1825,18 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 = RILRequest.obtain(RIL_REQUEST_SET_FACILITY_LOCK, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
-                + " aid: " + aid + " facility: " + facility
-                + " lockstate: " + lockState);
+                + " facility: " + facility
+                + " lockstate: " + lockState + " aid: " + aid);
 
         // count strings
         rr.mp.writeInt(5);
-
-        rr.mp.writeString(aid);
 
         rr.mp.writeString(facility);
         lockString = (lockState)?"1":"0";
         rr.mp.writeString(lockString);
         rr.mp.writeString(password);
         rr.mp.writeString(Integer.toString(serviceClass));
+        rr.mp.writeString(aid);
 
         send(rr);
 
@@ -3251,16 +3253,9 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         UiccCardStatusResponse.CardStatus cs = r.card;
         cs.card_state = UiccConstants.CardState.values()[p.readInt()];
         cs.universal_pin_state = UiccConstants.PinState.values()[p.readInt()];
-        int num_current_3gpp_indexes = p.readInt();
-        cs.subscription_3gpp_app_index = new int[num_current_3gpp_indexes];
-        for (int j = 0; j < num_current_3gpp_indexes; j++) {
-            cs.subscription_3gpp_app_index[j] = p.readInt();
-        }
-        int num_current_3gpp2_indexes = p.readInt();
-        cs.subscription_3gpp2_app_index = new int[num_current_3gpp2_indexes];
-        for (int j = 0; j < num_current_3gpp2_indexes; j++) {
-            cs.subscription_3gpp2_app_index[j] = p.readInt();
-        }
+        cs.subscription_3gpp_app_index = p.readInt();
+        cs.subscription_3gpp2_app_index = p.readInt();
+        cs.subscription_ims_app_index = p.readInt();
         int num_applications = p.readInt();
 
         if (num_applications > UiccConstants.RIL_CARD_MAX_APPS) {
@@ -3289,9 +3284,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         SimRefreshResponse response = new SimRefreshResponse();
 
         response.refreshResult = SimRefreshResponse.refreshResultFromRIL(p.readInt());
-        response.aidPtr = p.readString();
         response.efId   = p.readInt();
-
+        response.aidPtr = p.readString();
         return response;
     }
 

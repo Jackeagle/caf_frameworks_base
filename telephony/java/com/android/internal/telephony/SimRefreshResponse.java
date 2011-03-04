@@ -44,9 +44,9 @@ public class SimRefreshResponse {
     }
 
     public Result          refreshResult;      /* Sim Refresh result */
+    public int             efId;               /* EFID */
     public String          aidPtr;             /* null terminated string, e.g., from 0xA0, 0x00
                                                   0x41, 0x30*/
-    public int             efId;               /* EFID */
 
     public static Result
         refreshResultFromRIL(int refreshResult) throws ATParseEx {

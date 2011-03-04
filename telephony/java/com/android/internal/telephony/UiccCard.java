@@ -40,8 +40,8 @@ public class UiccCard extends Handler{
     private UiccRecords mUiccRecords;
     private CardState mCardState;
     private PinState mUniversalPinState;
-    private int[] mSubscription3gppAppIndex;     /* value < RIL_CARD_MAX_APPS */
-    private int[] mSubscription3gpp2AppIndex;    /* value < RIL_CARD_MAX_APPS */
+    private int mSubscription3gppAppIndex;     /* value < RIL_CARD_MAX_APPS */
+    private int mSubscription3gpp2AppIndex;    /* value < RIL_CARD_MAX_APPS */
     private RegistrantList mUnavailableRegistrants = new RegistrantList();
     private RegistrantList mAbsentRegistrants = new RegistrantList();
     private boolean mDestroyed = false; //set to true once this card is commanded to be disposed of.
@@ -124,11 +124,11 @@ public class UiccCard extends Handler{
     public UiccManager getUiccManager() {
         return mUiccManager;
     }
-    public int[] getSubscription3gppAppIndex() {
+    public int getSubscription3gppAppIndex() {
         return mSubscription3gppAppIndex;
     }
 
-    public int[] getSubscription3gpp2AppIndex() {
+    public int getSubscription3gpp2AppIndex() {
         return mSubscription3gpp2AppIndex;
     }
 
