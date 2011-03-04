@@ -2104,7 +2104,9 @@ void MPEG4Writer::Track::adjustMediaTime(int64_t *timestampUs) {
         if (adjustTimePerFrameUs >= kMaxAdjustTimePerFrame) {
             LOGE("Adjusted time per video frame is %lld us",
                 adjustTimePerFrameUs);
-            CHECK(!"Video frame time adjustment is too large!");
+            LOGE("Video frame time adjustment is too large!");
+            mOwner->notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN,
+                           ERROR_MALFORMED);
         }
 
         // Check on total accumulated time drift within a period of
@@ -2120,7 +2122,9 @@ void MPEG4Writer::Track::adjustMediaTime(int64_t *timestampUs) {
                 mTotalDriftTimeToAdjustUs,
                 kVideoMediaTimeAdjustPeriodTimeUs);
 
-            CHECK(!"The audio track media time drifts too much!");
+            LOGE("The audio track media time drifts too much!");
+            mOwner->notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN,
+                           ERROR_MALFORMED);
         }
 
     }
