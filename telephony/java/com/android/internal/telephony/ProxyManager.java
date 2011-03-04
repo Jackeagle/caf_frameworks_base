@@ -165,7 +165,8 @@ public class ProxyManager extends Handler {
                 mCi[i].registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, sub);
 
                 // Register for SIM Refresh events
-                mCi[i].registerForIccRefresh(this, EVENT_SIM_REFRESH, null);
+                Integer slot = new Integer(i);
+                mCi[i].registerForIccRefresh(this, EVENT_SIM_REFRESH, slot);
             }
 
             // Get the current active dds
@@ -743,22 +744,22 @@ public class ProxyManager extends Handler {
     }
 
     private void processSimRefresh(AsyncResult ar) {
-
         SimRefreshResponse state = (SimRefreshResponse)ar.result;
+
         if (state == null) {
             Log.e(LOG_TAG, "processSimRefresh received without input");
             return;
         }
 
-        if (state.refreshResult == SimRefreshResponse.Result.SIM_RESET) {
+        Integer slot = (Integer)ar.userObj;
+        Log.d(LOG_TAG, "processSimRefresh: slot = " + slot
+                + " refreshResult = " + state.refreshResult);
 
-            Log.d(LOG_TAG, "processSimRefresh: refreshResult" + state.refreshResult);
-            int currentSlotId = state.slot;
-            Log.d(LOG_TAG, "processSimRefresh: currentSlotId" + currentSlotId);
+        if (state.refreshResult == SimRefreshResponse.Result.SIM_RESET) {
             //subscription in mUserPrefSubs
             for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
-                if (mUserPrefSubs.subscription[i].slotId == currentSlotId) {
-                    Log.d(LOG_TAG, "processSimRefresh: mUserPrefSubs.slotId"
+                if (mUserPrefSubs.subscription[i].slotId == slot) {
+                    Log.d(LOG_TAG, "processSimRefresh: mUserPrefSubs.slotId = "
                             + mUserPrefSubs.subscription[i].slotId);
                     //By changing the status of prevSubscriptionData,
                     //we can activate individual subscriptions.
