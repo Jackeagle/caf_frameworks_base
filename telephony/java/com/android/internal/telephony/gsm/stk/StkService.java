@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2009-10, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -140,7 +140,7 @@ public class StkService extends Handler implements AppInterface {
     // Events to signal SIM presence or absent in the device.
     private static final int MSG_ID_ICC_RECORDS_LOADED       = 20;
 
-    static final int MSG_ID_ICC_REFRESH_RESET            = 30;
+    static final int MSG_ID_ICC_REFRESH              = 30;
 
     private static final int DEV_ID_KEYPAD      = 0x01;
     private static final int DEV_ID_DISPLAY     = 0x02;
@@ -168,15 +168,13 @@ public class StkService extends Handler implements AppInterface {
         mCmdIf.setOnStkProactiveCmd(this, MSG_ID_PROACTIVE_COMMAND, null);
         mCmdIf.setOnStkEvent(this, MSG_ID_EVENT_NOTIFY, null);
         mCmdIf.setOnStkCallSetUp(this, MSG_ID_CALL_SETUP, null);
+        mCmdIf.registerForIccRefresh(this, MSG_ID_ICC_REFRESH, null);
         //mCmdIf.setOnSimRefresh(this, MSG_ID_REFRESH, null);
 
         mIccRecords = ir;
 
         // Register for SIM ready event.
         mIccRecords.registerForRecordsLoaded(this, MSG_ID_ICC_RECORDS_LOADED, null);
-
-        // Register for IccRefreshReset event.
-        mIccRecords.registerForIccRefreshReset(this, MSG_ID_ICC_REFRESH_RESET, null);
 
         mCmdIf.reportStkServiceIsRunning(null);
         StkLog.d(this, "StkService: is running");
@@ -185,11 +183,11 @@ public class StkService extends Handler implements AppInterface {
     public void dispose() {
 
         mIccRecords.unregisterForRecordsLoaded(this);
-        mIccRecords.unregisterForIccRefreshReset(this);
         mCmdIf.unSetOnStkSessionEnd(this);
         mCmdIf.unSetOnStkProactiveCmd(this);
         mCmdIf.unSetOnStkEvent(this);
         mCmdIf.unSetOnStkCallSetUp(this);
+        mCmdIf.unregisterForIccRefresh(this);
 
         this.removeCallbacksAndMessages(null);
     }
@@ -669,12 +667,41 @@ public class StkService extends Handler implements AppInterface {
         case MSG_ID_RESPONSE:
             handleCmdResponse((StkResponseMessage) msg.obj);
             break;
-        case MSG_ID_ICC_REFRESH_RESET:
-            handleIccRefreshReset();
+        case MSG_ID_ICC_REFRESH:
+            if (msg.obj != null) {
+                AsyncResult ar = (AsyncResult) msg.obj;
+                if (ar != null && ar.result != null) {
+                    /*
+                     * ar.result[0] holds ICC REFRESH values
+                     * These results are defined in CommandsInterface
+                     */
+                     int[] IccRefreshResult = (int[]) (ar.result);
+                     handleIccStatusChange(IccRefreshResult[0]);
+                } else {
+                    StkLog.d(this,"Icc REFRESH with exception: " + ar.exception);
+                }
+            } else {
+                StkLog.d(this, "IccRefresh Message is null");
+            }
             break;
         default:
             throw new AssertionError("Unrecognized STK command: " + msg.what);
         }
+    }
+
+    /**
+     ** This function sends a ICC_Status_change notification to STK_APP.
+     ** This is triggered during ICC_REFRESH event.
+     **/
+    private void handleIccStatusChange(int IccRefreshState) {
+        Intent intent = new Intent(AppInterface.STK_ICC_STATUS_CHANGE);
+
+        //This case is when MSG_ID_ICC_REFRESH is received.
+        intent.putExtra("REFRESH_RESULT", IccRefreshState);
+        StkLog.d(this, "Sending STK_ICC_STATUS_CHANGE with Result: "
+                + IccRefreshState);
+
+        mContext.sendBroadcast(intent);
     }
 
     public synchronized void onCmdResponse(StkResponseMessage resMsg) {
@@ -710,21 +737,6 @@ public class StkService extends Handler implements AppInterface {
         }
         return false;
     }
-
-    private  void  handleIccRefreshReset() {
-        CommandDetails cmdDet = new  CommandDetails();
-	    cmdDet.typeOfCommand = AppInterface.CommandType.SET_UP_MENU.value();
-        SelectItemParams cmdParams = new  SelectItemParams(cmdDet,null,false);
-        StkCmdMessage cmdMsg = new StkCmdMessage(cmdParams);
-
-        // Send intent with NULL menu to uninstall STK Main menu.
-        StkLog.d(this, "Sending NULL menu to uninstall STK menu");
-        Intent intent = new Intent(AppInterface.STK_CMD_ACTION);
-        intent.putExtra("STK CMD", cmdMsg);
-        mContext.sendBroadcast(intent);
-    }
-
-
 
     private boolean isSetUpEventResponse(StkResponseMessage resMsg) {
         if (resMsg.cmdDet.typeOfCommand == CommandType.SET_UP_EVENT_LIST.value()) {
