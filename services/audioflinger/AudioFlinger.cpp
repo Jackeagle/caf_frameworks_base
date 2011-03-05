@@ -141,6 +141,9 @@ AudioFlinger::AudioFlinger()
     mLPAOutput = NULL;
     mLPAHandle = -1;
     mLPAStreamIsActive = false;
+    mLPASessionId = -2; // -2 is invalid session ID
+    mIsEffectConfigChanged = false;
+    mLPAEffectChain = NULL;
 
     mAudioHardware = AudioHardwareInterface::create();
 
@@ -388,6 +391,182 @@ Exit:
         *status = lStatus;
     }
     return trackHandle;
+}
+
+void AudioFlinger::createSession(
+        pid_t pid,
+        uint32_t sampleRate,
+        int channelCount,
+        int *sessionId,
+        status_t *status)
+{
+    status_t lStatus = NO_ERROR;
+    {
+        // createSession can be called from same PID (mediaserver process) only
+        if(pid != getpid()){
+            lStatus = BAD_VALUE;
+            goto Exit;
+        }
+        Mutex::Autolock _l(mLock);
+
+        LOGV("createSession() sessionId: %d sampleRate %d channelCount %d",
+             *sessionId, sampleRate, channelCount);
+        if (sessionId != NULL && *sessionId != AudioSystem::SESSION_OUTPUT_MIX) {
+            for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+                sp<PlaybackThread> t = mPlaybackThreads.valueAt(i);
+                // Check if the session ID is already associated with a track
+                uint32_t sessions = t->hasAudioSession(*sessionId);
+                if (sessions & PlaybackThread::TRACK_SESSION) {
+                    LOGE("There is a track already associated with this session %d", *sessionId);
+                    lStatus = BAD_VALUE;
+                    goto Exit;
+                }
+                // check if an effect with same session ID is waiting for a ssession to be created
+                if (sessions & PlaybackThread::EFFECT_SESSION) {
+                    // Clear reference to previous effect chain if any
+                    if(mLPAEffectChain.get()) {
+                        mLPAEffectChain.clear();
+                    }
+                    mLPAEffectChain = t->getEffectChain_l(*sessionId);
+                }
+            }
+            mLPASessionId = *sessionId;
+            LOGV("createSession() lSessionId: %d", mLPASessionId);
+            if (mLPAEffectChain != NULL) {
+                mLPAEffectChain->setLPAFlag(true);
+            } else {
+                LOGW("There was no effectChain created for the sessionId(%d)", mLPASessionId);
+            }
+        } else {
+            if(sessionId != NULL) {
+                LOGE("Error: Invalid sessionID (%d) for LPA playback", *sessionId);
+            }
+        }
+        mLPASampleRate  = sampleRate;
+        mLPANumChannels = channelCount;
+    }
+
+Exit:
+    if(status) {
+        *status = lStatus;
+    }
+}
+
+void AudioFlinger::deleteSession()
+{
+    Mutex::Autolock _l(mLock);
+    LOGV("deleteSession");
+    // -2 is invalid session ID
+    mLPASessionId = -2;
+    if (mLPAEffectChain != NULL) {
+        mLPAEffectChain->setLPAFlag(false);
+        size_t i, numEffects = mLPAEffectChain->getNumEffects();
+        for(i = 0; i < numEffects; i++) {
+            sp<EffectModule> effect = mLPAEffectChain->getEffectFromIndex_l(i);
+            effect->setInBuffer(mLPAEffectChain->inBuffer());
+            if (i == numEffects-1) {
+                effect->setOutBuffer(mLPAEffectChain->outBuffer());
+            } else {
+                effect->setOutBuffer(mLPAEffectChain->inBuffer());
+            }
+            effect->configure();
+        }
+        mLPAEffectChain.clear();
+        mLPAEffectChain = NULL;
+    }
+}
+
+// ToDo: Should we go ahead with this frameCount?
+#define DEAFULT_FRAME_COUNT 1200
+void AudioFlinger::applyEffectsOn(int16_t *inBuffer, int16_t *outBuffer, int size)
+{
+    LOGV("applyEffectsOn: inBuf %p outBuf %p size %d", inBuffer, outBuffer, size);
+    // This might be the first buffer to apply effects after effect config change
+    // should not skip effects processing
+    mIsEffectConfigChanged = false;
+
+    volatile size_t numEffects = 0;
+    if(mLPAEffectChain != NULL) {
+        numEffects = mLPAEffectChain->getNumEffects();
+    }
+
+    if( numEffects > 0) {
+        size_t  i     = 0;
+        int16_t *pIn  = inBuffer;
+        int16_t *pOut = outBuffer;
+
+        int frameCount = size / (sizeof(int16_t) * mLPANumChannels);
+
+        while(frameCount > 0) {
+            if(mLPAEffectChain == NULL) {
+                LOGV("LPA Effect Chain is removed - No effects processing !!");
+                numEffects = 0;
+                break;
+            }
+            mLPAEffectChain->lock();
+
+            numEffects = mLPAEffectChain->getNumEffects();
+            if(!numEffects) {
+                LOGV("applyEffectsOn: All the effects are removed - nothing to process");
+                mLPAEffectChain->unlock();
+                break;
+            }
+
+            int outFrameCount = (frameCount > DEAFULT_FRAME_COUNT ? DEAFULT_FRAME_COUNT: frameCount);
+            bool isEffectEnabled = false;
+            for(i = 0; i < numEffects; i++) {
+                // If effect configuration is changed while applying effects do not process further
+                if(mIsEffectConfigChanged) {
+                    mLPAEffectChain->unlock();
+                    LOGV("applyEffectsOn: mIsEffectConfigChanged is set - no further processing");
+                    return;
+                }
+                sp<EffectModule> effect = mLPAEffectChain->getEffectFromIndex_l(i);
+                if(effect == NULL) {
+                    LOGE("getEffectFromIndex_l(%d) returned NULL ptr", i);
+                    mLPAEffectChain->unlock();
+                    return;
+                }
+                if(i == 0) {
+                    // For the first set input and output buffers different
+                    isEffectEnabled = effect->isProcessEnabled();
+                    effect->setInBuffer(pIn);
+                    effect->setOutBuffer(pOut);
+                } else {
+                    // For the remaining use previous effect's output buffer as input buffer
+                    effect->setInBuffer(pOut);
+                    effect->setOutBuffer(pOut);
+                }
+                // true indicates that it is being applied on LPA output
+                effect->configure(true, mLPASampleRate, mLPANumChannels, outFrameCount);
+            }
+
+            if(isEffectEnabled) {
+                // Clear the output buffer
+                memset(pOut, 0, (outFrameCount * mLPANumChannels * sizeof(int16_t)));
+            } else {
+                // Copy input buffer content to the output buffer
+                memcpy(pOut, pIn, (outFrameCount * mLPANumChannels * sizeof(int16_t)));
+            }
+
+            mLPAEffectChain->process_l();
+
+            mLPAEffectChain->unlock();
+
+            // Update input and output buffer pointers
+            pIn        += (outFrameCount * mLPANumChannels);
+            pOut       += (outFrameCount * mLPANumChannels);
+            frameCount -= outFrameCount;
+        }
+    }
+
+    if (!numEffects) {
+        LOGV("applyEffectsOn: There are no effects to be applied");
+        if(inBuffer != outBuffer) {
+            // No effect applied so just copy input buffer to output buffer
+            memcpy(outBuffer, inBuffer, size);
+        }
+    }
 }
 
 uint32_t AudioFlinger::sampleRate(int output) const
@@ -903,6 +1082,10 @@ void AudioFlinger::removeNotificationClient(sp<IBinder> binder)
 // audioConfigChanged_l() must be called with AudioFlinger::mLock held
 void AudioFlinger::audioConfigChanged_l(int event, int ioHandle, void *param2)
 {
+    LOGV("AudioFlinger::audioConfigChanged_l: event %d", event);
+    if (event == AudioSystem::EFFECT_CONFIG_CHANGED) {
+        mIsEffectConfigChanged = true;
+    }
     size_t size = mNotificationClients.size();
     for (size_t i = 0; i < size; i++) {
         mNotificationClients.valueAt(i)->client()->ioConfigChanged(event, ioHandle, param2);
@@ -1224,6 +1407,7 @@ sp<AudioFlinger::PlaybackThread::Track>  AudioFlinger::PlaybackThread::createTra
     sp<Track> track;
     status_t lStatus;
 
+    LOGV("PlaybackThread::createTrack_l() sessionId %d mType %d", sessionId, mType);
     if (mType == DIRECT) {
         if (sampleRate != mSampleRate || format != mFormat || channelCount != (int)mChannelCount) {
             LOGE("createTrack_l() Bad parameter:  sampleRate %d format %d, channelCount %d for output %p",
@@ -1660,6 +1844,7 @@ bool AudioFlinger::MixerThread::threadLoop()
 
             mixerStatus = prepareTracks_l(activeTracks, &tracksToRemove);
 
+            LOGV("MixerThread:: calling lockEffectChains_l()");
             // prevent any changes in effect chain list and in each effect chain
             // during mixing and effect process as the audio buffers could be deleted
             // or modified if an effect is created or deleted
@@ -1667,6 +1852,7 @@ bool AudioFlinger::MixerThread::threadLoop()
        }
 
         if (LIKELY(mixerStatus == MIXER_TRACKS_READY)) {
+            LOGV("MixerThread:: calling mAudioMixer->process()");
             // mix buffers...
             mAudioMixer->process();
             sleepTime = 0;
@@ -1696,13 +1882,17 @@ bool AudioFlinger::MixerThread::threadLoop()
         // sleepTime == 0 means we must write to audio hardware
         if (sleepTime == 0) {
              for (size_t i = 0; i < effectChains.size(); i ++) {
+                 LOGV("MixerThread:: calling effectChains[%d]->process_l", i);
                  effectChains[i]->process_l();
              }
+             LOGV("MixerThread:: calling unlockEffectChains()");
              // enable changes in effect chain
              unlockEffectChains(effectChains);
 #ifdef LVMX
+            LOGV("MixerThread:: calling LifeVibes::getMixerType()");
             int audioOutputType = LifeVibes::getMixerType(mId, mType);
             if (LifeVibes::audioOutputTypeIsLifeVibes(audioOutputType)) {
+                LOGV("MixerThread:: calling LifeVibes::process()");
                LifeVibes::process(audioOutputType, mMixBuffer, mixBufferSize);
             }
 #endif
@@ -3136,6 +3326,7 @@ status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(AudioBufferProvider:
      uint32_t framesReady;
      uint32_t framesReq = buffer->frameCount;
 
+     LOGV("PlaybackThread::Track::getNextBuffer() mName %d framesReq %d", mName, framesReq);
      // Check if last stepServer failed, try to step now
      if (mFlags & TrackBase::STEPSERVER_FAILED) {
          if (!step())  goto getNextBuffer_exit;
@@ -4942,8 +5133,8 @@ sp<IEffect> AudioFlinger::createEffect(pid_t pid,
     sp<Client> client;
     wp<Client> wclient;
 
-    LOGV("createEffect pid %d, client %p, priority %d, sessionId %d, output %d",
-            pid, effectClient.get(), priority, sessionId, output);
+    LOGV("createEffect %s pid %d, client %p, priority %d, sessionId %d, output %d",
+            pDesc->name, pid, effectClient.get(), priority, sessionId, output);
 
     if (pDesc == NULL) {
         lStatus = BAD_VALUE;
@@ -5248,6 +5439,15 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::PlaybackThread::createEffect_l(
             addEffectChain_l(chain);
             chain->setStrategy(getStrategyForSession_l(sessionId));
             chainCreated = true;
+            if(sessionId == mAudioFlinger->mLPASessionId) {
+                // Clear reference to previous effect chain if any
+                if(mAudioFlinger->mLPAEffectChain.get()) {
+                    mAudioFlinger->mLPAEffectChain.clear();
+                }
+                LOGV("New EffectChain is created for LPA session ID %d", sessionId);
+                mAudioFlinger->mLPAEffectChain = chain;
+                chain->setLPAFlag(true);
+            }
         } else {
             effect = chain->getEffectFromDesc_l(desc);
         }
@@ -5276,6 +5476,11 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::PlaybackThread::createEffect_l(
 
             effect->setDevice(mDevice);
             effect->setMode(mAudioFlinger->getMode());
+
+            if(chain == mAudioFlinger->mLPAEffectChain) {
+                LOGV("New effect is being added to LPA chain, Notifying LPA Player");
+                mAudioFlinger->audioConfigChanged_l(AudioSystem::EFFECT_CONFIG_CHANGED, 0, NULL);
+            }
         }
         // create effect handle and connect it to effect module
         handle = new EffectHandle(effect, client, effectClient, priority);
@@ -5357,6 +5562,10 @@ void AudioFlinger::PlaybackThread::removeEffect_l(const sp<EffectModule>& effect
         // remove effect chain if removing last effect
         if (chain->removeEffect_l(effect) == 0) {
             removeEffectChain_l(chain);
+        }
+        if(chain == mAudioFlinger->mLPAEffectChain) {
+            LOGV("An effect is removed from LPA chain, Notifying LPA Player");
+            mAudioFlinger->audioConfigChanged_l(AudioSystem::EFFECT_CONFIG_CHANGED, 0, NULL);
         }
     } else {
         LOGW("removeEffect_l() %p cannot promote chain for effect %p", this, effect.get());
@@ -5461,7 +5670,10 @@ void AudioFlinger::PlaybackThread::lockEffectChains_l(
 {
     effectChains = mEffectChains;
     for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->lock();
+        // Do not LPA playback track's effect chain
+        if(mEffectChains[i] != mAudioFlinger->mLPAEffectChain) {
+            mEffectChains[i]->lock();
+        }
     }
 }
 
@@ -5469,7 +5681,10 @@ void AudioFlinger::PlaybackThread::unlockEffectChains(
         Vector<sp <AudioFlinger::EffectChain> >& effectChains)
 {
     for (size_t i = 0; i < effectChains.size(); i++) {
-        effectChains[i]->unlock();
+        // LPA playback track's effect chain is not locked - do not unlock
+        if(mEffectChains[i] != mAudioFlinger->mLPAEffectChain) {
+            effectChains[i]->unlock();
+        }
     }
 }
 
@@ -5497,6 +5712,7 @@ status_t AudioFlinger::PlaybackThread::attachAuxEffect_l(
 {
     status_t status = NO_ERROR;
 
+    LOGV("PlaybackThread::attachAuxEffect_l: EffectId %d", EffectId);
     if (EffectId == 0) {
         track->setAuxBuffer(0, NULL);
     } else {
@@ -5538,9 +5754,9 @@ AudioFlinger::EffectModule::EffectModule(const wp<ThreadBase>& wThread,
                                         int id,
                                         int sessionId)
     : mThread(wThread), mChain(chain), mId(id), mSessionId(sessionId), mEffectInterface(NULL),
-      mStatus(NO_INIT), mState(IDLE)
+      mStatus(NO_INIT), mState(IDLE), mIsForLPA(false)
 {
-    LOGV("Constructor %p", this);
+    LOGV("Constructor %p sessionId %d", this, sessionId);
     int lStatus;
     sp<ThreadBase> thread = mThread.promote();
     if (thread == 0) {
@@ -5695,6 +5911,7 @@ void AudioFlinger::EffectModule::process()
 {
     Mutex::Autolock _l(mLock);
 
+    LOGV("EffectModule::process()");
     if (mEffectInterface == NULL ||
             mConfig.inputCfg.buffer.raw == NULL ||
             mConfig.outputCfg.buffer.raw == NULL) {
@@ -5748,9 +5965,14 @@ void AudioFlinger::EffectModule::reset_l()
     (*mEffectInterface)->command(mEffectInterface, EFFECT_CMD_RESET, 0, NULL, 0, NULL);
 }
 
-status_t AudioFlinger::EffectModule::configure()
+status_t AudioFlinger::EffectModule::configure(bool isForLPA, int sampleRate, int channelCount, int frameCount)
 {
     uint32_t channels;
+
+    // Acquire lock here to make sure that any other thread does not delete
+    // the effect handle and release the effect module.
+    Mutex::Autolock _l(mLock);
+
     if (mEffectInterface == NULL) {
         return NO_INIT;
     }
@@ -5761,10 +5983,20 @@ status_t AudioFlinger::EffectModule::configure()
     }
 
     // TODO: handle configuration of effects replacing track process
-    if (thread->channelCount() == 1) {
-        channels = CHANNEL_MONO;
+    mIsForLPA = isForLPA;
+    if(isForLPA) {
+        if (channelCount == 1) {
+            channels = CHANNEL_MONO;
+        } else {
+            channels = CHANNEL_STEREO;
+        }
+        LOGV("%s: LPA ON - channels %d", __func__, channels);
     } else {
-        channels = CHANNEL_STEREO;
+        if (thread->channelCount() == 1) {
+            channels = CHANNEL_MONO;
+        } else {
+            channels = CHANNEL_STEREO;
+        }
     }
 
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
@@ -5775,7 +6007,13 @@ status_t AudioFlinger::EffectModule::configure()
     mConfig.outputCfg.channels = channels;
     mConfig.inputCfg.format = SAMPLE_FORMAT_PCM_S15;
     mConfig.outputCfg.format = SAMPLE_FORMAT_PCM_S15;
-    mConfig.inputCfg.samplingRate = thread->sampleRate();
+    if(isForLPA){
+        mConfig.inputCfg.samplingRate = sampleRate;
+        LOGV("%s: LPA ON - sampleRate %d", __func__, sampleRate);
+    } else {
+        mConfig.inputCfg.samplingRate = thread->sampleRate();
+    }
+
     mConfig.outputCfg.samplingRate = mConfig.inputCfg.samplingRate;
     mConfig.inputCfg.bufferProvider.cookie = NULL;
     mConfig.inputCfg.bufferProvider.getBuffer = NULL;
@@ -5800,7 +6038,12 @@ status_t AudioFlinger::EffectModule::configure()
     }
     mConfig.inputCfg.mask = EFFECT_CONFIG_ALL;
     mConfig.outputCfg.mask = EFFECT_CONFIG_ALL;
-    mConfig.inputCfg.buffer.frameCount = thread->frameCount();
+    if(isForLPA) {
+        mConfig.inputCfg.buffer.frameCount = frameCount;
+        LOGV("%s: LPA ON - frameCount %d", __func__, frameCount);
+    } else {
+        mConfig.inputCfg.buffer.frameCount = thread->frameCount();
+    }
     mConfig.outputCfg.buffer.frameCount = mConfig.inputCfg.buffer.frameCount;
 
     LOGV("configure() %p thread %p buffer %p framecount %d",
@@ -5889,7 +6132,7 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
                                              void *pReplyData)
 {
     Mutex::Autolock _l(mLock);
-//    LOGV("command(), cmdCode: %d, mEffectInterface: %p", cmdCode, mEffectInterface);
+    LOGV("command(), cmdCode: %d, mEffectInterface: %p", cmdCode, mEffectInterface);
 
     if (mEffectInterface == NULL) {
         return NO_INIT;
@@ -6076,7 +6319,12 @@ const uint32_t AudioFlinger::EffectModule::sDeviceConvTable[] = {
     DEVICE_BLUETOOTH_A2DP, //  AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP
     DEVICE_BLUETOOTH_A2DP_HEADPHONES, // AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES
     DEVICE_BLUETOOTH_A2DP_SPEAKER, // AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER
-    DEVICE_AUX_DIGITAL // AudioSystem::DEVICE_OUT_AUX_DIGITAL
+    DEVICE_AUX_DIGITAL, // AudioSystem::DEVICE_OUT_AUX_DIGITAL
+    DEVICE_AUX_HDMI,
+    DEVICE_FM,
+    DEVICE_ANC_HEADSET,
+    DEVICE_ANC_HEADPHONE,
+    DEVICE_FM_TX,
 };
 
 uint32_t AudioFlinger::EffectModule::deviceAudioSystemToEffectApi(uint32_t device)
@@ -6272,8 +6520,8 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
                                              uint32_t *replySize,
                                              void *pReplyData)
 {
-//    LOGV("command(), cmdCode: %d, mHasControl: %d, mEffect: %p",
-//              cmdCode, mHasControl, (mEffect == 0) ? 0 : mEffect.get());
+    LOGV("command(), cmdCode: %d, mHasControl: %d, mEffect: %p",
+              cmdCode, mHasControl, (mEffect == 0) ? 0 : mEffect.get());
 
     // only get parameter command is permitted for applications not controlling the effect
     if (!mHasControl && cmdCode != EFFECT_CMD_GET_PARAM) {
@@ -6311,6 +6559,7 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
             uint32_t psize = sizeof(effect_param_t) +
                              ((param->psize - 1) / sizeof(int) + 1) * sizeof(int) +
                              param->vsize;
+
             status_t ret = mEffect->command(EFFECT_CMD_SET_PARAM,
                                             psize,
                                             p,
@@ -6336,6 +6585,17 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
     } else if (cmdCode == EFFECT_CMD_DISABLE) {
         *(int *)pReplyData = NO_ERROR;
         return disable();
+    }
+
+    LOGV("EffectHandle::command: isOnLPA %d", mEffect->isOnLPA());
+    if(mEffect->isOnLPA() &&
+       ((cmdCode == EFFECT_CMD_SET_PARAM) || (cmdCode == EFFECT_CMD_SET_PARAM_DEFERRED) ||
+        (cmdCode == EFFECT_CMD_SET_PARAM_COMMIT) || (cmdCode == EFFECT_CMD_SET_DEVICE) ||
+        (cmdCode == EFFECT_CMD_SET_VOLUME) || (cmdCode == EFFECT_CMD_SET_AUDIO_MODE)) ) {
+        // Notify LPA Player for the change in Effect module
+        // TODO: check if it is required to send mLPAHandle
+        LOGV("Notifying LPA player for the change in effect config");
+        mClient->audioFlinger()->audioConfigChanged_l(AudioSystem::EFFECT_CONFIG_CHANGED, 0, NULL);
     }
 
     return mEffect->command(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
@@ -6407,13 +6667,15 @@ AudioFlinger::EffectChain::EffectChain(const wp<ThreadBase>& wThread,
                                         int sessionId)
     : mThread(wThread), mSessionId(sessionId), mActiveTrackCnt(0), mOwnInBuffer(false),
             mVolumeCtrlIdx(-1), mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
-            mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX)
+            mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX), mIsForLPATrack(false)
 {
+    LOGV("EffectChain::ctor sessionId %d", sessionId);
     mStrategy = AudioSystem::getStrategyForStream(AudioSystem::MUSIC);
 }
 
 AudioFlinger::EffectChain::~EffectChain()
 {
+    LOGV("EffectChain::dtor mOwnInBuffer %d", mOwnInBuffer);
     if (mOwnInBuffer) {
         delete mInBuffer;
     }
@@ -6451,9 +6713,22 @@ sp<AudioFlinger::EffectModule> AudioFlinger::EffectChain::getEffectFromId_l(int 
     return effect;
 }
 
+sp<AudioFlinger::EffectModule> AudioFlinger::EffectChain::getEffectFromIndex_l(int idx)
+{
+    sp<EffectModule> effect = NULL;
+    if(idx < 0 || idx >= mEffects.size()) {
+        LOGE("EffectChain::getEffectFromIndex_l: invalid index %d", idx);
+    }
+    if(mEffects.size() > 0){
+        effect = mEffects[idx];
+    }
+    return effect;
+}
+
 // Must be called with EffectChain::mLock locked
 void AudioFlinger::EffectChain::process_l()
 {
+    LOGV("EffectChain::process_l()");
     sp<ThreadBase> thread = mThread.promote();
     if (thread == 0) {
         LOGW("process_l(): cannot promote mixer thread");
@@ -6463,14 +6738,16 @@ void AudioFlinger::EffectChain::process_l()
     bool isGlobalSession = (mSessionId == AudioSystem::SESSION_OUTPUT_MIX) ||
             (mSessionId == AudioSystem::SESSION_OUTPUT_STAGE);
     bool tracksOnSession = false;
-    if (!isGlobalSession) {
+    if (!isGlobalSession && !isForLPATrack()) {
         tracksOnSession =
                 playbackThread->hasAudioSession(mSessionId) & PlaybackThread::TRACK_SESSION;
     }
 
     size_t size = mEffects.size();
+    LOGV("process_l(): isGlobalSession %d tracksOnSession %d isForLPA %d numEffects %d",
+         isGlobalSession, tracksOnSession, isForLPATrack(), size);
     // do not process effect if no track is present in same audio session
-    if (isGlobalSession || tracksOnSession) {
+    if (isGlobalSession || tracksOnSession || isForLPATrack()) {
         for (size_t i = 0; i < size; i++) {
             mEffects[i]->process();
         }

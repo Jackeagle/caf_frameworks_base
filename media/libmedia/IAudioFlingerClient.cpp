@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +51,7 @@ public:
             LOGV("ioConfigChanged stream %d", stream);
             data.writeInt32(stream);
         } else if (event != AudioSystem::OUTPUT_CLOSED && event != AudioSystem::INPUT_CLOSED &&
-                   event != AudioSystem::A2DP_OUTPUT_STATE ) {
+                   event != AudioSystem::A2DP_OUTPUT_STATE && event != AudioSystem::EFFECT_CONFIG_CHANGED) {
             AudioSystem::OutputDescriptor *desc = (AudioSystem::OutputDescriptor *)param2;
             data.writeInt32(desc->samplingRate);
             data.writeInt32(desc->format);

@@ -37,6 +37,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <media/stagefright/AudioPlayer.h>
+#include <media/stagefright/LPAPlayer.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
@@ -51,6 +52,8 @@
 #include <cutils/properties.h>
 
 #include <media/stagefright/foundation/ALooper.h>
+
+#include <cutils/properties.h>
 
 namespace android {
 
@@ -830,7 +833,34 @@ status_t AwesomePlayer::play_l() {
     if (mAudioSource != NULL) {
         if (mAudioPlayer == NULL) {
             if (mAudioSink != NULL) {
-                mAudioPlayer = new AudioPlayer(mAudioSink, this);
+                sp<MetaData> format = mAudioTrack->getFormat();
+                const char *mime;
+                bool success = format->findCString(kKeyMIMEType, &mime);
+                CHECK(success);
+
+                int64_t durationUs;
+                success = format->findInt64(kKeyDuration, &durationUs);
+                CHECK(success);
+                LOGV("LPAPlayer::getObjectsAlive() %d",LPAPlayer::objectsAlive);
+
+                char lpaDecode[128];
+                property_get("lpa.decode",lpaDecode,"0");
+                char lpaStagefright[128];
+                property_get("lpa.use-stagefright",lpaStagefright,"0");
+                if(strcmp("true",lpaDecode) == 0 && strcmp("true",lpaStagefright) == 0)
+                {
+                    LOGV("LPAPlayer::getObjectsAlive() %d",LPAPlayer::objectsAlive);
+                    if ( durationUs > 60000000 && !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG) && LPAPlayer::objectsAlive == 0) {
+                        LOGE("LPAPlayer created, LPA MODE detected mime %s duration %d\n", mime, durationUs);
+                        mAudioPlayer = new LPAPlayer(mAudioSink, this);
+                    }
+                }
+                if(mAudioPlayer == NULL) {
+                    LOGE("AudioPlayer created, Non-LPA mode mime %s duration %d\n", mime, durationUs);
+                    mAudioPlayer = new AudioPlayer(mAudioSink, this);
+                }
+
+                LOGV("Setting Audio source");
                 mAudioPlayer->setSource(mAudioSource);
 
                 // If there was a seek request while we were paused
@@ -1098,7 +1128,6 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
     if (!(mFlags & PLAYING)) {
         LOGV("seeking while paused, sending SEEK_COMPLETE notification"
              " immediately.");
-
         notifyListener_l(MEDIA_SEEK_COMPLETE);
         mSeekNotificationSent = true;
     }

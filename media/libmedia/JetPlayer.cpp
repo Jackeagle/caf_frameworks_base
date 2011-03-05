@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,6 +102,8 @@ int JetPlayer::init()
             1, // format = PCM 16bits per sample,
             (pLibConfig->numChannels == 2) ? AudioSystem::CHANNEL_OUT_STEREO : AudioSystem::CHANNEL_OUT_MONO,
             mTrackBufferSize,
+            0,
+            0,
             0);
 
     // create render and playback thread

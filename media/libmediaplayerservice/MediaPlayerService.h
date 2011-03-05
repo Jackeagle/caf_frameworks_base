@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2008, The Android Open Source Project
+** Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -85,7 +86,7 @@ class MediaPlayerService : public BnMediaPlayerService
                 AudioCallback cb, void *cookie);
 
         virtual status_t        openSession(
-                int format, int sessionId);
+                int format, int sessionId, uint32_t sampleRate, int channels);
 
         virtual void            start();
         virtual ssize_t         write(const void* buffer, size_t size);
