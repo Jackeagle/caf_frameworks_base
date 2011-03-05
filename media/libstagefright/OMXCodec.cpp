@@ -4643,10 +4643,10 @@ void OMXCodec::parseFlags(uint32_t flags) {
     mThumbnailMode = ((flags & kEnableThumbnailMode) ? true : false);
 
     { //Deal with the 3D flags
-        //Only one or the other can be set, but it's OK if neither are set (non-3d video)
-        CHECK(!((flags & kForce3DTopDown) && (flags & kForce3DLeftRight)));
-        mForce3D = ((flags & kForce3DTopDown) ? QOMX_3D_TOP_BOTTOM_VIDEO_FLAG : 0);
-        mForce3D = ((flags & kForce3DLeftRight) ? QOMX_3D_LEFT_RIGHT_VIDEO_FLAG : 0);
+        mForce3D |= ((flags & kForce3DTopBottom) ? QOMX_3D_TOP_BOTTOM_VIDEO_FLAG : 0);
+        mForce3D |= ((flags & kForce3DLeftRight) ? QOMX_3D_LEFT_RIGHT_VIDEO_FLAG : 0);
+        mForce3D |= ((flags & kForce3DRightLeft) ? QOMX_3D_RIGHT_LEFT_VIDEO_FLAG : 0);
+        mForce3D |= ((flags & kForce3DBottomTop) ? QOMX_3D_BOTTOM_TOP_VIDEO_FLAG : 0);
     }
 }
 
@@ -4824,16 +4824,30 @@ status_t OMXCodec::processSEIData()
         }
         else
         {
+            bool flip = false;
+            if (arrangementInfo.content_interpretation_type == 2) //LR should be treated as RL
+                flip = true;
+
             if (arrangementInfo.type == 3) //side by side
-                newColorFormat ^= QOMX_3D_LEFT_RIGHT_VIDEO_FLAG;
+            {
+                newColorFormat ^= flip ? QOMX_3D_RIGHT_LEFT_VIDEO_FLAG :
+                                          QOMX_3D_LEFT_RIGHT_VIDEO_FLAG;
+            }
             else if (arrangementInfo.type == 4) //top bottom
+            {
+                //Flipping top-bottom isn't supported on graphics side yet
+                //we'll display what we can without flipping
+                if (flip)
+                    LOGE("flipping top-bottom 3d video not supported, "
+                         "continuing to display as top bottom");
                 newColorFormat ^= QOMX_3D_TOP_BOTTOM_VIDEO_FLAG;
+            }
             else
             {
                 LOGE("This is supposedly a 3d video but the frame arragement [%d] is not supported", (int)arrangementInfo.type);
                 return ERROR_UNSUPPORTED;
             }
-            CODEC_LOGV("This is a 3d video...assuming side by side");
+            CODEC_LOGV("This is a 3d video");
         }
 
         mOutputFormat->setInt32(kKeyColorFormat, newColorFormat);

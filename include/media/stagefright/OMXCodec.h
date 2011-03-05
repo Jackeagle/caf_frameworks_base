@@ -46,8 +46,10 @@ struct OMXCodec : public MediaSource,
         //Qualcomm specific, use higher values
         kEnableGPUComposition    = CREATION_FLAGS_MAX,
         kEnableThumbnailMode     = CREATION_FLAGS_MAX>>1,
-        kForce3DTopDown          = CREATION_FLAGS_MAX>>2,
+        kForce3DTopBottom        = CREATION_FLAGS_MAX>>2,
         kForce3DLeftRight        = CREATION_FLAGS_MAX>>3,
+        kForce3DRightLeft        = CREATION_FLAGS_MAX>>4,
+        kForce3DBottomTop        = CREATION_FLAGS_MAX>>5,
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,

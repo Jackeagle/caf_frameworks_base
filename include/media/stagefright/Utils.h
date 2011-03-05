@@ -30,7 +30,9 @@ static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30
 //Flags that are XORed with colorformats
 static const int QOMX_INTERLACE_FLAG = 0x49283654;
 static const int QOMX_3D_LEFT_RIGHT_VIDEO_FLAG = 0x23784238;
+static const int QOMX_3D_RIGHT_LEFT_VIDEO_FLAG = 0x23784239;
 static const int QOMX_3D_TOP_BOTTOM_VIDEO_FLAG = 0x4678239b;
+static const int QOMX_3D_BOTTOM_TOP_VIDEO_FLAG = 0x4678239c;
 //Compression formats
 static const int QOMX_VIDEO_CodingDivx = 0x7FA30C02;
 static const int QOMX_VIDEO_CodingSpark = 0x7FA30C03;
@@ -61,10 +63,20 @@ static const int QOMX_VIDEO_CodingVp = 0x7FA30C04;
             case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_3D_LEFT_RIGHT_VIDEO_FLAG): \
                  format = QOMX_3D_LEFT_RIGHT_VIDEO_FLAG; \
                  break; \
+            case (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_3D_RIGHT_LEFT_VIDEO_FLAG): \
+            case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_3D_RIGHT_LEFT_VIDEO_FLAG): \
+            case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_3D_RIGHT_LEFT_VIDEO_FLAG): \
+                 format = QOMX_3D_RIGHT_LEFT_VIDEO_FLAG; \
+                 break; \
             case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_3D_TOP_BOTTOM_VIDEO_FLAG): \
             case (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_3D_TOP_BOTTOM_VIDEO_FLAG): \
             case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_3D_TOP_BOTTOM_VIDEO_FLAG): \
                 format = QOMX_3D_TOP_BOTTOM_VIDEO_FLAG; \
+                break; \
+            case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_3D_BOTTOM_TOP_VIDEO_FLAG): \
+            case (OMX_COLOR_FormatYUV420SemiPlanar ^ QOMX_3D_BOTTOM_TOP_VIDEO_FLAG): \
+            case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_3D_BOTTOM_TOP_VIDEO_FLAG): \
+                format = QOMX_3D_BOTTOM_TOP_VIDEO_FLAG; \
                 break; \
             default: \
                 format = 0; \

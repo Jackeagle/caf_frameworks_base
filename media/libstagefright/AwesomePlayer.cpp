@@ -1989,10 +1989,16 @@ status_t AwesomePlayer::resume() {
     switch (format3D)
     {
         case QOMX_3D_TOP_BOTTOM_VIDEO_FLAG:
-            mCodecFlags |= OMXCodec::kForce3DTopDown;
+            mCodecFlags |= OMXCodec::kForce3DTopBottom;
             break;
         case QOMX_3D_LEFT_RIGHT_VIDEO_FLAG:
             mCodecFlags |= OMXCodec::kForce3DLeftRight;
+            break;
+        case QOMX_3D_RIGHT_LEFT_VIDEO_FLAG:
+            mCodecFlags |= OMXCodec::kForce3DRightLeft;
+            break;
+        case QOMX_3D_BOTTOM_TOP_VIDEO_FLAG:
+            mCodecFlags |= OMXCodec::kForce3DBottomTop;
             break;
         default:
             //not a 3D colorformat; move along
