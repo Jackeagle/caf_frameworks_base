@@ -55,6 +55,7 @@ class CommandParamsFactory extends Handler {
     static final int REFRESH_UICC_RESET                     = 0x04;
 
     // Command Qualifier values for PLI command
+    static final int DATETIME_TIMEZONE_SETTING              = 0x03;
     static final int LANGUAGE_SETTING                       = 0x04;
 
     static synchronized CommandParamsFactory getInstance(RilMessageDecoder caller,
@@ -934,6 +935,10 @@ class CommandParamsFactory extends Handler {
             throws ResultException {
         CatLog.d(this, "process ProvideLocalInfo");
         switch (cmdDet.commandQualifier) {
+           case DATETIME_TIMEZONE_SETTING:
+                CatLog.d(this, "PLI [DATETIME_TIMEZONE_SETTING]");
+                mCmdParams = new CommandParams(cmdDet);
+                break;
             case LANGUAGE_SETTING:
                 CatLog.d(this, "PLI [LANGUAGE_SETTING]");
                 mCmdParams = new CommandParams(cmdDet);

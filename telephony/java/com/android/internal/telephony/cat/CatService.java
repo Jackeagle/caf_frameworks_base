@@ -30,6 +30,9 @@ import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccFileHandler;
 import com.android.internal.telephony.UiccApplicationRecords;
 import com.android.internal.telephony.SimRefreshResponse;
+import java.util.TimeZone;
+import java.util.Calendar;
+import android.text.format.Time;
 
 import android.util.Config;
 
@@ -61,6 +64,7 @@ enum ComprehensionTlvTag {
   EVENT_LIST(0x19),
   ICON_ID(0x1e),
   ITEM_ICON_ID_LIST(0x1f),
+  DATETIME_TIMEZONE(0x26),
   IMMEDIATE_RESPONSE(0x2b),
   LANGUAGE(0x2d),
   URL(0x31),
@@ -454,15 +458,20 @@ public class CatService extends Handler implements AppInterface {
                     }
                     break;
                 case PROVIDE_LOCAL_INFORMATION:
-                    if ((cmdDet.commandQualifier == CommandParamsFactory.LANGUAGE_SETTING) &&
-                        (resultCode.value() == ResultCode.OK.value())) {
-                        getPliResponse(buf);
+                    CatLog.d(this,"PLI: QUALIFIER" + cmdDet.commandQualifier);
+                    if (resultCode.value() == ResultCode.OK.value()) {
+                       if (cmdDet.commandQualifier == CommandParamsFactory.LANGUAGE_SETTING ||
+                                 cmdDet.commandQualifier == CommandParamsFactory.DATETIME_TIMEZONE_SETTING) {
+                            getPliResponse(buf, cmdDet.commandQualifier);
+                        }
+                    } else {
+                      CatLog.d(this,"PLI: resultCode" + resultCode.value());
                     }
                     break;
-                default:
+                 default:
                     CatLog.d(this, "encodeOptionalTags() Unsupported Cmd:" + cmdDet.typeOfCommand);
                     break;
-            }
+           }
         } else {
             CatLog.d(this, "encodeOptionalTags() Unsupported Command Type:" + cmdDet.typeOfCommand);
         }
@@ -477,18 +486,126 @@ public class CatService extends Handler implements AppInterface {
         buf.write(cmdInput.duration.timeInterval); // Time Duration
     }
 
-    private void getPliResponse(ByteArrayOutputStream buf) {
+    private void getPliResponse(ByteArrayOutputStream buf, int commandQualifier) {
+        int tag = 0;
+        int tagLen = 0;
+        byte[] tagValues = {0};
+        boolean writeToBuf = false;
 
-        // Locale Language Setting
-        String lang = SystemProperties.get("persist.sys.language");
+        switch (commandQualifier) {
+            case CommandParamsFactory.LANGUAGE_SETTING:
+                // Locale Language Setting
+                String lang = SystemProperties.get("persist.sys.language");
 
-        if (lang != null) {
-            // tag
-            int tag = ComprehensionTlvTag.LANGUAGE.value();
-            buf.write(tag);
-            ResponseData.writeLength(buf, lang.length());
-            buf.write(lang.getBytes(), 0, lang.length());
+                if (lang != null) {
+                    // tag
+                    tag = ComprehensionTlvTag.LANGUAGE.value();
+                    tagLen = lang.length();
+                    tagValues = lang.getBytes();
+                    writeToBuf = true;
+                }
+                break;
+
+            case CommandParamsFactory.DATETIME_TIMEZONE_SETTING:
+                byte[] datetimeAndTZ = getCurrentDateTimeAndTimezone();
+                if (datetimeAndTZ != null) {
+                    tag = ComprehensionTlvTag.DATETIME_TIMEZONE.value();
+                    tagLen = datetimeAndTZ.length;
+                    tagValues = datetimeAndTZ;
+                    writeToBuf = true;
+                }
+                break;
+
+            default:
+                CatLog.d(this, "getPliResponse() Unsupported Cmd Qualifier :" + commandQualifier);
+                break;
         }
+
+        if (writeToBuf) {
+            buf.write(tag);
+            ResponseData.writeLength(buf, tagLen);
+            buf.write(tagValues, 0, tagLen);
+        }
+    }
+
+    private byte[] getCurrentDateTimeAndTimezone() {
+        String mHomeTZ = Time.getCurrentTimezone();
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(mHomeTZ));
+        byte[] ret = new byte[7]; // We have fixed length of 7
+
+        if (null == mHomeTZ || null == calendar) {
+            return null;
+        }
+
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int minute = calendar.get(Calendar.MINUTE);
+        int second = calendar.get(Calendar.SECOND);
+        CatLog.d(this, "Date :: " + year + "/" + month + "/" + day);
+        CatLog.d(this, "Time :: " + hour + ":" + minute + ":" + second);
+
+        long zoneOffset = calendar.get(Calendar.ZONE_OFFSET);
+        long dst = calendar.get(Calendar.DST_OFFSET);
+        CatLog.d(this, "zoneOffset :" + zoneOffset + ": dst :" + dst);
+
+        // Knock out the first two digits for 'YEAR'
+        ret[0] = byteToBCD(year % 100);
+        // need to +1 since its gives zero based value
+        ret[1] = byteToBCD(month + 1);
+        ret[2] = byteToBCD(day);
+        ret[3] = byteToBCD(hour);
+        ret[4] = byteToBCD(minute);
+        ret[5] = byteToBCD(second);
+        if (zoneOffset == 0) {
+            // set FF in terminal response
+            ret[6] = (byte) 0xFF;
+        } else {
+            ret[6] = getTZOffSetByte(zoneOffset, dst);
+            CatLog.d(this, "dst : " + ret[6]);
+        }
+        return ret;
+    }
+
+    private byte byteToBCD(int value) {
+        Integer bcdVal = 0;
+
+        if (value >= 0 && value <= 99) {
+            // Do nothing.. Pass through...
+        } else {
+            CatLog.d(this, "Err: byteToBCD conversion");
+            return 0;
+        }
+
+        bcdVal = ((value / 10) | (value % 10) << 4);
+        return bcdVal.byteValue();
+    }
+
+    private byte getTZOffSetByte(long offSetVal, long dst) {
+        long tzOffset = 0;
+
+        /*
+         * The zone offset obtained is for current offset time
+         * (Calendar.ZONE_OFFSET) only,. So DST correction is not applied to the
+         * zone offset.
+         */
+        offSetVal += dst;
+
+        /*
+         * The 'offSetVal' is in milliseconds. Convert it to hours and compute
+         * offset While sending T.R to UICC, offset is expressed is 'quaters of
+         * hours'
+         */
+
+        tzOffset = offSetVal / (15 * 60 * 1000);
+
+        if (tzOffset < 0) {
+            tzOffset *= -1;
+            // For negative offsets, put '1' in the msb
+            tzOffset |= 0x08;
+        }
+        return byteToBCD((int) tzOffset);
     }
 
     private void sendMenuSelection(int menuId, boolean helpRequired) {
