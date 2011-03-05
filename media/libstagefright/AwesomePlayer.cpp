@@ -37,6 +37,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <media/stagefright/AudioPlayer.h>
+#include <media/stagefright/LPAPlayer.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
@@ -830,7 +831,24 @@ status_t AwesomePlayer::play_l() {
     if (mAudioSource != NULL) {
         if (mAudioPlayer == NULL) {
             if (mAudioSink != NULL) {
-                mAudioPlayer = new AudioPlayer(mAudioSink, this);
+                sp<MetaData> format = mAudioTrack->getFormat();
+                const char *mime;
+                bool success = format->findCString(kKeyMIMEType, &mime);
+                CHECK(success);
+
+                int64_t durationUs;
+                success = format->findInt64(kKeyDuration, &durationUs);
+                CHECK(success);
+                LOGV("LPAPlayer::getObjectsAlive() %d",LPAPlayer::objectsAlive);
+                if ( durationUs > 60000000 && !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG) && LPAPlayer::objectsAlive == 0) {
+                    LOGE("LPAPlayer created, LPA MODE detected mime %s duration %d\n", mime, durationUs);
+                    mAudioPlayer = new LPAPlayer(mAudioSink, this);
+                }
+                else {
+                    LOGE("AudioPlayer created, Non-LPA mode mime %s duration %d\n", mime, durationUs);
+                    mAudioPlayer = new AudioPlayer(mAudioSink, this);
+                }
+			    LOGV("Setting Audio source");
                 mAudioPlayer->setSource(mAudioSource);
 
                 // If there was a seek request while we were paused

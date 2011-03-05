@@ -20,7 +20,8 @@ LOCAL_SRC_FILES:=                         \
         FileSource.cpp                    \
         HTTPStream.cpp                    \
         JPEGSource.cpp                    \
-        MP3Extractor.cpp                  \
+	LPAPlayer.cpp                     \
+	MP3Extractor.cpp                  \
         MPEG2TSWriter.cpp                 \
         MPEG4Extractor.cpp                \
         MPEG4Writer.cpp                   \
@@ -55,6 +56,7 @@ LOCAL_SRC_FILES:=                         \
 LOCAL_C_INCLUDES:= \
         $(JNI_H_INCLUDE) \
         $(TOP)/frameworks/base/include/media/stagefright/openmax \
+        $(TOP)/frameworks/base/include/media/stagefright \
         $(TOP)/external/tremolo \
         $(TOP)/frameworks/base/media/libstagefright/rtsp \
         $(TOP)/vendor/qcom/opensource/omx/mm-core/omxcore/inc \
