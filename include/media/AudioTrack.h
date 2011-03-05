@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,9 +178,12 @@ public:
      */
 
                         AudioTrack( int streamType,
+                                    uint32_t sampleRate = 0,
                                     int format          = 0,
+                                    int channels        = 0,
                                     uint32_t flags      = 0,
-                                    int sessionId       = -1);
+                                    int sessionId       = 0,
+                                    int lpaSessionId    =-1);
 
     /* Terminates the AudioTrack and unregisters it from AudioFlinger.
      * Also destroys all resources assotiated with the AudioTrack.
@@ -215,9 +219,12 @@ public:
      *  - NO_INIT: audio server or audio hardware not initialized
      * */
             status_t    set(int streamType      =-1,
+                            uint32_t sampleRate = 0,
                             int format          = 0,
+                            int channels        = 0,
                             uint32_t flags      = 0,
-                            int sessionId       =-1);
+                            int sessionId       = 0,
+                            int lpaSessionId    =-1);
 
 
     /* Result of constructing the AudioTrack. This must be checked

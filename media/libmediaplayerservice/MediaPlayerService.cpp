@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2008, The Android Open Source Project
+** Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -18,6 +19,8 @@
 // Proxy for media player implementations
 
 //#define LOG_NDEBUG 0
+//#define LOG_NIDEBUG 0
+#define LOG_NDDEBUG 0
 #define LOG_TAG "MediaPlayerService"
 #include <utils/Log.h>
 
@@ -1426,7 +1429,7 @@ status_t MediaPlayerService::AudioOutput::getPosition(uint32_t *position)
 }
 
 status_t MediaPlayerService::AudioOutput::openSession(
-        int format, int sessionId)
+        int format, int lpaSessionId, uint32_t sampleRate, int channels)
 {
     uint32_t flags = 0;
     mCallback = NULL;
@@ -1438,9 +1441,12 @@ status_t MediaPlayerService::AudioOutput::openSession(
 
     AudioTrack *t = new AudioTrack(
                 mStreamType,
+                sampleRate,
                 format,
+                channels,
                 flags,
-                sessionId);
+                mSessionId,
+                lpaSessionId);
     LOGV("openSession: AudioTrack created successfully track(%p)",t);
     if ((t == 0) || (t->initCheck() != NO_ERROR)) {
         LOGE("Unable to create audio track");
