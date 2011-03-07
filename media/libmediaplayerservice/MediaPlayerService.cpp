@@ -682,12 +682,12 @@ static player_type getDefaultPlayerType(const char *url) {
     if (property_get("media.stagefright.enable-player", value, "0")
         && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
         if (PVPlayer::usePVPlayer(url)==OK) {
-            LOGV("usePVPlayer: asking for PVPlayer to play qcelp, evrc, or file with LPA implementation");
+            LOGV("usePVPlayer: asking for PVPlayer to play file with LPA implementation");
             LOGI("Returning PV_PLAYER*************************");
             return PV_PLAYER;
         }
         else {
-            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, or file with LPA implementation");
+            LOGV("usePVPlayer: did not detect file to be with LPA implementation");
             LOGI("The Default player that is returned is STAGEFRIGHT**************");
             return STAGEFRIGHT_PLAYER;
         }
@@ -702,12 +702,12 @@ static player_type getDefaultPlayerType(int fd, int64_t offset, int64_t length) 
     if (property_get("media.stagefright.enable-player", value, "0")
         && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
         if (PVPlayer::usePVPlayer(fd,offset,length)==OK) {
-            LOGV("usePVPlayer: asking for PVPlayer to play qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGV("usePVPlayer: asking for PVPlayer to play file with LPA implementation");
             LOGI("Returning PV_PLAYER*************************");
             return PV_PLAYER;
         }
         else {
-            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, or file with LPA implementation");
+            LOGV("usePVPlayer: did not detect file to be with LPA implementation");
             LOGI("The Default player that is returned is STAGEFRIGHT**************");
             return STAGEFRIGHT_PLAYER;
         }

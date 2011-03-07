@@ -214,6 +214,10 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_WMA, "OMX.qcom.audio.decoder.wma"},
     { MEDIA_MIMETYPE_AUDIO_WMA, "OMX.qcom.audio.decoder.wma10Pro"},
     { MEDIA_MIMETYPE_VIDEO_WMV, "OMX.qcom.video.decoder.vc1"},
+    { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13Hw"},
+    { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13"},
+    { MEDIA_MIMETYPE_AUDIO_EVRC, "OMX.qcom.audio.decoder.evrchw" },
+    { MEDIA_MIMETYPE_AUDIO_EVRC, "OMX.qcom.audio.decoder.evrc" },
 };
 
 static const CodecInfo kEncoderInfo[] = {
@@ -1993,9 +1997,9 @@ void OMXCodec::setComponentRole(
         { MEDIA_MIMETYPE_AUDIO_AAC,
             "audio_decoder.aac", "audio_encoder.aac" },
         { MEDIA_MIMETYPE_AUDIO_EVRC,
-            "audio_encoder.evrc", NULL },
+            "audio_decoder.evrchw", "audio_encoder.evrc" },
         { MEDIA_MIMETYPE_AUDIO_QCELP,
-            "audio_encoder.qcelp13", NULL },
+            "audio_decoder,qcelp13Hw", "audio_encoder.qcelp13" },
         { MEDIA_MIMETYPE_VIDEO_AVC,
             "video_decoder.avc", "video_encoder.avc" },
         { MEDIA_MIMETYPE_VIDEO_MPEG4,
@@ -4998,9 +5002,9 @@ status_t OMXCodec::sendEOSToOMXComponent( ) {
 }
 
 void OMXCodec::setEVRCFormat(int32_t numChannels, int32_t sampleRate, int32_t bitRate) {
-    CHECK(numChannels == 1);
-    CHECK(mIsEncoder == true );
+
     if (mIsEncoder) {
+        CHECK(numChannels == 1);
         //////////////// input port ////////////////////
         setRawAudioFormat(kPortIndexInput, sampleRate, numChannels);
         //////////////// output port ////////////////////
@@ -5043,14 +5047,16 @@ void OMXCodec::setEVRCFormat(int32_t numChannels, int32_t sampleRate, int32_t bi
         CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamAudioEvrc,
                 &profile, sizeof(profile)), OK);
     }
+    else
+    {
+       LOGI("EVRC Decoder");
+    }
 }
 
 void OMXCodec::setQCELPFormat(int32_t numChannels, int32_t sampleRate, int32_t bitRate) {
 
-    CHECK(numChannels == 1);
-    CHECK(mIsEncoder == true );
-
     if (mIsEncoder) {
+        CHECK(numChannels == 1);
         //////////////// input port ////////////////////
         setRawAudioFormat(kPortIndexInput, sampleRate, numChannels);
         //////////////// output port ////////////////////
@@ -5092,6 +5098,10 @@ void OMXCodec::setQCELPFormat(int32_t numChannels, int32_t sampleRate, int32_t b
         profile.nChannels = numChannels;
         CHECK_EQ(mOMX->setParameter(mNode, OMX_IndexParamAudioQcelp13,
                 &profile, sizeof(profile)), OK);
+    }
+    else
+    {
+       LOGI("QCELP Decoder");
     }
 }
 
