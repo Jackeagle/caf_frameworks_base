@@ -172,7 +172,9 @@ status_t HTTPStream::receive_line(char *line, size_t size) {
         char c;
         ssize_t n = recv(mSocket, &c, 1, 0);
         if (n < 0) {
-            if (errno == EINTR) {
+            if ((errno == EINTR)|| (errno == EAGAIN)) {
+		LOGV("recv failed attempting again");
+		sleep(100);
                 continue;
             }
 
