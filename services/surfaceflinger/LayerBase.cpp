@@ -53,6 +53,10 @@ LayerBase::LayerBase(SurfaceFlinger* flinger, DisplayID display)
       mPremultipliedAlpha(true), mName("unnamed"), mDebug(false),
       mInvalidate(0),
       mOverlayUsed(false)
+#ifdef AVOID_DRAW_TEXTURE
+      ,mTransformed(false)
+#endif
+
 {
     const DisplayHardware& hw(flinger->graphicPlane(0).displayHardware());
     mFlags = hw.getFlags();
@@ -260,6 +264,9 @@ void LayerBase::validateVisibility(const Transform& planeTransform)
     // cache a few things...
     mOrientation = tr.getOrientation();
     mTransformedBounds = tr.makeBounds(w, h);
+#ifdef AVOID_DRAW_TEXTURE
+    mTransformed = transformed;
+#endif
     mLeft = tr.tx();
     mTop  = tr.ty();
 }
