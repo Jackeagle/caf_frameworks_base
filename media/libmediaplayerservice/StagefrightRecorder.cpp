@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2010-2011 Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1151,7 +1152,7 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
 
     sp<MetaData> meta = cameraSource->getFormat();
 
-    int32_t width, height, stride, sliceHeight, colorFormat;
+    int32_t width, height, stride, sliceHeight, colorFormat, is3D;
     CHECK(meta->findInt32(kKeyWidth, &width));
     CHECK(meta->findInt32(kKeyHeight, &height));
     CHECK(meta->findInt32(kKeyStride, &stride));
@@ -1228,6 +1229,9 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
     }
     if (mVideoEncoderLevel != -1) {
         enc_meta->setInt32(kKeyVideoLevel, mVideoEncoderLevel);
+    }
+    if (meta->findInt32(kKey3D, &is3D)) {
+        enc_meta->setInt32(kKey3D, is3D);
     }
 
     OMXClient client;

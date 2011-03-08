@@ -166,6 +166,11 @@ CameraSource::CameraSource(const sp<Camera> &camera)
     CHECK(colorFormatStr != NULL);
     int32_t colorFormat = getColorFormat(colorFormatStr);
 
+    const char * k3dFrameArrangement = "3d-frame-format";
+    const char * arrangement = params.get(k3dFrameArrangement);
+    // XXX: just assume left/right for now since that's all the camera supports
+    bool want3D = (arrangement != NULL && !strcmp("left-right", arrangement));
+
     // XXX: query camera for the stride and slice height
     // when the capability becomes available.
     stride = width;
@@ -179,6 +184,9 @@ CameraSource::CameraSource(const sp<Camera> &camera)
     mMeta->setInt32(kKeyStride, stride);
     mMeta->setInt32(kKeySliceHeight, sliceHeight);
 
+    if (want3D || true) {
+        mMeta->setInt32(kKey3D, !0);
+    }
 }
 
 CameraSource::~CameraSource() {
