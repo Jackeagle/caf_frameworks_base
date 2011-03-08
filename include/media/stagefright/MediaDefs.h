@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+/*
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+*/
 #ifndef MEDIA_DEFS_H_
 
 #define MEDIA_DEFS_H_
@@ -47,6 +49,7 @@ extern const char *MEDIA_MIMETYPE_CONTAINER_MATROSKA;
 extern const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS;
 extern const char *MEDIA_MIMETYPE_CONTAINER_AVI;
 extern const char *MEDIA_MIMETYPE_CONTAINER_ASF;
+extern const char *MEDIA_MIMETYPE_CONTAINER_AAC;
 extern const char *MEDIA_MIMETYPE_VIDEO_DIVX;
 extern const char *MEDIA_MIMETYPE_VIDEO_DIVX311;
 extern const char *MEDIA_MIMETYPE_AUDIO_AC3;

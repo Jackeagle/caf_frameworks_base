@@ -14,6 +14,9 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+/*
+** Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+*/
 
 // Proxy for media player implementations
 
@@ -197,6 +200,7 @@ extmap FILE_EXTS [] =  {
         {".rtttl", SONIVOX_PLAYER},
         {".rtx", SONIVOX_PLAYER},
         {".ota", SONIVOX_PLAYER},
+        {".aac", STAGEFRIGHT_PLAYER},
 #ifndef NO_OPENCORE
         {".3g2", PV_PLAYER},
 #endif
@@ -678,12 +682,12 @@ static player_type getDefaultPlayerType(const char *url) {
     if (property_get("media.stagefright.enable-player", value, "0")
         && (!strcmp(value, "1") || !strcasecmp(value, "true"))) {
         if (PVPlayer::usePVPlayer(url)==OK) {
-            LOGV("usePVPlayer: asking for PVPlayer to play qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGV("usePVPlayer: asking for PVPlayer to play qcelp, evrc, or file with LPA implementation");
             LOGI("Returning PV_PLAYER*************************");
             return PV_PLAYER;
         }
         else {
-            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, or file with LPA implementation");
             LOGI("The Default player that is returned is STAGEFRIGHT**************");
             return STAGEFRIGHT_PLAYER;
         }
@@ -703,7 +707,7 @@ static player_type getDefaultPlayerType(int fd, int64_t offset, int64_t length) 
             return PV_PLAYER;
         }
         else {
-            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, raw aac, or file with LPA implementation");
+            LOGV("usePVPlayer: did not detect file to be qcelp, evrc, or file with LPA implementation");
             LOGI("The Default player that is returned is STAGEFRIGHT**************");
             return STAGEFRIGHT_PLAYER;
         }
