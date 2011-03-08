@@ -201,6 +201,7 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_VORBIS, "VorbisDecoder" },
     { MEDIA_MIMETYPE_VIDEO_VPX, "VPXDecoder" },
     { MEDIA_MIMETYPE_VIDEO_DIVX, "OMX.qcom.video.decoder.divx"},
+//    { MEDIA_MIMETYPE_VIDEO_DIVX311, "OMX.qcom.video.decoder.divx311"},
     { MEDIA_MIMETYPE_AUDIO_AC3, "OMX.qcom.audio.decoder.ac3" },
     { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
     { MEDIA_MIMETYPE_VIDEO_VP6,"OMX.qcom.video.decoder.vp"},
@@ -741,8 +742,8 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         CHECK(meta->findInt32(kKeyDivXVersion,&DivxVersion));
         CODEC_LOGV("Divx Version Type %d\n",DivxVersion);
 
-        if(DivxVersion == kTypeDivXVer_3_11 ){
-            paramDivX.eFormat = QOMX_VIDEO_DIVXFormat311;
+        if(DivxVersion == kTypeDivXVer_3_11) {
+            CHECK(!"Mime type is wrong for divx311");
         } else if(DivxVersion == kTypeDivXVer_4) {
             paramDivX.eFormat = QOMX_VIDEO_DIVXFormat4;
         } else if(DivxVersion == kTypeDivXVer_5) {
@@ -758,7 +759,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         status_t err =  mOMX->setParameter(mNode,
                          (OMX_INDEXTYPE)OMX_QcomIndexParamVideoDivx,
                          &paramDivX, sizeof(paramDivX));
-        if(err!=OK) {
+        if (err!=OK) {
             return err;
         }
     }
@@ -1679,7 +1680,7 @@ status_t OMXCodec::setVideoOutputFormat(
     } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime)) {
         compressionFormat = (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
     } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mime)) {
-    compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingSpark;
+        compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingSpark;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_VP6, mime)) {
         compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingVp;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mime)){
