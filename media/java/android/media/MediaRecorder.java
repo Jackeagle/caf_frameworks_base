@@ -167,8 +167,8 @@ public class MediaRecorder
          * is available.
          */
         public static final int VOICE_COMMUNICATION = 7;
-        public static final int FM_RX = 8;
-        public static final int FM_RX_A2DP = 9;
+        public static final int FM_RX = 1000;
+        public static final int FM_RX_A2DP = 1001;
     }
 
     /**
@@ -221,9 +221,9 @@ public class MediaRecorder
         public static final int OUTPUT_FORMAT_MPEG2TS = 8;
 
         /** QCP file format */
-        public static final int QCP = 9;
+        public static final int QCP = 1000;
         /** 3GPP2 media file format*/
-        public static final int THREE_GPP2 = 10;
+        public static final int THREE_GPP2 = 1001;
     };
 
     /**
@@ -247,9 +247,9 @@ public class MediaRecorder
         /** enhanced AAC plus audio codec */
         public static final int EAAC_PLUS = 5;
         /** EVRC audio codec */
-        public static final int EVRC = 6;
+        public static final int EVRC = 1000;
         /** QCELP audio codec */
-        public static final int QCELP =7;
+        public static final int QCELP =1001;
     }
 
     /**
