@@ -7878,6 +7878,19 @@ public class WebView extends AbsoluteLayout
        nativeUpdateCachedTextfield(updatedText, mTextGeneration);
     }
 
+    //smooth rotate : Listener class to catch start and end of smooth rotate animation.
+    private class SmoothRotateAnimationListener implements Animation.AnimationListener {
+
+        public void onAnimationStart(Animation animation) {
+            mWebViewCore.sendMessage(EventHub.HIDE_PLUGINS_DURING_SMOOTH_ROTATE);
+        }
+        public void onAnimationEnd(Animation animation) {
+            mWebViewCore.sendMessage(EventHub.SHOW_PLUGINS_AFTER_SMOOTH_ROTATE);
+        }
+        public void onAnimationRepeat(Animation animation) {
+        }
+    }
+
     protected void onConfigurationChanged (Configuration newConfig) {
 
          super.onConfigurationChanged(newConfig);
@@ -7910,6 +7923,7 @@ public class WebView extends AbsoluteLayout
              anim.setFillEnabled(true);
              anim.initialize(preRotateWidth,preRotateHeight,preRotateWidth,preRotateHeight);
              anim.setInterpolator(interp);
+             anim.setAnimationListener(new SmoothRotateAnimationListener());
              ViewParent parent = getParent();
              // Find the parent view so that, if it is a View class (it can be ViewRoot class), then it's
              // preferable to start the animation on the parent because the parent View can cache its children

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-11, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -887,6 +887,10 @@ final class WebViewCore {
         static final int ADD_PACKAGE_NAME = 185;
         static final int REMOVE_PACKAGE_NAME = 186;
 
+        // Messages for smooth rotate feature
+        static final int HIDE_PLUGINS_DURING_SMOOTH_ROTATE = 187;
+        static final int SHOW_PLUGINS_AFTER_SMOOTH_ROTATE = 188;
+
         // private message ids
         private static final int DESTROY =     200;
 
@@ -1310,6 +1314,14 @@ final class WebViewCore {
 
                         case SET_JS_FLAGS:
                             nativeSetJsFlags((String)msg.obj);
+                            break;
+
+                        case HIDE_PLUGINS_DURING_SMOOTH_ROTATE:
+                            nativeHidePluginsDuringSmoothRotate();
+                            break;
+
+                        case SHOW_PLUGINS_AFTER_SMOOTH_ROTATE:
+                            nativeShowPluginsAfterSmoothRotate();
                             break;
 
                         case GEOLOCATION_PERMISSIONS_PROVIDE:
@@ -2527,6 +2539,8 @@ final class WebViewCore {
     private native void nativeResume();
     private native void nativeFreeMemory();
     private native void nativeFullScreenPluginHidden(int npp);
+    private native void nativeShowPluginsAfterSmoothRotate();
+    private native void nativeHidePluginsDuringSmoothRotate();
     private native boolean nativeValidNodeAndBounds(int frame, int node,
             Rect bounds);
 
