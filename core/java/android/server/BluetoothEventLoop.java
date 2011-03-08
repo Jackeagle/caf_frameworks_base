@@ -527,6 +527,14 @@ class BluetoothEventLoop {
                 // some cases. For now, just don't move to incoming state in this case.
                 if (!BluetoothUuid.isAvrcpTarget(uuid)) {
                     mBluetoothService.notifyIncomingA2dpConnection(address);
+                } else {
+                // The below change will make sure A2DP connection is
+                // established. If the remote device sends AVRCP connection
+                // first DUT will accept the AVRCP connection and initiates
+                // A2DP connection from handset.
+                    Log.d(TAG,"AVRCP target connection");
+                    mBluetoothService.notifyConnectA2dp(address);
+                    return true;
                 }
             } else {
                 Log.i(TAG, "Rejecting incoming A2DP / AVRCP connection from " + address);

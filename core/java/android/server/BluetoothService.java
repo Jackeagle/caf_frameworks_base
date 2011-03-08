@@ -2203,6 +2203,19 @@ public class BluetoothService extends IBluetooth.Stub {
         }
     }
 
+    public boolean notifyConnectA2dp(String address) {
+        BluetoothDeviceProfileState state =
+             mDeviceProfileState.get(address);
+        if (state != null) {
+            Message msg = new Message();
+            msg.what = BluetoothDeviceProfileState.CONNECT_OTHER_PROFILES;
+            msg.arg1 = BluetoothDeviceProfileState.CONNECT_A2DP_OUTGOING;
+            state.sendMessage(msg);
+            return true;
+        }
+        return false;
+    }
+
     public boolean notifyIncomingConnection(String address) {
         BluetoothDeviceProfileState state =
              mDeviceProfileState.get(address);
