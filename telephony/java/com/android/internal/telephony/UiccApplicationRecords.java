@@ -184,20 +184,6 @@ public abstract class UiccApplicationRecords extends Handler{
         recordsLoadedRegistrants.remove(h);
     }
 
-    /** Register for IccRefresh */
-    public void registerForIccRefreshReset(Handler h, int what, Object obj) {
-        Registrant r = new Registrant(h, what, obj);
-        mIccRefreshRegistrants.add(r);
-    }
-
-    public void unregisterForIccRefreshReset(Handler h) {
-        mIccRefreshRegistrants.remove(h);
-    }
-
-    public void onIccRefreshReset() {
-        mIccRefreshRegistrants.notifyRegistrants();
-    }
-
     public String getMsisdnNumber() {
         return msisdn;
     }
