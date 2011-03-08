@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
  *
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -268,6 +268,7 @@ public class AudioService extends IAudioService.Stub {
 
     // Bluetooth headset connection state
     private boolean mBluetoothHeadsetConnected;
+    private PhoneStateListener[] mPhoneStateListener;
 
     ///////////////////////////////////////////////////////////////////////////
     // Construction
@@ -326,10 +327,16 @@ public class AudioService extends IAudioService.Stub {
         intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
         context.registerReceiver(mMediaButtonReceiver, intentFilter);
 
+        int numPhones = TelephonyManager.getPhoneCount();
+        mPhoneStateListener = new PhoneStateListener[numPhones];
         // Register for phone state monitoring
         TelephonyManager tmgr = (TelephonyManager)
                 context.getSystemService(Context.TELEPHONY_SERVICE);
-        tmgr.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+        for (int i=0; i < numPhones; i++) {
+             mPhoneStateListener[i] = getPhoneStateListener(i);
+             // register for phone state notifications.
+             tmgr.listen(mPhoneStateListener[i], PhoneStateListener.LISTEN_CALL_STATE);
+       }
     }
 
     private void createAudioSystemThread() {
@@ -2095,39 +2102,42 @@ public class AudioService extends IAudioService.Stub {
 
     private final static Object mRingingLock = new Object();
 
-    private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
-        @Override
-        public void onCallStateChanged(int state, String incomingNumber) {
-            if (state == TelephonyManager.CALL_STATE_RINGING) {
-                //Log.v(TAG, " CALL_STATE_RINGING");
-                synchronized(mRingingLock) {
-                    mIsRinging = true;
-                }
-                int ringVolume = AudioService.this.getStreamVolume(AudioManager.STREAM_RING);
-                if (ringVolume > 0) {
+    private PhoneStateListener getPhoneStateListener(int subscription) {
+        PhoneStateListener phoneStateListener = new PhoneStateListener(subscription) {
+            @Override
+            public void onCallStateChanged(int state, String incomingNumber) {
+                if (state == TelephonyManager.CALL_STATE_RINGING) {
+                    //Log.v(TAG, " CALL_STATE_RINGING");
+                    synchronized(mRingingLock) {
+                        mIsRinging = true;
+                    }
+                    int ringVolume = AudioService.this.getStreamVolume(AudioManager.STREAM_RING);
+                    if (ringVolume > 0) {
+                        requestAudioFocus(AudioManager.STREAM_RING,
+                                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
+                                    null, null /* both allowed to be null only for this clientId */,
+                                    IN_VOICE_COMM_FOCUS_ID /*clientId*/);
+                    }
+                } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                    //Log.v(TAG, " CALL_STATE_OFFHOOK");
+                    synchronized(mRingingLock) {
+                        mIsRinging = false;
+                    }
                     requestAudioFocus(AudioManager.STREAM_RING,
-                                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
-                                null, null /* both allowed to be null only for this clientId */,
-                                IN_VOICE_COMM_FOCUS_ID /*clientId*/);
+                            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
+                            null, null /* both allowed to be null only for this clientId */,
+                            IN_VOICE_COMM_FOCUS_ID /*clientId*/);
+                } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+                    //Log.v(TAG, " CALL_STATE_IDLE");
+                    synchronized(mRingingLock) {
+                        mIsRinging = false;
+                    }
+                    abandonAudioFocus(null, IN_VOICE_COMM_FOCUS_ID, null);
                 }
-            } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
-                //Log.v(TAG, " CALL_STATE_OFFHOOK");
-                synchronized(mRingingLock) {
-                    mIsRinging = false;
-                }
-                requestAudioFocus(AudioManager.STREAM_RING,
-                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
-                        null, null /* both allowed to be null only for this clientId */,
-                        IN_VOICE_COMM_FOCUS_ID /*clientId*/);
-            } else if (state == TelephonyManager.CALL_STATE_IDLE) {
-                //Log.v(TAG, " CALL_STATE_IDLE");
-                synchronized(mRingingLock) {
-                    mIsRinging = false;
-                }
-                abandonAudioFocus(null, IN_VOICE_COMM_FOCUS_ID, null);
             }
-        }
-    };
+        };
+        return phoneStateListener;
+    }
 
     private void notifyTopOfAudioFocusStack() {
         // notify the top of the stack it gained focus
