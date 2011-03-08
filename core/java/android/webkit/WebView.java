@@ -321,6 +321,8 @@ public class WebView extends AbsoluteLayout
     // true means redraw the screen all-the-time. Only with AUTO_REDRAW_HACK
     private boolean mAutoRedraw;
 
+    private AddressCacheMonitor mAddressCacheMonitor;
+
     static final String LOGTAG = "webview";
 
     private final float TO_DEGREES = 0.0f;
@@ -1005,6 +1007,7 @@ public class WebView extends AbsoluteLayout
         int orientation = display.getRotation();
         mOrientation = orientation * 90;
 
+        mAddressCacheMonitor = AddressCacheMonitor.getAddressCacheMonitor(context);
     }
 
     void updateMultiTouchSupport(Context context) {
