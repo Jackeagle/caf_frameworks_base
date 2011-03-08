@@ -283,7 +283,9 @@ static bool copybit(GLint x, GLint y,
                 c->currentColorClamped.b == c->currentColorClamped.a) {
                 // TODO: RGBA source, color={1,1,1,a} / regular-blending
                 // is equivalent
+#ifndef DISABLE_ALPHA_PLANE_WORKAROUND
                 alphaPlaneWorkaround = true;
+#endif
                 break;
             }
         }
