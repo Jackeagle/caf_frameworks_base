@@ -3268,11 +3268,9 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         SimRefreshResponse response = new SimRefreshResponse();
 
         response.refreshResult = SimRefreshResponse.refreshResultFromRIL(p.readInt());
-        response.slot   = p.readInt();
         response.aidPtr = p.readString();
         response.efId   = p.readInt();
 
-        Log.d(LOG_TAG, "responseSimRefresh response for slot" + response.slot);
         return response;
     }
 

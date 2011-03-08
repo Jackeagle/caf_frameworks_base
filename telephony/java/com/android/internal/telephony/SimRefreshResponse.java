@@ -29,8 +29,6 @@
   */
 package com.android.internal.telephony;
 
-import android.util.Log;
-
 /**
  * See also RIL_SimRefresh in include/telephony/ril.h
  *
@@ -46,7 +44,6 @@ public class SimRefreshResponse {
     }
 
     public Result          refreshResult;      /* Sim Refresh result */
-    public int             slot;               /* slot numbers 0, 1, ... etc. */
     public String          aidPtr;             /* null terminated string, e.g., from 0xA0, 0x00
                                                   0x41, 0x30*/
     public int             efId;               /* EFID */
@@ -63,4 +60,7 @@ public class SimRefreshResponse {
         }
     }
 
+    public String toString() {
+        return "{" + refreshResult + ", " + aidPtr +", " + efId + "}";
+    }
 }
