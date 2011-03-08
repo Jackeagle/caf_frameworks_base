@@ -3591,14 +3591,14 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
                       formattag, advencopt1, advencopt2, VirtualPktSize);
         }
 
-        status_t err;
+        status_t err = OK;
         OMX_INDEXTYPE index;
         if(version==kTypeWMA) {
-           status_t err = mOMX->getParameter(
+           err = mOMX->getParameter(
                    mNode, OMX_IndexParamAudioWma, &paramWMA, sizeof(paramWMA));
         } else if(version==kTypeWMAPro || version==kTypeWMAProPlus) {
            mOMX->getExtensionIndex(mNode,"OMX.Qualcomm.index.audio.wma10Pro",&index);
-           status_t err = mOMX->getParameter(
+           err = mOMX->getParameter(
                    mNode, index, &paramWMA10, sizeof(paramWMA10));
         }
         CHECK_EQ(err, OK);
