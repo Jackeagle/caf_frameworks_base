@@ -74,7 +74,12 @@ AudioSource::AudioSource(
                      AudioRecord::RECORD_NS_ENABLE  |
                      AudioRecord::RECORD_IIR_ENABLE;
 
-    mMaxBufferSize = kMaxBufferSize;
+    if ( NO_ERROR != AudioSystem::getInputBufferSize(
+        sampleRate, mFormat, channels, (size_t*)&mMaxBufferSize) ) {
+        mMaxBufferSize = kMaxBufferSize;
+        LOGV("mMaxBufferSize = %d", mMaxBufferSize);
+    }
+
     mNumChannels   = channels;
     mRecord = new AudioRecord(
                 inputSource, sampleRate, AudioSystem::PCM_16_BIT,
