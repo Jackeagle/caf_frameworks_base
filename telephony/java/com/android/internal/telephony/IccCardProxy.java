@@ -237,17 +237,6 @@ public class IccCardProxy extends Handler implements IccCard {
         }
     }
 
-    boolean isCardFaulty() {
-        UiccCard card = mUiccManager.getIccCard(0);
-
-        if ((card != null) && (card.getCardState() == CardState.ERROR)) {
-            Log.w(LOG_TAG, "Card is faulty");
-            return true;
-        }
-
-        return false;
-    }
-
     /* Sets subscription information */
     void setSubscriptionInfo(Subscription subscription) {
         mSubscriptionData = subscription;
@@ -280,7 +269,7 @@ public class IccCardProxy extends Handler implements IccCard {
 
         if (mFirstRun) {
             if (newApplication == null) {
-                if (isCardFaulty()) {
+                if (mUiccManager.isCardFaulty(0)) {
                     broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
                 } else {
                     broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
@@ -299,7 +288,7 @@ public class IccCardProxy extends Handler implements IccCard {
             }
             if (newApplication == null) {
                 if (mRadioOn) {
-                    if (isCardFaulty()) {
+                    if (mUiccManager.isCardFaulty(0)) {
                         broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
                     } else {
                         broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
