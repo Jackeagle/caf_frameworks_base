@@ -372,9 +372,7 @@ public class ProxyManager extends Handler {
             case EVENT_ICC_CHANGED:
                 if (TelephonyManager.isMultiSimEnabled()) {
                     Log.d(LOG_TAG, "ProxyManager EVENT_ICC_CHANGED for DSDS");
-                    for (int i = 0; i < UiccConstants.RIL_MAX_CARDS; i++) {
-                        mUiccCards[i] = mUiccManager.getCard(i);
-                    }
+                    mUiccCards = mUiccManager.getIccCards();
                     if (!mUiccSubSet) {
                         checkCardStatus();
                     }
@@ -382,8 +380,14 @@ public class ProxyManager extends Handler {
                     SubscriptionData cardSubData = new SubscriptionData(1);
                     cardSubData.subscription[0].slotId = 0;
                     cardSubData.subscription[0].subId = 0;
-                    cardSubData.subscription[0].m3gppIndex = mUiccManager.getFirst3gppAppIndex(0);
-                    cardSubData.subscription[0].m3gpp2Index = mUiccManager.getFirst3gpp2AppIndex(0);
+                    cardSubData.subscription[0].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
+                    cardSubData.subscription[0].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
+                    UiccCard[] cardsList = mUiccManager.getIccCards();
+                    UiccCard c = (cardsList.length > 0) ? cardsList[0] : null;
+                    if (c != null) {
+                        cardSubData.subscription[0].m3gppIndex = c.getSubscription3gppAppIndex();
+                        cardSubData.subscription[0].m3gpp2Index = c.getSubscription3gpp2AppIndex();
+                    }
                     Log.d(LOG_TAG, "ProxyManager EVENT_ICC_CHANGED for non DSDS m3gppIndex::"
                             + cardSubData.subscription[0].m3gppIndex + " m3gpp2Index::"
                             + cardSubData.subscription[0].m3gpp2Index);
@@ -549,28 +553,34 @@ public class ProxyManager extends Handler {
         }
     }
 
-    private void checkCardStatus() {
-        UiccCard card1 = mUiccCards[0];
-        UiccCard card2 = mUiccCards[1];
-
-        if (card1 != null && card2 != null) {
-            Log.d(LOG_TAG, ":  card 1 state: "+card1.getCardState());
-            Log.d(LOG_TAG, ":  card 2 state: "+card2.getCardState());
-
-            // Card status to be processed if
-            // card1 status is present and card2 status is present
-            // card1 status is present and card2 status is absent
-            // card1 status is absent and card2 status is present
-            if ((!(card1.getCardState() == CardState.ABSENT
-                        && card2.getCardState() == CardState.ABSENT))
-                    && (!(card1.getCardState() == CardState.ERROR
-                        && card2.getCardState() == CardState.ERROR))) {
-                // Get the Iccid and then process the cards
-                if (mReadIccid) {
-                    mReadIccid = false;
-                    getCardIccids();
-                }
+    /**
+     * Returns true if both cards are either ABSENT or PRESENT with
+     * atleast one application.
+     */
+    private boolean isValidCards() {
+        int numValidCards = 0;
+        for (UiccCard card : mUiccCards) {
+            if (card != null
+                    && (card.getCardState() == CardState.ABSENT
+                        || (card.getCardState() == CardState.PRESENT
+                            && card.getNumApplications() > 0))) {
+                numValidCards++;
             }
+        }
+        return (numValidCards == mUiccCards.length);
+    }
+
+    /**
+     * Check the card status and start processing.
+     * Card status to be processed if
+     * card1 status is present and card2 status is present
+     * card1 status is present and card2 status is absent
+     * card1 status is absent and card2 status is present
+     */
+    private void checkCardStatus() {
+        if (isValidCards() && mReadIccid) {
+            mReadIccid = false;
+            getCardIccids();
         }
     }
 

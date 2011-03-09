@@ -30,11 +30,12 @@ import android.telephony.TelephonyManager;
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.cat.CatService;
 
-/* This class will be responsible for keeping all knowledge about
- * ICCs in the system. It will also be used as API to get appropriate
+/* This class is responsible for keeping all knowledge about
+ * ICCs in the system. It is also used as API to get appropriate
  * applications to pass them to phone and service trackers.
  */
 public class UiccManager extends Handler{
+    private final static String LOG_TAG = "RIL_UiccManager";
     public enum AppFamily {
         APP_FAM_3GPP,
         APP_FAM_3GPP2;
@@ -47,9 +48,7 @@ public class UiccManager extends Handler{
     private static final int EVENT_ICC_STATUS_CHANGED = 2;
     private static final int EVENT_GET_ICC_STATUS_DONE = 3;
     private static final int EVENT_RADIO_OFF_OR_UNAVAILABLE = 4;
-    public static final int SUBSCRIPTION_INDEX_INVALID = 99999;
 
-    private String mLogTag = "RIL_UiccManager";
     CommandsInterface[] mCi;
     Context mContext;
     UiccCard[] mUiccCards;
@@ -77,7 +76,7 @@ public class UiccManager extends Handler{
     }
 
     private UiccManager(Context c, CommandsInterface[] ci) {
-        Log.d(mLogTag, "Creating UiccManager");
+        Log.d(LOG_TAG, "Creating UiccManager");
         mUiccCards = new UiccCard[UiccConstants.RIL_MAX_CARDS];
         int phoneCount = TelephonyManager.getPhoneCount();
         mCi = new CommandsInterface[phoneCount];
@@ -102,20 +101,20 @@ public class UiccManager extends Handler{
         switch (msg.what) {
             case EVENT_RADIO_ON:
                 mRadioOn = true;
-                Log.d(mLogTag, "Radio on -> Forcing sim status update on index : " + index);
+                Log.d(LOG_TAG, "Radio on -> Forcing sim status update on index : " + index);
                 sendMessage(obtainMessage(EVENT_ICC_STATUS_CHANGED, index));
                 break;
             case EVENT_ICC_STATUS_CHANGED:
                 if (index < mCi.length && mRadioOn) {
-                    Log.d(mLogTag, "Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus on index"
+                    Log.d(LOG_TAG, "Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus on index"
                             + index);
                     mCi[index].getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE, index));
                 } else {
-                    Log.d(mLogTag, "Received EVENT_ICC_STATUS_CHANGED while radio is not ON or index is invalid. Ignoring");
+                    Log.d(LOG_TAG, "Received EVENT_ICC_STATUS_CHANGED while radio is not ON or index is invalid. Ignoring");
                 }
                 break;
             case EVENT_GET_ICC_STATUS_DONE:
-                Log.d(mLogTag, "Received EVENT_GET_ICC_STATUS_DONE on index : " + index);
+                Log.d(LOG_TAG, "Received EVENT_GET_ICC_STATUS_DONE on index : " + index);
                 ar = (AsyncResult)msg.obj;
 
                 onGetIccCardStatusDone(ar, index);
@@ -137,12 +136,12 @@ public class UiccManager extends Handler{
                 }
                 break;
             case EVENT_RADIO_OFF_OR_UNAVAILABLE:
-                Log.d(mLogTag, "EVENT_RADIO_OFF_OR_UNAVAILABLE: index = " + index);
+                Log.d(LOG_TAG, "EVENT_RADIO_OFF_OR_UNAVAILABLE: index = " + index);
                 mRadioOn = false;
                 disposeCard(index);
                 break;
             default:
-                Log.e(mLogTag, " Unknown Event " + msg.what);
+                Log.e(LOG_TAG, " Unknown Event " + msg.what);
         }
 
     }
@@ -155,7 +154,7 @@ public class UiccManager extends Handler{
         /*
          * The events can be come in two ways. By explicitly sending it using
          * sendMessage, in this case the user object passed is msg.obj and from
-         * the CommandsInterface, in this case the user object is msg.onj.userObj
+         * the CommandsInterface, in this case the user object is msg.obj.userObj
          */
         if (msg != null) {
             if (msg.obj != null && msg.obj instanceof Integer) {
@@ -167,16 +166,12 @@ public class UiccManager extends Handler{
                 }
             }
         }
-
         return index;
     }
 
-
-
-
     private synchronized void onGetIccCardStatusDone(AsyncResult ar, Integer index) {
         if (ar.exception != null) {
-            Log.e(mLogTag,"Error getting ICC status. "
+            Log.e(LOG_TAG,"Error getting ICC status. "
                     + "RIL_REQUEST_GET_ICC_STATUS should "
                     + "never return an error", ar.exception);
             return;
@@ -200,14 +195,14 @@ public class UiccManager extends Handler{
             mUiccCards[index] = new UiccCard(this, status.card, mContext, mCi[index]);
         }
 
-        Log.d(mLogTag, "Notifying IccChangedRegistrants");
+        Log.d(LOG_TAG, "Notifying IccChangedRegistrants");
         mIccChangedRegistrants.notifyRegistrants();
     }
 
     private synchronized void disposeCard(int index) {
         if ((index < mUiccCards.length) &&
                 (mUiccCards[index] != null)) {
-             Log.d(mLogTag, "Disposing card " + index);
+             Log.d(LOG_TAG, "Disposing card " + index);
             mUiccCards[index].dispose();
             mUiccCards[index] = null;
         }
@@ -219,67 +214,31 @@ public class UiccManager extends Handler{
         sendMessage(obtainMessage(EVENT_ICC_STATUS_CHANGED, onComplete));
     }
 
+    public boolean isCardFaulty(int slotId) {
+        if (slotId < 0 || slotId >= mUiccCards.length) {
+            return false;
+        }
+
+        if ((mUiccCards[slotId] != null) && (mUiccCards[slotId].getCardState() == CardState.ERROR)) {
+            Log.d(LOG_TAG, "Card is faulty");
+            return true;
+        }
+
+        return false;
+    }
+
     public synchronized UiccCard getIccCard(int index) {
         return mUiccCards[index];
     }
 
     public synchronized UiccCard[] getIccCards() {
-        ArrayList<UiccCard> cards = new ArrayList<UiccCard>();
-        for (UiccCard c: mUiccCards) {
-            //present and absent both cards are returned.
-            if (c != null && (c.getCardState() == CardState.PRESENT
-                        || c.getCardState() == CardState.ABSENT)) {
-                cards.add(c);
-            }
-        }
-        Log.d(mLogTag, "Number of cards = " + cards.size());
-        UiccCard arrayCards[] = new UiccCard[cards.size()];
-        arrayCards = (UiccCard[])cards.toArray(arrayCards);
-        return arrayCards;
+        // Return cloned array since we don't want to give out reference
+        // to internal data structure.
+        return mUiccCards.clone();
     }
 
-    /*
-     * This Function gets the UiccCard at the index in case of
-     * the card is present and it has any applications or the
-     * card is absent.  Otherwise retrun null.
-     */
-    public synchronized UiccCard getCard(int index) {
-        UiccCard card = mUiccCards[index];
-        if (card != null &&
-            ((card.getCardState() == CardState.PRESENT &&
-              card.getNumApplications() > 0) ||
-             card.getCardState() == CardState.ABSENT)) {
-            return card;
-        }
-        return null;
-    }
-
-    //Gets first 3gpp Application Index
-    public int getFirst3gppAppIndex(int slotId) {
-        if (slotId >= 0 && slotId < mUiccCards.length) {
-            UiccCard c = mUiccCards[slotId];
-            if (c != null && (c.getCardState() == CardState.PRESENT)) {
-                return c.getSubscription3gppAppIndex();
-            }
-        }
-        return SUBSCRIPTION_INDEX_INVALID;
-    }
-
-    //Gets first 3gpp2 Application Index
-    public int getFirst3gpp2AppIndex(int slotId) {
-        if (slotId >= 0 && slotId < mUiccCards.length) {
-            UiccCard c = mUiccCards[slotId];
-            if (c != null && (c.getCardState() == CardState.PRESENT)) {
-                return c.getSubscription3gpp2AppIndex();
-            }
-        }
-        return SUBSCRIPTION_INDEX_INVALID;
-    }
-
-    //Gets current application based on slotId and appId
+    //Gets application based on slotId and appId
     public synchronized UiccCardApplication getApplication(int slotId, int appId) {
-
-        Log.d(mLogTag, "getapplication slot id = "+ slotId + "appid = "+ appId);
         if (slotId >= 0 && slotId < mUiccCards.length) {
             UiccCard c = mUiccCards[slotId];
             if (c != null && (c.getCardState() == CardState.PRESENT) &&
@@ -297,8 +256,8 @@ public class UiccManager extends Handler{
         synchronized (mIccChangedRegistrants) {
             mIccChangedRegistrants.add(r);
         }
-        //Notify registrants soon after registering, so that it will get the latest ICC status,		
-        //otherwise which may not happen until there is an actual change in ICC status.		
+        //Notify registrants right after registering, so that it will get the latest ICC status,
+        //otherwise which may not happen until there is an actual change in ICC status.
         r.notifyRegistrant();
     }
     public void unregisterForIccChanged(Handler h) {
