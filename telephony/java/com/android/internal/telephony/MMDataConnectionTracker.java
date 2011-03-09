@@ -1381,31 +1381,35 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         //TODO: Check voice call state, emergency call back info
         boolean isReadyForData = isDataConnectivityEnabled();
 
-        boolean roaming = mDsst.getDataServiceState().getRoaming();
-        isReadyForData = isReadyForData && (!roaming || getDataOnRoamingEnabled());
-
-        int dataRegState = this.mDsst.getDataServiceState().getState();
         RadioTechnology r = getRadioTechnology();
+        if (mCheckForConnectivity) {
 
-        isReadyForData = isReadyForData
-                        && ((dataRegState == ServiceState.STATE_IN_SERVICE
-                                && r != RadioTechnology.RADIO_TECH_UNKNOWN)
-                                || mNoAutoAttach);
+            boolean roaming = mDsst.getDataServiceState().getRoaming();
+            isReadyForData = isReadyForData && (!roaming || getDataOnRoamingEnabled());
 
-        if (r.isGsm()
-                || r == RadioTechnology.RADIO_TECH_EHRPD
-                || (r.isUnknown() && mNoAutoAttach)) {
-            isReadyForData = isReadyForData && mDsst.mSimRecords != null
-                    && mDsst.mSimRecords.getRecordsLoaded() && !mIsPsRestricted;
+            int dataRegState = this.mDsst.getDataServiceState().getState();
+
+            isReadyForData = isReadyForData
+                && ((dataRegState == ServiceState.STATE_IN_SERVICE
+                            && r != RadioTechnology.RADIO_TECH_UNKNOWN)
+                        || mNoAutoAttach);
         }
 
-        if (r.isCdma()) {
-            isReadyForData = isReadyForData
+        if (mCheckForSubscription) {
+            if (r.isGsm()
+                    || r == RadioTechnology.RADIO_TECH_EHRPD
+                    || (r.isUnknown() && mNoAutoAttach)) {
+                isReadyForData = isReadyForData && mDsst.mSimRecords != null
+                    && mDsst.mSimRecords.getRecordsLoaded() && !mIsPsRestricted;
+            }
+
+            if (r.isCdma()) {
+                isReadyForData = isReadyForData
                     && (mDsst.mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV
                             || (mDsst.mRuimRecords != null
-                                    && mDsst.mRuimRecords.getRecordsLoaded()));
+                                && mDsst.mRuimRecords.getRecordsLoaded()));
+            }
         }
-
         return isReadyForData;
     }
 
@@ -1426,8 +1430,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     private RadioTechnology getRadioTechnology() {
-        return RadioTechnology.getRadioTechFromInt(mDsst.getDataServiceState()
-                .getRadioTechnology());
+        if (mCheckForConnectivity) {
+            return RadioTechnology.getRadioTechFromInt(mDsst.getDataServiceState()
+                    .getRadioTechnology());
+        } else {
+            // Workaround to choose a technology for SETUP_DATA_CALL when
+            // mCheckForConnectivity is set to false. We need a technology for
+            // SETUP_DATA_CALL.
+            return RadioTechnology.RADIO_TECH_1xRTT;
+        }
     }
 
     public String dumpDataReadinessinfo() {
@@ -1450,6 +1461,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         if (mDsst.mRuimRecords != null)
             sb.append(mDsst.mRuimRecords.getRecordsLoaded())
                 .append("/"+mDsst.mRuimRecords.getRUIMOperatorNumeric());
+        sb.append(", checks = ").append(mCheckForConnectivity).append("/")
+            .append(mCheckForSubscription);
         sb.append("]");
         return sb.toString();
     }
@@ -1679,6 +1692,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     @Override
     protected boolean isConcurrentVoiceAndData() {
         return mDsst.isConcurrentVoiceAndData();
+    }
+
+    public void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
+        mCheckForConnectivity = checkConnectivity;
+        mCheckForSubscription = checkSubscription;
+        if (tryDataCalls) {
+            updateDataConnections(REASON_DATA_READINESS_CHECKS_MODIFIED);
+        }
     }
 
     public DataActivityState getDataActivityState() {
