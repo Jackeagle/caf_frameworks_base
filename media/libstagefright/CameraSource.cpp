@@ -184,7 +184,7 @@ CameraSource::CameraSource(const sp<Camera> &camera)
     mMeta->setInt32(kKeyStride, stride);
     mMeta->setInt32(kKeySliceHeight, sliceHeight);
 
-    if (want3D || true) {
+    if (want3D) {
         mMeta->setInt32(kKey3D, !0);
     }
 }
