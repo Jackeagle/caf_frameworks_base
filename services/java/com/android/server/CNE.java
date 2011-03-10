@@ -1959,13 +1959,13 @@ public final class CNE implements ILinkManager {
                     if (getFmcObj().dsAvail == true) {
                         ITelephony phone =
                                 ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
-                        //try {
+                        try {
                             // bypass connectivity and subscription
                             // checking, and bring up data call
-                            //phone.setDataReadinessChecks(false, false, true);
-                        //} catch (RemoteException e) {
-                            //Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
-                        //}
+                            phone.setDataReadinessChecks(false, false, true);
+                        } catch (RemoteException e) {
+                            Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
+                        }
                     }
                 }
                 mService.bringUpRat(CNE_RAT_WWAN);
@@ -2425,13 +2425,13 @@ public final class CNE implements ILinkManager {
                     || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
                 mRemoveHostEntry = true;
                 ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
-                //try {
+                try {
                     // tell telephony service to do all necessary
                     // network checking, no data call
-                    //phone.setDataReadinessChecks(true, true, false);
-                //} catch (RemoteException e) {
-                //    Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
-                //}
+                    phone.setDataReadinessChecks(true, true, false);
+                } catch (RemoteException e) {
+                    Log.w(LOG_TAG, "remoteException while calling setDataReadinessChecks");
+                }
             }
             if (DBG) Log.i(LOCAL_TAG, "onFmcStatus: mRemoveHostEntry=" + mRemoveHostEntry);
             if (rInfo.mListener != null) {
