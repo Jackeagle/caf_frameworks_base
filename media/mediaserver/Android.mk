@@ -1,5 +1,3 @@
-ifneq ($(strip $(libdspengineiface_already_built)),)
-
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -22,8 +20,4 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_MODULE:= mediaserver
 
-LOCAL_LDFLAGS += -ldspengineiface
-
 include $(BUILD_EXECUTABLE)
-
-endif

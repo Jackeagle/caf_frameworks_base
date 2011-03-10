@@ -33,19 +33,8 @@
 
 using namespace android;
 
-/*
- * DSP engine interface class
- */
-#include "interface_class.h"
-/**************/
-
 int main(int argc, char** argv)
 {
-/* Create class and open Codec Server */
-    InterfaceClass EngineInterface;
-    EngineInterface.EngineInit();
-/**************/
-
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
     LOGI("ServiceManager: %p", sm.get());
