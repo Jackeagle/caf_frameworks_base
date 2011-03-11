@@ -397,4 +397,7 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
 
     public void getDataCallProfile(int appType, Message result) {
     }
+
+    public void setRilPowerOff(Message result) {
+    }
 }
