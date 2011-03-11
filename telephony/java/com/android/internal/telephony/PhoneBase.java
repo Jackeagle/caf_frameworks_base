@@ -1174,6 +1174,11 @@ public abstract class PhoneBase extends Handler implements Phone {
         mDataConnection.setDataRoamingEnabled(enable);
     }
 
+    public void setDataReadinessChecks(
+        boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
+        mDataConnection.setDataReadinessChecks(checkConnectivity, checkSubscription, tryDataCalls);
+    }
+
     @Override
     public void setRadioPower(boolean power) {
         Log.e(LOG_TAG, "setRadioPower() shouldn't be called here!");

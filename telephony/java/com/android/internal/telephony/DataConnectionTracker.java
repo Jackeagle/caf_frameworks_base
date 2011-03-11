@@ -92,6 +92,11 @@ public abstract class DataConnectionTracker extends Handler {
     boolean mMasterDataEnabled = true;
     boolean mDnsCheckDisabled = false;
 
+    // Flags introduced for FMC (fixed mobile convergence) to trigger
+    // data call even when there is no service on mobile networks.
+    protected boolean mCheckForConnectivity = true;
+    protected boolean mCheckForSubscription = true;
+
     /***** Event Codes *****/
     protected static final int EVENT_UPDATE_DATA_CONNECTIONS = 1;
     protected static final int EVENT_SERVICE_TYPE_DISABLED = 2;
@@ -151,6 +156,7 @@ public abstract class DataConnectionTracker extends Handler {
     protected static final String REASON_CDMA_SUBSCRIPTION_SOURCE_CHANGED = "cdmaSubscriptionSourceChanged";
     protected static final String REASON_TETHERED_MODE_STATE_CHANGED = "tetheredModeStateChanged";
     protected static final String REASON_DATA_CONN_PROP_CHANGED = "dataConnectionPropertyChanged";
+    protected static final String REASON_DATA_READINESS_CHECKS_MODIFIED = "dataReadinessChecksModified";
 
     Subscription mSubscriptionData;
 
@@ -252,6 +258,8 @@ public abstract class DataConnectionTracker extends Handler {
     abstract public Subscription getSubscriptionInfo();
     abstract public void setSubscriptionInfo(Subscription subData);
     abstract public void update(CommandsInterface ci, Subscription subData);
+    abstract public void setDataReadinessChecks(boolean checkConnectivity,
+            boolean checkSubscription, boolean tryDataCalls);
 
     synchronized public int disableApnType(String type) {
 
@@ -391,7 +399,7 @@ public abstract class DataConnectionTracker extends Handler {
 
         State dsState = mDpt.getState(ds, ipv);
 
-        if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
+        if (mCheckForConnectivity && getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
             // If we're out of service, open TCP sockets may still work
             // but no data will flow
             ret = DataState.DISCONNECTED;
