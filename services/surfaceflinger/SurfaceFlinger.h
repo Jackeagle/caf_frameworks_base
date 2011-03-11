@@ -199,7 +199,7 @@ public:
     virtual status_t                    unfreezeDisplay(DisplayID dpy, uint32_t flags);
     virtual int                         setOrientation(DisplayID dpy, int orientation, uint32_t flags);
 
-    enum { HDMIOUT_DISABLE = 0, HDMIOUT_ENABLE, HDMIFB_OPEN, HDMIHPD_ON, HDMIHPD_OFF };
+    enum hdmi_state_t { HDMIOUT_DISABLE = 0, HDMIOUT_ENABLE, HDMIFB_OPEN, HDMIHPD_ON, HDMIHPD_OFF };
     virtual void                        enableHDMIOutput(int enable);
     virtual void                        setActionSafeWidthRatio(float asWidthRatio);
     virtual void                        setActionSafeHeightRatio(float asHeightRatio);
@@ -319,6 +319,7 @@ private:
             void        unlockPageFlip(const LayerVector& currentLayers);
             void        handleRepaint();
             bool        handleBypassLayer();
+            bool        closeBypass();
             void        postFramebuffer();
             void        composeSurfaces(const Region& dirty);
 
@@ -450,6 +451,9 @@ private:
    // Cached overlay layer in composeSurfaces function to be used in the ctx
    // of fixing jitter/flickering bug
    sp<LayerBuffer> mCachedVideoLayer;
+   enum bypass_state_t { eBypassInUse, eBypassNotInUse, eBypassClosePending };
+   bypass_state_t mBypassState;
+   hdmi_state_t mHDMIState;
 public:
    void ditchOverlayLayers();
    void freeBypassBuffers();

@@ -61,7 +61,6 @@ Layer::Layer(SurfaceFlinger* flinger,
         mTextureManager(),
         mBufferManager(mTextureManager),
         mWidth(0), mHeight(0), mNeedsScaling(false), mFixedSize(false),
-        mOverlay(false),
         mBypassState(false)
 {
 }
@@ -287,12 +286,6 @@ status_t Layer::drawWithOverlay(const Region& clip,
                     bool hdmiConnected, bool ignoreFB) const
 {
 #if defined(TARGET_USES_OVERLAY)
-#if defined(SF_BYPASS)
-    if (mBufferManager.getNumBuffers()
-                   <= mBufferManager.getDefaultBufferCount())
-        return NO_INIT;
-#endif
-
     Texture tex(mBufferManager.getActiveTexture());
     if (tex.image == EGL_NO_IMAGE_KHR)
         return INVALID_OPERATION;
@@ -363,7 +356,6 @@ status_t Layer::drawWithOverlay(const Region& clip,
     if (!ignoreFB)
         clearWithOpenGL(clip);
     setOverlayUsed(true);
-    mOverlay = true;
     return NO_ERROR;
 #endif
     return INVALID_OPERATION;
@@ -371,8 +363,6 @@ status_t Layer::drawWithOverlay(const Region& clip,
 
 void Layer::onDraw(const Region& clip) const
 {
-    mOverlay = false;
-
     Texture tex(mBufferManager.getActiveTexture());
     if (tex.name == -1LU) {
         // the texture has not been created yet, this Layer has
@@ -400,28 +390,6 @@ void Layer::onDraw(const Region& clip) const
         }
         return;
     }
-
-#ifdef USE_COMPOSITION_BYPASS
-    sp<GraphicBuffer> buffer(mBufferManager.getActiveBuffer());
-    if ((buffer != NULL) && (buffer->transform)) {
-        // Here we have a "bypass" buffer, but we need to composite it
-        // most likely because it's not fullscreen anymore.
-        // Since the buffer may have a transformation applied by the client
-        // we need to inverse this transformation here.
-
-        // calculate the inverse of the buffer transform
-        const uint32_t mask = HAL_TRANSFORM_FLIP_V | HAL_TRANSFORM_FLIP_H;
-        const uint32_t bufferTransformInverse = buffer->transform ^ mask;
-
-        // To accomplish the inverse transform, we use "mBufferTransform"
-        // which is not used by Layer.cpp
-        const_cast<Layer*>(this)->mBufferTransform = bufferTransformInverse;
-        drawWithOpenGL(clip, tex);
-        // reset to "no transfrom"
-        const_cast<Layer*>(this)->mBufferTransform = 0;
-        return;
-    }
-#endif
 
     drawWithOpenGL(clip, tex);
 }
@@ -517,32 +485,6 @@ sp<GraphicBuffer> Layer::requestBuffer(int index,
 
     status_t err = NO_MEMORY;
 
-#ifdef USE_COMPOSITION_BYPASS
-    if (!mSecure && bypass && (effectiveUsage & GRALLOC_USAGE_HW_RENDER)) {
-        // always allocate a buffer matching the screen size. the size
-        // may be different from (w,h) if the buffer is rotated.
-        const DisplayHardware& hw(graphicPlane(0).displayHardware());
-        int32_t w = hw.getWidth();
-        int32_t h = hw.getHeight();
-        int32_t f = hw.getFormat();
-
-        buffer = new GraphicBuffer(w, h, f, effectiveUsage | GRALLOC_USAGE_HW_FB);
-        err = buffer->initCheck();
-        buffer->transform = uint8_t(getOrientation());
-
-        if (err != NO_ERROR) {
-            // allocation didn't succeed, probably because an older bypass
-            // window hasn't released all its resources yet.
-            ClientRef::Access sharedClient(mUserClientRef);
-            SharedBufferServer* lcblk(sharedClient.get());
-            if (lcblk) {
-                // all buffers need reallocation
-                lcblk->reallocateAll();
-            }
-        }
-    }
-#endif
-
     if (err != NO_ERROR) {
         buffer = new GraphicBuffer(w, h, f, effectiveUsage);
         err = buffer->initCheck();
@@ -595,23 +537,35 @@ uint32_t Layer::getEffectiveUsage(uint32_t usage) const
 
 bool Layer::setBypass(bool enable)
 {
+#if defined(SF_BYPASS)
+    const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
+    if (!hw.isOverlayUIEnabled() ||
+                  getUseOriginalSurfaceResolution())
+        return false;
+
     Mutex::Autolock _l(mLock);
 
     if (mNeedsScaling || mNeedsFiltering) {
         return false;
     }
 
+    if (mBufferManager.getNumBuffers()
+                   <= mBufferManager.getDefaultBufferCount())
+        return false;
+
     if (mBypassState != enable) {
         mBypassState = enable;
         ClientRef::Access sharedClient(mUserClientRef);
         SharedBufferServer* lcblk(sharedClient.get());
-        if (lcblk) {
+        if (lcblk && enable) {
             // all buffers need reallocation
             lcblk->reallocateAll();
         }
     }
 
     return true;
+#endif
+    return false;
 }
 
 void Layer::updateBuffersOrientation()

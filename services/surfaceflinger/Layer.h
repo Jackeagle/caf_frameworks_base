@@ -73,6 +73,10 @@ public:
                         bool hdmiConnected, bool ignoreFB = true) const;
     virtual status_t setBufferInUse() const;
     virtual status_t freeBypassBuffers() const;
+    status_t clearFreezeLock() {
+                                    mFreezeLock.clear();
+                                    return NO_ERROR;
+                               };
     virtual void onDraw(const Region& clip) const;
     virtual uint32_t doTransaction(uint32_t transactionFlags);
     virtual void lockPageFlip(bool& recomputeVisibleRegions);
@@ -245,7 +249,6 @@ private:
     uint32_t mReqFormat;
     bool mNeedsScaling;
     bool mFixedSize;
-    mutable bool mOverlay;
     bool mBypassState;
 };
 
