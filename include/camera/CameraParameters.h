@@ -337,6 +337,9 @@ public:
     static const char KEY_GPS_STATUS[];
     static const char KEY_EXIF_DATETIME[];
 
+    static const char KEY_MEMORY_COLOR_ENHANCEMENT[];
+    static const char KEY_SUPPORTED_MEM_COLOR_ENHANCE_MODES[];
+
     // Value for KEY_ZOOM_SUPPORTED or KEY_SMOOTH_ZOOM_SUPPORTED.
     static const char TRUE[];
 
@@ -506,6 +509,10 @@ public:
     // Values for Face Detection settings.
     static const char FACE_DETECTION_OFF[];
     static const char FACE_DETECTION_ON[];
+
+    // Values for MCE settings.
+    static const char MCE_ENABLE[];
+    static const char MCE_DISABLE[];
 
     enum {
         CAMERA_ORIENTATION_UNKNOWN = 0,
