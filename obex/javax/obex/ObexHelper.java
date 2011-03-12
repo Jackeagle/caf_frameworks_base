@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
@@ -32,7 +33,9 @@
 
 package javax.obex;
 
+import android.os.SystemProperties;
 import android.security.Md5MessageDigest;
+import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -46,6 +49,12 @@ import java.util.TimeZone;
  * @hide
  */
 public final class ObexHelper {
+    private static final String TAG = "ObexHelper";
+    private static final boolean VERBOSE = false;
+
+    /* Debugging hooks to control AMP-related operations */
+    private static final String DEBUG_FORCE_SRM = "debug.obex.force_srm_capable";
+    private static final String DEBUG_FORCE_SRMP = "debug.obex.force_srmp_enabled";
 
     /**
      * Defines the basic packet length used by OBEX. Every OBEX packet has the
@@ -111,6 +120,148 @@ public final class ObexHelper {
     public static final int OBEX_AUTH_REALM_CHARSET_ISO_8859_9 = 0x09;
 
     public static final int OBEX_AUTH_REALM_CHARSET_UNICODE = 0xFF;
+
+    /**
+     * The value that is used for the OBEX Single Response Mode (SRM)
+     */
+    public static final Byte OBEX_SRM_DISABLED = 0x0;
+
+    public static final Byte OBEX_SRM_ENABLED = 0x1;
+
+    public static final Byte OBEX_SRM_SUPPORTED = 0x2;
+
+    /**
+     * The value that is used for the OBEX Single Response Mode (SRM) Parameters
+     */
+    public static final Byte OBEX_SRM_PARAM_RSVP = 0x0;
+
+    public static final Byte OBEX_SRM_PARAM_WAIT = 0x1;
+
+    public static final Byte OBEX_SRM_PARAM_RSVP_AND_WAIT = 0x2;
+
+    /** An invalid SRM parameter value to indicate no parameter set */
+    public static final Byte OBEX_SRM_PARAM_NONE = 0xF;
+
+    /**
+     * The value that is used for the SRM capability of Bluetooth device
+     */
+    public static final boolean SRM_INCAPABLE = false;
+
+    public static final boolean SRM_CAPABLE = true;
+
+    private static boolean mLocalSingleResponseCapability = SRM_INCAPABLE;
+
+    public static boolean getLocalSrmCapability() {
+        if (VERBOSE) Log.v(TAG, "getLocalSrmCapability: " + mLocalSingleResponseCapability);
+        return mLocalSingleResponseCapability;
+    }
+
+    public static void setLocalSrmCapability(boolean SrmCapable) {
+        if (!SystemProperties.get(DEBUG_FORCE_SRM).equals("")) {
+            if (SystemProperties.getBoolean(DEBUG_FORCE_SRM, false)) {
+                if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRM on");
+                mLocalSingleResponseCapability = SRM_CAPABLE;
+            } else {
+                if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRM off");
+                mLocalSingleResponseCapability = SRM_INCAPABLE;
+            }
+        } else {
+            mLocalSingleResponseCapability = SrmCapable ? SRM_CAPABLE : SRM_INCAPABLE;
+        }
+
+        Log.d(TAG, "setLocalSrmCapability: " + mLocalSingleResponseCapability);
+    }
+
+    /**
+     * The value that is used for the SRM status of current operation
+     */
+    public static final boolean LOCAL_SRM_DISABLED = false;
+
+    public static final boolean LOCAL_SRM_ENABLED = true;
+
+    /**
+     * This is used for the SRM status of local device
+     */
+    private static boolean mLocalSingleResponseActive;
+
+    public static boolean getLocalSrmStatus() {
+        if (VERBOSE) Log.v(TAG, "getLocalSrmStatus: " + mLocalSingleResponseActive);
+        return mLocalSingleResponseActive;
+    }
+
+    public static void setLocalSrmStatus(boolean SrmEnabled) {
+        mLocalSingleResponseActive = SrmEnabled ? LOCAL_SRM_ENABLED : LOCAL_SRM_DISABLED;
+        if (VERBOSE) Log.v(TAG, "setLocalSrmStatus: " + mLocalSingleResponseActive);
+    }
+
+    /**
+     * This is used for the SRM status of remote device
+     */
+    private static boolean mRemoteSingleResponseActive;
+
+    public static boolean getRemoteSrmStatus() {
+        if (VERBOSE) Log.v(TAG, "getRemoteSrmStatus: " + mRemoteSingleResponseActive);
+        return mRemoteSingleResponseActive;
+    }
+
+    public static void setRemoteSrmStatus(boolean SrmCapable) {
+        mRemoteSingleResponseActive = SrmCapable ? SRM_CAPABLE : SRM_INCAPABLE;
+        if (VERBOSE) Log.v(TAG, "setRemoteSrmStatus: " + mRemoteSingleResponseActive);
+    }
+
+    /**
+     * This is used for the Single Response Mode Parameters (SRMP) value
+     */
+    private static boolean mLocalSrmpWait;
+
+    public static boolean getLocalSrmpWait() {
+        if (VERBOSE) Log.v(TAG, "getLocalSrmpWait: " + mLocalSrmpWait);
+        return mLocalSrmpWait;
+    }
+
+    public static void setLocalSrmpWait(boolean SrmpWait) {
+        if (VERBOSE) Log.v(TAG, "setLocalSrmpWait: " + SrmpWait);
+        mLocalSrmpWait = SrmpWait;
+    }
+
+    /**
+     * The value that is used for the SRMP status of local device
+     */
+    public static final boolean SRMP_DISABLED = false;
+
+    public static final boolean SRMP_ENABLED = true;
+
+    private static boolean mLocalSrmpActive = SRMP_DISABLED;
+
+    public static boolean getLocalSrmParamStatus() {
+        if (VERBOSE) Log.v(TAG, "getLocalSrmParamStatus: " + mLocalSrmpActive);
+        return mLocalSrmpActive;
+    }
+
+    public static void setLocalSrmParamStatus(boolean SrmpEnabled) {
+        if (!SystemProperties.get(DEBUG_FORCE_SRMP).equals("")) {
+            if (SystemProperties.getBoolean(DEBUG_FORCE_SRMP, false)) {
+                if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRMP on");
+                mLocalSrmpActive = SRMP_ENABLED;
+            } else {
+                if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRMP off");
+                mLocalSrmpActive = SRMP_DISABLED;
+            }
+        } else {
+            mLocalSrmpActive = SrmpEnabled ? SRMP_ENABLED : SRMP_DISABLED;
+        }
+        if (VERBOSE) Log.v(TAG, "setLocalSrmParamStatus: " + mLocalSrmpActive);
+    }
+
+    /**
+     * This is used to reset the SRM status to default
+     */
+    public static void resetSrmStatus() {
+        if (VERBOSE) Log.v(TAG, "resetSrmStatus");
+        setLocalSrmStatus(LOCAL_SRM_DISABLED);
+        setLocalSrmpWait(false);
+        setRemoteSrmStatus(SRM_INCAPABLE);
+    }
 
     /**
      * Updates the HeaderSet with the headers received in the byte array
@@ -553,7 +704,7 @@ public final class ObexHelper {
                 }
             }
 
-            // Connection ID Header
+            // Application Parameter Header
             value = (byte[])headImpl.getHeader(HeaderSet.APPLICATION_PARAMETER);
             if (value != null) {
                 out.write((byte)HeaderSet.APPLICATION_PARAMETER);
@@ -578,6 +729,26 @@ public final class ObexHelper {
                 out.write(value);
                 if (nullOut) {
                     headImpl.setHeader(HeaderSet.OBJECT_CLASS, null);
+                }
+            }
+
+            // Single Response Mode (SRM) Header
+            byteHeader = (Byte)headImpl.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+            if (byteHeader != null) {
+                out.write((byte)HeaderSet.SINGLE_RESPONSE_MODE);
+                out.write(byteHeader.byteValue());
+                if (nullOut) {
+                    headImpl.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, null);
+                }
+            }
+
+            // Single Response Mode (SRM) Parameter Header
+            byteHeader = (Byte)headImpl.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+            if (byteHeader != null) {
+                out.write((byte)HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+                out.write(byteHeader.byteValue());
+                if (nullOut) {
+                    headImpl.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER, null);
                 }
             }
 

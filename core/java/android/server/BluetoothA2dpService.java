@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -430,6 +431,13 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                            BluetoothA2dp.STATE_CONNECTING,
                            BluetoothA2dp.STATE_DISCONNECTING});
         return sinks.toArray(new BluetoothDevice[sinks.size()]);
+    }
+
+    public synchronized boolean isPlayingSink() {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        Set<BluetoothDevice> sinks = lookupSinksMatchingStates(
+                new int[] {BluetoothA2dp.STATE_PLAYING});
+        return sinks.size() > 0;
     }
 
     public synchronized int getSinkState(BluetoothDevice device) {

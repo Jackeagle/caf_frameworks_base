@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +31,7 @@ interface IBluetoothA2dp {
     boolean resumeSink(in BluetoothDevice device);
     BluetoothDevice[] getConnectedSinks();  // change to Set<> once AIDL supports
     BluetoothDevice[] getNonDisconnectedSinks();  // change to Set<> once AIDL supports
+    boolean isPlayingSink();
     int getSinkState(in BluetoothDevice device);
     boolean setSinkPriority(in BluetoothDevice device, int priority);
     int getSinkPriority(in BluetoothDevice device);

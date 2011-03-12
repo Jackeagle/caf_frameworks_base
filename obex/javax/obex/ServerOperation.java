@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2010-2011, Motorola, Inc.
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2009, Motorola, Inc.
  *
  * All rights reserved.
  *
@@ -32,6 +33,8 @@
 
 package javax.obex;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.DataInputStream;
@@ -53,6 +56,9 @@ import java.io.ByteArrayOutputStream;
  * @hide
  */
 public final class ServerOperation implements Operation, BaseStream {
+    private static final String TAG = "Obex ServerOperation";
+
+    private static final boolean VERBOSE = false;
 
     public boolean isAborted;
 
@@ -90,6 +96,10 @@ public final class ServerOperation implements Operation, BaseStream {
 
     private boolean mEndofBody = true;
 
+    public boolean mSingleResponseActive;
+
+    public Byte mSingleResponseModeParameter;
+
     /**
      * Creates new ServerOperation
      * @param p the parent that created this object
@@ -102,6 +112,8 @@ public final class ServerOperation implements Operation, BaseStream {
      */
     public ServerOperation(ServerSession p, InputStream in, int request, int maxSize,
             ServerRequestHandler listen) throws IOException {
+
+        if (VERBOSE)  Log.v(TAG, "ServerOperation");
 
         isAborted = false;
         mParent = p;
@@ -116,6 +128,8 @@ public final class ServerOperation implements Operation, BaseStream {
         mRequestFinished = false;
         mPrivateOutputOpen = false;
         mHasBody = false;
+        mSingleResponseActive = false;
+        mSingleResponseModeParameter = ObexHelper.OBEX_SRM_PARAM_NONE;
         int bytesReceived;
 
         /*
@@ -158,7 +172,7 @@ public final class ServerOperation implements Operation, BaseStream {
         /*
          * Determine if the packet length is larger than this device can receive
          */
-        if (length > ObexHelper.MAX_PACKET_SIZE_INT) {
+        if (length > mParent.getMaxPacketSize()) {
             mParent.sendResponse(ResponseCodes.OBEX_HTTP_REQ_TOO_LARGE, null);
             throw new IOException("Packet received was too large");
         }
@@ -211,7 +225,9 @@ public final class ServerOperation implements Operation, BaseStream {
                 mPrivateInput.writeBytes(body, 1);
             } else {
                 while ((!mGetOperation) && (!finalBitSet)) {
-                    sendReply(ResponseCodes.OBEX_HTTP_CONTINUE);
+                    if (VERBOSE) Log.v(TAG, "ServerOperation pre-sendreply");
+                    sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive);
+
                     if (mPrivateInput.available() > 0) {
                         break;
                     }
@@ -220,7 +236,9 @@ public final class ServerOperation implements Operation, BaseStream {
         }
 
         while ((!mGetOperation) && (!finalBitSet) && (mPrivateInput.available() == 0)) {
-            sendReply(ResponseCodes.OBEX_HTTP_CONTINUE);
+            if (VERBOSE)  Log.v(TAG, "ServerOperation pre-sendreply");
+            sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive);
+
             if (mPrivateInput.available() > 0) {
                 break;
             }
@@ -228,7 +246,7 @@ public final class ServerOperation implements Operation, BaseStream {
 
         // wait for get request finished !!!!
         while (mGetOperation && !mRequestFinished) {
-            sendReply(ResponseCodes.OBEX_HTTP_CONTINUE);
+            sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, false);
         }
     }
 
@@ -250,14 +268,56 @@ public final class ServerOperation implements Operation, BaseStream {
      */
     public synchronized boolean continueOperation(boolean sendEmpty, boolean inStream)
             throws IOException {
+        if (VERBOSE) Log.v(TAG, "continueOperation");
         if (!mGetOperation) {
+
             if (!finalBitSet) {
                 if (sendEmpty) {
-                    sendReply(ResponseCodes.OBEX_HTTP_CONTINUE);
+                    sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive);
+
+                    if (VERBOSE) Log.v(TAG, "continueOperation: Server setting SRM, sendEmpty clause");
+
+                    mSingleResponseActive = ObexHelper.getLocalSrmStatus();
+                    if (mSingleResponseActive == ObexHelper.LOCAL_SRM_ENABLED) {
+                        if (VERBOSE) Log.v(TAG, "continueOperation: Server SRM enabled");
+                        if (ObexHelper.getLocalSrmpWait()) {
+                            if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                                if (VERBOSE) Log.v(TAG, "continueOperation: Server sent SRMP NONE to stop SRMP WAIT");
+                                mSingleResponseActive = ObexHelper.LOCAL_SRM_ENABLED;
+                                ObexHelper.setLocalSrmpWait(false);
+                            } else {
+                                if (VERBOSE) Log.v(TAG, "continueOperation: Server SRMP WAIT");
+                                mSingleResponseActive = ObexHelper.LOCAL_SRM_DISABLED;
+                                mSingleResponseModeParameter = ObexHelper.OBEX_SRM_PARAM_WAIT;
+                            }
+                        }
+                    } else {
+                        if (VERBOSE) Log.v(TAG, "continueOperation: Server SRM disabled");
+                    }
                     return true;
                 } else {
                     if ((mResponseSize > 3) || (mPrivateOutput.size() > 0)) {
-                        sendReply(ResponseCodes.OBEX_HTTP_CONTINUE);
+                        sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive);
+
+                        if (VERBOSE) Log.v(TAG, "continueOperation: Server setting SRM");
+
+                        mSingleResponseActive = ObexHelper.getLocalSrmStatus();
+                        if (mSingleResponseActive == ObexHelper.LOCAL_SRM_ENABLED) {
+                            if (VERBOSE) Log.v(TAG, "continueOperation: Server SRM enabled");
+                            if (ObexHelper.getLocalSrmpWait()) {
+                                if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                                    if (VERBOSE) Log.v(TAG, "continueOperation: Server sent SRMP NONE to stop SRMP WAIT");
+                                    mSingleResponseActive = ObexHelper.LOCAL_SRM_ENABLED;
+                                    ObexHelper.setLocalSrmpWait(false);
+                                } else {
+                                    if (VERBOSE) Log.v(TAG, "continueOperation: Server SRMP WAIT");
+                                    mSingleResponseActive = ObexHelper.LOCAL_SRM_DISABLED;
+                                    mSingleResponseModeParameter = ObexHelper.OBEX_SRM_PARAM_WAIT;
+                                }
+                            }
+                        } else {
+                            if (VERBOSE) Log.v(TAG, "continueOperation: Server SRM disabled");
+                        }
                         return true;
                     } else {
                         return false;
@@ -267,7 +327,7 @@ public final class ServerOperation implements Operation, BaseStream {
                 return false;
             }
         } else {
-            sendReply(ResponseCodes.OBEX_HTTP_CONTINUE);
+            sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive);
             return true;
         }
     }
@@ -276,89 +336,96 @@ public final class ServerOperation implements Operation, BaseStream {
      * Sends a reply to the client. If the reply is a OBEX_HTTP_CONTINUE, it
      * will wait for a response from the client before ending.
      * @param type the response code to send back to the client
+     * @param suppressSend suppress sending the reply, e.g., for SRM mode
      * @return <code>true</code> if the final bit was not set on the reply;
      *         <code>false</code> if no reply was received because the operation
      *         ended, an abort was received, or the final bit was set in the
      *         reply
      * @throws IOException if an IO error occurs
      */
-    public synchronized boolean sendReply(int type) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+    public synchronized boolean sendReply(int type,
+            boolean suppressSend) throws IOException {
+
+        if (VERBOSE) Log.v(TAG, "sendReply type: " + type + ", suppress: " + suppressSend + ", SRMP WAIT: " + ObexHelper.getLocalSrmpWait() );
+
         int bytesReceived;
 
-        long id = mListener.getConnectionId();
-        if (id == -1) {
-            replyHeader.mConnectionID = null;
-        } else {
-            replyHeader.mConnectionID = ObexHelper.convertToByteArray(id);
-        }
+        if ((!suppressSend) || (ObexHelper.getLocalSrmpWait())) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-        byte[] headerArray = ObexHelper.createHeader(replyHeader, true);
-        int bodyLength = -1;
-        int orginalBodyLength = -1;
-
-        if (mPrivateOutput != null) {
-            bodyLength = mPrivateOutput.size();
-            orginalBodyLength = bodyLength;
-        }
-
-        if ((ObexHelper.BASE_PACKET_LENGTH + headerArray.length) > mMaxPacketLength) {
-
-            int end = 0;
-            int start = 0;
-
-            while (end != headerArray.length) {
-                end = ObexHelper.findHeaderEnd(headerArray, start, mMaxPacketLength
-                        - ObexHelper.BASE_PACKET_LENGTH);
-                if (end == -1) {
-
-                    mClosed = true;
-
-                    if (mPrivateInput != null) {
-                        mPrivateInput.close();
-                    }
-
-                    if (mPrivateOutput != null) {
-                        mPrivateOutput.close();
-                    }
-                    mParent.sendResponse(ResponseCodes.OBEX_HTTP_INTERNAL_ERROR, null);
-                    throw new IOException("OBEX Packet exceeds max packet size");
-                }
-                byte[] sendHeader = new byte[end - start];
-                System.arraycopy(headerArray, start, sendHeader, 0, sendHeader.length);
-
-                mParent.sendResponse(type, sendHeader);
-                start = end;
-            }
-
-            if (bodyLength > 0) {
-                return true;
+            long id = mListener.getConnectionId();
+            if (id == -1) {
+                replyHeader.mConnectionID = null;
             } else {
-                return false;
+                replyHeader.mConnectionID = ObexHelper.convertToByteArray(id);
             }
 
-        } else {
-            out.write(headerArray);
-        }
+            byte[] headerArray = ObexHelper.createHeader(replyHeader, true);
+            int bodyLength = -1;
+            int orginalBodyLength = -1;
 
-        // For Get operation: if response code is OBEX_HTTP_OK, then this is the
-        // last packet; so set finalBitSet to true.
-        if (mGetOperation && type == ResponseCodes.OBEX_HTTP_OK) {
-            finalBitSet = true;
-        }
+            if (mPrivateOutput != null) {
+                bodyLength = mPrivateOutput.size();
+                orginalBodyLength = bodyLength;
+            }
 
-        if ((finalBitSet) || (headerArray.length < (mMaxPacketLength - 20))) {
-            if (bodyLength > 0) {
-                /*
-                 * Determine if I can send the whole body or just part of
-                 * the body.  Remember that there is the 3 bytes for the
-                 * response message and 3 bytes for the header ID and length
-                 */
-                if (bodyLength > (mMaxPacketLength - headerArray.length - 6)) {
-                    bodyLength = mMaxPacketLength - headerArray.length - 6;
+            if ((ObexHelper.BASE_PACKET_LENGTH + headerArray.length) > mMaxPacketLength) {
+
+                int end = 0;
+                int start = 0;
+
+                while (end != headerArray.length) {
+                    end = ObexHelper.findHeaderEnd(headerArray, start, mMaxPacketLength
+                            - ObexHelper.BASE_PACKET_LENGTH);
+                    if (end == -1) {
+
+                        mClosed = true;
+
+                        if (mPrivateInput != null) {
+                            mPrivateInput.close();
+                        }
+
+                        if (mPrivateOutput != null) {
+                            mPrivateOutput.close();
+                        }
+                        mParent.sendResponse(ResponseCodes.OBEX_HTTP_INTERNAL_ERROR, null);
+                        throw new IOException("OBEX Packet exceeds max packet size");
+                    }
+                    byte[] sendHeader = new byte[end - start];
+                    System.arraycopy(headerArray, start, sendHeader, 0, sendHeader.length);
+
+                    mParent.sendResponse(type, sendHeader);
+                    start = end;
                 }
 
-                byte[] body = mPrivateOutput.readBytes(bodyLength);
+                if (bodyLength > 0) {
+                    return true;
+                } else {
+                    return false;
+                }
+
+            } else {
+                out.write(headerArray);
+            }
+
+            // For Get operation: if response code is OBEX_HTTP_OK, then this is the
+            // last packet; so set finalBitSet to true.
+            if (mGetOperation && type == ResponseCodes.OBEX_HTTP_OK) {
+                finalBitSet = true;
+            }
+
+            if ((finalBitSet) || (headerArray.length < (mMaxPacketLength - 20))) {
+                if (bodyLength > 0) {
+                    /*
+                     * Determine if I can send the whole body or just part of
+                     * the body.  Remember that there is the 3 bytes for the
+                     * response message and 3 bytes for the header ID and length
+                     */
+                    if (bodyLength > (mMaxPacketLength - headerArray.length - 6)) {
+                        bodyLength = mMaxPacketLength - headerArray.length - 6;
+                    }
+
+                    byte[] body = mPrivateOutput.readBytes(bodyLength);
 
                 /*
                  * Since this is a put request if the final bit is set or
@@ -381,24 +448,26 @@ public final class ServerOperation implements Operation, BaseStream {
                     out.write(body);
                 }
              }
-        }
+          }
 
-        if ((finalBitSet) && (type == ResponseCodes.OBEX_HTTP_OK) && (orginalBodyLength <= 0)) {
-            if (mEndofBody) {
+          if ((finalBitSet) && (type == ResponseCodes.OBEX_HTTP_OK) && (orginalBodyLength <= 0)) {
+              if (mEndofBody) {
                 out.write(0x49);
                 orginalBodyLength = 3;
                 out.write((byte)(orginalBodyLength >> 8));
                 out.write((byte)orginalBodyLength);
-            }
-        }
+              }
+          }
 
-        mResponseSize = 3;
-        mParent.sendResponse(type, out.toByteArray());
+            mResponseSize = 3;
+            mParent.sendResponse(type, out.toByteArray());
+        }
 
         if (type == ResponseCodes.OBEX_HTTP_CONTINUE) {
             int headerID = mInput.read();
             int length = mInput.read();
             length = (length << 8) + mInput.read();
+            if (VERBOSE) Log.v(TAG, "sendReply reading headerID " + headerID + " length " + length);
             if ((headerID != ObexHelper.OBEX_OPCODE_PUT)
                     && (headerID != ObexHelper.OBEX_OPCODE_PUT_FINAL)
                     && (headerID != ObexHelper.OBEX_OPCODE_GET)
@@ -441,7 +510,7 @@ public final class ServerOperation implements Operation, BaseStream {
                 /*
                  * Determine if the packet length is larger then this device can receive
                  */
-                if (length > ObexHelper.MAX_PACKET_SIZE_INT) {
+                if (length > mParent.getMaxPacketSize()) {
                     mParent.sendResponse(ResponseCodes.OBEX_HTTP_REQ_TOO_LARGE, null);
                     throw new IOException("Packet received was too large");
                 }
@@ -450,6 +519,7 @@ public final class ServerOperation implements Operation, BaseStream {
                  * Determine if any headers were sent in the initial request
                  */
                 if (length > 3) {
+                    if (VERBOSE) Log.v(TAG, "sendReply reading " + (length-3));
                     byte[] data = new byte[length - 3];
                     bytesReceived = mInput.read(data);
 
@@ -457,6 +527,7 @@ public final class ServerOperation implements Operation, BaseStream {
                         bytesReceived += mInput.read(data, bytesReceived, data.length
                                 - bytesReceived);
                     }
+                    if (VERBOSE) Log.v(TAG, "sendReply read " + bytesReceived);
                     byte[] body = ObexHelper.updateHeaderSet(requestHeader, data);
                     if (body != null) {
                         mHasBody = true;
