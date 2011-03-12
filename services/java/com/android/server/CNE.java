@@ -427,13 +427,16 @@ public final class CNE implements ILinkManager {
                 if (DBG) Log.i(LOCAL_TAG, "CNE received action RSSI Changed events: " + action);
                 if (mWifiManager != null) {
                     String ipV4Addr = null;
+                    String iface = null;
                     ConnectivityManager cm = (ConnectivityManager) mContext
                             .getSystemService(Context.CONNECTIVITY_SERVICE);
                     NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
                     NetworkInfo.State networkState = (networkInfo
                             == null ? NetworkInfo.State.UNKNOWN : networkInfo.getState());
                     if (networkState == NetworkInfo.State.CONNECTED) {
-                        ipV4Addr = (getWlanAddrInfo(IPVersion.INET)).ipAddr;
+                        AddressInfo aInfo = getWlanAddrInfo(IPVersion.INET);
+                        ipV4Addr = aInfo.ipAddr;
+                        iface = aInfo.ifName;
                     }
                     WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
                     String ssid = wifiInfo.getSSID();
@@ -451,7 +454,7 @@ public final class CNE implements ILinkManager {
                         Log.i(LOCAL_TAG, logmsg);
                     }
                     updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G, NetworkStateToInt(networkState), rssi,
-                            ssid, ipV4Addr, tsStr);
+                            ssid, ipV4Addr, iface, tsStr);
                 } else {
                     Log.w(LOG_TAG, "CNE received action RSSI Changed events, null WifiManager");
                 }
@@ -533,7 +536,7 @@ public final class CNE implements ILinkManager {
                         Log.i(LOCAL_TAG, logmsg);
                     }
                     updateWlanStatus(CNE_NET_SUBTYPE_WLAN_G, NetworkStateToInt(networkState), rssi,
-                            ssid, wlanV4Addr.ipAddr, tsStr);
+                            ssid, wlanV4Addr.ipAddr, wlanV4Addr.ifName, tsStr);
                     notifyRatConnectStatus(CNE_RAT_WLAN, NetworkStateToInt(networkState),
                             wlanV4Addr.ipAddr);
                 } else {
@@ -617,7 +620,7 @@ public final class CNE implements ILinkManager {
                         Log.i(LOCAL_TAG, logmsg);
                     }
                     updateWwanStatus(networkType, NetworkStateToInt(netState), signalStrength,
-                            roaming, wwanV4AddrInfo.ipAddr, tsStr);
+                            roaming, wwanV4AddrInfo.ipAddr, wwanAddrInfo.ifName, tsStr);
                     notifyRatConnectStatus(CNE_RAT_WWAN, NetworkStateToInt(netState),
                             wwanV4AddrInfo.ipAddr);
                 } else {
@@ -1297,11 +1300,12 @@ public final class CNE implements ILinkManager {
                             + " state:" + networkState
                             + " ipV4Addr:" + wwanV4AddrInfo.ipAddr
                             + " roaming:" + roaming
+                            + " iface:" + wwanV4AddrInfo.ifName
                             + " timeStamp:" + tsStr;
                     Log.i(LOCAL_TAG, logmsg);
                 }
                 updateWwanStatus(type, NetworkStateToInt(networkState), rssi, roaming,
-                        wwanV4AddrInfo.ipAddr, tsStr);
+                        wwanV4AddrInfo.ipAddr, wwanV4AddrInfo.ifName, tsStr);
             } else {
                 Log.w(LOG_TAG, "onSignalStrengthsChanged null TelephonyManager");
             }
@@ -1389,7 +1393,7 @@ public final class CNE implements ILinkManager {
     }
 
     public boolean updateWlanStatus(int type, int state, int rssi, String ssid, String ipAddr,
-            String timeStamp) {
+            String iface, String timeStamp) {
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WLAN_INFO);
         if (rr == null) {
@@ -1402,8 +1406,9 @@ public final class CNE implements ILinkManager {
                     + " state=" + state
                     + " rssi=" + rssi
                     + " ssid=" + ssid
-                    + " ipAddr" + ipAddr
-                    + " timeStamp" + timeStamp);
+                    + " ipAddr=" + ipAddr
+                    + " iface=" + iface
+                    + " timeStamp=" + timeStamp);
         }
 
         rr.mp.writeInt(type);
@@ -1411,6 +1416,7 @@ public final class CNE implements ILinkManager {
         rr.mp.writeInt(rssi);
         rr.mp.writeString(ssid);
         rr.mp.writeString(ipAddr);
+        rr.mp.writeString(iface);
         rr.mp.writeString(timeStamp);
         send(rr);
         return true;
@@ -1448,7 +1454,7 @@ public final class CNE implements ILinkManager {
 
     /** {@hide} */
     public boolean updateWwanStatus(int type, int state, int rssi, int roaming, String ipV4Addr,
-            String timeStamp) {
+            String iface, String timeStamp) {
 
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WWAN_INFO);
         if (rr == null) {
@@ -1460,14 +1466,16 @@ public final class CNE implements ILinkManager {
                     + " state=" + state
                     + " rssi=" + rssi
                     + " roaming=" + roaming
-                    + " ipV4Addr" + ipV4Addr
-                    + " timeStamp" + timeStamp);
+                    + " ipV4Addr=" + ipV4Addr
+                    + " iface=" + iface
+                    + " timeStamp=" + timeStamp);
         }
         rr.mp.writeInt(type);
         rr.mp.writeInt(state);
         rr.mp.writeInt(rssi);
         rr.mp.writeInt(roaming);
         rr.mp.writeString(ipV4Addr);
+        rr.mp.writeString(iface);
         rr.mp.writeString(timeStamp);
         send(rr);
         return true;
