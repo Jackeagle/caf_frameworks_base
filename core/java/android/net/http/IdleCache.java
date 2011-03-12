@@ -23,6 +23,7 @@ package android.net.http;
 
 import org.apache.http.HttpHost;
 
+import android.net.http.RequestQueue;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 
@@ -47,6 +48,8 @@ class IdleCache {
     private final static int CHECK_INTERVAL = 2 * 1000;
     private Entry[] mEntries = new Entry[IDLE_CACHE_MAX];
 
+    private boolean mShutdownOnPageFinish;
+    public boolean pageFinished;
     private int mCount = 0;
 
     private IdleReaper mThread = null;
@@ -56,6 +59,8 @@ class IdleCache {
     private int mReused = 0;
 
     IdleCache() {
+        setShutdownFeature(false);
+        pageFinished = false;
         for (int i = 0; i < IDLE_CACHE_MAX; i++) {
             mEntries[i] = new Entry();
         }
@@ -116,8 +121,15 @@ class IdleCache {
         return ret;
     }
 
+    public void setShutdownFeature(boolean isOn) {
+        if (isOn) {
+            isOn = SystemProperties.getBoolean("net.http.idle_cache.shutdown", true);
+        }
+        mShutdownOnPageFinish = isOn;
+    }
+
     synchronized void clear() {
-        for (int i = 0; mCount > 0 && i < IDLE_CACHE_MAX; i++) {
+        for (int i = 0; (mCount > 0) && (i < IDLE_CACHE_MAX); i++) {
             Entry entry = mEntries[i];
             if (entry.mHost != null) {
                 entry.mHost = null;
@@ -131,7 +143,7 @@ class IdleCache {
     private synchronized void clearIdle() {
         if (mCount > 0) {
             long time = SystemClock.uptimeMillis();
-            for (int i = 0; i < IDLE_CACHE_MAX; i++) {
+            for (int i = 0; (mCount > 0) && (i < IDLE_CACHE_MAX); i++) {
                 Entry entry = mEntries[i];
                 if (entry.mHost != null && time > entry.mTimeout) {
                     entry.mHost = null;
@@ -141,6 +153,10 @@ class IdleCache {
                 }
             }
         }
+    }
+
+    public synchronized void wakeup() {
+        notify();
     }
 
     private class IdleReaper extends Thread {
@@ -157,6 +173,10 @@ class IdleCache {
                         IdleCache.this.wait(CHECK_INTERVAL);
                     } catch (InterruptedException ex) {
                     }
+                    if(mShutdownOnPageFinish && pageFinished && (ConnectionThread.sRunning.get() == 0)) {
+                        clear();
+                        break;
+                    }
                     if (mCount == 0) {
                         check++;
                     } else {
@@ -172,6 +192,8 @@ class IdleCache {
                 mCached = 0;
                 mReused = 0;
             }
+            pageFinished = false;
         }
     }
 }
+

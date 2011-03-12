@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ package android.net.http;
 
 import android.content.Context;
 import android.os.SystemClock;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.HttpHost;
 
@@ -28,6 +30,7 @@ import java.lang.Thread;
  */
 class ConnectionThread extends Thread {
 
+    static AtomicInteger sRunning = new AtomicInteger();
     static final int WAIT_TIMEOUT = 5000;
     static final int WAIT_TICK = 1000;
 
@@ -90,6 +93,7 @@ class ConnectionThread extends Thread {
         // next request starts.
         mCurrentThreadTime = 0;
         mTotalThreadTime = 0;
+        sRunning.incrementAndGet();
 
         while (mRunning) {
             if (mCurrentThreadTime == -1) {
@@ -110,11 +114,15 @@ class ConnectionThread extends Thread {
                 synchronized(mRequestFeeder) {
                     if (HttpLog.LOGV) HttpLog.v("ConnectionThread: Waiting for work");
                     mWaiting = true;
+                    sRunning.decrementAndGet();
+                    RequestQueue rq = (RequestQueue)mRequestFeeder;
+                    rq.checkPageFinished();
                     try {
                         mRequestFeeder.wait();
                     } catch (InterruptedException e) {
                     }
                     mWaiting = false;
+                    sRunning.incrementAndGet();
                     if (mCurrentThreadTime != 0) {
                         mCurrentThreadTime = SystemClock
                                 .currentThreadTimeMillis();
@@ -154,6 +162,7 @@ class ConnectionThread extends Thread {
             }
 
         }
+        sRunning.decrementAndGet();
     }
 
     public synchronized String toString() {
