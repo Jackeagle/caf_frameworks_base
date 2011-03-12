@@ -17,6 +17,7 @@
 
 package com.android.internal.telephony.gsm;
 
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.AsyncResult;
@@ -99,14 +100,23 @@ public class GSMPhone extends PhoneBase {
     public String mVmNumGsmKey = null;
     // Key used to read/write the SIM IMSI used for storing the voice mail
     public static final String VM_SIM_IMSI = "vm_sim_imsi_key";
+    public String mVmSimImsiKey = null;
+
     // Key used to read/write if Call Forwarding is enabled
     public static final String CF_ENABLED = "cf_enabled_key";
+    public String mCfEnabledKey = null;
 
     // Event constant for checking if Call Forwarding is enabled
     private static final int CHECK_CALLFORWARDING_STATUS = 75;
 
+    // Call Forward icons. Values have to be same as mentioned in
+    // NotificationMgr.java
+    private static final int CALL_FORWARD_NOTIFICATION = 6;
+    private static final int CALL_FORWARD_NOTIFICATION_SUB2 = 9;
+
     Subscription mSubscriptionData = null; //to store subscription information
     int mSubscription = 0;
+    NotificationManager notificationManager;
 
     // Instance Variables
     GsmCallTracker mCT;
@@ -151,7 +161,12 @@ public class GSMPhone extends PhoneBase {
             mSimulatedRadioControl = (SimulatedRadioControl) ci;
         }
 
+        notificationManager = (NotificationManager) mContext
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+
         mVmNumGsmKey = VM_NUMBER;
+        mVmSimImsiKey = VM_SIM_IMSI;
+        mCfEnabledKey = CF_ENABLED;
         mUiccManager = UiccManager.getInstance();
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
@@ -313,6 +328,10 @@ public class GSMPhone extends PhoneBase {
     public void resetSubSpecifics() {
         mImei = null;
         mImeiSv = null;
+        if (getCallForwardingIndicator()) {
+            int notificationId = (mSubscription == 0) ? CALL_FORWARD_NOTIFICATION : CALL_FORWARD_NOTIFICATION_SUB2;
+            notificationManager.cancel(notificationId);
+       }
     }
 
     //Gets Subscription information in the Phone Object
@@ -324,6 +343,8 @@ public class GSMPhone extends PhoneBase {
     public void setSubscription(int subId) {
         mSubscription = subId;
         mVmNumGsmKey = VM_NUMBER + mSubscription;
+        mVmSimImsiKey = VM_SIM_IMSI + mSubscription;
+        mCfEnabledKey = CF_ENABLED + mSubscription;
         // Make sure properties are set for proper subscription.
         setProperties();
     }
@@ -835,13 +856,13 @@ public class GSMPhone extends PhoneBase {
 
     private String getVmSimImsi() {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
-        return sp.getString(VM_SIM_IMSI, null);
+        return sp.getString(mVmSimImsiKey, null);
     }
 
     private void setVmSimImsi(String imsi) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         SharedPreferences.Editor editor = sp.edit();
-        editor.putString(VM_SIM_IMSI, imsi);
+        editor.putString(mVmSimImsiKey, imsi);
         editor.apply();
     }
 
@@ -1133,7 +1154,7 @@ public class GSMPhone extends PhoneBase {
     /*package*/ void setCallForwardingPreference(boolean enabled) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
         SharedPreferences.Editor edit = sp.edit();
-        edit.putBoolean(CF_ENABLED, enabled);
+        edit.putBoolean(mCfEnabledKey, enabled);
         edit.commit();
 
         // Using the same method as VoiceMail to be able to track when the sim card is changed.
@@ -1142,7 +1163,7 @@ public class GSMPhone extends PhoneBase {
 
     private boolean getCallForwardingPreference() {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
-        boolean cf = sp.getBoolean(CF_ENABLED, false);
+        boolean cf = sp.getBoolean(mCfEnabledKey, false);
         return cf;
     }
 
