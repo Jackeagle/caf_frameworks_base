@@ -403,13 +403,11 @@ uint32_t OMXCodec::getComponentQuirks(
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.evrc")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
-        quirks |= kRequiresEOSMessage;
     }
 
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.qcelp13")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
-        quirks |= kRequiresEOSMessage;
     }
 
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.aac")) {
