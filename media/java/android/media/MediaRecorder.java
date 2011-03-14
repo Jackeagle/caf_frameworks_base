@@ -34,6 +34,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileDescriptor;
 import java.lang.ref.WeakReference;
+import android.os.SystemProperties;
 
 /**
  * Used to record audio and video. The recording control is based on a
@@ -377,6 +378,13 @@ public class MediaRecorder
     {
         if((height == 1088) && (width == 1920)) {
             mUseWakeLock = true;
+        }
+        else if ((height == 720) && (width == 1280)) {
+            String deviceName = SystemProperties.get("ro.product.device");
+            if ( deviceName.startsWith("msm8660") ) {
+                Log.e("MediaRecorder", "Use wakelock for 720p on 8660");
+                mUseWakeLock = true;
+            }
         }
         else {
             mUseWakeLock = false;
