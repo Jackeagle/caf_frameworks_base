@@ -186,7 +186,7 @@ status_t NuHTTPDataSource::connect(
             return ERROR_IO;
         }
 
-        if (httpStatus == 200 || offset != 0) {
+        if (offset != 0 && httpStatus != 206) {
             mState = DISCONNECTED;
             mHTTP.disconnect();
             LOGE("Http server does not support byte range GET request");
