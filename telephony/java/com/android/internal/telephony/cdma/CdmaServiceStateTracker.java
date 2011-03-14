@@ -43,7 +43,6 @@ import android.util.Log;
 import android.util.TimeUtils;
 
 import com.android.internal.telephony.CommandsInterface;
-import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.IccCard;
@@ -939,11 +938,6 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
 
     private void pollStateDone() {
         if (DBG) log("Poll ServiceState done: oldSS=[" + ss + "] newSS=[" + newSS + "]");
-
-        if (RadioTechnology.getRadioTechFromInt(newSS.getRadioTechnology()).isGsm()) {
-            Log.e(LOG_TAG, "received invalid service state ...ignoring");
-            return;
-        }
 
         boolean hasRegistered =
             ss.getState() != ServiceState.STATE_IN_SERVICE
