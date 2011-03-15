@@ -46,6 +46,10 @@ else
 LOCAL_CFLAGS += -DNO_OPENCORE
 endif
 
+ifeq ($(WEBCORE_INPAGE_VIDEO), true)
+LOCAL_CFLAGS += -DYUVCLIENT
+endif
+
 ifneq ($(TARGET_SIMULATOR),true)
 LOCAL_SHARED_LIBRARIES += libdl
 endif
