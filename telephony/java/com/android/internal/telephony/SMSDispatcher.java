@@ -1082,6 +1082,8 @@ public abstract class SMSDispatcher extends Handler {
             } else if (intent.getAction().equals(Intent.ACTION_DEVICE_STORAGE_NOT_FULL)) {
                 mStorageAvailable = true;
                 mCm.reportSmsMemoryStatus(true, obtainMessage(EVENT_REPORT_MEMORY_STATUS_DONE));
+            } else if (intent.getAction().equals(Intents.CB_SMS_RECEIVED_ACTION)) {
+                // Ignore this intent. Apps will process it.
             } else {
                 // Assume the intent is one of the SMS receive intents that
                 // was sent as an ordered broadcast.  Check result and ACK.
