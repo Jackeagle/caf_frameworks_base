@@ -3160,9 +3160,11 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
 
     if (signalEOS) {
         flags |= OMX_BUFFERFLAG_EOS;
-        if ( mIsEncoder ) {
-            size_t off = info->mMediaBuffer->range_offset();
-            info->mMediaBuffer->set_range( 0, 0 );
+        if ( mIsEncoder && ( mQuirks & kRequiresEOSMessage ) ) {
+            if (info->mMediaBuffer != NULL ) {
+                size_t off = info->mMediaBuffer->range_offset();
+                info->mMediaBuffer->set_range( 0, 0 );
+            }
             offset = 0;
         }
     } else if (mThumbnailMode) {
