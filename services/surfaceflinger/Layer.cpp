@@ -79,8 +79,7 @@ Layer::~Layer()
         ourClient->detachLayer(this);
     }
 
-    int s3dFormat = const_cast<Layer*>(this)->getStereoscopic3DFormat();
-    if (s3dFormat) {
+    if(getStereoscopic3DFormat()) {
         const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
         hw.videoOverlayStarted(false);
         mFlinger->enableOverlayOpt(true);
@@ -295,7 +294,7 @@ status_t Layer::drawWithOverlay(const Region& clip,
 
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     overlay::Overlay* temp = hw.getOverlayObject();
-    int s3dFormat = const_cast<Layer*>(this)->getStereoscopic3DFormat();
+    int s3dFormat = getStereoscopic3DFormat();
     if (s3dFormat) {
         hw.videoOverlayStarted(true);
     }
