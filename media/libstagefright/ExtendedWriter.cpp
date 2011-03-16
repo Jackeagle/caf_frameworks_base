@@ -294,7 +294,7 @@ status_t ExtendedWriter::threadFunc() {
     fclose(mFile);
     mFile = NULL;
     mReachedEOS = true;
-    if (err == ERROR_END_OF_STREAM) {
+    if (err == ERROR_END_OF_STREAM || mDone) {
         return OK;
     }
     return err;
