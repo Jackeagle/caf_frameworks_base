@@ -66,7 +66,7 @@ namespace android {
 
 HDMIDaemon::HDMIDaemon() : Thread(false),
            mFrameworkSock(-1), mAcceptedConnection(-1), mUeventSock(-1),
-           mHDMIUeventQueueHead(NULL), fd1(-1)
+           mHDMIUeventQueueHead(NULL), fd1(-1), mCurrentID(-1)
 {
 }
 
@@ -480,33 +480,36 @@ bool HDMIDaemon::openFramebuffer()
 
 void HDMIDaemon::setResolution(int ID)
 {
-    if (mCurrentID == ID || !openFramebuffer())
+    if (!openFramebuffer())
         return;
 
-    const struct disp_mode_timing_type *mode = &supported_video_mode_lut[0];
-    for (unsigned int i = 0; i < sizeof(supported_video_mode_lut)/sizeof(*supported_video_mode_lut); ++i) {
-        const struct disp_mode_timing_type *cur = &supported_video_mode_lut[i];
-        if (cur->video_format == ID)
-            mode = cur;
+    if (mCurrentID != ID) {
+        const struct disp_mode_timing_type *mode = &supported_video_mode_lut[0];
+        for (unsigned int i = 0; i < sizeof(supported_video_mode_lut)/sizeof(*supported_video_mode_lut); ++i) {
+            const struct disp_mode_timing_type *cur = &supported_video_mode_lut[i];
+            if (cur->video_format == ID)
+                mode = cur;
+        }
+        SurfaceComposerClient::enableHDMIOutput(HDMIOUT_DISABLE);
+        struct fb_var_screeninfo info;
+        ioctl(fd1, FBIOGET_VSCREENINFO, &info);
+        LOGD("GET Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>",
+            info.reserved[3], info.xres, info.yres,
+            info.right_margin, info.hsync_len, info.left_margin,
+            info.lower_margin, info.vsync_len, info.upper_margin,
+            info.pixclock/1000/1000);
+            mode->set_info(info);
+        LOGD("SET Info<ID=%d => Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>", ID,
+            info.reserved[3], info.xres, info.yres,
+            info.right_margin, info.hsync_len, info.left_margin,
+            info.lower_margin, info.vsync_len, info.upper_margin,
+            info.pixclock/1000/1000);
+        info.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
+        ioctl(fd1, FBIOPUT_VSCREENINFO, &info);
+        mCurrentID = ID;
     }
-    SurfaceComposerClient::enableHDMIOutput(HDMIOUT_DISABLE);
-    struct fb_var_screeninfo info;
-    ioctl(fd1, FBIOGET_VSCREENINFO, &info);
-    LOGD("GET Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>",
-        info.reserved[3], info.xres, info.yres,
-        info.right_margin, info.hsync_len, info.left_margin,
-        info.lower_margin, info.vsync_len, info.upper_margin,
-        info.pixclock/1000/1000);
-    mode->set_info(info);
-    LOGD("SET Info<ID=%d => Info<ID=%d %dx%d (%d,%d,%d), (%d,%d,%d) %dMHz>", ID,
-        info.reserved[3], info.xres, info.yres,
-        info.right_margin, info.hsync_len, info.left_margin,
-        info.lower_margin, info.vsync_len, info.upper_margin,
-        info.pixclock/1000/1000);
-    info.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
-    ioctl(fd1, FBIOPUT_VSCREENINFO, &info);
     SurfaceComposerClient::enableHDMIOutput(HDMIOUT_ENABLE);
-    mCurrentID = ID;
+
 }
 
 int HDMIDaemon::processFrameworkCommand()
@@ -536,7 +539,6 @@ int HDMIDaemon::processFrameworkCommand()
         property_set("hw.hdmiON", "1");
         int en = 1;
         ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
-        SurfaceComposerClient::enableHDMIOutput(HDMIOUT_ENABLE);
     } else if (!strcmp(buffer, HDMI_CMD_DISABLE_HDMI)) {
         LOGD(HDMI_CMD_DISABLE_HDMI);
 
