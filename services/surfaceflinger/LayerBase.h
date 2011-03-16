@@ -64,7 +64,7 @@ public:
             LayerBase(SurfaceFlinger* flinger, DisplayID display);
 
     virtual status_t setStereoscopic3DFormat(int format) { mS3DFormat = format; return 0; }
-    virtual int getStereoscopic3DFormat() { return mS3DFormat; }
+    virtual int getStereoscopic3DFormat() const { return mS3DFormat; }
     DisplayID           dpy;
     mutable bool        contentDirty;
             Region      visibleRegionScreen;
