@@ -135,11 +135,6 @@ status_t MetadataRetrieverClient::setDataSource(const char *url)
         return UNKNOWN_ERROR;
     }
     player_type playerType;
-    char value[PROPERTY_VALUE_MAX];
-    if (!property_get("ro.product.device", value, "1")
-        || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa"))
-    playerType = PV_PLAYER;
-    else
     playerType = getPlayerType(url);
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
