@@ -87,6 +87,8 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
     private int         mCurrentBufferPercentage;
     private OnErrorListener mOnErrorListener;
     private int         mSeekWhenPrepared;  // recording the seek position while preparing
+    private int         mPosSuspend;        // position just before suspend
+    private boolean     mWakeFromSuspend;
     private boolean     mCanPause;
     private boolean     mCanSeekBack;
     private boolean     mCanSeekForward;
@@ -465,6 +467,13 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                     mMediaController.show();
                 }
             }
+            if (mWakeFromSuspend == true) {
+                // show the control after woke up
+                if (mMediaController != null) {
+                    mMediaController.show(0);
+                }
+                mWakeFromSuspend = false;
+            }
         }
 
         public void surfaceCreated(SurfaceHolder holder)
@@ -587,6 +596,7 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
                 mCurrentState = STATE_SUSPEND;
                 mTargetState = STATE_SUSPEND;
             } else {
+                mPosSuspend = getCurrentPosition();
                 release(false);
                 mCurrentState = STATE_SUSPEND_UNSUPPORTED;
                 Log.w(TAG, "Unable to suspend video. Release MediaPlayer.");
@@ -610,6 +620,10 @@ public class VideoView extends SurfaceView implements MediaPlayerControl {
         }
         if (mCurrentState == STATE_SUSPEND_UNSUPPORTED) {
             openVideo();
+            seekTo(mPosSuspend);
+            // UI is locked after woke up, so pause the playback
+            pause();
+            mWakeFromSuspend = true;
         }
     }
 
