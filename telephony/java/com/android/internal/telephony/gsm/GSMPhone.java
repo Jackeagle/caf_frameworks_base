@@ -1446,6 +1446,7 @@ public class GSMPhone extends PhoneBase {
             case EVENT_SUBSCRIPTION_READY:
                 Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY received");
                 mCM.getIMEI(obtainMessage(EVENT_GET_IMEI_DONE));
+                mCM.getIMEISV(obtainMessage(EVENT_GET_IMEISV_DONE));
                 break;
 
             case CHECK_CALLFORWARDING_STATUS:
