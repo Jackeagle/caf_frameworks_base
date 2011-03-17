@@ -565,6 +565,7 @@ public class BluetoothService extends IBluetooth.Stub {
                     // CONNECTABLE and CONNECTABLE_DISCOVERABLE
                     setScanMode(BluetoothAdapter.SCAN_MODE_CONNECTABLE, -1);
                 }
+                break;
             case MESSAGE_START_DUN_SERVER:
                 if (mDUNenable == true) {
                     Log.d(TAG, "Starting BT-DUN server");
@@ -1312,8 +1313,10 @@ public class BluetoothService extends IBluetooth.Stub {
             mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             pairable = true;
             discoverable = true;
-            Message msg = mHandler.obtainMessage(MESSAGE_DISCOVERABLE_TIMEOUT);
-            mHandler.sendMessageDelayed(msg, duration * 1000);
+            if (duration > 0) {
+                Message msg = mHandler.obtainMessage(MESSAGE_DISCOVERABLE_TIMEOUT);
+                mHandler.sendMessageDelayed(msg, duration * 1000);
+            }
             if (DBG) Log.d(TAG, "BT Discoverable for " + duration + " seconds");
             break;
         default:
