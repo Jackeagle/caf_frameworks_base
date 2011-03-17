@@ -3721,7 +3721,8 @@ status_t OMXCodec::read(
         mInitialBufferSubmit = false;
 
         if (seeking) {
-            CHECK(seekTimeUs >= 0);
+            if(seekTimeUs < 0)
+               return ERROR_UNSUPPORTED;
             mSeekTimeUs = seekTimeUs;
             mSeekMode = seekMode;
 
