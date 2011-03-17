@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,34 +104,38 @@ public class UiccCardApplication {
             Log.e(mLogTag, "Application updated after destroyed! Fix me!");
             return;
         }
+
         Log.d(mLogTag, mAppType + " update. New " + as);
         mContext = c;
         mCi = ci;
-
-        if (as.app_type != mAppType) {
-            mUiccApplicationRecords.dispose();
-            mUiccApplicationRecords = createUiccApplicationRecords(as.app_type, ur, c, ci);
-            mAppType = as.app_type;
-        }
-
-        if (mPersoSubState != as.perso_substate) {
-            mPersoSubState = as.perso_substate;
-            notifyPersoSubstateRegistrants();
-        }
-
+        AppType tempAppType = mAppType;
+        AppState tempAppState = mAppState;
+        PersoSubState tempPersoSubState = mPersoSubState;
+        mAppType = as.app_type;
+        mAppState = as.app_state;
+        mPersoSubState = as.perso_substate;
         mAid = as.aid;
         mAppLabel = as.app_label;
         mPin1Replaced = (as.pin1_replaced != 0);
         mPin1State = as.pin1;
         mPin2State = as.pin2;
-        if (mAppState != as.app_state) {
-            Log.d(mLogTag, mAppType + " changed state: " + mAppState + " -> " + as.app_state);
+
+        if (as.app_type != tempAppType) {
+            mUiccApplicationRecords.dispose();
+            mUiccApplicationRecords = createUiccApplicationRecords(as.app_type, ur, c, ci);
+        }
+
+        if (as.perso_substate != tempPersoSubState) {
+            notifyPersoSubstateRegistrants();
+        }
+
+        if (as.app_state != tempAppState) {
+            Log.d(mLogTag, tempAppType + " changed state: " + tempAppState + " -> " + as.app_state);
             // If the app state turns to APPSTATE_READY, then query FDN status,
             //as it might have failed in earlier attempt.
             if (as.app_state == UiccConstants.AppState.APPSTATE_READY) {
                 queryFdnAvailable();
             }
-            mAppState = as.app_state;
             notifyLockedRegistrants();
             notifyReadyRegistrants();
         }
