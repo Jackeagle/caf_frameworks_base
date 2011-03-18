@@ -754,6 +754,15 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
 
         paramDivX.eProfile = (QOMX_VIDEO_DIVXPROFILETYPE)0;//Not used for now.
 
+        paramDivX.pDrmHandle = NULL;
+        if (meta->findPointer(kKeyDivXDrm, &paramDivX.pDrmHandle) ) {
+            if( paramDivX.pDrmHandle != NULL ) {
+                LOGV("This DivX Clip is DRM encrypted, set the DRM handle ");
+            }
+            else {
+                LOGV("This DivX Clip is not DRM encrypted ");
+            }
+        }
         status_t err =  mOMX->setParameter(mNode,
                          (OMX_INDEXTYPE)OMX_QcomIndexParamVideoDivx,
                          &paramDivX, sizeof(paramDivX));

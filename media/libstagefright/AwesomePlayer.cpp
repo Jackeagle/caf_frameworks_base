@@ -41,7 +41,6 @@
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
-#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaDebug.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
@@ -371,13 +370,14 @@ status_t AwesomePlayer::setDataSource(
 
 status_t AwesomePlayer::setDataSource_l(
         const sp<DataSource> &dataSource) {
-    sp<MediaExtractor> extractor = MediaExtractor::Create(dataSource);
-
-    if (extractor == NULL) {
+    if( mMediaExtractor == NULL ) {
+       mMediaExtractor = MediaExtractor::Create(dataSource);
+    }
+    if (mMediaExtractor == NULL) {
         return UNKNOWN_ERROR;
     }
 
-    return setDataSource_l(extractor);
+    return setDataSource_l(mMediaExtractor);
 }
 
 status_t AwesomePlayer::setDataSource_l(const sp<MediaExtractor> &extractor) {
@@ -548,6 +548,7 @@ void AwesomePlayer::reset_l() {
     mUriHeaders.clear();
 
     mFileSource.clear();
+    mMediaExtractor.clear();
 
     delete mSuspensionState;
     mSuspensionState = NULL;
@@ -1916,6 +1917,9 @@ status_t AwesomePlayer::suspend() {
     state->mUri = mUri;
     state->mUriHeaders = mUriHeaders;
     state->mFileSource = mFileSource;
+    if( mFileSource != NULL ) {
+       state->mMediaExtractor = mMediaExtractor;
+    }
 
     state->mFlags = mFlags & (PLAYING | AUTO_LOOPING | LOOPING | AT_EOS);
     getPosition(&state->mPositionUs);
@@ -2006,6 +2010,10 @@ status_t AwesomePlayer::resume() {
     }
 
     if (state->mFileSource != NULL) {
+        // Set the extractor before calling setDataSource
+        if ( state->mMediaExtractor != NULL ) {
+           mMediaExtractor = state->mMediaExtractor;
+        }
         err = setDataSource_l(state->mFileSource);
 
         if (err == OK) {

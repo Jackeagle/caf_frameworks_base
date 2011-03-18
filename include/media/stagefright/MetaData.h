@@ -108,6 +108,7 @@ enum {
     kKeyIsUnreadable      = 'unre',  // bool (int32_t)
     kKeyRawCodecSpecificData = 'rcsd',  // raw data - added to support mmParser
     kKeyDivXVersion       = 'DivX',  // int32_t
+    kKeyDivXDrm           = 'QDrm',  // void *
     kKeyWriteCtts         = 'ctts',  // int32_t (bool)
     kKeyIsBFrame          = 'bfrm',  // int32_t (bool)
     kKeyWMAEncodeOpt      = 'eopt',  // int32_t

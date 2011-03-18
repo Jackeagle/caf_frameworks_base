@@ -25,6 +25,7 @@
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/TimeSource.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <utils/threads.h>
 #define BUFFER_QUEUE_CAPACITY 3
 
@@ -134,6 +135,7 @@ private:
     KeyedVector<String8, String8> mUriHeaders;
 
     sp<DataSource> mFileSource;
+    sp<MediaExtractor> mMediaExtractor;
 
     sp<MediaSource> mVideoTrack;
     sp<MediaSource> mVideoSource;
@@ -202,6 +204,7 @@ private:
         String8 mUri;
         KeyedVector<String8, String8> mUriHeaders;
         sp<DataSource> mFileSource;
+        sp<MediaExtractor> mMediaExtractor;
 
         uint32_t mFlags;
         int64_t mPositionUs;
