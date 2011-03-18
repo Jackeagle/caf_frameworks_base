@@ -1609,6 +1609,12 @@ public final class Settings {
         public static final String MULTI_SIM_VOICE_CALL = "multi_sim_voice_call";
 
         /**
+          * Multi Sim Selected Value for UserPrompt. The supported values are 0 = disabled,
+          * 1 = enabled.
+          */
+        public static final String MULTI_SIM_VOICE_PROMPT = "multi_sim_voice_prompt";
+
+        /**
           * Multi Sim Selected Value for Data Call. The supported values are 0 = SUB1,
           * 1 = SUB2.
           */

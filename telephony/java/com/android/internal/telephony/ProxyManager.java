@@ -59,6 +59,7 @@ public class ProxyManager extends Handler {
     public static final int SUBSCRIPTION_INDEX_INVALID = 99999;
 
     private static final int NUM_SUBSCRIPTIONS = 2;
+    private static final int PROMPT_VALUE = 0;
 
     // Set Subscription Return status
     public static final String SUB_ACTIVATE_SUCCESS = "ACTIVATE SUCCESS";
@@ -315,6 +316,7 @@ public class ProxyManager extends Handler {
                     + " is Active.  Update the default/voice/sms and data subscriptions");
             PhoneFactory.setVoiceSubscription(activeSub.subId);
             PhoneFactory.setSMSSubscription(activeSub.subId);
+            PhoneFactory.setPromptEnabled(false);
 
             Log.d(LOG_TAG, "updateSubPreferences: current defaultSub = "
                     + PhoneFactory.getDefaultSubscription());
@@ -1330,6 +1332,27 @@ public class ProxyManager extends Handler {
         return mSupplySubscription.subscriptionData;
     }
 
+    public boolean isSubActive(int subscription) {
+        boolean isActive = false;
+        SubscriptionData currentSelSub = getCurrentSubscriptions();
+        if (currentSelSub.subscription[subscription].subStatus == SUB_ACTIVATED) {
+            isActive = true;
+        }
+        return isActive;
+    }
+
+    public int numSubsActive() {
+        int phoneCount = TelephonyManager.getPhoneCount();
+        int subCount = 0;
+        for (int i = 0; i < phoneCount; i++) {
+            if (isSubActive(i)) {
+                subCount++;
+            }
+        }
+        Log.d(LOG_TAG, "count of subs activated " + subCount);
+        return subCount;
+    }
+
     /* Gets the default subscriptions for VOICE/SMS/DATA */
     private void getDefaultProperties(Context context) {
         boolean resetToDefault = true;
@@ -1367,6 +1390,8 @@ public class ProxyManager extends Handler {
                     Settings.System.MULTI_SIM_SMS, TelephonyManager.DEFAULT_SUB);
             Settings.System.putInt(context.getContentResolver(),
                     Settings.System.DEFAULT_SUBSCRIPTION, TelephonyManager.DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.MULTI_SIM_VOICE_PROMPT, PROMPT_VALUE);
         }
     }
 

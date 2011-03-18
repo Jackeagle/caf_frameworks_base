@@ -310,6 +310,30 @@ public class PhoneFactory {
         return subscription;
     }
 
+    /* Returns User Prompt property,  enabed or not */
+    public static boolean isPromptEnabled() {
+        boolean prompt = false;
+        int value = 0;
+        try {
+            value = Settings.System.getInt(sContext.getContentResolver(),
+                    Settings.System.MULTI_SIM_VOICE_PROMPT);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Settings Exception Reading Dual Sim Voice Prompt Values", snfe);
+        }
+        prompt = (value == 0) ? false : true ;
+        Log.d(LOG_TAG, "Prompt option:" + prompt);
+
+       return prompt;
+    }
+
+    /*Sets User Prompt property,  enabed or not */
+    public static void setPromptEnabled(boolean enabled) {
+        int value = (enabled == false) ? 0 : 1;
+        Settings.System.putInt(sContext.getContentResolver(),
+                Settings.System.MULTI_SIM_VOICE_PROMPT, value);
+        Log.d(LOG_TAG, "setVoicePromptOption to " + enabled);
+    }
+
     /* Gets User preferred Data subscription setting*/
     public static int getDataSubscription() {
         int subscription = 0;
