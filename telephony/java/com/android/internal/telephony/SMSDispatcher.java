@@ -1136,15 +1136,20 @@ public abstract class SMSDispatcher extends Handler {
         // Store the voice mail count in persistent memory.
         String imsi = mPhone.getSubscriberId();
         int mwi = mPhone.getVoiceMessageCount();
+        int sub = mPhone.getSubscription();
+        String vmCountForSub = ((PhoneBase)mPhone).VM_COUNT + sub;
 
         Log.d(TAG, " Storing Voice Mail Count = " + mwi
                     + " for imsi = " + imsi
+                    + " for sub = " + vmCountForSub
                     + " in preferences.");
 
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
         SharedPreferences.Editor editor = sp.edit();
-        editor.putInt(((PhoneBase)mPhone).VM_COUNT, mwi);
-        editor.putString(((PhoneBase)mPhone).VM_ID, imsi);
+        editor.putInt(vmCountForSub, mwi);
+        String vmId = ((PhoneBase)mPhone).VM_ID + sub;
+        Log.d(TAG, "vmId = " + vmId);
+        editor.putString(vmId, imsi);
         editor.commit();
 
     }

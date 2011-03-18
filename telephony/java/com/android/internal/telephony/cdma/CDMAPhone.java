@@ -98,6 +98,7 @@ public class CDMAPhone extends PhoneBase {
     private static final String VM_NUMBER_CDMA = "vm_number_key_cdma";
     private String mVmNumCdmaKey = null;
     private String mVmNumber = null;
+    public String mVmCountKey = null;
 
     static final int RESTART_ECM_TIMER = 0; // restart Ecm timer
     static final int CANCEL_ECM_TIMER = 1; // cancel Ecm timer
@@ -170,6 +171,7 @@ public class CDMAPhone extends PhoneBase {
                 EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null));
 
         mVmNumCdmaKey = VM_NUMBER_CDMA;
+        mVmCountKey = VM_COUNT;
         //TODO: fusion move RuimPhoneBookInterfaceManager functionality to IccPhoneBookIntManager
         mRuimPhoneBookInterfaceManager = new RuimPhoneBookInterfaceManager(this);
         mSubInfo = new PhoneSubInfo(this);
@@ -314,6 +316,7 @@ public class CDMAPhone extends PhoneBase {
     public void resetSubSpecifics() {
         mMeid = null;
         mEsn = null;
+        setVoiceMessageCount(0);
     }
 
     //Gets Subscription Information
@@ -324,6 +327,7 @@ public class CDMAPhone extends PhoneBase {
     public void setSubscription(int subId) {
         mSubscription = subId;
         mVmNumCdmaKey = VM_NUMBER_CDMA + mSubscription;
+        mVmCountKey = VM_COUNT + mSubscription;
         // Make sure the properties are set for the proper subscription.
         setProperties();
     }
@@ -996,6 +1000,7 @@ public class CDMAPhone extends PhoneBase {
             case EVENT_RUIM_RECORDS_LOADED:{
                 Log.d(LOG_TAG, "Event EVENT_RUIM_RECORDS_LOADED Received");
                 updateCurrentCarrierInProvider();
+                updateVoiceMail();
             }
             break;
 
@@ -1469,7 +1474,7 @@ public class CDMAPhone extends PhoneBase {
     /** gets the voice mail count from preferences */
     private int getStoredVoiceMessageCount() {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
-        return (sp.getInt(VM_COUNT, 0));
+        return (sp.getInt(mVmCountKey, 0));
     }
 
     /**
