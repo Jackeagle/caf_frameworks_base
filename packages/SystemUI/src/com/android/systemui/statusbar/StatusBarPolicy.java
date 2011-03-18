@@ -787,13 +787,14 @@ public class StatusBarPolicy {
             @Override
             public void onSignalStrengthsChanged(SignalStrength signalStrength) {
                 // mSubscription is a data member of PhoneStateListener class.
-                Slog.d(TAG, "onSignalStrengthsChangedreceived on subscription :" + mSubscription);
+                Slog.d(TAG, "onSignalStrengthsChanged:" + signalStrength
+                        + " for subscription" + mSubscription);
                 mSignalStrength[mSubscription] = signalStrength;
                 updateSignalStrength(mSubscription);
             }
 
             public void onServiceStateChanged(ServiceState state) {
-                Slog.d(TAG, "onServiceStateChanged Received on subscription :" + mSubscription);
+                Slog.d(TAG, "onServiceStateChanged:" + state + "for subscription :" + mSubscription);
                 mServiceState[mSubscription] = state;
                 updateSignalStrength(mSubscription);
                 updateDataIcon(mSubscription);
@@ -809,7 +810,8 @@ public class StatusBarPolicy {
 
             @Override
             public void onDataConnectionStateChanged(int state, int networkType) {
-                Slog.d(TAG, "StatusBarPolicy onDataConnectionStateChanged on subscription : " + mSubscription);
+                Slog.d(TAG, "StatusBarPolicy onDataConnectionStateChanged to " + state
+                        + "for nw : " + networkType + "on subscription : " + mSubscription);
                 mDataState = state;
                 updateDataNetType(networkType);
                 updateDataIcon(mSubscription);
@@ -1059,20 +1061,86 @@ public class StatusBarPolicy {
     }
 
     private int getLteLevel(int subscription) {
-        // TBD - comply with standards
-        // TS 36.214 Physical Layer Section 5.1.3
-        // TS 36.331 RRC
-        int rssi = mSignalStrength[subscription].getLteRssi();
-        int rsrp = mSignalStrength[subscription].getLteRsrp();
-        int iconLevel = -1;
 
-        if (rssi <= 2 || rssi == 99) iconLevel = 0;
-        else if (rssi >= 12) iconLevel = 4;
-        else if (rssi >= 8)  iconLevel = 3;
-        else if (rssi >= 5)  iconLevel = 2;
-        else iconLevel = 1;
+        /*
+         * TS 36.214 Physical Layer Section 5.1.3
+         * TS 36.331 RRC
+         * RSSI = received signal + noise
+         * RSRP = reference signal dBm
+         * RSRQ = quality of signal dB= Number of Resource blocksxRSRP/RSSI
+         * SNR = gain=signal/noise ratio = -10log P1/P2 dB
+         * CQI = channel quality = ?
+         */
+        int rssi, rsrp, snr;
+        int rssiIconLevel = -1, rsrpIconLevel = -1, snrIconLevel = -1;
 
-        return iconLevel;
+        rsrp = mSignalStrength[subscription].getLteRsrp();
+
+        /*
+         *  The current Reference Signal Receive Power Range: -44 to -140 dBm
+         *  RSRP >= -85 dBm => 4 bars
+         * -95 dBm <= RSRP < -85 dBm => 3bars
+         * -105 dBm <= RSRP < -95 dBm => 2
+         * -115 dBm <= RSRP < -105 dBm => 1
+         *  RSRP < -115 dBm/No Service Antenna Icon Only
+         *  RSRP ref: TS 33.331 - 6.3.5 range 0-97
+         */
+        if (rsrp > -44) rsrpIconLevel = -1;
+        else if (rsrp >= -85) rsrpIconLevel = 4;
+        else if (rsrp >= -95) rsrpIconLevel = 3;
+        else if (rsrp >= -105) rsrpIconLevel = 2;
+        else if (rsrp >= -115) rsrpIconLevel = 1;
+        else if (rsrp >= -140)rsrpIconLevel = 0;
+
+
+        snr = mSignalStrength[subscription].getLteSnr();
+        /*
+         * Values are -200 dB to +300 (= SNR *10dB )
+         * RS_SNR >= 13.0 dB =>4 bars
+         * 4.5 dB <= RS_SNR < 13.0 dB => 3 bars
+         * 1.0 dB <= RS_SNR < 4.5 dB => 2 bars
+         * -3.0 dB <= RS_SNR < 1.0 dB 1 bar
+         * RS_SNR < -3.0 dB/No Service Antenna Icon Only
+         */
+        if (snr > 300) snrIconLevel = -1;
+        else if (snr >= 130) snrIconLevel = 4;
+        else if (snr >= 45) snrIconLevel = 3;
+        else if (snr >= 10) snrIconLevel = 2;
+        else if (snr >= -30) snrIconLevel = 1;
+        else if (snr >= -200)snrIconLevel = 0;
+
+        Slog.d(TAG,"getLTELevel - rsrp:"+ rsrp + " snr:"+ snr);
+
+        /* Choose a measurement type to use for notification */
+        if ( snrIconLevel != -1 && rsrpIconLevel != -1){
+            /*
+             * The number of bars displayed shall be the smaller of the bars
+             * associated with LTE RSRP and the bars associated with the LTE
+             * RS_SNR
+             */
+            return (rsrpIconLevel < snrIconLevel ? rsrpIconLevel : snrIconLevel);
+        }
+
+        if (snrIconLevel != -1 )
+        {
+            return snrIconLevel;
+        }
+
+        if (rsrpIconLevel != -1 ) {
+            return rsrpIconLevel;
+        }
+
+        rssi = mSignalStrength[subscription].getLteRssi();
+        /* Valid values are (0-63, 99) as defined in TS 36.331 */
+        Slog.d(TAG,"getLTELevel -rssi:"+ rssi);
+        if (rssi > 63) rssiIconLevel = -1;
+        else if (rssi >= 12) rssiIconLevel = 4;
+        else if (rssi >= 8)  rssiIconLevel = 3;
+        else if (rssi >= 5) rssiIconLevel = 2;
+        else if ( rssi >= 0 ) rssiIconLevel = 1;
+
+        return rssiIconLevel;
+
     }
 
     private int getCdmaLevel(int subscription) {
@@ -1119,6 +1187,7 @@ public class StatusBarPolicy {
     }
 
     private final void updateDataNetType(int net) {
+        Slog.d(TAG,"Data network type changed to:" + net );
         switch (net) {
         case TelephonyManager.NETWORK_TYPE_EDGE:
             mDataIconList = sDataNetType_e[mInetCondition];
