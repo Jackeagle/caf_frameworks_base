@@ -407,7 +407,6 @@ uint32_t OMXCodec::getComponentQuirks(
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.aac")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
-        quirks |= kRequiresEOSMessage;
     }
 
     if (!strncmp(componentName, "OMX.qcom.video.encoder.", 23)) {
