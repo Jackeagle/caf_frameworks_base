@@ -970,27 +970,20 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
 
             if (canCopyBack) {
                 // copy the area that is invalid and not repainted this round
-                int size = mBuffers.size();
-                Region oldDirtyRegion;
-                for (int i = 0; i < size; i++) {
-                    if (i != backBufIdx && !mOldDirtyRegion[i].isEmpty())
-                        oldDirtyRegion.orSelf(mOldDirtyRegion[i]);
-                }
-                const Region copyback(oldDirtyRegion.subtract(newDirtyRegion));
+
+                const Region copyback(mOldDirtyRegion.subtract(newDirtyRegion));
+
                 if (!copyback.isEmpty())
                     copyBlt(backBuffer, frontBuffer, copyback);
             } else {
                 // if we can't copy-back anything, modify the user's dirty
                 // region to make sure they redraw the whole buffer
                 newDirtyRegion = boundsRegion;
-                int size = mBuffers.size();
-                for (int i = 0; i < size; i++)
-                    mOldDirtyRegion[i].clear();
             }
 
             // keep track of the are of the buffer that is "clean"
             // (ie: that will be redrawn)
-            mOldDirtyRegion[backBufIdx] = newDirtyRegion;
+            mOldDirtyRegion = newDirtyRegion;
 
             void* vaddr;
             status_t res = backBuffer->lock(
