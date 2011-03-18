@@ -29,6 +29,9 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 
+#include <cutils/properties.h>
+#include <string.h>
+
 #ifdef HAVE_BLUETOOTH
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/rfcomm.h>
@@ -101,6 +104,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
     jboolean auth;
     jboolean encrypt;
     jint type;
+    char value[PROPERTY_VALUE_MAX] = "";
 
     type = env->GetIntField(obj, field_mType);
 
@@ -132,17 +136,28 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
     encrypt = env->GetBooleanField(obj, field_mEncrypt);
 
     /* kernel does not yet support LM for SCO */
+
+    /* By default we request to be the MASTER of connection */
+    property_get("ro.bluetooth.request.master", value, "true");
     switch (type) {
     case TYPE_RFCOMM:
         lm |= auth ? RFCOMM_LM_AUTH : 0;
         lm |= encrypt ? RFCOMM_LM_ENCRYPT : 0;
         lm |= (auth && encrypt) ? RFCOMM_LM_SECURE : 0;
+        if (!strcmp("true", value)) {
+            LOGI("Setting Master socket option");
+            lm |= RFCOMM_LM_MASTER;
+        }
         break;
     case TYPE_L2CAP:
     case TYPE_EL2CAP:
         lm |= auth ? L2CAP_LM_AUTH : 0;
         lm |= encrypt ? L2CAP_LM_ENCRYPT : 0;
         lm |= (auth && encrypt) ? L2CAP_LM_SECURE : 0;
+        if (!strcmp("true", value)) {
+            LOGI("Setting Master socket option");
+            lm |= L2CAP_LM_MASTER;
+        }
         break;
     }
 
