@@ -42,6 +42,7 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.server.BatteryService;
+import com.android.internal.telephony.ITelephony;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -79,7 +80,7 @@ import android.telephony.TelephonyManager;
 import android.util.Config;
 import android.util.Log;
 
-import com.android.internal.telephony.ITelephony;
+import android.os.INetworkManagementService;
 
 /**
  * {@hide}
@@ -284,16 +285,6 @@ public final class CNE {
     static final int CNE_MASK_ON_LINK_AVAIL_SENT = 0x0001;
     static final int CNE_MASK_ON_BETTER_LINK_AVAIL_SENT = 0x0002;
 
-    static final int CNE_IPROUTE2_ADD_ROUTING = 0;
-    static final int CNE_IPROUTE2_DELETE_ROUTING = 1;
-    static final int CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN = 2;
-    static final int CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN = 3;
-    static final int CNE_IPROUTE2_ADD_HOST_TO_MAIN = 4;
-    static final int CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN = 5;
-    static final int CNE_IPROUTE2_DELETE_HOST_ROUTING = 6;
-    static final int CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN = 7;
-    static final int CNE_IPROUTE2_DELETE_HOST_IN_MAIN = 8;
-
     static final int CNE_NET_SUBTYPE_WLAN_B = 20;
     static final int CNE_NET_SUBTYPE_WLAN_G = 21;
 
@@ -484,35 +475,8 @@ public final class CNE {
                                 + " networkState: " + networkState);
                     }
                     if (networkState == NetworkInfo.State.CONNECTED) {
-                        try {
                             activeWlanIfName = wlanV4Addr.ifName;
                             activeWlanGatewayAddr = wlanV4Addr.gatewayAddr;
-                            // add network interface to main table and
-                            // create
-                            // an interface specific table if it does
-                            // not already exist
-                            configureIproute2(CNE_IPROUTE2_ADD_ROUTING, wlanV4Addr.ifName,
-                                    wlanV4Addr.ipAddr, wlanV4Addr.gatewayAddr);
-
-                            if ((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE)
-                                    && (mDefaultNetwork != ConnectivityManager.TYPE_WIFI)
-                                    && (activeWlanIfName != null)) {
-                                if (DBG) {
-                                    Log.i(LOCAL_TAG, "CNE received Network/Wifi State Changed - "
-                                            + "DELETE Wlan From Main");
-                                }
-                                // remove network interface from main
-                                // table if it is not preferred
-                                // interface
-                                configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
-                                        activeWlanIfName, null, null);
-                            }
-                        } catch (Exception e) {
-                            Log.w(LOG_TAG, "CNE receiver exception", e);
-                        }
-                    } else if (networkState == NetworkInfo.State.DISCONNECTED) {
-                        configureIproute2(CNE_IPROUTE2_DELETE_ROUTING, activeWlanIfName,
-                                null, null);
                     }
                     WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
                     String ssid = wifiInfo.getSSID();
@@ -569,32 +533,6 @@ public final class CNE {
                         if (ipv == IPVersion.IPV4) {
                             activeWwanV4IfName = wwanV4AddrInfo.ifName;
                             activeWwanV4GatewayAddr = wwanV4AddrInfo.gatewayAddr;
-                        }
-                        if (DBG) Log.i(LOCAL_TAG, "onDataConnectionStateChanged ADD IPROUTE2");
-                        // add network interface to main table and
-                        // create an interface
-                        // specific table if it does not already exist
-                        configureIproute2(CNE_IPROUTE2_ADD_ROUTING, wwanAddrInfo.ifName,
-                                wwanAddrInfo.ipAddr, wwanAddrInfo.gatewayAddr);
-                        if ((mDefaultNetwork != ConnectivityManager.MAX_NETWORK_TYPE)
-                                && (mDefaultNetwork != ConnectivityManager.TYPE_MOBILE)) {
-                            if (DBG) {
-                                Log.i(LOCAL_TAG,
-                                        "onDataConnectionStateChanged: Delete Wwan From Main");
-                            }
-                            // remove network interface from main
-                            // table if it is not preferred interface
-                            configureIproute2(CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN,
-                                    wwanAddrInfo.ifName, null, null);
-                        }
-                    } else if (netState == NetworkInfo.State.DISCONNECTED) {
-                        if (ipv == IPVersion.IPV4) {
-                            configureIproute2(CNE_IPROUTE2_DELETE_ROUTING, activeWwanV4IfName,
-                                    null, null);
-                            if (DBG) {
-                                Log.i(LOCAL_TAG, "onDataConnectionStateChanged: DISCONNECTED"
-                                        + "Delete Wwan(after)" + activeWwanV4IfName);
-                            }
                         }
                     }
                     int roaming = (int) (mTelephonyManager.isNetworkRoaming() ? 1 : 0);
@@ -748,7 +686,7 @@ public final class CNE {
             mLinkNotifier = new MyLinkNotifier();
             try {
                 mLinkProvider = new LinkProvider(LinkProvider.ROLE_DEFAULT, mLinkReqs,
-                        mLinkNotifier);
+                       mLinkNotifier);
             } catch (Exception e) {
                 Log.w(LOG_TAG, "LinkProvider creation threw an exception: " + e);
             }
@@ -783,7 +721,7 @@ public final class CNE {
                 if (DBG) Log.i(LOCAL_TAG, "DefaultConnection onLinkAvail called");
                 if (mLinkProvider != null) {
                     mLinkProvider.reportLinkSatisfaction(info, true, true);
-                    /* notify to the default network to iproute2 */
+                    /* notify to the default network */
                     notifyDefaultNwChange(info.getNwId());
                 }
             }
@@ -805,7 +743,7 @@ public final class CNE {
                 if (DBG) Log.i(LOCAL_TAG, "DefaultConnection onBetterLinkAvail called");
                 if (mLinkProvider != null) {
                     mLinkProvider.switchLink(info, true);
-                    /* notify to the default network to iproute2 */
+                    /* notify to the default network */
                     notifyDefaultNwChange(info.getNwId());
                 }
             }
@@ -1530,42 +1468,6 @@ public final class CNE {
     }
 
     /** {@hide} */
-    public boolean configureIproute2(int command, String ifName, String ipAddr,
-            String gatewayAddr) {
-
-        CNERequest rr = null;
-        if (DBG) {
-            Log.i(LOCAL_TAG, "configureIproute2: Command=" + command
-                    + " ifName=" + ifName
-                    + " ipAddr=" + ipAddr
-                    + " gatewayAddr=" + gatewayAddr);
-        }
-        if (getFmcObj() != null) {
-            if ((getFmcObj().dsAvail == true)
-                    && (command == CNE_IPROUTE2_ADD_ROUTING
-                            || command == CNE_IPROUTE2_DELETE_ROUTING
-                            || command == CNE_IPROUTE2_DELETE_DEFAULT_IN_MAIN
-                            || command == CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN)) {
-                Log.w(LOG_TAG, "configureIproute2: cmd=" + command + " invalid in FMC");
-                return false;
-            }
-        }
-
-        rr = CNERequest.obtain(CNE_REQUEST_CONFIG_IPROUTE2_CMD);
-        if (rr == null) {
-            Log.w(LOG_TAG, "configureIproute2: rr=NULL");
-            return false;
-        }
-
-        rr.mp.writeInt(command);
-        rr.mp.writeString(ifName);
-        rr.mp.writeString(ipAddr);
-        rr.mp.writeString(gatewayAddr);
-        send(rr);
-        return true;
-    }
-
-    /** {@hide} */
     public void sendDefaultNwPref2Cne(int preference) {
         mNetworkPreference = preference;
     }
@@ -2014,13 +1916,17 @@ public final class CNE {
             if (status == FmcNotifier.FMC_STATUS_ENABLED) {
                 AddressInfo wwanV4AddrInfo = getWwanAddrInfo(Phone.APN_TYPE_DEFAULT,
                         IPVersion.IPV4);
-                configureIproute2(CNE_IPROUTE2_DELETE_HOST_ROUTING, activeWlanIfName, null, null);
-                configureIproute2(CNE_IPROUTE2_DELETE_HOST_DEFAULT_IN_MAIN, activeWwanV4IfName,
-                        null, null);
-                configureIproute2(CNE_IPROUTE2_ADD_HOST_TO_MAIN, activeWlanIfName,
-                        hostRoutingIpAddr, activeWlanGatewayAddr);
-                configureIproute2(CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN,
-                        wwanV4AddrInfo.ifName, wwanV4AddrInfo.ipAddr, wwanV4AddrInfo.gatewayAddr);
+                Log.i(LOCAL_TAG, "handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status] + ",hostIp=" + hostRoutingIpAddr + ",interface=" + activeWlanIfName);
+                IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+                INetworkManagementService nms = INetworkManagementService.Stub.asInterface(b);
+                try {
+                    nms.addDstRoute(activeWlanIfName, hostRoutingIpAddr, activeWlanGatewayAddr);
+                    if (mService != null) {
+                        mService.setDefaultRoute(ConnectivityManager.TYPE_MOBILE);
+                    }
+                } catch (Exception e) {
+                    Log.w(LOCAL_TAG, "Error adding host routing");
+                }
                 rInfo.enabled = true;
             } else {
                 if ((status == FmcNotifier.FMC_STATUS_CLOSED)
@@ -2343,19 +2249,22 @@ public final class CNE {
         mDefaultNetwork = nwId;
         // Change default network interface in main table to new one
         if ((nwId == ConnectivityManager.TYPE_WIFI) && (activeWlanIfName != null)) {
-             configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWlanIfName, null,
-                               activeWlanGatewayAddr);
             // Need to delete the host entry
             if (mRemoveHostEntry) {
                 mRemoveHostEntry = false;
-                if (DBG) {
-                    Log.i(LOCAL_TAG, "notifyDefaultNwChange: CNE_IPROUTE2_DELETE_HOST_IN_MAIN");
+                IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+                INetworkManagementService nms = INetworkManagementService.Stub.asInterface(b);
+                try {
+                    nms.delDstRoute(hostRoutingIpAddr);
+                } catch (Exception e) {
+                    Log.w(LOCAL_TAG, "Error deleting host routing");
                 }
-                configureIproute2(CNE_IPROUTE2_DELETE_HOST_IN_MAIN, activeWlanIfName, null, null);
             }
-        } else if ((nwId == ConnectivityManager.TYPE_MOBILE) && (activeWwanV4IfName != null)) {
-            configureIproute2(CNE_IPROUTE2_REPLACE_DEFAULT_ENTRY_IN_MAIN, activeWwanV4IfName, null,
-                              activeWwanV4GatewayAddr);
+        }
+        if (mService != null) {
+            mService.setDefaultRoute(nwId);
+        } else {
+            if (DBG) Log.w(LOCAL_TAG, "notifyDefaultNwChange: mService in NULL");
         }
         return;
     }

@@ -1399,6 +1399,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (mNetAttributes[netType].isDefault()) {
                 if (!SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor")) {
                     mNetTrackers[netType].addDefaultRoute();
+                } else {
+                    mNetTrackers[netType].addSrcRoutes();
                 }
             } else {
                 // many radios add a default route even when we don't want one.
@@ -1416,7 +1418,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         } else {
             if (mNetAttributes[netType].isDefault()) {
-                mNetTrackers[netType].removeDefaultRoute();
+                if (!SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor")) {
+                    mNetTrackers[netType].removeDefaultRoute();
+                } else {
+                    mNetTrackers[netType].delSrcRoutes();
+                }
             } else {
                 mNetTrackers[netType].removePrivateDnsRoutes();
             }
@@ -2134,6 +2140,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-
+    /** {@hide}
+     * Used by LinkManager to set the default route.
+     * Forwards the request to NetworkStateTrackers.
+     */
+    public void setDefaultRoute(int network) {
+        // add default route for this network
+        Slog.d(TAG, "setDefaultRoute, network=" + network + ",len=" + mNetTrackers.length);
+        mNetTrackers[network].addDefaultRoute();
+    }
 
 }
