@@ -1348,13 +1348,19 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (mNetAttributes[netType].isDefault()) {
                 if (!SystemProperties.get(ILinkManager.UseCne,"none").equalsIgnoreCase("vendor")) {
                     mNetTrackers[netType].addDefaultRoute();
+                } else {
+                    mNetTrackers[netType].addSrcRoutes();
                 }
             } else {
                 mNetTrackers[netType].addPrivateDnsRoutes();
             }
         } else {
             if (mNetAttributes[netType].isDefault()) {
-                mNetTrackers[netType].removeDefaultRoute();
+                if (!SystemProperties.get(ILinkManager.UseCne,"none").equalsIgnoreCase("vendor")) {
+                    mNetTrackers[netType].removeDefaultRoute();
+                } else {
+                    mNetTrackers[netType].delSrcRoutes();
+                }
             } else {
                 mNetTrackers[netType].removePrivateDnsRoutes();
             }
@@ -2071,14 +2077,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      */
     public void setDefaultRoute(int network) {
         // add default route for this network
+        Slog.d(TAG, "setDefaultRoute, network=" + network + ",len=" + mNetTrackers.length);
         mNetTrackers[network].addDefaultRoute();
-
-        // remove all other default routes
-        for (int i = 0; i < mNetTrackers.length; i++) {
-            if (i != network) {
-                mNetTrackers[i].removeDefaultRoute();
-            }
-        }
     }
 
     /*
