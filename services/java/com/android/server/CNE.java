@@ -728,20 +728,17 @@ public final class CNE implements ILinkManager {
      * are not using cne api have connectivity
      */
     class DefaultConnection {
-        LinkProvider mLinkProvider;
         Map<LinkRequirement, String> mLinkReqs;
         MyLinkNotifier mLinkNotifier;
 
         /* Default constructor initializing linkrequirements to null */
         public DefaultConnection() {
             mLinkReqs = null;
-            mLinkProvider = null;
         }
 
         /* constructor initializing the linkRequirements */
         public DefaultConnection(Map<LinkRequirement, String> linkReqs) {
             mLinkReqs = linkReqs;
-            mLinkProvider = null;
         }
 
         /*
@@ -751,30 +748,23 @@ public final class CNE implements ILinkManager {
         public void startConnection() {
             if (DBG) Log.i(LOCAL_TAG, "DefaultConnection startConnection called");
             mLinkNotifier = new MyLinkNotifier();
-            try {
-                mLinkProvider = new LinkProvider(LinkProvider.ROLE_DEFAULT, mLinkReqs,
-                        mLinkNotifier);
-            } catch (Exception e) {
-                Log.w(LOG_TAG, "LinkProvider creation threw an exception: " + e);
-            }
-            if (mLinkProvider != null) {
-                mLinkProvider.getLink();
-            }
+            getLink_LP(LinkProvider.ROLE_DEFAULT,
+                       mLinkReqs,
+                       mLinkNotifier.getCallingPid(),
+                       mLinkNotifier);
         }
 
         /* Ends the previously started connection */
         public void endConnection() {
             if (DBG) Log.i(LOCAL_TAG, "DefaultConnection endConnection called");
-            if (mLinkProvider != null) {
-                mLinkProvider.releaseLink();
-            }
+            releaseLink_LP(LinkProvider.ROLE_DEFAULT,mLinkNotifier.getCallingPid());
         }
 
         /*
          * Implementation of the LinkNotifier interface to pass to the
          * LinkProvider class used to start connection
          */
-        private class MyLinkNotifier implements LinkNotifier {
+        private class MyLinkNotifier extends IConSvcEventListener.Stub {
             /* default constructor */
             public MyLinkNotifier() {
                 return;
@@ -786,11 +776,13 @@ public final class CNE implements ILinkManager {
              */
             public void onLinkAvail(LinkInfo info) {
                 if (DBG) Log.i(LOCAL_TAG, "DefaultConnection onLinkAvail called");
-                if (mLinkProvider != null) {
-                    mLinkProvider.reportLinkSatisfaction(info, true, true);
-                    /* notify to the default network to iproute2 */
-                    notifyDefaultNwChange(info.getNwId());
-                }
+                reportLinkSatisfaction_LP(LinkProvider.ROLE_DEFAULT,
+                                          getCallingPid(),
+                                          info,
+                                          true,
+                                          true);
+                /* notify to the default network to iproute2 */
+                notifyDefaultNwChange(info.getNwId());
             }
 
             /*
@@ -808,11 +800,10 @@ public final class CNE implements ILinkManager {
             /* a better link is available accept it. */
             public void onBetterLinkAvail(LinkInfo info) {
                 if (DBG) Log.i(LOCAL_TAG, "DefaultConnection onBetterLinkAvail called");
-                if (mLinkProvider != null) {
-                    mLinkProvider.switchLink(info, true);
-                    /* notify to the default network to iproute2 */
-                    notifyDefaultNwChange(info.getNwId());
-                }
+                Log.e(LOCAL_TAG, "onBetterLinkAvail pid= " + getCallingPid());
+                switchLink_LP(LinkProvider.ROLE_DEFAULT,getCallingPid(),info, true);
+                /* notify to the default network to iproute2 */
+                notifyDefaultNwChange(info.getNwId());
             }
 
             /* current connection is lost. */
