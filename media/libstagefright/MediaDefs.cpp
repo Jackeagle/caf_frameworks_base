@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+/*
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ */
 #include <media/stagefright/MediaDefs.h>
 
 namespace android {
@@ -45,6 +47,7 @@ const char *MEDIA_MIMETYPE_CONTAINER_WAV = "audio/wav";
 const char *MEDIA_MIMETYPE_CONTAINER_OGG = "application/ogg";
 const char *MEDIA_MIMETYPE_CONTAINER_MATROSKA = "video/x-matroska";
 const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS = "video/mp2ts";
+const char *MEDIA_MIMETYPE_CONTAINER_AAC = "audio/aac";
 
 const char *MEDIA_MIMETYPE_CONTAINER_AVI = "video/avi";
 const char *MEDIA_MIMETYPE_CONTAINER_ASF = "video/x-ms-asf";

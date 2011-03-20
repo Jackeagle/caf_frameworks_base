@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+/*
+ *Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+*/
 #include "AACDecoder.h"
 #define LOG_TAG "AACDecoder"
 
@@ -65,6 +67,16 @@ status_t AACDecoder::initCheck() {
     mConfig->outputFormat = OUTPUTFORMAT_16PCM_INTERLEAVED;
     mConfig->aacPlusEnabled = 1;
 
+    int32_t samplingRate;
+    mMeta->findInt32(kKeySampleRate, &samplingRate);
+    mConfig->samplingRate = samplingRate;
+
+    int32_t bitRate;
+    mMeta->findInt32(kKeyBitRate, &bitRate);
+
+    int32_t encodedChannelCnt;
+    mMeta->findInt32(kKeyChannelCount, &encodedChannelCnt);
+
     // The software decoder doesn't properly support mono output on
     // AACplus files. Always output stereo.
     mConfig->desiredChannels = 2;
@@ -99,6 +111,16 @@ status_t AACDecoder::initCheck() {
                 != MP4AUDEC_SUCCESS) {
             return ERROR_UNSUPPORTED;
         }
+    }
+    if(meta->findData(kKeyACC, &type, &data, &size)) {
+      mConfig->pInputBuffer = (UChar *)data;
+      mConfig->inputBufferCurrentLength = size;
+      mConfig->inputBufferMaxLength = 0;
+
+      if (PVMP4AudioDecoderConfig(mConfig, mDecoderBuf)
+          != MP4AUDEC_SUCCESS) {
+         return ERROR_UNSUPPORTED;
+      }
     }
     return OK;
 }
@@ -198,7 +220,6 @@ status_t AACDecoder::read(
 
     MediaBuffer *buffer;
     CHECK_EQ(mBufferGroup->acquire_buffer(&buffer), OK);
-
     mConfig->pInputBuffer =
         (UChar *)mInputBuffer->data() + mInputBuffer->range_offset();
 

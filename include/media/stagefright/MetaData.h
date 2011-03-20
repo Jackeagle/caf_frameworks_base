@@ -41,6 +41,7 @@ enum {
     kKeySampleRate        = 'srte',  // int32_t (also video frame rate)
     kKeyBitRate           = 'brte',  // int32_t (bps)
     kKeyESDS              = 'esds',  // raw data
+    kKeyACC               = 'acc' ,
     kKeyAVCC              = 'avcc',  // raw data
     kKeyVorbisInfo        = 'vinf',  // raw data
     kKeyVorbisBooks       = 'vboo',  // raw data
@@ -124,6 +125,7 @@ enum {
 
 enum {
     kTypeESDS        = 'esds',
+    kTypeAAC         = 'acc',
     kTypeAVCC        = 'avcc',
 };
 
