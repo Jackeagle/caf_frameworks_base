@@ -73,6 +73,7 @@ public final class ShutdownThread extends Thread {
     private PowerManager mPowerManager;
     private PowerManager.WakeLock mWakeLock;
     private Handler mHandler;
+    private boolean mRilShutdown = SystemProperties.getBoolean("ro.ril.shutdown",false);
     
     private ShutdownThread() {
     }
@@ -312,11 +313,13 @@ public final class ShutdownThread extends Thread {
         }
 
         // Send power off command to RIL
-        try {
-            Log.w(TAG, "Sending ril power off ...");
-            phone.setRilPowerOff();
-        } catch (RemoteException ex) {
-            Log.e(TAG, "RemoteException during Phone Power-off", ex);
+        if (mRilShutdown) {
+            try {
+                Log.w(TAG, "Sending ril power off ...");
+                phone.setRilPowerOff();
+            } catch (RemoteException ex) {
+                Log.e(TAG, "RemoteException during Phone Power-off", ex);
+            }
         }
 
         // Shutdown MountService to ensure media is in a safe state
