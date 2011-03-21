@@ -836,7 +836,10 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
      }
 
     if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_WMA, mMIME))  {
-        setWMAFormat(meta);
+        status_t err = setWMAFormat(meta);
+        if(err!=OK){
+           return err;
+        }
     }
     if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mMIME)) {
         OMX_QCOM_PARAM_PORTDEFINITIONTYPE portdef;
@@ -3529,10 +3532,11 @@ void OMXCodec::setAC3Format(int32_t /*numChannels*/, int32_t /*sampleRate*/) {
     CHECK_EQ(err, OK);
 */
 }
-void OMXCodec::setWMAFormat(const sp<MetaData> &meta)
+status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
 {
     if (mIsEncoder) {
         CODEC_LOGE("WMA encoding not supported");
+        return OK;
     } else {
         int32_t version;
         OMX_AUDIO_PARAM_WMATYPE paramWMA;
@@ -3573,6 +3577,12 @@ void OMXCodec::setWMAFormat(const sp<MetaData> &meta)
         CODEC_LOGV("Channels: %d, SampleRate: %d, BitRate; %d"
                    "EncodeOptions: %d, blockAlign: %d", numChannels,
                    sampleRate, bitRate, encodeOptions, blockAlign);
+
+        if(sampleRate>48000 || numChannels>2)
+        {
+           LOGE("Unsupported samplerate/channels");
+           return ERROR_UNSUPPORTED;
+        }
 
         if(version==kTypeWMAPro || version==kTypeWMAProPlus)
         {
@@ -3627,7 +3637,7 @@ void OMXCodec::setWMAFormat(const sp<MetaData> &meta)
            err = mOMX->setParameter(
                    mNode, index, &paramWMA10, sizeof(paramWMA10));
         }
-        CHECK_EQ(err, OK);
+        return err;
     }
 }
 
