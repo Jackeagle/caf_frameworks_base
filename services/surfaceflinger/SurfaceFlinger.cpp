@@ -889,9 +889,9 @@ void SurfaceFlinger::handleRepaint()
 {
     // compute the invalid region
     mInvalidRegion.orSelf(mDirtyRegion);
-    //Skip this check for original resolution surface, since MDP is used for display
-    //and we want to ensure UI updates.
-    if (mInvalidRegion.isEmpty() && mOrigResSurfAbsent) {
+    // Skip this check for original resolution  and layerbuffer surfaces, since MDP is
+    // used for display and we want to ensure UI updates.
+    if (mInvalidRegion.isEmpty() && mOrigResSurfAbsent && !mIsLayerBufferPresent) {
         // nothing to do
         return;
     }
