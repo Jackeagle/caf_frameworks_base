@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +22,11 @@ import android.hardware.Camera;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
+import android.app.ActivityThread;
+import android.app.Application;
+import android.content.Context;
 import android.util.Log;
 import android.view.Surface;
 import java.io.IOException;
@@ -76,6 +82,9 @@ public class MediaRecorder
     private OnErrorListener mOnErrorListener;
     private OnInfoListener mOnInfoListener;
 
+    private WakeLock mWakeLock;
+    private boolean mUseWakeLock;
+
     /**
      * Default constructor.
      */
@@ -89,6 +98,9 @@ public class MediaRecorder
         } else {
             mEventHandler = null;
         }
+
+        mWakeLock = null;
+        mUseWakeLock = false;
 
         /* Native setup requires a weak reference to our object.
          * It's easier to create it here than in C++.
@@ -360,8 +372,17 @@ public class MediaRecorder
      * @throws IllegalStateException if it is called after
      * prepare() or before setOutputFormat()
      */
-    public native void setVideoSize(int width, int height)
-            throws IllegalStateException;
+    public void setVideoSize(int width, int height)
+            throws IllegalStateException
+    {
+        if((height == 1088) && (width == 1920)) {
+            mUseWakeLock = true;
+        }
+        else {
+            mUseWakeLock = false;
+        }
+        native_setVideoSize(width, height);
+    }
 
     /**
      * Sets the frame rate of the video to be captured.  Must be called
@@ -565,7 +586,13 @@ public class MediaRecorder
      * @throws IllegalStateException if it is called before
      * prepare().
      */
-    public native void start() throws IllegalStateException;
+    public void start() throws IllegalStateException
+    {
+        if(mUseWakeLock) {
+            acquireWakeLock();
+        }
+        native_start();
+    }
 
     /**
      * Stops recording. Call this after start(). Once recording is stopped,
@@ -573,7 +600,11 @@ public class MediaRecorder
      *
      * @throws IllegalStateException if it is called before start()
      */
-    public native void stop() throws IllegalStateException;
+    public void stop() throws IllegalStateException
+    {
+        clearWakeLock();
+        native_stop();
+    }
 
     /**
      * Restarts the MediaRecorder to its idle state. After calling
@@ -583,6 +614,7 @@ public class MediaRecorder
     public void reset() {
         native_reset();
 
+        clearWakeLock();
         // make sure none of the listeners get called anymore
         mEventHandler.removeCallbacksAndMessages(null);
     }
@@ -774,4 +806,32 @@ public class MediaRecorder
 
     @Override
     protected void finalize() { native_finalize(); }
+
+
+    private native void native_start() throws IllegalStateException;
+
+    private native void native_stop() throws IllegalStateException;
+
+    private native void native_setVideoSize(int width, int height)
+            throws IllegalStateException;
+
+    private void acquireWakeLock()
+    {
+        if(mWakeLock == null) {
+            Application app = ActivityThread.systemMain().getApplication();
+            PowerManager pm = (PowerManager) app.getSystemService(Context.POWER_SERVICE);
+            mWakeLock = pm.newWakeLock(PowerManager.CPU_MAX_WAKE_LOCK, "MediaRecorder");
+            mWakeLock.acquire();
+        }
+    }
+
+    private void clearWakeLock()
+    {
+        if (mWakeLock != null) {
+            if(mWakeLock.isHeld()) {
+                mWakeLock.release();
+            }
+            mWakeLock = null;
+        }
+    }
 }
