@@ -308,7 +308,7 @@ private:
     OMXCodec &operator=(const OMXCodec &);
     status_t sendEOSToOMXComponent( );
 
-    void setWMAFormat(const sp<MetaData> &inputFormat);
+    status_t setWMAFormat(const sp<MetaData> &inputFormat);
     status_t freeBuffersOnOutPortIfAllAreWithUs();
 };
 
