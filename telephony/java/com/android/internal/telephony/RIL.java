@@ -55,6 +55,7 @@ import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.DataCallState;
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
+import com.android.internal.telephony.gsm.SsData;
 import com.android.internal.telephony.gsm.SuppServiceNotification;
 import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.RILConstants;
@@ -2594,6 +2595,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: ret =  responseInts(p); break;
             case RIL_UNSOL_CDMA_PRL_CHANGED: ret =  responseInts(p); break;
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: ret =  responseInts(p); break;
+            case RIL_UNSOL_ON_SS: ret =  responseSSData(p); break;
+            case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: ret =  responseString(p); break;
             case RIL_UNSOL_SUBSCRIPTION_READY: ret =  responseVoid(p); break;
 
             default:
@@ -2958,6 +2961,24 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                     } else {
                         Log.e(LOG_TAG, "null returned, expected non-null");
                     }
+                }
+                break;
+
+            case RIL_UNSOL_ON_SS:
+                if (RILJ_LOGD) unsljLogRet(response, ret);
+
+                if (mSSRegistrant != null) {
+                    mSSRegistrant.notifyRegistrant(
+                                        new AsyncResult (null, ret, null));
+                }
+                break;
+
+            case RIL_UNSOL_STK_CC_ALPHA_NOTIFY:
+                if (RILJ_LOGD) unsljLogRet(response, ret);
+
+                if (mCatCcAlphaRegistrant != null) {
+                    mCatCcAlphaRegistrant.notifyRegistrant(
+                                        new AsyncResult (null, ret, null));
                 }
                 break;
 
@@ -3800,6 +3821,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: return "UNSOL_VOICE_RADIO_TECH_CHANGED";
             case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: return "RIL_UNSOL_TETHERED_MODE_STATE_CHANGED";
+            case RIL_UNSOL_ON_SS: return "UNSOL_ON_SS";
+            case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: return "UNSOL_STK_CC_ALPHA_NOTIFY";
             case RIL_UNSOL_SUBSCRIPTION_READY: return "RIL_UNSOL_SUBSCRIPTION_READY";
             default: return "<unknown reponse>";
         }
@@ -3835,6 +3858,45 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
     private void unsljLogvRet(int response, Object ret) {
         riljLogv("[UNSL]< " + responseToString(response) + " " + retToString(response, ret));
+    }
+
+    private Object
+    responseSSData(Parcel p) {
+        int num;
+        SsData ssData = new SsData();
+
+        ssData.serviceType = ssData.ServiceTypeFromRILInt(p.readInt());
+        ssData.requestType = ssData.RequestTypeFromRILInt(p.readInt());
+        ssData.teleserviceType = ssData.TeleserviceTypeFromRILInt(p.readInt());
+        ssData.serviceClass = p.readInt(); // This is service class sent in the SS request.
+        ssData.result = p.readInt(); // This is the result of the SS request.
+        num = p.readInt();
+
+        if (ssData.serviceType.isTypeCF() &&
+            ssData.requestType.isTypeInterrogation()) {
+            ssData.cfInfo = new CallForwardInfo[num];
+
+            for (int i = 0; i < num; i++) {
+                ssData.cfInfo[i] = new CallForwardInfo();
+
+                ssData.cfInfo[i].status = p.readInt();
+                ssData.cfInfo[i].reason = p.readInt();
+                ssData.cfInfo[i].serviceClass = p.readInt();
+                ssData.cfInfo[i].toa = p.readInt();
+                ssData.cfInfo[i].number = p.readString();
+                ssData.cfInfo[i].timeSeconds = p.readInt();
+
+                riljLog("[SS Data] CF Info " + i + " : " +  ssData.cfInfo[i]);
+            }
+        } else {
+            ssData.ssInfo = new int[num];
+            for (int i = 0; i < num; i++) {
+                ssData.ssInfo[i] = p.readInt();
+                riljLog("[SS Data] SS Info " + i + " : " +  ssData.ssInfo[i]);
+            }
+        }
+
+        return ssData;
     }
 
 

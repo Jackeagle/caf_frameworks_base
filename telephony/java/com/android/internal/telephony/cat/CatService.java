@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2007, 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -140,6 +140,7 @@ public class CatService extends Handler implements AppInterface {
     static final int MSG_ID_CALL_SETUP               = 4;
     static final int MSG_ID_REFRESH                  = 5;
     static final int MSG_ID_RESPONSE                 = 6;
+    static final int MSG_ID_ALPHA_NOTIFY             = 7;
 
     static final int MSG_ID_RIL_MSG_DECODED          = 10;
 
@@ -176,6 +177,7 @@ public class CatService extends Handler implements AppInterface {
         mCmdIf.setOnCatCallSetUp(this, MSG_ID_CALL_SETUP, null);
         mCmdIf.registerForIccRefresh(this, MSG_ID_ICC_REFRESH, null);
         //mCmdIf.setOnSimRefresh(this, MSG_ID_REFRESH, null);
+        mCmdIf.setOnCatCcAlphaNotify(this, MSG_ID_ALPHA_NOTIFY, null);
 
         mIccRecords = ir;
         if (ir != null) {
@@ -196,6 +198,7 @@ public class CatService extends Handler implements AppInterface {
         mCmdIf.unSetOnCatEvent(this);
         mCmdIf.unSetOnCatCallSetUp(this);
         mCmdIf.unregisterForIccRefresh(this);
+        mCmdIf.unSetOnCatCcAlphaNotify(this);
 
         this.removeCallbacksAndMessages(null);
     }
@@ -829,6 +832,23 @@ public class CatService extends Handler implements AppInterface {
                 }
             } else {
                 CatLog.d(this, "IccRefresh Message is null");
+            }
+            break;
+        case MSG_ID_ALPHA_NOTIFY:
+            CatLog.d(this, "Received STK CC Alpha message from card");
+            if (msg.obj != null) {
+                AsyncResult ar = (AsyncResult) msg.obj;
+                if (ar != null && ar.result != null) {
+                    String alphaString = (String)ar.result;
+                    CatLog.d(this, "Broadcasting STK Alpha message from card: " + alphaString);
+                    Intent intent = new Intent(AppInterface.CAT_ALPHA_NOTIFY_ACTION);
+                    intent.putExtra(AppInterface.ALPHA_STRING, alphaString);
+                    mContext.sendBroadcast(intent);
+                } else {
+                    CatLog.d(this, "STK Alpha message: ar.result is null");
+                }
+            } else {
+                CatLog.d(this, "STK Alpha message: msg.obj is null");
             }
             break;
         default:

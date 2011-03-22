@@ -172,6 +172,7 @@ public class GSMPhone extends PhoneBase {
         mCM.setOnSuppServiceNotification(this, EVENT_SSN, null);
         mSST.registerForNetworkAttach(this, EVENT_REGISTERED_TO_NETWORK, null);
         mCM.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
+        mCM.setOnSS(this, EVENT_SS, null);
 
         // Set the default values of telephony properties.
         setProperties();
@@ -223,6 +224,7 @@ public class GSMPhone extends PhoneBase {
             mCM.unSetOnUSSD(this);
             mCM.unSetOnSuppServiceNotification(this);
             mCM.unregisterForSubscriptionReady(this);
+            mCM.unSetOnSS(this);
 
             mPendingMMIs.clear();
 
@@ -1108,7 +1110,7 @@ public class GSMPhone extends PhoneBase {
          * The exception is cancellation of an incoming USSD-REQUEST, which is
          * not on the list.
          */
-        if (mPendingMMIs.remove(mmi) || mmi.isUssdRequest()) {
+        if (mPendingMMIs.remove(mmi) || mmi.isUssdRequest() || mmi.isSsInfo()) {
             mMmiCompleteRegistrants.notifyRegistrants(
                 new AsyncResult(null, mmi, null));
         }
@@ -1454,6 +1456,16 @@ public class GSMPhone extends PhoneBase {
                 if (cfEnabled) {
                     notifyCallForwardingIndicator();
                 }
+                break;
+
+            case EVENT_SS:
+                ar = (AsyncResult)msg.obj;
+                Log.d(LOG_TAG, "Event EVENT_SS received");
+                // SS data is already being handled through MMI codes.
+                // So, this result if processed as MMI response would help
+                // in re-using the existing functionality.
+                GsmMmiCode mmi = new GsmMmiCode(this, m3gppApplication);
+                mmi.processSsData(ar);
                 break;
 
              default:
