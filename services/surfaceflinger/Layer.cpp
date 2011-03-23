@@ -327,10 +327,6 @@ status_t Layer::drawWithOverlay(const Region& clip,
     uint32_t ovpos_w, ovpos_h;
     bool ret;
 
-    // Do not set position for original resolution surfaces.
-    // This will default to occupying entire primary screen.
-    // If only a certain portion needs to be occupied, check for surface size exceeding
-    // the framebuffer size. Currently such checks not required.
     if(LIKELY(!originalResolutionFormat)) {
         if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
             if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
@@ -341,6 +337,12 @@ status_t Layer::drawWithOverlay(const Region& clip,
             ret = temp->setPosition(x, y, w, h);
         if (!ret)
             return INVALID_OPERATION;
+    } else {
+        ret = temp->setPosition(0, 0, temp->getFBWidth(), temp->getFBHeight());
+        if (UNLIKELY(!ret)) {
+            LOGE("setPosition failed for original resolution surface");
+            return INVALID_OPERATION;
+        }
     }
     int orientation;
     if (ret = temp->getOrientation(orientation)) {
