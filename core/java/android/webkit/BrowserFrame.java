@@ -198,7 +198,8 @@ class BrowserFrame extends Handler {
             ActivityManager am = (ActivityManager) context
                     .getSystemService(Context.ACTIVITY_SERVICE);
             if (am.getMemoryClass() > 16) {
-                sJavaBridge.setCacheSize(SystemProperties.getInt("webkit.cache.size", 8 * 1024 * 1024));
+                sJavaBridge.setCacheSize(SystemProperties
+                    .getInt("net.webkit.cache.size", 8 * 1024 * 1024));
             } else {
                 sJavaBridge.setCacheSize(4 * 1024 * 1024);
             }

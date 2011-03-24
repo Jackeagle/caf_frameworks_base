@@ -305,10 +305,14 @@ public class WebViewDatabase {
         if (mInstance == null) {
             mInstance = new WebViewDatabase();
 
-            CACHE_EVICT_EXPIRED = SystemProperties.getInt("nw.cache.evictexpired", CACHE_EVICT_EXPIRED_DEF);
-            CACHE_ADVANCE_STEP_PRIO = SystemProperties.getLong("nw.cache.prioadvstep", CACHE_PRIO_ADVANCE_STEP_DEF);
-            CACHE_ADVANCE_STEP_WEIGHT = SystemProperties.getLong("nw.cache.weightadvstep", CACHE_WEIGHT_ADVANCE_STEP_DEF);
-            CACHE_ORDER_BY = SystemProperties.get("nw.cache.orderby", CACHE_ORDER_BY_DEF);
+            CACHE_EVICT_EXPIRED = SystemProperties
+                .getInt("net.nw.cache.evictexpired", CACHE_EVICT_EXPIRED_DEF);
+            CACHE_ADVANCE_STEP_PRIO = SystemProperties
+                .getLong("net.nw.cache.prioadvstep", CACHE_PRIO_ADVANCE_STEP_DEF);
+            CACHE_ADVANCE_STEP_WEIGHT = SystemProperties
+                .getLong("net.nw.cache.weightadvstep", CACHE_WEIGHT_ADVANCE_STEP_DEF);
+            CACHE_ORDER_BY = SystemProperties
+                .get("net.nw.cache.orderby", CACHE_ORDER_BY_DEF);
 
             try {
                 mDatabase = context

@@ -39,7 +39,8 @@ class IdleCache {
         long mTimeout;
     };
 
-    private final static int IDLE_CACHE_MAX = SystemProperties.getInt("http.idle_cache.size", 8);
+    private final static int IDLE_CACHE_MAX =
+        SystemProperties.getInt("net.http.idle_cache.size", 8);
 
     /* Allow five consecutive empty queue checks before shutdown */
     private final static int EMPTY_CHECK_MAX = 5;
