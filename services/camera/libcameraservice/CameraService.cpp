@@ -697,7 +697,6 @@ status_t CameraService::Client::startRecordingMode() {
 
     // start recording mode
     enableMsgType(CAMERA_MSG_VIDEO_FRAME);
-    mCameraService->playSound(SOUND_RECORDING);
     result = mHardware->startRecording();
     if (result != NO_ERROR) {
         LOGE("mHardware->startRecording() failed with status %d", result);
