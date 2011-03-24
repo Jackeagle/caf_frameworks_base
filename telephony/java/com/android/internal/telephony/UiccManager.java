@@ -186,7 +186,8 @@ public class UiccManager extends Handler{
     public synchronized UiccCard[] getIccCards() {
         ArrayList<UiccCard> cards = new ArrayList<UiccCard>();
         for (UiccCard c: mUiccCards) {
-            if (c != null && c.getCardState() == CardState.PRESENT) {
+            if (c != null && (c.getCardState() == CardState.PRESENT ||
+                     c.getCardState() == CardState.ERROR)) {
                 cards.add(c);
             }
         }
