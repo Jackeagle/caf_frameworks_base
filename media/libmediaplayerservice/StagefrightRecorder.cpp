@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,11 +132,16 @@ status_t StagefrightRecorder::setAudioEncoder(audio_encoder ae) {
         mAudioEncoder = ae;
     }
 
-    /* If the encoder format is AAC, set appropriate values */
+    // Use default values if appropriate setparam's weren't called.
     if(mAudioEncoder == AUDIO_ENCODER_AAC) {
-        mSampleRate    = 48000;
-        mAudioChannels = 2;
-        mAudioBitRate  = 156000;
+        mSampleRate = mSampleRate ? mSampleRate : 48000;
+        mAudioChannels = mAudioChannels ? mAudioChannels : 2;
+        mAudioBitRate = mAudioBitRate ? mAudioBitRate : 156000;
+    }
+    else{
+        mSampleRate = mSampleRate ? mSampleRate : 8000;
+        mAudioChannels = mAudioChannels ? mAudioChannels : 1;
+        mAudioBitRate = mAudioBitRate ? mAudioBitRate : 12200;
     }
     return OK;
 }
@@ -1384,9 +1390,9 @@ status_t StagefrightRecorder::reset() {
     mVideoHeight   = 144;
     mFrameRate     = 20;
     mVideoBitRate  = 192000;
-    mSampleRate    = 8000;
-    mAudioChannels = 1;
-    mAudioBitRate  = 12200;
+    mSampleRate    = 0;
+    mAudioChannels = 0;
+    mAudioBitRate  = 0;
     mInterleaveDurationUs = 0;
     mIFramesIntervalSec = 1;
     mAudioSourceNode = 0;
