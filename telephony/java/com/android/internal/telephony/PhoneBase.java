@@ -1189,6 +1189,10 @@ public abstract class PhoneBase extends Handler implements Phone {
         return;
     }
 
+    public void setTransmitPower(int powerLevel) {
+        return;
+    }
+
     /**
      * @return operator numeric.
      */

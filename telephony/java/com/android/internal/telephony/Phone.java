@@ -1913,4 +1913,10 @@ public interface Phone {
      */
     public boolean updateCurrentCarrierInProvider();
 
+    /**
+     * Sets the transmit power
+     *
+     * @param power - Specifies the transmit power that is allowed
+     */
+    void setTransmitPower(int powerLevel);
 }

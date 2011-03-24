@@ -1163,5 +1163,9 @@ public class PhoneProxy extends Handler implements Phone {
             boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
         mActivePhone.setDataReadinessChecks(checkConnectivity, checkSubscription, tryDataCalls);
     }
+
+    public void setTransmitPower(int powerLevel) {
+        mCi.setTransmitPower(powerLevel, null);
+    }
 }
 
