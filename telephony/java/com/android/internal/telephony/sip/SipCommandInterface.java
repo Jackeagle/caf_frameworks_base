@@ -411,4 +411,7 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
 
     public void setRilPowerOff(Message result) {
     }
+
+    public void setTransmitPower(int powerLevel, Message result) {
+    }
 }

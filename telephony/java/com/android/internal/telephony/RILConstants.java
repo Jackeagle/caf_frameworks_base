@@ -158,6 +158,10 @@ cat include/telephony/ril.h | \
     int DEACTIVATE_REASON_NONE      = 0;
     int DEACTIVATE_REASON_RADIO_OFF = 1;
 
+    /* Modem transmit power levels as per FCC regulations */
+    static final int TRANSMIT_POWER_DEFAULT = 0;
+    static final int TRANSMIT_POWER_WIFI_HOTSPOT = 1;
+
     int RIL_REQUEST_GET_SIM_STATUS = 1;
     int RIL_REQUEST_ENTER_SIM_PIN = 2;
     int RIL_REQUEST_ENTER_SIM_PUK = 3;
@@ -271,6 +275,7 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE = 111;
     int RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE = 112;
     int RIL_REQUEST_SET_SUBSCRIPTION_MODE = 113;
+    int RIL_REQUEST_SET_TRANSMIT_POWER = 114;
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
     int RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED = 1001;

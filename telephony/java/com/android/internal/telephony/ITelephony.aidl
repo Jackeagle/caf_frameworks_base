@@ -562,5 +562,12 @@ interface ITelephony {
      */
     void setDataReadinessChecks(
             boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls);
+
+    /**
+     * Sets the transmit power
+     *
+     * @param power - Specifies the max transmit power that is allowed
+     */
+    void setTransmitPower(int powerLevel);
 }
 
