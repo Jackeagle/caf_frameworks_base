@@ -1500,9 +1500,12 @@ void MPEG4Writer::writeFirstChunk(ChunkInfo* info) {
     for (List<MediaBuffer *>::iterator it = chunkIt->mSamples.begin();
          it != chunkIt->mSamples.end(); ++it) {
 
+        mLock.unlock();
         off64_t offset = info->mTrack->isAvc()
                             ? addLengthPrefixedSample_l(*it)
                             : addSample_l(*it);
+        mLock.lock();
+
         if (it == chunkIt->mSamples.begin()) {
             info->mTrack->addChunkOffset(offset);
         }
