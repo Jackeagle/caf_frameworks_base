@@ -1515,6 +1515,9 @@ void MPEG4Writer::writeFirstChunk(ChunkInfo* info) {
         sp<Track::AVCParamSet> seqEnhanceInfo = info->mTrack->mSeqEnhanceInfo;
         off64_t chunk_offset = mOffset;
 
+        // Unlock the mutex during file write, since it can take a long time when
+        // recording high resolution clips and block the track threads.
+        mLock.unlock();
         if (info->mTrack->isAvc() && seqEnhanceInfo != NULL)
         {
             off_t length = seqEnhanceInfo->mLength;
@@ -1531,6 +1534,7 @@ void MPEG4Writer::writeFirstChunk(ChunkInfo* info) {
         info->mTrack->isAvc()
             ? addLengthPrefixedSample_l(*it)
             : addSample_l(*it);
+        mLock.lock();
 
         if (it == chunkIt->mSamples.begin()) {
             info->mTrack->addChunkOffset(chunk_offset);
