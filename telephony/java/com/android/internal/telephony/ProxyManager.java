@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,6 +75,7 @@ public class ProxyManager extends Handler {
     static final int EVENT_RADIO_ON = 10;
     static final int EVENT_SUBSCRIPTION_READY = 11;
     static final int EVENT_SIM_REFRESH = 12;
+    static final int EVENT_CLEANUP_DATA_CONNECTION_DONE = 13;
 
     static public final String INTENT_VALUE_SUBSCR_INFO_1 = "SUBSCR INFO 01";
     static public final String INTENT_VALUE_SUBSCR_INFO_2 = "SUBSCR INFO 02";
@@ -110,6 +111,7 @@ public class ProxyManager extends Handler {
     private boolean mReadIccid = true;
     private boolean mSetSubOnSimRefresh = false;
     private String[] mIccIds;
+    private boolean[] mSubscriptionReady = {false, false};
     // The subscription information of all the cards
     SubscriptionData[] mCardSubData = null;
     // The User prefered subscription information
@@ -307,15 +309,23 @@ public class ProxyManager extends Handler {
             }
 
             if (currentDds != activeSub.subNum) {
-                // If the DDS is not set to the modem yet, update the currentDds and the system
-                // property. Once the SUBSCRIPTION READY event receives, it will set the DDS
-                // properly. This scenario occures on powerup with single subscription and the
-                // DDS was set to the other subscription.
-                if (!mDdsSet) {
+                // Currently selected DDS subscription is not in activated state.
+                // So set the DDS to the only active subscription available now.
+                // Directly set the Data Subscription Source to the only activeSub if it
+                // is READY. If the SUBSCRIPTION_READY event is not yet received on this
+                // subscription, wait for the event to set the Data Subscription Source.
+                if (mSubscriptionReady[activeSub.subNum]) {
+                    queuedDds = activeSub.subNum;
+                    Message callback = Message.obtain(this, EVENT_SET_DATA_SUBSCRIPTION_DONE,
+                            Integer.toString(activeSub.subNum));
+                    Log.d(LOG_TAG, "update setDataSubscription to " + activeSub.subNum);
+                    mCi[activeSub.subNum].setDataSubscription(callback);
+                } else {
+                    // Set the flag and update the currentDds, so that when subscription
+                    // ready event receives, it will set the dds properly.
+                    mDdsSet = false;
                     currentDds = activeSub.subNum;
                     PhoneFactory.setDataSubscription(currentDds);
-                } else {
-                    setDataSubscription(activeSub.subNum, null);
                 }
             }
         }
@@ -364,6 +374,7 @@ public class ProxyManager extends Handler {
                 Integer subscription = (Integer)ar.userObj;
                 int sub = subscription.intValue();
                 Log.d(LOG_TAG, "SUBSCRIPTION READY event" + sub);
+                mSubscriptionReady[sub] = true;
 
                 if (!mDdsSet) {
                     // Set Data Subscription Source only when subscription becomes READY.
@@ -372,12 +383,15 @@ public class ProxyManager extends Handler {
                         if (getCurrentSubscriptions()
                                 .subscription[currentDds].subStatus == SUB_ACTIVATED) {
                             String str = Integer.toString(currentDds);
-                            Message callback = Message.obtain(supplySubscription.mHandler,
+                            Message callback = Message.obtain(this,
                                                        EVENT_SET_DATA_SUBSCRIPTION_DONE, str);
                             // Set Data Subscription preference at RIL
                             Log.d(LOG_TAG, "setDataSubscription on " + currentDds);
                             mCi[currentDds].setDataSubscription(callback);
                             mDdsSet = true;
+                            // Set mQueuedDds so that when the set data sub src is done, it will
+                            // update the system property and enable the data connectivity.
+                            queuedDds = currentDds;
                         } else {
                             Log.d(LOG_TAG, "User prefered data subsciption " + currentDds +
                                    " is not ACTIVATED");
@@ -446,12 +460,10 @@ public class ProxyManager extends Handler {
                     PhoneFactory.setDataSubscription(queuedDds);
                     currentDds = queuedDds;
 
-                    if (disableDdsInProgress) {
-                        // Enable the data connectivity on new dds.
-                        Log.d(LOG_TAG, "  Enable Data Connectivity on Subscription " + currentDds);
-                        sProxyPhone[currentDds]
-                               .enableDataConnectivity();
-                    }
+                    // Enable the data connectivity on new dds.
+                    Log.d(LOG_TAG, "  Enable Data Connectivity on Subscription " + currentDds);
+                    sProxyPhone[currentDds].enableDataConnectivity();
+
                     result = SetDdsResult.SUCCESS;
                     Log.d(LOG_TAG, "  setDataSubscriptionSource is Successful");
 
@@ -828,8 +840,18 @@ public class ProxyManager extends Handler {
                     @Override
                     public void handleMessage(Message msg) {
                         int phoneIndex = 0;
-                        AsyncResult ar = (AsyncResult) msg.obj;
-                        String string = (String) ar.userObj;
+
+                        AsyncResult ar = null;
+                        String string = null;
+
+                        if (msg.obj instanceof AsyncResult) {
+                            ar = (AsyncResult) msg.obj;
+                            string = (String) ar.userObj;
+                        } else if (msg.obj instanceof String) {
+                            // In case of callback msg from disableDataConnectivity.
+                            string = (String) msg.obj;
+                        }
+
                         if (string != null) {
                             phoneIndex = Integer.parseInt(string);
                             Log.d(LOG_TAG, ": parsed i:"+phoneIndex);
@@ -866,10 +888,26 @@ public class ProxyManager extends Handler {
                                 processSetUiccSubscriptionDone(phoneIndex, ar);
                                 break;
 
-                            case EVENT_SET_DATA_SUBSCRIPTION_DONE:
-                                //Data subscription preference is set at RIL
-                                Log.d(LOG_TAG, "EVENT_SET_DATA_SUBSCRIPTION_DONE: on sub: "
-                                        + phoneIndex);
+                            case EVENT_CLEANUP_DATA_CONNECTION_DONE:
+                                // This callback message will be received when user initiated
+                                // a deactivate subscription.
+                                Log.d(LOG_TAG, "EVENT_CLEANUP_DATA_CONNECTION_DONE: on sub: "
+                                        + phoneIndex + " Deactivate now");
+
+                                // Need to deactivate prev sub
+                                prevSubscriptionData.subscription[phoneIndex].subStatus =
+                                        SUB_DEACTIVATE;
+
+                                Message setUiccSubCompleteMsg = Message.obtain(mHandler,
+                                        EVENT_SET_UICC_SUBSCRIPTION_DONE, string);
+
+                                mCi[phoneIndex].setUiccSubscription(
+                                        prevSubscriptionData.subscription[phoneIndex],
+                                        setUiccSubCompleteMsg);
+
+                                // Now mark as deactivating
+                                prevSubscriptionData.subscription[phoneIndex].subStatus =
+                                        SUB_DEACTIVATING;
                                 break;
                         }
                     }
@@ -916,6 +954,13 @@ public class ProxyManager extends Handler {
                         subscriptionData.subscription[phoneIndex].copyFrom(
                                 prevSubscriptionData.subscription[phoneIndex]);
 
+                        // Enable the data on this subscription, if this the the currnet DDS.
+                        Phone currentPhone = sProxyPhone[phoneIndex];
+                        if (currentPhone.getSubscription() == currentDds) {
+                            Log.d(LOG_TAG, "Deactivated Failed. Enabling the data again");
+                            currentPhone.enableDataConnectivity();
+                        }
+
                         if (mPendingDeactivateEvents == 0) {
                             processPendingActivateRequests();
                         }
@@ -937,6 +982,7 @@ public class ProxyManager extends Handler {
                         mPendingDeactivateEvents--;
                         subResult[phoneIndex] = "DEACTIVATE SUCCESS";
                         prevSubscriptionData.subscription[phoneIndex].subStatus = SUB_DEACTIVATED;
+                        mSubscriptionReady[phoneIndex] = false;
 
                         if (subscriptionData.subscription[phoneIndex].subStatus == SUB_DEACTIVATE) {
                             subscriptionData.subscription[phoneIndex].subStatus = SUB_DEACTIVATED;
@@ -969,6 +1015,7 @@ public class ProxyManager extends Handler {
                             currentPhone.disableDataConnectivity();
                         } else {
                             Log.d(LOG_TAG, "Active DDS : " + currentPhone.getSubscription());
+                            currentPhone.enableDataConnectivity();
                         }
                     }
                 }
@@ -1095,19 +1142,30 @@ public class ProxyManager extends Handler {
 
                         if (prevSubscriptionData.subscription[i].subStatus == SUB_ACTIVATED) {
                             // Need to deactivate prev sub
-                            prevSubscriptionData.subscription[i].subStatus = SUB_DEACTIVATE;
+                            int subId = prevSubscriptionData.subscription[i].subNum;
+                            String str = Integer.toString(subId);
 
-                            Log.d(LOG_TAG, "Need to deactivate prevSubscription on SUB:" +
-                                    prevSubscriptionData.subscription[i].subNum);
-                            String str = Integer.toString(prevSubscriptionData
-                                    .subscription[i].subNum);
-                            Message callback = Message.obtain(mHandler,
-                                    EVENT_SET_UICC_SUBSCRIPTION_DONE, str);
-                            mCi[i].setUiccSubscription(prevSubscriptionData.subscription[i],
-                                    callback);
+                            Log.d(LOG_TAG, "Need to deactivate prevSubscription on SUB:" + subId);
 
-                            // Now mark as deactivating
-                            prevSubscriptionData.subscription[i].subStatus = SUB_DEACTIVATING;
+                            if (currentDds == subId) {
+                                // Tear down all the data calls on this subscription. Once the
+                                // clean up completed, the set uicc subscription request with
+                                // deactivate will be sent to deactivate this subscription.
+                                Log.d(LOG_TAG, "Deactivate all the data calls if there is any");
+                                Message allDataCleanedUpMsg = Message.obtain(mHandler,
+                                        EVENT_CLEANUP_DATA_CONNECTION_DONE, str);
+                                sProxyPhone[subId].disableDataConnectivity(allDataCleanedUpMsg);
+                            } else {
+                                prevSubscriptionData.subscription[i].subStatus = SUB_DEACTIVATE;
+                                Message callback = Message.obtain(mHandler,
+                                        EVENT_SET_UICC_SUBSCRIPTION_DONE, str);
+                                mCi[i].setUiccSubscription(prevSubscriptionData.subscription[i],
+                                        callback);
+
+                                // Now mark as deactivating
+                                prevSubscriptionData.subscription[i].subStatus = SUB_DEACTIVATING;
+                            }
+
                             done = false;
                             mPendingDeactivateEvents++;
                         } else if (prevSubscriptionData.subscription[i].subStatus == SUB_DEACTIVATED

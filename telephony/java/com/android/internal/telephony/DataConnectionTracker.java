@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -153,7 +153,6 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     protected static final String REASON_TETHERED_MODE_STATE_CHANGED = "tetheredModeStateChanged";
     protected static final String REASON_DATA_CONN_PROP_CHANGED = "dataConnectionPropertyChanged";
 
-    protected Message mPendingDataDisableCompleteMsg;
     Subscription mSubscriptionData;
 
     /**
@@ -201,7 +200,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
                 break;
 
             case EVENT_MASTER_DATA_DISABLED:
-                onMasterDataDisabled();
+                onMasterDataDisabled((Message) msg.obj);
                 break;
 
             case EVENT_MASTER_DATA_ENABLED:
@@ -240,7 +239,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     abstract protected void onRadioOn();
     abstract protected void onRadioOff();
     abstract protected void onMasterDataEnabled();
-    abstract protected void onMasterDataDisabled();
+    abstract protected void onMasterDataDisabled(Message onCompleteMsg);
     abstract protected boolean isConcurrentVoiceAndData();
     abstract protected void setDataConnectionAsDesired(boolean desiredPowerState, Message onCompleteMsg);
 
@@ -324,8 +323,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
     public boolean disableDataConnectivity(Message onCompleteMsg) {
         mMasterDataEnabled = false;
-        sendMessage(obtainMessage(EVENT_MASTER_DATA_DISABLED));
-        mPendingDataDisableCompleteMsg = onCompleteMsg;
+        sendMessage(obtainMessage(EVENT_MASTER_DATA_DISABLED, onCompleteMsg));
         return true;
     }
 

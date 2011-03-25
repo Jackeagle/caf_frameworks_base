@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -176,6 +176,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
      * mDataCallList holds all the Data connection,
      */
     private ArrayList<DataConnection> mDataConnectionList;
+
+    /* list of messages that are waiting to be posted, when data call disconnect
+     * is complete
+     */
+    ArrayList <Message> mDisconnectAllCompleteMsgList = new ArrayList<Message>();
+    private int mDisconnectPendingCount = 0;
 
     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -570,8 +576,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     @Override
-    protected void onMasterDataDisabled() {
+    protected void onMasterDataDisabled(Message onCompleteMsg) {
         mDisconnectAllDataCalls = true;
+        if (onCompleteMsg != null) {
+            mDisconnectAllCompleteMsgList.add(onCompleteMsg);
+        }
         updateDataConnections(REASON_MASTER_DATA_DISABLED);
     }
 
@@ -1037,6 +1046,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     protected void onDisconnectDone(AsyncResult ar) {
         logv("onDisconnectDone: reason=" + (String) ar.userObj);
+
+        logv("onDisconnectDone: mDisconnectAllDataCalls = " + mDisconnectAllDataCalls
+                + " mDisconnectPendingCount = " + mDisconnectPendingCount);
+
+        if (mDisconnectAllDataCalls && mDisconnectPendingCount > 0) {
+            mDisconnectPendingCount--;
+        }
+
         updateDataConnections((String) ar.userObj);
     }
 
@@ -1101,9 +1118,16 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 }
                 if (needsTearDown || mDisconnectAllDataCalls == true) {
                     wasDcDisconnected = wasDcDisconnected | tryDisconnectDataCall(dc, reason);
+
+                    if (mDisconnectAllDataCalls) {
+                        mDisconnectPendingCount++;
+                    }
                 }
             }
         }
+
+        logv("onUpdateDataConnections: mDisconnectAllDataCalls = " + mDisconnectAllDataCalls
+                + " mDisconnectPendingCount = " + mDisconnectPendingCount);
 
         if (wasDcDisconnected == true) {
             /*
@@ -1115,7 +1139,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
-        if (mDisconnectAllDataCalls) {
+        if (mDisconnectAllDataCalls && mDisconnectPendingCount == 0) {
             /*
              * Someone had requested that all calls be torn down.
              * Either there is no calls to disconnect, or we have already asked
@@ -1128,11 +1152,13 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 mPendingPowerOffCompleteMsg = null;
             }
 
-            //check for pending data disabled message
-            if (mPendingDataDisableCompleteMsg != null) {
+            if (mDisconnectAllCompleteMsgList.size() > 0) {
+                //check for pending data disabled message
                 logd("onUpdateDataConnections: All the Data Connections are down! Notifying the caller");
-                mPendingDataDisableCompleteMsg.sendToTarget();
-                mPendingDataDisableCompleteMsg = null;
+                for (Message m: mDisconnectAllCompleteMsgList) {
+                    m.sendToTarget();
+                }
+                mDisconnectAllCompleteMsgList.clear();
             }
         }
 
