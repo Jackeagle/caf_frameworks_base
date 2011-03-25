@@ -200,8 +200,8 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
                 opts.flush_to = 0xffff; /* infinite */
                 opts.mode = L2CAP_MODE_ERTM;
                 opts.fcs = 1;
-                opts.txwin_size = 63;
-                opts.max_tx = 3;
+                opts.txwin_size = 64;
+                opts.max_tx = 10;
             }
             err = setsockopt( fd, SOL_L2CAP, L2CAP_OPTIONS, &opts, optlen );
         }
