@@ -45,11 +45,9 @@ enum audio_source {
     AUDIO_SOURCE_CAMCORDER = 5,
     AUDIO_SOURCE_VOICE_RECOGNITION = 6,
     AUDIO_SOURCE_VOICE_COMMUNICATION = 7,
-    QCOM_AUDIO_SOURCE_LIST_START = 999,
-    AUDIO_SOURCE_FM_RX,
-    AUDIO_SOURCE_FM_RX_A2DP,
-    QCOM_AUDIO_SOURCE_LIST_END,
-    AUDIO_SOURCE_MAX = QCOM_AUDIO_SOURCE_LIST_END - 1,
+    AUDIO_SOURCE_FM_RX = 8,
+    AUDIO_SOURCE_FM_RX_A2DP = 9,
+    AUDIO_SOURCE_MAX = AUDIO_SOURCE_FM_RX_A2DP,
 
     AUDIO_SOURCE_LIST_END  // must be last - used to validate audio source type
 };
@@ -84,12 +82,10 @@ enum output_format {
     /* H.264/AAC data encapsulated in MPEG2/TS */
     OUTPUT_FORMAT_MPEG2TS = 8,
 
-    QCOM_OUTPUT_FORMAT_LIST_START = 999, // QCOM LIST start
-    OUTPUT_FORMAT_QCP, // QCP file format
-    OUTPUT_FORMAT_THREE_GPP2, /*3GPP2*/
-    QCOM_OUTPUT_FORMAT_LIST_END,           //QCOM LIST ends
+    OUTPUT_FORMAT_QCP = 9, // QCP file format
+    OUTPUT_FORMAT_THREE_GPP2 = 10, /*3GPP2*/
 
-    OUTPUT_FORMAT_LIST_END = QCOM_OUTPUT_FORMAT_LIST_END - 1 // must be last - used to validate format type
+    OUTPUT_FORMAT_LIST_END // must be last - used to validate format type
 };
 
 enum audio_encoder {
@@ -99,12 +95,10 @@ enum audio_encoder {
     AUDIO_ENCODER_AAC = 3,
     AUDIO_ENCODER_AAC_PLUS = 4,
     AUDIO_ENCODER_EAAC_PLUS = 5,
-    QCOM_AUDIO_ENCODER_LIST_START = 999,
-    AUDIO_ENCODER_EVRC,
-    AUDIO_ENCODER_QCELP,
-    QCOM_AUDIO_ENCODER_LIST_END,
+    AUDIO_ENCODER_EVRC = 6,
+    AUDIO_ENCODER_QCELP = 7,
 
-    AUDIO_ENCODER_LIST_END = QCOM_AUDIO_ENCODER_LIST_END - 1 // must be the last - used to validate the audio encoder type
+    AUDIO_ENCODER_LIST_END // must be the last - used to validate the audio encoder type
 };
 
 enum video_encoder {
