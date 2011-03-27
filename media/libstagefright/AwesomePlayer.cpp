@@ -1357,7 +1357,6 @@ void AwesomePlayer::onVideoEvent() {
                             mColorFormat = colorFormat;
 
                             notifyListener_l(MEDIA_SET_VIDEO_SIZE, mDecodedWidth, mDecodedHeight);
-                            notifyListener_l(MEDIA_BUFFER_FORMAT, mColorFormat);
                             notifyListener_l(MEDIA_FORMAT_CHANGED);
 
                             mFormatChanged = true;
@@ -1533,7 +1532,7 @@ void AwesomePlayer::onVideoEvent() {
         if (bufferAddress != NULL) {
             memcpy(bufferAddress, mVideoBuffer[mVideoQueueBack]->data(), copySize);
 
-            notifyListener_l(MEDIA_BUFFER_READY, frame);
+            notifyListener_l(MEDIA_BUFFER_READY, frame, 1);
         }
     }
 #endif
@@ -1987,17 +1986,6 @@ void AwesomePlayer::finishAsyncPrepare_l() {
             }
         }
 
-#ifdef YUVCLIENT
-        if (mFrameBuffers != NULL && mVideoTrack != NULL) {
-            mDecodedWidth = mVideoWidth;
-            mDecodedHeight = mVideoHeight;
-
-            sp<MetaData> meta = mVideoSource->getFormat();
-            CHECK(meta->findInt32(kKeyColorFormat, &mColorFormat));
-            notifyListener_l(MEDIA_BUFFER_FORMAT, mColorFormat);
-        }
-#endif
-
         notifyListener_l(MEDIA_PREPARED);
     }
 
@@ -2370,6 +2358,19 @@ status_t AwesomePlayer::queueFrameBuffer(int frame) {
     return OK;
 }
 
+status_t AwesomePlayer::queryBufferFormat(int *format) {
+    if (mVideoSource == NULL)
+        mColorFormat = 0;
+    else {
+        sp<MetaData> meta = mVideoSource->getFormat();
+        CHECK(meta->findInt32(kKeyColorFormat, &mColorFormat));
+        mDecodedWidth = mVideoWidth;
+        mDecodedHeight = mVideoHeight;
+    }
+    *format = mColorFormat;
+    return OK;
+}
+
 void* AwesomePlayer::getFrameBufferAddress(int index) {
     if (mFrameBuffers == NULL)
         return NULL;
@@ -2401,7 +2402,7 @@ void AwesomePlayer::sendBackFrameBuffers() {
     while (!mFrameBufferList.isEmpty()) {
         index = mFrameBufferList[0];
         mFrameBufferList.removeAt(0);
-        notifyListener_l(MEDIA_BUFFER_EMPTY, index);
+        notifyListener_l(MEDIA_BUFFER_READY, index, 0);
     }
 }
 

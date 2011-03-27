@@ -197,6 +197,13 @@ status_t StagefrightPlayer::invoke(const Parcel &request, Parcel *reply) {
             err = mPlayer->queueFrameBuffer(frame);
             break;
         }
+        case MEDIA_INVOKE_QUERY_BUFFER_FORMAT:
+        {
+            int format;
+            err = mPlayer->queryBufferFormat(&format);
+            reply->writeInt32(format);
+            break;
+        }
         default:
             LOGV("unknown invoke message %d", msg);
             return INVALID_OPERATION;
