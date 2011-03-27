@@ -108,6 +108,7 @@ struct AwesomePlayer {
     status_t registerFrameBufferHeap(const sp<IMemoryHeap> memoryHeap, int numFrames, int frameSize);
     status_t unregisterFrameBufferHeap();
     status_t queueFrameBuffer(int frame);
+    status_t queryBufferFormat(int *format);
 #endif
 
 private:

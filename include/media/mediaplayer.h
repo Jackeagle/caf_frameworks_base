@@ -31,9 +31,10 @@ namespace android {
 class Surface;
 
 enum media_invoke_type {
-    MEDIA_INVOKE_REGISTER_BUFFERS   = 1,
-    MEDIA_INVOKE_UNREGISTER_BUFFERS = 2,
-    MEDIA_INVOKE_QUEUE_BUFFER       = 3,
+    MEDIA_INVOKE_REGISTER_BUFFERS    = 1,
+    MEDIA_INVOKE_UNREGISTER_BUFFERS  = 2,
+    MEDIA_INVOKE_QUEUE_BUFFER        = 3,
+    MEDIA_INVOKE_QUERY_BUFFER_FORMAT = 4,
 };
 
 enum media_event_type {
@@ -46,9 +47,7 @@ enum media_event_type {
     MEDIA_ERROR             = 100,
     MEDIA_INFO              = 200,
     MEDIA_FORMAT_CHANGED    = 1001, // video format changed, shared memory buffers need to be freed and reallocated
-    MEDIA_BUFFER_READY      = 1002, // return buffer to mediaplayer client with new yuv data ready
-    MEDIA_BUFFER_EMPTY      = 1003, // return buffer to mediaplayer client without new yuv data
-    MEDIA_BUFFER_FORMAT     = 1004, // report YUV format
+    MEDIA_BUFFER_READY      = 1002, // return buffer to mediaplayer client
 };
 
 // Generic error codes for the media player framework.  Errors are fatal, the
