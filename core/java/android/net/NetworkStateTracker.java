@@ -370,9 +370,9 @@ public abstract class NetworkStateTracker extends Handler {
              * says CONNECTED, both v4 and v6 is connected. This may not be true
              * always but no other way of knowing this now.
              */
-            setDetailedState(state, true, true, null, null);
+            setDetailedState(state, true, true, null, null, null, null);
         } else {
-            setDetailedState(state, false, false, null, null);
+            setDetailedState(state, false, false, null, null, null, null);
         }
     }
 
@@ -386,8 +386,11 @@ public abstract class NetworkStateTracker extends Handler {
      * @param extraInfo optional {@code String} providing extra information about the state change
      */
     public void setDetailedState(NetworkInfo.DetailedState state, boolean isIpv4Connected,
-            boolean isIpv6Connected, String reason, String extraInfo) {
-        if (DBG) Log.d(TAG, "setDetailed state, old ="+mNetworkInfo.getDetailedState()+" and new state="+state);
+            boolean isIpv6Connected, String reason, String extraInfo,
+            String ipv4Apn, String ipv6Apn) {
+        if (DBG)
+            Log.d(TAG, "setDetailed state, old =" + mNetworkInfo.getDetailedState()
+                    + " and new state=" + state);
 
         boolean wasConnecting = (mNetworkInfo.getState() == NetworkInfo.State.CONNECTING);
         String lastReason = mNetworkInfo.getReason();
@@ -399,7 +402,8 @@ public abstract class NetworkStateTracker extends Handler {
         if (wasConnecting && state == NetworkInfo.DetailedState.CONNECTED && reason == null
                 && lastReason != null)
             reason = lastReason;
-        mNetworkInfo.setDetailedState(state, isIpv4Connected, isIpv6Connected, reason, extraInfo);
+        mNetworkInfo.setDetailedState(state, isIpv4Connected, isIpv6Connected, reason, extraInfo,
+                ipv4Apn, ipv6Apn);
         Message msg = mTarget.obtainMessage(EVENT_STATE_CHANGED, mNetworkInfo);
         msg.sendToTarget();
     }
@@ -412,9 +416,9 @@ public abstract class NetworkStateTracker extends Handler {
              * says CONNECTED, both v4 and v6 is connected. This may not be true
              * always but no other way of knowing this now.
              */
-            mNetworkInfo.setDetailedState(state, true, true, null, null);
+            mNetworkInfo.setDetailedState(state, true, true, null, null, null, null);
         } else {
-            mNetworkInfo.setDetailedState(state, false, false, null, null);
+            mNetworkInfo.setDetailedState(state, false, false, null, null, null, null);
         }
     }
 
