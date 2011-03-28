@@ -1085,14 +1085,8 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
 
     //Clear the VIDEO and AUDIO EOS flags only conditionally
     //for better performance; but clear AT_EOS unconditionally
-    if (timeUs < mVideoDurationUs) {
-        //rekick video events if video at EOS
-        if (mFlags & VIDEO_AT_EOS)
-        {
-            postVideoEvent_l();
-            mFlags &= ~VIDEO_AT_EOS;
-        }
-    }
+    if (timeUs < mVideoDurationUs)
+        mFlags &= ~VIDEO_AT_EOS;
 
     if (timeUs < mAudioDurationUs)
         mFlags &= ~AUDIO_AT_EOS;
@@ -1260,6 +1254,14 @@ void AwesomePlayer::onVideoEvent() {
     }
     mVideoEventPending = false;
 
+    if (mFlags & VIDEO_AT_EOS)
+    {
+        // If video is at EOS, we have nothing to do, we'll continue
+        // doing nothing until the video EOS flag is cleared
+        postVideoEvent_l();
+        return;
+    }
+
     if (mSeeking) {
         releaseAllVideoBuffersHeld();
 
@@ -1351,9 +1353,11 @@ void AwesomePlayer::onVideoEvent() {
                 }
                 finishSeekIfNecessary(-1);
 
+                LOGW("Got video EOS!");
                 mFlags |= VIDEO_AT_EOS;
                 mVideoDurationUs = mVideoTimeUs;
                 postStreamDoneEvent_l(err);
+                postVideoEvent_l();
                 return;
             }
 
