@@ -68,6 +68,22 @@
 
 #define DISPLAY_COUNT       1
 
+namespace {
+  // layer is LayerBase type, and mCachedVideoLayer is LayerBuffer.
+  // Dynamic cast should work here, but we have no rtti.
+  // we are however sure that we are dealing with LayerBuffer
+  android::LayerBuffer* cacheOverlayLayer(const android::sp<android::LayerBase>& src){
+     assert(src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers);
+     if(!src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers) {
+        LOGE("composeSurfaces expected ePushBuffer flags=%d",
+              src->getLayerInitFlags());
+        abort();
+     }
+     return static_cast<android::LayerBuffer*>(src.get());
+  }
+
+}
+
 namespace android {
 // ---------------------------------------------------------------------------
 
@@ -422,6 +438,14 @@ bool SurfaceFlinger::threadLoop()
         logger.log(GraphicLog::SF_SWAP_BUFFERS, index);
         if (!mFullScreen) {
             postFramebuffer();
+            // In case we cached mCachedVideoLayer, it means we kept while in
+            // composeSurface function and we need to call onQueueBuf when we
+            // are done with swap buffers.
+            if(mCachedVideoLayer.get()){
+              mCachedVideoLayer->onQueueBuf();
+              mCachedVideoLayer=0;
+            }
+
             if (mOverlayOpt && mOverlayUseChanged) {
                 enableOverlayOpt(false);
                 enableOverlayOpt(true);
@@ -999,6 +1023,9 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         }
     }
 #endif
+
+    PostBufferSingleton::instance()->setPolicy(layerbuffercount);
+
     mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
 
     if (mOverlayOpt || (layerbuffercount == 1)) {
@@ -1070,8 +1097,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                         layer->draw(clip);
                         mOverlayUseChanged = true;
                     }
-                    else
+                    else{
+                        mCachedVideoLayer = cacheOverlayLayer(layer);
                         mOverlayUsed = true;
+                    }
                 }
                 else
                     layer->draw(clip);

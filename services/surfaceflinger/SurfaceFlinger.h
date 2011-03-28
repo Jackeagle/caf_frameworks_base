@@ -445,6 +445,9 @@ private:
    bool mOverlayUseChanged;
    bool mIsLayerBufferPresent;
    Vector< sp<LayerBase> > mOverlayDitchedLayers;
+   // Cached overlay layer in composeSurfaces function to be used in the ctx
+   // of fixing jitter/flickering bug
+   sp<LayerBuffer> mCachedVideoLayer;
 public:
    void ditchOverlayLayers();
    void freeBypassBuffers();
