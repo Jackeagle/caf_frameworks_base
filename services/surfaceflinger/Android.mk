@@ -60,6 +60,8 @@ endif
 ifneq (, $(filter msm7630_surf msm7630_1x msm8660_surf msm8660_csfb msm7630_fusion, $(QCOM_TARGET_PRODUCT)))
 LOCAL_CFLAGS += -DTARGET_USES_OVERLAY
 LOCAL_SHARED_LIBRARIES += liboverlay
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
 endif
 LOCAL_MODULE:= libsurfaceflinger

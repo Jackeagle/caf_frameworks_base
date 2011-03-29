@@ -40,6 +40,9 @@ libsurfaceflinger_client \
 
 LOCAL_C_INCLUDES := \
 	$(call include-path-for, corecg graphics)
+LOCAL_C_INCLUDES += -I$(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include/linux/msm_mdp.h
+LOCAL_C_INCLUDES += -I$(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include/linux/fb.h
+LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 
 LOCAL_MODULE:= hdmid
 
