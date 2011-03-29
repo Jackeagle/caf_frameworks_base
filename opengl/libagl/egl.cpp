@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2007 The Android Open Source Project
+** Copyright (c) 2010-2011 Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License Version 2.0(the "License");
 ** you may not use this file except in compliance with the License.
@@ -243,6 +244,7 @@ private:
     copybit_device_t*          blitengine;
     int width;
     int height;
+    int numFramebuffers;
     void* bits;
     GGLFormat const* pixelFormatTable;
     
@@ -257,6 +259,13 @@ private:
             top    = max(top, r.top);
             right  = min(right, r.right);
             bottom = min(bottom, r.bottom);
+            return *this;
+        }
+        Rect& orSelf(const Rect& r) {
+            left   = min(left, r.left);
+            top    = min(top, r.top);
+            right  = max(right, r.right);
+            bottom = max(bottom, r.bottom);
             return *this;
         }
         bool isEmpty() const {
@@ -350,7 +359,7 @@ private:
             const Region& clip);
 
     Rect dirtyRegion;
-    Rect oldDirtyRegion;
+    Rect oldDirtyRegion[NUM_FRAMEBUFFERS_MAX - 1];
 };
 
 egl_window_surface_v2_t::egl_window_surface_v2_t(EGLDisplay dpy,
@@ -382,6 +391,7 @@ egl_window_surface_v2_t::egl_window_surface_v2_t(EGLDisplay dpy,
     nativeWindow->common.incRef(&nativeWindow->common);
     nativeWindow->query(nativeWindow, NATIVE_WINDOW_WIDTH, &width);
     nativeWindow->query(nativeWindow, NATIVE_WINDOW_HEIGHT, &height);
+    nativeWindow->query(nativeWindow, NATIVE_WINDOW_NUM_BUFFERS, &numFramebuffers);
 }
 
 egl_window_surface_v2_t::~egl_window_surface_v2_t() {
@@ -551,7 +561,7 @@ EGLBoolean egl_window_surface_v2_t::swapBuffers()
     if (!buffer) {
         return setError(EGL_BAD_ACCESS, EGL_FALSE);
     }
-    
+
     /*
      * Handle eglSetSwapRectangleANDROID()
      * We copyback from the front buffer 
@@ -559,7 +569,10 @@ EGLBoolean egl_window_surface_v2_t::swapBuffers()
     if (!dirtyRegion.isEmpty()) {
         dirtyRegion.andSelf(Rect(buffer->width, buffer->height));
         if (previousBuffer) {
-            const Region copyBack(Region::subtract(oldDirtyRegion, dirtyRegion));
+            for (int i = 1; i < (numFramebuffers - 1); i++) {
+                oldDirtyRegion[i].orSelf(oldDirtyRegion[i - 1]);
+            }
+            const Region copyBack(Region::subtract(oldDirtyRegion[numFramebuffers - 2], dirtyRegion));
             if (!copyBack.isEmpty()) {
                 void* prevBits;
                 if (lock(previousBuffer, 
@@ -570,7 +583,12 @@ EGLBoolean egl_window_surface_v2_t::swapBuffers()
                 }
             }
         }
-        oldDirtyRegion = dirtyRegion;
+
+        for (int i = 1; i < (numFramebuffers - 1); i++) {
+            oldDirtyRegion[i-1] = oldDirtyRegion[i];
+        }
+
+        oldDirtyRegion[numFramebuffers - 2] = dirtyRegion;
     }
 
     if (previousBuffer) {
