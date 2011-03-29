@@ -1,6 +1,7 @@
 /* 
 **
 ** Copyright 2007 The Android Open Source Project
+** Copyright (c) 2010-2011 Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License Version 2.0(the "License"); 
 ** you may not use this file except in compliance with the License. 
@@ -278,6 +279,9 @@ int FramebufferNativeWindow::query(ANativeWindow* window,
             return NO_ERROR;
         case NATIVE_WINDOW_FORMAT:
             *value = fb->format;
+            return NO_ERROR;
+        case NATIVE_WINDOW_NUM_BUFFERS:
+            *value = fb->numFramebuffers;
             return NO_ERROR;
     }
     *value = 0;
