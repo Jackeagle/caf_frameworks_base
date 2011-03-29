@@ -354,9 +354,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             // 2. Reset Data Connections List
             if (mDataConnectionList != null) {
                 for (DataConnection dc: mDataConnectionList) {
-                    // All data connections will be in inactive state.
-                    // Call reset to make sure those are in inactive state.
-                    dc.reset(null);
+                    ((MMDataConnection)dc).update(ci);
                 }
             }
 

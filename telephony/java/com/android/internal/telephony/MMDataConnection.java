@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,6 +160,13 @@ public class MMDataConnection extends DataConnection {
 
     boolean isAvailable() {
         return isAvailable;
+    }
+
+    public void update(CommandsInterface ci) {
+        // Update the commands interface object.
+        this.mCM = ci;
+        // Call reset to make sure those are in inactive state.
+        reset(null);
     }
 
     void logd(String logString) {
