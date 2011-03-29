@@ -191,7 +191,7 @@ public class UiccManager extends Handler{
                 cards.add(c);
             }
         }
-        return (UiccCard[])cards.toArray();
+        return (UiccCard[])cards.toArray(new UiccCard[0]);
     }
 
     /* Return First subscription of selected family */
