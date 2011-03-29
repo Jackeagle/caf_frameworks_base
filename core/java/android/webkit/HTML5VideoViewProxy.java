@@ -132,8 +132,10 @@ class HTML5VideoViewProxy extends Handler
                     // which happens when the video view is detached from its parent
                     // view. This happens in the WebChromeClient before this method
                     // is invoked.
-                    mTimer.cancel();
-                    mTimer = null;
+                    if(mTimer != null) {
+                        mTimer.cancel();
+                        mTimer = null;
+                    }
                     if (mVideoView.isPlaying()) {
                         mVideoView.stopPlayback();
                     }
