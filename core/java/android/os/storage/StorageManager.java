@@ -375,6 +375,19 @@ public class StorageManager
     }
 
     /**
+     * flag to indicate UMS is on/off
+     *
+     * @hide
+     */
+    public void setShared(boolean enable) {
+        try {
+            mMountService.enableShared(enable);
+        } catch (Exception ex) {
+            Log.e(TAG, "Failed to set Shared ",ex);
+        }
+    }
+
+    /**
      * Query if a USB Mass Storage (UMS) host is connected.
      * @return true if UMS host is connected.
      *

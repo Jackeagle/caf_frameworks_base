@@ -567,6 +567,23 @@ public interface IMountService extends IInterface {
                 }
                 return _result;
             }
+
+            /*
+             * set the mShared flag if volume state is changing to shared/unshared
+             */
+            public void enableShared(boolean enable) throws RemoteException {
+                Parcel _data = Parcel.obtain();
+                Parcel _reply = Parcel.obtain();
+                try {
+                    _data.writeInterfaceToken(DESCRIPTOR);
+                    _data.writeInt((enable ? 1 : 0));
+                    mRemote.transact(Stub.TRANSACTION_enableShared, _data, _reply, 0);
+                    _reply.readException();
+                } finally {
+                    _reply.recycle();
+                    _data.recycle();
+                }
+            }
         }
 
         private static final String DESCRIPTOR = "IMountService";
@@ -620,6 +637,8 @@ public interface IMountService extends IInterface {
         static final int TRANSACTION_isObbMounted = IBinder.FIRST_CALL_TRANSACTION + 23;
 
         static final int TRANSACTION_getMountedObbPath = IBinder.FIRST_CALL_TRANSACTION + 24;
+
+        static final int TRANSACTION_enableShared = IBinder.FIRST_CALL_TRANSACTION + 25;
 
         /**
          * Cast an IBinder object into an IMountService interface, generating a
@@ -895,6 +914,14 @@ public interface IMountService extends IInterface {
                     reply.writeString(mountedPath);
                     return true;
                 }
+                case TRANSACTION_enableShared: {
+                    data.enforceInterface(DESCRIPTOR);
+                    boolean enable;
+                    enable = 0 != data.readInt();
+                    enableShared(enable);
+                    reply.writeNoException();
+                    return true;
+                }
             }
             return super.onTransact(code, data, reply, flags);
         }
@@ -1049,4 +1076,9 @@ public interface IMountService extends IInterface {
      * Unregisters an IMountServiceListener
      */
     public void unregisterListener(IMountServiceListener listener) throws RemoteException;
+
+    /*
+     * Set the mShared flag while volume is changing state to shared/unshared
+     */
+    public void enableShared(boolean enable) throws RemoteException;
 }

@@ -47,6 +47,7 @@ enum {
     TRANSACTION_unmountObb,
     TRANSACTION_isObbMounted,
     TRANSACTION_getMountedObbPath,
+    TRANSACTION_enableShared,
 };
 
 class BpMountService: public BpInterface<IMountService>
@@ -502,6 +503,22 @@ public:
         }
         path = reply.readString16();
         return true;
+    }
+
+    virtual void enableShared(const bool enable)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMountService::getInterfaceDescriptor());
+        data.writeInt32(enable != 0);
+        if (remote()->transact(TRANSACTION_enableShared, data, &reply) != NO_ERROR) {
+            LOGD("enableShared could not contact remote\n");
+            return;
+        }
+        int32_t err = reply.readExceptionCode();
+        if (err < 0) {
+            LOGD("enableShared caught exception %d\n", err);
+            return;
+        }
     }
 };
 

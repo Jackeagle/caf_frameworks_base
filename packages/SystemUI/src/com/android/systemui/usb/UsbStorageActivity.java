@@ -328,9 +328,12 @@ public class UsbStorageActivity extends Activity
 
     public void onClick(View v) {
         if (v == mMountButton) {
-           // Check for list of storage users and display dialog if needed.
+            // notify MountService about changing volume state to shared
+            mStorageManager.setShared(true);
+            // Check for list of storage users and display dialog if needed.
             checkStorageUsers();
         } else if (v == mUnmountButton) {
+            mStorageManager.setShared(false);
             if (localLOGV) Log.i(TAG, "Disabling UMS");
             switchUsbMassStorage(false);
         }
