@@ -46,9 +46,6 @@ include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 
-ifeq ($(strip $(BOARD_NO_SPEAKER)),true)
-  LOCAL_CFLAGS += -DHW_NO_SPEAKER
-endif
 
 LOCAL_SRC_FILES:=               \
     AudioPolicyManagerBase.cpp

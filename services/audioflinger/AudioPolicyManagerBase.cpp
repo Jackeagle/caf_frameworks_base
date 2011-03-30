@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 #include <hardware_legacy/AudioPolicyManagerBase.h>
 #include <media/mediarecorder.h>
+#include <cutils/properties.h>
 
 namespace android {
 
@@ -1011,19 +1012,35 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     mTotalEffectsCpuLoad(0), mTotalEffectsMemory(0),
     mA2dpSuspended(false)
 {
+    FILE *fp;
+    unsigned char build_id[20];
+    char mDeviceName[100];
     mpClientInterface = clientInterface;
 
     for (int i = 0; i < AudioSystem::NUM_FORCE_USE; i++) {
         mForceUse[i] = AudioSystem::FORCE_NONE;
     }
 
-    uint32_t defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_EARPIECE;
+    uint32_t defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_SPEAKER;
     // devices available by default are speaker, ear piece and microphone
     mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE;
-#ifndef HW_NO_SPEAKER
-    mAvailableOutputDevices |= AudioSystem::DEVICE_OUT_SPEAKER;
-    defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_SPEAKER;
-#endif
+    property_get("ro.product.device",mDeviceName,"0");
+    if( !strncmp(mDeviceName, "msm7627_", 8)) {
+        if((fp = fopen("/sys/devices/system/soc/soc0/build_id","r")) == NULL){
+            LOGE("Cannot open build_id file.");
+        }
+        else{
+            (void)fgets((char *)build_id,sizeof(build_id),fp);
+
+            if (build_id[12] == 'F') //build loaded on FFA
+            {
+                LOGV("Detected target FFA, enabled speaker");
+                mAvailableOutputDevices |= AudioSystem::DEVICE_OUT_SPEAKER;
+            }
+            fclose(fp);
+        }
+    }
+
     mAvailableInputDevices = AudioSystem::DEVICE_IN_BUILTIN_MIC;
 
 #ifdef WITH_A2DP
@@ -1672,6 +1689,9 @@ uint32_t AudioPolicyManagerBase::getDeviceForStrategy(routing_strategy strategy,
 #endif
         if (device2 == 0) {
             device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
+        }
+        if (device2 == 0) {
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_EARPIECE;
         }
 
         // device is DEVICE_OUT_SPEAKER if we come from case STRATEGY_SONIFICATION, 0 otherwise
