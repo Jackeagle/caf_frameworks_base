@@ -560,7 +560,7 @@ public class TelephonyManager {
      */
     public String getNetworkOperatorName(int subscription) {
         return
-            getTelephonyProperty(TelephonyProperties.PROPERTY_OPERATOR_ALPHA, subscription, null);
+            getTelephonyProperty(TelephonyProperties.PROPERTY_OPERATOR_ALPHA, subscription, "");
     }
 
     /**
@@ -586,7 +586,7 @@ public class TelephonyManager {
      */
      public String getNetworkOperator(int subscription) {
          return
-             getTelephonyProperty(TelephonyProperties.PROPERTY_OPERATOR_NUMERIC, subscription, null);
+             getTelephonyProperty(TelephonyProperties.PROPERTY_OPERATOR_NUMERIC, subscription, "");
      }
 
     /**
@@ -636,7 +636,7 @@ public class TelephonyManager {
      */
     public String getNetworkCountryIso(int subscription) {
         return
-            getTelephonyProperty(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY, subscription, null);
+            getTelephonyProperty(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY, subscription, "");
     }
 
     /** Network type is unknown */
@@ -1028,7 +1028,7 @@ public class TelephonyManager {
      */
     public String getSimOperator(int subscription) {
         return getTelephonyProperty
-            (TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, subscription, null);
+            (TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, subscription, "");
     }
 
     /**
@@ -1053,7 +1053,7 @@ public class TelephonyManager {
      */
     public String getSimOperatorName(int subscription) {
         return
-            getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, subscription, null);
+            getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, subscription, "");
     }
 
     /**
@@ -1071,7 +1071,7 @@ public class TelephonyManager {
      */
      public String getSimCountryIso(int subscription) {
          return getTelephonyProperty
-             (TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY, subscription, null);
+             (TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY, subscription, "");
      }
 
     /**
