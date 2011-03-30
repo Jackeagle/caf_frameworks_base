@@ -169,6 +169,7 @@ public class WebSettings {
     private int             mDefaultFixedFontSize = 13;
     private int             mPageCacheCapacity = 0;
     private boolean         mLoadsImagesAutomatically = true;
+    private boolean         mDisplayPowerSaveModeEnabled = false;
     private boolean         mBlockNetworkImage = false;
     private boolean         mBlockNetworkLoads;
     private boolean         mJavaScriptEnabled = false;
@@ -972,6 +973,28 @@ public class WebSettings {
      */
     public synchronized boolean getLoadsImagesAutomatically() {
         return mLoadsImagesAutomatically;
+    }
+
+    /**
+     * Tell the WebView to enable power save mode.
+     * @param flag True if the WebView should enable power save mode.
+     * @hide
+     */
+    public synchronized void setDisplayPowerSaveModeEnabled(boolean flag) {
+        if (mDisplayPowerSaveModeEnabled != flag) {
+            mDisplayPowerSaveModeEnabled = flag;
+            postSync();
+        }
+    }
+
+    /**
+     * Return true if the WebView display power save mode is enabled.
+     * The default is true.
+     * @return True if the WebView display power save mode is enabled.
+     * @hide
+     */
+    public synchronized boolean getDisplayPowerSaveModeEnabled() {
+        return mDisplayPowerSaveModeEnabled;
     }
 
     /**
