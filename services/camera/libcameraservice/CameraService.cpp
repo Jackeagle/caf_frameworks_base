@@ -494,6 +494,19 @@ void CameraService::Client::disconnect() {
     if (mHardware == 0) return;
 
     LOG1("hardware teardown");
+    // Release the held overlay resources.
+    if (mUseOverlay)
+    {
+        /* Release previous overlay handle */
+        if( mOverlay != NULL){
+            LOG1("%s: setting HAL overlay to NULL", __FUNCTION__);
+            mHardware->setOverlay(NULL);
+            mOverlay->destroy();
+            mOverlay = NULL;
+        }
+        mOverlayRef = 0;
+    }
+
     // Before destroying mHardware, we must make sure it's in the
     // idle state.
     // Turn off all messages.
@@ -502,18 +515,6 @@ void CameraService::Client::disconnect() {
     mHardware->cancelPicture();
     // Release the hardware resources.
     mHardware->release();
-    // Release the held overlay resources.
-    if (mUseOverlay)
-    {
-        /* Release previous overlay handle */
-        if( mOverlay != NULL){
-            mOverlay->destroy();
-            mOverlay = NULL;
-            mHardware->setOverlay(NULL);
-        }
-        mOverlayRef = 0;
-    }
-
     mHardware.clear();
 
     mCameraService->removeClient(mCameraClient);
@@ -751,14 +752,12 @@ status_t CameraService::Client::startPreviewMode() {
     }
 
     if (mUseOverlay) {
-        result = mHardware->startPreview();
-        if (result != NO_ERROR) return result;
         // If preview display has been set, set overlay now.
         if (mSurface != 0) {
             result = setOverlay();
         }
-//       if (result != NO_ERROR) return result;
-//        result = mHardware->startPreview();
+        if (result != NO_ERROR) return result;
+        result = mHardware->startPreview();
     } else {
         enableMsgType(CAMERA_MSG_PREVIEW_FRAME);
         result = mHardware->startPreview();
@@ -811,13 +810,16 @@ void CameraService::Client::stopPreview() {
     /*Force the destruction of any previous overlay
       so that display will not refer to a buffer that
       will be  deallocated when hardware is stopped below */
-    sp<Overlay> dummy;
-    mHardware->setOverlay( dummy );
-    mOverlayRef = 0;
-    if(mOverlay != NULL){
-        mOverlay->destroy();
-        mHardware->setOverlay(NULL);
-        mOverlay = NULL;
+    if (mUseOverlay)
+    {
+        /* Release previous overlay handle */
+        if( mOverlay != NULL){
+            LOG1("%s: setting HAL overlay to NULL", __FUNCTION__);
+            mHardware->setOverlay(NULL);
+            mOverlay->destroy();
+            mOverlay = NULL;
+        }
+        mOverlayRef = 0;
     }
 
     disableMsgType(CAMERA_MSG_PREVIEW_FRAME);
