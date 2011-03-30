@@ -781,10 +781,12 @@ public final class MotionEvent extends InputEvent implements Parcelable {
         return mDataSamples[mLastDataSampleIndex + SAMPLE_Y] + mYOffset;
     }
 
+    /** @hide */
     public final float getXOffset() {
     return mXOffset;
     }
 
+    /** @hide */
     public final float getYOffset() {
     return mYOffset;
     }
