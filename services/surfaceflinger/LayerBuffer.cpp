@@ -44,6 +44,28 @@ gralloc_module_t const* LayerBuffer::sGrallocModule = 0;
 
 // ---------------------------------------------------------------------------
 
+PostBufferSingleton* PostBufferSingleton::mInstance=0;
+
+void PostBufLockPolicy::wait(Mutex & m, Condition& c, postBufState_t& s)
+{
+  const nsecs_t TIMEOUT = ms2ns(20);
+  Mutex::Autolock _l(m);
+  unsigned int count = 0;
+  enum { MAX_WAIT_COUNT = 50 };
+  /* That is the heart of postBuffer block call.
+   * we set wakeup to 3 sec. That should never deadblock
+   * since we always have *any* UI update that can release it */
+  while(s == PostBufPolicyBase::POSTBUF_BLOCK) {
+    (void) c.waitRelative(m, TIMEOUT);
+    if(++count > MAX_WAIT_COUNT){
+      LOGE("BufferSource::setBuffer too many wait count=%d", count);
+      s = PostBufPolicyBase::POSTBUF_GO;
+    }
+  }
+  // Mark it as block so no other setBuffer can sneak in
+  s = PostBufPolicyBase::POSTBUF_BLOCK;
+}
+
 LayerBuffer::LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
         const sp<Client>& client)
     : LayerBaseClient(flinger, display, client),
@@ -99,6 +121,13 @@ bool LayerBuffer::needsBlending() const {
 
 void LayerBuffer::setNeedsBlending(bool blending) {
     mNeedsBlending = blending;
+}
+
+void LayerBuffer::onQueueBuf()
+{
+  sp<Source> source(getSource());
+  if (source != 0)
+    source->onQueueBuf();
 }
 
 void LayerBuffer::postBuffer(ssize_t offset)
@@ -283,7 +312,7 @@ sp<OverlayRef> LayerBuffer::SurfaceLayerBuffer::createOverlay(
 
 LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
         ssize_t offset, size_t bufferSize)
-    : mBufferHeap(buffers)
+    : mBufferHeap(buffers), mCurrOffset(offset)
 {
     NativeBuffer& src(mNativeBuffer);
     src.crop.l = 0;
@@ -351,7 +380,9 @@ void LayerBuffer::Source::unregisterBuffers() {
 LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
         const ISurface::BufferHeap& buffers)
     : Source(layer), mStatus(NO_ERROR), mBufferSize(0),
-      mUseEGLImageDirectly(0), mNeedConversion(1)
+      mUseEGLImageDirectly(0), mNeedConversion(1),
+      mPostBufState(PostBufPolicyBase::POSTBUF_GO),
+      mPrevOffset(-1), mDirtyQueueBit(true)
 {
     if (buffers.heap == NULL) {
         // this is allowed, but in this case, it is illegal to receive
@@ -426,7 +457,10 @@ LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
 }
 
 LayerBuffer::BufferSource::~BufferSource()
-{    
+{
+  /* release any IBinder threads */
+  mPostBufState = PostBufPolicyBase::POSTBUF_GO;
+  mPostBufCond.signal(); // Let waiting thread to be done.
     class MessageDestroyTexture : public MessageBase {
         SurfaceFlinger* flinger;
         GLuint name;
@@ -492,10 +526,19 @@ sp<LayerBuffer::Buffer> LayerBuffer::BufferSource::getBuffer() const
     return mBuffer;
 }
 
+void LayerBuffer::BufferSource::onQueueBuf()
+{
+  // callback is being called when we are done queuing and it is safe for
+  // postBuffer to continue
+  PostBufferSingleton::instance()->onQueueBuf(mPostBufLock, mDirtyQueueBit, mPostBufState);
+}
+
+
 void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer>& buffer)
 {
-    Mutex::Autolock _l(mBufferSourceLock);
-    mBuffer = buffer;
+  PostBufferSingleton::instance()->wait(mPostBufLock, mPostBufCond, mPostBufState);
+  Mutex::Autolock _l(mBufferSourceLock);
+  mBuffer = buffer;
 }
 
 status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, 
@@ -505,21 +548,38 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
     sp<Buffer> ourBuffer(getBuffer());
     if (UNLIKELY(ourBuffer == 0))  {
         // nothing to do, we don't have a buffer
+        // happens in suspend resume
         mLayer.clearWithOpenGL(clip);
         return INVALID_OPERATION;
     }
+
+    Buffer::Offset& currOffset = ourBuffer->getCurrOffset();
+    // That will ensure no signaling would happen
+    mDirtyQueueBit = true;
+    // Dirty queue bit is false so no signaling would happen, only when the
+    // origin of the offset comes from the event loop and it is the same offset
+    // That is because in seek operations, same offset can come from postBuffer
+    // so the decoder is sending multiple postBuf with same offset and we want
+    // to signal in that case. (otherwise we will have a 2-3 of ui freeze)
+    if(currOffset.mOrigin == Buffer::Offset::EVENT_LOOP &&
+        currOffset == mPrevOffset) {
+      mDirtyQueueBit = false;
+    }
+    mPrevOffset = currOffset;
+    currOffset.mOrigin = Buffer::Offset::EVENT_LOOP;
+
     NativeBuffer src(ourBuffer->getBuffer());
     const DisplayHardware& hw(mLayer.mFlinger->
                                graphicPlane(0).displayHardware());
     hw.videoOverlayStarted(true);
-    overlay::Overlay* temp = hw.getOverlayObject();
+    overlay::Overlay* ov = hw.getOverlayObject();
     int s3dFormat = mLayer.getStereoscopic3DFormat();
 
-    if (!temp->setSource(src.hor_stride, src.ver_stride, 
+    if (!ov->setSource(src.hor_stride, src.ver_stride,
                           src.img.format|s3dFormat, mLayer.getOrientation(),
                           hdmiConnected, ignoreFB))
         return INVALID_OPERATION;
-    if (!temp->setCrop(0, 0, src.crop.r, src.crop.b))
+    if (!ov->setCrop(0, 0, src.crop.r, src.crop.b))
         return INVALID_OPERATION;
     const Rect bounds(mLayer.mTransformedBounds);
     int x = bounds.left;
@@ -528,29 +588,43 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
     int h = bounds.height();
     int ovpos_x, ovpos_y;
     uint32_t ovpos_w, ovpos_h;
-    bool ret;
-    if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
+    bool ret = ov->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h);
+    if (ret) {
         if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
-            ret = temp->setPosition(x, y, w, h);
+            ret = ov->setPosition(x, y, w, h);
         }
     }
     else
-        ret = temp->setPosition(x, y, w, h);
-    if (!ret)
-        return INVALID_OPERATION;
+        ret = ov->setPosition(x, y, w, h);
+    if (!ret) {
+      // Need to release postBuffer loc in case of bad setPos
+      // That happens in youtube app
+      // FIXME TODO - onQueueBuf should be probably call when we have all sort
+      // of errors in DWO function.
+      // That one is specifically here to _faster_ release a lock when dealing
+      // w/ youtube apk instead of waiting for setBuffer/wait timeout.
+      mLayer.onQueueBuf();
+      return INVALID_OPERATION;
+    }
     int orientation;
-    if (ret = temp->getOrientation(orientation)) {
+    if (ret = ov->getOrientation(orientation)) {
         if (orientation != mLayer.getOrientation())
-            ret = temp->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
+            ret = ov->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
     }
     else
-        ret = temp->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
+        ret = ov->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
     if (!ret)
         return INVALID_OPERATION;
-    ret = temp->queueBuffer(src.img.handle);
+    ret = ov->queueBuffer(src.img.handle);
     if (!ret)
         return INVALID_OPERATION;
 
+    // Need to inform video layer here after queuing
+    // It is safe to call onQueueBuf only when ignoreFB==true since in this case
+    // it is safe to let postBuffer thread (video renderer) to move ahead
+    if(ignoreFB)  {
+      mLayer.onQueueBuf();
+    }
     if (!ignoreFB)
         mLayer.clearWithOpenGL(clip);
     return NO_ERROR;
@@ -758,7 +832,7 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     mInitialized = false;
 
     mOverlayHandle = overlay->getHandleRef(overlay);
-    
+
     sp<OverlayChannel> channel = new OverlayChannel( &layer );
 
     *overlayRef = new OverlayRef(mOverlayHandle, channel,
@@ -820,7 +894,7 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
             int y = bounds.top;
             int w = bounds.width();
             int h = bounds.height();
-            
+
             // we need a lock here to protect "destroy"
             Mutex::Autolock _l(mOverlaySourceLock);
             if (mOverlay) {

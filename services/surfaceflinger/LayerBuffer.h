@@ -23,6 +23,8 @@
 #include "LayerBase.h"
 #include "TextureManager.h"
 
+#include "PostBufLock.h"
+
 struct copybit_device_t;
 
 namespace android {
@@ -35,9 +37,18 @@ class OverlayRef;
 
 // ---------------------------------------------------------------------------
 
-class LayerBuffer : public LayerBaseClient
+/* Interface being called after Queuing buffer to overlay in case of
+ * ignoreFB=true, or after swap being called in case of ignoreFB=false */
+class IOnQueueBuf{
+public:
+  virtual void onQueueBuf()=0;
+protected:
+  virtual ~IOnQueueBuf(){}
+};
+
+class LayerBuffer : public LayerBaseClient, public IOnQueueBuf
 {
-    class Source : public LightRefBase<Source> {
+    class Source : public LightRefBase<Source>, public IOnQueueBuf {
     public:
         Source(LayerBuffer& layer);
         virtual ~Source();
@@ -50,6 +61,7 @@ class LayerBuffer : public LayerBaseClient
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual void destroy() { }
+        virtual void onQueueBuf() { }
         SurfaceFlinger* getFlinger() const { return mLayer.mFlinger.get(); }
     protected:
         LayerBuffer& mLayer;
@@ -88,6 +100,14 @@ public:
     }
 
     void serverDestroy();
+    /* OnBufferQ is called from drawWithOverlay, or after egl swap,
+     * when buffs are queued to Overlay.
+     * Usecases: When ignoreFB==true it means WAIT==true in
+     * liboverlay and it is safe to invoke OnBufferQ immediately
+     * after return from QueueBuf.
+     * When ignoreFB==false it means WAIT==false and we are going to have
+     * that call invoked only after swap. */
+    virtual void onQueueBuf();
 
 private:
     struct NativeBuffer {
@@ -104,6 +124,13 @@ private:
 
     class Buffer : public LightRefBase<Buffer> {
     public:
+        struct Offset{
+          Offset(ssize_t offset) : mOffset(offset), mOrigin(POST_BUFFER) {}
+          ssize_t mOffset;
+          operator ssize_t() const { return mOffset; }
+          enum { POST_BUFFER, EVENT_LOOP } mOrigin;
+        };
+
         Buffer(const ISurface::BufferHeap& buffers,
                 ssize_t offset, size_t bufferSize);
         inline status_t getStatus() const {
@@ -112,6 +139,10 @@ private:
         inline const NativeBuffer& getBuffer() const {
             return mNativeBuffer;
         }
+        /* return the current offset */
+        Offset& getCurrOffset() { return mCurrOffset; }
+        const Offset& getCurrOffset() const { return mCurrOffset; }
+
     protected:
         friend class LightRefBase<Buffer>;
         Buffer& operator = (const Buffer& rhs);
@@ -120,6 +151,7 @@ private:
     private:
         ISurface::BufferHeap    mBufferHeap;
         NativeBuffer            mNativeBuffer;
+        Offset                  mCurrOffset;
     };
 
     class BufferSource : public Source {
@@ -137,6 +169,16 @@ private:
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual void destroy() { }
+
+       /* OnBufferQ is called from drawWithOverlay, or after egl swap,
+        * when buffs are queued to Overlay.
+        * Usecases: When ignoreFB==true it means WAIT==true in
+        * liboverlay and it is safe to invoke OnBufferQ immediately
+        * after return from QueueBuf.
+        * When ignoreFB==false it means WAIT==false and we are going to have
+        * that call invoked only after swap. */
+        virtual void onQueueBuf();
+
     private:
         status_t initTempBuffer() const;
         void clearTempBufferImage() const;
@@ -150,6 +192,21 @@ private:
         mutable TextureManager          mTextureManager;
         mutable int                     mUseEGLImageDirectly;
         mutable int                     mNeedConversion;
+
+        /* PostBuf Lock/Cond and state is being used in postBuffer function to
+         * avoid video renderer (or any client of that LayerBuffer/ISurface) to
+         * call postBuffer w/o LayerBuffer flow controlling the frequency of
+         * that call. w/o controlling it, setBuffer override a used buffer
+         * might create video artifacts.
+         * */
+        Mutex     mPostBufLock;
+        Condition mPostBufCond;
+        PostBufPolicyBase::postBufState_t mPostBufState;
+
+        // To avoid signaling twice in a raw with the same offset
+        // FIXME mutable because DWO is const
+        mutable ssize_t mPrevOffset;
+        mutable bool    mDirtyQueueBit;
     };
     
     class OverlaySource : public Source {
