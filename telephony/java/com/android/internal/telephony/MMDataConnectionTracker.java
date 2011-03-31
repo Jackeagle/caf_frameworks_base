@@ -333,6 +333,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         logv("SUPPORT_IPV6 = " + SUPPORT_IPV6);
         logv("SUPPORT_SERVICE_ARBITRATION = " + SUPPORT_SERVICE_ARBITRATION);
         logv("SUPPORT_OMH = " + mDpt.isOmhEnabled());
+        logv("SUPPORT_OOS_IS_DISCONNECT = " + mOosIsDisconnect);
     }
 
     public void dispose() {
