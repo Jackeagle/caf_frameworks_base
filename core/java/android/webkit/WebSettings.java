@@ -209,6 +209,7 @@ public class WebSettings {
     private boolean         mAllowFileAccess = true;
     private boolean         mLoadWithOverviewMode = false;
     private boolean         mUseWebViewBackgroundOverscrollBackground = true;
+    private boolean         mInpageVideoEnabled = false;
 
     // private WebSettings, not accessible by the host activity
     static private int      mDoubleTapToastCount = 3;
@@ -1425,6 +1426,16 @@ public class WebSettings {
      */
     public synchronized boolean getInvertColor() {
         return mInvertColor;
+    }
+
+    /**
+     * @hide
+     */
+    public synchronized void setInpageVideoEnabled(boolean flag) {
+        if (mInpageVideoEnabled != flag) {
+            mInpageVideoEnabled = flag;
+            postSync();
+        }
     }
 
     int getDoubleTapToastCount() {
