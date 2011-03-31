@@ -71,6 +71,7 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OP
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.CURRENT_ACTIVE_PHONE;
+import static com.android.internal.telephony.ProxyManager.SUB_DEACTIVATED;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -299,9 +300,20 @@ public class CDMAPhone extends PhoneBase {
     public void setSubscriptionInfo(Subscription subData) {
         mSubscriptionData = subData;
         setSubscription(mSubscriptionData.subId);
+        Log.d(LOG_TAG, "slotId:" + mSubscriptionData.slotId + "appId:"
+                + mSubscriptionData.m3gppIndex + "subId:" + mSubscriptionData.subId
+                + "subStatus:" + mSubscriptionData.subStatus);
+        if (mSubscriptionData.subStatus == SUB_DEACTIVATED) {
+            resetSubSpecifics();
+        }
         updateIccAvailability();
         mSST.updateRecords();
         mDataConnection.setSubscriptionInfo(subData);
+    }
+
+    public void resetSubSpecifics() {
+        mMeid = null;
+        mEsn = null;
     }
 
     //Gets Subscription Information

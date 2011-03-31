@@ -47,6 +47,7 @@ import static com.android.internal.telephony.CommandsInterface.CF_REASON_UNCONDI
 import static com.android.internal.telephony.CommandsInterface.SERVICE_CLASS_VOICE;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_BASEBAND_VERSION;
 import static com.android.internal.telephony.TelephonyProperties.CURRENT_ACTIVE_PHONE;
+import static com.android.internal.telephony.ProxyManager.SUB_DEACTIVATED;
 
 import com.android.internal.telephony.cat.CatService;
 import com.android.internal.telephony.Call;
@@ -298,11 +299,20 @@ public class GSMPhone extends PhoneBase {
     public void setSubscriptionInfo(Subscription subData) {
         mSubscriptionData = subData;
         setSubscription(mSubscriptionData.subId);
-        Log.d(LOG_TAG, "slotId:"+mSubscriptionData.slotId + "app_id:"
-                + mSubscriptionData.m3gppIndex+"subId:"+ mSubscriptionData.subId);
+        Log.d(LOG_TAG, "slotId:" + mSubscriptionData.slotId + "appId:"
+                + mSubscriptionData.m3gppIndex + "subId:" + mSubscriptionData.subId
+                + "subStatus:" + mSubscriptionData.subStatus);
+        if (mSubscriptionData.subStatus == SUB_DEACTIVATED) {
+            resetSubSpecifics();
+        }
         updateIccAvailability();
         mSST.updateRecords();
         mDataConnection.setSubscriptionInfo(subData);
+    }
+
+    public void resetSubSpecifics() {
+        mImei = null;
+        mImeiSv = null;
     }
 
     //Gets Subscription information in the Phone Object

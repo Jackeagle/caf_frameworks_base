@@ -1003,6 +1003,8 @@ public class ProxyManager extends Handler {
                         mPendingDeactivateEvents--;
                         mSubResult[phoneIndex] = SUB_DEACTIVATE_SUCCESS;
                         prevSubscriptionData.subscription[phoneIndex].subStatus = SUB_DEACTIVATED;
+                        prevSubscriptionData.subscription[phoneIndex].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
+                        prevSubscriptionData.subscription[phoneIndex].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
                         mSubscriptionReady[phoneIndex] = false;
                         if (subscriptionData.subscription[phoneIndex].subStatus == SUB_DEACTIVATE) {
                             subscriptionData.subscription[phoneIndex].subStatus = SUB_DEACTIVATED;
@@ -1011,6 +1013,8 @@ public class ProxyManager extends Handler {
                         if (mPendingDeactivateEvents == 0) {
                             processPendingActivateRequests();
                         }
+                        Phone currentPhone = mProxyPhones[phoneIndex];
+                        currentPhone.setSubscriptionInfo(prevSubscriptionData.subscription[phoneIndex]);
                     } else {
                         Log.d(LOG_TAG, "subscription of SUB:" + phoneIndex + " Activated");
                         mPendingActivateEvents--;
