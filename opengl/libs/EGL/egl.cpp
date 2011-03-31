@@ -1066,7 +1066,6 @@ EGLBoolean eglDestroySurface(EGLDisplay dpy, EGLSurface surface)
     if (result == EGL_TRUE) {
         if (s->win != NULL) {
             native_window_set_buffers_geometry(s->win.get(), 0, 0, 0);
-            s->win.clear();
         }
         _s.terminate();
     }
