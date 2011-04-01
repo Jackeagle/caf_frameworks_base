@@ -35,6 +35,7 @@ import android.os.Message;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.Log;
+import android.os.SystemClock;
 
 import java.io.InputStream;
 import java.util.Comparator;
@@ -47,6 +48,11 @@ import java.util.ListIterator;
 import java.util.Map;
 
 import org.apache.http.HttpHost;
+
+import java.lang.Thread;
+import android.webkit.Subhost;
+import android.webkit.PreConnectionManager;
+import java.lang.Exception;
 
 /**
  * {@hide}
@@ -68,6 +74,10 @@ public class RequestQueue implements RequestFeeder {
 
     /* default simultaneous connection count */
     private static final int CONNECTION_COUNT = SystemProperties.getInt("http.threads", 4);
+
+    private static final int PRE_CONNECTION_THREADS = 5;
+    private PreConnectionThread[] mPreConnectionThreads;
+
 
     /**
      * This class maintains active connection threads
@@ -173,8 +183,8 @@ public class RequestQueue implements RequestFeeder {
                 Connection connection = mThreads[i].mConnection;
                 if (connection != null) connection.setCanPersist(false);
             }
-            mIdleCache.clear();
         }
+
 
         /* Linear lookup -- okay for small thread counts.  Might use
            private HashMap<HttpHost, LinkedList<ConnectionThread>> mActiveMap;
@@ -243,6 +253,11 @@ public class RequestQueue implements RequestFeeder {
 
         mConnectivityManager = (ConnectivityManager)
                 context.getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        mPreConnectionThreads = new PreConnectionThread[PRE_CONNECTION_THREADS];
+        for (int i = 0; i < PRE_CONNECTION_THREADS; i++) {
+            mPreConnectionThreads[i] = null;
+        }
     }
 
     public synchronized boolean setRequestPriority(WebAddress uri, int priority) {
@@ -681,6 +696,48 @@ public class RequestQueue implements RequestFeeder {
             }
         }
         return ret;
+    }
+
+    public int handleConnectionRequest(PreConnectionManager preConnectionMgr, LinkedList<Subhost> subhosts)
+    {
+        if (null != subhosts) {
+            for (int i = 0; i < PRE_CONNECTION_THREADS; ++i) {
+                if (null == mPreConnectionThreads[i]) {
+                    mPreConnectionThreads[i] = new PreConnectionThread(subhosts, mActivePool, mContext, RequestQueue.this, preConnectionMgr);
+                    mPreConnectionThreads[i].start();
+
+                    return i;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    public void stopConnectionRequest(int preConnectionThreadId)
+    {
+        try {
+            if (null != mPreConnectionThreads[preConnectionThreadId]) {
+                if (mPreConnectionThreads[preConnectionThreadId].isAlive()) {
+                    mPreConnectionThreads[preConnectionThreadId].Stop();
+                }
+
+                mPreConnectionThreads[preConnectionThreadId] = null;
+            }
+        }catch (Exception e) {
+        }
+
+        return;
+    }
+
+    public void cleanPreConnectionThreadEntry(int preConnectionThreadId)
+    {
+
+        if(0<=preConnectionThreadId && preConnectionThreadId < PreConnectionManager.MAX_PRE_CONNECTION_THREADS) {
+            mPreConnectionThreads[preConnectionThreadId] = null;
+        }
+
+        return;
     }
 
     /**
