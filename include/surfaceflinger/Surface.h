@@ -293,7 +293,7 @@ private:
     // must be used from the lock/unlock thread
     sp<GraphicBuffer>           mLockedBuffer;
     sp<GraphicBuffer>           mPostedBuffer;
-    mutable Region              mOldDirtyRegion;
+    mutable Region              mOldDirtyRegion[SharedBufferStack::NUM_BUFFER_MAX];
     bool                        mReserved;
 
     // only used from dequeueBuffer()
