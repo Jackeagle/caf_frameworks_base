@@ -41,7 +41,8 @@ class OverlayRef;
  * ignoreFB=true, or after swap being called in case of ignoreFB=false */
 class IOnQueueBuf{
 public:
-  virtual void onQueueBuf()=0;
+  virtual void onQueueBuf() {}
+  virtual void setDirtyQueueSignal() {}
 protected:
   virtual ~IOnQueueBuf(){}
 };
@@ -61,7 +62,6 @@ class LayerBuffer : public LayerBaseClient, public IOnQueueBuf
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual void destroy() { }
-        virtual void onQueueBuf() { }
         SurfaceFlinger* getFlinger() const { return mLayer.mFlinger.get(); }
     protected:
         LayerBuffer& mLayer;
@@ -100,15 +100,12 @@ public:
     }
 
     void serverDestroy();
-    /* OnBufferQ is called from drawWithOverlay, or after egl swap,
-     * when buffs are queued to Overlay.
-     * Usecases: When ignoreFB==true it means WAIT==true in
-     * liboverlay and it is safe to invoke OnBufferQ immediately
-     * after return from QueueBuf.
-     * When ignoreFB==false it means WAIT==false and we are going to have
-     * that call invoked only after swap. */
+
+    /* pass through to buffer source. See BufferSource for details */
     virtual void onQueueBuf();
 
+    /* pass through to buffer source. See BufferSource for details */
+    virtual void setDirtyQueueSignal();
 private:
     struct NativeBuffer {
         copybit_image_t   img;
@@ -179,6 +176,10 @@ private:
         * that call invoked only after swap. */
         virtual void onQueueBuf();
 
+       /*
+        * Set dirty queue signal bit so when onQueueBuf is being called, it will
+        * transit the machine state to GO (non blocking postBuf) */
+        virtual void setDirtyQueueSignal() { mDirtyQueueBit = true; }
     private:
         status_t initTempBuffer() const;
         void clearTempBufferImage() const;
