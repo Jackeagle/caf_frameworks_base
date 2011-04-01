@@ -48,8 +48,9 @@ public class UiccCardStatusResponse {
         }
         CardState     card_state;
         PinState      universal_pin_state;
-        int[]         subscription_3gpp_app_index;     /* value < RIL_CARD_MAX_APPS */
-        int[]         subscription_3gpp2_app_index;    /* value < RIL_CARD_MAX_APPS */
+        int           subscription_3gpp_app_index;     /* value < RIL_CARD_MAX_APPS */
+        int           subscription_3gpp2_app_index;    /* value < RIL_CARD_MAX_APPS */
+        int           subscription_ims_app_index;      /* value < RIL_CARD_MAX_APPS */
         AppStatus[]   applications;
     }
 

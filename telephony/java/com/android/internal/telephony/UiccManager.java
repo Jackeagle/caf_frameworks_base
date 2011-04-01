@@ -259,13 +259,7 @@ public class UiccManager extends Handler{
         if (slotId >= 0 && slotId < mUiccCards.length) {
             UiccCard c = mUiccCards[slotId];
             if (c != null && (c.getCardState() == CardState.PRESENT)) {
-                int[] subscriptions;
-                subscriptions = c.getSubscription3gppAppIndex();
-                if (subscriptions != null && subscriptions.length > 0) {
-                    return subscriptions[0];
-                } else {
-                    return SUBSCRIPTION_INDEX_INVALID;
-                }
+                return c.getSubscription3gppAppIndex();
             }
         }
         return SUBSCRIPTION_INDEX_INVALID;
@@ -276,13 +270,7 @@ public class UiccManager extends Handler{
         if (slotId >= 0 && slotId < mUiccCards.length) {
             UiccCard c = mUiccCards[slotId];
             if (c != null && (c.getCardState() == CardState.PRESENT)) {
-                int[] subscriptions;
-                subscriptions = c.getSubscription3gpp2AppIndex();
-                if (subscriptions != null && subscriptions.length > 0) {
-                    return subscriptions[0];
-                } else {
-                    return SUBSCRIPTION_INDEX_INVALID;
-                }
+                return c.getSubscription3gpp2AppIndex();
             }
         }
         return SUBSCRIPTION_INDEX_INVALID;
