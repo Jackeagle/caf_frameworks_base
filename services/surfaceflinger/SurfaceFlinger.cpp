@@ -1165,12 +1165,15 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     mOverlayUsed = true;
                 } else if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && 
                             layerbuffercount == 1) {
+                    mCachedVideoLayer = cacheOverlayLayer(layer);
                     if (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR) {
                         layer->draw(clip);
                         mOverlayUseChanged = true;
+                        // Failed, so we would like it to signal after
+                        // postFrameBuffer call.
+                        mCachedVideoLayer->setDirtyQueueSignal();
                     }
                     else{
-                        mCachedVideoLayer = cacheOverlayLayer(layer);
                         mOverlayUsed = true;
                     }
                 }
