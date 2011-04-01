@@ -57,6 +57,7 @@ mNumFramesPlayed(0),
 mPositionTimeMediaUs(-1),
 mPositionTimeRealUs(-1),
 mSeeking(false),
+mInternalSeeking(false),
 mReachedEOS(false),
 mFinalStatus(OK),
 mStarted(false),
@@ -66,6 +67,7 @@ mFirstBuffer(NULL),
 mAudioSink(audioSink),
 mObserver(observer),
 AudioPlayer(audioSink,observer) {
+    LOGV("LPAPlayer::LPAPlayer() ctor");
     a2dpDisconnectPause = false;
     mSeeked = false;
     objectsAlive++;
@@ -77,6 +79,16 @@ AudioPlayer(audioSink,observer) {
     bIsA2DPEnabled = false;
     mAudioFlinger = NULL;
     AudioFlingerClient = NULL;
+
+    /* Initialize Suspend/Resume related variables */
+    mQueue.start();
+    mQueueStarted      = true;
+    mPauseEvent        = new TimedEvent(this, &LPAPlayer::onPauseTimeOut);
+    mPauseEventPending = false;
+    mPlaybackSuspended = false;
+    bIsAudioRouted     = false;
+    mIsDriverStarted   = false;
+
     LOGV("Opening pcm_dec driver");
     afd = open("/dev/msm_pcm_lp_dec", O_WRONLY | O_NONBLOCK);
     mSourceEmpty = true;
@@ -94,9 +106,14 @@ AudioPlayer(audioSink,observer) {
 }
 
 LPAPlayer::~LPAPlayer() {
+    LOGV("LPAPlayer::~LPAPlayer()");
+    if (mQueueStarted) {
+        mQueue.stop();
+    }
     if (mStarted) {
         reset();
     }
+    mAudioFlinger->deregisterClient(AudioFlingerClient);
     objectsAlive--;
 }
 
@@ -147,7 +164,6 @@ void LPAPlayer::AudioFlingerLPAdecodeClient::ioConfigChanged(int event, int ioHa
     case AudioSystem::A2DP_OUTPUT_STATE:
         {
             LOGV("ioConfigChanged() A2DP_OUTPUT_STATE iohandle is %d with A2DPEnabled in %d", ioHandle, pBaseClass->bIsA2DPEnabled);
-
             if ( -1 == ioHandle ) {
                 if ( pBaseClass->bIsA2DPEnabled ) {
                     pBaseClass->bIsA2DPEnabled = false;
@@ -165,7 +181,6 @@ void LPAPlayer::AudioFlingerLPAdecodeClient::ioConfigChanged(int event, int ioHa
                     }
 
                     LOGV("ioConfigChanged:: A2DP Enabled");
-
                 }
             }
         }
@@ -181,29 +196,35 @@ void LPAPlayer::handleA2DPSwitch() {
     LOGV("handleA2dpSwitch()");
     if (bIsA2DPEnabled) {
         if (!isPaused) {
-            if (ioctl(afd, AUDIO_PAUSE, 1) < 0) {
-                LOGE("AUDIO PAUSE failed");
+            if(mIsDriverStarted) {
+                if (ioctl(afd, AUDIO_PAUSE, 1) < 0) {
+                    LOGE("AUDIO PAUSE failed");
+                }
             }
+            /* Set timePlayed to time where we are pausing */
             timePlayed += (nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted);
             timeStarted = 0;
             LOGV("paused for bt switch");
         }
 
-        mSeeking = true;
+        mInternalSeeking = true;
         mReachedEOS = false;
         mSeekTimeUs = timePlayed;
 
-        if (ioctl(afd, AUDIO_FLUSH, 0) < 0) {
-            LOGE("Audio flush event failed");
+        if(mIsDriverStarted) {
+            mIsDriverStarted = false;
+            if (ioctl(afd, AUDIO_STOP, 0) < 0) {
+                LOGE("%s: Audio stop event failed", __func__);
+            }
         }
     } else {
+        if (!isPaused) {
+            timePlayed += (nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted);
+            timeStarted = 0;
+        }
+
         a2dpDisconnectPause = true;
     }
-
-
-/*
-
-*/
 }
 
 void LPAPlayer::setSource(const sp<MediaSource> &source) {
@@ -216,6 +237,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
     CHECK(!mStarted);
     CHECK(mSource != NULL);
 
+    LOGV("start: sourceAlreadyStarted %d", sourceAlreadyStarted);
     //Check if the source is started, start it
     status_t err;
     if (!sourceAlreadyStarted) {
@@ -288,9 +310,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
     }
 
     // Get the session id from the LPA Driver
-
-
-    //Register the session id with HAL for routing
+    // Register the session id with HAL for routing
     if (mAudioSink.get() != NULL) {
         unsigned short decId;
         if ( ioctl(afd, AUDIO_GET_SESSION_ID, &decId) == -1 ) {
@@ -299,11 +319,9 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
         } else {
             sessionId = (int)decId;
             LOGV("AUDIO_GET_SESSION_ID success : decId = %d", decId);
-
         }
 
         if (!bIsA2DPEnabled) {
-
             LOGV("Opening a routing session for audio playback: sessionId = %d", sessionId);
             status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId);
             if (err != OK) {
@@ -329,6 +347,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
                 LOGE("Driver start failed!");
                 return BAD_VALUE;
             }
+            mIsDriverStarted = true;
             LOGV("LPA Driver Started");
         } else {
             LOGV("Before Audio Sink Open");
@@ -338,7 +357,6 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
             mAudioSinkOpen = true;
             //pthread_cond_signal(&a2dp_cv);
         }
-
     } else {
         close(afd);
         afd = -1;
@@ -355,6 +373,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
 
 status_t LPAPlayer::seekTo(int64_t time_us) {
     Mutex::Autolock autoLock(mLock);
+    LOGV("seekTo: time_us %ld", time_us);
     if ( mReachedEOS ) {
         mReachedEOS = false;
         LOGV("Signalling to Decoder Thread");
@@ -363,30 +382,29 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
     mSeeking = true;
 
     mSeekTimeUs = time_us;
-    timePlayed = time_us;
+    timePlayed  = time_us;
     timeStarted = 0;
 
     LOGV("In seekTo(), mSeekTimeUs %u",mSeekTimeUs);
-    /*TODO: Check A2dp variable */
     if (!bIsA2DPEnabled) {
-        if (!isPaused) {
-            if (ioctl(afd, AUDIO_PAUSE, 1) < 0) {
-                LOGE("Audio Pause failed");
+        if(mIsDriverStarted) {
+            if (!isPaused) {
+                if (ioctl(afd, AUDIO_PAUSE, 1) < 0) {
+                    LOGE("Audio Pause failed");
+                }
+            }
+            if (ioctl(afd, AUDIO_FLUSH, 0) < 0) {
+                LOGE("Audio Flush failed");
+            }
+            LOGV("Paused case, %d",isPaused);
+            if (isPaused) {
+                LOGV("AUDIO pause in seek()");
+                if (ioctl(afd, AUDIO_PAUSE, 1) < 0) {
+                    LOGE("Audio Pause failed");
+                    return BAD_VALUE;
+                }
             }
         }
-        if (ioctl(afd, AUDIO_FLUSH, 0) < 0) {
-            LOGE("Audio Flush failed");
-        }
-        LOGV("Paused case, %d",isPaused);
-        if (isPaused) {
-            LOGV("AUDIO pause in seek()");
-            if (ioctl(afd, AUDIO_PAUSE, 1) < 0) {
-                LOGE("Audio Pause failed");
-                return BAD_VALUE;
-            }
-        }
-        LOGV("seek() after pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
-        mAudioSink->flush();
     } else {
         mSeeked = true;
         if (!isPaused) {
@@ -394,7 +412,6 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
             mAudioSink->flush();
             mAudioSink->start();
         }
-        
     }
 
     return OK;
@@ -403,36 +420,41 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
 void LPAPlayer::pause(bool playPendingSamples) {
     CHECK(mStarted);
 
+    LOGV("pause: playPendingSamples %d", playPendingSamples);
+    isPaused = true;
     if (playPendingSamples) {
         /* TODO: Check what needs to be in this case */
     } else {
         if (a2dpDisconnectPause) {
 
         } else {
-            /* TODO: Check A2DP variable */
             if (!bIsA2DPEnabled) {
-                LOGE("LPAPlayer::Pause - Pause driver");
+                LOGV("LPAPlayer::Pause - Pause driver");
                 if (ioctl(afd, AUDIO_PAUSE, 1) < 0) {
                     LOGE("Audio Pause failed");
                 }
+                if(!mPauseEventPending) {
+                    LOGV("Posting an event for Pause timeout");
+                    mQueue.postEventWithDelay(mPauseEvent, LPA_PAUSE_TIMEOUT_USEC);
+                    mPauseEventPending = true;
+                }
+
                 if (mAudioSink.get() != NULL) {
                     mAudioSink->pauseSession();
                 }
             } else {
-                isPaused = true;
                 mAudioSink->pause();
+                mAudioSink->flush();
             }
+            timePlayed += (nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted);
         }
     }
     CHECK(mSource != NULL);
     mSource->pause();
-    isPaused = true;
-    timePlayed += (nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted);
 }
 
 void LPAPlayer::resume() {
-
-
+    LOGV("resume: isPaused %d",isPaused);
     if ( isPaused) {
         CHECK(mStarted);
         if (mSource->isPaused()==true) {
@@ -448,14 +470,14 @@ void LPAPlayer::resume() {
             mAudioSinkOpen = false;
             status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId);
             a2dpDisconnectPause = false;
-            mSeeking = true;
+            mInternalSeeking = true;
             mReachedEOS = false;
             mSeekTimeUs = timePlayed;
-            mSeeked = true;
 
             if (ioctl(afd, AUDIO_START,0) < 0) {
-                LOGE("Driver start failed!");
+                LOGE("Driver start failed!");// TODO: How to report this error and stop playback ??
             }
+            mIsDriverStarted = true;
             LOGV("LPA Driver Started");
 
             pthread_cond_signal(&event_cv);
@@ -465,31 +487,92 @@ void LPAPlayer::resume() {
         } else {
             if (!bIsA2DPEnabled) {
                 LOGE("LPAPlayer::resume - Resuming Driver");
-                if (ioctl(afd, AUDIO_PAUSE, 0) < 0) {
-                    LOGE("Audio resume failed");
+
+                if(mPauseEventPending) {
+                    LOGV("Resume(): Cancelling the puaseTimeout event");
+                    mPauseEventPending = false;
+                    mQueue.cancelEvent(mPauseEvent->eventID());
                 }
-                if (mAudioSink.get() != NULL) {
-                    mAudioSink->resumeSession();
+
+                if(!bIsAudioRouted) {
+                    unsigned short decId;
+                    int sessionId;
+
+                    mPlaybackSuspended = false;
+
+                    CHECK(afd != -1);
+                    if ( ioctl(afd, AUDIO_GET_SESSION_ID, &decId) == -1 ) {
+                        LOGE("AUDIO_GET_SESSION_ID FAILED\n");
+                    } else {
+                        sessionId = (int)decId;
+                        LOGV("AUDIO_GET_SESSION_ID success : decId = %d", decId);
+                    }
+
+                    LOGV("Resume:: Opening a session for playback: sessionId = %d", sessionId);
+                    status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId);
+                    if (err != OK) {
+                        LOGE("Opening a routing session failed");
+                        if (mFirstBuffer != NULL) {
+                            mFirstBuffer->release();
+                            mFirstBuffer = NULL;
+                        }
+
+                        close(afd);
+                        afd = -1;
+                        return;
+                    }
+                    LOGV("Resume:: AudioSink Opened a session(%d)",sessionId);
+                    //Start the Driver
+                    LOGV("Resume:: Starting LPA Driver");
+                    if (ioctl(afd, AUDIO_START,0) < 0) {
+                        LOGE("Driver start failed!");
+                        return; // TODO: How to report this error and stop playback ??
+                    }
+                    mIsDriverStarted = true;
+                    bIsAudioRouted = true;
+
+                    LOGV("Resume: Waking up decoder thread");
+                    pthread_cond_signal(&decoder_cv);
+                } else {
+                    if (ioctl(afd, AUDIO_PAUSE, 0) < 0) {
+                        LOGE("Resume:: LPA driver resume failed");
+                        // TODO: How to report this error and stop playback ??
+                    }
+                    if (mAudioSink.get() != NULL) {
+                        mAudioSink->resumeSession();
+                    }
                 }
             } else {
                 isPaused = false;
-                if (mSeeked) {
-                    mAudioSink->flush();
+
+                if (!mAudioSinkOpen) {
+                    if (mAudioSink.get() != NULL) {
+                        LOGV("%s mAudioSink close session", __func__);
+                        mAudioSink->closeSession();
+                    } else {
+                        LOGE("close session NULL");
+                    }
+
+                    LOGV("Resume: Before Audio Sink Open");
+                    status_t ret = mAudioSink->open(mSampleRate, numChannels,AudioSystem::PCM_16_BIT, 
+                                                    DEFAULT_AUDIOSINK_BUFFERCOUNT);
+                    mAudioSink->start();
+                    LOGV("Resume: After Audio Sink Open");
+                    mAudioSinkOpen = true;
+
+                    LOGV("Resume: Waking up the decoder thread");
+                    pthread_cond_signal(&decoder_cv);
+                } else {
+                    /* If AudioSink is already open just start it */
+                    mAudioSink->start();
                 }
-                mAudioSink->start();
                 LOGV("Waking up A2dp thread");
                 pthread_cond_signal(&a2dp_cv);
-                if (mSeeked) {
-                    mAudioSink->flush();
-                }
-            }
-            if (!mSeeked) {
-                timeStarted = nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC));
             }
         }
         isPaused = false;
-
-
+        /* Set timeStarted to current systemTime */
+        timeStarted = nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC));
     }
 }
 
@@ -498,20 +581,16 @@ void LPAPlayer::reset() {
     LOGV("Reset called!!!!!");
     asyncReset = true;
 
-    if(bIsA2DPEnabled || a2dpDisconnectPause) {
-        LOGV("AudioSink close");
-        mAudioSink->pause();
-        mAudioSink->stop();
-        mAudioSink->close();
-    }
-    else {
+    if(!bIsA2DPEnabled) {
         ioctl(afd,AUDIO_FLUSH,0);
+        mIsDriverStarted = false;
         ioctl(afd,AUDIO_STOP,0);
         mAudioSink->closeSession();
     }
 
-    LOGV("reset() pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
-    
+    LOGV("reset() pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",
+         pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
+
     // make sure Decoder thread has exited
     requestAndWaitForDecoderThreadExit();
 
@@ -519,9 +598,10 @@ void LPAPlayer::reset() {
     requestAndWaitForEventThreadExit();
 
     requestAndWaitForA2DPThreadExit();
-    
 
-
+    if (mAudioSink.get() != NULL) {
+        mAudioSink->closeSession();
+    }
 
     // Make sure to release any buffer we hold onto so that the
     // source is able to stop().
@@ -559,6 +639,7 @@ void LPAPlayer::reset() {
     mPositionTimeMediaUs = -1;
     mPositionTimeRealUs = -1;
     mSeeking = false;
+    mInternalSeeking = false;
     mReachedEOS = false;
     mFinalStatus = OK;
     mStarted = false;
@@ -589,7 +670,7 @@ void LPAPlayer::decoderThreadEntry() {
     pthread_mutex_lock(&decoder_mutex);
 
     setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_AUDIO);
-    prctl(PR_SET_NAME, (unsigned long)"LPAPlayer", 0, 0, 0);
+    prctl(PR_SET_NAME, (unsigned long)"LPA DecodeThread", 0, 0, 0);
 
     LOGV("decoderThreadEntry wait for signal \n");
     if (!mStarted) {
@@ -600,9 +681,8 @@ void LPAPlayer::decoderThreadEntry() {
 
     void *pmem_buf; int32_t pmem_fd;
     struct msm_audio_pmem_info pmem_info;
-    for (int i = 0; i < PMEM_BUFFER_COUNT; i++) {
 
-        pthread_mutex_lock(&pmem_request_mutex);
+    for (int i = 0; i < PMEM_BUFFER_COUNT; i++) {
         pmem_buf = pmemBufferAlloc(PMEM_BUFFER_SIZE, &pmem_fd);
         memset(&pmem_info, 0, sizeof(msm_audio_pmem_info));
         LOGV("Registering PMEM with fd %d and address as %x", pmem_fd, pmem_buf);
@@ -612,13 +692,6 @@ void LPAPlayer::decoderThreadEntry() {
             LOGE("Registration of PMEM with the Driver failed with fd %d and memory %x",
                  pmem_info.fd, (unsigned int)pmem_info.vaddr);
         }
-        pthread_mutex_unlock(&pmem_request_mutex);
-    }
-
-    if (pmemBuffersRequestQueue.empty()) {
-        LOGV("Request Queue Empty");
-    } else {
-        LOGV("Request Queue Size: %d",pmemBuffersRequestQueue.size());
     }
 
     while (1) {
@@ -628,23 +701,32 @@ void LPAPlayer::decoderThreadEntry() {
             pthread_mutex_unlock(&pmem_request_mutex);
             break;
         }
-        if (pmemBuffersRequestQueue.empty() || a2dpDisconnectPause || mReachedEOS || (bIsA2DPEnabled && !mAudioSinkOpen) || asyncReset) {
-            pthread_cond_wait(&decoder_cv, &pmem_request_mutex);
-        }
 
+        LOGV("decoder pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",
+             pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
+
+        if (pmemBuffersRequestQueue.empty() || a2dpDisconnectPause || mReachedEOS || 
+            (bIsA2DPEnabled && !mAudioSinkOpen) || asyncReset || (!bIsA2DPEnabled && !mIsDriverStarted)) {
+            LOGV("decoderThreadEntry: a2dpDisconnectPause %d  mReachedEOS %d bIsA2DPEnabled %d "
+                 "mAudioSinkOpen %d asyncReset %d mIsDriverStarted %d", a2dpDisconnectPause,
+                 mReachedEOS, bIsA2DPEnabled, mAudioSinkOpen, asyncReset, mIsDriverStarted);
+            LOGV("decoderThreadEntry: waiting on decoder_cv");
+            pthread_cond_wait(&decoder_cv, &pmem_request_mutex);
+            pthread_mutex_unlock(&pmem_request_mutex);
+            LOGV("decoderThreadEntry: received a signal to wake up");
+            continue;
+        }
 
         List<BuffersAllocated>::iterator it = pmemBuffersRequestQueue.begin();
         BuffersAllocated buf = *it;
         pmemBuffersRequestQueue.erase(it);
         pthread_mutex_unlock(&pmem_request_mutex);
 
-        LOGV("decoder pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
-
         //Queue the buffers back to Request queue
         if (mReachedEOS || (bIsA2DPEnabled && !mAudioSinkOpen) || asyncReset || a2dpDisconnectPause) {
+            LOGV("%s: mReachedEOS %d bIsA2DPEnabled %d ", __func__, mReachedEOS, bIsA2DPEnabled);
             pthread_mutex_lock(&pmem_request_mutex);
             pmemBuffersRequestQueue.push_back(buf);
-            //pthread_cond_wait(&decoder_cv, &pmem_request_mutex);
             pthread_mutex_unlock(&pmem_request_mutex);
         } 
         //Queue up the buffers for writing either for A2DP or LPA Driver
@@ -683,7 +765,8 @@ void LPAPlayer::decoderThreadEntry() {
                     pthread_mutex_lock(&pmem_request_mutex);
                     pmemBuffersRequestQueue.push_back(buf);
                     pthread_mutex_unlock(&pmem_request_mutex);
-
+                    /* This is zero byte buffer - no need to put in response Q*/
+                    continue;
                 }
             }
             pthread_mutex_lock(&pmem_response_mutex);
@@ -711,7 +794,7 @@ void LPAPlayer::eventThreadEntry() {
     pthread_mutex_lock(&event_mutex);
     int rc = 0;
     setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_AUDIO);
-    prctl(PR_SET_NAME, (unsigned long)"LPAPlayer", 0, 0, 0);
+    prctl(PR_SET_NAME, (unsigned long)"LPA EventThread", 0, 0, 0);
 
     LOGV("eventThreadEntry wait for signal \n");
     pthread_cond_wait(&event_cv, &event_mutex);
@@ -754,7 +837,7 @@ void LPAPlayer::eventThreadEntry() {
                 }
 
                 /* If the rendering is complete report EOS to the AwesomePlayer */
-                if (mObserver && mReachedEOS && pmemBuffersResponseQueue.empty()) {
+                if (mObserver && !asyncReset && mReachedEOS && pmemBuffersResponseQueue.empty()) {
                     LOGV("Posting EOS event to AwesomePlayer");
                     mObserver->postAudioEOS();
                 }
@@ -763,7 +846,6 @@ void LPAPlayer::eventThreadEntry() {
                     if (mAudioSink.get() != NULL) {
                         mAudioSink->closeSession();
                         LOGV("mAudioSink close session");
-                        ioctl(afd, AUDIO_STOP,0);
                     } else {
                         LOGE("close session NULL");
                     }
@@ -784,12 +866,11 @@ void LPAPlayer::eventThreadEntry() {
                     mAudioSink->start();
                     LOGV("After Audio Sink Open");
                     mAudioSinkOpen = true;
-
                 }
-
 
                 pthread_mutex_unlock(&pmem_response_mutex);
 
+                // Post buffer to request Q
                 pthread_mutex_lock(&pmem_request_mutex);
                 pmemBuffersRequestQueue.push_back(buf);
                 pthread_mutex_unlock(&pmem_request_mutex);
@@ -799,7 +880,46 @@ void LPAPlayer::eventThreadEntry() {
             break;
         case AUDIO_EVENT_SUSPEND:
             {
+                struct msm_audio_stats stats;
+                int nBytesConsumed = 0;
+
                 LOGV("AUDIO_EVENT_SUSPEND received\n");
+                if(mPauseEventPending) {
+                    mPauseEventPending = false;
+                    mQueue.cancelEvent(mPauseEvent->eventID());
+                } else {
+                    LOGV("Not in paused, no need to honor SUSPEND event");
+                    break;
+                }
+                if(!bIsA2DPEnabled) {
+                    if(!mPlaybackSuspended) {
+                        mPlaybackSuspended = true;
+                        // 1. Get the Byte count that is consumed
+                        if ( ioctl(afd, AUDIO_GET_STATS, &stats)  < 0 ) {
+                            LOGE("AUDIO_GET_STATUS failed");
+                        } else {
+                            LOGV("Number of bytes consumed by DSP is %u", stats.byte_count);
+                            nBytesConsumed = stats.byte_count;
+                        }
+                        // Reset eosflag to resume playback where we actually paused
+                        mInternalSeeking = true;
+                        mReachedEOS = false;
+                        mSeekTimeUs = timePlayed;
+
+                        // 2. Call AUDIO_STOP on the Driver.
+                        LOGV("Received AUDIO_EVENT_SUSPEND and calling AUDIO_STOP");
+                        mIsDriverStarted = false;
+                        if ( ioctl(afd, AUDIO_STOP, 0) < 0 ) {
+                            LOGE("AUDIO_STOP failed");
+                        }
+                    }
+
+                    // 3. Close the session
+                    if(bIsAudioRouted) {
+                        mAudioSink->closeSession();
+                        bIsAudioRouted = false;
+                    }
+                }
             }
             break;
         case AUDIO_EVENT_RESUME:
@@ -824,7 +944,7 @@ void *LPAPlayer::A2DPThreadWrapper(void *me) {
 
 void LPAPlayer::A2DPThreadEntry() {
     setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_AUDIO);
-    prctl(PR_SET_NAME, (unsigned long)"LPAPlayer", 0, 0, 0);
+    prctl(PR_SET_NAME, (unsigned long)"LPA A2DPThread", 0, 0, 0);
 
     //TODO: Remove this
 /*
@@ -841,20 +961,25 @@ void LPAPlayer::A2DPThreadEntry() {
     }
 */
     while (1) {
-        //TODO: Remove this
-
-        pthread_mutex_lock(&pmem_response_mutex);
-        if (pmemBuffersResponseQueue.empty() || !mAudioSinkOpen || isPaused || !bIsA2DPEnabled) {
-            pthread_cond_wait(&a2dp_cv, &pmem_response_mutex);
+        /* If exitPending break here */
+        if (killA2DPThread) {
+            break;
         }
 
-        if (killA2DPThread) {
-            break;            
+        //TODO: Remove this
+        pthread_mutex_lock(&pmem_response_mutex);
+        if (pmemBuffersResponseQueue.empty() || !mAudioSinkOpen || isPaused || !bIsA2DPEnabled) {
+            LOGV("A2DPThreadEntry:: responseQ empty %d mAudioSinkOpen %d isPaused %d bIsA2DPEnabled %d",
+                 pmemBuffersResponseQueue.empty(), mAudioSinkOpen, isPaused, bIsA2DPEnabled);
+            LOGV("A2DPThreadEntry:: Waiting on a2dp_cv");
+            pthread_cond_wait(&a2dp_cv, &pmem_response_mutex);
+            LOGV("A2DPThreadEntry:: received signal to wake up");
+            pthread_mutex_unlock(&pmem_response_mutex);
+            continue;
         }
         // A2DP got disabled -- Queue up everything back to Request Queue
         if (!bIsA2DPEnabled) {
             pthread_mutex_lock(&pmem_request_mutex);
-            pthread_mutex_lock(&pmem_response_mutex);
             while (!pmemBuffersResponseQueue.empty()) {
                 LOGV("BUF transfer");
                 List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
@@ -884,14 +1009,18 @@ void LPAPlayer::A2DPThreadEntry() {
             uint32_t bytesAvailInBuffer = 0;
             void* data = buf.pmemBuf;
             while (bytesToWrite) {
+                /* If exitPending break here */
+                if (killA2DPThread || !bIsA2DPEnabled) {
+                    LOGV("A2DPThreadEntry: A2DPThread set to be killed");
+                    break;
+                }
+
                 bytesAvailInBuffer = mAudioSink->bufferSize();
 
                 uint32_t writeLen = bytesAvailInBuffer > bytesToWrite ? bytesToWrite : bytesAvailInBuffer;
                 //LOGV("16 bit :: cmdid = %d, len = %u, bytesAvailInBuffer = %u, bytesToWrite = %u", cmdid, len, bytesAvailInBuffer, bytesToWrite);
                 bytesWritten = mAudioSink->write(data, writeLen);
                 /*if ( bytesWritten != writeLen ) {
-
-
                     if (mSeeked) {
                         break;
                     }
@@ -902,10 +1031,8 @@ void LPAPlayer::A2DPThreadEntry() {
                     if (mSeeked) {
                         break;
                     }
-
                 }*/
                 if ( bytesWritten != writeLen ) {
-
                     //Paused - Wait till resume
                     if (isPaused) {
                         LOGV("Pausing A2DP playback");
@@ -916,18 +1043,16 @@ void LPAPlayer::A2DPThreadEntry() {
 
                     //Seeked: break out of loop, flush old buffers and write new buffers
                     LOGV("@_@bytes To write1:%d",bytesToWrite);
-                    if (mSeeked) {
-                        LOGV("Seeking A2DP Playback");
-                        break;
-                    }
-                    
+                }
+                if (mSeeked) {
+                    LOGV("Seeking A2DP Playback");
+                    break;
                 }
                 data += bytesWritten;
                 bytesToWrite -= bytesWritten;
                 LOGV("@_@bytes To write2:%d",bytesToWrite);
-                
             }
-            if (mObserver && mReachedEOS && pmemBuffersResponseQueue.empty()) {
+            if (mObserver && !asyncReset && mReachedEOS && pmemBuffersResponseQueue.empty()) {
                 LOGV("Posting EOS event to AwesomePlayer");
                 mObserver->postAudioEOS();
             }
@@ -938,8 +1063,9 @@ void LPAPlayer::A2DPThreadEntry() {
                 break;            
             }
             //flush out old buffer
-            if (mSeeked) {
+            if (mSeeked || !bIsA2DPEnabled) {
                 mSeeked = false;
+                LOGV("%s: Putting buffers back to requestQ from responseQ");
                 pthread_mutex_lock(&pmem_response_mutex);
                 while (!pmemBuffersResponseQueue.empty()) {
                     List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
@@ -950,12 +1076,18 @@ void LPAPlayer::A2DPThreadEntry() {
                 pthread_mutex_unlock(&pmem_response_mutex);
             }
             pthread_mutex_unlock(&pmem_request_mutex);
-        }
-        if (bIsA2DPEnabled) {
+            // Signal decoder thread when a buffer is put back to request Q
             pthread_cond_signal(&decoder_cv);
         }
     }
     a2dpThreadAlive = false;
+
+    LOGV("AudioSink stop");
+    if(mAudioSinkOpen) {
+        mAudioSinkOpen = false;
+        mAudioSink->stop();
+    }
+
     LOGV("A2DP Thread is dying.");
 }
 
@@ -1057,15 +1189,12 @@ void LPAPlayer::createThreads() {
     LOGV("Creating Event Thread");
     pthread_create(&eventThread, &attr, eventThreadWrapper, this);
 
-
     LOGV("Creating decoder Thread");
     pthread_create(&decoderThread, &attr, decoderThreadWrapper, this);
 
     LOGV("Creating A2dp Thread");
     pthread_create(&A2DPThread, &attr, A2DPThreadWrapper, this);
     pthread_attr_destroy(&attr);
-
-
 }
 
 
@@ -1087,7 +1216,7 @@ size_t LPAPlayer::fillBuffer(void *data, size_t size) {
         {
             Mutex::Autolock autoLock(mLock);
 
-            if (mSeeking) {
+            if (mSeeking || mInternalSeeking) {
                 if (mIsFirstBuffer) {
                     if (mFirstBuffer != NULL) {
                         mFirstBuffer->release();
@@ -1103,10 +1232,16 @@ size_t LPAPlayer::fillBuffer(void *data, size_t size) {
                     mInputBuffer = NULL;
                 }
 
+                // This is to ignore the data already filled in the output buffer
+                size_done = 0;
+                size_remaining = size;
+
                 mSeeking = false;
-                if (mObserver) {
+                if (mObserver && !asyncReset && !mInternalSeeking) {
+                    LOGV("fillBuffer: Posting audio seek complete event");
                     mObserver->postAudioSeekComplete();
                 }
+                mInternalSeeking = false;
             }
         }
 
@@ -1143,17 +1278,25 @@ size_t LPAPlayer::fillBuffer(void *data, size_t size) {
                     success = format->findInt32(kKeyChannelCount, &numChannels);
                     CHECK(success);
 
-                    mAudioSink->stop();
-                    mAudioSink->closeSession();
-                    LOGV("Opening a routing session in fillBuffer: sessionId = %d", sessionId);
-                    status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId);
-                    if (err != OK) {
-                        mSource->stop();
-                        return err;
+                    if(bIsA2DPEnabled) {
+                        mAudioSink->stop();
+                        mAudioSink->close();
+                        mAudioSinkOpen = false;
+                        status_t err = mAudioSink->open(
+                                mSampleRate, numChannels, AudioSystem::PCM_16_BIT,
+                                DEFAULT_AUDIOSINK_BUFFERCOUNT);
+                        if (err != OK) {
+                            mSource->stop();
+                            return err;
+                        }
+                        mAudioSinkOpen = true;
+                        mLatencyUs = (int64_t)mAudioSink->latency() * 1000;
+                        mFrameSize = mAudioSink->frameSize();
+                        mAudioSink->start();
+                    } else {
+                        /* TODO: LPA driver needs to be reconfigured
+                           For MP3 we might not come here but for AAC we need this */
                     }
-                    mLatencyUs = 96;//(int64_t)mAudioSink->latency() * 1000;
-                    mFrameSize = mAudioSink->frameSize();
-                    mAudioSink->start();
                     break;
                 } else {
                     mReachedEOS = true;
@@ -1178,7 +1321,6 @@ size_t LPAPlayer::fillBuffer(void *data, size_t size) {
         if (mInputBuffer->range_length() == 0) {
             mInputBuffer->release();
             mInputBuffer = NULL;
-
             continue;
         }
 
@@ -1241,16 +1383,13 @@ realTimeOffset = 0;
 
 return mPositionTimeMediaUs + realTimeOffset;
 */
-    struct msm_audio_stats stats;
-    if ( ioctl(afd, AUDIO_GET_STATS, &stats)  < 0 ) {
-        LOGE("AUDIO_GET_STATUS failed");
-    }
-
-
-    if (isPaused || timeStarted == 0)
+    LOGV("getMediaTimeUs() isPaused %d timeStarted %d timePlayed %d", isPaused, timeStarted, timePlayed);
+    if (isPaused || timeStarted == 0) {
         return timePlayed;
-    else
+    } else {
+        LOGV("curr_time %d", nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)));
         return nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted + timePlayed;
+    }
 
     /*int64_t bytes = (int64_t)stats.byte_count;
     LOGV("stats %u    %u",bytes,stats.byte_count);
@@ -1303,4 +1442,40 @@ void LPAPlayer::requestAndWaitForA2DPThreadExit() {
     LOGV("a2dp thread killed");
 }
 
+void LPAPlayer::onPauseTimeOut() {
+    struct msm_audio_stats stats;
+    int nBytesConsumed = 0;
+    LOGV("onPauseTimeOut");
+    if (!mPauseEventPending) {
+        return;
+    }
+    mPauseEventPending = false;
+
+    if(!bIsA2DPEnabled) {
+        // Reset eosflag to resume playback where we actually paused
+        mInternalSeeking = true;
+        mReachedEOS = false;
+        mSeekTimeUs = timePlayed;
+        LOGV("%s: mSeekTimeUs %d ", __func__, mSeekTimeUs);
+
+        // 1. Get the Byte count that is consumed
+        if ( ioctl(afd, AUDIO_GET_STATS, &stats)  < 0 ) {
+            LOGE("AUDIO_GET_STATUS failed");
+        } else {
+            LOGV("Number of bytes consumed by DSP is %u", stats.byte_count);
+            nBytesConsumed = stats.byte_count;
+        }
+
+        // 2. Call AUDIO_STOP on the Driver.
+        mIsDriverStarted = false;
+        if ( ioctl(afd, AUDIO_STOP, 0) < 0 ) {
+            LOGE("AUDIO_STOP failed");
+        }
+
+        // 3. Close the session
+        mAudioSink->closeSession();
+        bIsAudioRouted = false;
+    }
 }
+
+} //namespace android

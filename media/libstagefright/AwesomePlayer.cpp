@@ -53,6 +53,8 @@
 
 #include <media/stagefright/foundation/ALooper.h>
 
+#include <cutils/properties.h>
+
 namespace android {
 
 static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs
@@ -840,15 +842,25 @@ status_t AwesomePlayer::play_l() {
                 success = format->findInt64(kKeyDuration, &durationUs);
                 CHECK(success);
                 LOGV("LPAPlayer::getObjectsAlive() %d",LPAPlayer::objectsAlive);
-                if ( durationUs > 60000000 && !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG) && LPAPlayer::objectsAlive == 0) {
-                    LOGE("LPAPlayer created, LPA MODE detected mime %s duration %d\n", mime, durationUs);
-                    mAudioPlayer = new LPAPlayer(mAudioSink, this);
+
+                char lpaDecode[128];
+                property_get("lpa.decode",lpaDecode,"0");
+                char lpaStagefright[128];
+                property_get("lpa.use-stagefright",lpaStagefright,"0");
+                if(strcmp("true",lpaDecode) == 0 && strcmp("true",lpaStagefright) == 0)
+                {
+                    LOGV("LPAPlayer::getObjectsAlive() %d",LPAPlayer::objectsAlive);
+                    if ( durationUs > 60000000 && !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG) && LPAPlayer::objectsAlive == 0) {
+                        LOGE("LPAPlayer created, LPA MODE detected mime %s duration %d\n", mime, durationUs);
+                        mAudioPlayer = new LPAPlayer(mAudioSink, this);
+                    }
                 }
-                else {
+                if(mAudioPlayer == NULL) {
                     LOGE("AudioPlayer created, Non-LPA mode mime %s duration %d\n", mime, durationUs);
                     mAudioPlayer = new AudioPlayer(mAudioSink, this);
                 }
-			    LOGV("Setting Audio source");
+
+                LOGV("Setting Audio source");
                 mAudioPlayer->setSource(mAudioSource);
 
                 // If there was a seek request while we were paused
@@ -1116,7 +1128,7 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
     if (!(mFlags & PLAYING)) {
         LOGV("seeking while paused, sending SEEK_COMPLETE notification"
              " immediately.");
-
+        mSeeking = false;
         notifyListener_l(MEDIA_SEEK_COMPLETE);
         mSeekNotificationSent = true;
     }

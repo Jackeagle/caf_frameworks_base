@@ -31,9 +31,12 @@
 #include <linux/unistd.h>
 #include <linux/msm_audio.h>
 
+#include <include/TimedEventQueue.h>
+
+// Pause timeout = 3sec
+#define LPA_PAUSE_TIMEOUT_USEC 3000000
 
 namespace android {
-
 
 class LPAPlayer : public AudioPlayer  {
 public:
@@ -192,6 +195,7 @@ private:
     int64_t mPositionTimeRealUs;
 
     bool mSeeking;
+    bool mInternalSeeking;
     bool mReachedEOS;
     status_t mFinalStatus;
     int64_t mSeekTimeUs;
@@ -204,6 +208,12 @@ private:
     bool mIsFirstBuffer;
     status_t mFirstBufferResult;
     MediaBuffer *mFirstBuffer;
+    TimedEventQueue mQueue;
+    bool            mQueueStarted;
+    sp<TimedEventQueue::Event>  mPauseEvent;
+    bool                        mPauseEventPending;
+    bool                        mPlaybackSuspended;
+    bool                        mIsDriverStarted;
 
     sp<MediaPlayerBase::AudioSink> mAudioSink;
     AwesomePlayer *mObserver;
@@ -214,8 +224,32 @@ private:
 
     void reset();
 
+    void onPauseTimeOut();
+
     LPAPlayer(const LPAPlayer &);
     LPAPlayer &operator=(const LPAPlayer &);
+};
+
+struct TimedEvent : public TimedEventQueue::Event {
+    TimedEvent(LPAPlayer *player,
+               void (LPAPlayer::*method)())
+        : mPlayer(player),
+          mMethod(method) {
+    }
+
+protected:
+    virtual ~TimedEvent() {}
+
+    virtual void fire(TimedEventQueue *queue, int64_t /* now_us */) {
+        (mPlayer->*mMethod)();
+    }
+
+private:
+    LPAPlayer *mPlayer;
+    void (LPAPlayer::*mMethod)();
+
+    TimedEvent(const TimedEvent &);
+    TimedEvent &operator=(const TimedEvent &);
 };
 
 }  // namespace android
