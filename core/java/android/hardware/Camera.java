@@ -1371,6 +1371,7 @@ public class Camera {
         public static final String SCENE_MODE_CANDLELIGHT = "candlelight";
         public static final String SCENE_MODE_BACKLIGHT = "backlight";
         public static final String SCENE_MODE_FLOWERS = "flowers";
+        public static final String SCENE_MODE_AR = "AR";
 
         // Values for auto scene detection settings.
         public static final String SCENE_DETECT_OFF = "off";
