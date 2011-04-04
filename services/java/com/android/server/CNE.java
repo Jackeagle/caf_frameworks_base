@@ -2477,10 +2477,9 @@ public final class CNE implements ILinkManager {
         if (DBG) Log.v(LOCAL_TAG, "Converting Role: " + roleString);
         if (roleString == null)  roleInt = 0;
         else if (roleString.equals(LinkCapabilities.Role.DEFAULT)) roleInt = 0;
-        else if (roleString.equals(LinkCapabilities.Role.VIDEO_STREAMING_1040P)) roleInt = 1;
-        else {
-            Log.d(LOG_TAG, roleString + " is not a known role.");
-        }
+        else if (roleString.equals(LinkCapabilities.Role.VIDEO_STREAMING_1080P)) roleInt = 1;
+        else if (roleString.equals(LinkCapabilities.Role.WEB_BROWSER)) roleInt = 2;
+        else Log.d(LOG_TAG, roleString + " is not a known role.");
 
         // translate LinkCapabilities into a HashMap
         if (DBG) Log.v(LOCAL_TAG, "Converting Bandwidth Req's");

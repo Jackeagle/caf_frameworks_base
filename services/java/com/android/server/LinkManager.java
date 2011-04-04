@@ -503,10 +503,9 @@ public class LinkManager implements ILinkManager {
         int roleInt = 0;
         if (roleString == null) roleInt = 0;
         else if (roleString.equals(LinkCapabilities.Role.DEFAULT)) roleInt = 0;
-        else if (roleString.equals(LinkCapabilities.Role.VIDEO_STREAMING_1040P)) roleInt = 1;
-        else {
-            if (DBG) Log.d(TAG, roleString + " is not a known role.");
-        }
+        else if (roleString.equals(LinkCapabilities.Role.VIDEO_STREAMING_1080P)) roleInt = 1;
+        else if (roleString.equals(LinkCapabilities.Role.WEB_BROWSER)) roleInt = 2;
+        else Log.d(TAG, roleString + " is not a known role.");
         return roleInt;
     }
 

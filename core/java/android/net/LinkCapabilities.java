@@ -21,14 +21,22 @@ import android.os.Parcelable;
 import android.os.Parcel;
 import android.util.Log;
 
+import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 /**
- * A class representing the capabilities of a link
+ * A class representing the capabilities of a link.
+ * <p>
+ * LinkCapabilities is a mapping of {@link LinkCapabilities.Key}'s to Strings.
+ * The primary method of creating a LinkCapabilies map is to use the static
+ * helper function {@link LinkCapabilities#createNeeds(String)}, passing a
+ * String from {@link LinkCapabilities.Role}. The properties in the
+ * LinkCapabilities object can then be fine tuned using
+ * {@link LinkCapabilities#put(int, String)}, where the int is a
+ * {@link LinkCapabilities.Key}, and the String is the new parameter.
  *
  * @hide
  */
@@ -48,7 +56,7 @@ public class LinkCapabilities implements Parcelable {
      * Keys starting with RO are read only, i.e. the the application
      * can read the value of that key from the socket but cannot request
      * a corresponding requirement.
-     *
+     * <p>
      * TODO: Provide a documentation technique for concisely and precisely
      * define the syntax for each value string associated with a key.
      */
@@ -170,12 +178,13 @@ public class LinkCapabilities implements Parcelable {
         /**
          * A string containing the socket's role, as classified by the carrier.
          */
-        public final static int RW_CARRIER_ROLE = 15;
+        public final static int RO_CARRIER_ROLE = 15;
     }
 
     /**
      * Role informs the LinkSocket about the data usage patterns of your
-     * application.
+     * application. Application developers should choose the role that
+     * best matches their application.
      * <P>
      * {@code Role.DEFAULT} is the default role, and is used whenever
      * a role isn't set.
@@ -188,7 +197,10 @@ public class LinkCapabilities implements Parcelable {
         public static final String DEFAULT = "default";
 
         /** Video Streaming at 1040p */
-        public static final String VIDEO_STREAMING_1040P = "video_streaming_1040p";
+        public static final String VIDEO_STREAMING_1080P = "video_streaming_1080p";
+
+        /** Web Browser */
+        public static final String WEB_BROWSER = "web_browser";
     }
 
     /**
@@ -242,8 +254,9 @@ public class LinkCapabilities implements Parcelable {
 
     /**
      * Create the {@code LinkCapabilities} with values depending on role type.
-     * @param applicationRole a {@code LinkSocket.Role}
+     * @param applicationRole a {@link LinkCapabilities.Role}
      * @return the {@code LinkCapabilities} associated with the applicationRole, empty if none
+     * @throws IllegalArgumentException if LinkCapabilities does not recognize the role
      */
     public static LinkCapabilities createNeeds(String applicationRole) {
         if (DBG) log("createNeeds(applicationRole) EX");
@@ -251,14 +264,15 @@ public class LinkCapabilities implements Parcelable {
         cap.put(Key.RW_ROLE, applicationRole);
 
         // Map specific application roles to their respective needs
-        if (applicationRole == Role.DEFAULT) {
-            cap.put(Key.RW_CARRIER_ROLE, CarrierRole.DEFAULT);
-        } else if (applicationRole == Role.VIDEO_STREAMING_1040P) {
-            cap.put(Key.RW_CARRIER_ROLE, CarrierRole.HIGH_THROUGHPUT);
-            cap.put(Key.RW_REQUIRED_REV_BW, "2500"); // Require 2.5Mbps bandwidth
-            cap.put(Key.RW_MAX_ALLOWED_LATENCY, "500"); // 500ms latency
+        if (applicationRole == Role.VIDEO_STREAMING_1080P) {
+            cap.mCapabilities.put(Key.RO_CARRIER_ROLE, CarrierRole.HIGH_THROUGHPUT);
+            cap.mCapabilities.put(Key.RW_REQUIRED_FWD_BW, "2500"); // Require 2.5Mbps bandwidth
+            cap.mCapabilities.put(Key.RW_MAX_ALLOWED_LATENCY, "500"); // 500ms latency
+        } else if (applicationRole == Role.WEB_BROWSER) {
+            cap.mCapabilities.put(Key.RO_CARRIER_ROLE, CarrierRole.SHORT_LIVED);
+        } else {
+            cap.mCapabilities.put(Key.RO_CARRIER_ROLE, CarrierRole.DEFAULT);
         }
-
         return cap;
     }
 
@@ -288,7 +302,7 @@ public class LinkCapabilities implements Parcelable {
     /**
      * Returns the value of the capability string with the specified key.
      *
-     * @param key
+     * @param key a {@link LinkCapabilities.Key}
      * @return the value of the capability string with the specified key,
      * or {@code null} if no mapping for the specified key is found.
      */
@@ -297,19 +311,29 @@ public class LinkCapabilities implements Parcelable {
     }
 
     /**
-     * Store the key/value capability pair
+     * Store the key/value capability pair.
      *
-     * @param key
+     * @param key a {@link LinkCapabilities.Key}
      * @param value
+     * @throws IllegalArgumentException if LinkCapabilities does not recognize the key:value pair
      */
     public void put(int key, String value) {
+
+        // check to make sure input is valid, otherwise ignore
+        if (validRWKeyValuePair(key, value) == false) {
+            Log.d(TAG, keyName(key) + ":\"" + value
+                    + "\" is an invalid key:\"value\" pair, rejecting.");
+            throw new IllegalArgumentException("This version of the LinkCapabilities API" +
+                    "does not support the " + keyName(key) + ":\"" + value + "\" pair.");
+        }
+
         mCapabilities.put(key, value);
     }
 
     /**
      * Returns whether this map contains the specified key.
      *
-     * @param key to search for.
+     * @param key the {@link LinkCapabilities.Key} to search for.
      * @return {@code true} if this map contains the specified key,
      *         {@code false} otherwise.
      */
@@ -330,7 +354,7 @@ public class LinkCapabilities implements Parcelable {
 
     /**
      * Returns a set containing all of the mappings in this map. Each mapping is
-     * an instance of {@link Map.Entry}. As the set is backed by this map,
+     * an instance of {@link java.util.Map.Entry}. As the set is backed by this map,
      * changes in one will be reflected in the other.
      *
      * @return a set of the mappings.
@@ -425,41 +449,70 @@ public class LinkCapabilities implements Parcelable {
         Log.d(TAG, s);
     }
 
+    /*
+     * Check for a value R/W key:value pair. Method tries to return as soon as
+     * possible
+     */
+    protected static boolean validRWKeyValuePair(int key, String value) {
+
+        switch (key) {
+            case Key.RW_ROLE:
+                // make sure role matches a field in class Role
+                Class<Role> c = Role.class;
+                Field roleFields[] = c.getFields();
+                for (Field f : roleFields) {
+                    try {
+                        if (value == f.get(null)) return true;
+                    } catch (IllegalArgumentException e) {
+                        // should never see this exception since we are
+                        // accessing a static field
+                    } catch (IllegalAccessException e) {
+                        // should never see this exception because this method
+                        // should always have access to class Role
+                    }
+                }
+                return false;
+            case Key.RW_DESIRED_FWD_BW:
+            case Key.RW_REQUIRED_FWD_BW:
+            case Key.RW_DESIRED_REV_BW:
+            case Key.RW_REQUIRED_REV_BW:
+            case Key.RW_MAX_ALLOWED_LATENCY:
+                int testValue;
+                try {
+                    testValue = Integer.parseInt(value);
+                } catch (NumberFormatException ex) {
+                    return false; // not a valid integer
+                }
+                if (testValue < 0) return false; // values less than zero are invalid
+                return true;
+            case Key.RW_ALLOWED_NETWORKS:
+            case Key.RW_PROHIBITED_NETWORKS:
+                // TODO: implement checks for valid network names
+                return true;
+            case Key.RW_DISABLE_NOTIFICATIONS:
+                return true; // string->boolean is always successful
+        }
+        // if we made it this far, key is not a valid RW key.
+        return false;
+    }
+
     /**
      * convert a Key integer to a String name
      */
-    private static String keyName(int key) {
-        switch (key) {
-            case Key.RO_AVAILABLE_FWD_BW:
-                return "RO_AVAILABLE_FWD_BW";
-            case Key.RO_AVAILABLE_REV_BW:
-                return "RO_AVAILABLE_REV_BW";
-            case Key.RO_BOUND_INTERFACE:
-                return "RO_BOUND_INTERFACE";
-            case Key.RO_CURRENT_LATENCY:
-                return "RO_CURRENT_LATENCY";
-            case Key.RO_NETWORK_TYPE:
-                return "RO_NETWORK_TYPE";
-            case Key.RO_PHYSICAL_INTERFACE:
-                return "RO_PHYSICAL_INTERFACE";
-            case Key.RW_ALLOWED_NETWORKS:
-                return "RW_ALLOWED_NETWORKS";
-            case Key.RW_DESIRED_FWD_BW:
-                return "RW_DESIRED_FWD_BW";
-            case Key.RW_DESIRED_REV_BW:
-                return "RW_DESIRED_REV_BW";
-            case Key.RW_DISABLE_NOTIFICATIONS:
-                return "RW_DISABLE_NOTIFICATIONS";
-            case Key.RW_MAX_ALLOWED_LATENCY:
-                return "RW_MAX_ALLOWED_LATENCY";
-            case Key.RW_PROHIBITED_NETWORKS:
-                return "RW_PROHIBITED_NETWORKS";
-            case Key.RW_REQUIRED_FWD_BW:
-                return "RW_REQUIRED_FWD_BW";
-            case Key.RW_REQUIRED_REV_BW:
-                return "RW_REQUIRED_REV_BW";
-            case Key.RW_ROLE:
-                return "RW_ROLE";
+    protected static String keyName(int key) {
+
+        Class<Key> c = Key.class;
+        Field keyFields[] = c.getFields();
+        for (Field f : keyFields) {
+            try {
+                if (key == f.getInt(null)) return f.getName();
+            } catch (IllegalArgumentException e) {
+                // should never see this exception since we are
+                // accessing a static field
+            } catch (IllegalAccessException e) {
+                // should never see this exception because this method
+                // should always have access to class Role
+            }
         }
         return "UNKNOWN_KEY";
     }
