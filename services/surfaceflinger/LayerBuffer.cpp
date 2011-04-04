@@ -574,9 +574,11 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
     hw.videoOverlayStarted(true);
     overlay::Overlay* ov = hw.getOverlayObject();
     int s3dFormat = mLayer.getStereoscopic3DFormat();
+    Transform finalTransform(Transform(mLayer.getOrientation()) *
+                        Transform(mBufferHeap.transform));
 
     if (!ov->setSource(src.hor_stride, src.ver_stride,
-                          src.img.format|s3dFormat, mLayer.getOrientation(),
+                          src.img.format|s3dFormat, finalTransform.getOrientation(),
                           hdmiConnected, ignoreFB))
         return INVALID_OPERATION;
     if (!ov->setCrop(0, 0, src.crop.r, src.crop.b))
@@ -608,11 +610,12 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
     }
     int orientation;
     if (ret = ov->getOrientation(orientation)) {
-        if (orientation != mLayer.getOrientation())
-            ret = ov->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
+        if (orientation != finalTransform.getOrientation()) {
+            ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
+        }
     }
     else
-        ret = ov->setParameter(OVERLAY_TRANSFORM, mLayer.getOrientation());
+        ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
     if (!ret)
         return INVALID_OPERATION;
     ret = ov->queueBuffer(src.img.handle);
