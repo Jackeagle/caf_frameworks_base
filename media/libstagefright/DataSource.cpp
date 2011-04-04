@@ -75,6 +75,10 @@ bool DataSource::sniff(
                 *mimeType = newMimeType;
                 *confidence = newConfidence;
                 *meta = newMeta;
+                if(*confidence >= 0.6f) {
+                    LOGV("Ignore other Sniffers - confidence = %f , mimeType = %s",*confidence,mimeType->string());
+                    break;
+                }
             }
         }
     }
