@@ -64,6 +64,7 @@ import com.android.server.power.PowerManagerService;
 import com.android.server.power.ShutdownThread;
 import com.android.server.usb.UsbService;
 import com.android.server.wm.WindowManagerService;
+import com.android.internal.atfwd.AtCmdFwdService;
 
 import dalvik.system.VMRuntime;
 import dalvik.system.Zygote;
@@ -701,6 +702,14 @@ class ServerThread extends Thread {
                 ServiceManager.addService("diskstats", new DiskStatsService(context));
             } catch (Throwable e) {
                 reportWtf("starting DiskStats Service", e);
+            }
+
+            try {
+                Slog.i(TAG, "AtCmdFwd Service");
+                AtCmdFwdService atfwd = new AtCmdFwdService(context);
+                ServiceManager.addService("AtCmdFwd", atfwd);
+            } catch (Throwable e) {
+                reportWtf("starting AtCmdFwd Service", e);
             }
 
             try {
