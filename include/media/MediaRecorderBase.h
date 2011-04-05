@@ -50,6 +50,7 @@ struct MediaRecorderBase {
     virtual status_t reset() = 0;
     virtual status_t getMaxAmplitude(int *max) = 0;
     virtual status_t dump(int fd, const Vector<String16>& args) const = 0;
+    virtual status_t takeLiveSnapshot() {return NO_ERROR;}
 
 private:
     MediaRecorderBase(const MediaRecorderBase &);

@@ -47,6 +47,7 @@ enum {
     RELEASE_RECORDING_FRAME,
     GET_BUFFER_INFO,
     ENCODE_YUV_DATA,
+    TAKE_LIVESNAPSHOT,
 };
 
 class BpCamera: public BpInterface<ICamera>
@@ -128,6 +129,16 @@ public:
         Parcel data, reply;
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
         remote()->transact(START_RECORDING, data, &reply);
+        return reply.readInt32();
+    }
+
+    // take Live Snapshot, Must be in recording mode
+    status_t takeLiveSnapshot()
+    {
+        LOGV("takeLiveSnapshot");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        remote()->transact(TAKE_LIVESNAPSHOT, data, &reply);
         return reply.readInt32();
     }
 
@@ -319,6 +330,12 @@ status_t BnCamera::onTransact(
             LOGV("START_RECORDING");
             CHECK_INTERFACE(ICamera, data, reply);
             reply->writeInt32(startRecording());
+            return NO_ERROR;
+        } break;
+        case TAKE_LIVESNAPSHOT: {
+            LOGV("TAKE_LIVESNAPSHOT");
+            CHECK_INTERFACE(ICamera, data, reply);
+            reply->writeInt32(takeLiveSnapshot());
             return NO_ERROR;
         } break;
         case STOP_PREVIEW: {

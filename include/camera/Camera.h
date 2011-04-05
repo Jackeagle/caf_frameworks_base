@@ -239,6 +239,8 @@ public:
     virtual void        dataCallbackTimestamp(nsecs_t timestamp, int32_t msgType, const sp<IMemory>& dataPtr);
 
     sp<ICamera>         remote();
+    // start Livesnapshot, must be in recording mode
+    status_t    takeLiveSnapshot();
 
 private:
                         Camera();

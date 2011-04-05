@@ -52,6 +52,7 @@ public:
     virtual     status_t        release();
 
     virtual     status_t        dump(int fd, const Vector<String16>& args) const;
+    virtual     status_t        takeLiveSnapshot();
 private:
     friend class                MediaPlayerService;  // for accessing private constructor
 

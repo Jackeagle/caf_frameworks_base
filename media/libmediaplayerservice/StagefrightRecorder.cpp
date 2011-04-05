@@ -652,11 +652,9 @@ status_t StagefrightRecorder::setCameraParameters(const String8 &params) {
                                      //camera source
     LOGV("Got rotation %d", mRotationDegrees );
     cp.set("rotation", 0 ); //no source rotation
-   
     int64_t token = IPCThreadState::self()->clearCallingIdentity();
     mCamera->setParameters( cp.flatten( ) );
     IPCThreadState::self()->restoreCallingIdentity(token);
-    
     return OK;
 }
 
@@ -723,6 +721,16 @@ status_t StagefrightRecorder::start() {
             LOGE("Unsupported output file format: %d", mOutputFormat);
             return UNKNOWN_ERROR;
     }
+}
+
+status_t StagefrightRecorder::takeLiveSnapshot()
+{
+    LOGV("StagefrightRecorder::takeLiveSnapshot");
+    if (mCamera == NULL) {
+        return UNKNOWN_ERROR;
+    }
+
+    return mCamera->takeLiveSnapshot();
 }
 
 sp<MediaSource> StagefrightRecorder::createAudioSource() {

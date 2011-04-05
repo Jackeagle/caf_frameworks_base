@@ -64,6 +64,7 @@ public:
     virtual void release();
 
     static sp<CameraHardwareInterface> createInstance();
+    virtual status_t    takeLiveSnapshot();
 
 private:
                         CameraHardwareStub();

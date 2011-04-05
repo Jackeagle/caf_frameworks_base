@@ -79,6 +79,10 @@ void CameraSourceListener::notify(int32_t msgType, int32_t ext1, int32_t ext2) {
 void CameraSourceListener::postData(int32_t msgType, const sp<IMemory> &dataPtr) {
     LOGV("postData(%d, ptr:%p, size:%d)",
          msgType, dataPtr->pointer(), dataPtr->size());
+    sp<CameraSource> source = mSource.promote();
+    if (source.get() != NULL) {
+        source->dataCallback(msgType, dataPtr);
+    }
 }
 
 void CameraSourceListener::postDataTimestamp(
@@ -389,6 +393,14 @@ void CameraSource::dataCallbackTimestamp(int64_t timestampUs,
     LOGV("initial delay: %lld, current time stamp: %lld",
         mStartTimeUs, timeUs);
     mFrameAvailableCondition.signal();
+}
+
+void CameraSource::dataCallback( int32_t msgType, const sp<IMemory> &data ){
+  LOGV("dataCallback E");
+  Mutex::Autolock autoLock(mLock);
+  if( mListener != NULL ){
+    mListener->dataCallback(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE, data );
+  }
 }
 
 void CameraSource::errorCallback( ){

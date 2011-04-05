@@ -717,6 +717,26 @@ status_t CameraService::Client::startRecording() {
     return startCameraMode(CAMERA_RECORDING_MODE);
 }
 
+status_t CameraService::Client::takeLiveSnapshot()
+{
+    LOGV("takeLiveSnapshot (pid %d)", getCallingPid());
+
+    Mutex::Autolock lock(mLock);
+
+    if (mHardware == 0) {
+        LOGE("mHardware is NULL, returning.");
+        return INVALID_OPERATION;
+    }
+    mHardware->enableMsgType(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE);
+    if(mHardware->takeLiveSnapshot() != NO_ERROR) {
+        mHardware->disableMsgType(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE);
+        return INVALID_OPERATION;
+    }
+
+    LOGV("takeLiveSnapshot: X");
+    return NO_ERROR;
+}
+
 // start preview or recording
 status_t CameraService::Client::startCameraMode(camera_mode mode) {
     LOG1("startCameraMode(%d)", mode);
@@ -910,7 +930,7 @@ status_t CameraService::Client::takePicture() {
 
 // set preview/capture parameters - key/value pairs
 status_t CameraService::Client::setParameters(const String8& params) {
-    LOG1("setParameters (pid %d) (%s)", getCallingPid(), params.string());
+    LOGI("setParameters (pid %d) (%s)", getCallingPid(), params.string());
 
     Mutex::Autolock lock(mLock);
     status_t result = checkPidAndHardware();
@@ -1137,6 +1157,9 @@ void CameraService::Client::dataCallback(int32_t msgType,
         case CAMERA_MSG_COMPRESSED_IMAGE:
             client->handleCompressedPicture(dataPtr);
             break;
+        case MEDIA_RECORDER_MSG_COMPRESSED_IMAGE:
+            client->handleLiveShot(dataPtr);
+            break;
         default:
             client->handleGenericData(msgType, dataPtr);
             break;
@@ -1311,11 +1334,31 @@ void CameraService::Client::handleCompressedPicture(const sp<IMemory>& mem) {
     }
 }
 
+// Liveshot callback - jpeg picture ready
+void CameraService::Client::handleLiveShot(const sp<IMemory>& mem)
+{
+#if DEBUG_DUMP_JPEG_LIVESHOT_TO_FILE // for testing pursposes only
+    {
+        ssize_t offset;
+        size_t size;
+        sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
+        dump_to_file("/data/Liveshot.jpg",
+                     (uint8_t *)heap->base() + offset, size);
+    }
+#endif
+
+    sp<ICameraClient> c = mCameraClient;
+    mLock.unlock();
+    if (c != NULL) {
+        c->dataCallback(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE, mem);
+    }
+    mHardware->disableMsgType(MEDIA_RECORDER_MSG_COMPRESSED_IMAGE);
+}
 
 void CameraService::Client::handleGenericNotify(int32_t msgType,
     int32_t ext1, int32_t ext2) {
     sp<ICameraClient> c = mCameraClient;
-    
+
     mLock.unlock();
     if (c != 0) {
         c->notifyCallback(msgType, ext1, ext2);

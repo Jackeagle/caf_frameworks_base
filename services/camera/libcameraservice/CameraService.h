@@ -22,6 +22,7 @@
 
 #include <camera/ICameraService.h>
 #include <camera/CameraHardwareInterface.h>
+#include <media/mediarecorder.h>
 
 /* This needs to be increased if we can have more cameras */
 #define MAX_CAMERAS 2
@@ -108,6 +109,7 @@ private:
         virtual status_t        setParameters(const String8& params);
         virtual String8         getParameters() const;
         virtual status_t        sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
+        virtual status_t        takeLiveSnapshot();
     private:
         friend class CameraService;
                                 Client(const sp<CameraService>& cameraService,
@@ -205,6 +207,7 @@ private:
         // This function keeps trying to grab mLock, or give up if the message
         // is found to be disabled. It returns true if mLock is grabbed.
         bool                    lockIfMessageWanted(int32_t msgType);
+        void                    handleLiveShot(const sp<IMemory>& mem);
     };
 };
 
