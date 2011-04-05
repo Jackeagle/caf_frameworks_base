@@ -214,6 +214,7 @@ private:
         int32_t mColorFormat;
         int32_t mVideoWidth, mVideoHeight;
         int32_t mDecodedWidth, mDecodedHeight;
+        int32_t mRotation;
 
         SuspensionState()
             : mLastVideoFrame(NULL) {
