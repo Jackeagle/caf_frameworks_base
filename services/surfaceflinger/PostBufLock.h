@@ -121,7 +121,15 @@ public:
    * Using n/m (n out of m occurrences)
    */
   void setPolicy(unsigned int numLayers){
-    if(!numLayers) return;
+    // When numLayers is 0, it means:
+    // 1. Some targets have no overlay (but do use LayerBuffer).
+    // 2. When number of layer buffers is 0, it means no layer buffers in the
+    // system. It is safe in that case to have _any_ policy and just return.
+    // Choosing NoLockPolicy in order to make it work for(1) and similar targets
+    if(!numLayers) {
+      mPolicy = &mNoLockPolicy;
+      return;
+    }
     setLayer(numLayers);
     setPolicy_i();
   }
