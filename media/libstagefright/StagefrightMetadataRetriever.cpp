@@ -287,18 +287,13 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
 
     if (frame == NULL) {
         LOGV("Software decoder failed to extract thumbnail, "
-             "trying hardware decoder.");
-
-        //frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, 0);
+                "trying hardware decoder.");
 
         char value[PROPERTY_VALUE_MAX];
-        if (property_get("ro.product.device", value, "0")
-            && (!strcmp(value, "qsd8250_ffa") || !strcmp(value, "qsd8250_surf"))) {
-	  //            frame = extractVideoFrameWithCodecFlags(
-          //          &mClient, trackMeta, source, OMXCodec::kEnableThumbnailMode);
-        }
-        else {
-	  //frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, 0);
+        if (property_get("ro.product.device", value, "0") &&
+                (!strncmp(value, "msm8660", sizeof("msm8660") - 1))) {
+            frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, OMXCodec::kEnableThumbnailMode,
+                    timeUs, option);
         }
     }
 
