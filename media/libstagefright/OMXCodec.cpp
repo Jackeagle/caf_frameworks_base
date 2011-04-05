@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /*--------------------------------------------------------------------------
-Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 --------------------------------------------------------------------------*/
 
 //#define LOG_NDEBUG 0
@@ -214,6 +214,10 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_AC3, "OMX.qcom.audio.decoder.ac3" },
     { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
     { MEDIA_MIMETYPE_VIDEO_VP6,"OMX.qcom.video.decoder.vp"},
+    { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13Hw"},
+    { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13"},
+    { MEDIA_MIMETYPE_AUDIO_EVRC, "OMX.qcom.audio.decoder.evrchw" },
+    { MEDIA_MIMETYPE_AUDIO_EVRC, "OMX.qcom.audio.decoder.evrc" },
 };
 
 static const CodecInfo kEncoderInfo[] = {
@@ -762,6 +766,18 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
         setAC3Format(numChannels, sampleRate);*/
+    }
+
+    if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_EVRC, mMIME)) {
+        int32_t numChannels, sampleRate;
+        CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
+    }
+
+    if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_QCELP, mMIME)) {
+        int32_t numChannels, sampleRate;
+        CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
     }
 
      if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_SPARK, mMIME)) {
