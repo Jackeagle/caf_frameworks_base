@@ -40,6 +40,7 @@ import java.net.InetAddress;
 import java.lang.String;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import java.lang.SecurityException;
 
 class AddressCacheMonitor extends BroadcastReceiver {
 
@@ -78,11 +79,19 @@ class AddressCacheMonitor extends BroadcastReceiver {
             int type                    = networkInfo.getType();
             boolean isConnected         = networkInfo.isConnected();
             String networkName          = networkInfo.getTypeName();
+            boolean exceptionCaught = false;
 
             if (type == ConnectivityManager.TYPE_WIFI) {
-                WifiManager wifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
-                WifiInfo wifiInfo       = wifiManager.getConnectionInfo();
-                networkName             = networkName + " " + wifiInfo.getSSID();
+                try {
+                    WifiManager wifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
+                    WifiInfo wifiInfo       = wifiManager.getConnectionInfo();
+                    networkName             = networkName + " " + wifiInfo.getSSID();
+                }
+                catch (SecurityException se) {
+                    Log.i(ADDRESS_CACHE_LOGTAG,
+                          "No permission to access connection info? - "  + se);
+                    exceptionCaught = true;
+                }
             }
 
             Log.d(ADDRESS_CACHE_LOGTAG, "network ("  +
@@ -90,7 +99,8 @@ class AddressCacheMonitor extends BroadcastReceiver {
                                         ") is "      +
                                         (isConnected ? "connected" : "disconnected") );
 
-            if (isConnected && !networkName.equals(mPreviousNetworkName)) {
+            if ( isConnected &&
+                 (exceptionCaught || !networkName.equals(mPreviousNetworkName)) ) {
                 Log.d(ADDRESS_CACHE_LOGTAG, "clearing address cache" );
                 mPreviousNetworkName = networkName;
                 InetAddress.clearAddressCache();
