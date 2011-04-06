@@ -884,11 +884,8 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
     // this code-path must be as tight as possible, it's called each time
     // the screen is composited.
     if (UNLIKELY(mOverlay != 0)) {
-        if(mOverlayDevice && (mHDMIEnabled != (mLayer.mFlinger->mHDMIOutput))) {
-            overlay_control_device_t* ov_dev = mOverlayDevice;
-            ov_dev->setParameter(ov_dev, mOverlay, OVERLAY_HDMI_ENABLE, mLayer.mFlinger->mHDMIOutput);
-            mHDMIEnabled =  mLayer.mFlinger->mHDMIOutput;
-        }
+        // we need a lock here to protect "destroy"
+        Mutex::Autolock _l(mOverlaySourceLock);
         if (mVisibilityChanged || !mInitialized) {
             mVisibilityChanged = false;
             mInitialized = true;
@@ -897,9 +894,6 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
             int y = bounds.top;
             int w = bounds.width();
             int h = bounds.height();
-
-            // we need a lock here to protect "destroy"
-            Mutex::Autolock _l(mOverlaySourceLock);
             if (mOverlay) {
                 overlay_control_device_t* overlay_dev = mOverlayDevice;
                 // we need to combine the layer orientation and the
@@ -911,6 +905,14 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
                 overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 overlay_dev->commit(overlay_dev, mOverlay);
             }
+        }
+        if(mOverlayDevice &&
+                    (mHDMIEnabled != (mLayer.mFlinger->mHDMIOutput))) {
+            overlay_control_device_t* ov_dev = mOverlayDevice;
+            if(!ov_dev->setParameter(ov_dev, mOverlay, OVERLAY_HDMI_ENABLE,
+                                                 mLayer.mFlinger->mHDMIOutput))
+                ov_dev->commit(ov_dev, mOverlay);
+            mHDMIEnabled =  mLayer.mFlinger->mHDMIOutput;
         }
     }
 }
