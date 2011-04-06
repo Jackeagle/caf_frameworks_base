@@ -1154,6 +1154,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         logv("onDataCallDropped: dc=" + c.dc + ", reason=" + c.reason);
 
         handleDisconnectedDc(c.dc, c.reason);
+
+        updateDataConnections(c.reason); //check for something else to do.
     }
 
     protected synchronized void onDisconnectDone(AsyncResult ar) {
