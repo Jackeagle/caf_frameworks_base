@@ -144,6 +144,7 @@ class BluetoothEventLoop {
         mBluetoothService.addRemoteDeviceProperties(address, properties);
         String rssi = mBluetoothService.getRemoteDeviceProperty(address, "RSSI");
         String classValue = mBluetoothService.getRemoteDeviceProperty(address, "Class");
+        String devType = mBluetoothService.getRemoteDeviceProperty(address, "Type");
         String name = mBluetoothService.getRemoteDeviceProperty(address, "Name");
         short rssiValue;
         // For incoming connections, we don't get the RSSI value. Use a default of MIN_VALUE.
@@ -162,6 +163,18 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
 
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        } else if (devType != null)  {
+            if (DBG) log("Device type: " + devType);
+            if ("LE".equals(devType)){
+                Intent intent = new Intent(BluetoothDevice.ACTION_FOUND);
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
+                intent.putExtra(BluetoothDevice.EXTRA_RSSI, rssiValue);
+                intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
+
+                mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+
+            }
+
         } else {
             log ("ClassValue: " + classValue + " for remote device: " + address + " is null");
         }
