@@ -1960,6 +1960,14 @@ status_t AwesomePlayer::suspend() {
         }
     }
 
+    int32_t rotationDegrees = 0;
+    if (mVideoTrack != NULL &&
+        !mVideoTrack->getFormat()->findInt32(
+                                             kKeyRotation, &rotationDegrees)) {
+        rotationDegrees = 0;
+    }
+    state->mRotation = rotationDegrees;
+
     reset_l();
 
     mSuspensionState = state;
@@ -2045,7 +2053,7 @@ status_t AwesomePlayer::resume() {
                     state->mVideoHeight,
                     state->mDecodedWidth,
                     state->mDecodedHeight,
-                    0);
+                    state->mRotation);
 
         mVideoRendererIsPreview = true;
 
