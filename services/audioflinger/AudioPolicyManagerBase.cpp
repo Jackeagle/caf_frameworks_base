@@ -1653,7 +1653,7 @@ uint32_t AudioPolicyManagerBase::getDeviceForStrategy(routing_strategy strategy,
 
         // If incall, just select the STRATEGY_PHONE device: The rest of the behavior is handled by
         // handleIncallSonification().
-        if (isInCall() || (mPhoneState == AudioSystem::MODE_RINGTONE)) {
+        if (isInCall()) {
             device = getDeviceForStrategy(STRATEGY_PHONE, false);
             break;
         }
