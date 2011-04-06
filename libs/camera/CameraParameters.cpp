@@ -156,6 +156,7 @@ const char CameraParameters::SCENE_MODE_CANDLELIGHT[] = "candlelight";
 const char CameraParameters::SCENE_MODE_BACKLIGHT[] = "backlight";
 const char CameraParameters::SCENE_MODE_FLOWERS[] = "flowers";
 const char CameraParameters::SCENE_MODE_BARCODE[] = "barcode";
+const char CameraParameters::SCENE_MODE_AR[] = "AR";
 
 // Values for auto scene detection settings.
 const char CameraParameters::SCENE_DETECT_OFF[] = "off";
