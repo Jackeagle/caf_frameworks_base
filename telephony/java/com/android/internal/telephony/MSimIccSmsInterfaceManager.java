@@ -180,6 +180,36 @@ public class MSimIccSmsInterfaceManager extends ISms.Stub {
        return false;
     }
 
+    public boolean enableCdmaBroadcast(int messageIdentifier) {
+        return enableCdmaBroadcast(messageIdentifier, getPreferredSmsSubscription());
+    }
+
+    public boolean enableCdmaBroadcast(int messageIdentifier, int subscription) {
+        IccSmsInterfaceManager iccSmsIntMgr = getIccSmsInterfaceManager(subscription);
+        if (iccSmsIntMgr != null ) {
+            return iccSmsIntMgr.enableCdmaBroadcast(messageIdentifier);
+        } else {
+            Log.e(LOG_TAG,"enableCdmaBroadcast iccSmsIntMgr is null for" +
+                          " Subscription:"+subscription);
+        }
+        return false;
+    }
+
+    public boolean disableCdmaBroadcast(int messageIdentifier) {
+        return disableCdmaBroadcast(messageIdentifier, getPreferredSmsSubscription());
+    }
+
+    public boolean disableCdmaBroadcast(int messageIdentifier, int subscription) {
+        IccSmsInterfaceManager iccSmsIntMgr = getIccSmsInterfaceManager(subscription);
+        if (iccSmsIntMgr != null ) {
+            return iccSmsIntMgr.disableCdmaBroadcast(messageIdentifier);
+        } else {
+            Log.e(LOG_TAG,"disableCdmaBroadcast iccSmsIntMgr is null for" +
+                          " Subscription:"+subscription);
+        }
+       return false;
+    }
+
     /**
      * get sms interface manager object based on subscription.
      **/
