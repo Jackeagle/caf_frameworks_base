@@ -88,7 +88,7 @@ SoftwareRenderer::SoftwareRenderer(
     GET_3D_FORMAT(mColorFormat, format3D);
     switch (format3D) {
         case QOMX_3D_LEFT_RIGHT_VIDEO_FLAG:
-            flags3D = HAL_3D_OUT_SIDE_BY_SIDE | HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R;
+            flags3D = HAL_3D_OUT_SIDE_BY_SIDE | HAL_3D_IN_SIDE_BY_SIDE_L_R;
             break;
         case QOMX_3D_TOP_BOTTOM_VIDEO_FLAG:
             flags3D = HAL_3D_OUT_TOP_BOTTOM | HAL_3D_IN_TOP_BOTTOM;
