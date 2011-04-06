@@ -222,6 +222,7 @@ static bool copybit(GLint x, GLint y,
     const uint32_t enables = c->rasterizer.state.enables;
     int planeAlpha = 255;
     bool alphaPlaneWorkaround = false;
+    bool handleFade = false;
     static const int tmu = 0;
     texture_t& tev(c->rasterizer.state.texture[tmu]);
     int32_t opFormat = textureObject->surface.format;
@@ -285,6 +286,8 @@ static bool copybit(GLint x, GLint y,
                 // is equivalent
 #ifndef DISABLE_ALPHA_PLANE_WORKAROUND
                 alphaPlaneWorkaround = true;
+#else
+                handleFade = true;
 #endif
                 break;
             }
@@ -458,7 +461,12 @@ static bool copybit(GLint x, GLint y,
         }
     } else {
         copybit->set_parameter(copybit, COPYBIT_TRANSFORM, transform);
-        copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, planeAlpha);
+
+        int alpha = planeAlpha;
+        if (handleFade) {
+            alpha = fixedToByte(c->currentColorClamped.a);
+        }
+        copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, alpha);
         copybit->set_parameter(copybit, COPYBIT_DITHER,
                 (enables & GGL_ENABLE_DITHER) ?
                         COPYBIT_ENABLE : COPYBIT_DISABLE);
