@@ -48,5 +48,6 @@ const char *MEDIA_MIMETYPE_AUDIO_AC3 = "audio/ac3";
 const char *MEDIA_MIMETYPE_VIDEO_SPARK = "video/spark";
 const char *MEDIA_MIMETYPE_VIDEO_VP6 = "video/vp6";
 
+const char *MEDIA_MIMETYPE_AUDIO_EVRC = "audio/evrc";
 
 }  // namespace android

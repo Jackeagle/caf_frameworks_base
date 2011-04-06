@@ -48,6 +48,7 @@ extern const char *MEDIA_MIMETYPE_VIDEO_DIVX;
 extern const char *MEDIA_MIMETYPE_AUDIO_AC3;
 extern const char *MEDIA_MIMETYPE_VIDEO_SPARK;
 extern const char *MEDIA_MIMETYPE_VIDEO_VP6;
+extern const char *MEDIA_MIMETYPE_AUDIO_EVRC;
 }  // namespace android
 
 #endif  // MEDIA_DEFS_H_
