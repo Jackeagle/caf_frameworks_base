@@ -280,6 +280,7 @@ class SubResourcesHistory{
             while (removedHistories < URLHISTORIES_TO_REMOVE) {
                 ++removedHistories;
                 mHistory.remove((urlHistories.getLast()).getMainHost());
+                urlHistories.removeLast();
             }
         }
 
