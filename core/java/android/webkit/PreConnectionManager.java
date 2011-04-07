@@ -57,7 +57,7 @@ public class PreConnectionManager{
 
     public PreConnectionManager(Context context)
     {
-        TCP_PRE_CONNECT = false;
+        TCP_PRE_CONNECT = SystemProperties.getBoolean("http.preconnect", true);
 
         mCurrentMainURL = new String();
         mNetwork = Network.getInstance(context);
