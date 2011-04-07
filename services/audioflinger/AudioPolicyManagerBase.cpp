@@ -815,7 +815,7 @@ status_t AudioPolicyManagerBase::setStreamVolumeIndex(AudioSystem::stream_type s
     // Force max volume if stream cannot be muted
     if (!mStreams[stream].mCanBeMuted) index = mStreams[stream].mIndexMax;
 
-    LOGV("setStreamVolumeIndex() stream %d, index %d", stream, index);
+    LOGD("setStreamVolumeIndex() stream %d, index %d", stream, index);
     mStreams[stream].mIndexCur = index;
 
     // compute and apply stream volume on all outputs according to connected device

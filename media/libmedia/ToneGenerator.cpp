@@ -15,6 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
 #define LOG_TAG "ToneGenerator"
 #include <utils/threads.h>
 
@@ -907,7 +908,7 @@ bool ToneGenerator::startTone(int toneType, int durationMs) {
         }
     }
 
-    LOGV("startTone\n");
+    LOGD("startTone\n");
 
     mLock.lock();
 
@@ -984,7 +985,7 @@ bool ToneGenerator::startTone(int toneType, int durationMs) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 void ToneGenerator::stopTone() {
-    LOGV("stopTone");
+    LOGD("stopTone");
 
     mLock.lock();
     if (mState == TONE_PLAYING || mState == TONE_STARTING || mState == TONE_RESTARTING) {

@@ -16,6 +16,7 @@
 */
 
 //#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
 #define LOG_TAG "AudioRecord"
 
 #include <stdint.h>
@@ -128,7 +129,7 @@ status_t AudioRecord::set(
         int sessionId)
 {
 
-    LOGV("set(): sampleRate %d, channels %d, frameCount %d",sampleRate, channels, frameCount);
+    LOGD("set(): sampleRate %d, channels %d, frameCount %d",sampleRate, channels, frameCount);
     if (mAudioRecord != 0) {
         return INVALID_OPERATION;
     }
@@ -313,7 +314,7 @@ status_t AudioRecord::start()
     status_t ret = NO_ERROR;
     sp<ClientRecordThread> t = mClientRecordThread;
 
-    LOGV("start");
+    LOGD("start");
 
     if (t != 0) {
         if (t->exitPending()) {
@@ -361,7 +362,7 @@ status_t AudioRecord::stop()
 {
     sp<ClientRecordThread> t = mClientRecordThread;
 
-    LOGV("stop");
+    LOGD("stop");
 
     if (t != 0) {
         t->mLock.lock();
