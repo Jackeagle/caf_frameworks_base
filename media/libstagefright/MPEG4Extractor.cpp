@@ -1017,8 +1017,19 @@ status_t MPEG4Extractor::parseChunk(sfoff_t *offset, int depth) {
                     goto esds_parse_fail;
                 }
             }
-            mLastTrack->meta->setData(
+
+            const char *mime;
+            CHECK(mLastTrack->meta->findCString(kKeyMIMEType, &mime));
+            //Do not set ESDS to meta data if mime type is reset to H.263
+            if(!strcmp(mime,MEDIA_MIMETYPE_VIDEO_H263)) {
+                //Delete the buffer and update the offset
+                //since the mimetype is h.263
+                goto esds_parse_fail;
+            }
+            else {
+                mLastTrack->meta->setData(
                     kKeyESDS, kTypeESDS, &buffer[4], chunk_data_size - 4);
+            }
 
             if (mPath.size() >= 2
                     && mPath[mPath.size() - 2] == FOURCC('m', 'p', '4', 'a')) {
@@ -1823,6 +1834,13 @@ status_t MPEG4Extractor::updateVideoTrackInfoFromESDS_MPEG4Video(
     if (esds.getCodecSpecificInfo(
                 (const void **)&csd, &csd_size) != OK) {
         return ERROR_MALFORMED;
+    }
+
+    uint32_t offset = (csd_size) - 4;
+    if (csd != NULL && csd[offset] == 0x00 && csd[offset+1] == 0x00 &&
+        csd[offset+2] == 0x01 && csd[offset+3] < 0x20) {
+        LOGW("Reset Mime type from mp4v to H.263");
+        mLastTrack->meta->setCString(kKeyMIMEType, FourCC2MIME( FOURCC('s', '2', '6', '3')));
     }
     return OK;
 }
