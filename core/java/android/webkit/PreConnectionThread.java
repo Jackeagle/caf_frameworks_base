@@ -78,6 +78,9 @@ class PreConnectionThread extends Thread{
     private final static int FIRST_LEVEL_NUM_CONNECTIONS = 1;
     private final static int SECOND_LEVEL_NUM_CONNECTIONS = 2;
 
+    // Max number of connections to be opened is bounded by 25
+    private final static int MAX_PENDING_CONNECTONS = 25;
+
     private boolean mStopped;
     private Context mContext;
     private RequestFeeder mRequestFeeder;
@@ -85,6 +88,8 @@ class PreConnectionThread extends Thread{
     private LinkedList<SocketEntry> mSocketChannels;
     private RequestQueue.ConnectionManager mConnectionManager;
     private PreConnectionManager mPreConnectionMgr;
+    private int mPendingConnections;
+    private int mOpenedConnections;
 
     public PreConnectionThread(LinkedList<Subhost> subhosts,
                                RequestQueue.ConnectionManager connectionManager,
@@ -99,6 +104,8 @@ class PreConnectionThread extends Thread{
         mPreConnectionMgr = preConnectionMgr;
         mConnectionManager = connectionManager;
         mSubhosts = subhosts;
+        mPendingConnections = 0;
+        mOpenedConnections = 0;
         mSocketChannels = new LinkedList<SocketEntry>();
 
         setName("tcp pre-connection");
@@ -174,6 +181,7 @@ class PreConnectionThread extends Thread{
                         sEntry.mSocketChannel = sChannel;
 
                         mSocketChannels.add(sEntry);
+                        mPendingConnections++;
                     } catch (Exception e) {
                         try {
                              sChannel.close();
@@ -225,6 +233,12 @@ class PreConnectionThread extends Thread{
                             sEntry.mSocketChannel = sChannel;
 
                             mSocketChannels.add(sEntry);
+
+                            mPendingConnections++;
+                            if (mPendingConnections == MAX_PENDING_CONNECTONS) {
+                                // Stop initiating connections if max bound was reached
+                                return;
+                            }
                         } catch (Exception e) {
                             try {
                                 sChannel.close();
@@ -285,6 +299,7 @@ class PreConnectionThread extends Thread{
                     }
 
                     sChannelIter.remove();
+                    mOpenedConnections++;
                 }
             } catch (IOException e){
             }
@@ -334,6 +349,7 @@ class PreConnectionThread extends Thread{
                         }
 
                         sChannelIter.remove();
+                        mOpenedConnections++;
                     }
                 } catch (IOException e){
                 }
@@ -354,7 +370,7 @@ class PreConnectionThread extends Thread{
                      // Clear unopened connections
                      stopConnecting();
                  } else {
-                     Log.v("http","TCP pre-connection: all connections opened");
+                     Log.v("http","TCP pre-connection: total number of opened connections: " + mOpenedConnections);
                  }
                 return;
             }
