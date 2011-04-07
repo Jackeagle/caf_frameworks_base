@@ -47,6 +47,11 @@ class UsbObserver extends UEventObserver {
 
     private static final int MSG_UPDATE = 0;
 
+    // Delay for debouncing USB disconnects.
+    // We often get rapid connect/disconnect events when enabling USB functions,
+    // which need debouncing.
+    private static final int UPDATE_DELAY = 1000;
+
     private int mUsbConfig = 0;
     private int mPreviousUsbConfig = 0;
 
@@ -84,7 +89,7 @@ class UsbObserver extends UEventObserver {
                         mUsbConfig = newConfig;
                         // trigger an Intent broadcast
                         if (mSystemReady) {
-                            update();
+                            update(mUsbConfig == 0);
                         }
                     }
                 } catch (NumberFormatException e) {
@@ -149,13 +154,15 @@ class UsbObserver extends UEventObserver {
 
     void systemReady() {
         synchronized (this) {
-            update();
+            update(false);
             mSystemReady = true;
         }
     }
 
-    private final void update() {
-        mHandler.sendEmptyMessage(MSG_UPDATE);
+    private final void update(boolean delayed) {
+        mHandler.removeMessages(MSG_UPDATE);
+        mHandler.sendEmptyMessageDelayed(MSG_UPDATE, delayed ? UPDATE_DELAY : 0);
+
     }
 
     private final Handler mHandler = new Handler() {
