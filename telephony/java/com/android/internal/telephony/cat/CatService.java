@@ -279,10 +279,8 @@ public class CatService extends Handler implements AppInterface {
             CatLog.d(this,"Event: "+eventval);
             switch (eventval) {
                 /* Currently android is supporting only the below events in SetupEventList
-                 * Browser Termination,
                  * Idle Screen Available and
                  * Language Selection.  */
-                case BROWSER_TERMINATION_EVENT:
                 case IDLE_SCREEN_AVAILABLE_EVENT:
                 case LANGUAGE_SELECTION_EVENT:
                     break;
