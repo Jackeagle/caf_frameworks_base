@@ -1605,7 +1605,11 @@ public class TelephonyManager {
                 propVal = propVal + "," + p[i];
             }
         }
-        SystemProperties.set(property, propVal);
+        try {
+            SystemProperties.set(property, propVal);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG,"Propval length is greaterthan 91");
+        }
     }
 
     /**
