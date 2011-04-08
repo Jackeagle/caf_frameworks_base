@@ -62,7 +62,7 @@
 #define AID_GRAPHICS 1003
 #endif
 
-#ifdef USE_COMPOSITION_BYPASS
+#ifdef SF_BYPASS
 #warning "using COMPOSITION_BYPASS"
 #endif
 
@@ -125,7 +125,9 @@ SurfaceFlinger::SurfaceFlinger()
         mOverlayUsed(false),
         mOverlayUseChanged(false),
         mIsLayerBufferPresent(false),
-        mOrigResSurfAbsent(true)
+        mOrigResSurfAbsent(true),
+        mBypassState(eBypassNotInUse),
+        mHDMIState(HDMIOUT_DISABLE)
 {
     init();
 }
@@ -409,11 +411,13 @@ bool SurfaceFlinger::threadLoop()
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     if (LIKELY(hw.canDraw() && !isFrozen())) {
 
-#ifdef USE_COMPOSITION_BYPASS
+#ifdef SF_BYPASS
         if (handleBypassLayer()) {
-            unlockClients();
             return true;
         }
+
+        if (mBypassState == eBypassInUse)
+            mBypassState = eBypassClosePending;
 #endif
 
         // repaint the framebuffer (if needed)
@@ -431,11 +435,6 @@ bool SurfaceFlinger::threadLoop()
         // release the clients before we flip ('cause flip might block)
         logger.log(GraphicLog::SF_UNLOCK_CLIENTS, index);
 
-#ifdef SF_BYPASS
-        if (!mOverlayUseChanged)
-            unlockClients();
-#endif
-
         logger.log(GraphicLog::SF_SWAP_BUFFERS, index);
         if (!mFullScreen) {
             postFramebuffer();
@@ -451,13 +450,16 @@ bool SurfaceFlinger::threadLoop()
                 enableOverlayOpt(false);
                 enableOverlayOpt(true);
                 mOverlayUseChanged = false;
-
-#ifdef SF_BYPASS
-                unlockClients();
-#endif
                 freeBypassBuffers();
             }
         }
+
+#ifdef SF_BYPASS
+        if (mBypassState == eBypassClosePending) {
+            closeBypass();
+            freeBypassBuffers();
+        }
+#endif
         ditchOverlayLayers();
 
         logger.log(GraphicLog::SF_REPAINT_DONE, index);
@@ -465,6 +467,18 @@ bool SurfaceFlinger::threadLoop()
         if ((mHDMIOutput || mOverlayOpt) && !(hw.canDraw())) {
             enableOverlayOpt(false);
             enableOverlayOpt(true);
+
+#ifdef SF_BYPASS
+            /*
+             * We cant draw, close comp. bypass
+             */
+            if (mBypassState == eBypassClosePending || mBypassState == eBypassInUse) {
+                mBypassState = eBypassClosePending;
+                closeBypass();
+                freeBypassBuffers();
+            }
+#endif
+
             const DisplayHardware& hw(graphicPlane(0).displayHardware());
             if (mHDMIOutput)
                 hw.videoOverlayStarted(false);
@@ -476,17 +490,72 @@ bool SurfaceFlinger::threadLoop()
     return true;
 }
 
+bool SurfaceFlinger::closeBypass()
+{
+#ifdef SF_BYPASS
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    if (mBypassState == eBypassClosePending) {
+        hw.closeBypass();
+        mBypassState = eBypassNotInUse;
+        return true;
+    }
+#endif
+    return false;
+}
+
 bool SurfaceFlinger::handleBypassLayer()
 {
+#ifdef SF_BYPASS
+    if (mBypassState == eBypassClosePending) {
+        closeBypass();
+        return false;
+    }
+
+    /*
+     * For now, disable HDMI through comp. bypass,
+     */
+    bool hdmiOptionON = false;
+    switch (mHDMIState) {
+        case HDMIFB_OPEN:
+        case HDMIHPD_ON:
+        case HDMIOUT_ENABLE:
+            hdmiOptionON = true;
+            break;
+        case HDMIOUT_DISABLE:
+        case HDMIHPD_OFF:
+            hdmiOptionON = false;
+            break;
+        default:
+            break;
+    }
+
+    if (hdmiOptionON)
+        return false;
+
     sp<Layer> bypassLayer(mBypassLayer.promote());
     if (bypassLayer != 0) {
+        const DisplayHardware& hw(graphicPlane(0).displayHardware());
         sp<GraphicBuffer> buffer(bypassLayer->getBypassBuffer());
-        if (buffer!=0 && (buffer->usage & GRALLOC_USAGE_HW_FB)) {
-            const DisplayHardware& hw(graphicPlane(0).displayHardware());
-            hw.postBypassBuffer(buffer->handle);
-            return true;
+        if (buffer != 0 && hw.isOverlayUIEnabled()) {
+            bool isHPDON = hdmiOptionON;
+            status_t ret = hw.postBypassBuffer(buffer->handle, buffer->width,
+                                            buffer->height, buffer->format,
+                                            bypassLayer->getOrientation(), isHPDON);
+            if (ret == NO_ERROR) {
+                bypassLayer->setOverlayUsed(true);
+                bypassLayer->setBufferInUse();
+                mBypassState = eBypassInUse;
+                return true;
+            }
+
+            if (mBypassState != eBypassInUse)
+                closeBypass();
+            LOGE("comp. bypass failed.");
+            return false;
         }
     }
+#endif
+
     return false;
 }
 
@@ -577,14 +646,16 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
      */
     const size_t count = ditchedLayers.size();
     for (size_t i=0 ; i<count ; i++) {
-        if (ditchedLayers[i] != 0) {
+        if (ditchedLayers[i] == 0)
+            continue;
 #ifdef SF_BYPASS
-            if (ditchedLayers[i]->isOverlayUsed())
-                mOverlayDitchedLayers.add(ditchedLayers[i]);
-            else
-#endif
-                ditchedLayers[i]->ditch();
+        if (ditchedLayers[i]->isOverlayUsed()) {
+            mOverlayDitchedLayers.add(ditchedLayers[i]);
+            ditchedLayers[i]->clearFreezeLock();
+            continue;
         }
+#endif
+        ditchedLayers[i]->ditch();
     }
 }
 
@@ -814,12 +885,8 @@ void SurfaceFlinger::setBypassLayer(const sp<LayerBase>& layer)
 {
     // if this layer is already the bypass layer, do nothing
     sp<Layer> cur(mBypassLayer.promote());
-    if (mBypassLayer == layer) {
-        if (cur != NULL) {
-            cur->updateBuffersOrientation();
-        }
+    if (mBypassLayer == layer)
         return;
-    }
 
     // clear the current bypass layer
     mBypassLayer.clear();
@@ -861,7 +928,7 @@ void SurfaceFlinger::handlePageFlip()
                     mVisibleLayersSortedByZ.add(currentLayers[i]);
             }
 
-#ifdef USE_COMPOSITION_BYPASS
+#ifdef SF_BYPASS
             sp<LayerBase> bypassLayer;
             const size_t numVisibleLayers = mVisibleLayersSortedByZ.size();
             if (numVisibleLayers == 1) {
@@ -991,11 +1058,9 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     }
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
     const size_t count = layers.size();
-    int compcount = 0, ovLayerIndex = -1,
-               layerbuffercount = 0,   layerbufferIndex = -1;
+    int compcount = 0, layerbuffercount = 0, layerbufferIndex = -1;
     int layersNotUpdatingCount = 0, drawLayerIndex = -1;
     bool compositionStateChanged = false;
-    Region prevClip;
     Region layerBufferClip;
     Region drawClip;
     bool canUseOverlayToDraw = false;
@@ -1011,8 +1076,6 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
             const Region clip(dirty.intersect(visibleRegion));
             if (!clip.isEmpty()) {
                 compcount++;
-                prevClip = clip;
-                ovLayerIndex = i;
 
                 if(layer->isNothingToUpdate()) {
                     layersNotUpdatingCount++;
@@ -1059,20 +1122,10 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                 drawClip = layerBufferClip;
                 drawLayerIndex = layerbufferIndex;
             }
-#ifdef SF_BYPASS
-            else if(hw.isOverlayUIEnabled() && compcount == 1) {
-                canUseOverlayToDraw = true;
-                drawClip = prevClip;
-                drawLayerIndex = ovLayerIndex;
-            }
-#endif
         }
 
-        if (canUseOverlayToDraw && (ovLayerIndex != -1)) {
-            Region::const_iterator it = prevClip.begin();
-            const Rect& r = *it++;
-            if (((r.right - r.left) == hw.getWidth() && (r.bottom - r.top) == hw.getHeight()) ||
-                          layerbuffercount) {
+        if (canUseOverlayToDraw) {
+            if (layerbuffercount) {
                 const sp<LayerBase>& layer = layers[drawLayerIndex];
                 status_t err = NO_ERROR;
                 if ((err = layer->drawWithOverlay(drawClip, mHDMIOutput))
@@ -1414,20 +1467,17 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
 {
 #if defined(TARGET_USES_OVERLAY)
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    mHDMIState = static_cast<hdmi_state_t> (enable);
     switch(enable) {
         case HDMIFB_OPEN:
         case HDMIHPD_ON:
-            hw.setOverlayUIEnabled(false);
-        break;
         case HDMIHPD_OFF:
-            hw.setOverlayUIEnabled(true);
         break;
         case HDMIOUT_ENABLE:
         case HDMIOUT_DISABLE:
         {
             mHDMIOutput = enable;
             enableOverlayOpt(!enable);
-            hw.setOverlayUIEnabled(!enable);
             hw.enableHDMIOutput(enable);
         }
     }

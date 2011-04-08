@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -260,6 +261,15 @@ bool SharedBufferClient::LockCondition::operator()() const {
     // NOTE: if stack.head is messed up, we could crash the client
     // or cause some drawing artifacts. This is okay, as long as it is
     // limited to the client.
+#if defined(SF_BYPASS)
+    /*
+     * If comp. bypass is being used, its buffer will be marked in use
+     * using stack.reserved, check if current buffer is same as that
+     * being read by display.
+     */
+    if ((stack.reserved != -1) && buf == stack.index[stack.reserved])
+        return false;
+#endif
     return (buf != stack.index[stack.head]);
 }
 

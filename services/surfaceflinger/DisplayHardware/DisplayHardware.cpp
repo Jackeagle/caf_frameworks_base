@@ -190,11 +190,13 @@ void DisplayHardware::init(uint32_t dpy)
     mOverlayLibObject = new overlay::Overlay();
     mOverlayUIEnable = false;
     mOverlayUIEnablePropVal = false;
+#if defined(SF_BYPASS)
     property_get("debug.overlayui.enable", property, "0");
     if (atoi(property)) {
         mOverlayUIEnable = true;
         mOverlayUIEnablePropVal= true;
     }
+#endif
 #endif
 
     if (mFlags & PARTIAL_UPDATES) {
@@ -369,10 +371,18 @@ void DisplayHardware::flip(const Region& dirty) const
     //glClear(GL_COLOR_BUFFER_BIT);
 }
 
-status_t DisplayHardware::postBypassBuffer(const native_handle_t* handle) const
+status_t DisplayHardware::postBypassBuffer(const native_handle_t* handle, int w,
+                                             int h, int format, int orientation,
+                                             int isHPDON) const
 {
    framebuffer_device_t *fbDev = (framebuffer_device_t *)mNativeWindow->getDevice();
-   return fbDev->post(fbDev, handle);
+   return fbDev->postBypassBuffer(fbDev, handle, w, h, format, orientation, isHPDON);
+}
+
+status_t DisplayHardware::closeBypass() const
+{
+   framebuffer_device_t *fbDev = (framebuffer_device_t *)mNativeWindow->getDevice();
+   return fbDev->closeBypass(fbDev);
 }
 
 uint32_t DisplayHardware::getFlags() const

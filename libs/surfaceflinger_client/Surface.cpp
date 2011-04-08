@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -612,6 +613,10 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer)
             const sp<GraphicBuffer>& backBuffer(mBuffers[bufIdx]);
             mWidth  = uint32_t(backBuffer->width);
             mHeight = uint32_t(backBuffer->height);
+            if (bufIdx >= 0 && bufIdx < size)
+                mOldDirtyRegion[bufIdx].clear();
+            else
+                LOGE("Buffer Index out-of-bounds");
         }
     }
 
@@ -967,23 +972,35 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
             // user).
             mDirtyRegion = newDirtyRegion;
             int backBufIdx = backBuffer->getIndex();
+            int bufSize = mBuffers.size();
 
             if (canCopyBack) {
                 // copy the area that is invalid and not repainted this round
+                Region oldDirtyRegion;
+                for (int i = 0; i < bufSize; i++) {
+                    if (i != backBufIdx && !mOldDirtyRegion[i].isEmpty())
+                        oldDirtyRegion.orSelf(mOldDirtyRegion[i]);
+                }
 
-                const Region copyback(mOldDirtyRegion.subtract(newDirtyRegion));
-
-                if (!copyback.isEmpty())
+                const Region copyback(oldDirtyRegion.subtract(newDirtyRegion));
+                if (!copyback.isEmpty() && !mOldDirtyRegion[backBufIdx].isEmpty())
                     copyBlt(backBuffer, frontBuffer, copyback);
+                else if (mOldDirtyRegion[backBufIdx].isEmpty())
+                    newDirtyRegion = boundsRegion;
             } else {
                 // if we can't copy-back anything, modify the user's dirty
                 // region to make sure they redraw the whole buffer
                 newDirtyRegion = boundsRegion;
+                for (int i = 0; i < bufSize; i++)
+                    mOldDirtyRegion[i].clear();
             }
 
             // keep track of the are of the buffer that is "clean"
             // (ie: that will be redrawn)
-            mOldDirtyRegion = newDirtyRegion;
+            if (backBufIdx >= 0 && backBufIdx < bufSize)
+                mOldDirtyRegion[backBufIdx] = newDirtyRegion;
+            else
+                LOGE("Buffer index is out-of-bounds");
 
             void* vaddr;
             status_t res = backBuffer->lock(
