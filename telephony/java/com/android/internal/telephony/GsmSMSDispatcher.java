@@ -48,9 +48,11 @@ import static android.telephony.SmsMessage.MessageClass;
 
 final class GsmSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "GSM";
+    private ImsSMSDispatcher mImsSMSDispatcher;
 
-    GsmSMSDispatcher(Phone phone, CommandsInterface cm) {
+    GsmSMSDispatcher(Phone phone, CommandsInterface cm, ImsSMSDispatcher imsSMSDispatcher) {
         super(phone, cm);
+        mImsSMSDispatcher = imsSMSDispatcher;
         Log.d(TAG, "Register for EVENT_NEW_SMS");
         mCm.setOnNewSMS(this, EVENT_NEW_SMS, null);
         mCm.setOnSmsOnSim(this, EVENT_SMS_ON_ICC, null);
@@ -369,6 +371,11 @@ final class GsmSMSDispatcher extends SMSDispatcher {
             mCm.sendImsGsmSms(IccUtils.bytesToHexString(smsc),
                     IccUtils.bytesToHexString(pdu), reply);
         }
+    }
+
+    protected void sendRetrySms(SmsTracker tracker) {
+        //re-routing to ImsSMSDispatcher
+        mImsSMSDispatcher.sendRetrySms(tracker);
     }
 
     /**

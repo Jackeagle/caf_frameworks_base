@@ -55,12 +55,14 @@ import java.util.HashMap;
 
 final class CdmaSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "CDMA";
+    private ImsSMSDispatcher mImsSMSDispatcher;
 
     private byte[] mLastDispatchedSmsFingerprint;
     private byte[] mLastAcknowledgedSmsFingerprint;
 
-    CdmaSMSDispatcher(Phone phone, CommandsInterface cm) {
+    CdmaSMSDispatcher(Phone phone, CommandsInterface cm, ImsSMSDispatcher imsSMSDispatcher) {
         super(phone, cm);
+        mImsSMSDispatcher = imsSMSDispatcher;
         Log.d(TAG, "Register for EVENT_NEW_SMS");
         mCm.setOnNewCdmaSMS(this, EVENT_NEW_SMS, null);
     }
@@ -488,6 +490,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
         } else {
             mCm.sendImsCdmaSms(pdu, reply);
         }
+    }
+
+    protected void sendRetrySms(SmsTracker tracker) {
+        //re-routing to ImsSMSDispatcher
+        mImsSMSDispatcher.sendRetrySms(tracker);
     }
 
      /** {@inheritDoc} */
