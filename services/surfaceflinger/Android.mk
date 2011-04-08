@@ -57,6 +57,10 @@ ifeq ($(TARGET_USES_SF_BYPASS),true)
 LOCAL_CFLAGS += -DSF_BYPASS
 endif
 
+ifeq ($(TARGET_USES_TRIPLE_APP_BUFFER),true)
+LOCAL_CFLAGS += -DTRIPLE_APP_BUFFER
+endif
+
 ifneq (, $(filter msm7630_surf msm7630_1x msm8660_surf msm8660_csfb msm7630_fusion, $(QCOM_TARGET_PRODUCT)))
 LOCAL_CFLAGS += -DTARGET_USES_OVERLAY
 LOCAL_SHARED_LIBRARIES += liboverlay

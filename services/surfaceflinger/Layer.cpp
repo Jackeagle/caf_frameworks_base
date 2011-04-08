@@ -84,7 +84,7 @@ status_t Layer::setToken(const sp<UserClient>& userClient,
         SharedClient* sharedClient, int32_t token)
 {
     int numbuffers = mBufferManager.getDefaultBufferCount();
-#if defined(SF_BYPASS)
+#if defined(TRIPLE_APP_BUFFER)
     if (getLayerInitFlags() & ISurfaceComposer::eFullScreen) {
         numbuffers = 3;
         mBufferManager.resize(numbuffers);
