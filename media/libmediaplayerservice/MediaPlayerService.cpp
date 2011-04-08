@@ -200,7 +200,6 @@ extmap FILE_EXTS [] =  {
         {".rtttl", SONIVOX_PLAYER},
         {".rtx", SONIVOX_PLAYER},
         {".ota", SONIVOX_PLAYER},
-        {".aac", STAGEFRIGHT_PLAYER},
 #ifndef NO_OPENCORE
         {".3g2", PV_PLAYER},
 #endif
