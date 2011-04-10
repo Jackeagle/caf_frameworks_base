@@ -38,7 +38,11 @@ AACDecoder::AACDecoder(const sp<MediaSource> &source)
       mDecoderBuf(NULL),
       mAnchorTimeUs(0),
       mNumSamplesOutput(0),
-      mInputBuffer(NULL) {
+      mInputBuffer(NULL),
+      mTempInputBuffer(NULL),
+      mTempBufferTotalSize(0),
+      mTempBufferDataLen(0),
+      mInputBufferSize(0) {
 
     sp<MetaData> srcFormat = mSource->getFormat();
 
@@ -67,15 +71,22 @@ status_t AACDecoder::initCheck() {
     mConfig->outputFormat = OUTPUTFORMAT_16PCM_INTERLEAVED;
     mConfig->aacPlusEnabled = 1;
 
+    // The software decoder doesn't properly support mono output on
+    // AACplus files. Always output stereo.
+    mConfig->desiredChannels = 2;
+
+
     int32_t samplingRate;
-    mMeta->findInt32(kKeySampleRate, &samplingRate);
+    sp<MetaData> meta = mSource->getFormat();
+    meta->findInt32(kKeySampleRate, &samplingRate);
     mConfig->samplingRate = samplingRate;
 
     int32_t bitRate;
-    mMeta->findInt32(kKeyBitRate, &bitRate);
+    meta->findInt32(kKeyBitRate, &bitRate);
 
     int32_t encodedChannelCnt;
-    mMeta->findInt32(kKeyChannelCount, &encodedChannelCnt);
+    meta->findInt32(kKeyChannelCount, &encodedChannelCnt);
+    //mConfig->desiredChannels = encodedChannelCnt;
 
     // The software decoder doesn't properly support mono output on
     // AACplus files. Always output stereo.
@@ -93,7 +104,6 @@ status_t AACDecoder::initCheck() {
     uint32_t type;
     const void *data;
     size_t size;
-    sp<MetaData> meta = mSource->getFormat();
     if (meta->findData(kKeyESDS, &type, &data, &size)) {
         ESDS esds((const char *)data, size);
         CHECK_EQ(esds.InitCheck(), OK);
@@ -109,18 +119,25 @@ status_t AACDecoder::initCheck() {
 
         if (PVMP4AudioDecoderConfig(mConfig, mDecoderBuf)
                 != MP4AUDEC_SUCCESS) {
-            LOGE("PVMP4AudioDecoderConfig failed"); //channels and/or sample rate?
+            LOGE("Error in setting AAC decoder config");
             return ERROR_UNSUPPORTED;
         }
     }
-    if(meta->findData(kKeyAacCodecSpecificData, &type, &data, &size)) {
-      mConfig->pInputBuffer = (UChar *)data;
-      mConfig->inputBufferCurrentLength = size;
-      mConfig->inputBufferMaxLength = 0;
 
-      if (PVMP4AudioDecoderConfig(mConfig, mDecoderBuf)
-          != MP4AUDEC_SUCCESS) {
-          LOGE("PVMP4AudioDecoderConfig failed"); //channels and/or sample rate?
+    //this is used by mm-parser only, usually format block size is 2
+    if (meta->findData(kKeyAacCodecSpecificData, &type, &data, &size)) {
+       if( size > AAC_MAX_FORMAT_BLOCK_SIZE ) {
+          LOGE("AAC FormatBlock is too big %d", size);
+          return ERROR_UNSUPPORTED;
+       }
+       memcpy( mFormatBlock, (uint8_t*)data, size);
+       mConfig->pInputBuffer = mFormatBlock;
+       mConfig->inputBufferCurrentLength = size;
+       mConfig->inputBufferMaxLength = 0;
+
+       if (PVMP4AudioDecoderConfig(mConfig, mDecoderBuf)
+           != MP4AUDEC_SUCCESS) {
+          LOGE("Error in setting AAC decoder config");
           return ERROR_UNSUPPORTED;
       }
     }
@@ -134,6 +151,12 @@ AACDecoder::~AACDecoder() {
 
     delete mConfig;
     mConfig = NULL;
+
+    //Reset temp buffer
+    if( mTempInputBuffer != NULL ) {
+       free(mTempInputBuffer);
+       mTempInputBuffer = NULL;
+    }
 }
 
 status_t AACDecoder::start(MetaData *params) {
@@ -172,6 +195,13 @@ status_t AACDecoder::stop() {
     delete mBufferGroup;
     mBufferGroup = NULL;
 
+    if( mTempInputBuffer != NULL ) {
+       free(mTempInputBuffer);
+       mTempInputBuffer = NULL;
+    }
+    mTempBufferDataLen = 0;
+    mTempBufferTotalSize = 0;
+
     mSource->stop();
 
     mStarted = false;
@@ -208,6 +238,10 @@ status_t AACDecoder::read(
         seekTimeUs = -1;
     }
 
+
+    uint8_t* inputBuffer = NULL;
+    uint32_t inputBufferSize = 0;
+
     if (mInputBuffer == NULL) {
         err = mSource->read(&mInputBuffer, options);
 
@@ -218,19 +252,56 @@ status_t AACDecoder::read(
         int64_t timeUs;
         if (mInputBuffer->meta_data()->findInt64(kKeyTime, &timeUs)) {
             mAnchorTimeUs = timeUs;
-            mNumSamplesOutput = 0;
+            if( timeUs != 0 ) {
+                mNumSamplesOutput = 0;
+            }
         } else {
             // We must have a new timestamp after seeking.
             CHECK(seekTimeUs < 0);
         }
+
+        inputBuffer = (UChar *)mInputBuffer->data() + mInputBuffer->range_offset();
+        inputBufferSize = mInputBuffer->range_length();
+        if ( mInputBufferSize == 0 ) {
+            // Remember the first input buffer size
+            mInputBufferSize = mInputBuffer->size();
+        }
+        //Check if there was incomplete frame assembly started
+        if (  mTempBufferDataLen ) {
+            LOGV("Incomplete frame assembly is in progress mTempBufferDataLen %d", mTempBufferDataLen);
+            if ( mTempBufferDataLen + inputBufferSize > mTempBufferTotalSize ) {
+                LOGE("Temp buffer size exceeded %d input size %d", mTempBufferTotalSize, inputBufferSize);
+                return UNKNOWN_ERROR;
+            }
+            //append new input buffer to temp buffer
+            memcpy( mTempInputBuffer + mTempBufferDataLen, inputBuffer, inputBufferSize );
+
+            //update the new iput buffer data
+            if ( inputBufferSize + mTempBufferDataLen < mInputBufferSize ) {
+                LOGV("Reached end of stream case" );
+                inputBufferSize += mTempBufferDataLen;
+                mTempBufferDataLen = 0;
+                mInputBufferSize = inputBufferSize;
+                mInputBuffer->set_range(0, inputBufferSize);
+            }
+            memcpy( inputBuffer, mTempInputBuffer, inputBufferSize);
+        }
+    }
+    else {
+        inputBuffer = (UChar *)mInputBuffer->data() + mInputBuffer->range_offset();
+        inputBufferSize = mInputBuffer->range_length();
     }
 
+    //Allocate Output buffer
     MediaBuffer *buffer;
-    CHECK_EQ(mBufferGroup->acquire_buffer(&buffer), OK);
-    mConfig->pInputBuffer =
-        (UChar *)mInputBuffer->data() + mInputBuffer->range_offset();
+    CHECK_EQ(mBufferGroup->acquire_buffer(&buffer), (status_t)OK);
 
-    mConfig->inputBufferCurrentLength = mInputBuffer->range_length();
+    //Get the input buffer
+    LOGV("Input Buffer Length %d Offset %d size %d", mInputBuffer->range_length(), mInputBuffer->range_offset(), mInputBufferSize);
+
+    mConfig->pInputBuffer = inputBuffer;
+
+    mConfig->inputBufferCurrentLength = inputBufferSize;
     mConfig->inputBufferMaxLength = 0;
     mConfig->inputBufferUsedLength = 0;
     mConfig->remainderBits = 0;
@@ -239,7 +310,9 @@ status_t AACDecoder::read(
     mConfig->pOutputBuffer_plus = &mConfig->pOutputBuffer[2048];
     mConfig->repositionFlag = false;
 
-    Int decoderErr = PVMP4AudioDecodeFrame(mConfig, mDecoderBuf);
+    Int decoderErr;
+
+    decoderErr = PVMP4AudioDecodeFrame(mConfig, mDecoderBuf);
 
     /*
      * AAC+/eAAC+ streams can be signalled in two ways: either explicitly
@@ -306,14 +379,73 @@ status_t AACDecoder::read(
         numOutBytes *= 2;
     }
 
-    if (decoderErr != MP4AUDEC_SUCCESS) {
+    LOGV("AAC decoder %d frame length %d used length %d ", decoderErr, inputBufferSize, mConfig->inputBufferUsedLength);
+    if( inputBufferSize < mConfig->inputBufferUsedLength ) {
+        LOGE("unexpected error actual len %d is less than used len %d", inputBufferSize, mConfig->inputBufferUsedLength);
+        decoderErr = MP4AUDEC_INVALID_FRAME;
+    }
+
+    int aacformattype = 0;
+    sp<MetaData> metadata = mSource->getFormat();
+    metadata->findInt32(kkeyAacFormatAdif, &aacformattype);
+
+    if ( decoderErr == MP4AUDEC_INCOMPLETE_FRAME  && aacformattype == true) {
+        LOGW("Handle Incomplete frame error inputBufSize %d, usedLength %d", inputBufferSize, mConfig->inputBufferUsedLength);
+        if ( !mTempInputBuffer ) {
+            //Allocate Temp buffer
+            uint32_t bytesToAllocate = 2 * mInputBuffer->size();
+            mTempInputBuffer = (uint8_t*)malloc( bytesToAllocate );
+            mTempBufferDataLen = 0;
+            if (mTempInputBuffer == NULL) {
+                LOGE("Could not allocate temp buffer bytesToAllocate quit playing");
+                return UNKNOWN_ERROR;
+            }
+            mTempBufferTotalSize = bytesToAllocate;
+            LOGV("Allocated tempBuffer of size %d data len %d", mTempBufferTotalSize, mTempBufferDataLen);
+        }
+        // copy the remaining data into temp buffer
+        memcpy( mTempInputBuffer, inputBuffer, mConfig->inputBufferUsedLength );
+
+        if (mTempBufferDataLen != 0) {
+            //append previous remaining data back into temp buffer
+            LOGV("Appending remaining data tempDataLen %d usedLength %d", mTempBufferDataLen, mConfig->inputBufferUsedLength);
+            memcpy( mTempInputBuffer + mConfig->inputBufferUsedLength,
+                    mTempInputBuffer + mInputBufferSize,
+                    mTempBufferDataLen );
+        }
+
+        mTempBufferDataLen += mConfig->inputBufferUsedLength;
+        LOGV("mTempBufferDataLen %d inputBufferUsedLength %d", mTempBufferDataLen, mConfig->inputBufferUsedLength);
+        // temp buffer has accumulated one frame size worth data
+        // copy it back to input buffer so that it is fed to decoder next
+        if ( mTempBufferDataLen >= mInputBufferSize ) {
+            LOGV("mTempBufferDataLen %d exceeded mInputBufferSize %d ", mTempBufferDataLen, mInputBufferSize);
+            memcpy((UChar*)mInputBuffer->data(), mTempInputBuffer, mInputBufferSize );
+            mTempBufferDataLen -= mInputBufferSize;
+            mInputBuffer->set_range( 0, mInputBufferSize );
+            mConfig->inputBufferUsedLength = 0;
+        }
+
+        //reset the output buffer size
+        numOutBytes = 0;
+    }
+    else if (decoderErr != MP4AUDEC_SUCCESS) {
         LOGW("AAC decoder returned error %d, substituting silence", decoderErr);
 
         memset(buffer->data(), 0, numOutBytes);
 
         // Discard input buffer.
-        mInputBuffer->release();
-        mInputBuffer = NULL;
+        if( mInputBuffer != NULL ) {
+            mInputBuffer->release();
+            mInputBuffer = NULL;
+        }
+
+        if(mTempBufferDataLen) {
+            //put previous remaining data to temp buffer beginning
+            memcpy( mTempInputBuffer,
+                    mTempInputBuffer + mInputBufferSize,
+                    mTempBufferDataLen );
+        }
 
         // fall through
     }
@@ -326,6 +458,12 @@ status_t AACDecoder::read(
                 mInputBuffer->range_length() - mConfig->inputBufferUsedLength);
 
         if (mInputBuffer->range_length() == 0) {
+            if(decoderErr == MP4AUDEC_SUCCESS && mTempBufferDataLen) {
+                //put previous remaining data to temp buffer beginning
+                memcpy( mTempInputBuffer,
+                        mTempInputBuffer + mInputBufferSize,
+                        mTempBufferDataLen );
+            }
             mInputBuffer->release();
             mInputBuffer = NULL;
         }
@@ -336,7 +474,8 @@ status_t AACDecoder::read(
             mAnchorTimeUs
                 + (mNumSamplesOutput * 1000000) / mConfig->samplingRate);
 
-    mNumSamplesOutput += mConfig->frameLength;
+    if(numOutBytes > 0)
+        mNumSamplesOutput += mConfig->frameLength * mUpsamplingFactor;
 
     *out = buffer;
 

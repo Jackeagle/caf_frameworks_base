@@ -88,7 +88,11 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
     mFirstBufferResult = mSource->read(&mFirstBuffer);
     if (mFirstBufferResult == INFO_FORMAT_CHANGED) {
         LOGV("INFO_FORMAT_CHANGED!!!");
-
+        //After format change start giving input buffers from starting
+        if ( !mSeeking ) {
+            LOGV("seeking to 0, for audio format changed ");
+            seekTo( 0 );
+        }
         CHECK(mFirstBuffer == NULL);
         mFirstBufferResult = OK;
         mIsFirstBuffer = false;
