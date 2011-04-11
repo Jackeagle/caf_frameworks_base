@@ -1195,6 +1195,7 @@ public class Camera {
         private static final String KEY_MAX_CONTRAST = "max-contrast";
         private static final String KEY_SATURATION = "saturation";
         private static final String KEY_MAX_SATURATION = "max-saturation";
+        private static final String KEY_DENOISE = "denoise";
         private static final String KEY_SELECTABLE_ZONE_AF = "selectable-zone-af";
         private static final String KEY_FACE_DETECTION = "face-detection";
         private static final String KEY_MEMORY_COLOR_ENHANCEMENT = "mce";
@@ -1487,6 +1488,10 @@ public class Camera {
         private static final String PIXEL_FORMAT_YUV422I = "yuv422i-yuyv";
         private static final String PIXEL_FORMAT_RGB565 = "rgb565";
         private static final String PIXEL_FORMAT_JPEG = "jpeg";
+
+         //Values for Denoise
+         public static final String DENOISE_OFF = "denoise-off";
+         public static final String DENOISE_ON = "denoise-on";
 
         // Values for selectable zone af settings.
         public static final String SELECTABLE_ZONE_AF_AUTO = "auto";
@@ -3043,6 +3048,39 @@ public class Camera {
             }
             splitFloat(get(KEY_FOCUS_DISTANCES), output);
         }
+
+       /**
+         * Gets the current DENOISE  setting.
+         *
+         * @return one of DENOISE_XXX string constant. null if Denoise
+         *         setting is not supported.
+         *
+         */
+         public String getDenoise() {
+         return get(KEY_DENOISE);
+         }
+
+       /**
+         * Sets the current Denoise  mode.
+         * @param value DENOISE_XXX string constants.
+         *
+         */
+
+         public void setDenoise(String value) {
+             set(KEY_DENOISE, value);
+         }
+                                                                                                                                                           /**
+         * Gets the supported DENOISE  modes.
+         *
+         * @return a List of DENOISE_XXX string constant. null if DENOISE
+         *         setting is not supported.
+         *
+         */
+
+         public List<String> getSupportedDenoiseModes() {
+             String str = get(KEY_DENOISE + SUPPORTED_VALUES_SUFFIX);
+             return split(str);
+         }
 
          /**
          * Gets the current selectable zone af setting.
