@@ -212,6 +212,7 @@ class UrlHistory {
         while (removedSubhost < SUBHOSTS_TO_REMOVE) {
             ++removedSubhost;
             mSubhosts.remove((subhosts.getLast()).getHost());
+            subhosts.removeLast();
         }
 
         return;

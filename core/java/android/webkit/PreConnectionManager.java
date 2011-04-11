@@ -120,7 +120,12 @@ public class PreConnectionManager{
     private void preConnect()
     {
         if (TCP_PRE_CONNECT) {
-            LinkedList<Subhost> subhosts = mSubResorcesHistory.getSubhostsToConnect(mCurrentMainURL);
+            LinkedList<Subhost> subhosts = null;
+            if (null != mSubResorcesHistory.getSubhostsToConnect(mCurrentMainURL)) {
+                synchronized (SubResourcesHistory.mSubResourcesHistoryLock) {
+                    subhosts = new LinkedList<Subhost>(mSubResorcesHistory.getSubhostsToConnect(mCurrentMainURL));
+                }
+            }
 
             if ((null != subhosts) && (0 != subhosts.size())) {
                 mPreConnectionThreadId = mNetwork.requestNetworkConnections(this, subhosts);
