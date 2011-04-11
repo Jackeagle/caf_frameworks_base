@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +43,11 @@ import com.android.internal.telephony.ITelephony;
 import android.util.Log;
 import android.view.WindowManager;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
+
 public final class ShutdownThread extends Thread {
     // constants
     private static final String TAG = "ShutdownThread";
@@ -67,6 +73,12 @@ public final class ShutdownThread extends Thread {
     // static instance of this thread
     private static final ShutdownThread sInstance = new ShutdownThread();
     
+    // force sync modem file system before shutdown
+    private static final String SYSFS_MSM_EFS_SYNC_START = "/sys/devices/platform/rs300000a7.65536/force_sync";
+    private static final String SYSFS_MSM_EFS_SYNC_COMPLETE = "/sys/devices/platform/rs300000a7.65536/sync_sts";
+    private static final String SYSFS_MDM_EFS_SYNC_START = "/sys/devices/platform/rs300100a7.65536/force_sync";
+    private static final String SYSFS_MDM_EFS_SYNC_COMPLETE = "/sys/devices/platform/rs300100a7.65536/sync_sts";
+
     private final Object mActionDoneSync = new Object();
     private boolean mActionDone;
     private Context mContext;
@@ -200,6 +212,7 @@ public final class ShutdownThread extends Thread {
     public void run() {
         boolean bluetoothOff;
         boolean radioOff;
+        boolean msmEfsSyncDone, mdmEfsSyncDone;
 
         BroadcastReceiver br = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
@@ -260,7 +273,7 @@ public final class ShutdownThread extends Thread {
         final IMountService mount =
                 IMountService.Stub.asInterface(
                         ServiceManager.checkService("mount"));
-        
+
         try {
             bluetoothOff = bluetooth == null ||
                            bluetooth.getBluetoothState() == BluetoothAdapter.STATE_OFF;
@@ -284,8 +297,35 @@ public final class ShutdownThread extends Thread {
             radioOff = true;
         }
 
+        // Clean sync radio file system before shutdown
+        // Open the efs sync sysfs file for writing and write "1" to it.
+        PrintWriter outStream = null;
+        try {
+            msmEfsSyncDone = false;
+            FileOutputStream fos = new FileOutputStream(SYSFS_MSM_EFS_SYNC_START);
+            outStream = new PrintWriter(new OutputStreamWriter(fos));
+            outStream.println("1");
+        } catch (Exception e) {
+            msmEfsSyncDone = true;
+        } finally {
+            if (outStream != null)
+                outStream.close();
+        }
+
+        try {
+            mdmEfsSyncDone = false;
+            FileOutputStream fos = new FileOutputStream(SYSFS_MDM_EFS_SYNC_START);
+            outStream = new PrintWriter(new OutputStreamWriter(fos));
+            outStream.println("1");
+        } catch (Exception e) {
+            mdmEfsSyncDone = true;
+        } finally {
+            if (outStream != null)
+                outStream.close();
+        }
+
         Log.i(TAG, "Waiting for Bluetooth and Radio...");
-        
+
         // Wait a max of 8 seconds for clean shutdown
         for (int i = 0; i < MAX_NUM_PHONE_STATE_READS; i++) {
             if (!bluetoothOff) {
@@ -305,21 +345,37 @@ public final class ShutdownThread extends Thread {
                     radioOff = true;
                 }
             }
-            if (radioOff && bluetoothOff) {
+            if (!msmEfsSyncDone) {
+                try {
+                    FileInputStream fis = new FileInputStream(SYSFS_MSM_EFS_SYNC_COMPLETE);
+                    int result = fis.read();
+                    fis.close();
+                    if (result == '1')
+					{
+                    	msmEfsSyncDone = true;
+					}
+                } catch (Exception ex) {
+                    msmEfsSyncDone = true;
+                }
+            }
+            if (!mdmEfsSyncDone) {
+                try {
+                    FileInputStream fis = new FileInputStream(SYSFS_MDM_EFS_SYNC_COMPLETE);
+                    int result = fis.read();
+                    fis.close();
+                    if (result == '1')
+					{
+                    	mdmEfsSyncDone = true;
+					}
+                } catch (Exception ex) {
+                    mdmEfsSyncDone = true;
+                }
+            }
+            if (radioOff && bluetoothOff && msmEfsSyncDone && mdmEfsSyncDone) {
                 Log.i(TAG, "Radio and Bluetooth shutdown complete.");
                 break;
             }
             SystemClock.sleep(PHONE_STATE_POLL_SLEEP_MSEC);
-        }
-
-        // Send power off command to RIL
-        if (mRilShutdown) {
-            try {
-                Log.w(TAG, "Sending ril power off ...");
-                phone.setRilPowerOff();
-            } catch (RemoteException ex) {
-                Log.e(TAG, "RemoteException during Phone Power-off", ex);
-            }
         }
 
         // Shutdown MountService to ensure media is in a safe state
