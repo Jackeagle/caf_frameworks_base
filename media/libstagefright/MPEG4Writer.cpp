@@ -188,6 +188,7 @@ private:
     int64_t mLastDurationTicks;
     size_t  mSttsCount;
     size_t  mNumSttsCommitted;
+    int64_t mAddDurationUs;
 
     struct CommitOffset {
         CommitOffset( ) { }
@@ -1040,7 +1041,8 @@ MPEG4Writer::Track::Track(
       mReachedEOS(false),
       mRotation(0),
       mWriteCtts(false),
-      mSeqEnhanceInfo(NULL) {
+      mSeqEnhanceInfo(NULL),
+      mAddDurationUs(0) {
     getCodecSpecificDataFromInputFormatIfPossible();
 
     const char *mime;
@@ -1281,17 +1283,19 @@ void MPEG4Writer::Track::commitIP( int64_t ts, FrameType ft ) {
          ipFrame.ts, ipDecodeTime, durationUs);
     commitSttsEntry( cd );
 
-    int64_t offsetUs = ipFrame.ts - ipDecodeTime;
-    int64_t offsetTicks = timeDiffInTicks( ipFrame.ts, ipDecodeTime );
+    int64_t offsetUs = ipFrame.ts - mAddDurationUs;
+    int64_t offsetTicks = timeDiffInTicks( ipFrame.ts, mAddDurationUs );
     LOGV("Ctts for ipFrame, ts = %lld, decode time %lld  = %lld",
          ipFrame.ts, ipDecodeTime, offsetUs);
     CommitOffset co( offsetUs, offsetTicks );
     commitCttsEntry( co );
+    mAddDurationUs += durationUs;
 }
 
 void MPEG4Writer::Track::commitB( int64_t ts, FrameType ft ) {
     Vector<CommitDuration> tempStts;
     Vector<CommitOffset> tempCtts;
+    Vector<int64_t> tempBFrameTs;
 
     Frame ipFrame;
     int64_t ipDecodeTime;
@@ -1312,10 +1316,7 @@ void MPEG4Writer::Track::commitB( int64_t ts, FrameType ft ) {
         int64_t durationTicks = timeDiffInTicks(nextBFrame.ts,bFrame.ts);
         CommitDuration cd( durationUs, durationTicks );
         tempStts.add( cd );
-        int64_t offsetUs = bFrame.ts - bDecodeTime;
-        int64_t offsetTicks = timeDiffInTicks(bFrame.ts, bDecodeTime);
-        CommitOffset co( offsetUs, offsetTicks );
-        tempCtts.add( co );
+        tempBFrameTs.add(bFrame.ts);
 
         bFrame = nextBFrame;
         bDecodeTime = nextBDecodeTime;
@@ -1327,12 +1328,9 @@ void MPEG4Writer::Track::commitB( int64_t ts, FrameType ft ) {
     CommitDuration cd( durationUs, durationTicks );
     tempStts.add( cd );
 
-    int64_t offsetUs = bFrame.ts - bDecodeTime;
-    int64_t offsetTicks = timeDiffInTicks( bFrame.ts, bDecodeTime );
-    CommitOffset co( offsetUs, offsetTicks );
-    tempCtts.add( co );
+    tempBFrameTs.add(bFrame.ts);
+
     LOGV("Stts for last b-frame = %lld", durationUs );
-    LOGV("Ctts for last b-frame = %lld", offsetUs );
 
     //first commit stts and ctts for the p frame.
     if ( ft == B_FRAME ) {
@@ -1347,20 +1345,28 @@ void MPEG4Writer::Track::commitB( int64_t ts, FrameType ft ) {
     cd.durationUs = durationUs;
     cd.durationTicks = durationTicks;
 
-    offsetUs = ipFrame.ts - ipDecodeTime;
+    int64_t offsetUs = ipFrame.ts - mAddDurationUs;
     LOGV("Stts for closing p-frame ts = %lld, decode time = %lld = %lld",
          ipFrame.ts, ipDecodeTime, durationUs );
     LOGV("Ctts for closing p-frame ts = %lld, decode time = %lld = %lld",
          ipFrame.ts, ipDecodeTime, offsetUs );
-    offsetTicks = timeDiffInTicks( ipFrame.ts, ipDecodeTime );
-    co.offsetUs = offsetUs;
-    co.offsetTicks = offsetTicks;
+    int64_t offsetTicks = timeDiffInTicks( ipFrame.ts, mAddDurationUs );
+    CommitOffset co( offsetUs, offsetTicks );
+    mAddDurationUs += durationUs;
 
     commitSttsEntry( cd ); //copied in call
     commitCttsEntry( co );
 
-    for (size_t i = 0; i < tempStts.size( ); i++ ) {
+    size_t j = 0;
+    for (size_t i = 0;  i < tempStts.size( ) && j < tempBFrameTs.size(); i++ ,j++ ) {
         commitSttsEntry( tempStts[i] );
+        offsetUs =  tempBFrameTs[j] - mAddDurationUs;
+        offsetTicks = timeDiffInTicks(  tempBFrameTs[j], mAddDurationUs );
+        co.offsetUs = offsetUs;
+        co.offsetTicks = offsetTicks;
+        tempCtts.add( co );
+        mAddDurationUs +=  tempStts[i].durationUs;
+        LOGV("Ctts for last b-frame = %lld", offsetUs );
     }
 
     for (size_t i = 0 ; i < tempCtts.size( ); i++ ) {
