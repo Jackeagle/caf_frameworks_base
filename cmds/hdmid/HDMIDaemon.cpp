@@ -478,12 +478,17 @@ bool HDMIDaemon::openFramebuffer()
     return (fd1 > 0);
 }
 
+inline bool HDMIDaemon::isValidMode(int ID)
+{
+    return ((ID >= m640x480p60_4_3) && (ID <= m1920x1080p30_16_9));
+}
+
 void HDMIDaemon::setResolution(int ID)
 {
     if (!openFramebuffer())
         return;
 
-    if (mCurrentID != ID) {
+    if ((isValidMode(ID)) && mCurrentID != ID) {
         const struct disp_mode_timing_type *mode = &supported_video_mode_lut[0];
         for (unsigned int i = 0; i < sizeof(supported_video_mode_lut)/sizeof(*supported_video_mode_lut); ++i) {
             const struct disp_mode_timing_type *cur = &supported_video_mode_lut[i];

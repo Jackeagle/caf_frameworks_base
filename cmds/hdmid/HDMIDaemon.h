@@ -100,6 +100,7 @@ class HDMIDaemon : public Thread, public IBinder::DeathRecipient
     void setResolution(int ID);
     bool openFramebuffer();
     bool writeHPDOption(int userOption) const;
+    inline bool isValidMode(int ID);
 
     int mFrameworkSock;
     int mAcceptedConnection;
