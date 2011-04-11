@@ -45,21 +45,22 @@ import java.util.Set;
  * TODO: Capability tracking features are missing.
  */
 
-/** @hide
+/**
  * An extension of Java sockets. It provides a client-side TCP socket with a way to manage
  * wireless connections.
- *
+ * <p>
  * Example Code: <br>
  * <code>
  * LinkSocket sock = new LinkSocket(instanceOfLinkSocketNotifier); <br>
- * LinkCapabilities capabilities = LinkCapabilities.createNeeds(LinkCapabilities.Role.DEFAULT); <br>
+ * LinkCapabilities capabilities = LinkCapabilities.createNeeds(LinkCapabilities.Role.WEB_BROSWER); <br>
  * capabilities.put(LinkCapabilities.Key.RW_DESIRED_FWD_BW, "1000"); // set 1Mbps down <br>
- * sock.setNeededCapabilities(capabilities); <br>
- * sock.connect("10.41.38.46", 80); // cne-9-linux web server <br>
+ * sock.setNeededCapabilities(capabilities); // set the capabilities <br>
+ * sock.connect("www.google.com", 80); // Google's HTTP server <br>
  * sock.close(); <br>
  * </code>
  *
  * @see LinkSocketNotifier
+ * @hide
  */
 public class LinkSocket extends Socket {
     // Public error codes
@@ -184,8 +185,8 @@ public class LinkSocket extends Socket {
     }
 
     /**
-     * @return all of the {@code LinkCapabilities} of the link used by
-     *         this socket
+     * @return a LinkCapabilities object containing the READ ONLY capabilities
+     *         of the LinkSocket
      */
     public LinkCapabilities getCapabilities() {
         if (DBG) Log.v(TAG, "getCapabilities() EX");
@@ -198,11 +199,14 @@ public class LinkSocket extends Socket {
                     LinkCapabilities.Key.RO_CURRENT_LATENCY,
                     LinkCapabilities.Key.RO_BOUND_INTERFACE,
                     LinkCapabilities.Key.RO_NETWORK_TYPE,
-                    LinkCapabilities.Key.RO_PHYSICAL_INTERFACE
+                    LinkCapabilities.Key.RO_PHYSICAL_INTERFACE,
+                    LinkCapabilities.Key.RO_CARRIER_ROLE
             };
             cap = mService.requestCapabilities(mId, keys);
         } catch (RemoteException ex) {
             Log.d(TAG, "LinkSocket was unable to get capabilities from ConnectivityService");
+            // should not return a null reference
+            cap = new LinkCapabilities();
         }
         return cap;
     }
@@ -280,6 +284,20 @@ public class LinkSocket extends Socket {
             throw new UnknownHostException("destination port is not set");
         }
 
+        /*
+         * Currently RW_ALLOWED_NETWORKS and RW_PROHIBITED_NETWORKS are not
+         * implemented. If either of these keys are in use, throw an
+         * IOException.
+         *
+         * TODO: implement RW_ALLOWED_NETWORKS and RW_PROHIBITED_NETWORKS in
+         * next release.
+         */
+        if (mNeededCapabilities.containsKey(LinkCapabilities.Key.RW_ALLOWED_NETWORKS)
+                || mNeededCapabilities.containsKey(LinkCapabilities.Key.RW_PROHIBITED_NETWORKS)) {
+            throw new IOException("RW_ALLOWED_NETWORKS and RW_PROHIBITED_NETWORKS" +
+                    " are not supported at this time");
+        }
+
         // save the current time for timeouts
         Calendar start = Calendar.getInstance();
 
@@ -307,8 +325,28 @@ public class LinkSocket extends Socket {
                     mId = mService.requestLink(mNeededCapabilities, mMsgHandler);
                     if (DBG) Log.v(TAG, "Blocking: waiting for response");
                     while (isWaitingForResponse) {
-                        wait();
-                        if (DBG) Log.v(TAG, "Blocking: received notification");
+                        if (timeout == 0) {
+                            wait();
+                        } else {
+                            wait(timeout);
+                            /*
+                             * if 'timeout' time passes, wait() will stop
+                             * blocking just as if it was interrupted or
+                             * received a notification, and the while loop will
+                             * begin again. We need track time, and throw and
+                             * exception if appropriate. This also reduces the
+                             * amount of time socket.connect() will wait based
+                             * on how long it took to acquire the link.
+                             */
+                            timeout -= (int) (Calendar.getInstance().getTimeInMillis()
+                                    - start.getTimeInMillis());
+                            if (timeout <= 0) {
+                                releaseLink();
+                                throw new SocketTimeoutException(
+                                        "Socket timed out during link acquisition.");
+                            }
+                        }
+                        if (DBG) Log.v(TAG, "Blocking: received notification or timeout");
                     }
                     if (DBG) Log.v(TAG, "Blocking: done");
                 } catch (InterruptedException ex) {
@@ -337,14 +375,6 @@ public class LinkSocket extends Socket {
         for (InetAddress address : addresses) {
             bindAddress = address;
             break;
-        }
-
-        // subtract elapsed time from timeout value
-        if (timeout != 0) {
-            timeout -= (int) (Calendar.getInstance().getTimeInMillis() - start.getTimeInMillis());
-            if (timeout <= 0) {
-                throw new SocketTimeoutException( "Socket timed out during link acquisition.");
-            }
         }
 
         // bind and connect
@@ -405,15 +435,11 @@ public class LinkSocket extends Socket {
      * Connects this socket to the given remote host address and port specified
      * by the SocketAddress with the specified timeout.
      *
-     * @deprecated Use {@code connect(String dstName, int dstPort, int timeout)}
-     *             instead. Using this method may result in reduced
-     *             functionality.
+     * @deprecated Use {@link LinkSocket#connect(String, int, int)} instead.
+     *             Using this method will result in an IllegalArgumentException.
      * @param remoteAddr the address and port of the remote host to connect to
-     * @throws IllegalArgumentException if the given SocketAddress is not an
-     *             instance of {@code InetSocketAddress}
-     * @throws IOException if the socket is already connected or an error occurs
-     *             while connecting
-     * @throws SocketTimeoutException if the timeout expires
+     * @param timeout the timeout value in milliseconds or 0 for an infinite timeout
+     * @throws IllegalArgumentException always
      */
     @Override
     @Deprecated
@@ -428,19 +454,16 @@ public class LinkSocket extends Socket {
      * by the SocketAddress. Network selection happens during connect and may
      * take 30 seconds.
      *
-     * @deprecated Use {@code connect(String dstName, int dstPort)} Using this
-     *             method may result in reduced functionality.
+     * @deprecated Use {@link LinkSocket#connect(String, int)} instead. Using
+     *             this method will result in an IllegalArgumentException.
      * @param remoteAddr the address and port of the remote host to connect to.
-     * @throws IllegalArgumentException if the given SocketAddress is not an
-     *             instance of {@code InetSocketAddress}
-     * @throws IOException if the socket is already connected or an error occurs
-     *             while connecting
+     * @throws IllegalArgumentException always
      */
     @Override
     @Deprecated
     public void connect(SocketAddress remoteAddr) throws IOException, IllegalArgumentException {
         if (DBG) Log.v(TAG, "connect(remoteAddr) EX DEPRECATED");
-        connect(remoteAddr, 0);
+        throw new IllegalArgumentException("connect(remoteAddr) is deprecated");
     }
 
     /**
@@ -452,20 +475,9 @@ public class LinkSocket extends Socket {
     @Override
     public void close() throws IOException {
         if (DBG) Log.v(TAG, "close() EX");
-
         mMsgLoop.quit(); // disable callbacks
         releaseLink();
-
-        IOException caughtException = null;
-        try {
-            if (DBG) Log.v(TAG, "closing socket");
-            super.close();
-            if (DBG) Log.v(TAG, "socket closed");
-        } catch (IOException e) {
-            caughtException = e;
-            if (DBG) Log.d(TAG, "socket closed FAILED");
-        }
-        if (caughtException != null) throw caughtException;
+        super.close();
     }
 
     /**
@@ -504,8 +516,16 @@ public class LinkSocket extends Socket {
 
     @Override
     public String toString() {
-        return new String("LinkSocket");
-
+        if (this.isConnected() == false) {
+            if (mId == NOT_SET) {
+                return "LinkSocket id:none unconnected";
+            } else {
+                return "LinkSocket id:" + mId + " unconnected";
+            }
+        } else {
+            return "LinkSocket id:" + mId + " addr:" + super.getInetAddress()
+                + " port:" + super.getPort() + " local_port:" + super.getLocalPort();
+        }
     }
 
     /*
@@ -611,6 +631,18 @@ public class LinkSocket extends Socket {
     private void callbackOnLinkAvail(LinkProperties properties) {
         if (DBG) Log.v(TAG, "onLinkAvail(properties) EX");
 
+        if (mProperties != null) {
+            /*
+             * this is an unexpected onLinkAvail(), it probably should be a
+             * onBetterLinkAvail() so we're going to call that
+             *
+             * TODO: remove once CND is updated to the new architecture
+             */
+
+            callbackOnBetterLinkAvail();
+            return;
+        }
+
         // ConnectivityService found a link!
         mProperties = properties;
 
@@ -624,8 +656,17 @@ public class LinkSocket extends Socket {
     private void callbackOnGetLinkFailure(int reason) {
         if (DBG) Log.v(TAG, "onGetLinkFailure(reason) EX");
 
+        if (mProperties != null) {
+            /*
+             * this is an unexpected onGetLinkFailure, it probably should just
+             * be ignored
+             *
+             * TODO: remove once CND is updated to the new architecture
+             */
+            return;
+        }
+
         // implied releaseLink()
-        mProperties = null;
         mId = NOT_SET;
 
         // stop blocking
@@ -638,18 +679,33 @@ public class LinkSocket extends Socket {
     private void callbackOnBetterLinkAvail() {
         if (DBG) Log.v(TAG, "onBetterLinkAvail() EX");
         if (mNotifier == null) return;
+
+        // are notifications disabled?
+        String notify = mNeededCapabilities.get(LinkCapabilities.Key.RW_DISABLE_NOTIFICATIONS);
+        if (notify != null && notify.equalsIgnoreCase("true")) return;
+
         mNotifier.onBetterLinkAvailable(this);
     }
 
     private void callbackOnLinkLost() {
         if (DBG) Log.v(TAG, "onLinkLost() EX");
         if (mNotifier == null) return;
+
+        // are notifications disabled?
+        String notify = mNeededCapabilities.get(LinkCapabilities.Key.RW_DISABLE_NOTIFICATIONS);
+        if (notify != null && notify.equalsIgnoreCase("true")) return;
+
         mNotifier.onLinkLost(this);
     }
 
     private void callbackOnCapabilitiesChanged(LinkCapabilities changedCapabilities) {
         if (DBG) Log.v(TAG, "onCapabilitiesChanged(changedCapabilities) EX");
         if (mNotifier == null) return;
+
+        // are notifications disabled?
+        String notify = mNeededCapabilities.get(LinkCapabilities.Key.RW_DISABLE_NOTIFICATIONS);
+        if (notify != null && notify.equalsIgnoreCase("true")) return;
+
         // This feature is not implemented yet.
     }
 }

@@ -50,6 +50,8 @@ public class LinkProperties implements Parcelable {
             mAddresses = source.getAddresses();
             mDnses = source.getDnses();
             mGateway = source.getGateway();
+        } else {
+            clear();
         }
     }
 

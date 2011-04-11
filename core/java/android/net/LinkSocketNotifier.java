@@ -31,7 +31,7 @@ public interface LinkSocketNotifier {
      * If a new LinkSocket is created, it is important to close the
      * old LinkSocket once it is no longer in use.
      *
-     * @param socket the LinkSocket whose connection could be improved
+     * @param socket the original LinkSocket whose connection could be improved
      */
     public void onBetterLinkAvailable(LinkSocket socket);
 
