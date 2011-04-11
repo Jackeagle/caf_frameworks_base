@@ -350,6 +350,10 @@ public:
     // Value for KEY_FOCUS_DISTANCES.
     static const char FOCUS_DISTANCE_INFINITY[];
 
+    // DENOISE
+    static const char KEY_DENOISE[];
+    static const char KEY_SUPPORTED_DENOISE[];
+
     //Selectable zone AF.
     static const char KEY_SELECTABLE_ZONE_AF[];
     static const char KEY_SUPPORTED_SELECTABLE_ZONE_AF[];
@@ -508,6 +512,10 @@ public:
     // Values for SKIN TONE ENHANCEMENT
     static const char SKIN_TONE_ENHANCEMENT_ENABLE[] ;
     static const char SKIN_TONE_ENHANCEMENT_DISABLE[] ;
+
+    // Values for Denoise
+    static const char DENOISE_OFF[] ;
+    static const char DENOISE_ON[] ;
 
     // Values for auto exposure settings.
     static const char SELECTABLE_ZONE_AF_AUTO[];

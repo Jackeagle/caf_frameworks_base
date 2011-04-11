@@ -90,6 +90,8 @@ const char CameraParameters::KEY_LENSSHADE[] = "lensshade";
 const char CameraParameters::KEY_SUPPORTED_LENSSHADE_MODES[] = "lensshade-values";
 const char CameraParameters::KEY_AUTO_EXPOSURE[] = "auto-exposure";
 const char CameraParameters::KEY_SUPPORTED_AUTO_EXPOSURE[] = "auto-exposure-values";
+const char CameraParameters::KEY_DENOISE[] = "denoise";
+const char CameraParameters::KEY_SUPPORTED_DENOISE[] = "denoise-values";
 const char CameraParameters::KEY_SELECTABLE_ZONE_AF[] = "selectable-zone-af";
 const char CameraParameters::KEY_SUPPORTED_SELECTABLE_ZONE_AF[] = "selectable-zone-af-values";
 const char CameraParameters::KEY_FACE_DETECTION[] = "face-detection";
@@ -230,6 +232,9 @@ const char CameraParameters::KEY_MAX_CONTRAST[] = "max-contrast";
 const char CameraParameters::KEY_SATURATION[] = "saturation";
 const char CameraParameters::KEY_MAX_SATURATION[] = "max-saturation";
 
+//Values for DENOISE
+const char CameraParameters::DENOISE_OFF[] = "denoise-off";
+const char CameraParameters::DENOISE_ON[] = "denoise-on";
 // Values for selectable zone af Settings
 const char CameraParameters::SELECTABLE_ZONE_AF_AUTO[] = "auto";
 const char CameraParameters::SELECTABLE_ZONE_AF_SPOT_METERING[] = "spot-metering";
