@@ -249,7 +249,8 @@ private:
     GGLFormat const* pixelFormatTable;
     
     struct Rect {
-        inline Rect() { };
+        inline Rect()
+            : left(0), top(0), right(0), bottom(0)  { };
         inline Rect(int32_t w, int32_t h)
             : left(0), top(0), right(w), bottom(h) { }
         inline Rect(int32_t l, int32_t t, int32_t r, int32_t b)
@@ -569,10 +570,12 @@ EGLBoolean egl_window_surface_v2_t::swapBuffers()
     if (!dirtyRegion.isEmpty()) {
         dirtyRegion.andSelf(Rect(buffer->width, buffer->height));
         if (previousBuffer) {
-            for (int i = 1; i < (numFramebuffers - 1); i++) {
-                oldDirtyRegion[i].orSelf(oldDirtyRegion[i - 1]);
+            Rect consolidatedDirtyRegion;
+            for (int i = 0; i < (numFramebuffers - 1); i++) {
+                consolidatedDirtyRegion.orSelf(oldDirtyRegion[i]);
             }
-            const Region copyBack(Region::subtract(oldDirtyRegion[numFramebuffers - 2], dirtyRegion));
+            const Region copyBack
+                     (Region::subtract(consolidatedDirtyRegion, dirtyRegion));
             if (!copyBack.isEmpty()) {
                 void* prevBits;
                 if (lock(previousBuffer, 
