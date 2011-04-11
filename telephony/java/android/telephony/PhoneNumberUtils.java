@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2006, 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,7 +129,8 @@ public class PhoneNumberUtils
 
         Uri uri = intent.getData();
         String scheme = uri.getScheme();
-        int subscription = intent.getIntExtra("subId",0);
+        int subscription = intent.getIntExtra("Subscription",
+                TelephonyManager.getDefaultSubscription());
 
         if (scheme.equals("tel") || scheme.equals("sip")) {
             return uri.getSchemeSpecificPart();
@@ -1351,7 +1352,8 @@ public class PhoneNumberUtils
         String vmNumber;
 
         try {
-            vmNumber = TelephonyManager.getDefault().getVoiceMailNumber();
+            int subscription = TelephonyManager.getDefault().getPreferredVoiceSubscription();
+            vmNumber = TelephonyManager.getDefault().getVoiceMailNumber(subscription);
         } catch (SecurityException ex) {
             return false;
         }
