@@ -83,6 +83,9 @@ protected:
 private:
     friend class MediaBufferGroup;
     friend class OMXDecoder;
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    friend class OMXCodec;
+#endif
 
     // For use by OMXDecoder, reference count must be 1, drop reference
     // count to 0 without signalling the observer.

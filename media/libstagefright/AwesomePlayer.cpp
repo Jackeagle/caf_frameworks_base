@@ -89,6 +89,12 @@ struct AwesomeRemoteRenderer : public AwesomeRenderer {
         }
     }
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {
+        return mTarget->setCallback(cb, cookie);
+    }
+#endif
+
 private:
     sp<IOMXRenderer> mTarget;
 
@@ -222,6 +228,13 @@ void AwesomeLocalRenderer::init(
     }
 }
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+static void releaseRenderedBufferCallback(const void* mem, void *cookie) {
+    AwesomePlayer *ap = static_cast<AwesomePlayer *>(cookie);
+    ap->releaseRenderedBuffer(mem);
+}
+#endif
+
 AwesomePlayer::AwesomePlayer()
     : mQueueStarted(false),
       mTimeSource(NULL),
@@ -229,7 +242,11 @@ AwesomePlayer::AwesomePlayer()
       mAudioPlayer(NULL),
       mFlags(0),
       mExtractorFlags(0),
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+      mBufferReleaseCallbackSet(false),
+#else
       mLastVideoBuffer(NULL),
+#endif
       mVideoBuffer(NULL),
       mSuspensionState(NULL) {
     CHECK_EQ(mClient.connect(), OK);
@@ -443,10 +460,24 @@ void AwesomePlayer::reset_l() {
 
     mVideoRenderer.clear();
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    if (mBuffersWithRenderer.size()) {
+        unsigned int i;
+        unsigned int sz = mBuffersWithRenderer.size();
+
+        for(i = 0; i < sz; i++){
+            mBuffersWithRenderer[i]->release();
+        }
+        for(i = 0; i < sz; i++){
+            mBuffersWithRenderer.pop();
+        }
+    }
+#else
     if (mLastVideoBuffer) {
         mLastVideoBuffer->release();
         mLastVideoBuffer = NULL;
     }
+#endif
 
     if (mVideoBuffer) {
         mVideoBuffer->release();
@@ -636,10 +667,24 @@ void AwesomePlayer::partial_reset_l() {
 
     mVideoRenderer.clear();
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    if (mBuffersWithRenderer.size()) {
+        unsigned int i;
+        unsigned int sz = mBuffersWithRenderer.size();
+
+        for(i = 0; i < sz; i++){
+            mBuffersWithRenderer[i]->release();
+        }
+        for(i = 0; i < sz; i++){
+            mBuffersWithRenderer.pop();
+        }
+    }
+#else
     if (mLastVideoBuffer) {
         mLastVideoBuffer->release();
         mLastVideoBuffer = NULL;
     }
+#endif
 
     if (mVideoBuffer) {
         mVideoBuffer->release();
@@ -839,6 +884,13 @@ void AwesomePlayer::initRenderer_l() {
                         decodedWidth, decodedHeight,
                         mVideoWidth, mVideoHeight,
                         rotationDegrees));
+
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+            if (!strncmp("OMX.PV", component, 6)) {
+                mBufferReleaseCallbackSet = mVideoRenderer->setCallback(releaseRenderedBufferCallback, this);
+                mVideoRenderer->setCallback(releaseRenderedBufferCallback, this);
+            }
+#endif
         } else {
             // Other decoders are instantiated locally and as a consequence
             // allocate their buffers in local address space.
@@ -1133,10 +1185,24 @@ void AwesomePlayer::onVideoEvent() {
     mVideoEventPending = false;
 
     if (mSeeking) {
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+        if (mBuffersWithRenderer.size()) {
+            unsigned int i;
+            unsigned int sz = mBuffersWithRenderer.size();
+
+            for(i = 0; i < sz; i++){
+                mBuffersWithRenderer[i]->release();
+            }
+            for(i = 0; i < sz; i++){
+                mBuffersWithRenderer.pop();
+            }
+        }
+#else
         if (mLastVideoBuffer) {
             mLastVideoBuffer->release();
             mLastVideoBuffer = NULL;
         }
+#endif
 
         if (mVideoBuffer) {
             mVideoBuffer->release();
@@ -1268,15 +1334,30 @@ void AwesomePlayer::onVideoEvent() {
         initRenderer_l();
     }
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    /*the buffer needs to be pushed to local database before calling render.
+    * This is required to release the buffer back to Video source if the
+    * buffer can't be queued to the DSS
+    */
+    mBuffersWithRenderer.push(mVideoBuffer);
+#endif
+
     if (mVideoRenderer != NULL) {
         mVideoRenderer->render(mVideoBuffer);
     }
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    if ((!mBufferReleaseCallbackSet) && (mBuffersWithRenderer.size())) {
+        mBuffersWithRenderer[0]->release();
+        mBuffersWithRenderer.removeAt(0);
+    }
+#else
     if (mLastVideoBuffer) {
         mLastVideoBuffer->release();
         mLastVideoBuffer = NULL;
     }
     mLastVideoBuffer = mVideoBuffer;
+#endif
     mVideoBuffer = NULL;
 
     postVideoEvent_l();
@@ -1696,7 +1777,11 @@ status_t AwesomePlayer::suspend() {
     Mutex::Autolock autoLock(mLock);
 
     if (mSuspensionState != NULL) {
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+        if (mBuffersWithRenderer.size() == 0) {
+#else
         if (mLastVideoBuffer == NULL) {
+#endif
             //go into here if video is suspended again
             //after resuming without being played between
             //them
@@ -1731,20 +1816,38 @@ status_t AwesomePlayer::suspend() {
     state->mFlags = mFlags & (PLAYING | AUTO_LOOPING | LOOPING | AT_EOS);
     getPosition(&state->mPositionUs);
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    if (mBuffersWithRenderer.size()) {
+        size_t size = mBuffersWithRenderer[0]->range_length();
+#else
     if (mLastVideoBuffer) {
         size_t size = mLastVideoBuffer->range_length();
+#endif
 
         if (size) {
             int32_t unreadable;
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+            if (!mBuffersWithRenderer[0]->meta_data()->findInt32(
+                        kKeyIsUnreadable, &unreadable)
+                    || unreadable == 0) {
+#else
             if (!mLastVideoBuffer->meta_data()->findInt32(
                         kKeyIsUnreadable, &unreadable)
                     || unreadable == 0) {
+#endif
                 state->mLastVideoFrameSize = size;
                 state->mLastVideoFrame = malloc(size);
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+                memcpy(state->mLastVideoFrame,
+                        (const uint8_t *)mBuffersWithRenderer[0]->data()
+                            + mBuffersWithRenderer[0]->range_offset(),
+                       size);
+#else
                 memcpy(state->mLastVideoFrame,
                        (const uint8_t *)mLastVideoBuffer->data()
                             + mLastVideoBuffer->range_offset(),
                        size);
+#endif
 
                 state->mVideoWidth = mVideoWidth;
                 state->mVideoHeight = mVideoHeight;
@@ -1840,6 +1943,26 @@ void AwesomePlayer::postAudioEOS() {
 void AwesomePlayer::postAudioSeekComplete() {
     postCheckAudioStatusEvent_l();
 }
+
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+void AwesomePlayer::releaseRenderedBuffer(const void* mem) {
+    bool buffer_released = false;
+    unsigned int i = 0;
+
+    for (i = 0; i < mBuffersWithRenderer.size(); i++) {
+        if (mBuffersWithRenderer[i]->data() == mem) {
+            mBuffersWithRenderer[i]->release();
+            mBuffersWithRenderer.removeAt(i);
+            buffer_released = true;
+            break;
+        }
+    }
+
+    if (buffer_released == false) {
+        LOGD("Overlay returned wrong buffer address(%p). This message is harmless if a seek just happened.", mem);
+    }
+}
+#endif
 
 }  // namespace android
 

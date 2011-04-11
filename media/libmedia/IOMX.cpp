@@ -763,6 +763,10 @@ public:
         // so that the caller knows when to recycle the buffer.
         remote()->transact(RENDERER_RENDER, data, &reply);
     }
+
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {return false;}
+#endif
 };
 
 IMPLEMENT_META_INTERFACE(OMXRenderer, "android.hardware.IOMXRenderer");

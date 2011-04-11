@@ -1758,6 +1758,16 @@ void OMXCodec::on_message(const omx_message &msg) {
             CHECK(i < buffers->size());
             BufferInfo *info = &buffers->editItemAt(i);
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+            // Actual data can be movable, try fix MediaBuffer!
+            if (info->mMediaBuffer && info->mMediaBuffer->data() &&
+                (info->mMediaBuffer->data() != msg.u.extended_buffer_data.data_ptr)) {
+                CODEC_LOGV("FILL_BUFFER_DONE: Actual data mismatch at %p, fix MediaBuffer.mData",
+                        info->mMediaBuffer);
+                info->mMediaBuffer->mData = msg.u.extended_buffer_data.data_ptr;
+            }
+#endif
+
             if (!info->mOwnedByComponent) {
                 LOGW("We already own output buffer %p, yet received "
                      "a FILL_BUFFER_DONE.", buffer);

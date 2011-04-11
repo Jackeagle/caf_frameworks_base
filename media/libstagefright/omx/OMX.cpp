@@ -446,6 +446,12 @@ struct SharedVideoRenderer : public VideoRenderer {
         return mObj->render(data, size, platformPrivate);
     }
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {
+        return mObj->setCallback(cb, cookie);
+    }
+#endif
+
 private:
     void *mLibHandle;
     VideoRenderer *mObj;
@@ -547,6 +553,12 @@ void OMXRenderer::render(IOMX::buffer_id buffer) {
             header->nFilledLen,
             header->pPlatformPrivate);
 }
+
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+bool OMXRenderer::setCallback(release_rendered_buffer_callback cb, void *cookie) {
+    return mImpl->setCallback(cb, cookie);
+}
+#endif
 
 }  // namespace android
 

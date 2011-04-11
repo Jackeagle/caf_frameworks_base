@@ -182,11 +182,18 @@ public:
     virtual void onMessage(const omx_message &msg) = 0;
 };
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+typedef void (*release_rendered_buffer_callback)(const void* mem, void* cookie);
+#endif
+
 class IOMXRenderer : public IInterface {
 public:
     DECLARE_META_INTERFACE(OMXRenderer);
 
     virtual void render(IOMX::buffer_id buffer) = 0;
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) = 0;
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////

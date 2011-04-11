@@ -32,6 +32,10 @@ public:
 
     virtual void render(IOMX::buffer_id buffer);
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie);
+#endif
+
 private:
     VideoRenderer *mImpl;
 

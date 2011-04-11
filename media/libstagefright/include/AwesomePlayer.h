@@ -26,6 +26,9 @@
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/TimeSource.h>
 #include <utils/threads.h>
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+#include <utils/Vector.h>
+#endif
 
 namespace android {
 
@@ -45,6 +48,9 @@ struct AwesomeRenderer : public RefBase {
     AwesomeRenderer() {}
 
     virtual void render(MediaBuffer *buffer) = 0;
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {return false;}
+#endif
 
 private:
     AwesomeRenderer(const AwesomeRenderer &);
@@ -94,6 +100,10 @@ struct AwesomePlayer {
 
     void postAudioEOS();
     void postAudioSeekComplete();
+
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    void releaseRenderedBuffer(const void* mem);
+#endif
 
 private:
     friend struct AwesomeEvent;
@@ -178,7 +188,12 @@ private:
     void postCheckAudioStatusEvent_l();
     status_t play_l();
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    Vector<MediaBuffer*> mBuffersWithRenderer;
+    bool mBufferReleaseCallbackSet;
+#else
     MediaBuffer *mLastVideoBuffer;
+#endif
     MediaBuffer *mVideoBuffer;
 
     sp<NuHTTPDataSource> mConnectingDataSource;

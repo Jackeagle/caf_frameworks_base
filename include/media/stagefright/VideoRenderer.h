@@ -22,12 +22,20 @@
 
 namespace android {
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+typedef void (*release_rendered_buffer_callback)(const void* mem, void *cookie);
+#endif
+
 class VideoRenderer {
 public:
     virtual ~VideoRenderer() {}
 
     virtual void render(
             const void *data, size_t size, void *platformPrivate) = 0;
+
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {return false;}
+#endif
 
 protected:
     VideoRenderer() {}
