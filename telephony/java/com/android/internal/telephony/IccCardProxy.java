@@ -43,7 +43,6 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OP
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_SIM_STATE;
-import static com.android.internal.telephony.TelephonyProperties.PROPERTY_SIM_SUB_STATE;
 
 /*
  * The Phone App UI and the external world assumes that there is only one icc card,
@@ -103,6 +102,9 @@ public class IccCardProxy extends Handler implements IccCard {
         cm.registerForOn(this,EVENT_RADIO_ON, null);
         cm.registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, null);
         resetProperties();
+        for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+            TelephonyManager.setTelephonyProperty(PROPERTY_SIM_STATE, i, "ABSENT");
+        }
     }
 
     public void dispose() {
@@ -332,7 +334,7 @@ public class IccCardProxy extends Handler implements IccCard {
     private void updateStateProperty() {
         if (mSubscriptionData != null) {
             TelephonyManager.setTelephonyProperty
-                (PROPERTY_SIM_SUB_STATE, mSubscriptionData.subId, getState().toString());
+                (PROPERTY_SIM_STATE, mSubscriptionData.subId, getState().toString());
         }
     }
 
