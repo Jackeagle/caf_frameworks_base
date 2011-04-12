@@ -16,6 +16,7 @@
 */
 
 //#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
 #define LOG_TAG "MediaPlayer"
 #include <utils/Log.h>
 
@@ -136,7 +137,7 @@ status_t MediaPlayer::setDataSource(const sp<IMediaPlayer>& player)
 status_t MediaPlayer::setDataSource(
         const char *url, const KeyedVector<String8, String8> *headers)
 {
-    LOGV("setDataSource(%s)", url);
+    LOGD("setDataSource(%s)", url);
     status_t err = BAD_VALUE;
     if (url != NULL) {
         const sp<IMediaPlayerService>& service(getMediaPlayerService());
@@ -151,7 +152,7 @@ status_t MediaPlayer::setDataSource(
 
 status_t MediaPlayer::setDataSource(int fd, int64_t offset, int64_t length)
 {
-    LOGV("setDataSource(%d, %lld, %lld)", fd, offset, length);
+    LOGD("setDataSource(%d, %lld, %lld)", fd, offset, length);
     status_t err = UNKNOWN_ERROR;
     const sp<IMediaPlayerService>& service(getMediaPlayerService());
     if (service != 0) {
@@ -273,7 +274,7 @@ status_t MediaPlayer::prepareAsync()
 
 status_t MediaPlayer::start()
 {
-    LOGV("start");
+    LOGD("start state %d",mCurrentState);
     Mutex::Autolock _l(mLock);
     if (mCurrentState & MEDIA_PLAYER_STARTED)
         return NO_ERROR;
@@ -299,7 +300,7 @@ status_t MediaPlayer::start()
 
 status_t MediaPlayer::stop()
 {
-    LOGV("stop");
+    LOGD("stop state %d",mCurrentState);
     Mutex::Autolock _l(mLock);
     if (mCurrentState & MEDIA_PLAYER_STOPPED) return NO_ERROR;
     if ( (mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER_STARTED | MEDIA_PLAYER_PREPARED |
@@ -318,7 +319,7 @@ status_t MediaPlayer::stop()
 
 status_t MediaPlayer::pause()
 {
-    LOGV("pause");
+    LOGD("pause state %d",mCurrentState);
     Mutex::Autolock _l(mLock);
     if (mCurrentState & (MEDIA_PLAYER_PAUSED|MEDIA_PLAYER_PLAYBACK_COMPLETE))
         return NO_ERROR;
@@ -409,7 +410,7 @@ status_t MediaPlayer::getDuration(int *msec)
 
 status_t MediaPlayer::seekTo_l(int msec)
 {
-    LOGV("seekTo %d", msec);
+    LOGD("seekTo %d state %d", msec,mCurrentState);
     if ((mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER_STARTED | MEDIA_PLAYER_PREPARED | MEDIA_PLAYER_PAUSED |  MEDIA_PLAYER_PLAYBACK_COMPLETE) ) ) {
         if ( msec < 0 ) {
             LOGW("Attempt to seek to invalid position: %d", msec);
@@ -446,7 +447,7 @@ status_t MediaPlayer::seekTo(int msec)
 
 status_t MediaPlayer::reset()
 {
-    LOGV("reset");
+    LOGD("reset state %d",mCurrentState);
     Mutex::Autolock _l(mLock);
     mLoop = false;
     if (mCurrentState == MEDIA_PLAYER_IDLE) return NO_ERROR;

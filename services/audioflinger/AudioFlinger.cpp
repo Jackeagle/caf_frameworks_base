@@ -19,6 +19,7 @@
 
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
 
 #include <math.h>
 #include <signal.h>
@@ -360,7 +361,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(
                 *sessionId = lSessionId;
             }
         }
-        LOGV("createTrack() lSessionId: %d", lSessionId);
+        LOGD("createTrack() lSessionId: %d", lSessionId);
 
         track = thread->createTrack_l(client, streamType, sampleRate, format,
                 channelCount, frameCount, sharedBuffer, lSessionId, &lStatus);
@@ -470,7 +471,7 @@ status_t AudioFlinger::setMasterVolume(float value)
 status_t AudioFlinger::setMode(int mode)
 {
     status_t ret;
-
+    LOGD("setMode(%d)", mode);
     // check calling permissions
     if (!settingsAllowed()) {
         return PERMISSION_DENIED;
@@ -2013,7 +2014,7 @@ int AudioFlinger::MixerThread::getTrackName_l()
 // deleteTrackName_l() must be called with ThreadBase::mLock held
 void AudioFlinger::MixerThread::deleteTrackName_l(int name)
 {
-    LOGV("remove track (%d) and delete from mixer", name);
+    LOGD("remove track (%d) and delete from mixer", name);
     mAudioMixer->deleteTrackName(name);
 }
 
@@ -3055,7 +3056,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             mName = playbackThread->getTrackName_l();
             mMainBuffer = playbackThread->mixBuffer();
         }
-        LOGV("Track constructor name %d, calling thread %d", mName, IPCThreadState::self()->getCallingPid());
+        LOGD("Track constructor name %d, calling thread %d", mName, IPCThreadState::self()->getCallingPid());
         if (mName < 0) {
             LOGE("no more track names available");
         }
@@ -3185,7 +3186,7 @@ bool AudioFlinger::PlaybackThread::Track::isReady() const {
 status_t AudioFlinger::PlaybackThread::Track::start()
 {
     status_t status = NO_ERROR;
-    LOGV("start(%d), calling thread %d session %d",
+    LOGD("start(%d), calling thread %d session %d",
             mName, IPCThreadState::self()->getCallingPid(), mSessionId);
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
@@ -3222,7 +3223,7 @@ status_t AudioFlinger::PlaybackThread::Track::start()
 
 void AudioFlinger::PlaybackThread::Track::stop()
 {
-    LOGV("stop(%d), calling thread %d", mName, IPCThreadState::self()->getCallingPid());
+    LOGD("stop(%d), calling thread %d", mName, IPCThreadState::self()->getCallingPid());
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         Mutex::Autolock _l(thread->mLock);
@@ -4155,7 +4156,7 @@ bool AudioFlinger::RecordThread::threadLoop()
 
 status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrack)
 {
-    LOGV("RecordThread::start");
+    LOGD("RecordThread::start");
     sp <ThreadBase> strongMe = this;
     status_t status = NO_ERROR;
     {
@@ -4205,7 +4206,7 @@ startError:
 }
 
 void AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
-    LOGV("RecordThread::stop");
+    LOGD("RecordThread::stop");
     sp <ThreadBase> strongMe = this;
     {
         AutoMutex lock(&mLock);

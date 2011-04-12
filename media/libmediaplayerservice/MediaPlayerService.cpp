@@ -22,6 +22,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_NIDEBUG 0
+#define LOG_NDDEBUG 0
 #define LOG_TAG "MediaPlayerService"
 #include <utils/Log.h>
 
@@ -844,7 +845,7 @@ sp<MediaPlayerBase> MediaPlayerService::Client::createPlayer(player_type playerT
 status_t MediaPlayerService::Client::setDataSource(
         const char *url, const KeyedVector<String8, String8> *headers)
 {
-    LOGV("setDataSource(%s)", url);
+    LOGD("setDataSource(%s)", url);
     if (url == NULL)
         return UNKNOWN_ERROR;
 
@@ -889,7 +890,7 @@ status_t MediaPlayerService::Client::setDataSource(
 
 status_t MediaPlayerService::Client::setDataSource(int fd, int64_t offset, int64_t length)
 {
-    LOGV("setDataSource fd=%d, offset=%lld, length=%lld", fd, offset, length);
+    LOGD("setDataSource fd=%d, offset=%lld, length=%lld", fd, offset, length);
     struct stat sb;
     int ret = fstat(fd, &sb);
     if (ret != 0) {
@@ -1044,7 +1045,7 @@ status_t MediaPlayerService::Client::start()
 
 status_t MediaPlayerService::Client::stop()
 {
-    LOGV("[%d] stop", mConnId);
+    LOGD("[%d] stop", mConnId);
     sp<MediaPlayerBase> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->stop();
@@ -1052,7 +1053,7 @@ status_t MediaPlayerService::Client::stop()
 
 status_t MediaPlayerService::Client::pause()
 {
-    LOGV("[%d] pause", mConnId);
+    LOGD("[%d] pause", mConnId);
     sp<MediaPlayerBase> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->pause();
@@ -1098,7 +1099,7 @@ status_t MediaPlayerService::Client::getDuration(int *msec)
 
 status_t MediaPlayerService::Client::seekTo(int msec)
 {
-    LOGV("[%d] seekTo(%d)", mConnId, msec);
+    LOGD("[%d] seekTo(%d)", mConnId, msec);
     sp<MediaPlayerBase> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->seekTo(msec);
@@ -1530,7 +1531,7 @@ status_t MediaPlayerService::AudioOutput::open(
 
 void MediaPlayerService::AudioOutput::start()
 {
-    LOGV("start");
+    LOGD("start");
     if (mTrack) {
         mTrack->setVolume(mLeftVolume, mRightVolume);
         mTrack->setAuxEffectSendLevel(mSendLevel);
@@ -1554,19 +1555,19 @@ ssize_t MediaPlayerService::AudioOutput::write(const void* buffer, size_t size)
 
 void MediaPlayerService::AudioOutput::stop()
 {
-    LOGV("stop");
+    LOGD("stop");
     if (mTrack) mTrack->stop();
 }
 
 void MediaPlayerService::AudioOutput::flush()
 {
-    LOGV("flush");
+    LOGD("flush");
     if (mTrack) mTrack->flush();
 }
 
 void MediaPlayerService::AudioOutput::pause()
 {
-    LOGV("pause");
+    LOGD("pause");
     if (mTrack) mTrack->pause();
 }
 

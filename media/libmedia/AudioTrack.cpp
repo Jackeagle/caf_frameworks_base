@@ -18,6 +18,7 @@
 
 
 //#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
 #define LOG_TAG "AudioTrack"
 
 #include <stdint.h>
@@ -391,7 +392,7 @@ void AudioTrack::start()
     sp<AudioTrackThread> t = mAudioTrackThread;
     status_t status;
 
-    LOGV("start %p", this);
+    LOGD("start %p", this);
     if (t != 0) {
         if (t->exitPending()) {
             if (t->requestExitAndWait() == WOULD_BLOCK) {
@@ -452,7 +453,7 @@ void AudioTrack::stop()
 {
     sp<AudioTrackThread> t = mAudioTrackThread;
 
-    LOGV("stop %p", this);
+    LOGD("stop %p", this);
     if (t != 0) {
         t->mLock.lock();
     }
@@ -510,7 +511,7 @@ void AudioTrack::flush()
 
 void AudioTrack::pause()
 {
-    LOGV("pause");
+    LOGD("pause");
 
     if ( mAudioSession != -1 ) {
         if ( NO_ERROR != AudioSystem::pauseSession(mAudioSession,
@@ -824,7 +825,7 @@ status_t AudioTrack::createTrack(
             frameCount = sharedBuffer->size()/channelCount/sizeof(int16_t);
         }
     }
-
+ LOGD("Request AudioFlinger to create track");
     sp<IAudioTrack> track = audioFlinger->createTrack(getpid(),
                                                       streamType,
                                                       sampleRate,
