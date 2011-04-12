@@ -53,7 +53,7 @@ public class UiccManager extends Handler{
     CommandsInterface[] mCi;
     Context mContext;
     UiccCard[] mUiccCards;
-    private boolean mRadioOn = false;
+    private boolean[] mRadioOn = {false, false};
 
     private RegistrantList mIccChangedRegistrants = new RegistrantList();
 
@@ -100,12 +100,16 @@ public class UiccManager extends Handler{
 
         switch (msg.what) {
             case EVENT_RADIO_ON:
-                mRadioOn = true;
+                if (index < 0 || index >= mRadioOn.length) {
+                    Log.d(LOG_TAG, "EVENT_RADIO_ON: Invalid index - " + index);
+                    break;
+                }
+                mRadioOn[index] = true;
                 Log.d(LOG_TAG, "Radio on -> Forcing sim status update on index : " + index);
                 sendMessage(obtainMessage(EVENT_ICC_STATUS_CHANGED, index));
                 break;
             case EVENT_ICC_STATUS_CHANGED:
-                if (index < mCi.length && mRadioOn) {
+                if (index < mCi.length && mRadioOn[index]) {
                     Log.d(LOG_TAG, "Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus on index"
                             + index);
                     mCi[index].getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE, index));
@@ -136,8 +140,12 @@ public class UiccManager extends Handler{
                 }
                 break;
             case EVENT_RADIO_OFF_OR_UNAVAILABLE:
+                if (index < 0 || index >= mRadioOn.length) {
+                    Log.d(LOG_TAG, "EVENT_RADIO_OFF_OR_UNAVAILABLE: Invalid index - " + index);
+                    break;
+                }
                 Log.d(LOG_TAG, "EVENT_RADIO_OFF_OR_UNAVAILABLE: index = " + index);
-                mRadioOn = false;
+                mRadioOn[index] = false;
                 disposeCard(index);
                 break;
             default:
