@@ -629,8 +629,8 @@ public interface CommandsInterface {
      * @param what User-defined message code.
      * @param obj User object.
      */
-    void registerForSubscriptionReady(Handler h, int what, Object obj);
-    void unregisterForSubscriptionReady(Handler h);
+    void registerForSubscriptionStatusChanged(Handler h, int what, Object obj);
+    void unregisterForSubscriptionStatusChanged(Handler h);
 
 
     /**

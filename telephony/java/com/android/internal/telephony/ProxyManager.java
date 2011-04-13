@@ -52,8 +52,8 @@ public class ProxyManager extends Handler {
     //***** Constants
 
     // Subscription activation status
-    public static final int SUB_ACTIVATE = 0;
-    public static final int SUB_DEACTIVATE = 1;
+    public static final int SUB_DEACTIVATE = 0;
+    public static final int SUB_ACTIVATE = 1;
     public static final int SUB_ACTIVATED = 2;
     public static final int SUB_DEACTIVATED = 3;
     public static final int SUB_INVALID = 4;
@@ -81,11 +81,12 @@ public class ProxyManager extends Handler {
     static final int EVENT_GET_ICCID_DONE = 6;
     static final int EVENT_RADIO_OFF_OR_NOT_AVAILABLE = 7;
     static final int EVENT_RADIO_ON = 8;
-    static final int EVENT_SUBSCRIPTION_READY = 9;
+    static final int EVENT_SUBSCRIPTION_STATUS_CHANGED = 9;
     static final int EVENT_SIM_REFRESH = 10;
     static final int EVENT_CLEANUP_DATA_CONNECTION_DONE = 11;
     static final int EVENT_UPDATE_UICC_STATUS = 12;
     static final int EVENT_SET_SUBSCRIPTION_COMPLETED = 13;
+    static final int EVENT_ALL_DATA_DISCONNECTED = 15;
 
     //***** Class Variables
     private static ProxyManager sProxyManager;
@@ -234,7 +235,7 @@ public class ProxyManager extends Handler {
             for (int i = 0; i < mCi.length; i++) {
                 // Register for Subscription ready event for both the subscriptions.
                 Integer sub = new Integer(i);
-                mCi[i].registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, sub);
+                mCi[i].registerForSubscriptionStatusChanged(this, EVENT_SUBSCRIPTION_STATUS_CHANGED, sub);
 
                 // Register for SIM Refresh events
                 Integer slot = new Integer(i);
@@ -491,35 +492,14 @@ public class ProxyManager extends Handler {
                 onUpdateUiccStatus(((String)msg.obj), (int)msg.arg1);
                 break;
 
-            case EVENT_SUBSCRIPTION_READY:
-                ar = (AsyncResult)msg.obj;
-                Integer subscription = (Integer)ar.userObj;
-                int sub = subscription.intValue();
-                Log.d(LOG_TAG, "SUBSCRIPTION READY event on SUB:" + sub);
-                mSubscriptionReady[sub] = true;
+            case EVENT_SUBSCRIPTION_STATUS_CHANGED:
+                Log.d(LOG_TAG, "ProxyManager EVENT_SUBSCRIPTION_STATUS_CHANGED");
+                handleSubscriptionStatusChanged((AsyncResult)msg.obj);
+                break;
 
-                if (!mDdsSet) {
-                    // Set Data Subscription Source only when subscription becomes READY.
-                    if (sub == mCurrentDds) {
-                        // Set data sub only if the sub is activated.
-                        if (getCurrentSubscriptions()
-                                .subscription[mCurrentDds].subStatus == SUB_ACTIVATED) {
-                            String str = Integer.toString(mCurrentDds);
-                            Message callback = Message.obtain(this,
-                                    EVENT_SET_DATA_SUBSCRIPTION_DONE, str);
-                            // Set Data Subscription preference at RIL
-                            Log.d(LOG_TAG, "setDataSubscription on " + mCurrentDds);
-                            mCi[mCurrentDds].setDataSubscription(callback);
-                            mDdsSet = true;
-                            // Set mQueuedDds so that when the set data sub src is done, it will
-                            // update the system property and enable the data connectivity.
-                            mQueuedDds = mCurrentDds;
-                        } else {
-                            Log.d(LOG_TAG, "User prefered data subsciption " + mCurrentDds
-                                    + " is not ACTIVATED");
-                        }
-                    }
-                }
+            case EVENT_ALL_DATA_DISCONNECTED:
+                Log.d(LOG_TAG, "ProxyManager EVENT_ALL_DATA_DISCONNECTED");
+                handleAllDataDisconnected((AsyncResult)msg.obj);
                 break;
 
             case EVENT_GET_ICCID_DONE:
@@ -602,6 +582,75 @@ public class ProxyManager extends Handler {
                     mSetDdsCompleteMsg = null;
                 }
                 break;
+        }
+    }
+
+    /**
+     * Processes the SUBSCRIPTION_STATUS_CHANGED notification.
+     * Updates the subscription ready state and set the DDS.  If the subscription
+     * is deactivated, then update the subscription status to DEACTIVATED.
+     * In case of DDS, wait for the data disconnected indication from Modem.
+     */
+    private void handleSubscriptionStatusChanged(AsyncResult ar) {
+        Integer sub = (Integer)ar.userObj;
+        int actStatus = ((int[])ar.result)[0];
+        Log.d(LOG_TAG, "handleSubscriptionStatusChanged sub = " + sub
+                + " actStatus = " + actStatus);
+
+        if (actStatus == 1) { // Subscription Activated
+            mSubscriptionReady[sub] = true;
+
+            if (!mDdsSet) {
+                // Set Data Subscription Source only when subscription becomes READY.
+                if (sub == mCurrentDds) {
+                    Log.d(LOG_TAG, "setDataSubscription on " + mCurrentDds);
+                    Message msgSetDdsDone = Message.obtain(this, EVENT_SET_DATA_SUBSCRIPTION_DONE,
+                            Integer.toString(mCurrentDds));
+                    // Set Data Subscription preference at RIL
+                    mCi[mCurrentDds].setDataSubscription(msgSetDdsDone);
+                    mDdsSet = true;
+                    // Set mQueuedDds so that when the set data sub src is done, it will
+                    // update the system property and enable the data connectivity.
+                    mQueuedDds = mCurrentDds;
+                }
+            }
+        } else {
+            // Subscription is deactivated from below layers.
+            // In case if this is DDS subscription, then wait for the all data disconnected
+            // indication from the lower layers to mark the subscription as deactivated.
+            mSubscriptionReady[sub] = false;
+            if (sub == mCurrentDds) {
+                Log.d(LOG_TAG, "Register for the all data disconnect");
+                PhoneProxy currentPhone = (PhoneProxy)mProxyPhones[sub];
+                currentPhone.registerForAllDataDisconnected(sProxyManager,
+                        EVENT_ALL_DATA_DISCONNECTED, new Integer(sub));
+            } else {
+                resetCurrentSubscription(sub);
+                // Update the subscription preferences
+                updateSubPreferences(getSelectedSubscriptions());
+            }
+        }
+    }
+
+    /**
+     * Processes the all data disconnected notification.
+     * This method invoked in case of modem initiated subscription deactivation.
+     * Subscription deactivated notification already received and all the data
+     * connections are cleaned up.  Now mark the subscription as DEACTIVATED and
+     * set the DDS to the available subscription.
+     */
+    private void handleAllDataDisconnected(AsyncResult ar) {
+        Integer sub = (Integer)ar.userObj;
+        Log.d(LOG_TAG, "handleAllDataDisconnected: sub = " + sub
+                + " - mSubscriptionReady[" + sub + "] = " + mSubscriptionReady[sub]);
+
+        PhoneProxy currentPhone = (PhoneProxy)mProxyPhones[sub];
+        currentPhone.unregisterForAllDataDisconnected(sProxyManager);
+
+        if (mSubscriptionReady[sub] == false) {
+            resetCurrentSubscription(sub);
+            // Update the subscription preferences
+            updateSubPreferences(getSelectedSubscriptions());
         }
     }
 

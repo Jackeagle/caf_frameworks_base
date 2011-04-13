@@ -1105,6 +1105,14 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.unregisterForT53AudioControlInfo(h);
     }
 
+    public void registerForAllDataDisconnected(Handler h, int what, Object obj) {
+        mActivePhone.registerForAllDataDisconnected(h, what, obj);
+    }
+
+    public void unregisterForAllDataDisconnected(Handler h) {
+        mActivePhone.unregisterForAllDataDisconnected(h);
+    }
+
     public void setOnEcbModeExitResponse(Handler h, int what, Object obj){
         mActivePhone.setOnEcbModeExitResponse(h,what,obj);
     }

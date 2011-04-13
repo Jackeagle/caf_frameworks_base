@@ -113,7 +113,7 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected static final int EVENT_SET_NETWORK_AUTOMATIC          = 30;
     protected static final int EVENT_ICC_RECORD_EVENTS              = 31;
     protected static final int EVENT_GET_MDN_DONE                   = 32;
-    protected static final int EVENT_SUBSCRIPTION_READY             = 33;
+    protected static final int EVENT_SUBSCRIPTION_STATUS_CHANGED    = 33;
 
     // Key used to read/write current CLIR setting
     public static final String CLIR_KEY = "clir_key";
@@ -985,6 +985,14 @@ public abstract class PhoneBase extends Handler implements Phone {
 
     public void unregisterForT53AudioControlInfo(Handler h) {
         mCM.unregisterForT53AudioControlInfo(h);
+    }
+
+    public void registerForAllDataDisconnected(Handler h, int what, Object obj) {
+        mDataConnection.registerForAllDataDisconnected(h, what, obj);
+    }
+
+    public void unregisterForAllDataDisconnected(Handler h) {
+        mDataConnection.unregisterForAllDataDisconnected(h);
     }
 
      public void setOnEcbModeExitResponse(Handler h, int what, Object obj){

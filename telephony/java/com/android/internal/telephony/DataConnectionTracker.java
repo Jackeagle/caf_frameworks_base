@@ -260,6 +260,8 @@ public abstract class DataConnectionTracker extends Handler {
     abstract public void update(CommandsInterface ci, Subscription subData);
     abstract public void setDataReadinessChecks(boolean checkConnectivity,
             boolean checkSubscription, boolean tryDataCalls);
+    abstract public void registerForAllDataDisconnected(Handler h, int what, Object obj);
+    abstract public void unregisterForAllDataDisconnected(Handler h);
 
     synchronized public int disableApnType(String type) {
 

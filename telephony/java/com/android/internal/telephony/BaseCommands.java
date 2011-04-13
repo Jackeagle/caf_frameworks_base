@@ -574,12 +574,12 @@ public abstract class BaseCommands implements CommandsInterface {
         mTetheredModeStateRegistrants.remove(h);
     }
 
-    public void registerForSubscriptionReady(Handler h, int what, Object obj) {
+    public void registerForSubscriptionStatusChanged(Handler h, int what, Object obj) {
         Registrant r = new Registrant (h, what, obj);
         mSubscriptionReadyRegistrants.add(r);
     }
 
-    public void unregisterForSubscriptionReady(Handler h) {
+    public void unregisterForSubscriptionStatusChanged(Handler h) {
         mSubscriptionReadyRegistrants.remove(h);
     }
 

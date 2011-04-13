@@ -186,7 +186,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         cm.setOnNITZTime(this, EVENT_NITZ_TIME, null);
         cm.setOnSignalStrengthUpdate(this, EVENT_SIGNAL_STRENGTH_UPDATE, null);
         cm.registerForCdmaPrlChanged(this, EVENT_CDMA_PRL_VERSION_CHANGED, null);
-        cm.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
+        cm.registerForSubscriptionStatusChanged(this, EVENT_SUBSCRIPTION_STATUS_CHANGED, null);
 
         mUiccManager = UiccManager.getInstance();
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
@@ -214,7 +214,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         cr.unregisterContentObserver(this.mAutoTimeObserver);
         mCdmaSSM.dispose(this);
         cm.unregisterForCdmaPrlChanged(this);
-        cm.unregisterForSubscriptionReady(this);
+        cm.unregisterForSubscriptionStatusChanged(this);
 
         //cleanup icc stuff
         mUiccManager.unregisterForIccChanged(this);
@@ -542,11 +542,19 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
             }
             break;
 
-        case EVENT_SUBSCRIPTION_READY:
-            // In case of multi-SIM, framework should wait for the subscription ready
-            // to send any request to RIL.  Otherwise it will return failure.
-            Log.d(LOG_TAG, "EVENT_SUBSCRIPTION_READY: get CDMA Subscription");
-            cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
+        case EVENT_SUBSCRIPTION_STATUS_CHANGED:
+            Log.d(LOG_TAG, "EVENT_SUBSCRIPTION_STATUS_CHANGED");
+            ar = (AsyncResult)msg.obj;
+            if (ar.exception == null) {
+                int actStatus = ((int[])ar.result)[0];
+                Log.d(LOG_TAG, "actStatus = " + actStatus);
+                if (actStatus == 1) { // Subscription Activated
+                    Log.d(LOG_TAG, "get CDMA Subscription");
+                    // In case of multi-SIM, framework should wait for the subscription ready
+                    // to send any request to RIL.  Otherwise it will return failure.
+                    cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
+                }
+            }
             break;
 
         default:

@@ -41,6 +41,7 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.IBinder;
 import android.os.ServiceManager;
+import android.os.RegistrantList;
 import android.os.RemoteException;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
@@ -203,6 +204,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
      * mDataCallList holds all the Data connection,
      */
     private ArrayList<DataConnection> mDataConnectionList;
+
+    private RegistrantList mAllDataDisconnectedRegistrants = new RegistrantList();
 
     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -770,10 +773,14 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         boolean isDataDormant = true; // will be set to false, if atleast one
                                       // data connection is not dormant.
 
+        int activeDataCallCount = 0;
+
         for (DataConnection dc: mDataConnectionList) {
 
             if (dc.isActive() == false) {
                 continue;
+            } else {
+                activeDataCallCount++;
             }
 
             DataCallState activeDC = getDataCallStateByCid(dcStates, dc.cid);
@@ -786,6 +793,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 //onUpdateDataConnections will be called when async reset returns.
                 dc.reset(obtainMessage(EVENT_DATA_CALL_DROPPED, c));
 
+                // Active call disconnected
+                activeDataCallCount--;
             } else if (activeDC.active == DATA_CONNECTION_ACTIVE_PH_LINK_INACTIVE) {
                 DataConnectionFailCause failCause = DataConnectionFailCause
                         .getDataConnectionDisconnectCause(activeDC.status);
@@ -799,6 +808,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 //onUpdateDataConnections will be called when async reset returns.
                 dc.reset(obtainMessage(EVENT_DATA_CALL_DROPPED, c));
 
+                // Active call disconnected
+                activeDataCallCount--;
             } else if (isIpAddrChanged(activeDC, dc)) {
                 /*
                 * TODO: Handle Gateway / DNS sever IP changes in a
@@ -837,6 +848,38 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             startNetStatPoll();
         }
         notifyDataActivity();
+
+        logv("onDataCallListChanged: - activeDataCallCount = " + activeDataCallCount);
+        if (activeDataCallCount == 0) {
+            logv("onDataCallListChanged: - Notify all data disconnect from modem.");
+            notifyAllDataDisconnected();
+        }
+    }
+
+    public void notifyAllDataDisconnected() {
+        mAllDataDisconnectedRegistrants.notifyRegistrants();
+    }
+
+    public void registerForAllDataDisconnected(Handler h, int what, Object obj) {
+        mAllDataDisconnectedRegistrants.addUnique(h, what, obj);
+
+        boolean anyDcActive = false;
+        for (DataConnection dc: mDataConnectionList) {
+            logd("DC = " + dc);
+            if (dc.isActive()) {
+                anyDcActive = true;
+            }
+        }
+
+        logd("anyDcActive = " + anyDcActive);
+        if (!anyDcActive) {
+            logd("notify All Data Disconnected");
+            mAllDataDisconnectedRegistrants.notifyRegistrants();
+        }
+    }
+
+    public void unregisterForAllDataDisconnected(Handler h) {
+        mAllDataDisconnectedRegistrants.remove(h);
     }
 
     void onTetheredModeStateChanged(AsyncResult ar) {
