@@ -176,14 +176,24 @@ public class Camera {
         public int facing;
 
         /**
-         * The mode of sensor: 2D or 3D
+         * The mode of sensor: 2D/3D/ZSL
          */
         public static final int CAMERA_SUPPORT_MODE_2D = 0x01;
 
         /**
-         * The mode of sensor: 2D or 3D
+         * The mode of sensor: 2D/3D/ZSL
          */
         public static final int CAMERA_SUPPORT_MODE_3D = 0x02;
+
+        /**
+         * The mode of sensor: 2D/3D/ZSL
+         */
+        public static final int CAMERA_SUPPORT_MODE_NONZSL = 0x04;
+
+        /**
+         * The mode of sensor: 2D/3D/ZSL
+         */
+        public static final int CAMERA_SUPPORT_MODE_ZSL = 0x08;
 
         public int mode;
 

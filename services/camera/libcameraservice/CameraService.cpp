@@ -925,6 +925,10 @@ status_t CameraService::Client::takePicture() {
                   CAMERA_MSG_RAW_IMAGE |
                   CAMERA_MSG_COMPRESSED_IMAGE);
 
+    CameraParameters params(mHardware->getParameters());
+    mNumSnapshots = params.getInt("num-snaps-per-shutter");
+    if(mNumSnapshots == 0) mNumSnapshots = 1;
+    LOGI("%s: mNumSnapshots = %d", __FUNCTION__, mNumSnapshots);
     return mHardware->takePicture();
 }
 
@@ -1295,7 +1299,9 @@ void CameraService::Client::handlePreviewData(const sp<IMemory>& mem) {
 
 // picture callback - postview image ready
 void CameraService::Client::handlePostview(const sp<IMemory>& mem) {
-    disableMsgType(CAMERA_MSG_POSTVIEW_FRAME);
+    if(mNumSnapshots > 0) mNumSnapshots--;
+    if(mNumSnapshots == 0)
+        disableMsgType(CAMERA_MSG_POSTVIEW_FRAME);
 
     sp<ICameraClient> c = mCameraClient;
     mLock.unlock();
@@ -1306,7 +1312,9 @@ void CameraService::Client::handlePostview(const sp<IMemory>& mem) {
 
 // picture callback - raw image ready
 void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
-    disableMsgType(CAMERA_MSG_RAW_IMAGE);
+    if(mNumSnapshots > 0) mNumSnapshots--;
+    if(mNumSnapshots == 0)
+        disableMsgType(CAMERA_MSG_RAW_IMAGE);
     ssize_t offset;
     size_t size;
     sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
@@ -1325,7 +1333,9 @@ void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
 
 // picture callback - compressed picture ready
 void CameraService::Client::handleCompressedPicture(const sp<IMemory>& mem) {
-    disableMsgType(CAMERA_MSG_COMPRESSED_IMAGE);
+    if(mNumSnapshots > 0) mNumSnapshots--;
+    if(mNumSnapshots == 0)
+        disableMsgType(CAMERA_MSG_COMPRESSED_IMAGE);
 
     sp<ICameraClient> c = mCameraClient;
     mLock.unlock();
