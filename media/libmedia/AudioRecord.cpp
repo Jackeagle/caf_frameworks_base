@@ -214,7 +214,6 @@ status_t AudioRecord::set(
     mInputSource = (uint8_t)inputSource;
     mFlags = flags;
     mInput = input;
-    mFirstread = false;
 
     return NO_ERROR;
 }
