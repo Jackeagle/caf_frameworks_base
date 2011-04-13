@@ -1759,6 +1759,9 @@ status_t OMXCodec::setVideoOutputFormat(
         format.nIndex = 0;
 #endif
 
+        CODEC_LOGV("Video O/P format.nIndex 0x%x",format.nIndex);
+        CODEC_LOGV("Video O/P format.eColorFormat 0x%x",format.eColorFormat);
+
         status_t err = mOMX->getParameter(
                 mNode, OMX_IndexParamVideoPortFormat,
                 &format, sizeof(format));
@@ -3940,6 +3943,10 @@ status_t OMXCodec::stop() {
 sp<MetaData> OMXCodec::getFormat() {
     Mutex::Autolock autoLock(mLock);
 
+    int32_t targetColorFormat;
+    if (mOutputFormat->findInt32(kKeyColorFormat, &targetColorFormat)) {
+        CODEC_LOGV("OMXCodec::getFormat targetColorFormat (OutPut) 0x%x",targetColorFormat);
+        }
     return mOutputFormat;
 }
 

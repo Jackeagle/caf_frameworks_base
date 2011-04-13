@@ -26,20 +26,26 @@ modification, are permitted provided that the following conditions are met:
  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --------------------------------------------------------------------------*/
 
+//#define LOG_NDEBUG 0
 #define LOG_TAG "NativeBuffer"
 #include <utils/Log.h>
+#include <cutils/properties.h>
 #include <gralloc_priv.h>
 #include <OMX_QCOMExtns.h>
 #include <media/stagefright/NativeBuffer.h>
 
 namespace android {
     NativeBuffer::NativeBuffer(int w, int h, int fmat, int fd, int size, int offset, int base):BASE() {
-        LOGV("Creating Native Buffer: E");
+        LOGV("Creating Native Buffer: 0x%x",fmat);
         width  = w;
         height = h;
         /*Handling very few cases for now. Should be sufficient for 7x30 and 8x60 */
-        if(fmat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) {
-            format = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
+        if(QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka == fmat) {
+                LOGV("Set the HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED ");
+                format = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
+        } else if (QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka == fmat){
+                LOGV("Set the HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO for 7x27");
+                format = HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO;
         } else {
             LOGE("Error translating color format. Defaulting to YUV420 semi planar");
             format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
