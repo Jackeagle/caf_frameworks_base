@@ -208,6 +208,7 @@ private:
         // is found to be disabled. It returns true if mLock is grabbed.
         bool                    lockIfMessageWanted(int32_t msgType);
         void                    handleLiveShot(const sp<IMemory>& mem);
+        int mNumSnapshots;
     };
 };
 
