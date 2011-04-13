@@ -472,6 +472,14 @@ void CameraParameters::getSupportedPreviewSizes(Vector<Size> &sizes) const
     parseSizesList(previewSizesStr, sizes);
 }
 
+
+void CameraParameters::setPreviewFpsRange(int minFPS, int maxFPS)
+{
+    char str[32];
+    sprintf(str,"%d,%d",minFPS,maxFPS);
+    set(KEY_PREVIEW_FPS_RANGE,str);
+}
+
 void CameraParameters::setPreviewFrameRate(int fps)
 {
     set(KEY_PREVIEW_FRAME_RATE, fps);

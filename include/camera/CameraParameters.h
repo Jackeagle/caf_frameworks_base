@@ -37,7 +37,19 @@ struct Size {
         height = h;
     }
 };
+struct FPSRange{
+    int minFPS;
+    int maxFPS;
 
+    FPSRange(){
+        minFPS=0;
+        maxFPS=0;
+    };
+    FPSRange(int min,int max){
+        minFPS=min;
+        maxFPS=max;
+   };
+};
 class CameraParameters
 {
 public:
@@ -548,6 +560,7 @@ public:
     };
     int getOrientation() const;
     void setOrientation(int orientation);
+    void setPreviewFpsRange(int minFPS,int maxFPS);
 
 
 private:
