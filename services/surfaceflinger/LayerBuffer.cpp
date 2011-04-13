@@ -130,6 +130,13 @@ void LayerBuffer::onQueueBuf()
     source->onQueueBuf();
 }
 
+void LayerBuffer::setDirtyQueueSignal()
+{
+  sp<Source> source(getSource());
+  if (source != 0)
+    source->setDirtyQueueSignal();
+}
+
 void LayerBuffer::postBuffer(ssize_t offset)
 {
     sp<Source> source(getSource());
