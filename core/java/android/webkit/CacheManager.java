@@ -188,8 +188,10 @@ public final class CacheManager {
             mClearCacheOnInit = false;
         }
 
-        CACHE_THRESHOLD = SystemProperties.getLong("nw.cache.threshold", CACHE_THRESHOLD_DEF);
-        CACHE_TRIM_AMOUNT = SystemProperties.getLong("nw.cache.trimamount", CACHE_TRIM_AMOUNT_DEF);
+        CACHE_THRESHOLD = SystemProperties.getLong("net.nw.cache.threshold",
+                                                   CACHE_THRESHOLD_DEF);
+        CACHE_TRIM_AMOUNT = SystemProperties.getLong("net.nw.cache.trimamount",
+                                                     CACHE_TRIM_AMOUNT_DEF);
         CACHE_MAX_SIZE = (CACHE_THRESHOLD - CACHE_TRIM_AMOUNT) / 2;
     }
     

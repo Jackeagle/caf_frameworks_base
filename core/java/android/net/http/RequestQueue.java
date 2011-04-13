@@ -73,7 +73,8 @@ public class RequestQueue implements RequestFeeder {
     private BroadcastReceiver mProxyChangeReceiver;
 
     /* default simultaneous connection count */
-    private static final int CONNECTION_COUNT = SystemProperties.getInt("http.threads", 4);
+    private static final int CONNECTION_COUNT =
+        SystemProperties.getInt("net.http.threads", 4);
 
     private static final int PRE_CONNECTION_THREADS = 5;
     private PreConnectionThread[] mPreConnectionThreads;
