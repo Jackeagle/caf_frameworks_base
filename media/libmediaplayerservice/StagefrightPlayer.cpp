@@ -1,3 +1,21 @@
+/*
+ * Modified by Code Aurora Forum
+ *
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you
+ * may not use this file except in compliance with the License.  You may
+ * obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.  See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
 //#define LOG_NDEBUG 0
 #define LOG_TAG "StagefrightPlayer"
 #include <utils/Log.h>
@@ -151,7 +169,49 @@ status_t StagefrightPlayer::resume() {
 }
 
 status_t StagefrightPlayer::invoke(const Parcel &request, Parcel *reply) {
+#ifndef YUVCLIENT
     return INVALID_OPERATION;
+#else
+    LOGV("invoke");
+    int msg = request.readInt32();
+    status_t err;
+
+    switch (msg) {
+        case MEDIA_INVOKE_REGISTER_BUFFERS:
+        {
+            int numFrames = request.readInt32(); // number of frame buffers
+            int frameSize = request.readInt32(); // size of frame buffers
+            sp<IMemoryHeap> memoryHeap = interface_cast<IMemoryHeap>(request.readStrongBinder());
+            LOGV("%d frame buffer of %d bytes registered, memoryHeap ID %d, base 0x%08lX, total size %d", numFrames, frameSize, memoryHeap->getHeapID(), memoryHeap->getBase(), memoryHeap->getSize());
+            err = mPlayer->registerFrameBufferHeap(memoryHeap, numFrames, frameSize);
+            break;
+        }
+        case MEDIA_INVOKE_UNREGISTER_BUFFERS:
+            LOGV("unregister buffers");
+            err = mPlayer->unregisterFrameBufferHeap();
+            break;
+        case MEDIA_INVOKE_QUEUE_BUFFER:
+        {
+            int frame = request.readInt32();
+            LOGV("frame buffer %d returned", frame);
+            err = mPlayer->queueFrameBuffer(frame);
+            break;
+        }
+        case MEDIA_INVOKE_QUERY_BUFFER_FORMAT:
+        {
+            int format;
+            err = mPlayer->queryBufferFormat(&format);
+            reply->writeInt32(format);
+            break;
+        }
+        default:
+            LOGV("unknown invoke message %d", msg);
+            return INVALID_OPERATION;
+    }
+
+    reply->writeInt32(static_cast<int32_t>(err));
+    return OK; // the transaction is always good if reaches here, the detailed request's reply is embedded in the reply parcel
+#endif
 }
 
 void StagefrightPlayer::setAudioSink(const sp<AudioSink> &audioSink) {

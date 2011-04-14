@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +22,9 @@
 #include "NuHTTPDataSource.h"
 #include "TimedEventQueue.h"
 
+#ifdef YUVCLIENT
+#include <binder/IMemory.h>
+#endif
 #include <media/MediaPlayerInterface.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/OMXClient.h>
@@ -99,6 +103,13 @@ struct AwesomePlayer {
     void postAudioSeekComplete();
 
     status_t setParameters(const String8& params);
+
+#ifdef YUVCLIENT
+    status_t registerFrameBufferHeap(const sp<IMemoryHeap> memoryHeap, int numFrames, int frameSize);
+    status_t unregisterFrameBufferHeap();
+    status_t queueFrameBuffer(int frame);
+    status_t queryBufferFormat(int *format);
+#endif
 
 private:
     friend struct AwesomeEvent;
@@ -302,6 +313,23 @@ private:
     void logOnTime(int64_t ts, int64_t clock, int64_t delta);
     void logSyncLoss();
     int64_t getTimeOfDayUs();
+
+#ifdef YUVCLIENT
+    int mColorFormat;
+    sp<IMemoryHeap> mFrameBuffers; // shared memory region for frame buffers
+    int mNumFrames;
+    int mFrameSize;
+    int mDecodedWidth;
+    int mDecodedHeight;
+    bool mFormatChanged; // return all frames to client
+    Vector<int> mFrameBufferList; // buffer index queue-return vector
+    Mutex mFrameBufferListLock;
+
+    void* getFrameBufferAddress(int index);
+    int getAvailableFrameBuffer();
+    void sendBackFrameBuffers();
+    void resetFrameBuffers();
+#endif
 };
 
 }  // namespace android

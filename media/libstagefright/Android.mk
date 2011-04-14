@@ -111,6 +111,10 @@ endif
 
 LOCAL_CFLAGS += -Wno-multichar
 
+ifeq ($(WEBCORE_INPAGE_VIDEO), true)
+LOCAL_CFLAGS += -DYUVCLIENT
+endif
+
 LOCAL_MODULE:= libstagefright
 
 include $(BUILD_SHARED_LIBRARY)

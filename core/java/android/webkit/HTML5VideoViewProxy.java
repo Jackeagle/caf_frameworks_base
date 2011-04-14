@@ -76,6 +76,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int ENDED             = 201;
     private static final int POSTER_FETCHED    = 202;
     private static final int PAUSED            = 203;
+    private static final int HIDDEN            = 204;
 
     private static final String COOKIE = "Cookie";
 
@@ -146,6 +147,7 @@ class HTML5VideoViewProxy extends Handler
 
                     // Re enable plugin views.
                     mCurrentProxy.getWebView().getViewManager().showAll();
+                    mCurrentProxy.dispatchOnHidden();
 
                     isVideoSelfEnded = false;
                     mCurrentProxy = null;
@@ -315,8 +317,13 @@ class HTML5VideoViewProxy extends Handler
     }
 
     public void dispatchOnPaused() {
-      Message msg = Message.obtain(mWebCoreHandler, PAUSED);
-      mWebCoreHandler.sendMessage(msg);
+        Message msg = Message.obtain(mWebCoreHandler, PAUSED);
+        mWebCoreHandler.sendMessage(msg);
+    }
+
+    public void dispatchOnHidden() {
+        Message msg = Message.obtain(mWebCoreHandler, HIDDEN);
+        mWebCoreHandler.sendMessage(msg);
     }
 
     public void onTimeupdate() {
@@ -552,6 +559,9 @@ class HTML5VideoViewProxy extends Handler
                     case TIMEUPDATE:
                         nativeOnTimeupdate(msg.arg1, mNativePointer);
                         break;
+                    case HIDDEN:
+                        nativeOnHidden(mNativePointer);
+                        break;
                 }
             }
         };
@@ -660,4 +670,5 @@ class HTML5VideoViewProxy extends Handler
     private native void nativeOnPaused(int nativePointer);
     private native void nativeOnPosterFetched(Bitmap poster, int nativePointer);
     private native void nativeOnTimeupdate(int position, int nativePointer);
+    private native void nativeOnHidden(int nativePointer);
 }

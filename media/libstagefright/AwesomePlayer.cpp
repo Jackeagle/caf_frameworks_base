@@ -260,7 +260,16 @@ AwesomePlayer::AwesomePlayer()
       mMaxLateDelta(0),
       mMaxTimeSyncLoss(0),
       mTotalFrames(0),
+#ifndef YUVCLIENT
       mSuspensionState(NULL) {
+#else
+      mSuspensionState(NULL),
+      mNumFrames(0),
+      mFrameSize(0),
+      mDecodedWidth(0),
+      mDecodedHeight(0),
+      mFormatChanged(false) {
+#endif
 
     mVideoBuffer = new MediaBuffer*[BUFFER_QUEUE_CAPACITY];
     for(int i=0;i<BUFFER_QUEUE_CAPACITY;i++)
@@ -554,6 +563,10 @@ void AwesomePlayer::reset_l() {
     mSuspensionState = NULL;
 
     mBitrate = -1;
+
+#ifdef YUVCLIENT
+    resetFrameBuffers();
+#endif
 }
 
 void AwesomePlayer::notifyListener_l(int msg, int ext1, int ext2) {
@@ -1266,6 +1279,11 @@ void AwesomePlayer::onVideoEvent() {
         }
     }
 
+#ifdef YUVCLIENT
+    if (mFormatChanged && mFrameBuffers != NULL)
+        sendBackFrameBuffers();
+#endif
+
     if (mVideoBuffer[mVideoQueueBack] == NULL) {
         MediaSource::ReadOptions options;
         if (mSeeking) {
@@ -1283,6 +1301,31 @@ void AwesomePlayer::onVideoEvent() {
 
                 if (err == INFO_FORMAT_CHANGED) {
                     LOGV("VideoSource signalled format change.");
+
+#ifdef YUVCLIENT
+                    if (mFrameBuffers != NULL) {
+                        int32_t width;
+                        int32_t height;
+                        int32_t colorFormat;
+
+                        sp<MetaData> meta = mVideoSource->getFormat();
+                        CHECK(meta->findInt32(kKeyWidth, &width));
+                        CHECK(meta->findInt32(kKeyHeight, &height));
+                        CHECK(meta->findInt32(kKeyColorFormat, &colorFormat));
+
+                        if ((width != mDecodedWidth) || (height != mDecodedHeight) || (colorFormat != mColorFormat)) {
+                            mDecodedWidth = width;
+                            mDecodedHeight = height;
+                            mColorFormat = colorFormat;
+
+                            notifyListener_l(MEDIA_SET_VIDEO_SIZE, mDecodedWidth, mDecodedHeight);
+                            notifyListener_l(MEDIA_FORMAT_CHANGED);
+
+                            mFormatChanged = true;
+                            sendBackFrameBuffers();
+                        }
+                    }
+#endif
 
                     if (mVideoRenderer != NULL) {
                         mVideoRendererIsPreview = false;
@@ -1411,16 +1454,48 @@ void AwesomePlayer::onVideoEvent() {
     if (mVideoRendererIsPreview || mVideoRenderer == NULL) {
         mVideoRendererIsPreview = false;
 
-        status_t err = initRenderer_l();
+#ifdef YUVCLIENT
+        if (mFrameBuffers == NULL) {  // initialize render if not sending yuv frames to client
+#endif
+            status_t err = initRenderer_l();
 
-        if (err != OK) {
-            finishSeekIfNecessary(-1);
+            if (err != OK) {
+                finishSeekIfNecessary(-1);
 
-            mFlags |= VIDEO_AT_EOS;
-            postStreamDoneEvent_l(err);
+                mFlags |= VIDEO_AT_EOS;
+                postStreamDoneEvent_l(err);
+                return;
+            }
+#ifdef YUVCLIENT
+        }
+#endif
+    }
+
+#ifdef YUVCLIENT
+    if (mFrameBuffers != NULL) {
+        // send yuv frames to client
+        int frame = getAvailableFrameBuffer();
+        if (-1 == frame) {
+            LOGV("No frame buffer available, yuv frame lost");
+            postVideoEvent_l();
             return;
         }
+
+        size_t copySize =
+            (mVideoBuffer[mVideoQueueBack]->range_length() < mFrameSize) ?
+            mVideoBuffer[mVideoQueueBack]->range_length() : mFrameSize;
+
+        // need to copy YUV data from decoder memory pool to shared memory
+        // region -- ideally, the decoder memory pool can be shared with the
+        // mediaplayer client
+        void* bufferAddress = getFrameBufferAddress(frame);
+        if (bufferAddress != NULL) {
+            memcpy(bufferAddress, mVideoBuffer[mVideoQueueBack]->data(), copySize);
+
+            notifyListener_l(MEDIA_BUFFER_READY, frame, 1);
+        }
     }
+#endif
 
     if (mVideoRenderer != NULL) {
         mVideoRenderer->render(mVideoBuffer[mVideoQueueBack]);
@@ -2263,6 +2338,90 @@ inline int64_t AwesomePlayer::getTimeOfDayUs() {
 
     return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
+
+#ifdef YUVCLIENT
+status_t AwesomePlayer::registerFrameBufferHeap(const sp<IMemoryHeap> memoryHeap, int numFrames, int frameSize) {
+    if (mFrameBuffers == NULL) {
+        mFrameBuffers = memoryHeap;
+        mNumFrames = numFrames;
+        mFrameSize = frameSize;
+        return OK;
+    }
+
+    return ALREADY_EXISTS;
+}
+
+status_t AwesomePlayer::unregisterFrameBufferHeap() {
+    if (mFrameBuffers != NULL)
+        resetFrameBuffers();
+    return OK;
+}
+
+status_t AwesomePlayer::queueFrameBuffer(int frame) {
+    Mutex::Autolock autoLock(mFrameBufferListLock);
+    mFrameBufferList.push(frame);
+    return OK;
+}
+
+status_t AwesomePlayer::queryBufferFormat(int *format) {
+    if (mVideoSource == NULL)
+        mColorFormat = 0;
+    else {
+        sp<MetaData> meta = mVideoSource->getFormat();
+        CHECK(meta->findInt32(kKeyColorFormat, &mColorFormat));
+        mDecodedWidth = mVideoWidth;
+        mDecodedHeight = mVideoHeight;
+    }
+    *format = mColorFormat;
+    return OK;
+}
+
+void* AwesomePlayer::getFrameBufferAddress(int index) {
+    if (mFrameBuffers == NULL)
+        return NULL;
+
+    uint8_t* p = static_cast<uint8_t*>(mFrameBuffers->getBase());
+    p += mFrameSize * index;
+    return static_cast<void*>(p);
+}
+
+int AwesomePlayer::getAvailableFrameBuffer() {
+    Mutex::Autolock autoLock(mFrameBufferListLock);
+
+    if ((mFrameBuffers == NULL) || (mFrameBufferList.isEmpty()))
+        return -1;
+
+    int index = mFrameBufferList[0];
+    mFrameBufferList.removeAt(0);
+
+    return index;
+}
+
+void AwesomePlayer::sendBackFrameBuffers() {
+    if (mFrameBuffers == NULL)
+        return;
+
+    int index;
+    Mutex::Autolock autoLock(mFrameBufferListLock);
+
+    while (!mFrameBufferList.isEmpty()) {
+        index = mFrameBufferList[0];
+        mFrameBufferList.removeAt(0);
+        notifyListener_l(MEDIA_BUFFER_READY, index, 0);
+    }
+}
+
+void AwesomePlayer::resetFrameBuffers() {
+    Mutex::Autolock autoLock(mFrameBufferListLock);
+    mFrameBuffers.clear();
+    mNumFrames = 0;
+    mFrameSize = 0;
+    mDecodedWidth = 0;
+    mDecodedHeight = 0;
+    mFormatChanged = false;
+    mFrameBufferList.clear();
+}
+#endif
 
 }  // namespace android
 

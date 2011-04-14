@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +30,13 @@ namespace android {
 
 class Surface;
 
+enum media_invoke_type {
+    MEDIA_INVOKE_REGISTER_BUFFERS    = 1,
+    MEDIA_INVOKE_UNREGISTER_BUFFERS  = 2,
+    MEDIA_INVOKE_QUEUE_BUFFER        = 3,
+    MEDIA_INVOKE_QUERY_BUFFER_FORMAT = 4,
+};
+
 enum media_event_type {
     MEDIA_NOP               = 0, // interface test message
     MEDIA_PREPARED          = 1,
@@ -38,6 +46,8 @@ enum media_event_type {
     MEDIA_SET_VIDEO_SIZE    = 5,
     MEDIA_ERROR             = 100,
     MEDIA_INFO              = 200,
+    MEDIA_FORMAT_CHANGED    = 1001, // video format changed, shared memory buffers need to be freed and reallocated
+    MEDIA_BUFFER_READY      = 1002, // return buffer to mediaplayer client
 };
 
 // Generic error codes for the media player framework.  Errors are fatal, the
