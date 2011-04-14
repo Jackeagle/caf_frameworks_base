@@ -41,6 +41,7 @@ class UsbObserver extends UEventObserver {
     private static final boolean LOG = false;
 
     private static final String USB_CONFIGURATION_MATCH = "DEVPATH=/devices/virtual/switch/usb_configuration";
+    private static final String USB_CONNECTED_MATCH = "DEVPATH=/devices/virtual/switch/usb_connected";
     private static final String USB_FUNCTIONS_MATCH = "DEVPATH=/devices/virtual/usb_composite/";
     private static final String USB_CONFIGURATION_PATH = "/sys/class/switch/usb_configuration/state";
     private static final String USB_COMPOSITE_CLASS_PATH = "/sys/class/usb_composite";
@@ -70,6 +71,7 @@ class UsbObserver extends UEventObserver {
         init();  // set initial status
 
         startObserving(USB_CONFIGURATION_MATCH);
+        startObserving(USB_CONNECTED_MATCH);
         startObserving(USB_FUNCTIONS_MATCH);
     }
 
