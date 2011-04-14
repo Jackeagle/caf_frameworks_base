@@ -970,7 +970,6 @@ public class CDMAPhone extends PhoneBase {
                     break;
                 }
 
-                if (DBG) Log.d(LOG_TAG, "Baseband version: " + ar.result);
                 setSystemProperty(TelephonyProperties.PROPERTY_BASEBAND_VERSION, (String)ar.result);
             }
             break;
@@ -1027,7 +1026,6 @@ public class CDMAPhone extends PhoneBase {
 
             case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:{
                 handleCdmaSubscriptionSource();
-
                 // Get the new device identity
                 mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
             }
@@ -1077,6 +1075,7 @@ public class CDMAPhone extends PhoneBase {
 
             case EVENT_SUBSCRIPTION_READY: {
                 Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY Received");
+                mCM.getBasebandVersion(obtainMessage(EVENT_GET_BASEBAND_VERSION_DONE));
                 mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
             }
             break;
