@@ -1072,7 +1072,7 @@ public class StatusBarPolicy {
          * CQI = channel quality = ?
          */
         int rssi, rsrp, snr;
-        int rssiIconLevel = -1, rsrpIconLevel = -1, snrIconLevel = -1;
+        int rssiIconLevel = 0, rsrpIconLevel = -1, snrIconLevel = -1;
 
         rsrp = mSignalStrength[subscription].getLteRsrp();
 
@@ -1133,7 +1133,7 @@ public class StatusBarPolicy {
         rssi = mSignalStrength[subscription].getLteRssi();
         /* Valid values are (0-63, 99) as defined in TS 36.331 */
         Slog.d(TAG,"getLTELevel -rssi:"+ rssi);
-        if (rssi > 63) rssiIconLevel = -1;
+        if (rssi > 63) rssiIconLevel = 0;
         else if (rssi >= 12) rssiIconLevel = 4;
         else if (rssi >= 8)  rssiIconLevel = 3;
         else if (rssi >= 5) rssiIconLevel = 2;
