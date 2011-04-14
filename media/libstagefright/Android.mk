@@ -1,6 +1,10 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
+ifneq (, $(filter  msm7627_ffa msm7627_surf, $(QCOM_TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DTARGET7x27
+endif
+
 include frameworks/base/media/libstagefright/codecs/common/Config.mk
 
 LOCAL_SRC_FILES:=                         \
