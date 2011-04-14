@@ -203,7 +203,7 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_VORBIS, "VorbisDecoder" },
     { MEDIA_MIMETYPE_VIDEO_VPX, "VPXDecoder" },
     { MEDIA_MIMETYPE_VIDEO_DIVX, "OMX.qcom.video.decoder.divx"},
-//    { MEDIA_MIMETYPE_VIDEO_DIVX311, "OMX.qcom.video.decoder.divx311"},
+    { MEDIA_MIMETYPE_VIDEO_DIVX311, "OMX.qcom.video.decoder.divx311"},
     { MEDIA_MIMETYPE_AUDIO_AC3, "OMX.qcom.audio.decoder.ac3" },
     { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13"},
     { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
@@ -742,9 +742,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         CHECK(meta->findInt32(kKeyDivXVersion,&DivxVersion));
         CODEC_LOGV("Divx Version Type %d\n",DivxVersion);
 
-        if(DivxVersion == kTypeDivXVer_3_11) {
-            CHECK(!"Mime type is wrong for divx311");
-        } else if(DivxVersion == kTypeDivXVer_4) {
+        if(DivxVersion == kTypeDivXVer_4) {
             paramDivX.eFormat = QOMX_VIDEO_DIVXFormat4;
         } else if(DivxVersion == kTypeDivXVer_5) {
             paramDivX.eFormat = QOMX_VIDEO_DIVXFormat5;
@@ -770,6 +768,53 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
                          &paramDivX, sizeof(paramDivX));
         if (err!=OK) {
             return err;
+        }
+    }
+
+    // Set params for divx311 and configure
+    // decoder in frame by frame mode
+    if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mMIME)) {
+        CODEC_LOGV("Setting the QOMX_VIDEO_PARAM_DIVX311TYPE params ");
+        QOMX_VIDEO_PARAM_DIVXTYPE paramDivX;
+        InitOMXParams(&paramDivX);
+        paramDivX.nPortIndex = mIsEncoder ? kPortIndexOutput : kPortIndexInput;
+        int32_t DivxVersion = 0;
+        CHECK(meta->findInt32(kKeyDivXVersion,&DivxVersion));
+        CODEC_LOGV("Divx Version Type %d\n",DivxVersion);
+
+        if(DivxVersion == kTypeDivXVer_3_11 ) {
+            paramDivX.eFormat = QOMX_VIDEO_DIVXFormat311;
+            paramDivX.eProfile = (QOMX_VIDEO_DIVXPROFILETYPE)0;//Not used for now.
+            paramDivX.pDrmHandle = NULL;
+            if (meta->findPointer(kKeyDivXDrm, &paramDivX.pDrmHandle) ) {
+                if( paramDivX.pDrmHandle != NULL ) {
+                    CODEC_LOGV("This DivX Clip is DRM encrypted, set the DRM handle ");
+                }
+                else {
+                    CODEC_LOGV("This DivX Clip is not DRM encrypted ");
+                }
+            }
+
+            status_t err =  mOMX->setParameter(mNode,
+                             (OMX_INDEXTYPE)OMX_QcomIndexParamVideoDivx,
+                             &paramDivX, sizeof(paramDivX));
+            if (err!=OK) {
+                CODEC_LOGE("Set params DIVX error");
+                return err;
+            }
+
+            CODEC_LOGV("kTypeDivXVer_3_11 - set frame by frame mode");
+            OMX_QCOM_PARAM_PORTDEFINITIONTYPE portdef;
+            portdef.nSize = sizeof(OMX_QCOM_PARAM_PORTDEFINITIONTYPE);
+            portdef.nPortIndex = 0; //Input port.
+            portdef.nMemRegion = OMX_QCOM_MemRegionInvalid;
+            portdef.nCacheAttr = OMX_QCOM_CacheAttrNone;
+            portdef.nFramePackingFormat = OMX_QCOM_FramePacking_OnlyOneCompleteFrame;
+            err = mOMX->setParameter(mNode, (OMX_INDEXTYPE)OMX_QcomIndexPortDefn, &portdef, sizeof(OMX_QCOM_PARAM_PORTDEFINITIONTYPE));
+            if (err != OK) {
+                CODEC_LOGE("DIVX 311 set frame by frame mode error");
+                return err;
+            }
         }
     }
 
@@ -1700,6 +1745,8 @@ status_t OMXCodec::setVideoOutputFormat(
         compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingVp;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mime)){
         compressionFormat = OMX_VIDEO_CodingWMV;
+    } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mime)) {
+        compressionFormat = (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
     } else {
         LOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
@@ -1928,6 +1975,8 @@ void OMXCodec::setComponentRole(
             "video_decoder.divx", NULL },
         { MEDIA_MIMETYPE_AUDIO_AC3,
             "audio_decoder.ac3", NULL },
+        { MEDIA_MIMETYPE_VIDEO_DIVX311,
+            "video_decoder.divx", NULL },
     };
 
     static const size_t kNumMimeToRole =
