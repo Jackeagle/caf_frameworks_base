@@ -1312,7 +1312,6 @@ public class GSMPhone extends PhoneBase {
                     break;
                 }
 
-                if (LOCAL_DEBUG) Log.d(LOG_TAG, "Baseband version: " + ar.result);
                 setSystemProperty(PROPERTY_BASEBAND_VERSION, (String)ar.result);
             break;
 
@@ -1484,6 +1483,8 @@ public class GSMPhone extends PhoneBase {
 
             case EVENT_SUBSCRIPTION_READY:
                 Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY received");
+                mCM.getBasebandVersion(
+                        obtainMessage(EVENT_GET_BASEBAND_VERSION_DONE));
                 mCM.getIMEI(obtainMessage(EVENT_GET_IMEI_DONE));
                 mCM.getIMEISV(obtainMessage(EVENT_GET_IMEISV_DONE));
                 break;
