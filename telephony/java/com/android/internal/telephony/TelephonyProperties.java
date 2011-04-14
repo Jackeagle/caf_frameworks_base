@@ -163,4 +163,14 @@ public interface TelephonyProperties
      * Priorities.
      */
     static final String PROPERTY_DATA_SERVICE_PRIORITIES = "persist.telephony.ds.priorities";
+
+    /**
+     * Set as true if the device supports EHRPD.
+     */
+    static final String PROPERTY_SUPPORT_EHRPD = "ro.config.ehrpd";
+
+    /**
+     * Set as true if the device supports simultaneous 1x voice + LTE operation
+     */
+    static final String PROPERTY_SUPPORT_SVLTE1X = "ro.config.svlte1x";
 }

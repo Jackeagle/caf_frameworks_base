@@ -547,7 +547,8 @@ public class DataServiceStateTracker extends Handler {
         }
 
         if (r != RadioTechnology.RADIO_TECH_1xRTT
-                && SystemProperties.getBoolean("ro.config.svlte1x", false)) {
+                && SystemProperties.getBoolean(
+                        TelephonyProperties.PROPERTY_SUPPORT_SVLTE1X, false)) {
             //voice+data is always concurrent on 1x+LTE devices, except when data is on 1x.
             return true;
         }
