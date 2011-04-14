@@ -331,6 +331,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         logv("SUPPORT_IPV6 = " + SUPPORT_IPV6);
         logv("SUPPORT_SERVICE_ARBITRATION = " + SUPPORT_SERVICE_ARBITRATION);
         logv("SUPPORT_OMH = " + mDpt.isOmhEnabled());
+        logv("PROPERTY_SUPPORT_EHRPD = "
+                + SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SUPPORT_EHRPD, false));
+        logv("PROPERTY_SUPPORT_SVLTE1X = "
+                + SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SUPPORT_SVLTE1X, false));
     }
 
     public void update(CommandsInterface ci, Subscription subData) {
