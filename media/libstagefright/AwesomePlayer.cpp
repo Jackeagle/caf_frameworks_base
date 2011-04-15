@@ -1332,14 +1332,7 @@ void AwesomePlayer::onVideoEvent() {
                     if (mVideoRenderer != NULL) {
                         mVideoRendererIsPreview = false;
                         err = initRenderer_l();
-
-                        if (err == OK) {
-                            continue;
-                        }
-
-                        // fall through
-                    } else {
-                        continue;
+                        CHECK_EQ(err, OK);
                     }
                     releaseAllVideoBuffersHeld();
                     continue;
