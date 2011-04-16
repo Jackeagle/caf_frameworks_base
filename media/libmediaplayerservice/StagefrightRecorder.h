@@ -106,6 +106,7 @@ private:
 
     status_t startMPEG4Recording();
     status_t startAMRRecording();
+    status_t startFMA2DPWriter();
     status_t startAACRecording();
     status_t startRTPRecording();
     status_t startMPEG2TSRecording();

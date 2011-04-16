@@ -236,11 +236,20 @@ status_t MediaRecorderClient::prepare()
 
         // For 7627 target switch to OC for voice call recording
         property_get("ro.product.device",value,"0");
+
+        int useSFforFmA2DP = false;
+        if (property_get("media.stagefright.enable-fma2dp", value, NULL)
+        && (!strcmp(value, "1") || !strcasecmp(value, "true"))){
+            LOGW("FM Over A2DP Using SF");
+            useSFforFmA2DP = true;
+        }
+
         if(((mAudioSource ==  AUDIO_SOURCE_VOICE_CALL ||
              mAudioSource ==  AUDIO_SOURCE_VOICE_DOWNLINK) &&
             (strcmp("msm7627_surf",value) == 0 ||
              strcmp("msm7627_ffa",value) == 0))  ||
-            mAudioSource == AUDIO_SOURCE_FM_RX_A2DP ){
+             (!useSFforFmA2DP &&
+            mAudioSource == AUDIO_SOURCE_FM_RX_A2DP )){
             LOGW("FM_A2DP recording or voice call \
                   recording, switching to OC");
             MediaRecorderBase * sfRecorder = mRecorder;

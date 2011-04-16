@@ -49,7 +49,8 @@ LOCAL_SRC_FILES:=                         \
         avc_utils.cpp                     \
         string.cpp                        \
         ExtendedWriter.cpp                \
-        NativeBuffer.cpp
+        NativeBuffer.cpp              \
+        FMA2DPWriter.cpp
 
 LOCAL_C_INCLUDES:= \
         $(JNI_H_INCLUDE) \

@@ -25,6 +25,7 @@
 #include <binder/IPCThreadState.h>
 #include <media/stagefright/AudioSource.h>
 #include <media/stagefright/AMRWriter.h>
+#include <media/stagefright/FMA2DPWriter.h>
 #include <media/stagefright/CameraSource.h>
 #include <media/stagefright/ExtendedWriter.h>
 #include <media/stagefright/MPEG2TSWriter.h>
@@ -694,6 +695,9 @@ status_t StagefrightRecorder::start() {
         return UNKNOWN_ERROR;
     }
 
+    if(AUDIO_SOURCE_FM_RX_A2DP == mAudioSource)
+        return startFMA2DPWriter();
+
     switch (mOutputFormat) {
         case OUTPUT_FORMAT_DEFAULT:
         case OUTPUT_FORMAT_THREE_GPP:
@@ -912,6 +916,20 @@ status_t StagefrightRecorder::startAMRRecording() {
 
     return OK;
 }
+
+
+status_t StagefrightRecorder::startFMA2DPWriter() {
+
+    sp<MetaData> meta = new MetaData;
+    meta->setInt32(kKeyChannelCount, mAudioChannels);
+    meta->setInt32(kKeySampleRate, mSampleRate);
+
+    mWriter = new FMA2DPWriter();
+    mWriter->setListener(mListener);
+    mWriter->start(meta.get());
+    return OK;
+}
+
 
 status_t StagefrightRecorder::startRTPRecording() {
     CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_RTP_AVP);
