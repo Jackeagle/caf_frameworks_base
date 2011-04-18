@@ -116,8 +116,12 @@ public class LinkManager implements ILinkManager {
         try {
             mCarrierProfile.parse(new FileInputStream(carrierPolicyFilename));
         } catch (FileNotFoundException e) {
-            if (DBG) Log.d(TAG, "Carrier Policy file not found: " + carrierPolicyFilename);
+            Log.e(TAG, "Carrier Policy file not found: " + carrierPolicyFilename);
         }
+
+        mDefaultNetwork = mCarrierProfile.getPreferredNetworks(0).get(0);
+        if (DBG) Log.v(TAG, "Default network = " + networkIntToString(mDefaultNetwork));
+        mConnectivityService.setDefaultRoute(mDefaultNetwork);
 
         mHandlerThread = new HandlerThread("LMHandler");
         mHandlerThread.start();
@@ -150,7 +154,7 @@ public class LinkManager implements ILinkManager {
                     msg.sendToTarget();
                 }
             } else if (action.equals(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)) {
-                // Turn Telephony Intentes into LinkManager Handler events (connected/disconnected)
+                // Turn Telephony Intents into LinkManager Handler events (connected/disconnected)
                 String apnType = intent.getStringExtra(Phone.DATA_APN_TYPES_KEY);
                 if (apnType.equals(Phone.APN_TYPE_DEFAULT)) {
                     DataState dataState = Enum.valueOf(Phone.DataState.class, intent.getStringExtra(Phone.DATA_APN_TYPE_STATE));
@@ -222,9 +226,10 @@ public class LinkManager implements ILinkManager {
 
             // assign to the first active network
             for (int network : preferredNetworks) {
-                if (isNetworkActive(network)) {
+                if (isNetworkConnected(network)) {
                     getAvailableForwardBandwidth(network); // Stub for bandwidth estimation
                     // TODO: add a timer for bandwidth estimate changed.
+                    if (DBG) Log.v(TAG, "assigning id " + lsInfo.id + " to network " + networkIntToString(network));
                     lsInfo.assignedNetwork = network;
                     lsInfo.status = LinkSocketInfo.ASSIGNED;
                     break;
@@ -242,6 +247,7 @@ public class LinkManager implements ILinkManager {
                 // No active networks are acceptable - bring up the first preference
                 int network = preferredNetworks.get(0);
                 lsInfo.assignedNetwork = network;
+                if (DBG) Log.d(TAG, "cannot assign to available networks - bringing up " + networkIntToString(network));
                 mConnectivityService.reconnect(network);
                 // Start timer for connection
                 Message timeoutMsg = mHandler.obtainMessage(CONNECTION_TIMED_OUT, id, network);
@@ -273,7 +279,7 @@ public class LinkManager implements ILinkManager {
 
         private void handleNetworkConnected(Message msg) {
             int network = msg.arg1;
-            if (DBG) Log.v(TAG, "handleNetworkConnected: " + network);
+            if (DBG) Log.v(TAG, "handleNetworkConnected: " + networkIntToString(network));
 
             // check for waiting connections
             for (LinkSocketInfo lsInfo : mActiveLinks.values()) {
@@ -292,7 +298,7 @@ public class LinkManager implements ILinkManager {
 
         private void handleNetworkDisconnected(Message msg) {
             int network = msg.arg1;
-            if (DBG) Log.v(TAG, "handleNetworkDisonnected: " + network);
+            if (DBG) Log.v(TAG, "handleNetworkDisconnected: " + networkIntToString(network));
 
             // send notifications to all affected links
             for (LinkSocketInfo lsInfo : mActiveLinks.values()) {
@@ -343,7 +349,7 @@ public class LinkManager implements ILinkManager {
             if (network == ConnectivityManager.TYPE_MOBILE) otherNetwork = ConnectivityManager.TYPE_WIFI;
             else otherNetwork = ConnectivityManager.TYPE_MOBILE;
 
-            return isNetworkActive(otherNetwork);
+            return isNetworkConnected(otherNetwork);
         }
 
         private void bringDownUnusedNetworks() {
@@ -353,8 +359,8 @@ public class LinkManager implements ILinkManager {
 
             for (int i = 0; i < allNetworks.length; i++) {
                 int network = allNetworks[i];
-                if (network == mDefaultNetwork) break; // Don't bring down default network
-                if (!anotherNetworkIsAvailable(network)) break; // Don't bring down the only active network
+                if (network == mDefaultNetwork) continue; // Don't bring down default network
+                if (!anotherNetworkIsAvailable(network)) continue; // Don't bring down the only active network
 
                 boolean networkInUse = false;
                 for (LinkSocketInfo lsInfo : mActiveLinks.values()) {
@@ -365,7 +371,7 @@ public class LinkManager implements ILinkManager {
                 }
 
                 if (!networkInUse) {
-                    if (DBG) Log.v(TAG, "bringing down unused network: " + network);
+                    if (DBG) Log.v(TAG, "bringing down unused network: " + networkIntToString(network));
                     mConnectivityService.teardown(network);
                 }
             }
@@ -533,8 +539,21 @@ public class LinkManager implements ILinkManager {
         return networkInt;
     }
 
-    private boolean isNetworkActive(int networkType) {
-        if (DBG) Log.v(TAG, "isNetworkActive: " + networkType);
+    private String networkIntToString(int network) {
+        switch (network) {
+            case ConnectivityManager.TYPE_WIFI:
+                return "WiFi";
+            case ConnectivityManager.TYPE_MOBILE:
+                return "Mobile";
+            default:
+                // fall through
+        }
+
+        return "unknown network " + network;
+    }
+
+    private boolean isNetworkConnected(int networkType) {
+        if (DBG) Log.v(TAG, "isNetworkConnected: " + networkIntToString(networkType));
         NetworkInfo networkInfo = mConnectivityService.getNetworkInfo(networkType);
         return networkInfo.isConnected();
     }
@@ -613,16 +632,11 @@ public class LinkManager implements ILinkManager {
         return mSocketId++;
     }
 
+    /**
+     * The default connection is specified via Carrier Policy. This API is ignored.
+     */
     public void setDefaultConnectionNwPref(int preference) {
-        if (DBG) Log.v(TAG, "setDefaultConnectionNwPref: " + preference);
-
-        mDefaultNetwork = preference;
-
-        if (!isNetworkActive(preference)) {
-            mConnectivityService.reconnect(preference);
-        }
-
-        mConnectivityService.setDefaultRoute(preference);
+        if (DBG) Log.v(TAG, "setDefaultConnectionNwPref " + preference + " ignored");
     }
 
     /**
