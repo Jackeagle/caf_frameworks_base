@@ -63,7 +63,7 @@ import java.util.Map;
  */
 public class ConnectivityService extends IConnectivityManager.Stub {
 
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
     private static final String TAG = "ConnectivityService";
 
     // how long to wait before switching back to a radio's default network
