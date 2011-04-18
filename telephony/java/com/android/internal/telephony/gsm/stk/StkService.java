@@ -121,6 +121,7 @@ public class StkService extends Handler implements AppInterface {
 
     // Service members.
     private static StkService sInstance;
+    private static HandlerThread handlerThread;
     private CommandsInterface mCmdIf;
     private Context mContext;
     private StkCmdMessage mCurrntCmd = null;
@@ -192,6 +193,9 @@ public class StkService extends Handler implements AppInterface {
         mCmdIf.unSetOnStkProactiveCmd(this);
         mCmdIf.unSetOnStkEvent(this);
         mCmdIf.unSetOnStkCallSetUp(this);
+        sInstance = null;
+        handlerThread.quit();
+        handlerThread = null;
 
         this.removeCallbacksAndMessages(null);
     }
@@ -645,8 +649,8 @@ public class StkService extends Handler implements AppInterface {
             if (ci == null || context == null ) {
                 return null;
             }
-            HandlerThread thread = new HandlerThread("Stk Telephony service");
-            thread.start();
+            handlerThread = new HandlerThread("Stk Telephony service");
+            handlerThread.start();
             sInstance = new StkService(ci, ir, context, fh, ic);
             StkLog.d(sInstance, "NEW sInstance");
             return sInstance;
