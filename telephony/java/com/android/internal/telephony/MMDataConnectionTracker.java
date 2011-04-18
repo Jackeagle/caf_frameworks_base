@@ -63,6 +63,7 @@ import com.android.internal.telephony.Phone.BearerType;
 import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
 import com.android.internal.telephony.ProxyManager.Subscription;
+import com.android.internal.telephony.QosSpec;
 
 /*
  * Definitions:
@@ -1852,6 +1853,106 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
 
         return TelephonyManager.DEFAULT_SUB;
+    }
+
+    @Override
+    public int enableQos(int transId, QosSpec qosSpec, String type) {
+        int result = Phone.QOS_REQUEST_FAILURE;
+
+        DataServiceType serviceType = DataServiceType.apnTypeStringToServiceType(type);
+
+        if (serviceType != null) {
+            Log.d(LOG_TAG, "enableQos: serviceType:" + serviceType + " transId: " + transId);
+
+            // TODO: only supporting IPV4 now.
+            DataConnection dc = mDpt.getActiveDataConnection(serviceType, IPVersion.INET);
+            if (dc != null) {
+                dc.qosSetup(transId, qosSpec);
+                result = Phone.QOS_REQUEST_SUCCESS;
+            }
+        }
+
+        return result;
+    }
+
+    @Override
+    public int disableQos(int qosId) {
+        int result = Phone.QOS_REQUEST_FAILURE;
+        Log.d(LOG_TAG, "disableQos:" + qosId);
+
+        // TODO: only supporting IPV4 now.
+        DataConnection dc = mDpt.getActiveDataConnection(
+                                    DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
+        if (dc != null && dc.isValidQos(qosId)) {
+            dc.qosRelease(qosId);
+            result = Phone.QOS_REQUEST_SUCCESS;
+        }
+
+        return result;
+    }
+
+    @Override
+    public int modifyQos(int qosId, QosSpec qosSpec) {
+        int result = Phone.QOS_REQUEST_FAILURE;
+        Log.d(LOG_TAG, "modifyQos:" + qosId);
+
+        // TODO: only supporting IPV4 now.
+        DataConnection dc = mDpt.getActiveDataConnection(
+                                    DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
+        if (dc != null && dc.isValidQos(qosId)) {
+            // dc.modifyQos(qosId, qosSpec);
+            // result = Phone.QOS_REQUEST_SUCCESS;
+        }
+
+        return result;
+    }
+
+    @Override
+    public int suspendQos(int qosId) {
+        int result = Phone.QOS_REQUEST_FAILURE;
+        Log.d(LOG_TAG, "suspendQos:" + qosId);
+
+        // TODO: only supporting IPV4 now.
+        DataConnection dc = mDpt.getActiveDataConnection(
+                                    DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
+        if (dc != null && dc.isValidQos(qosId)) {
+            // dc.qosSuspend(qosId);
+            // result = Phone.QOS_REQUEST_SUCCESS;
+        }
+
+        return result;
+    }
+
+    @Override
+    public int resumeQos(int qosId) {
+        int result = Phone.QOS_REQUEST_FAILURE;
+        Log.d(LOG_TAG, "resumeQos:" + qosId);
+
+        // TODO: only supporting IPV4 now.
+        DataConnection dc = mDpt.getActiveDataConnection(
+                                    DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
+        if (dc != null && dc.isValidQos(qosId)) {
+            // dc.qosResume(qosId);
+            // result = Phone.QOS_REQUEST_SUCCESS;
+        }
+
+        return result;
+    }
+
+    @Override
+    public int getQosStatus(int qosId) {
+        int result = Phone.QOS_REQUEST_FAILURE;
+        Log.d(LOG_TAG, "getQosStatus:" + qosId);
+
+        // TODO: only supporting IPV4 now.
+        DataConnection dc = mDpt.getActiveDataConnection(
+                                    DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
+        if (dc != null && dc.isValidQos(qosId)) {
+            dc.getQosStatus(qosId);
+            result = Phone.QOS_REQUEST_SUCCESS;
+        }
+
+        return result;
     }
 
     void loge(String string) {

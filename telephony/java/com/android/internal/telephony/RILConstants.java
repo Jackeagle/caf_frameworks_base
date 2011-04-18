@@ -116,6 +116,173 @@ public interface RILConstants {
     String SETUP_DATA_PROTOCOL_IPV6   = "IPV6";
     String SETUP_DATA_PROTOCOL_IPV4V6 = "IPV4V6";
 
+    /* QoS constants */
+    public class RIL_QosClass {
+        public static final int RIL_QOS_CONVERSATIONAL = 0;
+        public static final int RIL_QOS_STREAMING       = 1;
+        public static final int RIL_QOS_INTERACTIVE     = 2;
+        public static final int RIL_QOS_BACKGROUND      = 3;
+
+        public static String getName(int val) {
+            switch(val) {
+                case RIL_QOS_CONVERSATIONAL: return "RIL_QOS_CONVERSATIONAL";
+                case RIL_QOS_STREAMING: return "RIL_QOS_STREAMING";
+                case RIL_QOS_INTERACTIVE: return "RIL_QOS_INTERACTIVE";
+                case RIL_QOS_BACKGROUND: return "RIL_QOS_BACKGROUND";
+                default: return null;
+            }
+        }
+    }
+
+    public class RIL_QosDirection {
+        public static final int RIL_QOS_TX = 0;
+        public static final int RIL_QOS_RX = 1;
+
+        public static String getName(int val) {
+            switch(val) {
+                case RIL_QOS_TX: return "RIL_QOS_TX";
+                case RIL_QOS_RX: return "RIL_QOS_RX";
+                default: return null;
+            }
+        }
+    }
+
+    public static class RIL_QosSpecKeys {
+        /* Positive numerical value */
+        public static final int RIL_QOS_SPEC_INDEX = 0;
+
+        /* RIL_QosDirection */
+        public static final int RIL_QOS_FLOW_DIRECTION = 1;
+        /* RIL_QosClass */
+        public static final int RIL_QOS_FLOW_TRAFFIC_CLASS = 2;
+        /* Positive number in kbps */
+        public static final int RIL_QOS_FLOW_DATA_RATE_MIN = 3;
+        /* Positive number in kbps */
+        public static final int RIL_QOS_FLOW_DATA_RATE_MAX = 4;
+        /* Positive number in milliseconds */
+        public static final int RIL_QOS_FLOW_LATENCY = 5;
+
+        /* Positive numerical value */
+        public static final int RIL_QOS_FLOW_3GPP2_PROFILE_ID = 6;
+        /* Positive numerical value */
+        public static final int RIL_QOS_FLOW_3GPP2_PRIORITY = 7;
+
+        /* RIL_QosDirection */
+        public static final int RIL_QOS_FILTER_DIRECTION = 8;
+        /* Format: xxx.xxx.xxx.xxx/yy */
+        public static final int RIL_QOS_FILTER_IPV4_SOURCE_ADDR = 9;
+        /* Format: xxx.xxx.xxx.xxx/yy */
+        public static final int RIL_QOS_FILTER_IPV4_DESTINATION_ADDR = 10;
+        /* Positive numerical Value (max 6-bit number) */
+        public static final int RIL_QOS_FILTER_IPV4_TOS = 11;
+        /* Mask for the 6 bit TOS value */
+        public static final int RIL_QOS_FILTER_IPV4_TOS_MASK = 12;
+
+        /**
+         * *PORT_START is the starting port number
+         * *PORT_RANGE is the number of continuous ports from *PORT_START key
+         */
+        public static final int RIL_QOS_FILTER_TCP_SOURCE_PORT_START = 13;
+        public static final int RIL_QOS_FILTER_TCP_SOURCE_PORT_RANGE = 14;
+        public static final int RIL_QOS_FILTER_TCP_DESTINATION_PORT_START = 15;
+        public static final int RIL_QOS_FILTER_TCP_DESTINATION_PORT_RANGE = 16;
+        public static final int RIL_QOS_FILTER_UDP_SOURCE_PORT_START = 17;
+        public static final int RIL_QOS_FILTER_UDP_SOURCE_PORT_RANGE = 18;
+        public static final int RIL_QOS_FILTER_UDP_DESTINATION_PORT_START = 19;
+        public static final int RIL_QOS_FILTER_UDP_DESTINATION_PORT_RANGE = 20;
+
+        /* TBD: For future implemenations based on requirements */
+        public static final int RIL_QOS_FILTER_IP_NEXT_HEADER_PROTOCOL = 21;
+        /* Format: xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx/yyy */
+        public static final int RIL_QOS_FILTER_IPV6_SOURCE_ADDR = 22;
+        /* Format: xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx/yyy */
+        public static final int RIL_QOS_FILTER_IPV6_DESTINATION_ADDR = 23;
+        public static final int RIL_QOS_FILTER_IPV6_TRAFFIC_CLASS = 24;
+        public static final int RIL_QOS_FILTER_IPV6_FLOW_LABEL = 25;
+
+        public static String getName(int val) {
+            switch(val) {
+                case RIL_QOS_SPEC_INDEX:
+                    return "RIL_QOS_SPEC_INDEX";
+                case RIL_QOS_FLOW_DIRECTION:
+                    return "RIL_QOS_FLOW_DIRECTION";
+                case RIL_QOS_FLOW_TRAFFIC_CLASS:
+                    return "RIL_QOS_FLOW_TRAFFIC_CLASS";
+                case RIL_QOS_FLOW_DATA_RATE_MIN:
+                    return "RIL_QOS_FLOW_DATA_RATE_MIN";
+                case RIL_QOS_FLOW_DATA_RATE_MAX:
+                    return "RIL_QOS_FLOW_DATA_RATE_MAX";
+                case RIL_QOS_FLOW_LATENCY:
+                    return "RIL_QOS_FLOW_LATENCY";
+                case RIL_QOS_FLOW_3GPP2_PROFILE_ID:
+                    return "RIL_QOS_FLOW_3GPP2_PROFILE_ID";
+                case RIL_QOS_FLOW_3GPP2_PRIORITY:
+                    return "RIL_QOS_FLOW_3GPP2_PRIORITY";
+                case RIL_QOS_FILTER_DIRECTION:
+                    return "RIL_QOS_FILTER_DIRECTION";
+                case RIL_QOS_FILTER_IPV4_SOURCE_ADDR:
+                    return "RIL_QOS_FILTER_IPV4_SOURCE_ADDR";
+                case RIL_QOS_FILTER_IPV4_DESTINATION_ADDR:
+                    return "RIL_QOS_FILTER_IPV4_DESTINATION_ADDR";
+                case RIL_QOS_FILTER_IPV4_TOS:
+                    return "RIL_QOS_FILTER_IPV4_TOS";
+                case RIL_QOS_FILTER_IPV4_TOS_MASK:
+                    return "RIL_QOS_FILTER_IPV4_TOS_MASK";
+                case RIL_QOS_FILTER_TCP_SOURCE_PORT_START:
+                    return "RIL_QOS_FILTER_TCP_SOURCE_PORT_START";
+                case RIL_QOS_FILTER_TCP_SOURCE_PORT_RANGE:
+                    return "RIL_QOS_FILTER_TCP_SOURCE_PORT_RANGE";
+                case RIL_QOS_FILTER_TCP_DESTINATION_PORT_START:
+                    return "RIL_QOS_FILTER_TCP_DESTINATION_PORT_START";
+                case RIL_QOS_FILTER_TCP_DESTINATION_PORT_RANGE:
+                    return "RIL_QOS_FILTER_TCP_DESTINATION_PORT_RANGE";
+                case RIL_QOS_FILTER_UDP_SOURCE_PORT_START:
+                    return "RIL_QOS_FILTER_UDP_SOURCE_PORT_START";
+                case RIL_QOS_FILTER_UDP_SOURCE_PORT_RANGE:
+                    return "RIL_QOS_FILTER_UDP_SOURCE_PORT_RANGE";
+                case RIL_QOS_FILTER_UDP_DESTINATION_PORT_START:
+                    return "RIL_QOS_FILTER_UDP_DESTINATION_PORT_START";
+                case RIL_QOS_FILTER_UDP_DESTINATION_PORT_RANGE:
+                    return "RIL_QOS_FILTER_UDP_DESTINATION_PORT_RANGE";
+                case RIL_QOS_FILTER_IP_NEXT_HEADER_PROTOCOL:
+                    return "RIL_QOS_FILTER_IP_NEXT_HEADER_PROTOCOL";
+                case RIL_QOS_FILTER_IPV6_SOURCE_ADDR:
+                    return "RIL_QOS_FILTER_IPV6_SOURCE_ADDR";
+                case RIL_QOS_FILTER_IPV6_DESTINATION_ADDR:
+                    return "RIL_QOS_FILTER_IPV6_DESTINATION_ADDR";
+                case RIL_QOS_FILTER_IPV6_TRAFFIC_CLASS:
+                    return "RIL_QOS_FILTER_IPV6_TRAFFIC_CLASS";
+                case RIL_QOS_FILTER_IPV6_FLOW_LABEL:
+                    return "RIL_QOS_FILTER_IPV6_FLOW_LABEL";
+                default:
+                    return null;
+            }
+        }
+    }
+
+    /* Overall QoS status */
+    public class RIL_QosStatus {
+        /* Qos not active */
+        public static final int RIL_QOS_STATUS_NONE      = 0;
+        /* Qos currently active */
+        public static final int RIL_QOS_STATUS_ACTIVATED = 1;
+        /* Qos Suspended */
+        public static final int RIL_QOS_STATUS_SUSPENDED = 2;
+    }
+
+    public static class RIL_QosIndStates {
+        /* QoS operation complete */
+        public static final int RIL_QOS_SUCCESS         = 0;
+        /* QoS setup resulted in a neogtiated value */
+        public static final int RIL_QOS_NEGOTIATED      = 1;
+        /* QoS released by the user */
+        public static final int RIL_QOS_USER_RELEASE    = 2;
+        /* QoS released by the network */
+        public static final int RIL_QOS_NETWORK_RELEASE = 3;
+        /* Any other error */
+        public static final int RIL_QOS_ERROR_UNKNOWN   = 4;
+    }
+
 /*
 cat include/telephony/ril.h | \
    egrep '^#define' | \
@@ -280,6 +447,12 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_GET_DATA_SUBSCRIPTION = 112;
     int RIL_REQUEST_SET_SUBSCRIPTION_MODE = 113;
     int RIL_REQUEST_SET_TRANSMIT_POWER = 114;
+    int RIL_REQUEST_SETUP_QOS = 115;
+    int RIL_REQUEST_RELEASE_QOS = 116;
+    int RIL_REQUEST_GET_QOS_STATUS = 117;
+    int RIL_REQUEST_MODIFY_QOS = 118;
+    int RIL_REQUEST_SUSPEND_QOS = 119;
+    int RIL_REQUEST_RESUME_QOS = 120;
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
     int RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED = 1001;
@@ -322,4 +495,5 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_ON_SS = 1038;
     int RIL_UNSOL_STK_CC_ALPHA_NOTIFY = 1039;
     int RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED = 1040;
+    int RIL_UNSOL_QOS_STATE_CHANGED_IND = 1041;
 }

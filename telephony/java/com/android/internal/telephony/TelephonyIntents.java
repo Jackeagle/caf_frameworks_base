@@ -316,4 +316,9 @@ public class TelephonyIntents {
      */
     public static final String ACTION_DEFAULT_SUBSCRIPTION_CHANGED
             = "android.intent.action.ACTION_DEFAULT_SUBSCRIPTION_CHANGED";
+
+    /**
+     * QoS State Intent. Used to indicate the status of QoS for the data connection.
+     */
+    public static final String ACTION_QOS_STATE_IND = "android.intent.action.ACTION_QOS_STATE_IND";
 }

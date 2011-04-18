@@ -33,6 +33,7 @@ import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.CommandsInterface.RadioTechnologyFamily;
 import com.android.internal.telephony.ProxyManager.Subscription;
+import com.android.internal.telephony.QosSpec;
 
 import java.util.List;
 
@@ -174,6 +175,11 @@ public interface Phone {
     static final int APN_TYPE_NOT_AVAILABLE = 2;
     static final int APN_REQUEST_FAILED     = 3;
 
+    /**
+     * Return codes for QoS APIs
+     */
+    static final int QOS_REQUEST_SUCCESS = 0;
+    static final int QOS_REQUEST_FAILURE = 1;
 
     /**
      * Optional reasons for disconnect and connect
@@ -1507,6 +1513,57 @@ public interface Phone {
      * Report on whether data connectivity is allowed.
      */
     boolean isDataConnectivityPossible();
+
+    /**
+     * Enable QoS
+     *
+     * @param transId Transaction ID for the request
+     * @param qosSpec QosSpec requested
+     * @param type Apn Type on which QoS is requested on
+     * @return true on success, else false
+     */
+    int enableQos(int transId, QosSpec qosSpec, String type);
+
+    /**
+     * Disable QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @return true on success, else false
+     */
+    int disableQos(int qosId);
+
+    /**
+     * Modify QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @param qosSpec New capabilities requested
+     * @return true on success, else false
+     */
+    int modifyQos(int qosId, QosSpec qosSpec);
+
+    /**
+     * Suspend QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @return
+     */
+    int suspendQos(int qosId);
+
+    /**
+     * Resume QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @return
+     */
+    int resumeQos(int qosId);
+
+    /**
+     * Retreive the QoS parameters of a particular QoS flow
+     *
+     * @param qosId QoS identifier
+     * @return true on success, else false
+     */
+    int getQosStatus(int qosId);
 
     /**
      * Returns the name of the network interface used by the specified APN type.

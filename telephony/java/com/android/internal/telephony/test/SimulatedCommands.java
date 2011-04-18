@@ -968,6 +968,30 @@ public final class SimulatedCommands extends BaseCommands
         unimplemented(result);
     }
 
+    public void setupQosReq (int callId, ArrayList<String> qosFlows, Message result) {
+        unimplemented(result);
+    }
+
+    public void releaseQos (int qosId, Message result) {
+        unimplemented(result);
+    }
+
+    public void modifyQos (int qosId, ArrayList<String> qosFlows, Message result) {
+        unimplemented(result);
+    }
+
+    public void suspendQos (int qosId, Message result) {
+        unimplemented(result);
+    }
+
+    public void resumeQos (int qosId, Message result) {
+        unimplemented(result);
+    }
+
+    public void getQosStatus (int qosId, Message result) {
+        unimplemented(result);
+    }
+
     public void deactivateDataCall(int cid, int reason, Message result) {unimplemented(result);}
 
     /**
