@@ -123,6 +123,7 @@ class MountService extends IMountService.Stub
     private boolean                               mBooted = false;
     private boolean                               mReady = false;
     private boolean                               mSendUmsConnectedOnBoot = false;
+    private boolean                               mShared = false;
 
     /**
      * Private hash of currently mounted secure containers.
@@ -822,12 +823,20 @@ class MountService extends IMountService.Stub
         }
 
         final String path = Environment.getExternalStorageDirectory().getPath();
-        if (avail == false && getVolumeState(path).equals(Environment.MEDIA_SHARED)) {
+        if (avail == false && mShared == true) {
             /*
              * USB mass storage disconnected while enabled
              */
             new Thread() {
                 public void run() {
+                    /*
+                     * If USB disconnected while UMS enable, we wait for
+                     * volume state change to shared
+                     */
+                    while (!(getVolumeState(path).equals(Environment.MEDIA_SHARED))) {
+                        SystemClock.sleep (100);
+                    }
+                    enableShared(false);
                     try {
                         int rc;
                         Slog.w(TAG, "Disabling UMS after cable disconnect");
@@ -983,6 +992,16 @@ class MountService extends IMountService.Stub
         return doGetShareMethodAvailable("ums");
     }
 
+    /*
+     * If UMS is enabled volume goes into Shared state
+     * with this flag we can handle USB disconnect while volume
+     * state is changing to Shared
+     *
+     */
+    public void enableShared(boolean enable) {
+        mShared = enable;
+    }
+
     public void setUsbMassStorageEnabled(boolean enable) {
         waitForReady();
         validatePermission(android.Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS);
@@ -992,6 +1011,7 @@ class MountService extends IMountService.Stub
         /*
          * If the volume is mounted and we're enabling then unmount it
          */
+        Slog.d(TAG, "setUsbMassStorageEnabled: enable "+enable);
         String path = Environment.getExternalStorageDirectory().getPath();
         String vs = getVolumeState(path);
         String method = "ums";

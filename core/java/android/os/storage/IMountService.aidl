@@ -52,6 +52,12 @@ interface IMountService
     void setUsbMassStorageEnabled(boolean enable);
 
     /**
+     * set the mShared flag if volume state is changing to
+     * shared/unshared
+     */
+    void enableShared(boolean enable);
+
+    /**
      * Returns true if a USB mass storage host is enabled (media is shared)
      */
     boolean isUsbMassStorageEnabled();
