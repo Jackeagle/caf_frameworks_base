@@ -179,6 +179,7 @@ static bool copybit(GLint x, GLint y,
     // returned true.
 
     const GGLSurface& cbSurface = c->rasterizer.state.buffers.color.s;
+    bool premultipliedAlpha = false;
 
     y = cbSurface.height - (y + h);
 
@@ -251,6 +252,10 @@ static bool copybit(GLint x, GLint y,
             // Incompatible blend mode.
             LOGD_IF(DEBUG_COPYBIT, "incompatible blend mode");
             return false;
+        }
+        if (c->rasterizer.state.blend.src == GL_ONE &&
+            c->rasterizer.state.blend.dst == GL_ONE_MINUS_SRC_ALPHA) {
+            premultipliedAlpha = true;
         }
         blending = true;
     } else {
@@ -467,6 +472,8 @@ static bool copybit(GLint x, GLint y,
             alpha = fixedToByte(c->currentColorClamped.a);
         }
         copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, alpha);
+        copybit->set_parameter(copybit, COPYBIT_PREMULTIPLIED_ALPHA,
+                 (premultipliedAlpha) ? COPYBIT_ENABLE : COPYBIT_DISABLE);
         copybit->set_parameter(copybit, COPYBIT_DITHER,
                 (enables & GGL_ENABLE_DITHER) ?
                         COPYBIT_ENABLE : COPYBIT_DISABLE);
