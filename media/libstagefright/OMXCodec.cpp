@@ -1182,7 +1182,7 @@ status_t OMXCodec::isColorFormatSupported(
 void OMXCodec::setVideoInputFormat(
         const char *mime, const sp<MetaData>& meta) {
 
-    int32_t width, height, frameRate, bitRate, stride, sliceHeight;
+    int32_t width, height, frameRate, bitRate, stride, sliceHeight, hfr;
 
     char value[PROPERTY_VALUE_MAX];
     if ( property_get("encoder.video.bitrate", value, 0) > 0 && atoi(value) > 0){
@@ -1196,8 +1196,11 @@ void OMXCodec::setVideoInputFormat(
     success = success && meta->findInt32(kKeyBitRate, &bitRate);
     success = success && meta->findInt32(kKeyStride, &stride);
     success = success && meta->findInt32(kKeySliceHeight, &sliceHeight);
+    success = success && meta->findInt32(kKeyHFR, &hfr);
     CHECK(success);
     CHECK(stride != 0);
+
+    frameRate = hfr?hfr:frameRate;
 
     OMX_VIDEO_CODINGTYPE compressionFormat = OMX_VIDEO_CodingUnused;
     if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime)) {
@@ -4594,6 +4597,12 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
 		mOutputFormat->setInt32(kKeyWidth, width );
 	        mOutputFormat->setInt32(kKeyHeight, height );
 
+        int32_t frameRate, hfr;
+        success = inputFormat->findInt32(kKeyHFR, &hfr);
+        success = inputFormat->findInt32(kKeySampleRate, &frameRate);
+        CHECK(success);
+        mOutputFormat->setInt32(kKeyHFR, hfr);
+        mOutputFormat->setInt32(kKeySampleRate, frameRate);
 		/*Do dummy call for capability type index so that
                   the component knows we are using pmem!!, we dont use it!!!
 		*/
