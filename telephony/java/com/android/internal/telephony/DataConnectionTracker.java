@@ -277,7 +277,8 @@ public abstract class DataConnectionTracker extends Handler {
             notifyDataConnection(serviceType, IPVersion.INET, REASON_SERVICE_TYPE_DISABLED);
             notifyDataConnection(serviceType, IPVersion.INET6, REASON_SERVICE_TYPE_DISABLED);
 
-            return Phone.APN_REQUEST_FAILED;
+            if (mDpt.isServiceTypeEnabled(serviceType) == false)
+                return Phone.APN_REQUEST_FAILED;
         }
 
         /* mark service type as disabled */
