@@ -165,11 +165,11 @@ bool LayerBuffer::transformed() const
     return false;
 }
 
-void LayerBuffer::serverDestroy()
+void LayerBuffer::serverDestroy(int showNoUI)
 {
     sp<Source> source(clearSource());
     if (source != 0) {
-        source->destroy();
+        source->destroy(showNoUI);
     }
 }
 
@@ -863,7 +863,7 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
     }
 }
 
-void LayerBuffer::OverlaySource::destroy()
+void LayerBuffer::OverlaySource::destroy(int showNoUI)
 {
     // we need a lock here to protect "onVisibilityResolved"
     Mutex::Autolock _l(mOverlaySourceLock);
@@ -871,9 +871,11 @@ void LayerBuffer::OverlaySource::destroy()
         overlay_control_device_t* overlay_dev = mOverlayDevice;
         overlay_dev->destroyOverlay(overlay_dev, mOverlay);
         mOverlay = 0;
-        const DisplayHardware& hw(mLayer.mFlinger->
-                                   graphicPlane(0).displayHardware());
-        hw.videoOverlayStarted(false);
+        if(!showNoUI) {
+            const DisplayHardware& hw(mLayer.mFlinger->
+                                       graphicPlane(0).displayHardware());
+            hw.videoOverlayStarted(false);
+        }
         mLayer.mFlinger->enableOverlayOpt(true);
     }
 }

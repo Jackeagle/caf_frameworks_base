@@ -47,7 +47,7 @@ class LayerBuffer : public LayerBaseClient
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual bool transformed() const;
-        virtual void destroy() { }
+        virtual void destroy(int showNoUI = 0) { }
     protected:
         LayerBuffer& mLayer;
     };
@@ -86,7 +86,7 @@ public:
         return mTransformedBounds;
     }
 
-    void serverDestroy();
+    void serverDestroy(int showNoUI = 0);
 
 private:
     struct NativeBuffer {
@@ -135,7 +135,7 @@ private:
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers();
         virtual bool transformed() const;
-        virtual void destroy() { }
+        virtual void destroy(int showNoUI = 0) { }
 
     private:
         status_t initTempBuffer() const;
@@ -161,15 +161,15 @@ private:
         virtual void onDraw(const Region& clip) const;
         virtual void onTransaction(uint32_t flags);
         virtual void onVisibilityResolved(const Transform& planeTransform);
-        virtual void destroy();
+        virtual void destroy(int showNoUI = 0);
     private:
 
         class OverlayChannel : public BnOverlay {
             wp<LayerBuffer> mLayer;
-            virtual void destroy() {
+            virtual void destroy(int showNoUI = 0) {
                 sp<LayerBuffer> layer(mLayer.promote());
                 if (layer != 0) {
-                    layer->serverDestroy();
+                    layer->serverDestroy(showNoUI);
                 }
             }
         public:

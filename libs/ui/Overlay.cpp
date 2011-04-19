@@ -102,7 +102,7 @@ void* Overlay::getBufferAddress(overlay_buffer_t buffer)
     return mOverlayData->getBufferAddress(mOverlayData, buffer);
 }
 
-void Overlay::destroy() {  
+void Overlay::destroy(int showNoUI) {
 
     // Must delete the objects in reverse creation order, thus the
     //  data side must be closed first and then the destroy send to
@@ -115,7 +115,7 @@ void Overlay::destroy() {
     }
 
     if (mOverlayRef != 0) {
-        mOverlayRef->mOverlayChannel->destroy();
+        mOverlayRef->mOverlayChannel->destroy(showNoUI);
     } else {
         LOGD("Overlay::destroy mOverlayRef is NULL");
     }

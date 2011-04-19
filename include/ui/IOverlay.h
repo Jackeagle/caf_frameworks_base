@@ -32,7 +32,8 @@ class IOverlay : public IInterface
 public: 
     DECLARE_META_INTERFACE(Overlay);
 
-    virtual void destroy() = 0; // one-way
+    virtual void destroy(int showNoUI = 0) = 0;
+
 };
 
 // ----------------------------------------------------------------------------

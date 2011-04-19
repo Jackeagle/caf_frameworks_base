@@ -72,7 +72,7 @@ public:
     Overlay(const sp<OverlayRef>& overlayRef);
 
     /* destroys this overlay */
-    void destroy();
+    void destroy(int showNoUI = 0);
     
     /* get the HAL handle for this overlay */
     overlay_handle_t getHandleRef() const;

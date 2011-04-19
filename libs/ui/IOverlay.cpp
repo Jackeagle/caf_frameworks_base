@@ -37,11 +37,12 @@ public:
     {
     }
 
-    virtual void destroy()
+    virtual void destroy(int showNoUI)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IOverlay::getInterfaceDescriptor());
-        remote()->transact(DESTROY, data, &reply, IBinder::FLAG_ONEWAY);
+        data.writeInt32(showNoUI);
+        remote()->transact(DESTROY, data, &reply);
     }
 };
 
@@ -55,7 +56,8 @@ status_t BnOverlay::onTransact(
     switch(code) {
         case DESTROY: {
             CHECK_INTERFACE(IOverlay, data, reply);
-            destroy();
+            int showNoUI = data.readInt32();
+            destroy(showNoUI);
             return NO_ERROR;
         } break;
         default:
