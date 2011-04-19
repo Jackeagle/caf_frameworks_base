@@ -118,16 +118,20 @@ AudioTrack::AudioTrack(
 
 AudioTrack::AudioTrack(
         int streamType,
+        uint32_t sampleRate,
         int format,
+        int channels,
         uint32_t flags,
-        int sessionId)
+        int sessionId,
+        int lpaSessionId)
     : mStatus(NO_INIT), mAudioSession(-1)
 {
-    mStatus = set(streamType, format, flags, sessionId);
+    mStatus = set(streamType, sampleRate, format, channels, flags, sessionId, lpaSessionId);
 }
 
 AudioTrack::~AudioTrack()
 {
+    LOGV("AudioTrack dtor");
     LOGV_IF(mSharedBuffer != 0, "Destructor sharedBuffer: %p", mSharedBuffer->pointer());
 
     if (mStatus == NO_ERROR) {
@@ -143,6 +147,15 @@ AudioTrack::~AudioTrack()
             mAudioTrack.clear();
         }
         if(mAudioSession >= 0) {
+            const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
+            if (audioFlinger != 0) {
+                status_t status;
+                LOGV("Calling AudioFlinger::deleteSession");
+                audioFlinger->deleteSession();
+            } else {
+                LOGE("Could not get audioflinger");
+            }
+
             AudioSystem::closeSession(mAudioSession);
             mAudioSession = -1;
         }
@@ -269,9 +282,12 @@ status_t AudioTrack::set(
 
 status_t AudioTrack::set(
         int streamType,
+        uint32_t sampleRate,
         int format,
+        int channels,
         uint32_t flags,
-        int sessionId)
+        int sessionId,
+        int lpaSessionId)
 {
     // handle default values first.
     if (streamType == AudioSystem::DEFAULT) {
@@ -292,7 +308,7 @@ status_t AudioTrack::set(
     }
 
     audio_io_handle_t output = AudioSystem::getSession((AudioSystem::stream_type)streamType,
-            format, (AudioSystem::output_flags)flags, sessionId);
+            format, (AudioSystem::output_flags)flags, lpaSessionId);
 
     if (output == 0) {
         LOGE("Could not get audio output for stream type %d", streamType);
@@ -321,7 +337,23 @@ status_t AudioTrack::set(
     mFlags = flags;
     mAudioTrack = NULL;
     mAudioSession = output;
+    mSessionId = sessionId;
+    mAuxEffectId = 0;
 
+    const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
+    if (audioFlinger == 0) {
+       LOGE("Could not get audioflinger");
+       return NO_INIT;
+    }
+    status_t status;
+    audioFlinger->createSession(getpid(),
+                                sampleRate,
+                                channels,
+                                &mSessionId,
+                                &status);
+    if(status != NO_ERROR) {
+        LOGE("createSession returned with status %d", status);
+    }
     /* Make the track active and start output */
     android_atomic_or(1, &mActive);
     AudioSystem::startOutput(output, (AudioSystem::stream_type)mStreamType);

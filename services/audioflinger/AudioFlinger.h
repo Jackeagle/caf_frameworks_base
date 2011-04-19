@@ -1,6 +1,7 @@
 /* //device/include/server/AudioFlinger/AudioFlinger.h
 **
 ** Copyright 2007, The Android Open Source Project
+** Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -83,6 +84,15 @@ public:
                                 int output,
                                 int *sessionId,
                                 status_t *status);
+
+    virtual     void        createSession(
+                                pid_t pid,
+                                uint32_t sampleRate,
+                                int channelCount,
+                                int *sessionId,
+                                status_t *status);
+
+    virtual     void        deleteSession();
 
     virtual     uint32_t    sampleRate(int output) const;
     virtual     int         channelCount(int output) const;
@@ -225,6 +235,10 @@ public:
                                 uint32_t flags);
 
                 uint32_t    getMode() { return mMode; }
+
+                void applyEffectsOn(int16_t *buffer1,
+                                    int16_t *buffer2,
+                                    int size);
 
 private:
                             AudioFlinger();
@@ -970,7 +984,10 @@ private:
                          void *pReplyData);
 
         void reset_l();
-        status_t configure();
+        status_t configure(bool isForLPA = false,
+                           int sampleRate = 0,
+                           int channelCount = 0,
+                           int frameCount = 0);
         status_t init();
         uint32_t state() {
             return mState;
@@ -1002,6 +1019,9 @@ private:
         status_t         setDevice(uint32_t device);
         status_t         setVolume(uint32_t *left, uint32_t *right, bool controller);
         status_t         setMode(uint32_t mode);
+
+        bool             isOnLPA() { return mIsForLPA;}
+        void             setLPAFlag(bool isForLPA) {mIsForLPA = isForLPA; }
 
         status_t         dump(int fd, const Vector<String16>& args);
 
@@ -1038,6 +1058,7 @@ private:
         uint32_t mMaxDisableWaitCnt;    // maximum grace period before forcing an effect off after
                                         // sending disable command.
         uint32_t mDisableWaitCnt;       // current process() calls count during disable period.
+        bool     mIsForLPA;
     };
 
     // The EffectHandle class implements the IEffect interface. It provides resources
@@ -1124,6 +1145,7 @@ private:
 
         status_t addEffect_l(const sp<EffectModule>& handle);
         size_t removeEffect_l(const sp<EffectModule>& handle);
+        size_t getNumEffects() { return mEffects.size(); }
 
         int sessionId() {
             return mSessionId;
@@ -1131,6 +1153,7 @@ private:
 
         sp<EffectModule> getEffectFromDesc_l(effect_descriptor_t *descriptor);
         sp<EffectModule> getEffectFromId_l(int id);
+        sp<EffectModule> getEffectFromIndex_l(int idx);
         bool setVolume_l(uint32_t *left, uint32_t *right);
         void setDevice_l(uint32_t device);
         void setMode_l(uint32_t mode);
@@ -1158,6 +1181,8 @@ private:
                  { mStrategy = strategy; }
 
         status_t dump(int fd, const Vector<String16>& args);
+        bool isForLPATrack() {return mIsForLPATrack; }
+        void setLPAFlag(bool flag) {mIsForLPATrack = flag;}
 
     protected:
 
@@ -1178,6 +1203,7 @@ private:
         uint32_t mNewLeftVolume;       // new volume on left channel
         uint32_t mNewRightVolume;      // new volume on right channel
         uint32_t mStrategy; // strategy for this effect chain
+        bool     mIsForLPATrack;
     };
 
     friend class RecordThread;
@@ -1211,10 +1237,13 @@ private:
                 int                                 mLPAStreamType;
                 AudioStreamOut                     *mLPAOutput;
                 audio_io_handle_t                   mLPAHandle;
-                //KeyedVector<audio_io_handle_t, AudioStreamOut *> mOutputSessions;   // list of output descriptors
                 int                                 mLPAStreamIsActive;
-
-
+                volatile bool                       mIsEffectConfigChanged;
+        public:
+                int                                 mLPASessionId;
+                sp<EffectChain>                     mLPAEffectChain;
+                int                                 mLPASampleRate;
+                int                                 mLPANumChannels;
 };
 
 // ----------------------------------------------------------------------------

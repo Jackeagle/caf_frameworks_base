@@ -84,14 +84,15 @@ private:
     bool mSeeked;
     bool a2dpDisconnectPause; 
     bool a2dpThreadStarted;
-    bool asyncReset;
+    volatile bool asyncReset;
 
     //Structure to hold pmem buffer information
     class BuffersAllocated {
     public:
-        BuffersAllocated(void *buf, int32_t nSize, int32_t fd) :
-        pmemBuf(buf), pmemBufsize(nSize), pmemFd(fd)
+        BuffersAllocated(void *buf1, void *buf2, int32_t nSize, int32_t fd) :
+        localBuf(buf1), pmemBuf(buf2), pmemBufsize(nSize), pmemFd(fd)
         {}
+        void* localBuf;
         void* pmemBuf;
         int32_t pmemBufsize;
         int32_t pmemFd;
@@ -99,6 +100,7 @@ private:
     };
     List<BuffersAllocated> pmemBuffersRequestQueue;
     List<BuffersAllocated> pmemBuffersResponseQueue;
+    List<BuffersAllocated> effectsQueue;
 
     void *pmemBufferAlloc(int32_t nSize, int32_t *pmem_fd);
     void pmemBufferDeAlloc();
@@ -107,16 +109,19 @@ private:
     pthread_t eventThread;
     pthread_t decoderThread;
     pthread_t A2DPThread;
+    pthread_t EffectsThread;
 
     //Kill Thread boolean
     bool killDecoderThread;
     bool killEventThread;
     bool killA2DPThread;
+    bool killEffectsThread;
 
     //Thread alive boolean
     bool decoderThreadAlive;
     bool eventThreadAlive;
     bool a2dpThreadAlive;
+    bool effectsThreadAlive;
 
     //Declare the condition Variables and Mutex
     pthread_mutex_t pmem_request_mutex;
@@ -124,10 +129,13 @@ private:
     pthread_mutex_t decoder_mutex;
     pthread_mutex_t event_mutex;
     pthread_mutex_t a2dp_mutex;
+    pthread_mutex_t effect_mutex;
+    pthread_mutex_t apply_effect_mutex;
 
     pthread_cond_t event_cv;
     pthread_cond_t decoder_cv;
     pthread_cond_t a2dp_cv;
+    pthread_cond_t effect_cv;
 
     // make sure Decoder thread has exited
     void requestAndWaitForDecoderThreadExit();
@@ -138,16 +146,21 @@ private:
     // make sure the A2dp thread also exited
     void requestAndWaitForA2DPThreadExit();
 
+    // make sure the Effects thread also exited
+    void requestAndWaitForEffectsThreadExit();
+
     static void *eventThreadWrapper(void *me);
     void eventThreadEntry();
     static void *decoderThreadWrapper(void *me);
     void decoderThreadEntry();
     static void *A2DPThreadWrapper(void *me);
     void A2DPThreadEntry();
+    static void *EffectsThreadWrapper(void *me);
+    void EffectsThreadEntry();
 
     void createThreads();
 
-    volatile bool bIsA2DPEnabled, bIsAudioRouted;
+    volatile bool bIsA2DPEnabled, bIsAudioRouted, bEffectConfigChanged;
 
     //Structure to recieve the BT notification from the flinger.
     class AudioFlingerLPAdecodeClient: public IBinder::DeathRecipient, public BnAudioFlingerClient {

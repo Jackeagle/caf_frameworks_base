@@ -41,6 +41,7 @@
 #include "include/AwesomePlayer.h"
 
 #define PMEM_BUFFER_SIZE 524288
+//#define PMEM_BUFFER_SIZE (4800 * 4)
 #define PMEM_BUFFER_COUNT 4
 
 namespace android {
@@ -99,10 +100,13 @@ AudioPlayer(audioSink,observer) {
         LOGV("pcm_lp_dec: pcm_lp_dec Driver opened");
     }
     getAudioFlinger();
+    LOGV("Registering client with AudioFlinger");
     mAudioFlinger->registerClient(AudioFlingerClient);
     mAudioSinkOpen = false;
     a2dpThreadStarted = true;
     asyncReset = false;
+
+    bEffectConfigChanged = false;
 }
 
 LPAPlayer::~LPAPlayer() {
@@ -156,7 +160,8 @@ void LPAPlayer::AudioFlingerLPAdecodeClient::binderDied(const wp<IBinder>& who) 
 void LPAPlayer::AudioFlingerLPAdecodeClient::ioConfigChanged(int event, int ioHandle, void *param2) {
     LOGV("ioConfigChanged() event %d", event);
 
-    if ( event != AudioSystem::A2DP_OUTPUT_STATE ) {
+    if ( event != AudioSystem::A2DP_OUTPUT_STATE &&
+         event != AudioSystem::EFFECT_CONFIG_CHANGED) {
         return;
     }
 
@@ -185,6 +190,19 @@ void LPAPlayer::AudioFlingerLPAdecodeClient::ioConfigChanged(int event, int ioHa
             }
         }
         break;
+    case AudioSystem::EFFECT_CONFIG_CHANGED:
+        {
+            LOGV("Received notification for change in effect module");
+            // Seek to current media time - flush the decoded buffers with the driver
+            if(!pBaseClass->bIsA2DPEnabled) {
+                pthread_mutex_lock(&pBaseClass->effect_mutex);
+                pBaseClass->bEffectConfigChanged = true;
+                pthread_mutex_unlock(&pBaseClass->effect_mutex);
+                // Signal effects thread to re-apply effects
+                LOGV("Signalling Effects Thread");
+                pthread_cond_signal(&pBaseClass->effect_cv);
+            }
+        }
     }
 
     LOGV("ioConfigChanged Out");
@@ -322,8 +340,9 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
         }
 
         if (!bIsA2DPEnabled) {
-            LOGV("Opening a routing session for audio playback: sessionId = %d", sessionId);
-            status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId);
+            LOGV("Opening a routing session for audio playback: sessionId = %d mSampleRate %d numChannels %d",
+                 sessionId, mSampleRate, numChannels);
+            status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId, mSampleRate, numChannels);
             if (err != OK) {
                 if (mFirstBuffer != NULL) {
                     mFirstBuffer->release();
@@ -385,7 +404,7 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
     timePlayed  = time_us;
     timeStarted = 0;
 
-    LOGV("In seekTo(), mSeekTimeUs %u",mSeekTimeUs);
+    LOGV("In seekTo(), mSeekTimeUs %lld",mSeekTimeUs);
     if (!bIsA2DPEnabled) {
         if(mIsDriverStarted) {
             if (!isPaused) {
@@ -468,7 +487,9 @@ void LPAPlayer::resume() {
             mAudioSink->stop();
             mAudioSink->close();
             mAudioSinkOpen = false;
-            status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId);
+            LOGV("resume:: opening audio session with mSampleRate %d numChannels %d sessionId %d",
+                 mSampleRate, numChannels, sessionId);
+            status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId,  mSampleRate, numChannels);
             a2dpDisconnectPause = false;
             mInternalSeeking = true;
             mReachedEOS = false;
@@ -582,26 +603,32 @@ void LPAPlayer::reset() {
     asyncReset = true;
 
     if(!bIsA2DPEnabled) {
-        ioctl(afd,AUDIO_FLUSH,0);
         mIsDriverStarted = false;
         ioctl(afd,AUDIO_STOP,0);
-        mAudioSink->closeSession();
     }
 
-    LOGV("reset() pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",
-         pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
+    LOGV("reset() requestQueue.size() = %d, responseQueue.size() = %d effectsQueue.size() = %d",
+         pmemBuffersRequestQueue.size(), pmemBuffersResponseQueue.size(), effectsQueue.size());
+
+    // make sure the Effects thread has exited
+    requestAndWaitForEffectsThreadExit();
 
     // make sure Decoder thread has exited
     requestAndWaitForDecoderThreadExit();
 
-    // make sure the event thread also has exited if it has not done before.
+    // make sure the event thread also has exited
     requestAndWaitForEventThreadExit();
 
     requestAndWaitForA2DPThreadExit();
 
-    if (mAudioSink.get() != NULL) {
+    // Close the audiosink after all the threads exited to make sure
+    // there is no thread writing data to audio sink or applying effect
+    if (bIsA2DPEnabled) {
+        mAudioSink->close();
+    } else {
         mAudioSink->closeSession();
     }
+    mAudioSink.clear();
 
     // Make sure to release any buffer we hold onto so that the
     // source is able to stop().
@@ -731,15 +758,15 @@ void LPAPlayer::decoderThreadEntry() {
         } 
         //Queue up the buffers for writing either for A2DP or LPA Driver
         else {
+            struct msm_audio_aio_buf aio_buf_local;
+
             LOGV("Calling fillBuffer for size %d",PMEM_BUFFER_SIZE);
-            buf.bytesToWrite = fillBuffer(buf.pmemBuf, PMEM_BUFFER_SIZE);
+            buf.bytesToWrite = fillBuffer(buf.localBuf, PMEM_BUFFER_SIZE);
             LOGV("fillBuffer returned size %d",buf.bytesToWrite);
 
             /* TODO: Check if we have to notify the app if an error occurs */
             if (!bIsA2DPEnabled) {
                 if ( buf.bytesToWrite > 0) {
-                    struct msm_audio_aio_buf aio_buf_local;
-
                     memset(&aio_buf_local, 0, sizeof(msm_audio_aio_buf));
                     aio_buf_local.buf_addr = buf.pmemBuf;
                     aio_buf_local.buf_len = buf.bytesToWrite;
@@ -754,12 +781,6 @@ void LPAPlayer::decoderThreadEntry() {
                     if (timeStarted == 0) {
                         timeStarted = nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC));
                     }
-                    if (!asyncReset) {
-                        LOGV("Wrting buffer to driver with pmem fd %d", buf.pmemFd);
-                        if ( ioctl(afd, AUDIO_ASYNC_WRITE, &aio_buf_local) < 0 ) {
-                            LOGE("error on async write\n");
-                        }
-                    }
                 } else {
                     /* Put the buffer back into requestQ */
                     pthread_mutex_lock(&pmem_request_mutex);
@@ -773,8 +794,25 @@ void LPAPlayer::decoderThreadEntry() {
             pmemBuffersResponseQueue.push_back(buf);
             pthread_mutex_unlock(&pmem_response_mutex);
 
-            if (!bIsA2DPEnabled)
+            if (!bIsA2DPEnabled){
                 pthread_cond_signal(&event_cv);
+                // Make sure the buffer is added to response Q before applying effects
+                // If there is a change in effects while applying on current buffer
+                // it will be re applied as the buffer already present in responseQ
+                if (!asyncReset) {
+                    pthread_mutex_lock(&apply_effect_mutex);
+                    LOGV("decoderThread: applying effects on pmem buf with fd %d", buf.pmemFd);
+                    mAudioFlinger->applyEffectsOn((int16_t*)buf.localBuf,
+                                                  (int16_t*)buf.pmemBuf,
+                                                  (int)buf.bytesToWrite);
+                    pthread_mutex_unlock(&apply_effect_mutex);
+
+                    LOGV("decoderThread: Writing buffer to driver with pmem fd %d", buf.pmemFd);
+                    if ( ioctl(afd, AUDIO_ASYNC_WRITE, &aio_buf_local) < 0 ) {
+                        LOGE("error on async write\n");
+                    }
+                }
+            }
             else
                 pthread_cond_signal(&a2dp_cv);
         }
@@ -802,6 +840,7 @@ void LPAPlayer::eventThreadEntry() {
     pthread_mutex_unlock(&event_mutex);
 
     if (killEventThread) {
+        eventThreadAlive = false;
         LOGV("Event Thread is dying.");
         return;
     }
@@ -1007,7 +1046,8 @@ void LPAPlayer::A2DPThreadEntry() {
             uint32_t bytesWritten = 0;
             uint32_t numBytesRemaining = 0;
             uint32_t bytesAvailInBuffer = 0;
-            void* data = buf.pmemBuf;
+            void* data = buf.localBuf;
+
             while (bytesToWrite) {
                 /* If exitPending break here */
                 if (killA2DPThread || !bIsA2DPEnabled) {
@@ -1065,7 +1105,7 @@ void LPAPlayer::A2DPThreadEntry() {
             //flush out old buffer
             if (mSeeked || !bIsA2DPEnabled) {
                 mSeeked = false;
-                LOGV("%s: Putting buffers back to requestQ from responseQ");
+                LOGV("A2DPThread: Putting buffers back to requestQ from responseQ");
                 pthread_mutex_lock(&pmem_response_mutex);
                 while (!pmemBuffersResponseQueue.empty()) {
                     List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
@@ -1091,9 +1131,72 @@ void LPAPlayer::A2DPThreadEntry() {
     LOGV("A2DP Thread is dying.");
 }
 
+void *LPAPlayer::EffectsThreadWrapper(void *me) {
+    static_cast<LPAPlayer *>(me)->EffectsThreadEntry();
+    return NULL;
+}
+
+void LPAPlayer::EffectsThreadEntry() {
+    while(1) {
+        if(killEffectsThread) {
+            break;
+        }
+        pthread_mutex_lock(&effect_mutex);
+
+        if(bEffectConfigChanged) {
+            bEffectConfigChanged = false;
+
+            // 1. Clear current effectQ
+            LOGV("Clearing EffectQ: size %d", effectsQueue.size());
+            while (!effectsQueue.empty())  {
+                List<BuffersAllocated>::iterator it = effectsQueue.begin();
+                effectsQueue.erase(it);
+            }
+
+            // 2. Lock the responseQ mutex
+            pthread_mutex_lock(&pmem_response_mutex);
+
+            // 3. Copy responseQ to effectQ
+            LOGV("Copying responseQ to effectQ: responseQ size %d", pmemBuffersResponseQueue.size());
+            for (List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
+                it != pmemBuffersResponseQueue.end(); ++it) {
+                BuffersAllocated buf = *it;
+                effectsQueue.push_back(buf);
+            }
+
+            // 4. Unlock the responseQ mutex
+            pthread_mutex_unlock(&pmem_response_mutex);
+        }
+        // If effectQ is empty just wait for a signal
+        // Else dequeue a buffer, apply effects and delete it from effectQ
+        if(effectsQueue.empty() || asyncReset || bIsA2DPEnabled) {
+            LOGV("EffectQ is empty or Reset called or A2DP enabled, waiting for signal");
+            pthread_cond_wait(&effect_cv, &effect_mutex);
+            LOGV("effectsThread: received signal to wake up");
+            pthread_mutex_unlock(&effect_mutex);
+        } else {
+            pthread_mutex_unlock(&effect_mutex);
+
+            List<BuffersAllocated>::iterator it = effectsQueue.begin();
+            BuffersAllocated buf = *it;
+
+            pthread_mutex_lock(&apply_effect_mutex);
+            LOGV("effectsThread: applying effects on %p fd %d", buf.pmemBuf, (int)buf.pmemFd);
+            mAudioFlinger->applyEffectsOn((int16_t*)buf.localBuf,
+                                          (int16_t*)buf.pmemBuf,
+                                          (int)buf.bytesToWrite);
+            pthread_mutex_unlock(&apply_effect_mutex);
+            effectsQueue.erase(it);
+        }
+    }
+    LOGV("Effects thread is dead");
+    effectsThreadAlive = false;
+}
+
 void *LPAPlayer::pmemBufferAlloc(int32_t nSize, int32_t *pmem_fd){
     int32_t pmemfd = -1;
     void  *pmem_buf = NULL;
+    void  *local_buf = NULL;
 
     // 1. Open the pmem_audio
     pmemfd = open("/dev/pmem_audio", O_RDWR);
@@ -1111,8 +1214,16 @@ void *LPAPlayer::pmemBufferAlloc(int32_t nSize, int32_t *pmem_fd){
         return NULL;
     }
 
+    local_buf = malloc(nSize);
+    if (NULL == local_buf) {
+        // unmap the corresponding PMEM buffer and close the fd
+        munmap(pmem_buf, PMEM_BUFFER_SIZE);
+        close(pmemfd);
+        return NULL;
+    }
+
     // 3. Store this information for internal mapping / maintanence
-    BuffersAllocated buf(pmem_buf, nSize, pmemfd);
+    BuffersAllocated buf(local_buf, pmem_buf, nSize, pmemfd);
     pmemBuffersRequestQueue.push_back(buf);
 
     // 4. Send the pmem fd information
@@ -1140,9 +1251,12 @@ void LPAPlayer::pmemBufferDeAlloc()
         munmap(pmemBuffer.pmemBuf, PMEM_BUFFER_SIZE);
         LOGV("closing the pmem fd");
         close(pmemBuffer.pmemFd);
+        // free the local buffer corresponding to pmem buffer
+        free(pmemBuffer.localBuf);
         LOGV("Removing from request Q");
         pmemBuffersRequestQueue.erase(it);
     }
+
     //Remove all the buffers from response queue
     while(!pmemBuffersResponseQueue.empty()){
         List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
@@ -1157,6 +1271,8 @@ void LPAPlayer::pmemBufferDeAlloc()
         munmap(pmemBuffer.pmemBuf, PMEM_BUFFER_SIZE);
         LOGV("closing the pmem fd");
         close(pmemBuffer.pmemFd);
+        // free the local buffer corresponding to pmem buffer
+        free(pmemBuffer.localBuf);
         LOGV("Removing from response Q");
         pmemBuffersResponseQueue.erase(it);
     }
@@ -1170,12 +1286,15 @@ void LPAPlayer::createThreads() {
     pthread_mutex_init(&decoder_mutex, NULL);
     pthread_mutex_init(&event_mutex, NULL);
     pthread_mutex_init(&a2dp_mutex, NULL);
+    pthread_mutex_init(&effect_mutex, NULL);
+    pthread_mutex_init(&apply_effect_mutex, NULL);
 
     pthread_cond_init (&event_cv, NULL);
     pthread_cond_init (&decoder_cv, NULL);
     pthread_cond_init (&a2dp_cv, NULL);
+    pthread_cond_init (&effect_cv, NULL);
 
-    // Create 4 threads LPA, decoder, event and A2dp
+    // Create 4 threads Effect, decoder, event and A2dp
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -1183,9 +1302,13 @@ void LPAPlayer::createThreads() {
     killDecoderThread = false;
     killEventThread = false;
     killA2DPThread = false;
+    killEffectsThread = false;
+
     decoderThreadAlive = true;
     eventThreadAlive = true;
     a2dpThreadAlive = true;
+    effectsThreadAlive = true;
+
     LOGV("Creating Event Thread");
     pthread_create(&eventThread, &attr, eventThreadWrapper, this);
 
@@ -1194,6 +1317,10 @@ void LPAPlayer::createThreads() {
 
     LOGV("Creating A2dp Thread");
     pthread_create(&A2DPThread, &attr, A2DPThreadWrapper, this);
+
+    LOGV("Creating Effects Thread");
+    pthread_create(&EffectsThread, &attr, EffectsThreadWrapper, this);
+
     pthread_attr_destroy(&attr);
 }
 
@@ -1296,6 +1423,15 @@ size_t LPAPlayer::fillBuffer(void *data, size_t size) {
                     } else {
                         /* TODO: LPA driver needs to be reconfigured
                            For MP3 we might not come here but for AAC we need this */
+                        mAudioSink->stop();
+                        mAudioSink->closeSession();
+                        LOGV("Opening a routing session in fillBuffer: sessionId = %d mSampleRate %d numChannels %d",
+                             sessionId, mSampleRate, numChannels);
+                        status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId, mSampleRate, numChannels);
+                        if (err != OK) {
+                            mSource->stop();
+                            return err;
+                        }
                     }
                     break;
                 } else {
@@ -1440,6 +1576,15 @@ void LPAPlayer::requestAndWaitForA2DPThreadExit() {
     pthread_cond_signal(&a2dp_cv);
     pthread_join(A2DPThread,NULL);
     LOGV("a2dp thread killed");
+}
+
+void LPAPlayer::requestAndWaitForEffectsThreadExit() {
+    if (!effectsThreadAlive)
+        return;
+    killEffectsThread = true;
+    pthread_cond_signal(&effect_cv);
+    pthread_join(EffectsThread,NULL);
+    LOGV("effects thread killed");
 }
 
 void LPAPlayer::onPauseTimeOut() {
