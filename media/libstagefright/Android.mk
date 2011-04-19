@@ -1,8 +1,8 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-ifneq (, $(filter  msm7627_ffa msm7627_surf, $(QCOM_TARGET_PRODUCT)))
-    LOCAL_CFLAGS += -DTARGET7x27
+ifeq "$(findstring msm7627,$(QCOM_TARGET_PRODUCT))" "msm7627"
+    LOCAL_CFLAGS += -DUSE_AAC_HW_DEC
 endif
 
 include frameworks/base/media/libstagefright/codecs/common/Config.mk
