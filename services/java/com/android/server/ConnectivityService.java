@@ -1945,6 +1945,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      */
     public boolean teardown(int networkType) {
         // TODO check input bounds
+        if (networkType == ConnectivityManager.TYPE_WIFI) {
+            mNetTrackers[networkType].resetTornDownbyConnMgr();
+        }
+
         return teardown(mNetTrackers[networkType]);
     }
     /** {@hide} */
