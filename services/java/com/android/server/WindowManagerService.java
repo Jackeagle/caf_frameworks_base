@@ -2463,9 +2463,12 @@ public class WindowManagerService extends IWindowManager.Stub
                             if (mInputMethodWindow == win) {
                                 mInputMethodWindow = null;
                             }
-                            /* if it is wallpaper preview, do not destroy the surface*/
-                            if (win.getAttrs().type != TYPE_APPLICATION_MEDIA_OVERLAY && win.mAttrs.windowAnimations != com.android.internal.R.style.Animation_Wallpaper)
+                            //Destroy the surface, only if it is not wallpaper preview
+                            if (!(win.getAttrs().type == TYPE_APPLICATION_MEDIA_OVERLAY &&
+                                win.mAttrs.windowAnimations ==
+                                com.android.internal.R.style.Animation_Wallpaper)) {
                                 win.destroySurfaceLocked();
+                            }
                         }
                     }
                 }
@@ -9604,9 +9607,12 @@ public class WindowManagerService extends IWindowManager.Stub
                 if (win == mWallpaperTarget) {
                     wallpaperDestroyed = true;
                 }
-                /*if it is wallpaper preview, do not destroy the surface*/
-                if (win.getAttrs().type != TYPE_APPLICATION_MEDIA_OVERLAY &&  win.mAttrs.windowAnimations != com.android.internal.R.style.Animation_Wallpaper)
+                //Destroy the surface, if not wallpaper preview
+                if(!(win.getAttrs().type == TYPE_APPLICATION_MEDIA_OVERLAY &&
+                    win.mAttrs.windowAnimations ==
+                    com.android.internal.R.style.Animation_Wallpaper)) {
                     win.destroySurfaceLocked();
+                }
             } while (i > 0);
             mDestroySurface.clear();
         }
