@@ -864,6 +864,8 @@
   <public type="drawable" name="stat_notify_sync" id="0x0108007c" />
   <public type="drawable" name="stat_notify_sync_noanim" id="0x0108007d" />
   <public type="drawable" name="stat_notify_voicemail" id="0x0108007e" />
+  <public type="drawable" name="stat_notify_voicemail_sub1" id="0x010800b2" />
+  <public type="drawable" name="stat_notify_voicemail_sub2" id="0x010800b3" />
   <public type="drawable" name="stat_notify_missed_call" id="0x0108007f" />
   <public type="drawable" name="stat_sys_data_bluetooth" id="0x01080080" />
   <public type="drawable" name="stat_sys_download" id="0x01080081" />
