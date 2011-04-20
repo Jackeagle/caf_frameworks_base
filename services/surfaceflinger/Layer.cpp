@@ -539,7 +539,7 @@ bool Layer::setBypass(bool enable)
 {
 #if defined(SF_BYPASS)
     const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
-    if (!hw.isOverlayUIEnabled() ||
+    if (!hw.isOverlayUIEnabled() || getStereoscopic3DFormat() ||
                   getUseOriginalSurfaceResolution())
         return false;
 
