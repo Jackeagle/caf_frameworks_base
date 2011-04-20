@@ -90,10 +90,6 @@ LOCAL_SHARED_LIBRARIES += \
         libstagefright_foundation \
         libstagefright_color_conversion
 
-ifeq ($(BUILD_WITHOUT_PV),true)
-LOCAL_CFLAGS += -DNO_OPENCORE
-endif
-
 ifeq ($(TARGET_OS)-$(TARGET_SIMULATOR),linux-true)
         LOCAL_LDLIBS += -lpthread -ldl
         LOCAL_SHARED_LIBRARIES += libdvm
