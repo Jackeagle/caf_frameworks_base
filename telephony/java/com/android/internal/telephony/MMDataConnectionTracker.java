@@ -165,7 +165,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     private static final boolean SUPPORT_SERVICE_ARBITRATION =
         SystemProperties.getBoolean("persist.telephony.ds.arbit", false);
 
-    boolean mIsEhrpdCapable = false;
     //used for NV+CDMA
     String mCdmaHomeOperatorNumeric = null;
 
@@ -291,8 +290,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         mDpt.setServiceTypeEnabled(DataServiceType.SERVICE_TYPE_DEFAULT, !dataDisabledOnBoot);
         mNoAutoAttach = dataDisabledOnBoot;
 
-        mIsEhrpdCapable = SystemProperties.getBoolean("ro.config.ehrpd", false);
-
         if (SystemProperties.getBoolean("persist.cust.tel.sdc.feature", false)) {
             /* use the SOCKET_DATA_CALL_ENABLE setting do determine the boot up value of
              * mMasterDataEnable - but only if persist.cust.tel.sdc.feature is on.
@@ -334,6 +331,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         logv("SUPPORT_IPV6 = " + SUPPORT_IPV6);
         logv("SUPPORT_SERVICE_ARBITRATION = " + SUPPORT_SERVICE_ARBITRATION);
         logv("SUPPORT_OMH = " + mDpt.isOmhEnabled());
+        logv("PROPERTY_SUPPORT_EHRPD = "
+                + SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SUPPORT_EHRPD, false));
+        logv("PROPERTY_SUPPORT_SVLTE1X = "
+                + SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SUPPORT_SVLTE1X, false));
     }
 
     public void update(CommandsInterface ci, Subscription subData) {
@@ -1595,24 +1596,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         RadioTechnology r = getRadioTechnology();
         if (r == RadioTechnology.RADIO_TECH_UNKNOWN || r == null) {
             type = null;
-        } else if (r == RadioTechnology.RADIO_TECH_EHRPD
-                || ( mIsEhrpdCapable && r.isEvdo())) {
-            /*
-             * It might not possible to distinguish an EVDO only network from
-             * one that supports EHRPD. If THIS is an EHRPD capable device, then
-             * we have to make sure that we send APN if its available!
-             */
-            if (mDpt.isAnyDataProfileAvailable(DataProfileType.PROFILE_TYPE_3GPP_APN)) {
-                /* At least one APN is configured, do everything as per APNs available */
-                type = DataProfileType.PROFILE_TYPE_3GPP_APN;
-            } else {
-                /*
-                 * APNs are not configured - just use the default NAI
-                 * as of now just one data call on IPV4 that supports all service types.
-                 */
-                type = DataProfileType.PROFILE_TYPE_3GPP2_NAI;
-            }
-        } else if (r.isGsm()) {
+        } else if (r.isGsm() || r == RadioTechnology.RADIO_TECH_EHRPD) {
             type = DataProfileType.PROFILE_TYPE_3GPP_APN;
         } else {
             if (mDpt.isOmhEnabled()) {
