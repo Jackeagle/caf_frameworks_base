@@ -153,9 +153,13 @@ public class PhoneProxy extends Handler implements Phone {
                 if ((Integer)ar.userObj != mVoiceTechQueryContext) return;
 
                 if (ar.exception == null) {
-                    RadioTechnologyFamily newVoiceTech =
+                    if (ar.result != null && (((int[]) ar.result).length != 0)) {
+                        RadioTechnologyFamily newVoiceTech =
                             RadioTechnologyFamily.getRadioTechFamilyFromInt(((int[]) ar.result)[0]);
-                    updatePhoneObject(newVoiceTech, getSubscription());
+                        updatePhoneObject(newVoiceTech, getSubscription());
+                    } else {
+                        loge("Voice Radio Technology query returned empty string");
+                    }
                 } else {
                     loge("Voice Radio Technology query failed!");
                 }
