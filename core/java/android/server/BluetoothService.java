@@ -125,14 +125,19 @@ public class BluetoothService extends IBluetooth.Stub {
 
     // The timeout used to sent the UUIDs Intent
     // This timeout should be greater than the page timeout
-    private static final int UUID_INTENT_DELAY = 6000;
+    // Some of devices takes more than 15 secons for SDP response,
+    // Therefore, it is better set 30 seconds timeout instead of 6 seconds.
+    private static final int UUID_INTENT_DELAY = 30000;
 
     /** Always retrieve RFCOMM channel for these SDP UUIDs */
     private static final ParcelUuid[] RFCOMM_UUIDS = {
             BluetoothUuid.Handsfree,
             BluetoothUuid.HSP,
             BluetoothUuid.ObexObjectPush,
-            BluetoothUuid.MessageNotificationServer };
+            BluetoothUuid.MessageNotificationServer,
+            BluetoothUuid.DirectPrinting,
+            BluetoothUuid.ReferencePrinting,
+            BluetoothUuid.PrintingStatus };
 
     // TODO(): Optimize all these string handling
     private final Map<String, String> mAdapterProperties;
@@ -140,6 +145,8 @@ public class BluetoothService extends IBluetooth.Stub {
 
     private final HashMap<String, Map<ParcelUuid, Integer>> mDeviceServiceChannelCache;
     private final HashMap<String, Map<ParcelUuid, Integer>> mDeviceL2capPsmCache;
+    private final HashMap<String, Map<String, String>> mDeviceFeatureCache;
+
     private final ArrayList<String> mUuidIntentTracker;
     private final HashMap<RemoteService, IBluetoothCallback> mUuidCallbackTracker;
 
@@ -208,6 +215,7 @@ public class BluetoothService extends IBluetooth.Stub {
         mDeviceProperties = new HashMap<String, Map<String,String>>();
 
         mDeviceServiceChannelCache = new HashMap<String, Map<ParcelUuid, Integer>>();
+        mDeviceFeatureCache = new HashMap<String, Map<String, String>>();
         mDeviceOobData = new HashMap<String, Pair<byte[], byte[]>>();
         mDeviceL2capPsmCache = new HashMap<String, Map<ParcelUuid, Integer>>();
         mUuidIntentTracker = new ArrayList<String>();
@@ -1854,6 +1862,31 @@ public class BluetoothService extends IBluetooth.Stub {
         return -1;
     }
 
+
+    /**
+     * Gets the remote features list associated with the feature name.
+     * Pulls records from the cache only.
+     *
+     * @param address Address of the remote device
+     * @param feature the name of feature to get
+     *
+     * @return feature list string value
+     *         null on error
+     */
+    public String getRemoteFeature(String address, String feature) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        if (!isEnabledInternal()) return null;
+
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
+            return null;
+        }
+
+        Map<String, String> value = mDeviceFeatureCache.get(address);
+        if (value != null && value.containsKey(feature))
+            return value.get(feature);
+        return null;
+    }
+
     /**
      * Gets the L2CAP PSM associated with the UUID.
      * Pulls records from the cache only.
@@ -2019,19 +2052,40 @@ public class BluetoothService extends IBluetooth.Stub {
 
         Map <ParcelUuid, Integer> rfcommValue = new HashMap<ParcelUuid, Integer>();
         Map <ParcelUuid, Integer> l2capPsmValue = new HashMap<ParcelUuid, Integer>();
+        Map <String, String> feature = new HashMap<String, String>();
 
         // Retrieve RFCOMM channel and L2CAP PSM (if available) for default uuids
         for (ParcelUuid uuid : RFCOMM_UUIDS) {
             if (BluetoothUuid.isUuidPresent(deviceUuids, uuid)) {
                 psm = getDeviceServiceChannelNative(getObjectPathFromAddress(address),
                         uuid.toString(), SDP_ATTR_GOEP_L2CAP_PSM);
-                channel = getDeviceServiceChannelNative(getObjectPathFromAddress(address),
-                        uuid.toString(), SDP_ATTR_PROTO_DESC_LIST);
-                if (DBG) log("\tuuid(system): " + uuid + " SCN: " + channel +
-                        " PSM: " + psm);
-                rfcommValue.put(uuid, channel);
                 l2capPsmValue.put(uuid, psm);
+                if (DBG) log("\tuuid(system): " + uuid + " PSM: "+ psm );
+                if(!BluetoothUuid.isPrintingStatus(uuid)){
+                    channel = getDeviceServiceChannelNative(getObjectPathFromAddress(address),
+                             uuid.toString(), SDP_ATTR_PROTO_DESC_LIST);
+                    rfcommValue.put(uuid, channel);
+                    if (DBG) log("\tuuid(system): " + uuid + " SCN: "+ channel );
+                }
             }
+
+            // Retrieve Additional RFCOMM Channel for BPP
+            if (BluetoothUuid.isPrintingStatus(uuid)) {
+                channel = getDeviceServiceChannelNative(getObjectPathFromAddress(address),
+                         uuid.toString(), 0x000d); // find additional Channel Number
+                if (DBG) log("\tuuid(system): " + uuid + " " + channel);
+                rfcommValue.put(uuid, channel);
+            }
+
+            if (BluetoothUuid.isDirectPrinting(uuid)) {
+                String SupportedFormats;
+                SupportedFormats = getDeviceStringAttrValue(getObjectPathFromAddress(address),
+                                   uuid.toString(), 0x0350); // find additional Channel Number
+                if (DBG) log("\tSupportedFormats: " + uuid + " " + SupportedFormats);
+                feature.put("SupportedFormats", SupportedFormats);
+                mDeviceFeatureCache.put(address, feature);
+            }
+
         }
         // Retrieve RFCOMM channel and L2CAP PSM (if available) for
         // application requested uuids
@@ -2604,6 +2658,8 @@ public class BluetoothService extends IBluetooth.Stub {
     private native boolean cancelDeviceCreationNative(String address);
     private native boolean removeDeviceNative(String objectPath);
     private native int getDeviceServiceChannelNative(String objectPath, String uuid,
+            int attributeId);
+    private native String getDeviceStringAttrValue(String objectPath, String uuid,
             int attributeId);
 
     private native boolean cancelPairingUserInputNative(String address, int nativeData);
