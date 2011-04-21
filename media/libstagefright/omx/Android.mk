@@ -1,7 +1,14 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-ifneq ($(BUILD_WITHOUT_PV),true)
+DONT_CONSIDER_PV := true
+ifneq ($(DONT_CONSIDER_PV),true)
+ifneq ($(BUILD_WITHOUT_PV), true)
+DONT_CONSIDER_PV := false
+endif
+endif
+
+ifneq ($(DONT_CONSIDER_PV),true)
 # Set up the OpenCore variables.
 include external/opencore/Config.mk
 LOCAL_C_INCLUDES := $(PV_INCLUDES)
@@ -16,7 +23,7 @@ LOCAL_SRC_FILES:=                     \
         OMXNodeInstance.cpp           \
         OMXMaster.cpp
 
-ifneq ($(BUILD_WITHOUT_PV),true)
+ifneq ($(DONT_CONSIDER_PV),true)
 LOCAL_SRC_FILES += \
         OMXPVCodecsPlugin.cpp
 else
@@ -33,7 +40,7 @@ LOCAL_SHARED_LIBRARIES :=       \
         libcutils               \
         libstagefright_color_conversion
 
-ifneq ($(BUILD_WITHOUT_PV),true)
+ifneq ($(DONT_CONSIDER_PV),true)
 LOCAL_SHARED_LIBRARIES += \
         libopencore_common
 endif
