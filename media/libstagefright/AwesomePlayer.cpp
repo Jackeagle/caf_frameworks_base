@@ -1188,6 +1188,9 @@ void AwesomePlayer::setVideoSource(sp<MediaSource> source) {
 status_t AwesomePlayer::initVideoDecoder(uint32_t flags) {
     flags |= mCodecFlags; //or whatever was added to mCodecFlags
                           //from setParameter calls to the flags
+    if(mFileSource != NULL) {
+        flags |= OMXCodec::kLocalFileMode;
+    }
     mVideoSource = OMXCodec::Create(
             mClient.interface(), mVideoTrack->getFormat(),
             false, // createEncoder
