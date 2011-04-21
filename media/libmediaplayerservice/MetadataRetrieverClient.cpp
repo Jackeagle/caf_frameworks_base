@@ -129,13 +129,26 @@ static sp<MediaMetadataRetrieverBase> createRetriever(player_type playerType)
 
 status_t MetadataRetrieverClient::setDataSource(const char *url)
 {
-    LOGV("setDataSource(%s)", url);
+    LOGW("setDataSource(%s)", url);
     Mutex::Autolock lock(mLock);
     if (url == NULL) {
         return UNKNOWN_ERROR;
     }
     player_type playerType;
     playerType = getPlayerType(url);
+
+    char curr_target[128] = {0};
+    char target[] = "msm8660_";
+    property_get("ro.product.device", curr_target, "0");
+    if(!strncmp(target, curr_target, sizeof(target) - 1)) {
+        char extension[] = ".3g2";
+        int lenURL = strlen(url);
+        int len = strlen(extension);
+        int start = lenURL - len;
+        if (start > 0 && (!strncasecmp(url + start, extension, len))) {
+            playerType =  STAGEFRIGHT_PLAYER;
+        }
+    }
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
     if (p == NULL) return NO_INIT;
