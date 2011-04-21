@@ -33,6 +33,8 @@
 #include "Transform.h"
 #include "TextureManager.h"
 
+#include "DumpFrame.h"
+
 namespace android {
 
 // ---------------------------------------------------------------------------
@@ -240,6 +242,9 @@ private:
     // see threading usage in declaration
     TextureManager mTextureManager;
     BufferManager mBufferManager;
+
+    // Dump layer
+    DumpFrame mDumpFrame;
 
     // binder thread, transaction thread
     mutable Mutex mLock;
