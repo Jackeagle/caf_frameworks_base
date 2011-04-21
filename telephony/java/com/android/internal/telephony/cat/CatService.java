@@ -126,6 +126,7 @@ public class CatService extends Handler implements AppInterface {
 
     // Service members.
     private static CatService sInstance;
+    private static HandlerThread handlerThread;
     private CommandsInterface mCmdIf;
     private Context mContext;
     private CatCmdMessage mCurrntCmd = null;
@@ -199,6 +200,9 @@ public class CatService extends Handler implements AppInterface {
         mCmdIf.unSetOnCatCallSetUp(this);
         mCmdIf.unregisterForIccRefresh(this);
         mCmdIf.unSetOnCatCcAlphaNotify(this);
+        sInstance = null;
+        handlerThread.quit();
+        handlerThread = null;
 
         this.removeCallbacksAndMessages(null);
     }
@@ -750,8 +754,8 @@ public class CatService extends Handler implements AppInterface {
             if (ci == null || context == null) {
                 return null;
             }
-            HandlerThread thread = new HandlerThread("Cat Telephony service");
-            thread.start();
+            handlerThread = new HandlerThread("Cat Telephony service");
+            handlerThread.start();
             sInstance = new CatService(ci, ir, context, fh, ic);
             CatLog.d(sInstance, "NEW sInstance");
             return sInstance;
