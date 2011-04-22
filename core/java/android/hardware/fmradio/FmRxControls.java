@@ -70,8 +70,8 @@ class FmRxControls
    private static final int V4L2_CID_PRIVATE_TAVARUA_RDSON = V4L2_CID_PRIVATE_BASE + 15;
    private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC = V4L2_CID_PRIVATE_BASE + 16;
    private static final int V4L2_CID_PRIVATE_TAVARUA_LP_MODE = V4L2_CID_PRIVATE_BASE + 17;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC = V4L2_CID_PRIVATE_BASE + 21;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET = V4L2_CID_PRIVATE_BASE + 22;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC = V4L2_CID_PRIVATE_BASE + 24;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET = V4L2_CID_PRIVATE_BASE + 25;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
    private static final int V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900;
