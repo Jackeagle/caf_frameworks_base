@@ -185,8 +185,11 @@ status_t AudioSource::start(MetaData *params) {
 
     if (err == OK) {
         mGroup = new MediaBufferGroup;
-        mGroup->add_buffer(new MediaBuffer(mMaxBufferSize));
-
+        if (mFormat == AudioSystem::AMR_NB) {
+            mGroup->add_buffer(new MediaBuffer(mMaxBufferSize/10));
+        } else {
+            mGroup->add_buffer(new MediaBuffer(mMaxBufferSize));
+        }
         mStarted = true;
     }
 
