@@ -533,6 +533,9 @@ jobject newParcelFileDescriptor(JNIEnv* env, jobject fileDesc)
 
 void signalExceptionForError(JNIEnv* env, jobject obj, status_t err)
 {
+    jclass cls;
+    jmethodID mid;
+
     switch (err) {
         case UNKNOWN_ERROR:
             jniThrowException(env, "java/lang/RuntimeException", "Unknown error");
@@ -576,6 +579,11 @@ void signalExceptionForError(JNIEnv* env, jobject obj, status_t err)
         case FAILED_TRANSACTION:
             LOGE("!!! FAILED BINDER TRANSACTION !!!");
             //jniThrowException(env, "java/lang/OutOfMemoryError", "Binder transaction too large");
+            cls = env->GetObjectClass(obj);
+            mid = env->GetMethodID(cls, "callback", "()V");
+            if (mid !=  0) {
+                env->CallVoidMethod(obj, mid);
+            }
             break;
         default:
             LOGE("Unknown binder error code. 0x%x", err);
@@ -950,6 +958,9 @@ static jboolean android_os_BinderProxy_transact(JNIEnv* env, jobject obj,
     } else if (err == UNKNOWN_TRANSACTION) {
         return JNI_FALSE;
     }
+
+    LOGE("Transact on %p in Java object %p with code %d failed\n",
+            target, obj, code);
 
     signalExceptionForError(env, obj, err);
     return JNI_FALSE;
