@@ -162,7 +162,10 @@ CameraSource::CameraSource(const sp<Camera> &camera)
     // Calculate glitch duraton threshold based on frame rate
     int32_t frameRate = params.getPreviewFrameRate();
     const char *hfr_str = params.get("video-hfr");
-    int32_t hfr = atoi(hfr_str);
+    int32_t hfr = -1;
+    if ( hfr_str != NULL ) {
+        hfr = atoi(hfr_str);
+    }
     if(hfr < 0) {
         LOGW("Invalid hfr value(%d) set from app. Disabling HFR.", hfr);
         hfr = 0;
