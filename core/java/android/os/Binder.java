@@ -363,6 +363,17 @@ final class BinderProxy implements IBinder {
     BinderProxy() {
         mSelf = new WeakReference(this);
     }
+
+    private void callback() {
+      try {
+           throw new Exception();
+      } catch (Exception e) {
+           StackTraceElement[] element = e.getStackTrace();
+           for(int i=0; i< element.length; i++) {
+               Log.e("BinderProxy","      " + element[i] + "]");
+           }
+      }
+    }
     
     @Override
     protected void finalize() throws Throwable {
