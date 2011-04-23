@@ -683,8 +683,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
          */
         for (IPVersion ipv : IPVersion.values()) {
 
-            if (mDpt.isServiceTypeActive(ds, ipv) == false)
+            if (mDpt.isServiceTypeActive(ds, ipv) == false) {
+                // reset the service state for this service type,
+                // clears out any connection (v4/v6) that was being retried.
+                mDpt.resetServiceState(ds);
                 continue;
+            }
 
             DataConnection dc = mDpt.getActiveDataConnection(ds, ipv);
             boolean tearDownNeeded = true;
