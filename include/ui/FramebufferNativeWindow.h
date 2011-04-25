@@ -79,6 +79,7 @@ public:
     bool isUpdateOnDemand() const { return mUpdateOnDemand; }
     status_t setUpdateRectangle(const Rect& updateRect);
     status_t compositionComplete();
+    buffer_handle_t getCurrentBufferHandle(ANativeWindow* window);
     
     // for debugging only
     int getCurrentBufferIndex() const;
