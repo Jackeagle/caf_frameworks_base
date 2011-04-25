@@ -109,6 +109,7 @@ status_t AACDecoder::initCheck() {
 
         if (PVMP4AudioDecoderConfig(mConfig, mDecoderBuf)
                 != MP4AUDEC_SUCCESS) {
+            LOGE("PVMP4AudioDecoderConfig failed"); //channels and/or sample rate?
             return ERROR_UNSUPPORTED;
         }
     }
@@ -119,7 +120,8 @@ status_t AACDecoder::initCheck() {
 
       if (PVMP4AudioDecoderConfig(mConfig, mDecoderBuf)
           != MP4AUDEC_SUCCESS) {
-         return ERROR_UNSUPPORTED;
+          LOGE("PVMP4AudioDecoderConfig failed"); //channels and/or sample rate?
+          return ERROR_UNSUPPORTED;
       }
     }
     return OK;
@@ -136,6 +138,11 @@ AACDecoder::~AACDecoder() {
 
 status_t AACDecoder::start(MetaData *params) {
     CHECK(!mStarted);
+
+    if (mInitCheck != OK) {
+        LOGE("InitCheck Failed");
+        return UNKNOWN_ERROR;
+    }
 
     mBufferGroup = new MediaBufferGroup;
     mBufferGroup->add_buffer(new MediaBuffer(4096 * 2));
