@@ -124,8 +124,11 @@ status_t MemoryHeapBase::mapfd(int fd, size_t size, uint32_t offset)
     }
 
     if ((mFlags & DONT_MAP_LOCALLY) == 0) {
+        int flags = (mFlags & MAP_LOCKED_MAP_POPULATE) ?
+                    MAP_POPULATE|MAP_LOCKED : 0;
+
         void* base = (uint8_t*)mmap(0, size,
-                PROT_READ|PROT_WRITE, MAP_SHARED, fd, offset);
+                PROT_READ|PROT_WRITE, MAP_SHARED|flags, fd, offset);
         if (base == MAP_FAILED) {
             LOGE("mmap(fd=%d, size=%u) failed (%s)",
                     fd, uint32_t(size), strerror(errno));

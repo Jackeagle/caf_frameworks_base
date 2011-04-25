@@ -36,6 +36,9 @@
 #include <surfaceflinger/ISurfaceComposer.h>
 #include <surfaceflinger/ISurfaceComposerClient.h>
 
+#include <hardware/copybit.h>
+#include <hardware/gralloc.h>
+
 #include "Barrier.h"
 #include "Layer.h"
 
@@ -454,6 +457,9 @@ private:
    enum bypass_state_t { eBypassInUse, eBypassNotInUse, eBypassClosePending };
    bypass_state_t mBypassState;
    hdmi_state_t mHDMIState;
+   gralloc_module_t const* mGrallocModule;
+   copybit_device_t *mBlitEngine;
+
 public:
    void ditchOverlayLayers();
    void freeBypassBuffers();
