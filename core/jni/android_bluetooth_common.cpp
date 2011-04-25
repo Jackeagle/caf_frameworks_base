@@ -54,7 +54,8 @@ static Properties remote_device_properties[] = {
     {"RSSI", DBUS_TYPE_INT16},
     {"TX", DBUS_TYPE_UINT32},
     {"Type", DBUS_TYPE_STRING},
-    {"Broadcaster", DBUS_TYPE_BOOLEAN}
+    {"Broadcaster", DBUS_TYPE_BOOLEAN},
+    {"Services", DBUS_TYPE_ARRAY}
 };
 
 static Properties adapter_properties[] = {
@@ -70,6 +71,22 @@ static Properties adapter_properties[] = {
     {"Devices", DBUS_TYPE_ARRAY},
     {"UUIDs", DBUS_TYPE_ARRAY},
     {"Type", DBUS_TYPE_STRING},
+};
+
+static Properties gatt_service_properties[] = {
+    {"Name", DBUS_TYPE_STRING},
+    {"Description", DBUS_TYPE_STRING},
+    {"UUID", DBUS_TYPE_STRING},
+    {"Characteristics", DBUS_TYPE_ARRAY},
+};
+
+static Properties gatt_characteristic_properties[] = {
+    {"UUID", DBUS_TYPE_STRING},
+    {"Name", DBUS_TYPE_STRING},
+    {"Description", DBUS_TYPE_STRING},
+    {"Format", DBUS_TYPE_STRUCT},
+    {"Value", DBUS_TYPE_ARRAY},
+    {"Representation", DBUS_TYPE_STRING},
 };
 
 typedef union {
@@ -710,6 +727,16 @@ jobjectArray parse_adapter_properties(JNIEnv *env, DBusMessageIter *iter) {
 jobjectArray parse_remote_device_properties(JNIEnv *env, DBusMessageIter *iter) {
     return parse_properties(env, iter, (Properties *) &remote_device_properties,
                           sizeof(remote_device_properties) / sizeof(Properties));
+}
+
+jobjectArray parse_gatt_service_properties(JNIEnv *env, DBusMessageIter *iter) {
+    return parse_properties(env, iter, (Properties *) &gatt_service_properties,
+                          sizeof(gatt_service_properties) / sizeof(Properties));
+}
+
+jobjectArray parse_gatt_characteristic_properties(JNIEnv *env, DBusMessageIter *iter) {
+    return parse_properties(env, iter, (Properties *) &gatt_characteristic_properties,
+                            sizeof(gatt_service_properties) / sizeof(Properties));
 }
 
 int get_bdaddr(const char *str, bdaddr_t *ba) {
