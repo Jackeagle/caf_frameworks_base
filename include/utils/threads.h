@@ -198,6 +198,14 @@ inline thread_id_t getThreadId() {
     return androidGetThreadId();
 }
 
+/* Provide null impl for Singleton with NullLock policy */
+struct NullMutex {
+   NullMutex (int) {}
+   void lock() {}
+   void unlock() {}
+};
+
+
 /*****************************************************************************/
 
 /*
