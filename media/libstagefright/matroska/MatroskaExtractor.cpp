@@ -668,6 +668,10 @@ static void addESDSFromAudioSpecificInfo(
     *ptr++ = asiSize;
     memcpy(ptr, asi, asiSize);
 
+    esds[6] = asiSize + 1 + 14; //asiSize - size of codec data, 1 - space for asiSize
+                                //14 bytes between esds[6] and end of static array
+    esds[1] = esds[6] + 5; //5 bytes between esds[1] and the rest of codec data.
+
     meta->setData(kKeyESDS, 0, esds, esdsSize);
 
     delete[] esds;
@@ -706,6 +710,11 @@ void MatroskaExtractor::addTracks() {
 
     for (size_t index = 0; index < tracks->GetTracksCount(); ++index) {
         const mkvparser::Track *track = tracks->GetTrackByIndex(index);
+
+        if (track == NULL) {
+            LOGW("Unsupported track returned");
+            continue;
+        }
 
         const char *const codecID = track->GetCodecId();
         LOGV("codec id = %s", codecID);
