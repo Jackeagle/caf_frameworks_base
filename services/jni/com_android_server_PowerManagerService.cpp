@@ -25,6 +25,7 @@
 
 #include <android_runtime/AndroidRuntime.h>
 #include <utils/Timers.h>
+#include <cutils/properties.h>
 #include <surfaceflinger/ISurfaceComposer.h>
 #include <surfaceflinger/SurfaceComposerClient.h>
 
@@ -67,6 +68,9 @@ static bool checkAndClearExceptionFromCallback(JNIEnv* env, const char* methodNa
 }
 
 bool android_server_PowerManagerService_isScreenOn() {
+    char value[PROPERTY_VALUE_MAX] = {0};
+    if (property_get("ro.alwayson", value, NULL))
+       return true;
     AutoMutex _l(gPowerManagerLock);
     return gScreenOn;
 }
