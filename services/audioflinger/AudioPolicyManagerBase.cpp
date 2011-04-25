@@ -1013,9 +1013,11 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     mA2dpSuspended(false)
 {
     FILE *fp;
-    unsigned char build_id[20];
+    char build_id[20];
     char mDeviceName[100];
     mpClientInterface = clientInterface;
+
+    memset(build_id,0,sizeof(build_id));
 
     for (int i = 0; i < AudioSystem::NUM_FORCE_USE; i++) {
         mForceUse[i] = AudioSystem::FORCE_NONE;
@@ -1034,6 +1036,22 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
             (void)fgets((char *)build_id,sizeof(build_id),fp);
 
             if (build_id[12] == 'S') //build loaded on Surf
+            {
+                LOGV("Detected target Surf, disable speaker");
+                mAvailableOutputDevices &= ~(AudioSystem::DEVICE_OUT_SPEAKER);
+                defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_EARPIECE;
+            }
+            fclose(fp);
+        }
+    }
+    else if( !strncmp(mDeviceName, "msm7627a", 8)) {
+        if((fp = fopen("/sys/devices/system/soc/soc0/hw_platform","r")) == NULL){
+            LOGE("Cannot open hw_platform file.");
+        }
+        else {
+            (void)fgets((char *)build_id,sizeof(build_id),fp);
+
+            if (!strncmp(build_id, "Surf", 4)) //build loaded on Surf
             {
                 LOGV("Detected target Surf, disable speaker");
                 mAvailableOutputDevices &= ~(AudioSystem::DEVICE_OUT_SPEAKER);
