@@ -49,16 +49,21 @@ public final class BluetoothUuid {
             ParcelUuid.fromString("0000110C-0000-1000-8000-00805F9B34FB");
     public static final ParcelUuid ObexObjectPush =
             ParcelUuid.fromString("00001105-0000-1000-8000-00805f9b34fb");
-
+    public static final ParcelUuid DirectPrinting =
+            ParcelUuid.fromString("00001118-0000-1000-8000-00805f9b34fb");
+    public static final ParcelUuid ReferencePrinting =
+            ParcelUuid.fromString("00001119-0000-1000-8000-00805f9b34fb");
+    public static final ParcelUuid PrintingStatus =
+            ParcelUuid.fromString("00001123-0000-1000-8000-00805f9b34fb");
     public static final ParcelUuid MessageAccessServer =
             ParcelUuid.fromString("00001132-0000-1000-8000-00805f9b34fb");
-
     public static final ParcelUuid MessageNotificationServer =
             ParcelUuid.fromString("00001133-0000-1000-8000-00805f9b34fb");
 
     public static final ParcelUuid[] RESERVED_UUIDS = {
         AudioSink, AudioSource, AdvAudioDist, HSP, Handsfree, AvrcpController, AvrcpTarget,
-        ObexObjectPush, MessageAccessServer, MessageNotificationServer};
+        ObexObjectPush, MessageAccessServer, MessageNotificationServer,
+        DirectPrinting, ReferencePrinting, PrintingStatus };
 
     public static boolean isAudioSource(ParcelUuid uuid) {
         return uuid.equals(AudioSource);
@@ -94,6 +99,14 @@ public final class BluetoothUuid {
 
     public static boolean isMessageNotificationServer(ParcelUuid uuid) {
         return uuid.equals(MessageNotificationServer);
+    }
+
+    public static boolean isPrintingStatus(ParcelUuid uuid) {
+        return uuid.equals(PrintingStatus);
+    }
+
+    public static boolean isDirectPrinting(ParcelUuid uuid) {
+        return uuid.equals(DirectPrinting);
     }
 
     /**

@@ -68,11 +68,14 @@ public final class ClientSession extends ObexSession {
 
     private final OutputStream mOutput;
 
+    private eventParser mEp;
+
     public ClientSession(final ObexTransport trans) throws IOException {
         mInput = trans.openInputStream();
         mOutput = trans.openOutputStream();
         mOpen = true;
         mRequestActive = false;
+        mEp = null;
     }
 
     public void setMaxPacketSize(int size) {
@@ -137,6 +140,9 @@ public final class ClientSession extends ObexSession {
         * Byte 7 to n: Optional HeaderSet
         */
         if (returnHeaderSet.responseCode == ResponseCodes.OBEX_HTTP_OK) {
+            if(returnHeaderSet.mConnectionID != null ){
+                System.arraycopy(returnHeaderSet.mConnectionID, 0, mConnectionId, 0, 4);
+            }
             mObexConnected = true;
 
             Byte srm = (Byte)returnHeaderSet.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
@@ -500,8 +506,31 @@ public final class ClientSession extends ObexSession {
                     data = new byte[length - 3];
                     bytesReceived = mInput.read(data);
 
+                    /*
+                                   * In case of BPP Operation, it needs to get parser earlier to get proper data
+                                   * to interpret to stop. Otherwise, there is no way to stop infinite wait response
+                                   * duirng read poll()
+                                   */
+                    if(mEp != null){
+                        if(mEp.Callback(new String(data))){
+                            if (VERBOSE) Log.v(TAG, "mEp.Callback - ABORT invoke !!");
+                            ByteArrayOutputStream abort = new ByteArrayOutputStream();
+                            abort.write(0xFF); /* ABORT*/
+                            abort.write(0x00);
+                            abort.write(0x03);
+                            mOutput.write(abort.toByteArray());
+                            mOutput.flush();
+
+                            header.responseCode = mInput.read();
+                            if (VERBOSE) Log.v(TAG, "ABORT responseCode - " + header.responseCode);
+                            int len = ((mInput.read() << 8) | (mInput.read()));
+                            if (VERBOSE) Log.v(TAG, "length - " + len);
+                            return true;
+                        }
+                    }
                     while (bytesReceived != (length - 3)) {
-                        bytesReceived += mInput.read(data, bytesReceived, data.length - bytesReceived);
+                        bytesReceived += mInput.read(data, bytesReceived, data.length
+                                                    - bytesReceived);
                     }
                     if (opCode == ObexHelper.OBEX_OPCODE_ABORT) {
                         return true;
@@ -511,6 +540,12 @@ public final class ClientSession extends ObexSession {
                 byte[] body = ObexHelper.updateHeaderSet(header, data);
                 if ((privateInput != null) && (body != null)) {
                     privateInput.writeBytes(body, 1);
+                    if((body[0] == HeaderSet.END_OF_BODY) &&
+                                            (header.getHeader(HeaderSet.LENGTH) == null)){
+                        header.setHeader(HeaderSet.LENGTH, (long)(body.length - 1)) ;
+                        if (VERBOSE) Log.v(TAG, " header.mLength : "
+                                                + header.getHeader(HeaderSet.LENGTH));
+                    }
                 }
 
                 if (header.mConnectionID != null) {
@@ -552,5 +587,13 @@ public final class ClientSession extends ObexSession {
         mOpen = false;
         mInput.close();
         mOutput.close();
+    }
+
+    public void enableEventParser(eventParser ep){
+        mEp = ep;
+    }
+
+    public interface eventParser{
+        public boolean Callback(String data);
     }
 }

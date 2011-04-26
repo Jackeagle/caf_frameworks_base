@@ -428,6 +428,34 @@ static jint getDeviceServiceChannelNative(JNIEnv *env, jobject object,
     return -1;
 }
 
+static jstring getDeviceStringAttrValue(JNIEnv *env, jobject object,
+                                          jstring path,
+                                          jstring pattern, jint attr_id) {
+#ifdef HAVE_BLUETOOTH
+    LOGV("%s",__FUNCTION__);
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+    if (nat && eventLoopNat) {
+        const char *c_pattern = env->GetStringUTFChars(pattern, NULL);
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        LOGV("... pattern = %s", c_pattern);
+        LOGV("... attr_id = %#X", attr_id);
+        DBusMessage *reply =
+            dbus_func_args(env, nat->conn, c_path,
+                           DBUS_DEVICE_IFACE, "GetServiceAttributeValue",
+                           DBUS_TYPE_STRING, &c_pattern,
+                           DBUS_TYPE_UINT16, &attr_id,
+                           DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(pattern, c_pattern);
+        env->ReleaseStringUTFChars(path, c_path);
+        return reply ? dbus_returns_string(env, reply) : NULL;
+    }
+#endif
+    return NULL;
+}
+
 static jboolean cancelDeviceCreationNative(JNIEnv *env, jobject object,
                                            jstring address) {
     LOGV(__FUNCTION__);
@@ -1056,7 +1084,8 @@ static JNINativeMethod sMethods[] = {
     {"removeDeviceNative", "(Ljava/lang/String;)Z", (void *)removeDeviceNative},
     {"getDeviceServiceChannelNative", "(Ljava/lang/String;Ljava/lang/String;I)I",
       (void *)getDeviceServiceChannelNative},
-
+    {"getDeviceStringAttrValue", "(Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/String;",
+    (void *)getDeviceStringAttrValue},
     {"setPairingConfirmationNative", "(Ljava/lang/String;ZI)Z",
             (void *)setPairingConfirmationNative},
     {"setPasskeyNative", "(Ljava/lang/String;II)Z", (void *)setPasskeyNative},

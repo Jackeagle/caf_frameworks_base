@@ -650,6 +650,14 @@ public final class BluetoothDevice implements Parcelable {
     }
 
     /** @hide */
+    public String getFeature(String feature) {
+         try {
+             return sService.getRemoteFeature(mAddress, feature);
+         } catch (RemoteException e) {Log.e(TAG, "", e);}
+         return null;
+    }
+
+    /** @hide */
     public boolean setPin(byte[] pin) {
         try {
             return sService.setPin(mAddress, pin);

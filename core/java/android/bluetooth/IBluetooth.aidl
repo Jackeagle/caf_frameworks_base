@@ -61,7 +61,7 @@ interface IBluetooth
     boolean fetchRemoteUuids(in String address, in ParcelUuid uuid, in IBluetoothCallback callback);
     int getRemoteServiceChannel(in String address, in ParcelUuid uuid);
     int getRemoteL2capPsm(in String address, in ParcelUuid uuid);
-
+    String getRemoteFeature(String address, String feature);
     boolean setPin(in String address, in byte[] pin);
     boolean setPasskey(in String address, int passkey);
     boolean setPairingConfirmation(in String address, boolean confirm);
