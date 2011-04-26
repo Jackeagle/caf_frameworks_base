@@ -514,6 +514,32 @@ public class MediaRecorder
     }
 
     /**
+     * Sets the video location latitude value. Call this method before prepare().
+     *
+     * @param latitude the video location latitude.
+     */
+    public void setParamLatitude(int latitude) {
+        if (latitude <= 0) {
+            throw new IllegalArgumentException("latitude is not positive");
+        }
+        setParameter(String.format("video-param-latitude=%d", latitude));
+    }
+
+
+    /**
+     * Sets the video location longitude value. Call this method before prepare().
+     *
+     * @param longitude the video location longitude.
+     */
+    public void setParamLongitude(int longitude) {
+        if (longitude <= 0) {
+            throw new IllegalArgumentException("longitude is not positive");
+        }
+        setParameter(String.format("video-param-longitude=%d", longitude));
+    }
+
+
+    /**
      * Sets the video encoding bit rate for recording. Call this method before prepare().
      * Prepare() may perform additional checks on the parameter to make sure whether the
      * specified bit rate is applicable, and sometimes the passed bitRate will be

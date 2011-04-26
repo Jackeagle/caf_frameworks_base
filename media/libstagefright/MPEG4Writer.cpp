@@ -288,6 +288,8 @@ private:
     // Simple validation on the codec specific data
     status_t checkCodecSpecificData() const;
     int32_t mRotation;
+    int32_t mLatitude;
+    int32_t mLongitude;
     bool    mWriteCtts;
 
     void updateTrackSizeEstimate();
@@ -1040,6 +1042,8 @@ MPEG4Writer::Track::Track(
       mGotAllCodecSpecificData(false),
       mReachedEOS(false),
       mRotation(0),
+      mLatitude(0),
+      mLongitude(0),
       mWriteCtts(false),
       mSeqEnhanceInfo(NULL),
       mAddDurationUs(0) {
@@ -1667,6 +1671,13 @@ status_t MPEG4Writer::Track::start(MetaData *params) {
     int32_t rotationDegrees;
     if (!mIsAudio && params && params->findInt32(kKeyRotationDegree, &rotationDegrees)) {
         mRotation = rotationDegrees;
+    }
+
+    int32_t latitude = 0, longitude = 0;
+    if (!mIsAudio && params && params->findInt32(kKeyLatitude, &latitude)
+                  && params->findInt32(kKeyLongitude, &longitude)) {
+        mLatitude  = latitude;
+        mLongitude = longitude;
     }
 
     mIsRealTimeRecording = true;
@@ -3024,6 +3035,46 @@ void MPEG4Writer::Track::writeTrackHeader(
         mOwner->endBox();  // stbl
        mOwner->endBox();  // minf
       mOwner->endBox();  // mdia
+
+      /*------------------------------------------------------------------------------|
+      |                                LOCI ATOM                                      |
+      |-------------------------------------------------------------------------------|
+      |   Feild            |    Type    |        Details                |    Value    |
+      |-------------------------------------------------------------------------------|
+      |   BoxHeader.Size   |    uint32  |                               |             |
+      |   BoxHeader.Type   |    uint32  |                               |    'loci'   |
+      |   BoxHeader.Version|    uint8   |                               |      0      |
+      |   BoxHeader.Flags  |    bits24  |                               |      0      |
+      |   Pad              |    bits1   |                               |      0      |
+      |   Language         |    uint5[3]| Packed ISO 639-2/T Lang. code |             |
+      |   Name             |    String  |        Text of place name     |             |
+      |   Role             |    uint8   | Non-negative indicating role  |             |
+      |                    |            | of location                   |             |
+      |   Longitude        |    uint32  | Fixed point value of longitude|             |
+      |   Latitude         |    uint32  | Fixed point value of latitude |             |
+      |   Altitude         |    uint32  | Fixed point value of altitude |             |
+      |   Astronomical_body|    String  | Text of astronomical body     |             |
+      |   Additional_notes |    String  | Text of additional location   |             |
+      |                    |            | related information           |             |
+      |------------------------------------------------------------------------------*/
+      if(!mIsAudio) {
+          mOwner->beginBox("udta");          // udta
+            mOwner->beginBox("loci");        // loci
+            mOwner->writeInt32(0);           // version=0, flags=0
+            mOwner->writeInt16(0x15e7);      // Pad, Language, Packed ISO 639-2/T Lang. code
+            mOwner->writeCString("QCOM");
+            /* Role: indicates the role of the place. Value 0 indicates .shooting location,
+             * 1 indicates real location., and 2 indicates fictional location.. Other values are reserved.*/
+            mOwner->writeInt8(0);            // Role
+            mOwner->writeInt32(mLongitude);  // longitude
+            mOwner->writeInt32(mLatitude);   // latitude
+            mOwner->writeInt32(0);           // altitude
+            mOwner->writeCString("earth");   // astronimical body
+            mOwner->writeCString(" ");       // additional notes
+            mOwner->endBox();                //loci
+          mOwner->endBox();                  // udta
+
+      }
     mOwner->endBox();  // trak
 }
 

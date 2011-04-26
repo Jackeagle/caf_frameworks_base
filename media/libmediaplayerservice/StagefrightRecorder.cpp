@@ -511,6 +511,26 @@ status_t StagefrightRecorder::setParamAudioTimeScale(int32_t timeScale) {
     return OK;
 }
 
+status_t StagefrightRecorder::setParamVideoLatitude(int32_t latitude) {
+    LOGV("setParamVideoLatitude: %d", latitude);
+    if (latitude < 0) {
+        LOGE("Wrong latitude value: %d", latitude);
+        return BAD_VALUE;
+    }
+    mLatitude = latitude;
+    return OK;
+}
+
+status_t StagefrightRecorder::setParamVideoLongitude(int32_t longitude) {
+    LOGV("setParamVideoLongitude: %d", longitude);
+    if (longitude < 0) {
+        LOGE("Wrong longitude value: %d", longitude);
+        return BAD_VALUE;
+    }
+    mLongitude = longitude;
+    return OK;
+}
+
 status_t StagefrightRecorder::setParameter(
         const String8 &key, const String8 &value) {
     LOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
@@ -598,6 +618,16 @@ status_t StagefrightRecorder::setParameter(
         int32_t timeScale;
         if (safe_strtoi32(value.string(), &timeScale)) {
             return setParamVideoTimeScale(timeScale);
+        }
+    } else if (key == "video-param-latitude") {
+        int32_t latitude;
+        if (safe_strtoi32(value.string(), &latitude)) {
+            return setParamVideoLatitude(latitude);
+        }
+    } else if (key == "video-param-longitude") {
+        int32_t longitude;
+        if (safe_strtoi32(value.string(), &longitude)) {
+            return setParamVideoLongitude(longitude);
         }
     } else {
         LOGE("setParameter: failed to find key %s", key.string());
@@ -1380,6 +1410,14 @@ status_t StagefrightRecorder::startMPEG4Recording() {
         meta->setInt32(kKeyWriteCtts, true );
     }
 
+    if(mLatitude != 0){
+       meta->setInt32(kKeyLatitude, mLatitude);
+    }
+
+    if(mLongitude != 0){
+       meta->setInt32(kKeyLongitude, mLongitude);
+    }
+
     writer->setListener(mListener);
     mWriter = writer;
     return mWriter->start(meta.get());
@@ -1463,6 +1501,8 @@ status_t StagefrightRecorder::reset() {
     mMaxFileSizeBytes = 0;
     mTrackEveryTimeDurationUs = 0;
     mRotationDegrees = 0;
+    mLongitude = 0;
+    mLatitude = 0;
     mEncoderProfiles = MediaProfiles::getInstance();
 
     mOutputFd = -1;
