@@ -47,7 +47,7 @@ public class UiccCard extends Handler{
     private boolean mDestroyed = false; //set to true once this card is commanded to be disposed of.
     private Context mContext;
     private CommandsInterface mCi;
-    private CatService mCatService;
+    static private CatService mCatService;
 
 
     UiccCard(UiccManager uiccManager, UiccCardStatusResponse.CardStatus ics, Context c, CommandsInterface ci) {
