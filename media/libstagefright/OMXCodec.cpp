@@ -431,7 +431,7 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresAllocateBufferOnOutputPorts;
         quirks |= kAvoidMemcopyInputRecordingFrames;
 
-        if (strncmp(mDeviceName, "msm7627_", 8)) {
+        if (strncmp(mDeviceName, "msm7627", 7)) {
             quirks |= kBFrameFlagInExtensions;
             quirks |= kRequiresEOSMessage;
         }
@@ -929,6 +929,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         if (!property_get("ro.product.device", value, "1")
             || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa")
             || !strcmp(value, "msm7627_7x_surf") || !strcmp(value, "msm7627_7x_ffa")
+            || !strcmp(value, "msm7627a")
             || !strcmp(value, "msm7625_surf") || !strcmp(value, "msm7625_ffa"))
         {
             LOGE("OMX_QCOM_FramePacking_OnlyOneCompleteFrame not supported by component err: %d", err);
@@ -3061,6 +3062,7 @@ void OMXCodec::drainInputBuffers() {
         char value[PROPERTY_VALUE_MAX];
         if (!property_get("ro.product.device", value, "1")
             || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa")
+            || !strcmp(value, "msm7627a")
             || !strcmp(value, "msm7625_surf") || !strcmp(value, "msm7625_ffa"))
            CAMERA_BUFFERS = 1;
         else

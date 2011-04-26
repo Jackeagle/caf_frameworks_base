@@ -1088,7 +1088,7 @@ status_t StagefrightRecorder::setupCameraSource() {
 
     char mDeviceName[100];
     property_get("ro.product.device",mDeviceName,"0");
-    if( !strncmp(mDeviceName, "msm7627_", 8)) {
+    if( !strncmp(mDeviceName, "msm7627", 7)) {
         if ((mVideoEncoder == VIDEO_ENCODER_H264) && (mFrameRate > 15) &&
             (((mVideoWidth * mVideoHeight) >> 8) >= (40 * 30))) {
             LOGW("msm7x27 supports upto 15 fps only with h264 "
