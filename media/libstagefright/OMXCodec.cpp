@@ -2115,6 +2115,8 @@ bool OMXCodec::isIntermediateState(State state) {
         || state == IDLE_TO_EXECUTING
         || state == EXECUTING_TO_IDLE
         || state == IDLE_TO_LOADED
+        || state == PAUSING
+        || state == FLUSHING
         || state == RECONFIGURING;
 }
 
@@ -2836,7 +2838,7 @@ void OMXCodec::onStateChange(OMX_STATETYPE newState) {
         {
            CODEC_LOGV("Now paused.");
 
-           CHECK_EQ(mState, EXECUTING_TO_IDLE);
+           CHECK_EQ(mState, PAUSING);
 
            setState(PAUSED);
            break;
@@ -2952,7 +2954,7 @@ void OMXCodec::onPortSettingsChanged(OMX_U32 portIndex) {
 
 bool OMXCodec::flushPortAsync(OMX_U32 portIndex) {
     CHECK(mState == EXECUTING || mState == RECONFIGURING
-            || mState == EXECUTING_TO_IDLE);
+            || mState == EXECUTING_TO_IDLE || mState == FLUSHING);
 
     if ( portIndex == -1 ) {
         mPortStatus[kPortIndexInput] = SHUTTING_DOWN;
@@ -3020,7 +3022,7 @@ void OMXCodec::enablePortAsync(OMX_U32 portIndex) {
 }
 
 void OMXCodec::fillOutputBuffers() {
-    CHECK_EQ(mState, EXECUTING);
+    CHECK(mState == EXECUTING || mState == FLUSHING);
 
     // This is a workaround for some decoders not properly reporting
     // end-of-output-stream. If we own all input buffers and also own
@@ -3052,7 +3054,7 @@ void OMXCodec::fillOutputBuffers() {
 }
 
 void OMXCodec::drainInputBuffers() {
-    CHECK(mState == EXECUTING || mState == RECONFIGURING);
+    CHECK(mState == EXECUTING || mState == RECONFIGURING || mState == FLUSHING);
     size_t CAMERA_BUFFERS = 0;
     Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexInput];
     for (size_t i = 0; i < buffers->size(); ++i) {
@@ -3932,10 +3934,10 @@ status_t OMXCodec::pause() {
    status_t err = mOMX->sendCommand(mNode,
        OMX_CommandStateSet, OMX_StatePause);
    CHECK_EQ(err, OK);
-   setState(EXECUTING_TO_IDLE);
+   setState(PAUSING);
 
    mIsPaused = true;
-   mPaused = true;
+
    while (mState != PAUSED && mState != ERROR) {
        mAsyncCompletion.wait(mLock);
    }
@@ -4102,6 +4104,7 @@ status_t OMXCodec::read(
         mFilledBuffers.clear();
 
         CHECK_EQ(mState, EXECUTING);
+        setState(FLUSHING);
         //DSP supports flushing of ports simultaneously. Flushing individual port is not supported.
 #if 0
         bool emulateInputFlushCompletion = !flushPortAsync(kPortIndexInput);
@@ -4127,7 +4130,11 @@ status_t OMXCodec::read(
     while (mState != ERROR && !mNoMoreOutputData && !mOutputPortSettingsHaveChanged && mFilledBuffers.empty()) {
         mBufferFilled.wait(mLock);
     }
-
+    if(seeking)
+    {
+        CHECK_EQ(mState, FLUSHING);
+        setState(EXECUTING);
+    }
     if (mState == ERROR) {
         return UNKNOWN_ERROR;
     }
