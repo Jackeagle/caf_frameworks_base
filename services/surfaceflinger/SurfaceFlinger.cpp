@@ -828,6 +828,7 @@ void SurfaceFlinger::computeVisibleRegions(
             // as well, as the old visible region
             dirty.orSelf(layer->visibleRegionScreen);
             layer->contentDirty = false;
+            layer->setNothingToUpdate(false);
         } else {
             /* compute the exposed region:
              *   the exposed region consists of two components:
