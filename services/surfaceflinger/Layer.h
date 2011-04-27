@@ -86,6 +86,7 @@ public:
     virtual bool needsFiltering() const;
     virtual bool isSecure() const           { return mSecure; }
     virtual bool isNothingToUpdate() const  { return mNothingToUpdate; }
+    virtual void setNothingToUpdate(bool value) { mNothingToUpdate = value; }
     virtual sp<Surface> createSurface() const;
     virtual status_t ditch();
     virtual void onRemoved();

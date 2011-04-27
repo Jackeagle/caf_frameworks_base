@@ -187,6 +187,7 @@ public:
     virtual bool needsBlending() const  { return false; }
 
     virtual bool isNothingToUpdate() const {return false; }
+    virtual void setNothingToUpdate(bool) {}
 
     /**
      * needsDithering - true if this surface needs dithering
