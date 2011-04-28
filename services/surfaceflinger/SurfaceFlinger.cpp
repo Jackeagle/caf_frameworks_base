@@ -1502,13 +1502,15 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
 }
 
 void SurfaceFlinger::setActionSafeWidthRatio(float asWidthRatio){
-    const DisplayHardware& hw(graphicPlane(0).displayHardware());
-    hw.setActionSafeWidthRatio(asWidthRatio);
+#if defined(TARGET_USES_OVERLAY)
+    overlay::ActionSafe::setWidthRatio(asWidthRatio);
+#endif
 }
 
 void SurfaceFlinger::setActionSafeHeightRatio(float asHeightRatio){
-    const DisplayHardware& hw(graphicPlane(0).displayHardware());
-    hw.setActionSafeHeightRatio(asHeightRatio);
+#if defined(TARGET_USES_OVERLAY)
+    overlay::ActionSafe::setHeightRatio(asHeightRatio);
+#endif
 }
 
 sp<ISurface> SurfaceFlinger::createSurface(const sp<Client>& client, int pid,
