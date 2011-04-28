@@ -2045,7 +2045,12 @@ static bool LegacySniffMPEG4(
         || !memcmp(header, "ftypMSNV", 8) || !memcmp(header, "ftypavc1", 8)
         || !memcmp(header, "ftypmmp4", 8) || !memcmp(header, "ftypk3g1", 8)
         || !memcmp(header, "ftypmp41", 8) || !memcmp(header, "ftypskm3", 8)
-        || !memcmp(header, "ftypFACE", 8) || !memcmp(header, "ftypwmf", 7)) {
+        || !memcmp(header, "ftypFACE", 8) || !memcmp(header, "ftypwmf", 7)
+        // 3g2 ftyp is added for thumbnail generation of 3g2 clips on 8660.
+        // This code will not be executed for the streaming and local
+        // playback of 3g2 clips as opencore would be selected through
+        // usePVPlayer function.
+        || !memcmp(header, "ftyp3g2", 7)) {
         *mimeType = MEDIA_MIMETYPE_CONTAINER_MPEG4;
         *confidence = 0.6;
 
