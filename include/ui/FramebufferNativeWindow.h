@@ -66,16 +66,6 @@ public:
                                 if (fbDev->enableHDMIOutput)
                                     fbDev->enableHDMIOutput(fbDev, enable);
                               }
-    void setActionSafeWidthRatio(float asWidthRatio)
-                              {
-                                if (fbDev->setActionSafeWidthRatio)
-                                    fbDev->setActionSafeWidthRatio(fbDev, asWidthRatio);
-                              }
-    void setActionSafeHeightRatio(float asHeightRatio)
-                              {
-                                if (fbDev->setActionSafeHeightRatio)
-                                    fbDev->setActionSafeHeightRatio(fbDev, asHeightRatio);
-                              }
     bool isUpdateOnDemand() const { return mUpdateOnDemand; }
     status_t setUpdateRectangle(const Rect& updateRect);
     status_t compositionComplete();
