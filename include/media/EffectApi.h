@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -597,7 +598,11 @@ enum audio_device_e {
     DEVICE_BLUETOOTH_A2DP_HEADPHONES = 0x100,   // bluetooth A2DP headphones
     DEVICE_BLUETOOTH_A2DP_SPEAKER = 0x200,      // bluetooth A2DP speakers
     DEVICE_AUX_DIGITAL = 0x400,                 // digital output
-    DEVICE_EXTERNAL_SPEAKER = 0x800             // external speaker (stereo and High quality)
+    DEVICE_EXTERNAL_SPEAKER = 0x800,             // external speaker (stereo and High quality)
+    DEVICE_AUX_HDMI = 0x1000,
+    DEVICE_ANC_HEADSET = 0x2000,
+    DEVICE_ANC_HEADPHONE = 0x4000,
+    DEVICE_FM_TX = 0x8000,
 };
 
 // Audio mode

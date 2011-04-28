@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +90,7 @@ public:
 
         // API to open a routing session for tunneled audio playback
         virtual status_t        openSession(
-                int format, int sessionId) {return 0;};
+                int format, int sessionId, uint32_t sampleRate = 44100, int channels = 2) {return 0;};
 
         virtual void        start() = 0;
         virtual ssize_t     write(const void* buffer, size_t size) = 0;
