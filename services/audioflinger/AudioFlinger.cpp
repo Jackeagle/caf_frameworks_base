@@ -513,7 +513,7 @@ void AudioFlinger::applyEffectsOn(int16_t *inBuffer, int16_t *outBuffer, int siz
             }
 
             int outFrameCount = (frameCount > DEAFULT_FRAME_COUNT ? DEAFULT_FRAME_COUNT: frameCount);
-
+            bool isEffectEnabled = false;
             for(i = 0; i < numEffects; i++) {
                 // If effect configuration is changed while applying effects do not process further
                 if(mIsEffectConfigChanged) {
@@ -529,6 +529,7 @@ void AudioFlinger::applyEffectsOn(int16_t *inBuffer, int16_t *outBuffer, int siz
                 }
                 if(i == 0) {
                     // For the first set input and output buffers different
+                    isEffectEnabled = effect->isProcessEnabled();
                     effect->setInBuffer(pIn);
                     effect->setOutBuffer(pOut);
                 } else {
@@ -540,8 +541,13 @@ void AudioFlinger::applyEffectsOn(int16_t *inBuffer, int16_t *outBuffer, int siz
                 effect->configure(true, mLPASampleRate, mLPANumChannels, outFrameCount);
             }
 
-            // Clear the output buffer
-            memset(pOut, 0, (outFrameCount * mLPANumChannels * sizeof(int16_t)));
+            if(isEffectEnabled) {
+                // Clear the output buffer
+                memset(pOut, 0, (outFrameCount * mLPANumChannels * sizeof(int16_t)));
+            } else {
+                // Copy input buffer content to the output buffer
+                memcpy(pOut, pIn, (outFrameCount * mLPANumChannels * sizeof(int16_t)));
+            }
 
             mLPAEffectChain->process_l();
 
@@ -6314,8 +6320,8 @@ const uint32_t AudioFlinger::EffectModule::sDeviceConvTable[] = {
     DEVICE_BLUETOOTH_A2DP_HEADPHONES, // AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES
     DEVICE_BLUETOOTH_A2DP_SPEAKER, // AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER
     DEVICE_AUX_DIGITAL, // AudioSystem::DEVICE_OUT_AUX_DIGITAL
-    DEVICE_EXTERNAL_SPEAKER,
     DEVICE_AUX_HDMI,
+    DEVICE_FM,
     DEVICE_ANC_HEADSET,
     DEVICE_ANC_HEADPHONE,
     DEVICE_FM_TX,
