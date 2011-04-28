@@ -1139,6 +1139,15 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
+        /*
+         * If we had issued a data call setup before, then wait for it to complete before
+         * trying any new calls or tear down data call in case of all data disconnect request.
+         */
+        if (mDataCallSetupPending == true) {
+            logi("Data Call setup pending. Wait for it to complete");
+            return;
+        }
+
         if (mDisconnectAllDataCalls && mDisconnectPendingCount == 0) {
             /*
              * Someone had requested that all calls be torn down.
@@ -1179,15 +1188,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             logi("   " + "getDesiredPowerState() = " + getDesiredPowerState());
             logi("   " + "mCm.getRadioState() = " + mCm.getRadioState());
             logi("   " + dumpDataReadinessinfo());
-        }
-
-        /*
-         * If we had issued a data call setup before, then wait for it to complete before
-         * trying any new calls.
-         */
-        if (mDataCallSetupPending == true) {
-            logi("Data Call setup pending. Not trying to bring up any new data connections.");
-            return;
         }
 
         /*
