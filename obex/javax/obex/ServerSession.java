@@ -104,6 +104,7 @@ public final class ServerSession extends ObexSession implements Runnable {
             boolean done = false;
             while (!done && !mClosed) {
                 int requestType = mInput.read();
+                if (VERBOSE)  Log.v(TAG, "run requestType "+requestType);
                 switch (requestType) {
                     case ObexHelper.OBEX_OPCODE_CONNECT:
                         handleConnectRequest();
@@ -130,7 +131,9 @@ public final class ServerSession extends ObexSession implements Runnable {
                     case ObexHelper.OBEX_OPCODE_ABORT:
                         handleAbortRequest();
                         break;
-
+                    case ObexHelper.OBEX_OPCODE_ACTION:
+                        handleActionRequest();
+                        break;
                     case -1:
                         done = true;
                         break;
@@ -189,6 +192,51 @@ public final class ServerSession extends ObexSession implements Runnable {
     }
 
     /**
+     * Handles a ACTION request from a client. This method will read the rest of
+     * the request from the client. Assuming the request is valid, it will
+     * create a <code>HeaderSet</code> object to pass to the
+     * <code>ServerRequestHandler</code> object. After the handler processes the
+     * request, this method will create a reply message to send to the server.
+     *
+     * @throws IOException if an error occurred at the transport layer
+     */
+    private void handleActionRequest() throws IOException {
+        int code = ResponseCodes.OBEX_HTTP_OK;
+        HeaderSet request = new HeaderSet();
+        HeaderSet reply = new HeaderSet();
+        int length = mInput.read();
+        int bytesReceived;
+
+        length = (length << 8) + mInput.read();
+
+        if (length > mMaxPacketLength) {
+            code = ResponseCodes.OBEX_HTTP_REQ_TOO_LARGE;
+        } else {
+            byte[] headers = new byte[length - 3];
+            bytesReceived = mInput.read(headers);
+
+            while (bytesReceived != headers.length) {
+                 bytesReceived += mInput.read(headers, bytesReceived, headers.length
+                                                                    - bytesReceived);
+            }
+            if (VERBOSE)  Log.v(TAG,"onAction headers.length = " + headers.length);
+            ObexHelper.updateHeaderSet(request, headers);
+
+            Byte actionId = (Byte)request.getHeader(HeaderSet.ACTION_ID);
+            if (actionId == ObexHelper.OBEX_ACTION_COPY) {
+                code = mListener.onCopy(request, reply);
+            } else if (actionId == ObexHelper.OBEX_ACTION_MOVE_RENAME) {
+                code = mListener.onRename(request, reply);
+            } else if (actionId == ObexHelper.OBEX_ACTION_SET_PERM) {
+                code = mListener.onSetPermissions(request, reply);
+            }
+            if (VERBOSE)  Log.v(TAG, "onAction request handler return value- " + code);
+            code = validateResponseCode(code);
+        }
+        sendResponse(code, null);
+    }
+
+    /**
      * Handles a PUT request from a client. This method will provide a
      * <code>ServerOperation</code> object to the request handler. The
      * <code>ServerOperation</code> object will handle the rest of the request.
@@ -232,14 +280,14 @@ public final class ServerSession extends ObexSession implements Runnable {
             }
             if (response != ResponseCodes.OBEX_HTTP_OK && !op.isAborted) {
                 if (VERBOSE) Log.v(TAG, "handlePutRequest pre != HTTP_OK sendReply");
-                op.sendReply(response, false);
+                op.sendReply(response, false,false);
             } else if (!op.isAborted) {
                 // wait for the final bit
                 while (!op.finalBitSet) {
                     if (VERBOSE) Log.v(TAG, "handlePutRequest pre looped sendReply");
-                    op.sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, op.mSingleResponseActive);
+                    op.sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, op.mSingleResponseActive,false);
                 }
-                op.sendReply(response, false);
+                op.sendReply(response, false,false);
             }
         } catch (Exception e) {
             /*To fix bugs in aborted cases,
@@ -267,12 +315,36 @@ public final class ServerSession extends ObexSession implements Runnable {
      * @throws IOException if an error occurred at the transport layer
      */
     private void handleGetRequest(int type) throws IOException {
+        if (VERBOSE)  Log.v(TAG, "handleGetRequest");
+
         ServerOperation op = new ServerOperation(this, mInput, type, mMaxPacketLength, mListener);
         try {
+            Byte srm = (Byte)op.requestHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+            if (VERBOSE)  Log.v(TAG, "handleGetRequest srm status" + srm );
+            if (srm == ObexHelper.OBEX_SRM_ENABLED) {
+                if (VERBOSE)  Log.v(TAG, "handlePutRequest srm == ObexHelper.OBEX_SRM_ENABLED");
+                if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                    if (VERBOSE)  Log.v(TAG, "ObexHelper.getLocalSrmCapability()" +
+                                                                       "=ObexHelper.SRM_CAPABLE");
+                    op.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE,
+                                                                     ObexHelper.OBEX_SRM_ENABLED);
+                    if (ObexHelper.getLocalSrmpWait()) {
+                        if (VERBOSE)  Log.v(TAG, "PutRequest:Server SRMP header set to WAIT");
+                        op.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER,
+                                                                  ObexHelper.OBEX_SRM_PARAM_WAIT);
+                    }
+                } else {
+                    if (VERBOSE)  Log.v(TAG, "ObexHelper.getLocalSrmCapability() == "+
+                                                                      "ObexHelper.SRM_INCAPABLE");
+                    op.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE,
+                                                                    ObexHelper.OBEX_SRM_DISABLED);
+                }
+            }
+
             int response = validateResponseCode(mListener.onGet(op));
 
             if (!op.isAborted) {
-                op.sendReply(response, false);
+                op.sendReply(response, false,false);
             }
         } catch (Exception e) {
             sendResponse(ResponseCodes.OBEX_HTTP_INTERNAL_ERROR, null);
@@ -288,9 +360,10 @@ public final class ServerSession extends ObexSession implements Runnable {
     public void sendResponse(int code, byte[] header) throws IOException {
         int totalLength = 3;
         byte[] data = null;
-
+        if (VERBOSE) Log.v(TAG,"sendResponse code "+code+" header : "+header);
         if (header != null) {
             totalLength += header.length;
+            if (VERBOSE) Log.v(TAG,"header != null totalLength = "+totalLength);
             data = new byte[totalLength];
             data[0] = (byte)code;
             data[1] = (byte)(totalLength >> 8);

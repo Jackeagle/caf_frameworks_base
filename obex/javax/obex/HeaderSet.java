@@ -192,13 +192,40 @@ public final class HeaderSet {
      */
     public static final int SINGLE_RESPONSE_MODE_PARAMETER = 0x98;
 
+     /**
+     * Represents the OBEX Action Id.
+     * <P>
+     * The value of <code>ACTION_ID</code> is 0x94 (148).
+     */
+    public static final int ACTION_ID = 0x94;
+
+     /**
+     * Represents the OBEX Destination name.
+     * <P>
+     * The value of <code>DEST_NAME</code> is 0x15 (21).
+     */
+    public static final int DEST_NAME = 0x15;
+
+     /**
+     * Represents the OBEX Permissions.
+     * <P>
+     * The value of <code>PERMISSION</code> is 0xD6 (214).
+     */
+    public static final int PERMISSION = 0xD6;
+
     private Long mCount; // 4 byte unsigned integer
 
+    private Byte mActionId; // 4 byte unsigned integer
+
     private String mName; // null terminated Unicode text string
+
+    private String mDestName; // null terminated Unicode text string
 
     private String mType; // null terminated ASCII text string
 
     private Long mLength; // 4 byte unsigend integer
+
+    private Long mPermission; // 4 byte unsigend integer
 
     private Calendar mIsoTime; // String of the form YYYYMMDDTHHMMSSZ
 
@@ -284,11 +311,26 @@ public final class HeaderSet {
                 }
                 mCount = (Long)headerValue;
                 break;
+            case ACTION_ID:
+                if ((headerValue != null) && (!(headerValue instanceof Byte))) {
+                    throw new IllegalArgumentException(
+                        "Action Id must be a Byte");
+                }
+                mActionId = (Byte)headerValue;
+
+                break;
             case NAME:
                 if ((headerValue != null) && (!(headerValue instanceof String))) {
                     throw new IllegalArgumentException("Name must be a String");
                 }
                 mName = (String)headerValue;
+                break;
+            case DEST_NAME:
+                if ((headerValue != null) && (!(headerValue instanceof String))) {
+                    throw new IllegalArgumentException("Name must be a String");
+                }
+                mDestName = (String)headerValue;
+
                 break;
             case TYPE:
                 if ((headerValue != null) && (!(headerValue instanceof String))) {
@@ -296,6 +338,19 @@ public final class HeaderSet {
                 }
                 mType = (String)headerValue;
                 break;
+            case PERMISSION:
+               if (!(headerValue instanceof Long)) {
+                    if (headerValue == null) {
+                        mPermission = null;
+                        break;
+                    }
+                    throw new IllegalArgumentException("Length must be a Long");
+                }
+                temp = ((Long)headerValue).longValue();
+                if ((temp < 0L) || (temp > 0xFFFFFFFFL)) {
+                    throw new IllegalArgumentException("Length must be between 0 and 0xFFFFFFFF");
+                }
+                mPermission = (Long)headerValue;
             case LENGTH:
                 if (!(headerValue instanceof Long)) {
                     if (headerValue == null) {
@@ -479,12 +534,18 @@ public final class HeaderSet {
         switch (headerID) {
             case COUNT:
                 return mCount;
+            case ACTION_ID:
+                return mActionId;
             case NAME:
                 return mName;
+            case DEST_NAME:
+                return mDestName;
             case TYPE:
                 return mType;
             case LENGTH:
                 return mLength;
+            case PERMISSION:
+                return mPermission;
             case TIME_ISO_8601:
                 return mIsoTime;
             case TIME_4_BYTE:
@@ -543,14 +604,23 @@ public final class HeaderSet {
         if (mCount != null) {
             out.write(COUNT);
         }
+        if(mActionId != null) {
+             out.write(ACTION_ID);
+        }
         if (mName != null) {
             out.write(NAME);
+        }
+        if (mDestName != null) {
+            out.write(DEST_NAME);
         }
         if (mType != null) {
             out.write(TYPE);
         }
         if (mLength != null) {
             out.write(LENGTH);
+        }
+        if (mPermission != null) {
+            out.write(PERMISSION);
         }
         if (mIsoTime != null) {
             out.write(TIME_ISO_8601);
