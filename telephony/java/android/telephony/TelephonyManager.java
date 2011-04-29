@@ -884,19 +884,24 @@ public class TelephonyManager {
      *
      * @see #SIM_STATE_UNKNOWN
      * @see #SIM_STATE_ABSENT
+     * @see #SIM_STATE_PIN_REQUIRED
+     * @see #SIM_STATE_PUK_REQUIRED
+     * @see #SIM_STATE_NETWORK_LOCKED
+     * @see #SIM_STATE_READY
      * @see #SIM_STATE_CARD_IO_ERROR
+     * @see #ICC_STATE_SIM_NETWORK_SUBSET_LOCKED
+     * @see #ICC_STATE_SIM_CORPORATE_LOCKED
+     * @see #ICC_STATE_SIM_SERVICE_PROVIDER_LOCKED
+     * @see #ICC_STATE_SIM_SIM_LOCKED
+     * @see #ICC_STATE_RUIM_NETWORK1_LOCKED
+     * @see #ICC_STATE_RUIM_NETWORK2_LOCKED
+     * @see #ICC_STATE_RUIM_HRPD_LOCKED
+     * @see #ICC_STATE_RUIM_CORPORATE_LOCKED
+     * @see #ICC_STATE_RUIM_SERVICE_PROVIDER_LOCKED
+     * @see #ICC_STATE_RUIM_RUIM_LOCKED
      */
     public int getSimState() {
-        String prop = SystemProperties.get(TelephonyProperties.PROPERTY_SIM_STATE);
-        if ("ABSENT".equals(prop)) {
-            return SIM_STATE_ABSENT;
-        }
-        else if ("CARD_IO_ERROR".equals(prop)) {
-            return SIM_STATE_CARD_IO_ERROR;
-        }
-        else {
-            return SIM_STATE_UNKNOWN;
-        }
+        return getSimState(getDefaultSubscription());
     }
 
 
@@ -985,8 +990,21 @@ public class TelephonyManager {
      *
      * @see #SIM_STATE_UNKNOWN
      * @see #SIM_STATE_ABSENT
+     * @see #SIM_STATE_PIN_REQUIRED
+     * @see #SIM_STATE_PUK_REQUIRED
+     * @see #SIM_STATE_NETWORK_LOCKED
+     * @see #SIM_STATE_READY
      * @see #SIM_STATE_CARD_IO_ERROR
-     *
+     * @see #ICC_STATE_SIM_NETWORK_SUBSET_LOCKED
+     * @see #ICC_STATE_SIM_CORPORATE_LOCKED
+     * @see #ICC_STATE_SIM_SERVICE_PROVIDER_LOCKED
+     * @see #ICC_STATE_SIM_SIM_LOCKED
+     * @see #ICC_STATE_RUIM_NETWORK1_LOCKED
+     * @see #ICC_STATE_RUIM_NETWORK2_LOCKED
+     * @see #ICC_STATE_RUIM_HRPD_LOCKED
+     * @see #ICC_STATE_RUIM_CORPORATE_LOCKED
+     * @see #ICC_STATE_RUIM_SERVICE_PROVIDER_LOCKED
+     * @see #ICC_STATE_RUIM_RUIM_LOCKED
      * @hide
      */
     public int getSimState(int slotId) {
@@ -994,11 +1012,37 @@ public class TelephonyManager {
             getTelephonyProperty(TelephonyProperties.PROPERTY_SIM_STATE, slotId, "");
         if ("ABSENT".equals(prop)) {
             return SIM_STATE_ABSENT;
-        }
-        else if ("CARD_IO_ERROR".equals(prop)) {
+        } else if ("PIN_REQUIRED".equals(prop)) {
+            return SIM_STATE_PIN_REQUIRED;
+        } else if ("PUK_REQUIRED".equals(prop)) {
+            return SIM_STATE_PUK_REQUIRED;
+        } else if ("NETWORK_LOCKED".equals(prop)) {
+            return SIM_STATE_NETWORK_LOCKED;
+        } else if ("READY".equals(prop)) {
+            return SIM_STATE_READY;
+        } else if ("CARD_IO_ERROR".equals(prop)) {
             return SIM_STATE_CARD_IO_ERROR;
-        }
-        else {
+        } else if ("SIM_NETWORK_SUBSET_LOCKED".equals(prop)) {
+            return ICC_STATE_SIM_NETWORK_SUBSET_LOCKED;
+        } else if ("SIM_CORPORATE_LOCKED".equals(prop)) {
+            return ICC_STATE_SIM_CORPORATE_LOCKED;
+        } else if ("SIM_SERVICE_PROVIDER_LOCKED".equals(prop)) {
+            return ICC_STATE_SIM_SERVICE_PROVIDER_LOCKED;
+        } else if ("SIM_SIM_LOCKED".equals(prop)) {
+            return ICC_STATE_SIM_SIM_LOCKED;
+        } else if ("RUIM_NETWORK1_LOCKED".equals(prop)) {
+            return ICC_STATE_RUIM_NETWORK1_LOCKED;
+        } else if ("RUIM_NETWORK2_LOCKED".equals(prop)) {
+            return ICC_STATE_RUIM_NETWORK2_LOCKED;
+        } else if ("RUIM_HRPD_LOCKED".equals(prop)) {
+            return ICC_STATE_RUIM_HRPD_LOCKED;
+        } else if ("RUIM_CORPORATE_LOCKED".equals(prop)) {
+            return ICC_STATE_RUIM_CORPORATE_LOCKED;
+        } else if ("RUIM_SERVICE_PROVIDER_LOCKED".equals(prop)) {
+            return ICC_STATE_RUIM_SERVICE_PROVIDER_LOCKED;
+        } else if ("RUIM_RUIM_LOCKED".equals(prop)) {
+            return ICC_STATE_RUIM_RUIM_LOCKED;
+        } else {
             return SIM_STATE_UNKNOWN;
         }
     }
