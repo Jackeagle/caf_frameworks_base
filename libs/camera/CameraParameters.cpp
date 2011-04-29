@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2008, The Android Open Source Project
+** Copyright (c) 2011 Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -97,6 +98,8 @@ const char CameraParameters::KEY_MEMORY_COLOR_ENHANCEMENT[] = "mce";
 const char CameraParameters::KEY_SUPPORTED_MEM_COLOR_ENHANCE_MODES[] = "mce-values";
 const char CameraParameters::KEY_VIDEO_HIGH_FRAME_RATE[] = "video-hfr";
 const char CameraParameters::KEY_SUPPORTED_VIDEO_HIGH_FRAME_RATE_MODES[] = "video-hfr-values";
+const char CameraParameters::KEY_REDEYE_REDUCTION[] = "redeye-reduction";
+const char CameraParameters::KEY_SUPPORTED_REDEYE_REDUCTION[] = "redeye-reduction-values";
 
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
@@ -246,6 +249,10 @@ const char CameraParameters::VIDEO_HFR_OFF[] = "off";
 const char CameraParameters::VIDEO_HFR_2X[] = "60";
 const char CameraParameters::VIDEO_HFR_3X[] = "90";
 const char CameraParameters::VIDEO_HFR_4X[] = "120";
+
+// Values for Redeye Reduction settings.
+const char CameraParameters::REDEYE_REDUCTION_ENABLE[] = "enable";
+const char CameraParameters::REDEYE_REDUCTION_DISABLE[] = "disable";
 
 static const char* portrait = "portrait";
 static const char* landscape = "landscape";
