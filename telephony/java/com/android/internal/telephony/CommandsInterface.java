@@ -1563,4 +1563,12 @@ public interface CommandsInterface {
      *          Callback message contains the information of SUCCESS/FAILURE.
     */
     public void setSubscriptionMode (int subscriptionMode, Message result);
+
+    /**
+     * Sets the transmit power
+     *
+     * @param result
+     *          Callback message contains the information of SUCCESS/FAILURE.
+     */
+    void setTransmitPower(int powerLevel, Message result);
 }

@@ -1540,4 +1540,8 @@ public final class SimulatedCommands extends BaseCommands
     public void setRilPowerOff(Message result) {
         return;
     }
+
+    public void setTransmitPower(int powerLevel, Message result) {
+        return;
+    }
 }
