@@ -2723,6 +2723,24 @@ public final class Settings {
                 "cdma_cell_broadcast_sms";
 
         /**
+         * Amber Alert Notification Configuration for CMAS Broadcast SMS
+         *                            0 = Amber Alerts enabled
+         *                            1 = Amber Alerts disabled
+         * {@hide}
+         */
+        public static final String AMBER_ALERT_CONFIG = "amber_alert_config";
+
+        /**
+         * Emergency Alert (Imminent threat) Notification configuration for CMAS Broadcast SMS
+         *                            0 = All emergency alerts on
+         *                            1 = Extreme alerts only
+         *                            2 = Presidential alerts only
+         *{@hide}
+         */
+        public static final String EMERGENCY_ALERT_CONFIG = "emergency_alert_config";
+
+
+        /**
          * The cdma subscription 0 = Subscription from RUIM, when available
          *                       1 = Subscription from NV
          * @hide
