@@ -151,13 +151,33 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     Message mPendingPowerOffCompleteMsg;
 
+    // if this property is set to false, android is not going to issue ANY ipv4 data calls.
     private static final boolean SUPPORT_IPV4 = SystemProperties.getBoolean(
             "persist.telephony.support_ipv4", true);
 
+    // if this property is set to false, android is not going to issue ANY ipv6 data calls.
     private static final boolean SUPPORT_IPV6 = SystemProperties.getBoolean(
             "persist.telephony.support_ipv6", true);
 
-    private static final boolean SUPPORT_SERVICE_ARBITRATION =
+    /*
+     * If this property is set to true then android assumes that multiple PDN is
+     * going to be supported in modem/nw. However if second PDN requests fails,
+     * then behavior is going to be determined by the
+     * SUPPORT_SERVICE_ARBITRATION property below. If MPDN is set to false, then
+     * android will ensure that the higher priority service is active. Low
+     * priority data calls may be pro-actively torn down to ensure this.
+     */
+    private static final boolean SUPPORT_MPDN =
+        SystemProperties.getBoolean("persist.telephony.mpdn", true);
+
+    /*
+     * if this property is set to true, and if multi PDN support is enabled
+     * (above), then android is going to disconnect data calls that support low
+     * priority services if setup data call requests for high priority services
+     * fails. Low priority services will be re-attempted after high priority
+     * services come up. Property should have no effect if MPDN is not enabled.
+     */
+    private static final boolean SUPPORT_MPDN_SERVICE_ARBITRATION =
         SystemProperties.getBoolean("persist.telephony.ds.arbit", false);
 
     boolean mIsEhrpdCapable = false;
@@ -331,7 +351,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         logv("SUPPORT_IPV4 = " + SUPPORT_IPV4);
         logv("SUPPORT_IPV6 = " + SUPPORT_IPV6);
-        logv("SUPPORT_SERVICE_ARBITRATION = " + SUPPORT_SERVICE_ARBITRATION);
+        logv("SUPPORT_MPDN = " + SUPPORT_MPDN);
+        logv("SUPPORT_MPDN_SERVICE_ARBITRATION = " + SUPPORT_MPDN_SERVICE_ARBITRATION);
         logv("SUPPORT_OMH = " + mDpt.isOmhEnabled());
         logv("SUPPORT_OOS_IS_DISCONNECT = " + mOosIsDisconnect);
     }
@@ -877,7 +898,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
              * But do not bother de-activating low priority calls if the same service
              * is already active on other ip versions.
              */
-            if (SUPPORT_SERVICE_ARBITRATION && disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
+            if (SUPPORT_MPDN_SERVICE_ARBITRATION && disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
                 logv("Disconnected low priority data call [pdp availability failure.]");
                 needDataConnectionUpdate = false;
                 // will be called, when disconnect is complete.
@@ -885,7 +906,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             // set state to scanning because can try on other data
             // profiles that might work with this ds+ipv.
             mDpt.setState(State.SCANNING, c.ds, c.ipv);
-        } else if (SUPPORT_SERVICE_ARBITRATION && mDpt.isServiceTypeActive(c.ds) == false
+        } else if (SUPPORT_MPDN_SERVICE_ARBITRATION && mDpt.isServiceTypeActive(c.ds) == false
                 && disconnectOneLowPriorityDataCall(c.ds, c.reason)) {
             logv("Disconnected low priority data call [pdp availability failure.]");
             /*
@@ -1204,6 +1225,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
          * call as required in order of decreasing service priority - highest priority
          * service gets data call setup first!
          */
+
         for (DataServiceType ds : DataServiceType.getPrioritySortedValues()) {
             /*
              * 2a : Poll all data calls and update the latest info.
@@ -1225,30 +1247,56 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 }
             }
 
-            /*
-             * 2b : Bring up data calls as required.
-             */
+            /* We bring up data calls strictly in order of service priority when
+            * 1. MPDN is disabled OR
+            * 2. MPDN is enabled and MPDN service arbitration is also enabled OR
+            * 3. We are in OMH mode.
+            *
+            * We can try data calls ignoring service priority on other cases.
+            */
+
+           boolean dataCallsInOrderOfPriority = SUPPORT_MPDN == false
+                   || (SUPPORT_MPDN && SUPPORT_MPDN_SERVICE_ARBITRATION)
+                   || mDpt.isAnyDataProfileAvailable(DataProfileType.PROFILE_TYPE_3GPP2_OMH);
+
+           /*
+            * If a service in WAITING_ALARM state, then we can try other services
+            * only if dataCallsInOrderOfPriority is false.
+            */
+
             if (mDpt.isServiceTypeEnabled(ds) == true) {
-
-                //IPV4
-                if (SUPPORT_IPV4
-                        && mDpt.isServiceTypeActive(ds, IPVersion.IPV4) == false
-                        && mDpt.getState(ds, IPVersion.IPV4) != State.WAITING_ALARM) {
-                    boolean setupDone = trySetupDataCall(ds, IPVersion.IPV4, reason);
-                    if (setupDone)
-                        return; //one at a time, in order of priority
+                // IPV4
+                if (SUPPORT_IPV4) {
+                    if (checkAndBringUpDs(ds, IPVersion.IPV4, reason, dataCallsInOrderOfPriority))
+                        return;
                 }
 
-                //IPV6
-                if (SUPPORT_IPV6
-                        && mDpt.isServiceTypeActive(ds, IPVersion.IPV6) == false
-                        && mDpt.getState(ds, IPVersion.IPV6) != State.WAITING_ALARM) {
-                    boolean setupDone = trySetupDataCall(ds, IPVersion.IPV6, reason);
-                    if (setupDone)
-                        return; //one at a time, in order of priority
+                // IPV6
+                if (SUPPORT_IPV6) {
+                    if (checkAndBringUpDs(ds, IPVersion.IPV6, reason, dataCallsInOrderOfPriority))
+                        return;
                 }
+            } // if (mDpt.isServiceTypeEnabled(ds) == true)
+        }
+    }
+
+    private boolean checkAndBringUpDs(DataServiceType ds, IPVersion ipv, String reason,
+            boolean dataCallsInOrderOfPriority) {
+
+        if (mDpt.isServiceTypeActive(ds, ipv) == false) {
+            if (mDpt.getState(ds, ipv) != State.WAITING_ALARM) {
+                boolean setupDone = trySetupDataCall(ds, ipv, reason);
+                if (setupDone)
+                    return true;
+            } else if (dataCallsInOrderOfPriority == true) {
+                // higher priority service is waiting for alarm to ring, so
+                // skip all lower priority calls.
+                logv("Skipping bringing up of low pri ds due to pending high pri ds");
+                return true;
             }
         }
+
+        return false;
     }
 
     private boolean getDesiredPowerState() {
@@ -1419,20 +1467,22 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             return false;
         }
 
-        /* For OMH arbitration, check if there is an existing OMH profile.
+        /* If MPDN is disabled, we ensure that only one PDN of highest priority is active.
          *
+         * Also, for OMH arbitration, check if there is an existing OMH profile.
          * If there is at least one, then we assume that the device is working in the
          * OMH enabled mode and has one or more OMH profile(s) and needs arbitration.
          * If not, we allow the device to operate using other non OMH profiles.
          */
-        if(mDpt.isAnyDataProfileAvailable(DataProfileType.PROFILE_TYPE_3GPP2_OMH)) {
+        if(SUPPORT_MPDN == false ||
+                mDpt.isAnyDataProfileAvailable(DataProfileType.PROFILE_TYPE_3GPP2_OMH)) {
             // If the call indeed got disconnected return, otherwise pass through
             if (disconnectOneLowPriorityDataCall(ds, reason)) {
-                logw("[OMH] Lower/Equal priority call disconnected.");
+                logw("Lower/Equal priority call disconnected.");
                 return true;
             }
             if(isHigherPriorityDataCallActive(ds)) {
-                logw("[OMH] Higher priority call active. Ignoring setup data call request.");
+                logw("Higher priority call active. Ignoring setup data call request.");
                 return false;
             }
         }
@@ -1441,7 +1491,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         if (dc == null) {
             // if this happens, it probably means that our data call list is not
             // big enough!
-            boolean ret = SUPPORT_SERVICE_ARBITRATION && disconnectOneLowPriorityDataCall(ds, reason);
+            boolean ret = SUPPORT_MPDN_SERVICE_ARBITRATION && disconnectOneLowPriorityDataCall(ds, reason);
             // irrespective of ret, we should return true here
             // - if a call was indeed disconnected, then updateDataConnections()
             //   will take care of setting up call again
