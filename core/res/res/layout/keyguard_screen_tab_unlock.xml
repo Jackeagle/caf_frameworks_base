@@ -42,28 +42,42 @@
         android:ellipsize="marquee"
         android:gravity="right|bottom"
         android:textAppearance="?android:attr/textAppearanceMedium"
-        />
+       />
+
+    <!-- "emergency calls only" shown when sim is missing or PUKd -->
+    <TextView
+        android:id="@+id/emergencyCallText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/carrier"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="0dip"
+        android:layout_marginRight="8dip"
+        android:text="@string/emergency_calls_only"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:textColor="@color/white"
+       />
 
     <!-- Carrier info for second subscription-->
     <TextView
         android:id="@+id/carrier_sub2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/carrier"
+        android:layout_below="@id/emergencyCallText"
         android:layout_alignParentTop="true"
         android:layout_alignParentRight="true"
-        android:layout_marginTop="40dip"
+        android:layout_marginTop="55dip"
         android:layout_marginRight="8dip"
         android:singleLine="true"
         android:ellipsize="marquee"
         android:gravity="right|bottom"
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:textSize="22sp"
-        />
+       />
 
-    <!-- "emergency calls only" shown when sim is missing or PUKd -->
+    <!-- "emergency calls only" shown when sim2 is missing or PUKd -->
     <TextView
-        android:id="@+id/emergencyCallText"
+        android:id="@+id/emergencyCallTextSub2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_below="@id/carrier_sub2"

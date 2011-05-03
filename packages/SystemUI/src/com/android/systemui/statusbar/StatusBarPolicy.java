@@ -125,6 +125,7 @@ public class StatusBarPolicy {
     // phone
     private TelephonyManager mPhone;
     private int[] mPhoneSignalIconId;
+    private int[] mSimIconId;
 
     private boolean isInAirplaneMode = false;
     //***** Signal strength icons
@@ -488,6 +489,7 @@ public class StatusBarPolicy {
     ServiceState[] mServiceState;
     SignalStrength[] mSignalStrength;
     String[] mSignalIcon = {"phone_signal", "phone_signal_second_sub"};
+    String[] mSimIcon = {"no_sim_card1", "no_sim_card2"};
     private PhoneStateListener[] mPhoneStateListener;
 
     // data connection
@@ -621,6 +623,7 @@ public class StatusBarPolicy {
         mSignalStrength = new SignalStrength[numPhones];
         mServiceState = new ServiceState[numPhones];
         mSimState = new IccCard.State[numPhones];
+        mSimIconId = new int[numPhones];
         mPhoneSignalIconId = new int[numPhones];
         mPhoneStateListener = new PhoneStateListener[numPhones];
 
@@ -634,6 +637,11 @@ public class StatusBarPolicy {
             mPhoneSignalIconId[i] = R.drawable.stat_sys_signal_null;
             mService.setIcon(mSignalIcon[i], mPhoneSignalIconId[i], 0);
             mPhoneStateListener[i] = getPhoneStateListener(i);
+
+            //Sim Icon
+            mSimIconId[i] = R.drawable.stat_sys_no_sim;
+            mService.setIcon(mSimIcon[i], mSimIconId[i], 0);
+            mService.setIconVisibility(mSimIcon[i], false);
 
             // register for phone state notifications.
             ((TelephonyManager)mContext.getSystemService(Context.TELEPHONY_SERVICE))
@@ -1038,14 +1046,11 @@ public class StatusBarPolicy {
         Slog.d(TAG, "updateSimState for subscription :" + sub);
         if (IccCard.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
             simState = IccCard.State.ABSENT;
-        }
-        else if (IccCard.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
+        } else if (IccCard.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
             simState = IccCard.State.CARD_IO_ERROR;
-        }
-        else if (IccCard.INTENT_VALUE_ICC_READY.equals(stateExtra)) {
+        } else if (IccCard.INTENT_VALUE_ICC_READY.equals(stateExtra)) {
             simState = IccCard.State.READY;
-        }
-        else if (IccCard.INTENT_VALUE_ICC_LOCKED.equals(stateExtra)) {
+        } else if (IccCard.INTENT_VALUE_ICC_LOCKED.equals(stateExtra)) {
             final String lockedReason = intent.getStringExtra(IccCard.INTENT_KEY_LOCKED_REASON);
             if (IccCard.INTENT_VALUE_LOCKED_ON_PIN.equals(lockedReason)) {
                 simState = IccCard.State.PIN_REQUIRED;
@@ -1080,6 +1085,7 @@ public class StatusBarPolicy {
             simState = IccCard.State.UNKNOWN;
         }
         mSimState[sub] = simState;
+        updateSimIcon(sub);
         updateDataIcon(sub);
     }
 
@@ -1430,6 +1436,16 @@ public class StatusBarPolicy {
         }
     }
 
+    private final void updateSimIcon(int cardIndex) {
+        boolean visible = false;
+
+        Slog.d(TAG,"In updateSimIcon card =" + cardIndex + ", simState= " + mSimState[cardIndex]);
+        if (mSimState[cardIndex] ==  IccCard.State.ABSENT) {
+            visible = true;
+        }
+        mService.setIconVisibility(mSimIcon[cardIndex], visible);
+    }
+
     private final void updateDataIcon(int subscription) {
         Slog.d(TAG,"updateDataIcon subscription =" + subscription);
         int iconId;
@@ -1440,13 +1456,7 @@ public class StatusBarPolicy {
             return;
         }
 
-        if (mSignalStrength != null && mSignalStrength.length > subscription &&
-               mSignalStrength[subscription] != null && mSignalStrength[subscription].isGsm() &&
-               mSimState[subscription] != IccCard.State.READY && mSimState[subscription] != IccCard.State.UNKNOWN) {
-               iconId = R.drawable.stat_sys_no_sim;
-               mService.setIcon("data_connection", iconId, 0);
-        } else if ((dataRadio(subscription) == GSM) ||
-                    (dataRadio(subscription) == LTE)) {
+        if ((dataRadio(subscription) == GSM) || (dataRadio(subscription) == LTE)) {
             // GSM data, we have to check also the sim state
             if (mSimState[subscription] == IccCard.State.READY || mSimState[subscription] == IccCard.State.UNKNOWN) {
                 if (hasService(subscription) && mDataState == TelephonyManager.DATA_CONNECTED) {
@@ -1469,8 +1479,7 @@ public class StatusBarPolicy {
                     visible = false;
                 }
             } else {
-                iconId = R.drawable.stat_sys_no_sim;
-                mService.setIcon("data_connection", iconId, 0);
+                visible = false;
             }
         } else if ((dataRadio(subscription) == CDMA) || (dataRadio(subscription) == EVDO)) {
             // CDMA case, mDataActivity can be also DATA_ACTIVITY_DORMANT
