@@ -260,6 +260,9 @@ public class IccCardProxy extends Handler implements IccCard {
         UiccCardApplication newApplication = null;
 
         mUiccCard = mUiccManager.getIccCard(mCardIndex);
+        if (mUiccCard != null) {
+            Log.d(LOG_TAG,"Card State = " + mUiccCard.getCardState() + "Card Index = " + mCardIndex);
+        }
 
         if (mSubscriptionData != null) {
             if (mCurrentAppType == AppFamily.APP_FAM_3GPP) {
@@ -293,8 +296,10 @@ public class IccCardProxy extends Handler implements IccCard {
                 if (mRadioOn) {
                     if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ERROR)) {
                         broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
-                    } else {
+                    } else if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
                         broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                    } else {
+                        Log.d(LOG_TAG,"CardState neither error nor absent");
                     }
                 } else {
                     broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
