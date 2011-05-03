@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,10 +86,13 @@ public class IccCardProxy extends Handler implements IccCard {
                                         // ACTION_SIM_STATE_CHANGED intents
     private boolean mInitialized = false;
 
-    public IccCardProxy(Context mContext, CommandsInterface cm) {
+    private int mCardIndex = 0;
+
+    public IccCardProxy(Context mContext, CommandsInterface cm, int cardIndex) {
         super();
         this.mContext = mContext;
         this.cm = cm;
+        mCardIndex = cardIndex;
 
         mUiccManager = UiccManager.getInstance(mContext, cm);
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
@@ -239,13 +242,15 @@ public class IccCardProxy extends Handler implements IccCard {
     void updateIccAvailability() {
         UiccCardApplication newApplication = null;
 
+        mUiccCard = mUiccManager.getCard(mCardIndex);
+        if (mUiccCard != null) {
+            Log.d(LOG_TAG,"Card State = " + mUiccCard.getCardState() + "Card Index = " + mCardIndex);
+        }
+
         if (TelephonyManager.isDsdsEnabled()) {
             /* In DSDS the current active application is identified by slot,app_index */
             if (mSubscriptionData != null) {
                 newApplication = mUiccManager.getApplication(mSubscriptionData.slotId, mSubscriptionData.subIndex);
-            }
-            else {
-                return;
             }
         } else {
             newApplication = mUiccManager.getCurrentApplication(mCurrentAppType);
@@ -253,7 +258,11 @@ public class IccCardProxy extends Handler implements IccCard {
 
         if (mFirstRun) {
             if (newApplication == null) {
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ERROR)) {
+                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
+                } else {
+                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                }
             }
             mFirstRun = false;
         }
@@ -263,12 +272,17 @@ public class IccCardProxy extends Handler implements IccCard {
                 mApplication.unregisterForUnavailable(this);
                 unregisterUiccCardEvents();
                 mApplication = null;
-                mUiccCard = null;
                 mAppRecords = null;
             }
             if (newApplication == null) {
                 if (mRadioOn) {
-                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                    if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ERROR)) {
+                        broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
+                    } else if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
+                        broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                    } else {
+                        Log.d(LOG_TAG,"CardState neither error nor absent");
+                    }
                 } else {
                     broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
                 }
@@ -280,9 +294,12 @@ public class IccCardProxy extends Handler implements IccCard {
                  * inserted when we are camped on CDMA, then mUicccCard will be
                  * null as SIM will not have 3GPP2 application present.
                  */
-                mUiccCard = newApplication.getCard();
                 mAppRecords = newApplication.getApplicationRecords();
                 registerUiccCardEvents();
+            }
+        } else {
+            if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ERROR)) {
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
             }
         }
     }
@@ -291,8 +308,8 @@ public class IccCardProxy extends Handler implements IccCard {
         mApplication.unregisterForReady(this);
         mApplication.unregisterForLocked(this);
         mApplication.unregisterForPersoSubstate(this);
-        mUiccCard.unregisterForAbsent(this);
-        mUiccCard.unregisterForError(this);
+        if (mUiccCard != null) mUiccCard.unregisterForAbsent(this);
+        if (mUiccCard != null) mUiccCard.unregisterForError(this);
         mAppRecords.unregisterForImsiReady(this);
         mAppRecords.unregisterForRecordsLoaded(this);
     }
@@ -301,8 +318,8 @@ public class IccCardProxy extends Handler implements IccCard {
         mApplication.registerForReady(this, EVENT_APP_READY, null);
         mApplication.registerForLocked(this, EVENT_ICC_LOCKED, null);
         mApplication.registerForPersoSubstate(this, EVENT_PERSO_LOCKED, null);
-        mUiccCard.registerForAbsent(this, EVENT_ICC_ABSENT, null);
-        mUiccCard.registerForError(this, EVENT_ICC_IO_ERROR, null);
+        if (mUiccCard != null) mUiccCard.registerForAbsent(this, EVENT_ICC_ABSENT, null);
+        if (mUiccCard != null) mUiccCard.registerForError(this, EVENT_ICC_IO_ERROR, null);
         mAppRecords.registerForImsiReady(this, EVENT_IMSI_READY, null);
         mAppRecords.registerForRecordsLoaded(this, EVENT_RECORDS_LOADED, null);
     }
@@ -313,6 +330,7 @@ public class IccCardProxy extends Handler implements IccCard {
 
     /* why do external apps need to use this? */
     public void broadcastIccStateChangedIntent(String value, String reason) {
+        int subId = mCardIndex;
         if (mQuiteMode) {
             Log.e(LOG_TAG, "QuiteMode: NOT Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
                     + " reason " + reason);
@@ -325,11 +343,12 @@ public class IccCardProxy extends Handler implements IccCard {
         intent.putExtra(INTENT_KEY_ICC_STATE, value);
         intent.putExtra(INTENT_KEY_LOCKED_REASON, reason);
         if ((TelephonyManager.isDsdsEnabled()) && (mSubscriptionData != null)) {
-            intent.putExtra(INTENT_KEY_SUBSCRIPTION, mSubscriptionData.subNum);
-            Log.d(LOG_TAG, "sub info " + mSubscriptionData.subNum);
+            subId = mSubscriptionData.subNum;
         }
+        intent.putExtra(INTENT_KEY_SUBSCRIPTION, subId);
+
         Log.e(LOG_TAG, "Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
-            + " reason " + reason);
+            + " reason " + reason + " for subscription : " + subId);
         ActivityManagerNative.broadcastStickyIntent(intent, READ_PHONE_STATE);
     }
 

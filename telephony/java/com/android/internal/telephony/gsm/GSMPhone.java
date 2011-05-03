@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -133,18 +133,20 @@ public class GSMPhone extends PhoneBase {
     // Constructors
 
     public
-    GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier) {
-        this(context,ci,notifier, false);
+    GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier, int subscription) {
+        this(context,ci,notifier, false, subscription);
     }
 
     public
-    GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier, boolean unitTestMode) {
+    GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier, boolean unitTestMode,
+            int subscription) {
         super(notifier, context, ci, unitTestMode);
 
         if (ci instanceof SimulatedRadioControl) {
             mSimulatedRadioControl = (SimulatedRadioControl) ci;
         }
 
+        mSubscription = subscription;
         mVmNumGsmKey = VM_NUMBER;
         mUiccManager = UiccManager.getInstance(context, mCM);
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);

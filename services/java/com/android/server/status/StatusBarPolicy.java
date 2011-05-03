@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -126,9 +126,12 @@ public class StatusBarPolicy {
     // phone
     private TelephonyManager mPhone;
     private IBinder[] mPhoneIcon;
+    private IBinder[] mSimIcon;
 
     //***** Signal strength icons
     private IconData[] mPhoneData;
+    //***** No Sim icons
+    private IconData[] mSimData;
     private boolean isInAirplaneMode = false;
     //GSM/UMTS
     private static final int[] sSignalImages = new int[] {
@@ -298,6 +301,8 @@ public class StatusBarPolicy {
     int mDataActivity = TelephonyManager.DATA_ACTIVITY_NONE;
     ServiceState[] mServiceState;
     SignalStrength[] mSignalStrength;
+    String[] mPhoneIconPkg = {"phone_signal", "phone_signal_second_sub"};
+    String[] mSimIconPkg = {"no_sim_card1", "no_sim_card2"};
     private PhoneStateListener[] mPhoneStateListener;
 
     // data connection
@@ -452,24 +457,23 @@ public class StatusBarPolicy {
         mSimState = new IccCard.State[numPhones];
         mPhoneIcon = new IBinder[numPhones];
         mPhoneData = new IconData[numPhones];
+        mSimIcon = new IBinder[numPhones];
+        mSimData = new IconData[numPhones];
         mPhoneStateListener = new PhoneStateListener[numPhones];
 
         mPhone = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
-        // phone_signal for subscription 1
-        mPhoneData[0] = IconData.makeIcon("phone_signal",
-                null, com.android.internal.R.drawable.stat_sys_signal_null, 0, 0);
-
-        if (TelephonyManager.isDsdsEnabled()) {
-            // phone_signal for subscription 2
-            mPhoneData[1] = IconData.makeIcon("phone_signal_second_sub",
-                    null, com.android.internal.R.drawable.stat_sys_signal_null, 0, 0);
-        }
 
         for (int i=0; i < numPhones; i++) {
             mSignalStrength[i] = new SignalStrength();
             mServiceState[i] = new ServiceState();
             mSimState[i] = IccCard.State.READY;
+            mPhoneData[i] = IconData.makeIcon(mPhoneIconPkg[i],
+                    null, com.android.internal.R.drawable.stat_sys_signal_null, 0, 0);
             mPhoneIcon[i] = service.addIcon(mPhoneData[i], null);
+            mSimData[i] = IconData.makeIcon(mSimIconPkg[i],
+                    null, com.android.internal.R.drawable.stat_sys_no_sim, 0, 0);
+            mSimIcon[i] = service.addIcon(mSimData[i], null);
+            service.setIconVisibility(mSimIcon[i], false);
             mPhoneStateListener[i] = getPhoneStateListener(i);
             // register for phone state notifications.
             ((TelephonyManager)mContext.getSystemService(Context.TELEPHONY_SERVICE))
@@ -1020,6 +1024,7 @@ public class StatusBarPolicy {
                 simState = IccCard.State.UNKNOWN;
             }
             mSimState[sub] = simState;
+            updateSimIcon(sub);
             updateDataIcon(sub);
         }
     }
@@ -1315,6 +1320,16 @@ public class StatusBarPolicy {
         }
     }
 
+    private final void updateSimIcon(int cardIndex) {
+        boolean visible = false;
+
+        Slog.d(TAG,"In updateSimIcon card =" + cardIndex + ", simState= " + mSimState[cardIndex]);
+        if (mSimState[cardIndex] == IccCard.State.ABSENT) {
+            visible = true;
+        }
+        mService.setIconVisibility(mSimIcon[cardIndex], visible);
+    }
+
     private final void updateDataIcon(int subscription) {
         int iconId, dds;
         boolean visible = true;
@@ -1329,13 +1344,7 @@ public class StatusBarPolicy {
             subscription = 0;
         }
         simState = mSimState[subscription];
-        if (mSignalStrength != null && mSignalStrength.length > subscription &&
-                mSignalStrength[subscription] != null && mSignalStrength[subscription].isGsm() &&
-                simState != IccCard.State.READY && simState != IccCard.State.UNKNOWN) {
-            mDataData.iconId = com.android.internal.R.drawable.stat_sys_no_sim;
-            mService.updateIcon(mDataIcon, mDataData, null);
-        } else if ((dataRadio(subscription) == GSM) ||
-                        (dataRadio(subscription) == LTE)) {
+        if ((dataRadio(subscription) == GSM) || (dataRadio(subscription) == LTE)) {
             // GSM case, we have to check also the sim state
             if (simState == IccCard.State.READY || simState == IccCard.State.UNKNOWN) {
                 if (hasService(subscription) && mDataState == TelephonyManager.DATA_CONNECTED) {
@@ -1359,8 +1368,7 @@ public class StatusBarPolicy {
                     visible = false;
                 }
             } else {
-                mDataData.iconId = com.android.internal.R.drawable.stat_sys_no_sim;
-                mService.updateIcon(mDataIcon, mDataData, null);
+                visible = false;
             }
         } else {
             // CDMA case, mDataActivity can be also DATA_ACTIVITY_DORMANT
