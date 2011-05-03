@@ -1128,7 +1128,6 @@ status_t AwesomePlayer::seekTo_l(int64_t timeUs) {
     if (!(mFlags & PLAYING)) {
         LOGV("seeking while paused, sending SEEK_COMPLETE notification"
              " immediately.");
-        mSeeking = false;
         notifyListener_l(MEDIA_SEEK_COMPLETE);
         mSeekNotificationSent = true;
     }
