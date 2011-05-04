@@ -31,6 +31,7 @@ import com.android.internal.telephony.DataCallState;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.gsm.CallFailCause;
+import com.android.internal.telephony.cdma.CdmaSmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SuppServiceNotification;
 
@@ -1462,6 +1463,10 @@ public final class SimulatedCommands extends BaseCommands
     }
 
     public void getGsmBroadcastConfig(Message response) {
+        unimplemented(response);
+    }
+ 
+    public void setCdmaBroadcastConfig(CdmaSmsBroadcastConfigInfo[] configs, Message response) {
         unimplemented(response);
     }
 }

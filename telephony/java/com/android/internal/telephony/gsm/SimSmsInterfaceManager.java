@@ -243,7 +243,7 @@ public class SimSmsInterfaceManager extends IccSmsInterfaceManager {
 
         context.enforceCallingPermission(
                 "android.permission.RECEIVE_SMS",
-                "Enabling cell broadcast SMS");
+                "Enabling broadcast SMS");
 
         String client = context.getPackageManager().getNameForUid(
                 Binder.getCallingUid());
@@ -276,7 +276,7 @@ public class SimSmsInterfaceManager extends IccSmsInterfaceManager {
 
         context.enforceCallingPermission(
                 "android.permission.RECEIVE_SMS",
-                "Disabling cell broadcast SMS");
+                "Disabling broadcast SMS");
 
         String client = context.getPackageManager().getNameForUid(
                 Binder.getCallingUid());
@@ -354,6 +354,18 @@ public class SimSmsInterfaceManager extends IccSmsInterfaceManager {
         }
 
         return mSuccess;
+    }
+
+    public boolean enableCdmaBroadcast(int messageIdentifier) {
+        // Not implemented
+        Log.e(LOG_TAG, "Error! Not implemented for GSM.");
+        return false;
+    }
+
+    public boolean disableCdmaBroadcast(int messageIdentifier) {
+        // Not implemented
+        Log.e(LOG_TAG, "Error! Not implemented for GSM.");
+        return false;
     }
 
     protected void log(String msg) {
