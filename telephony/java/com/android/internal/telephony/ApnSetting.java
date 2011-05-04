@@ -24,6 +24,8 @@ import com.android.internal.telephony.Phone.BearerType;
  */
 public class ApnSetting extends DataProfile {
 
+    static final String V2_FORMAT_REGEX = "^\\[ApnSettingV2\\]\\s*";
+
     String carrier;
     String apn;
     String proxy;
@@ -58,7 +60,6 @@ public class ApnSetting extends DataProfile {
         this.password = password;
         this.authType = authType;
         this.types = types;
-
         try {
             this.bearerType = Enum.valueOf(BearerType.class, bearerType.toUpperCase());
         } catch (Exception e) {
