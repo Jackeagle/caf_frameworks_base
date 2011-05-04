@@ -1406,6 +1406,11 @@ public class WebViewDatabase {
             return;
         }
 
+        // delete old data
+        synchronized (mTcpPreConnectionLock) {
+            mDatabase.delete(mTableNames[TABLE_TCPPRECONNECTION_ID], null, null);
+        }
+
         // save new data
         Set mainUrls;
         synchronized (SubResourcesHistory.mSubResourcesHistoryLock) {
