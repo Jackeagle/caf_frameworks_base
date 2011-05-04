@@ -858,10 +858,17 @@ public class MediaRecorder
     private void acquireWakeLock()
     {
         if(mWakeLock == null) {
-            Application app = ActivityThread.systemMain().getApplication();
-            PowerManager pm = (PowerManager) app.getSystemService(Context.POWER_SERVICE);
-            mWakeLock = pm.newWakeLock(PowerManager.CPU_MAX_WAKE_LOCK, "MediaRecorder");
-            mWakeLock.acquire();
+            try {
+                Application app = ActivityThread.systemMain().getApplication();
+                PowerManager pm = (PowerManager) app.getSystemService(Context.POWER_SERVICE);
+                mWakeLock = pm.newWakeLock(PowerManager.CPU_MAX_WAKE_LOCK, "MediaRecorder");
+                mWakeLock.acquire();
+            }
+            catch (Exception e) {
+                // Catch exception in case the looper is not initialized
+                Log.e(TAG, "Unable to acquire wakelock, ignoring exception and proceeding", e);
+                mWakeLock = null;
+            }
         }
     }
 
@@ -869,7 +876,12 @@ public class MediaRecorder
     {
         if (mWakeLock != null) {
             if(mWakeLock.isHeld()) {
-                mWakeLock.release();
+                try {
+                    mWakeLock.release();
+                }
+                catch (Exception e) {
+                    Log.e(TAG, "Caught exception while releasing the wakelock", e);
+                }
             }
             mWakeLock = null;
         }
