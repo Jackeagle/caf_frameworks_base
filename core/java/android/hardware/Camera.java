@@ -1197,6 +1197,7 @@ public class Camera {
         private static final String KEY_SELECTABLE_ZONE_AF = "selectable-zone-af";
         private static final String KEY_FACE_DETECTION = "face-detection";
         private static final String KEY_MEMORY_COLOR_ENHANCEMENT = "mce";
+        private static final String KEY_VIDEO_HIGH_FRAME_RATE = "video-hfr";
 
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
@@ -1263,6 +1264,12 @@ public class Camera {
         // Values for MCE settings.
         public static final String MCE_ENABLE = "enable";
         public static final String MCE_DISABLE = "disable";
+
+        // Values for HFR settings.
+        public static final String VIDEO_HFR_OFF = "off";
+        public static final String VIDEO_HFR_2X = "60";
+        public static final String VIDEO_HFR_3X = "90";
+        public static final String VIDEO_HFR_4X = "120";
 
         // Values for flash mode settings.
         /**
@@ -2962,6 +2969,35 @@ public class Camera {
          */
         public List<String> getSupportedMemColorEnhanceModes() {
             String str = get(KEY_MEMORY_COLOR_ENHANCEMENT + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+        }
+
+         /**
+         * Gets the current HFR Mode.
+         *
+         * @return VIDEO_HFR_XXX string constants
+         */
+        public String getVideoHighFrameRate() {
+            return get(KEY_VIDEO_HIGH_FRAME_RATE);
+        }
+
+        /**
+         * Sets the current HFR Mode.
+         *
+         * @param hfr VIDEO_HFR_XXX string constants
+         */
+        public void setVideoHighFrameRate(String hfr) {
+            set(KEY_VIDEO_HIGH_FRAME_RATE, hfr);
+        }
+
+         /**
+         * Gets the supported HFR modes.
+         *
+         * @return a List of VIDEO_HFR_XXX string constants. null if hfr mode
+         *         setting is not supported.
+         */
+        public List<String> getSupportedVideoHighFrameRateModes() {
+            String str = get(KEY_VIDEO_HIGH_FRAME_RATE + SUPPORTED_VALUES_SUFFIX);
             return split(str);
         }
 

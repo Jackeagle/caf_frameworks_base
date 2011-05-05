@@ -340,6 +340,9 @@ public:
     static const char KEY_MEMORY_COLOR_ENHANCEMENT[];
     static const char KEY_SUPPORTED_MEM_COLOR_ENHANCE_MODES[];
 
+    static const char KEY_VIDEO_HIGH_FRAME_RATE[];
+    static const char KEY_SUPPORTED_VIDEO_HIGH_FRAME_RATE_MODES[];
+
     // Value for KEY_ZOOM_SUPPORTED or KEY_SMOOTH_ZOOM_SUPPORTED.
     static const char TRUE[];
 
@@ -514,6 +517,12 @@ public:
     // Values for MCE settings.
     static const char MCE_ENABLE[];
     static const char MCE_DISABLE[];
+
+    // Values for HFR settings.
+    static const char VIDEO_HFR_OFF[];
+    static const char VIDEO_HFR_2X[];
+    static const char VIDEO_HFR_3X[];
+    static const char VIDEO_HFR_4X[];
 
     enum {
         CAMERA_ORIENTATION_UNKNOWN = 0,
