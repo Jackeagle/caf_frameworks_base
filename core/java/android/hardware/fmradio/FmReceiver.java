@@ -1665,6 +1665,28 @@ public class FmReceiver extends FmTransceiver
    }
 
 
+   /*==============================================================
+   FUNCTION:  getMpxDcc
+   ==============================================================*/
+   /**
+   *    Returns the MPX_DCC of the currently tuned station
+   *
+   *    <p>
+   *    This method returns the MPX_DCC of the currently
+   *    tuned station.
+   *
+   *    <p>
+   *    @return    MPX_DCC value of currently tuned station.
+   *               -1 on failure to retrieve the current MPX_DCC
+   */
+   public int getMpxDcc()
+   {
+      int re;
+
+      re = mControl.Mpx_Dcc(sFd);
+      return re;
+   }
+
 
    /*==============================================================
    FUNCTION:  getRawRDS
