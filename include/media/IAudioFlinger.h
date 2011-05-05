@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +57,20 @@ public:
                                 int output,
                                 int *sessionId,
                                 status_t *status) = 0;
+
+    virtual     void        createSession(
+                                pid_t pid,
+                                uint32_t sampleRate,
+                                int channelCount,
+                                int *sessionId,
+                                status_t *status) = 0;
+
+    virtual     void        deleteSession() = 0;
+
+    virtual     void        applyEffectsOn(
+                                int16_t *buffer1,
+                                int16_t *buffer2,
+                                int size) = 0;
 
     virtual sp<IAudioRecord> openRecord(
                                 pid_t pid,
