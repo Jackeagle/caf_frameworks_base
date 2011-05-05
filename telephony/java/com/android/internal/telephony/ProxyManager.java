@@ -118,6 +118,7 @@ public class ProxyManager extends Handler {
     private SubscriptionData[] mCardSubData = null;
     // The User prefered subscription information
     private SubscriptionData mUserPrefSubs = null;
+    private boolean[] mRadioOn = {false, false};
 
 
     //***** Class Methods
@@ -153,9 +154,6 @@ public class ProxyManager extends Handler {
         if (TelephonyManager.isMultiSimEnabled()) {
             mUiccCards = new UiccCard[UiccConstants.RIL_MAX_CARDS];
 
-            mCi[0].registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_NOT_AVAILABLE, null);
-            mCi[0].registerForOn(this, EVENT_RADIO_ON, null);
-
             getUserPreferredSubs();
             mSupplySubscription = this.new SupplySubscription(mContext);
 
@@ -167,6 +165,9 @@ public class ProxyManager extends Handler {
                 // Register for SIM Refresh events
                 Integer slot = new Integer(i);
                 mCi[i].registerForIccRefresh(this, EVENT_SIM_REFRESH, slot);
+
+                mCi[i].registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_NOT_AVAILABLE, slot);
+                mCi[i].registerForOn(this, EVENT_RADIO_ON, slot);
             }
 
             // Get the current active dds
@@ -344,29 +345,55 @@ public class ProxyManager extends Handler {
             }
         }
     }
+    private boolean isAllRadioOn() {
+        boolean result = true;
+        for (boolean radioOn : mRadioOn) {
+            result = result && radioOn;
+        }
+        return result;
+    }
 
     @Override
     public void handleMessage(Message msg) {
         AsyncResult ar;
         int cardIndex = 0;
         String strCardIndex;
+        Integer slot;
 
         switch(msg.what) {
             case EVENT_RADIO_OFF_OR_NOT_AVAILABLE:
-                // Unregister for card status indication when radio state becomes OFF or UNAVAILABLE.
-                mUiccManager.unregisterForIccChanged(sProxyManager);
-                // Reset the flag, which takes care of processing/Handling of card status
-                // card status is processed only the first time
-                mUiccSubSet = true;
+                ar = (AsyncResult)msg.obj;
+                slot = (Integer)ar.userObj;
+                Log.d(LOG_TAG, "ProxyManager EVENT_RADIO_OFF_OR_NOT_AVAILABLE on slot = " + slot);
+                if (slot >= 0 && slot < mRadioOn.length) {
+                    mRadioOn[slot] = false;
+                    // Unregister for card status indication when radio state becomes OFF or UNAVAILABLE.
+                    mUiccManager.unregisterForIccChanged(sProxyManager);
+                    // Reset the flag, which takes care of processing/Handling of card status
+                    // card status is processed only the first time
+                    mUiccSubSet = true;
+                } else {
+                    Log.d(LOG_TAG, "Invalid slot!!!");
+                }
                 break;
 
             case EVENT_RADIO_ON:
-                // Register for card status indication when radio state becomes ON.
-                mUiccManager.registerForIccChanged(sProxyManager, EVENT_ICC_CHANGED, null);
-                mSetSubscriptionMode = true;
-                mUiccSubSet = false;
-                mReadIccid = true;
-                mDdsSet = false;
+                ar = (AsyncResult)msg.obj;
+                slot = (Integer)ar.userObj;
+                Log.d(LOG_TAG, "ProxyManager EVENT_RADIO_ON on slot = " + slot);
+                if (slot >= 0 && slot < mRadioOn.length) {
+                    mRadioOn[slot] = true;
+                    if (isAllRadioOn()) {
+                        // Register for card status indication when radio state becomes ON.
+                        mUiccManager.registerForIccChanged(sProxyManager, EVENT_ICC_CHANGED, null);
+                        mSetSubscriptionMode = true;
+                        mUiccSubSet = false;
+                        mReadIccid = true;
+                        mDdsSet = false;
+                    }
+                } else {
+                    Log.d(LOG_TAG, "Invalid slot!!!");
+                }
                 break;
 
             case EVENT_ICC_CHANGED:
@@ -586,6 +613,15 @@ public class ProxyManager extends Handler {
 
     private void processCardStatus() {
         int numApps = 0;
+
+        // Process the cards only if both the radio states are ON.
+        // Check is required to avoid accessing the uicc cards when
+        // any of the radio state is off/unavailable, which may
+        // araise when user toggles the airplane mode immediately.
+        if (!isAllRadioOn()) {
+            Log.d(LOG_TAG, "processCardStatus: radio is OFF. Not processing cards");
+            return;
+        }
 
         mCardSubData = new SubscriptionData[UiccConstants.RIL_MAX_CARDS];
 
