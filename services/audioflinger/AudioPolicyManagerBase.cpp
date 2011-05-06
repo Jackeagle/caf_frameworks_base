@@ -1013,7 +1013,7 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     mA2dpSuspended(false)
 {
     FILE *fp;
-    unsigned char build_id[20];
+    char build_id[20];
     char mDeviceName[100];
     mpClientInterface = clientInterface;
 
@@ -1033,7 +1033,7 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
         else {
             (void)fgets((char *)build_id,sizeof(build_id),fp);
 
-            if (build_id[12] == 'S') //build loaded on Surf
+            if (strstr(build_id, "-TS")) //build loaded on Surf
             {
                 LOGV("Detected target Surf, disable speaker");
                 mAvailableOutputDevices &= ~(AudioSystem::DEVICE_OUT_SPEAKER);
