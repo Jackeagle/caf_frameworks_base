@@ -266,6 +266,7 @@ class PowerManagerService extends IPowerManager.Stub
 
     // could be either static or controllable at runtime
     private static final boolean mSpew = false;
+    private static final boolean mSpewWl = true;
     private static final boolean mDebugProximitySensor = (false || mSpew);
     private static final boolean mDebugLightSensor = (false || mSpew);
     
@@ -782,7 +783,7 @@ class PowerManagerService extends IPowerManager.Stub
 
     public void acquireWakeLockLocked(int flags, IBinder lock, int uid, int pid, String tag,
             WorkSource ws) {
-        if (mSpew) {
+        if (mSpewWl) {
             Slog.d(TAG, "acquireWakeLock flags=0x" + Integer.toHexString(flags) + " tag=" + tag);
         }
 
@@ -947,7 +948,7 @@ class PowerManagerService extends IPowerManager.Stub
             return;
         }
 
-        if (mSpew) {
+        if (mSpewWl) {
             Slog.d(TAG, "releaseWakeLock flags=0x"
                     + Integer.toHexString(wl.flags) + " tag=" + wl.tag);
         }
