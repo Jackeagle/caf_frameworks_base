@@ -98,7 +98,7 @@ public class PhoneProxy extends Handler implements Phone {
 
         mDct = ((PhoneBase) mActivePhone).mDataConnection;
 
-        mIccProxy = new IccCardProxy(phone.getContext(), mCi);
+        mIccProxy = new IccCardProxy(phone.getContext(), mCi, mActivePhone.getSubscription());
         mIccProxy.setVoiceRadioTech(
                 mActivePhone.getPhoneType() == Phone.PHONE_TYPE_CDMA ?
                         RadioTechnologyFamily.RADIO_TECH_3GPP2
