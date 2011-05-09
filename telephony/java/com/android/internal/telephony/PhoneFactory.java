@@ -143,11 +143,11 @@ public class PhoneFactory {
 
                     if (phoneType == Phone.PHONE_TYPE_GSM) {
                         sProxyPhone[i] = new PhoneProxy(new GSMPhone(context,
-                                                             sCommandsInterface[i], sPhoneNotifier, false, dct));
+                                sCommandsInterface[i], sPhoneNotifier, false, dct, i));
                         Log.i(LOG_TAG, "Creating GSMPhone");
                     } else if (phoneType == Phone.PHONE_TYPE_CDMA) {
                         sProxyPhone[i] = new PhoneProxy(new CDMAPhone(context,
-                                     sCommandsInterface[i], sPhoneNotifier, false, dct));
+                                sCommandsInterface[i], sPhoneNotifier, false, dct, i));
 
                         Log.i(LOG_TAG, "Creating CDMAPhone");
                     }
@@ -241,7 +241,7 @@ public class PhoneFactory {
 
     public static Phone getCdmaPhone(DataConnectionTracker dct) {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            Phone phone = new CDMAPhone(sContext, sCommandsInterface[getDefaultSubscription()], sPhoneNotifier, dct);
+            Phone phone = getCdmaPhone(dct, getDefaultSubscription());
             return phone;
         }
     }
@@ -250,14 +250,15 @@ public class PhoneFactory {
     public static Phone getCdmaPhone(DataConnectionTracker dct, int subscription) {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
             Phone phone;
-            phone = new CDMAPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier, false, dct);
+            phone = new CDMAPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier, false,
+                    dct, subscription);
             return phone;
         }
     }
 
     public static Phone getGsmPhone(DataConnectionTracker dct) {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            Phone phone = new GSMPhone(sContext, sCommandsInterface[getDefaultSubscription()], sPhoneNotifier, dct);
+            Phone phone = getGsmPhone(dct, getDefaultSubscription());
             return phone;
         }
     }
@@ -266,7 +267,8 @@ public class PhoneFactory {
     public static Phone getGsmPhone(DataConnectionTracker dct, int subscription) {
         Log.d(LOG_TAG,"getGsmPhone on sub :" + subscription);
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            Phone phone = new GSMPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier, false, dct);
+            Phone phone = new GSMPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier, false,
+                    dct, subscription);
             return phone;
         }
     }
