@@ -993,11 +993,6 @@ void SurfaceFlinger::freeBypassBuffers()
 
 void SurfaceFlinger::composeSurfaces(const Region& dirty)
 {
-    if (UNLIKELY(!mWormholeRegion.isEmpty())) {
-        // should never happen unless the window manager has a bug
-        // draw something...
-        drawWormhole();
-    }
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
     const size_t count = layers.size();
     int compcount = 0, ovLayerIndex = -1,
@@ -1034,10 +1029,23 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         }
     }
 #endif
-
     PostBufferSingleton::instance()->setPolicy(layerbuffercount);
 
     mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
+
+    /* That part moved from the beginning of the function in order to be able
+     * to check layerbuffercount before calling drawWormhole.
+     * If layerbuffercount > 0, it means we are going to use overlays
+     * so mWormholeRegion is not empty but that is fine(not a wm bug).
+     * If we call drawWormhole, it will issues some gl commands
+     * but we will not call glfinish or swapbuffers(because we use overlays).
+     * That causes mem leak as the gl driver stack keeps on growing.
+     * */
+    if (UNLIKELY(!mWormholeRegion.isEmpty()) && 1 != layerbuffercount) {
+        // should never happen unless the window manager has a bug
+        // draw something...
+        drawWormhole();
+    }
 
     if (mOverlayOpt || (layerbuffercount == 1)) {
         if(layerbuffercount == 1) {
