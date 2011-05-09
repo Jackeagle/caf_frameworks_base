@@ -2358,7 +2358,7 @@ status_t MPEG4Writer::Track::threadEntry() {
             }
             trackProgressStatus(timestampUs);
         }
-        if (mOwner->numTracks() == 1) {
+        if (mOwner->numTracks() == 1 && mIsAudio) {
             off64_t offset = mIsAvc? mOwner->addLengthPrefixedSample_l(copy)
                                  : mOwner->addSample_l(copy);
             if (mChunkOffsets.empty()) {
@@ -2400,7 +2400,7 @@ status_t MPEG4Writer::Track::threadEntry() {
     mOwner->trackProgressStatus(this, -1, err);
 
     // Last chunk
-    if (mOwner->numTracks() == 1) {
+    if (mOwner->numTracks() == 1 && mIsAudio) {
         addOneStscTableEntry(1, mNumSamples);
     } else if (!mChunkSamples.empty()) {
         addOneStscTableEntry(++nChunks, mChunkSamples.size());
