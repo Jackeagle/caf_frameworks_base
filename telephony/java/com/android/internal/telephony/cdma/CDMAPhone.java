@@ -154,14 +154,16 @@ public class CDMAPhone extends PhoneBase {
 
 
     // Constructors
-    public CDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier, DataConnectionTracker dct) {
-        this(context, ci, notifier, false, dct);
+    public CDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier, DataConnectionTracker dct,
+            int subscription) {
+        this(context, ci, notifier, false, dct, subscription);
     }
 
     public CDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier, boolean unitTestMode,
-            DataConnectionTracker dct) {
+            DataConnectionTracker dct, int subscription) {
         super(notifier, context, ci, unitTestMode);
 
+        mSubscription = subscription;
         mCM.setPhoneType(Phone.PHONE_TYPE_CDMA);
         mCT = new CdmaCallTracker(this);
         mSST = new CdmaServiceStateTracker (this);

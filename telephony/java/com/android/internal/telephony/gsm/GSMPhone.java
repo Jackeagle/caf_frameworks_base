@@ -149,13 +149,14 @@ public class GSMPhone extends PhoneBase {
     // Constructors
 
     public
-    GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier, DataConnectionTracker dct) {
-        this(context, ci, notifier, false, dct);
+    GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier, DataConnectionTracker dct,
+            int subscription) {
+        this(context, ci, notifier, false, dct, subscription);
     }
 
     public
     GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier, boolean unitTestMode,
-            DataConnectionTracker dct) {
+            DataConnectionTracker dct, int subscription) {
         super(notifier, context, ci, unitTestMode);
 
         if (ci instanceof SimulatedRadioControl) {
@@ -165,6 +166,7 @@ public class GSMPhone extends PhoneBase {
         notificationManager = (NotificationManager) mContext
                 .getSystemService(Context.NOTIFICATION_SERVICE);
 
+        mSubscription = subscription;
         mVmNumGsmKey = VM_NUMBER;
         mVmCountKey = VM_COUNT;
         mVmSimImsiKey = VM_SIM_IMSI;
