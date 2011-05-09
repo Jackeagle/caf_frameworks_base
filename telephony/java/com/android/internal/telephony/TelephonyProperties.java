@@ -173,4 +173,10 @@ public interface TelephonyProperties
      * Set as true if the device supports simultaneous 1x voice + LTE operation
      */
     static final String PROPERTY_SUPPORT_SVLTE1X = "ro.config.svlte1x";
+
+    /**
+     * Indicates whether sms should be sent in synchronous manner.
+     * Type: boolean ( false = asynchronous, true = send next queued sms after
+     * making sure previous sms was sent) */
+    static final String SMS_SYNCHRONOUS_SENDING = "persist.radio.sms_sync_sending";
 }
