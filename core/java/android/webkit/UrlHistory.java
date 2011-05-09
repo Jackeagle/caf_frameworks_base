@@ -49,7 +49,7 @@ import android.os.SystemProperties;
 class UrlHistory {
 
     // The maximal number of subhosts saved per main resource
-    private final static int SUBHOSTS_MAX = 40;
+    private final static int SUBHOSTS_MAX = 30;
 
     // The number of subhosts to remove when new subhost is to be inserted
     // and the hash is full
