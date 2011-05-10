@@ -24,7 +24,7 @@
 namespace android {
 // ---------------------------------------------------------------------------
 
-template <typename TYPE>
+template <typename TYPE, typename LOCK = Mutex>
 class Singleton
 {
 public:
@@ -45,7 +45,30 @@ protected:
 private:
     Singleton(const Singleton&);
     Singleton& operator = (const Singleton&);
-    static Mutex sLock;
+    static LOCK  sLock;
+    static TYPE* sInstance;
+};
+
+template <typename TYPE>
+class Singleton<TYPE, NullMutex>
+{
+public:
+    static TYPE& getInstance() {
+        TYPE* instance = sInstance;
+        if (instance == 0) {
+            instance = new TYPE();
+            sInstance = instance;
+        }
+        return *instance;
+    }
+
+protected:
+    ~Singleton() { };
+    Singleton() { };
+
+private:
+    Singleton(const Singleton&);
+    Singleton& operator = (const Singleton&);
     static TYPE* sInstance;
 };
 
@@ -62,6 +85,10 @@ private:
     template class Singleton< TYPE >;                           \
     template<> Mutex Singleton< TYPE >::sLock(Mutex::PRIVATE);  \
     template<> TYPE* Singleton< TYPE >::sInstance(0);
+
+#define ANDROID_SINGLETON_STATIC_INSTANCE_NO_LOCK(TYPE)                 \
+   template class Singleton< TYPE, NullMutex >;                                   \
+    template<> TYPE* Singleton< TYPE, NullMutex >::sInstance(0);
 
 
 // ---------------------------------------------------------------------------
