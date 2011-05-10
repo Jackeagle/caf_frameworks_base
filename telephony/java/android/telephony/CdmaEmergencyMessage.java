@@ -18,6 +18,7 @@ package android.telephony;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.telephony.EmergencyMessage.Alerts;
 
 import com.android.internal.telephony.cdma.SmsMessage;
 
@@ -35,6 +36,19 @@ public class CdmaEmergencyMessage implements EmergencyMessage{
     private Certainty mCertainty;
     private int mLanguageCode;
 
+    //C.R1001-G 9.3.3 - Cmas message IDs
+    public static final int CMAS_PRESIDENTIAL = 0x1000;
+    public static final int CMAS_EXTREME      = 0x1001;
+    public static final int CMAS_SEVERE       = 0x1002;
+    public static final int CMAS_AMBER        = 0x1003;
+
+    public static final int[][] MESSAGE_IDS = {{CMAS_PRESIDENTIAL},
+                                               {CMAS_EXTREME},
+                                               {CMAS_SEVERE},
+                                               {CMAS_AMBER},
+                                               {}, //Cdma Etws Earthquake
+                                               {}, //Cdma Etws Tsunami
+                                               {}};//Cdma Etws E&T
     private CdmaEmergencyMessage() {
 
     }
@@ -80,6 +94,10 @@ public class CdmaEmergencyMessage implements EmergencyMessage{
 
     private CdmaEmergencyMessage(Parcel in) {
         readFromParcel(in);
+    }
+
+    public static int[] getMessageIds(Alerts alertType) {
+        return MESSAGE_IDS[alertType.ordinal()];
     }
 
     @Override
