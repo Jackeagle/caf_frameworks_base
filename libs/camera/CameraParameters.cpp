@@ -27,6 +27,7 @@ namespace android {
 // Parameter keys to communicate between camera application and driver.
 const char CameraParameters::KEY_PREVIEW_SIZE[] = "preview-size";
 const char CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES[] = "preview-size-values";
+const char CameraParameters::KEY_SUPPORTED_HFR_SIZES[] = "hfr-size-values";
 const char CameraParameters::KEY_PREVIEW_FORMAT[] = "preview-format";
 const char CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS[] = "preview-format-values";
 const char CameraParameters::KEY_PREVIEW_FRAME_RATE[] = "preview-frame-rate";
@@ -470,6 +471,11 @@ void CameraParameters::getSupportedPreviewSizes(Vector<Size> &sizes) const
 {
     const char *previewSizesStr = get(KEY_SUPPORTED_PREVIEW_SIZES);
     parseSizesList(previewSizesStr, sizes);
+}
+void CameraParameters::getSupportedHfrSizes(Vector<Size> &sizes) const
+{
+    const char *hfrSizesStr = get(KEY_SUPPORTED_HFR_SIZES);
+    parseSizesList(hfrSizesStr, sizes);
 }
 
 
