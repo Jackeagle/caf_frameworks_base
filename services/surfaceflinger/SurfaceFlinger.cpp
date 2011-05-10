@@ -145,11 +145,23 @@ void SurfaceFlinger::init()
 
     LOGI_IF(mDebugRegion,       "showupdates enabled");
     LOGI_IF(mDebugBackground,   "showbackground enabled");
+
+    hw_module_t const* module;
+    if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module) == 0) {
+            mGrallocModule = (gralloc_module_t const *)module;
+    }
+
+    if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
+        copybit_open(module, &mBlitEngine);
+    }
 }
 
 SurfaceFlinger::~SurfaceFlinger()
 {
     glDeleteTextures(1, &mWormholeTexName);
+    if (mBlitEngine) {
+        copybit_close(mBlitEngine);
+    }
 }
 
 overlay_control_device_t* SurfaceFlinger::getOverlayEngine() const
@@ -2412,100 +2424,137 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
     if (UNLIKELY(uint32_t(dpy) >= DISPLAY_COUNT))
         return BAD_VALUE;
 
-    if (!GLExtensions::getInstance().haveFramebufferObject())
-        return INVALID_OPERATION;
-
     // get screen geometry
     const DisplayHardware& hw(graphicPlane(dpy).displayHardware());
     const uint32_t hw_w = hw.getWidth();
     const uint32_t hw_h = hw.getHeight();
-
     if ((sw > hw_w) || (sh > hw_h))
         return BAD_VALUE;
 
+    // allocate shared memory large enough to hold the
+    // screen capture
+    int flags = (hw.getFlags() & DisplayHardware::C2D_COMPOSITION) ?
+                 MemoryHeapBase::MAP_LOCKED_MAP_POPULATE:0;
     sw = (!sw) ? hw_w : sw;
     sh = (!sh) ? hw_h : sh;
     const size_t size = sw * sh * 4;
+    sp<MemoryHeapBase> base(
+          new MemoryHeapBase(size, flags, "screen-capture") );
+    void* const ptr = base->getBase();
 
-    // make sure to clear all GL error flags
-    while ( glGetError() != GL_NO_ERROR ) ;
+    // Use copybit for screen capture in case of c2d composition
+    if (hw.getFlags() & DisplayHardware::C2D_COMPOSITION) {
+        native_handle_t* handle = hw.getCurrentFBHandle();
+        copybit_image_t src;
+        src.w = ((hw_w + 31) &~31);
+        src.h = hw_h;
+        src.format = hw.getFormat();
+        src.base = (void *)0;
+        src.handle = handle;
 
-    // create a FBO
-    GLuint name, tname;
-    glGenRenderbuffersOES(1, &tname);
-    glBindRenderbufferOES(GL_RENDERBUFFER_OES, tname);
-    glRenderbufferStorageOES(GL_RENDERBUFFER_OES, GL_RGBA8_OES, sw, sh);
-    glGenFramebuffersOES(1, &name);
-    glBindFramebufferOES(GL_FRAMEBUFFER_OES, name);
-    glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES,
-            GL_COLOR_ATTACHMENT0_OES, GL_RENDERBUFFER_OES, tname);
+        native_handle_t *hnd = new native_handle_t;
+        // Create a gralloc buffer and set its flag as ashmem
+        mGrallocModule->perform(mGrallocModule,
+                GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER,
+                base->getHeapID(), size,
+                0, base->getBase(),
+                &hnd, GRALLOC_USAGE_PRIVATE_2);
 
-    GLenum status = glCheckFramebufferStatusOES(GL_FRAMEBUFFER_OES);
-    if (status == GL_FRAMEBUFFER_COMPLETE_OES) {
+        // Copybit dst
+        copybit_image_t dst;
+        dst.w = ((hw_w + 31) &~31);
+        dst.h = hw_h;
+        dst.format = hw.getFormat();
+        dst.base = ptr;
+        dst.handle = hnd;
 
-        // invert everything, b/c glReadPixel() below will invert the FB
-        glViewport(0, 0, sw, sh);
-        glScissor(0, 0, sw, sh);
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrthof(0, hw_w, 0, hw_h, 0, 1);
-        glMatrixMode(GL_MODELVIEW);
+        // Copybit region
+        region_iterator clip(Region(Rect(dst.w, dst.h)));
 
-        // redraw the screen entirely...
-        glClearColor(0,0,0,1);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
-        const size_t count = layers.size();
-        for (size_t i=0 ; i<count ; ++i) {
-            const sp<LayerBase>& layer(layers[i]);
-            layer->drawForSreenShot();
-        }
-
-        // XXX: this is needed on tegra
-        glScissor(0, 0, sw, sh);
-
-        // check for errors and return screen capture
-        if (glGetError() != GL_NO_ERROR) {
-            // error while rendering
-            result = INVALID_OPERATION;
-        } else {
-            // allocate shared memory large enough to hold the
-            // screen capture
-            sp<MemoryHeapBase> base(
-                    new MemoryHeapBase(size, 0, "screen-capture") );
-            void* const ptr = base->getBase();
-            if (ptr) {
-                // capture the screen with glReadPixels()
-                glReadPixels(0, 0, sw, sh, GL_RGBA, GL_UNSIGNED_BYTE, ptr);
-                if (glGetError() == GL_NO_ERROR) {
-                    *heap = base;
-                    *w = sw;
-                    *h = sh;
-                    *f = PIXEL_FORMAT_RGBA_8888;
-                    result = NO_ERROR;
-                }
-            } else {
-                result = NO_MEMORY;
-            }
-        }
-        glEnable(GL_SCISSOR_TEST);
-        glViewport(0, 0, hw_w, hw_h);
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-
+        mBlitEngine->set_parameter(mBlitEngine, COPYBIT_TRANSFORM, 0);
+        mBlitEngine->set_parameter(mBlitEngine, COPYBIT_PLANE_ALPHA, 0xFF);
+        result = mBlitEngine->blit(mBlitEngine, &dst, &src, &clip);
 
     } else {
-        result = BAD_VALUE;
+        if (!GLExtensions::getInstance().haveFramebufferObject())
+            return INVALID_OPERATION;
+
+        // make sure to clear all GL error flags
+        while ( glGetError() != GL_NO_ERROR ) ;
+
+        // create a FBO
+        GLuint name, tname;
+        glGenRenderbuffersOES(1, &tname);
+        glBindRenderbufferOES(GL_RENDERBUFFER_OES, tname);
+        glRenderbufferStorageOES(GL_RENDERBUFFER_OES, GL_RGBA8_OES, sw, sh);
+        glGenFramebuffersOES(1, &name);
+        glBindFramebufferOES(GL_FRAMEBUFFER_OES, name);
+        glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES,
+            GL_COLOR_ATTACHMENT0_OES, GL_RENDERBUFFER_OES, tname);
+
+        GLenum status = glCheckFramebufferStatusOES(GL_FRAMEBUFFER_OES);
+        if (status == GL_FRAMEBUFFER_COMPLETE_OES) {
+
+            // invert everything, b/c glReadPixel() below will invert the FB
+            glViewport(0, 0, sw, sh);
+            glScissor(0, 0, sw, sh);
+            glMatrixMode(GL_PROJECTION);
+            glPushMatrix();
+            glLoadIdentity();
+            glOrthof(0, hw_w, 0, hw_h, 0, 1);
+            glMatrixMode(GL_MODELVIEW);
+
+            // redraw the screen entirely...
+            glClearColor(0,0,0,1);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
+            const size_t count = layers.size();
+            for (size_t i=0 ; i<count ; ++i) {
+                const sp<LayerBase>& layer(layers[i]);
+                layer->drawForSreenShot();
+            }
+
+            // XXX: this is needed on tegra
+            glScissor(0, 0, sw, sh);
+
+            // check for errors and return screen capture
+            if (glGetError() != GL_NO_ERROR) {
+                // error while rendering
+                result = INVALID_OPERATION;
+            } else {
+                if (ptr) {
+                    // capture the screen with glReadPixels()
+                    glReadPixels(0, 0, sw, sh, GL_RGBA, GL_UNSIGNED_BYTE, ptr);
+                    if (glGetError() == GL_NO_ERROR) {
+                       result = NO_ERROR;
+                    }
+                } else {
+                    result = NO_MEMORY;
+                }
+            }
+            glEnable(GL_SCISSOR_TEST);
+            glViewport(0, 0, hw_w, hw_h);
+            glMatrixMode(GL_PROJECTION);
+            glPopMatrix();
+            glMatrixMode(GL_MODELVIEW);
+        } else {
+            result = BAD_VALUE;
+        }
+
+        // release FBO resources
+        glBindFramebufferOES(GL_FRAMEBUFFER_OES, 0);
+        glDeleteRenderbuffersOES(1, &tname);
+        glDeleteFramebuffersOES(1, &name);
     }
 
-    // release FBO resources
-    glBindFramebufferOES(GL_FRAMEBUFFER_OES, 0);
-    glDeleteRenderbuffersOES(1, &tname);
-    glDeleteFramebuffersOES(1, &name);
-
+    if (result == NO_ERROR) {
+        *heap = base;
+        *w = sw;
+        *h = sh;
+        *f = PIXEL_FORMAT_RGBA_8888;
+        result = NO_ERROR;
+    }
     hw.compositionComplete();
 
     return result;
@@ -2521,7 +2570,9 @@ status_t SurfaceFlinger::captureScreen(DisplayID dpy,
     if (UNLIKELY(uint32_t(dpy) >= DISPLAY_COUNT))
         return BAD_VALUE;
 
-    if (!GLExtensions::getInstance().haveFramebufferObject())
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    if (!(hw.getFlags() & DisplayHardware::C2D_COMPOSITION) &&
+        !GLExtensions::getInstance().haveFramebufferObject())
         return INVALID_OPERATION;
 
     class MessageCaptureScreen : public MessageBase {

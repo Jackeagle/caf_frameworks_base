@@ -341,7 +341,7 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
                 GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER,
                 buffers.heap->heapID(), bufferSize,
                 offset, buffers.heap->base(),
-                &src.img.handle);
+                &src.img.handle, GRALLOC_USAGE_PRIVATE_1);
 
     }
  }
