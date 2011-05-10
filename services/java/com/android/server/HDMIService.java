@@ -1,6 +1,6 @@
 /*
  * Copyright 2007, The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -209,10 +209,13 @@ class HDMIService extends IHDMIService.Stub {
         mHDMIModes = modes;
         broadcastEvent(HDMICableConnectedEvent);
         if(getHDMIUserOption()) {
-            broadcastEvent(HDMIONEvent, mHDMIModes);
             synchronized(mListener) {
-                mListener.enableHDMIOutput(true);
                 mListener.changeDisplayMode(getBestMode());
+                mListener.enableHDMIOutput(true);
+            }
+            if((mListener.getOnlineBroadcast())) {
+                Log.d(TAG, "Broadcast HDMI connected");
+                broadcastEvent(HDMIONEvent, mHDMIModes);
             }
         }
     }
@@ -227,6 +230,17 @@ class HDMIService extends IHDMIService.Stub {
                 mListener.setHPD(getHDMIUserOption());
             }
         }
+    }
 
+    public void notifyHDMIAudioOn() {
+        if(getHDMIUserOption()) {
+            broadcastEvent(HDMIONEvent, mHDMIModes);
+        }
+    }
+
+    public void notifyHDMIAudioOff() {
+        if(getHDMIUserOption()) {
+            broadcastEvent(HDMIOFFEvent);
+       }
     }
 }

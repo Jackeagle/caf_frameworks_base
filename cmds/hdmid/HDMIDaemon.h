@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@
 namespace android {
 
 enum uevent_action { action_add, action_remove, action_change,
-                                  action_online, action_offline };
+                                  action_online, action_offline, action_audio_on, action_audio_off, action_no_broadcast_online };
 const int ueventParamMax = 32;
 enum { HDMIOUT_DISABLE = 0, HDMIOUT_ENABLE, HDMIFB_OPEN, HDMIHPD_ON, HDMIHPD_OFF };
 
@@ -94,13 +94,14 @@ class HDMIDaemon : public Thread, public IBinder::DeathRecipient
     void processUeventQueue();
     void processUevent();
     int processFrameworkCommand();
-    bool sendCommandToFramework(bool connected = false);
+    bool sendCommandToFramework(uevent_action action = action_offline);
     bool cableConnected(bool defaultValue = true) const;
     bool readResolution();
     void setResolution(int ID);
     bool openFramebuffer();
     bool writeHPDOption(int userOption) const;
     inline bool isValidMode(int ID);
+    bool checkHDCPPresent();
 
     int mFrameworkSock;
     int mAcceptedConnection;
@@ -110,6 +111,7 @@ class HDMIDaemon : public Thread, public IBinder::DeathRecipient
     int fd1;
     bool mDriverOnline;
     int mCurrentID;
+    int mNxtMode;
     char mEDIDs[128];
 
 public:
