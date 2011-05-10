@@ -1,6 +1,6 @@
 /*
  * Copyright 2007, The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,11 +54,16 @@ final class HDMIListener implements Runnable {
     private static final String HDMI_EVT_CONNECTED = "hdmi_connected";
     private static final String HDMI_EVT_DISCONNECTED = "hdmi_disconnected";
     private static final String HDMI_EVT_START = "hdmi_listner_started";
+    private static final String HDMI_EVT_NO_BROADCAST_ONLINE = "hdmi_no_broadcast_online";
+    private static final String HDMI_EVT_AUDIO_ON = "hdmi_audio_on";
+    private static final String HDMI_EVT_AUDIO_OFF = "hdmi_audio_off";
 
     private HDMIService mService;
     private DataOutputStream mOutputStream;
     private boolean mHDMIConnected = false;
     private boolean mHDMIEnabled = false;
+    // Broadcast on HDMI connected
+    private boolean mOnlineBroadCast = true;
     private int[] mEDIDs = new int[0];
 
     HDMIListener(HDMIService service) {
@@ -83,6 +88,15 @@ final class HDMIListener implements Runnable {
         } else if (event.startsWith(HDMI_EVT_DISCONNECTED)) {
             mHDMIConnected = false;
             mService.notifyHDMIDisconnected();
+        } else if (event.startsWith(HDMI_EVT_AUDIO_ON)) {
+            // Notify HDMIAudio on
+            mService.notifyHDMIAudioOn();
+        } else if (event.startsWith(HDMI_EVT_AUDIO_OFF)) {
+            // Notify HDMIAudio off
+            mService.notifyHDMIAudioOff();
+        } else if (event.startsWith(HDMI_EVT_NO_BROADCAST_ONLINE)) {
+            // do not broadcast on connect event
+            mOnlineBroadCast = false;
         }
     }
 
@@ -187,6 +201,10 @@ final class HDMIListener implements Runnable {
 
     boolean isHDMIConnected() {
         return mHDMIConnected;
+    }
+    // returns true if we need to broadcast for Audio on cable connect
+    boolean getOnlineBroadcast() {
+        return mOnlineBroadCast;
     }
 
     public void enableHDMIOutput(boolean hdmiEnable) {
