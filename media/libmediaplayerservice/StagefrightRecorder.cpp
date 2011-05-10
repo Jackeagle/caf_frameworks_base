@@ -388,12 +388,15 @@ status_t StagefrightRecorder::setParamMaxFileDurationUs(int64_t timeUs) {
 
 status_t StagefrightRecorder::setParamMaxFileSizeBytes(int64_t bytes) {
     LOGV("setParamMaxFileSizeBytes: %lld bytes", bytes);
-    if (bytes <= 1024) {  // XXX: 1 kB
+    if (bytes <= 0) {
+        LOGW("Max file size is zero or negative: %lld bytes. Disabling file size limit.", bytes);
+        bytes = 0;
+    }
+    else if (bytes <= 1024) {  // XXX: 1 kB
         LOGE("Max file size is too small: %lld bytes", bytes);
         return BAD_VALUE;
     }
-
-    if (bytes <= 100 * 1024) {
+    else if (bytes <= 100 * 1024) {
         LOGW("Target file size (%lld bytes) is too small to be respected", bytes);
     }
 
