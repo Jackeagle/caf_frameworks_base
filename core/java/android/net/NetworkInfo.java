@@ -110,6 +110,9 @@ public class NetworkInfo implements Parcelable {
     private boolean mIsRoaming;
     private boolean mIsIpV4Connected;
     private boolean mIsIpV6Connected;
+    private String mIpv4Apn;
+    private String mIpv6Apn;
+
     /**
      * Indicates whether network connectivity is possible:
      */
@@ -131,7 +134,7 @@ public class NetworkInfo implements Parcelable {
         mSubtype = subtype;
         mTypeName = typeName;
         mSubtypeName = subtypeName;
-        setDetailedState(DetailedState.IDLE, false, false, null, null);
+        setDetailedState(DetailedState.IDLE, false, false, null, null, null, null);
         mState = State.UNKNOWN;
         mIsAvailable = false; // until we're told otherwise, assume unavailable
         mIsRoaming = false;
@@ -313,11 +316,14 @@ public class NetworkInfo implements Parcelable {
      * information passed up from the lower networking layers.
      */
     void setDetailedState(DetailedState detailedState, boolean isIpv4Connected,
-            boolean isIpv6Connected, String reason, String extraInfo) {
+            boolean isIpv6Connected, String reason, String extraInfo,
+            String ipv4Apn, String ipv6Apn) {
         this.mDetailedState = detailedState;
         this.mState = stateMap.get(detailedState);
         this.mReason = reason;
         this.mExtraInfo = extraInfo;
+        this.mIpv4Apn = ipv4Apn;
+        this.mIpv6Apn = ipv6Apn;
         if (this.mState != State.CONNECTED) {
             this.mIsIpV4Connected = false;
             this.mIsIpV6Connected = false;
@@ -346,6 +352,26 @@ public class NetworkInfo implements Parcelable {
         return mExtraInfo;
     }
 
+    /**
+     * Report the ipv4 apn used to establish the data call
+     * if one is available.
+     * @return the ipv4 apn, or null if not available
+     * @hide
+     */
+    public String getIpv4Apn() {
+        return mIpv4Apn;
+    }
+
+    /**
+     * Report the ipv6 apn used to establish the data call
+     * if one is available.
+     * @return the ipv6 apn, or null if not available
+     * @hide
+     */
+    public String getIpv6Apn() {
+        return mIpv6Apn;
+    }
+
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder("NetworkInfo: ");
@@ -357,7 +383,9 @@ public class NetworkInfo implements Parcelable {
                 append(", failover: ").append(mIsFailover).
                 append(", isAvailable: ").append(mIsAvailable).
                 append(", isIpv4Connected: ").append(mIsIpV4Connected).
-                append(", isIpv6Connected: ").append(mIsIpV6Connected);
+                append(", isIpv6Connected: ").append(mIsIpV6Connected).
+                append(", ipv4Name: ").append(mIpv4Apn).
+                append(", ipv6Name: ").append(mIpv6Apn);
         return builder.toString();
     }
 
@@ -387,6 +415,8 @@ public class NetworkInfo implements Parcelable {
         dest.writeString(mExtraInfo);
         dest.writeInt(mIsIpV4Connected? 1 : 0);
         dest.writeInt(mIsIpV6Connected? 1 : 0);
+        dest.writeString(mIpv4Apn);
+        dest.writeString(mIpv6Apn);
     }
 
     /**
@@ -410,6 +440,8 @@ public class NetworkInfo implements Parcelable {
                 netInfo.mExtraInfo = in.readString();
                 netInfo.mIsIpV4Connected = in.readInt() != 0;
                 netInfo.mIsIpV6Connected = in.readInt() != 0;
+                netInfo.mIpv4Apn = in.readString();
+                netInfo.mIpv6Apn = in.readString();
                 return netInfo;
             }
 

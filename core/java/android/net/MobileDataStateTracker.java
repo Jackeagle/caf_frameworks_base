@@ -267,8 +267,14 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                     }
 
                     String extraInfo = null;
+                    String ipv4Apn = null;
+                    String ipv6Apn = null;
                     if (mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTED) {
                         extraInfo = mMobileInfo.get(IPVersion.INET).mApnName;
+                        ipv4Apn = mMobileInfo.get(IPVersion.INET).mApnName;
+                    }
+                    if (mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTED) {
+                        ipv6Apn = mMobileInfo.get(IPVersion.INET6).mApnName;
                     }
 
                     if (needDetailedStateUpdate) {
@@ -279,20 +285,23 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                                     mEnabled = false;
                                     setTeardownRequested(false);
                                 }
-                                setDetailedState(DetailedState.DISCONNECTED, false, false, reason, extraInfo);
+                                setDetailedState(DetailedState.DISCONNECTED,
+                                        false, false, reason, extraInfo, ipv4Apn, ipv6Apn);
                                 break;
                             case CONNECTING:
-                                setDetailedState(DetailedState.CONNECTING, false, false, reason, extraInfo);
+                                setDetailedState(DetailedState.CONNECTING,
+                                        false, false, reason, extraInfo, ipv4Apn, ipv6Apn);
                                 break;
                             case SUSPENDED:
-                                setDetailedState(DetailedState.SUSPENDED, false, false, reason, extraInfo);
+                                setDetailedState(DetailedState.SUSPENDED,
+                                        false, false, reason, extraInfo, ipv4Apn, ipv6Apn);
                                 break;
                             case CONNECTED:
                                 setDetailedState(
                                         DetailedState.CONNECTED,
                                         mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTED,
                                         mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTED,
-                                        reason, extraInfo);
+                                        reason, extraInfo, ipv4Apn, ipv6Apn);
                                 break;
                         }
                     }
@@ -305,7 +314,8 @@ public class MobileDataStateTracker extends NetworkStateTracker {
                             reason == null ? "" : "(" + reason + ")");
                     setDetailedState(DetailedState.FAILED,
                             mMobileInfo.get(IPVersion.INET).mState == DataState.CONNECTED,
-                            mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTED, reason, apnName);
+                            mMobileInfo.get(IPVersion.INET6).mState == DataState.CONNECTED,
+                            reason, apnName, null, null);
                 }
 
                 if (subtype != oldSubtype) {
