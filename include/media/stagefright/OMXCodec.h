@@ -115,6 +115,9 @@ private:
     struct BufferInfo {
         IOMX::buffer_id mBuffer;
         bool mOwnedByComponent;
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+        bool mOwnedByPlayer;
+#endif
         sp<IMemory> mMem;
         size_t mSize;
         void *mData;

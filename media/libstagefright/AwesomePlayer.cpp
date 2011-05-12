@@ -1185,19 +1185,7 @@ void AwesomePlayer::onVideoEvent() {
     mVideoEventPending = false;
 
     if (mSeeking) {
-#ifdef OVERLAY_SUPPORT_USERPTR_BUF
-        if (mBuffersWithRenderer.size()) {
-            unsigned int i;
-            unsigned int sz = mBuffersWithRenderer.size();
-
-            for(i = 0; i < sz; i++){
-                mBuffersWithRenderer[i]->release();
-            }
-            for(i = 0; i < sz; i++){
-                mBuffersWithRenderer.pop();
-            }
-        }
-#else
+#ifndef OVERLAY_SUPPORT_USERPTR_BUF
         if (mLastVideoBuffer) {
             mLastVideoBuffer->release();
             mLastVideoBuffer = NULL;

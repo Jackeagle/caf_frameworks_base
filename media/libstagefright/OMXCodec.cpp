@@ -1654,6 +1654,9 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
 
         info.mBuffer = buffer;
         info.mOwnedByComponent = false;
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+        info.mOwnedByPlayer = false;
+#endif
         info.mMem = mem;
         info.mMediaBuffer = NULL;
 
@@ -2334,6 +2337,11 @@ void OMXCodec::fillOutputBuffers() {
 
     Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
     for (size_t i = 0; i < buffers->size(); ++i) {
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+        if ((*buffers)[i].mOwnedByPlayer) {
+            continue;
+        }
+#endif
         fillOutputBuffer(&buffers->editItemAt(i));
     }
 }
@@ -3130,6 +3138,9 @@ status_t OMXCodec::read(
 
     BufferInfo *info = &mPortBuffers[kPortIndexOutput].editItemAt(index);
     info->mMediaBuffer->add_ref();
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    info->mOwnedByPlayer = true;
+#endif
     *buffer = info->mMediaBuffer;
 
     return OK;
@@ -3144,6 +3155,9 @@ void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
 
         if (info->mMediaBuffer == buffer) {
             CHECK_EQ(mPortStatus[kPortIndexOutput], ENABLED);
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+            info->mOwnedByPlayer = false;
+#endif
             fillOutputBuffer(info);
             return;
         }
