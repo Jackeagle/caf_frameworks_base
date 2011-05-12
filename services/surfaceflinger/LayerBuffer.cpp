@@ -646,6 +646,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     status_t err = NO_ERROR;
     NativeBuffer src(ourBuffer->getBuffer());
     const Rect transformedBounds(mLayer.getTransformedBounds());
+    Region tempClip(clip);
 
 #if defined(EGL_ANDROID_image_native_buffer)
     if (GLExtensions::getInstance().haveDirectTexture()) {
@@ -678,6 +679,10 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                mTempGraphicBuffer->setVerticalStride(src.img.h);
                EGLDisplay dpy(getFlinger()->graphicPlane(0).getEGLDisplay());
                err = mTextureManager.initEglImage(&mTexture, dpy, mTempGraphicBuffer);
+               // Adjust clip for copybit resize issue
+               const DisplayHardware& hw(mLayer.
+                                       mFlinger->graphicPlane(0).displayHardware());
+               tempClip.orSelf(Region(hw.bounds()));
         } else {
                err = INVALID_OPERATION;
         }
@@ -702,7 +707,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     }
 
     mLayer.setBufferTransform(mBufferHeap.transform);
-    mLayer.drawWithOpenGL(clip, mTexture);
+    mLayer.drawWithOpenGL(tempClip, mTexture);
 }
 
 status_t LayerBuffer::BufferSource::initTempBuffer() const
