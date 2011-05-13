@@ -141,6 +141,7 @@ void DisplayHardware::init(uint32_t dpy)
                        copybit_open(module, &copybit);
                        if(copybit) {
                            LOGW("C2D or MDP composition");
+                           mFlags |= (((strncmp(property, "c2d", 3)) == 0)) ? C2D_COMPOSITION:0;
                            attribs[2] = EGL_CONFIG_CAVEAT;
                            attribs[3] = EGL_SLOW_CONFIG;
                            copybit_close(copybit);
@@ -338,6 +339,10 @@ status_t DisplayHardware::compositionComplete() const {
 
 int DisplayHardware::getCurrentBufferIndex() const {
     return mNativeWindow->getCurrentBufferIndex();
+}
+
+native_handle_t* DisplayHardware::getCurrentFBHandle() const{
+    return (native_handle_t*)mNativeWindow->getCurrentBufferHandle(mNativeWindow.get());
 }
 
 void DisplayHardware::flip(const Region& dirty) const
