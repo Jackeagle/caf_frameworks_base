@@ -598,6 +598,8 @@ void SurfaceFlinger::handleConsoleEvents()
     if (what & eConsoleAcquired) {
         hw.acquireScreen();
         hw.enableHDMIOutput(mHDMIOutput);
+        if(!mOrigResSurfAbsent)
+            hw.startOrigResDisplay();
         // this is a temporary work-around, eventually this should be called
         // by the power-manager
         SurfaceFlinger::turnElectronBeamOn(mElectronBeamAnimationMode);
@@ -608,12 +610,20 @@ void SurfaceFlinger::handleConsoleEvents()
         mDeferReleaseConsole = false;
         hw.releaseScreen();
         hw.enableHDMIOutput(false);
+        if(!mOrigResSurfAbsent) {
+            hw.stopOrigResDisplay();
+            freeBypassBuffers();
+        }
     }
 
     if (what & eConsoleReleased) {
         if (hw.isScreenAcquired()) {
             hw.releaseScreen();
             hw.enableHDMIOutput(false);
+            if(!mOrigResSurfAbsent) {
+                hw.stopOrigResDisplay();
+                freeBypassBuffers();
+            }
         } else {
             mDeferReleaseConsole = true;
         }
