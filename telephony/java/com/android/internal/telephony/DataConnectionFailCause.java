@@ -36,8 +36,8 @@ public enum DataConnectionFailCause {
     UNKNOWN,
 
     // following are custom codes that not all modems might be able to report
-    REGISTRATION_FAIL,
-    GPRS_REGISTRATION_FAIL,
+    VOICE_REGISTRATION_FAIL,
+    DATA_REGISTRATION_FAIL,
     RADIO_NOT_AVAILABLE,
     RADIO_ERROR_RETRY,
     PREF_RADIO_TECHNOLOGY_CHANGED,
@@ -47,7 +47,7 @@ public enum DataConnectionFailCause {
     SIGNAL_LOST,
     PREF_RADIO_TECH_CHANGED,
     RADIO_POWER_OFF,
-    TETHERED_CALL_ON;
+    TETHERED_CALL_ACTIVE;
 
     /*
      * indicates that setup failure is caused by some sort of data profile
@@ -138,11 +138,11 @@ public enum DataConnectionFailCause {
             case PDP_FAIL_ERROR_UNSPECIFIED:
                 cause = DataConnectionFailCause.UNKNOWN;
                 break;
-            case PDP_FAIL_REGISTRATION_FAIL:
-                cause = DataConnectionFailCause.REGISTRATION_FAIL;
+            case PDP_FAIL_VOICE_REGISTRATION_FAIL:
+                cause = DataConnectionFailCause.VOICE_REGISTRATION_FAIL;
                 break;
-            case PDP_FAIL_GPRS_REGISTRATION_FAIL:
-                cause = DataConnectionFailCause.GPRS_REGISTRATION_FAIL;
+            case PDP_FAIL_DATA_REGISTRATION_FAIL:
+                cause = DataConnectionFailCause.DATA_REGISTRATION_FAIL;
                 break;
             case PDP_FAIL_ONLY_IPV4_ALLOWED:
             case PDP_FAIL_ONLY_IPV6_ALLOWED:
@@ -157,8 +157,8 @@ public enum DataConnectionFailCause {
             case PDP_FAIL_RADIO_POWER_OFF:
                 cause = DataConnectionFailCause.RADIO_POWER_OFF;
                 break;
-            case PDP_FAIL_TETHERED_CALL_ON:
-                cause = DataConnectionFailCause.TETHERED_CALL_ON;
+            case PDP_FAIL_TETHERED_CALL_ACTIVE:
+                cause = DataConnectionFailCause.TETHERED_CALL_ACTIVE;
                 break;
             default:
                 cause = DataConnectionFailCause.UNKNOWN;
@@ -170,6 +170,7 @@ public enum DataConnectionFailCause {
         return getDataCallSetupFailCause(rilCause);
     }
 
+    private static final int PDP_FAIL_NONE = 0x0;
     private static final int PDP_FAIL_OPERATOR_BARRED = 0x08;
     private static final int PDP_FAIL_INSUFFICIENT_RESOURCES = 0x1A;
     private static final int PDP_FAIL_MISSING_UNKOWN_APN = 0x1B;
@@ -186,12 +187,12 @@ public enum DataConnectionFailCause {
     private static final int PDP_FAIL_ONLY_IPV6_ALLOWED = 0x33;
     private static final int PDP_FAIL_ONLY_SINGLE_BEARER_ALLOWED = 0x34;
     private static final int PDP_FAIL_PROTOCOL_ERRORS   = 0x6F;
-    private static final int PDP_FAIL_ERROR_UNSPECIFIED = 0xffff;
 
-    private static final int PDP_FAIL_REGISTRATION_FAIL = -1;
-    private static final int PDP_FAIL_GPRS_REGISTRATION_FAIL = -2;
+    private static final int PDP_FAIL_VOICE_REGISTRATION_FAIL = -1;
+    private static final int PDP_FAIL_DATA_REGISTRATION_FAIL = -2;
     private static final int PDP_FAIL_SIGNAL_LOST = -3;
     private static final int PDP_FAIL_PREF_RADIO_TECH_CHANGED = -4;
     private static final int PDP_FAIL_RADIO_POWER_OFF = -5;
-    private static final int PDP_FAIL_TETHERED_CALL_ON = -6;
+    private static final int PDP_FAIL_TETHERED_CALL_ACTIVE = -6;
+    private static final int PDP_FAIL_ERROR_UNSPECIFIED = 0xffff;
 }

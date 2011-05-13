@@ -17,21 +17,30 @@
 
 package com.android.internal.telephony;
 
-import com.android.internal.telephony.CommandsInterface.RadioTechnology;
-
 
 public class DataCallState {
+    public int status;
     public int cid;
     public int active;
     public String type;
-    public String apn;
-    public String address;
-    RadioTechnology mRadioTech;
-    public int inactiveReason;
+    public String ifname;
+    public String addresses;
+    public String dnses;
+    public String gateways;
 
     @Override
     public String toString() {
-        return "DataCallState: {" + " cid: " + cid + ", active: " + active + ", type: " + type
-                + ", apn: " + apn + ", address: " + address + " }";
+        StringBuilder sb = new StringBuilder();
+        sb.append("DataCallState: {");
+        sb.append("status:").append(status);
+        sb.append(",cid: ").append(cid);
+        sb.append(",active: ").append(active);
+        sb.append(",type: ").append(type);
+        sb.append(",ifname: ").append(ifname);
+        sb.append(",addresses: ").append(addresses);
+        sb.append(",dnses: ").append(dnses);
+        sb.append(",gateways: ").append(gateways);
+        sb.append("}");
+        return sb.toString();
     }
 }

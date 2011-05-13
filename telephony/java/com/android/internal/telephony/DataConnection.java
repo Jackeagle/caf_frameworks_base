@@ -16,6 +16,8 @@
 
 package com.android.internal.telephony;
 
+import java.util.ArrayList;
+
 import com.android.internal.telephony.DataConnectionFailCause;
 import com.android.internal.telephony.DataProfile;
 import com.android.internal.telephony.EventLogTags;
@@ -325,7 +327,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      */
     private SetupResult onSetupConnectionCompleted(AsyncResult ar) {
         SetupResult result;
-        String[] response = ((String[]) ar.result);
+        DataCallState response = ((ArrayList<DataCallState>)ar.result).get(0);
         ConnectionParams cp = (ConnectionParams) ar.userObj;
 
         if (ar.exception != null) {
@@ -336,12 +338,6 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                     == CommandException.Error.RADIO_NOT_AVAILABLE) {
                 result = SetupResult.ERR_BadCommand;
                 result.mFailCause = DataConnectionFailCause.RADIO_NOT_AVAILABLE;
-            } else if (ar.exception instanceof CommandException
-                    && ((CommandException)(ar.exception)).getCommandError() 
-                    == CommandException.Error.SETUP_DATA_CALL_FAILURE) {
-                result = SetupResult.ERR_Other;
-                int rilFailCause = ((int[]) (ar.result))[0];
-                result.mFailCause = DataConnectionFailCause.getDataCallSetupFailCause(rilFailCause);
             } else {
                 result = SetupResult.ERR_Other;
                 result.mFailCause = DataConnectionFailCause.UNKNOWN;
@@ -351,31 +347,36 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 log("BUG: onSetupConnectionCompleted is stale cp.tag=" + cp.tag + ", mtag=" + mTag);
             }
             result = SetupResult.ERR_Stale;
+        } else if (response.status != 0){
+            result = SetupResult.ERR_Other;
+            int rilFailCause = response.status;
+            result.mFailCause = DataConnectionFailCause.getDataCallSetupFailCause(rilFailCause);
         } else {
 //            log("onSetupConnectionCompleted received " + response.length + " response strings:");
 //            for (int i = 0; i < response.length; i++) {
 //                log("  response[" + i + "]='" + response[i] + "'");
 //            }
-            if (response.length >= 2) {
-                cid = Integer.parseInt(response[0]);
-                interfaceName = response[1];
+                cid = response.cid;
+                interfaceName = response.ifname;
                 // connection is successful, so associate this dc with
                 // ipversion and data profile we used to setup this
                 // dataconnection with.
                 mBearerType = cp.bearerType;
                 mDataProfile = cp.dp;
-                if (response.length > 2) {
-                    ipAddress = response[2];
-                    String prefix = "net." + interfaceName + ".";
-                    gatewayAddress = SystemProperties.get(prefix + "gw");
-                    dnsServers[0] = SystemProperties.get(prefix + "dns1");
-                    dnsServers[1] = SystemProperties.get(prefix + "dns2");
+                if (response.addresses != null) {
+                    ipAddress = response.addresses;
+                    gatewayAddress = response.gateways;
+                    if (response.dnses != null) {
+                        dnsServers[0] = response.dnses.split(" ")[0];
+                        if (response.dnses.split(" ").length > 1) {
+                            dnsServers[1] = response.dnses.split(" ")[1];
+                        }
+                    }
                     if (DBG) {
                         log("interface=" + interfaceName + " ipAddress=" + ipAddress
                             + " gateway=" + gatewayAddress + " DNS1=" + dnsServers[0]
                             + " DNS2=" + dnsServers[1]);
                     }
-
                     if (isDnsOk(dnsServers)) {
                         result = SetupResult.SUCCESS;
                     } else {
@@ -384,10 +385,6 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 } else {
                     result = SetupResult.SUCCESS;
                 }
-            } else {
-                result = SetupResult.ERR_Other;
-                result.mFailCause = DataConnectionFailCause.UNKNOWN;
-            }
         }
 
         if (DBG) log("DataConnection setup result='" + result + "' on cid=" + cid);

@@ -54,7 +54,6 @@ public interface RILConstants {
     int ILLEGAL_SIM_OR_ME = 15;               /* network selection failure due
                                                  to wrong SIM/ME and no
                                                  retries needed */
-    int SETUP_DATA_CALL_FAILURE = 16;         /* setup data call failure */
     int DIAL_MODIFIED_TO_USSD = 17;           /* DIAL request modified to USSD */
     int DIAL_MODIFIED_TO_SS = 18;             /* DIAL request modified to SS */
     int DIAL_MODIFIED_TO_DIAL = 19;           /* DIAL request modified to DIAL with different data */
@@ -186,7 +185,7 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_UDUB = 17;
     int RIL_REQUEST_LAST_CALL_FAIL_CAUSE = 18;
     int RIL_REQUEST_SIGNAL_STRENGTH = 19;
-    int RIL_REQUEST_REGISTRATION_STATE = 20;
+    int RIL_REQUEST_VOICE_REGISTRATION_STATE = 20;
     int RIL_REQUEST_DATA_REGISTRATION_STATE = 21;
     int RIL_REQUEST_OPERATOR = 22;
     int RIL_REQUEST_RADIO_POWER = 23;
@@ -284,7 +283,7 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
     int RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED = 1001;
-    int RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED = 1002;
+    int RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED = 1002;
     int RIL_UNSOL_RESPONSE_NEW_SMS = 1003;
     int RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT = 1004;
     int RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM = 1005;

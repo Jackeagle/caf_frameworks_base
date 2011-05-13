@@ -783,7 +783,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
             } else if (activeDC.active == DATA_CONNECTION_ACTIVE_PH_LINK_INACTIVE) {
                 DataConnectionFailCause failCause = DataConnectionFailCause
-                        .getDataConnectionDisconnectCause(activeDC.inactiveReason);
+                        .getDataConnectionDisconnectCause(activeDC.status);
 
                 logi("DC is inactive : dc = " + dc);
                 logi("   inactive cause = " + failCause);
@@ -800,7 +800,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 *       similar fashion and to be  wrapped in a generic function.
                 */
                 logi("Ip address change detected on " + dc.toString());
-                logi("new IpAddr = " + activeDC.address + ",old IpAddr" + dc.getIpAddress());
+                logi("new IpAddr = " + activeDC.addresses + ",old IpAddr" + dc.getIpAddress());
 
                 tryDisconnectDataCall(dc, REASON_DATA_CONN_PROP_CHANGED);
             } else {
@@ -882,7 +882,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
          * The data call is just setup we are receiving the IP address for the first time
          */
         if (!TextUtils.isEmpty(dc.getIpAddress())) {
-            if ((!(activeDC.address).equals(dc.getIpAddress()))) {
+            if ((!(activeDC.addresses).equals(dc.getIpAddress()))) {
                 ipaddrChanged = true;
             }
         }
