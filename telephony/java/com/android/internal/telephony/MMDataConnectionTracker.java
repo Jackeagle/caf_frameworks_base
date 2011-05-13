@@ -1229,6 +1229,9 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             }
         }
 
+        // clear any service type that is pending/retried.
+        mDpt.resetAllServiceStates();
+
         if (mDisconnectPendingCount == 0) {
             for (Message m: mDisconnectAllCompleteMsgList) {
                 m.sendToTarget();
