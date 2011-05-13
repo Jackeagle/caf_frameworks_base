@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,12 +27,13 @@ import android.os.ServiceManager;
 import android.util.Log;
 
 import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.DatagramSocketImplFactory;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Proxy;
-import java.net.Socket;
 import java.net.SocketAddress;
-import java.net.SocketTimeoutException;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Calendar;
 import java.util.Collection;
@@ -41,28 +41,30 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-/*
- * TODO: Capability tracking features are missing.
- */
-
 /**
- * An extension of Java sockets. It provides a client-side TCP socket with a way to manage
- * wireless connections.
+ * An extension of Java datagram sockets. It provides datagram socket for both endpoints of a connection
+ * with a way to manage wireless connections and needs for socket[s].
  * <p>
  * Example Code: <br>
  * <code>
- * LinkSocket sock = new LinkSocket(instanceOfLinkSocketNotifier); <br>
- * LinkCapabilities capabilities = LinkCapabilities.createNeeds(LinkCapabilities.Role.WEB_BROSWER); <br>
- * capabilities.put(LinkCapabilities.Key.RW_DESIRED_FWD_BW, "1000"); // set 1Mbps down <br>
- * sock.setNeededCapabilities(capabilities); // set the capabilities <br>
- * sock.connect("www.google.com", 80); // Google's HTTP server <br>
+ * LinkDatagramSocket sock = new LinkDatagramSocket(instanceOfLinkSocketNotifier); <br>
+ * LinkCapabilities needs = LinkCapabilities.createNeeds(LinkCapabilities.Role.CONVERSATIONAL);
+ * <p>
+ * //create desired needs <br>
+ * needs.put(LinkCapabilities.Key.RW_DESIRED_FWD_BW, "1000"); <br>
+ * needs.put (LinkCapabilities.Key.RW_DEST_IP_ADDRESSES, "192.168.20.85" );<br>
+ * needs.put (LinkCapabilities.Key.RW_DEST_PORTS, "16884, 16886" ); <p>
+ * DatagramPacket pkt = new DatagramPacket(byte[] data, int length); <br>
+ * sock.send(pkt); <br>
  * sock.close(); <br>
  * </code>
  *
+ * @see LinkCapabilities
  * @see LinkSocketNotifier
+ * @see DatagramSocket
  * @hide
  */
-public class LinkSocket extends Socket {
+public class LinkDatagramSocket extends DatagramSocket {
     // Public error codes
     /** Link Failure: Unknown failure */
     public static final int ERROR_UNKNOWN = 0;
@@ -71,8 +73,9 @@ public class LinkSocket extends Socket {
     /** Link Failure: Networks are available, but none meet requirements */
     public static final int ERROR_NETWORKS_FAIL_REQUIREMENTS = 2;
 
+
     // Debugging
-    private final static String TAG = "LinkSocket";
+    private final static String TAG = "LinkDatagramSocket";
     private final static boolean DBG = true;
 
     // Flags
@@ -80,11 +83,13 @@ public class LinkSocket extends Socket {
     private final static int NOT_SET = -1;
 
     // Members
+    protected int mNetSelectTimeout = 30000;             // network selection timeout
     private IConnectivityManager mService = null;        // handle to ConnectivityService
     private LinkCapabilities mNeededCapabilities = null; // requested capabilities
     private LinkProperties mProperties = null;           // socket properties
     private LinkSocketNotifier mNotifier = null;         // callback to application
     private String mHostname = null;                     // destination hostname
+    private int mBindPort = 0;                           // local bind port
     private int mId = NOT_SET;                           // unique ID
 
     private MessageHandler mMsgHandler = new MessageHandler(); // messages from ConnectivityServices
@@ -92,82 +97,108 @@ public class LinkSocket extends Socket {
     private MessageLoop mMsgLoop = new MessageLoop();          // message loop
 
     /**
-     * Default constructor
+     * Default Constructor
+     *
+     * @throws SocketException
+     *             if an error occurs while creating or binding the socket.
      */
-    public LinkSocket() {
-        super();
-        if (DBG) Log.v(TAG, "LinkSocket() EX");
-        constructor(null);
+    public LinkDatagramSocket() throws SocketException {
+        super(false);
+        if (DBG) Log.v(TAG, "LinkDatagramSocket() EX");
+        constructor(null, 0);
     }
 
     /**
-     * Creates a new unconnected socket.
+     * Creates a new unconnected link datagram socket.
      *
      * @param notifier a reference to a class that implements
      *            {@code LinkSocketNotifier}
      */
-    public LinkSocket(LinkSocketNotifier notifier) {
-        super();
-        if (DBG) Log.v(TAG, "LinkSocket(notifier) EX");
-        constructor(notifier);
+    public LinkDatagramSocket(LinkSocketNotifier notifier) throws SocketException {
+        super(false);
+        if (DBG) Log.v(TAG, "LinkDatagramSocket(notifier) EX");
+        constructor(notifier, 0);
     }
 
     /**
-     * Creates a new unconnected socket using the given proxy type.
+     * Constructs a link datagram socket which is bound to the specific port
+     * {@code aPort} on the localhost. Valid values for {@code aPort} are
+     * between 0 and 65535 inclusive. The bind will be delayed until link
+     * selection.
+     *
+     * @param aPort
+     *            the port to bind on the localhost.
+     * @throws SocketException
+     *             if an error occurs while creating or binding the socket.
+     */
+    public LinkDatagramSocket(int aPort) throws SocketException {
+        super(false);
+        if (DBG) Log.v(TAG, "LinkDatagramSocket(aPort) EX");
+        constructor(null, aPort);
+    }
+
+    /**
+     * Constructs a link datagram socket which is bound to the specific port
+     * {@code aPort} on the localhost. Valid values for {@code aPort} are
+     * between 0 and 65535 inclusive. The bind will be delayed until link
+     * selection.
+     *
+     * @param aPort
+     *            the port to bind on the localhost.
      *
      * @param notifier a reference to a class that implements
      *            {@code LinkSocketNotifier}
-     * @param proxy the specified proxy for this socket
-     * @throws IllegalArgumentException if the argument proxy is null or of an
-     *             invalid type.
-     * @throws SecurityException if a security manager exists and it denies the
-     *             permission to connect to the given proxy.
+     *
+     * @throws SocketException
+     *             if an error occurs while creating or binding the socket.
      */
-    public LinkSocket(LinkSocketNotifier notifier, Proxy proxy) {
-        super(proxy);
-        if (DBG) Log.v(TAG, "LinkSocket(notifier, proxy) EX");
-        constructor(notifier);
+    public LinkDatagramSocket(int aPort, LinkSocketNotifier notifier) throws SocketException {
+        super(false);
+        if (DBG) Log.v(TAG, "LinkDatagramSocket(aPort, notifier) EX");
+        constructor(notifier, aPort);
     }
 
     /**
      * Creates a new unconnected socket with the same notifier and needs map as
-     * the source LinkSocket.
+     * the source LinkDatagramSocket.
      *
      * @param source
      */
-    public LinkSocket(LinkSocket source) {
-        super();
-        if (DBG) Log.v(TAG, "LinkSocket(source) EX");
-        constructor(source.mNotifier);
+    public LinkDatagramSocket(LinkDatagramSocket source) throws SocketException {
+        super(false);
+        if (DBG) Log.v(TAG, "LinkDatagramSocket(source) EX");
+        constructor(source.mNotifier, 0);
         setNeededCapabilities(source.getNeededCapabilities());
     }
 
     /**
+     * Returns properties of the link this socket is bound to.
+     *
      * @return the {@code LinkProperties} for the socket
      */
     public LinkProperties getLinkProperties() {
-        if (DBG) Log.v(TAG, "LinkProperties() EX");
+        if (DBG) Log.v(TAG, "getLinkProperties() EX");
         return new LinkProperties(mProperties);
     }
 
     /**
      * Set the {@code LinkCapabilities} needed for this socket. If the socket is
      * already connected the request is ignored and {@code false} will be
-     * returned. A needs map can be created via the {@code createNeedsMap}
-     * static method.
+     * returned. A needs map can be created via the {@code createNeeds} static
+     * method.
      *
      * @param needs the needs of the socket
      * @return {@code true} if needs are successfully set, {@code false}
      *         otherwise
      */
     public boolean setNeededCapabilities(LinkCapabilities needs) {
-        if (DBG) Log.v(TAG, "setNeeds() EX");
+        if (DBG) Log.v(TAG, "setNeededCapabilities(needs) EX");
 
         // if mProperties is set, it is too late to set needs
         if (mProperties != null) return false;
 
         mNeededCapabilities = needs;
-        mNeededCapabilities.put(LinkCapabilities.Key.RO_TRANSPORT_PROTO_TYPE,"tcp");
+        mNeededCapabilities.put(LinkCapabilities.Key.RO_TRANSPORT_PROTO_TYPE,"udp");
         if (mNotifier == null) {
             // if mNotifier is null, then we cannot send notifications so we
             // might as well disable them
@@ -181,13 +212,13 @@ public class LinkSocket extends Socket {
      *         has been set
      */
     public LinkCapabilities getNeededCapabilities() {
-        if (DBG) Log.v(TAG, "getNeeds() EX");
+        if (DBG) Log.v(TAG, "getNeededCapabilities() EX");
         return new LinkCapabilities(mNeededCapabilities);
     }
 
     /**
      * @return a LinkCapabilities object containing the READ ONLY capabilities
-     *         of the LinkSocket
+     *         of the LinkDatagramSocket
      */
     public LinkCapabilities getCapabilities() {
         if (DBG) Log.v(TAG, "getCapabilities() EX");
@@ -205,7 +236,8 @@ public class LinkSocket extends Socket {
                     LinkCapabilities.Key.RO_NETWORK_TYPE,
                     LinkCapabilities.Key.RO_PHYSICAL_INTERFACE,
                     LinkCapabilities.Key.RO_CARRIER_ROLE,
-                    LinkCapabilities.Key.RO_QOS_STATE
+                    LinkCapabilities.Key.RO_QOS_STATE,
+                    LinkCapabilities.Key.RO_TRANSPORT_PROTO_TYPE
             };
             cap = mService.requestCapabilities(mId, keys);
         } catch (RemoteException ex) {
@@ -217,17 +249,17 @@ public class LinkSocket extends Socket {
     }
 
     /**
-     * Returns this LinkSockets set of capabilities, filtered according to the
+     * Returns this LinkDatagramSockets set of capabilities, filtered according to the
      * given {@code Set}. Capabilities in the Set but not available from the
      * link will not be reported in the results. Capabilities of the link but
      * not listed in the Set will also not be reported in the results.
      *
      * @param capability_keys {@code Set} of capabilities requested
-     * @return the filtered {@code LinkCapabilities} of this LinkSocket, may be
+     * @return the filtered {@code LinkCapabilities} of this LinkDatagramSocket, may be
      *         empty
      */
     public LinkCapabilities getCapabilities(Set<Integer> capability_keys) {
-        if (DBG) Log.v(TAG, "getCapabilities(capabilities) EX");
+        if (DBG) Log.v(TAG, "getCapabilities(capability_keys) EX");
         LinkCapabilities cap = null;
         int[] keys = new int[capability_keys.size()];
 
@@ -239,14 +271,14 @@ public class LinkSocket extends Socket {
         try {
             cap = mService.requestCapabilities(mId, keys);
         } catch (RemoteException ex) {
-            Log.d(TAG, "LinkSocket was unable to get capabilities from ConnectivityService");
+            Log.d(TAG, "LinkDatagramSocket was unable to get capabilities from ConnectivityService");
         }
         return cap;
     }
 
     /**
      * Provide the set of capabilities the application is interested in tracking
-     * for this LinkSocket.
+     * for this LinkDatagramSocket.
      *
      * @param capabilities a {@code Set} of capabilities to track
      */
@@ -255,47 +287,199 @@ public class LinkSocket extends Socket {
         // This feature is not implemented yet.
     }
 
+
     /**
+     * This method is not available in this release.
+     *
      * @return the {@code LinkCapabilities} that are tracked, empty if
      *         none has been set.
      */
     public Set<Integer> getTrackedCapabilities() {
         if (DBG) Log.v(TAG, "getTrackedCapabilities() EX");
-        // This feature is not implemented yet.
         return new HashSet<Integer>();
     }
 
     /**
+     * @deprecated LinkDatagramSocket will automatically pick the optimum interface to
+     *             bind to
+     * @param localAddr the specific address and port on the local machine to
+     *            bind to
+     * @throws IOException always as this method is deprecated for LinkDatagramSocket
+     */
+    @Override
+    @Deprecated
+    public void bind(SocketAddress localAddr) throws UnsupportedOperationException {
+        if (DBG) Log.v(TAG, "bind(localAddr) EX");
+        throw new UnsupportedOperationException(
+                "LinkDatagamSocket will automatically bind to the optimum interface.");
+    }
+
+    /**
      * Connects this socket to the given remote host address and port specified
-     * by dstName and dstPort.
+     * by dstName and dstPort. Network selection happens during connect and may
+     * take 30 seconds.
      *
      * @param dstName the address of the remote host to connect to
      * @param dstPort the port to connect to on the remote host
-     * @param timeout the timeout value in milliseconds or 0 for infinite
-     *            timeout
+     * @throws UnknownHostException if the given dstName is invalid
+     * @throws IOException if the socket is already connected or an error occurs
+     *             while connecting or if required needs are set but not granted
+     *             by the network.
+     */
+    public void connect(String dstName, int dstPort) throws UnknownHostException, IOException {
+        if (DBG) Log.v(TAG, "connect(dstName, dstPort) EX");
+
+        // save the addresses for future use
+        mHostname = dstName;
+        performNetworkSelection(mNetSelectTimeout);
+        super.connect(InetAddress.getByName(dstName), dstPort);
+    }
+
+    /**
+     * Connects this socket to the same remote host address and port as the
+     * source LinkDatagramSocket.
+     *
+     * @param source the LinkDatagramSocket from which to get the destination
      * @throws UnknownHostException if the given dstName is invalid
      * @throws IOException if the socket is already connected or an error occurs
      *             while connecting
-     * @throws SocketTimeoutException if the timeout fires
      */
-    public void connect(String dstName, int dstPort, int timeout) throws UnknownHostException,
-            IOException, SocketTimeoutException {
-        if (DBG) Log.v(TAG, "connect(dstName, dstPort, timeout) EX");
+    public void connect(LinkDatagramSocket source) throws UnknownHostException, IOException {
+        if (DBG) Log.v(TAG, "connect(source) EX");
+        connect(source.getHostname(), source.getPort());
+    }
 
-        if (dstName == null) {
-            throw new UnknownHostException("destination address is not set");
-        }
-        if (dstPort < 0) {
-            throw new UnknownHostException("destination port is not set");
-        }
+    /**
+     * Connects this socket to the given remote host address and port specified
+     * by the SocketAddress.
+     *
+     * @deprecated Use {@link LinkDatagramSocket#connect(String, int)} instead. Using
+     *             this method will result in an IllegalArgumentException.
+     * @param remoteAddr the address and port of the remote host to connect to.
+     * @throws IllegalArgumentException always
+     */
+    @Override
+    @Deprecated
+    public void connect(SocketAddress remoteAddr) throws IllegalArgumentException {
+        if (DBG) Log.v(TAG, "connect(remoteAddr) EX");
+        throw new IllegalArgumentException(
+                "This method is deprecated, use connect(String, int) instead.");
+    }
 
+    /**
+     * Receives a packet from this socket and stores it in the argument pack.
+     * All fields of pack must be set according to the data received. If the
+     * received data is longer than the packet buffer size it is truncated. This
+     * method blocks until a packet is received or a timeout has expired. If a
+     * security manager exists, its checkAccept method determines whether or not
+     * a packet is discarded. Any packets from unacceptable origins are silently
+     * discarded.
+     *
+     * Note: Network selection happens during send if the socket is
+     * unconnected and may take up to 30 seconds.
+     */
+    @Override
+    public synchronized void receive(DatagramPacket pack) throws IOException {
+        if (DBG) Log.v(TAG, "receive(pack) EX");
+        if (mProperties == null) performNetworkSelection(mNetSelectTimeout);
+        super.receive(pack);
+    }
+
+    /**
+     * Sends a packet over this socket. The packet must satisfy the security
+     * policy before it may be sent. If a security manager is installed, this
+     * method checks whether it is allowed to send this packet to the specified
+     * address.
+     *
+     * Note: Network selection happens during send if the socket is
+     * unconnected and may take up to 30 seconds.
+     *
+     * @param pack
+     *            the {@code DatagramPacket} which has to be sent.
+     * @throws IOException
+     *                if an error occurs while sending the packet or if required
+     *                needs are set but not granted by the network.
+     */
+    @Override
+    public void send(DatagramPacket pack) throws IOException {
+        if (DBG) Log.v(TAG, "send(pack) EX");
+        if (mProperties == null) performNetworkSelection(mNetSelectTimeout);
+        super.send(pack);
+    }
+
+    /**
+     * Closes the LinkDatagramSocket and tears down associated QoS reservations
+     */
+    @Override
+    public void close() {
+        if (DBG) Log.v(TAG, "close() EX");
+        mMsgLoop.quit(); // disable callbacks
+        releaseLink();
+        super.close();
+    }
+
+    /**
+     * Sets the socket implementation factory. This may only be invoked once
+     * over the lifetime of the application. This factory is used to create
+     * a new link datagram socket implementation. If a security manager is set its
+     * method {@code checkSetFactory()} is called to check if the operation is
+     * allowed. An {@code UnsupportedOperationException} is always thrown for this operation
+     *
+     * @deprecated PlainDatagramSocketImpl is always used
+     *
+     * @param fac
+     *            the socket factory to use.
+     * @throws UnsupportedOperationException always
+     */
+    @Deprecated
+    public static synchronized void setDatagramSocketImplFactory(DatagramSocketImplFactory fac)
+    throws IOException, UnsupportedOperationException {
+        if (DBG) Log.v(TAG, "setDatagramSocketImplFactory(fac) EX Deprecated");
+        throw new UnsupportedOperationException("This method is deprecated, "
+                + "LinkDatagramSocket will automatically manage which factory to use");
+    }
+
+    /**
+     * Gets the host name of the target host this socket is connected to.
+     *
+     * @return the host name of the connected target host, or {@code null} if
+     *         this socket is not yet connected.
+     */
+    public String getHostname() {
+        return mHostname;
+    }
+
+    /**
+     * Gets the port number of the target host this socket is connected to.
+     *
+     * @return the port number of the connected target host or 0 if this socket
+     *         is not yet connected.
+     */
+    public int getPort() {
+        return super.getPort();
+    }
+
+    @Override
+    public String toString() {
+        if (this.isConnected() == false) {
+            if (mId == NOT_SET) {
+                return "LinkDatagramSocket id:none unconnected";
+            } else {
+                return "LinkDatagramSocket id:" + mId + " unconnected";
+            }
+        } else {
+            return "LinkDatagramSocket id:" + mId + " addr:" + super.getInetAddress()
+                + " port:" + super.getPort() + " local_port:" + super.getLocalPort();
+        }
+    }
+
+    protected synchronized void performNetworkSelection(int timeout) throws IOException {
+        if (DBG) Log.v(TAG, "performNetworkSelection(timeout) EX");
+        if (mProperties != null) return; // cannot perform network selection twice
         /*
          * Currently RW_ALLOWED_NETWORKS and RW_PROHIBITED_NETWORKS are not
          * implemented. If either of these keys are in use, throw an
          * IOException.
-         *
-         * TODO: implement RW_ALLOWED_NETWORKS and RW_PROHIBITED_NETWORKS in
-         * next release.
          */
         if (mNeededCapabilities.containsKey(LinkCapabilities.Key.RW_ALLOWED_NETWORKS)
                 || mNeededCapabilities.containsKey(LinkCapabilities.Key.RW_PROHIBITED_NETWORKS)) {
@@ -311,45 +495,33 @@ public class LinkSocket extends Socket {
 
         /*
          * Steps:
-         * 1. save the destination address for future use
-         * 2. request a network link
-         * 3. figure out which address to bind to
-         * 4. bind to the given address
-         * 5. connect
+         * 1. request a network link
+         * 2. figure out which address to bind to
+         * 3. bind to the given address
          */
 
-        // save the addresses for future use
-        mHostname = dstName;
-
-        // get need a network connection
+        // request link
         synchronized (this) {
             if (mId == NOT_SET) {
                 try {
-                    isWaitingForResponse = true;
                     if (DBG) Log.v(TAG, "sending requestLink()");
+                    isWaitingForResponse = true;
                     mId = mService.requestLink(mNeededCapabilities, mMsgHandler);
-                    if (DBG) Log.v(TAG, "Blocking: waiting for response");
                     while (isWaitingForResponse) {
-                        if (timeout == 0) {
-                            wait();
-                        } else {
-                            wait(timeout);
-                            /*
-                             * if 'timeout' time passes, wait() will stop
-                             * blocking just as if it was interrupted or
-                             * received a notification, and the while loop will
-                             * begin again. We need track time, and throw and
-                             * exception if appropriate. This also reduces the
-                             * amount of time socket.connect() will wait based
-                             * on how long it took to acquire the link.
-                             */
-                            timeout -= (int) (Calendar.getInstance().getTimeInMillis()
-                                    - start.getTimeInMillis());
-                            if (timeout <= 0) {
-                                releaseLink();
-                                throw new SocketTimeoutException(
-                                        "Socket timed out during link acquisition.");
-                            }
+                        if (DBG) Log.v(TAG, "Blocking: waiting for response");
+                        wait(timeout);
+                        /*
+                         * if 'timeout' time passes, wait() will stop
+                         * blocking just as if it was interrupted or
+                         * received a notification, and the while loop will
+                         * begin again. We need track time, and throw and
+                         * exception if appropriate.
+                         */
+                        timeout -= (int) (Calendar.getInstance().getTimeInMillis()
+                                - start.getTimeInMillis());
+                        if (timeout <= 0) {
+                            releaseLink();
+                            throw new IOException("Socket timed out during link acquisition.");
                         }
                         if (DBG) Log.v(TAG, "Blocking: received notification or timeout");
                     }
@@ -382,161 +554,23 @@ public class LinkSocket extends Socket {
             break;
         }
 
-        // bind and connect
-        if (DBG) Log.v(TAG, "attempting to bind: " + bindAddress);
-        super.bind(new InetSocketAddress(bindAddress, 0));
-        if (DBG) Log.v(TAG, "bind successful: " + getLocalSocketAddress());
-        if (DBG) Log.v(TAG, "attempting to connect: " + mHostname + ":" + super.getPort());
-        //request Qos for all sockets regardless of role type, service will
-        //handle this request appropriately
+        // bind
+        if (DBG) Log.v(TAG, "attempting to bind: " + bindAddress + " port: " + mBindPort);
         try {
-            mService.requestQoS(mId, super.getLocalPort(), bindAddress.getHostAddress());
-        } catch (RemoteException re) {
-            if (DBG) Log.v(TAG,"requestQoS experienced remote exception: " + re);
+            super.bind(new InetSocketAddress(bindAddress, mBindPort));
+        } catch (SocketException se) {
+            releaseLink();
+            throw new IOException("Desired source port is already consumed: " + mBindPort);
         }
-        super.connect(new InetSocketAddress(dstName, dstPort), timeout);
-        if (DBG) Log.v(TAG, "connect successful: " + getInetAddress() + ":" + super.getPort());
-    }
+        mBindPort = getLocalPort();
+        if (DBG) Log.v(TAG, "bind successful: " + getLocalSocketAddress() + ":" + mBindPort);
 
-    /**
-     * Connects this socket to the given remote host address and port specified
-     * by dstName and dstPort.
-     *
-     * @param dstName the address of the remote host to connect to
-     * @param dstPort the port to connect to on the remote host
-     * @throws UnknownHostException if the given dstName is invalid
-     * @throws IOException if the socket is already connected or an error occurs
-     *             while connecting
-     */
-    public void connect(String dstName, int dstPort) throws UnknownHostException, IOException {
-        if (DBG) Log.v(TAG, "connect(dstName, dstPort) EX");
-        connect(dstName, dstPort, 0);
-    }
-
-    /**
-     * Connects this socket to the same remote host address and port as the
-     * source LinkSocket.
-     *
-     * @param source the LinkSocket from which to get the destination
-     * @param timeout the timeout value in milliseconds or 0 for infinite
-     *            timeout
-     * @throws UnknownHostException if the given dstName is invalid
-     * @throws IOException if the socket is already connected or an error occurs
-     *             while connecting
-     */
-    public void connect(LinkSocket source, int timeout) throws UnknownHostException, IOException {
-        if (DBG) Log.v(TAG, "connect(source) EX");
-        connect(source.getHostname(), source.getPort(), timeout);
-    }
-
-    /**
-     * Connects this socket to the same remote host address and port as the
-     * source LinkSocket.
-     *
-     * @param source the LinkSocket from which to get the destination
-     * @throws UnknownHostException if the given dstName is invalid
-     * @throws IOException if the socket is already connected or an error occurs
-     *             while connecting
-     */
-    public void connect(LinkSocket source) throws UnknownHostException, IOException {
-        if (DBG) Log.v(TAG, "connect(source) EX");
-        connect(source.getHostname(), source.getPort(), 0);
-    }
-
-    /**
-     * Connects this socket to the given remote host address and port specified
-     * by the SocketAddress with the specified timeout.
-     *
-     * @deprecated Use {@link LinkSocket#connect(String, int, int)} instead.
-     *             Using this method will result in an IllegalArgumentException.
-     * @param remoteAddr the address and port of the remote host to connect to
-     * @param timeout the timeout value in milliseconds or 0 for an infinite timeout
-     * @throws IllegalArgumentException always
-     */
-    @Override
-    @Deprecated
-    public void connect(SocketAddress remoteAddr, int timeout) throws IOException,
-    SocketTimeoutException, IllegalArgumentException {
-        if (DBG) Log.v(TAG, "connect(remoteAddr, timeout) EX DEPRECATED");
-        throw new IllegalArgumentException("connect(remoteAddr, timeout) is deprecated");
-    }
-
-    /**
-     * Connects this socket to the given remote host address and port specified
-     * by the SocketAddress. Network selection happens during connect and may
-     * take 30 seconds.
-     *
-     * @deprecated Use {@link LinkSocket#connect(String, int)} instead. Using
-     *             this method will result in an IllegalArgumentException.
-     * @param remoteAddr the address and port of the remote host to connect to.
-     * @throws IllegalArgumentException always
-     */
-    @Override
-    @Deprecated
-    public void connect(SocketAddress remoteAddr) throws IOException, IllegalArgumentException {
-        if (DBG) Log.v(TAG, "connect(remoteAddr) EX DEPRECATED");
-        throw new IllegalArgumentException("connect(remoteAddr) is deprecated");
-    }
-
-    /**
-     * Closes the socket. It is not possible to reconnect or re-bind to this
-     * socket thereafter which means a new socket instance has to be created.
-     *
-     * @throws IOException if an error occurs while closing the socket
-     */
-    @Override
-    public void close() throws IOException {
-        if (DBG) Log.v(TAG, "close() EX");
-        mMsgLoop.quit(); // disable callbacks
-        releaseLink();
-        super.close();
-    }
-
-    /**
-     * @deprecated LinkSocket will automatically pick the optimum interface to
-     *             bind to
-     * @param localAddr the specific address and port on the local machine to
-     *            bind to
-     * @throws IOException always as this method is deprecated for LinkSocket
-     */
-    @Override
-    @Deprecated
-    public void bind(SocketAddress localAddr) throws UnsupportedOperationException {
-        if (DBG) Log.v(TAG, "bind(localAddr) EX throws Exception");
-        throw new UnsupportedOperationException("bind is deprecated for LinkSocket");
-    }
-
-    /**
-     * Gets the host name of the target host this socket is connected to.
-     *
-     * @return the host name of the connected target host, or {@code null} if
-     *         this socket is not yet connected.
-     */
-    public String getHostname() {
-        return mHostname;
-    }
-
-    /**
-     * Gets the port number of the target host this socket is connected to.
-     *
-     * @return the port number of the connected target host or 0 if this socket
-     *         is not yet connected.
-     */
-    public int getPort() {
-        return super.getPort();
-    }
-
-    @Override
-    public String toString() {
-        if (this.isConnected() == false) {
-            if (mId == NOT_SET) {
-                return "LinkSocket id:none unconnected";
-            } else {
-                return "LinkSocket id:" + mId + " unconnected";
-            }
-        } else {
-            return "LinkSocket id:" + mId + " addr:" + super.getInetAddress()
-                + " port:" + super.getPort() + " local_port:" + super.getLocalPort();
+        //Do QOS request for all sockets. Check return value to validate if
+        //socket can get QoS service. Ignoring for now.
+        try {
+            mService.requestQoS(mId, mBindPort, bindAddress.getHostAddress());
+        } catch (RemoteException re) {
+            if (DBG) Log.w(TAG,"requestQoS experienced remote exception: " + re);
         }
     }
 
@@ -579,14 +613,15 @@ public class LinkSocket extends Socket {
         }
     }
 
-    private void constructor(LinkSocketNotifier notifier) {
-        if (DBG) Log.v(TAG, "constructor(notifier, proxy) EX");
+    private void constructor(LinkSocketNotifier notifier, int bindPort) {
+        if (DBG) Log.v(TAG, "constructor(notifier) EX");
 
         mMsgLoop.start(); // start up message processing thread
 
         mNotifier = notifier;
+        mBindPort = bindPort;
         setNeededCapabilities(LinkCapabilities.createNeeds(Role.DEFAULT));
-        mNeededCapabilities.put(LinkCapabilities.Key.RO_TRANSPORT_PROTO_TYPE,"tcp");
+        mNeededCapabilities.put(LinkCapabilities.Key.RO_TRANSPORT_PROTO_TYPE,"udp");
 
         IBinder binder = ServiceManager.getService(Context.CONNECTIVITY_SERVICE);
         mService = IConnectivityManager.Stub.asInterface(binder);
@@ -598,7 +633,7 @@ public class LinkSocket extends Socket {
         try {
             mService.releaseLink(mId);
         } catch (RemoteException ex) {
-            Log.w(TAG, "LinkSocket was unable relinquish the current network link. " + ex);
+            Log.w(TAG, "LinkDatagramSocket was unable relinquish the current network link. " + ex);
         }
         mId = NOT_SET;
     }
@@ -629,7 +664,7 @@ public class LinkSocket extends Socket {
                             callbackOnCapabilitiesChanged((LinkCapabilities) msg.obj);
                             break;
                         default:
-                            Log.d(TAG, "LinkSocket received an unknown message type");
+                            Log.d(TAG, "LinkDatagramSocket received an unknown message type");
                     }
                 }
             };
@@ -649,7 +684,7 @@ public class LinkSocket extends Socket {
              * this is an unexpected onLinkAvail(), it probably should be a
              * onBetterLinkAvail() so we're going to call that
              *
-             * TODO: remove once CND is updated to the new architecture
+             * remove once CND is updated to the new architecture
              */
 
             callbackOnBetterLinkAvail();
@@ -674,7 +709,7 @@ public class LinkSocket extends Socket {
              * this is an unexpected onGetLinkFailure, it probably should just
              * be ignored
              *
-             * TODO: remove once CND is updated to the new architecture
+             * remove once CND is updated to the new architecture
              */
             return;
         }

@@ -33,6 +33,7 @@ import android.content.res.Resources.NotFoundException;
 import android.net.ConnectivityManager;
 import android.net.IConnectivityManager;
 import android.net.LinkCapabilities;
+import android.net.ExtraLinkCapabilities;
 import android.net.LinkInfo;
 import android.net.MobileDataStateTracker;
 import android.net.NetworkInfo;
@@ -2175,24 +2176,46 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         android.util.Log.v(TAG, "releaseLink(id=" + id + ")");
         mLinkManager.releaseLink(id);
     }
+
+    /**
+     * Triggers QoS transaction using the specified local port
+     */
+    public boolean requestQoS(int id, int localPort, String localAddress) {
+        android.util.Log.v(TAG, "requestQoS(aport)");
+        return mLinkManager.requestQoS(id, localPort, localAddress);
+    }
+
     public LinkCapabilities requestCapabilities(int id, int[] capability_keys) {
         android.util.Log.v(TAG, "requestCapabilities(id=" + id + ", capabilities)");
 
         int netType;
-        LinkCapabilities cap = new LinkCapabilities();
+        ExtraLinkCapabilities cap = new ExtraLinkCapabilities();
         for (int key : capability_keys) {
+            String temp = null;
             switch (key) {
-                case LinkCapabilities.Key.RO_AVAILABLE_FWD_BW:
-                    cap.put(LinkCapabilities.Key.RO_AVAILABLE_FWD_BW,
-                            Integer.toString(mLinkManager.getAvailableForwardBandwidth(id)));
+                case LinkCapabilities.Key.RO_MIN_AVAILABLE_FWD_BW:
+                    if ((temp = mLinkManager.getMinAvailableForwardBandwidth(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_MIN_AVAILABLE_FWD_BW,temp);
                     break;
-                case LinkCapabilities.Key.RO_AVAILABLE_REV_BW:
-                    cap.put(LinkCapabilities.Key.RO_AVAILABLE_REV_BW,
-                            Integer.toString(mLinkManager.getAvailableReverseBandwidth(id)));
+                case LinkCapabilities.Key.RO_MAX_AVAILABLE_FWD_BW:
+                    if ((temp = mLinkManager.getMaxAvailableForwardBandwidth(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_MAX_AVAILABLE_FWD_BW, temp);
                     break;
-                case LinkCapabilities.Key.RO_CURRENT_LATENCY:
-                    cap.put(LinkCapabilities.Key.RO_CURRENT_LATENCY,
-                            Integer.toString(mLinkManager.getCurrentLatency(id)));
+                case LinkCapabilities.Key.RO_MIN_AVAILABLE_REV_BW:
+                    if ((temp = mLinkManager.getMinAvailableReverseBandwidth(id)) != null)
+                       cap.put(LinkCapabilities.Key.RO_MIN_AVAILABLE_REV_BW, temp);
+                    break;
+                case LinkCapabilities.Key.RO_MAX_AVAILABLE_REV_BW:
+                    if ((temp = mLinkManager.getMaxAvailableReverseBandwidth(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_MAX_AVAILABLE_REV_BW, temp);
+                    break;
+                case LinkCapabilities.Key.RO_CURRENT_FWD_LATENCY:
+                    if ((temp = mLinkManager.getCurrentFwdLatency(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_CURRENT_FWD_LATENCY, temp);
+                    break;
+                case LinkCapabilities.Key.RO_CURRENT_REV_LATENCY:
+                    if ((temp = mLinkManager.getCurrentRevLatency(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_CURRENT_REV_LATENCY, temp);
                     break;
                 case LinkCapabilities.Key.RO_NETWORK_TYPE:
                     cap.put(LinkCapabilities.Key.RO_NETWORK_TYPE,
@@ -2215,6 +2238,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                     } else {
                         cap.put(LinkCapabilities.Key.RO_PHYSICAL_INTERFACE, "unknown");
                     }
+                    break;
+               case LinkCapabilities.Key.RO_QOS_STATE:
+                    if ((temp = mLinkManager.getQosState(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_QOS_STATE, temp);
                     break;
             }
         }

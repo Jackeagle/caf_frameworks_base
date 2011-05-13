@@ -227,7 +227,7 @@ public class LinkManager implements ILinkManager {
             // assign to the first active network
             for (int network : preferredNetworks) {
                 if (isNetworkConnected(network)) {
-                    getAvailableForwardBandwidth(network); // Stub for bandwidth estimation
+                    getMinAvailableForwardBandwidth(network); // Stub for bandwidth estimation
                     // TODO: add a timer for bandwidth estimate changed.
                     if (DBG) Log.v(TAG, "assigning id " + lsInfo.id + " to network " + networkIntToString(network));
                     lsInfo.assignedNetwork = network;
@@ -458,30 +458,69 @@ public class LinkManager implements ILinkManager {
         msg.sendToTarget();
     }
 
-    /**
-     * Available forward link (download) bandwidth for the socket. This value is
-     * in kilobits per second (kbps).
-     */
-    public int getAvailableForwardBandwidth(int id) {
-        // Implementation left to OEMs
-        return -1;
+    public boolean requestQoS(int id, int localPort, String localAddress) {
+        if (DBG) Log.e(TAG, "requestQoS is not supported");
+        return false;
     }
 
     /**
-     * Available reverse link (upload) bandwidth for the socket. This value is
+     * Minimum available forward link (download) bandwidth for the socket. This value is
      * in kilobits per second (kbps).
      */
-    public int getAvailableReverseBandwidth(int id) {
+    public String getMinAvailableForwardBandwidth(int id) {
         // Implementation left to OEMs
-        return -1;
+        return null;
     }
 
     /**
-     * Current estimated latency of the socket, in milliseconds.
+     * Maximum available forward link (download) bandwidth for the socket. This value is
+     * in kilobits per second (kbps).
      */
-    public int getCurrentLatency(int id) {
+    public String getMaxAvailableForwardBandwidth(int id) {
         // Implementation left to OEMs
-        return -1;
+        return null;
+    }
+
+    /**
+     * Minimum available reverse link (upload) bandwidth for the socket. This value is
+     * in kilobits per second (kbps).
+     */
+    public String getMinAvailableReverseBandwidth(int id) {
+        // Implementation left to OEMs
+        return null;
+    }
+
+    /**
+     * Maximum available reverse link (upload) bandwidth for the socket. This value is
+     * in kilobits per second (kbps).
+     */
+    public String getMaxAvailableReverseBandwidth(int id) {
+        // Implementation left to OEMs
+        return null;
+    }
+
+    /**
+     * Current estimated downlink latency of the socket, in milliseconds.
+     */
+    public String getCurrentFwdLatency(int id) {
+        // Implementation left to OEMs
+        return null;
+    }
+
+    /**
+     * Current estimated uplink latency of the socket, in milliseconds.
+     */
+    public String getCurrentRevLatency(int id) {
+        // Implementation left to OEMs
+        return null;
+    }
+
+    /**
+     * Current Quality of Service state of the socket
+     */
+    public String getQosState(int id) {
+        // Implementation left to OEMs
+        return "inactive";
     }
 
     /**

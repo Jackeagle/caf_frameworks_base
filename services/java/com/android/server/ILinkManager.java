@@ -46,13 +46,23 @@ interface ILinkManager {
 
     void releaseLink(int id);
 
-    int getAvailableForwardBandwidth(int id);
+    String getMinAvailableForwardBandwidth(int id);
 
-    int getAvailableReverseBandwidth(int id);
+    String getMaxAvailableForwardBandwidth(int id);
 
-    int getCurrentLatency(int id);
+    String getMinAvailableReverseBandwidth(int id);
+
+    String getMaxAvailableReverseBandwidth(int id);
+
+    String getCurrentFwdLatency(int id);
+
+    String getCurrentRevLatency(int id);
 
     int getNetworkType(int id);
+
+    String getQosState(int id);
+
+    boolean requestQoS(int id, int localPort, String localAddress);
 
     /* ConnectivityService */
     void setDefaultConnectionNwPref(int preference);
