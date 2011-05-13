@@ -391,8 +391,19 @@ MediaProfiles::getInstance()
 /*static*/ MediaProfiles::VideoEncoderCap*
 MediaProfiles::createDefaultH263VideoEncoderCap()
 {
-    return new MediaProfiles::VideoEncoderCap(
-        VIDEO_ENCODER_H263, 192000, 6000000, 176, 800, 144, 480, 1, 30);
+    char mDeviceName[PROPERTY_VALUE_MAX] = {0};
+    property_get("ro.product.device",mDeviceName,"0");
+    if (strcmp(mDeviceName, "msm7627a") == 0)
+    {
+        /* increase max supported width to 864 from 800 for msm7x27a target */
+        return new MediaProfiles::VideoEncoderCap(
+            VIDEO_ENCODER_H263, 192000, 6000000, 176, 864, 144, 480, 1, 30);
+    }
+    else
+    {
+        return new MediaProfiles::VideoEncoderCap(
+            VIDEO_ENCODER_H263, 192000, 6000000, 176, 800, 144, 480, 1, 30);
+    }
 }
 
 /*static*/ MediaProfiles::VideoEncoderCap*
