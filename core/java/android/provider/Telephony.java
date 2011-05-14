@@ -1879,6 +1879,13 @@ public final class Telephony {
 
         public static final String IPVERSION = "ipversion";
 
+        /**
+          * The protocol to be used to connect to this APN when roaming.
+          *
+          * The syntax is the same as protocol.
+          */
+        public static final String ROAMING_PROTOCOL = "roaming_protocol";
+
         public static final String CURRENT = "current";
     }
 

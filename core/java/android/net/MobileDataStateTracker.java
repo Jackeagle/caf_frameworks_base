@@ -495,7 +495,6 @@ public class MobileDataStateTracker extends NetworkStateTracker {
             case Phone.APN_ALREADY_ACTIVE:
                 logv("dct reports apn already active. " + this);
                 //we will be sent intents again.
-
                 break;
             case Phone.APN_REQUEST_STARTED:
                 logv("dct reports apn request started " + this);
