@@ -28,7 +28,7 @@
 
 #include <linux/input.h>
 
-//uncomment to diable TS_LIB
+//uncomment to disable TS_LIB
 //#undef HAVE_TSLIB
 
 #ifdef HAVE_TSLIB
