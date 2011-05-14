@@ -273,6 +273,13 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
     sp<MetaData> trackMeta = mExtractor->getTrackMetaData(
             i, MediaExtractor::kIncludeExtensiveMetaData);
 
+    int32_t drm = 0;
+    if (trackMeta->findInt32(kKeyIsDRM, &drm) && drm != 0)
+    {
+        LOGW("frame grab not allowed");
+        return NULL;
+    }
+
     sp<MediaSource> source = mExtractor->getTrack(i);
 
     if (source.get() == NULL) {
