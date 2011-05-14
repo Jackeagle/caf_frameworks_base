@@ -119,6 +119,7 @@ enum {
     kKeyWMAFormatTag      = 'fmtt',  // int64_t
     kKeyWMABitspersample  = 'bsps',  // int64_t
     kKeyWMAVirPktSize     = 'vpks',  // int64_t
+    kKeyIsDRM             = 'idrm',   // int32_t (bool)
 
     // 3D Video Flag
     kKey3D                = '3Dvf',  // bool (int32_t)
