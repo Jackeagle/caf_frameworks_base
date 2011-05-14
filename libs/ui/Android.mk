@@ -38,6 +38,10 @@ ifeq ($(TARGET_HAVE_TSLIB),true)
 	LOCAL_C_INCLUDES += external/tslib/src
 endif
 
+ifeq ($(TARGET_FAKE_TOUCHSCREEN),true)
+	LOCAL_CFLAGS += -DFAKE_TOUCHSCREEN
+endif
+
 LOCAL_MODULE:= libui
 
 ifeq ($(TARGET_SIMULATOR),true)

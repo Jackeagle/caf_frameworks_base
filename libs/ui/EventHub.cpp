@@ -873,6 +873,10 @@ int EventHub::openDevice(const char *deviceName) {
         }
     }
 
+#ifdef FAKE_TOUCHSCREEN
+device->classes |= INPUT_DEVICE_CLASS_TOUCHSCREEN;
+#endif
+
 #ifdef EV_SW
     // figure out the switches this device reports
     uint8_t sw_bitmask[sizeof_bit_array(SW_MAX + 1)];
