@@ -1312,6 +1312,16 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
         enc_meta->setInt32(kKeyVideoLevel, mVideoEncoderLevel);
     }
     if (meta->findInt32(kKey3D, &is3D)) {
+        if (mVideoEncoder != VIDEO_ENCODER_H264) {
+            return ERROR_UNSUPPORTED;
+        }
+
+        if (mVideoEncoderProfile != OMX_VIDEO_AVCProfileHigh) {
+            LOGW("3D recording is only supported for H264 High profile, setting profile to High");
+            enc_meta->setInt32(kKeyVideoProfile, OMX_VIDEO_AVCProfileHigh);
+        }
+
+        mWriteCtts = true; //In High profile, composer is to expect b-frames
         enc_meta->setInt32(kKey3D, is3D);
     }
 
