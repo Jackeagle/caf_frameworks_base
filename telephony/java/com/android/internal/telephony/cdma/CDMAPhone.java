@@ -722,9 +722,9 @@ public class CDMAPhone extends PhoneBase {
         // Read platform settings for dynamic voicemail number
         if (getContext().getResources().getBoolean(com.android.internal
                 .R.bool.config_telephony_use_own_number_for_voicemail)) {
-            number = sp.getString(VM_NUMBER_CDMA, getLine1Number());
+            number = sp.getString(mVmNumCdmaKey, getLine1Number());
         } else {
-            number = sp.getString(VM_NUMBER_CDMA, "*86");
+            number = sp.getString(mVmNumCdmaKey, "*86");
         }
         return number;
     }
