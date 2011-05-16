@@ -512,5 +512,4 @@ public abstract class NetworkStateTracker extends Handler {
      */
     public void interpretScanResultsAvailable() {
     }
-
 }

@@ -1399,7 +1399,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         setupDataCall(Integer.toString(radioTechnology), profile, apn, user,
                 password, Integer.toString(authType), "IP", result);
-
     }
 
     /**
@@ -1410,11 +1409,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         deactivateDataCall(cid, DEACTIVATE_REASON_NONE, result);
     }
 
-    /**
-     * The preferred new alternative to setupDefaultPDP that is
-     * CDMA-compatible.
-     *
-     */
     public void
     setupDataCall(String radioTechnology, String profile, String apn,
             String user, String password, String authType, String ipVersion, Message result) {
