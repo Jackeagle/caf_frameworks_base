@@ -1714,7 +1714,7 @@ public class StatusBarPolicy {
              */
             mService.setIcon("cdma_eri", R.drawable.stat_sys_roaming_cdma_0, 0);
         }
-
+        mService.setIconVisibility("cdma_eri", true);
         return;
 
     }
