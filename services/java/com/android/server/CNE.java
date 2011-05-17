@@ -462,23 +462,20 @@ public final class CNE
                     if (DBG) Log.w(LOG_TAG, "CNE received action RSSI Changed events, null WifiManager");
                 }
 
+
             } else if ((action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) ||
-                       (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) ||
-                       (action.equals(WifiManager.NO_MORE_WIFI_LOCKS))) {
- 
-                if (DBG) {
-                    Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed: " + action);
-                }
+                       (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) ){
+
+                if (DBG) Log.i(LOG_TAG, "CNE received action Network/Wifi State Changed: " + action);
 
                 if (mWifiManager != null) {
                     AddressInfo wlanV4Addr = getWlanAddrInfo(IPVersion.IPV4);
                     NetworkInfo.State networkState = NetworkInfo.State.UNKNOWN;
-                    if(action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION) ||
-                       action.equals(WifiManager.NO_MORE_WIFI_LOCKS)) {
-                        NetworkInfo networkInfo = (NetworkInfo) intent
-                                .getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                        networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN
-                                : networkInfo.getState());
+                    if(action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)){
+                        NetworkInfo networkInfo = (NetworkInfo)
+                        intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                        networkState = (networkInfo == null ? NetworkInfo.State.UNKNOWN :
+                        networkInfo.getState());
                     }
                     if(action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)){
                         final boolean enabled = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
@@ -1153,7 +1150,6 @@ public final class CNE
         filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
         filter.addAction(WifiManager.RSSI_CHANGED_ACTION);
         filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
-        filter.addAction(WifiManager.NO_MORE_WIFI_LOCKS);
         filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         filter.addAction(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
 

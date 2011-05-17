@@ -2109,12 +2109,6 @@ public class WifiService extends IWifiManager.Stub {
                 mBatteryStats.noteScanWifiLockAcquired(uid);
                 break;
             }
-
-            //update the state tracker with wifi locks state. 
-            mWifiStateTracker.setHasWifiLocks(mLocks.hasLocks());
-
-            updateWifiState();
-            return true;
         } catch (RemoteException e) {
         } finally {
             Binder.restoreCallingIdentity(ident);
