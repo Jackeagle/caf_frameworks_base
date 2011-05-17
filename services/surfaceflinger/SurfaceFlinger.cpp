@@ -481,8 +481,6 @@ bool SurfaceFlinger::threadLoop()
             if (mHDMIOutput)
                 hw.videoOverlayStarted(false);
         }
-        // pretend we did the post
-        hw.compositionComplete();
         usleep(16667); // 60 fps period
     }
     return true;
