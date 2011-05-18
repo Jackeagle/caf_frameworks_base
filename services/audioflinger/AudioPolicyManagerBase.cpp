@@ -1044,22 +1044,6 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
             fclose(fp);
         }
     }
-    else if( !strncmp(mDeviceName, "msm7627a", 8)) {
-        if((fp = fopen("/sys/devices/system/soc/soc0/hw_platform","r")) == NULL){
-            LOGE("Cannot open hw_platform file.");
-        }
-        else {
-            (void)fgets((char *)build_id,sizeof(build_id),fp);
-
-            if (!strncmp(build_id, "Surf", 4)) //build loaded on Surf
-            {
-                LOGV("Detected target Surf, disable speaker");
-                mAvailableOutputDevices &= ~(AudioSystem::DEVICE_OUT_SPEAKER);
-                defaultDevice = (uint32_t) AudioSystem::DEVICE_OUT_EARPIECE;
-            }
-            fclose(fp);
-        }
-    }
     mAvailableInputDevices = AudioSystem::DEVICE_IN_BUILTIN_MIC;
 
 #ifdef WITH_A2DP
