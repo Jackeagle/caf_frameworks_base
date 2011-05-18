@@ -191,9 +191,6 @@ public class CatService extends Handler implements AppInterface {
 
     public void dispose() {
 
-        handleIccStatusChange(null);
-
-        mIccRecords.unregisterForRecordsLoaded(this);
         mCmdIf.unSetOnCatSessionEnd(this);
         mCmdIf.unSetOnCatProactiveCmd(this);
         mCmdIf.unSetOnCatEvent(this);
@@ -205,6 +202,14 @@ public class CatService extends Handler implements AppInterface {
         handlerThread = null;
 
         this.removeCallbacksAndMessages(null);
+    }
+
+    public void cleanSTKIcon() {
+        // Eventually sends an intent with RADIO_OFF so that StkAppService
+        // will clean up the Idle mode Text and Stk toolkit icon
+        handleIccStatusChange(null);
+
+        mIccRecords.unregisterForRecordsLoaded(this);
     }
 
     protected void finalize() {
