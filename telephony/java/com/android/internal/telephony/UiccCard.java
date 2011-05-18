@@ -109,9 +109,8 @@ public class UiccCard extends Handler{
         mUiccRecords.dispose();
         mUiccRecords = null;
         if (mCatService != null) {
-            mCatService.dispose();
+            mCatService.cleanSTKIcon();
         }
-        mCatService = null;
         for (UiccCardApplication app: mUiccApplications) {
             if (app != null) {
                 app.dispose();
