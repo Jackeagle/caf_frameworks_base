@@ -204,6 +204,7 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_VIDEO_AVC, "AVCDecoder" },
 //    { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.PV.avcdec" },
     { MEDIA_MIMETYPE_AUDIO_VORBIS, "VorbisDecoder" },
+    { MEDIA_MIMETYPE_VIDEO_VPX, "OMX.qcom.video.decoder.vp8" },
     { MEDIA_MIMETYPE_VIDEO_VPX, "VPXDecoder" },
     { MEDIA_MIMETYPE_VIDEO_DIVX, "OMX.qcom.video.decoder.divx"},
     { MEDIA_MIMETYPE_VIDEO_DIVX311, "OMX.qcom.video.decoder.divx311"},
@@ -1781,6 +1782,8 @@ status_t OMXCodec::setVideoOutputFormat(
         compressionFormat = OMX_VIDEO_CodingWMV;
     } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mime)) {
         compressionFormat = (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_VPX, mime)) {
+        compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingVp8;
     } else {
         LOGE("Not a supported video mime type: %s", mime);
         CHECK(!"Should not be here. Not a supported video mime type.");
