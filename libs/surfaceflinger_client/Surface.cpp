@@ -970,7 +970,6 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
             // the dirty region we report to surfaceflinger is the one
             // given by the user (as opposed to the one *we* return to the
             // user).
-            mDirtyRegion = newDirtyRegion;
             int backBufIdx = backBuffer->getIndex();
             int bufSize = mBuffers.size();
 
@@ -1001,6 +1000,7 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
                 mOldDirtyRegion[backBufIdx] = newDirtyRegion;
             else
                 LOGE("Buffer index is out-of-bounds");
+            mDirtyRegion = newDirtyRegion;
 
             void* vaddr;
             status_t res = backBuffer->lock(
