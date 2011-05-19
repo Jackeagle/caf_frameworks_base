@@ -190,6 +190,8 @@ private:
     Mutex mLock;
     Condition mAsyncCompletion;
 
+    State mStateBeforeError;
+
     bool mPaused;
 
     // A list of indices into mPortStatus[kPortIndexOutput] filled with data.

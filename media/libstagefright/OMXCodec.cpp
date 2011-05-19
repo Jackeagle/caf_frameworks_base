@@ -1964,6 +1964,7 @@ OMXCodec::OMXCodec(
       mSeekMode(ReadOptions::SEEK_CLOSEST_SYNC),
       mTargetTimeUs(-1),
       mSkipTimeUs(-1),
+      mStateBeforeError(mState),
       mPaused(false),
       mGPUComposition(false),
       mThumbnailMode(false),
@@ -2819,6 +2820,7 @@ void OMXCodec::onStateChange(OMX_STATETYPE newState) {
             CODEC_LOGV("Now Executing.");
 
             setState(EXECUTING);
+            mStateBeforeError = EXECUTING;
 
             // Buffers will be submitted to the component in the first
             // call to OMXCodec::read as mInitialBufferSubmit is true at
@@ -2835,6 +2837,7 @@ void OMXCodec::onStateChange(OMX_STATETYPE newState) {
             CODEC_LOGV("Now Loaded.");
 
             setState(LOADED);
+            mStateBeforeError = LOADED;
             break;
         }
         case OMX_StatePause:
@@ -2844,11 +2847,13 @@ void OMXCodec::onStateChange(OMX_STATETYPE newState) {
            CHECK_EQ(mState, PAUSING);
 
            setState(PAUSED);
+           mStateBeforeError = PAUSED;
            break;
         }
         case OMX_StateInvalid:
         {
             setState(ERROR);
+            mStateBeforeError = ERROR; //Component is in invalid state
             break;
         }
 
@@ -3954,6 +3959,13 @@ status_t OMXCodec::stop() {
 
     while (isIntermediateState(mState)) {
         mAsyncCompletion.wait(mLock);
+    }
+
+    //If error was received during executing or paused states,
+    //OMXCodec state is restored so that the component returns
+    //all buffers and the component state is moved to loaded.
+    if (mState == ERROR) {
+        mState = mStateBeforeError;
     }
 
     switch (mState) {
