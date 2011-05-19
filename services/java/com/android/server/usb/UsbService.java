@@ -157,16 +157,17 @@ public class UsbService extends IUsbManager.Stub {
                         int intState = Integer.parseInt(state);
                         if ("usb_connected".equals(name)) {
                             mConnected = intState;
+                            if (mConnected == 0) mConfiguration = 0;
                             // trigger an Intent broadcast
                             if (mSystemReady) {
                                 // debounce disconnects to avoid problems bringing up USB tethering
-                                update(mConnected == 0);
+                                update(mConfiguration == 0);
                             }
                         } else if ("usb_configuration".equals(name)) {
                             mConfiguration = intState;
                             // trigger an Intent broadcast
                             if (mSystemReady) {
-                                update(mConnected == 0);
+                                update(mConfiguration == 0);
                             }
                         }
                     } catch (NumberFormatException e) {
