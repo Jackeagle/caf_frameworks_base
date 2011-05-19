@@ -54,4 +54,12 @@ LOCAL_C_INCLUDES := \
     external/icu4c/common \
     external/expat/lib
 
+ifeq ($(OMAP_ENHANCEMENT),true)
+
+LOCAL_SRC_FILES += OverlayRenderer.cpp
+
+LOCAL_C_INCLUDES += $(TOP)/hardware/ti/$(TARGET_PRODUCT)/liboverlay
+
+endif
+
 include $(BUILD_SHARED_LIBRARY)

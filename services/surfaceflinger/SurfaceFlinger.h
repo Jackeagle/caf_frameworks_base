@@ -214,6 +214,9 @@ public:
     status_t invalidateLayerVisibility(const sp<LayerBase>& layer);
 
     sp<Layer> getLayer(const sp<ISurface>& sur) const;
+#ifdef OMAP_ENHANCEMENT
+    PixelFormat getFormat() const;
+#endif
 
 private:
     friend class Client;

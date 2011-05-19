@@ -78,6 +78,12 @@ public:
             node_id node, OMX_INDEXTYPE index,
             const void *params, size_t size) = 0;
 
+#if defined(OMAP_ENHANCEMENT) && defined(TARGET_OMAP4)
+    virtual status_t useBuffer(
+            node_id node, OMX_U32 port_index, const sp<IMemory> &params,
+            buffer_id *buffer, size_t size) = 0;
+#endif
+
     virtual status_t useBuffer(
             node_id node, OMX_U32 port_index, const sp<IMemory> &params,
             buffer_id *buffer) = 0;
@@ -118,6 +124,15 @@ public:
             size_t displayWidth, size_t displayHeight,
             int32_t rotationDegrees) = 0;
 
+#ifdef OMAP_ENHANCEMENT
+        virtual sp<IOMXRenderer> createRenderer(
+            const sp<ISurface> &surface,
+            const char *componentName,
+            OMX_COLOR_FORMATTYPE colorFormat,
+            size_t encodedWidth, size_t encodedHeight,
+            size_t displayWidth, size_t displayHeight, int32_t rotation, int isS3D, int numOfOpBuffers = -1) = 0;
+
+#endif
     // Note: These methods are _not_ virtual, it exists as a wrapper around
     // the virtual "createRenderer" method above facilitating extraction
     // of the ISurface from a regular Surface or a java Surface object.
@@ -129,6 +144,15 @@ public:
             size_t displayWidth, size_t displayHeight,
             int32_t rotationDegrees);
 
+#ifdef OMAP_ENHANCEMENT
+    sp<IOMXRenderer> createRenderer(
+            const sp<Surface> &surface,
+            const char *componentName,
+            OMX_COLOR_FORMATTYPE colorFormat,
+            size_t encodedWidth, size_t encodedHeight,
+            size_t displayWidth, size_t displayHeight, int32_t rotation, int isS3D, int numOfOpBuffers = -1);
+
+#endif
     sp<IOMXRenderer> createRendererFromJavaSurface(
             JNIEnv *env, jobject javaSurface,
             const char *componentName,
@@ -182,11 +206,22 @@ public:
     virtual void onMessage(const omx_message &msg) = 0;
 };
 
+#ifdef OMAP_ENHANCEMENT
+typedef void (*release_rendered_buffer_callback)(const sp<IMemory>& mem, void* cookie);
+#endif
+
 class IOMXRenderer : public IInterface {
 public:
     DECLARE_META_INTERFACE(OMXRenderer);
 
     virtual void render(IOMX::buffer_id buffer) = 0;
+#ifdef OMAP_ENHANCEMENT
+    virtual Vector< sp<IMemory> > getBuffers() = 0;
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) = 0;
+    virtual void set_s3d_frame_layout(uint32_t s3d_mode, uint32_t s3d_fmt, uint32_t s3d_order, uint32_t s3d_subsampling) =0;
+    virtual void resizeRenderer(uint32_t width, uint32_t height, uint32_t buffercount) = 0;
+    virtual void requestRendererClone(bool enable) = 0;
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////

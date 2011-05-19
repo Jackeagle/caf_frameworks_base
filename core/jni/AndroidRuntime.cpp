@@ -157,6 +157,11 @@ extern int register_android_bluetooth_ScoSocket(JNIEnv *env);
 extern int register_android_server_BluetoothService(JNIEnv* env);
 extern int register_android_server_BluetoothEventLoop(JNIEnv *env);
 extern int register_android_server_BluetoothA2dpService(JNIEnv* env);
+/* TI HID port - start */
+#ifdef OMAP_ENHANCEMENT
+extern int register_android_server_BluetoothHidService(JNIEnv* env);
+#endif
+/* TI HID port - end */
 extern int register_android_server_Watchdog(JNIEnv* env);
 extern int register_android_ddm_DdmHandleNativeHeap(JNIEnv *env);
 extern int register_com_android_internal_os_ZygoteInit(JNIEnv* env);

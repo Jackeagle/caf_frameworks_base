@@ -53,8 +53,13 @@ private:
 
     enum {
         kPageSize            = 65536,
+#ifndef OMAP_ENHANCEMENT
         kHighWaterThreshold  = 5 * 1024 * 1024,
         kLowWaterThreshold   = 512 * 1024,
+#else
+        kHighWaterThreshold  = 13 * 1024 * 1024,
+        kLowWaterThreshold   = 6 * 512 * 1024,
+#endif
 
         // Read data after a 15 sec timeout whether we're actively
         // fetching or not.
@@ -88,6 +93,9 @@ private:
     void onFetch();
     void onRead(const sp<AMessage> &msg);
     void onSuspend();
+#ifdef OMAP_ENHANCEMENT
+    void flushCache();
+#endif
 
     void fetchInternal();
     ssize_t readInternal(off_t offset, void *data, size_t size);

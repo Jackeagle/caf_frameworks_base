@@ -37,6 +37,14 @@ void MediaSource::ReadOptions::reset() {
 
 void MediaSource::ReadOptions::setSeekTo(int64_t time_us, SeekMode mode) {
     mOptions |= kSeekTo_Option;
+#ifdef OMAP_ENHANCEMENT
+    //Incase the app layer tries to seek to negative offset,
+    //resetting the value to Zero.
+    if (time_us < 0)
+    {
+        time_us = 0;
+    }
+#endif
     mSeekTimeUs = time_us;
     mSeekMode = mode;
 }

@@ -19,8 +19,16 @@
 #define VIDEO_RENDERER_H_
 
 #include <sys/types.h>
+#ifdef OMAP_ENHANCEMENT
+#include "binder/IMemory.h"
+#include <utils/Vector.h>
+#endif
 
 namespace android {
+
+#ifdef OMAP_ENHANCEMENT
+typedef void (*release_rendered_buffer_callback)(const sp<IMemory>& mem, void *cookie);
+#endif
 
 class VideoRenderer {
 public:
@@ -28,6 +36,14 @@ public:
 
     virtual void render(
             const void *data, size_t size, void *platformPrivate) = 0;
+
+#ifdef OMAP_ENHANCEMENT
+    virtual Vector< sp<IMemory> > getBuffers() = 0;
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {return false;}
+    virtual void set_s3d_frame_layout(uint32_t s3d_mode, uint32_t s3d_fmt, uint32_t s3d_order, uint32_t s3d_subsampling) {}
+    virtual void resizeRenderer(uint32_t width, uint32_t height, uint32_t buffercount) = 0;
+    virtual void requestRendererClone(bool enable) = 0;
+#endif
 
 protected:
     VideoRenderer() {}

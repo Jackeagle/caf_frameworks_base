@@ -56,6 +56,9 @@ using namespace android;
 static long gNumRepetitions;
 static long gMaxNumFrames;  // 0 means decode all available.
 static long gReproduceBug;  // if not -1.
+#ifdef OMAP_ENHANCEMENT
+static long gVideoFrameRate; // 0 means decode as fast as possible
+#endif
 static bool gPreferSoftwareCodec;
 static bool gPlaybackAudio;
 static bool gWriteMP4;
@@ -231,6 +234,13 @@ static void playSource(OMXClient *client, sp<MediaSource> &source) {
 
             sumDecodeUs += delayDecodeUs;
             totalBytes += buffer->range_length();
+
+#ifdef OMAP_ENHANCEMENT
+            //Delay introduced to decode according to frame rate
+            if (gVideoFrameRate != 0) {
+                usleep (gVideoFrameRate);
+            }
+#endif
 
             buffer->release();
             buffer = NULL;
@@ -466,6 +476,9 @@ static void usage(const char *me) {
     fprintf(stderr, "       -o playback audio\n");
     fprintf(stderr, "       -w(rite) filename (write to .mp4 file)\n");
     fprintf(stderr, "       -k seek test\n");
+#ifdef OMAP_ENHANCEMENT
+    fprintf(stderr, "       -f video decode frame rate\n");
+#endif
 }
 
 int main(int argc, char **argv) {
@@ -482,12 +495,19 @@ int main(int argc, char **argv) {
     gPreferSoftwareCodec = false;
     gPlaybackAudio = false;
     gWriteMP4 = false;
+#ifdef OMAP_ENHANCEMENT
+    gVideoFrameRate = 0;
+#endif
 
     sp<ALooper> looper;
     sp<ARTSPController> rtspController;
 
     int res;
+#ifdef OMAP_ENHANCEMENT
+    while ((res = getopt(argc, argv, "han:lm:b:f:ptsow:k")) >= 0) {
+#else
     while ((res = getopt(argc, argv, "han:lm:b:ptsow:k")) >= 0) {
+#endif
         switch (res) {
             case 'a':
             {
@@ -522,6 +542,26 @@ int main(int argc, char **argv) {
                 }
                 break;
             }
+
+#ifdef OMAP_ENHANCEMENT
+            case 'f':
+            {
+                char *end;
+                long x = strtol(optarg, &end, 10);
+
+                if (*end != '\0' || end == optarg) {
+                    x = 1;
+                }
+
+                if ((x < 10) || (x > 30)) {
+                    printf ("Invalid frame rate specified!!!, Valid range: 10 to 30fps\n");
+                } else  {
+                    gVideoFrameRate = ((1000 / x) * 1000);
+                    printf ("Video framerate delay time is %ld \n",gVideoFrameRate);
+                }
+                break;
+            }
+#endif
 
             case 'w':
             {

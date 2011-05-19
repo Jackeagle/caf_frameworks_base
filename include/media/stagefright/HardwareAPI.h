@@ -39,7 +39,14 @@ extern android::VideoRenderer *createRendererWithRotation(
         size_t displayWidth, size_t displayHeight,
         size_t decodedWidth, size_t decodedHeight,
         int32_t rotationDegrees);
-
+#ifdef OMAP_ENHANCEMENT
+extern android::VideoRenderer *createRenderer(
+        const android::sp<android::ISurface> &surface,
+        const char *componentName,
+        OMX_COLOR_FORMATTYPE colorFormat,
+        size_t displayWidth, size_t displayHeight,
+        size_t decodedWidth, size_t decodedHeight, int isS3D);
+#endif
 extern android::OMXPluginBase *createOMXPlugin();
 
 #endif  // HARDWARE_API_H_

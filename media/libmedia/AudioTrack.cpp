@@ -774,7 +774,13 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, int32_t waitCount)
     status_t result;
     audio_track_cblk_t* cblk = mCblk;
     uint32_t framesReq = audioBuffer->frameCount;
+
+#ifdef OMAP_ENHANCEMENT
+    /*wait based on the max output latency, depends on framecount and sample freq*/
+    uint32_t waitTimeMs = (waitCount < 0) ? cblk->bufferTimeoutMs : mLatency;
+#else
     uint32_t waitTimeMs = (waitCount < 0) ? cblk->bufferTimeoutMs : WAIT_PERIOD_MS;
+#endif
 
     audioBuffer->frameCount  = 0;
     audioBuffer->size = 0;

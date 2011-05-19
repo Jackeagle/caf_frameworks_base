@@ -260,6 +260,12 @@ public final class BluetoothClass implements Parcelable {
     /** @hide */
     public static final int PROFILE_OPP = 2;
 
+    /* TI HID port - start */
+    /** @hide */
+    public static final int PROFILE_HID = 3;
+    /* TI HID port - end */
+
+
     /**
      * Check class bits for possible bluetooth profile support.
      * This is a simple heuristic that tries to guess if a device with the

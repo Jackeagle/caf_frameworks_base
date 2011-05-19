@@ -240,18 +240,46 @@ status_t OMXNodeInstance::setConfig(
     return StatusFromOMXError(err);
 }
 
+#if defined(OMAP_ENHANCEMENT) && defined(TARGET_OMAP4)
 status_t OMXNodeInstance::useBuffer(
         OMX_U32 portIndex, const sp<IMemory> &params,
         OMX::buffer_id *buffer) {
+    return useBuffer(portIndex, params, buffer, 0);
+}
+#endif
+
+#if defined(OMAP_ENHANCEMENT) && defined(TARGET_OMAP4)
+status_t OMXNodeInstance::useBuffer(
+        OMX_U32 portIndex, const sp<IMemory> &params,
+        OMX::buffer_id *buffer, size_t size) {
+#else
+status_t OMXNodeInstance::useBuffer(
+        OMX_U32 portIndex, const sp<IMemory> &params,
+        OMX::buffer_id *buffer) {
+#endif
     Mutex::Autolock autoLock(mLock);
 
     BufferMeta *buffer_meta = new BufferMeta(params);
 
     OMX_BUFFERHEADERTYPE *header;
 
+#if defined(OMAP_ENHANCEMENT) && defined(TARGET_OMAP4)
+    OMX_ERRORTYPE err;
+
+    if(params.get() != NULL) {
+        err = OMX_UseBuffer(
+                mHandle, &header, portIndex, buffer_meta,
+                params->size(), static_cast<OMX_U8 *>(params->pointer()));
+    } else {
+        err = OMX_UseBuffer(
+                mHandle, &header, portIndex, buffer_meta,
+                size, NULL);
+    }
+#else
     OMX_ERRORTYPE err = OMX_UseBuffer(
             mHandle, &header, portIndex, buffer_meta,
             params->size(), static_cast<OMX_U8 *>(params->pointer()));
+#endif
 
     if (err != OMX_ErrorNone) {
         LOGE("OMX_UseBuffer failed with error %d (0x%08x)", err, err);

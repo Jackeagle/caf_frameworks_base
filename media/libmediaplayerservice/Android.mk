@@ -58,6 +58,14 @@ LOCAL_C_INCLUDES :=                                                 \
 	$(TOP)/frameworks/base/media/libstagefright/rtsp                \
         $(TOP)/external/tremolo/Tremolo
 
+ifeq ($(OMAP_ENHANCEMENT),true)
+
+LOCAL_C_INCLUDES += $(TOP)/hardware/ti/$(TARGET_PRODUCT)/liboverlay
+
+LOCAL_SHARED_LIBRARIES += libui
+
+endif
+
 LOCAL_MODULE:= libmediaplayerservice
 
 include $(BUILD_SHARED_LIBRARY)

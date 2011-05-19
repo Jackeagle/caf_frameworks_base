@@ -1241,6 +1241,12 @@ public class WifiStateTracker extends NetworkStateTracker {
                 mHaveIpAddress = true;
                 mObtainingIpAddress = false;
                 mWifiInfo.setIpAddress(mDhcpInfo.ipAddress);
+                if(SystemProperties.OMAP_ENHANCEMENT) {
+                    // Sending IP address to wifi driver for ARP filtering
+                    synchronized (this) {
+                        WifiNative.setIPAddressCommand(mDhcpInfo.ipAddress);
+                    }
+                }
                 mLastSignalLevel = -1; // force update of signal strength
                 if (mNetworkInfo.getDetailedState() != DetailedState.CONNECTED) {
                     setDetailedState(DetailedState.CONNECTED);
@@ -1377,6 +1383,12 @@ public class WifiStateTracker extends NetworkStateTracker {
     private void handleDisconnectedState(DetailedState newState, boolean disableInterface) {
         if (mDisconnectPending) {
             cancelDisconnect();
+        }
+        if(SystemProperties.OMAP_ENHANCEMENT) {
+            // Undo ARP filtering
+            synchronized (this) {
+                WifiNative.setIPAddressCommand(0);
+            }
         }
         mDisconnectExpected = false;
         resetConnections(disableInterface);
@@ -1672,6 +1684,24 @@ public class WifiStateTracker extends NetworkStateTracker {
      */
     public synchronized boolean unloadDriver() {
         return WifiNative.unloadDriver();
+    }
+
+    /**
+     * Load the Hotspot driver and firmware
+     *
+     * @return {@code true} if the operation succeeds, {@code false} otherwise
+     */
+    public synchronized boolean loadHotspotDriver() {
+        return WifiNative.loadHotspotDriver();
+    }
+
+    /**
+     * Unload the Hotspot driver and firmware
+     *
+     * @return {@code true} if the operation succeeds, {@code false} otherwise
+     */
+    public synchronized boolean unloadHotspotDriver() {
+        return WifiNative.unloadHotspotDriver();
     }
 
     /**

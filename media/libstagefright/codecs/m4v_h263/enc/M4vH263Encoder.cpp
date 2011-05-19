@@ -55,8 +55,9 @@ inline static void ConvertYUV420SemiPlanarToYUV420Planar(
             uint32_t tempV = (temp >> 8) & 0xFF;
             tempV = tempV | ((temp >> 16) & 0xFF00);
 
-            *outcb++ = tempU;
-            *outcr++ = tempV;
+            // Flip U and V
+            *outcb++ = tempV;
+            *outcr++ = tempU;
         }
     }
 }

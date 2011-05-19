@@ -57,6 +57,9 @@ MediaPlayer::MediaPlayer()
     mLockThreadId = 0;
     mAudioSessionId = AudioSystem::newAudioSessionId();
     mSendLevel = 0;
+#ifdef OMAP_ENHANCEMENT
+    mStateBeforeSuspend = mCurrentState;
+#endif
 }
 
 MediaPlayer::~MediaPlayer()
@@ -174,12 +177,22 @@ status_t MediaPlayer::invoke(const Parcel& request, Parcel *reply)
 
 status_t MediaPlayer::suspend() {
     Mutex::Autolock _l(mLock);
+#ifdef OMAP_ENHANCEMENT
+    mStateBeforeSuspend = mCurrentState;
+    mCurrentState = MEDIA_PLAYER_SUSPEND;
+#endif
     return mPlayer->suspend();
 }
 
 status_t MediaPlayer::resume() {
     Mutex::Autolock _l(mLock);
-    return mPlayer->resume();
+#ifdef OMAP_ENHANCEMENT
+    status_t ret = mPlayer->resume();
+    mCurrentState = mStateBeforeSuspend;
+    return ret;
+#else
+	return mPlayer->resume();
+#endif
 }
 
 status_t MediaPlayer::setMetadataFilter(const Parcel& filter)
@@ -292,8 +305,13 @@ status_t MediaPlayer::stop()
     LOGV("stop");
     Mutex::Autolock _l(mLock);
     if (mCurrentState & MEDIA_PLAYER_STOPPED) return NO_ERROR;
+#ifdef OMAP_ENHANCEMENT
+    if ( (mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER_STARTED | MEDIA_PLAYER_PREPARED |
+                    MEDIA_PLAYER_PAUSED | MEDIA_PLAYER_PLAYBACK_COMPLETE | MEDIA_PLAYER_SUSPEND ) ) ) {
+#else
     if ( (mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER_STARTED | MEDIA_PLAYER_PREPARED |
                     MEDIA_PLAYER_PAUSED | MEDIA_PLAYER_PLAYBACK_COMPLETE ) ) ) {
+#endif
         status_t ret = mPlayer->stop();
         if (ret != NO_ERROR) {
             mCurrentState = MEDIA_PLAYER_STATE_ERROR;
@@ -503,6 +521,18 @@ status_t MediaPlayer::setVolume(float leftVolume, float rightVolume)
     }
     return OK;
 }
+
+#ifdef OMAP_ENHANCEMENT
+status_t MediaPlayer::requestVideoCloneMode(bool enable)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer != NULL) {
+        return mPlayer->requestVideoCloneMode(enable);
+    }
+    return OK;
+}
+
+#endif
 
 status_t MediaPlayer::setAudioSessionId(int sessionId)
 {

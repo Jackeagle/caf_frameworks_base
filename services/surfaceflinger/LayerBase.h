@@ -206,6 +206,7 @@ public:
     
     /** always call base class first */
     virtual void dump(String8& result, char* scratch, size_t size) const;
+    virtual void shortDump(String8& result, char* scratch, size_t size) const;
 
 
     enum { // flags for doTransaction()
@@ -313,7 +314,12 @@ public:
         virtual void unregisterBuffers();
         virtual sp<OverlayRef> createOverlay(uint32_t w, uint32_t h,
                 int32_t format, int32_t orientation);
-
+#ifdef OMAP_ENHANCEMENT
+        virtual sp<OverlayRef> createOverlay(uint32_t w, uint32_t h,
+                int32_t format, int32_t orientation, int isS3D);
+	virtual void setDisplayId(int displayId);
+        virtual int requestOverlayClone(bool enable);
+#endif
     protected:
         friend class LayerBaseClient;
         sp<SurfaceFlinger>  mFlinger;
@@ -325,6 +331,7 @@ public:
 
 protected:
     virtual void dump(String8& result, char* scratch, size_t size) const;
+    virtual void shortDump(String8& result, char* scratch, size_t size) const;
 
 private:
     mutable Mutex mLock;

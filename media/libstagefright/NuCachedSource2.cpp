@@ -293,6 +293,10 @@ void NuCachedSource2::onFetch() {
         restartPrefetcherIfNecessary_l();
     }
 
+#ifdef OMAP_ENHANCEMENT
+    if (!mSuspended)
+        flushCache();
+#endif
     (new AMessage(kWhatFetchMore, mReflector->id()))->post(
             mFetching ? 0 : 100000ll);
 }
@@ -327,8 +331,9 @@ void NuCachedSource2::onRead(const sp<AMessage> &msg) {
 }
 
 void NuCachedSource2::restartPrefetcherIfNecessary_l() {
+#ifndef OMAP_ENHANCEMENT
     static const size_t kGrayArea = 256 * 1024;
-
+#endif
     if (mFetching || mFinalStatus != OK) {
         return;
     }
@@ -338,6 +343,7 @@ void NuCachedSource2::restartPrefetcherIfNecessary_l() {
         return;
     }
 
+#ifndef OMAP_ENHANCEMENT
     size_t maxBytes = mLastAccessPos - mCacheOffset;
     if (maxBytes < kGrayArea) {
         return;
@@ -347,6 +353,7 @@ void NuCachedSource2::restartPrefetcherIfNecessary_l() {
 
     size_t actualBytes = mCache->releaseFromStart(maxBytes);
     mCacheOffset += actualBytes;
+#endif
 
     LOGI("restarting prefetcher, totalSize = %d", mCache->totalSize());
     mFetching = true;
@@ -421,8 +428,12 @@ ssize_t NuCachedSource2::readInternal(off_t offset, void *data, size_t size) {
 
     if (offset < mCacheOffset
             || offset >= (off_t)(mCacheOffset + mCache->totalSize())) {
+#ifndef OMAP_ENHANCEMENT
         static const off_t kPadding = 32768;
-
+#else
+        // make this value larger for high profile playback
+        static const off_t kPadding = 768 * 1024;
+#endif
         // In the presence of multiple decoded streams, once of them will
         // trigger this seek request, the other one will request data "nearby"
         // soon, adjust the seek position so that that subsequent request
@@ -511,5 +522,22 @@ void NuCachedSource2::onSuspend() {
     mSuspended = true;
 }
 
+#ifdef OMAP_ENHANCEMENT
+void NuCachedSource2::flushCache() {
+    Mutex::Autolock autoLock(mLock);
+
+    size_t maxBytes = mLastAccessPos - mCacheOffset;
+    // data beyond kLowWaterThreshold can be safely disposed
+    if (maxBytes < kLowWaterThreshold) {
+        return;
+    }
+    maxBytes -= kLowWaterThreshold;
+
+    size_t actualBytes = mCache->releaseFromStart(maxBytes);
+    mCacheOffset += actualBytes;
+
+    LOGV("release old data %d bytes", actualBytes);
+}
+#endif
 }  // namespace android
 

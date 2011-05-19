@@ -121,6 +121,9 @@ enum media_player_states {
     MEDIA_PLAYER_PAUSED             = 1 << 5,
     MEDIA_PLAYER_STOPPED            = 1 << 6,
     MEDIA_PLAYER_PLAYBACK_COMPLETE  = 1 << 7
+#ifdef OMAP_ENHANCEMENT
+    ,MEDIA_PLAYER_SUSPEND           = 1 << 8
+#endif
 };
 
 // ----------------------------------------------------------------------------
@@ -175,6 +178,9 @@ public:
             int             getAudioSessionId();
             status_t        setAuxEffectSendLevel(float level);
             status_t        attachAuxEffect(int effectId);
+#ifdef OMAP_ENHANCEMENT
+            status_t        requestVideoCloneMode(bool enable);
+#endif
 private:
             void            clear_l();
             status_t        seekTo_l(int msec);
@@ -203,6 +209,9 @@ private:
     int                         mVideoHeight;
     int                         mAudioSessionId;
     float                       mSendLevel;
+#ifdef OMAP_ENHANCEMENT
+    media_player_states         mStateBeforeSuspend;
+#endif
 };
 
 }; // namespace android
