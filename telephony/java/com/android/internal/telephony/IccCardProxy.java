@@ -219,15 +219,9 @@ public class IccCardProxy extends Handler implements IccCard {
                 if (mApplication != null) {
                     PersoSubState subState = mApplication.getPersonalizationState();
                     broadcastPersoSubState(subState);
-                    if (subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK ||
-                        subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_SUBSET ||
-                        subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_PUK ||
-                        subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK ||
-                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK1 ||
-                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK2 ||
-                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK1_PUK ||
-                        subState == PersoSubState.PERSOSUBSTATE_RUIM_NETWORK2_PUK) {
-                        mNetworkLockedRegistrants.notifyRegistrants();
+                    if (subState == PersoSubState.PERSOSUBSTATE_SIM_NETWORK) {
+                        int sub = (mSubscriptionData != null) ? mSubscriptionData.subId : mCardIndex;
+                        mNetworkLockedRegistrants.notifyRegistrants(new AsyncResult(null, sub, null));
                     }
                 }
                 break;
