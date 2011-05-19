@@ -110,6 +110,13 @@ abstract class SipPhoneBase extends PhoneBase {
         return s;
     }
 
+    public ServiceState getVoiceServiceState() {
+        //FIXME: Need to fix when getServiceState is taken care
+        ServiceState s = new ServiceState();
+        s.setState(ServiceState.STATE_IN_SERVICE);
+        return s;
+    }
+
     public CellLocation getCellLocation() {
         return null;
     }
