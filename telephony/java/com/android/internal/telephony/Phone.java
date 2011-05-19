@@ -278,6 +278,11 @@ public interface Phone {
     ServiceState getServiceState();
 
     /**
+     * Get the current Voice ServiceState.
+     */
+    ServiceState getVoiceServiceState();
+
+    /**
      * Get the current CellLocation.
      */
     CellLocation getCellLocation();

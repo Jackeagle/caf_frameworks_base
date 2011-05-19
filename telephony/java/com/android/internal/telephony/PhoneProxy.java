@@ -337,6 +337,10 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.getServiceState();
     }
 
+    public ServiceState getVoiceServiceState() {
+        return mActivePhone.getVoiceServiceState();
+    }
+
     public CellLocation getCellLocation() {
         return mActivePhone.getCellLocation();
     }
