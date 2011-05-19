@@ -24,23 +24,35 @@ import android.os.Parcelable;
  * {@hide}
  */
 public interface EmergencyMessage extends Parcelable {
-    public enum Severity {
+    enum Severity {
         EXTREME,
         SEVERE,
         UNDEFINED,
     };
 
-    public enum Urgency {
+    enum Urgency {
         IMMEDIATE,
         EXPECTED,
         UNDEFINED,
     }
 
-    public enum Certainty {
+    enum Certainty {
         OBSERVED,
         LIKELY,
         UNDEFINED,
     }
+
+    enum Alerts {
+        CMAS_PRESIDENTIAL,
+        CMAS_EXTREME,
+        CMAS_SEVERE,
+        CMAS_AMBER,
+        ETWS_EARTHQUAKE,
+        ETWS_TSUNAMI,
+        ETWS_EARTHQUAKE_AND_TSUNAMI
+    }
+
+
     String getMessageBody();
     int getMessageIdentifier();
     Severity getSeverity();

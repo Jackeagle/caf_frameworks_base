@@ -31,7 +31,7 @@ import java.io.UnsupportedEncodingException;
  *
  * {@hide}
  */
-public class SmsCbMessage implements EmergencyMessage {
+public class SmsCbMessage {
 
     /**
      * Cell wide immediate geographical scope
@@ -168,66 +168,6 @@ public class SmsCbMessage implements EmergencyMessage {
      */
     public int getUpdateNumber() {
         return mHeader.updateNumber;
-    }
-
-    /**
-     * TS 23.041 9.4.1.2.2
-     */
-    public Severity getSeverity() {
-        switch (mHeader.messageIdentifier) {
-            case 4371:
-            case 4372:
-            case 4373:
-            case 4374:
-                return Severity.EXTREME;
-            case 4375:
-            case 4376:
-            case 4377:
-            case 4378:
-                return Severity.SEVERE;
-            default:
-                return Severity.UNDEFINED;
-        }
-    }
-
-    /**
-     * TS 23.041 9.4.1.2.2
-     */
-    public Urgency getUrgency() {
-        switch (mHeader.messageIdentifier) {
-            case 4371:
-            case 4372:
-            case 4375:
-            case 4376:
-                return Urgency.IMMEDIATE;
-            case 4373:
-            case 4374:
-            case 4377:
-            case 4378:
-                return Urgency.EXPECTED;
-            default:
-                return Urgency.UNDEFINED;
-        }
-    }
-
-    /**
-     * TS 23.041 9.4.1.2.2
-     */
-    public Certainty getCertainty() {
-        switch (mHeader.messageIdentifier) {
-            case 4371:
-            case 4373:
-            case 4375:
-            case 4377:
-                return Certainty.OBSERVED;
-            case 4372:
-            case 4374:
-            case 4376:
-            case 4378:
-                return Certainty.LIKELY;
-            default:
-                return Certainty.UNDEFINED;
-        }
     }
 
     /**
