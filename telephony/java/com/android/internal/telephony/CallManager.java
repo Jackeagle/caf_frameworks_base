@@ -803,14 +803,10 @@ public final class CallManager {
     private boolean canDial(Phone phone) {
         int serviceState = phone.getServiceState().getState();
         boolean hasRingingCall = hasActiveRingingCall();
-        boolean hasActiveCall = hasActiveFgCall();
-        boolean hasHoldingCall = hasActiveBgCall();
-        boolean allLinesTaken = hasActiveCall && hasHoldingCall;
         Call.State fgCallState = getActiveFgCallState();
 
         return (serviceState != ServiceState.STATE_POWER_OFF
                 && !hasRingingCall
-                && !allLinesTaken
                 && ((fgCallState == Call.State.ACTIVE)
                     || (fgCallState == Call.State.IDLE)
                     || (fgCallState == Call.State.DISCONNECTED)));
