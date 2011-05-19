@@ -61,6 +61,7 @@ else
 endif
 
 LOCAL_MODULE:= libaudiopolicybase
+LOCAL_PRELINK_MODULE := false
 
 ifeq ($(BOARD_HAVE_BLUETOOTH),true)
   LOCAL_CFLAGS += -DWITH_A2DP
