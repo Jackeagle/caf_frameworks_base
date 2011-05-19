@@ -967,7 +967,6 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
             // the dirty region we report to surfaceflinger is the one
             // given by the user (as opposed to the one *we* return to the
             // user).
-            mDirtyRegion = newDirtyRegion;
             int backBufIdx = backBuffer->getIndex();
 
             if (canCopyBack) {
@@ -996,6 +995,7 @@ status_t Surface::lock(SurfaceInfo* other, Region* dirtyIn, bool blocking)
             // keep track of the are of the buffer that is "clean"
             // (ie: that will be redrawn)
             mOldDirtyRegion[backBufIdx] = newDirtyRegion;
+            mDirtyRegion = newDirtyRegion;
 
             void* vaddr;
             status_t res = backBuffer->lock(
