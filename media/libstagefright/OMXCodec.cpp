@@ -1277,7 +1277,7 @@ void OMXCodec::setMinBufferSize(OMX_U32 portIndex, OMX_U32 size) {
             && (mQuirks & kInputBufferSizesAreBogus)) {
         CHECK_EQ(def.nBufferSize, size);
     } else {
-        CHECK(def.nBufferSize >= size);
+        //CHECK(def.nBufferSize >= size);
     }
 }
 
