@@ -2487,10 +2487,19 @@ OMXCodec::~OMXCodec() {
 
 status_t OMXCodec::init() {
     // mLock is held.
+    status_t err;
 
     CHECK_EQ(mState, LOADED);
 
-    status_t err;
+    // Enable input and output ports for TI816x
+    if (!strcmp("OMX.TI.DUCATI.VIDDEC", mComponentName)) {
+        err = mOMX->sendCommand(mNode, OMX_CommandPortEnable, kPortIndexInput);
+        CHECK_EQ(err, OK);
+
+        err = mOMX->sendCommand(mNode, OMX_CommandPortEnable, kPortIndexOutput);
+        CHECK_EQ(err, OK);
+    }
+
     if (!(mQuirks & kRequiresLoadedToIdleAfterAllocation)) {
         err = mOMX->sendCommand(mNode, OMX_CommandStateSet, OMX_StateIdle);
         CHECK_EQ(err, OK);
