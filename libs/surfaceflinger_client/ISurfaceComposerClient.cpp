@@ -60,7 +60,7 @@ enum {
 class BpSurfaceComposerClient : public BpInterface<ISurfaceComposerClient>
 {
 public:
-    BpSurfaceComposerClient(const sp<IBinder>& impl)
+    BpSurfaceComposerClient(const sp<IBinder> impl)
         : BpInterface<ISurfaceComposerClient>(impl)
     {
     }
@@ -73,7 +73,7 @@ public:
         return interface_cast<IMemoryHeap>(reply.readStrongBinder());
     }
 
-    virtual ssize_t getTokenForSurface(const sp<ISurface>& sur) const
+    virtual ssize_t getTokenForSurface(const sp<ISurface> sur) const
     {
         Parcel data, reply;
         data.writeInterfaceToken(ISurfaceComposerClient::getInterfaceDescriptor());

@@ -68,13 +68,13 @@ class LayerBuffer;
 class Client : public BnSurfaceComposerClient
 {
 public:
-        Client(const sp<SurfaceFlinger>& flinger);
+        Client(const sp<SurfaceFlinger> flinger);
         ~Client();
 
     status_t initCheck() const;
 
     // protected by SurfaceFlinger::mStateLock
-    ssize_t attachLayer(const sp<LayerBaseClient>& layer);
+    ssize_t attachLayer(const sp<LayerBaseClient> layer);
     void detachLayer(const LayerBaseClient* layer);
     sp<LayerBaseClient> getLayerUser(int32_t i) const;
 
@@ -82,7 +82,7 @@ private:
 
     // ISurfaceComposerClient interface
     virtual sp<IMemoryHeap> getControlBlock() const;
-    virtual ssize_t getTokenForSurface(const sp<ISurface>& sur) const;
+    virtual ssize_t getTokenForSurface(const sp<ISurface> sur) const;
     virtual sp<ISurface> createSurface(
             surface_data_t* params, int pid, const String8& name,
             DisplayID display, uint32_t w, uint32_t h,PixelFormat format,
@@ -102,7 +102,7 @@ public:
     SharedClient* ctrlblk;
 
 public:
-        UserClient(const sp<SurfaceFlinger>& flinger);
+        UserClient(const sp<SurfaceFlinger> flinger);
         ~UserClient();
 
     status_t initCheck() const;
@@ -114,7 +114,7 @@ private:
 
     // ISurfaceComposerClient interface
     virtual sp<IMemoryHeap> getControlBlock() const;
-    virtual ssize_t getTokenForSurface(const sp<ISurface>& sur) const;
+    virtual ssize_t getTokenForSurface(const sp<ISurface> sur) const;
     virtual sp<ISurface> createSurface(
             surface_data_t* params, int pid, const String8& name,
             DisplayID display, uint32_t w, uint32_t h,PixelFormat format,
@@ -223,11 +223,11 @@ public:
             overlay_control_device_t* getOverlayEngine() const;
             void enableOverlayOpt(bool start) const;
 
-    status_t removeLayer(const sp<LayerBase>& layer);
-    status_t addLayer(const sp<LayerBase>& layer);
-    status_t invalidateLayerVisibility(const sp<LayerBase>& layer);
+    status_t removeLayer(const sp<LayerBase> layer);
+    status_t addLayer(const sp<LayerBase> layer);
+    status_t invalidateLayerVisibility(const sp<LayerBase> layer);
 
-    sp<Layer> getLayer(const sp<ISurface>& sur) const;
+    sp<Layer> getLayer(const sp<ISurface> sur) const;
 
 private:
     friend class Client;
@@ -239,32 +239,32 @@ private:
     friend class LayerBlur;
     friend class LayerDim;
 
-    sp<ISurface> createSurface(const sp<Client>& client,
+    sp<ISurface> createSurface(const sp<Client> client,
             int pid, const String8& name,
             ISurfaceComposerClient::surface_data_t* params,
             DisplayID display, uint32_t w, uint32_t h, PixelFormat format,
             uint32_t flags);
 
     sp<Layer> createNormalSurface(
-            const sp<Client>& client, DisplayID display,
+            const sp<Client> client, DisplayID display,
             uint32_t w, uint32_t h, uint32_t flags,
             PixelFormat& format);
 
     sp<LayerBlur> createBlurSurface(
-            const sp<Client>& client, DisplayID display,
+            const sp<Client> client, DisplayID display,
             uint32_t w, uint32_t h, uint32_t flags);
 
     sp<LayerDim> createDimSurface(
-            const sp<Client>& client, DisplayID display,
+            const sp<Client> client, DisplayID display,
             uint32_t w, uint32_t h, uint32_t flags);
 
     sp<LayerBuffer> createPushBuffersSurface(
-            const sp<Client>& client, DisplayID display,
+            const sp<Client> client, DisplayID display,
             uint32_t w, uint32_t h, uint32_t flags);
 
-    status_t removeSurface(const sp<Client>& client, SurfaceID sid);
-    status_t destroySurface(const sp<LayerBaseClient>& layer);
-    status_t setClientState(const sp<Client>& client,
+    status_t removeSurface(const sp<Client> client, SurfaceID sid);
+    status_t destroySurface(const sp<LayerBaseClient> layer);
+    status_t setClientState(const sp<Client> client,
             int32_t count, const layer_state_t* states);
 
     class LayerVector : public SortedVector< sp<LayerBase> > {
@@ -272,8 +272,8 @@ private:
         LayerVector() { }
         LayerVector(const LayerVector& rhs) : SortedVector< sp<LayerBase> >(rhs) { }
         virtual int do_compare(const void* lhs, const void* rhs) const {
-            const sp<LayerBase>& l(*reinterpret_cast<const sp<LayerBase>*>(lhs));
-            const sp<LayerBase>& r(*reinterpret_cast<const sp<LayerBase>*>(rhs));
+            const sp<LayerBase> l(*reinterpret_cast<const sp<LayerBase>*>(lhs));
+            const sp<LayerBase> r(*reinterpret_cast<const sp<LayerBase>*>(rhs));
             // sort layers by Z order
             uint32_t lz = l->currentState().z;
             uint32_t rz = r->currentState().z;
@@ -327,17 +327,17 @@ private:
             void        composeSurfaces(const Region& dirty);
 
 
-            ssize_t     addClientLayer(const sp<Client>& client,
-                    const sp<LayerBaseClient>& lbc);
-            status_t    addLayer_l(const sp<LayerBase>& layer);
-            status_t    removeLayer_l(const sp<LayerBase>& layer);
-            status_t    purgatorizeLayer_l(const sp<LayerBase>& layer);
+            ssize_t     addClientLayer(const sp<Client> client,
+                    const sp<LayerBaseClient> lbc);
+            status_t    addLayer_l(const sp<LayerBase> layer);
+            status_t    removeLayer_l(const sp<LayerBase> layer);
+            status_t    purgatorizeLayer_l(const sp<LayerBase> layer);
 
             uint32_t    getTransactionFlags(uint32_t flags);
             uint32_t    setTransactionFlags(uint32_t flags);
             void        commitTransaction();
 
-            void        setBypassLayer(const sp<LayerBase>& layer);
+            void        setBypassLayer(const sp<LayerBase> layer);
 
             status_t captureScreenImplLocked(DisplayID dpy,
                     sp<IMemoryHeap>* heap,
@@ -372,10 +372,10 @@ private:
 
     mutable     MessageQueue    mEventQueue;
 
-    status_t postMessageAsync(const sp<MessageBase>& msg,
+    status_t postMessageAsync(const sp<MessageBase> msg,
             nsecs_t reltime=0, uint32_t flags = 0);
 
-    status_t postMessageSync(const sp<MessageBase>& msg,
+    status_t postMessageSync(const sp<MessageBase> msg,
             nsecs_t reltime=0, uint32_t flags = 0);
 
                 // access must be protected by mStateLock

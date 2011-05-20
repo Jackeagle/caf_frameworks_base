@@ -52,7 +52,7 @@ template <typename T> inline T min(T a, T b) {
 // ---------------------------------------------------------------------------
 
 Layer::Layer(SurfaceFlinger* flinger,
-        DisplayID display, const sp<Client>& client)
+        DisplayID display, const sp<Client> client)
     :   LayerBaseClient(flinger, display, client),
         mGLExtensions(GLExtensions::getInstance()),
         mNeedsBlending(true),
@@ -85,7 +85,7 @@ Layer::~Layer()
     }
 }
 
-status_t Layer::setToken(const sp<UserClient>& userClient,
+status_t Layer::setToken(const sp<UserClient> userClient,
         SharedClient* sharedClient, int32_t token)
 {
     int numbuffers = mBufferManager.getDefaultBufferCount();
@@ -376,7 +376,7 @@ void Layer::onDraw(const Region& clip) const
         const SurfaceFlinger::LayerVector& drawingLayers(mFlinger->mDrawingState.layersSortedByZ);
         const size_t count = drawingLayers.size();
         for (size_t i=0 ; i<count ; ++i) {
-            const sp<LayerBase>& layer(drawingLayers[i]);
+            const sp<LayerBase> layer(drawingLayers[i]);
             if (layer.get() == static_cast<LayerBase const*>(this))
                 break;
             under.orSelf(layer->visibleRegionScreen);
@@ -845,8 +845,8 @@ sp<UserClient> Layer::ClientRef::getClient() const {
     return mUserClient.promote();
 }
 
-status_t Layer::ClientRef::setToken(const sp<UserClient>& uc,
-        const sp<SharedBufferServer>& sharedClient, int32_t token) {
+status_t Layer::ClientRef::setToken(const sp<UserClient> uc,
+        const sp<SharedBufferServer> sharedClient, int32_t token) {
     Mutex::Autolock _l(mLock);
 
     { // scope for strong mUserClient reference
@@ -947,7 +947,7 @@ sp<GraphicBuffer> Layer::BufferManager::detachBuffer(size_t index)
 }
 
 status_t Layer::BufferManager::attachBuffer(size_t index,
-        const sp<GraphicBuffer>& buffer)
+        const sp<GraphicBuffer> buffer)
 {
     BufferData* const buffers = mBufferData;
     Mutex::Autolock _l(mLock);
@@ -975,7 +975,7 @@ status_t Layer::BufferManager::destroy(EGLDisplay dpy)
 }
 
 status_t Layer::BufferManager::initEglImage(EGLDisplay dpy,
-        const sp<GraphicBuffer>& buffer)
+        const sp<GraphicBuffer> buffer)
 {
     status_t err = NO_INIT;
     ssize_t index = mActiveBuffer;
@@ -1032,8 +1032,8 @@ status_t Layer::BufferManager::destroyTexture(Image* tex, EGLDisplay dpy)
 
 // ---------------------------------------------------------------------------
 
-Layer::SurfaceLayer::SurfaceLayer(const sp<SurfaceFlinger>& flinger,
-        const sp<Layer>& owner)
+Layer::SurfaceLayer::SurfaceLayer(const sp<SurfaceFlinger> flinger,
+        const sp<Layer> owner)
     : Surface(flinger, owner->getIdentity(), owner)
 {
 }

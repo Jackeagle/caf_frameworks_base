@@ -72,7 +72,7 @@ namespace {
   // layer is LayerBase type, and mCachedVideoLayer is LayerBuffer.
   // Dynamic cast should work here, but we have no rtti.
   // we are however sure that we are dealing with LayerBuffer
-  android::LayerBuffer* cacheOverlayLayer(const android::sp<android::LayerBase>& src){
+  android::LayerBuffer* cacheOverlayLayer(const android::sp<android::LayerBase> src){
      assert(src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers);
      if(!src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers) {
         LOGE("composeSurfaces expected ePushBuffer flags=%d",
@@ -376,13 +376,13 @@ void SurfaceFlinger::signal() const {
     const_cast<SurfaceFlinger*>(this)->signalEvent();
 }
 
-status_t SurfaceFlinger::postMessageAsync(const sp<MessageBase>& msg,
+status_t SurfaceFlinger::postMessageAsync(const sp<MessageBase> msg,
         nsecs_t reltime, uint32_t flags)
 {
     return mEventQueue.postMessage(msg, reltime, flags);
 }
 
-status_t SurfaceFlinger::postMessageSync(const sp<MessageBase>& msg,
+status_t SurfaceFlinger::postMessageSync(const sp<MessageBase> msg,
         nsecs_t reltime, uint32_t flags)
 {
     status_t res = mEventQueue.postMessage(msg, reltime, flags);
@@ -695,7 +695,7 @@ void SurfaceFlinger::handleTransactionLocked(
     const bool layersNeedTransaction = transactionFlags & eTraversalNeeded;
     if (layersNeedTransaction) {
         for (size_t i=0 ; i<count ; i++) {
-            const sp<LayerBase>& layer = currentLayers[i];
+            const sp<LayerBase> layer = currentLayers[i];
             uint32_t trFlags = layer->getTransactionFlags(eTransactionNeeded);
             if (!trFlags) continue;
 
@@ -752,7 +752,7 @@ void SurfaceFlinger::handleTransactionLocked(
             const LayerVector& previousLayers(mDrawingState.layersSortedByZ);
             const size_t count = previousLayers.size();
             for (size_t i=0 ; i<count ; i++) {
-                const sp<LayerBase>& layer(previousLayers[i]);
+                const sp<LayerBase> layer(previousLayers[i]);
                 if (currentLayers.indexOf( layer ) < 0) {
                     // this layer is not visible anymore
                     ditchedLayers.add(layer);
@@ -786,7 +786,7 @@ void SurfaceFlinger::computeVisibleRegions(
 
     size_t i = currentLayers.size();
     while (i--) {
-        const sp<LayerBase>& layer = currentLayers[i];
+        const sp<LayerBase> layer = currentLayers[i];
         layer->validateVisibility(planeTransform);
 
         // start with the whole surface at its current location
@@ -904,7 +904,7 @@ void SurfaceFlinger::commitTransaction()
     mTransactionCV.broadcast();
 }
 
-void SurfaceFlinger::setBypassLayer(const sp<LayerBase>& layer)
+void SurfaceFlinger::setBypassLayer(const sp<LayerBase> layer)
 {
     // if this layer is already the bypass layer, do nothing
     sp<Layer> cur(mBypassLayer.promote());
@@ -955,7 +955,7 @@ void SurfaceFlinger::handlePageFlip()
             sp<LayerBase> bypassLayer;
             const size_t numVisibleLayers = mVisibleLayersSortedByZ.size();
             if (numVisibleLayers == 1) {
-                const sp<LayerBase>& candidate(mVisibleLayersSortedByZ[0]);
+                const sp<LayerBase> candidate(mVisibleLayersSortedByZ[0]);
                 const Region& visibleRegion(candidate->visibleRegionScreen);
                 const Region reminder(screenRegion.subtract(visibleRegion));
                 if (reminder.isEmpty()) {
@@ -980,7 +980,7 @@ bool SurfaceFlinger::lockPageFlip(const LayerVector& currentLayers)
     size_t count = currentLayers.size();
     sp<LayerBase> const* layers = currentLayers.array();
     for (size_t i=0 ; i<count ; i++) {
-        const sp<LayerBase>& layer(layers[i]);
+        const sp<LayerBase> layer(layers[i]);
         layer->lockPageFlip(recomputeVisibleRegions);
     }
     return recomputeVisibleRegions;
@@ -993,7 +993,7 @@ void SurfaceFlinger::unlockPageFlip(const LayerVector& currentLayers)
     size_t count = currentLayers.size();
     sp<LayerBase> const* layers = currentLayers.array();
     for (size_t i=0 ; i<count ; i++) {
-        const sp<LayerBase>& layer(layers[i]);
+        const sp<LayerBase> layer(layers[i]);
         layer->unlockPageFlip(planeTransform, mDirtyRegion);
     }
 }
@@ -1066,7 +1066,7 @@ void SurfaceFlinger::freeBypassBuffers()
     const size_t count = drawingLayers.size();
     sp<LayerBase> const* const layers = drawingLayers.array();
     for (size_t i=0 ; i<count ; ++i) {
-        const sp<LayerBase>& layer(layers[i]);
+        const sp<LayerBase> layer(layers[i]);
         layer->freeBypassBuffers();
     }
 #endif
@@ -1088,7 +1088,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 #if defined(TARGET_USES_OVERLAY)
     for (size_t i = 0; ((i < count)  &&
           (compcount <= 1 || layerbuffercount <= 1 || s3dLayerCount <= 1)); ++i) {
-        const sp<LayerBase>& layer = layers[i];
+        const sp<LayerBase> layer = layers[i];
         const Region& visibleRegion(layer->visibleRegionScreen);
         if (!visibleRegion.isEmpty()) {
             const Region clip(dirty.intersect(visibleRegion));
@@ -1157,7 +1157,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 
         if (canUseOverlayToDraw) {
             if (layerbuffercount) {
-                const sp<LayerBase>& layer = layers[drawLayerIndex];
+                const sp<LayerBase> layer = layers[drawLayerIndex];
                 status_t err = NO_ERROR;
                 if ((err = layer->drawWithOverlay(drawClip, mHDMIOutput))
                             == NO_ERROR) {
@@ -1184,7 +1184,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     }
 
     for (size_t i=0 ; i<count ; ++i) {
-        const sp<LayerBase>& layer(layers[i]);
+        const sp<LayerBase> layer(layers[i]);
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
                 if ((getOverlayEngine() != NULL) && layer->getStereoscopic3DFormat()) {
@@ -1337,7 +1337,7 @@ void SurfaceFlinger::debugShowFPS() const
     // XXX: mFPS has the value we want
  }
 
-status_t SurfaceFlinger::addLayer(const sp<LayerBase>& layer)
+status_t SurfaceFlinger::addLayer(const sp<LayerBase> layer)
 {
     Mutex::Autolock _l(mStateLock);
     addLayer_l(layer);
@@ -1345,14 +1345,14 @@ status_t SurfaceFlinger::addLayer(const sp<LayerBase>& layer)
     return NO_ERROR;
 }
 
-status_t SurfaceFlinger::addLayer_l(const sp<LayerBase>& layer)
+status_t SurfaceFlinger::addLayer_l(const sp<LayerBase> layer)
 {
     ssize_t i = mCurrentState.layersSortedByZ.add(layer);
     return (i < 0) ? status_t(i) : status_t(NO_ERROR);
 }
 
-ssize_t SurfaceFlinger::addClientLayer(const sp<Client>& client,
-        const sp<LayerBaseClient>& lbc)
+ssize_t SurfaceFlinger::addClientLayer(const sp<Client> client,
+        const sp<LayerBaseClient> lbc)
 {
     Mutex::Autolock _l(mStateLock);
 
@@ -1365,7 +1365,7 @@ ssize_t SurfaceFlinger::addClientLayer(const sp<Client>& client,
     return name;
 }
 
-status_t SurfaceFlinger::removeLayer(const sp<LayerBase>& layer)
+status_t SurfaceFlinger::removeLayer(const sp<LayerBase> layer)
 {
     Mutex::Autolock _l(mStateLock);
     status_t err = purgatorizeLayer_l(layer);
@@ -1374,7 +1374,7 @@ status_t SurfaceFlinger::removeLayer(const sp<LayerBase>& layer)
     return err;
 }
 
-status_t SurfaceFlinger::removeLayer_l(const sp<LayerBase>& layerBase)
+status_t SurfaceFlinger::removeLayer_l(const sp<LayerBase> layerBase)
 {
     sp<LayerBaseClient> lbc(layerBase->getLayerBaseClient());
     if (lbc != 0) {
@@ -1388,7 +1388,7 @@ status_t SurfaceFlinger::removeLayer_l(const sp<LayerBase>& layerBase)
     return status_t(index);
 }
 
-status_t SurfaceFlinger::purgatorizeLayer_l(const sp<LayerBase>& layerBase)
+status_t SurfaceFlinger::purgatorizeLayer_l(const sp<LayerBase> layerBase)
 {
     // remove the layer from the main list (through a transaction).
     ssize_t err = removeLayer_l(layerBase);
@@ -1402,7 +1402,7 @@ status_t SurfaceFlinger::purgatorizeLayer_l(const sp<LayerBase>& layerBase)
     return (err == NAME_NOT_FOUND) ? status_t(NO_ERROR) : err;
 }
 
-status_t SurfaceFlinger::invalidateLayerVisibility(const sp<LayerBase>& layer)
+status_t SurfaceFlinger::invalidateLayerVisibility(const sp<LayerBase> layer)
 {
     layer->forceVisibilityTransaction();
     setTransactionFlags(eTraversalNeeded);
@@ -1531,7 +1531,7 @@ void SurfaceFlinger::setActionSafeHeightRatio(float asHeightRatio){
 #endif
 }
 
-sp<ISurface> SurfaceFlinger::createSurface(const sp<Client>& client, int pid,
+sp<ISurface> SurfaceFlinger::createSurface(const sp<Client> client, int pid,
         const String8& name, ISurfaceComposerClient::surface_data_t* params,
         DisplayID d, uint32_t w, uint32_t h, PixelFormat format,
         uint32_t flags)
@@ -1589,7 +1589,7 @@ sp<ISurface> SurfaceFlinger::createSurface(const sp<Client>& client, int pid,
 }
 
 sp<Layer> SurfaceFlinger::createNormalSurface(
-        const sp<Client>& client, DisplayID display,
+        const sp<Client> client, DisplayID display,
         uint32_t w, uint32_t h, uint32_t flags,
         PixelFormat& format)
 {
@@ -1629,7 +1629,7 @@ sp<Layer> SurfaceFlinger::createNormalSurface(
 }
 
 sp<LayerBlur> SurfaceFlinger::createBlurSurface(
-        const sp<Client>& client, DisplayID display,
+        const sp<Client> client, DisplayID display,
         uint32_t w, uint32_t h, uint32_t flags)
 {
     sp<LayerBlur> layer = new LayerBlur(this, display, client);
@@ -1638,7 +1638,7 @@ sp<LayerBlur> SurfaceFlinger::createBlurSurface(
 }
 
 sp<LayerDim> SurfaceFlinger::createDimSurface(
-        const sp<Client>& client, DisplayID display,
+        const sp<Client> client, DisplayID display,
         uint32_t w, uint32_t h, uint32_t flags)
 {
     sp<LayerDim> layer = new LayerDim(this, display, client);
@@ -1647,7 +1647,7 @@ sp<LayerDim> SurfaceFlinger::createDimSurface(
 }
 
 sp<LayerBuffer> SurfaceFlinger::createPushBuffersSurface(
-        const sp<Client>& client, DisplayID display,
+        const sp<Client> client, DisplayID display,
         uint32_t w, uint32_t h, uint32_t flags)
 {
     sp<LayerBuffer> layer = new LayerBuffer(this, display, client);
@@ -1655,7 +1655,7 @@ sp<LayerBuffer> SurfaceFlinger::createPushBuffersSurface(
     return layer;
 }
 
-status_t SurfaceFlinger::removeSurface(const sp<Client>& client, SurfaceID sid)
+status_t SurfaceFlinger::removeSurface(const sp<Client> client, SurfaceID sid)
 {
     /*
      * called by the window manager, when a surface should be marked for
@@ -1678,7 +1678,7 @@ status_t SurfaceFlinger::removeSurface(const sp<Client>& client, SurfaceID sid)
     return err;
 }
 
-status_t SurfaceFlinger::destroySurface(const sp<LayerBaseClient>& layer)
+status_t SurfaceFlinger::destroySurface(const sp<LayerBaseClient> layer)
 {
     // called by ~ISurface() when all references are gone
     
@@ -1687,7 +1687,7 @@ status_t SurfaceFlinger::destroySurface(const sp<LayerBaseClient>& layer)
         sp<LayerBaseClient> layer;
     public:
         MessageDestroySurface(
-                SurfaceFlinger* flinger, const sp<LayerBaseClient>& layer)
+                SurfaceFlinger* flinger, const sp<LayerBaseClient> layer)
             : flinger(flinger), layer(layer) { }
         virtual bool handler() {
             sp<LayerBaseClient> l(layer);
@@ -1713,7 +1713,7 @@ status_t SurfaceFlinger::destroySurface(const sp<LayerBaseClient>& layer)
 }
 
 status_t SurfaceFlinger::setClientState(
-        const sp<Client>& client,
+        const sp<Client> client,
         int32_t count,
         const layer_state_t* states)
 {
@@ -1820,7 +1820,7 @@ status_t SurfaceFlinger::dump(int fd, const Vector<String16>& args)
         const LayerVector& currentLayers = mCurrentState.layersSortedByZ;
         const size_t count = currentLayers.size();
         for (size_t i=0 ; i<count ; i++) {
-            const sp<LayerBase>& layer(currentLayers[i]);
+            const sp<LayerBase> layer(currentLayers[i]);
             layer->dump(result, buffer, SIZE);
             const Layer::State& s(layer->drawingState());
             s.transparentRegion.dump(result, "transparentRegion");
@@ -2009,7 +2009,7 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(DisplayID dpy,
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
     const size_t count = layers.size();
     for (size_t i=0 ; i<count ; ++i) {
-        const sp<LayerBase>& layer(layers[i]);
+        const sp<LayerBase> layer(layers[i]);
         layer->drawForSreenShot();
     }
 
@@ -2551,7 +2551,7 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
             const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
             const size_t count = layers.size();
             for (size_t i=0 ; i<count ; ++i) {
-                const sp<LayerBase>& layer(layers[i]);
+                const sp<LayerBase> layer(layers[i]);
                 layer->drawForSreenShot();
             }
 
@@ -2661,7 +2661,7 @@ status_t SurfaceFlinger::captureScreen(DisplayID dpy,
 
 // ---------------------------------------------------------------------------
 
-sp<Layer> SurfaceFlinger::getLayer(const sp<ISurface>& sur) const
+sp<Layer> SurfaceFlinger::getLayer(const sp<ISurface> sur) const
 {
     sp<Layer> result;
     Mutex::Autolock _l(mStateLock);
@@ -2671,7 +2671,7 @@ sp<Layer> SurfaceFlinger::getLayer(const sp<ISurface>& sur) const
 
 // ---------------------------------------------------------------------------
 
-Client::Client(const sp<SurfaceFlinger>& flinger)
+Client::Client(const sp<SurfaceFlinger> flinger)
     : mFlinger(flinger), mNameGenerator(1)
 {
 }
@@ -2691,7 +2691,7 @@ status_t Client::initCheck() const {
     return NO_ERROR;
 }
 
-ssize_t Client::attachLayer(const sp<LayerBaseClient>& layer)
+ssize_t Client::attachLayer(const sp<LayerBaseClient> layer)
 {
     int32_t name = android_atomic_inc(&mNameGenerator);
     mLayers.add(name, layer);
@@ -2722,7 +2722,7 @@ sp<LayerBaseClient> Client::getLayerUser(int32_t i) const {
 sp<IMemoryHeap> Client::getControlBlock() const {
     return 0;
 }
-ssize_t Client::getTokenForSurface(const sp<ISurface>& sur) const {
+ssize_t Client::getTokenForSurface(const sp<ISurface> sur) const {
     return -1;
 }
 sp<ISurface> Client::createSurface(
@@ -2743,7 +2743,7 @@ status_t Client::setState(int32_t count, const layer_state_t* states) {
 
 // ---------------------------------------------------------------------------
 
-UserClient::UserClient(const sp<SurfaceFlinger>& flinger)
+UserClient::UserClient(const sp<SurfaceFlinger> flinger)
     : ctrlblk(0), mBitmap(0), mFlinger(flinger)
 {
     const int pgsize = getpagesize();
@@ -2797,7 +2797,7 @@ sp<IMemoryHeap> UserClient::getControlBlock() const {
     return mCblkHeap;
 }
 
-ssize_t UserClient::getTokenForSurface(const sp<ISurface>& sur) const
+ssize_t UserClient::getTokenForSurface(const sp<ISurface> sur) const
 {
     int32_t name = NAME_NOT_FOUND;
     sp<Layer> layer(mFlinger->getLayer(sur));

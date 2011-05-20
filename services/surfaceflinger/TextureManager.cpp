@@ -132,7 +132,7 @@ bool TextureManager::isYuvFormat(int format)
 }
 
 status_t TextureManager::initEglImage(Image* pImage,
-        EGLDisplay dpy, const sp<GraphicBuffer>& buffer)
+        EGLDisplay dpy, const sp<GraphicBuffer> buffer)
 {
     status_t err = NO_ERROR;
     if (!pImage->dirty) return err;
