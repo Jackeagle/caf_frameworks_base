@@ -909,6 +909,8 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
             int y = bounds.top;
             int w = bounds.width();
             int h = bounds.height();
+            int currX = x, currY= y;
+            uint32_t currW = w, currH = h;
             if (mOverlay) {
                 overlay_control_device_t* overlay_dev = mOverlayDevice;
                 // we need to combine the layer orientation and the
@@ -917,7 +919,9 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
                         Transform(mOrientation));
                 overlay_dev->setParameter(overlay_dev, mOverlay,
                         OVERLAY_TRANSFORM, finalTransform.getOrientation() | mFlip);
-                overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
+                overlay_dev->getPosition(overlay_dev, mOverlay, &currX, &currY, &currW, &currH);
+                if((x != currX) || (y != currY) || (w != currW) || (h != currH))
+                    overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
                 overlay_dev->commit(overlay_dev, mOverlay);
             }
         }
