@@ -17,12 +17,21 @@
 
 #define DBUS_ADAPTER_IFACE BLUEZ_DBUS_BASE_IFC ".Adapter"
 #define DBUS_DEVICE_IFACE BLUEZ_DBUS_BASE_IFC ".Device"
+#define DBUS_CHARACTERISTIC_IFACE BLUEZ_DBUS_BASE_IFC ".Characteristic"
 #define LOG_TAG "BluetoothService.cpp"
 
 #include "android_bluetooth_common.h"
 #include "android_runtime/AndroidRuntime.h"
 #include "JNIHelp.h"
 #include "jni.h"
+
+
+//#undef NDEBUG
+
+//#define LOG_NIDEBUG 0
+//#define LOG_NDEBUG 0
+//#define LOG_NDDEBUG 0
+
 #include "utils/Log.h"
 #include "utils/misc.h"
 
@@ -69,7 +78,7 @@ extern DBusHandlerResult agent_event_filter(DBusConnection *conn,
 void onCreatePairedDeviceResult(DBusMessage *msg, void *user, void *nat);
 void onDiscoverServicesResult(DBusMessage *msg, void *user, void *nat);
 void onCreateDeviceResult(DBusMessage *msg, void *user, void *nat);
-
+void onDiscoverCharacteristicsResult(DBusMessage *msg, void *user, void *nat);
 
 /** Get native data stored in the opaque (Java code maintained) pointer mNativeData
  *  Perform quick sanity check, if there are any problems return NULL
@@ -199,6 +208,10 @@ static jstring getAdapterPathNative(JNIEnv *env, jobject object) {
 
 static jboolean startDiscoveryNative(JNIEnv *env, jobject object) {
     LOGV(__FUNCTION__);
+
+
+    LOGE("%s JNI LAyer", __FUNCTION__);
+
 #ifdef HAVE_BLUETOOTH
     DBusMessage *msg = NULL;
     DBusMessage *reply = NULL;
@@ -1050,6 +1063,170 @@ static jstring findDeviceNative(JNIEnv *env, jobject object,
 	return NULL;
 }
 
+static jobjectArray getGattServicePropertiesNative(JNIEnv *env, jobject object, jstring path) {
+    LOGV(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *msg, *reply;
+        DBusError err;
+        dbus_error_init(&err);
+
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        reply = dbus_func_args_timeout(env,
+                                   nat->conn, -1, c_path,
+                                   DBUS_CHARACTERISTIC_IFACE, "GetProperties",
+                                   DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+
+        if (!reply) {
+            if (dbus_error_is_set(&err)) {
+                LOG_AND_FREE_DBUS_ERROR(&err);
+            } else
+                LOGE("DBus reply is NULL in function %s", __FUNCTION__);
+            return NULL;
+        }
+        env->PushLocalFrame(PROPERTIES_NREFS);
+
+        DBusMessageIter iter;
+        jobjectArray str_array = NULL;
+        if (dbus_message_iter_init(reply, &iter))
+            str_array =  parse_gatt_service_properties(env, &iter);
+        dbus_message_unref(reply);
+
+        env->PopLocalFrame(NULL);
+
+        return str_array;
+    }
+#endif
+    return NULL;
+}
+
+static jboolean discoverCharacteristicsNative(JNIEnv *env, jobject object,
+                                              jstring path) {
+    LOGV(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+
+    if (nat && eventLoopNat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        int len = env->GetStringLength(path) + 1;
+        char *context_path = (char *)calloc(len, sizeof(char));
+        strlcpy(context_path, c_path, len);  // for callback
+
+        LOGV("... Object Path = %s", c_path);
+        LOGE(" %s .. Object Path = %s\n",  __FUNCTION__, c_path);
+
+        bool ret = dbus_func_args_async(env, nat->conn, -1,
+                                        onDiscoverCharacteristicsResult,
+                                        context_path,
+                                        eventLoopNat,
+                                        c_path,
+                                        DBUS_CHARACTERISTIC_IFACE,
+                                        "DiscoverCharacteristics",
+                                        DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+
+static jobjectArray getCharacteristicPropertiesNative(JNIEnv *env, jobject object, jstring path) {
+    LOGV(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *msg, *reply;
+        DBusError err;
+        dbus_error_init(&err);
+
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        reply = dbus_func_args_timeout(env,
+                                   nat->conn, -1, c_path,
+                                   DBUS_CHARACTERISTIC_IFACE, "GetProperties",
+                                   DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+
+        if (!reply) {
+            if (dbus_error_is_set(&err)) {
+                LOG_AND_FREE_DBUS_ERROR(&err);
+            } else
+                LOGE("DBus reply is NULL in function %s", __FUNCTION__);
+            return NULL;
+        }
+        env->PushLocalFrame(PROPERTIES_NREFS);
+
+        DBusMessageIter iter;
+        jobjectArray str_array = NULL;
+        if (dbus_message_iter_init(reply, &iter))
+            str_array =  parse_gatt_characteristic_properties(env, &iter);
+        dbus_message_unref(reply);
+
+        env->PopLocalFrame(NULL);
+
+        return str_array;
+    }
+#endif
+    return NULL;
+}
+
+static jboolean registerCharacteristicsWatcherNative(JNIEnv *env, jobject object,
+                                              jstring path) {
+    LOGV(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        char *c_watcher_path = "/android/bluetooth/watcher";
+
+        LOGV("... Object Path = %s", c_path);
+        LOGE(" %s .. Object Path = %s\n",  __FUNCTION__, c_path);
+        LOGE(" %s .. Watcher Path = %s\n",  __FUNCTION__, c_watcher_path);
+
+        DBusMessage *reply = dbus_func_args(env, nat->conn,
+                                            c_path,
+                                            DBUS_CHARACTERISTIC_IFACE, "RegisterCharacteristicsWatcher",
+                                            DBUS_TYPE_OBJECT_PATH, &c_watcher_path,
+                                            DBUS_TYPE_INVALID);
+
+        env->ReleaseStringUTFChars(path, c_path);
+        return reply ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+static jboolean deregisterCharacteristicsWatcherNative(JNIEnv *env, jobject object,
+                                              jstring path) {
+    LOGV(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        char *c_watcher_path = "/android/bluetooth/watcher";
+
+        LOGV("... Object Path = %s", c_path);
+        LOGE(" %s .. Object Path = %s\n",  __FUNCTION__, c_path);
+        LOGE(" %s .. Watcher Path = %s\n",  __FUNCTION__, c_watcher_path);
+
+        DBusMessage *reply = dbus_func_args(env, nat->conn,
+                                            c_path,
+                                            DBUS_CHARACTERISTIC_IFACE, "UnregisterCharacteristicsWatcher",
+                                            DBUS_TYPE_OBJECT_PATH, &c_watcher_path,
+                                            DBUS_TYPE_INVALID);
+
+        env->ReleaseStringUTFChars(path, c_path);
+        return reply ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 static JNINativeMethod sMethods[] = {
      /* name, signature, funcPtr */
     {"classInitNative", "()V", (void*)classInitNative},
@@ -1101,6 +1278,11 @@ static JNINativeMethod sMethods[] = {
     {"removeServiceRecordNative", "(I)Z", (void *)removeServiceRecordNative},
     {"setLinkTimeoutNative", "(Ljava/lang/String;I)Z", (void *)setLinkTimeoutNative},
     {"findDeviceNative", "(Ljava/lang/String;)Ljava/lang/String;", (void*)findDeviceNative},
+    {"getGattServicePropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getGattServicePropertiesNative},
+    {"discoverCharacteristicsNative", "(Ljava/lang/String;)Z", (void*)discoverCharacteristicsNative},
+    {"getCharacteristicPropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getCharacteristicPropertiesNative},
+    {"registerCharacteristicsWatcherNative", "(Ljava/lang/String;)Z", (void*)registerCharacteristicsWatcherNative},
+    {"deregisterCharacteristicsWatcherNative", "(Ljava/lang/String;)Z", (void*)deregisterCharacteristicsWatcherNative},
 };
 
 int register_android_server_BluetoothService(JNIEnv *env) {

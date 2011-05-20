@@ -18,7 +18,14 @@
 #define ANDROID_BLUETOOTH_COMMON_H
 
 // Set to 0 to enable verbose bluetooth logging
-#define LOG_NDEBUG 1
+//#define LOG_NDEBUG 1
+
+
+//#undef NDEBUG
+
+//#define LOG_NIDEBUG 0
+//#define LOG_NDEBUG 0
+//#define LOG_NDDEBUG 0
 
 #include "jni.h"
 #include "utils/Log.h"
@@ -160,6 +167,8 @@ jobjectArray parse_property_change(JNIEnv *env, DBusMessage *msg,
                                    Properties *properties, int max_num_properties);
 jobjectArray parse_adapter_properties(JNIEnv *env, DBusMessageIter *iter);
 jobjectArray parse_remote_device_properties(JNIEnv *env, DBusMessageIter *iter);
+jobjectArray parse_gatt_service_properties(JNIEnv *env, DBusMessageIter *iter);
+jobjectArray parse_gatt_characteristic_properties(JNIEnv *env, DBusMessageIter *iter);
 jobjectArray parse_remote_device_property_change(JNIEnv *env, DBusMessage *msg);
 jobjectArray parse_adapter_property_change(JNIEnv *env, DBusMessage *msg);
 void append_variant(DBusMessageIter *iter, int type, void *val);

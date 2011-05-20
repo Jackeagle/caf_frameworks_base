@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import java.util.Set;
  */
 class BluetoothEventLoop {
     private static final String TAG = "BluetoothEventLoop";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
 
     private int mNativeData;
     private Thread mThread;
@@ -144,6 +144,7 @@ class BluetoothEventLoop {
         mBluetoothService.addRemoteDeviceProperties(address, properties);
         String rssi = mBluetoothService.getRemoteDeviceProperty(address, "RSSI");
         String classValue = mBluetoothService.getRemoteDeviceProperty(address, "Class");
+        String devType = mBluetoothService.getRemoteDeviceProperty(address, "Type");
         String name = mBluetoothService.getRemoteDeviceProperty(address, "Name");
         short rssiValue;
         // For incoming connections, we don't get the RSSI value. Use a default of MIN_VALUE.
@@ -162,6 +163,18 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
 
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        } else if (devType != null)  {
+            if (DBG) log("Device type: " + devType);
+            if ("LE".equals(devType)){
+                Intent intent = new Intent(BluetoothDevice.ACTION_FOUND);
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
+                intent.putExtra(BluetoothDevice.EXTRA_RSSI, rssiValue);
+                intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
+
+                mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+
+            }
+
         } else {
             log ("ClassValue: " + classValue + " for remote device: " + address + " is null");
         }
@@ -201,6 +214,7 @@ class BluetoothEventLoop {
         String address = mBluetoothService.getAddressFromObjectPath(deviceObjectPath);
         if (!mBluetoothService.isRemoteDeviceInCache(address)) {
             // Incoming connection, we haven't seen this device, add to cache.
+
             String[] properties = mBluetoothService.getRemoteDeviceProperties(address);
             if (properties != null) {
                 addDevice(address, properties);
@@ -225,6 +239,7 @@ class BluetoothEventLoop {
             mBluetoothService.getAllProperties();
         }
         String name = propValues[0];
+
         if (name.equals("Name")) {
             mBluetoothService.setProperty(name, propValues[1]);
             Intent intent = new Intent(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED);
@@ -291,7 +306,7 @@ class BluetoothEventLoop {
             return;
         }
         if (DBG) {
-            log("Device property changed:" + address + "property:" + name);
+            log("Device property changed:" + address + ", property: " + name);
         }
         BluetoothDevice device = mAdapter.getRemoteDevice(address);
         if (name.equals("Name")) {
@@ -346,6 +361,21 @@ class BluetoothEventLoop {
             mBluetoothService.updateDeviceServiceChannelCache(address);
 
             mBluetoothService.sendUuidIntent(address);
+        } else if (name.equals("Services")) {
+            String services = null;
+            int len = Integer.valueOf(propValues[1]);
+            if (len > 0) {
+                StringBuilder str = new StringBuilder();
+                for (int i = 2; i < propValues.length; i++) {
+                    str.append(propValues[i]);
+                    str.append(",");
+                }
+                services = str.toString();
+            }
+            mBluetoothService.setRemoteDeviceProperty(address, name, services);
+
+            //TODO: maybe we should send GATT intent here...
+
         } else if (name.equals("Paired")) {
             if (propValues[1].equals("true")) {
                 // If locally initiated pairing, we will
@@ -608,6 +638,7 @@ class BluetoothEventLoop {
             break;
         case CREATE_DEVICE_SUCCESS:
             // nothing to do, UUID intent's will be sent via property changed
+
         }
     }
 
@@ -617,6 +648,19 @@ class BluetoothEventLoop {
                        "restarting Bluetooth ***");
             mHandler.sendEmptyMessage(EVENT_RESTART_BLUETOOTH);
         }
+    }
+
+    private void onDiscoverCharacteristicsResult(String serviceObjectPath, boolean result) {
+
+        if (result) {
+            mBluetoothService.updateGattServicePropertiesCache(serviceObjectPath);
+        }
+        mBluetoothService.makeDiscoverCharacteristicsCallback(serviceObjectPath);
+    }
+
+    private void onWatcherValueChanged(String serviceObjectPath, byte[] characteristicValue) {
+        // TODO: Send this to upper layer
+
     }
 
     private static void log(String msg) {

@@ -19,6 +19,7 @@ package android.bluetooth;
 
 import android.bluetooth.IBluetoothCallback;
 import android.os.ParcelUuid;
+import android.bluetooth.IBluetoothGattService;
 
 /**
  * System private API for talking with the Bluetooth service.
@@ -84,4 +85,11 @@ interface IBluetooth
     int getEffectiveAmpPolicy(in int policy);
     boolean setDesiredAmpPolicy(in int handle, in int policy);
     void setUseWifiForBtTransfers(in boolean useWifi);
+
+    boolean getGattServices(in String address, in ParcelUuid uuid);
+    String getGattServiceName(in String path);
+    boolean discoverCharacteristics(in String path, in IBluetoothGattService gattCallback);
+    String[] getCharacteristicProperties(in String path);
+    boolean registerCharacteristicsWatcher(in String path);
+    boolean deregisterCharacteristicsWatcher(in String path);
 }
