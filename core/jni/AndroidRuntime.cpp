@@ -1280,6 +1280,12 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_server_BluetoothService),
     REG_JNI(register_android_server_BluetoothEventLoop),
     REG_JNI(register_android_server_BluetoothA2dpService),
+    /* TI HID port - start */
+#ifdef OMAP_ENHANCEMENT
+     REG_JNI(register_android_server_BluetoothHidService),
+#endif
+    /* TI HID port - end */
+
     REG_JNI(register_android_server_Watchdog),
     REG_JNI(register_android_message_digest_sha1),
     REG_JNI(register_android_ddm_DdmHandleNativeHeap),
