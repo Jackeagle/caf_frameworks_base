@@ -103,7 +103,7 @@ static int use_wal_mode (char const *path8)
          "telephony.db","launcher.db","user_dict.db",\
          "downloads.db", "mmssms.db", "internal.db", \
          "EmailProvider.db","alarms.db","EmailProviderBody.db",\
-         "btopp.db","picasa.db","webview.db",\
+         "btopp.db","picasa.db","webview.db","rlbencmark.db", \
          "webviewCache.db","browser.db","quadrant.db", NULL};
 
     for (i = 0 ; wal_dbs[i]!= NULL ; i++) {
