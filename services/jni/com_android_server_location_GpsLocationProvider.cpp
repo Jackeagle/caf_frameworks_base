@@ -610,9 +610,9 @@ static void android_location_GpsLocationProvider_update_network_state(JNIEnv* en
             interface->update_network_state(connected, type, roaming, NULL);
         }
 
-        if (interface->update_network_vailability) {
+        if (interface->update_network_availability) {
             const char *c_apn = env->GetStringUTFChars(apn, NULL);
-            interface->update_network_vailability(available, c_apn);
+            interface->update_network_availability(available, c_apn);
             env->ReleaseStringUTFChars(apn, c_apn);
         }
     }
