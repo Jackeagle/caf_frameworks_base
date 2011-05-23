@@ -41,7 +41,6 @@ enum {
     kKeySampleRate        = 'srte',  // int32_t (also video frame rate)
     kKeyBitRate           = 'brte',  // int32_t (bps)
     kKeyESDS              = 'esds',  // raw data
-    kKeyACC               = 'acc' ,
     kKeyAVCC              = 'avcc',  // raw data
     kKeyVorbisInfo        = 'vinf',  // raw data
     kKeyVorbisBooks       = 'vboo',  // raw data
@@ -123,11 +122,15 @@ enum {
     // 3D Video Flag
     kKey3D                = '3Dvf',  // bool (int32_t)
     kKeyHFR               = 'hfr ',  // int32_t
+    kKeyLatitude          = 'lati',  // int32_t
+    kKeyLongitude         = 'logi',  // int32_t
+    kKeyAacCodecSpecificData = 'acsd' ,
+    // for AAC specific type ADTS or ADIF
+    kkeyAacFormatAdif     = 'adif', // bool (int32_t)
 };
 
 enum {
     kTypeESDS        = 'esds',
-    kTypeAAC         = 'acc',
     kTypeAVCC        = 'avcc',
 };
 

@@ -112,7 +112,7 @@ status_t AACDecoder::initCheck() {
             return ERROR_UNSUPPORTED;
         }
     }
-    if(meta->findData(kKeyACC, &type, &data, &size)) {
+    if(meta->findData(kKeyAacCodecSpecificData, &type, &data, &size)) {
       mConfig->pInputBuffer = (UChar *)data;
       mConfig->inputBufferCurrentLength = size;
       mConfig->inputBufferMaxLength = 0;
