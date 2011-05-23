@@ -140,14 +140,9 @@ status_t MetadataRetrieverClient::setDataSource(const char *url)
     char curr_target[128] = {0};
     char target[] = "msm8660_";
     property_get("ro.product.device", curr_target, "0");
-    if(!strncmp(target, curr_target, sizeof(target) - 1)) {
-        char extension[] = ".3g2";
-        int lenURL = strlen(url);
-        int len = strlen(extension);
-        int start = lenURL - len;
-        if (start > 0 && (!strncasecmp(url + start, extension, len))) {
-            playerType =  STAGEFRIGHT_PLAYER;
-        }
+    if((!strncmp(target, curr_target, sizeof(target) - 1)) && (playerType == PV_PLAYER)) {
+        LOGW("Switch to Stagefright Player if PV player is returned in Metadata retriever");
+        playerType = STAGEFRIGHT_PLAYER;
     }
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
@@ -184,6 +179,13 @@ status_t MetadataRetrieverClient::setDataSource(int fd, int64_t offset, int64_t 
     }
     player_type playerType;
     playerType = getPlayerType(fd, offset, length);
+    char curr_target[128] = {0};
+    char target[] = "msm8660_";
+    property_get("ro.product.device", curr_target, "0");
+    if((!strncmp(target, curr_target, sizeof(target) - 1)) && (playerType == PV_PLAYER)) {
+        LOGW("Switch to Stagefright Player if PV player is returned in Metadata retriever");
+        playerType = STAGEFRIGHT_PLAYER;
+    }
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
     if (p == NULL) {
