@@ -4089,4 +4089,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
+    public int getInstanceId() {
+        return mInstanceId;
+    }
 }
