@@ -479,6 +479,11 @@ public class Watchdog extends Thread {
             // Only kill the process if the debugger is not attached.
             if(!Debug.isDebuggerConnected()) {
                if(SystemProperties.getInt("debug.watchdog.disabled", 0) == 0) {
+                  Process.sendSignal(Process.myPid(), 6);
+                  SystemClock.sleep(2000);
+                  Process.sendSignal(Process.myPid(), 6);
+                  SystemClock.sleep(2000);
+
                   Slog.w(TAG, "*** WATCHDOG KILLING SYSTEM PROCESS: " + name);
                   Process.killProcess(Process.myPid());
                   System.exit(10);
