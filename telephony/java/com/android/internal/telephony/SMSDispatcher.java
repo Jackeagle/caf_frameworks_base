@@ -581,7 +581,7 @@ public abstract class SMSDispatcher extends Handler {
                 Log.d(TAG, "SMS send failed");
             }
 
-            int ss = mPhone.getServiceState().getState();
+            int ss = mPhone.getVoiceServiceState().getState();
 
             // if IMS not registered on data and voice is not available...
             if (!isIms() && ss != ServiceState.STATE_IN_SERVICE) {
