@@ -70,6 +70,8 @@ public final class ClientSession extends ObexSession {
 
     private eventParser mEp;
 
+    private long mTotalSize = 0;
+
     public ClientSession(final ObexTransport trans) throws IOException {
         mInput = trans.openInputStream();
         mOutput = trans.openOutputStream();
@@ -540,11 +542,13 @@ public final class ClientSession extends ObexSession {
                 byte[] body = ObexHelper.updateHeaderSet(header, data);
                 if ((privateInput != null) && (body != null)) {
                     privateInput.writeBytes(body, 1);
+                    mTotalSize += (long)(body.length - 1);
                     if((body[0] == HeaderSet.END_OF_BODY) &&
                                             (header.getHeader(HeaderSet.LENGTH) == null)){
-                        header.setHeader(HeaderSet.LENGTH, (long)(body.length - 1)) ;
+                        header.setHeader(HeaderSet.LENGTH, mTotalSize);
                         if (VERBOSE) Log.v(TAG, " header.mLength : "
                                                 + header.getHeader(HeaderSet.LENGTH));
+                        mTotalSize = 0;
                     }
                 }
 
