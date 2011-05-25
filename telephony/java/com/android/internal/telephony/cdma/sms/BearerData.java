@@ -25,6 +25,9 @@ import android.util.Log;
 import android.util.SparseIntArray;
 
 import android.telephony.SmsMessage;
+import android.telephony.EmergencyMessage.Severity;
+import android.telephony.EmergencyMessage.Urgency;
+import android.telephony.EmergencyMessage.Certainty;
 
 import android.text.format.Time;
 
@@ -988,30 +991,83 @@ public final class BearerData {
         }
     }
 
-    private static boolean decodeCmaeRecordType0(UserData userdata,
-        BitwiseInputStream inStream, int recordLen)
-        throws BitwiseInputStream.AccessException {
-            int bitsLeft = recordLen * 8;
-            // C.R1001 9.1-1
-            int cmaeCharSet = inStream.read(5);
-            bitsLeft -= 5;
-            byte[] cmaeAlertTextData = inStream.readByteArray(bitsLeft);
+    private static boolean decodeCmaeRecordType0(UserData userData,
+            BitwiseInputStream inStream, int recordLen)
+    throws BitwiseInputStream.AccessException {
+        int bitsLeft = recordLen * 8;
+        // C.R1001 9.1-1
+        int cmaeCharSet = inStream.read(5);
+        bitsLeft -= 5;
+        byte[] cmaeAlertTextData = inStream.readByteArray(bitsLeft);
 
-            try {
-                switch(cmaeCharSet) {
-                    case UserData.ENCODING_7BIT_ASCII:
-                        int numChars = cmaeAlertTextData.length * 8 / 7;
-                        int fun = bitsLeft / 7;
-                        userdata.payloadStr = decode7bitAscii(cmaeAlertTextData, 0, numChars);
-                        break;
-                    default:
-                        // TODO: Add additional encodings
-                       throw new CodingException("Cmae encoding not supported: " + cmaeCharSet);
-                }
-            } catch (CodingException e) {
-                Log.e(LOG_TAG, "Cmae record type 0 coding exception: " + e);
+        try {
+            switch(cmaeCharSet) {
+                case UserData.ENCODING_7BIT_ASCII:
+                    int numChars = cmaeAlertTextData.length * 8 / 7;
+                    userData.payloadStr = decode7bitAscii(cmaeAlertTextData, 0, numChars);
+                    break;
+                default:
+                    throw new CodingException("Cmae encoding not supported: " + cmaeCharSet);
             }
-            return true;
+         } catch (CodingException e) {
+	     Log.e(LOG_TAG, "Cmae record type 0 coding exception: " + e);
+             Log.e(LOG_TAG, "Cmae record type 0 coding exception: " + e);
+         }
+        return true;
+    }
+
+    private static boolean decodeCmaeRecordType1(UserData userData,
+            BitwiseInputStream inStream, int recordLen)
+    throws BitwiseInputStream.AccessException {
+        int bitsLeft = recordLen * 8;
+        if (recordLen < 4) {
+            // This record has to be at least 4 bytes long
+            inStream.skip(bitsLeft);
+            return false;
+        }
+        // TIA 1149 4.3
+        int cmaeCategory = inStream.read(8);
+        bitsLeft -= 8;
+        int cmaeResponseType = inStream.read(8);
+        bitsLeft -= 8;
+        userData.severity = Severity.values()[inStream.read(4)];
+        bitsLeft -= 4;
+        userData.urgency = Urgency.values()[inStream.read(4)];
+        bitsLeft -= 4;
+        userData.certainty = Certainty.values()[inStream.read(4)];
+        bitsLeft -= 4;
+
+        inStream.skip(bitsLeft);
+        return true;
+    }
+
+    private static boolean decodeCmaeRecordType2(UserData userData,
+            BitwiseInputStream inStream, int recordLen)
+    throws BitwiseInputStream.AccessException {
+        int bitsLeft = recordLen * 8;
+        if (recordLen < 10) {
+            // This record has to be at least 10 bytes long
+            inStream.skip(bitsLeft);
+            return false;
+        }
+        // TIA 1149 4.3
+        int cmaeIdentifier = inStream.read(8) << 8 | inStream.read(8);
+        bitsLeft -= 16;
+        int cmaeAlertHandling = inStream.read(8);
+        bitsLeft -= 8;
+        // TIA 1149 4.3 Table 4-9
+        int cmaeExpiresYear = inStream.read(8);    //0 - 99 UTC
+        int cmaeExpiresMonth = inStream.read(8);   //1 - 12 UTC
+        int cmaeExpiresDay = inStream.read(8);     //1 - 31 UTC
+        int cmaeExpiresHours = inStream.read(8);   //0 - 23 UTC
+        int cmaeExpiresMinutes = inStream.read(8); //0 - 59 UTC
+        int cmaeExpiresSeconds = inStream.read(8); //0 - 59 UTC
+        bitsLeft -= 48;
+        userData.language = inStream.read(8); // can only be english
+        bitsLeft -= 8;
+
+        inStream.skip(bitsLeft);
+        return true;
     }
 
     private static void decodeCmasUserDataPayload(UserData userData)
@@ -1027,25 +1083,23 @@ public final class BearerData {
                         + cmaeProtocolVersion + ")");
                 }
 
-                boolean typeZeroFound = false; // Cmas user data has to have type 0 record
-                while (inStream.available() > 2 * 8) {
-                    int recordType = inStream.read(8);
-                    int recordLen = inStream.read(8);
-                    switch (recordType) {
-                        case CMAS_RECORD_TYPE_0:
-                            typeZeroFound = true;
-                            decodeCmaeRecordType0(userData, inStream, recordLen);
-                            break;
-                        case CMAS_RECORD_TYPE_1:
-                            // TODO: parse this record
-                            inStream.skip(recordLen * 8);
-                            break;
-                        case CMAS_RECORD_TYPE_2:
-                            // TODO: parse this record
-                            inStream.skip(recordLen * 8);
-                            break;
-                        default:
-                            throw new CodingException("unsupported cmas user data record type ("
+            boolean typeZeroFound = false; // Cmas user data has to have type 0 record
+            while (inStream.available() > 2 * 8) {
+                int recordType = inStream.read(8);
+                int recordLen = inStream.read(8);
+                switch (recordType) {
+                    case CMAS_RECORD_TYPE_0:
+                        typeZeroFound = true;
+                        decodeCmaeRecordType0(userData, inStream, recordLen);
+                        break;
+                    case CMAS_RECORD_TYPE_1:
+                        decodeCmaeRecordType1(userData, inStream, recordLen);
+                        break;
+                    case CMAS_RECORD_TYPE_2:
+                        decodeCmaeRecordType2(userData, inStream, recordLen);
+                        break;
+                    default:
+                        throw new CodingException("unsupported cmas user data record type ("
                                 + recordType + ")");
                     }
                 }
