@@ -39,9 +39,13 @@ LOCAL_STATIC_LIBRARIES := \
         libstagefright_rtsp
 
 ifneq ($(BUILD_WITHOUT_PV),true)
+ifeq ($(BUILD_PV_OMX_ONLY),true)
+    LOCAL_CFLAGS += -DNO_OPENCORE
+else
 LOCAL_SHARED_LIBRARIES += \
 	libopencore_player    \
 	libopencore_author
+endif
 else
 LOCAL_CFLAGS += -DNO_OPENCORE
 endif
