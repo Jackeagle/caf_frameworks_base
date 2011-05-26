@@ -73,6 +73,9 @@ public class CdmaSubscriptionSourceManager extends Handler {
     // Type of CDMA subscription source
     protected int mCdmaSubscriptionSource = RILConstants.SUBSCRIPTION_FROM_NV;
 
+    // Notify the cdma subscription source first time.
+    private boolean mNotifyCdmaSubSource = true;
+
     // Hide constructor
     private CdmaSubscriptionSourceManager(Context context, CommandsInterface ci) {
         if (context == null) {
@@ -206,15 +209,20 @@ public class CdmaSubscriptionSourceManager extends Handler {
     private void handleCdmaSubscriptionSource(AsyncResult ar) {
         if ((ar.exception == null) && (ar.result != null)) {
             int newSubscriptionSource = ((int[]) ar.result)[0];
+            boolean cdmaSubSourceChanged = false;
 
             if (newSubscriptionSource != mCdmaSubscriptionSource) {
                 Log.v(LOG_TAG, "Subscription Source Changed : " + mCdmaSubscriptionSource + " >> "
                         + newSubscriptionSource);
                 mCdmaSubscriptionSource = newSubscriptionSource;
+                cdmaSubSourceChanged = true;
+            }
 
+            if (cdmaSubSourceChanged || mNotifyCdmaSubSource) {
                 // Notify registrants of the new CDMA subscription source
                 mCdmaSubscriptionSourceChangedRegistrants.notifyRegistrants(new AsyncResult(null,
                         null, null));
+                if (mNotifyCdmaSubSource) mNotifyCdmaSubSource = false;
             }
         } else {
             // GET_CDMA_SUBSCRIPTION is returning Failure. Probably

@@ -482,6 +482,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 break;
 
             case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
+                if (mCdmaSSM.getCdmaSubscriptionSource() == Phone.CDMA_SUBSCRIPTION_NV) {
+                    mDpt.updateOperatorNumeric(mCdmaHomeOperatorNumeric,
+                            REASON_CDMA_SUBSCRIPTION_SOURCE_CHANGED);
+                }
                 updateDataConnections(REASON_CDMA_SUBSCRIPTION_SOURCE_CHANGED);
                 break;
 
@@ -590,7 +594,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         if (mDsst.mSimRecords != null) {
             mDpt.updateOperatorNumeric(mDsst.mSimRecords.getSIMOperatorNumeric(), reason);
-        } else if (mDsst.mRuimRecords != null) {
+        } else if (mDsst.mRuimRecords != null
+                && mCdmaSSM.getCdmaSubscriptionSource() == Phone.CDMA_SUBSCRIPTION_RUIM_SIM) {
             mDpt.updateOperatorNumeric(mDsst.mRuimRecords.getRUIMOperatorNumeric(), reason);
         } else {
             loge("records are loaded, but both mSimrecords & mRuimRecords are null.");
@@ -1451,7 +1456,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         if (mCheckForSubscription) {
             if (r.isGsm()
-                    || r == RadioTechnology.RADIO_TECH_EHRPD
+                    || (r == RadioTechnology.RADIO_TECH_EHRPD
+                        && mDsst.mCdmaSubscriptionSource != Phone.CDMA_SUBSCRIPTION_NV)
                     || (r.isUnknown() && mNoAutoAttach)) {
                 isReadyForData = isReadyForData && mDsst.mSimRecords != null
                     && mDsst.mSimRecords.getRecordsLoaded() && !mIsPsRestricted;
