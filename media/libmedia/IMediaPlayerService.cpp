@@ -23,11 +23,8 @@
 #include <media/IMediaPlayerService.h>
 #include <media/IMediaRecorder.h>
 #include <media/IOMX.h>
-#include <utils/Errors.h>  // for status_t
 
-#ifdef OMAP_ENHANCEMENT
-#include <media/OverlayRenderer.h>
-#endif
+#include <utils/Errors.h>  // for status_t
 
 namespace android {
 
@@ -38,10 +35,7 @@ enum {
     DECODE_FD,
     CREATE_MEDIA_RECORDER,
     CREATE_METADATA_RETRIEVER,
-    GET_OMX,
-#ifdef OMAP_ENHANCEMENT
-    GET_OVERLAY_RENDERER,
-#endif
+    GET_OMX
 };
 
 class BpMediaPlayerService: public BpInterface<IMediaPlayerService>
@@ -145,15 +139,6 @@ public:
         remote()->transact(GET_OMX, data, &reply);
         return interface_cast<IOMX>(reply.readStrongBinder());
     }
-
-#ifdef OMAP_ENHANCEMENT
-    virtual sp<IOverlayRenderer> getOverlayRenderer() {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayerService::getInterfaceDescriptor());
-        remote()->transact(GET_OVERLAY_RENDERER, data, &reply);
-        return interface_cast<IOverlayRenderer>(reply.readStrongBinder());
-    }
-#endif
 };
 
 IMPLEMENT_META_INTERFACE(MediaPlayerService, "android.media.IMediaPlayerService");
@@ -247,14 +232,6 @@ status_t BnMediaPlayerService::onTransact(
             reply->writeStrongBinder(omx->asBinder());
             return NO_ERROR;
         } break;
-#ifdef OMAP_ENHANCEMENT
-        case GET_OVERLAY_RENDERER: {
-            CHECK_INTERFACE(IMediaPlayerService, data, reply);
-            sp<IOverlayRenderer> renderer = getOverlayRenderer();
-            reply->writeStrongBinder(renderer->asBinder());
-            return NO_ERROR;
-        } break;
-#endif
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }

@@ -79,9 +79,6 @@ public:
     status_t    setAlpha(float alpha=1.0f);
     status_t    setMatrix(float dsdx, float dtdx, float dsdy, float dtdy);
     status_t    setFreezeTint(uint32_t tint);
-#ifdef OMAP_ENHANCEMENT
-    status_t    setDisplayId(int32_t displayId);
-#endif
 
     static status_t writeSurfaceToParcel(
             const sp<SurfaceControl>& control, Parcel* parcel);
@@ -104,9 +101,8 @@ private:
     // for testing
     friend class Test;
     const sp<ISurface>& getISurface() const { return mSurface; }
-#ifdef OMAP_ENHANCEMENT
-    friend class OmapMMLibrary;
-#endif
+    
+
     friend class Surface;
 
     SurfaceControl(
@@ -184,9 +180,7 @@ private:
     friend class IOMX;
     // this is just to be able to write some unit tests
     friend class Test;
-#ifdef OMAP_ENHANCEMENT
-    friend class OmapMMLibrary;
-#endif
+
 private:
     friend class SurfaceComposerClient;
     friend class SurfaceControl;

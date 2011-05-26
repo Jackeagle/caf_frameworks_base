@@ -28,7 +28,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileDescriptor;
 import java.lang.ref.WeakReference;
-import android.os.SystemProperties;
 
 /**
  * Used to record audio and video. The recording control is based on a
@@ -288,25 +287,11 @@ public class MediaRecorder
         setVideoFrameRate(profile.videoFrameRate);
         setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
         setVideoEncodingBitRate(profile.videoBitRate);
-
-        if(SystemProperties.OMAP_ENHANCEMENT) {
-            setVideoEncoder(profile.videoCodec);
-
-            if (profile.audioCodec != 0)
-            {
-                setAudioEncodingBitRate(profile.audioBitRate);
-                setAudioChannels(profile.audioChannels);
-                setAudioSamplingRate(profile.audioSampleRate);
-                setAudioEncoder(profile.audioCodec);
-            }
-            setParameter(String.format("param-use-64bit-offset=%d", 1));
-        } else {
-            setAudioEncodingBitRate(profile.audioBitRate);
-            setAudioChannels(profile.audioChannels);
-            setAudioSamplingRate(profile.audioSampleRate);
-            setVideoEncoder(profile.videoCodec);
-            setAudioEncoder(profile.audioCodec);
-        }
+        setAudioEncodingBitRate(profile.audioBitRate);
+        setAudioChannels(profile.audioChannels);
+        setAudioSamplingRate(profile.audioSampleRate);
+        setVideoEncoder(profile.videoCodec);
+        setAudioEncoder(profile.audioCodec);
     }
 
     /**

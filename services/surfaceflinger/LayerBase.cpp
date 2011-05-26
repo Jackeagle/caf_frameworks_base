@@ -515,12 +515,6 @@ void LayerBase::dump(String8& result, char* buffer, size_t SIZE) const
     result.append(buffer);
 }
 
-void LayerBase::shortDump(String8& result, char* scratch, size_t size) const
-{
-    LayerBase::dump(result, scratch, size);
-}
-
-
 // ---------------------------------------------------------------------------
 
 int32_t LayerBaseClient::sIdentity = 1;
@@ -570,12 +564,6 @@ void LayerBaseClient::dump(String8& result, char* buffer, size_t SIZE) const
             client.get(), getIdentity());
 
     result.append(buffer);
-}
-
-
-void LayerBaseClient::shortDump(String8& result, char* scratch, size_t size) const
-{
-    LayerBaseClient::dump(result, scratch, size);
 }
 
 // ---------------------------------------------------------------------------
@@ -657,26 +645,6 @@ sp<OverlayRef> LayerBaseClient::Surface::createOverlay(
 {
     return NULL;
 };
-
-#ifdef OMAP_ENHANCEMENT
-sp<OverlayRef> LayerBaseClient::Surface::createOverlay(
-        uint32_t w, uint32_t h, int32_t format, int32_t orientation, int isS3D)
-{
-    return NULL;
-};
-
-
-void LayerBaseClient::Surface::setDisplayId(int displayId)
-{
-    return;
-}
-
-int LayerBaseClient::Surface::requestOverlayClone(bool enable)
-{
-    return (-1);
-}
-
-#endif
 
 // ---------------------------------------------------------------------------
 

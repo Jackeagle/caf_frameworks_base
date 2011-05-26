@@ -63,7 +63,6 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.os.SystemProperties;
 import android.os.WorkSource;
 import android.provider.Settings;
 import android.util.Slog;
@@ -100,7 +99,6 @@ public class WifiService extends IWifiManager.Stub {
     private final WifiStateTracker mWifiStateTracker;
     /* TODO: fetch a configurable interface */
     private static final String SOFTAP_IFACE = "wl0.1";
-    private static final String TI_SOFTAP_IFACE = "tiap0";
 
     private Context mContext;
     private int mWifiApState;
@@ -685,13 +683,8 @@ public class WifiService extends IWifiManager.Stub {
             /* Configuration changed on a running access point */
             if(enable && (wifiConfig != null)) {
                 try {
-                    if(SystemProperties.OMAP_ENHANCEMENT) {
-                        nwService.setAccessPoint(wifiConfig, mWifiStateTracker.getInterfaceName(),
-                                                 TI_SOFTAP_IFACE);
-                    } else {
-                        nwService.setAccessPoint(wifiConfig, mWifiStateTracker.getInterfaceName(),
-                                                 SOFTAP_IFACE);
-                    }
+                    nwService.setAccessPoint(wifiConfig, mWifiStateTracker.getInterfaceName(),
+                                             SOFTAP_IFACE);
                     setWifiApConfiguration(wifiConfig);
                     return true;
                 } catch(Exception e) {
@@ -729,28 +722,15 @@ public class WifiService extends IWifiManager.Stub {
                 wifiConfig.allowedKeyManagement.set(KeyMgmt.NONE);
             }
 
-            if (SystemProperties.OMAP_ENHANCEMENT) {
-                if (!mWifiStateTracker.loadHotspotDriver()) {
-                    Slog.e(TAG, "Failed to load Wi-Fi driver for AP mode");
-                    setWifiApEnabledState(WIFI_AP_STATE_FAILED, uid, DriverAction.NO_DRIVER_UNLOAD);
-                    return false;
-                }
-            } else {
-                if (!mWifiStateTracker.loadDriver()) {
-                    Slog.e(TAG, "Failed to load Wi-Fi driver for AP mode");
-                    setWifiApEnabledState(WIFI_AP_STATE_FAILED, uid, DriverAction.NO_DRIVER_UNLOAD);
-                    return false;
-                }
+            if (!mWifiStateTracker.loadDriver()) {
+                Slog.e(TAG, "Failed to load Wi-Fi driver for AP mode");
+                setWifiApEnabledState(WIFI_AP_STATE_FAILED, uid, DriverAction.NO_DRIVER_UNLOAD);
+                return false;
             }
 
             try {
-                if(SystemProperties.OMAP_ENHANCEMENT) {
-                    nwService.startAccessPoint(wifiConfig, mWifiStateTracker.getInterfaceName(),
-                                               TI_SOFTAP_IFACE);
-                } else {
-                    nwService.startAccessPoint(wifiConfig, mWifiStateTracker.getInterfaceName(),
-                                               SOFTAP_IFACE);
-                }
+                nwService.startAccessPoint(wifiConfig, mWifiStateTracker.getInterfaceName(),
+                                           SOFTAP_IFACE);
             } catch(Exception e) {
                 Slog.e(TAG, "Exception in startAccessPoint()");
                 setWifiApEnabledState(WIFI_AP_STATE_FAILED, uid, DriverAction.DRIVER_UNLOAD);
@@ -769,18 +749,10 @@ public class WifiService extends IWifiManager.Stub {
                 return false;
             }
 
-            if(SystemProperties.OMAP_ENHANCEMENT) {
-                if (!mWifiStateTracker.unloadHotspotDriver()) {
-                    Slog.e(TAG, "Failed to unload Wi-Fi driver for AP mode");
-                    setWifiApEnabledState(WIFI_AP_STATE_FAILED, uid, DriverAction.NO_DRIVER_UNLOAD);
-                    return false;
-                }
-            } else {
-                if (!mWifiStateTracker.unloadDriver()) {
-                    Slog.e(TAG, "Failed to unload Wi-Fi driver for AP mode");
-                    setWifiApEnabledState(WIFI_AP_STATE_FAILED, uid, DriverAction.NO_DRIVER_UNLOAD);
-                    return false;
-                }
+            if (!mWifiStateTracker.unloadDriver()) {
+                Slog.e(TAG, "Failed to unload Wi-Fi driver for AP mode");
+                setWifiApEnabledState(WIFI_AP_STATE_FAILED, uid, DriverAction.NO_DRIVER_UNLOAD);
+                return false;
             }
         }
 
@@ -808,11 +780,7 @@ public class WifiService extends IWifiManager.Stub {
          * Unload the driver if going to a failed state
          */
         if ((mWifiApState == WIFI_AP_STATE_FAILED) && (flag == DriverAction.DRIVER_UNLOAD)) {
-            if(SystemProperties.OMAP_ENHANCEMENT) {
-                mWifiStateTracker.unloadHotspotDriver();
-            } else {
-                mWifiStateTracker.unloadDriver();
-            }
+            mWifiStateTracker.unloadDriver();
         }
 
         long ident = Binder.clearCallingIdentity();

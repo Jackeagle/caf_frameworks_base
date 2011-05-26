@@ -125,13 +125,6 @@ overlay_control_device_t* SurfaceFlinger::getOverlayEngine() const
     return graphicPlane(0).displayHardware().getOverlayEngine();
 }
 
-#ifdef OMAP_ENHANCEMENT
-PixelFormat SurfaceFlinger::getFormat() const
-{
-    return graphicPlane(0).displayHardware().getFormat();
-}
-#endif
-
 sp<IMemoryHeap> SurfaceFlinger::getCblk() const
 {
     return mServerHeap;

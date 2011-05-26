@@ -108,6 +108,7 @@ public:
     virtual     bool        getMicMute() const;
 
     virtual     bool        isStreamActive(int stream) const;
+
     virtual     status_t    setParameters(int ioHandle, const String8& keyValuePairs);
     virtual     String8     getParameters(int ioHandle, const String8& keys);
 
@@ -658,9 +659,6 @@ private:
         int                             mSuspended;
         int                             mBytesWritten;
         bool                            mMasterMute;
-#ifdef OMAP_ENHANCEMENT
-        bool                            mFmInplay;
-#endif
         SortedVector< wp<Track> >       mActiveTracks;
 
         virtual int             getTrackName_l() = 0;
@@ -1175,9 +1173,6 @@ private:
 
                 mutable     Mutex                   mHardwareLock;
                 AudioHardwareInterface*             mAudioHardware;
-#ifdef OMAP_ENHANCEMENT
-                bool                                mFmEnabled;
-#endif
     mutable     int                                 mHardwareStatus;
 
 

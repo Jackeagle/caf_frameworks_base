@@ -71,7 +71,11 @@ ifeq ($(AUDIO_POLICY_TEST),true)
   LOCAL_CFLAGS += -DAUDIO_POLICY_TEST
 endif
 
+ifeq ($(strip $(BOARD_USES_GENERIC_AUDIO)),true)
 include $(BUILD_STATIC_LIBRARY)
+else
+include $(BUILD_SHARED_LIBRARY)
+endif
 
 include $(CLEAR_VARS)
 
@@ -95,7 +99,7 @@ ifeq ($(strip $(BOARD_USES_GENERIC_AUDIO)),true)
   LOCAL_STATIC_LIBRARIES += libaudiointerface libaudiopolicybase
   LOCAL_CFLAGS += -DGENERIC_AUDIO
 else
-  LOCAL_SHARED_LIBRARIES += libaudio libaudiopolicy
+  LOCAL_SHARED_LIBRARIES += libaudio libaudiopolicy libaudiopolicybase
 endif
 
 ifeq ($(TARGET_SIMULATOR),true)

@@ -61,9 +61,6 @@
 #include "StagefrightPlayer.h"
 
 #include <OMX.h>
-#ifdef OMAP_ENHANCEMENT
-#include <media/OverlayRenderer.h>
-#endif
 
 /* desktop Linux needs a little help with gettid() */
 #if defined(HAVE_GETTID) && !defined(HAVE_ANDROID_OS)
@@ -296,18 +293,6 @@ sp<IOMX> MediaPlayerService::getOMX() {
 
     return mOMX;
 }
-
-#ifdef OMAP_ENHANCEMENT
-sp<IOverlayRenderer> MediaPlayerService::getOverlayRenderer() {
-    Mutex::Autolock autoLock(mLock);
-
-    if (mOverlayRenderer.get() == NULL) {
-        mOverlayRenderer = new OverlayRenderer;
-    }
-
-    return mOverlayRenderer;
-}
-#endif
 
 status_t MediaPlayerService::AudioCache::dump(int fd, const Vector<String16>& args) const
 {
@@ -994,16 +979,6 @@ status_t MediaPlayerService::Client::resume() {
 
     return p->resume();
 }
-
-#ifdef OMAP_ENHANCEMENT
-status_t MediaPlayerService::Client::requestVideoCloneMode(bool enable) {
-    sp<MediaPlayerBase> p = getPlayer();
-    if (p == 0) return UNKNOWN_ERROR;
-
-    return p->requestVideoCloneMode(enable);
-}
-
-#endif
 
 status_t MediaPlayerService::Client::prepareAsync()
 {
