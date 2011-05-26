@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010,2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ public class UiccCard extends Handler{
     static private CatService mCatService;
 
 
-    UiccCard(UiccManager uiccManager, UiccCardStatusResponse.CardStatus ics, Context c, CommandsInterface ci) {
+    UiccCard(UiccManager uiccManager, UiccCardStatusResponse.CardStatus ics, Context c, CommandsInterface ci, CatService catService) {
         mUiccManager = uiccManager;
         mCardState = ics.card_state;
         mUniversalPinState = ics.universal_pin_state;
@@ -67,8 +67,8 @@ public class UiccCard extends Handler{
         }
 
         if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
-            mCatService = CatService.getInstance(mCi, mUiccApplications[0].getApplicationRecords(), mContext,
-                                                 mUiccApplications[0].getIccFileHandler(), null);
+            mCatService = catService;
+            mCatService.update( mUiccApplications[0].getApplicationRecords(),mUiccApplications[0].getIccFileHandler());
         }
     }
 
