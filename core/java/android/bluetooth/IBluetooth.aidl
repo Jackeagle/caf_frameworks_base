@@ -92,4 +92,5 @@ interface IBluetooth
     String[] getCharacteristicProperties(in String path);
     boolean registerCharacteristicsWatcher(in String path);
     boolean deregisterCharacteristicsWatcher(in String path);
+    void disconnectSap();
 }
