@@ -46,6 +46,9 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.io.FileInputStream;
+import java.lang.Byte;
+import java.io.IOException;
 
 /**
  * UsbService monitors for changes to USB state.
@@ -70,6 +73,8 @@ public class UsbService extends IUsbManager.Stub {
             "/sys/class/switch/usb_configuration/state";
     private static final String USB_COMPOSITE_CLASS_PATH =
             "/sys/class/usb_composite";
+    private static final String USB_RNDIS_ENABLE =
+            "/sys/class/usb_composite/rndis/enable";
 
     private static final int MSG_UPDATE_STATE = 0;
     private static final int MSG_FUNCTION_ENABLED = 1;
@@ -78,7 +83,7 @@ public class UsbService extends IUsbManager.Stub {
     // Delay for debouncing USB disconnects.
     // We often get rapid connect/disconnect events when enabling USB functions,
     // which need debouncing.
-    private static final int UPDATE_DELAY = 1000;
+    private static final int UPDATE_DELAY = 5000;
 
     // current connected and configuration state
     private int mConnected;
@@ -306,6 +311,30 @@ public class UsbService extends IUsbManager.Stub {
         }
     }
 
+    public boolean rndisStatus(String path) {
+        byte[] value = new byte[2];
+        char status;
+        try {
+            File file = new File(path);
+            FileInputStream fis = new FileInputStream(file);
+            try {
+                int con = fis.read(value,0,1);
+            } catch (IOException e) {
+                Log.e(TAG, "unable to read file"+e);
+                return false;
+            }
+            Byte b1 = new Byte(value[0]);
+            status = (char) b1.intValue();
+            if (status == '1')
+                return true;
+            else
+                return false;
+        } catch(FileNotFoundException e) {
+            Log.e(TAG, "Exception File not found"+e);
+        }
+        return false;
+    }
+
     /*
      * Sends a message to update the USB connected and configured state (device mode).
      * If delayed is true, then we add a small delay in sending the message to debounce
@@ -313,6 +342,7 @@ public class UsbService extends IUsbManager.Stub {
      */
     private final void update(boolean delayed) {
         mHandler.removeMessages(MSG_UPDATE_STATE);
+        delayed = delayed && rndisStatus(USB_RNDIS_ENABLE);
         mHandler.sendEmptyMessageDelayed(MSG_UPDATE_STATE, delayed ? UPDATE_DELAY : 0);
     }
 
