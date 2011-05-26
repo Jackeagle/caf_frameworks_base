@@ -997,15 +997,16 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         if (hasChanged) {
             if (mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV) {
                 String eriText;
-                /*
-                 * If mobile is registered on NV, the ss.mOperatorAlphaLong is
-                 * set with the ERI text. If mobile is not registered No Service
-                 * will be shown since ss.mOperatorAlphaLong is set to null.
-                 */
+                // Now the CDMAPhone sees the new ServiceState so it can get the new ERI text
                 if (ss.getState() == ServiceState.STATE_IN_SERVICE) {
                     eriText = phone.getCdmaEriText();
-                    ss.setCdmaEriText(eriText);
+                } else {
+                    // Note that ServiceState.STATE_OUT_OF_SERVICE is valid used for
+                    // mRegistrationState 0,2,3 and 4
+                    eriText = phone.getContext().getText(
+                            com.android.internal.R.string.roamingTextSearching).toString();
                 }
+                ss.setCdmaEriText(eriText);
             }
 
             String operatorNumeric;
