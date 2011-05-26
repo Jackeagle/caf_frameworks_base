@@ -48,6 +48,7 @@ public class UiccManager extends Handler{
     private static final int EVENT_ICC_STATUS_CHANGED = 2;
     private static final int EVENT_GET_ICC_STATUS_DONE = 3;
     private static final int EVENT_RADIO_OFF_OR_UNAVAILABLE = 4;
+    private CatService[] mCatService;
 
     CommandsInterface[] mCi;
     Context mContext;
@@ -55,7 +56,6 @@ public class UiccManager extends Handler{
     private boolean mRadioOn = false;
 
     private RegistrantList mIccChangedRegistrants = new RegistrantList();
-    private CatService mCatService;
 
     public static UiccManager getInstance(Context c, CommandsInterface[] ci) {
         if (mInstance == null) {
@@ -80,6 +80,7 @@ public class UiccManager extends Handler{
         mUiccCards = new UiccCard[UiccConstants.RIL_MAX_CARDS];
         int phoneCount = TelephonyManager.getPhoneCount();
         mCi = new CommandsInterface[phoneCount];
+        mCatService = new CatService[phoneCount];
 
         mContext = c;
         for (int i = 0; i < phoneCount; i++) {
@@ -88,8 +89,7 @@ public class UiccManager extends Handler{
             mCi[i].registerForOn(this,EVENT_RADIO_ON, index);
             mCi[i].registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, index);
             mCi[i].registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, index);
-
-            mCatService = CatService.getInstance(mCi[i], null, mContext, null, null);
+            mCatService[i] = new CatService(mCi[i], null, mContext, null, i);
         }
     }
 
@@ -192,7 +192,7 @@ public class UiccManager extends Handler{
 
         //Create new card
         if (mUiccCards[index] == null && status.card != null) {
-            mUiccCards[index] = new UiccCard(this, status.card, mContext, mCi[index]);
+            mUiccCards[index] = new UiccCard(this, status.card, mContext, mCi[index], mCatService[index]);
         }
 
         Log.d(LOG_TAG, "Notifying IccChangedRegistrants");
@@ -206,8 +206,6 @@ public class UiccManager extends Handler{
             mUiccCards[index].dispose();
             mUiccCards[index] = null;
         }
-        // CatService is disposed so the instance is no longer valid
-        mCatService = null;
     }
 
     public void triggerIccStatusUpdate(Object onComplete) {
@@ -248,6 +246,11 @@ public class UiccManager extends Handler{
             }
         }
         return null;
+    }
+
+    //Gets CatService for the slotId specified.
+    public CatService getCatService(int slotId) {
+        return mCatService[slotId];
     }
 
     //Notifies when any of the cards' STATE changes (or card gets added or removed)

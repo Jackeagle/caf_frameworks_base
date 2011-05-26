@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007, 2011 The Android Open Source Project
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,17 +123,17 @@ class RilMessage {
 public class CatService extends Handler implements AppInterface {
 
     // Class members
-    private static UiccApplicationRecords mIccRecords;
+    private UiccApplicationRecords mIccRecords;
 
     // Service members.
-    private static CatService sInstance;
-    private static HandlerThread handlerThread;
+    private HandlerThread mhandlerThread;
     private CommandsInterface mCmdIf;
     private Context mContext;
     private CatCmdMessage mCurrntCmd = null;
     private CatCmdMessage mMenuCmd = null;
-
+    private int  mSlotId;
     private RilMessageDecoder mMsgDecoder = null;
+    private IconLoader mIconLoader = null;
 
     // Service constants.
     static final int MSG_ID_SESSION_END              = 1;
@@ -159,17 +160,29 @@ public class CatService extends Handler implements AppInterface {
     private static final int DEV_ID_NETWORK     = 0x83;
 
     /* Intentionally private for singleton */
-    private CatService(CommandsInterface ci, UiccApplicationRecords ir, Context context,
-            IccFileHandler fh, IccCard ic) {
+    public CatService(CommandsInterface ci, UiccApplicationRecords ir, Context context,
+            IccFileHandler fh, int slotId) {
         if (ci == null || context == null) {
             throw new NullPointerException(
                     "Service: Input parameters must not be null");
         }
         mCmdIf = ci;
         mContext = context;
+        mSlotId = slotId;
+
+        mhandlerThread = new HandlerThread("Cat Telephony service" + slotId);
+        mhandlerThread.start();
+
+        if (fh != null) {
+            CatLog.d(this, "Initialize the Service with new IccFilehandler");
+            mIconLoader = new IconLoader(fh, mSlotId);
+            if (mIconLoader == null) {
+                CatLog.d(this, "Error in initializing IconLoader");
+            }
+        }
 
         // Get the RilMessagesDecoder for decoding the messages.
-        mMsgDecoder = RilMessageDecoder.getInstance(this, fh);
+        mMsgDecoder = RilMessageDecoder.getInstance();
 
         // Register ril events handling.
         mCmdIf.setOnCatSessionEnd(this, MSG_ID_SESSION_END, null);
@@ -186,7 +199,7 @@ public class CatService extends Handler implements AppInterface {
             mIccRecords.registerForRecordsLoaded(this, MSG_ID_ICC_RECORDS_LOADED, null);
         }
         mCmdIf.reportStkServiceIsRunning(null);
-        CatLog.d(this, "Is running");
+        CatLog.d(this, "CatService on "+ mSlotId + "Is running");
     }
 
     public void dispose() {
@@ -197,9 +210,8 @@ public class CatService extends Handler implements AppInterface {
         mCmdIf.unSetOnCatCallSetUp(this);
         mCmdIf.unregisterForIccRefresh(this);
         mCmdIf.unSetOnCatCcAlphaNotify(this);
-        sInstance = null;
-        handlerThread.quit();
-        handlerThread = null;
+        mhandlerThread.quit();
+        mhandlerThread = null;
 
         this.removeCallbacksAndMessages(null);
     }
@@ -210,6 +222,29 @@ public class CatService extends Handler implements AppInterface {
         handleIccStatusChange(null);
 
         mIccRecords.unregisterForRecordsLoaded(this);
+    }
+
+    public void update(UiccApplicationRecords ir, IccFileHandler fh) {
+        if ((ir != null) && (mIccRecords != ir)) {
+            CatLog.d(this, "Reinitialize the Service with IccRecords");
+            if (mIccRecords != null) {
+                mIccRecords.unregisterForRecordsLoaded(this);
+            }
+            mIccRecords = ir;
+
+            // Register for records loaded event.
+            mIccRecords.registerForRecordsLoaded(this, MSG_ID_ICC_RECORDS_LOADED, null);
+            CatLog.d(this, "Records changed reinitialize");
+        }
+
+        if (fh != null) {
+            CatLog.d(this, "Reinitialize the Service with new IccFilehandler");
+            if (mIconLoader != null) {
+                mIconLoader.updateIccFileHandler(fh);
+            } else {
+                mIconLoader = new IconLoader(fh, mSlotId);
+            }
+        }
     }
 
     protected void finalize() {
@@ -372,6 +407,9 @@ public class CatService extends Handler implements AppInterface {
         mCurrntCmd = cmdMsg;
         Intent intent = new Intent(AppInterface.CAT_CMD_ACTION);
         intent.putExtra("STK CMD", cmdMsg);
+        intent.putExtra("SLOT_ID", mSlotId);
+
+        CatLog.d(this, "Sending CmdMsg: "+cmdMsg+ " on slotid:"+ mSlotId);
         mContext.sendBroadcast(intent);
     }
 
@@ -380,10 +418,11 @@ public class CatService extends Handler implements AppInterface {
      *
      */
     private void handleSessionEnd() {
-        CatLog.d(this, "SESSION END");
+        CatLog.d(this, "SESSION END on"+ mSlotId);
 
         mCurrntCmd = mMenuCmd;
         Intent intent = new Intent(AppInterface.CAT_SESSION_END_ACTION);
+        intent.putExtra("SLOT_ID", mSlotId);
         mContext.sendBroadcast(intent);
     }
 
@@ -701,17 +740,17 @@ public class CatService extends Handler implements AppInterface {
         /* TODO: eventDownload should be extended for other Envelope Commands */
         switch (event) {
             case BROWSER_TERMINATION_EVENT:
-                CatLog.d(sInstance, " Sending Browser termination event download to ICC");
+                CatLog.d(this, " Sending Browser termination event download to ICC");
                 tag = 0x80 | ComprehensionTlvTag.BROWSER_TERMINATION_CAUSE.value();
                 buf.write(tag);
                 // Browser Termination length should be 1 byte
                 buf.write(0x01);
                 break;
             case IDLE_SCREEN_AVAILABLE_EVENT:
-                CatLog.d(sInstance, " Sending Idle Screen Available event download to ICC");
+                CatLog.d(this, " Sending Idle Screen Available event download to ICC");
                 break;
             case LANGUAGE_SELECTION_EVENT:
-                CatLog.d(sInstance, " Sending Language Selection event download to ICC");
+                CatLog.d(this, " Sending Language Selection event download to ICC");
                 tag = 0x80 | ComprehensionTlvTag.LANGUAGE.value();
                 buf.write(tag);
                 // Language length should be 2 byte
@@ -743,68 +782,15 @@ public class CatService extends Handler implements AppInterface {
         mCmdIf.sendEnvelope(hexString, null);
     }
 
-    /**
-     * Used for instantiating/updating the Service from the GsmPhone or CdmaPhone constructor.
-     *
-     * @param ci CommandsInterface object
-     * @param ir IccRecords object
-     * @param context phone app context
-     * @param fh Icc file handler
-     * @param ic Icc card
-     * @return The only Service object in the system
-     */
-    public static CatService getInstance(CommandsInterface ci, UiccApplicationRecords ir,
-            Context context, IccFileHandler fh, IccCard ic) {
-        if (sInstance == null) {
-            if (ci == null || context == null) {
-                return null;
-            }
-            handlerThread = new HandlerThread("Cat Telephony service");
-            handlerThread.start();
-            sInstance = new CatService(ci, ir, context, fh, ic);
-            CatLog.d(sInstance, "NEW sInstance");
-            return sInstance;
-        }
-
-        if ((ir != null) && (mIccRecords != ir)) {
-            CatLog.d(sInstance, "Reinitialize the Service with SIMRecords");
-            mIccRecords = ir;
-
-            // re-Register for SIM ready event.
-            mIccRecords.registerForRecordsLoaded(sInstance, MSG_ID_ICC_RECORDS_LOADED, null);
-            CatLog.d(sInstance, "sr changed reinitialize and return current sInstance");
-        }
-
-        if (fh != null) {
-            CatLog.d(sInstance, "Reinitialize the Service with new IccFilehandler");
-            IconLoader mIconLoader = IconLoader.getInstance(null,null);
-            if (mIconLoader != null) {
-                mIconLoader.updateIccFileHandler(fh);
-            }
-        }
-
-        CatLog.d(sInstance, "Return current sInstance");
-        return sInstance;
-    }
-
-    /**
-     * Used by application to get an AppInterface object.
-     *
-     * @return The only Service object in the system
-     */
-    public static AppInterface getInstance() {
-        return getInstance(null, null, null, null, null);
-    }
-
     @Override
     public void handleMessage(Message msg) {
 
+        CatLog.d(this, msg.what + "arrived on slotid: "+ mSlotId);
         switch (msg.what) {
         case MSG_ID_SESSION_END:
         case MSG_ID_PROACTIVE_COMMAND:
         case MSG_ID_EVENT_NOTIFY:
         case MSG_ID_REFRESH:
-            CatLog.d(this, "ril message arrived");
             String data = null;
             if (msg.obj != null) {
                 AsyncResult ar = (AsyncResult) msg.obj;
@@ -812,14 +798,15 @@ public class CatService extends Handler implements AppInterface {
                     try {
                         data = (String) ar.result;
                     } catch (ClassCastException e) {
+                        CatLog.d(this,"Exception caught for proactive cmd");
                         break;
                     }
                 }
             }
-            mMsgDecoder.sendStartDecodingMessageParams(new RilMessage(msg.what, data));
+            mMsgDecoder.sendStartDecodingMessageParams(this, mIconLoader, new RilMessage(msg.what, data));
             break;
         case MSG_ID_CALL_SETUP:
-            mMsgDecoder.sendStartDecodingMessageParams(new RilMessage(msg.what, null));
+            mMsgDecoder.sendStartDecodingMessageParams(this, mIconLoader, new RilMessage(msg.what, null));
             break;
         case MSG_ID_ICC_RECORDS_LOADED:
             break;
@@ -849,6 +836,7 @@ public class CatService extends Handler implements AppInterface {
                     String alphaString = (String)ar.result;
                     CatLog.d(this, "Broadcasting STK Alpha message from card: " + alphaString);
                     Intent intent = new Intent(AppInterface.CAT_ALPHA_NOTIFY_ACTION);
+                    intent.putExtra("SLOT_ID", mSlotId);
                     intent.putExtra(AppInterface.ALPHA_STRING, alphaString);
                     mContext.sendBroadcast(intent);
                 } else {
@@ -904,6 +892,10 @@ public class CatService extends Handler implements AppInterface {
             CatLog.d(this, "CmdType: " + resMsg.cmdDet.typeOfCommand);
             validResponse = true;
         } else if (mCurrntCmd != null) {
+
+            CatLog.d(this, "Response CmdType: " + resMsg.cmdDet.typeOfCommand);
+            CatLog.d(this, "Current  CmdType: " + mCurrntCmd.mCmdDet.typeOfCommand);
+
             validResponse = resMsg.cmdDet.compareTo(mCurrntCmd.mCmdDet);
             CatLog.d(this, "isResponse for last valid cmd: " + validResponse);
         }
@@ -966,6 +958,7 @@ public class CatService extends Handler implements AppInterface {
                 switch (cmdType) {
                     case SET_UP_MENU:
                         helpRequired = resMsg.resCode == ResultCode.HELP_INFO_REQUIRED;
+                        CatLog.d(this, "Event Download being sent");
                         sendMenuSelection(resMsg.usersMenuSelection, helpRequired);
                         return;
                     case SELECT_ITEM:
