@@ -546,9 +546,9 @@ void HDMIDaemon::setResolution(int ID)
     ioctl(fd1, FBIOPAN_DISPLAY, &info);
     int en = 1;
     ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
+    property_set("hw.hdmiON", "1");
     //Inform SF about HDMI
     SurfaceComposerClient::enableHDMIOutput(HDMIOUT_ENABLE);
-    property_set("hw.hdmiON", "1");
 
 }
 
