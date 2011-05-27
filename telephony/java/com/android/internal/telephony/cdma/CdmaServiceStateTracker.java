@@ -995,7 +995,7 @@ final class CdmaServiceStateTracker extends ServiceStateTracker {
         }
 
         if (hasChanged) {
-            if (mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV) {
+            if (cm.getRadioState().isOn() && mCdmaSubscriptionSource == Phone.CDMA_SUBSCRIPTION_NV) {
                 String eriText;
                 // Now the CDMAPhone sees the new ServiceState so it can get the new ERI text
                 if (ss.getState() == ServiceState.STATE_IN_SERVICE) {
