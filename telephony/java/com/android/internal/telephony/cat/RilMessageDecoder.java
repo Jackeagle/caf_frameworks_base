@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +40,7 @@ class RilMessageDecoder extends HierarchicalStateMachine {
     private CommandParamsFactory mCmdParamsFactory = null;
     private RilMessage mCurrentRilMessage = null;
     private Handler mCaller = null;
+    private IconLoader mIconLoader = null;
 
     // States
     private StateStart mStateStart = new StateStart();
@@ -51,9 +53,9 @@ class RilMessageDecoder extends HierarchicalStateMachine {
      * @param fh
      * @return RilMesssageDecoder
      */
-    public static synchronized RilMessageDecoder getInstance(Handler caller, IccFileHandler fh) {
+    public static synchronized RilMessageDecoder getInstance() {
         if (sInstance == null) {
-            sInstance = new RilMessageDecoder(caller, fh);
+            sInstance = new RilMessageDecoder();
             sInstance.start();
         }
         return sInstance;
@@ -65,7 +67,9 @@ class RilMessageDecoder extends HierarchicalStateMachine {
      *
      * @param rilMsg
      */
-    public void sendStartDecodingMessageParams(RilMessage rilMsg) {
+    public void sendStartDecodingMessageParams(Handler caller, IconLoader iconLoader, RilMessage rilMsg) {
+        mCaller = caller;
+        mIconLoader = iconLoader;
         Message msg = obtainMessage(CMD_START);
         msg.obj = rilMsg;
         sendMessage(msg);
@@ -90,15 +94,14 @@ class RilMessageDecoder extends HierarchicalStateMachine {
         msg.sendToTarget();
     }
 
-    private RilMessageDecoder(Handler caller, IccFileHandler fh) {
+    private RilMessageDecoder() {
         super("RilMessageDecoder");
 
         addState(mStateStart);
         addState(mStateCmdParamsReady);
         setInitialState(mStateStart);
 
-        mCaller = caller;
-        mCmdParamsFactory = CommandParamsFactory.getInstance(this, fh);
+        mCmdParamsFactory = CommandParamsFactory.getInstance(this);
     }
 
     private class StateStart extends HierarchicalState {
@@ -156,7 +159,7 @@ class RilMessageDecoder extends HierarchicalStateMachine {
             }
             try {
                 // Start asynch parsing of the command parameters.
-                mCmdParamsFactory.make(BerTlv.decode(rawData));
+                mCmdParamsFactory.make(BerTlv.decode(rawData), mIconLoader);
                 decodingStarted = true;
             } catch (ResultException e) {
                 // send to Service for proper RIL communication.
