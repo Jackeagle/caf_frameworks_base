@@ -5255,6 +5255,11 @@ public class WindowManagerService extends IWindowManager.Stub
             mPolicy.notifyLidSwitchChanged(whenNanos, lidOpen);
         }
         
+        /* Notifies that the Jack switch changed state. */
+        public void notifyJackSwitchChanged(long whenNanos,int switchCode, boolean jackOpen) {
+            mPolicy.notifyJackSwitchChanged(whenNanos, switchCode, jackOpen);
+        }
+
         /* Provides an opportunity for the window manager policy to intercept early key
          * processing as soon as the key has been read from the device. */
         public int interceptKeyBeforeQueueing(long whenNanos, int action, int flags,
