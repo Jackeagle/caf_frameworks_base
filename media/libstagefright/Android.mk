@@ -5,6 +5,22 @@ ifeq "$(findstring msm7627,$(QCOM_TARGET_PRODUCT))" "msm7627"
     LOCAL_CFLAGS += -DUSE_AAC_HW_DEC
 endif
 
+ifneq (, $(filter  msm7627_ffa msm7627_surf, $(QCOM_TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DTARGET7x27
+endif
+ifneq (, $(filter  msm7627a, $(QCOM_TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DTARGET7x27A
+endif
+ifneq (, $(filter  msm7630_surf msm7630_fusion msm7630_1x, $(QCOM_TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DTARGET7x30
+endif
+ifneq (, $(filter  qsd8250_surf qsd8250_ffa qsd8650a_st1x, $(QCOM_TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DTARGET8x50
+endif
+ifneq (, $(filter  msm8660_surf msm8660_csfb msm8960, $(QCOM_TARGET_PRODUCT)))
+    LOCAL_CFLAGS += -DTARGET8x60
+endif
+
 include frameworks/base/media/libstagefright/codecs/common/Config.mk
 
 LOCAL_SRC_FILES:=                         \

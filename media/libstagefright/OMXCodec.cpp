@@ -74,6 +74,47 @@ struct CodecInfo {
     const char *codec;
 };
 
+class ColorFormatInfo {
+    private:
+        enum {
+            LOCAL = 0,
+            REMOTE = 1,
+            END = 2
+        };
+        static const int32_t preferredColorFormat[END];
+    public:
+        static int32_t getPreferredColorFormat(bool isLocal) {
+            if(isLocal) {
+                return preferredColorFormat[LOCAL];
+            }
+            return preferredColorFormat[REMOTE];
+        }
+};
+
+const int32_t ColorFormatInfo::preferredColorFormat[] = {
+#ifdef TARGET7x30
+    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
+    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+#endif
+#ifdef TARGET8x60
+    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
+    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+#endif
+#ifdef TARGET7x27
+    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
+    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+#endif
+#ifdef TARGET7x27A
+    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
+    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
+#endif
+#ifdef TARGET8x50
+    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
+    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+#endif
+};
+
+
 #define FACTORY_CREATE(name) \
 static sp<MediaSource> Make##name(const sp<MediaSource> &source) { \
     return new name(source); \
@@ -497,14 +538,6 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
     }
-
-    //if 7x30, we always want to use NV12 tile
-    char curr_target[128] = {0};
-    char target[] = "msm7630_";
-    property_get("ro.product.device", curr_target, "0");
-
-    if (!strncmp(target, curr_target, sizeof(target) - 1))
-        quirks |= kForceNV12TileColorFormat;
 
     if (!strcmp(componentName, "OMX.qcom.audio.decoder.wma")) {
         quirks |= kRequiresWMAProComponent;
@@ -1805,42 +1838,21 @@ status_t OMXCodec::setVideoOutputFormat(
             LOGV("Not supported parameter OMX_QcomIndexParamFrameInfoExtraData");
     }
 
-#if 1
     {
         OMX_VIDEO_PARAM_PORTFORMATTYPE format;
         InitOMXParams(&format);
         format.nPortIndex = kPortIndexOutput;
 
-        // For 3rd party applications we want to iterate through all the
-        // supported color formats by the OMX component. If OMX codec is
-        // being run in a sepparate process, then pick the second iterated
-        // color format.
-#if 1
         if (!strncmp(mComponentName, "OMX.qcom",8)) {
-            OMX_U32 index;
-	    
-            for(index = 0 ;; index++){
-              format.nIndex = index;
-	      if(mOMX->getParameter(
-			    mNode, OMX_IndexParamVideoPortFormat,
-			    &format, sizeof(format)) != OK) {
-		if(format.nIndex) format.nIndex--;
-		break;
-	      }
-            }
-            if(mOMXLivesLocally)
-            {
-                //force NV12 tile if needed; assuming NV12 is index 1
-                if (mQuirks & kForceNV12TileColorFormat)
-                    format.nIndex = 1;
-                else
-                    format.nIndex = 0;
+            int32_t reqdColorFormat = ColorFormatInfo::getPreferredColorFormat(mOMXLivesLocally);
+            for(format.nIndex = 0;
+                    (OK == mOMX->getParameter(mNode, OMX_IndexParamVideoPortFormat, &format, sizeof(format)));
+                    format.nIndex++) {
+                if(format.eColorFormat == reqdColorFormat)
+                    break;
             }
         } else
-          format.nIndex = 0;
-#else
-        format.nIndex = 0;
-#endif
+            format.nIndex = 0;
 
         CODEC_LOGV("Video O/P format.nIndex 0x%x",format.nIndex);
         CODEC_LOGV("Video O/P format.eColorFormat 0x%x",format.eColorFormat);
@@ -1874,7 +1886,6 @@ status_t OMXCodec::setVideoOutputFormat(
             return err;
         }
     }
-#endif
 
     OMX_PARAM_PORTDEFINITIONTYPE def;
     InitOMXParams(&def);

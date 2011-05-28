@@ -132,10 +132,9 @@ private:
         kOutputBuffersAreUnreadable           = 8192,
         kStoreMetaDataInInputVideoBuffers     = 16384,
         kDoesNotRequireMemcpyOnOutputPort     = 32768,
-        kForceNV12TileColorFormat             = 65536,
-        kBFrameFlagInExtensions               = 131072,
-        kRequiresEOSMessage                   = 262144,
-        kRequiresWMAProComponent              = 524288,
+        kBFrameFlagInExtensions               = 65536,
+        kRequiresEOSMessage                   = 131072,
+        kRequiresWMAProComponent              = 262144,
     };
 
     struct BufferInfo {
