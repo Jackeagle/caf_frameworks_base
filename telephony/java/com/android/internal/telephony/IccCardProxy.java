@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -158,6 +159,7 @@ public class IccCardProxy extends Handler implements IccCard {
             case EVENT_ICC_ABSENT:
                 mAbsentRegistrants.notifyRegistrants();
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                updateStateProperty();
                 break;
             case EVENT_ICC_LOCKED:
                 processLockedState();
@@ -277,7 +279,7 @@ public class IccCardProxy extends Handler implements IccCard {
         if (mUiccCard == null) {
             SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, CardState.ABSENT.toString());
         } else {
-            SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, mUiccCard.getCardState().toString());
+            SystemProperties.set(TelephonyProperties.PROPERTY_SIM_STATE, getState().toString());
         }
     }
 
