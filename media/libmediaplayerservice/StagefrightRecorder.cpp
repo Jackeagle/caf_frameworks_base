@@ -1236,9 +1236,19 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
         enc_meta->setInt32(kKeyTimeScale, mVideoTimeScale);
     }
 
-    if(hfr && ((mVideoEncoder != VIDEO_ENCODER_H264) || (width * height > 800*480))) {
-        LOGE("HFR mode is supported only upto WVGA and H264 codec.");
-        return INVALID_OPERATION;
+    char mDeviceName[100];
+    property_get("ro.product.device",mDeviceName,"0");
+    if(!strncmp(mDeviceName, "msm7627a", 8)) {
+       if(hfr && (width * height > 432*240)) {
+           LOGE("HFR mode is supported only upto WQVGA resolution");
+           return INVALID_OPERATION;
+       }
+    }
+    else {
+       if(hfr && ((mVideoEncoder != VIDEO_ENCODER_H264) || (width * height > 800*480))) {
+           LOGE("HFR mode is supported only upto WVGA and H264 codec.");
+           return INVALID_OPERATION;
+       }
     }
 
     /*
