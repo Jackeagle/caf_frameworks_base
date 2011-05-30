@@ -1147,6 +1147,7 @@ public class Camera {
     public class Parameters {
         // Parameter keys to communicate with the camera driver.
         private static final String KEY_PREVIEW_SIZE = "preview-size";
+        private static final String KEY_HFR_SIZE = "hfr-size";
         private static final String KEY_PREVIEW_FORMAT = "preview-format";
         private static final String KEY_PREVIEW_FRAME_RATE = "preview-frame-rate";
         private static final String KEY_PREVIEW_FPS_RANGE = "preview-fps-range";
@@ -1678,6 +1679,17 @@ public class Camera {
          */
         public List<Size> getSupportedPreviewSizes() {
             String str = get(KEY_PREVIEW_SIZE + SUPPORTED_VALUES_SUFFIX);
+            return splitSize(str);
+        }
+
+        /**
+         * Gets the supported preview sizes in high frame rate recording mode.
+         *
+         * @return a list of Size object. This method will always return a list
+         *         with at least one element.
+         */
+        public List<Size> getSupportedHfrSizes() {
+            String str = get(KEY_HFR_SIZE + SUPPORTED_VALUES_SUFFIX);
             return splitSize(str);
         }
 
