@@ -646,6 +646,26 @@ sp<OverlayRef> LayerBaseClient::Surface::createOverlay(
     return NULL;
 };
 
+#ifdef TARGET_OMAP4
+sp<OverlayRef> LayerBaseClient::Surface::createOverlay(
+        uint32_t w, uint32_t h, int32_t format, int32_t orientation, int isS3D)
+{
+    return NULL;
+};
+
+
+void LayerBaseClient::Surface::setDisplayId(int displayId)
+{
+    return;
+}
+
+int LayerBaseClient::Surface::requestOverlayClone(bool enable)
+{
+    return (-1);
+}
+
+#endif
+
 // ---------------------------------------------------------------------------
 
 }; // namespace android
