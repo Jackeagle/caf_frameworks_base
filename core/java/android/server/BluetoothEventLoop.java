@@ -31,6 +31,12 @@ import android.util.Log;
 import java.util.HashMap;
 import java.util.Set;
 
+/* TI HID port - start */
+import android.os.SystemProperties;
+/* TI HID port - end */
+
+
+
 /**
  * TODO: Move this to
  * java/services/com/android/server/BluetoothEventLoop.java
@@ -523,6 +529,14 @@ class BluetoothEventLoop {
             } else {
                 Log.i(TAG, "Rejecting incoming A2DP / AVRCP connection from " + address);
             }
+        }
+        /* TI HID port - start */
+        if (mBluetoothService.isEnabled() &&
+                (BluetoothUuid.isInputHID(uuid)) && SystemProperties.TARGET_OMAP4) {
+            authorized = true;
+            Log.i(TAG, "Allowing incoming HID connection from " + address);
+        /* TI HID port - end */
+
         } else {
             Log.i(TAG, "Rejecting incoming " + deviceUuid + " connection from " + address);
         }

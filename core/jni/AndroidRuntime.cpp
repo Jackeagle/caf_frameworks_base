@@ -157,6 +157,11 @@ extern int register_android_bluetooth_ScoSocket(JNIEnv *env);
 extern int register_android_server_BluetoothService(JNIEnv* env);
 extern int register_android_server_BluetoothEventLoop(JNIEnv *env);
 extern int register_android_server_BluetoothA2dpService(JNIEnv* env);
+/* TI HID port - start */
+#ifdef TARGET_OMAP4
+extern int register_android_server_BluetoothHidService(JNIEnv* env);
+#endif
+/* TI HID port - end */
 extern int register_android_server_Watchdog(JNIEnv* env);
 extern int register_android_ddm_DdmHandleNativeHeap(JNIEnv *env);
 extern int register_com_android_internal_os_ZygoteInit(JNIEnv* env);
@@ -1275,6 +1280,12 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_server_BluetoothService),
     REG_JNI(register_android_server_BluetoothEventLoop),
     REG_JNI(register_android_server_BluetoothA2dpService),
+    /* TI HID port - start */
+#ifdef TARGET_OMAP4
+     REG_JNI(register_android_server_BluetoothHidService),
+#endif
+    /* TI HID port - end */
+
     REG_JNI(register_android_server_Watchdog),
     REG_JNI(register_android_message_digest_sha1),
     REG_JNI(register_android_ddm_DdmHandleNativeHeap),

@@ -142,6 +142,10 @@ LOCAL_SRC_FILES:= \
 	android_content_res_ObbScanner.cpp \
     android_content_res_Configuration.cpp
 
+ifeq ($(TARGET_OMAP4), true)
+LOCAL_SRC_FILES += android_server_BluetoothHidService.cpp
+endif
+
 LOCAL_C_INCLUDES += \
 	$(JNI_H_INCLUDE) \
 	$(LOCAL_PATH)/android/graphics \
