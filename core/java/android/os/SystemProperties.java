@@ -27,6 +27,7 @@ public class SystemProperties
 {
     public static final int PROP_NAME_MAX = 31;
     public static final int PROP_VALUE_MAX = 91;
+    public static final boolean TARGET_OMAP4 = native_get_boolean("com.ti.target_omap4", false);
 
     private static native String native_get(String key);
     private static native String native_get(String key, String def);
