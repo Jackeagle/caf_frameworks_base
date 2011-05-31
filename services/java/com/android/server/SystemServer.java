@@ -45,6 +45,10 @@ import android.os.SystemProperties;
 import android.provider.Contacts.People;
 import android.provider.Settings;
 import android.server.BluetoothA2dpService;
+/* TI HID port - start */
+import android.server.BluetoothHidService;
+/* TI HID port - end */
+
 import android.server.BluetoothService;
 import android.server.search.SearchManagerService;
 import android.util.EventLog;
@@ -55,6 +59,9 @@ import android.accounts.AccountManagerService;
 import java.io.File;
 import java.util.Timer;
 import java.util.TimerTask;
+
+/* TI-OMAP custom package */
+import com.ti.omap.omap_mm_library.UiCloningService;
 
 class ServerThread extends Thread {
     private static final String TAG = "SystemServer";
@@ -121,12 +128,18 @@ class ServerThread extends Thread {
         WindowManagerService wm = null;
         BluetoothService bluetooth = null;
         BluetoothA2dpService bluetoothA2dp = null;
+        /* TI HID port - start */
+        BluetoothHidService bluetoothHid = null;
+        /* TI HID port - end */
+
         HeadsetObserver headset = null;
+        HDMIObserver hdmi = null;
         DockObserver dock = null;
         UsbService usb = null;
         UiModeManagerService uiMode = null;
         RecognitionManagerService recognition = null;
         ThrottleService throttle = null;
+        UiCloningService uiCloning = null;
 
         // Critical services...
         try {
@@ -216,6 +229,13 @@ class ServerThread extends Thread {
                 bluetoothA2dp = new BluetoothA2dpService(context, bluetooth);
                 ServiceManager.addService(BluetoothA2dpService.BLUETOOTH_A2DP_SERVICE,
                                           bluetoothA2dp);
+                /* TI HID port - start */
+                if (SystemProperties.TARGET_OMAP4) {
+                    bluetoothHid = new BluetoothHidService(context, bluetooth);
+                    ServiceManager.addService(BluetoothHidService.BLUETOOTH_HID_SERVICE,
+                                          bluetoothHid);
+                }
+                /* TI HID port - end */
 
                 int bluetoothOn = Settings.Secure.getInt(mContentResolver,
                     Settings.Secure.BLUETOOTH_ON, 0);
@@ -390,6 +410,14 @@ class ServerThread extends Thread {
             }
 
             try {
+                Slog.i(TAG, "HDMI Observer");
+                // Listen for hdmi changes
+                hdmi = new HDMIObserver(context);
+            } catch (Throwable e) {
+                Slog.e(TAG, "Failure starting HDMIObserver", e);
+            }
+
+            try {
                 Slog.i(TAG, "Dock Observer");
                 // Listen for dock station changes
                 dock = new DockObserver(context, power);
@@ -442,6 +470,17 @@ class ServerThread extends Thread {
                 ServiceManager.addService("diskstats", new DiskStatsService(context));
             } catch (Throwable e) {
                 Slog.e(TAG, "Failure starting DiskStats Service", e);
+            }
+
+            if (SystemProperties.TARGET_OMAP4 ) {
+                if(SystemProperties.getBoolean("tv.hdmi.uicloning.enable", false)) {
+                    try {
+                        Slog.i(TAG, "UiCloningService");
+                        uiCloning = new UiCloningService(context);
+                    } catch (Throwable e) {
+                        Slog.e(TAG, "Failure starting UiCloningService", e);
+                    }
+                }
             }
         }
 
