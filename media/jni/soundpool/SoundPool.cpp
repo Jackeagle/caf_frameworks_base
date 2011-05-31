@@ -382,7 +382,6 @@ void SoundPool::done(SoundChannel* channel)
 {
     LOGV("done(%d)", channel->channelID());
 
-    Mutex::Autolock lock(&mLock);
     // if "stolen", play next event
     if (channel->nextChannelID() != 0) {
         LOGV("add to restart list");
