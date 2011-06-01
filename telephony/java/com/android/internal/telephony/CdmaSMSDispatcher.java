@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -199,6 +200,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
                     // The message was sent to a port, so concoct a URI for it.
                     dispatchPortAddressedPdus(pdus, smsHeader.portAddrs.destPort);
                 }
+            } else if (sms.getMessageType() == SmsEnvelope.MESSAGE_TYPE_BROADCAST &&
+                       sms.getServiceCategory() >= SmsEnvelope.EMERGENCY_MESSAGE_ID_START &&
+                       sms.getServiceCategory() <= SmsEnvelope.EMERGENCY_MESSAGE_ID_END) {
+                //This is cmas message
+                dispatchBroadcastPdus(Intents.EMERGENCY_CDMA_MESSAGE_RECEIVED_ACTION, pdus);
             } else {
                 // Normal short and non-port-addressed message, dispatch it.
                 dispatchPdus(pdus);
@@ -486,6 +492,11 @@ final class CdmaSMSDispatcher extends SMSDispatcher {
             }
             mLastDispatchedSmsFingerprint = null;
         }
+    }
+
+    protected void handleBroadcastSms(AsyncResult ar) {
+        // Not supported
+        Log.e(TAG, "Error! Not implemented for CDMA.");
     }
 
     private int resultToCause(int rc) {

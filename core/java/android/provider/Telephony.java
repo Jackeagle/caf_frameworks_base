@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -514,6 +515,42 @@ public final class Telephony {
              * supported.
              */
             public static final int RESULT_SMS_UNSUPPORTED = 4;
+
+            /**
+             * Broadcast Action: A new Cell Broadcast SMS message has been received
+             * by the device. The intent will have the following extra
+             * values:</p>
+             *
+             * <ul>
+             *   <li><em>pdus</em> - A CB SMS pdus.</li>
+             * </ul>
+             *
+             * <p>The extra values can be extracted using
+             * {@link #getSerializableExtra("pdus")}.</p>
+             *
+             * <p>If a BroadcastReceiver encounters an error while processing
+             * this intent it should set the result code appropriately.</p>
+             */
+            public static final String CB_SMS_RECEIVED_ACTION =
+                "android.provider.Telephony.CB_SMS_RECEIVED";
+
+            /**
+             * Broadcast Action: A new Emergency Cdma message has been received
+             * by the device. The intent will have the following extra
+             * values:</p>
+             *
+             * <ul>
+             *   <li><em>pdus</em> - Emergency message pdus.</li>
+             * </ul>
+             *
+             * <p>The extra values can be extracted using
+             * {@link #getSerializableExtra("pdus")}.</p>
+             *
+             * <p>If a BroadcastReceiver encounters an error while processing
+             * this intent it should set the result code appropriately.</p>
+             */
+            public static final String EMERGENCY_CDMA_MESSAGE_RECEIVED_ACTION =
+                "android.provider.Telephony.EMERGENCY_CDMA_MESSAGE_RECEIVED";
 
             /**
              * Broadcast Action: A new text based SMS message has been received
