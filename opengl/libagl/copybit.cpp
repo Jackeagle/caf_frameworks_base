@@ -68,7 +68,11 @@ static void textureToCopyBitImage(
     img->format = opFormat;
     img->base   = surface->data;
     img->handle = (native_handle_t *)buffer->handle;
-    img->padding = surface->stride - surface->width;
+    img->horiz_padding = surface->stride - surface->width;
+    if(vstride)
+        img->vert_padding  = vstride - surface->height;
+    else
+        img->vert_padding = 0;
 }
 
 struct clipRectRegion : public copybit_region_t {
@@ -372,7 +376,8 @@ static bool copybit(GLint x, GLint y,
             tmp_dst.h = tmp_h;
             tmp_dst.format = tempBitmap->format;
             tmp_dst.handle = (native_handle_t*)tempBitmap->getNativeBuffer()->handle;
-            tmp_dst.padding = cbSurface.stride - cbSurface.width;
+            tmp_dst.horiz_padding = cbSurface.stride - cbSurface.width;
+            tmp_dst.vert_padding = 0;
             tmp_rect.l = 0;
             tmp_rect.t = 0;
             tmp_rect.r = tmp_dst.w;
@@ -411,7 +416,8 @@ static bool copybit(GLint x, GLint y,
         tmpCbImg.h = h;
         tmpCbImg.format = tempCb->format;
         tmpCbImg.handle = (native_handle_t*)tempCb->getNativeBuffer()->handle;
-        tmpCbImg.padding = cbSurface.stride - cbSurface.width;
+        tmpCbImg.horiz_padding = cbSurface.stride - cbSurface.width;
+        tmpCbImg.vert_padding = 0;
         tmpCbRect.l = 0;
         tmpCbRect.t = 0;
 
