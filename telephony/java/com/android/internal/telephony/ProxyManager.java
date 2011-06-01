@@ -41,6 +41,8 @@ import com.android.internal.telephony.UiccConstants.AppType;
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.UiccManager;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.regex.PatternSyntaxException;
 import java.lang.Exception;
 
@@ -82,6 +84,8 @@ public class ProxyManager extends Handler {
     static final int EVENT_SUBSCRIPTION_READY = 9;
     static final int EVENT_SIM_REFRESH = 10;
     static final int EVENT_CLEANUP_DATA_CONNECTION_DONE = 11;
+    static final int EVENT_UPDATE_UICC_STATUS = 12;
+    static final int EVENT_SET_SUBSCRIPTION_COMPLETED = 13;
 
     //***** Class Variables
     private static ProxyManager sProxyManager;
@@ -100,26 +104,91 @@ public class ProxyManager extends Handler {
     //MSimPhoneSubInfoProxy to use proper PhoneSubInfoProxy object
     private MSimPhoneSubInfoProxy mMSimPhoneSubInfoProxy;
     private UiccManager mUiccManager;
-    private UiccCard[] mUiccCards;
     private Context  mContext;
-    private boolean mUiccSubSet = false;
     private boolean mDdsSet = false;
     private SupplySubscription mSupplySubscription;
     private int mQueuedDds;
     private int mCurrentDds;
     private boolean mDisableDdsInProgress = false;
     private Message mSetDdsCompleteMsg;
-    private int mPendingIccidRequest = 0;
     private boolean mSetSubscriptionMode = true;
-    private boolean mReadIccid = true;
-    private boolean mSetSubOnSimRefresh = false;
-    private String[] mIccIds;
     private boolean[] mSubscriptionReady = {false, false};
     // The subscription information of all the cards
     private SubscriptionData[] mCardSubData = null;
     // The User prefered subscription information
     private SubscriptionData mUserPrefSubs = null;
+
+    private boolean mSetSubscriptionInProgress = false;
     private boolean[] mRadioOn = {false, false};
+
+    class CardInfo {
+        private UiccCard mUiccCard;
+        private boolean mReadIccIdInProgress;
+        private String mIccId;
+        private CardState mCardState;
+
+        public CardInfo(UiccCard uiccCard) {
+            mUiccCard = uiccCard;
+            if (uiccCard !=  null) {
+                mCardState = uiccCard.getCardState();
+            } else {
+                mCardState = null;
+            }
+            mIccId = null;
+            mReadIccIdInProgress = false;
+        }
+
+        public UiccCard getUiccCard() {
+            return mUiccCard;
+        }
+
+        public void setUiccCard(UiccCard uiccCard) {
+            mUiccCard = uiccCard;
+            if (mUiccCard !=  null) {
+                mCardState = mUiccCard.getCardState();
+                if (mCardState != CardState.PRESENT) {
+                    mIccId = null;
+                    mReadIccIdInProgress = false;
+                }
+            } else {
+                mCardState = null;
+                mIccId = null;
+                mReadIccIdInProgress = false;
+            }
+        }
+
+        public void setCardState(CardState cardState) {
+            mCardState = cardState;
+        }
+
+        public CardState getCardState() {
+            return mCardState;
+        }
+
+        public boolean isReadIccIdInProgress() {
+            return mReadIccIdInProgress;
+        }
+
+        public void setReadIccIdInProgress(boolean read) {
+            mReadIccIdInProgress = read;
+        }
+
+        public String getIccId() {
+            return mIccId;
+        }
+
+        public void setIccId(String iccId) {
+            mIccId = iccId;
+        }
+
+        public String toString() {
+            return "[mUiccCard = " + mCardState + ", mIccId = " + mIccId
+                    + ", mReadIccIdInProgress = " + mReadIccIdInProgress + "]";
+        }
+    }
+
+    private ArrayList<CardInfo> mUiccCardList = new ArrayList<CardInfo>(UiccConstants.RIL_MAX_CARDS);
+    private int mUpdateUiccStatusContext = 0;
 
 
     //***** Class Methods
@@ -153,7 +222,11 @@ public class ProxyManager extends Handler {
         mCi = ci;
 
         if (TelephonyManager.isMultiSimEnabled()) {
-            mUiccCards = new UiccCard[UiccConstants.RIL_MAX_CARDS];
+            mCardSubData = new SubscriptionData[UiccConstants.RIL_MAX_CARDS];
+            mUiccCardList = new ArrayList<CardInfo>(UiccConstants.RIL_MAX_CARDS);
+            for (int i = 0; i < UiccConstants.RIL_MAX_CARDS; i++) {
+                mUiccCardList.add(new CardInfo(null));
+            }
 
             getUserPreferredSubs();
             mSupplySubscription = this.new SupplySubscription(mContext);
@@ -241,7 +314,7 @@ public class ProxyManager extends Handler {
                 String defaultUserSub = " " + ","        // iccId
                     + mUserDefaultSubs[i] + ","          // app type
                     + " " + ","                          // app id
-                    + Integer.toString(SUB_ACTIVATED)    // activate state
+                    + Integer.toString(SUB_INVALID)      // activate state
                     + "," + SUBSCRIPTION_INDEX_INVALID   // 3gppIndex in the card
                     + "," + SUBSCRIPTION_INDEX_INVALID;  // 3gpp2Index in the card
 
@@ -251,7 +324,7 @@ public class ProxyManager extends Handler {
                 mUserPrefSubs.subscription[i].iccId = null;
                 mUserPrefSubs.subscription[i].appType = mUserDefaultSubs[i];
                 mUserPrefSubs.subscription[i].appId = null;
-                mUserPrefSubs.subscription[i].subStatus = SUB_ACTIVATED;
+                mUserPrefSubs.subscription[i].subStatus = SUB_INVALID;
                 mUserPrefSubs.subscription[i].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
                 mUserPrefSubs.subscription[i].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
             }
@@ -263,32 +336,32 @@ public class ProxyManager extends Handler {
         }
     }
 
-    private void saveUserPreferredSubscription(SubscriptionData userPrefSubData) {
-        Subscription userPrefSub;
+    private void saveUserPreferredSubscription(int subIndex, Subscription userPrefSub) {
         String userSub;
+        if ((subIndex >= NUM_SUBSCRIPTIONS) || (userPrefSub == null)) {
+            Log.d(LOG_TAG, "saveUserPreferredSubscription: INVALID PARAMETERS:"
+                    + " subIndex = " + subIndex + " userPrefSub = " + userPrefSub);
+            return;
+        }
 
         // Update the user prefered sub
-        mUserPrefSubs.copyFrom(userPrefSubData);
+        mUserPrefSubs.subscription[subIndex].copyFrom(userPrefSub);
 
-        for (int index = 0; index < userPrefSubData.getLength(); index++) {
-            userPrefSub = userPrefSubData.subscription[index];
+        userSub = ((userPrefSub.iccId != null) ? userPrefSub.iccId : " ") + ","
+            + ((userPrefSub.appType != null) ? userPrefSub.appType : " ") + ","
+            + ((userPrefSub.appId != null) ? userPrefSub.appId : " ") + ","
+            + Integer.toString(userPrefSub.subStatus) + ","
+            + Integer.toString(userPrefSub.m3gppIndex) + ","
+            + Integer.toString(userPrefSub.m3gpp2Index);
 
-            userSub = ((userPrefSub.iccId != null) ? userPrefSub.iccId : " ") + ","
-                + ((userPrefSub.appType != null) ? userPrefSub.appType : " ") + ","
-                + ((userPrefSub.appId != null) ? userPrefSub.appId : " ") + ","
-                + Integer.toString(userPrefSub.subStatus) + ","
-                + Integer.toString(userPrefSub.m3gppIndex) + ","
-                + Integer.toString(userPrefSub.m3gpp2Index);
+        Log.d(LOG_TAG, "saveUserPreferredSubscription: userPrefSub = " + userPrefSub);
+        Log.d(LOG_TAG, "saveUserPreferredSubscription: userSub = " + userSub);
 
-            Log.d(LOG_TAG, "saveUserPreferredSubscription: userPrefSub = " + userPrefSub);
-            Log.d(LOG_TAG, "saveUserPreferredSubscription: userSub = " + userSub);
-
-            // Construct the string and store in Settings data base at index.
-            // update the user pref settings so that next time user is
-            // not prompted of the subscriptions
-            Settings.System.putString(mContext.getContentResolver(),
-                    Settings.System.USER_PREFERRED_SUBS[index], userSub);
-        }
+        // Construct the string and store in Settings data base at subIndex.
+        // update the user pref settings so that next time user is
+        // not prompted of the subscriptions
+        Settings.System.putString(mContext.getContentResolver(),
+                Settings.System.USER_PREFERRED_SUBS[subIndex], userSub);
     }
 
     private String getStringFrom(String str) {
@@ -347,81 +420,75 @@ public class ProxyManager extends Handler {
             }
         }
     }
-    private boolean isAllRadioOn() {
-        boolean result = true;
-        for (boolean radioOn : mRadioOn) {
-            result = result && radioOn;
-        }
-        return result;
-    }
 
     @Override
     public void handleMessage(Message msg) {
         AsyncResult ar;
-        int cardIndex = 0;
-        String strCardIndex;
-        Integer slot;
+        Integer cardIndex;
+
 
         switch(msg.what) {
             case EVENT_RADIO_OFF_OR_NOT_AVAILABLE:
                 ar = (AsyncResult)msg.obj;
-                slot = (Integer)ar.userObj;
-                Log.d(LOG_TAG, "ProxyManager EVENT_RADIO_OFF_OR_NOT_AVAILABLE on slot = " + slot);
-                if (slot >= 0 && slot < mRadioOn.length) {
-                    mRadioOn[slot] = false;
-                    // Unregister for card status indication when radio state becomes OFF or UNAVAILABLE.
-                    mUiccManager.unregisterForIccChanged(sProxyManager);
-                    // Reset the flag, which takes care of processing/Handling of card status
-                    // card status is processed only the first time
-                    mUiccSubSet = true;
+                cardIndex = (Integer)ar.userObj;
+
+                logd("ProxyManager EVENT_RADIO_OFF_OR_NOT_AVAILABLE on cardIndex = " + cardIndex);
+
+                if (cardIndex >= 0 && cardIndex < mRadioOn.length) {
+                    mRadioOn[cardIndex] = false;
+
+                    // Reset all subscriptions selected from this card.
+                    SubscriptionData currentSub = getSelectedSubscriptions();
+                    for (int subId = 0; subId < NUM_SUBSCRIPTIONS; subId++) {
+                        if (currentSub.subscription[subId].subStatus == SUB_ACTIVATED
+                                && currentSub.subscription[subId].slotId == cardIndex) {
+                            resetCurrentSubscription(subId);
+                        }
+                    }
+
+                    // Reset the card info corresponds to this cardIndex
+                    resetCardInfo(cardIndex);
                 } else {
-                    Log.d(LOG_TAG, "Invalid slot!!!");
+                    logd("Invalid Index!!!");
                 }
                 break;
 
             case EVENT_RADIO_ON:
                 ar = (AsyncResult)msg.obj;
-                slot = (Integer)ar.userObj;
-                Log.d(LOG_TAG, "ProxyManager EVENT_RADIO_ON on slot = " + slot);
-                if (slot >= 0 && slot < mRadioOn.length) {
-                    mRadioOn[slot] = true;
-                    if (isAllRadioOn()) {
-                        // Register for card status indication when radio state becomes ON.
-                        mUiccManager.registerForIccChanged(sProxyManager, EVENT_ICC_CHANGED, null);
+                cardIndex = (Integer)ar.userObj;
+
+                logd("ProxyManager EVENT_RADIO_ON on cardIndex = " + cardIndex);
+
+                if (cardIndex >= 0 && cardIndex < mRadioOn.length) {
+                    mRadioOn[cardIndex] = true;
+
+                    // If there is no subscriptions are activated yet, then we need to set
+                    // the subscription mode followed by setting the subscriptions.
+                    if (!isAnySubscriptionActive()) {
+                        // Reset the flags
                         mSetSubscriptionMode = true;
-                        mUiccSubSet = false;
-                        mReadIccid = true;
                         mDdsSet = false;
                     }
                 } else {
-                    Log.d(LOG_TAG, "Invalid slot!!!");
+                    logd("Invalid Index!!!");
                 }
                 break;
 
+            case EVENT_SET_SUBSCRIPTION_COMPLETED:
+                logd("EVENT_SET_SUBSCRIPTION_COMPLETED");
+                mSetSubscriptionInProgress = false;
+                // Process the card status if there is any change.
+                handleIccChanged();
+                break;
+
             case EVENT_ICC_CHANGED:
-                if (TelephonyManager.isMultiSimEnabled()) {
-                    Log.d(LOG_TAG, "ProxyManager EVENT_ICC_CHANGED for DSDS");
-                    mUiccCards = mUiccManager.getIccCards();
-                    if (!mUiccSubSet) {
-                        checkCardStatus();
-                    }
-                } else {
-                    SubscriptionData cardSubData = new SubscriptionData(1);
-                    cardSubData.subscription[0].slotId = 0;
-                    cardSubData.subscription[0].subId = 0;
-                    cardSubData.subscription[0].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
-                    cardSubData.subscription[0].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
-                    UiccCard[] cardsList = mUiccManager.getIccCards();
-                    UiccCard c = (cardsList.length > 0) ? cardsList[0] : null;
-                    if (c != null) {
-                        cardSubData.subscription[0].m3gppIndex = c.getSubscription3gppAppIndex();
-                        cardSubData.subscription[0].m3gpp2Index = c.getSubscription3gpp2AppIndex();
-                    }
-                    Log.d(LOG_TAG, "ProxyManager EVENT_ICC_CHANGED for non DSDS m3gppIndex::"
-                            + cardSubData.subscription[0].m3gppIndex + " m3gpp2Index::"
-                            + cardSubData.subscription[0].m3gpp2Index);
-                    mProxyPhones[0].setSubscriptionInfo(cardSubData.subscription[0]);
-                }
+                logd("ProxyManager EVENT_ICC_CHANGED");
+                handleIccChanged();
+                break;
+
+            case EVENT_UPDATE_UICC_STATUS:
+                logd("ProxyManager EVENT_UPDATE_UICC_STATUS");
+                onUpdateUiccStatus(((String)msg.obj), (int)msg.arg1);
                 break;
 
             case EVENT_SUBSCRIPTION_READY:
@@ -456,28 +523,8 @@ public class ProxyManager extends Handler {
                 break;
 
             case EVENT_GET_ICCID_DONE:
-                Log.d(LOG_TAG, "ProxyManager EVENT_READ_ICCID_DONE");
-                ar = (AsyncResult)msg.obj;
-                byte []data = (byte[])ar.result;
-                cardIndex = 0;
-                strCardIndex = (String) ar.userObj;
-                if (strCardIndex != null) {
-                    cardIndex = Integer.parseInt(strCardIndex);
-                    Log.d(LOG_TAG, "parsed cardIndex: " + cardIndex);
-                }
-
-                if (ar.exception != null) {
-                    Log.d(LOG_TAG, "Exception in GET ICCID");
-                    mIccIds[cardIndex] = null;
-                } else {
-                    mIccIds[cardIndex] = IccUtils.bcdToString(data, 0, data.length);
-                }
-                Log.d(LOG_TAG, "GET ICCID DONE.. mIccIds[" + cardIndex + "] = "
-                        + mIccIds[cardIndex]);
-                mPendingIccidRequest--;
-                if (mPendingIccidRequest <= 0) {
-                    processCardStatus();
-                }
+                logd("ProxyManager EVENT_READ_ICCID_DONE");
+                handleGetIccIdDone((AsyncResult)msg.obj);
                 break;
 
             case EVENT_DISABLE_DATA_CONNECTION_DONE:
@@ -558,120 +605,358 @@ public class ProxyManager extends Handler {
         }
     }
 
-    private void getCardIccids() {
-        // get the iccid from the cards present.
-        mIccIds = new String[UiccConstants.RIL_MAX_CARDS];
+    /**
+     * Process the ICC_CHANGED notification.
+     * If Multi SIM is enabled, then update the local list of available cards, trigger
+     * read request for ICCID for new cards, and trigger UPDATE_UICC_STATUS if there
+     * is any change in the card list.
+     * If Multi SIM is not enabled, then set the subscription information to the
+     * default subscription to PhoneProxy.
+     */
+    synchronized private void handleIccChanged() {
+        if (TelephonyManager.isMultiSimEnabled()) {
+            logd("handleIccChanged: MultiSIM Enabled");
 
-        for (int cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
-            mIccIds[cardIndex] = null;
-            if (mUiccCards[cardIndex].getCardState() == CardState.PRESENT) {
-                Log.d(LOG_TAG, "get ICCID for card : " + cardIndex);
+            boolean processCards = false;
+            int cardIndex = 0;
+            UiccCard[] uiccCards = mUiccManager.getIccCards();
+
+            for (UiccCard uiccCard : uiccCards) {
+                boolean cardStateChanged = false;
+                UiccCard card = mUiccCardList.get(cardIndex).getUiccCard();
+
+                logd("cardIndex = " + cardIndex + " new uiccCard = "
+                        + uiccCard + " old card = " + card);
+
+                // If old card is null then update the card info
+                // If no change in card state then no need to read ICCID
+                if (card != null) {
+                    CardState oldCardState = mUiccCardList.get(cardIndex).getCardState();
+                    mUiccCardList.get(cardIndex).setUiccCard(uiccCard);
+
+                    logd("handleIccChanged: oldCardState = " + oldCardState);
+
+                    if (uiccCard != null) {
+                        logd("handleIccChanged: new uiccCard.getCardState() = "
+                                + uiccCard.getCardState());
+
+                        // If this is a new card then we need to read the ICCID
+                        // once again. Reset the ICCID and the read flag.
+                        if (uiccCard.getCardState() != oldCardState) {
+                            if (uiccCard.getCardState() == CardState.PRESENT) {
+                                mUiccCardList.get(cardIndex).setIccId(null);
+                                mUiccCardList.get(cardIndex).setReadIccIdInProgress(false);
+                            }
+                            cardStateChanged = true;
+                        }
+                    } else {
+                        logd("handleIccChanged: new uiccCard is NULL");
+                        cardStateChanged = true;
+                    }
+                } else if (card == null) {  // First time when gets a new uiccCard
+                    mUiccCardList.set(cardIndex, new CardInfo(uiccCard));
+                }
+
+                card = mUiccCardList.get(cardIndex).getUiccCard();
+                // TODO: We shall process the cards only if there is a change in the cards status.
+                if ((card != null && card.getCardState() == CardState.PRESENT)
+                        || cardStateChanged) {
+                    processCards = true;
+                }
+
+                cardIndex++;
+            }
+
+            if (mSetSubscriptionInProgress) {
+                logd("handleIccChanged: SET UICC SUBSCRIPTION is under progress, "
+                        + "Process the ICC CHANGED later!!");
+                return;
+            }
+
+            updateIccIds();
+
+            boolean readIccIdInProgress = isReadIccIdInProgress();
+
+            logd("handleIccChanged: MultiSIM Enabled : "
+                    + " processCards = " + processCards
+                    + " readIccIdInProgress = " + readIccIdInProgress);
+
+            if (processCards && !readIccIdInProgress) {
+                updateUiccStatus("ICC STATUS CHANGED");
+            }
+        } else {
+            SubscriptionData cardSubData = new SubscriptionData(1);
+            cardSubData.subscription[0].slotId = 0;
+            cardSubData.subscription[0].subId = 0;
+            cardSubData.subscription[0].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
+            cardSubData.subscription[0].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
+            UiccCard[] cardsList = mUiccManager.getIccCards();
+            UiccCard c = (cardsList.length > 0) ? cardsList[0] : null;
+            if (c != null) {
+                cardSubData.subscription[0].m3gppIndex = c.getSubscription3gppAppIndex();
+                cardSubData.subscription[0].m3gpp2Index = c.getSubscription3gpp2AppIndex();
+            }
+            mProxyPhones[0].setSubscriptionInfo(cardSubData.subscription[0]);
+        }
+    }
+
+    /**
+     * This issues a read ICCID request if the ICCID is not yet read for the cards.
+     */
+    private void updateIccIds() {
+        int cardIndex = 0;
+        // get the ICCID from the cards present.
+        for (CardInfo cardInfo : mUiccCardList) {
+            logd("updateIccIds: cardIndex = " + cardIndex
+                    + " cardInfo = " + cardInfo);
+            UiccCard uiccCard = cardInfo.getUiccCard();
+
+            // If card is present and ICCID is null, and no read ICCID
+            // request is issued so far, then issue read request now.
+            if (uiccCard != null
+                    && uiccCard.getCardState() == CardState.PRESENT
+                    && cardInfo.getIccId() == null
+                    && !cardInfo.isReadIccIdInProgress()) {
                 String strCardIndex = Integer.toString(cardIndex);
-
                 Message response = obtainMessage(EVENT_GET_ICCID_DONE, strCardIndex);
-
-                UiccCardApplication cardApp = mUiccCards[cardIndex].getUiccCardApplication(0);
+                UiccCardApplication cardApp = uiccCard.getUiccCardApplication(0);
                 if (cardApp != null) {
                     IccFileHandler fileHandler = cardApp.getIccFileHandler();
                     if (fileHandler != null) {
+                        logd("updateIccIds: get ICCID for cardInfo : "
+                                + cardIndex);
                         fileHandler.loadEFTransparent(IccConstants.EF_ICCID, response);
-                        mPendingIccidRequest++;
+                        cardInfo.setReadIccIdInProgress(true); // ICCID read started!!!
                     }
                 }
             }
+
+            cardIndex++;
         }
     }
 
     /**
-     * Returns true if both cards are either ABSENT or PRESENT with
-     * atleast one application.
+     * Return true if there is any read ICCID request is in progress otherwise false.
      */
-    private boolean isValidCards() {
-        int numValidCards = 0;
-        for (UiccCard card : mUiccCards) {
-            if (card != null
-                    && (card.getCardState() == CardState.ABSENT
-                        || (card.getCardState() == CardState.PRESENT
-                            && card.getNumApplications() > 0))) {
-                numValidCards++;
+    private boolean isReadIccIdInProgress() {
+        for (CardInfo cardInfo : mUiccCardList) {
+            if (cardInfo.isReadIccIdInProgress()) {
+                return true;
             }
         }
-        return (numValidCards == mUiccCards.length);
+        return false;
     }
+
 
     /**
-     * Check the card status and start processing.
-     * Card status to be processed if
-     * card1 status is present and card2 status is present
-     * card1 status is present and card2 status is absent
-     * card1 status is absent and card2 status is present
+     * Process the read ICCID response.
+     * Update the ICCID for the corresponding card and trigger UPDATE_UICC_STATUS
+     * if there is no other read ICCID in progress.
+     *
      */
-    private void checkCardStatus() {
-        if (isValidCards() && mReadIccid) {
-            mReadIccid = false;
-            getCardIccids();
-        }
-    }
-
-    private void processCardStatus() {
-        int numApps = 0;
-
-        // Process the cards only if both the radio states are ON.
-        // Check is required to avoid accessing the uicc cards when
-        // any of the radio state is off/unavailable, which may
-        // araise when user toggles the airplane mode immediately.
-        if (!isAllRadioOn()) {
-            Log.d(LOG_TAG, "processCardStatus: radio is OFF. Not processing cards");
+    synchronized private void handleGetIccIdDone(AsyncResult ar) {
+        if (ar == null) {
+            logd("handleGetIccIdDone: parameter is null");
             return;
         }
 
-        mCardSubData = new SubscriptionData[UiccConstants.RIL_MAX_CARDS];
+        byte []data = (byte[])ar.result;
+        int cardIndex = 0;
 
-        // Loop through list of cards and list of applications and store it in the mCardSubData
-        for (int cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
-            CardState cardstate = mUiccCards[cardIndex].getCardState();
-            Log.d(LOG_TAG, "cardIndex = " + cardIndex + " cardstate = " + cardstate);
+        if (ar.userObj != null) {
+            cardIndex = Integer.parseInt((String)ar.userObj);
+        }
 
-            if (cardstate == CardState.PRESENT) {
-                numApps = mUiccCards[cardIndex].getNumApplications();
-                Log.d(LOG_TAG, "Number of apps : " + numApps);
+        logd("handleGetIccIdDone: cardIndex = " + cardIndex);
 
-                mCardSubData[cardIndex] = new SubscriptionData(numApps);
+        String iccId = null;
 
-                for (int appIndex = 0; appIndex < numApps ; appIndex++ ) {
-                    Log.d(LOG_TAG, "appIndex : "+ appIndex);
+        if (ar.exception != null) {
+            logd("Exception in GET ICCID");
+            // ICCID read failure. We may need to read the ICCID again.
+        } else {
+            iccId = IccUtils.bcdToString(data, 0, data.length);
+        }
 
-                    Subscription cardSub = mCardSubData[cardIndex].subscription[appIndex];
+        mUiccCardList.get(cardIndex).setReadIccIdInProgress(false);
 
-                    UiccCardApplication uiccCardApplication = mUiccCards[cardIndex]
-                        .getUiccCardApplication(appIndex);
+        mUiccCardList.get(cardIndex).setIccId(iccId);
+        logd("=============================================================");
+        logd("GET ICCID DONE. ICCID of card[" + cardIndex + "] = " + iccId);
+        logd("=============================================================");
 
-                    cardSub.slotId = cardIndex;
-                    cardSub.subId = SUBSCRIPTION_INDEX_INVALID;  // Not set the sub id
-                    cardSub.subStatus = SUB_INVALID;
-                    cardSub.appId = uiccCardApplication.getAid();
-                    cardSub.appLabel = uiccCardApplication.getAppLabel();
-                    cardSub.iccId = mIccIds[cardIndex];
+        // ICCID read are completed.  Now proceed with the card processing.
+        updateUiccStatus("ICCID Read Done for card : " + cardIndex);
+    }
 
-                    AppType type = uiccCardApplication.getType();
-                    String subAppType = appTypetoString(type);
-                    //Apps like ISIM etc are treated as UNKNOWN apps, to be discarded
-                    if (!subAppType.equals("UNKNOWN")) {
-                        Log.d(LOG_TAG, "appType: "+ subAppType);
-                        cardSub.appType = subAppType;
-                    } else {
-                        cardSub.appType = null;
-                        Log.d(LOG_TAG, "UNKNOWN APP");
-                    }
+    private void updateUiccStatus(String reason) {
+        mUpdateUiccStatusContext++;
+        Message msg = obtainMessage(EVENT_UPDATE_UICC_STATUS, //what
+                mUpdateUiccStatusContext, //arg1
+                0, //arg2
+                reason); //userObj
+        sendMessage(msg);
+    }
 
-                    fillAppIndex(cardSub, appIndex);
-                    Log.d(LOG_TAG, "mCardSubData[" + cardIndex + "].subscription[" + appIndex +
-                            "] = " + cardSub.toString());
+    /**
+     *  Update the UICC status and intiates set uicc subscription if required.
+     */
+    synchronized private void onUpdateUiccStatus(String reason, int context) {
+        logd("onUpdateUiccStatus: context = " + context + " mUpdateUiccStatusContext = "
+                + mUpdateUiccStatusContext + " reason = " + reason);
+
+        if (mSetSubscriptionInProgress) {
+            logd("onUpdateUiccStatus: Already a SET UICC SUBSCRIPTION is under progress, "
+                    + "Process the ICC CHANGED later!!");
+            return;
+        }
+
+        if (context != mUpdateUiccStatusContext) {
+            // we have other EVENT_UPDATE_UICC_STATUS on the way.
+            logd("onUpdateUiccStatus: [ignored] : reason=" + reason);
+            return;
+        }
+
+        boolean setSubRequired = false;
+        boolean cardsUpdated = compareAndUpdateCardSubData();
+        SubscriptionData matchedSub = null;
+
+        logd("onUpdateUiccStatus: cardsUpdated = " + cardsUpdated);
+
+        if (cardsUpdated) {
+            matchedSub = getMatchedUserPrefSubs();
+            SubscriptionData currentSub = getSelectedSubscriptions();
+
+            for (int subId = 0; subId < NUM_SUBSCRIPTIONS; subId++) {
+                if (matchedSub.subscription[subId].subStatus == SUB_ACTIVATE
+                        && currentSub.subscription[subId].subStatus == SUB_ACTIVATED) {
+                    // If the subscription is already activated, then no need to
+                    // set the subscription again.
+                    matchedSub.subscription[subId].subStatus = SUB_ACTIVATED;
+                    logd("onUpdateUiccStatus: subId = " + subId + " : Already ACTIVATED");
+                } else if (matchedSub.subscription[subId].subStatus == SUB_ACTIVATE
+                        && currentSub.subscription[subId].subStatus != SUB_ACTIVATED) {
+                    setSubRequired = true;
+                    logd("onUpdateUiccStatus: subId = " + subId + " : Need to ACTIVATE");
                 }
             }
         }
 
-        matchSubscriptions();
+        if (setSubRequired) {
+            logd("onUpdateUiccStatus: automatic set subscription");
+            setSubscription(matchedSub, null);
+        } else {
+            logd("onUpdateUiccStatus: Set Subscription not Required");
+        }
+
+        boolean newCardsAvailable = isNewCardsAvailable();
+        if (newCardsAvailable){
+            logd("onUpdateUiccStatus: New cards available, notify user to configure subscriptions");
+            notifyNewCardsAvailable();
+        }
+    }
+
+    void notifyNewCardsAvailable() {
+        logd("notifyNewCardsAvailable" );
+        Intent setSubscriptionIntent = new Intent(Intent.ACTION_MAIN);
+        setSubscriptionIntent.setClassName("com.android.phone",
+                "com.android.phone.SetSubscription");
+        setSubscriptionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        setSubscriptionIntent.putExtra("NOTIFY_NEW_CARD_AVAILABLE", true);
+
+        mContext.startActivity(setSubscriptionIntent);
+    }
+
+    /**
+     *  Update the card subscription data from the UiccCards.
+     *  Return true if updates atleast one card, else false.
+     */
+    private boolean compareAndUpdateCardSubData() {
+        boolean cardsUpdated = false;
+
+        // Loop through list of cards and list of applications and store it in the mCardSubData
+        for (int cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
+            CardState cardState = null;
+            CardInfo cardInfo = mUiccCardList.get(cardIndex);
+            UiccCard uiccCard = null;
+
+            if (cardInfo != null) {
+                uiccCard = cardInfo.getUiccCard();
+            }
+
+            if (uiccCard == null || mRadioOn[cardIndex] == false) {
+                logd("compareAndUpdateCardSubData(): mRadioOn[" + cardIndex + "] = " + mRadioOn[cardIndex]);
+                logd("compareAndUpdateCardSubData(): NO Card!!!!! at index : " + cardIndex);
+                if (mCardSubData[cardIndex] != null) {
+                    // Card is removed.
+                    cardsUpdated = true;
+                }
+                mCardSubData[cardIndex] = null;
+                continue;
+            }
+
+            cardState = uiccCard.getCardState();
+
+            logd("compareAndUpdateCardSubData(): cardIndex = " + cardIndex
+                    + " cardInfo = " + cardInfo);
+
+            int numApps = 0;
+            if (cardState == CardState.PRESENT) {
+                numApps = uiccCard.getNumApplications();
+            }
+
+            logd("compareAndUpdateCardSubData(): Number of apps : " + numApps);
+
+            // Process only if the card is PRESENT, the ICCID is available and number of app > 0.
+            if (cardState == CardState.PRESENT && cardInfo.getIccId() != null && numApps > 0) {
+                logd("compareAndUpdateCardSubData(): mCardSubData[" + cardIndex
+                        + "] = " + mCardSubData[cardIndex]);
+
+                // Update the mCardSubData only if a new card available.
+                // ie., if previous mCardSubData is null or the iccId is different.
+                if (mCardSubData[cardIndex] == null ||
+                        (mCardSubData[cardIndex] != null
+                         && mCardSubData[cardIndex].getIccId() != cardInfo.getIccId())) {
+
+                    logd("compareAndUpdateCardSubData(): New card, update card info at index = "
+                        + cardIndex);
+
+                    mCardSubData[cardIndex] = new SubscriptionData(numApps);
+
+                    for (int appIndex = 0; appIndex < numApps; appIndex++) {
+                        Subscription cardSub = mCardSubData[cardIndex].subscription[appIndex];
+                        UiccCardApplication uiccCardApplication = uiccCard.getUiccCardApplication(appIndex);
+
+                        cardSub.slotId = cardIndex;
+                        cardSub.subId = SUBSCRIPTION_INDEX_INVALID;  // Not set the sub id
+                        cardSub.subStatus = SUB_INVALID;
+                        cardSub.appId = uiccCardApplication.getAid();
+                        cardSub.appLabel = uiccCardApplication.getAppLabel();
+                        cardSub.iccId = cardInfo.getIccId();
+
+                        AppType type = uiccCardApplication.getType();
+                        String subAppType = appTypetoString(type);
+                        //Apps like ISIM etc are treated as UNKNOWN apps, to be discarded
+                        if (!subAppType.equals("UNKNOWN")) {
+                            cardSub.appType = subAppType;
+                        } else {
+                            cardSub.appType = null;
+                            logd("compareAndUpdateCardSubData(): UNKNOWN APP");
+                        }
+
+                        fillAppIndex(cardSub, appIndex);
+                    }
+                    cardsUpdated = true;
+                }
+            } else {
+                mCardSubData[cardIndex] = null;
+            }
+        }
+
+        logd("compareAndUpdateCardSubData(): cardsUpdated = " + cardsUpdated);
+        logd("compareAndUpdateCardSubData(): mCardSubData = " + Arrays.toString(mCardSubData));
+
+        return cardsUpdated;
     }
 
     private void fillAppIndex(Subscription cardSub, int appIndex) {
@@ -704,34 +989,35 @@ public class ProxyManager extends Handler {
         }
     }
 
-    /*
-     * Compare each of the user pref sub with the Subscriptions in each of the card.
-     * If all of the user pref subscriptions, which were activated on the last session,
-     * matches the subscriptions(applications) in the card then automatically set the
-     * subscription.  Otherwise prompt the User to select subscriptions.
+    /**
+     * Compare each of the user preferred subscriptions with the subscriptions in each of the card.
+     * Return the subscriptions from the cards, which are matched with the any of the
+     * user preferred subscriptions.
      */
-    private void matchSubscriptions() {
+    private SubscriptionData getMatchedUserPrefSubs() {
         int cardIndex = 0;
-        int num_cards = 0;
         SubscriptionData matchedSub = new SubscriptionData(NUM_SUBSCRIPTIONS);
 
-        Log.d(LOG_TAG, "matchSubscriptions");
+        logd("getMatchedUserPrefSubs(): Enter");
 
         // For each subscription in mUserPrefSubs
         for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
             Subscription userSub = mUserPrefSubs.subscription[i];
-            Log.d(LOG_TAG, "subId: " + i);
+            logd("getMatchedUserPrefSubs(): Compare for UserPrefSubs["
+                    + i + "] = " + userSub);
+
+            if (userSub.subStatus != SUB_ACTIVATED) {
+                logd("getMatchedUserPrefSubs(): UserPrefSubs at subId = " + i
+                        + " Not required to activate");
+                continue;
+            }
 
             // For each cards in mCardSubData
             for (cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
-                Log.d(LOG_TAG, "cardIndex: " + cardIndex + " userSub.m3gppIndex: "
-                        + userSub.m3gppIndex + " userSub.m3gpp2Index: "
-                        + userSub.m3gpp2Index);
+                if (userSub.getAppIndex() != SUBSCRIPTION_INDEX_INVALID
+                        && mCardSubData[cardIndex] != null
+                        && userSub.getAppIndex() < mCardSubData[cardIndex].getLength()) {
 
-                if (((userSub.m3gppIndex != SUBSCRIPTION_INDEX_INVALID)
-                            || (userSub.m3gpp2Index != SUBSCRIPTION_INDEX_INVALID))
-                        && (mCardSubData[cardIndex] != null)
-                        && (userSub.getAppIndex() < mCardSubData[cardIndex].getLength())) {
                     Subscription cardSub = mCardSubData[cardIndex].subscription[userSub.getAppIndex()];
 
                     // Check for the iccid, app id, app name
@@ -746,15 +1032,6 @@ public class ProxyManager extends Handler {
                         matchedSub.subscription[i].copyFrom(userSub);
                         // Set the activate state
                         matchedSub.subscription[i].subStatus = SUB_ACTIVATE;
-
-                        if (mSetSubOnSimRefresh) {
-                            //In case of sim refresh, only affected subscriptions are activated wrt slotID.
-                            if (mSupplySubscription.prevSubscriptionData.subscription[i].subStatus
-                                    == SUB_ACTIVATED) {
-                                matchedSub.subscription[i].subStatus = SUB_ACTIVATED;
-                                Log.d(LOG_TAG,"current subStatus is set to SUB_ACTIVATED");
-                            }
-                        }
                         matchedSub.subscription[i].subId = i;
                         // Set the slot id, sub index and appLabel from mCardSubData
                         matchedSub.subscription[i].slotId = cardSub.slotId;
@@ -763,32 +1040,42 @@ public class ProxyManager extends Handler {
                         if (cardSub.appLabel != null) {
                             matchedSub.subscription[i].appLabel = new String(cardSub.appLabel);
                         }
-
-                        Log.d(LOG_TAG, "Subscription is matched for UserPrefSub subId = " + i
-                                + " cardIndex = " + cardIndex + " 3gppIndex = "
-                                + userSub.m3gppIndex + " 3gpp2Index = " + userSub.m3gpp2Index);
+                        logd("getMatchedUserPrefSubs(): UserPrefSubs at subId = "
+                                + i + " matches with : " + " matchedSub.subscription[" + i + "] = "
+                                + matchedSub.subscription[i]);
                         break;
                     }
                 }
-                Log.d(LOG_TAG, "Not matched for UserPrefSub subId: " + i
-                        + " userSub.3gppIndex : " + userSub.m3gppIndex + " cardIndex : "
-                        + cardIndex + " userSub.3gpp2Index : " + userSub.m3gpp2Index);
             }
-            Log.d(LOG_TAG, "matchedSub.subscription[" + i + "] = " + matchedSub.subscription[i]);
+
+            if (cardIndex >= UiccConstants.RIL_MAX_CARDS) {
+                logd("getMatchedUserPrefSubs(): No match for UserPrefSubs at subId = " + i);
+            }
         }
 
-        // If the user pref sub is not matched, then propmt the user to select the subs.
-        if ((mUserPrefSubs.subscription[0].subStatus == SUB_ACTIVATED
-                    && matchedSub.subscription[0].subId == SUBSCRIPTION_INDEX_INVALID)
-                || (mUserPrefSubs.subscription[1].subStatus == SUB_ACTIVATED
-                    && matchedSub.subscription[1].subId == SUBSCRIPTION_INDEX_INVALID)) {
-            //Subscription settings do not match with the card applications
-            mUiccSubSet = true;  //card status is processed only the first time
-            promptUserSubscription();
-        } else {
-            setSubscription(matchedSub, null);
-            mUiccSubSet = true;
+        logd("getMatchedUserPrefSubs(): matchedSub = " + matchedSub);
+
+        return matchedSub;
+    }
+
+    /**
+     * Return true is a new card is available.
+     */
+    private boolean isNewCardsAvailable() {
+        for (SubscriptionData cardSub : mCardSubData) {
+            if (cardSub != null && cardSub.getIccId() != null) {
+                boolean cardMatched = false;
+                for (Subscription userSub : mUserPrefSubs.subscription) {
+                    if (cardSub.getIccId().equals(userSub.iccId)) {
+                        cardMatched = true;
+                    }
+                }
+                if (!cardMatched) {
+                    return true;
+                }
+            }
         }
+        return false;
     }
 
     private void processSimRefresh(AsyncResult ar) {
@@ -800,26 +1087,24 @@ public class ProxyManager extends Handler {
         }
 
         Integer slot = (Integer)ar.userObj;
-        Log.d(LOG_TAG, "processSimRefresh: slot = " + slot
+        logd("processSimRefresh: slot = " + slot
                 + " refreshResult = " + state.refreshResult);
 
         if (state.refreshResult == SimRefreshResponse.Result.SIM_RESET) {
             //subscription in mUserPrefSubs
             for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
                 if (mUserPrefSubs.subscription[i].slotId == slot) {
-                    Log.d(LOG_TAG, "processSimRefresh: mUserPrefSubs.slotId = "
+                    logd("processSimRefresh: mUserPrefSubs.slotId = "
                             + mUserPrefSubs.subscription[i].slotId);
                     //By changing the status of prevSubscriptionData,
                     //we can activate individual subscriptions.
-                    mSupplySubscription.prevSubscriptionData.subscription[i].subStatus = SUB_DEACTIVATED;
-                    mUiccSubSet = false;
-                    mReadIccid = true;
+                    resetCurrentSubscription(i);
                     if (mUserPrefSubs.subscription[i].getAppIndex() == mCurrentDds) {
                         mDdsSet = false;
                     }
                 }
             }
-            mSetSubOnSimRefresh = true;
+            mCardSubData[slot] = null;
         }
     }
 
@@ -852,30 +1137,152 @@ public class ProxyManager extends Handler {
             }
         }
 
-        mUiccSubSet = true;
-
         // Setting the subscription at RIL/Modem is handled through a thread. Start the thread
         // if it is not already started.
         if (!mSupplySubscription.isAlive()) {
             mSupplySubscription.start();
         }
 
+        logd("Set subscription is started. Setting the flag mSetSubscriptionInProgress");
+        mSetSubscriptionInProgress = true;
+
+        logd("Calling mSupplySubscription.setSubscription");
         mSupplySubscription.setSubscription(subData, onCompleteMsg);
     }
 
-    public void promptUserSubscription() {
-        // Send an intent to start SetSubscription.java activity to show the list of apps
-        // on each card for user selection
-        Log.d(LOG_TAG, "promptUserSubscription" );
-        Intent setSubscriptionIntent = new Intent(Intent.ACTION_MAIN);
-        setSubscriptionIntent.setClassName("com.android.phone",
-                "com.android.phone.SetSubscription");
-        setSubscriptionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        setSubscriptionIntent.putExtra("CONFIG_SUB", false);
+    /**
+     * Sets the designated data subscription source(DDS).
+     */
+    public void setDataSubscription(int subscription, Message onCompleteMsg) {
+        Log.d(LOG_TAG, " setDataSubscription: mCurrentDds = "
+                + mCurrentDds + " new subscription = " + subscription);
 
-        mContext.startActivity(setSubscriptionIntent);
+        mSetDdsCompleteMsg = onCompleteMsg;
+
+        // If there is no set dds in progress disable the current
+        // active dds. Once all data connections is teared down, the data
+        // connections on mQueuedDds will be enabled.
+        // Call the PhoneFactory setDataSubscription API only after disconnecting
+        // the current dds.
+        mQueuedDds = subscription;
+        if (!mDisableDdsInProgress) {
+            Message allDataDisabledMsg = obtainMessage(EVENT_DISABLE_DATA_CONNECTION_DONE);
+            mProxyPhones[mCurrentDds].disableDataConnectivity(allDataDisabledMsg);
+            mDisableDdsInProgress = true;
+        }
     }
 
+    /** Returns the card subscriptions */
+    public SubscriptionData[] getCardSubscriptions() {
+        return mCardSubData;
+    }
+
+    /** Resets the card subscriptions */
+    private void resetCardInfo(int cardIndex) {
+        logd("resetCardInfo(): cardIndex = " + cardIndex);
+        if (cardIndex < mCardSubData.length) {
+            mCardSubData[cardIndex] = null;
+        }
+        if (cardIndex < mUiccCardList.size()) {
+            mUiccCardList.set(cardIndex, new CardInfo(null));
+        }
+    }
+
+    /** Returns the current subscriptions in use.  */
+    public SubscriptionData getCurrentSubscriptions() {
+        return mSupplySubscription.prevSubscriptionData;
+    }
+
+    /** Returns the selected subscriptions. */
+    public SubscriptionData getSelectedSubscriptions() {
+        return mSupplySubscription.subscriptionData;
+    }
+
+    /** Reset the subscriptions.  Mark the selected subscription as Deactivated. */
+    private void resetCurrentSubscription(int subscr) {
+        Log.d(LOG_TAG, "resetCurrentSubscription : subscr = " + subscr);
+        mSupplySubscription.subscriptionData.subscription[subscr].subStatus = SUB_DEACTIVATED;
+        mSupplySubscription.prevSubscriptionData.subscription[subscr].subStatus = SUB_DEACTIVATED;
+    }
+
+    /** Returns true if there is any active subscriptions */
+    private boolean isAnySubscriptionActive() {
+        for (Subscription sub : mSupplySubscription.subscriptionData.subscription) {
+            if (sub.subStatus == SUB_ACTIVATED) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isSubActive(int subscription) {
+        boolean isActive = false;
+        SubscriptionData currentSelSub = getCurrentSubscriptions();
+        if (currentSelSub.subscription[subscription].subStatus == SUB_ACTIVATED) {
+            isActive = true;
+        }
+        return isActive;
+    }
+
+    public int numSubsActive() {
+        int phoneCount = TelephonyManager.getPhoneCount();
+        int subCount = 0;
+        for (int i = 0; i < phoneCount; i++) {
+            if (isSubActive(i)) {
+                subCount++;
+            }
+        }
+        Log.d(LOG_TAG, "count of subs activated " + subCount);
+        return subCount;
+    }
+
+    /* Gets the default subscriptions for VOICE/SMS/DATA */
+    private void getDefaultProperties(Context context) {
+        boolean resetToDefault = true;
+
+        if (TelephonyManager.isMultiSimEnabled()) {
+            try {
+                int voiceSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.MULTI_SIM_VOICE_CALL);
+                int dataSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.MULTI_SIM_DATA_CALL);
+                int smsSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.MULTI_SIM_SMS);
+                int defaultSubscription = Settings.System.getInt(context.getContentResolver(),
+                        Settings.System.DEFAULT_SUBSCRIPTION);
+                Log.d(LOG_TAG,"Dual Sim Settings from Settings Provider :");
+                Log.d(LOG_TAG,"voiceSubscription = " + voiceSubscription
+                        + " dataSubscription = " + dataSubscription
+                        + " smsSubscription = " + smsSubscription
+                        + " defaultSubscription = " + defaultSubscription);
+                resetToDefault = false;
+            } catch (SettingNotFoundException snfe) {
+                Log.e(LOG_TAG, "Settings Exception Reading Voice/Sms/Data/Default Subscriptions", snfe);
+            }
+        }
+
+        // Reset the Voice/Sms/Data/Default Subscriptions to default values
+        // if the dsds is not enabled or if there is any exception occured
+        // while reading the system properties.
+        if (resetToDefault) {
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.MULTI_SIM_VOICE_CALL, TelephonyManager.DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.MULTI_SIM_DATA_CALL, TelephonyManager.DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.MULTI_SIM_SMS, TelephonyManager.DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.DEFAULT_SUBSCRIPTION, TelephonyManager.DEFAULT_SUB);
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.MULTI_SIM_VOICE_PROMPT, PROMPT_VALUE);
+        }
+    }
+
+    private void logd(String string) {
+        Log.d(LOG_TAG, string);
+    }
+
+    /** Helper thread for set subscription */
     public class SupplySubscription extends Thread {
 
         private Handler mHandler;
@@ -1080,6 +1487,10 @@ public class ProxyManager extends Handler {
                             currentPhone.enableDataConnectivity();
                         }
                     }
+
+                    // Store the User prefered Subscription once all
+                    // the set uicc subscription is done.
+                    saveUserPreferredSubscription(phoneIndex, subscriptionData.subscription[phoneIndex]);
                 }
 
                 if (mPendingActivateEvents == 0 && mPendingDeactivateEvents == 0) {
@@ -1087,9 +1498,6 @@ public class ProxyManager extends Handler {
 
                     sendSetSubscriptionCallback();
 
-                    // Store the User prefered Subscription once all
-                    // the set uicc subscription is done.
-                    saveUserPreferredSubscription(subscriptionData);
                     prevSubscriptionData.copyFrom(subscriptionData);
 
                     updateSubPreferences(subscriptionData);
@@ -1124,7 +1532,6 @@ public class ProxyManager extends Handler {
                                 subscriptionData.subscription[i].subId,
                                 subscriptionData.subscription[i].subStatus,
                                 callback);
-                        mSetSubOnSimRefresh = false;
                     } else {
                         mSubResult[i] = "ACTIVATE FAILED";
                         // Fall back to the previous subscription.
@@ -1290,6 +1697,7 @@ public class ProxyManager extends Handler {
         }
 
         private void sendSetSubscriptionCallback() {
+            ProxyManager.getInstance().sendMessage(obtainMessage(EVENT_SET_SUBSCRIPTION_COMPLETED));
             // Send the message back to callee with result.
             if (mSetSubCompleteMsg != null) {
                 Log.d(LOG_TAG, "sendSetSubscriptionCallback");
@@ -1297,101 +1705,6 @@ public class ProxyManager extends Handler {
                 mSetSubCompleteMsg.sendToTarget();
                 mSetSubCompleteMsg = null;
             }
-        }
-    }
-
-    /**
-     * Sets the designated data subscription source(DDS).
-     */
-    public void setDataSubscription(int subscription, Message onCompleteMsg) {
-        Log.d(LOG_TAG, " setDataSubscription: mCurrentDds = "
-                + mCurrentDds + " new subscription = " + subscription);
-
-        mSetDdsCompleteMsg = onCompleteMsg;
-
-        // If there is no set dds in progress disable the current
-        // active dds. Once all data connections is teared down, the data
-        // connections on mQueuedDds will be enabled.
-        // Call the PhoneFactory setDataSubscription API only after disconnecting
-        // the current dds.
-        mQueuedDds = subscription;
-        if (!mDisableDdsInProgress) {
-            Message allDataDisabledMsg = obtainMessage(EVENT_DISABLE_DATA_CONNECTION_DONE);
-            mProxyPhones[mCurrentDds].disableDataConnectivity(allDataDisabledMsg);
-            mDisableDdsInProgress = true;
-        }
-    }
-
-    /** Returns the card subscriptions */
-    public SubscriptionData[] getCardSubscriptions() {
-        return mCardSubData;
-    }
-
-    /** Returns the current subscriptions in use.  */
-    public SubscriptionData getCurrentSubscriptions() {
-        return mSupplySubscription.subscriptionData;
-    }
-
-    public boolean isSubActive(int subscription) {
-        boolean isActive = false;
-        SubscriptionData currentSelSub = getCurrentSubscriptions();
-        if (currentSelSub.subscription[subscription].subStatus == SUB_ACTIVATED) {
-            isActive = true;
-        }
-        return isActive;
-    }
-
-    public int numSubsActive() {
-        int phoneCount = TelephonyManager.getPhoneCount();
-        int subCount = 0;
-        for (int i = 0; i < phoneCount; i++) {
-            if (isSubActive(i)) {
-                subCount++;
-            }
-        }
-        Log.d(LOG_TAG, "count of subs activated " + subCount);
-        return subCount;
-    }
-
-    /* Gets the default subscriptions for VOICE/SMS/DATA */
-    private void getDefaultProperties(Context context) {
-        boolean resetToDefault = true;
-
-        if (TelephonyManager.isMultiSimEnabled()) {
-            try {
-                int voiceSubscription = Settings.System.getInt(context.getContentResolver(),
-                        Settings.System.MULTI_SIM_VOICE_CALL);
-                int dataSubscription = Settings.System.getInt(context.getContentResolver(),
-                        Settings.System.MULTI_SIM_DATA_CALL);
-                int smsSubscription = Settings.System.getInt(context.getContentResolver(),
-                        Settings.System.MULTI_SIM_SMS);
-                int defaultSubscription = Settings.System.getInt(context.getContentResolver(),
-                        Settings.System.DEFAULT_SUBSCRIPTION);
-                Log.d(LOG_TAG,"Dual Sim Settings from Settings Provider :");
-                Log.d(LOG_TAG,"voiceSubscription = " + voiceSubscription
-                        + " dataSubscription = " + dataSubscription
-                        + " smsSubscription = " + smsSubscription
-                        + " defaultSubscription = " + defaultSubscription);
-                resetToDefault = false;
-            } catch (SettingNotFoundException snfe) {
-                Log.e(LOG_TAG, "Settings Exception Reading Voice/Sms/Data/Default Subscriptions", snfe);
-            }
-        }
-
-        // Reset the Voice/Sms/Data/Default Subscriptions to default values
-        // if the dsds is not enabled or if there is any exception occured
-        // while reading the system properties.
-        if (resetToDefault) {
-            Settings.System.putInt(context.getContentResolver(),
-                    Settings.System.MULTI_SIM_VOICE_CALL, TelephonyManager.DEFAULT_SUB);
-            Settings.System.putInt(context.getContentResolver(),
-                    Settings.System.MULTI_SIM_DATA_CALL, TelephonyManager.DEFAULT_SUB);
-            Settings.System.putInt(context.getContentResolver(),
-                    Settings.System.MULTI_SIM_SMS, TelephonyManager.DEFAULT_SUB);
-            Settings.System.putInt(context.getContentResolver(),
-                    Settings.System.DEFAULT_SUBSCRIPTION, TelephonyManager.DEFAULT_SUB);
-            Settings.System.putInt(context.getContentResolver(),
-                    Settings.System.MULTI_SIM_VOICE_PROMPT, PROMPT_VALUE);
         }
     }
 
@@ -1430,6 +1743,17 @@ public class ProxyManager extends Handler {
                 }
             }
             return this;
+        }
+
+        public String getIccId() {
+            if (subscription.length > 0 && subscription[0] != null) {
+                return subscription[0].iccId;
+            }
+            return null;
+        }
+
+        public String toString() {
+            return Arrays.toString(subscription);
         }
     }
 
