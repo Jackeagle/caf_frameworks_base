@@ -102,6 +102,7 @@ class HDMIDaemon : public Thread, public IBinder::DeathRecipient
     bool writeHPDOption(int userOption) const;
     inline bool isValidMode(int ID);
     bool checkHDCPPresent();
+    bool isHDMIPanel();
 
     int mFrameworkSock;
     int mAcceptedConnection;
