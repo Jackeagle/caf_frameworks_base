@@ -285,7 +285,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     // how often to request NTP time, in milliseconds
     // current setting 4 hours
-    private static final long NTP_INTERVAL = 4*60*60*1000;
+    private static final long NTP_INTERVAL = 12*60*60*1000;
     // how long to wait if we have a network error in NTP or XTRA downloading
     // current setting - 5 minutes
     private static final long RETRY_INTERVAL = 5*60*1000;
