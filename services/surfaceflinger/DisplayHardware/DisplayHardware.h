@@ -77,6 +77,7 @@ public:
     status_t postOrigResBuffer(const native_handle_t* handle, int w = 0, int h = 0,
                                  int format = 0, int orientation = 0) const;
     status_t stopOrigResDisplay() const;
+    status_t copyBypassBuffer() const;
 
     unsigned int getDumpframe() const;
     float       getDpiX() const;

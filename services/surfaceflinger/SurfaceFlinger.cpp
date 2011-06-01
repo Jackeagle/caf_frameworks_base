@@ -480,21 +480,26 @@ bool SurfaceFlinger::threadLoop()
             enableOverlayOpt(false);
             enableOverlayOpt(true);
 
-#ifdef SF_BYPASS
-            /*
-             * We cant draw, close comp. bypass
-             */
-            if (mBypassState == eBypassClosePending || mBypassState == eBypassInUse) {
-                mBypassState = eBypassClosePending;
-                closeBypass();
-                freeBypassBuffers();
-            }
-#endif
-
             const DisplayHardware& hw(graphicPlane(0).displayHardware());
             if (mHDMIOutput)
                 hw.videoOverlayStarted(false);
         }
+
+#ifdef SF_BYPASS
+        if (hw.canDraw() && mBypassState == eBypassInUse) {
+            copyBypassBuffer();
+            bool clearBypassFlag = false;
+            freeBypassBuffers(clearBypassFlag);
+            return true;
+        }
+
+        if (mBypassState == eBypassClosePending || !(hw.canDraw())) {
+            mBypassState = eBypassClosePending;
+            closeBypass();
+            freeBypassBuffers();
+            return true;
+        }
+#endif
         usleep(16667); // 60 fps period
     }
     return true;
@@ -507,6 +512,18 @@ bool SurfaceFlinger::closeBypass()
     if (mBypassState == eBypassClosePending) {
         hw.closeBypass();
         mBypassState = eBypassNotInUse;
+        return true;
+    }
+#endif
+    return false;
+}
+
+bool SurfaceFlinger::copyBypassBuffer()
+{
+#ifdef SF_BYPASS
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    if (mBypassState == eBypassInUse) {
+        hw.copyBypassBuffer();
         return true;
     }
 #endif
@@ -1066,6 +1083,19 @@ void SurfaceFlinger::freeBypassBuffers()
     for (size_t i=0 ; i<count ; ++i) {
         const sp<LayerBase>& layer(layers[i]);
         layer->freeBypassBuffers();
+    }
+#endif
+}
+
+void SurfaceFlinger::freeBypassBuffers(bool clearOverlayFlag)
+{
+#ifdef SF_BYPASS
+    const LayerVector& drawingLayers(mDrawingState.layersSortedByZ);
+    const size_t count = drawingLayers.size();
+    sp<LayerBase> const* const layers = drawingLayers.array();
+    for (size_t i=0 ; i<count ; ++i) {
+        const sp<LayerBase>& layer(layers[i]);
+        layer->freeBypassBuffers(clearOverlayFlag);
     }
 #endif
 }
