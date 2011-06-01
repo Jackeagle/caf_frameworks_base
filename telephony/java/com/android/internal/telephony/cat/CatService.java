@@ -595,9 +595,11 @@ public class CatService extends Handler implements AppInterface {
         CatLog.d(this, "Date :: " + year + "/" + month + "/" + day);
         CatLog.d(this, "Time :: " + hour + ":" + minute + ":" + second);
 
-        long zoneOffset = calendar.get(Calendar.ZONE_OFFSET);
-        long dst = calendar.get(Calendar.DST_OFFSET);
-        CatLog.d(this, "zoneOffset :" + zoneOffset + ": dst :" + dst);
+        TimeZone zone = TimeZone.getTimeZone(
+                        SystemProperties.get("persist.sys.timezone"));
+        int zoneOffset = zone.getRawOffset() + zone.getDSTSavings() ;
+
+        CatLog.d(this, "TimeZone :" + zone + ": zoneOffset :" + zoneOffset);
 
         // Knock out the first two digits for 'YEAR'
         ret[0] = byteToBCD(year % 100);
@@ -611,8 +613,8 @@ public class CatService extends Handler implements AppInterface {
             // set FF in terminal response
             ret[6] = (byte) 0xFF;
         } else {
-            ret[6] = getTZOffSetByte(zoneOffset, dst);
-            CatLog.d(this, "dst : " + ret[6]);
+            ret[6] = getTZOffSetByte(zoneOffset);
+            CatLog.d(this, "tzOffset : " + ret[6]);
         }
         return ret;
     }
@@ -631,15 +633,10 @@ public class CatService extends Handler implements AppInterface {
         return bcdVal.byteValue();
     }
 
-    private byte getTZOffSetByte(long offSetVal, long dst) {
+    private byte getTZOffSetByte(long offSetVal) {
         long tzOffset = 0;
-
-        /*
-         * The zone offset obtained is for current offset time
-         * (Calendar.ZONE_OFFSET) only,. So DST correction is not applied to the
-         * zone offset.
-         */
-        offSetVal += dst;
+        boolean sign = (offSetVal < 0);
+        byte bcdVal = 0;
 
         /*
          * The 'offSetVal' is in milliseconds. Convert it to hours and compute
@@ -648,13 +645,10 @@ public class CatService extends Handler implements AppInterface {
          */
 
         tzOffset = offSetVal / (15 * 60 * 1000);
-
-        if (tzOffset < 0) {
-            tzOffset *= -1;
-            // For negative offsets, put '1' in the msb
-            tzOffset |= 0x08;
-        }
-        return byteToBCD((int) tzOffset);
+        tzOffset = (sign ? -1 : 1) * tzOffset;
+        bcdVal = byteToBCD((int) tzOffset);
+        // For negative offsets, put '1' in the msb
+        return sign ?  (bcdVal |= 0x08) : bcdVal;
     }
 
     private void sendMenuSelection(int menuId, boolean helpRequired) {
