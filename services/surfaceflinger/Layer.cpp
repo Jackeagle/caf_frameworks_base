@@ -136,10 +136,9 @@ void Layer::onRemoved()
     // If original resolution surface, close current VG channels.
     // Notify gralloc of the end of current playback.
     if(getUseOriginalSurfaceResolution()) {
-        const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
-        mFlinger->enableOverlayOpt(false);
-        mFlinger->enableOverlayOpt(true);
-        hw.videoOverlayStarted(false);
+        const DisplayHardware& hw(graphicPlane(0).displayHardware());
+        hw.stopOrigResDisplay();
+        freeBypassBuffers();
     }
 }
 
@@ -296,11 +295,18 @@ status_t Layer::drawWithOverlay(const Region& clip,
     }
 
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    if(getUseOriginalSurfaceResolution()){
+        sp<GraphicBuffer> buffer(mBufferManager.getActiveBuffer());
+        buffer_handle_t handle = (buffer->getNativeBuffer())->handle;
+        hw.postOrigResBuffer(handle, mWidth, mHeight, mFormat, getOrientation());
+        setOverlayUsed(true);
+        setBufferInUse();
+        return NO_ERROR;
+    }
     overlay::Overlay* temp = hw.getOverlayObject();
     int s3dFormat = getStereoscopic3DFormat();
-    bool originalResolutionFormat = getUseOriginalSurfaceResolution();
 
-    if (s3dFormat || originalResolutionFormat) {
+    if (s3dFormat) {
         hw.videoOverlayStarted(true);
     }
     if (!temp->setSource(mWidth, mHeight, mFormat|s3dFormat,
@@ -308,7 +314,7 @@ status_t Layer::drawWithOverlay(const Region& clip,
                            ignoreFB, mBufferManager.getNumBuffers()))
         return INVALID_OPERATION;
 
-    if ((s3dFormat || originalResolutionFormat) && !temp->setCrop(0, 0, mWidth, mHeight))
+    if ((s3dFormat) && !temp->setCrop(0, 0, mWidth, mHeight))
         return INVALID_OPERATION;
 
     const Rect bounds(mTransformedBounds);
@@ -320,23 +326,15 @@ status_t Layer::drawWithOverlay(const Region& clip,
     uint32_t ovpos_w, ovpos_h;
     bool ret;
 
-    if(LIKELY(!originalResolutionFormat)) {
-        if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
-            if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
-                ret = temp->setPosition(x, y, w, h);
-            }
-        }
-        else
+    if (ret = temp->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h)) {
+        if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
             ret = temp->setPosition(x, y, w, h);
-        if (!ret)
-            return INVALID_OPERATION;
-    } else {
-        ret = temp->setPosition(0, 0, temp->getFBWidth(), temp->getFBHeight());
-        if (UNLIKELY(!ret)) {
-            LOGE("setPosition failed for original resolution surface");
-            return INVALID_OPERATION;
         }
-    }
+    } else
+        ret = temp->setPosition(x, y, w, h);
+    if (!ret)
+        return INVALID_OPERATION;
+
     int orientation;
     if (ret = temp->getOrientation(orientation)) {
         if (orientation != getOrientation())
@@ -1090,6 +1088,8 @@ status_t Layer::SurfaceLayer::useOriginalSurfaceResolution(bool flag)
     sp<Layer> owner(getOwner());
     if (LIKELY(owner != 0)) {
         owner->useOriginalSurfaceResolution(flag);
+        const DisplayHardware& hw(owner->graphicPlane(0).displayHardware());
+        hw.startOrigResDisplay();
     }
     return 0;
 }

@@ -73,6 +73,10 @@ public:
     status_t postBypassBuffer(const native_handle_t* handle, int w = 0, int h = 0,
                                  int format = 0, int orientation = 0, int isHPDON = 0) const;
     status_t closeBypass() const;
+    status_t startOrigResDisplay() const;
+    status_t postOrigResBuffer(const native_handle_t* handle, int w = 0, int h = 0,
+                                 int format = 0, int orientation = 0) const;
+    status_t stopOrigResDisplay() const;
 
     unsigned int getDumpframe() const;
     float       getDpiX() const;
