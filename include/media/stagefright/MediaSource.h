@@ -22,11 +22,19 @@
 
 #include <media/stagefright/MediaErrors.h>
 #include <utils/RefBase.h>
+#ifdef TARGET_OMAP4
+#include <utils/Vector.h>
+#include "binder/IMemory.h"
+#endif
 
 namespace android {
 
 class MediaBuffer;
 class MetaData;
+
+#if defined(TARGET_OMAP4)
+struct S3D_params;
+#endif
 
 struct MediaSource : public RefBase {
     MediaSource();
@@ -118,6 +126,18 @@ protected:
 private:
     MediaSource(const MediaSource &);
     MediaSource &operator=(const MediaSource &);
+
+public:
+#if defined(TARGET_OMAP4)
+    // Method to share externally allocated buffers with the Codec.
+    virtual void setBuffers(Vector< sp<IMemory> > mBufferAddresse, bool portReconfig = false) {}
+    // Method used to reset read position without consuming the buffer
+    virtual int64_t setSeekTo(const ReadOptions *options) { return 0; }
+    virtual int getNumofOutputBuffers() {return -1; }
+
+    virtual void parseSEIMessages(S3D_params &mS3Dparams) {}
+#endif
+
 };
 
 }  // namespace android
