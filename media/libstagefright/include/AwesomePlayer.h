@@ -17,6 +17,11 @@
 #ifndef AWESOME_PLAYER_H_
 
 #define AWESOME_PLAYER_H_
+#if defined(TARGET_OMAP4)
+#include <utils/Vector.h>
+#include "TISEIMessagesParser.h"
+#endif
+
 
 #include "NuHTTPDataSource.h"
 #include "TimedEventQueue.h"
@@ -46,6 +51,13 @@ struct AwesomeRenderer : public RefBase {
 
     virtual status_t initCheck() const = 0;
     virtual void render(MediaBuffer *buffer) = 0;
+#ifdef TARGET_OMAP4
+    virtual Vector< sp<IMemory> > getBuffers() = 0;
+    virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {return false;}
+    virtual void set_s3d_frame_layout(uint32_t s3d_mode, uint32_t s3d_fmt, uint32_t s3d_order, uint32_t s3d_subsampling){};
+    virtual void resizeRenderer(uint32_t width, uint32_t height, uint32_t buffercount) = 0;
+    virtual void requestRendererClone(bool enable) = 0;
+#endif
 
 private:
     AwesomeRenderer(const AwesomeRenderer &);
@@ -89,13 +101,18 @@ struct AwesomePlayer {
 
     status_t suspend();
     status_t resume();
+#ifdef TARGET_OMAP4
+    status_t requestVideoCloneMode(bool enable);
+#endif
 
     // This is a mask of MediaExtractor::Flags.
     uint32_t flags() const;
 
     void postAudioEOS();
     void postAudioSeekComplete();
-
+#ifdef TARGET_OMAP4
+    void releaseRenderedBuffer(const sp<IMemory>& mem);
+#endif
 private:
     friend struct AwesomeEvent;
 
@@ -112,6 +129,22 @@ private:
         VIDEO_AT_EOS        = 512,
         AUTO_LOOPING        = 1024,
     };
+
+#if defined(TARGET_OMAP4)
+    enum {
+        HOLD_TO_RESUME      = 2048,
+        MAX_RESOLUTION      = 414720, // 864x480(WVGA) - 720x576(D1-PAL)
+    };
+    enum {
+         VID_MODE_NORMAL = 0,
+         VID_MODE_CLONE = 1
+      };
+
+    int mVideoMode;
+
+    S3D_params mS3Dparams;
+#endif
+
 
     mutable Mutex mLock;
     Mutex mMiscStateLock;
@@ -179,6 +212,13 @@ private:
     void postCheckAudioStatusEvent_l();
     status_t play_l();
 
+#ifdef TARGET_OMAP4
+    Vector<MediaBuffer*> mBuffersWithRenderer;
+    bool mBufferReleaseCallbackSet;
+    bool mIsFirstVideoBuffer;
+    status_t mFirstVideoBufferResult;
+    MediaBuffer *mFirstVideoBuffer;
+#endif
     MediaBuffer *mLastVideoBuffer;
     MediaBuffer *mVideoBuffer;
 

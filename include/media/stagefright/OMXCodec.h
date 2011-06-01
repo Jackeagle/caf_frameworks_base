@@ -38,6 +38,11 @@ struct OMXCodec : public MediaSource,
         // The client wants to access the output buffer's video
         // data for example for thumbnail extraction.
         kClientNeedsFramebuffer  = 4,
+#ifdef TARGET_OMAP4
+        kPreferThumbnailMode               = 0x8,
+        kPreferInterlacedOutputContent     = 0x10,
+        MAX_RESOLUTION = 414720, // video resolution for TI Vid Dec
+#endif
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,
@@ -45,6 +50,16 @@ struct OMXCodec : public MediaSource,
             const sp<MediaSource> &source,
             const char *matchComponentName = NULL,
             uint32_t flags = 0);
+
+#ifdef TARGET_OMAP4
+    static sp<MediaSource> Create(
+            const sp<IOMX> &omx,
+            const sp<MetaData> &meta, bool createEncoder,
+            const sp<MediaSource> &source,
+            IOMX::node_id &nodeId,
+            const char *matchComponentName = NULL,
+            uint32_t flags = 0);
+#endif
 
     static void setComponentRole(
             const sp<IOMX> &omx, IOMX::node_id node, bool isEncoder,
@@ -54,7 +69,10 @@ struct OMXCodec : public MediaSource,
     virtual status_t stop();
 
     virtual sp<MetaData> getFormat();
-
+#ifdef TARGET_OMAP4
+    virtual void setBuffers(Vector< sp<IMemory> > mBufferAddresses, bool portReconfig = false);
+    virtual int getNumofOutputBuffers();
+#endif
     virtual status_t read(
             MediaBuffer **buffer, const ReadOptions *options = NULL);
 
@@ -115,6 +133,12 @@ private:
         kRequiresLargerEncoderOutputBuffer    = 4096,
         kOutputBuffersAreUnreadable           = 8192,
         kStoreMetaDataInInputVideoBuffers     = 16384,
+#ifdef TARGET_OMAP4
+        kDecoderNeedsPortReconfiguration      = 32768,
+        kDecoderCantRenderSmallClips          = 65536,
+        kInterlacedOutputContent              = 131072,
+        kThumbnailMode                        = 262144,
+#endif
     };
 
     struct BufferInfo {
@@ -146,6 +170,10 @@ private:
     sp<MemoryDealer> mDealer[2];
 
     State mState;
+#ifdef TARGET_OMAP4
+    Vector< sp<IMemory> > mExtBufferAddresses;
+    uint32_t mStride;
+#endif
     Vector<BufferInfo> mPortBuffers[2];
     PortStatus mPortStatus[2];
     bool mInitialBufferSubmit;
@@ -188,6 +216,10 @@ private:
 
     void setVideoInputFormat(
             const char *mime, const sp<MetaData>& meta);
+
+#if defined (TARGET_OMAP4)
+    status_t setupEncoderPresetParams();
+#endif
 
     status_t setupBitRate(int32_t bitRate);
     status_t setupErrorCorrectionParameters();
@@ -259,11 +291,19 @@ private:
 
     void dumpPortStatus(OMX_U32 portIndex);
 
+#ifdef TARGET_OMAP4
+public:
+#endif
     status_t configureCodec(const sp<MetaData> &meta, uint32_t flags);
 
+#ifdef TARGET_OMAP4
+protected:
+    static uint32_t getComponentQuirks(const char *componentName, bool isEncoder, uint32_t flags = 0);
+    int32_t mVideoFPS;
+#else
     static uint32_t getComponentQuirks(
             const char *componentName, bool isEncoder);
-
+#endif
     static void findMatchingCodecs(
             const char *mime,
             bool createEncoder, const char *matchComponentName,
@@ -272,7 +312,54 @@ private:
 
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
+
+#if defined(TARGET_OMAP4) && defined (NPA_BUFFERS)
+    uint32_t mNumberOfNPABuffersSent;
+	uint32_t mThumbnailEOSSent;
+#endif
 };
+
+#if defined(TARGET_OMAP4)
+struct OMXCodecObserver : public BnOMXObserver {
+    OMXCodecObserver() {
+    }
+
+    void setCodec(const sp<OMXCodec> &target) {
+        mTarget = target;
+    }
+
+    // from IOMXObserver
+    virtual void onMessage(const omx_message &msg) {
+         sp<OMXCodec> codec = mTarget.promote();
+
+        if (codec.get() != NULL) {
+            Mutex::Autolock autoLock(codec->mLock);
+            codec->on_message(msg);
+            codec.clear();
+        }
+    }
+
+protected:
+    virtual ~OMXCodecObserver() {}
+
+private:
+    wp<OMXCodec> mTarget;
+
+    OMXCodecObserver(const OMXCodecObserver &);
+    OMXCodecObserver &operator=(const OMXCodecObserver &);
+};
+
+template<class T>
+static void InitOMXParams(T *params) {
+    params->nSize = sizeof(T);
+    params->nVersion.s.nVersionMajor = 1;
+    //Ducati strict OMX Version check
+    params->nVersion.s.nVersionMinor = 1;
+    params->nVersion.s.nRevision = 0;
+    params->nVersion.s.nStep = 0;
+}
+
+#endif
 
 struct CodecProfileLevel {
     OMX_U32 mProfile;

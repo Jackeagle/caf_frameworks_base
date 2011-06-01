@@ -150,6 +150,12 @@ status_t StagefrightPlayer::resume() {
     return mPlayer->resume();
 }
 
+#ifdef TARGET_OMAP4
+status_t StagefrightPlayer::requestVideoCloneMode(bool enable) {
+    return mPlayer->requestVideoCloneMode(enable);
+}
+#endif
+
 status_t StagefrightPlayer::invoke(const Parcel &request, Parcel *reply) {
     return INVALID_OPERATION;
 }

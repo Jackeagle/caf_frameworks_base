@@ -27,6 +27,10 @@ extern const char *MEDIA_MIMETYPE_VIDEO_AVC;
 extern const char *MEDIA_MIMETYPE_VIDEO_MPEG4;
 extern const char *MEDIA_MIMETYPE_VIDEO_H263;
 extern const char *MEDIA_MIMETYPE_VIDEO_RAW;
+#if defined(TARGET_OMAP4)
+extern const char *MEDIA_MIMETYPE_VIDEO_VP6;
+extern const char *MEDIA_MIMETYPE_VIDEO_VP7;
+#endif
 
 extern const char *MEDIA_MIMETYPE_AUDIO_AMR_NB;
 extern const char *MEDIA_MIMETYPE_AUDIO_AMR_WB;
@@ -44,6 +48,9 @@ extern const char *MEDIA_MIMETYPE_CONTAINER_OGG;
 extern const char *MEDIA_MIMETYPE_CONTAINER_MATROSKA;
 extern const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS;
 
+#if defined(TARGET_OMAP4)
+extern const char *MEDIA_MIMETYPE_CONTAINER_AVI;
+#endif
 }  // namespace android
 
 #endif  // MEDIA_DEFS_H_

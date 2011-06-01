@@ -108,10 +108,25 @@ size_t MediaBuffer::range_length() const {
 }
 
 void MediaBuffer::set_range(size_t offset, size_t length) {
+#ifdef TARGET_OMAP4
+    if(offset) {
+        if (offset + length > mSize) {
+            LOGE("offset = %d, length = %d, mSize = %d", offset, length, mSize);
+        }
+        CHECK(offset + length <= mSize);
+    }
+    else {
+        if (length > mSize) {
+            LOGE("offset = %d, length = %d, mSize = %d", offset, length, mSize);
+            length = mSize;
+        }
+    }
+#else
     if (offset + length > mSize) {
         LOGE("offset = %d, length = %d, mSize = %d", offset, length, mSize);
     }
     CHECK(offset + length <= mSize);
+#endif
 
     mRangeOffset = offset;
     mRangeLength = length;

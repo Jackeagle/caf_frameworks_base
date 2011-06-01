@@ -210,7 +210,11 @@ void *TimedEventQueue::ThreadWrapper(void *me) {
     vm->AttachCurrentThread(&env, NULL);
 #endif
 
+#ifndef TARGET_OMAP4
     setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_FOREGROUND);
+#else
+    setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_URGENT_AUDIO);
+#endif
     set_sched_policy(androidGetTid(), SP_FOREGROUND);
 
     static_cast<TimedEventQueue *>(me)->threadEntry();

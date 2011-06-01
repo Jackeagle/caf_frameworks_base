@@ -108,4 +108,12 @@ void SoftwareRenderer::render(
     mIndex = 1 - mIndex;
 }
 
+#ifdef TARGET_OMAP4
+Vector< sp<IMemory> > SoftwareRenderer::getBuffers(){
+    // Not Implemented
+    Vector< sp<IMemory> > mDummy;
+    return mDummy;
+}
+#endif
+
 }  // namespace android
