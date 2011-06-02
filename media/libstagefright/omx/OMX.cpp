@@ -401,6 +401,8 @@ OMX_ERRORTYPE OMX::OnFillBufferDone(
         node_id node, OMX_IN OMX_BUFFERHEADERTYPE *pBuffer) {
     LOGV("OnFillBufferDone buffer=%p", pBuffer);
 
+    pBuffer->nFilledLen -= pBuffer->nOffset;
+
     omx_message msg;
     msg.type = omx_message::FILL_BUFFER_DONE;
     msg.node = node;
