@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2006, 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -327,8 +327,6 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      */
     private SetupResult onSetupConnectionCompleted(AsyncResult ar) {
         SetupResult result;
-        DataCallState response = ((ArrayList<DataCallState>)ar.result).get(0);
-        ConnectionParams cp = (ConnectionParams) ar.userObj;
 
         if (ar.exception != null) {
             if (DBG) log("DataConnection Init failed " + ar.exception);
@@ -342,16 +340,20 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 result = SetupResult.ERR_Other;
                 result.mFailCause = DataConnectionFailCause.UNKNOWN;
             }
-        } else if (cp.tag != mTag) {
-            if (DBG) {
-                log("BUG: onSetupConnectionCompleted is stale cp.tag=" + cp.tag + ", mtag=" + mTag);
-            }
-            result = SetupResult.ERR_Stale;
-        } else if (response.status != 0){
-            result = SetupResult.ERR_Other;
-            int rilFailCause = response.status;
-            result.mFailCause = DataConnectionFailCause.getDataCallSetupFailCause(rilFailCause);
         } else {
+            DataCallState response = ((ArrayList<DataCallState>)ar.result).get(0);
+            ConnectionParams cp = (ConnectionParams) ar.userObj;
+
+            if (cp.tag != mTag) {
+                if (DBG) {
+                    log("BUG: onSetupConnectionCompleted is stale cp.tag=" + cp.tag + ", mtag=" + mTag);
+                }
+                result = SetupResult.ERR_Stale;
+            } else if (response.status != 0){
+                result = SetupResult.ERR_Other;
+                int rilFailCause = response.status;
+                result.mFailCause = DataConnectionFailCause.getDataCallSetupFailCause(rilFailCause);
+            } else {
 //            log("onSetupConnectionCompleted received " + response.length + " response strings:");
 //            for (int i = 0; i < response.length; i++) {
 //                log("  response[" + i + "]='" + response[i] + "'");
@@ -385,6 +387,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 } else {
                     result = SetupResult.SUCCESS;
                 }
+            }
         }
 
         if (DBG) log("DataConnection setup result='" + result + "' on cid=" + cid);
