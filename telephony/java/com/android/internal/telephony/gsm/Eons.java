@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (C) 2010-2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,8 +101,6 @@ public final class Eons {
     EonsControlState mOplDataState = EonsControlState.INITING;
     OplRecords mOplRecords;
     PnnRecords mPnnRecords;
-    String mCphsOnsName;
-    String mCphsOnsShortName;
 
     // ***** Constructor
     Eons() {
@@ -115,8 +113,6 @@ public final class Eons {
         mOplDataState = EonsControlState.INITING;
         mOplRecords = null;
         mPnnRecords = null;
-        mCphsOnsName = null;
-        mCphsOnsShortName = null;
     }
 
     public void setOplData(ArrayList <byte[]> records) {
@@ -139,25 +135,6 @@ public final class Eons {
         mPnnRecords = null;
     }
 
-    public void setCphsData(CphsType type, byte[] data) {
-        if (type.isLong()) {
-            mCphsOnsName = IccUtils.adnStringFieldToString(data, 0, data.length - 1);
-        } else if (type.isShort()) {
-            mCphsOnsShortName = IccUtils.adnStringFieldToString(data, 0, data.length - 1);
-        }
-    }
-
-    public void resetCphsData(CphsType type) {
-        if (type.isLong()) {
-            mCphsOnsName = null;
-        } else if (type.isShort()) {
-            mCphsOnsShortName = null;
-        } else {
-            mCphsOnsName = null;
-            mCphsOnsShortName = null;
-        }
-    }
-
     /**
      * Get the EONS derived from EF_OPL/EF_PNN or EF_CPHS_ONS/EF_CPHS_ONS_SHORT
      * files for registered operator.
@@ -169,15 +146,6 @@ public final class Eons {
 
         if (mPnnRecords != null) {
             name = mPnnRecords.getCurrentEons();
-        }
-        // If there is no PNN data or if there is no matching record, get name
-        // from EF_CPHS_ONS or EF_CPHS_ONS_SHORT
-        if (name == null) {
-            if (mCphsOnsName != null) {
-                name = mCphsOnsName;
-            } else {
-                name = mCphsOnsShortName;
-            }
         }
         return name;
     }
