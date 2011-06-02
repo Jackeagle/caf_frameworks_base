@@ -651,10 +651,12 @@ status_t StagefrightRecorder::setListener(const sp<IMediaRecorderClient> &listen
 status_t StagefrightRecorder::setCameraParameters(const String8 &params) {
 
     CameraParameters cp(params);
-    mRotationDegrees = cp.getInt("rotation"); //todo zoom and pass the parameters to
-                                     //camera source
-    LOGV("Got rotation %d", mRotationDegrees );
-    cp.set("rotation", 0 ); //no source rotation
+    int tempRotation = cp.getInt("rotation");
+    if (tempRotation >= 0) {
+        mRotationDegrees = tempRotation;
+        LOGV("Got rotation %d", mRotationDegrees );
+        cp.set("rotation", 0 ); //no source rotation
+    }
     int64_t token = IPCThreadState::self()->clearCallingIdentity();
     mCamera->setParameters( cp.flatten( ) );
     IPCThreadState::self()->restoreCallingIdentity(token);
