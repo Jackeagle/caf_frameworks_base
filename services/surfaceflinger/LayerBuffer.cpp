@@ -23,6 +23,7 @@
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <utils/StopWatch.h>
+#include <cutils/properties.h>
 
 #include <ui/GraphicBuffer.h>
 #include <ui/PixelFormat.h>
@@ -69,8 +70,13 @@ void PostBufLockPolicy::wait(Mutex & m, Condition& c, postBufState_t& s)
 LayerBuffer::LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
         const sp<Client>& client)
     : LayerBaseClient(flinger, display, client),
-      mNeedsBlending(false), mBlitEngine(0)
+      mNeedsBlending(false), mInvalidate(false), mBlitEngine(0)
 {
+    char property[PROPERTY_VALUE_MAX];
+    if(property_get("debug.composition.type", property, NULL) > 0 &&
+                            (strncmp(property, "mdp", 3) == 0)) {
+        mInvalidate = true;
+    }
 }
 
 LayerBuffer::~LayerBuffer()
@@ -170,6 +176,8 @@ void LayerBuffer::unlockPageFlip(const Transform& planeTransform,
     sp<Source> source(getSource());
     if (source != 0)
         source->onVisibilityResolved(planeTransform);
+    if(mInvalidate)
+        outDirtyRegion.orSelf(getTransformedBounds());
     LayerBase::unlockPageFlip(planeTransform, outDirtyRegion);    
 }
 
