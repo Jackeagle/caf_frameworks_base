@@ -36,6 +36,7 @@ import android.os.SystemClock;
 import android.os.Vibrator;
 import android.os.storage.IMountService;
 import android.os.storage.IMountShutdownObserver;
+import android.telephony.TelephonyManager;
 
 import com.android.internal.telephony.ITelephony;
 import android.util.Log;
@@ -248,10 +249,16 @@ public final class ShutdownThread extends Thread {
         }
 
         try {
-            radioOff = phone == null || !phone.isRadioOn();
-            if (!radioOff) {
-                Log.w(TAG, "Turning off radio...");
-                phone.setRadio(false);
+            radioOff = true;
+            if (phone != null) {
+                //radio off indication should be sent for both subscriptions in case of DSDS.
+                for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+                    radioOff = radioOff && !phone.isRadioOnOnSubscription(i);
+                    if (phone.isRadioOnOnSubscription(i)) {
+                        Log.w(TAG, "Turning off radio on Subscription :" + i);
+                        phone.setRadioOnSubscription(false, i);
+                    }
+                }
             }
         } catch (RemoteException ex) {
             Log.e(TAG, "RemoteException during radio shutdown", ex);
@@ -272,8 +279,11 @@ public final class ShutdownThread extends Thread {
                 }
             }
             if (!radioOff) {
+                radioOff = true;
                 try {
-                    radioOff = !phone.isRadioOn();
+                    for (i = 0; i < TelephonyManager.getPhoneCount(); i++) {
+                        radioOff = radioOff && !phone.isRadioOnOnSubscription(i);
+                    }
                 } catch (RemoteException ex) {
                     Log.e(TAG, "RemoteException during radio shutdown", ex);
                     radioOff = true;
