@@ -103,6 +103,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private final static int STATUS_FWD_SEEK = 0X03;
     private final static int STATUS_REV_SEEK = 0X04;
     private final static int STATUS_ERROR = 0XFF;
+    private String mPlayStatusRequestPath = "/";
 
     private final static int MESSAGE_PLAYSTATUS_TIMEOUT = 1;
 
@@ -111,10 +112,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case MESSAGE_PLAYSTATUS_TIMEOUT:
-                    for (String path: getConnectedSinksPaths()) {
-                        Log.i(TAG, "Timed outM - Sending Playstatus");
-                        sendPlayStatus(path);
-                    }
+                    Log.i(TAG, "Timed outM - Sending Playstatus");
+                    sendPlayStatus(mPlayStatusRequestPath);
             }
         }
     };
@@ -261,10 +260,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     mPosition = 0;
                 boolean playStatus = intent.getBooleanExtra("playing", false);
                 mPlayStatus = convertedPlayStatus(playStatus, mPosition);
-                for (String path: getConnectedSinksPaths()) {
-                    if(DBG) Log.d(TAG, "Sending Playstatus");
-                    sendPlayStatus(path);
-                }
+                if(DBG) Log.d(TAG, "Sending Playstatus");
+                sendPlayStatus(mPlayStatusRequestPath);
             }
         }
     };
@@ -299,8 +296,9 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         sendPlayStatusNative(path, (int)Integer.valueOf(mDuration), (int)mPosition, mPlayStatus);
     }
 
-    private void onGetPlayStatusRequest() {
-        if(DBG) Log.d(TAG, "onGetPlayStatusRequest");
+    private void onGetPlayStatusRequest(String path) {
+        if(DBG) Log.d(TAG, "onGetPlayStatusRequest"+path);
+        mPlayStatusRequestPath = path;
         mContext.sendBroadcast(new Intent(PLAYSTATUS_REQUEST));
         mHandler.sendMessageDelayed(
             mHandler.obtainMessage(MESSAGE_PLAYSTATUS_TIMEOUT), 130);
