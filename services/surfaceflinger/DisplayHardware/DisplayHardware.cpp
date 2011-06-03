@@ -390,6 +390,24 @@ status_t DisplayHardware::closeBypass() const
    return fbDev->closeBypass(fbDev);
 }
 
+status_t DisplayHardware::postOrigResBuffer(const native_handle_t* handle, int w,
+                                            int h, int format, int orientation
+                                            ) const
+{
+   framebuffer_device_t *fbDev = (framebuffer_device_t *)mNativeWindow->getDevice();
+   return fbDev->postOrigResBuffer(fbDev, handle, w, h, format, orientation);
+}
+
+status_t DisplayHardware::startOrigResDisplay() const {
+   framebuffer_device_t *fbDev = (framebuffer_device_t *)mNativeWindow->getDevice();
+    return fbDev->startOrigResDisplay(fbDev);
+}
+
+status_t DisplayHardware::stopOrigResDisplay() const {
+   framebuffer_device_t *fbDev = (framebuffer_device_t *)mNativeWindow->getDevice();
+    return fbDev->stopOrigResDisplay(fbDev);
+}
+
 uint32_t DisplayHardware::getFlags() const
 {
     return mFlags;
