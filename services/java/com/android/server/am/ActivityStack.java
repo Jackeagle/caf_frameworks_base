@@ -3245,7 +3245,6 @@ public class ActivityStack {
             if (r.app == app) {
                 if (localLOGV) Slog.v(TAG, "Removing this entry!");
                 list.remove(i);
-                r.resultTo = null;
             }
         }
     }
