@@ -84,6 +84,7 @@ public class PhoneProxy extends Handler implements Phone {
     public PhoneProxy(Phone phone) {
 
         mActivePhone = phone;
+        mPhoneSubscription = mActivePhone.getSubscription();
 
         mResetModemOnRadioTechnologyChange = SystemProperties.getBoolean(
                 TelephonyProperties.PROPERTY_RESET_ON_RADIO_TECH_CHANGE, false);
@@ -108,11 +109,10 @@ public class PhoneProxy extends Handler implements Phone {
                 Settings.System.AIRPLANE_MODE_ON, 0);
         mDesiredPowerState = !(airplaneMode > 0);
 
-        // TODO: DSDS - Do setDataConnectionAsDesired and egisterForDataServiceStateChanged
-        // only if this is the current DDS.
-        logv("Calling setDataConnectionAsDesired on DCT");
-        mDct.setDataConnectionAsDesired(mDesiredPowerState, null);
-
+        if (mPhoneSubscription == PhoneFactory.getDataSubscription()) {
+            logv("Calling setDataConnectionAsDesired on DCT");
+            mDct.setDataConnectionAsDesired(mDesiredPowerState, null);
+        }
     }
 
     @Override
@@ -1126,7 +1126,7 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.setSubscriptionInfo(subscription);
         mIccProxy.setSubscriptionInfo(subscription);
         mIccSmsInterfaceManager.updateRecords();
-        setSubscription(subscription.subId);
+        mPhoneSubscription = subscription.subId;
     }
 
     public Subscription getSubscriptionInfo() {
