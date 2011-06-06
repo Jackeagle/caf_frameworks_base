@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,11 +134,11 @@ public class PhoneFactory {
 
                     if (phoneType == VoicePhone.PHONE_TYPE_GSM) {
                         sProxyPhone[i] = new PhoneProxy(new GSMPhone(context,
-                                                             sCommandsInterface[i], sPhoneNotifier), dct);
+                                                             sCommandsInterface[i], sPhoneNotifier, i), dct);
                         Log.i(LOG_TAG, "Creating GSMPhone");
                     } else if (phoneType == VoicePhone.PHONE_TYPE_CDMA) {
                         sProxyPhone[i] = new PhoneProxy(new CDMAPhone(context,
-                                     sCommandsInterface[i], sPhoneNotifier), dct);
+                                     sCommandsInterface[i], sPhoneNotifier, i), dct);
                         Log.i(LOG_TAG, "Creating CDMAPhone");
                     }
                 }
@@ -231,7 +231,7 @@ public class PhoneFactory {
 
     public static VoicePhone getCdmaPhone() {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            VoicePhone phone = new CDMAPhone(sContext, sCommandsInterface[0], sPhoneNotifier);
+            VoicePhone phone = getCdmaPhone(getDefaultSubscription());
             return phone;
         }
     }
@@ -240,14 +240,15 @@ public class PhoneFactory {
     public static VoicePhone getCdmaPhone(int subscription) {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
             VoicePhone phone;
-            phone = new CDMAPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier);
+            phone = new CDMAPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier,
+                    subscription);
             return phone;
         }
     }
 
     public static VoicePhone getGsmPhone() {
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            VoicePhone phone = new GSMPhone(sContext, sCommandsInterface[0], sPhoneNotifier);
+            VoicePhone phone = getGsmPhone(getDefaultSubscription());
             return phone;
         }
     }
@@ -256,7 +257,8 @@ public class PhoneFactory {
     public static VoicePhone getGsmPhone(int subscription) {
         Log.d(LOG_TAG,"getGsmPhone on sub :" + subscription);
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            VoicePhone phone = new GSMPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier);
+            VoicePhone phone = new GSMPhone(sContext, sCommandsInterface[subscription], sPhoneNotifier,
+                    subscription);
             return phone;
         }
     }

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ public class PhoneProxy extends Handler implements Phone {
         mCi.registerForRadioStateChanged(this, EVENT_RADIO_STATE_CHANGED, null);
         mCi.registerForVoiceRadioTechChanged(this, EVENT_VOICE_RADIO_TECHNOLOGY_CHANGED, null);
 
-        mIccProxy = new IccCardProxy(voicePhone.getContext(), mCi);
+        mIccProxy = new IccCardProxy(voicePhone.getContext(), mCi, mActiveVoicePhone.getSubscription());
         mIccProxy.setVoiceRadioTech(
                 voicePhone.getPhoneType() == VoicePhone.PHONE_TYPE_CDMA ?
                         RadioTechnologyFamily.RADIO_TECH_3GPP2
