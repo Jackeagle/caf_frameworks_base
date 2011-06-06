@@ -141,11 +141,9 @@ public final class SIMRecords extends UiccApplicationRecords {
     private static final int EVENT_GET_ALL_OPL_RECORDS_DONE = 34;
     private static final int EVENT_GET_ALL_PNN_RECORDS_DONE = 35;
     private static final int EVENT_GET_SPN = 36;
-    private static final int EVENT_GET_SPN_CPHS_DONE = 37;
-    private static final int EVENT_GET_SPN_SHORT_CPHS_DONE = 38;
 
-    private static final int EVENT_SET_MWIS_DONE = 39;
-    private static final int EVENT_SET_CPHS_MWIS_DONE = 40;
+    private static final int EVENT_SET_MWIS_DONE = 37;
+    private static final int EVENT_SET_CPHS_MWIS_DONE = 38;
 
     // Lookup table for carriers known to produce SIMs which incorrectly indicate MNC length.
 
@@ -1050,34 +1048,6 @@ public final class SIMRecords extends UiccApplicationRecords {
                 mRecordsEventsRegistrants.notifyResult(EVENT_EONS);
                 break;
 
-            case EVENT_GET_SPN_CPHS_DONE:
-                isRecordLoadResponse = true;
-                ar = (AsyncResult)msg.obj;
-
-                if (ar.exception != null) {
-                    Log.e(LOG_TAG, "[EONS] Exception in reading EF_SPN_CPHS: " + ar.exception);
-                    mEons.resetCphsData(CphsType.LONG);
-                    break;
-                }
-
-                data = (byte[]) ar.result;
-                mEons.setCphsData(CphsType.LONG, data);
-                break;
-
-            case EVENT_GET_SPN_SHORT_CPHS_DONE:
-                isRecordLoadResponse = true;
-                ar = (AsyncResult)msg.obj;
-
-                if (ar.exception != null) {
-                    Log.e(LOG_TAG, "[EONS] Exception in reading EF_SPN_SHORT_CPHS: " + ar.exception);
-                    mEons.resetCphsData(CphsType.SHORT);
-                    break;
-                }
-
-                data = (byte[]) ar.result;
-                mEons.setCphsData(CphsType.SHORT, data);
-                break;
-
              case EVENT_GET_SPN:
                 isRecordLoadResponse = true;
                 ar = (AsyncResult)msg.obj;
@@ -1163,18 +1133,6 @@ public final class SIMRecords extends UiccApplicationRecords {
                 recordsToLoad++;
                 mFh.loadEFTransparent(IccConstants.EF_SPN,
                         obtainMessage(EVENT_GET_SPN));
-                break;
-            case IccConstants.EF_SPN_CPHS:
-                if (DBG) log("[EONS] SIM Refresh for EF_SPN_CPHS");
-                recordsToLoad++;
-                mFh.loadEFTransparent(IccConstants.EF_SPN_CPHS,
-                        obtainMessage(EVENT_GET_SPN_CPHS_DONE));
-                break;
-            case IccConstants.EF_SPN_SHORT_CPHS:
-                if (DBG) log("[EONS] SIM Refresh for EF_SPN_SHORT_CPHS");
-                recordsToLoad++;
-                mFh.loadEFTransparent(IccConstants.EF_SPN_SHORT_CPHS,
-                        obtainMessage(EVENT_GET_SPN_SHORT_CPHS_DONE));
                 break;
             default:
                 // For now, fetch all records if this is not
@@ -1335,12 +1293,6 @@ public final class SIMRecords extends UiccApplicationRecords {
         recordsToLoad++;
 
         mFh.loadEFLinearFixedAll(IccConstants.EF_PNN, obtainMessage(EVENT_GET_ALL_PNN_RECORDS_DONE));
-        recordsToLoad++;
-
-        mFh.loadEFTransparent(IccConstants.EF_SPN_CPHS, obtainMessage(EVENT_GET_SPN_CPHS_DONE));
-        recordsToLoad++;
-
-        mFh.loadEFTransparent(IccConstants.EF_SPN_SHORT_CPHS, obtainMessage(EVENT_GET_SPN_SHORT_CPHS_DONE));
         recordsToLoad++;
 
         mFh.loadEFTransparent(IccConstants.EF_SST, obtainMessage(EVENT_GET_SST_DONE));
