@@ -49,6 +49,7 @@ import android.util.Log;
 import com.android.internal.telephony.Phone;
 import com.android.internal.util.HierarchicalState;
 import com.android.internal.util.HierarchicalStateMachine;
+import com.android.server.ConnectivityService;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -435,7 +436,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 mUsbMassStorageOff = true;
                 updateUsbStatus();
             } else if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
-                mTetherMasterSM.sendMessage(TetherMasterSM.CMD_UPSTREAM_CHANGED);
+                NetworkInfo info = (NetworkInfo) intent.getParcelableExtra(ConnectivityManager.EXTRA_NETWORK_INFO);
+                mTetherMasterSM.sendMessage(TetherMasterSM.CMD_UPSTREAM_CHANGED, info);
             } else if (action.equals(Intent.ACTION_BOOT_COMPLETED)) {
                 mBooted = true;
                 updateUsbStatus();
@@ -1157,6 +1159,31 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 transitionTo(mInitialState);
                 return true;
             }
+
+            protected void addV6UpstreamInterface(String iface) {
+                IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+                INetworkManagementService service = INetworkManagementService.Stub.asInterface(b);
+
+                Log.d(TAG, "adding v6 interface " + iface);
+                try {
+                    service.addUpstreamV6Interface(iface);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Unable to append v6 upstream interface");
+                }
+            }
+
+            protected void removeV6UpstreamInterface(String iface) {
+                IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+                INetworkManagementService service = INetworkManagementService.Stub.asInterface(b);
+
+                Log.d(TAG, "removing v6 interface " + iface);
+                try {
+                    service.removeUpstreamV6Interface(iface);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Unable to remove v6 upstream interface");
+                }
+            }
+
             protected String findActiveUpstreamIface() {
                 // check for what iface we can use - if none found switch to error.
                 IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
@@ -1205,6 +1232,9 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                             // check if Dun is on - we can use that
                             NetworkInfo info = cm.getNetworkInfo(
                                     ConnectivityManager.TYPE_MOBILE_DUN);
+                            if (info.isIpv6Connected()) {
+                                addV6UpstreamInterface(info.getIpv6Interface());
+                            }
                             if (info.isConnected()) {
                                 Log.d(TAG, "setting dun ifacename =" + iface);
                                 // even if we're already connected - it may be somebody else's
@@ -1220,7 +1250,15 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                         } else {
                             Log.d(TAG, "checking if hipri brought us this connection");
                             NetworkInfo info = cm.getNetworkInfo(
+                                    ConnectivityManager.TYPE_MOBILE);
+                            NetworkInfo infohp = cm.getNetworkInfo(
                                     ConnectivityManager.TYPE_MOBILE_HIPRI);
+                            if (info.isIpv6Connected()) {
+                                addV6UpstreamInterface(info.getIpv6Interface());
+                            } else if(infohp.isIpv6Connected()) {
+                                addV6UpstreamInterface(infohp.getIpv6Interface());
+                            }
+
                             if (info.isConnected()) {
                                 Log.d(TAG, "yes - hipri in use");
                                 // even if we're already connected - it may be sombody else's
@@ -1323,8 +1361,12 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                         }
                         break;
                     case CMD_UPSTREAM_CHANGED:
+                        NetworkInfo info = (NetworkInfo) message.obj;
                         mTryCell = WAIT_FOR_NETWORK_TO_SETTLE;
                         chooseUpstreamType(mTryCell);
+                        if (info.getIpv6Interface() != null && (!info.isConnected() || !info.isIpv6Connected())) {
+                            removeV6UpstreamInterface(info.getIpv6Interface());
+                        }
                         mTryCell = !mTryCell;
                         break;
                     case CMD_CELL_CONNECTION_RENEW:
