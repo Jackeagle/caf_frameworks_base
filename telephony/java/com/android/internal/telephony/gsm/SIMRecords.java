@@ -21,6 +21,7 @@ import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Message;
 import android.os.SystemProperties;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.android.internal.telephony.AdnRecord;
@@ -33,6 +34,7 @@ import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.IccVmFixedException;
 import com.android.internal.telephony.IccVmNotSupportedException;
 import com.android.internal.telephony.MccTable;
+import com.android.internal.telephony.RIL;
 import com.android.internal.telephony.UiccApplicationRecords;
 import com.android.internal.telephony.UiccCardApplication;
 import com.android.internal.telephony.UiccRecords;
@@ -42,6 +44,9 @@ import com.android.internal.telephony.SimRefreshResponse;
 
 import java.util.ArrayList;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
+
 /**
  * {@hide}
  */
@@ -1206,6 +1211,16 @@ public final class SIMRecords extends UiccApplicationRecords {
 
         String operator = getSIMOperatorNumeric();
 
+        // Some fields require more than one SIM record to set
+        TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_NUMERIC,
+                                              ((RIL)mCi).getInstanceId(), operator);
+        if (mImsi != null) {
+            TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
+                    ((RIL)mCi).getInstanceId(),
+                    MccTable.countryCodeForMcc(Integer.parseInt(mImsi.substring(0,3))));
+        } else {
+            Log.e("SIM", "[SIMRecords] onAllRecordsLoaded: imsi is NULL!");
+        }
         setVoiceMailByCountry(operator);
         setSpnFromConfig(operator);
 
