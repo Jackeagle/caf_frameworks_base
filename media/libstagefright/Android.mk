@@ -36,7 +36,6 @@ LOCAL_SRC_FILES:=                         \
         FileSource.cpp                    \
         HTTPStream.cpp                    \
         JPEGSource.cpp                    \
-        LPAPlayer.cpp                     \
         MP3Extractor.cpp                  \
         MPEG2TSWriter.cpp                 \
         MPEG4Extractor.cpp                \
@@ -68,6 +67,10 @@ LOCAL_SRC_FILES:=                         \
         ExtendedWriter.cpp                \
         NativeBuffer.cpp              \
         FMA2DPWriter.cpp
+
+#LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
+#        $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include \
+
 
 LOCAL_C_INCLUDES:= \
         $(JNI_H_INCLUDE) \
@@ -110,6 +113,15 @@ LOCAL_STATIC_LIBRARIES := \
         libstagefright_rtsp \
         libstagefright_id3 \
         libstagefright_g711dec \
+
+ifeq ($(BOARD_USES_ALSA_AUDIO),true)
+        LOCAL_SRC_FILES += LPAPlayerALSA.cpp
+        LOCAL_C_INCLUDES += $(TOP)/hardware/msm7k/libalsa-intf
+        LOCAL_C_INCLUDES += $(TOP)/kernel/include/sound
+        LOCAL_SHARED_LIBRARIES += libalsa-intf
+else
+        LOCAL_SRC_FILES += LPAPlayer.cpp
+endif
 
 LOCAL_SHARED_LIBRARIES += \
         libstagefright_amrnb_common \

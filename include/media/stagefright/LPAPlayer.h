@@ -74,6 +74,7 @@ public:
     virtual bool reachedEOS(status_t *finalStatus);
 
 
+    void* handle;
     static int objectsAlive;
 private:
 
