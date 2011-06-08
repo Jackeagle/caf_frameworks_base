@@ -130,7 +130,7 @@ public class PhoneFactory {
                     int phoneType = getPhoneType(networkMode);
                     Log.i(LOG_TAG, "get Phone Type:"+ phoneType);
                     DataPhone dct = new MMDataConnectionTracker(context, sPhoneNotifier,
-                                                                    sCommandsInterface[i]);
+                                                                    sCommandsInterface[i], i);
 
                     if (phoneType == VoicePhone.PHONE_TYPE_GSM) {
                         sProxyPhone[i] = new PhoneProxy(new GSMPhone(context,

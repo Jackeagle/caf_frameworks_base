@@ -229,9 +229,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     };
 
-    protected MMDataConnectionTracker(Context context, PhoneNotifier notifier, CommandsInterface ci) {
+    protected MMDataConnectionTracker(Context context, PhoneNotifier notifier,
+            CommandsInterface ci, int subscription) {
         super(context, notifier, ci);
 
+        mSubscription = subscription;
         mDsst = new DataServiceStateTracker(this, context, notifier, ci);
         mPollNetStat = new DataNetStatistics(this);
 
@@ -1590,6 +1592,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
     public void setSubscriptionInfo(Subscription subData) {
         mSubscriptionData = subData;
+        mSubscription = mSubscriptionData.subNum;
         mDsst.getRecords();
         mDpt.setSubscription(mSubscriptionData.subNum);
     }
@@ -1599,11 +1602,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     public int getSubscription() {
-        if (mSubscriptionData != null) {
-           return mSubscriptionData.subNum;
-        } else {
-            return 0;
-        }
+           return mSubscription;
     }
 
     void loge(String string) {

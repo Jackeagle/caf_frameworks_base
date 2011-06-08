@@ -154,6 +154,7 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     protected static final String REASON_DATA_CONN_PROP_CHANGED = "dataConnectionPropertyChanged";
 
     Subscription mSubscriptionData;
+    int mSubscription;
 
     /**
      * Default constructor
@@ -566,15 +567,11 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
 
     void notifyDataConnection(DataServiceType ds, IPVersion ipv, String reason) {
         // Notify the Data Connection state only if this is the active DDS.
-        if (getSubscriptionInfo() != null) {
-            if (getSubscription() == PhoneFactory.getDataSubscription()) {
-                mNotifier.notifyDataConnection(this, ds.toApnTypeString(), ipv, reason);
-            } else {
-                Log.d(LOG_TAG, "[DCT" + getSubscription() +
-                               "] notifyDataConnection: Not the active DDS");
-            }
+        if (getSubscription() == PhoneFactory.getDataSubscription()) {
+            mNotifier.notifyDataConnection(this, ds.toApnTypeString(), ipv, reason);
         } else {
-            Log.d(LOG_TAG, "[DCT] notifyDataConnection: Subscription info is not set. Do not notify");
+            Log.d(LOG_TAG, "[DCT" + getSubscription() +
+                           "] notifyDataConnection: Not the active DDS");
         }
     }
 
@@ -590,28 +587,24 @@ public abstract class DataConnectionTracker extends Handler implements DataPhone
     // notify data connection as failed - applicable for default type only?
     void notifyDataConnectionFail(String reason) {
         // Notify the Data Connection failed only if this is the active DDS.
-        if (getSubscriptionInfo() != null) {
-            if (getSubscription() == PhoneFactory.getDataSubscription()) {
-                /*
-                 * Notify data connection fail ONLY if no other data call is active and
-                 * we give up on DEFAULT, or this will cause route deletion issues in
-                 * network state trackers.
-                 */
-                boolean isAnyServiceActive = false;
-                for (DataServiceType ds : DataServiceType.values()) {
-                    if (mDpt.isServiceTypeActive(ds)) {
-                        isAnyServiceActive = true;
-                    }
+        if (getSubscription() == PhoneFactory.getDataSubscription()) {
+            /*
+             * Notify data connection fail ONLY if no other data call is active and
+             * we give up on DEFAULT, or this will cause route deletion issues in
+             * network state trackers.
+             */
+            boolean isAnyServiceActive = false;
+            for (DataServiceType ds : DataServiceType.values()) {
+                if (mDpt.isServiceTypeActive(ds)) {
+                    isAnyServiceActive = true;
                 }
-                if (isAnyServiceActive == false) {
-                    mNotifier.notifyDataConnectionFailed(this, reason);
-                }
-            } else {
-                Log.d(LOG_TAG, "[DCT" + getSubscription() +
-                               "] notifyDataConnectionFail: Not the active DDS");
+            }
+            if (isAnyServiceActive == false) {
+                mNotifier.notifyDataConnectionFailed(this, reason);
             }
         } else {
-            Log.d(LOG_TAG, "[DCT] notifyDataConnection: Subscription info is not set. Do not notify");
+            Log.d(LOG_TAG, "[DCT" + getSubscription() +
+                           "] notifyDataConnectionFail: Not the active DDS");
         }
     }
 
