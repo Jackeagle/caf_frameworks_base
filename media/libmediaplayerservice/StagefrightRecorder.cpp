@@ -708,14 +708,6 @@ status_t StagefrightRecorder::prepare() {
     }
   }
 
-  if((mVideoSource != VIDEO_SOURCE_LIST_END) && /*Video recording*/
-         (mMaxFileDurationUs <=0 ||             /*Max duration is not set*/
-         (mVideoHeight * mVideoWidth < 720 * 1280 && mMaxFileDurationUs > 30*60*1000*1000) ||
-         (mVideoHeight * mVideoWidth >= 720 * 1280 && mMaxFileDurationUs > 10*60*1000*1000))) {
-    /*Above Check can be further optimized for lower resolutions to reduce file size*/
-    LOGV("File is huge so setting 64 bit file offsets");
-    setParam64BitFileOffset(true);
-  }
   LOGV(" %s X", __func__ );
   return OK;
 }
@@ -1225,6 +1217,9 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
     CHECK(meta->findInt32(kKeyColorFormat, &colorFormat));
     CHECK(meta->findInt32(kKeyHFR, &hfr));
 
+    if(hfr) {
+        mMaxFileDurationUs = mMaxFileDurationUs * (hfr/mFrameRate);
+    }
     enc_meta->setInt32(kKeyWidth, width);
     enc_meta->setInt32(kKeyHeight, height);
     enc_meta->setInt32(kKeyIFramesInterval, mIFramesIntervalSec);
@@ -1232,6 +1227,14 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
     enc_meta->setInt32(kKeySliceHeight, sliceHeight);
     enc_meta->setInt32(kKeyColorFormat, colorFormat);
     enc_meta->setInt32(kKeyHFR, hfr);
+    if((mVideoSource != VIDEO_SOURCE_LIST_END) && /*Video recording*/
+            (mMaxFileDurationUs <=0 ||             /*Max duration is not set*/
+             (mVideoHeight * mVideoWidth < 720 * 1280 && mMaxFileDurationUs > 30*60*1000*1000) ||
+             (mVideoHeight * mVideoWidth >= 720 * 1280 && mMaxFileDurationUs > 10*60*1000*1000))) {
+        /*Above Check can be further optimized for lower resolutions to reduce file size*/
+        LOGV("File is huge so setting 64 bit file offsets");
+        setParam64BitFileOffset(true);
+    }
     if (mVideoTimeScale > 0) {
         enc_meta->setInt32(kKeyTimeScale, mVideoTimeScale);
     }
