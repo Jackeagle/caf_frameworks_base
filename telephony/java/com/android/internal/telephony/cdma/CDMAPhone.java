@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2006,2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1027,13 +1027,10 @@ public class CDMAPhone extends PhoneBase {
      * @param holds the new CDMA subscription source value
      */
     private void handleCdmaSubscriptionSource() {
-        int newSubscriptionSource = mCdmaSSM.getCdmaSubscriptionSource();
-        if (newSubscriptionSource != mCdmaSubscriptionSource) {
-            mCdmaSubscriptionSource = newSubscriptionSource;
-            if (newSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
-                // NV is ready when subscription source is NV
-                sendMessage(obtainMessage(EVENT_NV_READY));
-            }
+        mCdmaSubscriptionSource = mCdmaSSM.getCdmaSubscriptionSource();
+        if (mCdmaSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
+            // NV is ready when subscription source is NV
+            sendMessage(obtainMessage(EVENT_NV_READY));
         }
     }
 
