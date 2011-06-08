@@ -362,7 +362,11 @@ DBusHandlerResult a2dp_event_filter(DBusMessage *msg, JNIEnv *env) {
         return result;
     } else if (dbus_message_is_signal(msg, "org.bluez.Control",
                                       "GetPlayStatus")) {
-        env->CallVoidMethod(nat->me, method_onGetPlayStatusRequest);
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+
+        env->CallVoidMethod(nat->me, method_onGetPlayStatusRequest, path);
+        env->DeleteLocalRef(path);
         result = DBUS_HANDLER_RESULT_HANDLED;
         return result;
     }else {
@@ -451,7 +455,7 @@ int register_android_server_BluetoothA2dpService(JNIEnv *env) {
     method_onConnectSinkResult = env->GetMethodID(clazz, "onConnectSinkResult",
                                                          "(Ljava/lang/String;Z)V");
     method_onGetPlayStatusRequest = env->GetMethodID(clazz, "onGetPlayStatusRequest",
-                                          "()V");
+                                          "(Ljava/lang/String;)V");
     field_mTrackName = env->GetFieldID(clazz, "mTrackName", "Ljava/lang/String;");
     field_mArtistName = env->GetFieldID(clazz, "mArtistName", "Ljava/lang/String;");
     field_mAlbumName = env->GetFieldID(clazz, "mAlbumName", "Ljava/lang/String;");
