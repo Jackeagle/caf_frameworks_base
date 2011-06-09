@@ -139,10 +139,8 @@ class HDMIService extends IHDMIService.Stub {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
-            String targetDevice = SystemProperties.get("ro.product.device");
             if (action.equals(Intent.ACTION_BOOT_COMPLETED)
-                    && (targetDevice != null
-                    && (targetDevice.startsWith("msm7630") || targetDevice.startsWith("msm8660")))) {
+                    && (SystemProperties.getBoolean("ro.hdmi.enable", false))) {
                 Thread thread = new Thread(mListener, HDMIListener.class.getName());
                 thread.start();
             }
