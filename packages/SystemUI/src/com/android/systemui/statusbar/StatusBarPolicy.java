@@ -1153,8 +1153,10 @@ public class StatusBarPolicy {
                 || (!hasService(subscription) && !mServiceState[subscription].isEmergencyOnly())) {
             //Slog.d(TAG, "updateSignalStrength: no service");
             int numPhones = TelephonyManager.getPhoneCount();
-            if (Settings.System.getInt(mContext.getContentResolver(),
-                    Settings.System.AIRPLANE_MODE_ON, 0) == 1) {
+            if ((Settings.System.getInt(mContext.getContentResolver(),
+                    Settings.System.AIRPLANE_MODE_ON, 0) == 1)
+                    && (mServiceState[subscription] != null)
+                    && (mServiceState[subscription].getState() == ServiceState.STATE_POWER_OFF)) {
                 /*
                  * To display single airplane annuciator for both the subscriptions,
                  * while in  Airplane Mode.
