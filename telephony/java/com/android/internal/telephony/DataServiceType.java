@@ -177,6 +177,7 @@ enum DataServiceType {
     }
 
     static public DataServiceType apnTypeStringToServiceType(String type) {
+        type = type == null ? type : type.toLowerCase();
         if (TextUtils.equals(type, Phone.APN_TYPE_DEFAULT)) {
             return SERVICE_TYPE_DEFAULT;
         } else if (TextUtils.equals(type, Phone.APN_TYPE_MMS)) {
