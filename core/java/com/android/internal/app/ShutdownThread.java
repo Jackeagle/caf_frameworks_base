@@ -85,7 +85,6 @@ public final class ShutdownThread extends Thread {
     private PowerManager mPowerManager;
     private PowerManager.WakeLock mWakeLock;
     private Handler mHandler;
-    private boolean mRilShutdown = SystemProperties.getBoolean("ro.ril.shutdown",false);
     
     private ShutdownThread() {
     }
