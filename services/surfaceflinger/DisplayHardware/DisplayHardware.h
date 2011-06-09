@@ -78,6 +78,7 @@ public:
                                  int format = 0, int orientation = 0) const;
     status_t stopOrigResDisplay() const;
 
+    unsigned int getDumpframe() const;
     float       getDpiX() const;
     float       getDpiY() const;
     float       getRefreshRate() const;
@@ -130,6 +131,7 @@ private:
     int             mHeight;
     PixelFormat     mFormat;
     uint32_t        mFlags;
+    unsigned int    mDumpFrame;
     mutable uint32_t mPageFlipCount;
     GLint           mMaxViewportDims;
     GLint           mMaxTextureSize;

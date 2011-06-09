@@ -390,6 +390,10 @@ void Layer::onDraw(const Region& clip) const
     }
 
     drawWithOpenGL(clip, tex);
+    const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
+    if(hw.getDumpframe()){
+       const_cast<DumpFrame&>(mDumpFrame).dump(this, clip);
+    }
 }
 
 bool Layer::needsFiltering() const

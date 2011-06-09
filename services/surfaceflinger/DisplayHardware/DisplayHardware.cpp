@@ -86,6 +86,7 @@ DisplayHardware::~DisplayHardware()
     fini();
 }
 
+unsigned int DisplayHardware::getDumpframe() const { return mDumpFrame; }
 float DisplayHardware::getDpiX() const          { return mDpiX; }
 float DisplayHardware::getDpiY() const          { return mDpiY; }
 float DisplayHardware::getDensity() const       { return mDensity; }
@@ -110,6 +111,14 @@ void DisplayHardware::init(uint32_t dpy)
         overlay_control_open(module, &mOverlayEngine);
     }
 
+    char property[PROPERTY_VALUE_MAX];
+
+    // enable/disable frames dump
+    mDumpFrame=0;
+    if (property_get("debug.dumpframe.enable", property, "0")) {
+       mDumpFrame = atoi(property);
+    }
+
     EGLint w, h, dummy;
     EGLint numConfigs=0;
     EGLSurface surface;
@@ -123,7 +132,7 @@ void DisplayHardware::init(uint32_t dpy)
     };
 
     // debug: disable h/w rendering
-    char property[PROPERTY_VALUE_MAX];
+
     if (property_get("debug.sf.hw", property, NULL) > 0) {
         if (atoi(property) == 0) {
             LOGW("H/W composition disabled");
