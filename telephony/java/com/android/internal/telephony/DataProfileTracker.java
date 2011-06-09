@@ -31,6 +31,7 @@ import android.os.Message;
 import android.os.Registrant;
 import android.os.RegistrantList;
 import android.os.SystemProperties;
+import android.provider.Settings;
 import android.provider.Telephony;
 import android.util.Log;
 
@@ -40,6 +41,7 @@ import com.android.internal.telephony.DataProfile;
 import com.android.internal.telephony.DataProfile.DataProfileType;
 import com.android.internal.telephony.DataProfileOmh.DataProfileTypeModem;
 import com.android.internal.telephony.DataProfileOmh;
+import com.android.internal.R;
 
 /*
  * This class keeps track of the following :
@@ -281,6 +283,13 @@ public class DataProfileTracker extends Handler {
             }
         }
 
+        /* add the secured dun APN */
+        DataProfile dunApn = fetchDunApn();
+        if (dunApn != null) {
+            logv("static dun apn found. =" + dunApn.toString());
+            allDataProfiles.add(dunApn);
+        }
+
         /*
          * For supporting CDMA, for now, we just create a Data profile of TYPE NAI that
          * supports all service types and add it to all DataProfiles.
@@ -343,6 +352,18 @@ public class DataProfileTracker extends Handler {
         }
 
         return hasProfileDbChanged;
+    }
+
+    private ApnSetting fetchDunApn() {
+
+        String apnData = Settings.Secure.getString(mContext.getContentResolver(),
+                                    Settings.Secure.TETHER_DUN_APN);
+        ApnSetting dunSetting = ApnSetting.fromString(apnData);
+        if (dunSetting != null)
+            return dunSetting;
+
+        apnData = mContext.getResources().getString(R.string.config_tether_apndata);
+        return ApnSetting.fromString(apnData);
     }
 
     private void updateDataServiceTypePrioritiesForOmh() {
