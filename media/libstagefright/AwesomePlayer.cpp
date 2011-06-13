@@ -863,6 +863,8 @@ status_t AwesomePlayer::play_l() {
                 LOGV("Setting Audio source");
                 mAudioPlayer->setSource(mAudioSource);
 
+                mWatchForAudioSeekComplete = false;
+
                 // If there was a seek request while we were paused
                 // and we're just starting up again, honor the request now.
                 seekAudioIfNecessary_l();
@@ -883,7 +885,6 @@ status_t AwesomePlayer::play_l() {
 
                 mTimeSource = mAudioPlayer;
 
-                mWatchForAudioSeekComplete = false;
                 mWatchForAudioEOS = true;
             }
         } else {
