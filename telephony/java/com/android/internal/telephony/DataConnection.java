@@ -323,7 +323,6 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      */
     private SetupResult onSetupConnectionCompleted(AsyncResult ar) {
         SetupResult result;
-        String[] response = ((String[]) ar.result);
         ConnectionParams cp = (ConnectionParams) ar.userObj;
 
         if (ar.exception != null) {
@@ -338,7 +337,13 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                     && ((CommandException)(ar.exception)).getCommandError() 
                     == CommandException.Error.SETUP_DATA_CALL_FAILURE) {
                 result = SetupResult.ERR_Other;
-                int rilFailCause = ((int[]) (ar.result))[0];
+                String[] response = ((String[]) ar.result);
+                int rilFailCause = 0xffff;
+                try {
+                    rilFailCause = Integer.parseInt(response[0]);
+                } catch (Exception e) {
+                    log("Error parsing failure code with SETUP_DATA_CALL_FAILURE response.");
+                }
                 result.mFailCause = DataConnectionFailCause.getDataCallSetupFailCause(rilFailCause);
             } else {
                 result = SetupResult.ERR_Other;
@@ -354,6 +359,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 //            for (int i = 0; i < response.length; i++) {
 //                log("  response[" + i + "]='" + response[i] + "'");
 //            }
+            String[] response = ((String[]) ar.result);
             if (response.length >= 2) {
                 cid = Integer.parseInt(response[0]);
                 interfaceName = response[1];
