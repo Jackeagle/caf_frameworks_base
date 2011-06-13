@@ -104,6 +104,10 @@ int32_t CameraService::getNumberOfCameras() {
     return mNumberOfCameras;
 }
 
+bool CameraService::isIn3DMode() {
+    return HAL_isIn3DMode();
+}
+
 status_t CameraService::getCameraInfo(int cameraId,
                                       struct CameraInfo* cameraInfo) {
     if (cameraId < 0 || cameraId >= mNumberOfCameras) {
@@ -596,6 +600,7 @@ status_t CameraService::Client::registerPreviewBuffers() {
 status_t CameraService::Client::setOverlay(int pw, int ph) {
     int w, h;
     CameraParameters params(mHardware->getParameters());
+
     if(pw == 0 && ph == 0)
         params.getPreviewSize(&w, &h);
     else {
@@ -1239,9 +1244,14 @@ void CameraService::Client::handleShutter(image_rect_type *size,
         IPCThreadState::self()->flushCommands();
     }
 
-    if (mUseOverlay)
-        setOverlay(w, h);
+    if (mUseOverlay) {
+        CameraInfo info;
+        mCameraService->getCameraInfo(mCameraId, &info);
 
+        ((info.mode & CAMERA_SUPPORT_MODE_3D) && mCameraService->isIn3DMode()) ?
+            setOverlay(2*w, h) :
+            setOverlay(w, h);
+    }
     mLock.unlock();
 }
 
