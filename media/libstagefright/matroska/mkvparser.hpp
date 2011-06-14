@@ -11,6 +11,7 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <utils/threads.h>
 
 namespace mkvparser
 {
@@ -470,6 +471,7 @@ private:
     long long m_timecode;
     BlockEntry** m_entries;
     size_t m_entriesCount;
+    pthread_mutex_t mMutex;
 
     void Load();
     void LoadBlockEntries();
