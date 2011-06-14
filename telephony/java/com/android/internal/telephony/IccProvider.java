@@ -197,10 +197,11 @@ public class IccProvider extends ContentProvider {
         "emails"
     };
 
-    private static final int ADN  = 1;
-    private static final int FDN_SUB1 = 2;
-    private static final int FDN_SUB2 = 3;
-    private static final int SDN  = 4;
+    private static final int ADN_SUB1 = 1;
+    private static final int ADN_SUB2 = 2;
+    private static final int FDN_SUB1 = 3;
+    private static final int FDN_SUB2 = 4;
+    private static final int SDN  = 5;
 
     private static final int SUB1 = 0;
     private static final int SUB2 = 1;
@@ -214,7 +215,8 @@ public class IccProvider extends ContentProvider {
                             new UriMatcher(UriMatcher.NO_MATCH);
 
     static {
-        URL_MATCHER.addURI("icc", "adn", ADN);
+        URL_MATCHER.addURI("icc", "adn_sub1", ADN_SUB1);
+        URL_MATCHER.addURI("icc", "adn_sub2", ADN_SUB2);
         URL_MATCHER.addURI("icc", "fdn_sub1", FDN_SUB1);
         URL_MATCHER.addURI("icc", "fdn_sub2", FDN_SUB2);
         URL_MATCHER.addURI("icc", "sdn", SDN);
@@ -240,19 +242,24 @@ public class IccProvider extends ContentProvider {
     public Cursor query(Uri url, String[] projection, String selection,
             String[] selectionArgs, String sort) {
         ArrayList<ArrayList> results = new ArrayList();
-        ArrayList<ArrayList> singleResults = null;
 
         if (!mSimulator) {
             switch (URL_MATCHER.match(url)) {
-                case ADN:
-                    for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
-                        if (TelephonyManager.getDefault().hasIccCard(i)) {
-                            singleResults = loadFromEf(IccConstants.EF_ADN, i);
-                            Log.i(TAG,"ADN Records Result:: "+singleResults+" Subscription ::"+i);
-                            results.addAll(singleResults);
-                        } else {
-                            Log.e(TAG,"ICC card is not present for subscription ::"+i);
-                        }
+                case ADN_SUB1:
+                    if (TelephonyManager.getDefault().hasIccCard(SUB1)) {
+                        results = loadFromEf(IccConstants.EF_ADN, SUB1);
+                        Log.i(TAG,"ADN Records Result:: " + results + " Subscription ::" + SUB1);
+                    } else {
+                        Log.e(TAG,"ICC card is not present for subscription ::" + SUB1);
+                    }
+                    break;
+
+                case ADN_SUB2:
+                    if (TelephonyManager.getDefault().hasIccCard(SUB2)) {
+                        results = loadFromEf(IccConstants.EF_ADN, SUB2);
+                        Log.i(TAG,"ADN Records Result:: " + results + " Subscription ::" + SUB2);
+                    } else {
+                        Log.e(TAG,"ICC card is not present for subscription ::" + SUB2);
                     }
                     break;
 
@@ -303,7 +310,8 @@ public class IccProvider extends ContentProvider {
     @Override
     public String getType(Uri url) {
         switch (URL_MATCHER.match(url)) {
-            case ADN:
+            case ADN_SUB1:
+            case ADN_SUB2:
             case FDN_SUB1:
             case FDN_SUB2:
             case SDN:
@@ -325,7 +333,8 @@ public class IccProvider extends ContentProvider {
 
         int match = URL_MATCHER.match(url);
         switch (match) {
-            case ADN:
+            case ADN_SUB1:
+            case ADN_SUB2:
                 efType = IccConstants.EF_ADN;
                 break;
 
@@ -352,8 +361,12 @@ public class IccProvider extends ContentProvider {
 
         StringBuilder buf = new StringBuilder("content://icc/");
         switch (match) {
-            case ADN:
-                buf.append("adn/");
+            case ADN_SUB1:
+                buf.append("adn_sub1/");
+                break;
+
+            case ADN_SUB2:
+                buf.append("adn_sub2/");
                 break;
 
             case FDN_SUB1:
@@ -400,7 +413,8 @@ public class IccProvider extends ContentProvider {
 
         int match = URL_MATCHER.match(url);
         switch (match) {
-            case ADN:
+            case ADN_SUB1:
+            case ADN_SUB2:
                 efType = IccConstants.EF_ADN;
                 break;
 
@@ -476,7 +490,8 @@ public class IccProvider extends ContentProvider {
 
         int match = URL_MATCHER.match(url);
         switch (match) {
-            case ADN:
+            case ADN_SUB1:
+            case ADN_SUB2:
                 efType = IccConstants.EF_ADN;
                 break;
 
