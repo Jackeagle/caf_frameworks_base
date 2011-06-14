@@ -80,6 +80,8 @@ public final class ClientOperation implements Operation, BaseStream {
 
     private boolean mSingleResponseActiveClient;
 
+    private boolean mSrmGetActiveClient;
+
     /**
      * Creates new OperationImpl to read and write data to a server
      * @param maxSize the maximum packet size
@@ -95,6 +97,7 @@ public final class ClientOperation implements Operation, BaseStream {
         mParent = p;
         mEndOfBodySent = false;
         mSingleResponseActiveClient = false;
+        mSrmGetActiveClient = false;
         mInputOpen = true;
         mOperationDone = false;
         mMaxPacketSize = maxSize;
@@ -114,6 +117,7 @@ public final class ClientOperation implements Operation, BaseStream {
         if (headerList != null) {
 
             for (int i = 0; i < headerList.length; i++) {
+                if (VERBOSE) Log.v(TAG, "SetHeader "+headerList[i]);
                 mRequestHeader.setHeader(headerList[i], header.getHeader(headerList[i]));
             }
         }
@@ -160,7 +164,7 @@ public final class ClientOperation implements Operation, BaseStream {
              * Since we are not sending any headers or returning any headers then
              * we just need to write and read the same bytes
              */
-            mParent.sendRequest(ObexHelper.OBEX_OPCODE_ABORT, null, mReplyHeader, null, false);
+            mParent.sendRequest(ObexHelper.OBEX_OPCODE_ABORT, null, mReplyHeader, null, false,false);
 
             if (mReplyHeader.responseCode != ResponseCodes.OBEX_HTTP_OK) {
                 throw new IOException("Invalid response code from server");
@@ -412,7 +416,8 @@ public final class ClientOperation implements Operation, BaseStream {
      */
     private boolean sendRequest(int opCode) throws IOException {
 
-        if (VERBOSE) Log.v(TAG, "sendRequest");
+        if (VERBOSE) Log.v(TAG, "sendRequest mSingleResponseActiveClient "
+                                             + mSingleResponseActiveClient);
 
         boolean returnValue = false;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -459,7 +464,7 @@ public final class ClientOperation implements Operation, BaseStream {
                 byte[] sendHeader = new byte[end - start];
                 System.arraycopy(headerArray, start, sendHeader, 0, sendHeader.length);
                 if (!mParent.sendRequest(opCode, sendHeader, mReplyHeader,
-                        mPrivateInput, mSingleResponseActiveClient)) {
+                        mPrivateInput, mSingleResponseActiveClient,mSrmGetActiveClient)) {
                     return false;
                 }
 
@@ -530,18 +535,19 @@ public final class ClientOperation implements Operation, BaseStream {
             out.write((byte)bodyLength);
         }
 
-        if (VERBOSE) Log.v(TAG, "sendRequest with out.size " + out.size());
+        if (VERBOSE) Log.v(TAG, "sendRequest with out.size " + out.size()
+                             +"mSingleResponseActiveClient "+mSingleResponseActiveClient);
 
         if (out.size() == 0) {
             if (!mParent.sendRequest(opCode, null, mReplyHeader, mPrivateInput,
-                    mSingleResponseActiveClient)) {
+                    mSingleResponseActiveClient,mSrmGetActiveClient)) {
                 return false;
             }
             return returnValue;
         }
         if ((out.size() > 0)
                 && (!mParent.sendRequest(opCode, out.toByteArray(), mReplyHeader,
-                    mPrivateInput, mSingleResponseActiveClient))) {
+                    mPrivateInput, mSingleResponseActiveClient,mSrmGetActiveClient))) {
             return false;
         }
 
@@ -561,7 +567,8 @@ public final class ClientOperation implements Operation, BaseStream {
      */
     private synchronized void startProcessing() throws IOException {
 
-        if (VERBOSE)  Log.v(TAG, "startProcessing");
+        if (VERBOSE)  Log.v(TAG, "startProcessing mSingleResponseActiveClient "
+                                                       +mSingleResponseActiveClient);
 
         if (mPrivateInput == null) {
             mPrivateInput = new PrivateInputStream(this);
@@ -572,11 +579,14 @@ public final class ClientOperation implements Operation, BaseStream {
             if (!mOperationDone) {
                 mReplyHeader.responseCode = ResponseCodes.OBEX_HTTP_CONTINUE;
                 while ((more) && (mReplyHeader.responseCode == ResponseCodes.OBEX_HTTP_CONTINUE)) {
+                    if (VERBOSE) Log.v(TAG,"startProcessing SendRequest(0x03)");
                     more = sendRequest(0x03);
+                    if (VERBOSE) Log.v(TAG,"more "+more);
                 }
 
                 if (mReplyHeader.responseCode == ResponseCodes.OBEX_HTTP_CONTINUE) {
-                    mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false);
+                    if (VERBOSE) Log.v(TAG,"startProcessing mParent.sendRequest(0x83)");
+                    mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false,false);
                 }
                 if (mReplyHeader.responseCode != ResponseCodes.OBEX_HTTP_CONTINUE) {
                     mOperationDone = true;
@@ -593,7 +603,7 @@ public final class ClientOperation implements Operation, BaseStream {
             }
 
             if (mReplyHeader.responseCode == ResponseCodes.OBEX_HTTP_CONTINUE) {
-                mParent.sendRequest(0x82, null, mReplyHeader, mPrivateInput, false);
+                mParent.sendRequest(0x82, null, mReplyHeader, mPrivateInput, false,false);
             }
 
             if (mReplyHeader.responseCode != ResponseCodes.OBEX_HTTP_CONTINUE) {
@@ -613,12 +623,23 @@ public final class ClientOperation implements Operation, BaseStream {
     public synchronized boolean continueOperation(boolean sendEmpty, boolean inStream)
             throws IOException {
 
-        if (VERBOSE)  Log.v(TAG, "continueOperation");
+        if (VERBOSE)  Log.v(TAG, "continueOperation mSingleResponseActiveClient "
+                                                       + mSingleResponseActiveClient);
 
         if (mGetOperation) {
             if ((inStream) && (!mOperationDone)) {
                 // to deal with inputstream in get operation
-                mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false);
+                if (VERBOSE)  Log.v(TAG, "continueOperation inStream&&!mOperationDone"
+                                            +" mReplyHeader.responseCode = "+mReplyHeader.responseCode);
+
+               // Turn on SRM only if supported by both Client and Server. Otherwise, don't turn on SRM.
+                if (ObexHelper.getRemoteSrmStatus()) {
+                    if (VERBOSE)  Log.v(TAG, "continueOperation: Remote SRM Enabled");
+                    mSrmGetActiveClient = ObexHelper.getLocalSrmStatus();
+                }
+
+                mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false,mSrmGetActiveClient);
+
                 /*
                   * Determine if that was not the last packet in the operation
                   */
@@ -630,6 +651,7 @@ public final class ClientOperation implements Operation, BaseStream {
 
             } else if ((!inStream) && (!mOperationDone)) {
                 // to deal with outputstream in get operation
+                if (VERBOSE)  Log.v(TAG, "continueOperation (!inStream) && (!mOperationDone) ");
 
                 if (mPrivateInput == null) {
                     mPrivateInput = new PrivateInputStream(this);
@@ -638,6 +660,7 @@ public final class ClientOperation implements Operation, BaseStream {
                 return true;
 
             } else if (mOperationDone) {
+                if (VERBOSE)  Log.v(TAG, "continueOperation mOperationDone ");
                 return false;
             }
 
@@ -743,14 +766,21 @@ public final class ClientOperation implements Operation, BaseStream {
                 if (mReplyHeader.responseCode == -1) {
                     mReplyHeader.responseCode = ResponseCodes.OBEX_HTTP_CONTINUE;
                 }
-
+                if (VERBOSE)  Log.v(TAG,"(inStream) && (!mOperationDone) StreamClosed");
                 while (mReplyHeader.responseCode == ResponseCodes.OBEX_HTTP_CONTINUE) {
+                    if (VERBOSE)  Log.v(TAG,"StreamClosed sendRequest(0x83)");
                     if (!sendRequest(0x83)) {
                         break;
                     }
                 }
+                if (VERBOSE)  Log.v(TAG, "streamClosed: Client SRM Disabled");
+                /* Reset Srm status once the operation completes */
+                ObexHelper.resetSrmStatus();
+                mSrmGetActiveClient = ObexHelper.LOCAL_SRM_DISABLED;
+
                 while (mReplyHeader.responseCode == ResponseCodes.OBEX_HTTP_CONTINUE) {
-                    mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false);
+                    if (VERBOSE)  Log.v(TAG,"StreamClosed  mParent.sendRequest(0x83)");
+                    mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false,false);
                 }
                 mOperationDone = true;
             } else if ((!inStream) && (!mOperationDone)) {

@@ -97,6 +97,8 @@ public final class ObexHelper {
 
     public static final int OBEX_OPCODE_SETPATH = 0x85;
 
+    public static final int OBEX_OPCODE_ACTION = 0x86;
+
     public static final int OBEX_OPCODE_ABORT = 0xFF;
 
     public static final int OBEX_AUTH_REALM_CHARSET_ASCII = 0x00;
@@ -120,6 +122,15 @@ public final class ObexHelper {
     public static final int OBEX_AUTH_REALM_CHARSET_ISO_8859_9 = 0x09;
 
     public static final int OBEX_AUTH_REALM_CHARSET_UNICODE = 0xFF;
+
+    /**
+     * The values used for various ACTION commands
+     */
+    public static final Byte OBEX_ACTION_COPY = 0x0;
+
+    public static final Byte OBEX_ACTION_MOVE_RENAME = 0x1;
+
+    public static final Byte OBEX_ACTION_SET_PERM = 0x2;
 
     /**
      * The value that is used for the OBEX Single Response Mode (SRM)
@@ -317,6 +328,7 @@ public final class ObexHelper {
         try {
             while (index < headerArray.length) {
                 headerID = 0xFF & headerArray[index];
+                if (VERBOSE) Log.e(TAG,"updateHeaderSet headerID = "+ headerID);
                 switch (headerID & (0xC0)) {
 
                     /*
@@ -502,8 +514,9 @@ public final class ObexHelper {
              * Determine if there is a connection ID to send.  If there is,
              * then it should be the first header in the packet.
              */
+            if (VERBOSE) Log.e(TAG,"createHeader = "+ head);
             if ((headImpl.mConnectionID != null) && (headImpl.getHeader(HeaderSet.TARGET) == null)) {
-
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.CONNECTION_ID);
                 out.write((byte)HeaderSet.CONNECTION_ID);
                 out.write(headImpl.mConnectionID);
             }
@@ -511,6 +524,7 @@ public final class ObexHelper {
             // Count Header
             intHeader = (Long)headImpl.getHeader(HeaderSet.COUNT);
             if (intHeader != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.COUNT);
                 out.write((byte)HeaderSet.COUNT);
                 value = ObexHelper.convertToByteArray(intHeader.longValue());
                 out.write(value);
@@ -522,6 +536,7 @@ public final class ObexHelper {
             // Name Header
             stringHeader = (String)headImpl.getHeader(HeaderSet.NAME);
             if (stringHeader != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.NAME);
                 out.write((byte)HeaderSet.NAME);
                 value = ObexHelper.convertToUnicodeByteArray(stringHeader);
                 length = value.length + 3;
@@ -534,9 +549,27 @@ public final class ObexHelper {
                 }
             }
 
+            // Dest Name Header
+            stringHeader = (String)headImpl.getHeader(HeaderSet.DEST_NAME);
+            if (stringHeader != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.DEST_NAME);
+                out.write((byte)HeaderSet.DEST_NAME);
+                value = ObexHelper.convertToUnicodeByteArray(stringHeader);
+                length = value.length + 3;
+                lengthArray[0] = (byte)(0xFF & (length >> 8));
+                lengthArray[1] = (byte)(0xFF & length);
+                out.write(lengthArray);
+                out.write(value);
+                if (nullOut) {
+                    headImpl.setHeader(HeaderSet.DEST_NAME, null);
+                }
+            }
+
+
             // Type Header
             stringHeader = (String)headImpl.getHeader(HeaderSet.TYPE);
             if (stringHeader != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.TYPE);
                 out.write((byte)HeaderSet.TYPE);
                 try {
                     value = stringHeader.getBytes("ISO8859_1");
@@ -558,6 +591,7 @@ public final class ObexHelper {
             // Length Header
             intHeader = (Long)headImpl.getHeader(HeaderSet.LENGTH);
             if (intHeader != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.LENGTH);
                 out.write((byte)HeaderSet.LENGTH);
                 value = ObexHelper.convertToByteArray(intHeader.longValue());
                 out.write(value);
@@ -665,6 +699,7 @@ public final class ObexHelper {
             // Target Header
             value = (byte[])headImpl.getHeader(HeaderSet.TARGET);
             if (value != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.TARGET);
                 out.write((byte)HeaderSet.TARGET);
                 length = value.length + 3;
                 lengthArray[0] = (byte)(255 & (length >> 8));
@@ -693,6 +728,7 @@ public final class ObexHelper {
             // Who Header
             value = (byte[])headImpl.getHeader(HeaderSet.WHO);
             if (value != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.WHO);
                 out.write((byte)HeaderSet.WHO);
                 length = value.length + 3;
                 lengthArray[0] = (byte)(255 & (length >> 8));
@@ -735,6 +771,7 @@ public final class ObexHelper {
             // Single Response Mode (SRM) Header
             byteHeader = (Byte)headImpl.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
             if (byteHeader != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.SINGLE_RESPONSE_MODE);
                 out.write((byte)HeaderSet.SINGLE_RESPONSE_MODE);
                 out.write(byteHeader.byteValue());
                 if (nullOut) {
@@ -745,6 +782,7 @@ public final class ObexHelper {
             // Single Response Mode (SRM) Parameter Header
             byteHeader = (Byte)headImpl.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
             if (byteHeader != null) {
+                if (VERBOSE) Log.e(TAG," Add Header = "+ HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
                 out.write((byte)HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
                 out.write(byteHeader.byteValue());
                 if (nullOut) {
