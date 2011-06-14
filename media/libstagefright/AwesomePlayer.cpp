@@ -1388,7 +1388,7 @@ void AwesomePlayer::onVideoEvent() {
 
                 LOGW("Got video EOS!");
                 mFlags |= VIDEO_AT_EOS;
-                mVideoDurationUs = mVideoTimeUs;
+                if (mVideoTimeUs > mVideoDurationUs) mVideoDurationUs = mVideoTimeUs;
                 postStreamDoneEvent_l(err);
                 postVideoEvent_l();
                 return;
