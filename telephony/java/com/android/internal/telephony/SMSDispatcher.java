@@ -1184,6 +1184,7 @@ public abstract class SMSDispatcher extends Handler {
     protected void dispatchBroadcastPdus(String intent, byte[][] pdus) {
         Intent broadcastIntent = new Intent(intent);
         broadcastIntent.putExtra("pdus", pdus);
+        broadcastIntent.putExtra("sub_id", mPhone.getSubscription());
 
         if (Config.LOGD)
             Log.d(TAG, "Dispatching " + pdus.length + " pdus");
