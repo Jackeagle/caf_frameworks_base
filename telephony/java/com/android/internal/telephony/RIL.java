@@ -763,7 +763,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
     public void setUiccSubscription(int slotId, int appIndex, int subId, int subStatus, Message result) {
         //Note: This RIL request is also valid for SIM and RUIM (ICC card)
-        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE, result);
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_UICC_SUBSCRIPTION, result);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
                 + " slot: " + slotId + " appIndex: " + appIndex
@@ -790,7 +790,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void setDataSubscription(Message result) {
-        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE, result);
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_DATA_SUBSCRIPTION, result);
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
         send(rr);
     }
@@ -2441,10 +2441,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
             case RIL_REQUEST_IMS_SEND_SMS: ret =  responseSMS(p); break;
             case RIL_REQUEST_GET_DATA_CALL_PROFILE: ret = responseGetDataCallProfile(p); break;
-            case RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE: ret = responseVoid(p); break;
-            case RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE: ret = responseVoid(p); break;
-            case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: ret = responseUiccSubscription(p); break;
-            case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: ret = responseInts(p); break;
+            case RIL_REQUEST_SET_UICC_SUBSCRIPTION: ret = responseVoid(p); break;
+            case RIL_REQUEST_SET_DATA_SUBSCRIPTION: ret = responseVoid(p); break;
+            case RIL_REQUEST_GET_UICC_SUBSCRIPTION: ret = responseUiccSubscription(p); break;
+            case RIL_REQUEST_GET_DATA_SUBSCRIPTION: ret = responseInts(p); break;
             case RIL_REQUEST_SET_SUBSCRIPTION_MODE: ret = responseVoid(p); break;
             case RIL_REQUEST_SET_TRANSMIT_POWER: ret = responseVoid(p); break;
             default:
@@ -2597,7 +2597,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: ret =  responseInts(p); break;
             case RIL_UNSOL_ON_SS: ret =  responseSSData(p); break;
             case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: ret =  responseString(p); break;
-            case RIL_UNSOL_SUBSCRIPTION_READY: ret =  responseVoid(p); break;
+            case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED: ret =  responseInts(p); break;
 
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -2982,7 +2982,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 }
                 break;
 
-            case RIL_UNSOL_SUBSCRIPTION_READY:
+            case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED:
                 if (RILJ_LOGD) unsljLogRet(response, ret);
 
                 if (mSubscriptionReadyRegistrants != null) {
@@ -3762,10 +3762,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_IMS_REGISTRATION_STATE: return "RIL_REQUEST_IMS_REGISTRATION_STATE";
             case RIL_REQUEST_IMS_SEND_SMS: return "RIL_REQUEST_IMS_SEND_SMS";
             case RIL_REQUEST_GET_DATA_CALL_PROFILE: return "RIL_REQUEST_GET_DATA_CALL_PROFILE";
-            case RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE";
-            case RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE";
-            case RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE";
-            case RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE: return "RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE";
+            case RIL_REQUEST_SET_UICC_SUBSCRIPTION: return "RIL_REQUEST_SET_UICC_SUBSCRIPTION";
+            case RIL_REQUEST_SET_DATA_SUBSCRIPTION: return "RIL_REQUEST_SET_DATA_SUBSCRIPTION";
+            case RIL_REQUEST_GET_UICC_SUBSCRIPTION: return "RIL_REQUEST_GET_UICC_SUBSCRIPTION";
+            case RIL_REQUEST_GET_DATA_SUBSCRIPTION: return "RIL_REQUEST_GET_DATA_SUBSCRIPTION";
             case RIL_REQUEST_SET_SUBSCRIPTION_MODE: return "RIL_REQUEST_SET_SUBSCRIPTION_MODE";
             case RIL_REQUEST_SET_TRANSMIT_POWER: return "RIL_REQUEST_SET_TRANSMIT_POWER";
             default: return "<unknown request>";
@@ -3821,7 +3821,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: return "RIL_UNSOL_TETHERED_MODE_STATE_CHANGED";
             case RIL_UNSOL_ON_SS: return "UNSOL_ON_SS";
             case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: return "UNSOL_STK_CC_ALPHA_NOTIFY";
-            case RIL_UNSOL_SUBSCRIPTION_READY: return "RIL_UNSOL_SUBSCRIPTION_READY";
+            case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED: return "RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED";
             default: return "<unknown reponse>";
         }
     }

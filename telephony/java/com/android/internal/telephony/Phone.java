@@ -1857,6 +1857,22 @@ public interface Phone {
     void unregisterForT53AudioControlInfo(Handler h);
 
     /**
+     * Register for all data connections disconnected notifications.
+     *
+     * @param h Handler that receives the notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void registerForAllDataDisconnected(Handler h, int what, Object obj);
+
+    /**
+     * Unregisters for all data disconnected notifications.
+     *
+     * @param h Handler to be removed from the registrant list.
+     */
+    void unregisterForAllDataDisconnected(Handler h);
+
+    /**
      * registers for exit emergency call back mode request response
      *
      * @param h Handler that receives the notification message.

@@ -186,7 +186,7 @@ public class CDMAPhone extends PhoneBase {
         mCM.setOnSuppServiceNotification(this, EVENT_SSN, null);
         mSST.registerForNetworkAttach(this, EVENT_REGISTERED_TO_NETWORK, null);
         mCM.setEmergencyCallbackMode(this, EVENT_EMERGENCY_CALLBACK_MODE, null);
-        mCM.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
+        mCM.registerForSubscriptionStatusChanged(this, EVENT_SUBSCRIPTION_STATUS_CHANGED, null);
 
         mUiccManager = UiccManager.getInstance();
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
@@ -226,7 +226,7 @@ public class CDMAPhone extends PhoneBase {
             mCM.unSetOnSuppServiceNotification(this);
             mCdmaSSM.dispose(this);
             removeCallbacks(mExitEcmRunnable);
-            mCM.unregisterForSubscriptionReady(this);
+            mCM.unregisterForSubscriptionStatusChanged(this);
 
             mPendingMmis.clear();
 
@@ -1073,10 +1073,18 @@ public class CDMAPhone extends PhoneBase {
             }
             break;
 
-            case EVENT_SUBSCRIPTION_READY: {
-                Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY Received");
-                mCM.getBasebandVersion(obtainMessage(EVENT_GET_BASEBAND_VERSION_DONE));
-                mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
+            case EVENT_SUBSCRIPTION_STATUS_CHANGED: {
+                Log.d(LOG_TAG, "EVENT_SUBSCRIPTION_STATUS_CHANGED");
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception == null) {
+                    int actStatus = ((int[])ar.result)[0];
+                    Log.d(LOG_TAG, "actStatus = " + actStatus);
+                    if (actStatus == 1) { // Subscription Activated
+                        Log.d(LOG_TAG, "get Device Identity");
+                        mCM.getBasebandVersion(obtainMessage(EVENT_GET_BASEBAND_VERSION_DONE));
+                        mCM.getDeviceIdentity(obtainMessage(EVENT_GET_DEVICE_IDENTITY_DONE));
+                    }
+                }
             }
             break;
 

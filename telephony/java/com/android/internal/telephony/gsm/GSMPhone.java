@@ -191,7 +191,7 @@ public class GSMPhone extends PhoneBase {
         mCM.setOnUSSD(this, EVENT_USSD, null);
         mCM.setOnSuppServiceNotification(this, EVENT_SSN, null);
         mSST.registerForNetworkAttach(this, EVENT_REGISTERED_TO_NETWORK, null);
-        mCM.registerForSubscriptionReady(this, EVENT_SUBSCRIPTION_READY, null);
+        mCM.registerForSubscriptionStatusChanged(this, EVENT_SUBSCRIPTION_STATUS_CHANGED, null);
         mCM.setOnSS(this, EVENT_SS, null);
 
         // Set the default values of telephony properties.
@@ -243,7 +243,7 @@ public class GSMPhone extends PhoneBase {
             mSST.unregisterForNetworkAttach(this); //EVENT_REGISTERED_TO_NETWORK
             mCM.unSetOnUSSD(this);
             mCM.unSetOnSuppServiceNotification(this);
-            mCM.unregisterForSubscriptionReady(this);
+            mCM.unregisterForSubscriptionStatusChanged(this);
             mCM.unSetOnSS(this);
 
             mPendingMMIs.clear();
@@ -1481,12 +1481,19 @@ public class GSMPhone extends PhoneBase {
                 mMdn = localTemp[0];
                 break;
 
-            case EVENT_SUBSCRIPTION_READY:
-                Log.d(LOG_TAG, "Event EVENT_SUBSCRIPTION_READY received");
-                mCM.getBasebandVersion(
-                        obtainMessage(EVENT_GET_BASEBAND_VERSION_DONE));
-                mCM.getIMEI(obtainMessage(EVENT_GET_IMEI_DONE));
-                mCM.getIMEISV(obtainMessage(EVENT_GET_IMEISV_DONE));
+            case EVENT_SUBSCRIPTION_STATUS_CHANGED:
+                Log.d(LOG_TAG, "EVENT_SUBSCRIPTION_STATUS_CHANGED");
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception == null) {
+                    int actStatus = ((int[])ar.result)[0];
+                    Log.d(LOG_TAG, "actStatus = " + actStatus);
+                    if (actStatus == 1) { // Subscription Activated
+                        mCM.getBasebandVersion(
+                                obtainMessage(EVENT_GET_BASEBAND_VERSION_DONE));
+                        mCM.getIMEI(obtainMessage(EVENT_GET_IMEI_DONE));
+                        mCM.getIMEISV(obtainMessage(EVENT_GET_IMEISV_DONE));
+                    }
+                }
                 break;
 
             case CHECK_CALLFORWARDING_STATUS:

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2006,2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -274,10 +274,10 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_IMS_REGISTRATION_STATE = 106;
     int RIL_REQUEST_IMS_SEND_SMS = 107;
     int RIL_REQUEST_GET_DATA_CALL_PROFILE = 108;
-    int RIL_REQUEST_SET_UICC_SUBSCRIPTION_SOURCE = 109;
-    int RIL_REQUEST_SET_DATA_SUBSCRIPTION_SOURCE = 110;
-    int RIL_REQUEST_GET_UICC_SUBSCRIPTION_SOURCE = 111;
-    int RIL_REQUEST_GET_DATA_SUBSCRIPTION_SOURCE = 112;
+    int RIL_REQUEST_SET_UICC_SUBSCRIPTION = 109;
+    int RIL_REQUEST_SET_DATA_SUBSCRIPTION = 110;
+    int RIL_REQUEST_GET_UICC_SUBSCRIPTION = 111;
+    int RIL_REQUEST_GET_DATA_SUBSCRIPTION = 112;
     int RIL_REQUEST_SET_SUBSCRIPTION_MODE = 113;
     int RIL_REQUEST_SET_TRANSMIT_POWER = 114;
     int RIL_UNSOL_RESPONSE_BASE = 1000;
@@ -321,5 +321,5 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED = 1037;
     int RIL_UNSOL_ON_SS = 1038;
     int RIL_UNSOL_STK_CC_ALPHA_NOTIFY = 1039;
-    int RIL_UNSOL_SUBSCRIPTION_READY = 1040;
+    int RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED = 1040;
 }
