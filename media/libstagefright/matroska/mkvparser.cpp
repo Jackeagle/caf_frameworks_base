@@ -3739,6 +3739,7 @@ Cluster::Cluster() :
     m_entries(NULL),
     m_entriesCount(0)
 {
+    pthread_mutex_init(&mMutex, NULL);
 }
 
 
@@ -3754,6 +3755,7 @@ Cluster::Cluster(
     m_entries(NULL),
     m_entriesCount(0)
 {
+    pthread_mutex_init(&mMutex, NULL);
 }
 
 
@@ -3761,7 +3763,7 @@ Cluster::~Cluster()
 {
     BlockEntry** i = m_entries;
     BlockEntry** const j = m_entries + m_entriesCount;
-
+    pthread_mutex_destroy(&mMutex);
     while (i != j)
     {
          BlockEntry* p = *i++;
@@ -3782,8 +3784,12 @@ bool Cluster::EOS() const
 
 void Cluster::LoadBlockEntries()
 {
+    pthread_mutex_lock(&mMutex);
     if (m_entries)
+    {
+        pthread_mutex_unlock(&mMutex);
         return;
+    }
 
     assert(m_pSegment);
     assert(m_pos);
@@ -3867,7 +3873,10 @@ void Cluster::LoadBlockEntries()
     assert(m_timecode >= 0);
 
     if (m_entriesCount == 0)  //TODO: handle empty clusters
+    {
+        pthread_mutex_unlock(&mMutex);
         return;
+    }
 
     m_entries = new BlockEntry*[m_entriesCount];
     size_t index = 0;
@@ -3904,6 +3913,7 @@ void Cluster::LoadBlockEntries()
     assert(pos == stop);
     assert(timecode >= 0);
     assert(index == m_entriesCount);
+    pthread_mutex_unlock(&mMutex);
 }
 
 
