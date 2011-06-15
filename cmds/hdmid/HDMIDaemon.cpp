@@ -574,8 +574,6 @@ void HDMIDaemon::setResolution(int ID)
     ioctl(fd1, FBIOGET_VSCREENINFO, &info);
     //Pan_Display
     ioctl(fd1, FBIOPAN_DISPLAY, &info);
-    int en = 1;
-    ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
     property_set("hw.hdmiON", "1");
     //Inform SF about HDMI
     SurfaceComposerClient::enableHDMIOutput(HDMIOUT_ENABLE);
@@ -610,11 +608,8 @@ int HDMIDaemon::processFrameworkCommand()
 
         if (!openFramebuffer())
             return -1;
-        int en = 0;
-        ioctl(fd1, MSMFB_OVERLAY_PLAY_ENABLE, &en);
         property_set("hw.hdmiON", "0");
         SurfaceComposerClient::enableHDMIOutput(HDMIOUT_DISABLE);
-        ioctl(fd1, FBIOBLANK, FB_BLANK_POWERDOWN);
         close(fd1);
         fd1 = -1;
     } else if (!strncmp(buffer, HDMI_CMD_SET_ASWIDTH, strlen(HDMI_CMD_SET_ASWIDTH))) {
