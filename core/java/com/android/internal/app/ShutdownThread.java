@@ -347,8 +347,8 @@ public final class ShutdownThread extends Thread {
             if (!radioOff) {
                 radioOff = true;
                 try {
-                    for (i = 0; i < TelephonyManager.getPhoneCount(); i++) {
-                        radioOff = radioOff && !phone.isRadioOnOnSubscription(i);
+                    for (int j = 0; j < TelephonyManager.getPhoneCount(); j++) {
+                        radioOff = radioOff && !phone.isRadioOnOnSubscription(j);
                     }
                 } catch (RemoteException ex) {
                     Log.e(TAG, "RemoteException during radio shutdown", ex);
