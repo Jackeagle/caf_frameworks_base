@@ -840,7 +840,13 @@ status_t AwesomePlayer::play_l() {
 
                 int64_t durationUs;
                 success = format->findInt64(kKeyDuration, &durationUs);
-                CHECK(success);
+                /*
+                 * Some clips may not have kKeyDuration set, especially so for clips in a MP3
+                 * container with the Frames field absent in the Xing header.
+                 */
+                if (!success)
+                    durationUs = 0;
+
                 LOGV("LPAPlayer::getObjectsAlive() %d",LPAPlayer::objectsAlive);
 
                 char lpaDecode[128];
