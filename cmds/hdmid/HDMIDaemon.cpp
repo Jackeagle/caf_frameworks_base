@@ -68,6 +68,7 @@ namespace android {
 #define SYSFS_EDID_MODES        DEVICE_ROOT "/" DEVICE_NODE "/edid_modes"
 #define SYSFS_HPD               DEVICE_ROOT "/" DEVICE_NODE "/hpd"
 #define SYSFS_HDCP_PRESENT      DEVICE_ROOT "/" DEVICE_NODE "/hdcp_present"
+#define HDMI_PANEL               '7'
 
 HDMIDaemon::HDMIDaemon() : Thread(false),
            mFrameworkSock(-1), mAcceptedConnection(-1), mUeventSock(-1),
@@ -199,9 +200,16 @@ bool HDMIDaemon::threadLoop()
                 strerror(errno));
         }
         else {
-            // Check if HDCP Keys are present
-            if(checkHDCPPresent()) {
-                LOGD("threadLoop: HDCP keys are present, delay Broadcast.");
+            // Check what is external display connected(HDMI or Analog TV)
+            // and if HDCP Keys are present
+            if((!isHDMIPanel()) || checkHDCPPresent()) {
+                /*
+                 If the external display is Analog TV - do not broadcast
+                 Connected event.
+                 If the HDCP keys are present, delay the broadcast to audio
+                 as a different event will be triggred to notify audio.
+                */
+                LOGD("threadLoop: delay Broadcast");
                 sendCommandToFramework(action_no_broadcast_online);
             }
 
@@ -243,6 +251,28 @@ bool HDMIDaemon::checkHDCPPresent() {
     close(hdcpFile);
     return (present == '1') ? true : false;
 }
+
+bool HDMIDaemon::isHDMIPanel() {
+    int len  = strlen("msmfbXX_");
+    bool ret = false;
+    struct fb_fix_screeninfo fb_finfo;
+    if (!openFramebuffer())
+        return false;
+    if (ioctl(fd1, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
+        LOGE("%s: Cannot retreive fixed screeninfo...!!", __func__);
+    } else {
+        LOGD("%s: fb_finfo.id == %s", __func__, fb_finfo.id);
+        if(fb_finfo.id[len] == HDMI_PANEL)
+            ret = true;
+    }
+    if (fd1 > 0) {
+        close(fd1);
+        fd1 = -1;
+    }
+    LOGD("%s: isHDMIPanel returns %d", __func__, ret);
+    return ret;
+}
+
 bool HDMIDaemon::cableConnected(bool defaultValue) const
 {
     int hdmiStateFile = open(SYSFS_CONNECTED, O_RDONLY, 0);
