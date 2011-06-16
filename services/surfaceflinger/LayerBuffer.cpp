@@ -69,8 +69,13 @@ void PostBufLockPolicy::wait(Mutex & m, Condition& c, postBufState_t& s)
 LayerBuffer::LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
         const sp<Client>& client)
     : LayerBaseClient(flinger, display, client),
-      mNeedsBlending(false), mBlitEngine(0)
+      mNeedsBlending(false), mInvalidate(false), mBlitEngine(0)
 {
+    char property[PROPERTY_VALUE_MAX];
+    if(property_get("debug.composition.type", property, NULL) > 0 &&
+                            (strncmp(property, "mdp", 3) == 0)) {
+        mInvalidate = true;
+    }
 }
 
 LayerBuffer::~LayerBuffer()
@@ -170,6 +175,8 @@ void LayerBuffer::unlockPageFlip(const Transform& planeTransform,
     sp<Source> source(getSource());
     if (source != 0)
         source->onVisibilityResolved(planeTransform);
+    if(mInvalidate)
+        outDirtyRegion.orSelf(getTransformedBounds());
     LayerBase::unlockPageFlip(planeTransform, outDirtyRegion);    
 }
 
@@ -654,7 +661,6 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     status_t err = NO_ERROR;
     NativeBuffer src(ourBuffer->getBuffer());
     const Rect transformedBounds(mLayer.getTransformedBounds());
-    Region tempClip(clip);
 
 #if defined(EGL_ANDROID_image_native_buffer)
     if (GLExtensions::getInstance().haveDirectTexture()) {
@@ -687,10 +693,6 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                mTempGraphicBuffer->setVerticalStride(src.img.h);
                EGLDisplay dpy(getFlinger()->graphicPlane(0).getEGLDisplay());
                err = mTextureManager.initEglImage(&mTexture, dpy, mTempGraphicBuffer);
-               // Adjust clip for copybit resize issue
-               const DisplayHardware& hw(mLayer.
-                                       mFlinger->graphicPlane(0).displayHardware());
-               tempClip.orSelf(Region(hw.bounds()));
         } else {
                err = INVALID_OPERATION;
         }
@@ -715,7 +717,7 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     }
 
     mLayer.setBufferTransform(mBufferHeap.transform);
-    mLayer.drawWithOpenGL(tempClip, mTexture);
+    mLayer.drawWithOpenGL(clip, mTexture);
 }
 
 status_t LayerBuffer::BufferSource::initTempBuffer() const
