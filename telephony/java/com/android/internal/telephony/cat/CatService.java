@@ -854,6 +854,7 @@ public class CatService extends Handler implements AppInterface {
     private void  handleIccStatusChange(SimRefreshResponse IccRefreshState) {
 
         Intent intent = new Intent(AppInterface.CAT_ICC_STATUS_CHANGE);
+        intent.putExtra("SLOT_ID", mSlotId);
 
         if (IccRefreshState != null) {
             //This case is when MSG_ID_ICC_REFRESH is received.
