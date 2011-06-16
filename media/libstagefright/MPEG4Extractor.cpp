@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2010-2011 Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -262,6 +263,12 @@ static const char *FourCC2MIME(uint32_t fourcc) {
 
         case FOURCC('a', 'v', 'c', '1'):
             return MEDIA_MIMETYPE_VIDEO_AVC;
+
+        case FOURCC('s', 'q', 'c', 'p'):
+            return MEDIA_MIMETYPE_AUDIO_QCELP;
+
+        case FOURCC('s', 'e', 'v', 'c'):
+            return MEDIA_MIMETYPE_AUDIO_EVRC;
 
         default:
             CHECK(!"should not be here.");
@@ -795,6 +802,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('.', 'm', 'p', '3'):
         case FOURCC('s', 'a', 'm', 'r'):
         case FOURCC('s', 'a', 'w', 'b'):
+        case FOURCC('s', 'e', 'v', 'c'):
+        case FOURCC('s', 'q', 'c', 'p'):
         {
             uint8_t buffer[8 + 20];
             if (chunk_data_size < (ssize_t)sizeof(buffer)) {
@@ -1173,6 +1182,23 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             *offset += chunk_size;
             break;
         }
+        case FOURCC('d', 'q', 'c', 'p'):
+        case FOURCC('d', 'e', 'v', 'c'):
+        {
+            uint8_t buffer[20];
+
+            if (mDataSource->readAt(
+                        data_offset, buffer, sizeof(buffer)) < (ssize_t)sizeof(buffer)) {
+                return ERROR_IO;
+            }
+
+            uint32_t vendor = U32_AT(&buffer[0]);
+            uint8_t decoder_version = ((U16_AT(&buffer[4])) & 0xff00) >>8;
+            uint8_t frames_per_sample = (U16_AT(&buffer[4])) & 0x00ff;
+            *offset += chunk_size;
+            break;
+        }
+
         case FOURCC('s', 'k', 'i' ,'p'):
         //fall through; we can completely ignore this atom
         default:
@@ -1465,6 +1491,12 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
     uint8_t objectTypeIndication;
     if (esds.getObjectTypeIndication(&objectTypeIndication) != OK) {
         return ERROR_MALFORMED;
+    }
+
+    if (objectTypeIndication == 0xA0) {
+        // This isn't MPEG4 audio at all, it's EVRC
+        mLastTrack->meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_EVRC);
+        return OK;
     }
 
     if (objectTypeIndication == 0xe1) {
@@ -2003,7 +2035,8 @@ static bool LegacySniffMPEG4(
         return false;
     }
 
-    if (!memcmp(header, "ftyp3gp", 7) || !memcmp(header, "ftypmp42", 8)
+    if (!memcmp(header, "ftyp3g2a", 8)    || !memcmp(header, "ftyp3g2b", 8) || !memcmp(header, "ftyp3g2c", 8)
+        ||  !memcmp(header, "ftyp3gp", 7) || !memcmp(header, "ftypmp42", 8)
         || !memcmp(header, "ftyp3gr6", 8) || !memcmp(header, "ftyp3gs6", 8)
         || !memcmp(header, "ftyp3ge6", 8) || !memcmp(header, "ftyp3gg6", 8)
         || !memcmp(header, "ftypisom", 8) || !memcmp(header, "ftypM4V ", 8)
