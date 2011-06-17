@@ -948,6 +948,11 @@ status_t StagefrightRecorder::startAMRRecording() {
 status_t StagefrightRecorder::startFMA2DPWriter() {
 
     sp<MetaData> meta = new MetaData;
+
+    /* FM soc outputs at 48k */
+    mSampleRate = 48000;
+    mAudioChannels = 2;
+
     meta->setInt32(kKeyChannelCount, mAudioChannels);
     meta->setInt32(kKeySampleRate, mSampleRate);
 
