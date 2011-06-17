@@ -407,7 +407,12 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresFlushCompleteEmulation;
         quirks |= kSupportsMultipleFramesPerInputBuffer;
     }
-
+#ifdef USE_AAC_HW_DEC
+    if (!strcmp(componentName, "OMX.qcom.audio.decoder.aac")) {
+        quirks |= kRequiresAllocateBufferOnInputPorts;
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+    }
+#endif
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.evrc")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
@@ -601,6 +606,16 @@ sp<MediaSource> OMXCodec::Create(
               componentName= "OMX.qcom.audio.decoder.wma10Pro";
            }
         }
+#ifdef USE_AAC_HW_DEC
+        int aacformattype = 0;
+        sp<MetaData> metadata = source->getFormat();
+        metadata->findInt32(kkeyAacFormatAdif, &aacformattype);
+
+        if (aacformattype == true)  {
+            LOGE("This is ADIF clip , so using sw decoder ");
+            componentName= "AACDecoder";
+        }
+#endif
 
         if (!createEncoder
                 && (quirks & kOutputBuffersAreUnreadable)
@@ -838,7 +853,15 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         int32_t numChannels, sampleRate;
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
-
+#ifdef USE_AAC_HW_DEC
+        uint32_t type;
+        const void *data;
+        size_t size;
+	    if (meta->findData(kKeyAacCodecSpecificData, &type, &data, &size)) {
+                LOGV("OMXCodec::configureCodec found kKeyAacCodecSpecificData of size %d\n", size);
+                addCodecSpecificData(data, size);
+        }
+#endif
         setAACFormat(numChannels, sampleRate, bitRate);
     }
 
@@ -3533,7 +3556,7 @@ void OMXCodec::setAACFormat(int32_t numChannels, int32_t sampleRate, int32_t bit
 
         profile.nChannels = numChannels;
         profile.nSampleRate = sampleRate;
-        profile.eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4ADTS;
+        profile.eAACStreamFormat = OMX_AUDIO_AACStreamFormatRAW;
 
         err = mOMX->setParameter(
                 mNode, OMX_IndexParamAudioAac, &profile, sizeof(profile));
