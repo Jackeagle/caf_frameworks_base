@@ -924,6 +924,12 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         freeDataConnection((MMDataConnection)c.dc);
 
+        //Set data call state as FAILED, state might move
+        //to WAITING_FOR_ALARM if we have retries left.
+
+        mDpt.setState(State.FAILED, c.ds, c.ipv);
+        notifyDataConnection(c.ds, c.ipv, c.reason);
+
         DataConnectionFailCause cause = (DataConnectionFailCause) (ar.result);
 
         logi("--------------------------");
@@ -1034,6 +1040,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 // set state to scanning because can try on other data
                 // profiles that might work with this ds+ipv.
                 mDpt.setState(State.WAITING_ALARM, c.ds, c.ipv);
+                notifyDataConnection(c.ds, c.ipv, c.reason);
             } else {
                 /* 2 : enough of retries. disable the data profile */
                 logv("No retries left, disabling data profile. dp=" +
@@ -1123,10 +1130,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             if (getRadioTechnology().isGsm()
                     || getRadioTechnology() == RadioTechnology.RADIO_TECH_EHRPD) {
                 EventLog.writeEvent(EventLogTags.PDP_NETWORK_DROP,
-                        id, getRadioTechnology());
+                        id, getRadioTechnology().toString());
             } else {
                 EventLog.writeEvent(EventLogTags.CDMA_DATA_DROP,
-                        id, getRadioTechnology());
+                        id, getRadioTechnology().toString());
             }
         }
     }
