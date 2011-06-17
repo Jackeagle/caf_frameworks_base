@@ -72,6 +72,7 @@ import android.util.EventLog;
  *        x(clearNotifications) {
  *            EVENT_RESET { notifiyDisconnectCompleted }.
  *            EVENT_CONNECT {startConnecting, >mActivatingState }.
+ *            EVENT_DEACTIVATE_DONE { notifyDisconnectCompleted }
  *        }
  *   ++   mActivatingState {
  *            EVENT_DISCONNECT { %EVENT_DISCONNECT }.
@@ -486,8 +487,9 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 
             switch (msg.what) {
                 case EVENT_RESET:
+                case EVENT_DEACTIVATE_DONE:
                     if (DBG) {
-                        log("DcInactiveState: msg.what=EVENT_RESET, ignore we're already reset");
+                        log("DcInactiveState: already reset, notify again. msg.what= " + msg.what);
                     }
                     if (msg.obj != null) {
                         notifyDisconnectCompleted((DisconnectParams) msg.obj);
