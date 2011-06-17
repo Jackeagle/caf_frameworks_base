@@ -173,6 +173,7 @@ public class IccCardProxy extends Handler implements IccCard {
             case EVENT_ICC_ABSENT:
                 mAbsentRegistrants.notifyRegistrants();
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                updateStateProperty();
                 break;
             case EVENT_ICC_LOCKED:
                 processLockedState();
@@ -302,7 +303,11 @@ public class IccCardProxy extends Handler implements IccCard {
                         Log.d(LOG_TAG,"CardState neither error nor absent");
                     }
                 } else {
-                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
+                      if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
+                          broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                      } else {
+                          broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
+                      }
                 }
             } else {
                 mApplication = newApplication;
@@ -318,6 +323,10 @@ public class IccCardProxy extends Handler implements IccCard {
         } else {
             if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ERROR)) {
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
+            } else if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+            } else {
+                Log.d(LOG_TAG,"CardState neither error nor absent when mApplication = newApplication");
             }
         }
     }
