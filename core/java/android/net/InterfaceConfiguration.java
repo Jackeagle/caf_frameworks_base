@@ -61,7 +61,8 @@ public class InterfaceConfiguration implements Parcelable {
     public boolean isActive() {
         try {
             if(interfaceFlags.contains("up")) {
-                if (ipAddr != 0) return true;
+                /* TODO: We should check for v6 address for the v6-only case */
+                /*if (ipAddr != 0)*/ return true;
             }
         } catch (NullPointerException e) {
             return false;
