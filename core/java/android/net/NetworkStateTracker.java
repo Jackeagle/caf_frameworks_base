@@ -402,8 +402,10 @@ public abstract class NetworkStateTracker extends Handler {
         if (wasConnecting && state == NetworkInfo.DetailedState.CONNECTED && reason == null
                 && lastReason != null)
             reason = lastReason;
+        String v4int = getInterfaceName(IPVersion.INET);
+        String v6int = getInterfaceName(IPVersion.INET6);
         mNetworkInfo.setDetailedState(state, isIpv4Connected, isIpv6Connected, reason, extraInfo,
-                ipv4Apn, ipv6Apn);
+                ipv4Apn, ipv6Apn, v4int, v6int);
         Message msg = mTarget.obtainMessage(EVENT_STATE_CHANGED, mNetworkInfo);
         msg.sendToTarget();
     }
@@ -416,9 +418,11 @@ public abstract class NetworkStateTracker extends Handler {
              * says CONNECTED, both v4 and v6 is connected. This may not be true
              * always but no other way of knowing this now.
              */
-            mNetworkInfo.setDetailedState(state, true, true, null, null, null, null);
+            String v4int = getInterfaceName(IPVersion.INET);
+            String v6int = getInterfaceName(IPVersion.INET6);
+            mNetworkInfo.setDetailedState(state, true, true, null, null, null, null, v4int, v6int);
         } else {
-            mNetworkInfo.setDetailedState(state, false, false, null, null, null, null);
+            mNetworkInfo.setDetailedState(state, false, false, null, null, null, null, null, null);
         }
     }
 

@@ -40,7 +40,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * protocol.
  */
 final class NativeDaemonConnector implements Runnable {
-    private static final boolean LOCAL_LOGD = false;
+    private static final boolean LOCAL_LOGD = true;
 
     private BlockingQueue<String> mResponseQueue;
     private OutputStream          mOutputStream;
