@@ -1690,7 +1690,12 @@ public class GSMPhone extends PhoneBase {
     }
 
     public boolean isCspPlmnEnabled() {
-        return mSIMRecords.isCspPlmnEnabled();
+        if (mSIMRecords != null) {
+            return mSIMRecords.isCspPlmnEnabled();
+        } else {
+            Log.e(LOG_TAG, "isCspPlmnEnabled(), mSIMRecords is null.");
+            return true;
+        }
     }
 
     private void registerForSimRecordEvents() {
