@@ -479,12 +479,12 @@ public class ProxyManager extends Handler {
                 logd("EVENT_SET_SUBSCRIPTION_COMPLETED");
                 mSetSubscriptionInProgress = false;
                 // Process the card status if there is any change.
-                handleIccChanged();
+                handleIccChanged(true);
                 break;
 
             case EVENT_ICC_CHANGED:
                 logd("ProxyManager EVENT_ICC_CHANGED");
-                handleIccChanged();
+                handleIccChanged(false);
                 break;
 
             case EVENT_UPDATE_UICC_STATUS:
@@ -619,13 +619,14 @@ public class ProxyManager extends Handler {
             // In case if this is DDS subscription, then wait for the all data disconnected
             // indication from the lower layers to mark the subscription as deactivated.
             mSubscriptionReady[sub] = false;
+            PhoneProxy currentPhone = (PhoneProxy)mProxyPhones[sub];
             if (sub == mCurrentDds) {
                 Log.d(LOG_TAG, "Register for the all data disconnect");
-                PhoneProxy currentPhone = (PhoneProxy)mProxyPhones[sub];
                 currentPhone.registerForAllDataDisconnected(sProxyManager,
                         EVENT_ALL_DATA_DISCONNECTED, new Integer(sub));
             } else {
                 resetCurrentSubscription(sub);
+                currentPhone.setSubscriptionInfo(getCurrentSubscriptions().subscription[sub]);
                 // Update the subscription preferences
                 updateSubPreferences(getSelectedSubscriptions());
             }
@@ -649,6 +650,8 @@ public class ProxyManager extends Handler {
 
         if (mSubscriptionReady[sub] == false) {
             resetCurrentSubscription(sub);
+            currentPhone.setSubscriptionInfo(getCurrentSubscriptions().subscription[sub]);
+
             // Update the subscription preferences
             updateSubPreferences(getSelectedSubscriptions());
         }
@@ -662,16 +665,16 @@ public class ProxyManager extends Handler {
      * If Multi SIM is not enabled, then set the subscription information to the
      * default subscription to PhoneProxy.
      */
-    synchronized private void handleIccChanged() {
+    synchronized private void handleIccChanged(boolean triggerUpdate) {
         if (TelephonyManager.isMultiSimEnabled()) {
-            logd("handleIccChanged: MultiSIM Enabled");
+            logd("handleIccChanged(" + triggerUpdate + "): MultiSIM Enabled");
 
-            boolean processCards = false;
+            boolean cardStateChanged = false;
             int cardIndex = 0;
             UiccCard[] uiccCards = mUiccManager.getIccCards();
 
             for (UiccCard uiccCard : uiccCards) {
-                boolean cardStateChanged = false;
+                //boolean cardStateChanged = false;
                 UiccCard card = mUiccCardList.get(cardIndex).getUiccCard();
 
                 logd("cardIndex = " + cardIndex + " new uiccCard = "
@@ -703,34 +706,22 @@ public class ProxyManager extends Handler {
                         cardStateChanged = true;
                     }
                 } else if (card == null) {  // First time when gets a new uiccCard
+                    cardStateChanged = true;
                     mUiccCardList.set(cardIndex, new CardInfo(uiccCard));
                 }
-
-                card = mUiccCardList.get(cardIndex).getUiccCard();
-                // TODO: We shall process the cards only if there is a change in the cards status.
-                if ((card != null && card.getCardState() == CardState.PRESENT)
-                        || cardStateChanged) {
-                    processCards = true;
-                }
-
                 cardIndex++;
-            }
-
-            if (mSetSubscriptionInProgress) {
-                logd("handleIccChanged: SET UICC SUBSCRIPTION is under progress, "
-                        + "Process the ICC CHANGED later!!");
-                return;
             }
 
             updateIccIds();
 
-            boolean readIccIdInProgress = isReadIccIdInProgress();
+            boolean iccIdsAvailable = isAllIccIdsAvailable();
 
             logd("handleIccChanged: MultiSIM Enabled : "
-                    + " processCards = " + processCards
-                    + " readIccIdInProgress = " + readIccIdInProgress);
+                    + " triggerUpdate = " + triggerUpdate
+                    + " cardStateChanged = " + cardStateChanged
+                    + " iccIdsAvailable = " + iccIdsAvailable);
 
-            if (processCards && !readIccIdInProgress) {
+            if ((triggerUpdate || cardStateChanged) && iccIdsAvailable) {
                 updateUiccStatus("ICC STATUS CHANGED");
             }
         } else {
@@ -787,13 +778,14 @@ public class ProxyManager extends Handler {
     /**
      * Return true if there is any read ICCID request is in progress otherwise false.
      */
-    private boolean isReadIccIdInProgress() {
+    private boolean isAllIccIdsAvailable() {
         for (CardInfo cardInfo : mUiccCardList) {
-            if (cardInfo.isReadIccIdInProgress()) {
-                return true;
+            if (cardInfo.getCardState() == CardState.PRESENT
+                    && cardInfo.getIccId() == null) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
 
@@ -823,6 +815,7 @@ public class ProxyManager extends Handler {
         if (ar.exception != null) {
             logd("Exception in GET ICCID");
             // ICCID read failure. We may need to read the ICCID again.
+            mUiccCardList.get(cardIndex).setCardState(null);
         } else {
             iccId = IccUtils.bcdToString(data, 0, data.length);
         }
@@ -848,6 +841,20 @@ public class ProxyManager extends Handler {
     }
 
     /**
+     * Returns true if both cards state either ABSENT, ERROR or PRESENT with a valid ICCID.
+     */
+    private boolean isValidCards() {
+        for (CardInfo cardInfo : mUiccCardList) {
+            if (cardInfo.getUiccCard() == null
+                    || (cardInfo.getCardState() == CardState.PRESENT
+                        && cardInfo.getIccId() == null)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      *  Update the UICC status and intiates set uicc subscription if required.
      */
     synchronized private void onUpdateUiccStatus(String reason, int context) {
@@ -863,6 +870,11 @@ public class ProxyManager extends Handler {
         if (context != mUpdateUiccStatusContext) {
             // we have other EVENT_UPDATE_UICC_STATUS on the way.
             logd("onUpdateUiccStatus: [ignored] : reason=" + reason);
+            return;
+        }
+
+        if (mSetSubscriptionMode && !isValidCards()) {
+            logd("onUpdateUiccStatus: Need to set the subscription mode, but all cards are not available");
             return;
         }
 
@@ -1251,7 +1263,12 @@ public class ProxyManager extends Handler {
     private void resetCurrentSubscription(int subscr) {
         Log.d(LOG_TAG, "resetCurrentSubscription : subscr = " + subscr);
         mSupplySubscription.subscriptionData.subscription[subscr].subStatus = SUB_DEACTIVATED;
+        mSupplySubscription.subscriptionData.subscription[subscr].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
+        mSupplySubscription.subscriptionData.subscription[subscr].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
+
         mSupplySubscription.prevSubscriptionData.subscription[subscr].subStatus = SUB_DEACTIVATED;
+        mSupplySubscription.prevSubscriptionData.subscription[subscr].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
+        mSupplySubscription.prevSubscriptionData.subscription[subscr].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
     }
 
     /** Returns true if there is any active subscriptions */
