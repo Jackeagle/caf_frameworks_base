@@ -24,6 +24,7 @@ import com.android.internal.telephony.GsmAlphabet;
 import com.android.internal.telephony.EncodeException;
 import com.android.internal.telephony.SmsHeader;
 import com.android.internal.telephony.SmsMessageBase;
+import com.android.internal.telephony.SmsRawData;
 import com.android.internal.telephony.SmsMessageBase.SubmitPduBase;
 import com.android.internal.telephony.SmsMessageBase.TextEncodingDetails;
 
@@ -253,6 +254,30 @@ public class SmsMessage {
         } else {
             wrappedMessage = com.android.internal.telephony.gsm.SmsMessage.createFromEfRecord(
                     index, data);
+        }
+
+        return wrappedMessage != null ? new SmsMessage(wrappedMessage) : null;
+    }
+
+    /**
+     * Create an SmsMessage from an SMS EF record based on Apptype.
+     *
+     * @param index Index of SMS record. This should be index in ArrayList
+     *            returned by SmsManager.getAllMessagesFromSim + 1.
+     * @param rawSms SmsRawData.
+     * @return An SmsMessage representing the record.
+     * @hide
+     */
+    public static SmsMessage createFromEfRecord(int index, SmsRawData rawSms) {
+        SmsMessageBase wrappedMessage;
+
+        if (rawSms.is3gpp) {
+            wrappedMessage = com.android.internal.telephony.gsm.SmsMessage.createFromEfRecord(
+                    index, rawSms.getBytes());
+
+        } else {
+            wrappedMessage = com.android.internal.telephony.cdma.SmsMessage.createFromEfRecord(
+                    index, rawSms.getBytes());
         }
 
         return wrappedMessage != null ? new SmsMessage(wrappedMessage) : null;

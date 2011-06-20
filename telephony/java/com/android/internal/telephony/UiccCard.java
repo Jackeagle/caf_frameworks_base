@@ -156,7 +156,7 @@ public class UiccCard extends Handler{
             return null;
         }
 
-        if (appIndex < mUiccApplications.length) {
+        if (appIndex < mUiccApplications.length && appIndex >= 0) {
             return mUiccApplications[appIndex];
         } else {
             return null;

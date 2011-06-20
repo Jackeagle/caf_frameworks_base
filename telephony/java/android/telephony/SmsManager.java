@@ -759,7 +759,7 @@ public final class SmsManager {
                 SmsRawData data = records.get(i);
                 // List contains all records, including "free" records (null)
                 if (data != null) {
-                    SmsMessage sms = SmsMessage.createFromEfRecord(i+1, data.getBytes());
+                    SmsMessage sms = SmsMessage.createFromEfRecord(i+1, data);
                     if (sms != null) {
                         messages.add(sms);
                     }
