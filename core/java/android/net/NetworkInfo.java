@@ -109,7 +109,9 @@ public class NetworkInfo implements Parcelable {
     private boolean mIsFailover;
     private boolean mIsRoaming;
     private boolean mIsIpV4Connected;
+    private String mIpv4Interface;
     private boolean mIsIpV6Connected;
+    private String mIpv6Interface;
     /**
      * Indicates whether network connectivity is possible:
      */
@@ -131,7 +133,7 @@ public class NetworkInfo implements Parcelable {
         mSubtype = subtype;
         mTypeName = typeName;
         mSubtypeName = subtypeName;
-        setDetailedState(DetailedState.IDLE, false, false, null, null);
+        setDetailedState(DetailedState.IDLE, false, false, null, null, null, null);
         mState = State.UNKNOWN;
         mIsAvailable = false; // until we're told otherwise, assume unavailable
         mIsRoaming = false;
@@ -214,6 +216,15 @@ public class NetworkInfo implements Parcelable {
     }
 
     /**
+     * Provides the name of the interface on which ipv4 connectivity for this network is enabled
+     * @return Name of the interface. Null if IPv4 not active for this network
+     */
+
+    public String getIpv4Interface() {
+        return mIpv4Interface;
+    }
+
+    /**
      * Indicates whether ipv6 network connectivity exists and it is possible to establish
      * connections and pass ipv6 data.
      * @return {@code true} if network connectivity through ipv6 exists, {@code false} otherwise.
@@ -225,6 +236,15 @@ public class NetworkInfo implements Parcelable {
             return mIsIpV6Connected;
         }
         return false;
+    }
+
+    /**
+     * Provides the name of the interface on which IPv6 connectivity for this network is enabled
+     * @return Name of the interface. Null if IPv6 not active for this network
+     */
+
+    public String getIpv6Interface() {
+        return mIpv6Interface;
     }
 
     /**
@@ -313,7 +333,8 @@ public class NetworkInfo implements Parcelable {
      * information passed up from the lower networking layers.
      */
     void setDetailedState(DetailedState detailedState, boolean isIpv4Connected,
-            boolean isIpv6Connected, String reason, String extraInfo) {
+            boolean isIpv6Connected, String reason, String extraInfo,
+            String ipv4Interface, String ipv6Interface) {
         this.mDetailedState = detailedState;
         this.mState = stateMap.get(detailedState);
         this.mReason = reason;
@@ -321,9 +342,13 @@ public class NetworkInfo implements Parcelable {
         if (this.mState != State.CONNECTED) {
             this.mIsIpV4Connected = false;
             this.mIsIpV6Connected = false;
+            this.mIpv4Interface = null;
+            this.mIpv6Interface = null;
         } else {
             this.mIsIpV4Connected = isIpv4Connected;
+            this.mIpv4Interface = ipv4Interface;
             this.mIsIpV6Connected = isIpv6Connected;
+            this.mIpv6Interface = ipv6Interface;
         }
     }
 
@@ -357,7 +382,10 @@ public class NetworkInfo implements Parcelable {
                 append(", failover: ").append(mIsFailover).
                 append(", isAvailable: ").append(mIsAvailable).
                 append(", isIpv4Connected: ").append(mIsIpV4Connected).
-                append(", isIpv6Connected: ").append(mIsIpV6Connected);
+                append(", isIpv6Connected: ").append(mIsIpV6Connected).
+                append(", ipv4Name: ").append(mIpv4Interface).
+                append(", ipv6Name: ").append(mIpv6Interface);
+
         return builder.toString();
     }
 
@@ -387,6 +415,8 @@ public class NetworkInfo implements Parcelable {
         dest.writeString(mExtraInfo);
         dest.writeInt(mIsIpV4Connected? 1 : 0);
         dest.writeInt(mIsIpV6Connected? 1 : 0);
+        dest.writeString(mIpv4Interface);
+        dest.writeString(mIpv6Interface);
     }
 
     /**
@@ -410,6 +440,8 @@ public class NetworkInfo implements Parcelable {
                 netInfo.mExtraInfo = in.readString();
                 netInfo.mIsIpV4Connected = in.readInt() != 0;
                 netInfo.mIsIpV6Connected = in.readInt() != 0;
+                netInfo.mIpv4Interface = in.readString();
+                netInfo.mIpv6Interface = in.readString();
                 return netInfo;
             }
 
