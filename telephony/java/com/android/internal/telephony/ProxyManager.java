@@ -22,6 +22,8 @@ import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Registrant;
+import android.os.RegistrantList;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.telephony.TelephonyManager;
@@ -121,6 +123,8 @@ public class ProxyManager extends Handler {
 
     private boolean mSetSubscriptionInProgress = false;
     private boolean[] mRadioOn = {false, false};
+
+    private RegistrantList mSimStateRegistrants = new RegistrantList();
 
     class CardInfo {
         private UiccCard mUiccCard;
@@ -928,6 +932,15 @@ public class ProxyManager extends Handler {
         mContext.startActivity(setSubscriptionIntent);
     }
 
+    public synchronized void registerForSimStateChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mSimStateRegistrants.add(r);
+    }
+
+    public synchronized void unRegisterForSimStateChanged(Handler h) {
+        mSimStateRegistrants.remove(h);
+    }
+
     /**
      *  Update the card subscription data from the UiccCards.
      *  Return true if updates atleast one card, else false.
@@ -979,6 +992,7 @@ public class ProxyManager extends Handler {
                         (mCardSubData[cardIndex] != null
                          && mCardSubData[cardIndex].getIccId() != cardInfo.getIccId())) {
 
+                    mSimStateRegistrants.notifyRegistrants();
                     logd("compareAndUpdateCardSubData(): New card, update card info at index = "
                         + cardIndex);
 
@@ -1011,6 +1025,7 @@ public class ProxyManager extends Handler {
                 }
             } else {
                 mCardSubData[cardIndex] = null;
+                mSimStateRegistrants.notifyRegistrants();
             }
         }
 
