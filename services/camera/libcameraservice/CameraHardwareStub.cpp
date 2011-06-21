@@ -399,6 +399,11 @@ static CameraInfo sCameraInfo[] = {
     }
 };
 
+extern "C" int HAL_isIn3DMode()
+{
+    return false;
+}
+
 extern "C" int HAL_getNumberOfCameras()
 {
     return sizeof(sCameraInfo) / sizeof(sCameraInfo[0]);

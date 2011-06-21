@@ -54,6 +54,7 @@ public:
     virtual status_t    dump(int fd, const Vector<String16>& args);
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
                                    Parcel* reply, uint32_t flags);
+    bool isIn3DMode();
 
     enum sound_kind {
         SOUND_SHUTTER = 0,
