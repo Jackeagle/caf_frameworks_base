@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,7 +106,7 @@ public class UiccCard extends Handler{
 
     public synchronized void dispose() {
         mDestroyed = true;
-
+        mCardState = CardState.ABSENT;
         mUiccRecords.dispose();
         mUiccRecords = null;
         if (mCatService != null) {
@@ -117,6 +118,7 @@ public class UiccCard extends Handler{
             }
         }
         mUiccApplications = null;
+        mAbsentRegistrants.notifyRegistrants();
         mUnavailableRegistrants.notifyRegistrants();
     }
 
