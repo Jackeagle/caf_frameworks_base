@@ -565,7 +565,8 @@ bool SurfaceFlinger::handleBypassLayer()
     if (bypassLayer != 0) {
         const DisplayHardware& hw(graphicPlane(0).displayHardware());
         sp<GraphicBuffer> buffer(bypassLayer->getBypassBuffer());
-        if (buffer != 0 && hw.isOverlayUIEnabled()) {
+        if (buffer != 0 && hw.isOverlayUIEnabled() &&
+            !bypassLayer->getStereoscopic3DFormat()) {
             bool isHPDON = hdmiOptionON;
             status_t ret = hw.postBypassBuffer(buffer->handle, buffer->width,
                                             buffer->height, buffer->format,
