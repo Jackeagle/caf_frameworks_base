@@ -66,9 +66,6 @@ Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 
 #define OMX_COMPONENT_CAPABILITY_TYPE_INDEX 0xFF7A347
 
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
 
 namespace android {
 
@@ -684,18 +681,6 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
 
             size_t numSeqParameterSets = ptr[5] & 31;
 
-            SpsInfo info;
-            if ( parseSps( size - 1, ptr + 1, &info ) == OK ) {
-                mSPSParsed = true;
-                if (info.mInterlaced)
-                    mInterlaceFormatDetected = true;
-            }
-            else {
-                LOGI("ParseSPS failed to find if content is interlaced");
-                mSPSParsed = false;
-                mInterlaceFormatDetected = false;
-            }
-
             ptr += 6;
             size -= 6;
 
@@ -973,20 +958,6 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
 
             if (err != OK) {
                 return err;
-            }
-            if ((flags & kLocalFileMode) &&
-                (strcmp(mMIME, MEDIA_MIMETYPE_VIDEO_AVC) == 0) &&
-                (mSPSParsed) &&
-                (!mInterlaceFormatDetected)){
-                CODEC_LOGI("Local file playback frame by frame mode enabled");
-                OMX_QCOM_PARAM_PORTDEFINITIONTYPE portFmt;
-                portFmt.nPortIndex = kPortIndexInput;
-                portFmt.nFramePackingFormat = OMX_QCOM_FramePacking_OnlyOneCompleteFrame;
-                err = mOMX->setParameter(
-                        mNode, (OMX_INDEXTYPE)OMX_QcomIndexPortDefn, (void *)&portFmt, sizeof(portFmt));
-                if(err != OK) {
-                    LOGW("Failed to set frame packing format on component");
-                }
             }
         }
     }
@@ -1974,8 +1945,7 @@ OMXCodec::OMXCodec(
       m3DVideoDetected(false),
       mSendEOS(false),
       mForce3D(0),
-      mFinalStatus(OK),
-      mSPSParsed(false) {
+      mFinalStatus(OK) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
