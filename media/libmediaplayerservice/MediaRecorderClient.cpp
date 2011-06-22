@@ -359,6 +359,12 @@ status_t MediaRecorderClient::release()
         wp<MediaRecorderClient> client(this);
         mMediaPlayerService->removeMediaRecorderClient(client);
     }
+
+    if( mFd != -1 ){
+        ::close( mFd );
+        mFd = -1;
+    }
+
     return NO_ERROR;
 }
 
@@ -403,9 +409,6 @@ MediaRecorderClient::~MediaRecorderClient()
 {
     LOGV("Client destructor");
     release();
-    if( mFd != -1 ){
-        ::close( mFd );
-    }
 }
 
 status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listener)
