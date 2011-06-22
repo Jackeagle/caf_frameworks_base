@@ -247,8 +247,9 @@ buffer_handle_t FramebufferNativeWindow::getCurrentBufferHandle(ANativeWindow* w
     FramebufferNativeWindow* self = getSelf(window);
     Mutex::Autolock _l(self->mutex);
 
-    android_native_buffer_t* buffer = self->buffers[self->mCurrentBufferIndex].get();
-    buffer_handle_t handle = static_cast<NativeBuffer*>(buffer)->handle;
+    sp<NativeBuffer> buffer = self->front;
+    buffer_handle_t handle = buffer->handle;
+
     return handle;
 }
 

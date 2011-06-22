@@ -2464,13 +2464,33 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
 
     // Use copybit for screen capture in case of c2d composition
     if (hw.getFlags() & DisplayHardware::C2D_COMPOSITION) {
-        native_handle_t* handle = hw.getCurrentFBHandle();
         copybit_image_t src;
-        src.w = ((hw_w + 31) &~31);
-        src.h = hw_h;
-        src.format = hw.getFormat();
-        src.base = (void *)0;
-        src.handle = handle;
+        native_handle_t* handle;
+        int orientation = 0;
+        if (mBypassState == eBypassInUse) {
+            sp<Layer> bypassLayer(mBypassLayer.promote());
+            if (bypassLayer != 0) {
+                sp<GraphicBuffer> buffer(bypassLayer->getBypassBuffer());
+                if (buffer == 0) {
+                    LOGE("SurfaceFlinger::captureScreenImplLocked Invalid Bypass buffer");
+                    return BAD_VALUE;
+                }
+                handle = (native_handle_t *)buffer->handle;
+                orientation = bypassLayer->getOrientation();
+                src.w = ((buffer->width + 31) &~31);
+                src.h = buffer->height;
+                src.format = buffer->format;
+                src.base = (void *)0;
+                src.handle = handle;
+            }
+        } else {
+            handle = hw.getCurrentFBHandle();
+            src.w = ((hw_w + 31) &~31);
+            src.h = hw_h;
+            src.format = hw.getFormat();
+            src.base = (void *)0;
+            src.handle = handle;
+        }
 
         native_handle_t *hnd = new native_handle_t;
         // Create a gralloc buffer and set its flag as ashmem
@@ -2482,8 +2502,8 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
 
         // Copybit dst
         copybit_image_t dst;
-        dst.w = ((hw_w + 31) &~31);
-        dst.h = hw_h;
+        dst.w = sw;
+        dst.h = sh;
         dst.format = hw.getFormat();
         dst.base = ptr;
         dst.handle = hnd;
@@ -2491,7 +2511,7 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
         // Copybit region
         region_iterator clip(Region(Rect(dst.w, dst.h)));
 
-        mBlitEngine->set_parameter(mBlitEngine, COPYBIT_TRANSFORM, 0);
+        mBlitEngine->set_parameter(mBlitEngine, COPYBIT_TRANSFORM, orientation);
         mBlitEngine->set_parameter(mBlitEngine, COPYBIT_PLANE_ALPHA, 0xFF);
         result = mBlitEngine->blit(mBlitEngine, &dst, &src, &clip);
 
