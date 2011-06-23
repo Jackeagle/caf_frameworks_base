@@ -417,6 +417,12 @@ status_t DisplayHardware::stopOrigResDisplay() const {
     return fbDev->stopOrigResDisplay(fbDev);
 }
 
+status_t DisplayHardware::copyBypassBuffer() const
+{
+   framebuffer_device_t *fbDev = (framebuffer_device_t *)mNativeWindow->getDevice();
+   return fbDev->copyBypassBuffer(fbDev);
+}
+
 uint32_t DisplayHardware::getFlags() const
 {
     return mFlags;

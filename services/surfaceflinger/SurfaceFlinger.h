@@ -323,6 +323,7 @@ private:
             void        handleRepaint();
             bool        handleBypassLayer();
             bool        closeBypass();
+            bool        copyBypassBuffer();
             void        postFramebuffer();
             void        composeSurfaces(const Region& dirty);
 
@@ -463,6 +464,7 @@ private:
 public:
    void ditchOverlayLayers();
    void freeBypassBuffers();
+   void freeBypassBuffers(bool clearOverlayFlag);
 };
 
 // ---------------------------------------------------------------------------
