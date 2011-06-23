@@ -797,8 +797,7 @@ player_type getPlayerType(const char* url)
         if (start > 0) {
             if (!strncmp(url + start, FILE_EXTS[i].extension, len)) {
                 if (FILE_EXTS[i].playertype == VORBIS_PLAYER
-                    && !strncasecmp(url, "http://", 7)
-                    && useStagefrightForHTTP) {
+                    && !strncasecmp(url, "http://", 7)) {
                     return STAGEFRIGHT_PLAYER;
                 }
                 return OverrideStagefrightForVorbis(FILE_EXTS[i].playertype);
