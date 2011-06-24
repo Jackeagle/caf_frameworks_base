@@ -66,8 +66,9 @@ public class UiccCard extends Handler{
             mUiccApplications[i] = new UiccCardApplication(this, ics.applications[i], mUiccRecords, mContext, mCi);
         }
 
+        mCatService = catService;
+
         if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
-            mCatService = catService;
             mCatService.update( mUiccApplications[0].getApplicationRecords(),mUiccApplications[0].getIccFileHandler());
         }
     }
@@ -77,6 +78,11 @@ public class UiccCard extends Handler{
             Log.e(mLogTag, "Updated after destroyed! Fix me!");
             return;
         }
+
+        if (ics.card_state == CardState.ABSENT && mCardState == CardState.PRESENT && mCatService != null) {
+            mCatService.cleanSTKIcon();
+        }
+
         //TODO: Fusion - If state changed - notify registrants
         mCardState = ics.card_state;
         mUniversalPinState = ics.universal_pin_state;
@@ -100,6 +106,9 @@ public class UiccCard extends Handler{
                 //Update the rest
                 mUiccApplications[i].update(ics.applications[i], mUiccRecords, mContext, mCi);
             }
+        }
+        if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
+            mCatService.update(mUiccApplications[0].getApplicationRecords(),mUiccApplications[0].getIccFileHandler());
         }
     }
 

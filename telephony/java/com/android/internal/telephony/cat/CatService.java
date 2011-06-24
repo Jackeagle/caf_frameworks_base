@@ -221,7 +221,9 @@ public class CatService extends Handler implements AppInterface {
         // will clean up the Idle mode Text and Stk toolkit icon
         handleIccStatusChange(null);
 
-        mIccRecords.unregisterForRecordsLoaded(this);
+        if (mIccRecords != null) {
+            mIccRecords.unregisterForRecordsLoaded(this);
+        }
     }
 
     public void update(UiccApplicationRecords ir, IccFileHandler fh) {
