@@ -59,6 +59,10 @@ struct OMXNodeInstance {
             OMX_U32 portIndex, const sp<IMemory> &params,
             OMX::buffer_id *buffer);
 
+    status_t useBuffer(
+            OMX_U32 port_index, void *data, size_t size,
+            OMX::buffer_id *buffer);
+
     status_t allocateBuffer(
             OMX_U32 portIndex, size_t size, OMX::buffer_id *buffer,
             void **buffer_data);

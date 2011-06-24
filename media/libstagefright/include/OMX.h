@@ -69,6 +69,10 @@ public:
             node_id node, OMX_U32 port_index, const sp<IMemory> &params,
             buffer_id *buffer);
 
+    virtual status_t useBuffer(
+            node_id node, OMX_U32 port_index, void *data, size_t size,
+            buffer_id *buffer);
+
     virtual status_t allocateBuffer(
             node_id node, OMX_U32 port_index, size_t size,
             buffer_id *buffer, void **buffer_data);

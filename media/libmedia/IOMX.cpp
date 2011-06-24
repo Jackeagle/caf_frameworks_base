@@ -22,6 +22,7 @@ enum {
     GET_CONFIG,
     SET_CONFIG,
     USE_BUFFER,
+    USE_BUFFER_RAW,
     ALLOC_BUFFER,
     ALLOC_BUFFER_WITH_BACKUP,
     GET_ACTIVE_BUFFERS,
@@ -268,6 +269,29 @@ public:
         data.writeInt32(size);
 #endif
         remote()->transact(USE_BUFFER, data, &reply);
+
+        status_t err = reply.readInt32();
+        if (err != OK) {
+            *buffer = 0;
+
+            return err;
+        }
+
+        *buffer = (void*)reply.readIntPtr();
+
+        return err;
+    }
+
+    virtual status_t useBuffer(
+            node_id node, OMX_U32 port_index, void *bufdata, size_t size,
+            buffer_id *buffer) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
+        data.writeIntPtr((intptr_t)node);
+        data.writeInt32(port_index);
+        data.writeIntPtr((intptr_t)bufdata);
+        data.writeInt32(size);
+        remote()->transact(USE_BUFFER_RAW, data, &reply);
 
         status_t err = reply.readInt32();
         if (err != OK) {
@@ -655,6 +679,27 @@ status_t BnOMX::onTransact(
 
             return NO_ERROR;
         }
+
+        case USE_BUFFER_RAW:
+        {
+            CHECK_INTERFACE(IOMX, data, reply);
+
+            node_id node = (void*)data.readIntPtr();
+            OMX_U32 port_index = data.readInt32();
+            void *bufdata = (void*)data.readIntPtr();
+            size_t size = data.readInt32();
+
+            buffer_id buffer;
+            status_t err = useBuffer(node, port_index, bufdata, size, &buffer);
+            reply->writeInt32(err);
+
+            if (err == OK) {
+                reply->writeIntPtr((intptr_t)buffer);
+            }
+
+            return NO_ERROR;
+        }
+
 
         case ALLOC_BUFFER:
         {

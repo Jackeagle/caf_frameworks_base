@@ -311,6 +311,13 @@ status_t OMX::useBuffer(
             port_index, params, buffer);
 }
 
+status_t OMX::useBuffer(
+       node_id node, OMX_U32 port_index, void *data, size_t size,
+       buffer_id *buffer) {
+    return findInstance(node)->useBuffer(
+            port_index, data, size, buffer);
+}
+
 status_t OMX::allocateBuffer(
         node_id node, OMX_U32 port_index, size_t size,
         buffer_id *buffer, void **buffer_data) {

@@ -301,6 +301,39 @@ status_t OMXNodeInstance::useBuffer(
     return OK;
 }
 
+status_t OMXNodeInstance::useBuffer(
+        OMX_U32 portIndex, void *data, size_t size,
+        OMX::buffer_id *buffer) {
+    Mutex::Autolock autoLock(mLock);
+
+    BufferMeta *buffer_meta = new BufferMeta(0);
+
+    OMX_BUFFERHEADERTYPE *header;
+
+    OMX_ERRORTYPE err = OMX_UseBuffer(
+            mHandle, &header, portIndex, buffer_meta,
+            size, static_cast<OMX_U8 *>(data));
+
+    if (err != OMX_ErrorNone) {
+        LOGE("OMX_UseBuffer failed with error %d (0x%08x)", err, err);
+
+        delete buffer_meta;
+        buffer_meta = NULL;
+
+        *buffer = 0;
+
+        return UNKNOWN_ERROR;
+    }
+
+    CHECK_EQ(header->pAppPrivate, buffer_meta);
+
+    *buffer = header;
+
+    addActiveBuffer(portIndex, *buffer);
+
+    return OK;
+}
+
 status_t OMXNodeInstance::allocateBuffer(
         OMX_U32 portIndex, size_t size, OMX::buffer_id *buffer,
         void **buffer_data) {
