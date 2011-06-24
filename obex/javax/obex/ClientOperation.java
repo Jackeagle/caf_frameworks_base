@@ -632,6 +632,12 @@ public final class ClientOperation implements Operation, BaseStream {
                 if (VERBOSE)  Log.v(TAG, "continueOperation inStream&&!mOperationDone"
                                             +" mReplyHeader.responseCode = "+mReplyHeader.responseCode);
 
+                Byte srm = (Byte)mReplyHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                if ((srm == ObexHelper.OBEX_SRM_SUPPORTED)||(srm == ObexHelper.OBEX_SRM_ENABLED)) {
+                    ObexHelper.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
+                    if (VERBOSE) Log.v(TAG, "Remote SRM status: Enabled by Server response");
+                }
+
                // Turn on SRM only if supported by both Client and Server. Otherwise, don't turn on SRM.
                 if (ObexHelper.getRemoteSrmStatus()) {
                     if (VERBOSE)  Log.v(TAG, "continueOperation: Remote SRM Enabled");
@@ -674,6 +680,11 @@ public final class ClientOperation implements Operation, BaseStream {
                 sendRequest(0x02);
 
                 if (VERBOSE)  Log.v(TAG, "continueOperation: Client setting SRM, sendEmpty clause");
+                Byte srm = (Byte)mReplyHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
+                if ((srm == ObexHelper.OBEX_SRM_SUPPORTED)||(srm == ObexHelper.OBEX_SRM_ENABLED)) {
+                    ObexHelper.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
+                    if (VERBOSE) Log.v(TAG, "Remote SRM status: Enabled by Server response");
+                }
 
                 // Turn on SRM only if supported by both Client and Server. Otherwise, don't turn on SRM.
                 if (ObexHelper.getRemoteSrmStatus()) {
