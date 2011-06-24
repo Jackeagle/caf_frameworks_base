@@ -125,6 +125,7 @@ public class ProxyManager extends Handler {
     private boolean[] mRadioOn = {false, false};
 
     private RegistrantList mSimStateRegistrants = new RegistrantList();
+    private RegistrantList mSetSubscriptionRegistrants = new RegistrantList();
 
     class CardInfo {
         private UiccCard mUiccCard;
@@ -909,7 +910,7 @@ public class ProxyManager extends Handler {
 
         if (setSubRequired) {
             logd("onUpdateUiccStatus: automatic set subscription");
-            setSubscription(matchedSub, null);
+            setSubscription(matchedSub);
         } else {
             logd("onUpdateUiccStatus: Set Subscription not Required");
         }
@@ -939,6 +940,19 @@ public class ProxyManager extends Handler {
 
     public synchronized void unRegisterForSimStateChanged(Handler h) {
         mSimStateRegistrants.remove(h);
+    }
+
+    public synchronized void registerForSetSubscriptionCompleted(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mSetSubscriptionRegistrants.add(r);
+    }
+
+    public synchronized void unRegisterForSetSubscriptionCompleted(Handler h) {
+        mSetSubscriptionRegistrants.remove(h);
+    }
+
+    public boolean isSetSubscriptionInProgress() {
+        return mSetSubscriptionInProgress;
     }
 
     /**
@@ -1185,7 +1199,7 @@ public class ProxyManager extends Handler {
     }
 
     /** Sets the subscriptions */
-    public void setSubscription(SubscriptionData subData, Message onCompleteMsg) {
+    public void setSubscription(SubscriptionData subData) {
 
         Log.d(LOG_TAG, "setSubscription");
 
@@ -1223,7 +1237,7 @@ public class ProxyManager extends Handler {
         mSetSubscriptionInProgress = true;
 
         logd("Calling mSupplySubscription.setSubscription");
-        mSupplySubscription.setSubscription(subData, onCompleteMsg);
+        mSupplySubscription.setSubscription(subData);
     }
 
     /**
@@ -1373,7 +1387,6 @@ public class ProxyManager extends Handler {
         private SubscriptionData subscriptionData;
         private SubscriptionData prevSubscriptionData;
 
-        private Message mSetSubCompleteMsg;
         private int mPendingDeactivateEvents;
         private int mPendingActivateEvents;
 
@@ -1383,8 +1396,6 @@ public class ProxyManager extends Handler {
 
             subscriptionData = new SubscriptionData(NUM_SUBSCRIPTIONS);
             prevSubscriptionData = new SubscriptionData(NUM_SUBSCRIPTIONS);
-
-            mSetSubCompleteMsg = null;
         }
 
 
@@ -1652,7 +1663,7 @@ public class ProxyManager extends Handler {
         }
 
 
-        synchronized void setSubscription(SubscriptionData userSubData, Message onCompleteMsg) {
+        synchronized void setSubscription(SubscriptionData userSubData) {
             String [] string = null;
             boolean done = true;
 
@@ -1669,8 +1680,6 @@ public class ProxyManager extends Handler {
                     Thread.currentThread().interrupt();
                 }
             }
-
-            mSetSubCompleteMsg = onCompleteMsg;
 
             Log.d(LOG_TAG, "Copying the subscriptionData from the userSubData");
             subscriptionData.copyFrom(userSubData);
@@ -1780,11 +1789,9 @@ public class ProxyManager extends Handler {
         private void sendSetSubscriptionCallback() {
             ProxyManager.getInstance().sendMessage(obtainMessage(EVENT_SET_SUBSCRIPTION_COMPLETED));
             // Send the message back to callee with result.
-            if (mSetSubCompleteMsg != null) {
-                Log.d(LOG_TAG, "sendSetSubscriptionCallback");
-                AsyncResult.forMessage(mSetSubCompleteMsg, mSubResult, null);
-                mSetSubCompleteMsg.sendToTarget();
-                mSetSubCompleteMsg = null;
+            Log.d(LOG_TAG, "sendSetSubscriptionCallback");
+            if (mSetSubscriptionRegistrants != null) {
+                mSetSubscriptionRegistrants.notifyRegistrants(new AsyncResult(null, mSubResult, null));
             }
         }
     }
