@@ -79,6 +79,8 @@ struct OMXNodeInstance {
     status_t getExtensionIndex(
             const char *parameterName, OMX_INDEXTYPE *index);
 
+    Vector<OMX::buffer_id> getActiveBuffers(OMX_U32 portIndex);
+
     void onMessage(const omx_message &msg);
     void onObserverDied(OMXMaster *master);
     void onGetHandleFailed();

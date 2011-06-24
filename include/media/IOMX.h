@@ -100,6 +100,9 @@ public:
             node_id node, OMX_U32 port_index, const sp<IMemory> &params,
             buffer_id *buffer) = 0;
 
+    virtual Vector<IOMX::buffer_id> getActiveBuffers(
+            node_id node, OMX_U32 port_index) = 0;
+
     virtual status_t freeBuffer(
             node_id node, OMX_U32 port_index, buffer_id buffer) = 0;
 

@@ -325,6 +325,11 @@ status_t OMX::allocateBufferWithBackup(
             port_index, params, buffer);
 }
 
+Vector<IOMX::buffer_id> OMX::getActiveBuffers(node_id node,
+        OMX_U32 port_index) {
+    return findInstance(node)->getActiveBuffers(port_index);
+}
+
 status_t OMX::freeBuffer(node_id node, OMX_U32 port_index, buffer_id buffer) {
     return findInstance(node)->freeBuffer(
             port_index, buffer);

@@ -24,6 +24,7 @@ enum {
     USE_BUFFER,
     ALLOC_BUFFER,
     ALLOC_BUFFER_WITH_BACKUP,
+    GET_ACTIVE_BUFFERS,
     FREE_BUFFER,
     FILL_BUFFER,
     EMPTY_BUFFER,
@@ -323,6 +324,24 @@ public:
         *buffer = (void*)reply.readIntPtr();
 
         return err;
+    }
+
+    virtual Vector<IOMX::buffer_id> getActiveBuffers(
+            node_id node, OMX_U32 port_index) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
+        data.writeIntPtr((intptr_t)node);
+        data.writeInt32(port_index);
+
+        remote()->transact(GET_ACTIVE_BUFFERS, data, &reply);
+
+        Vector<IOMX::buffer_id> result;
+        size_t size = reply.readInt32();
+
+        for (uint32_t i = 0; i < size; i++) {
+            result.push((IOMX::buffer_id)reply.readIntPtr());
+        }
+        return result;
     }
 
     virtual status_t freeBuffer(
@@ -676,6 +695,25 @@ status_t BnOMX::onTransact(
 
             if (err == OK) {
                 reply->writeIntPtr((intptr_t)buffer);
+            }
+
+            return NO_ERROR;
+        }
+
+        case GET_ACTIVE_BUFFERS:
+        {
+            CHECK_INTERFACE(IOMX, data, reply);
+
+            node_id node = (void*)data.readIntPtr();
+            OMX_U32 port_index = data.readInt32();
+
+            Vector<IOMX::buffer_id> result =
+                getActiveBuffers(node, port_index);
+
+            reply->writeInt32(result.size());
+
+            for (uint32_t i = 0; i < result.size(); i++) {
+                reply->writeIntPtr((intptr_t)result[i]);
             }
 
             return NO_ERROR;

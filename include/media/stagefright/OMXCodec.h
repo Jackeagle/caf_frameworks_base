@@ -78,6 +78,8 @@ struct OMXCodec : public MediaSource,
 
     virtual status_t pause();
 
+    Vector<IOMX::buffer_id> getOutputBuffers();
+
     // from MediaBufferObserver
     virtual void signalBufferReturned(MediaBuffer *buffer);
 

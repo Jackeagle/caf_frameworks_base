@@ -500,6 +500,19 @@ void OMXNodeInstance::addActiveBuffer(OMX_U32 portIndex, OMX::buffer_id id) {
     mActiveBuffers.push(active);
 }
 
+Vector<OMX::buffer_id> OMXNodeInstance::getActiveBuffers(OMX_U32 portIndex) {
+
+    Vector<OMX::buffer_id> buffers;
+
+    for (size_t i = 0; i < mActiveBuffers.size(); ++i) {
+        if (mActiveBuffers[i].mPortIndex == portIndex) {
+            buffers.push(mActiveBuffers[i].mID);
+        }
+    }
+
+    return buffers;
+}
+
 void OMXNodeInstance::removeActiveBuffer(
         OMX_U32 portIndex, OMX::buffer_id id) {
     bool found = false;

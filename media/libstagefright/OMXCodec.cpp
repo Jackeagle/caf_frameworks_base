@@ -2932,6 +2932,10 @@ void OMXCodec::on_message(const omx_message &msg) {
     }
 }
 
+Vector<IOMX::buffer_id> OMXCodec::getOutputBuffers() {
+    return mOMX->getActiveBuffers(mNode, kPortIndexOutput);
+}
+
 void OMXCodec::onEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
     switch (event) {
         case OMX_EventCmdComplete:
