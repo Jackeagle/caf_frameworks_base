@@ -435,6 +435,13 @@ public class CDMAPhone extends PhoneBase {
     public void
     setNetworkSelectionModeAutomatic(Message response) {
         Log.e(LOG_TAG, "method setNetworkSelectionModeAutomatic is NOT supported in CDMA!");
+        if (response != null) {
+            Log.e(LOG_TAG, "setNetworkSelectionModeAutomatic: not possible in CDMA- Posting exception");
+            CommandException ce = new CommandException(
+                    CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(response).exception = ce;
+            response.sendToTarget();
+        }
     }
 
     public void unregisterForSuppServiceNotification(Handler h) {
@@ -520,6 +527,11 @@ public class CDMAPhone extends PhoneBase {
     selectNetworkManually(com.android.internal.telephony.gsm.NetworkInfo network,
             Message response) {
         Log.e(LOG_TAG, "selectNetworkManually: not possible in CDMA");
+        if (response != null) {
+            CommandException ce = new CommandException(CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(response).exception = ce;
+            response.sendToTarget();
+        }
     }
 
     public void setOnPostDialCharacter(Handler h, int what, Object obj) {
@@ -680,6 +692,11 @@ public class CDMAPhone extends PhoneBase {
 
     public void getAvailableNetworks(Message response) {
         Log.e(LOG_TAG, "getAvailableNetworks: not possible in CDMA");
+        if (response != null) {
+            CommandException ce = new CommandException(CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(response).exception = ce;
+            response.sendToTarget();
+        }
     }
 
     public void setOutgoingCallerIdDisplay(int commandInterfaceCLIRMode, Message onComplete) {
