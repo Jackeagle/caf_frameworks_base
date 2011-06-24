@@ -326,6 +326,8 @@ static jint android_hardware_fmradio_FmReceiverJNI_getBufferNative
     v4l2_buf.m.userptr = (unsigned long)bool_buffer;
     err = ioctl(fd,VIDIOC_DQBUF,&v4l2_buf) ;
     if(err < 0){
+        /* free up the memory in failure case*/
+        env->ReleaseBooleanArrayElements(buff, bool_buffer, 0);
         return FM_JNI_FAILURE;
     }
 
