@@ -817,6 +817,10 @@ public class IccCardProxy extends Handler implements IccCard {
     private void handleCdmaSubscriptionSource() {
         int newSubscriptionSource = mCdmaSSM.getCdmaSubscriptionSource();
         mCdmaSubscriptionFromNv = newSubscriptionSource == CDMA_SUBSCRIPTION_NV;
+        if (mCdmaSubscriptionFromNv && mIsMultimodeCdmaPhone) {
+            Log.d(LOG_TAG, "Cdma multimode phone detected. Forcing IccCardProxy into 3gpp mode");
+            mCurrentAppType = AppFamily.APP_FAM_3GPP;
+        }
         boolean newQuiteMode = mCdmaSubscriptionFromNv
                 && (mCurrentAppType == AppFamily.APP_FAM_3GPP2) && !mIsMultimodeCdmaPhone;
         if (mQuiteMode == false && newQuiteMode == true) {
