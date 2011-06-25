@@ -369,6 +369,11 @@ public class InputManager {
         }
         
         @SuppressWarnings("unused")
+        public void notifyJackSwitchChanged(long whenNanos,int switchCode, boolean jackOpen) {
+            mWindowManagerService.mInputMonitor.notifyJackSwitchChanged(whenNanos,switchCode,jackOpen);
+        }
+
+        @SuppressWarnings("unused")
         public void notifyInputChannelBroken(InputChannel inputChannel) {
             mWindowManagerService.mInputMonitor.notifyInputChannelBroken(inputChannel);
         }

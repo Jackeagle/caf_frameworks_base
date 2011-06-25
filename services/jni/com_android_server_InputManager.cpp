@@ -48,6 +48,7 @@ static struct {
 
     jmethodID notifyConfigurationChanged;
     jmethodID notifyLidSwitchChanged;
+    jmethodID notifyJackSwitchChanged;
     jmethodID notifyInputChannelBroken;
     jmethodID notifyANR;
     jmethodID interceptKeyBeforeQueueing;
@@ -585,6 +586,12 @@ void NativeInputManager::notifySwitch(nsecs_t when, int32_t switchCode,
         env->CallVoidMethod(mCallbacksObj, gCallbacksClassInfo.notifyLidSwitchChanged,
                 when, switchValue == 0);
         checkAndClearExceptionFromCallback(env, "notifyLidSwitchChanged");
+        break;
+    case SW_HEADPHONE_INSERT:
+    LOGD("JACK-DETECT: In NativeInputManager-Before calling windowmanager service for HEADPHONE_INSERT");
+        env->CallVoidMethod(mCallbacksObj, gCallbacksClassInfo.notifyJackSwitchChanged,
+               when, switchCode, switchValue);
+        checkAndClearExceptionFromCallback(env, "notifyJackSwitchChanged");
         break;
     }
 }
@@ -1350,6 +1357,9 @@ int register_android_server_InputManager(JNIEnv* env) {
 
     GET_METHOD_ID(gCallbacksClassInfo.notifyLidSwitchChanged, gCallbacksClassInfo.clazz,
             "notifyLidSwitchChanged", "(JZ)V");
+
+    GET_METHOD_ID(gCallbacksClassInfo.notifyJackSwitchChanged, gCallbacksClassInfo.clazz,
+            "notifyJackSwitchChanged", "(JIZ)V");
 
     GET_METHOD_ID(gCallbacksClassInfo.notifyInputChannelBroken, gCallbacksClassInfo.clazz,
             "notifyInputChannelBroken", "(Landroid/view/InputChannel;)V");
