@@ -386,6 +386,7 @@ void CameraSource::dataCallbackTimestamp(int64_t timestampUs,
         mFirstFrameTimeUs = timestampUs;
         // Initial delay
         if (mStartTimeUs > 0) {
+            timestampUs = systemTime()/1000; //Use system time for calculating start time
             if (timestampUs < mStartTimeUs) {
                 // Frame was captured before recording was started
                 // Drop it without updating the statistical data.
@@ -393,6 +394,7 @@ void CameraSource::dataCallbackTimestamp(int64_t timestampUs,
                 return;
             }
             mStartTimeUs = timestampUs - mStartTimeUs;
+            timestampUs = mLastFrameTimestampUs; //Restore original timestamp value
         }
     }
     ++mNumFramesReceived;
