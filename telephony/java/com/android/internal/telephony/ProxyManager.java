@@ -22,6 +22,8 @@ import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Registrant;
+import android.os.RegistrantList;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.telephony.TelephonyManager;
@@ -118,8 +120,10 @@ public class ProxyManager extends Handler {
     private SubscriptionData[] mCardSubData = null;
     // The User prefered subscription information
     private SubscriptionData mUserPrefSubs = null;
+    private boolean mSetSubscriptionInProgress = false;
     private boolean[] mRadioOn = {false, false};
 
+    private RegistrantList mSetSubscriptionRegistrants = new RegistrantList();
 
     //***** Class Methods
     public static ProxyManager getInstance(Context context, Phone[] phoneProxy,
@@ -784,7 +788,7 @@ public class ProxyManager extends Handler {
             mUiccSubSet = true;  //card status is processed only the first time
             promptUserSubscription();
         } else {
-            setSubscription(matchedSub, null);
+            setSubscription(matchedSub);
             mUiccSubSet = true;
         }
     }
@@ -822,7 +826,7 @@ public class ProxyManager extends Handler {
     }
 
     /** Sets the subscriptions */
-    public void setSubscription(SubscriptionData subData, Message onCompleteMsg) {
+    public void setSubscription(SubscriptionData subData) {
 
         Log.d(LOG_TAG, "setSubscription");
 
@@ -858,7 +862,11 @@ public class ProxyManager extends Handler {
             mSupplySubscription.start();
         }
 
-        mSupplySubscription.setSubscription(subData, onCompleteMsg);
+        Log.d(LOG_TAG, "Set subscription is started. Setting the flag mSetSubscriptionInProgress");
+        mSetSubscriptionInProgress = true;
+
+        Log.d(LOG_TAG, "Calling mSupplySubscription.setSubscription");
+        mSupplySubscription.setSubscription(subData);
     }
 
     public void promptUserSubscription() {
@@ -874,6 +882,19 @@ public class ProxyManager extends Handler {
         mContext.startActivity(setSubscriptionIntent);
     }
 
+    public synchronized void registerForSetSubscriptionCompleted(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mSetSubscriptionRegistrants.add(r);
+    }
+
+    public synchronized void unRegisterForSetSubscriptionCompleted(Handler h) {
+        mSetSubscriptionRegistrants.remove(h);
+    }
+
+    public boolean isSetSubscriptionInProgress() {
+        return mSetSubscriptionInProgress;
+    }
+
     public class SupplySubscription extends Thread {
 
         private Handler mHandler;
@@ -883,7 +904,6 @@ public class ProxyManager extends Handler {
         private SubscriptionData subscriptionData;
         private SubscriptionData prevSubscriptionData;
 
-        private Message mSetSubCompleteMsg;
         private int mPendingDeactivateEvents;
         private int mPendingActivateEvents;
 
@@ -893,8 +913,6 @@ public class ProxyManager extends Handler {
 
             subscriptionData = new SubscriptionData(NUM_SUBSCRIPTIONS);
             prevSubscriptionData = new SubscriptionData(NUM_SUBSCRIPTIONS);
-
-            mSetSubCompleteMsg = null;
         }
 
 
@@ -1162,7 +1180,7 @@ public class ProxyManager extends Handler {
         }
 
 
-        synchronized void setSubscription(SubscriptionData userSubData, Message onCompleteMsg) {
+        synchronized void setSubscription(SubscriptionData userSubData) {
             String [] string = null;
             boolean done = true;
 
@@ -1179,8 +1197,6 @@ public class ProxyManager extends Handler {
                     Thread.currentThread().interrupt();
                 }
             }
-
-            mSetSubCompleteMsg = onCompleteMsg;
 
             Log.d(LOG_TAG, "Copying the subscriptionData from the userSubData");
             subscriptionData.copyFrom(userSubData);
@@ -1288,12 +1304,11 @@ public class ProxyManager extends Handler {
         }
 
         private void sendSetSubscriptionCallback() {
+            mSetSubscriptionInProgress = false;
             // Send the message back to callee with result.
-            if (mSetSubCompleteMsg != null) {
-                Log.d(LOG_TAG, "sendSetSubscriptionCallback");
-                AsyncResult.forMessage(mSetSubCompleteMsg, mSubResult, null);
-                mSetSubCompleteMsg.sendToTarget();
-                mSetSubCompleteMsg = null;
+            Log.d(LOG_TAG, "sendSetSubscriptionCallback");
+            if (mSetSubscriptionRegistrants != null) {
+                mSetSubscriptionRegistrants.notifyRegistrants(new AsyncResult(null, mSubResult, null));
             }
         }
     }
