@@ -2312,6 +2312,13 @@ void OMXCodec::on_message(const omx_message &msg) {
                  buffers->editItemAt(i).mMediaBuffer = NULL;
             }
 
+            if (mState == ERROR) {
+                CODEC_LOGV("mState ERROR, freeing i/p buffer %p", buffer);
+                status_t err =
+                    mOMX->freeBuffer(mNode, kPortIndexInput, buffer);
+                CHECK_EQ(err, OK);
+                buffers->removeAt(i);
+            }
             if (mPortStatus[kPortIndexInput] == DISABLING) {
                 CODEC_LOGV("Port is disabled, freeing buffer %p", buffer);
 
@@ -2368,6 +2375,12 @@ void OMXCodec::on_message(const omx_message &msg) {
                 }
             }
 #endif
+            if (mState == ERROR) {
+                CODEC_LOGV("mState ERROR, freeing o/p buffer %p", buffer);
+                status_t err =
+                         mOMX->freeBuffer(mNode, kPortIndexOutput, buffer);
+                CHECK_EQ(err, OK);
+            }
 
             if (mPortStatus[kPortIndexOutput] == DISABLING) {
                 CODEC_LOGV("Port is disabled, freeing buffer %p", buffer);
@@ -2527,8 +2540,13 @@ void OMXCodec::onEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
         case OMX_EventError:
         {
             CODEC_LOGE("ERROR(0x%08lx, %ld)", data1, data2);
-
+            if (data1 == OMX_ErrorInvalidState) {
+                mPortStatus[kPortIndexInput] = SHUTTING_DOWN;
+                mPortStatus[kPortIndexOutput] = SHUTTING_DOWN;
+            }
             setState(ERROR);
+            if (data1 == OMX_ErrorInvalidState)
+                mStateBeforeError = ERROR;
             break;
         }
 
@@ -2713,10 +2731,6 @@ void OMXCodec::onCmdComplete(OMX_COMMANDTYPE cmd, OMX_U32 data) {
                 break;
             }
 
-            if(mState == ERROR) {
-              CODEC_LOGE("Ignoring OMX_CommandFlush in ERROR state");
-              break;
-            }
 
             if (mState == RECONFIGURING) {
                 CHECK_EQ(portIndex, kPortIndexOutput);
