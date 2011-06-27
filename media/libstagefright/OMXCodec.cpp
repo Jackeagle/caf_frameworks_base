@@ -4073,6 +4073,9 @@ status_t OMXCodec::read(
 
     Mutex::Autolock autoLock(mLock);
 
+    if (mState == PAUSING) {
+        return INVALID_OPERATION;
+    }
     if (mState != EXECUTING && mState != RECONFIGURING) {
         return UNKNOWN_ERROR;
     }
