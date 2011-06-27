@@ -462,6 +462,7 @@ public:
     static const char PIXEL_FORMAT_RGB565[];
     static const char PIXEL_FORMAT_JPEG[];
     static const char PIXEL_FORMAT_RAW[];
+    static const char PIXEL_FORMAT_YV12[]; // NV21
 
     // Values for focus mode settings.
     // Auto-focus mode. Applications should call
