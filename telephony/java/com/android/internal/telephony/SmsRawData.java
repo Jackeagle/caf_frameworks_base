@@ -26,6 +26,8 @@ import android.os.Parcelable;
 public class SmsRawData implements Parcelable {
     byte[] data;
 
+    public boolean is3gpp = true; // helps to determine sms encoding type - 3GPP or 3GPP2
+
     //Static Methods
     public static final Parcelable.Creator<SmsRawData> CREATOR
             = new Parcelable.Creator<SmsRawData> (){
@@ -45,6 +47,11 @@ public class SmsRawData implements Parcelable {
     // Constructor
     public SmsRawData(byte[] data) {
         this.data = data;
+    }
+
+    public SmsRawData(byte[] data, boolean is3gpp) {
+        this.data = data;
+        this.is3gpp = is3gpp;
     }
 
     public byte[] getBytes() {

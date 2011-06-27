@@ -27,7 +27,9 @@ import android.util.Log;
 
 import com.android.internal.telephony.cdma.CdmaSmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
+import com.android.internal.telephony.UiccConstants;
 import com.android.internal.util.HexDump;
+import com.android.internal.telephony.ProxyManager.Subscription;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,7 +52,10 @@ public class IccSmsInterfaceManager {
 
     private final Object mLock = new Object();
     private boolean mSuccess;
-    private List<SmsRawData> mSms;
+
+    private List<SmsRawData> mSms; // List all SmsRawData from all apps in
+                                   // UiccCard associated with a subscription
+
     private HashMap<Integer, HashSet<String>> mCellBroadcastSubscriptions =
             new HashMap<Integer, HashSet<String>>();
     private HashMap<Integer, HashSet<String>> mCdmaBroadcastSubscriptions =
@@ -70,6 +75,7 @@ public class IccSmsInterfaceManager {
     protected Context mContext;
     protected SMSDispatcher mDispatcher;
     protected CommandsInterface mCm;
+    protected Subscription mSubscription;
 
     Handler mHandler = new Handler() {
         @Override
@@ -86,16 +92,13 @@ public class IccSmsInterfaceManager {
                     break;
                 case EVENT_LOAD_DONE:
                     ar = (AsyncResult)msg.obj;
+                    boolean is3gpp = (Boolean)ar.userObj;
                     synchronized (mLock) {
                         if (ar.exception == null) {
-                            mSms  = (List<SmsRawData>)
-                                    buildValidRawData((ArrayList<byte[]>) ar.result);
+                            buildValidRawData((ArrayList<byte[]>) ar.result,is3gpp);
+
                             //Mark SMS as read after importing it from card.
                             markMessagesAsRead((ArrayList<byte[]>) ar.result);
-                        } else {
-                            if(DBG) log("Cannot load Sms records");
-                            if (mSms != null)
-                                mSms.clear();
                         }
                         mLock.notifyAll();
                     }
@@ -159,7 +162,8 @@ public class IccSmsInterfaceManager {
         if(DBG) Log.d(LOG_TAG, "IccSmsInterfaceManager finalized");
     }
 
-    protected void updateRecords() {
+    protected void updateRecords(Subscription subscription) {
+        mSubscription = subscription;
         ((ImsSMSDispatcher)mDispatcher).updateRecords();
     }
 
@@ -275,27 +279,48 @@ public class IccSmsInterfaceManager {
         mContext.enforceCallingPermission(
                 "android.permission.RECEIVE_SMS",
                 "Reading messages from SIM");
+
         synchronized(mLock) {
-
-            IccFileHandler fh = getIccFileHandler();
-            if (fh == null) {
-                Log.e(LOG_TAG, "Cannot load Sms records. No icc card?");
-                if (mSms != null) {
-                    mSms.clear();
-                    return mSms;
-                }
+            mSms = new ArrayList<SmsRawData>();
+            UiccManager mUiccManager = UiccManager.getInstance();
+            if (mUiccManager == null) {
+                Log.e(LOG_TAG, "Could not get UiccManager instance");
+                return mSms;
             }
-
-            Message response = mHandler.obtainMessage(EVENT_LOAD_DONE);
-            fh.loadEFLinearFixedAll(IccConstants.EF_SMS, response);
-
-            try {
-                mLock.wait();
-            } catch (InterruptedException e) {
-                log("interrupted while trying to load from the UIcc");
+            if (mSubscription == null) {
+                Log.e(LOG_TAG, "Could not get Subscription instance");
+                return mSms;
             }
+            UiccCardApplication m3gppApp = mUiccManager.getApplication(mSubscription.slotId,
+                    mSubscription.m3gppIndex);
+            fetchSmsFromUiccApp(m3gppApp, true);
+
+            UiccCardApplication m3gpp2App = mUiccManager.getApplication(mSubscription.slotId,
+                    mSubscription.m3gpp2Index);
+            fetchSmsFromUiccApp(m3gpp2App, false);
         }
         return mSms;
+    }
+
+    private void fetchSmsFromUiccApp(UiccCardApplication mUiccCardApplication, boolean is3gpp) {
+        if (mUiccCardApplication == null)
+            return;
+
+        IccFileHandler fh = mUiccCardApplication.getIccFileHandler();
+        if (fh == null) {
+            Log.e(LOG_TAG, "Cannot load Sms records. No icc card?");
+            return;
+        }
+
+        Message response = mHandler.obtainMessage(EVENT_LOAD_DONE, is3gpp);
+        fh.loadEFLinearFixedAll(IccConstants.EF_SMS, response);
+
+        try {
+            mLock.wait();
+        } catch (InterruptedException e) {
+            log("interrupted while trying to load from the UIcc");
+        }
+
     }
 
     /**
@@ -415,28 +440,23 @@ public class IccSmsInterfaceManager {
     }
 
     /**
-     * create SmsRawData lists from all sms record byte[]
-     * Use null to indicate "free" record
+     * Populate SmsRawData lists from all sms record byte[] Use null to indicate
+     * "free" record
      *
      * @param messages List of message records from EF_SMS.
-     * @return SmsRawData list of all in-used records
+     * @param is3gpp Indicates if Sms Encoding type is 3gpp
      */
-    protected ArrayList<SmsRawData> buildValidRawData(ArrayList<byte[]> messages) {
+    protected void buildValidRawData(ArrayList<byte[]> messages, boolean is3gpp) {
         int count = messages.size();
-        ArrayList<SmsRawData> ret;
-
-        ret = new ArrayList<SmsRawData>(count);
 
         for (int i = 0; i < count; i++) {
             byte[] ba = messages.get(i);
             if (ba[0] == STATUS_ON_ICC_FREE) {
-                ret.add(null);
+                mSms.add(null);
             } else {
-                ret.add(new SmsRawData(messages.get(i)));
+                mSms.add(new SmsRawData(messages.get(i), is3gpp));
             }
         }
-
-        return ret;
     }
 
     /**

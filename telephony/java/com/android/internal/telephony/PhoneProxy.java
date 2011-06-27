@@ -1133,7 +1133,7 @@ public class PhoneProxy extends Handler implements Phone {
         logd("setSubscriptionInfo sub= " + subscription);
         mActivePhone.setSubscriptionInfo(subscription);
         mIccProxy.setSubscriptionInfo(subscription);
-        mIccSmsInterfaceManager.updateRecords();
+        mIccSmsInterfaceManager.updateRecords(subscription);
         mPhoneSubscription = subscription.subId;
     }
 
