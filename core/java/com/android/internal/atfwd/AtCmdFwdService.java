@@ -84,6 +84,13 @@ public class AtCmdFwdService extends IAtCmdFwd.Stub {
         }
 
         try {
+            cmd = new AtCdisCmdHandler(c);
+            mCmdHandlers.put(cmd.getCommandName().toUpperCase(), cmd);
+        } catch (AtCmdHandlerInstantiationException e) {
+            Log.e(LOG_TAG, "Unable to instantiate command", e);
+        }
+
+        try {
             cmd = new AtCssCmdHandler(c);
             mCmdHandlers.put(cmd.getCommandName().toUpperCase(), cmd);
         } catch (AtCmdHandlerInstantiationException e) {
@@ -108,6 +115,7 @@ public class AtCmdFwdService extends IAtCmdFwd.Stub {
             try {
             ret = h.handleCommand(cmd);
             } catch(Throwable e) {
+                Log.e(LOG_TAG, "Exception " + e.toString());
                 ret = new AtCmdResponse(AtCmdResponse.RESULT_ERROR, "+CME ERROR: 2");
             }
         } else {
