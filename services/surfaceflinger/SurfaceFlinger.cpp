@@ -1319,6 +1319,7 @@ void SurfaceFlinger::drawWormhole() const
             glScissor(r.left, sy, r.width(), r.height());
             glClear(GL_COLOR_BUFFER_BIT);
         }
+        glFinish();
     } else {
         const GLshort vertices[][2] = { { 0, 0 }, { width, 0 },
                 { width, height }, { 0, height }  };
