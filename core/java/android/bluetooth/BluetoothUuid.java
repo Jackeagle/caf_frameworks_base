@@ -49,10 +49,15 @@ public final class BluetoothUuid {
             ParcelUuid.fromString("0000110C-0000-1000-8000-00805F9B34FB");
     public static final ParcelUuid ObexObjectPush =
             ParcelUuid.fromString("00001105-0000-1000-8000-00805f9b34fb");
+    /* TI HID port - start */
+    public static final ParcelUuid HID =
+            ParcelUuid.fromString("00001124-0000-1000-8000-00805f9b34fb");
+    /* TI HID port - end */
 
+    /* TI HID port - added HID UUID here */
     public static final ParcelUuid[] RESERVED_UUIDS = {
         AudioSink, AudioSource, AdvAudioDist, HSP, Handsfree, AvrcpController, AvrcpTarget,
-        ObexObjectPush};
+        ObexObjectPush,HID};
 
     public static boolean isAudioSource(ParcelUuid uuid) {
         return uuid.equals(AudioSource);
@@ -81,6 +86,12 @@ public final class BluetoothUuid {
     public static boolean isAvrcpTarget(ParcelUuid uuid) {
         return uuid.equals(AvrcpTarget);
     }
+
+    /* TI HID port - start */
+    public static boolean isInputHID(ParcelUuid uuid) {
+        return uuid.equals(HID);
+    }
+    /* TI HID port - end */
 
     /**
      * Returns true if ParcelUuid is present in uuidArray

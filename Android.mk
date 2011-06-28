@@ -192,6 +192,10 @@ LOCAL_SRC_FILES += \
 	voip/java/android/net/sip/ISipSessionListener.aidl \
 	voip/java/android/net/sip/ISipService.aidl
 #
+#ifeq ($(TARGET_OMAP4), true)
+LOCAL_SRC_FILES += \
+       core/java/android/bluetooth/IBluetoothHid.aidl
+#endif
 
 
 # FRAMEWORKS_BASE_JAVA_SRC_DIRS comes from build/core/pathmap.mk
