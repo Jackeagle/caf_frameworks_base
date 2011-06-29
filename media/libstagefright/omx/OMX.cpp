@@ -638,10 +638,15 @@ OMXRenderer::~OMXRenderer() {
 void OMXRenderer::render(IOMX::buffer_id buffer) {
     OMX_BUFFERHEADERTYPE *header = (OMX_BUFFERHEADERTYPE *)buffer;
 
+    OMX_PTR savePlatformPrivate = header->pPlatformPrivate;
+    header->pPlatformPrivate = header;
+
     mImpl->render(
             header->pBuffer + header->nOffset,
             header->nFilledLen,
             header->pPlatformPrivate);
+
+    header->pPlatformPrivate = savePlatformPrivate;
 }
 
 #ifdef TARGET_OMAP4
