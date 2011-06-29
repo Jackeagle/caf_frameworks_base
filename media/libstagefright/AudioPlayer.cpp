@@ -51,6 +51,7 @@ AudioPlayer::AudioPlayer(
       mFirstBufferResult(OK),
       mFirstBuffer(NULL),
       mAudioSink(audioSink),
+      mPaused(false),
       mObserver(observer) {
 }
 
@@ -77,6 +78,7 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
             return err;
         }
     }
+    mPaused = false;
 
     // We allow an optional INFO_FORMAT_CHANGED at the very beginning
     // of playback, if there is one, getFormat below will retrieve the
@@ -186,6 +188,7 @@ void AudioPlayer::pause(bool playPendingSamples) {
             mAudioTrack->pause();
         }
     }
+    mPaused = true;
     CHECK(mSource != NULL);
     mSource->pause();
 
@@ -383,8 +386,9 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
                     mFrameSize = mAudioSink->frameSize();
                     mAudioSink->start();
                     break;
-                }
-                else {
+                } else if ((err ==INVALID_OPERATION)&&mPaused){
+                     break;
+                } else {
                      mReachedEOS = true;
                      mFinalStatus = err;
                      break;
