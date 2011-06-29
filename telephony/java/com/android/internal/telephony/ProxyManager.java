@@ -680,7 +680,6 @@ public class ProxyManager extends Handler {
             UiccCard[] uiccCards = mUiccManager.getIccCards();
 
             for (UiccCard uiccCard : uiccCards) {
-                //boolean cardStateChanged = false;
                 UiccCard card = mUiccCardList.get(cardIndex).getUiccCard();
 
                 logd("cardIndex = " + cardIndex + " new uiccCard = "
@@ -917,7 +916,10 @@ public class ProxyManager extends Handler {
         }
 
         boolean newCardsAvailable = isNewCardsAvailable();
-        if (newCardsAvailable){
+        logd("onUpdateUiccStatus: cardsUpdated = " + cardsUpdated
+                + " newCardsAvailable = " + newCardsAvailable);
+
+        if (newCardsAvailable && cardsUpdated){
             logd("onUpdateUiccStatus: New cards available, notify user to configure subscriptions");
             notifyNewCardsAvailable();
         }
@@ -1168,7 +1170,8 @@ public class ProxyManager extends Handler {
             if (cardSub != null && cardSub.getIccId() != null) {
                 boolean cardMatched = false;
                 for (Subscription userSub : mUserPrefSubs.subscription) {
-                    if (cardSub.getIccId().equals(userSub.iccId)) {
+                    if (userSub.subStatus == SUB_ACTIVATED
+                            && cardSub.getIccId().equals(userSub.iccId)) {
                         cardMatched = true;
                     }
                 }
