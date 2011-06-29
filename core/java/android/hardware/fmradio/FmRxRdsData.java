@@ -49,6 +49,7 @@ public class FmRxRdsData {
     private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC = V4L2_CID_PRIVATE_BASE + 16;
     private static final int V4L2_CID_PRIVATE_TAVARUA_RDSD_BUF = V4L2_CID_PRIVATE_BASE + 19;
     private static final int V4L2_CID_PRIVATE_TAVARUA_PSALL = V4L2_CID_PRIVATE_BASE + 20;
+    private static final int V4L2_CID_PRIVATE_TAVARUA_AF_JUMP = V4L2_CID_PRIVATE_BASE + 27;
 
 
     private static final int RDS_GROUP_RT = 0x1;
@@ -56,6 +57,7 @@ public class FmRxRdsData {
     private static final int RDS_GROUP_AF = 1 << 2;
     private static final int RDS_AF_AUTO  = 1 << 6;
     private static final int RDS_PS_ALL   = 1 << 4;
+    private static final int RDS_AF_JUMP  = 0x1;
     private static final String LOGTAG="FmRxRdsData";
 
 
@@ -152,22 +154,27 @@ public class FmRxRdsData {
     /* Enable auto seek to alternate frequency */
     public int enableAFjump(boolean AFenable)
     {
+      int re;
+      int rds_group_mask = 0;
 
-      Log.d(LOGTAG, "In enableAFjump: AFenable: " + AFenable);
+      Log.d(LOGTAG, "In enableAFjump: AFenable : " + AFenable);
 
-      int rds_group_mask = FmReceiverJNI.getControlNative(mFd, V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC);
+      rds_group_mask = FmReceiverJNI.getControlNative(mFd, V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC);
+      Log.d(LOGTAG, "Currently set rds_group_mask : " + rds_group_mask);
 
-      Log.d(LOGTAG, "In enableAFjump: rds_group_mask: " + rds_group_mask);
+      if (AFenable)
+        re = FmReceiverJNI.setControlNative(mFd ,V4L2_CID_PRIVATE_TAVARUA_AF_JUMP, 1);
+      else
+        re = FmReceiverJNI.setControlNative(mFd, V4L2_CID_PRIVATE_TAVARUA_AF_JUMP, 0);
 
-      if (AFenable) {
-        FmReceiverJNI.setControlNative(mFd ,V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC,
-                                         rds_group_mask | RDS_AF_AUTO);
-      }
-      else {
-        FmReceiverJNI.setControlNative(mFd, V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC,
-                                         rds_group_mask & ~RDS_AF_AUTO);
-      }
-      return 1;
+      rds_group_mask = FmReceiverJNI.getControlNative(mFd, V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC);
+
+      if (AFenable)
+        Log.d(LOGTAG, "After enabling the rds_group_mask is : " + rds_group_mask);
+      else
+        Log.d(LOGTAG, "After disabling the rds_group_mask is : " + rds_group_mask);
+
+      return re;
     }
 
 
