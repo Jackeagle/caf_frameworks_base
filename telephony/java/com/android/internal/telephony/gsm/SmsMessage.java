@@ -1254,14 +1254,14 @@ public class SmsMessage extends SmsMessageBase{
      */
     public int getNumOfVoicemails() {
         /*
-         * Voice mail count for UDH/DCS = >0 , CPHS = -1.
+         * Voice mail count for UDH/DCS = >0 , CPHS = 0xff.
          * Voice mail clear for UDH/DCS = 0 , CPHS = 0.
          * Order of priority if multiple indications 1.UDH, 2.DCS, 3.CPHS
          */
         if ((!isMwi) && isCphsMwiMessage()) {
             if (originatingAddress != null
                     && ((GsmSmsAddress) originatingAddress).isCphsVoiceMessageSet()) {
-                mVoiceMailCount = -1;
+                mVoiceMailCount = 0xff;
             } else {
                 mVoiceMailCount = 0;
             }
