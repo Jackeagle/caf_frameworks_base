@@ -1052,6 +1052,11 @@ status_t AwesomePlayer::initRenderer_l() {
 				}
 
 				mVideoRenderer = new AwesomeRemoteRenderer(native);
+
+                if (!strcmp("OMX.TI.DUCATI.VIDDEC", component)) {
+                   OMXCodec *codec = static_cast<OMXCodec*>(mVideoSource.get());
+                   mVideoRenderer->setInputBuffers(codec->getOutputBuffers());
+                }
 #endif
 #if defined(TARGET_OMAP4)
 				if (!strncmp("OMX.TI", component, 6)) {
