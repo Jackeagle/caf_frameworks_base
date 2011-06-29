@@ -40,8 +40,7 @@ public class UiccConstants {
     public enum CardState {
         ABSENT,
         PRESENT,
-        ERROR,
-        NOT_INITIALIZED
+        ERROR
     }
 
     public enum PersoSubState{
