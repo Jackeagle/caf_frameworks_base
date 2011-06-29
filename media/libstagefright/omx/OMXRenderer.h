@@ -31,6 +31,7 @@ public:
     virtual ~OMXRenderer();
 
     virtual void render(IOMX::buffer_id buffer);
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers);
 #ifdef TARGET_OMAP4
     virtual Vector< sp<IMemory> > getBuffers();
     virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie);

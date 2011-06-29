@@ -21,6 +21,7 @@
 #include <media/stagefright/ColorConverter.h>
 #include <media/stagefright/VideoRenderer.h>
 #include <utils/RefBase.h>
+#include <utils/Vector.h>
 
 namespace android {
 
@@ -42,6 +43,8 @@ public:
 
     virtual void render(
             const void *data, size_t size, void *platformPrivate);
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) {}
+
 #ifdef TARGET_OMAP4
     virtual Vector< sp<IMemory> > getBuffers();
     virtual void resizeRenderer(uint32_t width, uint32_t height, uint32_t buffercount) {}

@@ -101,6 +101,10 @@ struct AwesomeRemoteRenderer : public AwesomeRenderer {
         }
     }
 
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) {
+        mTarget->setInputBuffers(inputBuffers);
+    }
+
 #ifdef TARGET_OMAP4
     virtual Vector< sp<IMemory> > getBuffers(){
         return mTarget->getBuffers();
@@ -159,6 +163,10 @@ struct AwesomeLocalRenderer : public AwesomeRenderer {
 
     void render(const void *data, size_t size) {
         mTarget->render(data, size, NULL);
+    }
+
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) {
+        mTarget->setInputBuffers(inputBuffers);
     }
 
 #ifdef TARGET_OMAP4

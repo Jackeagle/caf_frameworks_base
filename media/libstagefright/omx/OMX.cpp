@@ -461,6 +461,10 @@ struct SharedVideoRenderer : public VideoRenderer {
         return mObj->render(data, size, platformPrivate);
     }
 
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) {
+        mObj->setInputBuffers(inputBuffers);
+    }
+
 #ifdef TARGET_OMAP4
     virtual Vector< sp<IMemory> > getBuffers() {
         return mObj->getBuffers();
@@ -647,6 +651,10 @@ void OMXRenderer::render(IOMX::buffer_id buffer) {
             header->pPlatformPrivate);
 
     header->pPlatformPrivate = savePlatformPrivate;
+}
+
+void OMXRenderer::setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) {
+    mImpl->setInputBuffers(inputBuffers);
 }
 
 #ifdef TARGET_OMAP4

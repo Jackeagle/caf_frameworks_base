@@ -51,6 +51,7 @@ struct AwesomeRenderer : public RefBase {
 
     virtual status_t initCheck() const = 0;
     virtual void render(MediaBuffer *buffer) = 0;
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) = 0;
 #ifdef TARGET_OMAP4
     virtual Vector< sp<IMemory> > getBuffers() = 0;
     virtual bool setCallback(release_rendered_buffer_callback cb, void *cookie) {return false;}

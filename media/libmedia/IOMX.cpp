@@ -34,6 +34,7 @@ enum {
 #endif
     OBSERVER_ON_MSG,
     RENDERER_RENDER,
+    SET_INPUT_BUFFERS,
 #ifdef TARGET_OMAP4
     GET_BUFFERS,
 #endif
@@ -864,6 +865,19 @@ public:
         remote()->transact(RENDERER_RENDER, data, &reply);
     }
 
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IOMXRenderer::getInterfaceDescriptor());
+
+        data.writeInt32(inputBuffers.size());
+
+        for (uint32_t i = 0; i < inputBuffers.size(); i++) {
+            data.writeIntPtr((intptr_t)inputBuffers[i]);
+        }
+
+        remote()->transact(SET_INPUT_BUFFERS, data, &reply);
+    }
+
 #ifdef TARGET_OMAP4
     virtual Vector< sp<IMemory> > getBuffers(){
         int n = 0;
@@ -901,6 +915,22 @@ status_t BnOMXRenderer::onTransact(
             IOMX::buffer_id buffer = (void*)data.readIntPtr();
 
             render(buffer);
+
+            return NO_ERROR;
+        }
+
+        case SET_INPUT_BUFFERS:
+        {
+            CHECK_INTERFACE(IOMXRenderer, data, reply);
+
+            Vector<IOMX::buffer_id> inputBuffers;
+            size_t size = data.readInt32();
+
+            for (uint32_t i = 0; i < size; i++) {
+                inputBuffers.push((IOMX::buffer_id)data.readIntPtr());
+            }
+
+            setInputBuffers(inputBuffers);
 
             return NO_ERROR;
         }

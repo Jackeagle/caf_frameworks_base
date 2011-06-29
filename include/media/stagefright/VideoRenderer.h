@@ -19,9 +19,10 @@
 #define VIDEO_RENDERER_H_
 
 #include <sys/types.h>
+#include <media/IOMX.h>
+#include <utils/Vector.h>
 #ifdef TARGET_OMAP4
 #include "binder/IMemory.h"
-#include <utils/Vector.h>
 #endif
 
 namespace android {
@@ -36,6 +37,7 @@ public:
 
     virtual void render(
             const void *data, size_t size, void *platformPrivate) = 0;
+    virtual void setInputBuffers(Vector<IOMX::buffer_id> inputBuffers) = 0;
 
 #ifdef TARGET_OMAP4
     virtual Vector< sp<IMemory> > getBuffers() = 0;
