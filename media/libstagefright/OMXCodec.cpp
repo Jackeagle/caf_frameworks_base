@@ -2192,9 +2192,7 @@ status_t OMXCodec::setVideoOutputFormat(
         CHECK(format.eColorFormat == OMX_COLOR_FormatYUV420Planar
                || format.eColorFormat == OMX_COLOR_FormatYUV420SemiPlanar
                || format.eColorFormat == OMX_COLOR_FormatCbYCrY
-#if defined(TARGET_OMAP4)
                || format.eColorFormat == OMX_COLOR_FormatYUV420PackedSemiPlanar
-#endif
                || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar);
 
         err = mOMX->setParameter(
