@@ -54,7 +54,8 @@ static void textureToCopyBitImage(
     if (opFormat == COPYBIT_FORMAT_YCbCr_422_SP ||
         opFormat == COPYBIT_FORMAT_YCrCb_420_SP ||
         opFormat == HAL_PIXEL_FORMAT_YCbCr_420_SP||
-        opFormat == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
+        opFormat == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED||
+        opFormat == HAL_PIXEL_FORMAT_YV12 ) {
         // NOTE: this static_cast is really not safe b/c we can't know for
         // sure the buffer passed is of the right type.
         // However, since we do this only for YUV formats, we should be safe
@@ -99,6 +100,11 @@ public:
 };
 
 static bool supportedCopybitsFormat(int format) {
+
+    /* Mask the top 3 bytes since GGLSurface format is only 1 byte */
+    if(format ==(HAL_PIXEL_FORMAT_YV12 & 0x000000FF))
+        return true;
+
     switch (format) {
     case COPYBIT_FORMAT_RGBA_8888:
     case COPYBIT_FORMAT_RGBX_8888:
@@ -231,6 +237,9 @@ static bool copybit(GLint x, GLint y,
     static const int tmu = 0;
     texture_t& tev(c->rasterizer.state.texture[tmu]);
     int32_t opFormat = textureObject->surface.format;
+    /* Mask the top 3 bytes since GGLSurface format is only 1 byte */
+    if(opFormat == (HAL_PIXEL_FORMAT_YV12 & 0x000000FF))
+        opFormat = HAL_PIXEL_FORMAT_YV12;
     const bool srcTextureHasAlpha = hasAlpha(opFormat);
     if (!srcTextureHasAlpha) {
         planeAlpha = fixedToByte(c->currentColorClamped.a);
