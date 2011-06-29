@@ -1344,11 +1344,8 @@ void AwesomePlayer::finishSeekIfNecessary(int64_t videoTimeUs) {
     }
 
     if (mAudioPlayer != NULL) {
-#ifdef TARGET_OMAP4
         LOGV("seeking audio to %lld us (%.2f secs).", videoTimeUs, videoTimeUs / 1E6);
-#else
-        LOGV("seeking audio to %lld us (%.2f secs).", timeUs, timeUs / 1E6);
-#endif
+
         // If we don't have a video time, seek audio to the originally
         // requested seek time instead.
 
