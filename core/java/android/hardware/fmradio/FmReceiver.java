@@ -1686,7 +1686,21 @@ public class FmReceiver extends FmTransceiver
       re = mControl.Mpx_Dcc(sFd);
       return re;
    }
-
+/*==============================================================
+   FUNCTION:  setHiLoInj
+   ==============================================================*/
+   /**
+   *    Sets the Hi-Lo injection
+   *
+   *    <p>
+   *    This method sets the hi-low injection.
+   *
+   *    <p>
+   */
+   public void setHiLoInj(int inj)
+   {
+      int re =  mControl.setHiLoInj(sFd, inj);
+   }
 
 /*==============================================================
    FUNCTION:  setRmssiDel

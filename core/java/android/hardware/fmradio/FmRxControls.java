@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -73,7 +73,9 @@ class FmRxControls
    private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC = V4L2_CID_PRIVATE_BASE + 24;
    private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET = V4L2_CID_PRIVATE_BASE + 25;
    private static final int V4L2_CID_PRIVATE_TAVARUA_MPX_DCC = V4L2_CID_PRIVATE_BASE + 26;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_AF_JUMP = V4L2_CID_PRIVATE_BASE + 27;
    private static final int V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA = V4L2_CID_PRIVATE_BASE + 28;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_HLSI = V4L2_CID_PRIVATE_BASE + 29;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
    private static final int V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900;
@@ -137,6 +139,16 @@ class FmRxControls
       Log.d(TAG, "MPX_DCC value is : " + mpx_dcc);
       return mpx_dcc;
    }
+
+   /*
+    * Set Hi-Low injection
+    */
+   public int setHiLoInj(int fd, int inj)
+   {
+      int re =  FmReceiverJNI.setControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_HLSI, inj);
+      return re;
+   }
+
    /*
     * Set RMSSI Delta
     */
