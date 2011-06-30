@@ -23,6 +23,7 @@
 #define DEBUG_POINTER_ASSIGNMENT 0
 
 #include <cutils/log.h>
+#include <cutils/properties.h>
 #include <ui/InputReader.h>
 
 #include <stddef.h>
@@ -3426,6 +3427,12 @@ void SingleTouchInputMapper::initialize() {
     mY = 0;
     mPressure = 0; // default to 0 for devices that don't report pressure
     mToolWidth = 0; // default to 0 for devices that don't report tool width
+    mHWRotation = 0;
+
+    char prop[PROPERTY_VALUE_MAX];
+    if (property_get("ro.sf.hwrotation", prop, NULL) > 0) {
+        mHWRotation = atoi(prop);
+    }
 }
 
 void SingleTouchInputMapper::reset() {
@@ -3451,12 +3458,36 @@ void SingleTouchInputMapper::process(const RawEvent* rawEvent) {
     case EV_ABS:
         switch (rawEvent->scanCode) {
         case ABS_X:
-            mAccumulator.fields |= Accumulator::FIELD_ABS_X;
-            mAccumulator.absX = rawEvent->value;
+            switch (mHWRotation) {
+            case 90:
+                mAccumulator.fields |= Accumulator::FIELD_ABS_Y;
+                mAccumulator.absY = mRawAxes.x.getRange() - rawEvent->value;
+                break;
+            case 270:
+                mAccumulator.fields |= Accumulator::FIELD_ABS_Y;
+                mAccumulator.absY = rawEvent->value;
+                break;
+            default:
+                mAccumulator.fields |= Accumulator::FIELD_ABS_X;
+                mAccumulator.absX = rawEvent->value;
+                break;
+            }
             break;
         case ABS_Y:
-            mAccumulator.fields |= Accumulator::FIELD_ABS_Y;
-            mAccumulator.absY = rawEvent->value;
+            switch (mHWRotation) {
+            case 90:
+                mAccumulator.fields |= Accumulator::FIELD_ABS_X;
+                mAccumulator.absX = rawEvent->value;
+                break;
+            case 270:
+                mAccumulator.fields |= Accumulator::FIELD_ABS_X;
+                mAccumulator.absX = mRawAxes.y.getRange() - rawEvent->value;
+                break;
+            default:
+                mAccumulator.fields |= Accumulator::FIELD_ABS_Y;
+                mAccumulator.absY = rawEvent->value;
+                break;
+            }
             break;
         case ABS_PRESSURE:
             mAccumulator.fields |= Accumulator::FIELD_ABS_PRESSURE;

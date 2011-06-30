@@ -928,6 +928,7 @@ private:
     int32_t mY;
     int32_t mPressure;
     int32_t mToolWidth;
+    int32_t mHWRotation;
 
     void initialize();
 
