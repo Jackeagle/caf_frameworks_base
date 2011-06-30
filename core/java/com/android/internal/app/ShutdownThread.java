@@ -303,33 +303,6 @@ public final class ShutdownThread extends Thread {
             radioOff = true;
         }
 
-        // Clean sync radio file system before shutdown
-        // Open the efs sync sysfs file for writing and write "1" to it.
-        PrintWriter outStream = null;
-        try {
-            msmEfsSyncDone = false;
-            FileOutputStream fos = new FileOutputStream(SYSFS_MSM_EFS_SYNC_START);
-            outStream = new PrintWriter(new OutputStreamWriter(fos));
-            outStream.println("1");
-        } catch (Exception e) {
-            msmEfsSyncDone = true;
-        } finally {
-            if (outStream != null)
-                outStream.close();
-        }
-
-        try {
-            mdmEfsSyncDone = false;
-            FileOutputStream fos = new FileOutputStream(SYSFS_MDM_EFS_SYNC_START);
-            outStream = new PrintWriter(new OutputStreamWriter(fos));
-            outStream.println("1");
-        } catch (Exception e) {
-            mdmEfsSyncDone = true;
-        } finally {
-            if (outStream != null)
-                outStream.close();
-        }
-
         Log.i(TAG, "Waiting for Bluetooth and Radio...");
 
         // Wait a max of 8 seconds for clean shutdown
@@ -354,6 +327,40 @@ public final class ShutdownThread extends Thread {
                     radioOff = true;
                 }
             }
+            if (radioOff && bluetoothOff) {
+                Log.i(TAG, "Radio and Bluetooth shutdown complete.");
+                break;
+            }
+            SystemClock.sleep(PHONE_STATE_POLL_SLEEP_MSEC);
+        }
+
+        // Clean sync radio file system before shutdown
+        // Open the efs sync sysfs file for writing and write "1" to it.
+        PrintWriter outStream = null;
+        try {
+            msmEfsSyncDone = false;
+            FileInputStream fis = new FileInputStream(SYSFS_MSM_EFS_SYNC_START);
+            fis.read();
+            fis.close();
+        } catch (Exception ex) {
+            Log.e(TAG, "Exception during msmEfsSync", ex);
+            msmEfsSyncDone = true;
+        }
+
+        try {
+            mdmEfsSyncDone = false;
+            FileInputStream fis = new FileInputStream(SYSFS_MDM_EFS_SYNC_START);
+            fis.read();
+            fis.close();
+        } catch (Exception ex) {
+            Log.e(TAG, "Exception during mdmEfsSync", ex);
+            mdmEfsSyncDone = true;
+        }
+
+        Log.i(TAG, "Waiting for radio file system sync to complete ...");
+
+        // Wait a max of 8 seconds
+        for (int i = 0; i < MAX_NUM_PHONE_STATE_READS; i++) {
             if (!msmEfsSyncDone) {
                 try {
                     FileInputStream fis = new FileInputStream(SYSFS_MSM_EFS_SYNC_COMPLETE);
@@ -361,9 +368,10 @@ public final class ShutdownThread extends Thread {
                     fis.close();
                     if (result == '1')
 					{
-                    	msmEfsSyncDone = true;
+                        msmEfsSyncDone = true;
 					}
                 } catch (Exception ex) {
+                    Log.e(TAG, "Exception during msmEfsSyncDone", ex);
                     msmEfsSyncDone = true;
                 }
             }
@@ -374,16 +382,18 @@ public final class ShutdownThread extends Thread {
                     fis.close();
                     if (result == '1')
 					{
-                    	mdmEfsSyncDone = true;
+                        mdmEfsSyncDone = true;
 					}
                 } catch (Exception ex) {
+                    Log.e(TAG, "Exception during mdmEfsSyncDone", ex);
                     mdmEfsSyncDone = true;
                 }
             }
-            if (radioOff && bluetoothOff && msmEfsSyncDone && mdmEfsSyncDone) {
-                Log.i(TAG, "Radio and Bluetooth shutdown complete.");
+            if (msmEfsSyncDone && mdmEfsSyncDone) {
+                Log.i(TAG, "Radio file system sync complete.");
                 break;
             }
+            Log.i(TAG, "Radio file system sync incomplete - retry.");
             SystemClock.sleep(PHONE_STATE_POLL_SLEEP_MSEC);
         }
 
