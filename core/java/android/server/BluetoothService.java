@@ -552,7 +552,7 @@ public class BluetoothService extends IBluetooth.Stub {
                     break;
                 case 5:
                     Log.d(TAG, "Registering map record");
-                    SystemService.start("map");
+                    SystemService.start("mapZero");
                     mHandler.sendMessageDelayed(
                             mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 6, -1), 500);
                     break;
@@ -569,6 +569,12 @@ public class BluetoothService extends IBluetooth.Stub {
                         Log.d(TAG, "Registering ftp record");
                         SystemService.start("ftp");
                     }
+                    mHandler.sendMessageDelayed(
+                            mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 8, -1), 500);
+                    break;
+                case 8:
+                    Log.d(TAG, "Registering map record instance id 1");
+                    SystemService.start("mapOne");
                     break;
                 }
                 break;
