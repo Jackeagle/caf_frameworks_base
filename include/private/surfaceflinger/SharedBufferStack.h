@@ -181,12 +181,41 @@ protected:
     status_t updateCondition(T update);
 };
 
+/*
+ * During Monkey runs, sometimes, a process, holding SharedClient
+ * LOCK, dies while holding that lock. Since SharedClient lock is
+ * of type SHARED, SF and Binder threads cannot acquire it anymore
+ * causing a system hang. Since it seems like posix would not allow
+ * us to unlock a mutex not owned by the caller thread, we are out
+ * of luck and need to ignore that update.
+ * It is assumed to be safe since because if the client dies (process
+ * dies which was the client to SF), so it is safe to ignore all related
+ * pending updates and/or transactions.
+ * */
+class SharedClientTryLock {
+public:
+   SharedClientTryLock(Mutex& m);
+   ~SharedClientTryLock() {
+      if(LOCKED == _status) {
+         _m.unlock();
+      }
+   }
+   bool locked() const { return _status == LOCKED; }
+private:
+   enum Status { LOCKED, UNLOCKED } _status;
+   Mutex& _m;
+};
+
 template <typename T>
 status_t SharedBufferBase::updateCondition(T update) {
     SharedClient& client( *mSharedClient );
-    Mutex::Autolock _l(client.lock);
-    ssize_t result = update();
-    client.cv.broadcast();    
+    SharedClientTryLock _l(client.lock);
+    ssize_t result = 0;
+    if(_l.locked()) {
+       // only update+broadcast if we acquired the lock
+       result = update();
+       client.cv.broadcast();
+    }
     return result;
 }
 

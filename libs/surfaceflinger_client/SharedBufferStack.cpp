@@ -49,6 +49,28 @@ status_t SharedClient::validate(size_t i) const {
     return surfaces[i].status;
 }
 
+SharedClientTryLock::SharedClientTryLock(Mutex& m) :
+   _status(UNLOCKED), _m(m)
+{
+   /* trylock with sleeps of 1ms for  times. total of 0.5 sec*/
+   const uint32_t U_TIMEOUT = 1000;
+   enum { MAX_WAIT_COUNT = 500 };
+   for(uint32_t i=0; i < MAX_WAIT_COUNT; ++i){
+      if(0 == _m.tryLock()){
+         // we got the lock
+         _status = LOCKED;
+         break;
+      }
+      // sleep for U_TIMEOUT microsec
+      usleep(U_TIMEOUT);
+   }
+   // we could not get the lock, LOGE here.
+   if(!locked()) {
+      LOGE("SharedBufferBase::updateCondition could not acquire lock "
+           "within 0.5 sec giving up (non fatal)");
+   }
+}
+
 // ----------------------------------------------------------------------------
 
 
