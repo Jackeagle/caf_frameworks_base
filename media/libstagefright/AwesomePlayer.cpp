@@ -1075,7 +1075,14 @@ status_t AwesomePlayer::getPosition(int64_t *positionUs) {
         *positionUs = mVideoTimeUs;
     } else if (mAudioPlayer != NULL && !(mFlags & AUDIO_AT_EOS)) {
         *positionUs = mAudioPlayer->getMediaTimeUs();
-    } else {
+    } else if ((mFlags & VIDEO_AT_EOS) || (mFlags & AUDIO_AT_EOS)){
+         Mutex::Autolock autoLock(mMiscStateLock);
+         if(mVideoSource != NULL) *positionUs = mVideoDurationUs;
+         if(mAudioPlayer != NULL) {
+            if (mAudioPlayer->getMediaTimeUs() > mVideoDurationUs)
+                *positionUs = mAudioPlayer->getMediaTimeUs();
+            }
+    }else {
         *positionUs = 0;
     }
 
@@ -1294,6 +1301,18 @@ void AwesomePlayer::onVideoEvent() {
     {
         // If video is at EOS, we have nothing to do, we'll continue
         // doing nothing until the video EOS flag is cleared
+        if(mAudioPlayer == NULL || (mFlags & AUDIO_AT_EOS)) {
+            /*
+            To handle the below scenario:
+            Play the Clip, Reach the EOS and called postStreamDoneEvent_l
+            b4 notification happens to app  PAUSE called immediately
+            which clears the event.So the lost EOS Event is Returned
+            on next Play call. For Audio Video clips AudioPlayer::resume()
+            should take care of it
+            */
+            postStreamDoneEvent_l(ERROR_END_OF_STREAM);
+            return;
+        }
         postVideoEvent_l();
         return;
     }
