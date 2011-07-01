@@ -322,6 +322,7 @@ public:
     virtual ~LayerBaseClient();
 
             sp<Surface> getSurface();
+            bool isSurface() const;
     virtual sp<Surface> createSurface() const;
     virtual sp<LayerBaseClient> getLayerBaseClient() const {
         return const_cast<LayerBaseClient*>(this); }
