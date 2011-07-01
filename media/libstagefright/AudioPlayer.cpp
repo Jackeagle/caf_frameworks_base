@@ -477,6 +477,8 @@ status_t AudioPlayer::seekTo(int64_t time_us) {
     mSeeking = true;
     mReachedEOS = false;
     mSeekTimeUs = time_us;
+    if(mSource->isPaused()==true)
+        mPositionTimeMediaUs = mSeekTimeUs;
 
     if (mAudioSink != NULL) {
         mAudioSink->flush();
