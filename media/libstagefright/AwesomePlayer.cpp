@@ -1595,24 +1595,25 @@ void AwesomePlayer::onCheckAudioStatus() {
     }
 
     mAudioStatusEventPending = false;
+    if (mAudioPlayer != NULL)
+    {
+        if (mWatchForAudioSeekComplete && !mAudioPlayer->isSeeking()) {
+            mWatchForAudioSeekComplete = false;
 
-    if (mWatchForAudioSeekComplete && !mAudioPlayer->isSeeking()) {
-        mWatchForAudioSeekComplete = false;
-
-        if (!mSeekNotificationSent) {
-            notifyListener_l(MEDIA_SEEK_COMPLETE);
-            mSeekNotificationSent = true;
+            if (!mSeekNotificationSent) {
+                notifyListener_l(MEDIA_SEEK_COMPLETE);
+                mSeekNotificationSent = true;
+            }
+            mSeeking = false;
         }
 
-        mSeeking = false;
-    }
-
-    status_t finalStatus;
-    if (mWatchForAudioEOS && mAudioPlayer->reachedEOS(&finalStatus)) {
-        mWatchForAudioEOS = false;
-        mFlags |= AUDIO_AT_EOS;
-        mFlags |= FIRST_FRAME;
-        postStreamDoneEvent_l(finalStatus);
+        status_t finalStatus;
+        if (mWatchForAudioEOS && mAudioPlayer->reachedEOS(&finalStatus)) {
+            mWatchForAudioEOS = false;
+            mFlags |= AUDIO_AT_EOS;
+            mFlags |= FIRST_FRAME;
+            postStreamDoneEvent_l(finalStatus);
+        }
     }
 }
 
