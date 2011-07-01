@@ -352,6 +352,8 @@ private:
             status_t electronBeamOnAnimationImplLocked();
             status_t renderScreenToTextureLocked(DisplayID dpy,
                     GLuint* textureName, GLfloat* uOut, GLfloat* vOut);
+            status_t createEGLImage(DisplayID dpy, Image* image,
+                    sp<IMemoryHeap>* heap, uint32_t hw_w, uint32_t hw_h);
 
             friend class FreezeLock;
             sp<FreezeLock> getFreezeLock() const;

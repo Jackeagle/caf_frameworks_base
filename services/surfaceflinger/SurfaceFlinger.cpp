@@ -2073,30 +2073,111 @@ void SurfaceFlinger::enableOverlayOpt(bool start) const
 #endif
 }
 
+status_t SurfaceFlinger::createEGLImage(DisplayID dpy, Image* image,
+                        sp<IMemoryHeap>* heap, uint32_t hw_w, uint32_t hw_h)
+{
+     uint32_t width,height;
+     PixelFormat fmt;
+     status_t result;
+
+     result = captureScreenImplLocked(dpy, heap, &width, &height, &fmt, hw_w, hw_h);
+     if (result != NO_ERROR) {
+            LOGW("ERROR: captureScreenImplLocked failed");
+            return result;
+     }
+
+     TextureManager  textureManager;
+     native_handle_t *hnd = new native_handle_t;
+
+     //Heap is allocated for the aligned width and height.
+     //So we need to align them before creating gralloc handle
+     width = (width + 31) & ~31;
+     height = (height + 31) & ~31;
+
+     uint32_t size = width * height * 4;
+
+     mGrallocModule->perform(mGrallocModule,
+                             GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER,
+                            (*heap)->getHeapID(), size,0,
+                            (*heap)->getBase(), &hnd, GRALLOC_USAGE_PRIVATE_2);
+
+     sp<GraphicBuffer> tempGraphicBuffer = new GraphicBuffer(width, height, fmt,
+                             GraphicBuffer::USAGE_HW_TEXTURE,width, hnd, false);
+
+     result = tempGraphicBuffer->initCheck();
+     if(result != NO_ERROR) {
+            LOGE("ERROR: GraphicBuffer creation failed");
+            return result;
+     }
+
+     EGLDisplay dpy1(graphicPlane(0).getEGLDisplay());
+     result = textureManager.initEglImage(image, dpy1, tempGraphicBuffer);
+     if(result != NO_ERROR) {
+            LOGE("ERROR: EGLImage creation failed");
+            return result;
+     }
+
+     // make sure to clear all GL error flags
+     while ( glGetError() != GL_NO_ERROR ) ;
+
+     glClearColor(0,0,0,1);
+     glClear(GL_COLOR_BUFFER_BIT);
+     glDisable(GL_SCISSOR_TEST);
+
+     return NO_ERROR;
+}
 // ---------------------------------------------------------------------------
 
 status_t SurfaceFlinger::electronBeamOffAnimationImplLocked()
 {
     status_t result = PERMISSION_DENIED;
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
 
-    if (!GLExtensions::getInstance().haveFramebufferObject())
+    if (!(hw.getFlags() & DisplayHardware::C2D_COMPOSITION) &&
+               !GLExtensions::getInstance().haveFramebufferObject())
+    {
         return INVALID_OPERATION;
+    }
 
     // get screen geometry
-    const DisplayHardware& hw(graphicPlane(0).displayHardware());
     const uint32_t hw_w = hw.getWidth();
     const uint32_t hw_h = hw.getHeight();
     const Region screenBounds(hw.bounds());
 
     GLfloat u, v;
     GLuint tname;
-    result = renderScreenToTextureLocked(0, &tname, &u, &v);
-    if (result != NO_ERROR) {
-        return result;
+    Texture texture;
+    sp<IMemoryHeap> heap;
+
+    if(!(hw.getFlags() & DisplayHardware::C2D_COMPOSITION)) {
+        result = renderScreenToTextureLocked(0, &tname, &u, &v);
+
+        if (result != NO_ERROR) {
+            LOGE("ERROR: renderScreenToTextureLocked failed");
+            return result;
+        }
+    } else {
+        result = createEGLImage(0, &texture, &heap, hw_w, hw_h);
+
+        if(result != NO_ERROR) {
+            LOGE("ERROR: createEGLInitImage failed");
+            return result;
+        }
+        tname = texture.name;
+        u = 1.0;
+        v = 1.0;
     }
 
     GLfloat vtx[8];
-    const GLfloat texCoords[4][2] = { {0,v}, {0,0}, {u,0}, {u,v} };
+    GLfloat texCoords[4][2] = { {0,v}, {0,0}, {u,0}, {u,v} };
+
+    if((hw.getFlags() & DisplayHardware::C2D_COMPOSITION)) {
+        texCoords[0][1] = 0;
+        texCoords[1][1] = v;
+        texCoords[2][1] = v;
+        texCoords[3][1] = 0;
+    }
+
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, tname);
     glTexEnvx(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
@@ -2163,7 +2244,12 @@ status_t SurfaceFlinger::electronBeamOffAnimationImplLocked()
 
     v_stretch vverts(hw_w, hw_h);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    if(!(hw.getFlags() & DisplayHardware::C2D_COMPOSITION)) {
+         glBlendFunc(GL_ONE, GL_ONE);
+    } else {
+         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    }
+
     for (int i=0 ; i<nbFrames ; i++) {
         float x, y, w, h;
         const float vr = itr(i);
@@ -2191,7 +2277,9 @@ status_t SurfaceFlinger::electronBeamOffAnimationImplLocked()
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
         // draw the white highlight (we use the last vertices)
-        glDisable(GL_TEXTURE_2D);
+        if(!(hw.getFlags() & DisplayHardware::C2D_COMPOSITION))
+            glDisable(GL_TEXTURE_2D);
+
         glColorMask(1,1,1,1);
         glColor4f(vg, vg, vg, 1);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -2209,6 +2297,13 @@ status_t SurfaceFlinger::electronBeamOffAnimationImplLocked()
         glColor4f(1-v, 1-v, 1-v, 1);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         hw.flip(screenBounds);
+    }
+
+    if((hw.getFlags() & DisplayHardware::C2D_COMPOSITION)) {
+        if (texture.image != EGL_NO_IMAGE_KHR) {
+            EGLDisplay egl_dpy(graphicPlane(0).getEGLDisplay());
+            eglDestroyImageKHR(egl_dpy, texture.image);
+        }
     }
 
     glColorMask(1,1,1,1);
@@ -2491,7 +2586,13 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
                  MemoryHeapBase::MAP_LOCKED_MAP_POPULATE:0;
     sw = (!sw) ? hw_w : sw;
     sh = (!sh) ? hw_h : sh;
-    const size_t size = sw * sh * 4;
+
+    //Align width and height to 32bit before calculating the size - c2d requirement
+    int aligned_sw = (sw + 31)& ~31;
+    int aligned_sh = (sh + 31)& ~31;
+
+    const size_t size = aligned_sw * aligned_sh * 4;
+
     sp<MemoryHeapBase> base(
           new MemoryHeapBase(size, flags, "screen-capture") );
     void* const ptr = base->getBase();
