@@ -546,6 +546,10 @@ LayerBaseClient::~LayerBaseClient()
     }
 }
 
+bool LayerBaseClient::isSurface() const {
+   return (mClientSurface.promote() != 0);
+}
+
 sp<LayerBaseClient::Surface> LayerBaseClient::getSurface()
 {
     sp<Surface> s;
