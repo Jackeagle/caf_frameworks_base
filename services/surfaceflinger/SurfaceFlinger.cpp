@@ -484,8 +484,6 @@ bool SurfaceFlinger::threadLoop()
             if (mHDMIOutput)
                 hw.videoOverlayStarted(false);
         }
-        // pretend we did the post
-        hw.compositionComplete();
 
 #ifdef SF_BYPASS
         if (hw.canDraw() && mBypassState == eBypassInUse) {
