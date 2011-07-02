@@ -72,6 +72,7 @@ class FmRxControls
    private static final int V4L2_CID_PRIVATE_TAVARUA_LP_MODE = V4L2_CID_PRIVATE_BASE + 17;
    private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC = V4L2_CID_PRIVATE_BASE + 24;
    private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET = V4L2_CID_PRIVATE_BASE + 25;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_MPX_DCC = V4L2_CID_PRIVATE_BASE + 26;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
    private static final int V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900;
@@ -126,6 +127,15 @@ class FmRxControls
       return intdet;
    }
 
+   /*
+    * Get MPX_DCC
+    */
+   public int Mpx_Dcc(int fd)
+   {
+      int mpx_dcc =  FmReceiverJNI.getControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_MPX_DCC);
+      Log.d(TAG, "MPX_DCC value is : " + mpx_dcc);
+      return mpx_dcc;
+   }
    /*
     * Tune FM core to specified freq.
     */
