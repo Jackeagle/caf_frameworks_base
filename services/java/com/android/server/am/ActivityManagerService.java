@@ -2593,6 +2593,8 @@ public final class ActivityManagerService extends ActivityManagerNative
                         TAG, "Removing this entry!  frozen=" + r.haveState
                         + " finishing=" + r.finishing);
 
+                    mWindowManager.removeAppToken(r);
+
                     if (r.finishing ||
                         !r.stack.finishActivityLocked(r, i, Activity.RESULT_CANCELED,
                                                       null, "crashed")) {
@@ -2600,7 +2602,6 @@ public final class ActivityManagerService extends ActivityManagerNative
                         r.inHistory = false;
                     }
 
-                    mWindowManager.removeAppToken(r);
                     if (VALIDATE_TOKENS) {
                         mWindowManager.validateAppTokens(mMainStack.mHistory);
                     }
