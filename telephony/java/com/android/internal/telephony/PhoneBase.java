@@ -47,6 +47,7 @@ import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.Phone.DataState;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.ProxyManager.Subscription;
+import com.android.internal.telephony.QosSpec;
 
 import java.util.List;
 import java.util.Locale;
@@ -1040,6 +1041,30 @@ public abstract class PhoneBase extends Handler implements Phone {
     public int disableApnType(String type) {
         return mDataConnection.disableApnType(type);
      }
+
+    public int enableQos(int transId, QosSpec qosSpec, String type) {
+        return mDataConnection.enableQos(transId, qosSpec, type);
+    }
+
+    public int disableQos(int qosId) {
+        return mDataConnection.disableQos(qosId);
+    }
+
+    public int modifyQos(int qosId, QosSpec qosSpec) {
+        return mDataConnection.modifyQos(qosId, qosSpec);
+    }
+
+    public int suspendQos(int qosId) {
+        return mDataConnection.suspendQos(qosId);
+    }
+
+    public int resumeQos(int qosId) {
+        return mDataConnection.resumeQos(qosId);
+    }
+
+    public int getQosStatus(int qosId) {
+        return mDataConnection.getQosStatus(qosId);
+    }
 
     /**
      * Notify registrants of a new ringing Connection.

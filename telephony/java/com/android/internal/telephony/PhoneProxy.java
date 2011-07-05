@@ -45,6 +45,7 @@ import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.gsm.NetworkInfo;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.ProxyManager.Subscription;
+import com.android.internal.telephony.QosSpec;
 
 public class PhoneProxy extends Handler implements Phone {
     public final static Object lockForRadioTechnologyChange = new Object();
@@ -899,6 +900,30 @@ public class PhoneProxy extends Handler implements Phone {
 
     public int disableApnType(String type) {
         return mActivePhone.disableApnType(type);
+    }
+
+    public int enableQos(int transId, QosSpec qosSpec, String type) {
+        return mActivePhone.enableQos(transId, qosSpec, type);
+    }
+
+    public int disableQos(int qosId) {
+        return mActivePhone.disableQos(qosId);
+    }
+
+    public int modifyQos(int qosId, QosSpec qosSpec) {
+        return mActivePhone.modifyQos(qosId, qosSpec);
+    }
+
+    public int suspendQos(int qosId) {
+        return mActivePhone.suspendQos(qosId);
+    }
+
+    public int resumeQos(int qosId) {
+        return mActivePhone.resumeQos(qosId);
+    }
+
+    public int getQosStatus(int qosId) {
+        return mActivePhone.getQosStatus(qosId);
     }
 
     public boolean isDataConnectivityEnabled() {

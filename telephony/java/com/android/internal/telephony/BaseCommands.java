@@ -74,6 +74,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mTetheredModeStateRegistrants = new RegistrantList();
     protected RegistrantList mSubscriptionReadyRegistrants = new RegistrantList();
     protected RegistrantList mIccRefreshRegistrants = new RegistrantList();
+    protected RegistrantList mQosStateChangedIndRegistrants = new RegistrantList();
 
     protected Registrant mSMSRegistrant;
     protected Registrant mCdmaSMSRegistrant;
@@ -581,6 +582,15 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForSubscriptionStatusChanged(Handler h) {
         mSubscriptionReadyRegistrants.remove(h);
+    }
+
+    public void registerForQosStateChangedInd(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mQosStateChangedIndRegistrants.add(r);
+    }
+
+    public void unregisterForQosStateChangedInd(Handler h) {
+        mQosStateChangedIndRegistrants.remove(h);
     }
 
     public void registerForResendIncallMute(Handler h, int what, Object obj) {

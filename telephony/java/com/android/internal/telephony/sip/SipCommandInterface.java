@@ -16,6 +16,8 @@
 
 package com.android.internal.telephony.sip;
 
+import java.util.ArrayList;
+
 import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
@@ -205,6 +207,24 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
             String apn, String user, String password, String authType,
             String ipVersion,
             Message result) {
+    }
+
+    public void setupQosReq (int callId, ArrayList<String> qosFlows, Message result) {
+    }
+
+    public void releaseQos (int qosId, Message result) {
+    }
+
+    public void modifyQos (int qosId, ArrayList<String> qosFlows, Message result) {
+    }
+
+    public void suspendQos (int qosId, Message result) {
+    }
+
+    public void resumeQos (int qosId, Message result) {
+    }
+
+    public void getQosStatus (int qosId, Message result) {
     }
 
     public void deactivateDataCall(int cid, int reason, Message result) {

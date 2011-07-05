@@ -38,6 +38,7 @@ import com.android.internal.telephony.Phone.DataActivityState;
 import com.android.internal.telephony.Phone.DataState;
 import com.android.internal.telephony.DataProfile.DataProfileType;
 import com.android.internal.telephony.ProxyManager.Subscription;
+import com.android.internal.telephony.QosSpec;
 
 /**
  * {@hide}
@@ -231,6 +232,7 @@ public abstract class DataConnectionTracker extends Handler {
                 onVoiceCallEnded();
                 break;
 
+
             default:
                 Log.e(LOG_TAG, "[DCT] Unhandle event : " + msg.what);
         }
@@ -248,6 +250,12 @@ public abstract class DataConnectionTracker extends Handler {
     abstract protected void onRadioOff();
     abstract protected void onMasterDataEnabled();
     abstract protected void onMasterDataDisabled(Message onCompleteMsg);
+    abstract protected int enableQos(int transId, QosSpec qosSpec, String type);
+    abstract protected int disableQos(int qosId);
+    abstract protected int modifyQos(int qosId, QosSpec qosSpec);
+    abstract protected int suspendQos(int qosId);
+    abstract protected int resumeQos(int qosId);
+    abstract protected int getQosStatus(int qosId);
     abstract protected boolean isConcurrentVoiceAndData();
     abstract protected void setDataConnectionAsDesired(boolean desiredPowerState, Message onCompleteMsg);
     abstract public List<DataConnection> getCurrentDataConnectionList();

@@ -23,6 +23,7 @@ import com.android.internal.telephony.DataProfile;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 import com.android.internal.telephony.Phone.BearerType;
+import com.android.internal.telephony.QosSpec;
 import com.android.internal.util.HierarchicalState;
 import com.android.internal.util.HierarchicalStateMachine;
 
@@ -67,7 +68,7 @@ import android.util.EventLog;
  *        EVENT_GET_LAST_FAIL_DONE,
  *        EVENT_DEACTIVATE_DONE.
  *     }
- *   ++ # mInactiveState 
+ *   ++ # mInactiveState
  *        e(doNotifications)
  *        x(clearNotifications) {
  *            EVENT_RESET { notifiyDisconnectCompleted }.
@@ -148,8 +149,21 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     }
 
     /**
-     * An instance used for notification of blockingReset.
-     * TODO: Remove when blockingReset is removed.
+     * Used internally for saving qos parameters.
+     */
+    protected class QosConnectionParams {
+        public QosConnectionParams(int transId, QosSpec qosSpec) {
+            this.transId = transId;
+            this.qosSpec = qosSpec;
+        }
+
+        public int transId;
+        public QosSpec qosSpec;
+    }
+
+    /**
+     * An instance used for notification of blockingReset. TODO: Remove when
+     * blockingReset is removed.
      */
     class ResetSynchronouslyLock {
     }
@@ -161,6 +175,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         public DisconnectParams(Message onCompletedMsg) {
             this.onCompletedMsg = onCompletedMsg;
         }
+
         public DisconnectParams(ResetSynchronouslyLock lockObj) {
             this.lockObj = lockObj;
         }
@@ -178,10 +193,24 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     protected static final int EVENT_DEACTIVATE_DONE = 5;
     protected static final int EVENT_DISCONNECT = 6;
 
-    //***** Tag IDs for EventLog
+    protected static final int EVENT_QOS_ENABLE = 7;
+    protected static final int EVENT_QOS_ENABLE_DONE = 8;
+    protected static final int EVENT_QOS_DISABLE = 9;
+    protected static final int EVENT_QOS_DISABLE_DONE = 10;
+    protected static final int EVENT_QOS_MODIFY = 11;
+    protected static final int EVENT_QOS_MODIFY_DONE = 12;
+    protected static final int EVENT_QOS_SUSPEND = 13;
+    protected static final int EVENT_QOS_SUSPEND_DONE = 14;
+    protected static final int EVENT_QOS_RESUME = 15;
+    protected static final int EVENT_QOS_RESUME_DONE = 16;
+    protected static final int EVENT_QOS_GET_STATUS = 17;
+    protected static final int EVENT_QOS_GET_STATUS_DONE = 18;
+    protected static final int EVENT_QOS_IND = 19;
+
+    // ***** Tag IDs for EventLog
     protected static final int EVENT_LOG_BAD_DNS_ADDRESS = 50100;
 
-    //***** Member Variables
+    // ***** Member Variables
     protected int mTag;
     protected Context mContext;
     protected CommandsInterface mCM;
@@ -192,6 +221,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     protected String ipAddress;
     protected String gatewayAddress;
     protected String[] dnsServers;
+    protected ArrayList<Integer> mQosFlowIds = new ArrayList<Integer>();
     protected long createTime;
     protected long lastFailTime;
     protected DataConnectionFailCause lastFailCause;
@@ -202,6 +232,20 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     public abstract String toString();
 
     protected abstract void onConnect(ConnectionParams cp);
+
+    protected abstract void onQosSetup(QosConnectionParams qp);
+
+    protected abstract void onQosRelease(int qosId);
+
+    protected abstract void onQosGetStatus(int qosId);
+
+    protected abstract void onQosSetupDone(int transId, String[] responses, String error);
+
+    protected abstract void onQosReleaseDone(int qosId, String error);
+
+    protected abstract void onQosGetStatusDone(int qosId, AsyncResult ar, String error);
+
+    protected abstract void onQosStateChangedInd(AsyncResult ar);
 
     protected abstract boolean isDnsOk(String[] domainNameServers);
 
@@ -224,6 +268,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
             addState(mInactiveState, mDefaultState);
             addState(mActivatingState, mDefaultState);
             addState(mActiveState, mDefaultState);
+                addState(mQosActiveState, mActiveState);
             addState(mDisconnectingState, mDefaultState);
             addState(mDisconnectingBadDnsState, mDefaultState);
         setInitialState(mInactiveState);
@@ -246,6 +291,15 @@ public abstract class DataConnection extends HierarchicalStateMachine {
             if (DBG) log("tearDownData radio is off sendMessage EVENT_DEACTIVATE_DONE immediately");
             AsyncResult ar = new AsyncResult(o, null, null);
             sendMessage(obtainMessage(EVENT_DEACTIVATE_DONE, ar));
+        }
+    }
+
+    /**
+     * Tear down all the QoS flows that has been setup
+     */
+    private void tearDownQos() {
+        for (int id: (Integer[])mQosFlowIds.toArray(new Integer[0])) {
+            qosRelease(id);
         }
     }
 
@@ -619,6 +673,15 @@ public abstract class DataConnection extends HierarchicalStateMachine {
             boolean retVal;
 
             switch (msg.what) {
+                case EVENT_QOS_ENABLE:
+                case EVENT_QOS_DISABLE:
+                case EVENT_QOS_GET_STATUS:
+                    if (DBG) log("DcActiveState moving to DcQosActiveState msg.what="
+                                + msg.what);
+                    deferMessage(msg);
+                    transitionTo(mQosActiveState);
+                    retVal = true;
+                    break;
                 case EVENT_DISCONNECT:
                     if (DBG) log("DcActiveState msg.what=EVENT_DISCONNECT");
                     DisconnectParams dp = (DisconnectParams) msg.obj;
@@ -637,6 +700,135 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         }
     }
     private DcActiveState mActiveState = new DcActiveState();
+    /**
+     * The state machine is connected, expecting QoS requests
+     */
+    private class DcQosActiveState extends HierarchicalState {
+        private QosConnectionParams mQosConnParams = null;
+
+        @Override
+        public void enter() {
+        }
+
+        @Override
+        protected void exit() {
+            // clear QosSpec
+        }
+
+        @Override
+        protected boolean processMessage(Message msg) {
+            boolean retVal = false;
+            int qosId;
+            String error;
+
+            switch (msg.what) {
+            case EVENT_QOS_ENABLE:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_ENABLE");
+                // Send out qosRequest
+                mQosConnParams = (QosConnectionParams) msg.obj;
+                onQosSetup(mQosConnParams);
+                retVal = true;
+                break;
+            case EVENT_QOS_DISABLE:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_DISABLE");
+                // Send out qosRequest
+                qosId = msg.arg1;
+                onQosRelease(qosId);
+                retVal = true;
+                break;
+            case EVENT_QOS_GET_STATUS:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_GET_STATUS");
+                // Send out qosRequest
+                qosId = msg.arg1;
+                onQosGetStatus(qosId);
+                retVal = true;
+                break;
+            case EVENT_QOS_IND:
+                log("DcQosActiveState msg.what=EVENT_QOS_IND");
+                onQosStateChangedInd((AsyncResult)msg.obj);
+                retVal = true;
+                break;
+
+            case EVENT_QOS_ENABLE_DONE:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_ENABLE_DONE");
+
+                error = getAsyncException(msg);
+                AsyncResult ar = (AsyncResult) msg.obj;
+
+                String responses[] = (String[])ar.result;
+                int transId = (Integer) ar.userObj;
+                onQosSetupDone(transId, responses, error);
+                retVal = true;
+                break;
+
+            case EVENT_QOS_DISABLE_DONE:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_DISABLE_DONE");
+
+                error = getAsyncException(msg);
+
+                qosId = (Integer) ((AsyncResult)msg.obj).userObj;
+                onQosReleaseDone(qosId, error);
+                // If all QosSpecs are empty, go back to active.
+                if (mQosFlowIds.size() == 0) {
+                    transitionTo(mActiveState);
+                }
+                retVal = true;
+                break;
+
+            case EVENT_QOS_GET_STATUS_DONE:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_GET_STATUS_DONE");
+
+                error = getAsyncException(msg);
+                qosId = (Integer) ((AsyncResult)msg.obj).userObj;
+                onQosGetStatusDone(qosId, (AsyncResult)msg.obj, error);
+                // If all QosSpecs are empty, go back to active.
+                if (mQosFlowIds.size() == 0) {
+                    transitionTo(mActiveState);
+                }
+                retVal = true;
+                break;
+            case EVENT_QOS_MODIFY_DONE:
+            case EVENT_QOS_SUSPEND_DONE:
+            case EVENT_QOS_RESUME_DONE:
+                break;
+
+            case EVENT_DISCONNECT:
+                if (DBG) log("DcQosActiveState msg.what=EVENT_DISCONNECT");
+                //Release QoS for all flows
+                tearDownQos();
+                deferMessage(msg);
+                transitionTo(mActiveState);
+                retVal = true;
+                break;
+
+            default:
+                if (DBG)
+                    log("DcQosActiveState nothandled msg.what=" + msg.what);
+                retVal = false;
+                break;
+            }
+            return retVal;
+        }
+
+        private String getAsyncException(Message msg) {
+            AsyncResult ar = (AsyncResult) msg.obj;
+            String ex = null;
+
+            if (ar.exception != null) {
+                if (DBG)
+                    log("Error in response" + ar.result);
+                ex = ar.result == null ? null : (String)ar.result;
+            }
+            return ex;
+        }
+    }
+    private DcQosActiveState mQosActiveState = new DcQosActiveState();
 
     /**
      * The state machine is disconnecting.
@@ -748,6 +940,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      */
     public void connect(RadioTechnology radioTech, DataProfile dp, BearerType bearerType,
             Message onCompletedMsg) {
+        mCM.registerForQosStateChangedInd(getHandler(), EVENT_QOS_IND, null);
+
         sendMessage(obtainMessage(EVENT_CONNECT, new ConnectionParams(radioTech, dp, bearerType,
                 onCompletedMsg)));
     }
@@ -759,7 +953,34 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      *        With AsyncResult.userObj set to the original msg.obj.
      */
     public void disconnect(Message onCompletedMsg) {
+        mCM.unregisterForQosStateChangedInd(getHandler());
         sendMessage(obtainMessage(EVENT_DISCONNECT, new DisconnectParams(onCompletedMsg)));
+    }
+
+    public void qosSetup(int transId, QosSpec qosSpec) {
+        sendMessage(obtainMessage(EVENT_QOS_ENABLE, new QosConnectionParams(transId,
+                qosSpec)));
+    }
+
+    public void qosRelease(int qosId) {
+        sendMessage(getHandler().obtainMessage(EVENT_QOS_DISABLE, qosId, 0));
+    }
+
+    public void qosModify(int qosId, QosSpec qosSpec) {
+        sendMessage(getHandler().obtainMessage(EVENT_QOS_MODIFY, qosId, 0,
+                qosSpec));
+    }
+
+    public void qosSuspend(int qosId) {
+        sendMessage(getHandler().obtainMessage(EVENT_QOS_SUSPEND, qosId, 0));
+    }
+
+    public void qosResume(int qosId) {
+        sendMessage(getHandler().obtainMessage(EVENT_QOS_RESUME, qosId, 0));
+    }
+
+    public void getQosStatus(int qosId) {
+        sendMessage(getHandler().obtainMessage(EVENT_QOS_GET_STATUS, qosId, 0));
     }
 
     // ****** The following are used for debugging.
@@ -773,6 +994,23 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     public boolean isInactive() {
         boolean retVal = getCurrentState() == mInactiveState;
         return retVal;
+    }
+
+    /**
+     * Check if QoS enabled for this data call
+     * @return
+     */
+    public boolean isQosAvailable() {
+        boolean retVal = getCurrentState() == mQosActiveState;
+        return retVal;
+    }
+
+    /**
+     * Check if the QoS ID is valid
+     * @return
+     */
+    public boolean isValidQos(int qosId) {
+        return !mQosFlowIds.isEmpty() && mQosFlowIds.contains(qosId);
     }
 
     /**
