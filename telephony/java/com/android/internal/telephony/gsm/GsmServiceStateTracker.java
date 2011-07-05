@@ -474,11 +474,11 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     }
 
     public void updateSpnDisplay() {
-        if (mSIMRecords == null) {
+        if (phone.mSIMRecords == null) {
             Log.e(LOG_TAG, "mSIMRecords null while updateSpnDisplay was called.");
             return;
         }
-            int rule = mSIMRecords.getDisplayRule(ss.getOperatorNumeric());
+            int rule = phone.mSIMRecords.getDisplayRule(ss.getOperatorNumeric());
             String spn = phone.mSIMRecords.getServiceProviderName();
             String plmn = ss.getOperatorAlphaLong();
 
