@@ -1688,6 +1688,22 @@ public class FmReceiver extends FmTransceiver
    }
 
 
+/*==============================================================
+   FUNCTION:  setRmssiDel
+   ==============================================================*/
+   /**
+   *    Sets the RMSSI Delta
+   *
+   *    <p>
+   *    This method sets the RMSSI Delta.
+   *
+   *    <p>
+   */
+   public void setRmssiDel(int delta)
+   {
+      int re =  mControl.setRmssiDel(sFd, delta);
+   }
+
    /*==============================================================
    FUNCTION:  getRawRDS
    ==============================================================*/

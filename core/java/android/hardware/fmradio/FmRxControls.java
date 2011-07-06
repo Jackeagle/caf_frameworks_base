@@ -73,6 +73,7 @@ class FmRxControls
    private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC = V4L2_CID_PRIVATE_BASE + 24;
    private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET = V4L2_CID_PRIVATE_BASE + 25;
    private static final int V4L2_CID_PRIVATE_TAVARUA_MPX_DCC = V4L2_CID_PRIVATE_BASE + 26;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA = V4L2_CID_PRIVATE_BASE + 28;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
    private static final int V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900;
@@ -136,6 +137,15 @@ class FmRxControls
       Log.d(TAG, "MPX_DCC value is : " + mpx_dcc);
       return mpx_dcc;
    }
+   /*
+    * Set RMSSI Delta
+    */
+   public int setRmssiDel(int fd, int delta)
+   {
+      int re =  FmReceiverJNI.setControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA, delta);
+      return re;
+   }
+
    /*
     * Tune FM core to specified freq.
     */
