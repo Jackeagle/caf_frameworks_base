@@ -945,15 +945,22 @@ void LPAPlayer::eventThreadEntry() {
                         mReachedEOS = false;
                         mSeekTimeUs = timePlayed;
 
-                        // 2. Call AUDIO_STOP on the Driver.
+                        // 2. Close the session
+                        if(bIsAudioRouted) {
+                            mAudioSink->closeSession();
+                            bIsAudioRouted = false;
+                        }
+
+                        // 3. Call AUDIO_STOP on the Driver.
                         LOGV("Received AUDIO_EVENT_SUSPEND and calling AUDIO_STOP");
                         mIsDriverStarted = false;
                         if ( ioctl(afd, AUDIO_STOP, 0) < 0 ) {
                             LOGE("AUDIO_STOP failed");
                         }
+                        break;
                     }
 
-                    // 3. Close the session
+                    // 4. Close the session if existing
                     if(bIsAudioRouted) {
                         mAudioSink->closeSession();
                         bIsAudioRouted = false;
@@ -1611,15 +1618,15 @@ void LPAPlayer::onPauseTimeOut() {
             nBytesConsumed = stats.byte_count;
         }
 
-        // 2. Call AUDIO_STOP on the Driver.
+        // 2. Close the session
+        mAudioSink->closeSession();
+        bIsAudioRouted = false;
+
+        // 3. Call AUDIO_STOP on the Driver.
         mIsDriverStarted = false;
         if ( ioctl(afd, AUDIO_STOP, 0) < 0 ) {
             LOGE("AUDIO_STOP failed");
         }
-
-        // 3. Close the session
-        mAudioSink->closeSession();
-        bIsAudioRouted = false;
     }
 }
 
