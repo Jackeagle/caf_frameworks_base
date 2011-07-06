@@ -202,9 +202,6 @@ extmap FILE_EXTS [] =  {
         {".rtttl", SONIVOX_PLAYER},
         {".rtx", SONIVOX_PLAYER},
         {".ota", SONIVOX_PLAYER},
-#ifndef NO_OPENCORE
-        {".3g2", PV_PLAYER},
-#endif
 };
 
 // TODO: Find real cause of Audio/Video delay in PV framework and remove this workaround
