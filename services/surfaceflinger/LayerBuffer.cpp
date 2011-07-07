@@ -692,7 +692,8 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
                            src.img.handle, false);
                mTempGraphicBuffer->setVerticalStride(src.img.h);
                EGLDisplay dpy(getFlinger()->graphicPlane(0).getEGLDisplay());
-               err = mTextureManager.initEglImage(&mTexture, dpy, mTempGraphicBuffer);
+               EGLContext ctx(getFlinger()->graphicPlane(0).getEGLContext());
+               err = mTextureManager.initEglImage(&mTexture, dpy, mTempGraphicBuffer, ctx);
         } else {
                err = INVALID_OPERATION;
         }

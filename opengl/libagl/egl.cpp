@@ -2126,9 +2126,7 @@ EGLImageKHR eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target,
     if (egl_display_t::is_valid(dpy) == EGL_FALSE) {
         return setError(EGL_BAD_DISPLAY, EGL_NO_IMAGE_KHR);
     }
-    if (ctx != EGL_NO_CONTEXT) {
-        return setError(EGL_BAD_CONTEXT, EGL_NO_IMAGE_KHR);
-    }
+
     if (target != EGL_NATIVE_BUFFER_ANDROID) {
         return setError(EGL_BAD_PARAMETER, EGL_NO_IMAGE_KHR);
     }

@@ -132,7 +132,7 @@ bool TextureManager::isYuvFormat(int format)
 }
 
 status_t TextureManager::initEglImage(Image* pImage,
-        EGLDisplay dpy, const sp<GraphicBuffer> buffer)
+        EGLDisplay dpy, const sp<GraphicBuffer>& buffer, EGLContext ctx)
 {
     status_t err = NO_ERROR;
     if (!pImage->dirty) return err;
@@ -152,7 +152,7 @@ status_t TextureManager::initEglImage(Image* pImage,
             EGL_NONE,                   EGL_NONE
     };
     pImage->image = eglCreateImageKHR(
-            dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
+            dpy, ctx, EGL_NATIVE_BUFFER_ANDROID,
             (EGLClientBuffer)clientBuf, attrs);
 
     if (pImage->image != EGL_NO_IMAGE_KHR) {

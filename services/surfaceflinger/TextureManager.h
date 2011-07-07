@@ -77,7 +77,7 @@ public:
 
     // make active buffer an EGLImage if needed
     status_t initEglImage(Image* texture,
-            EGLDisplay dpy, const sp<GraphicBuffer> buffer);
+            EGLDisplay dpy, const sp<GraphicBuffer>& buffer, EGLContext ctx=EGL_NO_CONTEXT);
 
     // activate a texture
     static void activateTexture(const Texture& texture, bool filter);
