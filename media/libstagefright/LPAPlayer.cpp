@@ -48,7 +48,7 @@ namespace android {
 int LPAPlayer::objectsAlive = 0;
 
 LPAPlayer::LPAPlayer(
-                    const sp<MediaPlayerBase::AudioSink> &audioSink,
+                    const sp<MediaPlayerBase::AudioSink> &audioSink, bool &initCheck,
                     AwesomePlayer *observer)
 :mInputBuffer(NULL),
 mSampleRate(0),
@@ -95,8 +95,10 @@ AudioPlayer(audioSink,observer) {
     mSourceEmpty = true;
     if ( afd < 0 ) {
         LOGE("pcm_lp_dec: cannot open pcm_dec device and the error is %d", errno);
+        initCheck = false;
         return;
     } else {
+        initCheck = true;
         LOGV("pcm_lp_dec: pcm_lp_dec Driver opened");
     }
     getAudioFlinger();
@@ -117,7 +119,8 @@ LPAPlayer::~LPAPlayer() {
     if (mStarted) {
         reset();
     }
-    mAudioFlinger->deregisterClient(AudioFlingerClient);
+    if (mAudioFlinger != NULL)
+        mAudioFlinger->deregisterClient(AudioFlingerClient);
     objectsAlive--;
 }
 
