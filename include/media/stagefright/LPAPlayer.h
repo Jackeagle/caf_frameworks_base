@@ -45,7 +45,7 @@ public:
         SEEK_COMPLETE
     };
 
-    LPAPlayer(const sp<MediaPlayerBase::AudioSink> &audioSink,
+    LPAPlayer(const sp<MediaPlayerBase::AudioSink> &audioSink, bool &initCheck,
                 AwesomePlayer *audioObserver = NULL);
 
     virtual ~LPAPlayer();
