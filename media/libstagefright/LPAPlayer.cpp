@@ -448,7 +448,7 @@ void LPAPlayer::pause(bool playPendingSamples) {
         /* TODO: Check what needs to be in this case */
     } else {
         if (a2dpDisconnectPause) {
-
+            mAudioSink->pause();
         } else {
             if (!bIsA2DPEnabled) {
                 LOGV("LPAPlayer::Pause - Pause driver");
@@ -484,7 +484,15 @@ void LPAPlayer::resume() {
             mSource->start();
         }
         /* TODO: Check A2dp variable */
-        if (a2dpDisconnectPause) {
+        if (bIsA2DPEnabled && a2dpDisconnectPause) {
+            mInternalSeeking = true;
+            mReachedEOS = false;
+            mSeekTimeUs = timePlayed;
+            a2dpDisconnectPause = false;
+            mAudioSink->start();
+            pthread_cond_signal(&decoder_cv);
+        }
+        else if (a2dpDisconnectPause) {
             LOGV("A2DP disconnect resume");
             mAudioSink->pause();
             mAudioSink->stop();
