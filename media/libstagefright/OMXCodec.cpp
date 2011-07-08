@@ -209,7 +209,6 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_VIDEO_DIVX311, "OMX.qcom.video.decoder.divx311"},
     { MEDIA_MIMETYPE_VIDEO_DIVX4, "OMX.qcom.video.decoder.divx4"},
     { MEDIA_MIMETYPE_AUDIO_AC3, "OMX.qcom.audio.decoder.ac3" },
-    { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13"},
     { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
     { MEDIA_MIMETYPE_VIDEO_VP6,"OMX.qcom.video.decoder.vp"},
     { MEDIA_MIMETYPE_AUDIO_WMA, "OMX.qcom.audio.decoder.wma"},
