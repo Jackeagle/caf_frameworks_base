@@ -78,13 +78,14 @@ namespace android {
 
 static JavaVM *jvm;
 static jfieldID field_mNativeData;
+static jfieldID field_mIsWbs;
 static jmethodID method_onAccepted;
 static jmethodID method_onConnected;
 static jmethodID method_onClosed;
 
 struct thread_data_t;
 static void *work_thread(void *arg);
-static int connect_work(const char *address, uint16_t sco_pkt_type);
+static int connect_work(const char *address, uint16_t sco_pkt_type, int8_t is_wbs);
 static int accept_work(int signal_sk);
 static void wait_for_close(int sk, int signal_sk);
 static void closeNative(JNIEnv *env, jobject object);
@@ -122,10 +123,15 @@ struct thread_data_t {
     int signal_sk;         // socket for thread to listen for unblock signal
     char address[BTADDR_SIZE];  // BT addres as string
     uint16_t sco_pkt_type;   // SCO packet types supported
+    bool is_wbs;
 };
 
 static inline native_data_t * get_native_data(JNIEnv *env, jobject object) {
     return (native_data_t *)(env->GetIntField(object, field_mNativeData));
+}
+
+static inline jboolean get_is_wbs(JNIEnv *env, jobject object) {
+    return env->GetBooleanField(object, field_mIsWbs);
 }
 
 static uint16_t str2scoType (char *key) {
@@ -166,7 +172,7 @@ static void parseBlacklist(void) {
     scoBlacklist_t *list = NULL;
     scoBlacklist_t *newelem;
 
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
 
     /* Open file */
     FILE *fp = fopen(filename, "r");
@@ -262,12 +268,13 @@ static uint16_t getScoType(char *address, const char *name) {
 #endif
 
 static void classInitNative(JNIEnv* env, jclass clazz) {
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
     if (env->GetJavaVM(&jvm) < 0) {
         LOGE("Could not get handle to the VM");
     }
     field_mNativeData = get_field(env, clazz, "mNativeData", "I");
+    field_mIsWbs = get_field(env, clazz, "mIsWbs", "Z");
     method_onAccepted = env->GetMethodID(clazz, "onAccepted", "(I)V");
     method_onConnected = env->GetMethodID(clazz, "onConnected", "(I)V");
     method_onClosed = env->GetMethodID(clazz, "onClosed", "()V");
@@ -279,7 +286,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
 /* Returns false if a serious error occured */
 static jboolean initNative(JNIEnv* env, jobject object) {
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
 
     native_data_t *nat = (native_data_t *) calloc(1, sizeof(native_data_t));
@@ -299,7 +306,7 @@ static jboolean initNative(JNIEnv* env, jobject object) {
 }
 
 static void destroyNative(JNIEnv* env, jobject object) {
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
     
@@ -317,7 +324,7 @@ static void destroyNative(JNIEnv* env, jobject object) {
 }
 
 static jboolean acceptNative(JNIEnv *env, jobject object) {
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
     int signal_sks[2];
@@ -365,7 +372,7 @@ static jboolean acceptNative(JNIEnv *env, jobject object) {
 static jboolean connectNative(JNIEnv *env, jobject object, jstring address,
         jstring name) {
 
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
     int signal_sks[2];
@@ -403,6 +410,7 @@ static jboolean connectNative(JNIEnv *env, jobject object, jstring address,
     strlcpy(data->address, c_address, BTADDR_SIZE);
     env->ReleaseStringUTFChars(address, c_address);
     data->is_accept = false;
+    data->is_wbs = get_is_wbs(env, object);
 
     if (name == NULL) {
         LOGE("%s: Null pointer passed in for device name", __FUNCTION__);
@@ -424,7 +432,7 @@ static jboolean connectNative(JNIEnv *env, jobject object, jstring address,
 }
 
 static void closeNative(JNIEnv *env, jobject object) {
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
     int signal_sk;
@@ -452,7 +460,7 @@ static void *work_thread(void *arg) {
     thread_data_t *data = (thread_data_t *)arg;
     int sk;
 
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
     if (jvm->AttachCurrentThread(&env, NULL) != JNI_OK) {
         LOGE("%s: AttachCurrentThread() failed", __FUNCTION__);
         return NULL;
@@ -464,7 +472,7 @@ static void *work_thread(void *arg) {
         sk = accept_work(data->signal_sk);
         LOGV("SCO OBJECT %p END ACCEPT *****", data->nat->object);
     } else {
-        sk = connect_work(data->address, data->sco_pkt_type);
+        sk = connect_work(data->address, data->sco_pkt_type, data->is_wbs);
     }
 
     /* callback with connection result */
@@ -538,7 +546,7 @@ done:
 }
 
 static int accept_work(int signal_sk) {
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
     int sk;
     int nsk;
     int addr_sz;
@@ -608,8 +616,8 @@ error:
     return -1;
 }
 
-static int connect_work(const char *address, uint16_t sco_pkt_type) {
-    LOGV(__FUNCTION__);
+static int connect_work(const char *address, uint16_t sco_pkt_type, int8_t is_wbs) {
+    LOGV("%s", __FUNCTION__);
     struct sockaddr_sco addr;
     int sk = -1;
 
@@ -632,7 +640,8 @@ static int connect_work(const char *address, uint16_t sco_pkt_type) {
     addr.sco_family = AF_BLUETOOTH;
     get_bdaddr(address, &addr.sco_bdaddr);
     addr.sco_pkt_type = sco_pkt_type;
-    LOGI("Connecting to socket");
+    LOGI("Connecting to socket, sco_pkt_type: %d", sco_pkt_type);
+    addr.is_wbs = is_wbs;
     while (connect(sk, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         if (errno != EINTR) {
             LOGE("%s: connect() failed: %s", __FUNCTION__, strerror(errno));
@@ -650,7 +659,7 @@ error:
 }
 
 static void wait_for_close(int sk, int signal_sk) {
-    LOGV(__FUNCTION__);
+    LOGV("%s", __FUNCTION__);
     pollfd p[2];
 
     memset(p, 0, 2 * sizeof(pollfd));
