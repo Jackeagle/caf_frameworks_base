@@ -89,6 +89,11 @@ public class TelephonyManager {
         return (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
     }
 
+    /** @hide */
+    public static boolean isMultiSimEnabled() {
+        return false;
+    }
+
     //
     // Broadcast Intent actions
     //
