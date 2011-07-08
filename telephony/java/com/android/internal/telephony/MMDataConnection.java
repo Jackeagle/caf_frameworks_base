@@ -76,8 +76,8 @@ public class MMDataConnection extends DataConnection {
             mIntent.putExtra(QosSpec.QosIntentKeys.QOS_STATUS, state);
         }
 
-        void setTransId(int transId) {
-            mIntent.putExtra(QosSpec.QosIntentKeys.QOS_TRANSID, transId);
+        void setUserData(int userData) {
+            mIntent.putExtra(QosSpec.QosIntentKeys.QOS_USERDATA, userData);
         }
 
         void setQosId(int qosId) {
@@ -169,16 +169,13 @@ public class MMDataConnection extends DataConnection {
     /**
      * Initiate QoS Setup with the given parameters
      *
-     * @param qp
-     *            QoS parameters
+     * @param qosSpec
+     *            QoS Spec
      */
-    protected void onQosSetup(QosConnectionParams qp) {
-        logd("Requesting QoS Setup");
-        QosSpec qosSpec = qp.qosSpec;
-
-        logd("Invoking RIL QoS Setup, QosSpec:" + qosSpec.toString());
+    protected void onQosSetup(QosSpec qosSpec) {
+        logd("Requesting QoS Setup. QosSpec:" + qosSpec.toString());
         this.mCM.setupQosReq(cid, qosSpec.getRilQosSpec(),
-                obtainMessage(EVENT_QOS_ENABLE_DONE, qp.transId));
+                obtainMessage(EVENT_QOS_ENABLE_DONE, qosSpec.getUserData()));
     }
 
     /**
@@ -208,22 +205,27 @@ public class MMDataConnection extends DataConnection {
     /**
      * QoS Setup is complete. Notify upper layers
      *
-     * @param qp
-     *            QoS params used to setup QoS
+     * @param userData
+     *            User Data recieved in the asynchronous response
+     * @param responses
+     *            Fields from the QoS Setup Response
+     * @param error
+     *            error string
      */
-    protected void onQosSetupDone(int transId, String[] responses, String error) {
+    protected void onQosSetupDone(int userData, String[] responses, String error) {
         boolean failure = false;
         int state = QosSpec.QosIndStates.REQUEST_FAILED;
 
         QosIndication ind = new QosIndication();
-        ind.setTransId(transId);
+        ind.setUserData(userData);
 
         try {
             // non zero response is a failure
             if (responses[0].equals("0")) {
                 ind.setQosId(Integer.parseInt(responses[1]));
                 mQosFlowIds.add(Integer.parseInt(responses[1]));
-                logd("Added QosId:" + Integer.parseInt(responses[1]) + "to DC:" + cid);
+                logd("Added QosId:" + Integer.parseInt(responses[1])
+                        + " to DC:" + cid + " QoS Flow Count:" + mQosFlowIds.size());
             }
             else
                 failure = true;
@@ -240,7 +242,7 @@ public class MMDataConnection extends DataConnection {
         ind.setIndState(state, error);
         ind.sendIndication();
 
-        logd("onQosSetupDone Complete, transId:" + transId + " error:" + error);
+        logd("onQosSetupDone Complete, userData:" + userData + " error:" + error);
     }
 
     /**
@@ -258,7 +260,8 @@ public class MMDataConnection extends DataConnection {
 
             mQosFlowIds.remove(mQosFlowIds.indexOf(qosId));
 
-            logd("onQosReleaseDone Complete, qosId:" + qosId + " error:" + error);
+            logd("onQosReleaseDone Complete, qosId:" + qosId
+                    + " error:" + error + " QoS Flow Count:" + mQosFlowIds.size());
         }
         else
             logd("onQosReleaseDone Invalid qosId:" + qosId + " error:" + error);

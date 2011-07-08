@@ -334,13 +334,12 @@ interface ITelephony {
 
     /**
      * Enable QoS
-     * @param transId Transaction Id for the QoS. Used to match request/response
      * @param qosSpec QoS spec containing various QoS parameters
      * @param type Type of data connection (any of Phone.APN_TYPE_*)
      * @return Phone.QOS_REQUEST_SUCCESS - success, else failure
      * {@hide}
      */
-    int enableQos(int transId, in QosSpec qosSpec, String type);
+    int enableQos(in QosSpec qosSpec, String type);
 
     /**
      * Disable QoS

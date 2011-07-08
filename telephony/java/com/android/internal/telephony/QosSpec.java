@@ -240,9 +240,9 @@ public class QosSpec implements Parcelable {
          * Optional param. Type of Value: Integer */
         public static final String QOS_ERROR = "QosError";
 
-        /* Transaction ID that is echoed back to the higher layers.
+        /* User Data that is echoed back to the higher layers.
          * Used only for IND following setup qos request. Type of Value: Integer */
-        public static final String QOS_TRANSID = "QosTransId";
+        public static final String QOS_USERDATA = "QosUserData";
 
         /* Unique QoS ID. Type of Value: Integer */
         public static final String QOS_ID = "QosId";
@@ -252,6 +252,10 @@ public class QosSpec implements Parcelable {
     }
 
     LinkedHashMap<Integer, QosPipe> mQosPipes;
+
+    /* Unique token used to identify a QosSpec returned in a response */
+    private int mUserData = 0;
+
     private static int mPipeId = 0;
 
 
@@ -358,7 +362,6 @@ public class QosSpec implements Parcelable {
             return sb.toString();
         }
     }
-
 
     public QosSpec() {
         mQosPipes = new LinkedHashMap<Integer, QosPipe>();
@@ -509,6 +512,7 @@ public class QosSpec implements Parcelable {
      * @hide
      */
     public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(mUserData);
         dest.writeInt(mQosPipes.size());
         for(QosPipe pipe : mQosPipes.values()) {
             dest.writeInt(pipe.mQosParams.entrySet().size());
@@ -528,6 +532,7 @@ public class QosSpec implements Parcelable {
     public static final Creator<QosSpec> CREATOR = new Creator<QosSpec>() {
         public QosSpec createFromParcel(Parcel in) {
             QosSpec qosSpec = new QosSpec();
+            qosSpec.setUserData(in.readInt());
             int nPipes = in.readInt();
             while (nPipes-- != 0) {
                 int mapSize = in.readInt();
@@ -548,6 +553,14 @@ public class QosSpec implements Parcelable {
             return new QosSpec[size];
         }
     };
+
+    public void setUserData(int userData) {
+        mUserData = userData;
+    }
+
+    public int getUserData() {
+        return mUserData;
+    }
 
     /**
      * Debug logging
