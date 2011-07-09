@@ -90,8 +90,17 @@ FramebufferNativeWindow::FramebufferNativeWindow()
         LOGE_IF(err, "couldn't open gralloc HAL (%s)", strerror(-err));
 
         // bail out if we can't initialize the modules
-        if (!fbDev || !grDev)
+        if (!fbDev || !grDev) {
+            if (grDev) {
+                gralloc_close(grDev);
+                grDev = 0;
+            }
+            if (fbDev) {
+                framebuffer_close(fbDev);
+                fbDev = 0;
+            }
             return;
+        }
         
         mUpdateOnDemand = (fbDev->setUpdateRect != 0);
         
@@ -134,6 +143,10 @@ FramebufferNativeWindow::FramebufferNativeWindow()
 
 FramebufferNativeWindow::~FramebufferNativeWindow() 
 {
+    LOGE_IF(!grDev, "~FramebufferNativeWindow [grDev==NULL]");
+
+    Mutex::Autolock _l(mutex);
+
     if (grDev) {
         for(int i = 0; i < mNumBuffers; i++) {
             if (buffers[i] != NULL) {
@@ -141,16 +154,18 @@ FramebufferNativeWindow::~FramebufferNativeWindow()
             }
         }
         gralloc_close(grDev);
+        grDev = 0;
     }
 
     if (fbDev) {
         framebuffer_close(fbDev);
+        fbDev = 0;
     }
 }
 
 status_t FramebufferNativeWindow::setUpdateRectangle(const Rect& r) 
 {
-    if (!mUpdateOnDemand) {
+    if (!mUpdateOnDemand || !fbDev) {
         return INVALID_OPERATION;
     }
     return fbDev->setUpdateRect(fbDev, r.left, r.top, r.width(), r.height());
@@ -158,7 +173,7 @@ status_t FramebufferNativeWindow::setUpdateRectangle(const Rect& r)
 
 status_t FramebufferNativeWindow::compositionComplete()
 {
-    if (fbDev->compositionComplete) {
+    if (fbDev && fbDev->compositionComplete) {
         return fbDev->compositionComplete(fbDev);
     }
     return INVALID_OPERATION;
@@ -168,13 +183,14 @@ int FramebufferNativeWindow::setSwapInterval(
         ANativeWindow* window, int interval) 
 {
     framebuffer_device_t* fb = getSelf(window)->fbDev;
-    return fb->setSwapInterval(fb, interval);
+    return fb != NULL ? fb->setSwapInterval(fb, interval) : -EINVAL;
 }
 
 // only for debugging / logging
 int FramebufferNativeWindow::getCurrentBufferIndex() const
 {
     Mutex::Autolock _l(mutex);
+    LOGE_IF(!grDev, "[RACE] FramebufferNativeWindow::getCurrentBufferIndex");
     const int index = mCurrentBufferIndex;
     return index;
 }
@@ -183,7 +199,12 @@ int FramebufferNativeWindow::dequeueBuffer(ANativeWindow* window,
         android_native_buffer_t** buffer)
 {
     FramebufferNativeWindow* self = getSelf(window);
+
+    Mutex::Autolock _l(self->mutex);
+    LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::dequeueBuffer");
     framebuffer_device_t* fb = self->fbDev;
+    if (!fb)
+        return NO_INIT;
 
     int index = self->mBufferHead;
 
@@ -207,8 +228,6 @@ int FramebufferNativeWindow::dequeueBuffer(ANativeWindow* window,
     }
 
     /* The buffer is available, return it */
-    Mutex::Autolock _l(self->mutex);
-
     self->mBufferHead++;
     if (self->mBufferHead >= self->mNumBuffers)
         self->mBufferHead = 0;
@@ -228,6 +247,7 @@ int FramebufferNativeWindow::lockBuffer(ANativeWindow* window,
 {
     FramebufferNativeWindow* self = getSelf(window);
     Mutex::Autolock _l(self->mutex);
+    LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::lockBuffer");
 
     const int index = self->mCurrentBufferIndex;
     GraphicLog& logger(GraphicLog::getInstance());
@@ -239,7 +259,6 @@ int FramebufferNativeWindow::lockBuffer(ANativeWindow* window,
     }
 
     logger.log(GraphicLog::SF_FB_LOCK_AFTER, index);
-
     return NO_ERROR;
 }
 
@@ -247,11 +266,10 @@ buffer_handle_t FramebufferNativeWindow::getCurrentBufferHandle(ANativeWindow* w
 {
     FramebufferNativeWindow* self = getSelf(window);
     Mutex::Autolock _l(self->mutex);
+    LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::getCurrentBufferHandle");
 
     sp<NativeBuffer> buffer = self->front;
-    buffer_handle_t handle = buffer->handle;
-
-    return handle;
+    return buffer != NULL ? buffer->handle : NULL;
 }
 
 int FramebufferNativeWindow::queueBuffer(ANativeWindow* window, 
@@ -259,7 +277,11 @@ int FramebufferNativeWindow::queueBuffer(ANativeWindow* window,
 {
     FramebufferNativeWindow* self = getSelf(window);
     Mutex::Autolock _l(self->mutex);
+    LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::queueBuffer");
+
     framebuffer_device_t* fb = self->fbDev;
+    if (!fb)
+        return NO_INIT;
     buffer_handle_t handle = static_cast<NativeBuffer*>(buffer)->handle;
 
     const int index = self->mCurrentBufferIndex;
@@ -281,8 +303,11 @@ int FramebufferNativeWindow::query(ANativeWindow* window,
 {
     FramebufferNativeWindow* self = getSelf(window);
     Mutex::Autolock _l(self->mutex);
+    LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::query");
+
     framebuffer_device_t* fb = self->fbDev;
-    switch (what) {
+    if (fb) {
+        switch (what) {
         case NATIVE_WINDOW_WIDTH:
             *value = fb->width;
             return NO_ERROR;
@@ -295,6 +320,7 @@ int FramebufferNativeWindow::query(ANativeWindow* window,
         case NATIVE_WINDOW_NUM_BUFFERS:
             *value = fb->numFramebuffers;
             return NO_ERROR;
+        }
     }
     *value = 0;
     return BAD_VALUE;
