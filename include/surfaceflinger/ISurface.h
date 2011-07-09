@@ -50,6 +50,7 @@ protected:
         SET_BUFFER_COUNT,
         SET_STEREOSCOPIC_3D_FORMAT,
         USE_ORIGINAL_SURFACE_RESOLUTION,
+        RECONFIGURE_BUFFERS,
     };
 
 public: 
@@ -109,6 +110,7 @@ public:
     
     virtual status_t registerBuffers(const BufferHeap& buffers) = 0;
     virtual void postBuffer(ssize_t offset) = 0; // one-way
+    virtual void reconfigureBuffers() = 0;
     virtual void unregisterBuffers() = 0;
     
     virtual sp<OverlayRef> createOverlay(

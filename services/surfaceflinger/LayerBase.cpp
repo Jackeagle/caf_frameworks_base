@@ -939,6 +939,10 @@ status_t LayerBaseClient::Surface::registerBuffers(
     return INVALID_OPERATION; 
 }
 
+void LayerBaseClient::Surface::reconfigureBuffers()
+{
+}
+
 void LayerBaseClient::Surface::postBuffer(ssize_t offset) 
 {
 }

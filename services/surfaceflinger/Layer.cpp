@@ -271,7 +271,7 @@ status_t Layer::setBufferInUse() const
 }
 
 status_t Layer::drawWithOverlay(const Region& clip,
-                    bool hdmiConnected, bool ignoreFB) const
+                    bool hdmiConnected, bool waitVsync) const
 {
 #if defined(TARGET_USES_OVERLAY)
     Texture tex(mBufferManager.getActiveTexture());
@@ -298,9 +298,13 @@ status_t Layer::drawWithOverlay(const Region& clip,
     if (s3dFormat) {
         hw.videoOverlayStarted(true);
     }
+
     if (!temp->setSource(mWidth, mHeight, mFormat|s3dFormat,
                            getOrientation(), hdmiConnected,
-                           ignoreFB, mBufferManager.getNumBuffers()))
+                           waitVsync, mBufferManager.getNumBuffers()))
+        return INVALID_OPERATION;
+
+    if(!temp->setParameter(OVERLAY_TRANSFORM, getOrientation()))
         return INVALID_OPERATION;
 
     if ((s3dFormat) && !temp->setCrop(0, 0, mWidth, mHeight))
@@ -324,23 +328,12 @@ status_t Layer::drawWithOverlay(const Region& clip,
     if (!ret)
         return INVALID_OPERATION;
 
-    int orientation;
-    if (ret = temp->getOrientation(orientation)) {
-        if (orientation != getOrientation())
-            ret = temp->setParameter(OVERLAY_TRANSFORM, getOrientation());
-    }
-    else
-        ret = temp->setParameter(OVERLAY_TRANSFORM, getOrientation());
-    if (!ret)
-        return INVALID_OPERATION;
-
-
     sp<GraphicBuffer> buffer(mBufferManager.getActiveBuffer());
     buffer_handle_t handle = (buffer->getNativeBuffer())->handle;
     ret = temp->queueBuffer(handle);
     if (!ret)
         return INVALID_OPERATION;
-    if (!ignoreFB)
+    if (!waitVsync)
         clearWithOpenGL(clip);
     setOverlayUsed(true);
     return NO_ERROR;

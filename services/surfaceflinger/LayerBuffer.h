@@ -38,7 +38,7 @@ class OverlayRef;
 // ---------------------------------------------------------------------------
 
 /* Interface being called after Queuing buffer to overlay in case of
- * ignoreFB=true, or after swap being called in case of ignoreFB=false */
+ * waitVsync=true, or after swap being called in case of waitVsync=false */
 class IOnQueueBuf{
 public:
   virtual void onQueueBuf() {}
@@ -55,12 +55,13 @@ class LayerBuffer : public LayerBaseClient, public IOnQueueBuf
         virtual ~Source();
         virtual void onDraw(const Region& clip) const;
         virtual status_t drawWithOverlay(const Region& clip, 
-                        bool hdmiConnected, bool ignoreFB = true) const;
+                bool hdmiConnected, bool waitVsync = true,
+                bool isReconfiguring = false, bool needsClearing = false) const;
         virtual void onTransaction(uint32_t flags);
         virtual void onVisibilityResolved(const Transform& planeTransform);
         virtual void onvalidateVisibility(const Transform& globalTransform) { }
         virtual void postBuffer(ssize_t offset);
-        virtual void unregisterBuffers();
+        virtual void unregisterBuffers(bool isReconfiguring = false);
         virtual void destroy() { }
         SurfaceFlinger* getFlinger() const { return mLayer.mFlinger.get(); }
     protected:
@@ -81,14 +82,17 @@ public:
     virtual void onDraw(const Region& clip) const;
     virtual void drawForSreenShot() const;
     virtual status_t drawWithOverlay(const Region& clip,
-              bool hdmiConnected, bool ignoreFB = true) const;
+              bool hdmiConnected, bool waitVsync = true) const;
     virtual uint32_t doTransaction(uint32_t flags);
     virtual void unlockPageFlip(const Transform& planeTransform, Region& outDirtyRegion);
     virtual void validateVisibility(const Transform& globalTransform);
 
     status_t registerBuffers(const ISurface::BufferHeap& buffers);
     void postBuffer(ssize_t offset);
+    void reconfigureBuffers();
     void unregisterBuffers();
+    void resetReconfigStatus();
+    bool isReconfiguring() const { return mIsReconfiguring; }
     sp<OverlayRef> createOverlay(uint32_t w, uint32_t h, int32_t format,
             int32_t orientation);
     
@@ -113,6 +117,9 @@ private:
         int hor_stride;
         int ver_stride;
     };
+
+    typedef enum { RECONFIG_BUFFER_GO, RECONFIG_BUFFER_BLOCK } reconfigBufState_t;
+    void wait(Mutex & m, Condition& c, reconfigBufState_t& s);
 
     static gralloc_module_t const* sGrallocModule;
     static gralloc_module_t const* getGrallocModule() {
@@ -162,17 +169,18 @@ private:
 
         virtual void onDraw(const Region& clip) const;
         virtual status_t drawWithOverlay(const Region& clip, 
-                        bool hdmiConnected, bool ignoreFB = true) const;
+                bool hdmiConnected, bool waitVsync = true,
+                bool isReconfiguring = false, bool needsClearing = false) const;
         virtual void postBuffer(ssize_t offset);
-        virtual void unregisterBuffers();
+        virtual void unregisterBuffers(bool isReconfiguring = false);
         virtual void destroy() { }
 
        /* OnBufferQ is called from drawWithOverlay, or after egl swap,
         * when buffs are queued to Overlay.
-        * Usecases: When ignoreFB==true it means WAIT==true in
+        * Usecases: When waitVsync==true it means WAIT==true in
         * liboverlay and it is safe to invoke OnBufferQ immediately
         * after return from QueueBuf.
-        * When ignoreFB==false it means WAIT==false and we are going to have
+        * When waitVsync==false it means WAIT==false and we are going to have
         * that call invoked only after swap. */
         virtual void onQueueBuf();
 
@@ -213,7 +221,7 @@ private:
     class OverlaySource : public Source {
     public:
         OverlaySource(LayerBuffer& layer,
-                sp<OverlayRef>* overlayRef, 
+                sp<OverlayRef>* overlayRef,
                 uint32_t w, uint32_t h, int32_t format, int32_t orientation);
         virtual ~OverlaySource();
         virtual void onDraw(const Region& clip) const;
@@ -265,6 +273,7 @@ private:
 
         virtual status_t registerBuffers(const ISurface::BufferHeap& buffers);
         virtual void postBuffer(ssize_t offset);
+        virtual void reconfigureBuffers();
         virtual void unregisterBuffers();
         
         virtual sp<OverlayRef> createOverlay(
@@ -276,10 +285,16 @@ private:
     };
 
     mutable Mutex   mLock;
+    Mutex     mReconfigMutex;
+    Condition mReconfigCond;
+    reconfigBufState_t mReconfigStatus;
+
     sp<Source>      mSource;
     sp<Surface>     mSurface;
     bool            mInvalidate;
     bool            mNeedsBlending;
+    bool            mIsReconfiguring;
+    mutable bool    mNeedsFBClearing;
     copybit_device_t* mBlitEngine;
 };
 
