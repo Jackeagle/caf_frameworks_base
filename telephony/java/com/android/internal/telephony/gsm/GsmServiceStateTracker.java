@@ -588,7 +588,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                         try {
                             int rejCode = Integer.parseInt(states[13]);
                             // Check if rejCode is "Persistent location update reject",
-                            if (rejCode == 10) {
+                            if (rejCode == 17) {
                                 createManagedRoamingDialog();
                             }
                         } catch (NumberFormatException ex) {
