@@ -844,9 +844,10 @@ public class CDMAPhone extends PhoneBase {
     void sendEmergencyCallbackModeChange(){
         //Send an Intent
         Intent intent = new Intent(TelephonyIntents.ACTION_EMERGENCY_CALLBACK_MODE_CHANGED);
+        intent.putExtra("phone_subscription", mSubscription);
         intent.putExtra(PHONE_IN_ECM_STATE, mIsPhoneInEcmState);
         ActivityManagerNative.broadcastStickyIntent(intent,null);
-        if (DBG) Log.d(LOG_TAG, "sendEmergencyCallbackModeChange");
+        if (DBG) Log.d(LOG_TAG, "sendEmergencyCallbackModeChange on subscription : " + mSubscription);
     }
 
     /**
