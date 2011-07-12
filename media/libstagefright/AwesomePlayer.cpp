@@ -856,7 +856,7 @@ status_t AwesomePlayer::play_l() {
                 if(strcmp("true",lpaDecode) == 0 && strcmp("true",lpaStagefright) == 0)
                 {
                     LOGV("LPAPlayer::getObjectsAlive() %d",LPAPlayer::objectsAlive);
-                    if ( durationUs > 60000000 && !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG) && LPAPlayer::objectsAlive == 0) {
+                    if ( durationUs > 60000000 && (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG) || !strcasecmp(mime,MEDIA_MIMETYPE_AUDIO_AAC)) && LPAPlayer::objectsAlive == 0) {
                         LOGE("LPAPlayer created, LPA MODE detected mime %s duration %d\n", mime, durationUs);
                         bool initCheck =  false;
                         mAudioPlayer = new LPAPlayer(mAudioSink, initCheck, this);
