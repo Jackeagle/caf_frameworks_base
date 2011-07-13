@@ -246,6 +246,19 @@ status_t AACDecoder::read(
         err = mSource->read(&mInputBuffer, options);
 
         if (err != OK) {
+            if(mInputBuffer){
+                mInputBuffer->release();
+                mInputBuffer = NULL;
+            }
+
+            if(mTempInputBuffer != NULL){
+                free(mTempInputBuffer);
+                mTempInputBuffer = NULL;
+            }
+
+            mTempBufferDataLen = 0;
+            mTempBufferTotalSize = 0;
+            mInputBufferSize = 0;
             return err;
         }
 
