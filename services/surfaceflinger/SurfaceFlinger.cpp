@@ -1402,10 +1402,18 @@ status_t SurfaceFlinger::removeLayer(const sp<LayerBase> layer)
 status_t SurfaceFlinger::removeLayer_l(const sp<LayerBase> layerBase)
 {
     sp<LayerBaseClient> lbc(layerBase->getLayerBaseClient());
+
     if (lbc != 0) {
-        mLayerMap.removeItem( lbc->getSurface()->asBinder() );
+       if(!lbc->isSurface()) {
+          LOGV("LayerBaseClient does not hold a valid surface anymore. "
+               "Ignoring remove request lbc=%p layermap size=%d",
+               lbc.get(), mLayerMap.size());
+       }else {
+          mLayerMap.removeItem( lbc->getSurface()->asBinder() );
+       }
     }
     ssize_t index = mCurrentState.layersSortedByZ.remove(layerBase);
+
     if (index >= 0) {
         mLayersRemoved = true;
         return NO_ERROR;
