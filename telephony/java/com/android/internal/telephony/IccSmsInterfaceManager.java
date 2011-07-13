@@ -499,7 +499,7 @@ public class IccSmsInterfaceManager {
 
     }
 
-    public boolean enableCellBroadcast(int messageIdentifier) {
+    synchronized public boolean enableCellBroadcast(int messageIdentifier) {
         return enableBroadcast(TYPE_3GPP, messageIdentifier);
     }
 
@@ -532,15 +532,15 @@ public class IccSmsInterfaceManager {
         return false;
 
     }
-    public boolean disableCellBroadcast(int messageIdentifier) {
+    synchronized public boolean disableCellBroadcast(int messageIdentifier) {
         return disableBroadcast(TYPE_3GPP, messageIdentifier);
     }
 
-    public boolean enableCdmaBroadcast(int messageIdentifier) {
+    synchronized public boolean enableCdmaBroadcast(int messageIdentifier) {
         return enableBroadcast(TYPE_3GPP2, messageIdentifier);
     }
 
-    public boolean disableCdmaBroadcast(int messageIdentifier) {
+    synchronized public boolean disableCdmaBroadcast(int messageIdentifier) {
         return disableBroadcast(TYPE_3GPP2, messageIdentifier);
     }
 
