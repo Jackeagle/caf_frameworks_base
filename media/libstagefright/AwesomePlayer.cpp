@@ -1234,8 +1234,16 @@ void AwesomePlayer::setVideoSource(sp<MediaSource> source) {
 }
 
 status_t AwesomePlayer::initVideoDecoder(uint32_t flags) {
+    char value[PROPERTY_VALUE_MAX];
+
     flags |= mCodecFlags; //or whatever was added to mCodecFlags
                           //from setParameter calls to the flags
+    property_get("sys.media.vdec.sw", value, "0");
+    if (atoi(value)) {
+        LOGW("Software Codec is prefered for Video");
+        flags |= OMXCodec::kPreferSoftwareCodecs;
+    }
+
     mVideoSource = OMXCodec::Create(
             mClient.interface(), mVideoTrack->getFormat(),
             false, // createEncoder
