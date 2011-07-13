@@ -12,6 +12,7 @@ LOCAL_C_INCLUDES := \
         $(TOP)/frameworks/base/include/media/stagefright/openmax \
         $(TOP)/frameworks/base/include/media/stagefright         \
         $(TOP)/hardware/msm7k/libgralloc-qsd8k                   \
+        $(TOP)/vendor/qcom/proprietary/mm-color-converter
 
 LOCAL_SHARED_LIBRARIES :=       \
         libbinder               \
@@ -20,7 +21,8 @@ LOCAL_SHARED_LIBRARIES :=       \
         libui                   \
         libcutils               \
         libsurfaceflinger_client\
-        libcamera_client
+        libcamera_client        \
+        libdl
 
 LOCAL_MODULE:= libstagefright_color_conversion
 
