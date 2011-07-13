@@ -49,6 +49,7 @@ static const AGpsInterface* sAGpsInterface = NULL;
 static const GpsNiInterface* sGpsNiInterface = NULL;
 static const GpsDebugInterface* sGpsDebugInterface = NULL;
 static const AGpsRilInterface* sAGpsRilInterface = NULL;
+static const InjectRawCmdInterface* sInjectRawCmdInterface = NULL;
 
 // temporary storage for GPS callbacks
 static GpsSvStatus  sGpsSvStatus;
@@ -70,11 +71,16 @@ static void checkAndClearExceptionFromCallback(JNIEnv* env, const char* methodNa
 static void location_callback(GpsLocation* location)
 {
     JNIEnv* env = AndroidRuntime::getJNIEnv();
+
+    jbyteArray byteArray = env->NewByteArray(location->rawDataSize);
+    LOG_ASSERT(byteArray, "Native could not create new byte[]");
+    env->SetByteArrayRegion(byteArray, 0, location->rawDataSize, (const jbyte *) location->rawData );
     env->CallVoidMethod(mCallbacksObj, method_reportLocation, location->flags,
             (jdouble)location->latitude, (jdouble)location->longitude,
             (jdouble)location->altitude,
             (jfloat)location->speed, (jfloat)location->bearing,
-            (jfloat)location->accuracy, (jlong)location->timestamp);
+            (jfloat)location->accuracy, (jlong)location->timestamp,
+             byteArray);
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
 }
 
@@ -297,7 +303,7 @@ static const AGpsRilInterface* GetAGpsRilInterface(JNIEnv* env, jobject obj)
 }
 
 static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, jclass clazz) {
-    method_reportLocation = env->GetMethodID(clazz, "reportLocation", "(IDDDFFFJ)V");
+    method_reportLocation = env->GetMethodID(clazz, "reportLocation", "(IDDDFFFJ[B)V");
     method_reportStatus = env->GetMethodID(clazz, "reportStatus", "(I)V");
     method_reportSvStatus = env->GetMethodID(clazz, "reportSvStatus", "()V");
     method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(III[B)V");
@@ -321,6 +327,9 @@ static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject o
 
     if (!sGpsDebugInterface)
        sGpsDebugInterface = (const GpsDebugInterface*)interface->get_extension(GPS_DEBUG_INTERFACE);
+
+    if (!sInjectRawCmdInterface)
+        sInjectRawCmdInterface = (const InjectRawCmdInterface*)interface->get_extension(ULP_RAW_CMD_INTERFACE);
 
     //Initialize the interface for AGPS call flow at this point as AGPS connection requests can come
     //in anytime after the main native GPS itnerface is initialized
@@ -522,6 +531,20 @@ static jboolean android_location_GpsLocationProvider_supports_xtra(JNIEnv* env, 
     return (sGpsXtraInterface != NULL);
 }
 
+static jboolean android_location_GpsLocationProvider_inject_raw_command(JNIEnv* env, jobject obj, jbyteArray data, jint length)
+{
+    jboolean result = false;
+
+    if (sInjectRawCmdInterface) {
+        if (data != NULL) {
+            jbyte* bytes = env->GetByteArrayElements(data, 0);
+            result = sInjectRawCmdInterface->inject_raw_cmd((char *)bytes, length);
+            env->ReleaseByteArrayElements(data, bytes, 0);
+        }
+    }
+    return result;
+}
+
 static void android_location_GpsLocationProvider_inject_xtra_data(JNIEnv* env, jobject obj,
         jbyteArray data, jint length)
 {
@@ -643,6 +666,7 @@ static JNINativeMethod sMethods[] = {
     {"native_inject_location", "(DDF)V", (void*)android_location_GpsLocationProvider_inject_location},
     {"native_supports_xtra", "()Z", (void*)android_location_GpsLocationProvider_supports_xtra},
     {"native_inject_xtra_data", "([BI)V", (void*)android_location_GpsLocationProvider_inject_xtra_data},
+    {"native_inject_raw_command", "([BI)Z", (void*)android_location_GpsLocationProvider_inject_raw_command},
     {"native_agps_data_conn_open", "(Ljava/lang/String;I)V", (void*)android_location_GpsLocationProvider_agps_data_conn_open},
     {"native_agps_data_conn_closed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_closed},
     {"native_agps_data_conn_failed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_failed},
