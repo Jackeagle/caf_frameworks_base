@@ -392,7 +392,9 @@ class BluetoothEventLoop {
                 // If locally initiated pairing, we will
                 // not go to BOND_BONDED state until we have received a
                 // successful return value in onCreatePairedDeviceResult
-                if (null == mBluetoothService.getPendingOutgoingBonding()) {
+
+                // There can be one outgoing and one incoming pairing at the same time
+                if (!address.equals(mBluetoothService.getPendingOutgoingBonding())) {
                     mBluetoothService.setBondState(address, BluetoothDevice.BOND_BONDED);
                 }
             } else {
