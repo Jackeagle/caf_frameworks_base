@@ -324,7 +324,7 @@ private:
             void        handleRepaint();
             bool        handleBypassLayer();
             bool        closeBypass();
-            bool        copyBypassBuffer();
+            status_t    copyBypassBuffer();
             void        postFramebuffer();
             void        composeSurfaces(const Region& dirty);
 
@@ -454,17 +454,14 @@ private:
    bool mIsLayerBufferPresent;
    //Flag tracks the absence of surfaces to be displayed in original resolution.
    bool mOrigResSurfAbsent;
-   Vector< sp<LayerBase> > mOverlayDitchedLayers;
-   enum bypass_state_t { eBypassInUse, eBypassNotInUse, eBypassClosePending };
+   enum bypass_state_t { eBypassInUse, eBypassNotInUse, eBypassClosePending, eBypassFree };
    bypass_state_t mBypassState;
    hdmi_state_t mHDMIState;
    gralloc_module_t const* mGrallocModule;
    copybit_device_t *mBlitEngine;
 
 public:
-   void ditchOverlayLayers();
    void freeBypassBuffers();
-   void freeBypassBuffers(bool clearOverlayFlag);
 };
 
 // ---------------------------------------------------------------------------

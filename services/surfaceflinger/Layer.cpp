@@ -259,19 +259,6 @@ status_t Layer::freeBypassBuffers() const
     return NO_ERROR;
 }
 
-status_t Layer::freeBypassBuffers(bool clearOverlayFlag) const
-{
-    if (!isOverlayUsed())
-        return NO_ERROR;
-    ClientRef::Access sharedClient(mUserClientRef);
-    SharedBufferServer* lcblk(sharedClient.get());
-    if (lcblk)
-        lcblk->setInUseBypass(-1);
-    if (clearOverlayFlag)
-        setOverlayUsed(false);
-    return NO_ERROR;
-}
-
 status_t Layer::setBufferInUse() const
 {
     Texture tex(mBufferManager.getActiveTexture());

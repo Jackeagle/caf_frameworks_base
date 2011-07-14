@@ -413,8 +413,12 @@ bool SurfaceFlinger::threadLoop()
             return true;
         }
 
-        if (mBypassState == eBypassInUse)
+        if (mBypassState == eBypassInUse) {
+            copyBypassBuffer();
             mBypassState = eBypassClosePending;
+            closeBypass();
+            mBypassState = eBypassFree;
+        }
 #endif
 
         // repaint the framebuffer (if needed)
@@ -449,13 +453,11 @@ bool SurfaceFlinger::threadLoop()
         }
 
 #ifdef SF_BYPASS
-        if (mBypassState == eBypassClosePending) {
-            closeBypass();
+        if (mBypassState == eBypassFree) {
             freeBypassBuffers();
+            mBypassState = eBypassNotInUse;
         }
 #endif
-        ditchOverlayLayers();
-
         logger.log(GraphicLog::SF_REPAINT_DONE, index);
     } else {
         if ((mHDMIOutput || mOverlayOpt) && !(hw.canDraw())) {
@@ -469,10 +471,10 @@ bool SurfaceFlinger::threadLoop()
 
 #ifdef SF_BYPASS
         if (hw.canDraw() && mBypassState == eBypassInUse) {
-            copyBypassBuffer();
-            bool clearBypassFlag = false;
-            freeBypassBuffers(clearBypassFlag);
-            return true;
+            if (copyBypassBuffer() == NO_ERROR) {
+                freeBypassBuffers();
+                return true;
+            }
         }
 
         if (mBypassState == eBypassClosePending || !(hw.canDraw())) {
@@ -491,35 +493,29 @@ bool SurfaceFlinger::closeBypass()
 {
 #ifdef SF_BYPASS
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
-    if (mBypassState == eBypassClosePending) {
-        hw.closeBypass();
-        mBypassState = eBypassNotInUse;
+    if (hw.closeBypass() == NO_ERROR) {
         return true;
     }
 #endif
     return false;
 }
 
-bool SurfaceFlinger::copyBypassBuffer()
+status_t SurfaceFlinger::copyBypassBuffer()
 {
 #ifdef SF_BYPASS
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     if (mBypassState == eBypassInUse) {
-        hw.copyBypassBuffer();
-        return true;
+        return hw.copyBypassBuffer();
     }
 #endif
-    return false;
+    return NO_INIT;
 }
 
 bool SurfaceFlinger::handleBypassLayer()
 {
 #ifdef SF_BYPASS
-    if (mBypassState == eBypassClosePending) {
-        closeBypass();
+    if (mBypassState == eBypassClosePending || mBypassState == eBypassFree)
         return false;
-    }
-
     /*
      * For now, disable HDMI through comp. bypass,
      */
@@ -632,16 +628,6 @@ void SurfaceFlinger::handleConsoleEvents()
     mDirtyRegion.set(hw.bounds());
 }
 
-void SurfaceFlinger::ditchOverlayLayers()
-{
-#ifdef SF_BYPASS
-    const size_t count = mOverlayDitchedLayers.size();
-    for (size_t i=0 ; i<count ; i++)
-        mOverlayDitchedLayers[i]->ditch();
-    mOverlayDitchedLayers.clear();
-#endif
-}
-
 void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
 {
     Vector< sp<LayerBase> > ditchedLayers;
@@ -668,13 +654,6 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
     for (size_t i=0 ; i<count ; i++) {
         if (ditchedLayers[i] == 0)
             continue;
-#ifdef SF_BYPASS
-        if (ditchedLayers[i]->isOverlayUsed()) {
-            mOverlayDitchedLayers.add(ditchedLayers[i]);
-            ditchedLayers[i]->clearFreezeLock();
-            continue;
-        }
-#endif
         ditchedLayers[i]->ditch();
     }
 }
@@ -1066,19 +1045,6 @@ void SurfaceFlinger::freeBypassBuffers()
     for (size_t i=0 ; i<count ; ++i) {
         const sp<LayerBase>& layer(layers[i]);
         layer->freeBypassBuffers();
-    }
-#endif
-}
-
-void SurfaceFlinger::freeBypassBuffers(bool clearOverlayFlag)
-{
-#ifdef SF_BYPASS
-    const LayerVector& drawingLayers(mDrawingState.layersSortedByZ);
-    const size_t count = drawingLayers.size();
-    sp<LayerBase> const* const layers = drawingLayers.array();
-    for (size_t i=0 ; i<count ; ++i) {
-        const sp<LayerBase>& layer(layers[i]);
-        layer->freeBypassBuffers(clearOverlayFlag);
     }
 #endif
 }

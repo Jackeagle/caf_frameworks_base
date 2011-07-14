@@ -289,7 +289,7 @@ bool SharedBufferClient::LockCondition::operator()() const {
      * using stack.reserved, check if current buffer is same as that
      * being read by display.
      */
-    if ((stack.reserved != -1) && buf == stack.index[stack.reserved])
+    if ((stack.reserved != -1) && buf == stack.reserved)
         return false;
 #endif
     return (buf != stack.index[stack.head]);
