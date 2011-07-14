@@ -68,23 +68,8 @@
 
 #define DISPLAY_COUNT       1
 
-namespace {
-  // layer is LayerBase type, and mCachedVideoLayer is LayerBuffer.
-  // Dynamic cast should work here, but we have no rtti.
-  // we are however sure that we are dealing with LayerBuffer
-  android::LayerBuffer* cacheOverlayLayer(const android::sp<android::LayerBase>& src){
-     assert(src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers);
-     if(!src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers) {
-        LOGE("composeSurfaces expected ePushBuffer flags=%d",
-              src->getLayerInitFlags());
-        abort();
-     }
-     return static_cast<android::LayerBuffer*>(src.get());
-  }
-
-}
-
 namespace android {
+
 // ---------------------------------------------------------------------------
 
 SurfaceFlinger::SurfaceFlinger()
@@ -124,7 +109,6 @@ SurfaceFlinger::SurfaceFlinger()
         mFullScreen(false),
         mOverlayUsed(false),
         mOverlayUseChanged(false),
-        mIsLayerBufferPresent(false),
         mOrigResSurfAbsent(true),
         mBypassState(eBypassNotInUse),
         mHDMIState(HDMIOUT_DISABLE)
@@ -453,10 +437,7 @@ bool SurfaceFlinger::threadLoop()
             // In case we cached mCachedVideoLayer, it means we kept while in
             // composeSurface function and we need to call onQueueBuf when we
             // are done with swap buffers.
-            if(mCachedVideoLayer.get()){
-              mCachedVideoLayer->onQueueBuf();
-              mCachedVideoLayer=0;
-            }
+            PostBufferSingleton::instance()->onQueueBuf();
 
             if (mOverlayOpt && mOverlayUseChanged) {
                 enableOverlayOpt(false);
@@ -1021,7 +1002,7 @@ void SurfaceFlinger::handleRepaint()
     mInvalidRegion.orSelf(mDirtyRegion);
     // Skip this check for original resolution  and layerbuffer surfaces, since MDP is
     // used for display and we want to ensure UI updates.
-    if (mInvalidRegion.isEmpty() && mOrigResSurfAbsent && !mIsLayerBufferPresent) {
+    if (mInvalidRegion.isEmpty() && mOrigResSurfAbsent) {
         // nothing to do
         return;
     }
@@ -1038,7 +1019,7 @@ void SurfaceFlinger::handleRepaint()
     uint32_t flags = hw.getFlags();
     //Enter block only if original resolution surface absent.
     //If present, ensures that the entire region is marked dirty.
-    if ((flags & DisplayHardware::SWAP_RECTANGLE && !mIsLayerBufferPresent && mOrigResSurfAbsent) ||
+    if ((flags & DisplayHardware::SWAP_RECTANGLE && mOrigResSurfAbsent) ||
         (flags & DisplayHardware::BUFFER_PRESERVED)) 
     {
         // we can redraw only what's dirty, but since SWAP_RECTANGLE only
@@ -1118,6 +1099,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     bool canUseOverlayToDraw = false;
     int s3dLayerCount = 0;
     int origResLayerCount = 0;
+    PostBufferSingleton::instance()->clearBufferLayerList();
 
 #if defined(TARGET_USES_OVERLAY)
     for (size_t i = 0; ((i < count)  &&
@@ -1151,7 +1133,6 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 
     PostBufferSingleton::instance()->setPolicy(layerbuffercount);
 
-    mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
     mOrigResSurfAbsent = (0 == origResLayerCount);
 
     if (mOverlayOpt || (layerbuffercount == 1)) {
@@ -1204,6 +1185,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         mOverlayUseChanged = true;
     }
 
+    PostBufferSingleton::instance()->addPushBufferLayers(layers);
     for (size_t i=0 ; i<count ; ++i) {
         const sp<LayerBase>& layer(layers[i]);
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
@@ -1217,20 +1199,17 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     mOverlayUsed = true;
                 } else if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && 
                             layerbuffercount == 1) {
-                    mCachedVideoLayer = cacheOverlayLayer(layer);
                     if (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR) {
                         layer->draw(clip);
                         mOverlayUseChanged = true;
-                        // Failed, so we would like it to signal after
-                        // postFrameBuffer call.
-                        mCachedVideoLayer->setDirtyQueueSignal();
                     }
                     else{
                         mOverlayUsed = true;
                     }
                 }
-                else
+                else {
                     layer->draw(clip);
+                }
         }
     }
 }

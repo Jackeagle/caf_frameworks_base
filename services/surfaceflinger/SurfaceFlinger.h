@@ -451,13 +451,9 @@ private:
    bool mFullScreen;
    bool mOverlayUsed;
    bool mOverlayUseChanged;
-   bool mIsLayerBufferPresent;
    //Flag tracks the absence of surfaces to be displayed in original resolution.
    bool mOrigResSurfAbsent;
    Vector< sp<LayerBase> > mOverlayDitchedLayers;
-   // Cached overlay layer in composeSurfaces function to be used in the ctx
-   // of fixing jitter/flickering bug
-   sp<LayerBuffer> mCachedVideoLayer;
    enum bypass_state_t { eBypassInUse, eBypassNotInUse, eBypassClosePending };
    bypass_state_t mBypassState;
    hdmi_state_t mHDMIState;
