@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -191,7 +192,7 @@ class CNERequest {
 public final class CNE {
     static final String LOG_TAG = "CNE";         // global logcat tag
     static final String LOCAL_TAG = "CNE_DEBUG"; // local logcat tag
-    private static final boolean DBG = false;    // enable local logging?
+    private static final boolean DBG = true;    // enable local logging?
 
     // ***** Instance Variables
     LocalSocket mSocket;
@@ -418,6 +419,10 @@ public final class CNE {
                 int pluginType = intent.getIntExtra("plugged", 0);
                 int status = intent.getIntExtra("status", 0);
                 updateBatteryStatus(level, pluginType, status);
+
+            } else if (action.equals(Intent.ACTION_SHUTDOWN)) {
+                if (DBG) Log.i(LOCAL_TAG, "CNE received action: " + action);
+                stopFmc(null);
 
             } else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
                 if (DBG) Log.i(LOCAL_TAG, "CNE received action RSSI Changed events: " + action);
@@ -1117,6 +1122,7 @@ public final class CNE {
         filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
         filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         filter.addAction(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
+        filter.addAction(Intent.ACTION_SHUTDOWN);
 
         context.registerReceiver(mIntentReceiver, filter);
         activeRegsList = new ConcurrentHashMap<Integer, RegInfo>();
@@ -2014,9 +2020,19 @@ public final class CNE {
                 configureIproute2(CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN,
                         wwanV4AddrInfo.ifName, wwanV4AddrInfo.ipAddr, wwanV4AddrInfo.gatewayAddr);
                 rInfo.enabled = true;
+            } else if (status == FmcNotifier.FMC_STATUS_REGISTRATION_SUCCESS) {
+                Log.i(LOCAL_TAG, "handleFmcStatusMsg REGISTRATION_SUCCESS - fmcEnabled="
+                      + rInfo.enabled );
+                if (rInfo.enabled == true) {
+                    configureIproute2(CNE_IPROUTE2_REPLACE_HOST_DEFAULT_ENTRY_IN_MAIN, activeWlanIfName, null,
+                                      activeWlanGatewayAddr);
+                    configureIproute2(CNE_IPROUTE2_DELETE_HOST_IN_MAIN, activeWlanIfName, null, null);
+                    rInfo.enabled = false;
+                }
             } else {
                 if ((status == FmcNotifier.FMC_STATUS_CLOSED)
                         || (status == FmcNotifier.FMC_STATUS_FAILURE)
+                        || (status == FmcNotifier.FMC_STATUS_DS_NOT_AVAIL)
                         || (status == FmcNotifier.FMC_STATUS_RETRIED)) {
                     rInfo.enabled = false;
                     rInfo.dsAvail = false;
@@ -2403,6 +2419,7 @@ public final class CNE {
             rInfo.lastSendStatus = status;
             if ((rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_CLOSED)
                     || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_FAILURE)
+                    || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_DS_NOT_AVAIL)
                     || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
                 mRemoveHostEntry = true;
                 ITelephony phone = ITelephony.Stub.asInterface(ServiceManager.getService("phone"));
@@ -2468,14 +2485,30 @@ public final class CNE {
         if (DBG) Log.i(LOCAL_TAG, "startFmc: ");
         if (rInfo != null) {
             rInfo = reestablishBinder(rInfo, binder);
+            if (DBG) Log.i(LOCAL_TAG, "startFmc: enabled=" + rInfo.enabled +
+                           ",dsAvail=" + rInfo.dsAvail);
             if (rInfo.enabled) { // already enabled
                 onFmcStatus(FmcNotifier.FMC_STATUS_ENABLED);
+                reqToStart = false;
+            } else if (rInfo.dsAvail) {
+                onFmcStatus(FmcNotifier.FMC_STATUS_REGISTRATION_SUCCESS);
                 reqToStart = false;
             } 
         } else { /* new OEM registration for this app */
             setFmcObj(new FmcRegInfo(binder));
         }
         if (reqToStart) {
+            ConnectivityManager cm = (ConnectivityManager) mContext
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            NetworkInfo.State networkState = (networkInfo
+                    == null ? NetworkInfo.State.UNKNOWN : networkInfo.getState());
+            if (DBG) Log.i(LOCAL_TAG, "CNE@startFmc: wifi state=" + networkState);
+            if (networkState != NetworkInfo.State.CONNECTED) {
+                if (DBG) Log.i(LOCAL_TAG, "CNE@startFmc: wifi not ready");
+                onFmcStatus(FmcNotifier.FMC_STATUS_FAILURE);
+                return ok;
+            }
             onFmcStatus(FmcNotifier.FMC_STATUS_INITIALIZED);
             // send enableFMC to Cnd
             CNERequest rr = CNERequest.obtain(CNE_REQUEST_START_FMC_CMD);

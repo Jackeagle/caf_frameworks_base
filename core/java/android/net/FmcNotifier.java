@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010,2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -44,7 +44,8 @@ public interface FmcNotifier {
     public final static int FMC_STATUS_NOT_AVAIL       = 6;  // fmc not available(check persist)
     public final static int FMC_STATUS_DS_NOT_AVAIL    = 7;  // data server not available
     public final static int FMC_STATUS_RETRIED         = 8;  // out of coverage
-    public final static int FMC_STATUS_MAX             = 9;
+    public final static int FMC_STATUS_REGISTRATION_SUCCESS = 9;  // successful registration
+    public final static int FMC_STATUS_MAX             = 10;
 
     public final static String[] FMC_STATUS_STR = {
         "Enabled",
@@ -56,6 +57,7 @@ public interface FmcNotifier {
         "Fmc not available",
         "DS not available",
         "OoC - retry...",
+        "Registration successful",
         "Undefined FMC Status"
     };
 
