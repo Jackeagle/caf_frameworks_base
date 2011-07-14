@@ -173,6 +173,7 @@ extern int register_android_view_KeyEvent(JNIEnv* env);
 extern int register_android_view_MotionEvent(JNIEnv* env);
 extern int register_android_content_res_ObbScanner(JNIEnv* env);
 extern int register_android_content_res_Configuration(JNIEnv* env);
+extern int register_com_android_internal_app_ActivityTrigger(JNIEnv *env);
 
 static AndroidRuntime* gCurRuntime = NULL;
 
@@ -1300,6 +1301,8 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_content_res_ObbScanner),
     REG_JNI(register_android_content_res_Configuration),
     REG_JNI(register_android_hardware_fm_fmradio),
+
+    REG_JNI(register_com_android_internal_app_ActivityTrigger),
 };
 
 /*
