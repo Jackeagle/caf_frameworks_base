@@ -66,8 +66,9 @@ public class UiccCard extends Handler{
             mUiccApplications[i] = new UiccCardApplication(this, ics.applications[i], mUiccRecords, mContext, mCi);
         }
 
+        mCatService = catService;
+
         if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
-            mCatService = catService;
             mCatService.update( mUiccApplications[0].getApplicationRecords(),mUiccApplications[0].getIccFileHandler());
         }
     }
@@ -100,6 +101,10 @@ public class UiccCard extends Handler{
                 //Update the rest
                 mUiccApplications[i].update(ics.applications[i], mUiccRecords, mContext, mCi);
             }
+        }
+
+        if (mUiccApplications.length > 0 && mUiccApplications[0] != null && mCatService != null) {
+            mCatService.update(mUiccApplications[0].getApplicationRecords(),mUiccApplications[0].getIccFileHandler());
         }
     }
 
