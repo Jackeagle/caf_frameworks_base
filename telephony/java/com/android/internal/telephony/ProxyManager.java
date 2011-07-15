@@ -39,6 +39,7 @@ import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.PhoneProxy;
 import com.android.internal.telephony.SimRefreshResponse;
 import com.android.internal.telephony.UiccCard;
+import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccConstants.AppType;
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.UiccManager;
@@ -664,6 +665,17 @@ public class ProxyManager extends Handler {
                     } else {
                         cardSub.appType = null;
                         Log.d(LOG_TAG, "UNKNOWN APP");
+                    }
+
+                    // In case of MultiSIM, APPSTATE_READY should not come before selecting the subscriptions from UI.
+                    // Show a warning message in this case.
+                    if (uiccCardApplication.getState() == AppState.APPSTATE_READY) {
+                        Log.e(LOG_TAG, "*************************************************************************************");
+                        Log.e(LOG_TAG, "AppState of the UiccCardApplication @ cardIndex:" + cardIndex + " appIndex:" + appIndex
+                                + " is APPSTATE_READY!!!!!");
+                        Log.e(LOG_TAG, "Android expectes APPSTATE_DETECTED before selecting the subscriptions!!!!!");
+                        Log.e(LOG_TAG, "WARNING!!! Please configure the NV items properly to select the subscriptions from UI");
+                        Log.e(LOG_TAG, "*************************************************************************************");
                     }
 
                     fillAppIndex(cardSub, appIndex);
