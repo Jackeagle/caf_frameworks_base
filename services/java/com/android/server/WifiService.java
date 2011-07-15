@@ -1051,7 +1051,7 @@ public class WifiService extends IWifiManager.Stub {
                     }
                     return -1;
                 }
-                doReconfig = true;
+                //doReconfig = true;
             }
             mNeedReconfig = mNeedReconfig || doReconfig;
         }
