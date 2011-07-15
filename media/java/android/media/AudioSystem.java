@@ -247,24 +247,22 @@ public class AudioSystem
     public static final int DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES= 0x100;
     public static final int DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER   = 0x200;
     public static final int DEVICE_OUT_AUX_DIGITAL              = 0x400;
-    public static final int DEVICE_OUT_AUX_HDMI                 = 0x800;
-    public static final int DEVICE_OUT_FM                       = 0x1000;
-    public static final int DEVICE_OUT_ANC_HEADSET              = 0x2000;
-    public static final int DEVICE_OUT_ANC_HEADPHONE            = 0x4000;
-    public static final int DEVICE_OUT_FM_TX                    = 0x8000;
-    public static final int DEVICE_OUT_DEFAULT                  = 0x10000;
+    public static final int DEVICE_OUT_FM                       = 0x800;
+    public static final int DEVICE_OUT_ANC_HEADSET              = 0x1000;
+    public static final int DEVICE_OUT_ANC_HEADPHONE            = 0x2000;
+    public static final int DEVICE_OUT_FM_TX                    = 0x4000;
+    public static final int DEVICE_OUT_DEFAULT                  = 0x8000;
+
     // input devices
     public static final int DEVICE_IN_COMMUNICATION         = 0x10000;
     public static final int DEVICE_IN_AMBIENT               = 0x20000;
     public static final int DEVICE_IN_BUILTIN_MIC1          = 0x40000;
     public static final int DEVICE_IN_BUILTIN_MIC2          = 0x80000;
-    public static final int DEVICE_IN_MIC_ARRAY             = 0x400000;
+    public static final int DEVICE_IN_MIC_ARRAY             = 0x100000;
     public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = 0x200000;
-    public static final int DEVICE_IN_WIRED_HEADSET         = 0x100000;
+    public static final int DEVICE_IN_WIRED_HEADSET         = 0x400000;
     public static final int DEVICE_IN_AUX_DIGITAL           = 0x800000;
-    public static final int DEVICe_IN_FM_RX                 = 0x1000000;
-    public static final int DEVICe_IN_FM_RXA2DP             = 0x2000000;
-    public static final int DEVICE_IN_ANC_HEADSET           = 0x400000;
+    public static final int DEVICE_IN_ANC_HEADSET           = 0x1000000;
     public static final int DEVICE_IN_DEFAULT               = 0x80000000;
 
     // device states

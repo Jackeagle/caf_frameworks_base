@@ -2182,16 +2182,16 @@ public class AudioService extends IAudioService.Stub {
                 }
             } else if (action.equals("HDMI_CONNECTED")) {
                 Log.v(TAG, "HDMI connected");
-                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_HDMI,
+                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_DIGITAL,
                                                      AudioSystem.DEVICE_STATE_AVAILABLE,
                                                      "");
-                mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_AUX_HDMI), "");
+                mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_AUX_DIGITAL), "");
             } else if (action.equals("HDMI_DISCONNECTED")) {
                 Log.v(TAG, "HDMI disconnected");
-                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_HDMI,
+                AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_AUX_DIGITAL,
                                                      AudioSystem.DEVICE_STATE_UNAVAILABLE,
                                                      "");
-                mConnectedDevices.remove(AudioSystem.DEVICE_OUT_AUX_HDMI);
+                mConnectedDevices.remove(AudioSystem.DEVICE_OUT_AUX_DIGITAL);
             } else if (action.equals(Intent.ACTION_BOOT_COMPLETED)) {
                 mBootCompleted = true;
                 sendMsg(mAudioHandler, MSG_LOAD_SOUND_EFFECTS, SHARED_MSG, SENDMSG_NOOP,
