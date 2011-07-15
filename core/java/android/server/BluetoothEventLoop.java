@@ -56,10 +56,16 @@ class BluetoothEventLoop {
     private static final int EVENT_RESTART_BLUETOOTH = 1;
     private static final int EVENT_PAIRING_CONSENT_DELAYED_ACCEPT = 2;
     private static final int EVENT_AGENT_CANCEL = 3;
+    private static final int EVENT_PAIRING_TIMEOUT = 4;
 
     private static final int CREATE_DEVICE_ALREADY_EXISTS = 1;
     private static final int CREATE_DEVICE_SUCCESS = 0;
     private static final int CREATE_DEVICE_FAILED = -1;
+
+    // The 1.2/2.0 incoming pairing request would timeout in 30 seconds at LMP since LMP
+    // Response time out is 30 seconds. Setting the INCOMING_PAIRING_TIMEOUT to 26 seconds
+    // to make sure that the pairing clean up happens from the HOST side.
+    private static final int INCOMING_PAIRING_TIMEOUT = 26000;
 
     private static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
     private static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
@@ -93,6 +99,10 @@ class BluetoothEventLoop {
                         BluetoothDevice.BOND_NONE,
                         BluetoothDevice.UNBOND_REASON_REMOTE_AUTH_CANCELED);
                 break;
+            case EVENT_PAIRING_TIMEOUT:
+                address = (String) msg.obj;
+                Log.d(TAG, "Cancelling bond process");
+                mBluetoothService.cancelBondProcess(address);
             }
         }
     };
@@ -504,6 +514,17 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.PAIRING_VARIANT_PIN);
         mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        if (mHandler.hasMessages(EVENT_PAIRING_TIMEOUT)) {
+            Log.d(TAG, "Ther is EVENT_PAIRING_TIMEOUT message");
+            mHandler.removeMessages(EVENT_PAIRING_TIMEOUT);
+        }
+        if (!(address.equals(pendingOutgoingAddress))) {
+            Message msg = mHandler.obtainMessage(EVENT_PAIRING_TIMEOUT);
+            msg.obj = address;
+            mHandler.sendMessageDelayed(msg, INCOMING_PAIRING_TIMEOUT);
+            Log.d(TAG, "Queuing INCOMING_PAIRING_TIMEOUT msg");
+        }
+
         return;
     }
 
