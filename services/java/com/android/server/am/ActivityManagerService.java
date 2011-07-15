@@ -2575,7 +2575,6 @@ public final class ActivityManagerService extends ActivityManagerNative
         // Remove this application's activities from active lists.
         mMainStack.removeHistoryRecordsForAppLocked(app);
 
-        boolean atTop = true;
         boolean hasVisibleActivities = false;
 
         // Clean out the history list.
@@ -2592,15 +2591,22 @@ public final class ActivityManagerService extends ActivityManagerNative
                     if (localLOGV) Slog.v(
                         TAG, "Removing this entry!  frozen=" + r.haveState
                         + " finishing=" + r.finishing);
+                    mMainStack.mHistory.remove(i);
 
-                    mWindowManager.removeAppToken(r);
-
-                    if (r.finishing ||
-                        !r.stack.finishActivityLocked(r, i, Activity.RESULT_CANCELED,
-                                                      null, "crashed")) {
-                        mMainStack.mHistory.remove(i);
-                        r.inHistory = false;
+                    r.inHistory = false;
+                    final ActivityRecord resultTo = r.resultTo;
+                    if (resultTo != null) {
+                        resultTo.addResultLocked(r, r.resultWho, r.requestCode,
+                                                 Activity.RESULT_CANCELED, null);
+                        r.resultTo = null;
                     }
+                    if (!r.finishing) {
+                        r.finishing = true;
+                        if (r.task != null) {
+                            r.task.numActivities--;
+                        }
+                    }
+                    mWindowManager.removeAppToken(r);
 
                     if (VALIDATE_TOKENS) {
                         mWindowManager.validateAppTokens(mMainStack.mHistory);
@@ -2625,7 +2631,6 @@ public final class ActivityManagerService extends ActivityManagerNative
                 r.stack.cleanUpActivityLocked(r, true);
                 r.state = ActivityState.STOPPED;
             }
-            atTop = false;
         }
 
         app.activities.clear();
