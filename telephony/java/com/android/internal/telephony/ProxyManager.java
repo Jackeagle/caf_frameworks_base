@@ -39,6 +39,7 @@ import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.PhoneProxy;
 import com.android.internal.telephony.SimRefreshResponse;
 import com.android.internal.telephony.UiccCard;
+import com.android.internal.telephony.UiccConstants.AppState;
 import com.android.internal.telephony.UiccConstants.AppType;
 import com.android.internal.telephony.UiccConstants.CardState;
 import com.android.internal.telephony.UiccManager;
@@ -1033,6 +1034,17 @@ public class ProxyManager extends Handler {
                             logd("compareAndUpdateCardSubData(): UNKNOWN APP");
                         }
 
+                        // In case of MultiSIM, APPSTATE_READY should not come before selecting the subscriptions from UI.
+                        // Show a warning message in this case.
+                        if (uiccCardApplication.getState() == AppState.APPSTATE_READY) {
+                            loge("*************************************************************************************");
+                            loge("AppState of the UiccCardApplication @ cardIndex:" + cardIndex + " appIndex:" + appIndex
+                                    + " is APPSTATE_READY!!!!!");
+                            loge("Android expectes APPSTATE_DETECTED before selecting the subscriptions!!!!!");
+                            loge("WARNING!!! Please configure the NV items properly to select the subscriptions from UI");
+                            loge("*************************************************************************************");
+                        }
+
                         fillAppIndex(cardSub, appIndex);
                     }
                     cardsUpdated = true;
@@ -1376,6 +1388,11 @@ public class ProxyManager extends Handler {
     private void logd(String string) {
         Log.d(LOG_TAG, string);
     }
+
+    private void loge(String string) {
+        Log.e(LOG_TAG, string);
+    }
+
 
     /** Helper thread for set subscription */
     public class SupplySubscription extends Thread {
