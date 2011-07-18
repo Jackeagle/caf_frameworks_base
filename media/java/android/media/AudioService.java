@@ -331,7 +331,6 @@ public class AudioService extends IAudioService.Stub {
         intentFilter.addAction(Intent.ACTION_FM);
         intentFilter.addAction(Intent.ACTION_FM_TX);
         intentFilter.addAction(Intent.ACTION_BOOT_COMPLETED);
-        intentFilter.addAction(Intent.ACTION_ANALOG_FM);
         context.registerReceiver(mReceiver, intentFilter);
 
         // Register for media button intent broadcasts.
@@ -2206,32 +2205,15 @@ public class AudioService extends IAudioService.Stub {
                int state = intent.getIntExtra("state", 0);
                boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_FM);
                if(state == 1 && !isConnected){
-                    if(0 == AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
                             AudioSystem.DEVICE_STATE_AVAILABLE,
-                            "")){
-                        mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_FM), "");
-                    }
+                            "");
+                    mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_FM), "");
                 }else if(state == 0 && isConnected){
                     AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
                             AudioSystem.DEVICE_STATE_UNAVAILABLE,
                             "");
                     mConnectedDevices.remove(AudioSystem.DEVICE_OUT_FM);
-                }
-            }else if (action.equals(Intent.ACTION_ANALOG_FM)){
-               Log.v(TAG, "Analog FM Intent received");
-               int state = intent.getIntExtra("state", 0);
-               boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_ANALOG_FM);
-               if(state == 1 && !isConnected){
-                    if(0 == AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_ANALOG_FM,
-                            AudioSystem.DEVICE_STATE_AVAILABLE,
-                            "")){
-                        mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_ANALOG_FM), "");
-                    }
-                }else if(state == 0 && isConnected){
-                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_ANALOG_FM,
-                            AudioSystem.DEVICE_STATE_UNAVAILABLE,
-                            "");
-                    mConnectedDevices.remove(AudioSystem.DEVICE_OUT_ANALOG_FM);
                 }
             }else if (action.equals(Intent.ACTION_FM_TX)){
                int state = intent.getIntExtra("state", 0);
