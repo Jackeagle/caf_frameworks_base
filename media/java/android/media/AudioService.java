@@ -2203,13 +2203,12 @@ public class AudioService extends IAudioService.Stub {
             } else if (action.equals(Intent.ACTION_FM)){
                Log.v(TAG, "FM Intent received");
                int state = intent.getIntExtra("state", 0);
-               boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_FM);
-               if(state == 1 && !isConnected){
+               if(state == 1){
                     AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
                             AudioSystem.DEVICE_STATE_AVAILABLE,
                             "");
                     mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_FM), "");
-                }else if(state == 0 && isConnected){
+                }else if(state == 0){
                     AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
                             AudioSystem.DEVICE_STATE_UNAVAILABLE,
                             "");
