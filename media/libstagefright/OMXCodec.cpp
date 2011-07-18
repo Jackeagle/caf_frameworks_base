@@ -84,10 +84,18 @@ class ColorFormatInfo {
         static const int32_t preferredColorFormat[END];
     public:
         static int32_t getPreferredColorFormat(bool isLocal) {
-            if(isLocal) {
+            char colorformat[10]="";
+            if(!property_get("sf.debug.colorformat", colorformat, NULL)){
+                if(isLocal) {
+                    return preferredColorFormat[LOCAL];
+                }
+                return preferredColorFormat[REMOTE];
+            } else {
+                if(!strcmp(colorformat, "yamato")) {
+                    return preferredColorFormat[REMOTE];
+                }
                 return preferredColorFormat[LOCAL];
             }
-            return preferredColorFormat[REMOTE];
         }
 };
 
@@ -106,7 +114,7 @@ const int32_t ColorFormatInfo::preferredColorFormat[] = {
 #endif
 #ifdef TARGET7x27A
     OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
-    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
+    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
 #endif
 #ifdef TARGET8x50
     OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
