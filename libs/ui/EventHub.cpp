@@ -814,6 +814,8 @@ int EventHub::openDevice(const char *deviceName) {
         // See if this is a keyboard.  Ignore everything in the button range except for
         // gamepads which are also considered keyboards.
         if (containsNonZeroByte(key_bitmask, 0, sizeof_bit_array(BTN_MISC))
+            || containsNonZeroByte(key_bitmask, sizeof_bit_array(BTN_MISC), 
+                                   sizeof_bit_array(BTN_9))
                 || containsNonZeroByte(key_bitmask, sizeof_bit_array(BTN_GAMEPAD),
                         sizeof_bit_array(BTN_DIGI))
                 || containsNonZeroByte(key_bitmask, sizeof_bit_array(KEY_OK),
