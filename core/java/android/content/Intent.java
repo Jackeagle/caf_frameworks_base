@@ -1835,8 +1835,6 @@ public class Intent implements Parcelable, Cloneable {
     public static final String ACTION_FM_TX =
             "android.intent.action.FMTX";
 
-    public static final String ACTION_ANALOG_FM =
-            "android.intent.action.ANALOG_FM";
     /**
      * Broadcast Action: An outgoing call is about to be placed.
      *
