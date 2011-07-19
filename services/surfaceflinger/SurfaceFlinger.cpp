@@ -109,6 +109,7 @@ SurfaceFlinger::SurfaceFlinger()
         mFullScreen(false),
         mOverlayUsed(false),
         mOverlayUseChanged(false),
+        mIsLayerBufferPresent(false),
         mOrigResSurfAbsent(true),
         mBypassState(eBypassNotInUse),
         mHDMIState(HDMIOUT_DISABLE)
@@ -995,14 +996,13 @@ void SurfaceFlinger::unlockPageFlip(const LayerVector& currentLayers)
     }
 }
 
-
 void SurfaceFlinger::handleRepaint()
 {
     // compute the invalid region
     mInvalidRegion.orSelf(mDirtyRegion);
     // Skip this check for original resolution  and layerbuffer surfaces, since MDP is
     // used for display and we want to ensure UI updates.
-    if (mInvalidRegion.isEmpty() && mOrigResSurfAbsent) {
+    if (mInvalidRegion.isEmpty() && mOrigResSurfAbsent && !mIsLayerBufferPresent) {
         // nothing to do
         return;
     }
@@ -1019,7 +1019,8 @@ void SurfaceFlinger::handleRepaint()
     uint32_t flags = hw.getFlags();
     //Enter block only if original resolution surface absent.
     //If present, ensures that the entire region is marked dirty.
-    if ((flags & DisplayHardware::SWAP_RECTANGLE && mOrigResSurfAbsent) ||
+    if ((flags & DisplayHardware::SWAP_RECTANGLE &&
+         !mIsLayerBufferPresent && mOrigResSurfAbsent) ||
         (flags & DisplayHardware::BUFFER_PRESERVED)) 
     {
         // we can redraw only what's dirty, but since SWAP_RECTANGLE only
@@ -1128,6 +1129,7 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 
     PostBufferSingleton::instance()->setPolicy(layerbuffercount);
 
+    mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
     mOrigResSurfAbsent = (0 == origResLayerCount);
 
     if (mOverlayOpt || (layerbuffercount == 1)) {
