@@ -1499,6 +1499,7 @@ public class Camera {
         private static final String PIXEL_FORMAT_YUV422I = "yuv422i-yuyv";
         private static final String PIXEL_FORMAT_RGB565 = "rgb565";
         private static final String PIXEL_FORMAT_JPEG = "jpeg";
+        private static final String PIXEL_FORMAT_YV12 = "yv12";
 
          //Values for Denoise
          public static final String DENOISE_OFF = "denoise-off";
@@ -2009,6 +2010,7 @@ public class Camera {
             case ImageFormat.YUY2:      return PIXEL_FORMAT_YUV422I;
             case ImageFormat.RGB_565:   return PIXEL_FORMAT_RGB565;
             case ImageFormat.JPEG:      return PIXEL_FORMAT_JPEG;
+            case ImageFormat.YV12:      return PIXEL_FORMAT_YV12;
             default:                    return null;
             }
         }
@@ -2034,6 +2036,8 @@ public class Camera {
 
             if (format.equals(PIXEL_FORMAT_JPEG))
                 return ImageFormat.JPEG;
+            if (format.equals(PIXEL_FORMAT_YV12))
+                return ImageFormat.YV12;
 
             return ImageFormat.UNKNOWN;
         }
