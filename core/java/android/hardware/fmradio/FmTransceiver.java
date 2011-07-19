@@ -476,6 +476,23 @@ public class FmTransceiver
    public void setNotchFilter(boolean value) {
 	FmReceiverJNI.setNotchFilterNative(value);
    }
+
+   /*==============================================================
+   FUNCTION:  SetAnalogMode
+   ==============================================================*/
+   /**
+    *    Enable/Disable the Analog lowpower mode.
+    *    <p>
+    *    This method enables/disables the analog lowpower mode.
+    *
+    */
+   public boolean setAnalogMode(boolean value) {
+        int re = FmReceiverJNI.setAnalogModeNative(value);
+        if (re == 1)
+            return true;
+        return false;
+   }
+
    /*==============================================================
    FUNCTION:  getInternalAntenna
    ==============================================================*/

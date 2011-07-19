@@ -368,6 +368,44 @@ static void android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative(JNIEnv *
     LOGE("init_success:%d after %d seconds \n", init_success, i);
 }
 
+
+/* native interface */
+static jint android_hardware_fmradio_FmReceiverJNI_setAnalogModeNative(JNIEnv * env, jobject thiz, jboolean aValue)
+{
+    int i=0;
+    char value = 0;
+    char firmwareVersion[80];
+
+    /*Enable/Disable Analog Mode FM*/
+    if (aValue) {
+        property_set("hw.fm.isAnalog", "true");
+    } else {
+        property_set("hw.fm.isAnalog", "false");
+    }
+
+    // If SOC is not yet initialised, skip downloading soc patches
+    property_get("hw.fm.version",firmwareVersion,"notset");
+    if ((0 == strcmp(firmwareVersion,"notset"))) {
+        LOGE("hw.fm.isAnalog : %s [soc not intialized yet] \n", firmwareVersion);
+        return 0;
+    }
+    property_set("hw.fm.mode","config_dac");
+    property_set("ctl.start", "fm_dl");
+    sleep(1);
+    for(i=0;i<2;i++) {
+        property_get("hw.fm.init", &value, NULL);
+        if(value == '1') {
+           return 1;
+        } else {
+            sleep(1);
+        }
+    }
+    return 0;
+}
+
+
+
+
 /*
  * Interfaces added for Tx
 */
@@ -615,7 +653,8 @@ static JNINativeMethod gMethods[] = {
             (void*)android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative},
         { "setTxPowerLevelNative", "(II)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_setTxPowerLevelNative},
-
+       { "setAnalogModeNative", "(Z)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_setAnalogModeNative},
 
 };
 
