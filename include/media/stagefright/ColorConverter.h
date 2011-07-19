@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum
+ * Copyright (c) 2010-2011, Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,25 +64,6 @@ private:
             const void *srcBits, size_t srcSkip,
             void *dstBits, size_t dstSkip);
 
-    void convertNV12Tile(
-        size_t width, size_t height,
-        const void *srcBits, size_t srcSkip,
-        void *dstBits, size_t dstSkip);
-
-    size_t nv12TileGetTiledMemBlockNum(
-        size_t bx, size_t by,
-        size_t nbx, size_t nby);
-
-    void nv12TileComputeRGB(
-        uint8_t **dstPtr,const uint8_t *blockUV,
-        const uint8_t *blockY, size_t blockWidth,
-        size_t dstSkip);
-
-    void nv12TileTraverseBlock(
-        uint8_t **dstPtr, const uint8_t *blockY,
-        const uint8_t *blockUV, size_t blockWidth,
-        size_t blockHeight, size_t dstSkip);
-
     void convertYUV420SemiPlanar32Aligned(
             size_t width, size_t height,
             const void *srcBits, size_t srcSkip,
@@ -92,6 +73,34 @@ private:
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);
 };
+
+
+
+enum ColorConvertFormat {
+    RGB565 = 1,
+    YCbCr420Tile
+};
+
+struct ColorConvertParams {
+    size_t width;
+    size_t height;
+
+    size_t cropWidth;
+    size_t cropHeight;
+
+    size_t cropLeft;
+    size_t cropRight;
+    size_t cropTop;
+    size_t cropBottom;
+
+    ColorConvertFormat colorFormat;
+    const void * data;
+
+    uint64_t flags;
+};
+
+int convert(ColorConvertParams src, ColorConvertParams dst,
+            uint8_t *adjustedClip);
 
 }  // namespace android
 
