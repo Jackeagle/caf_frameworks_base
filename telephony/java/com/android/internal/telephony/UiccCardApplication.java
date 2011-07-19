@@ -72,6 +72,8 @@ public class UiccCardApplication {
     private CommandsInterface mCi;
     private Context mContext;
 
+    Integer mSubscription = null; //to store subscription id
+
     private RegistrantList mReadyRegistrants = new RegistrantList();
     private RegistrantList mUnavailableRegistrants = new RegistrantList();
     private RegistrantList mLockedRegistrants = new RegistrantList();
@@ -743,6 +745,14 @@ public class UiccCardApplication {
      */
     public boolean getIccPuk2Blocked() {
         return mPin2State == PinState.PINSTATE_ENABLED_PERM_BLOCKED;
+    }
+
+    public void setSubscription(Integer subId) {
+        mSubscription = subId;
+    }
+
+    public int getSubscription() {
+        return (mSubscription != null ? mSubscription : 0);
     }
 
     private void log(String msg) {

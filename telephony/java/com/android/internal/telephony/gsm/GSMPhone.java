@@ -1561,12 +1561,14 @@ public class GSMPhone extends PhoneBase {
                     mSIMRecords = null;
                     mSimPhoneBookIntManager.updateSimRecords(null);
                 }
+                m3gppApplication.setSubscription(null);
                 m3gppApplication = null;
                 mSimCard = null;
             }
             if (new3gppApplication != null) {
                 Log.d(LOG_TAG, "New 3gpp application found");
                 m3gppApplication = new3gppApplication;
+                m3gppApplication.setSubscription(mSubscription);
                 mSimCard = new3gppApplication.getCard();
                 mSIMRecords = (SIMRecords) m3gppApplication.getApplicationRecords();
                 registerForSimRecordEvents();

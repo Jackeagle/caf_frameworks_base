@@ -1067,7 +1067,8 @@ public final class SIMRecords extends UiccApplicationRecords {
                 spnDisplayCondition = 0xff & data[0];
                 spn = IccUtils.adnStringFieldToString(data, 1, data.length - 1);
 
-                SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, spn);
+                TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_ALPHA,
+                        mParentApp.getSubscription(), spn);
 
                 // When device enters or exits Home Zone, certain operators update
                 // EF_SPN file. This helps to know if the device is in Home Zone or
@@ -1213,10 +1214,10 @@ public final class SIMRecords extends UiccApplicationRecords {
 
         // Some fields require more than one SIM record to set
         TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_NUMERIC,
-                                              ((RIL)mCi).getInstanceId(), operator);
+                mParentApp.getSubscription(), operator);
         if (mImsi != null) {
             TelephonyManager.setTelephonyProperty(PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
-                    ((RIL)mCi).getInstanceId(),
+                    mParentApp.getSubscription(),
                     MccTable.countryCodeForMcc(Integer.parseInt(mImsi.substring(0,3))));
         } else {
             Log.e("SIM", "[SIMRecords] onAllRecordsLoaded: imsi is NULL!");
