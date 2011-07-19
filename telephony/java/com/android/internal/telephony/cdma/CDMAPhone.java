@@ -1151,12 +1151,14 @@ public class CDMAPhone extends PhoneBase {
                     mRuimRecords = null;
                     mRuimPhoneBookInterfaceManager.updateRuimRecords(null);
                 }
+                m3gpp2Application.setSubscription(null);
                 m3gpp2Application = null;
                 mRuimCard = null;
             }
             if (new3gpp2Application != null) {
                 Log.d(LOG_TAG, "New 3gpp application found");
                 m3gpp2Application = new3gpp2Application;
+                m3gpp2Application.setSubscription(mSubscription);
                 mRuimCard = new3gpp2Application.getCard();
                 mRuimRecords = (RuimRecords) m3gpp2Application.getApplicationRecords();
                 mRuimPhoneBookInterfaceManager.updateRuimRecords(mRuimRecords);
