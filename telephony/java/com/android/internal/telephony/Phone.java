@@ -1517,12 +1517,11 @@ public interface Phone {
     /**
      * Enable QoS
      *
-     * @param transId Transaction ID for the request
      * @param qosSpec QosSpec requested
      * @param type Apn Type on which QoS is requested on
      * @return true on success, else false
      */
-    int enableQos(int transId, QosSpec qosSpec, String type);
+    int enableQos(QosSpec qosSpec, String type);
 
     /**
      * Disable QoS

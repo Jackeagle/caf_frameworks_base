@@ -1042,8 +1042,8 @@ public abstract class PhoneBase extends Handler implements Phone {
         return mDataConnection.disableApnType(type);
      }
 
-    public int enableQos(int transId, QosSpec qosSpec, String type) {
-        return mDataConnection.enableQos(transId, qosSpec, type);
+    public int enableQos(QosSpec qosSpec, String type) {
+        return mDataConnection.enableQos(qosSpec, type);
     }
 
     public int disableQos(int qosId) {

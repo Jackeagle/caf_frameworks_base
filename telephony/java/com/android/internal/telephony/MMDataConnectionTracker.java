@@ -1856,18 +1856,19 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     }
 
     @Override
-    public int enableQos(int transId, QosSpec qosSpec, String type) {
+    public int enableQos(QosSpec qosSpec, String type) {
         int result = Phone.QOS_REQUEST_FAILURE;
 
         DataServiceType serviceType = DataServiceType.apnTypeStringToServiceType(type);
 
         if (serviceType != null) {
-            Log.d(LOG_TAG, "enableQos: serviceType:" + serviceType + " transId: " + transId);
+            Log.d(LOG_TAG, "enableQos: serviceType:" + serviceType +
+                                        " userData:" + qosSpec.getUserData());
 
             // TODO: only supporting IPV4 now.
             DataConnection dc = mDpt.getActiveDataConnection(serviceType, IPVersion.INET);
             if (dc != null) {
-                dc.qosSetup(transId, qosSpec);
+                dc.qosSetup(qosSpec);
                 result = Phone.QOS_REQUEST_SUCCESS;
             }
         }
@@ -1900,8 +1901,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         DataConnection dc = mDpt.getActiveDataConnection(
                                     DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
         if (dc != null && dc.isValidQos(qosId)) {
-            // dc.modifyQos(qosId, qosSpec);
-            // result = Phone.QOS_REQUEST_SUCCESS;
+            dc.qosModify(qosId, qosSpec);
+            result = Phone.QOS_REQUEST_SUCCESS;
         }
 
         return result;
@@ -1916,8 +1917,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         DataConnection dc = mDpt.getActiveDataConnection(
                                     DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
         if (dc != null && dc.isValidQos(qosId)) {
-            // dc.qosSuspend(qosId);
-            // result = Phone.QOS_REQUEST_SUCCESS;
+            dc.qosSuspend(qosId);
+            result = Phone.QOS_REQUEST_SUCCESS;
         }
 
         return result;
@@ -1932,8 +1933,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         DataConnection dc = mDpt.getActiveDataConnection(
                                     DataServiceType.SERVICE_TYPE_DEFAULT, IPVersion.INET);
         if (dc != null && dc.isValidQos(qosId)) {
-            // dc.qosResume(qosId);
-            // result = Phone.QOS_REQUEST_SUCCESS;
+            dc.qosResume(qosId);
+            result = Phone.QOS_REQUEST_SUCCESS;
         }
 
         return result;

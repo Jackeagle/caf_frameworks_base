@@ -149,19 +149,6 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     }
 
     /**
-     * Used internally for saving qos parameters.
-     */
-    protected class QosConnectionParams {
-        public QosConnectionParams(int transId, QosSpec qosSpec) {
-            this.transId = transId;
-            this.qosSpec = qosSpec;
-        }
-
-        public int transId;
-        public QosSpec qosSpec;
-    }
-
-    /**
      * An instance used for notification of blockingReset. TODO: Remove when
      * blockingReset is removed.
      */
@@ -233,13 +220,13 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 
     protected abstract void onConnect(ConnectionParams cp);
 
-    protected abstract void onQosSetup(QosConnectionParams qp);
+    protected abstract void onQosSetup(QosSpec qosSpec);
 
     protected abstract void onQosRelease(int qosId);
 
     protected abstract void onQosGetStatus(int qosId);
 
-    protected abstract void onQosSetupDone(int transId, String[] responses, String error);
+    protected abstract void onQosSetupDone(int userData, String[] responses, String error);
 
     protected abstract void onQosReleaseDone(int qosId, String error);
 
@@ -704,7 +691,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      * The state machine is connected, expecting QoS requests
      */
     private class DcQosActiveState extends HierarchicalState {
-        private QosConnectionParams mQosConnParams = null;
+        private QosSpec qosSpec = null;
 
         @Override
         public void enter() {
@@ -726,8 +713,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 if (DBG)
                     log("DcQosActiveState msg.what=EVENT_QOS_ENABLE");
                 // Send out qosRequest
-                mQosConnParams = (QosConnectionParams) msg.obj;
-                onQosSetup(mQosConnParams);
+                qosSpec = (QosSpec) msg.obj;
+                onQosSetup(qosSpec);
                 retVal = true;
                 break;
             case EVENT_QOS_DISABLE:
@@ -760,8 +747,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 AsyncResult ar = (AsyncResult) msg.obj;
 
                 String responses[] = (String[])ar.result;
-                int transId = (Integer) ar.userObj;
-                onQosSetupDone(transId, responses, error);
+                int userData = (Integer) ar.userObj;
+                onQosSetupDone(userData, responses, error);
                 retVal = true;
                 break;
 
@@ -803,7 +790,6 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 //Release QoS for all flows
                 tearDownQos();
                 deferMessage(msg);
-                transitionTo(mActiveState);
                 retVal = true;
                 break;
 
@@ -957,9 +943,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         sendMessage(obtainMessage(EVENT_DISCONNECT, new DisconnectParams(onCompletedMsg)));
     }
 
-    public void qosSetup(int transId, QosSpec qosSpec) {
-        sendMessage(obtainMessage(EVENT_QOS_ENABLE, new QosConnectionParams(transId,
-                qosSpec)));
+    public void qosSetup(QosSpec qosSpec) {
+        sendMessage(obtainMessage(EVENT_QOS_ENABLE, qosSpec));
     }
 
     public void qosRelease(int qosId) {
