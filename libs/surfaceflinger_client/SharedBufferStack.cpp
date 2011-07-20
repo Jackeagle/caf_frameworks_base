@@ -67,8 +67,8 @@ SharedClientTryLock::SharedClientTryLock(Mutex& m) :
    }
    // we could not get the lock, LOGE here.
    if(!locked()) {
-      LOGD("SharedBufferBase::updateCondition could not acquire lock "
-           "within 1sec giving up");
+      LOGE("SharedBufferBase::updateCondition could not acquire lock "
+           "within 0.5 sec giving up. (non fatal)");
    }
 }
 
