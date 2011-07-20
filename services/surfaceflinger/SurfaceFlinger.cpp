@@ -1103,11 +1103,6 @@ void SurfaceFlinger::freeBypassBuffers(bool clearOverlayFlag)
 
 void SurfaceFlinger::composeSurfaces(const Region& dirty)
 {
-    if (UNLIKELY(!mWormholeRegion.isEmpty())) {
-        // should never happen unless the window manager has a bug
-        // draw something...
-        drawWormhole();
-    }
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
     const size_t count = layers.size();
     int compcount = 0, layerbuffercount = 0, layerbufferIndex = -1;
@@ -1185,7 +1180,6 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     mFullScreen = true;
                     mOverlayUsed = true;
                     layer->setBufferInUse();
-                    return;
                 }
                 else if (err != NO_INIT) {
                     if (!mOverlayUsed) {
@@ -1197,7 +1191,15 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         }
     }
 
-    mFullScreen = false;
+    if (UNLIKELY(!mWormholeRegion.isEmpty()) && !mFullScreen) {
+        // should never happen unless the window manager has a bug
+        // draw something...
+        // For full screen mode, never draw the wormhole
+            drawWormhole();
+    }
+    if(mFullScreen)
+        return;
+
     if (mOverlayUsed && !s3dLayerCount && !origResLayerCount
             && layerbuffercount != 1) {
         mOverlayUsed = false;
@@ -1311,7 +1313,6 @@ void SurfaceFlinger::drawWormhole() const
             glScissor(r.left, sy, r.width(), r.height());
             glClear(GL_COLOR_BUFFER_BIT);
         }
-        glFinish();
     } else {
         const GLshort vertices[][2] = { { 0, 0 }, { width, 0 },
                 { width, height }, { 0, height }  };
