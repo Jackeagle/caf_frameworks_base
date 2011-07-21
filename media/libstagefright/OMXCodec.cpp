@@ -3501,6 +3501,49 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
         return;
     }
 
+    // Pass SPS+PPS packets or other codec-specific data as separate buffers,
+    // except when using OMX.TI.DUCATI.VIDDEC
+    if (strcmp("OMX.TI.DUCATI.VIDDEC", mComponentName)) {
+        if (mCodecSpecificDataIndex < mCodecSpecificData.size()) {
+            const CodecSpecificData *specific =
+                mCodecSpecificData[mCodecSpecificDataIndex];
+
+            size_t size = specific->mSize;
+
+            if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mMIME)
+                    && !(mQuirks & kWantsNALFragments)) {
+                static const uint8_t kNALStartCode[4] =
+                        { 0x00, 0x00, 0x00, 0x01 };
+
+                CHECK(info->mSize >= specific->mSize + 4);
+
+                size += 4;
+
+                memcpy(info->mData, kNALStartCode, 4);
+                memcpy((uint8_t *)info->mData + 4,
+                       specific->mData, specific->mSize);
+            } else {
+                CHECK(info->mSize >= specific->mSize);
+                memcpy(info->mData, specific->mData, specific->mSize);
+            }
+
+            mNoMoreOutputData = false;
+
+            CODEC_LOGV("calling emptyBuffer with codec specific data");
+
+            status_t err = mOMX->emptyBuffer(
+                    mNode, info->mBuffer, 0, size,
+                    OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_CODECCONFIG,
+                    0);
+            CHECK_EQ(err, OK);
+
+            info->mOwnedByComponent = true;
+
+            ++mCodecSpecificDataIndex;
+            return;
+        }
+    }
+
     if (mPaused) {
         return;
     }
@@ -3617,35 +3660,40 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
                 info->mMediaBuffer = srcBuffer;
             }
 
-            while (mCodecSpecificDataIndex < mCodecSpecificData.size()) {
-                const CodecSpecificData *specific =
-                    mCodecSpecificData[mCodecSpecificDataIndex];
+            // For OMX.TI.DUCATI.VIDDEC, pass SPS+PPS or other codec data with
+            // the first I-frame.
+            if (!strcmp("OMX.TI.DUCATI.VIDDEC", mComponentName)) {
+                while (mCodecSpecificDataIndex < mCodecSpecificData.size()) {
+                    const CodecSpecificData *specific =
+                        mCodecSpecificData[mCodecSpecificDataIndex];
 
-                size_t size = specific->mSize;
+                    size_t size = specific->mSize;
 
-                if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mMIME)
-                        && !(mQuirks & kWantsNALFragments)) {
-                    static const uint8_t kNALStartCode[4] =
-                            { 0x00, 0x00, 0x00, 0x01 };
+                    if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mMIME)
+                            && !(mQuirks & kWantsNALFragments)) {
+                        static const uint8_t kNALStartCode[4] =
+                                { 0x00, 0x00, 0x00, 0x01 };
 
-                    CHECK(info->mSize >= specific->mSize + 4 + offset);
+                        CHECK(info->mSize >= specific->mSize + 4 + offset);
 
-                    memcpy(info->mData + offset, kNALStartCode, 4);
-                    offset += 4;
-                    size   += 4;
+                        memcpy((uint8_t*)info->mData + offset,
+                            kNALStartCode, 4);
+                        offset += 4;
+                        size   += 4;
 
-                    memcpy((uint8_t *)info->mData + offset,
-                           specific->mData, specific->mSize);
-                    offset += specific->mSize;
+                        memcpy((uint8_t *)info->mData + offset,
+                               specific->mData, specific->mSize);
+                        offset += specific->mSize;
+                    }
+
+                    passedCodecSpecificData = true;
+                    CODEC_LOGV("adding codec specific data to input buffer");
+
+                    ++mCodecSpecificDataIndex;
                 }
 
-                passedCodecSpecificData = true;
-                CODEC_LOGV("adding codec specific data to input buffer");
-
-                ++mCodecSpecificDataIndex;
+                CHECK(info->mSize >= offset + srcBuffer->range_length());
             }
-
-            CHECK(info->mSize >= offset + srcBuffer->range_length());
             memcpy((uint8_t *)info->mData + offset,
                     (const uint8_t *)srcBuffer->data() + srcBuffer->range_offset(),
                     srcBuffer->range_length());
