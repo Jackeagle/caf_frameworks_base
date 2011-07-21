@@ -215,7 +215,7 @@ static sp<MediaSource> InstantiateSoftwareCodec(
 #undef FACTORY_REF
 #undef FACTORY_CREATE
 
-#ifdef defined(TARGET_OMAP4) && defined(HARDWARE_OMX)
+#if defined(TARGET_OMAP4) && defined(HARDWARE_OMX)
 //Enable Ducati Codecs for Video, PV SW codecs for Audio
 static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_AUDIO_MPEG, "MP3Decoder" },
