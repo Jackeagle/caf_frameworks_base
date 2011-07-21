@@ -2298,22 +2298,25 @@ status_t OMXCodec::setVideoOutputFormat(
             def.nBufferCountActual = def.nBufferCountMin + (2 * NUM_BUFFERS_TO_BE_QUEUED_FOR_OPTIMAL_PERFORMANCE);
     }
 #endif
-    video_def->nFrameWidth           = width;
-    video_def->nFrameHeight          = height;
-    def.nBufferCountMin              = 1;
-    def.nBufferCountActual           = 8;
-    def.bEnabled                     = OMX_TRUE;
-    def.bPopulated                   = OMX_FALSE;
-    def.bBuffersContiguous           = OMX_FALSE;
-    def.nBufferAlignment             = 0x0;
-    video_def->cMIMEType             = "H264";
-    video_def->pNativeRender         = NULL;
-    video_def->nStride               = ((width + (2 * 32) + 127) & 0xFFFFFF80);
-    video_def->nSliceHeight          = 0;
-    video_def->xFramerate            = 60 << 16;
-    video_def->bFlagErrorConcealment = OMX_FALSE;
-    video_def->eCompressionFormat    = OMX_VIDEO_CodingUnused;
-    video_def->eColorFormat          = OMX_COLOR_FormatYUV420SemiPlanar;
+    video_def->nFrameWidth = width;
+    video_def->nFrameHeight = height;
+
+    if (!strcmp("OMX.TI.DUCATI.VIDDEC", mComponentName)) {
+        def.nBufferCountMin              = 1;
+        def.nBufferCountActual           = 8;
+        def.bEnabled                     = OMX_TRUE;
+        def.bPopulated                   = OMX_FALSE;
+        def.bBuffersContiguous           = OMX_FALSE;
+        def.nBufferAlignment             = 0x0;
+        video_def->cMIMEType             = "H264";
+        video_def->pNativeRender         = NULL;
+        video_def->nStride               = ((width + 64 + 0x7F) & ~0x7F);
+        video_def->nSliceHeight          = 0;
+        video_def->xFramerate            = 60 << 16;
+        video_def->bFlagErrorConcealment = OMX_FALSE;
+        video_def->eCompressionFormat    = OMX_VIDEO_CodingUnused;
+        video_def->eColorFormat          = OMX_COLOR_FormatYUV420SemiPlanar;
+    }
 
     err = mOMX->setParameter(
             mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
