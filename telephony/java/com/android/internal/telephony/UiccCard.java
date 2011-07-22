@@ -115,6 +115,7 @@ public class UiccCard extends Handler{
     public synchronized void dispose() {
         mDestroyed = true;
 
+        mCardState = CardState.ABSENT;
         mUiccRecords.dispose();
         mUiccRecords = null;
         if (mCatService != null) {
@@ -127,6 +128,7 @@ public class UiccCard extends Handler{
         }
         mUiccApplications = null;
         mUnavailableRegistrants.notifyRegistrants();
+        mAbsentRegistrants.notifyRegistrants();
     }
 
     public UiccManager getUiccManager() {
