@@ -116,6 +116,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int MESSAGE_START_DUN_SERVER = 6;
     private static final int MESSAGE_GATT_INTENT = 7;
     private static final int MESSAGE_GATT_CHARACTERISTICS_DISCOVERY = 8;
+    private static final int MESSAGE_START_SAP_SERVER = 9;
 
     // The time (in millisecs) to delay the pairing attempt after the first
     // auto pairing attempt fails. We use an exponential delay with
@@ -136,6 +137,17 @@ public class BluetoothService extends IBluetooth.Stub {
     // The timeout used to sent the GATT services Intent
     // This timeout should be greater than the page timeout
     private static final int GATT_INTENT_DELAY = 6000;
+
+    public static final String SAP_AUTHORIZE_INTENT =
+            "com.android.bluetooth.sap.accessrequest";
+    public static final String SAP_STATECHANGE_INTENT =
+            "com.android.bluetooth.sap.statechanged";
+    public static final String SAP_ACCESS_ALLOWED_ACTION =
+            "com.android.bluetooth.sap.accessallowed";
+    public static final String SAP_EXTRA_ALWAYS_ALLOWED =
+            "com.android.bluetooth.sap.alwaysallowed";
+    public static final String SAP_ACCESS_DISALLOWED_ACTION =
+            "com.android.bluetooth.sap.accessdisallowed";
 
     /** Always retrieve RFCOMM channel for these SDP UUIDs */
     private static final ParcelUuid[] RFCOMM_UUIDS = {
@@ -175,6 +187,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static String mDockAddress;
     private String mDockPin;
     private boolean mDUNenable = false;
+    private boolean mSAPenable = false;
     private boolean mFTPenable = false;
 
     private static class RemoteService {
@@ -255,6 +268,8 @@ public class BluetoothService extends IBluetooth.Stub {
         filter.addAction(BluetoothA2dp.ACTION_SINK_STATE_CHANGED);
 
         filter.addAction(Intent.ACTION_DOCK_EVENT);
+        filter.addAction(SAP_ACCESS_ALLOWED_ACTION);
+        filter.addAction(SAP_ACCESS_DISALLOWED_ACTION);
         mContext.registerReceiver(mReceiver, filter);
     }
 
@@ -404,6 +419,10 @@ public class BluetoothService extends IBluetooth.Stub {
             SystemService.stop("bt-dun");
         }
 
+        if (mSAPenable == true) {
+            Log.d(TAG, "Stopping BT SAP server");
+            SystemService.stop("bt-sap");
+        }
         mEventLoop.stop();
         tearDownNativeDataNative();
         disableNative();
@@ -475,6 +494,9 @@ public class BluetoothService extends IBluetooth.Stub {
         }
         if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.ftp", false)) {
             mFTPenable = true;
+        }
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.sap", false)) {
+            mSAPenable = true;
         }
         setBluetoothState(BluetoothAdapter.STATE_TURNING_ON);
         mEnableThread = new EnableThread(saveSetting);
@@ -569,7 +591,20 @@ public class BluetoothService extends IBluetooth.Stub {
                         Log.d(TAG, "Registering ftp record");
                         SystemService.start("ftp");
                     }
+                    mHandler.sendMessageDelayed(
+                            mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 8, -1), 500);
                     break;
+                case 8:
+                    Log.d(TAG, "Registering map record instance id 1");
+                    SystemService.start("mapOne");
+                    mHandler.sendMessageDelayed(
+                           mHandler.obtainMessage(MESSAGE_REGISTER_SDP_RECORDS, 9, -1), 500);
+                    break;
+                case 9:
+                   if (mSAPenable == true) {
+                       Log.d(TAG, "Registering SAP record");
+                       SystemService.start("sapd");
+                   }
                 }
                 break;
             case MESSAGE_FINISH_DISABLE:
@@ -616,6 +651,11 @@ public class BluetoothService extends IBluetooth.Stub {
                     makeDiscoverCharacteristicsCallback(path);
                 }
                 break;
+            case MESSAGE_START_SAP_SERVER:
+                if (mSAPenable == true) {
+                    Log.d(TAG, "Starting BT-SAP server");
+                    SystemService.start("bt-sap");
+                }
             }
         }
     };
@@ -670,6 +710,11 @@ public class BluetoothService extends IBluetooth.Stub {
                 if (mDUNenable == true) {
                     mHandler.sendMessage(
                             mHandler.obtainMessage(MESSAGE_START_DUN_SERVER));
+                }
+
+                if (mSAPenable == true) {
+                    mHandler.sendMessage(
+                            mHandler.obtainMessage(MESSAGE_START_SAP_SERVER));
                 }
 
                 mHandler.sendMessageDelayed(
@@ -1980,6 +2025,24 @@ public class BluetoothService extends IBluetooth.Stub {
         return setPinNative(address, pinString, data.intValue());
     }
 
+    public synchronized boolean sapAuthorize(String address, boolean access) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
+                                                "Need BLUETOOTH_ADMIN permission");
+        if (!isEnabledInternal()) return false;
+
+
+        address = address.toUpperCase();
+        Integer data = mEventLoop.getAuthorizationRequestData().remove(address);
+        if (data == null) {
+            Log.w(TAG, "sapAuthorize(" + address + ") called but no native data available, " +
+                  "ignoring. Maybe the PasskeyAgent Request was cancelled by the remote device" +
+                  " or by bluez.\n");
+            return false;
+        }
+
+        return sapAuthorizeNative(address, access, data.intValue());
+    }
+
     public synchronized boolean setPasskey(String address, int passkey) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                                                 "Need BLUETOOTH_ADMIN permission");
@@ -2302,6 +2365,19 @@ public class BluetoothService extends IBluetooth.Stub {
             } else if (BluetoothA2dp.ACTION_SINK_STATE_CHANGED.equals(action)) {
                 BluetoothA2dp btA2dp = new BluetoothA2dp(context);
                 mConnectionManager.setA2dpAudioActive(btA2dp.isPlayingSink());
+            } else if (SAP_ACCESS_ALLOWED_ACTION.equals(action)) {
+                Log.i(TAG, "Received SAP_ACCESS_ALLOWED_ACTION");
+                String address = intent.getStringExtra("address");
+                boolean alwaysAllow = intent.getBooleanExtra(SAP_EXTRA_ALWAYS_ALLOWED, false);
+                sapAuthorize(address, true);
+                if (alwaysAllow) {
+                    Log.i(TAG, "Setting trust state to true");
+                    setTrust(address,true);
+                }
+            } else if (SAP_ACCESS_DISALLOWED_ACTION.equals(action)) {
+                Log.i(TAG, "Received SAP_ACCESS_DISALLOWED_ACTION");
+                String address = intent.getStringExtra("address");
+                sapAuthorize(address, false);
             }
         }
     };
@@ -2960,6 +3036,12 @@ public class BluetoothService extends IBluetooth.Stub {
         return ret;
    }
 
+   public synchronized void disconnectSap() {
+        Log.d(TAG, "disconnectSap");
+        int res = disConnectSapNative();
+        Log.d(TAG, "disconnectSap returns -" + res);
+        return;
+   }
 
     private native static void classInitNative();
     private native void initializeNativeDataNative();
@@ -2994,6 +3076,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
     private native boolean cancelPairingUserInputNative(String address, int nativeData);
     private native boolean setPinNative(String address, String pin, int nativeData);
+    private native boolean sapAuthorizeNative(String address, boolean access, int nativeData);
     private native boolean setPasskeyNative(String address, int passkey, int nativeData);
     private native boolean setPairingConfirmationNative(String address, boolean confirm,
             int nativeData);
@@ -3016,4 +3099,5 @@ public class BluetoothService extends IBluetooth.Stub {
     private native Object[] getCharacteristicPropertiesNative(String path);
     private native boolean registerCharacteristicsWatcherNative(String path);
     private native boolean deregisterCharacteristicsWatcherNative(String path);
+    private native int disConnectSapNative();
 }

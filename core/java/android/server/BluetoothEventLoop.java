@@ -28,6 +28,8 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.ParcelUuid;
 import android.util.Log;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
 
 import java.util.HashMap;
 import java.util.Set;
@@ -49,6 +51,7 @@ class BluetoothEventLoop {
     private boolean mInterrupted;
 
     private final HashMap<String, Integer> mPasskeyAgentRequestData;
+    private final HashMap<String, Integer> mAuthorizationRequestData;
     private final BluetoothService mBluetoothService;
     private final BluetoothAdapter mAdapter;
     private final Context mContext;
@@ -115,6 +118,7 @@ class BluetoothEventLoop {
         mBluetoothService = bluetoothService;
         mContext = context;
         mPasskeyAgentRequestData = new HashMap();
+        mAuthorizationRequestData = new HashMap();
         mAdapter = adapter;
         initializeNativeDataNative();
     }
@@ -129,6 +133,10 @@ class BluetoothEventLoop {
 
     /* package */ HashMap<String, Integer> getPasskeyAgentRequestData() {
         return mPasskeyAgentRequestData;
+    }
+
+    /* package */ HashMap<String, Integer> getAuthorizationRequestData() {
+        return mAuthorizationRequestData;
     }
 
     /* package */ void start() {
@@ -408,6 +416,24 @@ class BluetoothEventLoop {
         }
     }
 
+    private String checkAuthorizationRequestAndGetAddress(String objectPath, int nativeData) {
+        String address = mBluetoothService.getAddressFromObjectPath(objectPath);
+        if (address == null) {
+            Log.e(TAG, "Unable to get device address in checkAuthorizationRequestAndGetAddress, " +
+                  "returning null");
+            return null;
+        }
+        address = address.toUpperCase();
+        mAuthorizationRequestData.put(address, new Integer(nativeData));
+
+        if (mBluetoothService.getBluetoothState() == BluetoothAdapter.STATE_TURNING_OFF) {
+            // shutdown path
+            mBluetoothService.sapAuthorize(address, false);
+            return null;
+        }
+        return address;
+    }
+
     private String checkPairingRequestAndGetAddress(String objectPath, int nativeData) {
         String address = mBluetoothService.getAddressFromObjectPath(objectPath);
         if (address == null) {
@@ -483,10 +509,45 @@ class BluetoothEventLoop {
         return;
     }
 
-    private void onRequestPinCode(String objectPath, int nativeData) {
+    private void onSapAuthorize(String objectPath, String uuid, int nativeData) {
+        Log.i(TAG, "onSapAuthorize" + objectPath + uuid);
+        String address = checkAuthorizationRequestAndGetAddress(objectPath, nativeData);
+        if (address == null) {
+            Log.e(TAG, "address is null");
+            return;
+        }
+        Intent intent = new Intent(BluetoothService.SAP_AUTHORIZE_INTENT);
+        intent.putExtra("name", mBluetoothService.getRemoteName(address));
+        intent.putExtra("address", address);
+        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+
+    }
+    private void onSapStateChanged(String objectPath, String state, int nativeData) {
+        Log.i(TAG, "onSapStateChanged" + objectPath + state);
+
+        String address = mBluetoothService.getAddressFromObjectPath(objectPath);
+        if (address == null) {
+            Log.e(TAG, "Unable to get device address , " +
+                  "returning null");
+            return;
+        }
+        address = address.toUpperCase();
+
+        int sapState;
+        if(state.equals("Connected")) {
+                sapState = 1;
+        } else  {
+                sapState = 0;
+        }
+        Intent intent = new Intent(BluetoothService.SAP_STATECHANGE_INTENT);
+        intent.putExtra(BluetoothDevice.EXTRA_DEVICE,  mAdapter.getRemoteDevice(address));
+        intent.putExtra("state", sapState);
+        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+    }
+    private void onRequestPinCode(String objectPath, int nativeData, boolean secure) {
         String address = checkPairingRequestAndGetAddress(objectPath, nativeData);
         if (address == null) return;
-
+        Log.i(TAG, "Secure pairing is "+ secure);
         String pendingOutgoingAddress =
                 mBluetoothService.getPendingOutgoingBonding();
         if (address.equals(pendingOutgoingAddress)) {
@@ -515,6 +576,7 @@ class BluetoothEventLoop {
         Intent intent = new Intent(BluetoothDevice.ACTION_PAIRING_REQUEST);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.PAIRING_VARIANT_PIN);
+        intent.putExtra(BluetoothDevice.EXTRA_SECURE_PAIRING, secure);
         mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
         if (mHandler.hasMessages(EVENT_PAIRING_TIMEOUT)) {
             Log.d(TAG, "Ther is EVENT_PAIRING_TIMEOUT message");

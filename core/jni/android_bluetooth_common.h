@@ -125,6 +125,15 @@ DBusMessage * dbus_func_args(JNIEnv *env,
                              int first_arg_type,
                              ...);
 
+DBusMessage * dbus_func_args_generic(JNIEnv *env,
+                             DBusConnection *conn,
+                             const char *service,
+                             const char *path,
+                             const char *ifc,
+                             const char *func,
+                             int first_arg_type,
+                             ...);
+
 DBusMessage * dbus_func_args_error(JNIEnv *env,
                                    DBusConnection *conn,
                                    DBusError *err,
@@ -147,6 +156,18 @@ DBusMessage * dbus_func_args_timeout_valist(JNIEnv *env,
                                             DBusConnection *conn,
                                             int timeout_ms,
                                             DBusError *err,
+                                            const char *path,
+                                            const char *ifc,
+                                            const char *func,
+                                            int first_arg_type,
+                                            va_list args);
+
+
+DBusMessage * dbus_func_args_generic_timeout_valist(JNIEnv *env,
+                                            DBusConnection *conn,
+                                            int timeout_ms,
+                                            DBusError *err,
+                                            const char *service,
                                             const char *path,
                                             const char *ifc,
                                             const char *func,
