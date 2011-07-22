@@ -770,7 +770,7 @@ bool AudioGroup::DeviceThread::threadLoop()
     if (AudioTrack::getMinFrameCount(&output, AudioSystem::VOICE_CALL,
         sampleRate) != NO_ERROR || output <= 0 ||
         AudioRecord::getMinFrameCount(&input, sampleRate,
-        AudioSystem::PCM_16_BIT, 1) != NO_ERROR || input <= 0) {
+        AudioSystem::VOIP_PCM_INPUT, 1) != NO_ERROR || input <= 0) {
         LOGE("cannot compute frame count");
         return false;
     }
@@ -938,7 +938,7 @@ void add(JNIEnv *env, jobject thiz, jint mode,
     if (!group) {
         int mode = env->GetIntField(thiz, gMode);
         group = new AudioGroup;
-        if (!group->set(8000, 256) || !group->setMode(mode)) {
+        if (!group->set(sampleRate, sampleCount) || !group->setMode(mode)) {
             jniThrowException(env, "java/lang/IllegalStateException",
                 "cannot initialize audio group");
             goto error;

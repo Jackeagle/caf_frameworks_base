@@ -50,6 +50,17 @@ status_t AudioTrack::getMinFrameCount(
         int streamType,
         uint32_t sampleRate)
 {
+
+    if(streamType == AudioSystem::VOICE_CALL) {
+        LOGV("AudioTrack :: getMinFramecount voice call \n");
+        if(sampleRate == 8000) {
+            *frameCount = 160;
+        } else if (sampleRate == 16000) {
+            *frameCount = 320;
+        }
+        return NO_ERROR;
+    }
+
     int afSampleRate;
     if (AudioSystem::getOutputSamplingRate(&afSampleRate, streamType) != NO_ERROR) {
         return NO_INIT;
