@@ -92,7 +92,7 @@ class ColorFormatInfo {
                 return preferredColorFormat[REMOTE];
             } else {
                 if(!strcmp(colorformat, "yamato")) {
-                    return preferredColorFormat[REMOTE];
+                    return QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka;
                 }
                 return preferredColorFormat[LOCAL];
             }
@@ -114,7 +114,7 @@ const int32_t ColorFormatInfo::preferredColorFormat[] = {
 #endif
 #ifdef TARGET7x27A
     OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
-    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+    OMX_QCOM_COLOR_FormatYVU420SemiPlanar
 #endif
 #ifdef TARGET8x50
     OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
