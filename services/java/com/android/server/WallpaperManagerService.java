@@ -654,6 +654,7 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
             out.endTag(null, "wp");
 
             out.endDocument();
+            stream.getFD().sync();
             stream.close();
             journal.commit();
         } catch (IOException e) {
