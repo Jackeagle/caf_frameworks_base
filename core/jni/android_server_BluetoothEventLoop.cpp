@@ -31,7 +31,6 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include <cutils/properties.h>
 #ifdef HAVE_BLUETOOTH
 #include <dbus/dbus.h>
 #endif
@@ -41,7 +40,6 @@ namespace android {
 #define CREATE_DEVICE_ALREADY_EXISTS 1
 #define CREATE_DEVICE_SUCCESS 0
 #define CREATE_DEVICE_FAILED -1
-#define SAP_UUID "0000112D-0000-1000-8000-00805F9B34FB"
 
 #ifdef HAVE_BLUETOOTH
 static jfieldID field_mNativeData;
@@ -71,9 +69,6 @@ static jmethodID method_onRequestOobData;
 static jmethodID method_onAgentOutOfBandDataAvailable;
 static jmethodID method_onAgentAuthorize;
 static jmethodID method_onAgentCancel;
-static jmethodID method_onSapAuthorize;
-static jmethodID method_onSapStateChanged;
-
 
 typedef event_loop_native_data_t native_data_t;
 
@@ -122,10 +117,6 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_onAgentAuthorize = env->GetMethodID(clazz, "onAgentAuthorize",
                                                "(Ljava/lang/String;Ljava/lang/String;)Z");
-    method_onSapAuthorize = env->GetMethodID(clazz, "onSapAuthorize",
-                                               "(Ljava/lang/String;Ljava/lang/String;I)V");
-    method_onSapStateChanged = env->GetMethodID(clazz, "onSapStateChanged",
-                                               "(Ljava/lang/String;Ljava/lang/String;I)V");
     method_onAgentOutOfBandDataAvailable = env->GetMethodID(clazz, "onAgentOutOfBandDataAvailable",
                                                "(Ljava/lang/String;)Z");
     method_onAgentCancel = env->GetMethodID(clazz, "onAgentCancel", "()V");
@@ -272,14 +263,6 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             LOG_AND_FREE_DBUS_ERROR(&err);
             return JNI_FALSE;
         }
-        dbus_bus_add_match(nat->conn,
-                "type='signal',interface='org.qcom.sap'",
-                &err);
-        if (dbus_error_is_set(&err)) {
-            LOGE("Not able to register to get the org.qcom.sap");
-            LOG_AND_FREE_DBUS_ERROR(&err);
-            return JNI_FALSE;
-        }
 
         const char *agent_path = "/android/bluetooth/agent";
         const char *capabilities = "DisplayYesNo";
@@ -361,9 +344,6 @@ static int register_agent(native_data_t *nat,
     DBusMessage *msg, *reply;
     DBusError err;
     bool oob = TRUE;
-    const char *sender = NULL;
-    char sender_conn[PROPERTY_VALUE_MAX];
-    char value[PROPERTY_VALUE_MAX];
 
     if (!dbus_connection_register_object_path(nat->conn, agent_path,
             &agent_vtable, nat)) {
@@ -391,15 +371,7 @@ static int register_agent(native_data_t *nat,
     dbus_error_init(&err);
     reply = dbus_connection_send_with_reply_and_block(nat->conn, msg, -1, &err);
     dbus_message_unref(msg);
-    sender = dbus_bus_get_unique_name(nat->conn);
-    LOGV("Sender is %s", sender);
-    if (sender != NULL) {
-               strcpy(sender_conn, sender);
-               sender_conn[strlen(sender)]='\0';
-               LOGV("Sender conn is %s", sender_conn);
-               int ret = property_set("bluetooth.eventloop.dbus", sender_conn);
-               LOGV("Ret is %d", ret);
-    }
+
     if (!reply) {
         LOGE("%s: Can't register agent!", __FUNCTION__);
         if (dbus_error_is_set(&err)) {
@@ -936,24 +908,6 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                             method_onDeviceDisconnectRequested,
                             env->NewStringUTF(remote_device_path));
         goto success;
-    }  else if (dbus_message_is_signal(msg,
-                                      "org.qcom.sap",
-                                      "SapStateChanged")) {
-        const char *remote_device_path = dbus_message_get_path(msg);
-        const char *state;
-        LOGV("Got the SAP state changed :dev: %s \n", remote_device_path );
-        if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_OBJECT_PATH, &remote_device_path,
-                                   DBUS_TYPE_STRING, &state,
-                                   DBUS_TYPE_INVALID)) {
-            LOGE("%s: Invalid arguments for SapStateChanged() method", __FUNCTION__);
-        }
-        LOGV("<SAP>SapState: %s\n", state);
-        env->CallVoidMethod(nat->me, method_onSapStateChanged,
-                                       env->NewStringUTF(remote_device_path),
-                                       env->NewStringUTF(state),
-                                       int(msg));
-        goto success;
     }
 
     ret = a2dp_event_filter(msg, env);
@@ -1009,15 +963,7 @@ DBusHandlerResult agent_event_filter(DBusConnection *conn,
 
         LOGV("... object_path = %s", object_path);
         LOGV("... uuid = %s", uuid);
-        if (!strcmp(uuid, SAP_UUID)) {
-            LOGV("Received SAP authorization request");
-            dbus_message_ref(msg);  // increment refcount because we pass to java
-            env->CallVoidMethod(nat->me, method_onSapAuthorize,
-                                       env->NewStringUTF(object_path),
-                                       env->NewStringUTF(uuid),
-                                       int(msg));
-            goto success;
-        }
+
         bool auth_granted =
             env->CallBooleanMethod(nat->me, method_onAgentAuthorize,
                 env->NewStringUTF(object_path), env->NewStringUTF(uuid));
@@ -1082,20 +1028,17 @@ DBusHandlerResult agent_event_filter(DBusConnection *conn,
     } else if (dbus_message_is_method_call(msg,
             "org.bluez.Agent", "RequestPinCode")) {
         char *object_path;
-        dbus_bool_t secure;
         if (!dbus_message_get_args(msg, NULL,
                                    DBUS_TYPE_OBJECT_PATH, &object_path,
-                                   DBUS_TYPE_BOOLEAN, &secure,
                                    DBUS_TYPE_INVALID)) {
             LOGE("%s: Invalid arguments for RequestPinCode() method", __FUNCTION__);
             goto failure;
         }
-        LOGV("Secure Pairing %d", secure);
 
         dbus_message_ref(msg);  // increment refcount because we pass to java
         env->CallVoidMethod(nat->me, method_onRequestPinCode,
                                        env->NewStringUTF(object_path),
-                                       int(msg), secure);
+                                       int(msg));
         goto success;
     } else if (dbus_message_is_method_call(msg,
             "org.bluez.Agent", "RequestPasskey")) {
