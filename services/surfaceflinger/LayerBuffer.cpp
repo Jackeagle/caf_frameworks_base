@@ -576,6 +576,17 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
         return INVALID_OPERATION;
     if (!ov->setCrop(0, 0, src.crop.r, src.crop.b))
         return INVALID_OPERATION;
+    int orientation = Transform::ROT_0;
+    bool ret = false;
+    if (ret = ov->getOrientation(orientation)) {
+        if (orientation != finalTransform.getOrientation()) {
+            ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
+        }
+    }
+    else
+        ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
+    if (!ret)
+        return INVALID_OPERATION;
     const Rect bounds(mLayer.mTransformedBounds);
     int x = bounds.left;
     int y = bounds.top;
@@ -583,7 +594,7 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
     int h = bounds.height();
     int ovpos_x, ovpos_y;
     uint32_t ovpos_w, ovpos_h;
-    bool ret = ov->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h);
+    ret = ov->getPosition(ovpos_x, ovpos_y, ovpos_w, ovpos_h);
     if (ret) {
         if ((ovpos_x != x) || (ovpos_y != y) || (ovpos_w != w) || (ovpos_h != h)) {
             ret = ov->setPosition(x, y, w, h);
@@ -601,16 +612,7 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
       mLayer.onQueueBuf();
       return INVALID_OPERATION;
     }
-    int orientation;
-    if (ret = ov->getOrientation(orientation)) {
-        if (orientation != finalTransform.getOrientation()) {
-            ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
-        }
-    }
-    else
-        ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
-    if (!ret)
-        return INVALID_OPERATION;
+
     ret = ov->queueBuffer(src.img.handle);
     if (!ret)
         return INVALID_OPERATION;
