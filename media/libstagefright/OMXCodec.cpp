@@ -4125,10 +4125,14 @@ status_t OMXCodec::read(
         mSeekTimeUs = seekTimeUs;
         mSeekMode = seekMode;
 
-        mFilledBuffers.clear();
+        if(mState != EXECUTING && mState != RECONFIGURING){
+           LOGE("Seek is issued in a invalid state");
+           return INVALID_OPERATION;
+        }
 
-        CHECK_EQ(mState, EXECUTING);
-        setState(FLUSHING);
+        if(mState == EXECUTING){
+           mFilledBuffers.clear();
+           setState(FLUSHING);
         //DSP supports flushing of ports simultaneously. Flushing individual port is not supported.
 #if 0
         bool emulateInputFlushCompletion = !flushPortAsync(kPortIndexInput);
@@ -4142,12 +4146,16 @@ status_t OMXCodec::read(
             onCmdComplete(OMX_CommandFlush, kPortIndexOutput);
         }
 #endif
-        bool emulateFlushCompletion = !flushPortAsync(kPortIndexBoth);
-        if (emulateFlushCompletion) {
-            onCmdComplete(OMX_CommandFlush, kPortIndexBoth);
+           bool emulateFlushCompletion = !flushPortAsync(kPortIndexBoth);
+           if (emulateFlushCompletion) {
+               onCmdComplete(OMX_CommandFlush, kPortIndexBoth);
+           }
         }
+
+        // for cases like , seek is issued while in port reconfiguring state
+        // wait till the reconfiguration is completed
         while (mSeekTimeUs >= 0) {
-            mBufferFilled.wait(mLock);
+               mBufferFilled.wait(mLock);
         }
     }
 
@@ -4156,8 +4164,13 @@ status_t OMXCodec::read(
     }
     if(seeking)
     {
-        CHECK_EQ(mState, FLUSHING);
-        setState(EXECUTING);
+        if(mState != EXECUTING){
+           CHECK_EQ(mState, FLUSHING);
+           setState(EXECUTING);
+        }
+        else {
+           CHECK_EQ(mState, EXECUTING);
+        }
     }
     if (mState == ERROR) {
         return UNKNOWN_ERROR;
