@@ -345,6 +345,10 @@ public final class ServerSession extends ObexSession implements Runnable {
 
             if (!op.isAborted) {
                 op.sendReply(response, false,false);
+            } else {
+                if(ObexHelper.getLocalSrmStatus() == ObexHelper.LOCAL_SRM_ENABLED) {
+                  sendResponse(ResponseCodes.OBEX_HTTP_OK, null);
+                }
             }
         } catch (Exception e) {
             sendResponse(ResponseCodes.OBEX_HTTP_INTERNAL_ERROR, null);

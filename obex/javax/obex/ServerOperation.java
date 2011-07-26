@@ -859,4 +859,28 @@ public final class ServerOperation implements Operation, BaseStream {
         mEndofBody = false;
     }
 
+    public boolean isAborted() {
+        try {
+            if (mInput.available() != 0) {
+               int headerID = mInput.read();
+               int length = mInput.read();
+               length = (length << 8) + mInput.read();
+               if (length > 3) {
+                  byte[] temp = new byte[length - 3];
+                  // First three bytes already read, compensating for this
+                  int bytesReceived = mInput.read(temp);
+                  while (bytesReceived != temp.length) {
+                      bytesReceived += mInput.read(temp, bytesReceived,
+                                       temp.length - bytesReceived);
+                  }
+                  if (headerID == ObexHelper.OBEX_OPCODE_ABORT) {
+                     return true;
+                  }
+               }
+            }
+        } catch (IOException e) {
+            Log.e(TAG,"IOException = "+e.toString());
+        }
+        return false;
+    }
 }
