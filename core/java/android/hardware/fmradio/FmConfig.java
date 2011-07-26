@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -175,10 +175,12 @@ public class FmConfig {
         re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_SPACING, configSettings.getChSpacing() );
         re = FmReceiverJNI.setBandNative    (fd, configSettings.getLowerLimit(), configSettings.getUpperLimit() );
 
-        re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_REGION, FM_USER_DEFINED_BAND );
+        if (configSettings.mRadioBand == FM_US_BAND)
+            re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_REGION, FM_US_BAND );
+        else
+            re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_REGION, FM_USER_DEFINED_BAND );
 
-        // setControlNative for V4L2_CID_PRIVATE_TAVARUA_REGION triggers the
-        // config change.
+        /* setControlNative for V4L2_CID_PRIVATE_TAVARUA_REGION triggers the config change*/
         if (re < 0)
           return false;
 
