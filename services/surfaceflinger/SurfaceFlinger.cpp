@@ -2566,6 +2566,9 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
     // Use copybit for screen capture in case of c2d composition
     if (hw.getFlags() & DisplayHardware::C2D_COMPOSITION) {
         copybit_image_t src;
+        copybit_rect_t src_rect;
+        src_rect.l = 0;
+        src_rect.t = 0;
         native_handle_t* handle;
         int orientation = 0;
         if (mBypassState == eBypassInUse) {
@@ -2583,6 +2586,8 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
                 src.format = buffer->format;
                 src.base = (void *)0;
                 src.handle = handle;
+                src_rect.r = buffer->width;
+                src_rect.b = buffer->height;
             }
         } else {
             handle = hw.getCurrentFBHandle();
@@ -2591,6 +2596,8 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
             src.format = hw.getFormat();
             src.base = (void *)0;
             src.handle = handle;
+            src_rect.r = hw_w;
+            src_rect.b = hw_h;
         }
 
         native_handle_t *hnd = new native_handle_t;
@@ -2603,19 +2610,27 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
 
         // Copybit dst
         copybit_image_t dst;
-        dst.w = sw;
+        dst.w = ((sw+31) &~31);
         dst.h = sh;
         dst.format = hw.getFormat();
         dst.base = ptr;
         dst.handle = hnd;
+
+        copybit_rect_t dst_rect;
+        dst_rect.l = 0;
+        dst_rect.t = 0;
+        dst_rect.r = dst.w;
+        dst_rect.b = dst.h;
 
         // Copybit region
         region_iterator clip(Region(Rect(dst.w, dst.h)));
 
         mBlitEngine->set_parameter(mBlitEngine, COPYBIT_TRANSFORM, orientation);
         mBlitEngine->set_parameter(mBlitEngine, COPYBIT_PLANE_ALPHA, 0xFF);
-        result = mBlitEngine->blit(mBlitEngine, &dst, &src, &clip);
-
+        result = mBlitEngine->stretch(mBlitEngine, &dst, &src, &dst_rect, &src_rect, &clip);
+        if (result == NO_ERROR) {
+            *w = dst.w;
+        }
     } else {
         if (!GLExtensions::getInstance().haveFramebufferObject())
             return INVALID_OPERATION;
@@ -2687,11 +2702,13 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
         glBindFramebufferOES(GL_FRAMEBUFFER_OES, 0);
         glDeleteRenderbuffersOES(1, &tname);
         glDeleteFramebuffersOES(1, &name);
+        if (result == NO_ERROR) {
+            *w = sw;
+        }
     }
 
     if (result == NO_ERROR) {
         *heap = base;
-        *w = sw;
         *h = sh;
         *f = PIXEL_FORMAT_RGBA_8888;
         result = NO_ERROR;
