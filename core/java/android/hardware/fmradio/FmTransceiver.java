@@ -137,7 +137,7 @@ public class FmTransceiver
    */
    protected boolean acquire(String device){
       boolean bStatus = true;
-      if( sFd == 0  ) {
+      if (sFd <= 0) { // if previous open fails fd will be -ve.
          sFd = FmReceiverJNI.acquireFdNative(V4L2_DEVICE);
 
          if (sFd > 0) {
