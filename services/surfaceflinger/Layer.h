@@ -74,7 +74,6 @@ public:
     virtual status_t drawWithOverlay(const Region& clip,
                         bool hdmiConnected, bool ignoreFB = true) const;
     virtual status_t setBufferInUse() const;
-    virtual status_t freeBypassBuffers(bool clearOverlayFlag) const;
     virtual status_t freeBypassBuffers() const;
     status_t clearFreezeLock() {
                                     mFreezeLock.clear();
