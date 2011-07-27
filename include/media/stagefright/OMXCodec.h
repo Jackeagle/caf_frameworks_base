@@ -50,6 +50,7 @@ struct OMXCodec : public MediaSource,
         kForce3DLeftRight        = CREATION_FLAGS_MAX>>3,
         kForce3DRightLeft        = CREATION_FLAGS_MAX>>4,
         kForce3DBottomTop        = CREATION_FLAGS_MAX>>5,
+        kLocalFileMode           = CREATION_FLAGS_MAX>>6,
     };
     static sp<MediaSource> Create(
             const sp<IOMX> &omx,
@@ -199,6 +200,7 @@ private:
     bool mInterlaceFormatDetected;
     bool m3DVideoDetected;
     bool mSendEOS;
+    bool mSPSParsed;
 
     OMXCodec(const sp<IOMX> &omx, IOMX::node_id node, uint32_t quirks,
              bool isEncoder, const char *mime, const char *componentName,
