@@ -198,6 +198,8 @@ void DisplayHardware::init(uint32_t dpy)
 
 #if defined(TARGET_USES_OVERLAY)
     mOverlayLibObject = new overlay::Overlay();
+    if(overlay::initOverlay() == -1)
+        LOGE("overlay::initOverlay() ERROR!!");
     mOverlayUIEnable = false;
     mOverlayUIEnablePropVal = false;
 #if defined(SF_BYPASS)
