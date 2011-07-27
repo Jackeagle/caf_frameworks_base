@@ -262,6 +262,7 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
     { MEDIA_MIMETYPE_VIDEO_VP6,"OMX.qcom.video.decoder.vp"},
     { MEDIA_MIMETYPE_AUDIO_WMA, "OMX.qcom.audio.decoder.wma"},
+    { MEDIA_MIMETYPE_AUDIO_WMA, "OMX.qcom.audio.decoder.wmaLossLess"},
     { MEDIA_MIMETYPE_AUDIO_WMA, "OMX.qcom.audio.decoder.wma10Pro"},
     { MEDIA_MIMETYPE_VIDEO_WMV, "OMX.qcom.video.decoder.vc1"},
     { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13Hw"},
@@ -645,9 +646,13 @@ sp<MediaSource> OMXCodec::Create(
            {
               componentName = "OMX.qcom.audio.decoder.wma";
            }
-           else
+           else if(version==kTypeWMAPro)
            {
               componentName= "OMX.qcom.audio.decoder.wma10Pro";
+           }
+           else if(version==kTypeWMALossLess)
+           {
+              componentName= "OMX.qcom.audio.decoder.wmaLossLess";
            }
         }
 #ifdef USE_AAC_HW_DEC
@@ -3744,6 +3749,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
         int32_t version;
         OMX_AUDIO_PARAM_WMATYPE paramWMA;
         QOMX_AUDIO_PARAM_WMA10PROTYPE paramWMA10;
+
         CHECK(meta->findInt32(kKeyWMAVersion, &version));
 
         int32_t numChannels;
@@ -3756,8 +3762,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
         int32_t advencopt1;
         int32_t advencopt2;
         int32_t VirtualPktSize;
-
-        if(version==kTypeWMAPro || version==kTypeWMAProPlus) {
+        if(version==kTypeWMAPro || version==kTypeWMALossLess) {
            CHECK(meta->findInt32(kKeyWMABitspersample, &bitspersample));
            CHECK(meta->findInt32(kKeyWMAFormatTag, &formattag));
            CHECK(meta->findInt32(kKeyWMAAdvEncOpt1,&advencopt1));
@@ -3768,7 +3773,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
         if(version==kTypeWMA) {
            InitOMXParams(&paramWMA);
            paramWMA.nPortIndex = kPortIndexInput;
-        } else if(version==kTypeWMAPro || version==kTypeWMAProPlus) {
+        } else if(version==kTypeWMAPro || version==kTypeWMALossLess) {
            InitOMXParams(&paramWMA10);
            paramWMA10.nPortIndex = kPortIndexInput;
         }
@@ -3786,8 +3791,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
            LOGE("Unsupported samplerate/channels");
            return ERROR_UNSUPPORTED;
         }
-
-        if(version==kTypeWMAPro || version==kTypeWMAProPlus)
+        if(version==kTypeWMAPro || version==kTypeWMALossLess)
         {
            CODEC_LOGV("Bitspersample: %d, wmaformattag: %d,"
                       "advencopt1: %d, advencopt2: %d VirtualPktSize %d", bitspersample,
@@ -3799,7 +3803,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
         if(version==kTypeWMA) {
            err = mOMX->getParameter(
                    mNode, OMX_IndexParamAudioWma, &paramWMA, sizeof(paramWMA));
-        } else if(version==kTypeWMAPro || version==kTypeWMAProPlus) {
+        } else if(version==kTypeWMAPro || version==kTypeWMALossLess) {
            mOMX->getExtensionIndex(mNode,"OMX.Qualcomm.index.audio.wma10Pro",&index);
            err = mOMX->getParameter(
                    mNode, index, &paramWMA10, sizeof(paramWMA10));
@@ -3814,8 +3818,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
            //paramWMA.eFormat = eFormat;
            //paramWMA.eProfile = eProfile;
            paramWMA.nBlockAlign = blockAlign;
-           //paramWMA.nSuperBlockAlign = superBlockAlign;
-        } else if(version==kTypeWMAPro || version==kTypeWMAProPlus) {
+        } else if(version==kTypeWMAPro || version==kTypeWMALossLess) {
            paramWMA10.nChannels = numChannels;
            paramWMA10.nSamplingRate = sampleRate;
            paramWMA10.nEncodeOptions = encodeOptions;
@@ -3825,7 +3828,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
            paramWMA10.nBlockAlign = blockAlign;
            //paramWMA10.nSuperBlockAlign = superBlockAlign;
         }
-        if(version==kTypeWMAPro || version==kTypeWMAProPlus) {
+        if(version==kTypeWMAPro || version==kTypeWMALossLess) {
            paramWMA10.advancedEncodeOpt = advencopt1;
            paramWMA10.advancedEncodeOpt2 = advencopt2;
            paramWMA10.formatTag = formattag;
@@ -3836,7 +3839,7 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
         if(version==kTypeWMA) {
            err = mOMX->setParameter(
                    mNode, OMX_IndexParamAudioWma, &paramWMA, sizeof(paramWMA));
-        } else if(version==kTypeWMAPro || version==kTypeWMAProPlus) {
+        } else if(version==kTypeWMAPro || version==kTypeWMALossLess) {
            err = mOMX->setParameter(
                    mNode, index, &paramWMA10, sizeof(paramWMA10));
         }
