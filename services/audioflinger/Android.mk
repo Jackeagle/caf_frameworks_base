@@ -93,6 +93,14 @@ LOCAL_SHARED_LIBRARIES := \
     libmedia \
     libhardware_legacy \
     libeffects
+    
+# SRS Processing    
+ifeq ($(strip $(BOARD_USES_SRS_TRUEMEDIA)),true)
+LOCAL_SHARED_LIBRARIES += libsrsprocessing
+LOCAL_CFLAGS += -DSRS_PROCESSING
+LOCAL_C_INCLUDES += vendor/qcom/proprietary/mm-audio/audio-effects/srs/TruMedia
+endif
+# SRS Processing
 
 ifeq ($(strip $(BOARD_USES_GENERIC_AUDIO)),true)
   LOCAL_STATIC_LIBRARIES += libaudiointerface libaudiopolicybase
