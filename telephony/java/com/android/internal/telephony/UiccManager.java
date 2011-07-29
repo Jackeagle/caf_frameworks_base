@@ -118,25 +118,29 @@ public class UiccManager extends Handler{
                 }
                 break;
             case EVENT_GET_ICC_STATUS_DONE:
-                Log.d(LOG_TAG, "Received EVENT_GET_ICC_STATUS_DONE on index : " + index);
-                ar = (AsyncResult)msg.obj;
+                if (index < mCi.length && mRadioOn[index]) {
+                    Log.d(LOG_TAG, "Received EVENT_GET_ICC_STATUS_DONE on index : " + index);
+                    ar = (AsyncResult)msg.obj;
 
-                onGetIccCardStatusDone(ar, index);
+                    onGetIccCardStatusDone(ar, index);
 
-                //If UiccManager was provided with a callback when icc status update
-                //was triggered - now is the time to call it.
-                if (ar.userObj != null && ar.userObj instanceof AsyncResult) {
-                    AsyncResult internalAr = (AsyncResult)ar.userObj;
-                    if (internalAr.userObj != null &&
-                            internalAr.userObj instanceof Message) {
-                        Message onComplete = (Message)internalAr.userObj;
-                        if (onComplete != null) {
-                            onComplete.sendToTarget();
+                    //If UiccManager was provided with a callback when icc status update
+                    //was triggered - now is the time to call it.
+                    if (ar.userObj != null && ar.userObj instanceof AsyncResult) {
+                        AsyncResult internalAr = (AsyncResult)ar.userObj;
+                        if (internalAr.userObj != null &&
+                                internalAr.userObj instanceof Message) {
+                            Message onComplete = (Message)internalAr.userObj;
+                            if (onComplete != null) {
+                                onComplete.sendToTarget();
+                            }
                         }
+                    } else if (ar.userObj != null && ar.userObj instanceof Message) {
+                        Message onComplete = (Message)ar.userObj;
+                        onComplete.sendToTarget();
                     }
-                } else if (ar.userObj != null && ar.userObj instanceof Message) {
-                    Message onComplete = (Message)ar.userObj;
-                    onComplete.sendToTarget();
+                } else {
+                    Log.d(LOG_TAG, "Received EVENT_GET_ICC_STATUS_DONE while radio is not ON or index is invalid. Ignoring");
                 }
                 break;
             case EVENT_RADIO_OFF_OR_UNAVAILABLE:
