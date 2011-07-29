@@ -88,6 +88,8 @@ interface IConnectivityManager
 
     LinkCapabilities requestCapabilities(int id, in int[] capability_keys);
 
+    boolean requestQoS(int id, int localPort, String localAddress);
+
     void setTrackedCapabilities(int id, in int[] capabilities);
 
     /* LinkProvider */

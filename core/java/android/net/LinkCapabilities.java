@@ -23,6 +23,7 @@ import android.util.Log;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -45,7 +46,7 @@ public class LinkCapabilities implements Parcelable {
     private static final boolean DBG = false;
 
     /** The Map of Keys to Values */
-    private HashMap<Integer, String> mCapabilities;
+    protected HashMap<Integer, String> mCapabilities;
 
 
     /**
@@ -90,11 +91,18 @@ public class LinkCapabilities implements Parcelable {
         public final static int RW_REQUIRED_FWD_BW = 3;
 
         /**
-         * Available forward link (download) bandwidth for the socket.
+         * Minimum available forward link (download) bandwidth for the socket.
          * This value is in kilobits per second (kbps).
          * Values will be strings such as "50", "100", "1500", etc.
          */
-        public final static int RO_AVAILABLE_FWD_BW = 4;
+        public final static int RO_MIN_AVAILABLE_FWD_BW = 4;
+
+        /**
+         * Maximum available forward link (download) bandwidth for the socket.
+         * This value is in kilobits per second (kbps).
+         * Values will be strings such as "50", "100", "1500", etc.
+         */
+        public final static int RO_MAX_AVAILABLE_FWD_BW = 5;
 
         /**
          * Desired minimum reverse link (upload) bandwidth for the socket
@@ -103,7 +111,7 @@ public class LinkCapabilities implements Parcelable {
          * <p>
          * This key is set via the needs map.
          */
-        public final static int RW_DESIRED_REV_BW = 5;
+        public final static int RW_DESIRED_REV_BW = 6;
 
         /**
          * Required minimum reverse link (upload) bandwidth, in kilobits
@@ -111,27 +119,50 @@ public class LinkCapabilities implements Parcelable {
          * If a rate is not specified, the default rate of kbps will be
          * Values should be strings such as "50", "100", "1500", etc.
          */
-        public final static int RW_REQUIRED_REV_BW = 6;
+        public final static int RW_REQUIRED_REV_BW = 7;
 
         /**
-         * Available reverse link (upload) bandwidth for the socket.
+         * Minimum available reverse link (upload) bandwidth for the socket.
          * This value is in kilobits per second (kbps).
          * Values will be strings such as "50", "100", "1500", etc.
          */
-        public final static int RO_AVAILABLE_REV_BW = 7;
+        public final static int RO_MIN_AVAILABLE_REV_BW = 8;
 
         /**
-         * Maximum latency for the socket, in milliseconds, above which
-         * socket cannot function.
-         * Values should be strings such as "50", "300", "500", etc.
-         */
-        public final static int RW_MAX_ALLOWED_LATENCY = 8;
-
-        /**
-         * Current estimated latency of the socket, in milliseconds.
+         * Maximum available reverse link (upload) bandwidth for the socket.
+         * This value is in kilobits per second (kbps).
          * Values will be strings such as "50", "100", "1500", etc.
          */
-        public final static int RO_CURRENT_LATENCY = 9;
+        public final static int RO_MAX_AVAILABLE_REV_BW = 9;
+
+        /**
+         * Maximum incoming flow (forward link) latency for the socket, in
+         * milliseconds, above which socket cannot function.
+         * Values should be strings such as "50", "300", "500",
+         * etc.
+         */
+        public final static int RW_MAX_ALLOWED_FWD_LATENCY = 10;
+
+        /**
+         * Current estimated incoming flow (forward link) latency of the socket, in
+         * milliseconds. Values will be strings such as "50", "100",
+         * "1500", etc.
+         */
+        public final static int RO_CURRENT_FWD_LATENCY = 11;
+
+        /**
+         * Maximum outgoing flow (reverse link) latency for the socket, in
+         * milliseconds, above which socket cannot function. Values
+         * should be strings such as "50", "300", "500", etc.
+         */
+        public final static int RW_MAX_ALLOWED_REV_LATENCY = 12;
+
+        /**
+         * Current estimated outgoing flow (reverse link) latency of the socket, in
+         * milliseconds. Values will be strings such as "50", "100",
+         * "1500", etc.
+         */
+        public final static int RO_CURRENT_REV_LATENCY = 13;
 
         /**
          * Interface that the socket is bound to. This can be a virtual
@@ -140,7 +171,7 @@ public class LinkCapabilities implements Parcelable {
          * Values will be strings such as "wlan0", "rmnet0"
          */
         // TODO: consider removing, this is information about the interface, not the socket
-        public final static int RO_BOUND_INTERFACE = 10;
+        public final static int RO_BOUND_INTERFACE = 14;
 
         /**
          * Physical interface that the socket is routed on.
@@ -150,7 +181,7 @@ public class LinkCapabilities implements Parcelable {
          * Values will be strings such as "wlan0", "rmnet0"
          */
         // TODO: consider removing, this is information about the interface, not the socket
-        public final static int RO_PHYSICAL_INTERFACE = 11;
+        public final static int RO_PHYSICAL_INTERFACE = 15;
 
         /**
          * Network types that the socket will restrict itself to.
@@ -159,30 +190,67 @@ public class LinkCapabilities implements Parcelable {
          * Values will be comma separated strings such as "wifi",
          * "mobile", or "mobile, wimax".
          */
-        public final static int RW_ALLOWED_NETWORKS = 12;
+        public final static int RW_ALLOWED_NETWORKS = 16;
 
         /**
          * Network types that the socket will not bind to.
          * Values will be comma separated strings such as "wifi",
          * "mobile", or "mobile, wimax".
          */
-        public final static int RW_PROHIBITED_NETWORKS = 13;
+        public final static int RW_PROHIBITED_NETWORKS = 17;
 
         /**
-         * If set to true, LinkSocket will not send callback
+         * If set to true, Link[Datagram]Socket will not send callback
          * notifications to the application.
          * Values should be a String set to either "true" or "false"
          */
-        public final static int RW_DISABLE_NOTIFICATIONS = 14;
+        public final static int RW_DISABLE_NOTIFICATIONS = 18;
 
         /**
          * A string containing the socket's role, as classified by the carrier.
          */
-        public final static int RO_CARRIER_ROLE = 15;
+        public final static int RO_CARRIER_ROLE = 19;
+
+        /**
+         * A string containing the QoS status granted by the network for a socket.
+         * It can be any of the following strings: "active", "inactive",
+         * "failed", or "suspended".
+         */
+        public final static int RO_QOS_STATE = 20;
+
+        /**
+         * A string representing the transport protocol, Its set to {@code udp}
+         * for a LinkDatagramSocket and {@code tcp} for a LinkSocket.
+         */
+        public final static int RO_TRANSPORT_PROTO_TYPE = 21;
+
+        /**
+         * A string representing QOS filter spec for a range of destination
+         * IP Addresses.
+         * Values should be a String of comma separated IP address in presentation format.
+         * If a range needs to be specified, then it can be described by CIDR notation of
+         * IP address/mask. <br>
+         * <code>For e.g. "192.168.1.1, 10.14.224.25" or "10.14.224.20/30" </code>
+         */
+        public final static int RW_DEST_IP_ADDRESSES = 22;
+
+        /**
+         * A string representing QOS filter spec for a range of destination ports.
+         * Values should be a String of comma separated port numbers, or a
+         * hyphen separated numbers to indicate a range. <br> <code>For e.g.
+         * "18000, 180001, 18002" or "18680-18682"</code>
+         */
+        public final static int RW_DEST_PORTS = 23;
+
+        /**
+         * A String representing numeric traffic class IP_TOS value that will be applied as a
+         * filter-spec for a QoS reservation. Valid values are between "0" and "255" inclusive.
+         */
+        public final static int RW_FILTERSPEC_IP_TOS = 24;
     }
 
     /**
-     * Role informs the LinkSocket about the data usage patterns of your
+     * Role informs the Link[Datagram]Socket about the data usage patterns of your
      * application. Application developers should choose the role that
      * best matches their application.
      * <P>
@@ -196,15 +264,18 @@ public class LinkCapabilities implements Parcelable {
         /** Default Role */
         public static final String DEFAULT = "default";
 
-        /** Video Streaming at 1040p */
+        /** Video Streaming at 1080p */
         public static final String VIDEO_STREAMING_1080P = "video_streaming_1080p";
 
         /** Web Browser */
         public static final String WEB_BROWSER = "web_browser";
+
+        /** Video telephony applications - real time, delay sensitive */
+        public static final String QOS_VIDEO_TELEPHONY = "qos_video_telephony";
     }
 
     /**
-     * The Carrier Role is used to classify LinkSockets for carrier-specified usage.
+     * The Carrier Role is used to classify Link[Datagram]Sockets for carrier-specified usage.
      * <P>
      * {@code Role.DEFAULT} is the default role, and is used whenever
      * a role isn't set.
@@ -222,7 +293,7 @@ public class LinkCapabilities implements Parcelable {
         /** High Throughput - prioritize throughput */
         public static final String HIGH_THROUGHPUT = "high_throughput";
 
-        /** Short Lived - sockets that will only be open for a few seconds at most */
+        /** Short Lived sockets that will only be open for a few seconds at most */
         public static final String SHORT_LIVED = "short_lived";
 
         /** Bulk down load - low priority download */
@@ -267,7 +338,7 @@ public class LinkCapabilities implements Parcelable {
         if (applicationRole == Role.VIDEO_STREAMING_1080P) {
             cap.mCapabilities.put(Key.RO_CARRIER_ROLE, CarrierRole.HIGH_THROUGHPUT);
             cap.mCapabilities.put(Key.RW_REQUIRED_FWD_BW, "2500"); // Require 2.5Mbps bandwidth
-            cap.mCapabilities.put(Key.RW_MAX_ALLOWED_LATENCY, "500"); // 500ms latency
+            cap.mCapabilities.put(Key.RW_MAX_ALLOWED_FWD_LATENCY, "500"); // 500ms latency
         } else if (applicationRole == Role.WEB_BROWSER) {
             cap.mCapabilities.put(Key.RO_CARRIER_ROLE, CarrierRole.SHORT_LIVED);
         } else {
@@ -476,7 +547,8 @@ public class LinkCapabilities implements Parcelable {
             case Key.RW_REQUIRED_FWD_BW:
             case Key.RW_DESIRED_REV_BW:
             case Key.RW_REQUIRED_REV_BW:
-            case Key.RW_MAX_ALLOWED_LATENCY:
+            case Key.RW_MAX_ALLOWED_FWD_LATENCY:
+            case Key.RW_MAX_ALLOWED_REV_LATENCY:
                 int testValue;
                 try {
                     testValue = Integer.parseInt(value);
@@ -491,6 +563,14 @@ public class LinkCapabilities implements Parcelable {
                 return true;
             case Key.RW_DISABLE_NOTIFICATIONS:
                 return true; // string->boolean is always successful
+            case Key.RO_TRANSPORT_PROTO_TYPE:
+                value.toLowerCase();
+                if (value.equals("udp") || value.equals("tcp")) return true;
+                return false;
+            case Key.RW_DEST_IP_ADDRESSES:  //TODO validate arguments
+            case Key.RW_DEST_PORTS:         //TODO validate arguments
+            case Key.RW_FILTERSPEC_IP_TOS:  //TODO validate arguments
+                return true;
         }
         // if we made it this far, key is not a valid RW key.
         return false;
