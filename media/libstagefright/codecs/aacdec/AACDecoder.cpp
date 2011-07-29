@@ -404,6 +404,10 @@ status_t AACDecoder::read(
 
     if ( decoderErr == MP4AUDEC_INCOMPLETE_FRAME  && aacformattype == true) {
         LOGW("Handle Incomplete frame error inputBufSize %d, usedLength %d", inputBufferSize, mConfig->inputBufferUsedLength);
+        if(mConfig->inputBufferUsedLength == mInputBufferSize){
+           LOGW("Decoder cannot process the buffer due to invalid frame");
+           decoderErr = MP4AUDEC_INVALID_FRAME;
+        }
         if ( !mTempInputBuffer ) {
             //Allocate Temp buffer
             uint32_t bytesToAllocate = 2 * mInputBuffer->size();
@@ -442,7 +446,7 @@ status_t AACDecoder::read(
         //reset the output buffer size
         numOutBytes = 0;
     }
-    else if (decoderErr != MP4AUDEC_SUCCESS) {
+    if (decoderErr != MP4AUDEC_SUCCESS && decoderErr != MP4AUDEC_INCOMPLETE_FRAME) {
         LOGW("AAC decoder returned error %d, substituting silence", decoderErr);
 
         memset(buffer->data(), 0, numOutBytes);
