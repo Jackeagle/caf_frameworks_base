@@ -671,6 +671,44 @@ static jboolean setPinNative(JNIEnv *env, jobject object, jstring address,
     return JNI_FALSE;
 }
 
+static jboolean sapAuthorizeNative(JNIEnv *env, jobject object, jstring address,
+                         jboolean access, int nativeData) {
+#ifdef HAVE_BLUETOOTH
+    LOGV("sapAuthorizeNative %s %d", (char*)address, access);
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *msg = (DBusMessage *)nativeData;
+        DBusMessage *reply;
+        if (access) {
+            reply = dbus_message_new_method_return(msg);
+            if (!reply) {
+                LOGE("%s: Cannot create message reply to authorize sap "
+                     "D-Bus\n", __FUNCTION__);
+                dbus_message_unref(msg);
+                return JNI_FALSE;
+            }
+        } else {
+            reply = dbus_message_new_error(msg,
+                    "org.bluez.Error.Rejected", "Authorization rejected");
+            if (!reply) {
+                LOGE("%s: Cannot create message reply\n", __FUNCTION__);
+                return JNI_FALSE;
+            }
+
+        }
+
+        dbus_connection_send(nat->conn, reply, NULL);
+        dbus_message_unref(msg);
+        dbus_message_unref(reply);
+        return JNI_TRUE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+
+
+
 static jboolean cancelPairingUserInputNative(JNIEnv *env, jobject object,
                                             jstring address, int nativeData) {
 #ifdef HAVE_BLUETOOTH
@@ -1227,6 +1265,24 @@ static jboolean deregisterCharacteristicsWatcherNative(JNIEnv *env, jobject obje
     return JNI_FALSE;
 }
 
+static jboolean disConnectSapNative(JNIEnv *env, jobject object) {
+#ifdef HAVE_BLUETOOTH
+    LOGV(__FUNCTION__);
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *reply = dbus_func_args_generic(env, nat->conn,
+                           "org.qcom.sap",
+                           "/SapService",
+                           "org.qcom.sap", "DisConnect",
+                           DBUS_TYPE_INVALID);
+
+        LOGV("%s: Sap Disconnect returned %s", reply);
+        return reply ?  JNI_TRUE: JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 static JNINativeMethod sMethods[] = {
      /* name, signature, funcPtr */
     {"classInitNative", "()V", (void*)classInitNative},
@@ -1283,6 +1339,8 @@ static JNINativeMethod sMethods[] = {
     {"getCharacteristicPropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getCharacteristicPropertiesNative},
     {"registerCharacteristicsWatcherNative", "(Ljava/lang/String;)Z", (void*)registerCharacteristicsWatcherNative},
     {"deregisterCharacteristicsWatcherNative", "(Ljava/lang/String;)Z", (void*)deregisterCharacteristicsWatcherNative},
+    {"sapAuthorizeNative", "(Ljava/lang/String;ZI)Z", (void *)sapAuthorizeNative},
+    {"disConnectSapNative", "()I", (void *)disConnectSapNative},
 };
 
 int register_android_server_BluetoothService(JNIEnv *env) {
