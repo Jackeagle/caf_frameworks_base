@@ -298,7 +298,8 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
 
         char value[PROPERTY_VALUE_MAX];
         if (property_get("ro.product.device", value, "0") &&
-                (!strncmp(value, "msm8660", sizeof("msm8660") - 1))) {
+                (!strncmp(value, "msm8660", sizeof("msm8660") - 1) ||
+                 !strncmp(value, "msm8960", sizeof("msm8960") - 1))) {
             frame = extractVideoFrameWithCodecFlags(&mClient, trackMeta, source, OMXCodec::kEnableThumbnailMode,
                     timeUs, option);
         }
