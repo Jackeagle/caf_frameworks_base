@@ -485,6 +485,15 @@ sp<GraphicBuffer> Layer::requestBuffer(int index,
     // (eg: status bar), and we can't release the handle under its feet.
     uint32_t effectiveUsage = getEffectiveUsage(usage);
 
+    // We need to ensure PMEM memory is allocated for:
+    // a. Bypass buffers
+    // b. Original Resolution surfaces
+    // c. S3D surfaces
+    if (getStereoscopic3DFormat() || getUseOriginalSurfaceResolution() ||
+        bypass) {
+        effectiveUsage |= GRALLOC_USAGE_PRIVATE_1;
+    }
+
     status_t err = NO_MEMORY;
 
     if (err != NO_ERROR) {
