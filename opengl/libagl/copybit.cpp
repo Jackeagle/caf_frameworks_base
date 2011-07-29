@@ -100,11 +100,6 @@ public:
 };
 
 static bool supportedCopybitsFormat(int format) {
-
-    /* Mask the top 3 bytes since GGLSurface format is only 1 byte */
-    if(format ==(HAL_PIXEL_FORMAT_YV12 & 0x000000FF))
-        return true;
-
     switch (format) {
     case COPYBIT_FORMAT_RGBA_8888:
     case COPYBIT_FORMAT_RGBX_8888:
@@ -116,9 +111,12 @@ static bool supportedCopybitsFormat(int format) {
     case COPYBIT_FORMAT_YCbCr_422_SP:
     case COPYBIT_FORMAT_YCrCb_420_SP:
     case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-    case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+    /* Mask the top 3 bytes since GGLSurface format is only 1 byte */
+    case (HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED & 0x000000FF):
+    case (HAL_PIXEL_FORMAT_YV12 & 0x000000FF):
         return true;
     default:
+        LOGE("supportedCopybitsFormat: invalid format %x", format);
         return false;
     }
 }
@@ -240,6 +238,8 @@ static bool copybit(GLint x, GLint y,
     /* Mask the top 3 bytes since GGLSurface format is only 1 byte */
     if(opFormat == (HAL_PIXEL_FORMAT_YV12 & 0x000000FF))
         opFormat = HAL_PIXEL_FORMAT_YV12;
+    if(opFormat == (HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED & 0x000000FF))
+        opFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
     const bool srcTextureHasAlpha = hasAlpha(opFormat);
     if (!srcTextureHasAlpha) {
         planeAlpha = fixedToByte(c->currentColorClamped.a);
