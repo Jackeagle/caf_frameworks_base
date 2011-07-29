@@ -321,7 +321,7 @@ status_t AudioSource::read(
         if (numFramesRecorded == 0 && mPrevSampleTimeUs == 0) {
             mInitialReadTimeUs = readTimeUs;
             // Initial delay
-            if (mStartTimeUs > 0) {
+            if ((mStartTimeUs > 0) && (mFormat == AudioSystem::PCM_16_BIT)) {
                 mStartTimeUs = readTimeUs - mStartTimeUs;
             } else {
                 // Assume latency is constant.
