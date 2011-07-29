@@ -26,17 +26,20 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define LOG_TAG "ActTriggerJNI"
+
 #include "jni.h"
 #include "JNIHelp.h"
 #include <android_runtime/AndroidRuntime.h>
 
 #include <dlfcn.h>
 #include <limits.h>
+#include <string.h>
 
-#define LOG_TAG "ActTriggerJNI"
+#include <cutils/properties.h>
 #include <utils/Log.h>
 
-#define ACTIVIT_TRIGGER_LIBRARY		"/system/lib/libacttrig.so"
+#define LIBRARY_PATH_PREFIX	"/system/lib/"
 
 namespace android
 {
@@ -54,8 +57,23 @@ com_android_internal_app_ActivityTrigger_native_at_init()
     void *handle;
     const char *rc;
     void (*init)(void);
+    char buf[PROPERTY_VALUE_MAX];
+    int len;
 
-    handle = dlopen(ACTIVIT_TRIGGER_LIBRARY, RTLD_NOW | RTLD_LOCAL);
+    /* Retrieve name of vendor extension library */
+    if (property_get("ro.vendor.extension_library", buf, NULL) <= 0) {
+        return;
+    }
+
+    /* Sanity check - ensure */
+    buf[PROPERTY_VALUE_MAX-1] = '\0';
+    if ((strncmp(buf, LIBRARY_PATH_PREFIX, sizeof(LIBRARY_PATH_PREFIX) - 1) != 0)
+        ||
+        (strstr(buf, "..") != NULL)) {
+        return;
+    }
+
+    handle = dlopen(buf, RTLD_NOW | RTLD_LOCAL);
     if (handle == NULL) {
         return;
     }
