@@ -59,7 +59,8 @@ public:
             data.writeInt32(desc->frameCount);
             data.writeInt32(desc->latency);
         }
-        remote()->transact(IO_CONFIG_CHANGED, data, &reply, IBinder::FLAG_ONEWAY);
+        //remove parameter IBinder::FLAG_ONEWAY from remote()->transact to make the binder call synchronous.
+        remote()->transact(IO_CONFIG_CHANGED, data, &reply);
     }
 };
 
