@@ -516,11 +516,18 @@ class BluetoothEventLoop {
             Log.e(TAG, "address is null");
             return;
         }
-        Intent intent = new Intent(BluetoothService.SAP_AUTHORIZE_INTENT);
-        intent.putExtra("name", mBluetoothService.getRemoteName(address));
-        intent.putExtra("address", address);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
-
+        /*Get the Trust state of the device*/
+        boolean trusted = mBluetoothService.getTrustState(address);
+        if (trusted) {
+            /*Say as authorized to lower layers without popping up to
+            user*/
+            mBluetoothService.sapAuthorize(address, true);
+        } else {
+            Intent intent = new Intent(BluetoothService.SAP_AUTHORIZE_INTENT);
+            intent.putExtra("name", mBluetoothService.getRemoteName(address));
+            intent.putExtra("address", address);
+            mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        }
     }
     private void onSapStateChanged(String objectPath, String state, int nativeData) {
         Log.i(TAG, "onSapStateChanged" + objectPath + state);
