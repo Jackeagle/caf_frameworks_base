@@ -411,6 +411,16 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(int event, int ioHandle, v
 
     if (ioHandle == 0) return;
 
+    if ((event == A2DP_OUTPUT_STATE) || (event == EFFECT_CONFIG_CHANGED))
+    {
+        //1. ioConfigChanged is changed from binder call to synchronous call by removing
+        //   IBinder::FLAG_ONEWAY from BpAudioFlingerClient::ioConfigChanged::remote()->transact().
+        //2. Since there's already a mutex autolock in AudioFlinger::registerClient,
+        //   to avoid deadlock issue, return before Mutex::Autolock if event is not handled here.
+        LOGD("ioConfigChanged() return before Mutex::Autolock to avoid deadlock,  event %d", event);
+        return ;
+    }
+
     Mutex::Autolock _l(AudioSystem::gLock);
 
     switch (event) {
