@@ -79,6 +79,7 @@ public:
 private:
 
     int afd;
+    int efd;
     int sessionId;
     uint32_t bytesToWrite;
     bool isPaused;
