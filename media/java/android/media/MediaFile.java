@@ -23,7 +23,10 @@ import android.provider.MediaStore.Video;
 import android.media.DecoderCapabilities;
 import android.media.DecoderCapabilities.VideoDecoder;
 import android.media.DecoderCapabilities.AudioDecoder;
-
+import android.os.SystemProperties;
+import java.io.FileReader;
+import java.lang.String;
+import android.util.Log;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -93,6 +96,10 @@ public class MediaFile {
     private static final int FIRST_PLAYLIST_FILE_TYPE = FILE_TYPE_M3U;
     private static final int LAST_PLAYLIST_FILE_TYPE = FILE_TYPE_WPL;
     
+    private static FileReader socinfo_fd;
+    private static char[] socinfo = new char[20];;
+    private static String build_id;
+    private static int error;
     static class MediaFileType {
     
         int fileType;
@@ -115,9 +122,32 @@ public class MediaFile {
 
     private static boolean isWMAEnabled() {
         List<AudioDecoder> decoders = DecoderCapabilities.getAudioDecoders();
+        try {
+            socinfo_fd = new FileReader("/sys/devices/system/soc/soc0/build_id");
+            error = socinfo_fd.read(socinfo,0,20);
+            if (error==-1)
+                Log.e("MediaFile","error in reading from build_id file");
+            socinfo_fd.close();
+        } catch(Exception e) {
+            Log.e("MediaFile","Exception in FileReader");
+        }
+        build_id = new String(socinfo,17,1);
         for (AudioDecoder decoder: decoders) {
             if (decoder == AudioDecoder.AUDIO_DECODER_WMA) {
-                return true;
+                if ("msm7630_surf".equals(SystemProperties.get("ro.product.device")))
+                {
+                    if (build_id.equals("0")) {
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    return true;
+                }
             }
         }
         return false;
@@ -125,9 +155,32 @@ public class MediaFile {
 
     private static boolean isWMVEnabled() {
         List<VideoDecoder> decoders = DecoderCapabilities.getVideoDecoders();
+        try {
+            socinfo_fd = new FileReader("/sys/devices/system/soc/soc0/build_id");
+            error = socinfo_fd.read(socinfo,0,20);
+            if(error==-1)
+                Log.e("MediaFile","error in reading from build_id file");
+            socinfo_fd.close();
+        } catch(Exception e) {
+            Log.e("MediaFile","Exception in FileReader");
+        }
+        build_id = new String(socinfo,17,1);
         for (VideoDecoder decoder: decoders) {
             if (decoder == VideoDecoder.VIDEO_DECODER_WMV) {
-                return true;
+                if ("msm7630_surf".equals(SystemProperties.get("ro.product.device")))
+                {
+                    if (build_id.equals("0")) {
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    return true;
+                }
             }
         }
         return false;
