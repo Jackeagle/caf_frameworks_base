@@ -105,6 +105,7 @@ EventHub::EventHub(void)
     , mDevicesById(0), mNumDevicesById(0)
     , mOpeningDevices(0), mClosingDevices(0)
     , mDevices(0), mFDs(0), mFDCount(0), mOpened(false), mNeedToSendFinishedDeviceScan(false)
+    , mNeedToSendHeadPhoneEvent(false), mNeedToSendMicroPhoneEvent(false), mHeadsetDeviceId(-1)
     , mInputBufferIndex(0), mInputBufferCount(0), mInputDeviceIndex(0)
 #ifdef HAVE_TSLIB
     , mTS(), numOfEventsSent(0), tsSamp()
@@ -393,6 +394,21 @@ bool EventHub::getEvent(RawEvent* outEvent)
             outEvent->type = DEVICE_ADDED;
             outEvent->when = systemTime(SYSTEM_TIME_MONOTONIC);
             mNeedToSendFinishedDeviceScan = true;
+
+#ifdef ALSA_HEADSET_DETECTION
+            if(device->classes == INPUT_DEVICE_CLASS_SWITCH) {
+                int state = getSwitchState(device->id, SW_HEADPHONE_INSERT);
+                if(state > 0) {
+                    mNeedToSendHeadPhoneEvent = true;
+                }
+
+                state = getSwitchState(device->id, SW_MICROPHONE_INSERT);
+                if(state > 0) {
+                    mNeedToSendMicroPhoneEvent = true;
+                }
+                mHeadsetDeviceId = device->id;
+            }
+#endif
             return true;
         }
 
@@ -402,7 +418,30 @@ bool EventHub::getEvent(RawEvent* outEvent)
             outEvent->when = systemTime(SYSTEM_TIME_MONOTONIC);
             return true;
         }
-
+#ifdef ALSA_HEADSET_DETECTION
+        if(mNeedToSendHeadPhoneEvent) {
+            outEvent->type = EV_SW;
+            outEvent->scanCode = SW_HEADPHONE_INSERT;
+            outEvent->value = 1;
+            outEvent->keyCode = SW_HEADPHONE_INSERT;
+            outEvent->flags = 0;
+            outEvent->deviceId = mHeadsetDeviceId;
+            outEvent->when = systemTime(SYSTEM_TIME_MONOTONIC);
+            mNeedToSendHeadPhoneEvent = false;
+            return true;
+        }
+        if(mNeedToSendMicroPhoneEvent) {
+            outEvent->type = EV_SW;
+            outEvent->scanCode = SW_MICROPHONE_INSERT;
+            outEvent->value = 1;
+            outEvent->keyCode = SW_MICROPHONE_INSERT;
+            outEvent->flags = 0;
+            outEvent->deviceId = mHeadsetDeviceId;
+            outEvent->when = systemTime(SYSTEM_TIME_MONOTONIC);
+            mNeedToSendMicroPhoneEvent = false;
+            return true;
+        }
+#endif
         // Grab the next input event for device mDevices[mInputDeviceIndex].
         for (;;) {
 #ifdef HAVE_TSLIB
