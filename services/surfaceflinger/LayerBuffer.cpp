@@ -423,7 +423,11 @@ LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
     if(flags & DisplayHardware::CPU_COMPOSITION) {
         snprintf(compositionUsed, 4, "cpu");
     } else if(flags & DisplayHardware::SLOW_CONFIG) {
-        snprintf(compositionUsed, 4, "mdp");
+        if (hw.getFlags() & DisplayHardware::C2D_COMPOSITION) {
+            snprintf(compositionUsed, 4, "c2d");
+        } else {
+            snprintf(compositionUsed, 4, "mdp");
+        }
     } else {
         snprintf(compositionUsed, 4, "gpu");
     }
