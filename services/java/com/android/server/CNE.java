@@ -429,6 +429,10 @@ public final class CNE implements ILinkManager {
                 int normalizedLevel = (int)((level/scale) * 100);
                 updateBatteryStatus(status, pluginType, normalizedLevel);
 
+            } else if (action.equals(Intent.ACTION_SHUTDOWN)) {
+                    dlogi("CNE received action: " + action);
+                    stopFmc(null);
+
             } else if (action.equals(WifiManager.RSSI_CHANGED_ACTION)) {
                 dlogi( "CNE received action RSSI Changed events: " + action);
                 if (mWifiManager != null) {
@@ -1075,6 +1079,7 @@ public final class CNE implements ILinkManager {
         filter.addAction(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
         //QOS intents
         filter.addAction(TelephonyIntents.ACTION_QOS_STATE_IND);
+        filter.addAction(Intent.ACTION_SHUTDOWN);
 
         context.registerReceiver(mIntentReceiver, filter);
         activeRegsList = new ConcurrentHashMap<Integer, RegInfo>();
@@ -1907,7 +1912,7 @@ public final class CNE implements ILinkManager {
             if (status == FmcNotifier.FMC_STATUS_ENABLED) {
                 AddressInfo wwanV4AddrInfo = getWwanAddrInfo(Phone.APN_TYPE_DEFAULT,
                         IPVersion.INET);
-                logi("handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status] +
+                dlogi("handleFmcStatusMsg fmc_status=" + FmcNotifier.FMC_STATUS_STR[status] +
                     ",hostIp=" + hostRoutingIpAddr + ",interface=" + activeWlanIfName);
                 IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
                 INetworkManagementService nms = INetworkManagementService.Stub.asInterface(b);
@@ -1920,9 +1925,24 @@ public final class CNE implements ILinkManager {
                     logw("Error adding host routing");
                 }
                 rInfo.enabled = true;
+            } else if (status == FmcNotifier.FMC_STATUS_REGISTRATION_SUCCESS) {
+                dlogi("handleFmcStatusMsg REGISTRATION_SUCCESS - fmcEnabled="
+                      + rInfo.enabled );
+                if (rInfo.enabled == true) {
+                    IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+                    INetworkManagementService nms = INetworkManagementService.Stub.asInterface(b);
+                    try {
+                        nms.replaceV4DefaultRoute(activeWlanIfName, activeWlanGatewayAddr);
+                        nms.delDstRoute(hostRoutingIpAddr);
+                    } catch (Exception e) {
+                        logw("Error adding host routing");
+                    }
+                    rInfo.enabled = false;
+                }
             } else {
                 if ((status == FmcNotifier.FMC_STATUS_CLOSED)
                         || (status == FmcNotifier.FMC_STATUS_FAILURE)
+                        || (status == FmcNotifier.FMC_STATUS_DS_NOT_AVAIL)
                         || (status == FmcNotifier.FMC_STATUS_RETRIED)) {
                     rInfo.enabled = false;
                     rInfo.dsAvail = false;
@@ -2356,6 +2376,7 @@ public final class CNE implements ILinkManager {
             rInfo.lastSendStatus = status;
             if ((rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_CLOSED)
                     || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_FAILURE)
+                    || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_DS_NOT_AVAIL)
                     || (rInfo.lastSendStatus == FmcNotifier.FMC_STATUS_RETRIED)) {
                 mRemoveHostEntry = true;
                 try {
@@ -2424,11 +2445,26 @@ public final class CNE implements ILinkManager {
             if (rInfo.enabled) { // already enabled
                 onFmcStatus(FmcNotifier.FMC_STATUS_ENABLED);
                 reqToStart = false;
+            } else if (rInfo.dsAvail) {
+                onFmcStatus(FmcNotifier.FMC_STATUS_REGISTRATION_SUCCESS);
+                reqToStart = false;
             }
         } else { /* new OEM registration for this app */
             setFmcObj(new FmcRegInfo(binder));
         }
         if (reqToStart) {
+
+            ConnectivityManager cm = (ConnectivityManager) mContext
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            NetworkInfo.State networkState = (networkInfo
+                    == null ? NetworkInfo.State.UNKNOWN : networkInfo.getState());
+            dlogi("CNE@startFmc: wifi state=" + networkState);
+            if (networkState != NetworkInfo.State.CONNECTED) {
+                dlogi("CNE@startFmc: wifi not ready");
+                onFmcStatus(FmcNotifier.FMC_STATUS_FAILURE);
+                return ok;
+            }
             onFmcStatus(FmcNotifier.FMC_STATUS_INITIALIZED);
             // send enableFMC to Cnd
             CNERequest rr = CNERequest.obtain(CNE_REQUEST_START_FMC_CMD);
