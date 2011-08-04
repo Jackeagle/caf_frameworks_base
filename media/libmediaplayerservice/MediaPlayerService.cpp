@@ -795,7 +795,14 @@ player_type getPlayerType(const char* url)
         int len = strlen(FILE_EXTS[i].extension);
         int start = lenURL - len;
         if (start > 0) {
-            if (!strncmp(url + start, FILE_EXTS[i].extension, len)) {
+            char *QueryStr=NULL;
+            const char *temp=NULL;
+            QueryStr=strchr(url,'?');
+            if(QueryStr)
+                temp = QueryStr-len;
+            else
+                temp = url+start;
+            if (!strncmp(temp, FILE_EXTS[i].extension, len)) {
                 if (FILE_EXTS[i].playertype == VORBIS_PLAYER
                     && !strncasecmp(url, "http://", 7)) {
                     return STAGEFRIGHT_PLAYER;
