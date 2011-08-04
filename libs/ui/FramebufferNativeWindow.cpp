@@ -127,6 +127,7 @@ FramebufferNativeWindow::FramebufferNativeWindow()
     ANativeWindow::dequeueBuffer = dequeueBuffer;
     ANativeWindow::lockBuffer = lockBuffer;
     ANativeWindow::queueBuffer = queueBuffer;
+    ANativeWindow::cancelBuffer = NULL;
     ANativeWindow::query = query;
     ANativeWindow::perform = perform;
 }
