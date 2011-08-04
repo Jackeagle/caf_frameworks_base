@@ -359,6 +359,10 @@ uint32_t OMXCodec::getComponentQuirks(
         const char *componentName, bool isEncoder) {
     uint32_t quirks = 0;
 
+    if (!strcmp(componentName, "OMX.PV.avcdspdec") ||
+        !strcmp(componentName, "OMX.PV.mpeg4dspdec")) {
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+    }
     if (!strcmp(componentName, "OMX.PV.avcdec")) {
         quirks |= kWantsNALFragments;
     }
@@ -1761,16 +1765,6 @@ void OMXCodec::on_message(const omx_message &msg) {
             CHECK(i < buffers->size());
             BufferInfo *info = &buffers->editItemAt(i);
 
-#ifdef OVERLAY_SUPPORT_USERPTR_BUF
-            // Actual data can be movable, try fix MediaBuffer!
-            if (info->mMediaBuffer && info->mMediaBuffer->data() &&
-                (info->mMediaBuffer->data() != msg.u.extended_buffer_data.data_ptr)) {
-                CODEC_LOGV("FILL_BUFFER_DONE: Actual data mismatch at %p, fix MediaBuffer.mData",
-                        info->mMediaBuffer);
-                info->mMediaBuffer->mData = msg.u.extended_buffer_data.data_ptr;
-            }
-#endif
-
             if (!info->mOwnedByComponent) {
                 LOGW("We already own output buffer %p, yet received "
                      "a FILL_BUFFER_DONE.", buffer);
@@ -1813,6 +1807,15 @@ void OMXCodec::on_message(const omx_message &msg) {
                 }
 
                 MediaBuffer *buffer = info->mMediaBuffer;
+
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+                // This is for TI OMX.PV.* codecs.
+                // The decoders don't allocate and assign the 'pBuffer'
+                // member on a call to OMX_AllocateBuffer().
+                // Assign it in here.
+                if (mOMXLivesLocally)
+                    buffer->mData = msg.u.extended_buffer_data.data_ptr;
+#endif
 
                 if (msg.u.extended_buffer_data.range_offset
                         + msg.u.extended_buffer_data.range_length
