@@ -199,13 +199,14 @@ int FramebufferNativeWindow::dequeueBuffer(ANativeWindow* window,
         android_native_buffer_t** buffer)
 {
     FramebufferNativeWindow* self = getSelf(window);
-
-    Mutex::Autolock _l(self->mutex);
-    LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::dequeueBuffer");
-    framebuffer_device_t* fb = self->fbDev;
-    if (!fb)
-        return NO_INIT;
-
+    framebuffer_device_t* fb;
+    {
+        Mutex::Autolock _l(self->mutex);
+        LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::dequeueBuffer");
+        fb = self->fbDev;
+        if (!fb)
+            return NO_INIT;
+    }
     int index = self->mBufferHead;
 
     GraphicLog& logger(GraphicLog::getInstance());
@@ -228,6 +229,7 @@ int FramebufferNativeWindow::dequeueBuffer(ANativeWindow* window,
     }
 
     /* The buffer is available, return it */
+    Mutex::Autolock _l(self->mutex);
     self->mBufferHead++;
     if (self->mBufferHead >= self->mNumBuffers)
         self->mBufferHead = 0;
