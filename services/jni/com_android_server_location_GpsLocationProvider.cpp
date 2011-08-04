@@ -167,6 +167,7 @@ static void agps_status_callback(AGpsStatus* agps_status)
     env->CallVoidMethod(mCallbacksObj, method_reportAGpsStatus,
                         agps_status->type, agps_status->status, agps_status->ipv4_addr, byteArray);
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
+    env->DeleteLocalRef(byteArray);
 }
 
 AGpsCallbacks sAGpsCallbacks = {
