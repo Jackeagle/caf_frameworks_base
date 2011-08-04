@@ -382,24 +382,19 @@ static jint android_hardware_fmradio_FmReceiverJNI_setAnalogModeNative(JNIEnv * 
     } else {
         property_set("hw.fm.isAnalog", "false");
     }
-
-    // If SOC is not yet initialised, skip downloading soc patches
-    property_get("hw.fm.version",firmwareVersion,"notset");
-    if ((0 == strcmp(firmwareVersion,"notset"))) {
-        LOGE("hw.fm.isAnalog : %s [soc not intialized yet] \n", firmwareVersion);
-        return 0;
-    }
     property_set("hw.fm.mode","config_dac");
     property_set("ctl.start", "fm_dl");
     sleep(1);
-    for(i=0;i<2;i++) {
-        property_get("hw.fm.init", &value, NULL);
-        if(value == '1') {
-           return 1;
-        } else {
-            sleep(1);
-        }
+    property_get("hw.fm.init", &value, NULL);
+    if(value == '1') {
+            return 1;
     }
+    sleep(1);
+    property_get("hw.fm.init", &value, NULL);
+    if(value == '1') {
+            return 1;
+    }
+
     return 0;
 }
 
