@@ -34,7 +34,7 @@ namespace android {
 // ---------------------------------------------------------------------------
 
 LayerBlur::LayerBlur(SurfaceFlinger* flinger, DisplayID display,
-        const sp<Client> client)
+        const sp<Client>& client)
     : LayerBaseClient(flinger, display, client), mCacheDirty(true),
           mRefreshCache(true), mCacheAge(0), mTextureName(-1U),
           mWidthScale(1.0f), mHeightScale(1.0f),

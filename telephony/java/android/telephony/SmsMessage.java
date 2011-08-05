@@ -349,7 +349,8 @@ public class SmsMessage {
                     nextPos = pos + Math.min(limit, textLen - pos);
                 } else {
                     // For multi-segment messages, CDMA 7bit equals GSM 7bit encoding (EMS mode).
-                    nextPos = GsmAlphabet.findGsmSeptetLimitIndex(text, pos, limit);
+                    nextPos = GsmAlphabet.findGsmSeptetLimitIndex(text, pos, limit,
+                            ted.languageTable, ted.languageShiftTable);
                 }
             } else {  // Assume unicode.
                 nextPos = pos + Math.min(limit / 2, textLen - pos);
@@ -406,6 +407,7 @@ public class SmsMessage {
 
     /** TODO: fusion -  Not used remove? SmsMessage in gsm/cdma is public.
      * Get an SMS-SUBMIT PDU for a destination address and a message
+     * This method will not attempt to use any GSM national language 7 bit encodings.
      *
      * @param scAddress Service Centre address.  Null means use default.
      * @return a <code>SubmitPdu</code> containing the encoded SC
@@ -432,6 +434,7 @@ public class SmsMessage {
 
     /** TODO: fusion -  Not used remove? SmsMessage in gsm/cdma is public.
      * Get an SMS-SUBMIT PDU for a destination address and a message
+     * This method will not attempt to use any GSM national language 7 bit encodings.
      *
      * @param scAddress Service Centre address.  Null means use default.
      * @return a <code>SubmitPdu</code> containing the encoded SC
@@ -455,6 +458,7 @@ public class SmsMessage {
 
     /** TODO: fusion -  Not used remove? SmsMessage in gsm/cdma is public.
      * Get an SMS-SUBMIT PDU for a data message to a destination address &amp; port
+     * This method will not attempt to use any GSM national language 7 bit encodings.
      *
      * @param scAddress Service Centre address. null == use default
      * @param destinationAddress the address of the destination for the message

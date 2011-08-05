@@ -46,11 +46,11 @@ class UserClient;
 
 // ---------------------------------------------------------------------------
 
-class Layer : public LayerBaseClient
+class Layer : public LayerBaseClient, private RefBase::Destroyer
 {
 public:
             Layer(SurfaceFlinger* flinger, DisplayID display,
-                    const sp<Client> client);
+                    const sp<Client>& client);
 
     virtual ~Layer();
 
@@ -61,7 +61,7 @@ public:
             PixelFormat format, uint32_t flags=0);
 
     // associate a UserClient to this Layer
-    status_t setToken(const sp<UserClient> uc, SharedClient* sc, int32_t idx);
+    status_t setToken(const sp<UserClient>& uc, SharedClient* sc, int32_t idx);
     int32_t getToken() const;
     sp<UserClient> getClient() const;
 
@@ -90,7 +90,6 @@ public:
     virtual bool isNothingToUpdate() const  { return mNothingToUpdate; }
     virtual void setNothingToUpdate(bool value) { mNothingToUpdate = value; }
     virtual sp<Surface> createSurface() const;
-    virtual status_t ditch();
     virtual void onRemoved();
     virtual bool setBypass(bool enable);
 
@@ -103,10 +102,11 @@ public:
     inline sp<GraphicBuffer> getBuffer(int i) const {
         return mBufferManager.getBuffer(i); }
     // only for debugging
-    inline const sp<FreezeLock>  getFreezeLock() const {
+    inline const sp<FreezeLock>&  getFreezeLock() const {
         return mFreezeLock; }
 
 protected:
+    virtual void destroy(RefBase const* base);
     virtual void dump(String8& result, char* scratch, size_t size) const;
 
 private:
@@ -120,7 +120,7 @@ private:
 
     class SurfaceLayer : public LayerBaseClient::Surface {
     public:
-        SurfaceLayer(const sp<SurfaceFlinger> flinger, const sp<Layer> owner);
+        SurfaceLayer(const sp<SurfaceFlinger>& flinger, const sp<Layer>& owner);
         ~SurfaceLayer();
     private:
         virtual sp<GraphicBuffer> requestBuffer(int bufferIdx,
@@ -149,8 +149,8 @@ private:
         ~ClientRef();
         int32_t getToken() const;
         sp<UserClient> getClient() const;
-        status_t setToken(const sp<UserClient> uc,
-                const sp<SharedBufferServer> sharedClient, int32_t token);
+        status_t setToken(const sp<UserClient>& uc,
+                const sp<SharedBufferServer>& sharedClient, int32_t token);
         sp<UserClient> getUserClientUnsafe() const;
         class Access {
             Access(const Access& rhs);
@@ -193,7 +193,7 @@ private:
 
         // detach/attach buffer from/to given index
         sp<GraphicBuffer> detachBuffer(size_t index);
-        status_t attachBuffer(size_t index, const sp<GraphicBuffer> buffer);
+        status_t attachBuffer(size_t index, const sp<GraphicBuffer>& buffer);
         // resize the number of active buffers
         status_t resize(size_t size);
 
@@ -213,7 +213,7 @@ private:
         status_t loadTexture(const Region& dirty, const GGLSurface& t);
         // make active buffer an EGLImage if needed
         status_t initEglImage(EGLDisplay dpy,
-                const sp<GraphicBuffer> buffer);
+                const sp<GraphicBuffer>& buffer);
 
         // ----------------------------------------------
         // only for debugging

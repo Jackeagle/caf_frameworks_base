@@ -40,6 +40,7 @@ import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.gsm.SmsCbHeader;
 import com.android.internal.telephony.gsm.SmsMessage;
 import com.android.internal.telephony.BaseCommands;
+import com.android.internal.telephony.TelephonyProperties;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -254,7 +255,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsMessage.SubmitPdu pdus = SmsMessage.getSubmitPdu(scAddress, destinationAddress,
                     parts.get(i), deliveryIntent != null, SmsHeader.toByteArray(smsHeader),
-                    encoding);
+                    encoding, smsHeader.languageTable, smsHeader.languageShiftTable);
 
             HashMap map =  SmsTrackerMapFactory(destinationAddress, scAddress,
                     parts.get(i), pdus);
@@ -345,7 +346,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsMessage.SubmitPdu pdus = SmsMessage.getSubmitPdu(scAddress, destinationAddress,
                     parts.get(i), deliveryIntent != null, SmsHeader.toByteArray(smsHeader),
-                    encoding);
+                    encoding, smsHeader.languageTable, smsHeader.languageShiftTable);
 
             HashMap map =  SmsTrackerMapFactory(destinationAddress, scAddress,
                     parts.get(i), pdus);

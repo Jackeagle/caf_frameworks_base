@@ -29,7 +29,7 @@ namespace android {
 
 // ---------------------------------------------------------------------------
 
-void MessageList::insert(const sp<MessageBase> node) 
+void MessageList::insert(const sp<MessageBase>& node) 
 {
     LIST::iterator cur(mList.begin());
     LIST::iterator end(mList.end());
@@ -146,7 +146,7 @@ sp<MessageBase> MessageQueue::waitMessage(nsecs_t timeout)
 }
 
 status_t MessageQueue::postMessage(
-        const sp<MessageBase> message, nsecs_t relTime, uint32_t flags)
+        const sp<MessageBase>& message, nsecs_t relTime, uint32_t flags)
 {
     return queueMessage(message, relTime, flags);
 }
@@ -159,7 +159,7 @@ status_t MessageQueue::invalidate() {
 }
 
 status_t MessageQueue::queueMessage(
-        const sp<MessageBase> message, nsecs_t relTime, uint32_t flags)
+        const sp<MessageBase>& message, nsecs_t relTime, uint32_t flags)
 {
     Mutex::Autolock _l(mLock);
     message->when = systemTime() + relTime;
@@ -172,13 +172,13 @@ status_t MessageQueue::queueMessage(
     return NO_ERROR;
 }
 
-void MessageQueue::dump(const sp<MessageBase> message)
+void MessageQueue::dump(const sp<MessageBase>& message)
 {
     Mutex::Autolock _l(mLock);
     dumpLocked(message);
 }
 
-void MessageQueue::dumpLocked(const sp<MessageBase> message)
+void MessageQueue::dumpLocked(const sp<MessageBase>& message)
 {
     LIST::const_iterator cur(mMessages.begin());
     LIST::const_iterator end(mMessages.end());

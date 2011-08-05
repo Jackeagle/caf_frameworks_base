@@ -43,7 +43,7 @@ public:
     inline LIST::iterator end()                  { return mList.end(); }
     inline LIST::const_iterator end() const      { return mList.end(); }
     inline bool isEmpty() const { return mList.empty(); }
-    void insert(const sp<MessageBase> node);
+    void insert(const sp<MessageBase>& node);
     void remove(LIST::iterator pos);
 };
 
@@ -100,17 +100,17 @@ public:
 
     sp<MessageBase> waitMessage(nsecs_t timeout = -1);
     
-    status_t postMessage(const sp<MessageBase> message,
+    status_t postMessage(const sp<MessageBase>& message,
             nsecs_t reltime=0, uint32_t flags = 0);
 
     status_t invalidate();
     
-    void dump(const sp<MessageBase> message);
+    void dump(const sp<MessageBase>& message);
 
 private:
-    status_t queueMessage(const sp<MessageBase> message,
+    status_t queueMessage(const sp<MessageBase>& message,
             nsecs_t reltime, uint32_t flags);
-    void dumpLocked(const sp<MessageBase> message);
+    void dumpLocked(const sp<MessageBase>& message);
     
     Mutex           mLock;
     Condition       mCondition;

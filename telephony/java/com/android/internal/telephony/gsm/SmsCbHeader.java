@@ -19,8 +19,9 @@ package com.android.internal.telephony.gsm;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.telephony.SmsCbConstants;
 
-public class SmsCbHeader implements Parcelable {
+public class SmsCbHeader implements Parcelable, SmsCbConstants {
     /**
      * Length of SMS-CB header
      */
@@ -49,12 +50,12 @@ public class SmsCbHeader implements Parcelable {
     /**
      * Length of GSM pdus
      */
-    private static final int PDU_LENGTH_GSM = 88;
+    public static final int PDU_LENGTH_GSM = 88;
 
     /**
      * Maximum length of ETWS primary message GSM pdus
      */
-    private static final int PDU_LENGTH_ETWS = 56;
+    public static final int PDU_LENGTH_ETWS = 56;
 
     public final int geographicalScope;
 
@@ -72,50 +73,52 @@ public class SmsCbHeader implements Parcelable {
 
     public final int format;
 
-    public final int etwsEmergencyUserAlert;
+    public final boolean etwsEmergencyUserAlert;
 
-    public final int etwsPopup;
+    public final boolean etwsPopup;
+
+    public final int etwsWarningType;
 
     public SmsCbHeader(byte[] pdu) throws IllegalArgumentException {
         if (pdu == null || pdu.length < PDU_HEADER_LENGTH) {
             throw new IllegalArgumentException("Illegal PDU");
         }
 
-        if (pdu.length <= PDU_LENGTH_GSM) {
+        if (pdu.length <= PDU_LENGTH_ETWS) {
+            format = FORMAT_ETWS_PRIMARY;
+            geographicalScope = -1; //not applicable
+            messageCode = -1;
+            updateNumber = -1;
+            messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
+            dataCodingScheme = -1;
+            pageIndex = -1;
+            nrOfPages = -1;
+            etwsEmergencyUserAlert = (pdu[4] & 0x1) != 0;
+            etwsPopup = (pdu[5] & 0x80) != 0;
+            etwsWarningType = (pdu[4] & 0xfe) >> 1;
+        } else if (pdu.length <= PDU_LENGTH_GSM) {
             // GSM pdus are no more than 88 bytes
-            if (pdu.length <= PDU_LENGTH_ETWS) {
-                format = FORMAT_ETWS_PRIMARY;
-                geographicalScope = -1; //not applicable
-                messageCode = -1;
-                updateNumber = -1;
-                messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
-                dataCodingScheme = -1;
-                pageIndex = -1;
-                nrOfPages = -1;
-                etwsEmergencyUserAlert = (pdu[4] & 0x1);
-                etwsPopup = (pdu[5] & 0x8) >> 7;
-            } else {
-                format = FORMAT_GSM;
-                geographicalScope = (pdu[0] & 0xc0) >> 6;
-                messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >> 4);
-                updateNumber = pdu[1] & 0x0f;
-                messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
-                dataCodingScheme = pdu[4] & 0xff;
+            format = FORMAT_GSM;
+            geographicalScope = (pdu[0] & 0xc0) >> 6;
+            messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >> 4);
+            updateNumber = pdu[1] & 0x0f;
+            messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
+            dataCodingScheme = pdu[4] & 0xff;
 
-                // Check for invalid page parameter
-                int pageIndex = (pdu[5] & 0xf0) >> 4;
-                int nrOfPages = pdu[5] & 0x0f;
+            // Check for invalid page parameter
+            int pageIndex = (pdu[5] & 0xf0) >> 4;
+            int nrOfPages = pdu[5] & 0x0f;
 
-                if (pageIndex == 0 || nrOfPages == 0 || pageIndex > nrOfPages) {
-                    pageIndex = 1;
-                    nrOfPages = 1;
-                }
-
-                this.pageIndex = pageIndex;
-                this.nrOfPages = nrOfPages;
-                etwsEmergencyUserAlert = -1;
-                etwsPopup = -1;
+            if (pageIndex == 0 || nrOfPages == 0 || pageIndex > nrOfPages) {
+                pageIndex = 1;
+                nrOfPages = 1;
             }
+
+            this.pageIndex = pageIndex;
+            this.nrOfPages = nrOfPages;
+            etwsEmergencyUserAlert = false;
+            etwsPopup = false;
+            etwsWarningType = -1;
         } else {
             // UMTS pdus are always at least 90 bytes since the payload includes
             // a number-of-pages octet and also one length octet per page
@@ -138,8 +141,9 @@ public class SmsCbHeader implements Parcelable {
             // actual payload may contain several pages.
             pageIndex = 1;
             nrOfPages = 1;
-            etwsEmergencyUserAlert = -1;
-            etwsPopup = -1;
+            etwsEmergencyUserAlert = false;
+            etwsPopup = false;
+            etwsWarningType = -1;
         }
     }
 
@@ -155,13 +159,7 @@ public class SmsCbHeader implements Parcelable {
         this.format = other.format;
         this.etwsEmergencyUserAlert = other.etwsEmergencyUserAlert;
         this.etwsPopup = other.etwsPopup;
-    }
-
-    @Override
-    public String toString() {
-        return ("[Id = " + messageIdentifier + " Code = " + messageCode
-                + " Coding Scheme = " + dataCodingScheme + " Gs = "
-                + geographicalScope + " Update Number = " + updateNumber + "]");
+        this.etwsWarningType = other.etwsWarningType;
     }
 
     public int describeContents() {
@@ -177,8 +175,9 @@ public class SmsCbHeader implements Parcelable {
         dest.writeInt(pageIndex);
         dest.writeInt(nrOfPages);
         dest.writeInt(format);
-        dest.writeInt(etwsEmergencyUserAlert);
-        dest.writeInt(etwsPopup);
+        dest.writeInt((etwsEmergencyUserAlert) ? 1 : 0);
+        dest.writeInt((etwsPopup) ? 1 : 0);
+        dest.writeInt(etwsWarningType);
     }
 
     public static final Parcelable.Creator<SmsCbHeader> CREATOR = new Parcelable.Creator<SmsCbHeader>() {
@@ -200,7 +199,76 @@ public class SmsCbHeader implements Parcelable {
         pageIndex = in.readInt();
         nrOfPages = in.readInt();
         format = in.readInt();
-        etwsEmergencyUserAlert = in.readInt();
-        etwsPopup = in.readInt();
+        etwsEmergencyUserAlert = in.readInt() == 1;
+        etwsPopup = in.readInt() == 1;
+        etwsWarningType = in.readInt();
+    }
+
+    /**
+     * Return whether the specified message ID is an emergency (PWS) message type.
+     * This method is static and takes an argument so that it can be used by
+     * CellBroadcastReceiver, which stores message ID's in SQLite rather than PDU.
+     * @param id the message identifier to check
+     * @return true if the message is emergency type; false otherwise
+     */
+    public static boolean isEmergencyMessage(int id) {
+        return id >= MESSAGE_ID_PWS_FIRST_IDENTIFIER && id <= MESSAGE_ID_PWS_LAST_IDENTIFIER;
+    }
+
+    /**
+     * Return whether the specified message ID is an ETWS emergency message type.
+     * This method is static and takes an argument so that it can be used by
+     * CellBroadcastReceiver, which stores message ID's in SQLite rather than PDU.
+     * @param id the message identifier to check
+     * @return true if the message is ETWS emergency type; false otherwise
+     */
+    public static boolean isEtwsMessage(int id) {
+        return (id & MESSAGE_ID_ETWS_TYPE_MASK) == MESSAGE_ID_ETWS_TYPE;
+    }
+
+    /**
+     * Return whether the specified message ID is a CMAS emergency message type.
+     * This method is static and takes an argument so that it can be used by
+     * CellBroadcastReceiver, which stores message ID's in SQLite rather than PDU.
+     * @param id the message identifier to check
+     * @return true if the message is CMAS emergency type; false otherwise
+     */
+    public static boolean isCmasMessage(int id) {
+        return id >= MESSAGE_ID_CMAS_FIRST_IDENTIFIER && id <= MESSAGE_ID_CMAS_LAST_IDENTIFIER;
+    }
+
+    /**
+     * Return whether the specified message code indicates an ETWS popup alert.
+     * This method is static and takes an argument so that it can be used by
+     * CellBroadcastReceiver, which stores message codes in SQLite rather than PDU.
+     * This method assumes that the message ID has already been checked for ETWS type.
+     *
+     * @param messageCode the message code to check
+     * @return true if the message code indicates a popup alert should be displayed
+     */
+    public static boolean isEtwsPopupAlert(int messageCode) {
+        return (messageCode & MESSAGE_CODE_ETWS_ACTIVATE_POPUP) != 0;
+    }
+
+    /**
+     * Return whether the specified message code indicates an ETWS emergency user alert.
+     * This method is static and takes an argument so that it can be used by
+     * CellBroadcastReceiver, which stores message codes in SQLite rather than PDU.
+     * This method assumes that the message ID has already been checked for ETWS type.
+     *
+     * @param messageCode the message code to check
+     * @return true if the message code indicates an emergency user alert
+     */
+    public static boolean isEtwsEmergencyUserAlert(int messageCode) {
+        return (messageCode & MESSAGE_CODE_ETWS_EMERGENCY_USER_ALERT) != 0;
+    }
+
+    @Override
+    public String toString() {
+        return "SmsCbHeader{GS=" + geographicalScope + ", messageCode=0x" +
+                Integer.toHexString(messageCode) + ", updateNumber=" + updateNumber +
+                ", messageIdentifier=0x" + Integer.toHexString(messageIdentifier) +
+                ", DCS=0x" + Integer.toHexString(dataCodingScheme) +
+                ", page " + pageIndex + " of " + nrOfPages + '}';
     }
 }

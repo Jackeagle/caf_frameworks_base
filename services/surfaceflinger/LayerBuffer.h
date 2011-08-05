@@ -69,7 +69,7 @@ class LayerBuffer : public LayerBaseClient, public IOnQueueBuf
 
 public:
             LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
-                    const sp<Client> client);
+                    const sp<Client>& client);
         virtual ~LayerBuffer();
 
     virtual void onFirstRef();
@@ -158,7 +158,7 @@ private:
 
         status_t getStatus() const { return mStatus; }
         sp<Buffer> getBuffer() const;
-        void setBuffer(const sp<Buffer> buffer);
+        void setBuffer(const sp<Buffer>& buffer);
 
         virtual void onDraw(const Region& clip) const;
         virtual status_t drawWithOverlay(const Region& clip, 
@@ -232,7 +232,7 @@ private:
                 }
             }
         public:
-            OverlayChannel(const sp<LayerBuffer> layer)
+            OverlayChannel(const sp<LayerBuffer>& layer)
                 : mLayer(layer) {
             }
         };
@@ -259,8 +259,8 @@ private:
     class SurfaceLayerBuffer : public LayerBaseClient::Surface
     {
     public:
-        SurfaceLayerBuffer(const sp<SurfaceFlinger> flinger,
-                        const sp<LayerBuffer> owner);
+        SurfaceLayerBuffer(const sp<SurfaceFlinger>& flinger,
+                        const sp<LayerBuffer>& owner);
         virtual ~SurfaceLayerBuffer();
 
         virtual status_t registerBuffers(const ISurface::BufferHeap& buffers);

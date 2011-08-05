@@ -73,7 +73,7 @@ public:
         return interface_cast<IMemoryHeap>(reply.readStrongBinder());
     }
 
-    virtual ssize_t getTokenForSurface(const sp<ISurface> sur) const
+    virtual ssize_t getTokenForSurface(const sp<ISurface>& sur) const
     {
         Parcel data, reply;
         data.writeInterfaceToken(ISurfaceComposerClient::getInterfaceDescriptor());

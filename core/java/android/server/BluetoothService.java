@@ -112,6 +112,9 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int MESSAGE_DISCOVERABLE_TIMEOUT = 4;
     private static final int MESSAGE_AUTO_PAIRING_FAILURE_ATTEMPT_DELAY = 5;
     private static final int MESSAGE_START_DUN_SERVER = 6;
+    private static final int MESSAGE_GATT_INTENT = 7;
+    private static final int MESSAGE_GATT_CHARACTERISTICS_DISCOVERY = 8;
+
 
     // The time (in millisecs) to delay the pairing attempt after the first
     // auto pairing attempt fails. We use an exponential delay with
@@ -1300,17 +1303,15 @@ public class BluetoothService extends IBluetooth.Stub {
 
         switch (mode) {
         case BluetoothAdapter.SCAN_MODE_NONE:
-            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             pairable = false;
             discoverable = false;
             break;
         case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
-            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             pairable = true;
             discoverable = false;
             break;
         case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
-            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
+            setDiscoverableTimeout(duration);
             pairable = true;
             discoverable = true;
             if (duration > 0) {

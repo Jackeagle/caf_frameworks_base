@@ -34,7 +34,6 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.net.Uri;
 import android.os.AsyncResult;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -143,10 +142,10 @@ public abstract class SMSDispatcher extends Handler {
     static protected boolean mIms = false;
     static protected RadioTechnologyFamily mImsSmsEncoding = RadioTechnologyFamily.RADIO_TECH_UNKNOWN;
     //DSDS static cannot be used
-    protected Phone mPhone;
-
     /** New broadcast SMS */
     static final protected int EVENT_NEW_BROADCAST_SMS = 13;
+
+    protected Phone mPhone;
 
     protected Context mContext;
     protected ContentResolver mResolver;
@@ -1218,6 +1217,24 @@ public abstract class SMSDispatcher extends Handler {
             if (mPendingMessagesList.size() == 1) {
                 sendSms(tracker);
             }
+        }
+    }
+
+    protected void dispatchBroadcastPdus(byte[][] pdus, boolean isEmergencyMessage) {
+        if (isEmergencyMessage) {
+            Intent intent = new Intent(Intents.SMS_EMERGENCY_CB_RECEIVED_ACTION);
+            intent.putExtra("pdus", pdus);
+            if (Config.LOGD)
+                Log.d(TAG, "Dispatching " + pdus.length + " emergency SMS CB pdus");
+
+            dispatch(intent, "android.permission.RECEIVE_EMERGENCY_BROADCAST");
+        } else {
+            Intent intent = new Intent(Intents.SMS_CB_RECEIVED_ACTION);
+            intent.putExtra("pdus", pdus);
+            if (Config.LOGD)
+                Log.d(TAG, "Dispatching " + pdus.length + " SMS CB pdus");
+
+            dispatch(intent, "android.permission.RECEIVE_SMS");
         }
     }
 }

@@ -38,7 +38,7 @@ class LayerDim : public LayerBaseClient
     static int32_t sHeight;
 public:    
                 LayerDim(SurfaceFlinger* flinger, DisplayID display,
-                        const sp<Client> client);
+                        const sp<Client>& client);
         virtual ~LayerDim();
 
     virtual void onDraw(const Region& clip) const;

@@ -225,10 +225,6 @@ public:
      */
     virtual bool isSecure() const       { return false; }
 
-    /** Called from the main thread, when the surface is removed from the
-     * draw list */
-    virtual status_t ditch() { return NO_ERROR; }
-
     /** called with the state lock when the surface is removed from the
      *  current list */
     virtual void onRemoved() { };
@@ -295,7 +291,8 @@ protected:
                 bool            mTransformed;
 #endif
 
-protected:
+public:
+    // called from class SurfaceFlinger
     virtual ~LayerBase();
 
 private:
@@ -316,7 +313,7 @@ public:
     class Surface;
 
             LayerBaseClient(SurfaceFlinger* flinger, DisplayID display,
-                        const sp<Client> client);
+                        const sp<Client>& client);
     virtual ~LayerBaseClient();
 
             sp<Surface> getSurface();
@@ -333,8 +330,8 @@ public:
         int32_t getIdentity() const { return mIdentity; }
         
     protected:
-        Surface(const sp<SurfaceFlinger> flinger, int identity,
-                const sp<LayerBaseClient> owner);
+        Surface(const sp<SurfaceFlinger>& flinger, int identity,
+                const sp<LayerBaseClient>& owner);
         virtual ~Surface();
         virtual status_t onTransact(uint32_t code, const Parcel& data,
                 Parcel* reply, uint32_t flags);

@@ -532,7 +532,7 @@ void LayerBase::dump(String8& result, char* buffer, size_t SIZE) const
 int32_t LayerBaseClient::sIdentity = 1;
 
 LayerBaseClient::LayerBaseClient(SurfaceFlinger* flinger, DisplayID display,
-        const sp<Client> client)
+        const sp<Client>& client)
     : LayerBase(flinger, display), mClientRef(client),
       mIdentity(uint32_t(android_atomic_inc(&sIdentity)))
 {
@@ -585,9 +585,9 @@ void LayerBaseClient::dump(String8& result, char* buffer, size_t SIZE) const
 // ---------------------------------------------------------------------------
 
 LayerBaseClient::Surface::Surface(
-        const sp<SurfaceFlinger> flinger,
+        const sp<SurfaceFlinger>& flinger,
         int identity,
-        const sp<LayerBaseClient> owner) 
+        const sp<LayerBaseClient>& owner) 
     : mFlinger(flinger), mIdentity(identity), mOwner(owner)
 {
 }
@@ -599,10 +599,7 @@ LayerBaseClient::Surface::~Surface()
      */
 
     // destroy client resources
-    sp<LayerBaseClient> layer = getOwner();
-    if (layer != 0) {
-        mFlinger->destroySurface(layer);
-    }
+    mFlinger->destroySurface(mOwner);
 }
 
 sp<LayerBaseClient> LayerBaseClient::Surface::getOwner() const {

@@ -67,7 +67,7 @@ void PostBufLockPolicy::wait(Mutex & m, Condition& c, postBufState_t& s)
 }
 
 LayerBuffer::LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
-        const sp<Client> client)
+        const sp<Client>& client)
     : LayerBaseClient(flinger, display, client),
       mNeedsBlending(false), mInvalidate(false), mBlitEngine(0)
 {
@@ -278,7 +278,7 @@ sp<LayerBuffer::Source> LayerBuffer::clearSource() {
 // ============================================================================
 
 LayerBuffer::SurfaceLayerBuffer::SurfaceLayerBuffer(
-        const sp<SurfaceFlinger> flinger, const sp<LayerBuffer> owner)
+        const sp<SurfaceFlinger>& flinger, const sp<LayerBuffer>& owner)
     : LayerBaseClient::Surface(flinger, owner->getIdentity(), owner)
 {
 }
@@ -553,7 +553,7 @@ void LayerBuffer::BufferSource::onQueueBuf()
 }
 
 
-void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer> buffer)
+void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer>& buffer)
 {
   PostBufferSingleton::instance()->wait(mPostBufLock, mPostBufCond, mPostBufState);
   Mutex::Autolock _l(mBufferSourceLock);
