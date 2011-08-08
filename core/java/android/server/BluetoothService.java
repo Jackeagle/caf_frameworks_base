@@ -1382,17 +1382,15 @@ public class BluetoothService extends IBluetooth.Stub {
 
         switch (mode) {
         case BluetoothAdapter.SCAN_MODE_NONE:
-            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             pairable = false;
             discoverable = false;
             break;
         case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
-            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             pairable = true;
             discoverable = false;
             break;
         case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
-            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
+            setDiscoverableTimeout(duration);
             pairable = true;
             discoverable = true;
             if (duration > 0) {

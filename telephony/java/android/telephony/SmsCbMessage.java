@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+<<<<<<< HEAD
  * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,8 +21,10 @@ package android.telephony;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.Log;
+import android.text.format.Time;
 
 import com.android.internal.telephony.GsmAlphabet;
+import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.gsm.SmsCbHeader;
 
 import java.io.UnsupportedEncodingException;
@@ -96,10 +99,23 @@ public class SmsCbMessage {
 
     private String mBody;
 
+    /** Timestamp of ETWS primary notification with security. */
+    private long mPrimaryNotificationTimestamp;
+
+    /** 43 byte digital signature of ETWS primary notification with security. */
+    private byte[] mPrimaryNotificationDigitalSignature;
+
     private SmsCbMessage(byte[] pdu) throws IllegalArgumentException {
         mHeader = new SmsCbHeader(pdu);
-        if (mHeader.format == mHeader.FORMAT_ETWS_PRIMARY) {
+        if (mHeader.format == SmsCbHeader.FORMAT_ETWS_PRIMARY) {
             mBody = "ETWS";
+            // ETWS primary notification with security is 56 octets in length
+            if (pdu.length >= SmsCbHeader.PDU_LENGTH_ETWS) {
+                mPrimaryNotificationTimestamp = getTimestampMillis(pdu);
+                mPrimaryNotificationDigitalSignature = new byte[43];
+                // digital signature starts after 6 byte header and 7 byte timestamp
+                System.arraycopy(pdu, 13, mPrimaryNotificationDigitalSignature, 0, 43);
+            }
         } else {
             parseBody(pdu);
         }
@@ -110,6 +126,8 @@ public class SmsCbMessage {
         this.mHeader = other.mHeader;
         this.mBody = other.mBody;
         this.mLanguage = other.mLanguage;
+        this.mPrimaryNotificationTimestamp = other.mPrimaryNotificationTimestamp;
+        //TODO copy mPrimaryNotificationDigitalSignature
     }
 
     /**
@@ -171,13 +189,54 @@ public class SmsCbMessage {
     }
 
     /**
-     * Get the format of this message
-     *
-     * @return message format
+     * Get the format of this message.
+     * @return {@link SmsCbHeader#FORMAT_GSM}, {@link SmsCbHeader#FORMAT_UMTS}, or
+     *         {@link SmsCbHeader#FORMAT_ETWS_PRIMARY}
      */
-    public int getFormat() {
+    public int getMessageFormat() {
         return mHeader.format;
     }
+
+    /**
+     * For ETWS primary notifications, return the emergency user alert flag.
+     * @return true to notify terminal to activate emergency user alert; false otherwise
+     */
+    public boolean getEtwsEmergencyUserAlert() {
+        return mHeader.etwsEmergencyUserAlert;
+    }
+
+    /**
+     * For ETWS primary notifications, return the popup flag.
+     * @return true to notify terminal to activate display popup; false otherwise
+     */
+    public boolean getEtwsPopup() {
+        return mHeader.etwsPopup;
+    }
+
+    /**
+     * For ETWS primary notifications, return the warning type.
+     * @return a value such as {@link SmsCbConstants#ETWS_WARNING_TYPE_EARTHQUAKE}
+     */
+    public int getEtwsWarningType() {
+        return mHeader.etwsWarningType;
+    }
+
+    /**
+     * For ETWS primary notifications, return the Warning-Security-Information timestamp.
+     * @return a timestamp in System.currentTimeMillis() format.
+     */
+    public long getEtwsSecurityTimestamp() {
+        return mPrimaryNotificationTimestamp;
+    }
+
+    /**
+     * For ETWS primary notifications, return the 43 byte digital signature.
+     * @return a byte array containing a copy of the digital signature
+     */
+    public byte[] getEtwsSecuritySignature() {
+        return mPrimaryNotificationDigitalSignature.clone();
+    }
+
     /**
      * Parse and unpack the body text according to the encoding in the DCS.
      * After completing successfully this method will have assigned the body
@@ -361,11 +420,6 @@ public class SmsCbMessage {
         readFromParcel(in);
     }
 
-    @Override
-    public String toString() {
-        return ("SmsCbMessage: " + mHeader.toString() + " " + mBody);
-    }
-
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeParcelable(mHeader, 0);
         dest.writeString(mBody);
@@ -392,4 +446,58 @@ public class SmsCbMessage {
         }
     };
 
+    /**
+     * Parses an ETWS primary notification timestamp and returns a currentTimeMillis()-style
+     * timestamp. Copied from com.android.internal.telephony.gsm.SmsMessage.
+     * @param pdu the ETWS primary notification PDU to decode
+     * @return the UTC timestamp from the Warning-Security-Information parameter
+     */
+    private long getTimestampMillis(byte[] pdu) {
+        // Timestamp starts after CB header, in pdu[6]
+        int year = IccUtils.gsmBcdByteToInt(pdu[6]);
+        int month = IccUtils.gsmBcdByteToInt(pdu[7]);
+        int day = IccUtils.gsmBcdByteToInt(pdu[8]);
+        int hour = IccUtils.gsmBcdByteToInt(pdu[9]);
+        int minute = IccUtils.gsmBcdByteToInt(pdu[10]);
+        int second = IccUtils.gsmBcdByteToInt(pdu[11]);
+
+        // For the timezone, the most significant bit of the
+        // least significant nibble is the sign byte
+        // (meaning the max range of this field is 79 quarter-hours,
+        // which is more than enough)
+
+        byte tzByte = pdu[12];
+
+        // Mask out sign bit.
+        int timezoneOffset = IccUtils.gsmBcdByteToInt((byte) (tzByte & (~0x08)));
+
+        timezoneOffset = ((tzByte & 0x08) == 0) ? timezoneOffset : -timezoneOffset;
+
+        Time time = new Time(Time.TIMEZONE_UTC);
+
+        // It's 2006.  Should I really support years < 2000?
+        time.year = year >= 90 ? year + 1900 : year + 2000;
+        time.month = month - 1;
+        time.monthDay = day;
+        time.hour = hour;
+        time.minute = minute;
+        time.second = second;
+
+        // Timezone offset is in quarter hours.
+        return time.toMillis(true) - (timezoneOffset * 15 * 60 * 1000);
+    }
+
+    /**
+     * Append text to the message body. This is used to concatenate multi-page GSM broadcasts.
+     * @param body the text to append to this message
+     */
+    public void appendToBody(String body) {
+        mBody = mBody + body;
+    }
+
+    @Override
+    public String toString() {
+        return "SmsCbMessage{" + mHeader.toString() + ", language=" + mLanguage +
+                ", body=\"" + mBody + "\"}";
+    }
 }

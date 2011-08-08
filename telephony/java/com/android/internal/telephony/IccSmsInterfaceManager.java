@@ -56,10 +56,10 @@ public class IccSmsInterfaceManager {
     private List<SmsRawData> mSms; // List all SmsRawData from all apps in
                                    // UiccCard associated with a subscription
 
-    private HashMap<Integer, HashSet<String>> mCellBroadcastSubscriptions =
-            new HashMap<Integer, HashSet<String>>();
-    private HashMap<Integer, HashSet<String>> mCdmaBroadcastSubscriptions =
-        new HashMap<Integer, HashSet<String>>();
+    private CellBroadcastRangeManager mCellBroadcastRangeManager =
+            new CellBroadcastRangeManager();
+    private CdmaBroadcastRangeManager mCdmaBroadcastRangeManager =
+        new CdmaBroadcastRangeManager();
 
     private static final int TYPE_3GPP = 1;
     private static final int TYPE_3GPP2 = 2;
@@ -482,134 +482,102 @@ public class IccSmsInterfaceManager {
         return data;
     }
 
-    private boolean enableBroadcast(int type, int messageIdentifier) {
-        if (DBG) log("enableBroadcast " + ((type == TYPE_3GPP) ? "3gpp " : "3gpp2 ") +
-                "message_id " + messageIdentifier);
+    public boolean enableCellBroadcast(int messageIdentifier) {
+        return enableCellBroadcastRange(messageIdentifier, messageIdentifier);
+    }
+
+    public boolean disableCellBroadcast(int messageIdentifier) {
+        return disableCellBroadcastRange(messageIdentifier, messageIdentifier);
+    }
+
+    public boolean enableCellBroadcastRange(int startMessageId, int endMessageId) {
+        if (DBG) log("enableCellBroadcastRange");
+
         Context context = mPhone.getContext();
 
         context.enforceCallingPermission(
                 "android.permission.RECEIVE_SMS",
-                "Enabling broadcast SMS");
-
-        HashMap<Integer, HashSet<String>> subscriptions;
-        subscriptions = (type == TYPE_3GPP) ? mCellBroadcastSubscriptions : mCdmaBroadcastSubscriptions;
+                "Enabling cell broadcast SMS");
 
         String client = context.getPackageManager().getNameForUid(
                 Binder.getCallingUid());
-        HashSet<String> clients = subscriptions.get(messageIdentifier);
 
-        if (clients == null) {
-            // This is a new message identifier
-            clients = new HashSet<String>();
-            subscriptions.put(messageIdentifier, clients);
-
-            if (!updateBroadcastConfig(type)) {
-                subscriptions.remove(messageIdentifier);
-                return false;
-            }
-        }
-
-        clients.add(client);
-
-        if (DBG)
-            log("Added broadcast subscription for MID " + messageIdentifier
-                    + " from client " + client);
-
-        return true;
-
-    }
-
-    synchronized public boolean enableCellBroadcast(int messageIdentifier) {
-        return enableBroadcast(TYPE_3GPP, messageIdentifier);
-    }
-
-    private boolean disableBroadcast(int type, int messageIdentifier) {
-        if (DBG) log("disableBroadcast " + ((type == TYPE_3GPP) ? "3gpp " : "3gpp2 ") + "message_id " + messageIdentifier);
-        Context context = mPhone.getContext();
-
-        context.enforceCallingPermission(
-                "android.permission.RECEIVE_SMS",
-                "Disabling broadcast SMS");
-
-        HashMap<Integer, HashSet<String>> subscriptions;
-        subscriptions = (type == TYPE_3GPP) ? mCellBroadcastSubscriptions : mCdmaBroadcastSubscriptions;
-
-        String client = context.getPackageManager().getNameForUid(
-                Binder.getCallingUid());
-        HashSet<String> clients = subscriptions.get(messageIdentifier);
-        if (clients != null && clients.remove(client)) {
-            if (DBG)
-                log("Removed cell broadcast subscription for MID " + messageIdentifier
-                        + " from client " + client);
-
-            if (clients.isEmpty()) {
-                subscriptions.remove(messageIdentifier);
-                updateBroadcastConfig(type);
-            }
-            return true;
-        }
-
-        return false;
-
-    }
-    synchronized public boolean disableCellBroadcast(int messageIdentifier) {
-        return disableBroadcast(TYPE_3GPP, messageIdentifier);
-    }
-
-    synchronized public boolean enableCdmaBroadcast(int messageIdentifier) {
-        return enableBroadcast(TYPE_3GPP2, messageIdentifier);
-    }
-
-    synchronized public boolean disableCdmaBroadcast(int messageIdentifier) {
-        return disableBroadcast(TYPE_3GPP2, messageIdentifier);
-    }
-
-    private boolean updateCellBroadcastConfig() {
-        Set<Integer> messageIdentifiers = mCellBroadcastSubscriptions.keySet();
-
-        if (messageIdentifiers.size() > 0) {
-            SmsBroadcastConfigInfo[] configs =
-                    new SmsBroadcastConfigInfo[messageIdentifiers.size()];
-            int i = 0;
-
-            for (int messageIdentifier : messageIdentifiers) {
-                configs[i++] = new SmsBroadcastConfigInfo(messageIdentifier, messageIdentifier,
-                        SMS_CB_CODE_SCHEME_MIN, SMS_CB_CODE_SCHEME_MAX, true);
-            }
-
-            return setCellBroadcastConfig(configs) && setCellBroadcastActivation(true);
-        } else {
-            return setCellBroadcastActivation(false);
-        }
-    }
-
-    private boolean updateCdmaBroadcastConfig() {
-        Set<Integer> messageIdentifiers = mCdmaBroadcastSubscriptions.keySet();
-
-        if (messageIdentifiers.size() > 0) {
-            CdmaSmsBroadcastConfigInfo[] configs =
-                    new CdmaSmsBroadcastConfigInfo[messageIdentifiers.size()];
-            int i = 0;
-
-            for (int messageIdentifier : messageIdentifiers) {
-                configs[i++] = new CdmaSmsBroadcastConfigInfo(messageIdentifier, 1, true);
-            }
-
-            return setCdmaBroadcastConfig(configs) && setCdmaBroadcastActivation(true);
-        } else {
-            return setCdmaBroadcastActivation(false);
-        }
-    }
-
-    private boolean updateBroadcastConfig(int type) {
-        if (type == TYPE_3GPP) {
-            return updateCellBroadcastConfig();
-        } else if (type == TYPE_3GPP2) {
-            return updateCdmaBroadcastConfig();
-        } else {
+        if (!mCellBroadcastRangeManager.enableRange(startMessageId, endMessageId, client)) {
+            log("Failed to add cell broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
             return false;
         }
-   }
+
+        if (DBG)
+            log("Added cell broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
+
+        return true;
+    }
+
+    public boolean disableCellBroadcastRange(int startMessageId, int endMessageId) {
+        if (DBG) log("disableCellBroadcastRange");
+
+        Context context = mPhone.getContext();
+
+        context.enforceCallingPermission(
+                "android.permission.RECEIVE_SMS",
+                "Disabling cell broadcast SMS");
+
+        String client = context.getPackageManager().getNameForUid(
+                Binder.getCallingUid());
+
+        if (!mCellBroadcastRangeManager.disableRange(startMessageId, endMessageId, client)) {
+            log("Failed to remove cell broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
+            return false;
+        }
+
+        if (DBG)
+            log("Removed cell broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
+
+        return true;
+    }
+
+    class CellBroadcastRangeManager extends IntRangeManager {
+        private ArrayList<SmsBroadcastConfigInfo> mConfigList =
+                new ArrayList<SmsBroadcastConfigInfo>();
+
+        /**
+         * Called when the list of enabled ranges has changed. This will be
+         * followed by zero or more calls to {@link #addRange} followed by
+         * a call to {@link #finishUpdate}.
+         */
+        protected void startUpdate() {
+            mConfigList.clear();
+        }
+
+        /**
+         * Called after {@link #startUpdate} to indicate a range of enabled
+         * values.
+         * @param startId the first id included in the range
+         * @param endId the last id included in the range
+         */
+        protected void addRange(int startId, int endId, boolean selected) {
+            mConfigList.add(new SmsBroadcastConfigInfo(startId, endId,
+                        SMS_CB_CODE_SCHEME_MIN, SMS_CB_CODE_SCHEME_MAX, selected));
+        }
+
+        /**
+         * Called to indicate the end of a range update started by the
+         * previous call to {@link #startUpdate}.
+         */
+        protected boolean finishUpdate() {
+            if (mConfigList.isEmpty()) {
+                return setCellBroadcastActivation(false);
+            } else {
+                SmsBroadcastConfigInfo[] configs =
+                        mConfigList.toArray(new SmsBroadcastConfigInfo[mConfigList.size()]);
+                return setCellBroadcastConfig(configs) && setCellBroadcastActivation(true);
+            }
+        }
+    }
 
     private boolean setCellBroadcastConfig(SmsBroadcastConfigInfo[] configs) {
         if (DBG)
@@ -651,6 +619,101 @@ public class IccSmsInterfaceManager {
         return mSuccess;
     }
 
+    public boolean enableCdmaBroadcast(int messageIdentifier) {
+        return enableCdmaBroadcastRange(messageIdentifier, messageIdentifier);
+    }
+
+    public boolean disableCdmaBroadcast(int messageIdentifier) {
+        return disableCdmaBroadcastRange(messageIdentifier, messageIdentifier);
+    }
+
+    public boolean enableCdmaBroadcastRange(int startMessageId, int endMessageId) {
+        if (DBG) log("enableCdmaBroadcastRange");
+
+        Context context = mPhone.getContext();
+
+        context.enforceCallingPermission(
+                "android.permission.RECEIVE_SMS",
+                "Enabling cdma broadcast SMS");
+
+        String client = context.getPackageManager().getNameForUid(
+                Binder.getCallingUid());
+
+        if (!mCdmaBroadcastRangeManager.enableRange(startMessageId, endMessageId, client)) {
+            log("Failed to add cdma broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
+            return false;
+        }
+
+        if (DBG)
+            log("Added cdma broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
+
+        return true;
+    }
+
+    public boolean disableCdmaBroadcastRange(int startMessageId, int endMessageId) {
+        if (DBG) log("disableCdmaBroadcastRange");
+
+        Context context = mPhone.getContext();
+
+        context.enforceCallingPermission(
+                "android.permission.RECEIVE_SMS",
+                "Disabling cell broadcast SMS");
+
+        String client = context.getPackageManager().getNameForUid(
+                Binder.getCallingUid());
+
+        if (!mCdmaBroadcastRangeManager.disableRange(startMessageId, endMessageId, client)) {
+            log("Failed to remove cdma broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
+            return false;
+        }
+
+        if (DBG)
+            log("Removed cdma broadcast subscription for MID range " + startMessageId
+                    + " to " + endMessageId + " from client " + client);
+
+        return true;
+    }
+    class CdmaBroadcastRangeManager extends IntRangeManager {
+        private ArrayList<CdmaSmsBroadcastConfigInfo> mConfigList =
+                new ArrayList<CdmaSmsBroadcastConfigInfo>();
+
+        /**
+         * Called when the list of enabled ranges has changed. This will be
+         * followed by zero or more calls to {@link #addRange} followed by
+         * a call to {@link #finishUpdate}.
+         */
+        protected void startUpdate() {
+            mConfigList.clear();
+        }
+
+        /**
+         * Called after {@link #startUpdate} to indicate a range of enabled
+         * values.
+         * @param startId the first id included in the range
+         * @param endId the last id included in the range
+         */
+        protected void addRange(int startId, int endId, boolean selected) {
+            mConfigList.add(new CdmaSmsBroadcastConfigInfo(startId, endId,
+                        1, selected));
+        }
+
+        /**
+         * Called to indicate the end of a range update started by the
+         * previous call to {@link #startUpdate}.
+         */
+        protected boolean finishUpdate() {
+            if (mConfigList.isEmpty()) {
+                return setCdmaBroadcastActivation(false);
+            } else {
+                CdmaSmsBroadcastConfigInfo[] configs =
+                        mConfigList.toArray(new CdmaSmsBroadcastConfigInfo[mConfigList.size()]);
+                return setCdmaBroadcastConfig(configs) && setCdmaBroadcastActivation(true);
+            }
+        }
+    }
     private boolean setCdmaBroadcastConfig(CdmaSmsBroadcastConfigInfo[] configs) {
         if (DBG)
             log("Calling setCdmaBroadcastConfig with " + configs.length + " configurations");

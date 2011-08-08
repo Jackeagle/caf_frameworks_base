@@ -40,6 +40,7 @@ import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.gsm.SmsCbHeader;
 import com.android.internal.telephony.gsm.SmsMessage;
 import com.android.internal.telephony.BaseCommands;
+import com.android.internal.telephony.TelephonyProperties;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -83,9 +84,8 @@ final class GsmSMSDispatcher extends SMSDispatcher {
         String pduString = (String) ar.result;
         SmsMessage sms = SmsMessage.newFromCDS(pduString);
 
-        int tpStatus = sms.getStatus();
-
         if (sms != null) {
+            int tpStatus = sms.getStatus();
             int messageRef = sms.messageRef;
             for (int i = 0, count = deliveryPendingList.size(); i < count; i++) {
                 SmsTracker tracker = deliveryPendingList.get(i);
@@ -218,6 +218,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
         mRemainingMessages = msgCount;
 
+        TextEncodingDetails[] encodingForParts = new TextEncodingDetails[msgCount];
         for (int i = 0; i < msgCount; i++) {
             TextEncodingDetails details = SmsMessage.calculateLength(parts.get(i), false);
             if (encoding != details.codeUnitSize
@@ -225,6 +226,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
                             || encoding == android.telephony.SmsMessage.ENCODING_7BIT)) {
                 encoding = details.codeUnitSize;
             }
+            encodingForParts[i] = details;
         }
 
         for (int i = 0; i < msgCount; i++) {
@@ -241,6 +243,10 @@ final class GsmSMSDispatcher extends SMSDispatcher {
             concatRef.isEightBits = true;
             SmsHeader smsHeader = new SmsHeader();
             smsHeader.concatRef = concatRef;
+            if (encoding == android.telephony.SmsMessage.ENCODING_7BIT) {
+                smsHeader.languageTable = encodingForParts[i].languageTable;
+                smsHeader.languageShiftTable = encodingForParts[i].languageShiftTable;
+            }
 
             PendingIntent sentIntent = null;
             if (sentIntents != null && sentIntents.size() > i) {
@@ -254,7 +260,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsMessage.SubmitPdu pdus = SmsMessage.getSubmitPdu(scAddress, destinationAddress,
                     parts.get(i), deliveryIntent != null, SmsHeader.toByteArray(smsHeader),
-                    encoding);
+                    encoding, smsHeader.languageTable, smsHeader.languageShiftTable);
 
             HashMap map =  SmsTrackerMapFactory(destinationAddress, scAddress,
                     parts.get(i), pdus);
@@ -315,6 +321,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
         mRemainingMessages = msgCount;
 
+        TextEncodingDetails[] encodingForParts = new TextEncodingDetails[msgCount];
         for (int i = 0; i < msgCount; i++) {
             TextEncodingDetails details = SmsMessage.calculateLength(parts.get(i), false);
             if (encoding != details.codeUnitSize
@@ -322,6 +329,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
                             || encoding == android.telephony.SmsMessage.ENCODING_7BIT)) {
                 encoding = details.codeUnitSize;
             }
+            encodingForParts[i] = details;
         }
 
         for (int i = 0; i < msgCount; i++) {
@@ -332,6 +340,10 @@ final class GsmSMSDispatcher extends SMSDispatcher {
             concatRef.isEightBits = false;
             SmsHeader smsHeader = new SmsHeader();
             smsHeader.concatRef = concatRef;
+            if (encoding == android.telephony.SmsMessage.ENCODING_7BIT) {
+                smsHeader.languageTable = encodingForParts[i].languageTable;
+                smsHeader.languageShiftTable = encodingForParts[i].languageShiftTable;
+            }
 
             PendingIntent sentIntent = null;
             if (sentIntents != null && sentIntents.size() > i) {
@@ -345,7 +357,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsMessage.SubmitPdu pdus = SmsMessage.getSubmitPdu(scAddress, destinationAddress,
                     parts.get(i), deliveryIntent != null, SmsHeader.toByteArray(smsHeader),
-                    encoding);
+                    encoding, smsHeader.languageTable, smsHeader.languageShiftTable);
 
             HashMap map =  SmsTrackerMapFactory(destinationAddress, scAddress,
                     parts.get(i), pdus);
@@ -384,6 +396,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
      *
      * @param tracker holds the multipart Sms tracker ready to be sent
      */
+    @Override
     protected void sendMultipartSms (SmsTracker tracker) {
         ArrayList<String> parts;
         ArrayList<PendingIntent> sentIntents;
@@ -404,6 +417,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
     }
 
     /** {@inheritDoc} */
+    @Override
     protected void acknowledgeLastIncomingSms(boolean success, int result, Message response){
         // FIXME unit test leaves cm == null. this should change
         if (mCm != null) {
@@ -467,6 +481,57 @@ final class GsmSMSDispatcher extends SMSDispatcher {
             mRecords.setVoiceMessageWaiting(1, mwi, onComplete);
         } else {
             Log.d(TAG, "SIM Records not found, MWI not updated");
+        }
+    }
+
+    /*
+     * Called when a Class2 SMS is  received.
+     *
+     * @param ar AsyncResult passed to this function. "ar.result" should
+     *           be representing the INDEX of SMS on SIM.
+     */
+    protected void handleSmsOnIcc(AsyncResult ar) {
+        int[] index = (int[])ar.result;
+
+        if (ar.exception != null || index.length != 1) {
+            Log.e(TAG, " Error on SMS_ON_SIM with exp "
+                   + ar.exception + " length " + index.length);
+        } else {
+            Log.d(TAG, "READ EF_SMS RECORD index=" + index[0]);
+            mApplication.getIccFileHandler().loadEFLinearFixed(IccConstants.EF_SMS,index[0],
+                   obtainMessage(EVENT_GET_ICC_SMS_DONE));
+        }
+    }
+
+
+    /**
+     * Called when a SMS on SIM is retrieved.
+     *
+     * @param ar AsyncResult passed to this function.
+     */
+    protected void handleGetIccSmsDone(AsyncResult ar) {
+        byte[] ba;
+
+        if (ar.exception == null) {
+            ba = (byte[])ar.result;
+            if (ba[0] != 0)
+                Log.d(TAG, "status : " + ba[0]);
+
+            // 3GPP TS 51.011 v5.0.0 (20011-12)  10.5.3
+            // 3 == "received by MS from network; message to be read"
+            if (ba[0] == 3) {
+                int n = ba.length;
+
+                // Note: Data may include trailing FF's.  That's OK; message
+                // should still parse correctly.
+                byte[] pdu = new byte[n - 1];
+                System.arraycopy(ba, 1, pdu, 0, n - 1);
+                SmsMessage message = SmsMessage.createFromPdu(pdu);
+                dispatchMessage((SmsMessageBase) message);
+            } else {
+                Log.e(TAG, "Error on GET_SMS with exp "
+                    + ar.exception);
+            }
         }
     }
 
@@ -547,9 +612,10 @@ final class GsmSMSDispatcher extends SMSDispatcher {
     }
 
     // This map holds incomplete concatenated messages waiting for assembly
-    private HashMap<SmsCbConcatInfo, byte[][]> mSmsCbPageMap =
+    private final HashMap<SmsCbConcatInfo, byte[][]> mSmsCbPageMap =
             new HashMap<SmsCbConcatInfo, byte[][]>();
 
+    @Override
     protected void handleBroadcastSms(AsyncResult ar) {
         try {
             byte[][] pdus = null;
@@ -561,9 +627,9 @@ final class GsmSMSDispatcher extends SMSDispatcher {
                     for (int j = i; j < i + 8 && j < receivedPdu.length; j++) {
                         int b = receivedPdu[j] & 0xff;
                         if (b < 0x10) {
-                            sb.append("0");
+                            sb.append('0');
                         }
-                        sb.append(Integer.toHexString(b)).append(" ");
+                        sb.append(Integer.toHexString(b)).append(' ');
                     }
                     Log.d(TAG, sb.toString());
                 }
@@ -571,14 +637,9 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsCbHeader header = new SmsCbHeader(receivedPdu);
             String plmn = SystemProperties.get(TelephonyProperties.PROPERTY_OPERATOR_NUMERIC);
-            int lac = -1;
-            int cid = -1;
-            CellLocation cl = mPhone.getCellLocation();
-            if (cl instanceof GsmCellLocation) {
-                GsmCellLocation cellLocation = (GsmCellLocation)cl;
-                lac = cellLocation.getLac();
-                cid = cellLocation.getCid();
-            }
+            GsmCellLocation cellLocation = (GsmCellLocation)mPhone.getCellLocation();
+            int lac = cellLocation.getLac();
+            int cid = cellLocation.getCid();
 
             if (header.nrOfPages > 1) {
                 // Multi-page message
@@ -613,7 +674,8 @@ final class GsmSMSDispatcher extends SMSDispatcher {
                 pdus[0] = receivedPdu;
             }
 
-            dispatchBroadcastPdus(Intents.CB_SMS_RECEIVED_ACTION, pdus);
+            boolean isEmergencyMessage = SmsCbHeader.isEmergencyMessage(header.messageIdentifier);
+            dispatchBroadcastPdus(pdus, isEmergencyMessage);
 
             // Remove messages that are out of scope to prevent the map from
             // growing indefinitely, containing incomplete messages that were
@@ -632,54 +694,4 @@ final class GsmSMSDispatcher extends SMSDispatcher {
         }
     }
 
-    /*
-     * Called when a Class2 SMS is  received.
-     *
-     * @param ar AsyncResult passed to this function. "ar.result" should
-     *           be representing the INDEX of SMS on SIM.
-     */
-    protected void handleSmsOnIcc(AsyncResult ar) {
-        int[] index = (int[])ar.result;
-
-        if (ar.exception != null || index.length != 1) {
-            Log.e(TAG, " Error on SMS_ON_SIM with exp "
-                   + ar.exception + " length " + index.length);
-        } else {
-            Log.d(TAG, "READ EF_SMS RECORD index=" + index[0]);
-            mApplication.getIccFileHandler().loadEFLinearFixed(IccConstants.EF_SMS,index[0],
-                   obtainMessage(EVENT_GET_ICC_SMS_DONE));
-        }
-    }
-
-
-    /**
-     * Called when a SMS on SIM is retrieved.
-     *
-     * @param ar AsyncResult passed to this function.
-     */
-    protected void handleGetIccSmsDone(AsyncResult ar) {
-        byte[] ba;
-
-        if (ar.exception == null) {
-            ba = (byte[])ar.result;
-            if (ba[0] != 0)
-                Log.d(TAG, "status : " + ba[0]);
-
-            // 3GPP TS 51.011 v5.0.0 (20011-12)  10.5.3
-            // 3 == "received by MS from network; message to be read"
-            if (ba[0] == 3) {
-                int n = ba.length;
-
-                // Note: Data may include trailing FF's.  That's OK; message
-                // should still parse correctly.
-                byte[] pdu = new byte[n - 1];
-                System.arraycopy(ba, 1, pdu, 0, n - 1);
-                SmsMessage message = SmsMessage.createFromPdu(pdu);
-                dispatchMessage((SmsMessageBase) message);
-            } else {
-                Log.e(TAG, "Error on GET_SMS with exp "
-                    + ar.exception);
-            }
-        }
-    }
 }

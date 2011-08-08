@@ -254,6 +254,7 @@ interface ISms {
      * @see #disableCellBroadcast(int)
      */
     boolean enableCellBroadcast(int messageIdentifier);
+
     /**
      * Enable reception of cell broadcast (SMS-CB) messages with the given
      * message identifier and subscription. Note that if two different clients enable the same
@@ -358,4 +359,33 @@ interface ISms {
      * @return subscription id
      */
     int getPreferredSmsSubscription();
+
+    /*
+     * Enable reception of cell broadcast (SMS-CB) messages with the given
+     * message identifier range. Note that if two different clients enable
+     * a message identifier range, they must both disable it for the device
+     * to stop receiving those messages.
+     *
+     * @param startMessageId first message identifier as specified in TS 23.041
+     * @param endMessageId last message identifier as specified in TS 23.041
+     * @return true if successful, false otherwise
+     *
+     * @see #disableCellBroadcastRange(int, int)
+     */
+    boolean enableCellBroadcastRange(int startMessageId, int endMessageId);
+
+    /**
+     * Disable reception of cell broadcast (SMS-CB) messages with the given
+     * message identifier range. Note that if two different clients enable
+     * a message identifier range, they must both disable it for the device
+     * to stop receiving those messages.
+     *
+     * @param startMessageId first message identifier as specified in TS 23.041
+     * @param endMessageId last message identifier as specified in TS 23.041
+     * @return true if successful, false otherwise
+     *
+     * @see #enableCellBroadcastRange(int, int)
+     */
+    boolean disableCellBroadcastRange(int startMessageId, int endMessageId);
+
 }
