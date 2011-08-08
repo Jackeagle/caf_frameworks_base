@@ -28,6 +28,7 @@ import com.android.internal.telephony.uicc.IccUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
+import java.text.ParseException;
 
 import static android.telephony.SmsMessage.ENCODING_16BIT;
 import static android.telephony.SmsMessage.ENCODING_7BIT;
@@ -559,7 +560,12 @@ public class SmsMessage extends SmsMessageBase {
             int addressLength = pdu[cur] & 0xff;
             int lengthBytes = 2 + (addressLength + 1) / 2;
 
-            ret = new GsmSmsAddress(pdu, cur, lengthBytes);
+            try {
+                ret = new GsmSmsAddress(pdu, cur, lengthBytes);
+            } catch (ParseException e) {
+                Log.e(LOG_TAG, e.getMessage());
+                ret = null;
+            }
 
             cur += lengthBytes;
 
