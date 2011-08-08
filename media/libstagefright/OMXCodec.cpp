@@ -1378,6 +1378,10 @@ status_t OMXCodec::setVideoOutputFormat(
 
     CHECK_EQ(err, OK);
 
+#ifdef OVERLAY_SUPPORT_USERPTR_BUF
+    def.nBufferSize = width * height;
+#endif
+
 #if 1
     // XXX Need a (much) better heuristic to compute input buffer sizes.
     const size_t X = 64 * 1024;
