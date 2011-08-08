@@ -32,8 +32,13 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#include <utils/threads.h>
+#include <utils/Vector.h>
 
 namespace android {
+
+class LayerBuffer;
+class LayerBase;
 
 /* Helper class like std::count_if */
 template <class T, class F>
@@ -150,6 +155,21 @@ public:
                    PostBufPolicyBase::postBufState_t& s) {
       mPolicy->onQueueBuf(m, c, dirtyBit, s);
   }
+
+  /*
+   * Add push buffer layer to a list that track it
+   */
+   void addPushBufferLayers(const Vector< sp<LayerBase> >& l);
+
+   /*
+    * Call onQueueBuf for each cached layer mPushBufList
+    * */
+   void onQueueBuf();
+
+   /*
+    * Clear push buffer list.
+    * */
+   void clearBufferLayerList() { mPushBufList.clear(); }
 private:
   /*
    * Ctor/Copy/Assignment and instance here
@@ -186,6 +206,10 @@ private:
   PostBufPolicyBase* mPolicy;
   PostBufLockPolicy mLockPolicy;
   PostBufNoLockPolicy mNoLockPolicy;
+
+   /* push buffer layer list. Used in SurfaceFlinger to signal
+    * all pending push buffer layers*/
+   Vector< sp<LayerBase> > mPushBufList;
 
   /* "sliding window" enums */
   enum { MAX_WIN_SIZE = 4, MAX_WIN_ARRAY = 6 };

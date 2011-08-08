@@ -45,28 +45,6 @@ gralloc_module_t const* LayerBuffer::sGrallocModule = 0;
 
 // ---------------------------------------------------------------------------
 
-PostBufferSingleton* PostBufferSingleton::mInstance=0;
-
-void PostBufLockPolicy::wait(Mutex & m, Condition& c, postBufState_t& s)
-{
-  const nsecs_t TIMEOUT = ms2ns(20);
-  Mutex::Autolock _l(m);
-  unsigned int count = 0;
-  enum { MAX_WAIT_COUNT = 50 };
-  /* That is the heart of postBuffer block call.
-   * we set wakeup to 3 sec. That should never deadblock
-   * since we always have *any* UI update that can release it */
-  while(s == PostBufPolicyBase::POSTBUF_BLOCK) {
-    (void) c.waitRelative(m, TIMEOUT);
-    if(++count > MAX_WAIT_COUNT){
-      LOGE("BufferSource::setBuffer too many wait count=%d", count);
-      s = PostBufPolicyBase::POSTBUF_GO;
-    }
-  }
-  // Mark it as block so no other setBuffer can sneak in
-  s = PostBufPolicyBase::POSTBUF_BLOCK;
-}
-
 LayerBuffer::LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
         const sp<Client>& client)
     : LayerBaseClient(flinger, display, client),
