@@ -1084,18 +1084,9 @@ public class GSMPhone extends PhoneBase {
 
         // get the message
         Message msg = obtainMessage(EVENT_SET_NETWORK_AUTOMATIC_COMPLETE, nsm);
-
-        // Mode is automatic already, dont send request to RIL
-        if (!mSST.ss.getIsManualSelection()) {
-            Log.d(LOG_TAG, "Posting EVENT_SET_NETWORK_AUTOMATIC_COMPLETE internally ");
-            AsyncResult.forMessage(msg, null, null);
-            msg.sendToTarget();
-        } else {
-            mCM.setNetworkSelectionModeAutomatic(msg);
-            if (LOCAL_DEBUG)
-                Log.d(LOG_TAG, "wrapping and sending message to connect automatically");
-
-        }
+        if (LOCAL_DEBUG)
+            Log.d(LOG_TAG, "wrapping and sending message to connect automatically");
+        mCM.setNetworkSelectionModeAutomatic(msg);
     }
 
     public void
@@ -1426,8 +1417,15 @@ public class GSMPhone extends PhoneBase {
                 break;
 
             case EVENT_SET_NETWORK_AUTOMATIC:
-                ar = (AsyncResult)msg.obj;
-                setNetworkSelectionModeAutomatic((Message)ar.result);
+                // Automatic network selection from EF_CSP SIM record
+                ar = (AsyncResult) msg.obj;
+                if (mSST.ss.getIsManualSelection()) {
+                    setNetworkSelectionModeAutomatic((Message) ar.result);
+                } else {
+                    // prevent duplicate request which will push current PLMN to
+                    // low priority
+                    Log.d(LOG_TAG, "Stop duplicate SET_NETWORK_SELECTION_AUTOMATIC to Ril ");
+                }
                 break;
 
             case EVENT_ICC_RECORD_EVENTS:
