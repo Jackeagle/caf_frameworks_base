@@ -86,7 +86,7 @@ private:
     bool a2dpDisconnectPause; 
     bool a2dpThreadStarted;
     volatile bool asyncReset;
-
+    bool eventThreadCreated;
     //Structure to hold pmem buffer information
     class BuffersAllocated {
     public:
@@ -137,7 +137,7 @@ private:
     pthread_cond_t decoder_cv;
     pthread_cond_t a2dp_cv;
     pthread_cond_t effect_cv;
-
+    pthread_cond_t event_thread_cv;
     // make sure Decoder thread has exited
     void requestAndWaitForDecoderThreadExit();
 

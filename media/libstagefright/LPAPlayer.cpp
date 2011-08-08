@@ -80,7 +80,7 @@ AudioPlayer(audioSink,observer) {
     bIsA2DPEnabled = false;
     mAudioFlinger = NULL;
     AudioFlingerClient = NULL;
-
+    eventThreadCreated = false;
     /* Initialize Suspend/Resume related variables */
     mQueue.start();
     mQueueStarted      = true;
@@ -841,6 +841,8 @@ void LPAPlayer::eventThreadEntry() {
     struct msm_audio_event cur_pcmdec_event;
 
     pthread_mutex_lock(&event_mutex);
+    eventThreadCreated = true;
+    pthread_cond_signal(&event_thread_cv);
     int rc = 0;
     setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_AUDIO);
     prctl(PR_SET_NAME, (unsigned long)"LPA EventThread", 0, 0, 0);
@@ -1311,7 +1313,7 @@ void LPAPlayer::createThreads() {
     pthread_cond_init (&decoder_cv, NULL);
     pthread_cond_init (&a2dp_cv, NULL);
     pthread_cond_init (&effect_cv, NULL);
-
+    pthread_cond_init (&event_thread_cv, NULL);
     // Create 4 threads Effect, decoder, event and A2dp
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -1576,6 +1578,10 @@ void LPAPlayer::requestAndWaitForEventThreadExit() {
     if (!eventThreadAlive)
         return;
     killEventThread = true;
+    pthread_mutex_lock(&event_mutex);
+    if (!eventThreadCreated)
+        pthread_cond_wait(&event_thread_cv,&event_mutex);
+    pthread_mutex_unlock(&event_mutex);
     pthread_cond_signal(&event_cv);
     if (ioctl(afd, AUDIO_ABORT_GET_EVENT, 0) < 0) {
         LOGE("Audio Abort event failed");
