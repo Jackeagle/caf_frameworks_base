@@ -98,7 +98,7 @@ public class WifiService extends IWifiManager.Stub {
     private static final Pattern scanResultPattern = Pattern.compile("\t+");
     private final WifiStateTracker mWifiStateTracker;
     /* TODO: fetch a configurable interface */
-    private static final String SOFTAP_IFACE = "wl0.1";
+    private static final String SOFTAP_IFACE = "softap.0";
 
     private Context mContext;
     private int mWifiApState;
