@@ -66,7 +66,8 @@ AudioSource::AudioSource(
       mPrevLostBytes(0),
       mGroup(NULL),
       mFormat(AudioSystem::PCM_16_BIT),
-      mMime(MEDIA_MIMETYPE_AUDIO_RAW) {
+      mMime(MEDIA_MIMETYPE_AUDIO_RAW),
+      mFirstFrame(false) {
 
     LOGV("sampleRate: %d, channels: %d", sampleRate, channels);
     CHECK(channels == 1 || channels == 2);
@@ -96,7 +97,8 @@ AudioSource::AudioSource( int inputSource, const sp<MetaData>& meta )
       mPrevSampleTimeUs(0),
       mTotalLostFrames(0),
       mPrevLostBytes(0),
-      mGroup(NULL) {
+      mGroup(NULL),
+      mFirstFrame(false) {
 
     const char * mime;
     CHECK( meta->findCString( kKeyMIMEType, &mime ) );
@@ -306,6 +308,10 @@ status_t AudioSource::read(
     }
 
     int64_t readTimeUs = systemTime() / 1000;
+    if (mFirstFrame == false) {
+        mStartTimeUs = readTimeUs;
+        mFirstFrame = true;
+    }
     *out = NULL;
 
     MediaBuffer *buffer;
@@ -321,7 +327,7 @@ status_t AudioSource::read(
         if (numFramesRecorded == 0 && mPrevSampleTimeUs == 0) {
             mInitialReadTimeUs = readTimeUs;
             // Initial delay
-            if ((mStartTimeUs > 0) && (mFormat == AudioSystem::PCM_16_BIT)) {
+            if (mStartTimeUs > 0) {
                 mStartTimeUs = readTimeUs - mStartTimeUs;
             } else {
                 // Assume latency is constant.

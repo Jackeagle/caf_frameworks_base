@@ -64,6 +64,7 @@ private:
     AudioRecord *mRecord;
     status_t mInitCheck;
     bool mStarted;
+    bool mFirstFrame;
 
     bool mCollectStats;
     bool mTrackMaxAmplitude;
