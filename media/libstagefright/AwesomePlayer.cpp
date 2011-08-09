@@ -1555,10 +1555,6 @@ void AwesomePlayer::onVideoEvent() {
         // and we'll play incoming video as fast as we get it.
         latenessUs = 0;
     }
-
-    // Timestamps currently not passed through by OMX components -- ignore them
-    latenessUs = 0;
-
 #ifdef TARGET_OMAP4
     LOGV("%s::%d: (latenessUs= %lld) = ((nowUs= %lld) - (timeUs=%lld))", __FUNCTION__, __LINE__, latenessUs, nowUs, timeUs);
 
