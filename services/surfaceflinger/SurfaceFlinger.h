@@ -466,9 +466,6 @@ private:
    bool mIsLayerBufferPresent;
    //Flag tracks the absence of surfaces to be displayed in original resolution.
    bool mOrigResSurfAbsent;
-   // Cached overlay layer in composeSurfaces function to be used in the ctx
-   // of fixing jitter/flickering bug
-   sp<LayerBuffer> mCachedVideoLayer;
    enum bypass_state_t { eBypassInUse, eBypassNotInUse, eBypassClosePending, eBypassFree };
    bypass_state_t mBypassState;
    hdmi_state_t mHDMIState;

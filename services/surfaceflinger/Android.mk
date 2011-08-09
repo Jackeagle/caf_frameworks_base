@@ -16,7 +16,8 @@ LOCAL_SRC_FILES:= \
     SurfaceFlinger.cpp \
     TextureManager.cpp \
     Transform.cpp \
-    DumpFrame.cpp
+    DumpFrame.cpp \
+    PostBufLock.cpp
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"SurfaceFlinger\"
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
