@@ -1109,15 +1109,12 @@ public class CDMAPhone extends PhoneBase {
      * @param holds the new CDMA subscription source value
      */
     private void handleCdmaSubscriptionSource() {
-        int newSubscriptionSource = mCdmaSSM.getCdmaSubscriptionSource();
-        if (newSubscriptionSource != mCdmaSubscriptionSource) {
-            mCdmaSubscriptionSource = newSubscriptionSource;
-            if (newSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
-                // NV is ready when subscription source is NV
-                sendMessage(obtainMessage(EVENT_NV_READY));
-            }
-            updateCurrentCarrierInProvider();
+        mCdmaSubscriptionSource = mCdmaSSM.getCdmaSubscriptionSource();
+        if (mCdmaSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
+            // NV is ready when subscription source is NV
+            sendMessage(obtainMessage(EVENT_NV_READY));
         }
+        updateCurrentCarrierInProvider();
     }
 
     void updateIccAvailability() {
