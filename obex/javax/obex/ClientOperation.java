@@ -82,6 +82,7 @@ public final class ClientOperation implements Operation, BaseStream {
 
     private boolean mSrmGetActiveClient;
 
+    private ObexHelper mSrmClientSession;
     /**
      * Creates new OperationImpl to read and write data to a server
      * @param maxSize the maximum packet size
@@ -112,6 +113,7 @@ public final class ClientOperation implements Operation, BaseStream {
 
         mRequestHeader = new HeaderSet();
 
+        mSrmClientSession = p.mSrmClient;
         int[] headerList = header.getHeaderList();
 
         if (headerList != null) {
@@ -634,14 +636,14 @@ public final class ClientOperation implements Operation, BaseStream {
 
                 Byte srm = (Byte)mReplyHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                 if ((srm == ObexHelper.OBEX_SRM_SUPPORTED)||(srm == ObexHelper.OBEX_SRM_ENABLED)) {
-                    ObexHelper.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
+                    mSrmClientSession.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
                     if (VERBOSE) Log.v(TAG, "Remote SRM status: Enabled by Server response");
                 }
 
                // Turn on SRM only if supported by both Client and Server. Otherwise, don't turn on SRM.
-                if (ObexHelper.getRemoteSrmStatus()) {
+                if (mSrmClientSession.getRemoteSrmStatus()) {
                     if (VERBOSE)  Log.v(TAG, "continueOperation: Remote SRM Enabled");
-                    mSrmGetActiveClient = ObexHelper.getLocalSrmStatus();
+                    mSrmGetActiveClient = mSrmClientSession.getLocalSrmStatus();
                 }
 
                 mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false,mSrmGetActiveClient);
@@ -682,14 +684,14 @@ public final class ClientOperation implements Operation, BaseStream {
                 if (VERBOSE)  Log.v(TAG, "continueOperation: Client setting SRM, sendEmpty clause");
                 Byte srm = (Byte)mReplyHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                 if ((srm == ObexHelper.OBEX_SRM_SUPPORTED)||(srm == ObexHelper.OBEX_SRM_ENABLED)) {
-                    ObexHelper.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
+                    mSrmClientSession.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
                     if (VERBOSE) Log.v(TAG, "Remote SRM status: Enabled by Server response");
                 }
 
                 // Turn on SRM only if supported by both Client and Server. Otherwise, don't turn on SRM.
-                if (ObexHelper.getRemoteSrmStatus()) {
+                if (mSrmClientSession.getRemoteSrmStatus()) {
                     if (VERBOSE)  Log.v(TAG, "continueOperation: Remote SRM Enabled");
-                    mSingleResponseActiveClient = ObexHelper.getLocalSrmStatus();
+                    mSingleResponseActiveClient = mSrmClientSession.getLocalSrmStatus();
                 }
                 if (VERBOSE)  Log.v(TAG, "continueOperation: Client SRM status: " + mSingleResponseActiveClient);
 
@@ -699,11 +701,11 @@ public final class ClientOperation implements Operation, BaseStream {
                     if (VERBOSE)  Log.v(TAG, "SRMP header (CONTINUE): " + srmp);
                     if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
                         if (VERBOSE)  Log.v(TAG, "continueOperation: Client SRMP WAIT requested by Server");
-                        ObexHelper.setLocalSrmpWait(true);
+                        mSrmClientSession.setLocalSrmpWait(true);
                         mSingleResponseActiveClient = ObexHelper.LOCAL_SRM_DISABLED;
                     } else {
                         if (VERBOSE)  Log.v(TAG, "continueOperation: Client SRMP NONE");
-                        ObexHelper.setLocalSrmpWait(false);
+                        mSrmClientSession.setLocalSrmpWait(false);
                     }
                     mReplyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER, ObexHelper.OBEX_SRM_PARAM_NONE);
                 } else {
@@ -751,7 +753,7 @@ public final class ClientOperation implements Operation, BaseStream {
 
                 if (VERBOSE)  Log.v(TAG, "streamClosed: Client SRM Disabled");
 
-                ObexHelper.resetSrmStatus();
+                mSrmClientSession.resetSrmStatus();
                 mSingleResponseActiveClient = ObexHelper.LOCAL_SRM_DISABLED;
 
                 /*
@@ -786,7 +788,7 @@ public final class ClientOperation implements Operation, BaseStream {
                 }
                 if (VERBOSE)  Log.v(TAG, "streamClosed: Client SRM Disabled");
                 /* Reset Srm status once the operation completes */
-                ObexHelper.resetSrmStatus();
+                mSrmClientSession.resetSrmStatus();
                 mSrmGetActiveClient = ObexHelper.LOCAL_SRM_DISABLED;
 
                 while (mReplyHeader.responseCode == ResponseCodes.OBEX_HTTP_CONTINUE) {

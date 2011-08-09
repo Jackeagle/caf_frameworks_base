@@ -63,8 +63,8 @@ public final class ObexHelper {
      */
     public static final int BASE_PACKET_LENGTH = 3;
 
-    /** Prevent object construction of helper class */
-    private ObexHelper() {
+    /** Object construction of helper class */
+    public ObexHelper() {
     }
 
     /**
@@ -160,14 +160,14 @@ public final class ObexHelper {
 
     public static final boolean SRM_CAPABLE = true;
 
-    private static boolean mLocalSingleResponseCapability = SRM_INCAPABLE;
+    private boolean mLocalSingleResponseCapability = SRM_INCAPABLE;
 
-    public static boolean getLocalSrmCapability() {
+    public boolean getLocalSrmCapability() {
         if (VERBOSE) Log.v(TAG, "getLocalSrmCapability: " + mLocalSingleResponseCapability);
         return mLocalSingleResponseCapability;
     }
 
-    public static void setLocalSrmCapability(boolean SrmCapable) {
+    public void setLocalSrmCapability(boolean SrmCapable) {
         if (!SystemProperties.get(DEBUG_FORCE_SRM).equals("")) {
             if (SystemProperties.getBoolean(DEBUG_FORCE_SRM, false)) {
                 if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRM on");
@@ -193,14 +193,14 @@ public final class ObexHelper {
     /**
      * This is used for the SRM status of local device
      */
-    private static boolean mLocalSingleResponseActive;
+    private boolean mLocalSingleResponseActive;
 
-    public static boolean getLocalSrmStatus() {
+    public boolean getLocalSrmStatus() {
         if (VERBOSE) Log.v(TAG, "getLocalSrmStatus: " + mLocalSingleResponseActive);
         return mLocalSingleResponseActive;
     }
 
-    public static void setLocalSrmStatus(boolean SrmEnabled) {
+    public void setLocalSrmStatus(boolean SrmEnabled) {
         mLocalSingleResponseActive = SrmEnabled ? LOCAL_SRM_ENABLED : LOCAL_SRM_DISABLED;
         if (VERBOSE) Log.v(TAG, "setLocalSrmStatus: " + mLocalSingleResponseActive);
     }
@@ -208,14 +208,14 @@ public final class ObexHelper {
     /**
      * This is used for the SRM status of remote device
      */
-    private static boolean mRemoteSingleResponseActive;
+    private boolean mRemoteSingleResponseActive;
 
-    public static boolean getRemoteSrmStatus() {
+    public boolean getRemoteSrmStatus() {
         if (VERBOSE) Log.v(TAG, "getRemoteSrmStatus: " + mRemoteSingleResponseActive);
         return mRemoteSingleResponseActive;
     }
 
-    public static void setRemoteSrmStatus(boolean SrmCapable) {
+    public void setRemoteSrmStatus(boolean SrmCapable) {
         mRemoteSingleResponseActive = SrmCapable ? SRM_CAPABLE : SRM_INCAPABLE;
         if (VERBOSE) Log.v(TAG, "setRemoteSrmStatus: " + mRemoteSingleResponseActive);
     }
@@ -223,14 +223,14 @@ public final class ObexHelper {
     /**
      * This is used for the Single Response Mode Parameters (SRMP) value
      */
-    private static boolean mLocalSrmpWait;
+    private boolean mLocalSrmpWait;
 
-    public static boolean getLocalSrmpWait() {
+    public boolean getLocalSrmpWait() {
         if (VERBOSE) Log.v(TAG, "getLocalSrmpWait: " + mLocalSrmpWait);
         return mLocalSrmpWait;
     }
 
-    public static void setLocalSrmpWait(boolean SrmpWait) {
+    public void setLocalSrmpWait(boolean SrmpWait) {
         if (VERBOSE) Log.v(TAG, "setLocalSrmpWait: " + SrmpWait);
         mLocalSrmpWait = SrmpWait;
     }
@@ -242,14 +242,14 @@ public final class ObexHelper {
 
     public static final boolean SRMP_ENABLED = true;
 
-    private static boolean mLocalSrmpActive = SRMP_DISABLED;
+    private boolean mLocalSrmpActive = SRMP_DISABLED;
 
-    public static boolean getLocalSrmParamStatus() {
+    public boolean getLocalSrmParamStatus() {
         if (VERBOSE) Log.v(TAG, "getLocalSrmParamStatus: " + mLocalSrmpActive);
         return mLocalSrmpActive;
     }
 
-    public static void setLocalSrmParamStatus(boolean SrmpEnabled) {
+    public void setLocalSrmParamStatus(boolean SrmpEnabled) {
         if (!SystemProperties.get(DEBUG_FORCE_SRMP).equals("")) {
             if (SystemProperties.getBoolean(DEBUG_FORCE_SRMP, false)) {
                 if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRMP on");
@@ -267,7 +267,7 @@ public final class ObexHelper {
     /**
      * This is used to reset the SRM status to default
      */
-    public static void resetSrmStatus() {
+    public void resetSrmStatus() {
         if (VERBOSE) Log.v(TAG, "resetSrmStatus");
         setLocalSrmStatus(LOCAL_SRM_DISABLED);
         setLocalSrmpWait(false);

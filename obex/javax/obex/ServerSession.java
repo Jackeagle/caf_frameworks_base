@@ -63,6 +63,7 @@ public final class ServerSession extends ObexSession implements Runnable {
 
     private boolean mClosed;
 
+    public ObexHelper mSrmServer;
     /**
      * Creates new ServerSession.
      * @param trans the connection to the client
@@ -79,7 +80,7 @@ public final class ServerSession extends ObexSession implements Runnable {
         mOutput = mTransport.openOutputStream();
         mListener = handler;
         mMaxPacketLength = 256;
-
+        mSrmServer = new ObexHelper();
         mClosed = false;
         mProcessThread = new Thread(this);
         mProcessThread.start();
@@ -259,10 +260,10 @@ public final class ServerSession extends ObexSession implements Runnable {
             Byte srm = (Byte)op.requestHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
             if (srm == ObexHelper.OBEX_SRM_ENABLED) {
                 if (VERBOSE)  Log.v(TAG, "handlePutRequest srm == ObexHelper.OBEX_SRM_ENABLED");
-                if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                if (mSrmServer.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                     if (VERBOSE)  Log.v(TAG, "ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE");
                     op.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_ENABLED);
-                    if (ObexHelper.getLocalSrmpWait()) {
+                    if (mSrmServer.getLocalSrmpWait()) {
                         if (VERBOSE)  Log.v(TAG, "handlePutRequest: Server SRMP header set to WAIT");
                         op.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER, ObexHelper.OBEX_SRM_PARAM_WAIT);
                     }
@@ -323,12 +324,12 @@ public final class ServerSession extends ObexSession implements Runnable {
             if (VERBOSE)  Log.v(TAG, "handleGetRequest srm status" + srm );
             if (srm == ObexHelper.OBEX_SRM_ENABLED) {
                 if (VERBOSE)  Log.v(TAG, "handlePutRequest srm == ObexHelper.OBEX_SRM_ENABLED");
-                if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                if (mSrmServer.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                     if (VERBOSE)  Log.v(TAG, "ObexHelper.getLocalSrmCapability()" +
                                                                        "=ObexHelper.SRM_CAPABLE");
                     op.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE,
                                                                      ObexHelper.OBEX_SRM_ENABLED);
-                    if (ObexHelper.getLocalSrmpWait()) {
+                    if (mSrmServer.getLocalSrmpWait()) {
                         if (VERBOSE)  Log.v(TAG, "PutRequest:Server SRMP header set to WAIT");
                         op.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER,
                                                                   ObexHelper.OBEX_SRM_PARAM_WAIT);
@@ -346,7 +347,7 @@ public final class ServerSession extends ObexSession implements Runnable {
             if (!op.isAborted) {
                 op.sendReply(response, false,false);
             } else {
-                if(ObexHelper.getLocalSrmStatus() == ObexHelper.LOCAL_SRM_ENABLED) {
+                if(mSrmServer.getLocalSrmStatus() == ObexHelper.LOCAL_SRM_ENABLED) {
                   sendResponse(ResponseCodes.OBEX_HTTP_OK, null);
                 }
             }
@@ -669,7 +670,7 @@ public final class ServerSession extends ObexSession implements Runnable {
                 ObexHelper.updateHeaderSet(request, headers);
             }
 
-            if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+            if (mSrmServer.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                 /* As per GOEP TS Spec the Server should not respond with a SRM Supported Header
                  * when the Client sends a invalid SRM header with wrong values
                  */
@@ -679,12 +680,12 @@ public final class ServerSession extends ObexSession implements Runnable {
                     if (VERBOSE) Log.v(TAG, "handleConnectRequest: Server SRM_SUPPORTED header added");
                     reply.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_SUPPORTED);
 
-                    if (ObexHelper.getLocalSrmParamStatus()) {
+                    if (mSrmServer.getLocalSrmParamStatus()) {
                         if (VERBOSE) Log.v(TAG, "handleConnectRequest: Enabled the SRMP WAIT");
-                        ObexHelper.setLocalSrmpWait(ObexHelper.SRMP_ENABLED);
+                        mSrmServer.setLocalSrmpWait(ObexHelper.SRMP_ENABLED);
                     } else {
                         if (VERBOSE) Log.v(TAG, "handleConnectRequest: Disabled the SRMP WAIT");
-                        ObexHelper.setLocalSrmpWait(ObexHelper.SRMP_DISABLED);
+                        mSrmServer.setLocalSrmpWait(ObexHelper.SRMP_DISABLED);
                     }
                 }
             }
