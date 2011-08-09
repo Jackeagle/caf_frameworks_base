@@ -102,6 +102,8 @@ public final class ServerOperation implements Operation, BaseStream {
 
     public Byte mSingleResponseModeParameter;
 
+    public ObexHelper mSrmServerSession;
+
     /**
      * Creates new ServerOperation
      * @param p the parent that created this object
@@ -133,6 +135,7 @@ public final class ServerOperation implements Operation, BaseStream {
         mSingleResponseActive = false;
         mSrmGetActive = false;
         mSingleResponseModeParameter = ObexHelper.OBEX_SRM_PARAM_NONE;
+        mSrmServerSession = p.mSrmServer;
         int bytesReceived;
 
         /*
@@ -232,10 +235,10 @@ public final class ServerOperation implements Operation, BaseStream {
                     Byte srm = (Byte)this.requestHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                     if (srm == ObexHelper.OBEX_SRM_ENABLED) {
                         if (VERBOSE)  Log.v(TAG, "ServerOperation srm == ObexHelper.OBEX_SRM_ENABLED");
-                        if (ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
+                        if (mSrmServerSession.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
                             if (VERBOSE)  Log.v(TAG, "ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE");
                             this.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_ENABLED);
-                            if (ObexHelper.getLocalSrmpWait()) {
+                            if (mSrmServerSession.getLocalSrmpWait()) {
                                 if (VERBOSE)  Log.v(TAG, "ServerOperation: Server SRMP header set to WAIT");
                                 this.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER, ObexHelper.OBEX_SRM_PARAM_WAIT);
                             }
@@ -246,14 +249,14 @@ public final class ServerOperation implements Operation, BaseStream {
                     }
 
                     sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive,false);
-                    mSingleResponseActive = ObexHelper.getLocalSrmStatus();
+                    mSingleResponseActive = mSrmServerSession.getLocalSrmStatus();
                     if (mSingleResponseActive == ObexHelper.LOCAL_SRM_ENABLED) {
                         if (VERBOSE) Log.v(TAG, "ServerOperation: Server SRM enabled");
-                        if (ObexHelper.getLocalSrmpWait()) {
+                        if (mSrmServerSession.getLocalSrmpWait()) {
                             if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT) {
                                 if (VERBOSE) Log.v(TAG, "ServerOperation: Server sent SRMP NONE to stop SRMP WAIT");
                                 mSingleResponseActive = ObexHelper.LOCAL_SRM_ENABLED;
-                                ObexHelper.setLocalSrmpWait(false);
+                                mSrmServerSession.setLocalSrmpWait(false);
                             } else {
                                 if (VERBOSE) Log.v(TAG, "ServerOperation: Server SRMP WAIT");
                                 mSingleResponseActive = ObexHelper.LOCAL_SRM_DISABLED;
@@ -312,14 +315,14 @@ public final class ServerOperation implements Operation, BaseStream {
 
                     if (VERBOSE) Log.v(TAG, "continueOperation: Server setting SRM, sendEmpty clause");
 
-                    mSingleResponseActive = ObexHelper.getLocalSrmStatus();
+                    mSingleResponseActive = mSrmServerSession.getLocalSrmStatus();
                     if (mSingleResponseActive == ObexHelper.LOCAL_SRM_ENABLED) {
                         if (VERBOSE) Log.v(TAG, "continueOperation: Server SRM enabled");
-                        if (ObexHelper.getLocalSrmpWait()) {
+                        if (mSrmServerSession.getLocalSrmpWait()) {
                             if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT) {
                                 if (VERBOSE) Log.v(TAG, "continueOperation: Server sent SRMP NONE to stop SRMP WAIT");
                                 mSingleResponseActive = ObexHelper.LOCAL_SRM_ENABLED;
-                                ObexHelper.setLocalSrmpWait(false);
+                                mSrmServerSession.setLocalSrmpWait(false);
                             } else {
                                 if (VERBOSE) Log.v(TAG, "continueOperation: Server SRMP WAIT");
                                 mSingleResponseActive = ObexHelper.LOCAL_SRM_DISABLED;
@@ -336,14 +339,14 @@ public final class ServerOperation implements Operation, BaseStream {
 
                         if (VERBOSE) Log.v(TAG, "continueOperation: Server setting SRM");
 
-                        mSingleResponseActive = ObexHelper.getLocalSrmStatus();
+                        mSingleResponseActive = mSrmServerSession.getLocalSrmStatus();
                         if (mSingleResponseActive == ObexHelper.LOCAL_SRM_ENABLED) {
                             if (VERBOSE) Log.v(TAG, "continueOperation: Server SRM enabled");
-                            if (ObexHelper.getLocalSrmpWait()) {
+                            if (mSrmServerSession.getLocalSrmpWait()) {
                                 if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT) {
                                     if (VERBOSE) Log.v(TAG, "continueOperation: Server sent SRMP NONE to stop SRMP WAIT");
                                     mSingleResponseActive = ObexHelper.LOCAL_SRM_ENABLED;
-                                    ObexHelper.setLocalSrmpWait(false);
+                                    mSrmServerSession.setLocalSrmpWait(false);
                                 } else {
                                     if (VERBOSE) Log.v(TAG, "continueOperation: Server SRMP WAIT");
                                     mSingleResponseActive = ObexHelper.LOCAL_SRM_DISABLED;
@@ -362,16 +365,16 @@ public final class ServerOperation implements Operation, BaseStream {
                 return false;
             }
         } else {
-            mSrmGetActive = ObexHelper.getLocalSrmStatus();
+            mSrmGetActive = mSrmServerSession.getLocalSrmStatus();
             sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive,mSrmGetActive);
 
             if (mSrmGetActive == ObexHelper.LOCAL_SRM_ENABLED) {
                 if (VERBOSE) Log.v(TAG, "continueOperation: Server SRM enabled");
-                if (ObexHelper.getLocalSrmpWait()) {
+                if (mSrmServerSession.getLocalSrmpWait()) {
                     if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT) {
                         if (VERBOSE) Log.v(TAG, "continueOperation: Server sent SRMP NONE to stop SRMP WAIT");
                         mSrmGetActive = ObexHelper.LOCAL_SRM_ENABLED;
-                        ObexHelper.setLocalSrmpWait(false);
+                        mSrmServerSession.setLocalSrmpWait(false);
                     } else {
                         if (VERBOSE) Log.v(TAG, "continueOperation: Server SRMP WAIT");
                         mSrmGetActive = ObexHelper.LOCAL_SRM_DISABLED;
@@ -401,12 +404,12 @@ public final class ServerOperation implements Operation, BaseStream {
             boolean suppressSend,boolean supressReceive) throws IOException {
 
         if (VERBOSE) Log.v(TAG, "sendReply type: " + type + ", suppress: "
-                       + suppressSend + ", SRMP WAIT: "+ ObexHelper.getLocalSrmpWait()
+                       + suppressSend + ", SRMP WAIT: "+ mSrmServerSession.getLocalSrmpWait()
                        + "supressReceive: "+supressReceive);
 
         int bytesReceived;
 
-        if ((!suppressSend) || (ObexHelper.getLocalSrmpWait())) {
+        if ((!suppressSend) || (mSrmServerSession.getLocalSrmpWait())) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
 
             long id = mListener.getConnectionId();
@@ -524,7 +527,7 @@ public final class ServerOperation implements Operation, BaseStream {
         }
 
         if (type == ResponseCodes.OBEX_HTTP_CONTINUE) {
-            if((!supressReceive) || (ObexHelper.getLocalSrmpWait())) {
+            if((!supressReceive) || (mSrmServerSession.getLocalSrmpWait())) {
                 int headerID = mInput.read();
                 int length = mInput.read();
                 length = (length << 8) + mInput.read();
