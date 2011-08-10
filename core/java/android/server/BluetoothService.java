@@ -76,6 +76,8 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.ListIterator;
@@ -115,8 +117,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int MESSAGE_AUTO_PAIRING_FAILURE_ATTEMPT_DELAY = 5;
     private static final int MESSAGE_START_DUN_SERVER = 6;
     private static final int MESSAGE_GATT_INTENT = 7;
-    private static final int MESSAGE_GATT_CHARACTERISTICS_DISCOVERY = 8;
-    private static final int MESSAGE_START_SAP_SERVER = 9;
+    private static final int MESSAGE_START_SAP_SERVER = 8;
 
     // The time (in millisecs) to delay the pairing attempt after the first
     // auto pairing attempt fails. We use an exponential delay with
@@ -136,7 +137,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
     // The timeout used to sent the GATT services Intent
     // This timeout should be greater than the page timeout
-    private static final int GATT_INTENT_DELAY = 6000;
+    private static final int GATT_INTENT_DELAY = 30000;
 
     public static final String SAP_AUTHORIZE_INTENT =
             "com.android.bluetooth.sap.accessrequest";
@@ -172,8 +173,11 @@ public class BluetoothService extends IBluetooth.Stub {
     private final ArrayList<String> mUuidIntentTracker;
     private final HashMap<RemoteService, IBluetoothCallback> mUuidCallbackTracker;
 
-    private final ArrayList<RemoteService> mGattIntentTracker;
+    private final HashMap<String, ArrayList<ParcelUuid>> mGattIntentTracker;
     private final HashMap<String, IBluetoothGattService> mGattServiceTracker;
+    private final HashMap<String, IBluetoothGattService> mGattWatcherTracker;
+
+    private final SortedMap<String, Integer> mGattServices;
 
     private final HashMap<Integer, Integer> mServiceRecordToPid;
 
@@ -248,8 +252,10 @@ public class BluetoothService extends IBluetooth.Stub {
         mDeviceL2capPsmCache = new HashMap<String, Map<ParcelUuid, Integer>>();
         mUuidIntentTracker = new ArrayList<String>();
         mUuidCallbackTracker = new HashMap<RemoteService, IBluetoothCallback>();
-        mGattIntentTracker = new ArrayList<RemoteService>();
+        mGattIntentTracker = new HashMap<String, ArrayList<ParcelUuid>>();
         mGattServiceTracker = new HashMap<String, IBluetoothGattService>();
+        mGattWatcherTracker = new HashMap<String, IBluetoothGattService>();
+        mGattServices = new TreeMap<String, Integer>();
         mServiceRecordToPid = new HashMap<Integer, Integer>();
         mDeviceProfileState = new HashMap<String, BluetoothDeviceProfileState>();
         mA2dpProfileState = new BluetoothProfileState(mContext, BluetoothProfileState.A2DP);
@@ -640,15 +646,9 @@ public class BluetoothService extends IBluetooth.Stub {
                 }
                 break;
             case MESSAGE_GATT_INTENT:
-                RemoteService service = (RemoteService)msg.obj;
-                if (service != null) {
-                    sendGattIntent(service);
-                }
-                break;
-            case MESSAGE_GATT_CHARACTERISTICS_DISCOVERY:
-                String path = (String)msg.obj;
-                if (path != null) {
-                    makeDiscoverCharacteristicsCallback(path);
+                address = (String)msg.obj;
+                if (address != null && mGattIntentTracker.containsKey(address)){
+                    sendGattIntent(address);
                 }
                 break;
             case MESSAGE_START_SAP_SERVER:
@@ -1674,6 +1674,7 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     /*package*/ String[] getRemoteDeviceProperties(String address) {
+        Log.d(TAG, "getRemoteDeviceProperties: " + address);
         if (!isEnabledInternal()) return null;
 
         String objectPath = getObjectPathFromAddress(address);
@@ -1684,7 +1685,6 @@ public class BluetoothService extends IBluetooth.Stub {
         Map<String, String> properties = mDeviceProperties.get(address);
         Log.d(TAG, "getRemoteDeviceProperty: " + property + ", " + address);
         if (properties != null) {
-            Log.d(TAG, "property present");
             return properties.get(property);
         } else {
             // Query for remote device properties, again.
@@ -1699,6 +1699,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
     /* package */ synchronized boolean updateRemoteDevicePropertiesCache(String address) {
         String[] propValues = getRemoteDeviceProperties(address);
+        Log.d(TAG, "updateRemoteDevicePropertiesCache: " + address);
         if (propValues != null) {
             addRemoteDeviceProperties(address, propValues);
             return true;
@@ -2743,14 +2744,13 @@ public class BluetoothService extends IBluetooth.Stub {
         Map<String, String> properties = mGattProperties.get(path);
         Log.d(TAG, "getGattServiceProperty: " + property + ", path "+ path);
         if (properties != null) {
-            Log.d(TAG, "property present");
             return properties.get(property);
         } else {
             // Query for GATT service properties, again.
             if (updateGattServicePropertiesCache(path))
                 return getGattServiceProperty(path, property);
         }
-        Log.e(TAG, "getGattProperty: " + property + " not present: " + path);
+        Log.e(TAG, "getGattServiceProperty: " + property + " not present: " + path);
         return null;
     }
 
@@ -2810,9 +2810,12 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
    private String[] getGattServicesFromCache(String address) {
-        String value = getRemoteDeviceProperty(address, "Services");
+
+       Log.d (TAG, "getGattServicesFromCache");
+
+       String value = getRemoteDeviceProperty(address, "Services");
         if (value == null) {
-            Log.d(TAG, "getGattServicesFromCache: not services found");
+            Log.d(TAG, "getGattServicesFromCache: no services found");
             return null;
         }
 
@@ -2823,45 +2826,46 @@ public class BluetoothService extends IBluetooth.Stub {
         return path;
     }
 
-    private String[] matchGattService(RemoteService service)
+    private String[] matchGattService(String address, ParcelUuid uuid)
     {
         // The properties should be cached at this point
-        String value = getRemoteDeviceProperty(service.address, "Services");
+        String value = getRemoteDeviceProperty(address, "Services");
         if (value == null) {
-            Log.e(TAG, "matchGattService: No GATT based services were found on " + service.address);
+            Log.e(TAG, "matchGattService: No GATT based services were found on " + address);
             return null;
+        } else {
+            Log.d(TAG, "matchGattService: Value " + value);
         }
 
-       String[] gattServicePaths = null;
+        String[] gattServicePaths = null;
         // The  object paths are stored as a "," separated string.
         gattServicePaths = value.split(",");
 
-
         ArrayList<String> matchList = new ArrayList<String>();
         int count = 0;
-        ParcelUuid uuid = service.uuid;
-        String stringUuid = uuid.toString();
+        String stringUuid = null;
+
+        if (uuid != null)
+            stringUuid = uuid.toString();
 
         Log.d(TAG, "Requested GATT UUID to match: " + stringUuid);
 
         for (int i  = 0; i < gattServicePaths.length; i++) {
-            boolean match = false;
+            boolean match = true;
             String serviceUuid = getGattServiceProperty(gattServicePaths[i], "UUID");
 
             if (serviceUuid != null) {
                 Log.d(TAG, "Found GATT UUID: " + serviceUuid);
-                if (serviceUuid.equals(stringUuid) ){
-                    Log.d(TAG,"UUID" + stringUuid +  "match found");
-                    match = true;
-                }
-            } else
-                // Return all GATT-based services
-                match = true;
 
-            if (match) {
-                matchList.add(gattServicePaths[i]);
-                count++;
-                break;
+                if (stringUuid != null && !serviceUuid.equals(stringUuid)){
+                        Log.d(TAG,"UUID does not match");
+                        match = false;
+                }
+
+                if (match) {
+                    matchList.add(gattServicePaths[i]);
+                    count++;
+                }
             }
         }
 
@@ -2878,37 +2882,54 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
    /* Broadcast the GATT services intent */
-    private synchronized void sendGattIntent(RemoteService service) {
+    /*package*/ synchronized void sendGattIntent(String address) {
         Intent intent = new Intent(BluetoothDevice.ACTION_GATT);
-        String[] gattPath = matchGattService (service);
+        ParcelUuid[] uuids = null;
+        String[] gattPath;
+        int count = 1;
+        int i;
 
-        intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(service.address));
-        intent.putExtra(BluetoothDevice.EXTRA_UUID, service.uuid);
-        intent.putExtra(BluetoothDevice.EXTRA_GATT, gattPath);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        synchronized (this) {
+            if (mGattIntentTracker.containsKey(address)) {
 
-        if (mGattIntentTracker.contains(service))
-            mGattIntentTracker.remove(service);
+                ArrayList<ParcelUuid> serviceUuids = mGattIntentTracker.get(address);
+
+                if(serviceUuids != null) {
+                    uuids = new ParcelUuid[serviceUuids.size()];
+                    uuids = serviceUuids.toArray(uuids);
+                }
+
+                Log.d(TAG, "Clear GATT INTENT tracker");
+                mGattIntentTracker.remove(address);
+            }
+        }
+
+        if (uuids != null)
+            count = uuids.length;
+
+        for (i = 0; i < count; i++) {
+            gattPath = matchGattService (address, uuids[i]);
+
+            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
+            intent.putExtra(BluetoothDevice.EXTRA_UUID, uuids[i]);
+            intent.putExtra(BluetoothDevice.EXTRA_GATT, gattPath);
+            mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        }
     }
 
-   private String[] getCharacteristicsFromCache(String servicePath) {
+    private String[] getCharacteristicsFromCache(String servicePath) {
         String value = getGattServiceProperty(servicePath, "Characteristics");
         if (value == null) {
-            Log.d(TAG, "getCharacteristicsFromCache nothing found  for service " + servicePath);
             return null;
         }
 
         String[] paths = null;
         // The Charateristic paths are stored as a "," separated string.
         paths = value.split(",");
-
-        Log.d(TAG, "getCharacteristicsFromCache found " + paths.length + " characteristics on service " + servicePath);
-
         return paths;
     }
 
     /*package*/ synchronized void makeDiscoverCharacteristicsCallback(String servicePath) {
-
         IBluetoothGattService callback = mGattServiceTracker.get(servicePath);
         String[]  charPaths = getCharacteristicsFromCache(servicePath);
 
@@ -2919,13 +2940,82 @@ public class BluetoothService extends IBluetooth.Stub {
                 callback.onCharacteristicsDiscovered(charPaths);
             } catch (RemoteException e) {Log.e(TAG, "", e);}
         } else
-
             Log.d(TAG, "Discover Characteristics Callback for  service " + servicePath + " not queued");
 
-        mGattServiceTracker.remove(servicePath);
     }
 
-    /**
+    /*package*/ synchronized void makeSetCharacteristicPropertyCallback(String charPath, String property, boolean result) {
+        Log.d(TAG, "makeSetCharacteristicPropertyCallback for char: " + charPath);
+
+        if (charPath == null) {
+            return;
+        }
+
+        String servicePath = charPath.substring(0, charPath.indexOf("/characteristic"));
+
+        if (servicePath == null) {
+            return;
+        }
+
+        IBluetoothGattService callback = mGattServiceTracker.get(servicePath);
+
+        if (callback != null) {
+            try {
+                callback.onSetCharacteristicProperty(charPath, property, result);
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
+        } else
+            Log.d(TAG, "Set Characteristics Property Callback for  service " + servicePath + " not queued");
+
+    }
+
+    /*package*/ synchronized void makeWatcherValueChangedCallback(String charPath, String value) {
+
+        if (charPath == null) {
+            return;
+        }
+
+        String servicePath = charPath.substring(0, charPath.indexOf("/characteristic"));
+
+        if (servicePath == null) {
+            return;
+        }
+
+        Log.d(TAG, "WatcherValueChanged : service Path = " + servicePath);
+
+        IBluetoothGattService callback = mGattWatcherTracker.get(servicePath);
+
+        if (callback != null) {
+            try {
+                callback.onValueChanged(charPath, value);
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
+        } else {
+            Log.d(TAG, "Callback for service " + servicePath + " not registered");
+        }
+    }
+
+    /*package*/ synchronized void makeUpdateCharacteristicValueCallback(String charPath, boolean result) {
+
+        String servicePath = charPath.substring(0, charPath.indexOf("/characteristic"));
+
+        if (servicePath == null) {
+            return;
+        }
+
+        IBluetoothGattService callback = mGattServiceTracker.get(servicePath);
+
+        Log.d(TAG, "makeCharacteristicValueUpdatedCallback for service: " + charPath);
+
+        if (callback != null) {
+            try {
+                callback.onCharacteristicValueUpdated(charPath, result);
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
+        } else {
+            Log.d(TAG, "Callback for service " + servicePath + " not registered");
+        }
+    }
+
+   /**
+     * Bluetooth: Support for GATT Update Characteristic Value
      * Returns the user-friendly name of a GATT based service. This value is
      * returned from our local cache.
      */
@@ -2947,78 +3037,116 @@ public class BluetoothService extends IBluetooth.Stub {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return false;
 
+        Log.d(TAG, "getGattServices");
+
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             return false;
         }
 
-        RemoteService service = new RemoteService(address, uuid);
-
-        if (mGattIntentTracker.contains(service)) {
-            // A GATT query for this address is already in progress
-            return true;
-        }
-
         boolean ret = true;
+        boolean delay = false;
+        boolean discovering = false;
 
-        if (isRemoteDeviceInCache(address) && getRemoteGattServices(address) != null && findDeviceNative(address) != null) {
-
-            Log.d(TAG, "Get device property: Services");
-
-            String value = getRemoteDeviceProperty(address, "Services");
-            if (value == null) {
-                Log.e(TAG, "No GATT based services were found on " + address);
-                ret = false;
-            }
-        } else {
-            Log.d(TAG, "Need to Create Remote Device" + address + " before accessing properties");
-            ret = createDeviceNative(address);
+        synchronized (this) {
+            discovering = mGattIntentTracker.containsKey(address);
         }
 
-        mGattIntentTracker.add(service);
+        if (!discovering) {
+            if (isRemoteDeviceInCache(address) && getRemoteGattServices(address) != null && findDeviceNative(address) != null) {
+                String value = getRemoteDeviceProperty(address, "Services");
+                if (value == null) {
+                    Log.e(TAG, "No GATT based services were found on " + address);
+                    ret = false;
+                }
+            } else {
+                Log.d(TAG, "Need to Create Remote Device" + address + " before accessing properties");
+                ret = createDeviceNative(address);
+                delay = true;
+            }
+        } else
+                Log.d(TAG, "GATT service discovery for remote device " + address + "is in progress");
 
-        Message message = mHandler.obtainMessage(MESSAGE_GATT_INTENT);
-        message.obj = service;
-        mHandler.sendMessageDelayed(message, GATT_INTENT_DELAY);
-        return ret;
+        if (!ret)
+            return false;
+
+        ArrayList<ParcelUuid> serviceUuids;
+        synchronized (this) {
+            if (mGattIntentTracker.containsKey(address)) {
+                serviceUuids = mGattIntentTracker.get(address);
+                mGattIntentTracker.remove(address);
+            } else {
+                serviceUuids = new ArrayList<ParcelUuid>();
+            }
+
+            serviceUuids.add(uuid);
+            mGattIntentTracker.put(address, serviceUuids);
+        }
+
+        if (!discovering) {
+            Message message = mHandler.obtainMessage(MESSAGE_GATT_INTENT);
+            message.obj = address;
+            if (delay)
+                mHandler.sendMessageDelayed(message, GATT_INTENT_DELAY);
+            else
+                mHandler.sendMessage(message);
+        }
+
+        return true;
    }
 
-    public synchronized boolean discoverCharacteristics(String path, IBluetoothGattService gattCallback) {
+    public synchronized boolean discoverCharacteristics(String path) {
        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return false;
 
         Log.d(TAG, "discoverCharacteristics");
 
-        if (mGattServiceTracker.get(path) != null) {
-            // Characteristic discovery  query for this GATT based service
-            // Do not add this callback
-            Log.d(TAG, "discoverCharacteristics: queuery is in already in progress for " + path);
-            return false;
-        }
-
-        mGattServiceTracker.put(path, gattCallback);
-
         boolean ret = discoverCharacteristicsNative(path);
-
-        Message message = mHandler.obtainMessage(MESSAGE_GATT_CHARACTERISTICS_DISCOVERY);
-        message.obj = path;
-        mHandler.sendMessageDelayed(message, GATT_INTENT_DELAY);
 
         return ret;
    }
 
     public synchronized String[] getCharacteristicProperties(String path) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        if (!isEnabledInternal()) return null;
 
         String[] propValues = (String []) getCharacteristicPropertiesNative(path);
         return propValues;
     }
 
-    public synchronized boolean registerCharacteristicsWatcher(String path) {
+    public synchronized boolean setCharacteristicProperty(String path, String key, byte[] value) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        if (!isEnabledInternal()) return false;
+
+        boolean ret = setCharacteristicPropertyNative(path, key, value, value.length);
+        return ret;
+    }
+
+    public synchronized boolean updateCharacteristicValue(String path) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        if (!isEnabledInternal()) return false;
+
+        Log.d(TAG, "updateCharacteristicValue");
+
+        return updateCharacteristicValueNative(path);
+    }
+
+    public synchronized boolean registerCharacteristicsWatcher(String path, IBluetoothGattService gattCallback) {
        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return false;
 
         Log.d(TAG, "registerCharacteristicsWatcher");
 
+        if (mGattWatcherTracker.get(path) != null) {
+            // Do not add this callback
+            Log.d(TAG, "registerCharacteristicsWatcher: already registered for " + path);
+            return false;
+        }
+
         boolean ret = registerCharacteristicsWatcherNative(path);
+
+        if (ret == true) {
+            mGattWatcherTracker.put(path, gattCallback);
+        }
 
         return ret;
    }
@@ -3031,15 +3159,120 @@ public class BluetoothService extends IBluetooth.Stub {
 
         boolean ret = deregisterCharacteristicsWatcherNative(path);
 
-        return ret;
-   }
+        mGattWatcherTracker.remove(path);
 
-   public synchronized void disconnectSap() {
+        return ret;
+    }
+
+    public synchronized void disconnectSap() {
         Log.d(TAG, "disconnectSap");
         int res = disConnectSapNative();
         Log.d(TAG, "disconnectSap returns -" + res);
         return;
-   }
+    }
+
+    public synchronized boolean startRemoteGattService(String path, IBluetoothGattService gattCallback) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        if (!isEnabledInternal()) return false;
+
+        Log.d(TAG, "startRemoteGattService(");
+
+        if (mGattServiceTracker.get(path) != null) {
+            // Do not add this callback, its already there
+            Log.d(TAG, "startRemoteGattService: callback already registered " + path);
+            return false;
+        }
+
+        mGattServiceTracker.put(path, gattCallback);
+
+        if (!mGattServices.containsKey(path))
+            mGattServices.put(path, 1);
+        else {
+            Integer refCount = mGattServices.get(path);
+            refCount++;
+            mGattServices.remove(path);
+            mGattServices.put(path, refCount);
+        }
+
+        return true;
+    }
+
+    public synchronized void closeRemoteGattService(String path) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        if (!isEnabledInternal()) return;
+
+        if (!mGattServices.containsKey(path)) {
+            Log.d(TAG, "removeRemoteGattService: service not found " + path);
+            return;
+        }
+
+        Integer refCount = mGattServices.get(path);
+        refCount--;
+
+        Log.d(TAG, "removeRemoteGattService: refCount for " + path + " is " + refCount);
+
+        if (refCount > 0) {
+            mGattServices.remove(path);
+            mGattServices.put(path, refCount);
+            return;
+        }
+
+        Map<String, String> properties = mGattProperties.get(path);
+        if (properties == null)
+            return;
+
+        String chars = properties.get("Characteristics");
+
+        if (chars != null) {
+            String[] charPaths = chars.split(",");
+
+            for (int i = 0; i < charPaths.length; i++)
+                mGattServiceTracker.remove(charPaths[i]);
+        }
+
+        removeGattServiceProperties(path);
+        mGattServiceTracker.remove(path);
+        mGattServices.remove(path);
+
+        //Check if we can disconnect from the remote device (LE only)
+        String devicePath = path.substring(0, path.indexOf("/service"));
+
+        if (devicePath == null)
+            return;
+
+        String address = getAddressFromObjectPath(devicePath);
+
+        if(address == null) {
+            Log.d(TAG, "adress is null????");
+            return;
+        }
+
+        SortedMap subMap = mGattServices.tailMap(devicePath);
+
+        if (!subMap.isEmpty()) {
+            String nextServicePath = (String) subMap.firstKey();
+            if (devicePath.equals(nextServicePath.substring(0, path.indexOf("/service")))) {
+                Log.d(TAG, "removeRemoteGattService: more GATT services are running on device " + nextServicePath);
+                // There are still other GATT services used on this remote device
+                return;
+            }
+        }
+
+        // Do disconnect only for LE devices
+        String devType = getRemoteDeviceProperty(address, "Type");
+        if(devType == null) {
+            Log.d(TAG, "device type null????");
+            return;
+        }
+
+        if (!devType.equals("LE")) {
+            Log.d(TAG, "Device is not LE " + devType);
+            return;
+        }
+
+        Log.d(TAG, "removeRemoteGattService: disconnect" + address);
+        disconnectNative(devicePath);
+    }
 
     private native static void classInitNative();
     private native void initializeNativeDataNative();
@@ -3095,7 +3328,10 @@ public class BluetoothService extends IBluetooth.Stub {
     private native Object[] getGattServicePropertiesNative(String path);
     private native boolean discoverCharacteristicsNative(String path);
     private native Object[] getCharacteristicPropertiesNative(String path);
+    private native boolean setCharacteristicPropertyNative(String path, String key, byte[] value, int length);
+    private native boolean updateCharacteristicValueNative(String path);
     private native boolean registerCharacteristicsWatcherNative(String path);
     private native boolean deregisterCharacteristicsWatcherNative(String path);
     private native int disConnectSapNative();
+    private native void disconnectNative(String path);
 }

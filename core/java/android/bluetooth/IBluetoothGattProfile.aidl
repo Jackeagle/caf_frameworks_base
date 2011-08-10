@@ -21,9 +21,10 @@ package android.bluetooth;
  *
  * {@hide}
  */
-interface IBluetoothGattService {
-    void onCharacteristicsDiscovered(in String[] paths);
-    void onSetCharacteristicProperty(in String path, in String property, in boolean result);
+interface IBluetoothGattProfile {
+    void onDiscoverCharacteristicsResult(in String path, in boolean result);
+    void onSetCharacteristicValueResult(in String path, in boolean result);
+    void onSetCharacteristicCliConfResult(in String path, in boolean result);
+    void onUpdateCharacteristicValueResult(in String path, in boolean result);
     void onValueChanged(in String path, in String value);
-    void onCharacteristicValueUpdated(in String path, in boolean result);
 }

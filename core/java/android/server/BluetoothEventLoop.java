@@ -181,18 +181,16 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
 
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
-        } else if (devType != null)  {
+        } else if (devType != null) {
             if (DBG) log("Device type: " + devType);
-            if ("LE".equals(devType)){
+            if ("LE".equals(devType)) {
                 Intent intent = new Intent(BluetoothDevice.ACTION_FOUND);
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
                 intent.putExtra(BluetoothDevice.EXTRA_RSSI, rssiValue);
                 intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
 
                 mContext.sendBroadcast(intent, BLUETOOTH_PERM);
-
             }
-
         } else {
             log ("ClassValue: " + classValue + " for remote device: " + address + " is null");
         }
@@ -393,7 +391,7 @@ class BluetoothEventLoop {
             }
             mBluetoothService.setRemoteDeviceProperty(address, name, services);
 
-            //TODO: maybe we should send GATT intent here...
+            mBluetoothService.sendGattIntent(address);
 
         } else if (name.equals("Paired")) {
             if (propValues[1].equals("true")) {
@@ -751,9 +749,22 @@ class BluetoothEventLoop {
         mBluetoothService.makeDiscoverCharacteristicsCallback(serviceObjectPath);
     }
 
-    private void onWatcherValueChanged(String serviceObjectPath, byte[] characteristicValue) {
-        // TODO: Send this to upper layer
+    private void onSetCharacteristicPropertyResult(String path, String property, boolean result) {
 
+        Log.d(TAG, "onSetCharPropResult path " + path + " property = " + property);
+        Log.d(TAG, "Result = " + result);
+        mBluetoothService.makeSetCharacteristicPropertyCallback(path, property, result);
+    }
+
+    private void onWatcherValueChanged(String characteristicPath, String value) {
+        // TODO: Send this to upper layer
+        mBluetoothService.makeWatcherValueChangedCallback(characteristicPath, value);
+
+    }
+
+    private void onUpdateCharacteristicValueResult(String charObjectPath, boolean result) {
+
+        mBluetoothService.makeUpdateCharacteristicValueCallback(charObjectPath, result);
     }
 
     private static void log(String msg) {

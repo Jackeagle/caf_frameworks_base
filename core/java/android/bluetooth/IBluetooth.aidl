@@ -88,9 +88,13 @@ interface IBluetooth
 
     boolean getGattServices(in String address, in ParcelUuid uuid);
     String getGattServiceName(in String path);
-    boolean discoverCharacteristics(in String path, in IBluetoothGattService gattCallback);
+    boolean discoverCharacteristics(in String path);
     String[] getCharacteristicProperties(in String path);
-    boolean registerCharacteristicsWatcher(in String path);
+    boolean setCharacteristicProperty(in String path, in String key, in byte[] value);
+    boolean registerCharacteristicsWatcher(in String path, in IBluetoothGattService gattCallback);
+    boolean updateCharacteristicValue(in String path);
     boolean deregisterCharacteristicsWatcher(in String path);
     void disconnectSap();
+    boolean startRemoteGattService(in String path, IBluetoothGattService gattCallback);
+    void closeRemoteGattService(in String path);
 }

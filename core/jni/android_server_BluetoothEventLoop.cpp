@@ -60,6 +60,8 @@ static jmethodID method_onDiscoverServicesResult;
 static jmethodID method_onGetDeviceServiceChannelResult;
 
 static jmethodID method_onDiscoverCharacteristicsResult;
+static jmethodID method_onSetCharacteristicPropertyResult;
+static jmethodID method_onUpdateCharacteristicValueResult;
 static jmethodID method_onWatcherValueChanged;
 
 static jmethodID method_onRequestPinCode;
@@ -116,9 +118,13 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_onDiscoverCharacteristicsResult = env->GetMethodID(clazz, "onDiscoverCharacteristicsResult",
                                                          "(Ljava/lang/String;Z)V");
+    method_onSetCharacteristicPropertyResult = env->GetMethodID(clazz, "onSetCharacteristicPropertyResult",
+                                                         "(Ljava/lang/String;Ljava/lang/String;Z)V");
+    method_onUpdateCharacteristicValueResult = env->GetMethodID(clazz, "onUpdateCharacteristicValueResult",
+                                                         "(Ljava/lang/String;Z)V");
 
     method_onWatcherValueChanged = env->GetMethodID(clazz, "onWatcherValueChanged",
-                                                         "(Ljava/lang/String;[B)V");
+                                                         "(Ljava/lang/String;Ljava/lang/String;)V");
 
     method_onAgentAuthorize = env->GetMethodID(clazz, "onAgentAuthorize",
                                                "(Ljava/lang/String;Ljava/lang/String;)Z");
@@ -282,18 +288,18 @@ static jboolean setUpEventLoop(native_data_t *nat) {
         }
 
         const char *agent_path = "/android/bluetooth/agent";
-        const char *capabilities = "DisplayYesNo";
+        const char *capabilities = "KeyboardDisplay";
         if (register_agent(nat, agent_path, capabilities) < 0) {
             dbus_connection_unregister_object_path (nat->conn, agent_path);
             return JNI_FALSE;
         }
-        return JNI_TRUE;
 
         const char *watcher_path = "/android/bluetooth/watcher";
         if (register_watcher_path(nat, watcher_path) < 0) {
             dbus_connection_unregister_object_path (nat->conn, watcher_path);
             return JNI_FALSE;
         }
+        return JNI_TRUE;
 
     }
     return JNI_FALSE;
@@ -437,6 +443,7 @@ static void tearDownEventLoop(native_data_t *nat) {
         DBusError err;
         dbus_error_init(&err);
         const char * agent_path = "/android/bluetooth/agent";
+        const char * watcher_path = "/android/bluetooth/watcher";
 
         msg = dbus_message_new_method_call("org.bluez",
                                            nat->adapter,
@@ -463,6 +470,7 @@ static void tearDownEventLoop(native_data_t *nat) {
 
         dbus_connection_flush(nat->conn);
         dbus_connection_unregister_object_path(nat->conn, agent_path);
+        dbus_connection_unregister_object_path(nat->conn, watcher_path);
 
         dbus_bus_remove_match(nat->conn,
                 "type='signal',interface='"BLUEZ_DBUS_BASE_IFC".Control'",
@@ -1222,30 +1230,33 @@ DBusHandlerResult watcher_event_filter(DBusConnection *conn,
 
     if (dbus_message_is_method_call(msg,
             "org.bluez.Watcher", "ValueChanged")) {
-        char *char_path;
-        jbyte *char_val;
-        jbyteArray byteArray = NULL;
-        int char_vlen;
+        char *object_path;
+        uint8_t *value;
+        int vlen;
+
         if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_OBJECT_PATH, &char_path,
-                                   DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                                   &char_val, &char_vlen,
+                                   DBUS_TYPE_OBJECT_PATH, &object_path,
+                                    DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &value, &vlen,
                                    DBUS_TYPE_INVALID)) {
             LOGE("%s: Invalid arguments for ValueChanged() method", __FUNCTION__);
             goto failure;
         }
 
+        char *tmpValueArray = (char *) malloc(sizeof(char) * ( (2*vlen) + 1 ));
+        char *tmpPos = tmpValueArray;
+        for (int j=0; j<vlen; j++) {
+            sprintf(tmpPos, "%02x", value[j]);
+            tmpPos+=2;
+        }
+        tmpValueArray[2*vlen] = '\0';
+
         dbus_message_ref(msg);  // increment refcount because we pass to java
 
-        byteArray = env->NewByteArray(char_vlen);
-        if (byteArray) {
-            env->SetByteArrayRegion(byteArray, 0, char_vlen, char_val);
-            env->CallVoidMethod(nat->me, method_onWatcherValueChanged,
-                                           env->NewStringUTF(char_path),
-                                           byteArray);
-        } else {
-            LOGE("Error on allocating memory for method_onWatcherValueChanged");
-        }
+        env->CallVoidMethod(nat->me, method_onWatcherValueChanged,
+                                       env->NewStringUTF(object_path),
+                                       env->NewStringUTF(tmpValueArray)
+                                       );
+        free(tmpValueArray);
 
         goto success;
     } else {
@@ -1459,6 +1470,71 @@ void onDiscoverCharacteristicsResult(DBusMessage *msg, void *user, void *n) {
     env->DeleteLocalRef(jPath);
     free(user);
 }
+
+void onSetCharacteristicPropertyResult(DBusMessage *msg, void *user, void *n) {
+    native_data_t *nat = (native_data_t *)n;
+    DBusError err;
+    uint8_t status;
+    dbus_error_init(&err);
+    JNIEnv *env;
+    jbyteArray byteArray = NULL;
+    nat->vm->GetEnv((void**)&env, nat->envVer);
+
+    struct set_characteristic_property_t *prop = (set_characteristic_property_t *)user;
+
+    char *c_object_path;
+    bool result = JNI_TRUE;
+    if (dbus_set_error_from_message(&err, msg)) {
+        LOG_AND_FREE_DBUS_ERROR(&err);
+        result = JNI_FALSE;
+    }
+
+    jstring jPath = env->NewStringUTF(prop->path);
+    jstring jProperty = env->NewStringUTF(prop->property);
+    env->CallVoidMethod(nat->me,
+                        method_onSetCharacteristicPropertyResult,
+                        jPath,
+                        jProperty,
+                        result);
+    env->DeleteLocalRef(jPath);
+    env->DeleteLocalRef(jProperty);
+
+    free(prop->path);
+    free(prop->property);
+    free(user);
+}
+
+void onUpdateCharacteristicValueResult(DBusMessage *msg, void *user, void *n) {
+    LOGV(__FUNCTION__);
+
+    native_data_t *nat = (native_data_t *)n;
+    const char *path = (const char *)user;
+    DBusError err;
+    dbus_error_init(&err);
+    JNIEnv *env;
+    jbyte *char_val;
+    int char_vlen;
+    bool result = JNI_TRUE;
+
+    nat->vm->GetEnv((void**)&env, nat->envVer);
+
+    LOGV("... GATT Characteristic Path = %s", path);
+
+    if (dbus_set_error_from_message(&err, msg)){
+        LOGE("%s: D-Bus error: %s (%s)\n", __FUNCTION__, err.name, err.message);
+
+        LOG_AND_FREE_DBUS_ERROR(&err);
+        result = JNI_FALSE;
+    }
+
+    jstring jPath = env->NewStringUTF(path);
+    env->CallVoidMethod(nat->me,
+                        method_onUpdateCharacteristicValueResult,
+                        jPath,
+                        result);
+    env->DeleteLocalRef(jPath);
+    free(user);
+ }
 
 #endif
 

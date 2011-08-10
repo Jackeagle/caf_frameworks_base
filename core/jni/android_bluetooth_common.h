@@ -105,6 +105,18 @@ struct _Properties {
 };
 typedef struct _Properties Properties;
 
+typedef struct {
+    void (*user_cb)(DBusMessage *, void *, void *);
+    void *user;
+    void *nat;
+    JNIEnv *env;
+} dbus_async_call_t;
+
+struct set_characteristic_property_t {
+    char * path;
+    char * property;
+};
+
 dbus_bool_t dbus_func_args_async(JNIEnv *env,
                                  DBusConnection *conn,
                                  int timeout_ms,
@@ -174,6 +186,8 @@ DBusMessage * dbus_func_args_generic_timeout_valist(JNIEnv *env,
                                             int first_arg_type,
                                             va_list args);
 
+void dbus_func_args_async_callback(DBusPendingCall *call, void *data);
+
 jint dbus_returns_int32(JNIEnv *env, DBusMessage *reply);
 jint dbus_returns_uint32(JNIEnv *env, DBusMessage *reply);
 jstring dbus_returns_string(JNIEnv *env, DBusMessage *reply);
@@ -193,6 +207,7 @@ jobjectArray parse_gatt_characteristic_properties(JNIEnv *env, DBusMessageIter *
 jobjectArray parse_remote_device_property_change(JNIEnv *env, DBusMessage *msg);
 jobjectArray parse_adapter_property_change(JNIEnv *env, DBusMessage *msg);
 void append_variant(DBusMessageIter *iter, int type, void *val);
+void append_array_variant(DBusMessageIter *iter, int type, void *val, int n_elements);
 int get_bdaddr(const char *str, bdaddr_t *ba);
 void get_bdaddr_as_string(const bdaddr_t *ba, char *str);
 
