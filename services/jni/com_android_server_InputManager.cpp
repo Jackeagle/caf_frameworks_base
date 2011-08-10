@@ -587,12 +587,16 @@ void NativeInputManager::notifySwitch(nsecs_t when, int32_t switchCode,
                 when, switchValue == 0);
         checkAndClearExceptionFromCallback(env, "notifyLidSwitchChanged");
         break;
+#ifdef ALSA_HEADSET_DETECTION
     case SW_HEADPHONE_INSERT:
+    case SW_MICROPHONE_INSERT:
+        // ToDo: Handle ANC switch event as well
     LOGD("JACK-DETECT: In NativeInputManager-Before calling windowmanager service for HEADPHONE_INSERT");
         env->CallVoidMethod(mCallbacksObj, gCallbacksClassInfo.notifyJackSwitchChanged,
                when, switchCode, switchValue);
         checkAndClearExceptionFromCallback(env, "notifyJackSwitchChanged");
         break;
+#endif
     }
 }
 

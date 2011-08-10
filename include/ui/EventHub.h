@@ -285,6 +285,9 @@ private:
 
     bool            mOpened;
     bool            mNeedToSendFinishedDeviceScan;
+    bool            mNeedToSendHeadPhoneEvent;
+    bool            mNeedToSendMicroPhoneEvent;
+    int             mHeadsetDeviceId;
     List<String8>   mExcludedDevices;
 
     //tslib
