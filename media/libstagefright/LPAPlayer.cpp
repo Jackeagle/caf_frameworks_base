@@ -370,6 +370,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
                 return BAD_VALUE;
             }
             mIsDriverStarted = true;
+            bIsAudioRouted = true;
             LOGV("LPA Driver Started");
         } else {
             LOGV("Before Audio Sink Open");
@@ -477,6 +478,7 @@ void LPAPlayer::pause(bool playPendingSamples) {
 
 void LPAPlayer::resume() {
     LOGV("resume: isPaused %d",isPaused);
+    Mutex::Autolock autoLock(resumeLock);
     if ( isPaused) {
         CHECK(mStarted);
         if (mSource->isPaused()==true) {
@@ -1612,6 +1614,7 @@ void LPAPlayer::requestAndWaitForEffectsThreadExit() {
 }
 
 void LPAPlayer::onPauseTimeOut() {
+    Mutex::Autolock autoLock(resumeLock);
     struct msm_audio_stats stats;
     int nBytesConsumed = 0;
     LOGV("onPauseTimeOut");
