@@ -201,6 +201,7 @@ private:
     bool m3DVideoDetected;
     bool mSendEOS;
     bool mSPSParsed;
+    bool bInvalidState;
 
     OMXCodec(const sp<IOMX> &omx, IOMX::node_id node, uint32_t quirks,
              bool isEncoder, const char *mime, const char *componentName,
