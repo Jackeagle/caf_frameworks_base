@@ -1971,7 +1971,8 @@ OMXCodec::OMXCodec(
       mSendEOS(false),
       mForce3D(0),
       mFinalStatus(OK),
-      mSPSParsed(false) {
+      mSPSParsed(false),
+      bInvalidState(false) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
 
@@ -2315,11 +2316,10 @@ void OMXCodec::on_message(const omx_message &msg) {
                  buffers->editItemAt(i).mMediaBuffer = NULL;
             }
 
-            if (mState == ERROR) {
+            if (mState == ERROR && (bInvalidState == true)) {
                 CODEC_LOGV("mState ERROR, freeing i/p buffer %p", buffer);
-                status_t err =
-                    mOMX->freeBuffer(mNode, kPortIndexInput, buffer);
-                CHECK_EQ(err, OK);
+                status_t err = mOMX->freeBuffer(mNode, kPortIndexInput, buffer);
+                CHECK_EQ(err, (status_t)OK);
                 buffers->removeAt(i);
             }
             if (mPortStatus[kPortIndexInput] == DISABLING) {
@@ -2378,11 +2378,11 @@ void OMXCodec::on_message(const omx_message &msg) {
                 }
             }
 #endif
-            if (mState == ERROR) {
+            if (mState == ERROR && (bInvalidState == true)) {
                 CODEC_LOGV("mState ERROR, freeing o/p buffer %p", buffer);
-                status_t err =
-                         mOMX->freeBuffer(mNode, kPortIndexOutput, buffer);
-                CHECK_EQ(err, OK);
+                status_t err = mOMX->freeBuffer(mNode, kPortIndexOutput, buffer);
+                CHECK_EQ(err, (status_t)OK);
+                buffers->removeAt(i);
             }
 
             if (mPortStatus[kPortIndexOutput] == DISABLING) {
@@ -2544,6 +2544,7 @@ void OMXCodec::onEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
         {
             CODEC_LOGE("ERROR(0x%08lx, %ld)", data1, data2);
             if (data1 == OMX_ErrorInvalidState) {
+                bInvalidState = true;
                 mPortStatus[kPortIndexInput] = SHUTTING_DOWN;
                 mPortStatus[kPortIndexOutput] = SHUTTING_DOWN;
             }
