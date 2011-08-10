@@ -765,7 +765,7 @@ void AwesomePlayer::onStreamDone() {
         partial_reset_l();
         postVideoEvent_l();
         return;
-    } else if (mStreamDoneStatus != ERROR_END_OF_STREAM) {
+    } else if ((mStreamDoneStatus != ERROR_IO) && (mStreamDoneStatus != ERROR_END_OF_STREAM)) {
         LOGV("MEDIA_ERROR %d", mStreamDoneStatus);
 
         notifyListener_l(
