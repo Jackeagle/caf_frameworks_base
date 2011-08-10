@@ -34,7 +34,6 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.net.Uri;
 import android.os.AsyncResult;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -142,7 +141,7 @@ public abstract class SMSDispatcher extends Handler {
     static protected Phone mPhone;
 
     /** New broadcast SMS */
-    static final protected int EVENT_NEW_BROADCAST_SMS = 13;
+    static final protected int EVENT_NEW_BROADCAST_SMS = 20;
 
     protected Context mContext;
     protected ContentResolver mResolver;
@@ -1147,4 +1146,21 @@ public abstract class SMSDispatcher extends Handler {
         dispatch(broadcastIntent, "android.permission.RECEIVE_SMS");
     }
 
+    protected void dispatchBroadcastPdus(byte[][] pdus, boolean isEmergencyMessage) {
+        if (isEmergencyMessage) {
+            Intent intent = new Intent(Intents.SMS_EMERGENCY_CB_RECEIVED_ACTION);
+            intent.putExtra("pdus", pdus);
+            if (Config.LOGD)
+                Log.d(TAG, "Dispatching " + pdus.length + " emergency SMS CB pdus");
+
+            dispatch(intent, "android.permission.RECEIVE_EMERGENCY_BROADCAST");
+        } else {
+            Intent intent = new Intent(Intents.SMS_CB_RECEIVED_ACTION);
+            intent.putExtra("pdus", pdus);
+            if (Config.LOGD)
+                Log.d(TAG, "Dispatching " + pdus.length + " SMS CB pdus");
+
+            dispatch(intent, "android.permission.RECEIVE_SMS");
+        }
+    }
 }

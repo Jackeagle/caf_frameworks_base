@@ -74,9 +74,8 @@ final class GsmSMSDispatcher extends SMSDispatcher {
         String pduString = (String) ar.result;
         SmsMessage sms = SmsMessage.newFromCDS(pduString);
 
-        int tpStatus = sms.getStatus();
-
         if (sms != null) {
+            int tpStatus = sms.getStatus();
             int messageRef = sms.messageRef;
             for (int i = 0, count = deliveryPendingList.size(); i < count; i++) {
                 SmsTracker tracker = deliveryPendingList.get(i);
@@ -245,7 +244,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsMessage.SubmitPdu pdus = SmsMessage.getSubmitPdu(scAddress, destinationAddress,
                     parts.get(i), deliveryIntent != null, SmsHeader.toByteArray(smsHeader),
-                    encoding);
+                    encoding, smsHeader.languageTable, smsHeader.languageShiftTable);
 
             HashMap map =  SmsTrackerMapFactory(destinationAddress, scAddress,
                     parts.get(i), pdus);
@@ -336,7 +335,7 @@ final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsMessage.SubmitPdu pdus = SmsMessage.getSubmitPdu(scAddress, destinationAddress,
                     parts.get(i), deliveryIntent != null, SmsHeader.toByteArray(smsHeader),
-                    encoding);
+                    encoding, smsHeader.languageTable, smsHeader.languageShiftTable);
 
             HashMap map =  SmsTrackerMapFactory(destinationAddress, scAddress,
                     parts.get(i), pdus);

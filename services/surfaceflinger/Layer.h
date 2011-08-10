@@ -44,7 +44,7 @@ class UserClient;
 
 // ---------------------------------------------------------------------------
 
-class Layer : public LayerBaseClient
+class Layer : public LayerBaseClient, private RefBase::Destroyer
 {
 public:
             Layer(SurfaceFlinger* flinger, DisplayID display,
@@ -88,7 +88,6 @@ public:
     virtual bool isNothingToUpdate() const  { return mNothingToUpdate; }
     virtual void setNothingToUpdate(bool value) { mNothingToUpdate = value; }
     virtual sp<Surface> createSurface() const;
-    virtual status_t ditch();
     virtual void onRemoved();
     virtual bool setBypass(bool enable);
 
@@ -105,6 +104,7 @@ public:
         return mFreezeLock; }
 
 protected:
+    virtual void destroy(RefBase const* base);
     virtual void dump(String8& result, char* scratch, size_t size) const;
 
 private:

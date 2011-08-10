@@ -3893,7 +3893,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
         rr.mp.writeInt(configs.length);
         for(int i = 0; i < configs.length; i++) {
-            rr.mp.writeInt(configs[i].getServiceCategory());
+            rr.mp.writeInt(configs[i].getFromServiceCategory());
             rr.mp.writeInt(configs[i].getLanguage());
             rr.mp.writeInt(configs[i].isSelected() ? 1 : 0);
         }

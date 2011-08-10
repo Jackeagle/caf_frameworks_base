@@ -64,6 +64,7 @@ Layer::Layer(SurfaceFlinger* flinger,
         mOverlay(false),
         mBypassState(false)
 {
+    setDestroyer(this);
 }
 
 Layer::~Layer()
@@ -78,6 +79,10 @@ Layer::~Layer()
     if (ourClient != 0) {
         ourClient->detachLayer(this);
     }
+}
+
+void Layer::destroy(RefBase const* base) {
+    mFlinger->destroyLayer(static_cast<LayerBase const*>(base));
 }
 
 status_t Layer::setToken(const sp<UserClient>& userClient,
@@ -134,18 +139,6 @@ sp<LayerBaseClient::Surface> Layer::createSurface() const
 {
     sp<Surface> sur(new SurfaceLayer(mFlinger, const_cast<Layer *>(this)));
     return sur;
-}
-
-status_t Layer::ditch()
-{
-    // NOTE: Called from the main UI thread
-
-    // the layer is not on screen anymore. free as much resources as possible
-    mFreezeLock.clear();
-
-    Mutex::Autolock _l(mLock);
-    mWidth = mHeight = 0;
-    return NO_ERROR;
 }
 
 status_t Layer::setBuffers( uint32_t w, uint32_t h,
