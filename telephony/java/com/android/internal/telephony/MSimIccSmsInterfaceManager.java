@@ -154,10 +154,10 @@ public class MSimIccSmsInterfaceManager extends ISms.Stub {
         return enableCellBroadcastOnSubscription(messageIdentifier, getPreferredSmsSubscription());
     }
 
-    public boolean enableCellBroadcastOnSubscription(int messageIdentifier, int subscription) {
+    public boolean enableCellBroadcastRangeOnSubscription(int startMessageId, int endMessageId, int subscription) {
         IccSmsInterfaceManager iccSmsIntMgr = getIccSmsInterfaceManager(subscription);
         if (iccSmsIntMgr != null ) {
-            return iccSmsIntMgr.enableCellBroadcast(messageIdentifier);
+            return iccSmsIntMgr.enableCellBroadcastRange(startMessageId, endMessageId);
         } else {
             Log.e(LOG_TAG,"enableCellBroadcast iccSmsIntMgr is null for" +
                           " Subscription:"+subscription);
@@ -165,19 +165,35 @@ public class MSimIccSmsInterfaceManager extends ISms.Stub {
         return false;
     }
 
-    public boolean disableCellBroadcast(int messageIdentifier) {
-        return disableCellBroadcastOnSubscription(messageIdentifier, getPreferredSmsSubscription());
-    }
-
-    public boolean disableCellBroadcastOnSubscription(int messageIdentifier, int subscription) {
+    public boolean disableCellBroadcastRangeOnSubscription(int startMessageId, int endMessageId, int subscription) {
         IccSmsInterfaceManager iccSmsIntMgr = getIccSmsInterfaceManager(subscription);
         if (iccSmsIntMgr != null ) {
-            return iccSmsIntMgr.disableCellBroadcast(messageIdentifier);
+            return iccSmsIntMgr.disableCellBroadcastRange(startMessageId, endMessageId);
         } else {
             Log.e(LOG_TAG,"disableCellBroadcast iccSmsIntMgr is null for" +
                           " Subscription:"+subscription);
         }
        return false;
+    }
+
+    public boolean enableCellBroadcastRange(int startMessageId, int endMessageId) {
+        return enableCellBroadcastRangeOnSubscription(startMessageId, endMessageId, getPreferredSmsSubscription());
+    }
+
+    public boolean enableCellBroadcastOnSubscription(int messageIdentifier, int subscription) {
+        return enableCellBroadcastRangeOnSubscription(messageIdentifier, messageIdentifier, subscription);
+    }
+
+    public boolean disableCellBroadcast(int messageIdentifier) {
+        return disableCellBroadcastOnSubscription(messageIdentifier, getPreferredSmsSubscription());
+    }
+
+    public boolean disableCellBroadcastOnSubscription(int messageIdentifier, int subscription) {
+        return disableCellBroadcastRangeOnSubscription(messageIdentifier, messageIdentifier, subscription);
+    }
+
+    public boolean disableCellBroadcastRange(int startMessageId, int endMessageId) {
+        return disableCellBroadcastRangeOnSubscription(startMessageId, endMessageId, getPreferredSmsSubscription());
     }
 
     public boolean enableCdmaBroadcast(int messageIdentifier) {

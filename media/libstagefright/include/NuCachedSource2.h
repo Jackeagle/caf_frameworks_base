@@ -98,7 +98,7 @@ private:
     status_t seekInternal_l(off64_t offset);
 
     size_t approxDataRemaining_l(bool *eos);
-    void restartPrefetcherIfNecessary_l();
+    void restartPrefetcherIfNecessary_l(bool force = false);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuCachedSource2);
 
