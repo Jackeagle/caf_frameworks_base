@@ -55,6 +55,7 @@ const char *MEDIA_MIMETYPE_CONTAINER_QCP = "audio/vnd.qcelp";
 const char *MEDIA_MIMETYPE_CONTAINER_ASF = "video/x-ms-asf";
 const char *MEDIA_MIMETYPE_VIDEO_DIVX = "video/divx";
 const char *MEDIA_MIMETYPE_VIDEO_DIVX311 = "video/divx311";
+const char *MEDIA_MIMETYPE_VIDEO_DIVX4 = "video/divx4";
 const char *MEDIA_MIMETYPE_AUDIO_AC3 = "audio/ac3";
 const char *MEDIA_MIMETYPE_VIDEO_SPARK = "video/spark";
 const char *MEDIA_MIMETYPE_VIDEO_VP6 = "video/vp6";
