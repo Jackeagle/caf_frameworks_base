@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
+#define LOG_TAG "ColorConverter"
+#include <utils/Log.h>
+
 #include <media/stagefright/ColorConverter.h>
 #include <media/stagefright/MediaDebug.h>
 
@@ -43,8 +47,8 @@ bool ColorConverter::isValid() const {
         case OMX_COLOR_FormatCbYCrY:
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
         case OMX_COLOR_FormatYUV420SemiPlanar:
-#if defined(TARGET_OMAP4)
         case OMX_COLOR_FormatYUV420PackedSemiPlanar:
+#if defined(TARGET_OMAP4)
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar_Sequential_TopBottom:
 #endif
             return true;
@@ -54,18 +58,11 @@ bool ColorConverter::isValid() const {
     }
 }
 
-#if defined(TARGET_OMAP4)
 void ColorConverter::convert(
         size_t width, size_t height,
         const void *srcBits, size_t srcSkip,
         void *dstBits, size_t dstSkip,
         size_t dwidth, size_t dheight, size_t nOffset, bool interlaced) {
-#else
-void ColorConverter::convert(
-        size_t width, size_t height,
-        const void *srcBits, size_t srcSkip,
-        void *dstBits, size_t dstSkip) {
-#endif
     CHECK_EQ(mDstFormat, OMX_COLOR_Format16bitRGB565);
 
     switch (mSrcFormat) {
@@ -88,13 +85,13 @@ void ColorConverter::convert(
             convertYUV420SemiPlanar(
                     width, height, srcBits, srcSkip, dstBits, dstSkip);
             break;
-#if defined(TARGET_OMAP4)
         case OMX_COLOR_FormatYUV420PackedSemiPlanar:
+#if defined(TARGET_OMAP4)
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar_Sequential_TopBottom:
+#endif
             convertYUV420PackedSemiPlanar(
                     width, height, dwidth, dheight,nOffset,srcBits, srcSkip, dstBits, dstSkip, interlaced);
             break;
-#endif
         default:
         {
             CHECK(!"Should not be here. Unknown color conversion.");
@@ -366,7 +363,6 @@ void ColorConverter::convertYUV420SemiPlanar(
 }
 
 
-#if defined(TARGET_OMAP4)
 void ColorConverter::convertYUV420PackedSemiPlanar(
         size_t width, size_t height,
         size_t displaywidth, size_t displayheight, size_t nOffset,
@@ -375,7 +371,7 @@ void ColorConverter::convertYUV420PackedSemiPlanar(
 
     CHECK((dstSkip & 3) == 0);
 
-    size_t stride = width;
+    size_t stride = ((width + 64) + 0x7F) & ~0x7F;
 
     if(srcSkip)
         stride = srcSkip;
@@ -389,7 +385,8 @@ void ColorConverter::convertYUV420PackedSemiPlanar(
     uint32_t offy = nOffset / stride;
 
 
-    const uint8_t *src_u = (const uint8_t *)(src_y-nOffset) + (stride * height);
+    const uint8_t *src_u = (const uint8_t *)(src_y-nOffset) +
+                           (stride * (height + offy * 4));
     src_u += ( ( stride * (offy/2) ) + offx );
 
     const uint8_t *src_v = src_u + 1;
@@ -450,7 +447,6 @@ void ColorConverter::convertYUV420PackedSemiPlanar(
         dst_ptr += dstSkip / 4;
     }
 }
-#endif
 
 uint8_t *ColorConverter::initClip() {
     static const signed kClipMin = -278;
