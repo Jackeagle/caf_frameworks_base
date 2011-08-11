@@ -128,6 +128,7 @@ enum {
     kKeyAacCodecSpecificData = 'acsd' ,
     // for AAC specific type ADTS or ADIF
     kkeyAacFormatAdif     = 'adif', // bool (int32_t)
+    kkeyAacFormatLtp      = 'ltp',
 
 };
 
