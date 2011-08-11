@@ -2315,7 +2315,6 @@ status_t OMXCodec::setVideoOutputFormat(
         video_def->xFramerate            = 60 << 16;
         video_def->bFlagErrorConcealment = OMX_FALSE;
         video_def->eCompressionFormat    = OMX_VIDEO_CodingUnused;
-        video_def->eColorFormat          = OMX_COLOR_FormatYUV420SemiPlanar;
     }
 
     err = mOMX->setParameter(

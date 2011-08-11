@@ -116,9 +116,11 @@ static VideoFrame *extractVideoFrameWithCodecFlags(
         uint32_t flags,
         int64_t frameTimeUs,
         int seekMode) {
+
+    int32_t isInterlaced = false;
+
 #ifdef TARGET_OMAP4
     flags |= OMXCodec::kPreferThumbnailMode;
-    int32_t isInterlaced = false;
 
     //Call config parser to update profile,level,interlaced,reference frame data
     updateMetaData(trackMeta);
@@ -241,7 +243,6 @@ static VideoFrame *extractVideoFrameWithCodecFlags(
 
     VideoFrame *frame = new VideoFrame;
 
-#if defined(TARGET_OMAP4)
     int32_t srcFormat;
     CHECK(meta->findInt32(kKeyColorFormat, &srcFormat));
 
@@ -257,76 +258,58 @@ static VideoFrame *extractVideoFrameWithCodecFlags(
     CHECK(source_meta->findInt32(kKeyHeight, &displayHeight));
     LOGD("VideoFrame WxH %dx%d", displayWidth, displayHeight);
 
-    if(((OMX_COLOR_FORMATTYPE)srcFormat == OMX_COLOR_FormatYUV420PackedSemiPlanar) ||
-       ((OMX_COLOR_FORMATTYPE)srcFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar_Sequential_TopBottom)){
-        frame->mWidth = displayWidth;
-        frame->mHeight = displayHeight;
-        frame->mDisplayWidth = displayWidth;
-        frame->mDisplayHeight = displayHeight;
-        frame->mSize = displayWidth * displayHeight * 2;
-        frame->mData = new uint8_t[frame->mSize];
-    frame->mRotationAngle = rotationAngle;
-    }else {
-        frame->mWidth = width;
-        frame->mHeight = height;
-        frame->mDisplayWidth = width;
-        frame->mDisplayHeight = height;
-        frame->mSize = width * height * 2;
-        frame->mData = new uint8_t[frame->mSize];
-    frame->mRotationAngle = rotationAngle;
-    }
+    switch ((OMX_COLOR_FORMATTYPE)srcFormat)
+    {
+        case OMX_COLOR_FormatYUV420PackedSemiPlanar:
+#if defined(TARGET_OMAP4)
+        case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar_Sequential_TopBottom:
+#endif
+        {
+            frame->mWidth = displayWidth;
+            frame->mHeight = displayHeight;
+            frame->mDisplayWidth = displayWidth;
+            frame->mDisplayHeight = displayHeight;
+            frame->mSize = displayWidth * displayHeight * 2;
+            frame->mData = new uint8_t[frame->mSize];
+            frame->mRotationAngle = rotationAngle;
 
-    if(((OMX_COLOR_FORMATTYPE)srcFormat == OMX_COLOR_FormatYUV420PackedSemiPlanar) ||
-       ((OMX_COLOR_FORMATTYPE)srcFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar_Sequential_TopBottom)){
-
-        ColorConverter converter(
+            ColorConverter converter(
                 (OMX_COLOR_FORMATTYPE)srcFormat, OMX_COLOR_Format16bitRGB565);
 
-        CHECK(converter.isValid());
+            CHECK(converter.isValid());
 
-        converter.convert(
+            converter.convert(
                 width, height,
                 (const uint8_t *)buffer->data() + buffer->range_offset(),
-                0, //1D buffer in 1.16 Ducati rls. If 2D buffer -> 4096 stride should be used
+                0, // 1D buffer in 1.16 Ducati rls.
+                   // If 2D buffer -> 4096 stride should be used
                 frame->mData, displayWidth * 2,
                 displayWidth,displayHeight,buffer->range_offset(),isInterlaced);
-    }
-    else{
+            break;
+        }
+        default:
+        {
+            frame->mWidth = width;
+            frame->mHeight = height;
+            frame->mDisplayWidth = width;
+            frame->mDisplayHeight = height;
+            frame->mSize = width * height * 2;
+            frame->mData = new uint8_t[frame->mSize];
+            frame->mRotationAngle = rotationAngle; 
 
-        ColorConverter converter(
+            ColorConverter converter(
                 (OMX_COLOR_FORMATTYPE)srcFormat, OMX_COLOR_Format16bitRGB565);
 
-        CHECK(converter.isValid());
+            CHECK(converter.isValid());
 
-        converter.convert(
+            converter.convert(
                 width, height,
                 (const uint8_t *)buffer->data() + buffer->range_offset(),
                 0,
                 frame->mData, width * 2);
+            break;
+        }
     }
-
-#else
-    frame->mWidth = width;
-    frame->mHeight = height;
-    frame->mDisplayWidth = width;
-    frame->mDisplayHeight = height;
-    frame->mSize = width * height * 2;
-    frame->mData = new uint8_t[frame->mSize];
-    frame->mRotationAngle = rotationAngle;
-
-    int32_t srcFormat;
-    CHECK(meta->findInt32(kKeyColorFormat, &srcFormat));
-
-    ColorConverter converter(
-            (OMX_COLOR_FORMATTYPE)srcFormat, OMX_COLOR_Format16bitRGB565);
-    CHECK(converter.isValid());
-
-    converter.convert(
-            width, height,
-            (const uint8_t *)buffer->data() + buffer->range_offset(),
-            0,
-            frame->mData, width * 2);
-#endif
 
     buffer->release();
     buffer = NULL;
