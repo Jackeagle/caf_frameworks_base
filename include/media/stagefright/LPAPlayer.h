@@ -202,6 +202,7 @@ private:
     size_t mFrameSize;
 
     Mutex mLock;
+    Mutex resumeLock;
     int64_t mNumFramesPlayed;
 
     int64_t mPositionTimeMediaUs;
