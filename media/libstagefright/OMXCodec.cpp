@@ -933,10 +933,26 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         {
             LOGE("OMX_QCOM_FramePacking_OnlyOneCompleteFrame not supported by component err: %d", err);
         }
-        else
-            if(err!=OK){
+        else if(err!=OK){
+            return err;
+        }
+
+        if (!property_get("ro.product.device", value, "1") ||
+            !strncmp(value, "msm76", 5) ) {
+            LOGV("OMX_QcomIndexParamEnableTimeStampReorder not supported by 7k");
+        } else {
+            QOMX_INDEXTIMESTAMPREORDER tsReorderDef;
+            InitOMXParams(&tsReorderDef);
+            tsReorderDef.nPortIndex = 0;
+            tsReorderDef.nSize = sizeof(QOMX_INDEXTIMESTAMPREORDER);
+            tsReorderDef.bEnable = OMX_TRUE;
+            err = mOMX->setParameter(mNode, (OMX_INDEXTYPE)OMX_QcomIndexParamEnableTimeStampReorder,
+                                 &tsReorderDef, sizeof(QOMX_INDEXTIMESTAMPREORDER));
+            if( err != OK) {
+               LOGE("error in OMX SetParam for OMX_QcomIndexParamEnableTimeStampReorder for VC1");
                return err;
             }
+        }
     }
     if (!strncasecmp(mMIME, "video/", 6)) {
 
