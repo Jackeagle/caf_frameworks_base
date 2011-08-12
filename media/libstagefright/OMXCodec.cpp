@@ -4070,6 +4070,10 @@ status_t OMXCodec::stop() {
         mLeftOverBuffer = NULL;
     }
 
+    LOGV("stop: no more output data, sending the mBufferFilled signal");
+    mNoMoreOutputData = true;
+    mBufferFilled.signal();
+
     mSource->stop();
 
     int i = 0;
