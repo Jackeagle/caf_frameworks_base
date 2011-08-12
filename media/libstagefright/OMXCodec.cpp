@@ -207,6 +207,7 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_VIDEO_VPX, "VPXDecoder" },
     { MEDIA_MIMETYPE_VIDEO_DIVX, "OMX.qcom.video.decoder.divx"},
     { MEDIA_MIMETYPE_VIDEO_DIVX311, "OMX.qcom.video.decoder.divx311"},
+    { MEDIA_MIMETYPE_VIDEO_DIVX4, "OMX.qcom.video.decoder.divx4"},
     { MEDIA_MIMETYPE_AUDIO_AC3, "OMX.qcom.audio.decoder.ac3" },
     { MEDIA_MIMETYPE_AUDIO_QCELP, "OMX.qcom.audio.decoder.Qcelp13"},
     { MEDIA_MIMETYPE_VIDEO_SPARK,"OMX.qcom.video.decoder.spark"},
@@ -752,7 +753,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         }
     }
 
-    if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mMIME)) {
+    if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mMIME) || !strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX4, mMIME)) {
         LOGV("Setting the QOMX_VIDEO_PARAM_DIVXTYPE params ");
         QOMX_VIDEO_PARAM_DIVXTYPE paramDivX;
         InitOMXParams(&paramDivX);
@@ -1289,6 +1290,10 @@ void OMXCodec::setVideoInputFormat(
         compressionFormat = OMX_VIDEO_CodingH263;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime)){
         compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mime)){
+        compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX4, mime)){
+        compressionFormat= (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mime)){
         compressionFormat = OMX_VIDEO_CodingWMV;
     } else {
@@ -1779,6 +1784,8 @@ status_t OMXCodec::setVideoOutputFormat(
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_WMV, mime)){
         compressionFormat = OMX_VIDEO_CodingWMV;
     } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mime)) {
+        compressionFormat = (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
+    } else if(!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX4, mime)) {
         compressionFormat = (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
     } else {
         LOGE("Not a supported video mime type: %s", mime);

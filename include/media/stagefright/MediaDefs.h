@@ -51,8 +51,9 @@ extern const char *MEDIA_MIMETYPE_CONTAINER_AVI;
 extern const char *MEDIA_MIMETYPE_CONTAINER_QCP;
 extern const char *MEDIA_MIMETYPE_CONTAINER_ASF;
 extern const char *MEDIA_MIMETYPE_CONTAINER_AAC;
-extern const char *MEDIA_MIMETYPE_VIDEO_DIVX;
-extern const char *MEDIA_MIMETYPE_VIDEO_DIVX311;
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX;    // DIVX 5 & 6
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX311; // DIVX 311
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX4;   // DIVX 4
 extern const char *MEDIA_MIMETYPE_AUDIO_AC3;
 extern const char *MEDIA_MIMETYPE_VIDEO_SPARK;
 extern const char *MEDIA_MIMETYPE_VIDEO_VP6;
