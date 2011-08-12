@@ -50,6 +50,7 @@ public class ScoSocket {
     private int mAcceptedCode;
     private int mConnectedCode;
     private int mClosedCode;
+    private boolean mIsWbs;  // try only eSCO if true for wBS
 
     private WakeLock mWakeLock;  // held while in STATE_CONNECTING
 
@@ -66,6 +67,21 @@ public class ScoSocket {
         mAcceptedCode = acceptedCode;
         mConnectedCode = connectedCode;
         mClosedCode = closedCode;
+        mIsWbs = false;
+        mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ScoSocket");
+        mWakeLock.setReferenceCounted(false);
+        if (VDBG) log(this + " SCO OBJECT CTOR");
+    }
+
+    public ScoSocket(PowerManager pm, Handler handler, int acceptedCode, int connectedCode,
+                     int closedCode, boolean isWbs) {
+        initNative();
+        mState = STATE_READY;
+        mHandler = handler;
+        mAcceptedCode = acceptedCode;
+        mConnectedCode = connectedCode;
+        mClosedCode = closedCode;
+        mIsWbs = isWbs;
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ScoSocket");
         mWakeLock.setReferenceCounted(false);
         if (VDBG) log(this + " SCO OBJECT CTOR");
