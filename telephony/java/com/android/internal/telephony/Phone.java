@@ -1520,9 +1520,10 @@ public interface Phone {
      *
      * @param qosSpec QosSpec requested
      * @param type Apn Type on which QoS is requested on
+     * @param ipv IPVersion of the data connection QoS is requested on
      * @return true on success, else false
      */
-    int enableQos(QosSpec qosSpec, String type);
+    int enableQos(QosSpec qosSpec, String type, IPVersion ipv);
 
     /**
      * Disable QoS

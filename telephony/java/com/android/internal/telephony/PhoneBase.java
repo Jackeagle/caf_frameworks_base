@@ -1043,8 +1043,8 @@ public abstract class PhoneBase extends Handler implements Phone {
         return mDataConnection.disableApnType(type);
      }
 
-    public int enableQos(QosSpec qosSpec, String type) {
-        return mDataConnection.enableQos(qosSpec, type);
+    public int enableQos(QosSpec qosSpec, String type, IPVersion ipv) {
+        return mDataConnection.enableQos(qosSpec, type, ipv);
     }
 
     public int disableQos(int qosId) {

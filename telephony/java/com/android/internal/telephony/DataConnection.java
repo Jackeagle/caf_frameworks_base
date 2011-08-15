@@ -246,11 +246,19 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 
     protected abstract void onQosRelease(int qosId);
 
+    protected abstract void onQosSuspend(int qosId);
+
+    protected abstract void onQosResume(int qosId);
+
     protected abstract void onQosGetStatus(int qosId);
 
     protected abstract void onQosSetupDone(int userData, String[] responses, String error);
 
     protected abstract void onQosReleaseDone(int qosId, String error);
+
+    protected abstract void onQosSuspendDone(int qosId, String error);
+
+    protected abstract void onQosResumeDone(int qosId, String error);
 
     protected abstract void onQosGetStatusDone(int qosId, AsyncResult ar, String error);
 
@@ -945,6 +953,22 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 onQosRelease(qosId);
                 retVal = true;
                 break;
+            case EVENT_QOS_SUSPEND:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_SUSPEND");
+                // Send out qosSuspend
+                qosId = msg.arg1;
+                onQosSuspend(qosId);
+                retVal = true;
+                break;
+            case EVENT_QOS_RESUME:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_RESUME");
+                // Send out qosResume
+                qosId = msg.arg1;
+                onQosResume(qosId);
+                retVal = true;
+                break;
             case EVENT_QOS_GET_STATUS:
                 if (DBG)
                     log("DcQosActiveState msg.what=EVENT_QOS_GET_STATUS");
@@ -956,6 +980,10 @@ public abstract class DataConnection extends HierarchicalStateMachine {
             case EVENT_QOS_IND:
                 log("DcQosActiveState msg.what=EVENT_QOS_IND");
                 onQosStateChangedInd((AsyncResult)msg.obj);
+                // If all QosSpecs are empty, go back to active.
+                if (mQosFlowIds.size() == 0) {
+                    transitionTo(mActiveState);
+                }
                 retVal = true;
                 break;
 
@@ -980,10 +1008,28 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 
                 qosId = (Integer) ((AsyncResult)msg.obj).userObj;
                 onQosReleaseDone(qosId, error);
-                // If all QosSpecs are empty, go back to active.
-                if (mQosFlowIds.size() == 0) {
-                    transitionTo(mActiveState);
-                }
+                retVal = true;
+                break;
+
+            case EVENT_QOS_SUSPEND_DONE:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_SUSPEND_DONE");
+
+                error = getAsyncException(msg);
+
+                qosId = (Integer) ((AsyncResult)msg.obj).userObj;
+                onQosSuspendDone(qosId, error);
+                retVal = true;
+                break;
+
+            case EVENT_QOS_RESUME_DONE:
+                if (DBG)
+                    log("DcQosActiveState msg.what=EVENT_QOS_RESUME_DONE");
+
+                error = getAsyncException(msg);
+
+                qosId = (Integer) ((AsyncResult)msg.obj).userObj;
+                onQosResumeDone(qosId, error);
                 retVal = true;
                 break;
 
@@ -1001,8 +1047,6 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 retVal = true;
                 break;
             case EVENT_QOS_MODIFY_DONE:
-            case EVENT_QOS_SUSPEND_DONE:
-            case EVENT_QOS_RESUME_DONE:
                 break;
 
             case EVENT_DISCONNECT:

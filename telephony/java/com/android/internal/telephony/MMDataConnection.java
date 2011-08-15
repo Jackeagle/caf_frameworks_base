@@ -191,6 +191,30 @@ public class MMDataConnection extends DataConnection {
     }
 
     /**
+     * Initiate QoS Suspend for the given QoS ID
+     *
+     * @param qosId
+     *            QoS ID
+     */
+    protected void onQosSuspend(int qosId) {
+        logd("Requesting QoS Suspend, qosId" + qosId);
+
+        this.mCM.suspendQos(qosId, obtainMessage(EVENT_QOS_SUSPEND_DONE, qosId));
+    }
+
+    /**
+     * Initiate QoS Resume for the given QoS ID
+     *
+     * @param qosId
+     *            QoS ID
+     */
+    protected void onQosResume(int qosId) {
+        logd("Requesting QoS Resume, qosId" + qosId);
+
+        this.mCM.resumeQos(qosId, obtainMessage(EVENT_QOS_RESUME_DONE, qosId));
+    }
+
+    /**
      * Get QoS status and parameters for a given QoS ID
      *
      * @param qosId
@@ -268,6 +292,46 @@ public class MMDataConnection extends DataConnection {
     }
 
     /**
+     * QoS Suspend Done. Notify upper layers.
+     *
+     * @param error
+     */
+    protected void onQosSuspendDone(int qosId, String error) {
+
+        if (mQosFlowIds.contains(qosId)) {
+            QosIndication ind = new QosIndication();
+            ind.setIndState(QosSpec.QosIndStates.SUSPENDING, error);
+            ind.setQosId(qosId);
+            ind.sendIndication();
+
+            logd("onQosSuspendDone Complete, qosId:" + qosId
+                    + " error:" + error);
+        }
+        else
+            logd("onQosSuspendDone Invalid qosId:" + qosId + " error:" + error);
+    }
+
+    /**
+     * QoS Resume Done. Notify upper layers.
+     *
+     * @param error
+     */
+    protected void onQosResumeDone(int qosId, String error) {
+
+        if (mQosFlowIds.contains(qosId)) {
+            QosIndication ind = new QosIndication();
+            ind.setIndState(QosSpec.QosIndStates.RESUMING, error);
+            ind.setQosId(qosId);
+            ind.sendIndication();
+
+            logd("onQosResumeDone Complete, qosId:" + qosId
+                    + " error:" + error);
+        }
+        else
+            logd("onQosResumeDone Invalid qosId:" + qosId + " error:" + error);
+    }
+
+    /**
      * QoS Get Status Done. Notify upper layers.
      *
      * @param ar
@@ -338,27 +402,34 @@ public class MMDataConnection extends DataConnection {
 
         QosIndication ind = new QosIndication();
 
-        ind.setQosId(Integer.parseInt(qosInd[0]));
+        try {
+            ind.setQosId(Integer.parseInt(qosInd[0]));
 
-        // Converting RIL's definition of QoS state into the one defined in QosSpec
-        int qosState = Integer.parseInt(qosInd[1]);
+            // Converting RIL's definition of QoS state into the one defined in QosSpec
+            int qosState = Integer.parseInt(qosInd[1]);
 
-        switch(qosState) {
-        case RILConstants.RIL_QosIndStates.RIL_QOS_SUCCESS:
-            qosIndState = QosSpec.QosIndStates.ACTIVATED;
-            break;
-        case RILConstants.RIL_QosIndStates.RIL_QOS_NEGOTIATED:
-            qosIndState = QosSpec.QosIndStates.NEGOTIATED;
-            break;
-        case RILConstants.RIL_QosIndStates.RIL_QOS_USER_RELEASE:
-            qosIndState = QosSpec.QosIndStates.RELEASED;
-            break;
-        case RILConstants.RIL_QosIndStates.RIL_QOS_NETWORK_RELEASE:
-            qosIndState = QosSpec.QosIndStates.RELEASED_NETWORK;
-            break;
-        default:
-            loge("Invalid Qos State, ignoring indication!");
-            break;
+            switch(qosState) {
+                case RILConstants.RIL_QosIndStates.RIL_QOS_ACTIVATED:
+                    qosIndState = QosSpec.QosIndStates.ACTIVATED;
+                    break;
+                case RILConstants.RIL_QosIndStates.RIL_QOS_USER_RELEASE:
+                    qosIndState = QosSpec.QosIndStates.RELEASED;
+                    break;
+                case RILConstants.RIL_QosIndStates.RIL_QOS_NETWORK_RELEASE:
+                    qosIndState = QosSpec.QosIndStates.RELEASED_NETWORK;
+                    break;
+                case RILConstants.RIL_QosIndStates.RIL_QOS_SUSPENDED:
+                    qosIndState = QosSpec.QosIndStates.SUSPENDED;
+                    break;
+                case RILConstants.RIL_QosIndStates.RIL_QOS_MODIFIED:
+                    qosIndState = QosSpec.QosIndStates.MODIFIED;
+                    break;
+                default:
+                    loge("Invalid Qos State, ignoring indication!");
+                    break;
+            }
+        } catch (Exception e) {
+            logd("Exception processing indication:" + e);
         }
 
         ind.setIndState(qosIndState, null);

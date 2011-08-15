@@ -168,38 +168,42 @@ public interface RILConstants {
         /* Positive numerical value */
         public static final int RIL_QOS_FLOW_3GPP2_PRIORITY = 7;
 
+        /* Positive numerical value */
+        public static final int RIL_QOS_FILTER_INDEX = 8;
+        /* IP VERSION - "IP" or "IPV6" */
+        public static final int RIL_QOS_FILTER_IPVERSION = 9;
         /* RIL_QosDirection */
-        public static final int RIL_QOS_FILTER_DIRECTION = 8;
+        public static final int RIL_QOS_FILTER_DIRECTION = 10;
         /* Format: xxx.xxx.xxx.xxx/yy */
-        public static final int RIL_QOS_FILTER_IPV4_SOURCE_ADDR = 9;
+        public static final int RIL_QOS_FILTER_IPV4_SOURCE_ADDR = 11;
         /* Format: xxx.xxx.xxx.xxx/yy */
-        public static final int RIL_QOS_FILTER_IPV4_DESTINATION_ADDR = 10;
+        public static final int RIL_QOS_FILTER_IPV4_DESTINATION_ADDR = 12;
         /* Positive numerical Value (max 6-bit number) */
-        public static final int RIL_QOS_FILTER_IPV4_TOS = 11;
+        public static final int RIL_QOS_FILTER_IPV4_TOS = 13;
         /* Mask for the 6 bit TOS value */
-        public static final int RIL_QOS_FILTER_IPV4_TOS_MASK = 12;
+        public static final int RIL_QOS_FILTER_IPV4_TOS_MASK = 14;
 
         /**
          * *PORT_START is the starting port number
          * *PORT_RANGE is the number of continuous ports from *PORT_START key
          */
-        public static final int RIL_QOS_FILTER_TCP_SOURCE_PORT_START = 13;
-        public static final int RIL_QOS_FILTER_TCP_SOURCE_PORT_RANGE = 14;
-        public static final int RIL_QOS_FILTER_TCP_DESTINATION_PORT_START = 15;
-        public static final int RIL_QOS_FILTER_TCP_DESTINATION_PORT_RANGE = 16;
-        public static final int RIL_QOS_FILTER_UDP_SOURCE_PORT_START = 17;
-        public static final int RIL_QOS_FILTER_UDP_SOURCE_PORT_RANGE = 18;
-        public static final int RIL_QOS_FILTER_UDP_DESTINATION_PORT_START = 19;
-        public static final int RIL_QOS_FILTER_UDP_DESTINATION_PORT_RANGE = 20;
+        public static final int RIL_QOS_FILTER_TCP_SOURCE_PORT_START = 15;
+        public static final int RIL_QOS_FILTER_TCP_SOURCE_PORT_RANGE = 16;
+        public static final int RIL_QOS_FILTER_TCP_DESTINATION_PORT_START = 17;
+        public static final int RIL_QOS_FILTER_TCP_DESTINATION_PORT_RANGE = 18;
+        public static final int RIL_QOS_FILTER_UDP_SOURCE_PORT_START = 19;
+        public static final int RIL_QOS_FILTER_UDP_SOURCE_PORT_RANGE = 20;
+        public static final int RIL_QOS_FILTER_UDP_DESTINATION_PORT_START = 21;
+        public static final int RIL_QOS_FILTER_UDP_DESTINATION_PORT_RANGE = 22;
 
         /* TBD: For future implemenations based on requirements */
-        public static final int RIL_QOS_FILTER_IP_NEXT_HEADER_PROTOCOL = 21;
+        public static final int RIL_QOS_FILTER_IP_NEXT_HEADER_PROTOCOL = 23;
         /* Format: xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx/yyy */
-        public static final int RIL_QOS_FILTER_IPV6_SOURCE_ADDR = 22;
+        public static final int RIL_QOS_FILTER_IPV6_SOURCE_ADDR = 24;
         /* Format: xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx/yyy */
-        public static final int RIL_QOS_FILTER_IPV6_DESTINATION_ADDR = 23;
-        public static final int RIL_QOS_FILTER_IPV6_TRAFFIC_CLASS = 24;
-        public static final int RIL_QOS_FILTER_IPV6_FLOW_LABEL = 25;
+        public static final int RIL_QOS_FILTER_IPV6_DESTINATION_ADDR = 25;
+        public static final int RIL_QOS_FILTER_IPV6_TRAFFIC_CLASS = 26;
+        public static final int RIL_QOS_FILTER_IPV6_FLOW_LABEL = 27;
 
         public static String getName(int val) {
             switch(val) {
@@ -219,6 +223,10 @@ public interface RILConstants {
                     return "RIL_QOS_FLOW_3GPP2_PROFILE_ID";
                 case RIL_QOS_FLOW_3GPP2_PRIORITY:
                     return "RIL_QOS_FLOW_3GPP2_PRIORITY";
+                case RIL_QOS_FILTER_INDEX:
+                    return "RIL_QOS_FILTER_INDEX";
+                case RIL_QOS_FILTER_IPVERSION:
+                    return "RIL_QOS_FILTER_IPVERSION";
                 case RIL_QOS_FILTER_DIRECTION:
                     return "RIL_QOS_FILTER_DIRECTION";
                 case RIL_QOS_FILTER_IPV4_SOURCE_ADDR:
@@ -273,15 +281,19 @@ public interface RILConstants {
 
     public static class RIL_QosIndStates {
         /* QoS operation complete */
-        public static final int RIL_QOS_SUCCESS         = 0;
-        /* QoS setup resulted in a neogtiated value */
-        public static final int RIL_QOS_NEGOTIATED      = 1;
+        public static final int RIL_QOS_ACTIVATED         = 0;
+        /* QoS (NW initiated) setup complete */
+        public static final int RIL_QOS_ACTIVATED_NETWORK = 1;
         /* QoS released by the user */
-        public static final int RIL_QOS_USER_RELEASE    = 2;
+        public static final int RIL_QOS_USER_RELEASE      = 2;
         /* QoS released by the network */
-        public static final int RIL_QOS_NETWORK_RELEASE = 3;
+        public static final int RIL_QOS_NETWORK_RELEASE   = 3;
+        /* QoS suspended */
+        public static final int RIL_QOS_SUSPENDED         = 4;
+        /* QoS modified */
+        public static final int RIL_QOS_MODIFIED          = 5;
         /* Any other error */
-        public static final int RIL_QOS_ERROR_UNKNOWN   = 4;
+        public static final int RIL_QOS_ERROR_UNKNOWN     = 6;
     }
 
 /*

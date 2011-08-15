@@ -902,8 +902,8 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.disableApnType(type);
     }
 
-    public int enableQos(QosSpec qosSpec, String type) {
-        return mActivePhone.enableQos(qosSpec, type);
+    public int enableQos(QosSpec qosSpec, String type, IPVersion ipv) {
+        return mActivePhone.enableQos(qosSpec, type, ipv);
     }
 
     public int disableQos(int qosId) {

@@ -250,7 +250,7 @@ public abstract class DataConnectionTracker extends Handler {
     abstract protected void onRadioOff();
     abstract protected void onMasterDataEnabled();
     abstract protected void onMasterDataDisabled(Message onCompleteMsg);
-    abstract protected int enableQos(QosSpec qosSpec, String type);
+    abstract protected int enableQos(QosSpec qosSpec, String type, IPVersion ipv);
     abstract protected int disableQos(int qosId);
     abstract protected int modifyQos(int qosId, QosSpec qosSpec);
     abstract protected int suspendQos(int qosId);

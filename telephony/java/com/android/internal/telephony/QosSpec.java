@@ -41,6 +41,9 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.LinkedList;
 import java.util.Set;
 import java.util.Map.Entry;
 import java.io.File;
@@ -114,6 +117,14 @@ public class QosSpec implements Parcelable {
                             RIL_QosSpecKeys.RIL_QOS_FLOW_3GPP2_PROFILE_ID;
         public static final int FLOW_3GPP2_PRIORITY =
                             RIL_QosSpecKeys.RIL_QOS_FLOW_3GPP2_PRIORITY;
+
+        /* Filter Index [Mandatory] */
+        public static final int FILTER_INDEX =
+                            RIL_QosSpecKeys.RIL_QOS_FILTER_INDEX;
+
+        /* IP Version [Mandatory], values are "IP" or "IPV6" */
+        public static final int FILTER_IPVERSION =
+                            RIL_QosSpecKeys.RIL_QOS_FILTER_IPVERSION;
 
         /* Values from QosDirection [Mandatory] */
         public static final int FILTER_DIRECTION =
@@ -212,21 +223,19 @@ public class QosSpec implements Parcelable {
     /* Values of QoS Indication Status */
     public static class QosIndStates {
         public static final int INITIATED = 0;
-        public static final int NEGOTIATED = 1;
-        public static final int ACTIVATED = 2;
-        public static final int RELEASING = 3;
-        public static final int RELEASED = 4;
-        public static final int RELEASED_NETWORK = 5;
-        public static final int MODIFIED = 6;
-        public static final int MODIFYING = 7;
-        public static final int MODIFIED_NETWORK = 8;
-        public static final int SUSPENDED = 9;
-        public static final int SUSPENDING = 10;
-        public static final int SUSPENDED_NETWORK = 11;
-        public static final int RESUMED = 12;
-        public static final int RESUMED_NETWORK = 13;
-        public static final int REQUEST_FAILED = 14;
-        public static final int NONE = 15;
+        public static final int ACTIVATED = 1;
+        public static final int RELEASING = 2;
+        public static final int RELEASED = 3;
+        public static final int RELEASED_NETWORK = 4;
+        public static final int MODIFIED = 5;
+        public static final int MODIFYING = 6;
+        public static final int MODIFIED_NETWORK = 7;
+        public static final int SUSPENDED = 8;
+        public static final int SUSPENDING = 9;
+        public static final int RESUMING = 10;
+        public static final int RESUMED_NETWORK = 11;
+        public static final int REQUEST_FAILED = 12;
+        public static final int NONE = 13;
     }
 
     public static class QosIntentKeys {
@@ -261,11 +270,21 @@ public class QosSpec implements Parcelable {
 
     public class QosPipe {
 
-        /** The Map of Keys to Values */
-        LinkedHashMap<Integer, String> mQosParams;
+        public class QosKeyValue {
+            int qosKey;
+            String qosValue;
+
+            QosKeyValue(int key, String value) {
+                qosKey = key;
+                qosValue = value;
+            }
+        }
+
+        /** The List of Key/Value objects. Can contain duplicate keys */
+        LinkedList<QosKeyValue> mQosParams;
 
         public QosPipe() {
-            mQosParams = new LinkedHashMap<Integer, String>();
+            mQosParams = new LinkedList<QosKeyValue>();
         }
 
         /**
@@ -292,14 +311,51 @@ public class QosSpec implements Parcelable {
         }
 
         /**
-         * Returns the value of the capability string with the specified key.
+         * Returns the value of the capability string with the specified key
+         * if the key was unique.
          *
          * @param key
-         * @return the value of the QoS Param
-         * or {@code null} if no mapping for the specified key is found.
+         * @return the value of QosS Param key if the key was unique.
+         * or {@code null} if key was not found or had duplicates.
          */
         public String get(int key) {
-            return mQosParams.get(key);
+            int count = 0;
+            String value = null;
+            QosKeyValue kv = null;
+
+            ListIterator itr = mQosParams.listIterator();
+            while(itr.hasNext()) {
+                kv = (QosKeyValue)itr.next();
+                if (kv.qosKey == key) {
+                    value = kv.qosValue;
+                    count++;
+                }
+            }
+
+            return count == 1 ? value : null;
+        }
+
+
+        /**
+         * Returns the list of values for the specified key
+         *
+         * @param key
+         * @return the list of values of QosS Param key
+         * or {@code null} if key was not found
+         */
+        public List<String> getValues(int key) {
+            List<String> values = new ArrayList<String>();
+            QosKeyValue kv = null;
+
+            ListIterator itr = mQosParams.listIterator();
+            while(itr.hasNext()) {
+                kv = (QosKeyValue)itr.next();
+                if (kv.qosKey == key) {
+                    values.add(kv.qosValue);
+                }
+            }
+
+            return values;
         }
 
         /**
@@ -317,18 +373,44 @@ public class QosSpec implements Parcelable {
                 throw new IllegalArgumentException("Invalid Key:" + key);
             }
 
-            mQosParams.put(key, value);
+            mQosParams.add(new QosKeyValue(key, value));
+        }
+
+        /**
+         * Returns the list of Keys in the pipe.
+         *
+         * @return the list of keys
+         */
+        public List<Integer> getKeys() {
+            List<Integer> keys = new ArrayList<Integer>();
+            for (QosKeyValue qkv : mQosParams.toArray(new QosKeyValue[0])) {
+                keys.add(qkv.qosKey);
+            }
+
+            return keys;
+        }
+
+        /**
+         * Returns the list of values in the pipe.
+         *
+         * @return the list of values
+         */
+        public List<String> getValues() {
+            List<String> values = new ArrayList<String>();
+            for (QosKeyValue qkv : mQosParams.toArray(new QosKeyValue[0])) {
+                values.add(qkv.qosValue);
+            }
+
+            return values;
         }
 
         private String getRilPipeSpec() {
             String rilPipeSpec = "";
             String keyValue = "";
 
-            Set<Integer> qosKeys = mQosParams.keySet();
-
-            for (int i : (Integer[])qosKeys.toArray(new Integer[0])) {
-                keyValue = RILConstants.RIL_QosSpecKeys.getName(i)
-                                 + "=" + mQosParams.get(i);
+            for (QosKeyValue qkv : mQosParams.toArray(new QosKeyValue[0])) {
+                keyValue = RILConstants.RIL_QosSpecKeys.getName(qkv.qosKey)
+                                 + "=" + qkv.qosValue;
 
                 rilPipeSpec += keyValue + ",";
             }
@@ -347,15 +429,15 @@ public class QosSpec implements Parcelable {
             StringBuilder sb = new StringBuilder();
             sb.append("{");
             boolean firstTime = true;
-            for (Entry<Integer, String> entry : mQosParams.entrySet()) {
+            for (QosKeyValue qkv : mQosParams.toArray(new QosKeyValue[0])) {
                 if (firstTime) {
                     firstTime = false;
                 } else {
                     sb.append(", ");
                 }
-                sb.append(entry.getKey().toString());
+                sb.append(qkv.qosKey);
                 sb.append(":\"");
-                sb.append(entry.getValue());
+                sb.append(qkv.qosValue);
                 sb.append("\"");
             }
             sb.append("}");
@@ -365,6 +447,19 @@ public class QosSpec implements Parcelable {
 
     public QosSpec() {
         mQosPipes = new LinkedHashMap<Integer, QosPipe>();
+    }
+
+    /**
+     * Copy constructor
+     */
+    public QosSpec(QosSpec qosSpec) {
+        this();
+        for(QosPipe qosPipe : qosSpec.mQosPipes.values()) {
+            QosPipe pipe = createPipe();
+            for (QosPipe.QosKeyValue qkv : qosPipe.mQosParams.toArray(new QosPipe.QosKeyValue[0])) {
+                pipe.put(qkv.qosKey, qkv.qosValue);
+            }
+        }
     }
 
     public void clear() {
@@ -440,16 +535,12 @@ public class QosSpec implements Parcelable {
         return value;
     }
 
-    public Set<Entry<Integer, String>> entrySet(int pipeId) {
-        return isValid(pipeId) ? mQosPipes.get(pipeId).mQosParams.entrySet() : null;
+    public List<Integer> pipeKeys(int pipeId) {
+        return isValid(pipeId) ? mQosPipes.get(pipeId).getKeys() : null;
     }
 
-    public Set<Integer> pipeKeySet(int pipeId) {
-        return isValid(pipeId) ? mQosPipes.get(pipeId).mQosParams.keySet() : null;
-    }
-
-    public Collection<String> pipeValues(int pipeId) {
-        return isValid(pipeId) ? mQosPipes.get(pipeId).mQosParams.values() : null;
+    public List<String> pipeValues(int pipeId) {
+        return isValid(pipeId) ? mQosPipes.get(pipeId).getValues() : null;
     }
 
     public int pipeSize(int pipeId) {
@@ -465,26 +556,6 @@ public class QosSpec implements Parcelable {
         boolean flag = false;
         if (isValid(pipeId))
             flag = mQosPipes.get(pipeId).mQosParams.isEmpty();
-        else
-            Log.e(TAG, "Warning: Invalid pipeId:" + pipeId);
-        return flag;
-    }
-
-
-    public boolean containsKey(int pipeId, QosSpecKey key) {
-        boolean flag = false;
-        if (isValid(pipeId))
-            flag = mQosPipes.get(pipeId).mQosParams.containsKey(key);
-        else
-            Log.e(TAG, "Warning: Invalid pipeId:" + pipeId);
-        return flag;
-    }
-
-
-    public boolean containsValue(int pipeId, String value) {
-        boolean flag = false;
-        if (isValid(pipeId))
-            flag = mQosPipes.get(pipeId).mQosParams.containsValue(value);
         else
             Log.e(TAG, "Warning: Invalid pipeId:" + pipeId);
         return flag;
@@ -515,11 +586,11 @@ public class QosSpec implements Parcelable {
         dest.writeInt(mUserData);
         dest.writeInt(mQosPipes.size());
         for(QosPipe pipe : mQosPipes.values()) {
-            dest.writeInt(pipe.mQosParams.entrySet().size());
+            dest.writeInt(pipe.mQosParams.size());
 
-            for (Entry<Integer, String> entry : pipe.mQosParams.entrySet()) {
-                dest.writeInt(entry.getKey());
-                dest.writeString(entry.getValue());
+            for (QosPipe.QosKeyValue qkv : pipe.mQosParams.toArray(new QosPipe.QosKeyValue[0])) {
+                dest.writeInt(qkv.qosKey);
+                dest.writeString(qkv.qosValue);
             }
         }
     }
