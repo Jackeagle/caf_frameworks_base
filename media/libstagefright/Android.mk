@@ -1,23 +1,23 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-ifeq "$(findstring msm7627,$(QCOM_TARGET_PRODUCT))" "msm7627"
+ifeq ($(call is-board-platform-in-list,msm7627a msm7627_surf),true)
     LOCAL_CFLAGS += -DUSE_AAC_HW_DEC
 endif
 
-ifneq (, $(filter  msm7627_ffa msm7627_surf, $(QCOM_TARGET_PRODUCT)))
+ifeq ($(call is-chipset-in-board-platform,msm7627),true)
     LOCAL_CFLAGS += -DTARGET7x27
 endif
-ifneq (, $(filter  msm7627a, $(QCOM_TARGET_PRODUCT)))
+ifeq ($(call is-board-platform,msm7627a),true)
     LOCAL_CFLAGS += -DTARGET7x27A
 endif
-ifneq (, $(filter  msm7630_surf msm7630_fusion msm7630_1x, $(QCOM_TARGET_PRODUCT)))
+ifeq ($(call is-chipset-in-board-platform,msm7630),true)
     LOCAL_CFLAGS += -DTARGET7x30
 endif
-ifneq (, $(filter  qsd8250_surf qsd8250_ffa qsd8650a_st1x, $(QCOM_TARGET_PRODUCT)))
+ifeq ($(call is-board-platform-in-list,$(QSD8K_BOARD_PLATFORMS)),true)
     LOCAL_CFLAGS += -DTARGET8x50
 endif
-ifneq (, $(filter  msm8660_surf msm8660_csfb msm8960, $(QCOM_TARGET_PRODUCT)))
+ifeq ($(call is-board-platform-in-list,msm8660 msm8960),true)
     LOCAL_CFLAGS += -DTARGET8x60
 endif
 
