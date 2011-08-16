@@ -206,6 +206,53 @@ static jstring getAdapterPathNative(JNIEnv *env, jobject object) {
 }
 
 
+static jint listConnectionNative(JNIEnv *env, jobject object) {
+    LOGV(__FUNCTION__);
+
+#ifdef HAVE_BLUETOOTH
+    DBusMessage *msg = NULL;
+    DBusMessage *reply = NULL;
+    DBusError err;
+    jint ret = -1;
+    int32_t conn = 0;
+
+    native_data_t *nat = get_native_data(env, object);
+    if (nat == NULL) {
+        goto done;
+    }
+
+    dbus_error_init(&err);
+
+    /* Compose the command */
+    msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
+                                       get_adapter_path(env, object),
+                                       DBUS_ADAPTER_IFACE, "ListConnection");
+
+    if (msg == NULL) {
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
+        }
+        goto done;
+    }
+
+    /* Send the command. */
+    reply = dbus_connection_send_with_reply_and_block(nat->conn, msg, -1, &err);
+    if (dbus_error_is_set(&err)) {
+         LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
+           if (reply) dbus_message_unref(reply);
+         goto done;
+    }
+    conn =  reply ? dbus_returns_int32(env, reply) : -1;
+    ret = conn;
+
+done:
+    if (msg) dbus_message_unref(msg);
+    return ret;
+#else
+    return -1;
+#endif
+}
+
 static jboolean startDiscoveryNative(JNIEnv *env, jobject object) {
     LOGV(__FUNCTION__);
 
@@ -1310,6 +1357,7 @@ static JNINativeMethod sMethods[] = {
     {"setAdapterPropertyIntegerNative", "(Ljava/lang/String;I)Z",
       (void *)setAdapterPropertyIntegerNative},
 
+    {"listConnectionNative", "()I", (void*)listConnectionNative},
     {"startDiscoveryNative", "()Z", (void*)startDiscoveryNative},
     {"stopDiscoveryNative", "()Z", (void *)stopDiscoveryNative},
 

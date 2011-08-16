@@ -384,6 +384,8 @@ public class BluetoothService extends IBluetooth.Stub {
      */
     public synchronized boolean disable(boolean saveSetting) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM, "Need BLUETOOTH_ADMIN permission");
+        int disconnDelay = 3000;
+        int conn = 0;
 
         switch (mBluetoothState) {
         case BluetoothAdapter.STATE_OFF:
@@ -400,11 +402,16 @@ public class BluetoothService extends IBluetooth.Stub {
         mHandler.removeMessages(MESSAGE_REGISTER_SDP_RECORDS);
         mHandler.removeMessages(MESSAGE_START_DUN_SERVER);
 
-        // Allow 3 seconds for profiles to gracefully disconnect
+        // Allow 3 second for profiles to gracefully disconnect
         // TODO: Introduce a callback mechanism so that each profile can notify
         // BluetoothService when it is done shutting down
+
+        conn = listConnectionNative();
+        Log.d(TAG,"conn = "+conn);
+        if(conn == 0)
+            disconnDelay = 2000;
         mHandler.sendMessageDelayed(
-                mHandler.obtainMessage(MESSAGE_FINISH_DISABLE, saveSetting ? 1 : 0, 0), 3000);
+                mHandler.obtainMessage(MESSAGE_FINISH_DISABLE, saveSetting ? 1 : 0, 0),disconnDelay);
         return true;
     }
 
@@ -3065,7 +3072,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
     private native boolean startDiscoveryNative();
     private native boolean stopDiscoveryNative();
-
+    private native int listConnectionNative();
     private native boolean createPairedDeviceNative(String address, int timeout_ms);
     private native boolean createPairedDeviceOutOfBandNative(String address, int timeout_ms);
     private native byte[] readAdapterOutOfBandDataNative();
