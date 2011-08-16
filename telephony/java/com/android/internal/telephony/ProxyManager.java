@@ -245,7 +245,7 @@ public class ProxyManager extends Handler {
                 String defaultUserSub = " " + ","        // iccId
                     + mUserDefaultSubs[i] + ","          // app type
                     + " " + ","                          // app id
-                    + Integer.toString(SUB_ACTIVATED)    // activate state
+                    + Integer.toString(SUB_INVALID)      // activate state
                     + "," + SUBSCRIPTION_INDEX_INVALID   // 3gppIndex in the card
                     + "," + SUBSCRIPTION_INDEX_INVALID;  // 3gpp2Index in the card
 
@@ -255,7 +255,7 @@ public class ProxyManager extends Handler {
                 mUserPrefSubs.subscription[i].iccId = null;
                 mUserPrefSubs.subscription[i].appType = mUserDefaultSubs[i];
                 mUserPrefSubs.subscription[i].appId = null;
-                mUserPrefSubs.subscription[i].subStatus = SUB_ACTIVATED;
+                mUserPrefSubs.subscription[i].subStatus = SUB_INVALID;
                 mUserPrefSubs.subscription[i].m3gppIndex = SUBSCRIPTION_INDEX_INVALID;
                 mUserPrefSubs.subscription[i].m3gpp2Index = SUBSCRIPTION_INDEX_INVALID;
             }
@@ -270,6 +270,7 @@ public class ProxyManager extends Handler {
     private void saveUserPreferredSubscription(SubscriptionData userPrefSubData) {
         Subscription userPrefSub;
         String userSub;
+        int subStatus;
 
         // Update the user prefered sub
         mUserPrefSubs.copyFrom(userPrefSubData);
@@ -277,10 +278,17 @@ public class ProxyManager extends Handler {
         for (int index = 0; index < userPrefSubData.getLength(); index++) {
             userPrefSub = userPrefSubData.subscription[index];
 
+            if (userPrefSub.subStatus == SUB_ACTIVATED) {
+                subStatus = SUB_ACTIVATED;
+            } else {
+                subStatus = SUB_DEACTIVATED;
+            }
+            mUserPrefSubs.subscription[index].subStatus = subStatus;
+
             userSub = ((userPrefSub.iccId != null) ? userPrefSub.iccId : " ") + ","
                 + ((userPrefSub.appType != null) ? userPrefSub.appType : " ") + ","
                 + ((userPrefSub.appId != null) ? userPrefSub.appId : " ") + ","
-                + Integer.toString(userPrefSub.subStatus) + ","
+                + Integer.toString(subStatus) + ","
                 + Integer.toString(userPrefSub.m3gppIndex) + ","
                 + Integer.toString(userPrefSub.m3gpp2Index);
 
@@ -294,6 +302,7 @@ public class ProxyManager extends Handler {
                     Settings.System.USER_PREFERRED_SUBS[index], userSub);
         }
     }
+
 
     private String getStringFrom(String str) {
         if ((str == null) || (str != null && str.equals(" "))) {
@@ -736,6 +745,12 @@ public class ProxyManager extends Handler {
             Subscription userSub = mUserPrefSubs.subscription[i];
             Log.d(LOG_TAG, "subId: " + i);
 
+            if (userSub.subStatus != SUB_ACTIVATED) {
+                matchedSub.subscription[i].subStatus = SUB_DEACTIVATED;
+                Log.d(LOG_TAG, "UserPrefSubs at subId = " + i + " Not required to activate");
+                continue;
+            }
+
             // For each cards in mCardSubData
             for (cardIndex = 0; cardIndex < UiccConstants.RIL_MAX_CARDS; cardIndex++) {
                 Log.d(LOG_TAG, "cardIndex: " + cardIndex + " userSub.m3gppIndex: "
@@ -791,17 +806,27 @@ public class ProxyManager extends Handler {
             Log.d(LOG_TAG, "matchedSub.subscription[" + i + "] = " + matchedSub.subscription[i]);
         }
 
-        // If the user pref sub is not matched, then propmt the user to select the subs.
-        if ((mUserPrefSubs.subscription[0].subStatus == SUB_ACTIVATED
-                    && matchedSub.subscription[0].subId == SUBSCRIPTION_INDEX_INVALID)
-                || (mUserPrefSubs.subscription[1].subStatus == SUB_ACTIVATED
-                    && matchedSub.subscription[1].subId == SUBSCRIPTION_INDEX_INVALID)) {
-            //Subscription settings do not match with the card applications
-            mUiccSubSet = true;  //card status is processed only the first time
-            promptUserSubscription();
-        } else {
+        // If all the previous user selected subscriptions are present in the
+        // available cards, then we need to automatically select the subscriptions,
+        // otherwise prompt the user to select the subscriptions.
+        int userPrefsCount = 0;
+        int availableCount = 0;
+        for (int i = 0; i < NUM_SUBSCRIPTIONS; i++) {
+            Log.d(LOG_TAG, "matchedSub.subscription[" + i + "] = " + matchedSub.subscription[i]);
+            if (mUserPrefSubs.subscription[i].subStatus == SUB_ACTIVATED) {
+                userPrefsCount++;
+                if (matchedSub.subscription[i].subStatus == SUB_ACTIVATE) {
+                    availableCount++;
+                }
+            }
+        }
+        mUiccSubSet = true;
+        if (availableCount > 0 && (availableCount == userPrefsCount)) {
             setSubscription(matchedSub);
-            mUiccSubSet = true;
+        } else {
+            //User Preferred Subscription settings do not match with the
+            //card applications. Prompt the user to select the subscriptions.
+            promptUserSubscription();
         }
     }
 
@@ -973,9 +998,6 @@ public class ProxyManager extends Handler {
                                         mPendingActivateEvents++;
                                         mCi[index].setUiccSubscription(sub.slotId, sub.getAppIndex(),
                                                 sub.subId, sub.subStatus, msgSetUiccSubDone);
-                                    } else {
-                                        // This subscription is not in use.  Mark as INVALID.
-                                        subscriptionData.subscription[index].subStatus = SUB_INVALID;
                                     }
                                 }
                                 break;
@@ -1118,6 +1140,7 @@ public class ProxyManager extends Handler {
                     // Store the User prefered Subscription once all
                     // the set uicc subscription is done.
                     saveUserPreferredSubscription(subscriptionData);
+
                     prevSubscriptionData.copyFrom(subscriptionData);
 
                     updateSubPreferences(subscriptionData);
@@ -1304,10 +1327,12 @@ public class ProxyManager extends Handler {
                 Log.d(LOG_TAG, "Calling setSubscriptionMode with numSubsciptions = " +
                         numSubsciptions);
 
-                Message callback = Message.obtain(mHandler, EVENT_SET_SUBSCRIPTION_MODE_DONE, null);
-                mCi[0].setSubscriptionMode(numSubsciptions, callback);
-                mSetSubscriptionMode = false;
-                done = false;
+                if (numSubsciptions > 0) {
+                    Message callback = Message.obtain(mHandler, EVENT_SET_SUBSCRIPTION_MODE_DONE, null);
+                    mCi[0].setSubscriptionMode(numSubsciptions, callback);
+                    mSetSubscriptionMode = false;
+                    done = false;
+                }
             }
 
             if(done) {
