@@ -996,7 +996,6 @@ public class CatService extends Handler implements AppInterface {
                                     resMsg.addedInfo, false);
                         }
                         // No need to send the terminal response after event download.
-                        mCurrntCmd = null;
                         return;
                     }
             } else {
