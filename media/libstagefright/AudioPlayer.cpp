@@ -70,10 +70,7 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
     CHECK(!mStarted);
     CHECK(mSource != NULL);
 
-#if defined(TARGET_OMAP4)
     mRealTimeInterpolation = GetSystemTimeuSec();
-#endif
-
 
     status_t err;
     if (!sourceAlreadyStarted) {
@@ -203,9 +200,7 @@ void AudioPlayer::flush() {
 void AudioPlayer::resume() {
     CHECK(mStarted);
 
-#if defined(TARGET_OMAP4)
     mRealTimeInterpolation = GetSystemTimeuSec();
-#endif
 
     if (mAudioSink.get() != NULL) {
         mAudioSink->start();
@@ -408,26 +403,21 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
     Mutex::Autolock autoLock(mLock);
     mNumFramesPlayed += size_done / mFrameSize;
 
-#if defined(TARGET_OMAP4)
     //Reset the interpolation time
     mRealTimeInterpolation = GetSystemTimeuSec();
-#endif
     return size_done;
 }
 
-#if defined(TARGET_OMAP4)
 //Function to get the system time
 int64_t AudioPlayer::GetSystemTimeuSec(){
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return ((int64_t)tv.tv_sec * 1000000 + tv.tv_usec);
 }
-#endif
 
 int64_t AudioPlayer::getRealTimeUs() {
     Mutex::Autolock autoLock(mLock);
 
-#if defined(TARGET_OMAP4)
     int64_t realtime = getRealTimeUsLocked();
 
     //We need to interpolate the time to reolution of 1msec
@@ -459,10 +449,6 @@ int64_t AudioPlayer::getRealTimeUs() {
 
     LOGV("IPT %lld",deltaFromPosting/1000);
     return realtime + deltaFromPosting;
-#else
-    return getRealTimeUsLocked();
-#endif
-
 }
 
 int64_t AudioPlayer::getRealTimeUsLocked() const {

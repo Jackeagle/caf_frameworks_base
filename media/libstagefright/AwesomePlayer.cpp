@@ -1555,7 +1555,6 @@ void AwesomePlayer::onVideoEvent() {
         // and we'll play incoming video as fast as we get it.
         latenessUs = 0;
     }
-#ifdef TARGET_OMAP4
     LOGV("%s::%d: (latenessUs= %lld) = ((nowUs= %lld) - (timeUs=%lld))", __FUNCTION__, __LINE__, latenessUs, nowUs, timeUs);
 
     if (latenessUs > 50000) {
@@ -1564,35 +1563,23 @@ void AwesomePlayer::onVideoEvent() {
         /* Trace to detect frame drops */
         LOGV("Frame dropped - lateness (%lld - %lld = %lld uS)",nowUs,timeUs,latenessUs);
 
-#else
-    if (latenessUs > 40000) {
-        // We're more than 40ms late.
-#endif
-        LOGV("we're late by %lld us (%.2f secs)", latenessUs, latenessUs / 1E6);
 
         mVideoBuffer->release();
         mVideoBuffer = NULL;
-#if defined(TARGET_OMAP4)
         postVideoEvent_l(0);
-#else
-        postVideoEvent_l();
-#endif
+
         return;
     }
 
     if (latenessUs < -10000) {
         // We're more than 10ms early.
 
-#if defined(TARGET_OMAP4)
         //There is no need to poll for 10 msec
         //This going to increase the MHz on ARM. Try to come back
         //when we need to exactly post. Need to do a mod for 100 msec
         //so that while seeking the video frame doesnt wait for lateness
         //which can be a huge delay. This will result like a hang
         postVideoEvent_l((latenessUs * -1) % 100000);
-#else
-        postVideoEvent_l(10000);
-#endif
         return;
     }
 
@@ -1636,15 +1623,11 @@ void AwesomePlayer::onVideoEvent() {
 #endif
 
     mVideoBuffer = NULL;
-#if defined(TARGET_OMAP4)
+
     // No need to trigger the poll after 10 msec which is default value
     // This is causing a jerk in AV sync. We can trigger a 0 msec and accurate
     // wait which will allow more ARM sleep time
     postVideoEvent_l(0);
-#else
-    postVideoEvent_l();
-#endif
-
 }
 
 void AwesomePlayer::postVideoEvent_l(int64_t delayUs) {

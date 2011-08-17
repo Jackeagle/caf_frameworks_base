@@ -111,10 +111,9 @@ private:
 
     AudioPlayer(const AudioPlayer &);
     AudioPlayer &operator=(const AudioPlayer &);
-#if defined(TARGET_OMAP4)
+
     int64_t mRealTimeInterpolation;
     int64_t GetSystemTimeuSec();
-#endif
 };
 
 }  // namespace android
