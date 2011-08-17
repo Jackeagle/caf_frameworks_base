@@ -137,6 +137,7 @@ public final class ServerOperation implements Operation, BaseStream {
         mSingleResponseModeParameter = ObexHelper.OBEX_SRM_PARAM_NONE;
         mSrmServerSession = p.mSrmServer;
         int bytesReceived;
+        Byte rmtRqstSRM = ObexHelper.OBEX_SRM_DISABLED;
 
         /*
          * Determine if this is a PUT request
@@ -195,7 +196,7 @@ public final class ServerOperation implements Operation, BaseStream {
             }
 
             byte[] body = ObexHelper.updateHeaderSet(requestHeader, data);
-
+            rmtRqstSRM  = (Byte)this.requestHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
             if (body != null) {
                 mHasBody = true;
             }
@@ -229,43 +230,13 @@ public final class ServerOperation implements Operation, BaseStream {
 
             if (body != null) {
                 mPrivateInput.writeBytes(body, 1);
-            } else {
+             /* Don't Pre-Send continue when Remote requested for SRM
+              * Let the Application confirm
+              */
+            } else if (rmtRqstSRM != ObexHelper.OBEX_SRM_ENABLED) {
                 while ((!mGetOperation) && (!finalBitSet)) {
                     if (VERBOSE) Log.v(TAG, "length > 3 ServerOperation pre-sendreply");
-                    Byte srm = (Byte)this.requestHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
-                    if (srm == ObexHelper.OBEX_SRM_ENABLED) {
-                        if (VERBOSE)  Log.v(TAG, "ServerOperation srm == ObexHelper.OBEX_SRM_ENABLED");
-                        if (mSrmServerSession.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
-                            if (VERBOSE)  Log.v(TAG, "ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE");
-                            this.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_ENABLED);
-                            if (mSrmServerSession.getLocalSrmpWait()) {
-                                if (VERBOSE)  Log.v(TAG, "ServerOperation: Server SRMP header set to WAIT");
-                                this.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER, ObexHelper.OBEX_SRM_PARAM_WAIT);
-                            }
-                        } else {
-                            if (VERBOSE)  Log.v(TAG, "ObexHelper.getLocalSrmCapability() == ObexHelper.SRM_INCAPABLE");
-                            this.replyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_DISABLED);
-                        }
-                    }
-
-                    sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive,false);
-                    mSingleResponseActive = mSrmServerSession.getLocalSrmStatus();
-                    if (mSingleResponseActive == ObexHelper.LOCAL_SRM_ENABLED) {
-                        if (VERBOSE) Log.v(TAG, "ServerOperation: Server SRM enabled");
-                        if (mSrmServerSession.getLocalSrmpWait()) {
-                            if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT) {
-                                if (VERBOSE) Log.v(TAG, "ServerOperation: Server sent SRMP NONE to stop SRMP WAIT");
-                                mSingleResponseActive = ObexHelper.LOCAL_SRM_ENABLED;
-                                mSrmServerSession.setLocalSrmpWait(false);
-                            } else {
-                                if (VERBOSE) Log.v(TAG, "ServerOperation: Server SRMP WAIT");
-                                mSingleResponseActive = ObexHelper.LOCAL_SRM_DISABLED;
-                                mSingleResponseModeParameter = ObexHelper.OBEX_SRM_PARAM_WAIT;
-                            }
-                        }
-                    } else {
-                        if (VERBOSE) Log.v(TAG, "ServerOperation: Server SRM disabled");
-                    }
+                    sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive, false);
                     if (mPrivateInput.available() > 0) {
                         break;
                     }
@@ -273,7 +244,10 @@ public final class ServerOperation implements Operation, BaseStream {
             }
         }
 
-        while ((!mGetOperation) && (!finalBitSet) && (mPrivateInput.available() == 0)) {
+        /* Don't Pre-Send continue when Remote requested for SRM
+         * Let the Application confirm
+         */
+        while ((rmtRqstSRM != ObexHelper.OBEX_SRM_ENABLED) && (!mGetOperation) && (!finalBitSet) && (mPrivateInput.available() == 0)) {
             if (VERBOSE)  Log.v(TAG, "mPrivateInput.available() == 0 ServerOperation pre-sendreply");
             sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive,false);
 
