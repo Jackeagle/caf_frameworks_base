@@ -72,12 +72,15 @@ public final class ClientSession extends ObexSession {
 
     private long mTotalSize = 0;
 
+    public ObexHelper mSrmClient;
+
     public ClientSession(final ObexTransport trans) throws IOException {
         mInput = trans.openInputStream();
         mOutput = trans.openOutputStream();
         mOpen = true;
         mRequestActive = false;
         mEp = null;
+        mSrmClient = new ObexHelper();
     }
 
     public void setMaxPacketSize(int size) {
@@ -149,10 +152,10 @@ public final class ClientSession extends ObexSession {
 
             Byte srm = (Byte)returnHeaderSet.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
             if (srm == ObexHelper.OBEX_SRM_SUPPORTED) {
-                ObexHelper.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
+                mSrmClient.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
                 if (VERBOSE) Log.v(TAG, "SRM status: Enabled by Server response");
             } else {
-                ObexHelper.setRemoteSrmStatus(ObexHelper.SRM_INCAPABLE);
+                mSrmClient.setRemoteSrmStatus(ObexHelper.SRM_INCAPABLE);
                 if (VERBOSE) Log.v(TAG, "SRM status: Disabled by Server response");
             }
         }
@@ -446,7 +449,7 @@ public final class ClientSession extends ObexSession {
             boolean supressSend) throws IOException {
 
         if (VERBOSE) Log.v(TAG, "sendRequest ignore: " + ignoreResponse
-                                   + ", SRMP WAIT: " + ObexHelper.getLocalSrmpWait()
+                                   + ", SRMP WAIT: " + mSrmClient.getLocalSrmpWait()
                                    + " supressSend : "+supressSend);
 
         //check header length with local max size
@@ -478,7 +481,7 @@ public final class ClientSession extends ObexSession {
             mOutput.flush();
         }
 
-        if ( (!ignoreResponse) || (ObexHelper.getLocalSrmpWait()) ) {
+        if ( (!ignoreResponse) || (mSrmClient.getLocalSrmpWait()) ) {
             header.responseCode = mInput.read();
             if (VERBOSE) Log.v(TAG, "sendRequest responseCode "+header.responseCode);
 
