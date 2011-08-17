@@ -47,6 +47,7 @@ AudioPlayer::AudioPlayer(
       mReachedEOS(false),
       mFinalStatus(OK),
       mStarted(false),
+      mSourceStopped(false),
       mIsFirstBuffer(false),
       mFirstBufferResult(OK),
       mFirstBuffer(NULL),
@@ -215,16 +216,6 @@ void AudioPlayer::resume() {
 void AudioPlayer::reset() {
     CHECK(mStarted);
 
-    if (mAudioSink.get() != NULL) {
-        mAudioSink->stop();
-        mAudioSink->close();
-    } else {
-        mAudioTrack->stop();
-
-        delete mAudioTrack;
-        mAudioTrack = NULL;
-    }
-
     // Make sure to release any buffer we hold onto so that the
     // source is able to stop().
 
@@ -240,6 +231,7 @@ void AudioPlayer::reset() {
         mInputBuffer = NULL;
     }
 
+    mSourceStopped = true;
     mSource->stop();
 
     // The following hack is necessary to ensure that the OMX
@@ -250,6 +242,18 @@ void AudioPlayer::reset() {
     while (tmp.promote() != NULL) {
         usleep(1000);
     }
+
+    LOGV("Stop/close mAudioSink and mAudioTrack after mSource is successfully de-inited");
+    if (mAudioSink.get() != NULL) {
+        mAudioSink->stop();
+        mAudioSink->close();
+    } else {
+        mAudioTrack->stop();
+
+        delete mAudioTrack;
+        mAudioTrack = NULL;
+    }
+
     IPCThreadState::self()->flushCommands();
 
     mNumFramesPlayed = 0;
@@ -304,7 +308,8 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
         LOGV("AudioCallback");
     }
 
-    if (mReachedEOS) {
+    if (mReachedEOS || mSourceStopped) {
+        LOGV("AudioPlayer::fillBuffer Return. mReachedEOS: %d mSourceStopped:%d",mReachedEOS,mSourceStopped);
         return 0;
     }
 
