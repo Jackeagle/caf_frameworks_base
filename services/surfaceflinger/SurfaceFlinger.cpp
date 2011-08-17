@@ -68,22 +68,6 @@
 
 #define DISPLAY_COUNT       1
 
-namespace {
-  // layer is LayerBase type, and mCachedVideoLayer is LayerBuffer.
-  // Dynamic cast should work here, but we have no rtti.
-  // we are however sure that we are dealing with LayerBuffer
-  android::LayerBuffer* cacheOverlayLayer(const android::sp<android::LayerBase>& src){
-     assert(src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers);
-     if(!src->getLayerInitFlags() & android::ISurfaceComposer::ePushBuffers) {
-        LOGE("composeSurfaces expected ePushBuffer flags=%d",
-              src->getLayerInitFlags());
-        abort();
-     }
-     return static_cast<android::LayerBuffer*>(src.get());
-  }
-
-}
-
 namespace android {
 
 // ---------------------------------------------------------------------------
