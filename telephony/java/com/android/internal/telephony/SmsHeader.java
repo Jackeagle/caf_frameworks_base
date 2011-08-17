@@ -176,6 +176,7 @@ public class SmsHeader {
                 specialSmsMsg.msgIndType = inStream.read();
                 specialSmsMsg.msgCount = inStream.read();
                 smsHeader.specialSmsMsgList.add(specialSmsMsg);
+                break;
             case ELT_ID_NATIONAL_LANGUAGE_SINGLE_SHIFT:
                 smsHeader.languageShiftTable = inStream.read();
                 break;
