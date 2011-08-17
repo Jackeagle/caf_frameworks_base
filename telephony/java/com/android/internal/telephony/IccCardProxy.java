@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -646,7 +645,7 @@ public class IccCardProxy extends Handler implements IccCard {
 
     public void supplyPuk2(String puk2, String newPin2, Message onComplete) {
         if (mApplication != null) {
-            mApplication.supplyPuk(puk2, newPin2, onComplete);
+            mApplication.supplyPuk2(puk2, newPin2, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
