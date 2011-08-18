@@ -720,7 +720,8 @@ public final class BluetoothAdapter {
             10,  // HFAG
             11,  // HSAG
             12,  // OPUSH
-            16,  // MAP
+            16,  // MAS0
+            17,  // MAS1
             19,  // PBAP
             20,  // FTP
         };
