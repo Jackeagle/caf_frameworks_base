@@ -2578,8 +2578,17 @@ void OMXCodec::onEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
 
         case OMX_EventPortSettingsChanged:
         {
-            if(mState == EXECUTING)
+            if(mState == EXECUTING){
               onPortSettingsChanged(data1);
+            }
+            else if(mState == FLUSHING){
+              LOGV("Received port reconfig while waiting for FBD\n");
+              // Seek is completed and waiting for FBD, at this instance
+              // Port reconfig is received rather than FBD.
+              // Unblock from buffer fill wait and complete the port reconfig.
+              mBufferFilled.signal();
+              onPortSettingsChanged(data1);
+            }
             else
               LOGE("Ignore PortSettingsChanged event \n");
             break;
@@ -2980,7 +2989,7 @@ status_t OMXCodec::freeBuffersOnPort(
 void OMXCodec::onPortSettingsChanged(OMX_U32 portIndex) {
     CODEC_LOGV("PORT_SETTINGS_CHANGED(%ld)", portIndex);
 
-    CHECK_EQ(mState, EXECUTING);
+    CHECK(mState == EXECUTING || mState == FLUSHING);
     CHECK_EQ(portIndex, kPortIndexOutput);
     setState(RECONFIGURING);
 
@@ -3027,6 +3036,9 @@ bool OMXCodec::flushPortAsync(OMX_U32 portIndex) {
 
 void OMXCodec::disablePortAsync(OMX_U32 portIndex) {
     CHECK(mState == EXECUTING || mState == RECONFIGURING);
+
+    if (mPortStatus[portIndex] == DISABLED || mPortStatus[portIndex] == DISABLING)
+       return;
 
     CHECK_EQ(mPortStatus[portIndex], ENABLED);
     mPortStatus[portIndex] = DISABLING;
@@ -4199,6 +4211,10 @@ status_t OMXCodec::read(
     }
     if(seeking)
     {
+        if(mState == RECONFIGURING){
+           LOGV("Received reconfig while in seek, wait till reconfig is complete");
+           mBufferFilled.wait(mLock);
+        }
         if(mState != EXECUTING){
            CHECK_EQ(mState, FLUSHING);
            setState(EXECUTING);
