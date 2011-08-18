@@ -945,7 +945,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 result = true;
                }
         } else {
-          if (native_inject_raw_command(command.getBytes(), command.length()) == 0)
+          if (native_inject_raw_command(command.getBytes(), command.length()) == false)
               result = true;
         }
 
@@ -1691,7 +1691,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private native void native_inject_xtra_data(byte[] data, int length);
 
     // Special Test Command Path
-    private native int native_inject_raw_command(byte[] data, int length);
+    private native boolean native_inject_raw_command(byte[] data, int length);
 
     // DEBUG Support
     private native String native_get_internal_state();

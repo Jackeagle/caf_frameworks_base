@@ -81,6 +81,7 @@ static void location_callback(GpsLocation* location)
             (jfloat)location->speed, (jfloat)location->bearing,
             (jfloat)location->accuracy, (jlong)location->timestamp,
              byteArray);
+    env->DeleteLocalRef(byteArray);
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
 }
 
