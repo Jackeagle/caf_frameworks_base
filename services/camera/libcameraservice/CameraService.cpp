@@ -71,6 +71,8 @@ static int getCallingUid() {
 // should be ok for now.
 static CameraService *gCameraService;
 
+static bool lockedFromTakePicture;
+
 CameraService::CameraService()
 :mSoundRef(0)
 {
@@ -926,6 +928,7 @@ status_t CameraService::Client::takePicture() {
     LOG1("takePicture (pid %d)", getCallingPid());
 
     Mutex::Autolock lock(mLock);
+    lockedFromTakePicture = true;
     status_t result = checkPidAndHardware();
     if (result != NO_ERROR) return result;
 
@@ -1061,6 +1064,12 @@ bool CameraService::Client::lockIfMessageWanted(int32_t msgType) {
                 LOG1("lockIfMessageWanted(%d): waited for %d ms",
                     msgType, sleepCount * CHECK_MESSAGE_INTERVAL);
             }
+            return true;
+        }
+        else if(lockedFromTakePicture == true)
+        {
+            lockedFromTakePicture = false;
+            LOG1("releasing lock form takePicture to handle PCB");
             return true;
         }
         if (sleepCount++ == 0) {
