@@ -648,11 +648,13 @@ sp<MediaSource> OMXCodec::Create(
         }
 #ifdef USE_AAC_HW_DEC
         int aacformattype = 0;
+        int aacLTPType = 0;
         sp<MetaData> metadata = source->getFormat();
         metadata->findInt32(kkeyAacFormatAdif, &aacformattype);
+        metadata->findInt32(kkeyAacFormatLtp, &aacLTPType);
 
-        if (aacformattype == true)  {
-            LOGE("This is ADIF clip , so using sw decoder ");
+        if (aacformattype == true || aacLTPType == true)  {
+            LOGE("This is ADIF/LTP clip , so using sw decoder ");
             componentName= "AACDecoder";
         }
 #endif
