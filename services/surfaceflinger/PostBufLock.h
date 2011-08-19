@@ -70,8 +70,7 @@ public:
   /*
    * onQueueBuf would implement mechanism for transition to GO state
    * */
-   virtual void onQueueBuf(Mutex & m, Condition& c,
-                           bool dirtyBit, postBufState_t& s) {}
+  virtual void onQueueBuf(Mutex & m, bool dirtyBit, postBufState_t& s) {}
   virtual ~PostBufPolicyBase(){}
 };
 
@@ -93,10 +92,9 @@ public:
   /*
    * onQueueBuf would implement mechanism for transition to GO state
    * */
-   virtual void onQueueBuf(Mutex & m, Condition& c,
-                           bool dirtyBit, postBufState_t& s){
+  virtual void onQueueBuf(Mutex & m, bool dirtyBit, postBufState_t& s){
     Mutex::Autolock _l(m);
-    if(dirtyBit) { s = PostBufPolicyBase::POSTBUF_GO; c.signal(); }
+    if(dirtyBit) { s = PostBufPolicyBase::POSTBUF_GO; }
   }
 };
 
@@ -146,9 +144,9 @@ public:
   /*
    * Pass through for the onQueueBuf policy function
    */
-   void onQueueBuf(Mutex & m, Condition& c, bool dirtyBit,
-                   PostBufPolicyBase::postBufState_t& s) {
-      mPolicy->onQueueBuf(m, c, dirtyBit, s);
+  void onQueueBuf(Mutex & m, bool dirtyBit,
+        PostBufPolicyBase::postBufState_t& s) {
+    mPolicy->onQueueBuf(m, dirtyBit, s);
   }
 private:
   /*

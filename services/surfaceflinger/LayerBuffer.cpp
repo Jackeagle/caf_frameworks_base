@@ -545,8 +545,7 @@ void LayerBuffer::BufferSource::onQueueBuf()
 {
   // callback is being called when we are done queuing and it is safe for
   // postBuffer to continue
-  PostBufferSingleton::instance()->onQueueBuf(mPostBufLock, mPostBufCond,
-                                              mDirtyQueueBit, mPostBufState);
+  PostBufferSingleton::instance()->onQueueBuf(mPostBufLock, mDirtyQueueBit, mPostBufState);
 }
 
 
