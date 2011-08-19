@@ -856,7 +856,7 @@ public class FmReceiver extends FmTransceiver
    *    time a list-based search completes, the client will be
    *    notified via an FmRxEvSearchListComplete event.
    *    <p>
-   *    On completion or cancellation of the search, the originally tuned station
+   *    On completion of the search, the originally tuned station
    *    will be tuned and the following events will be generated:
    *    FmRxEvSearchListComplete - The search has completed.
    *    FmRxEvRadioTuneStatus - The original frequency has been
@@ -867,8 +867,9 @@ public class FmReceiver extends FmTransceiver
    *    <p>
    *    The search can be canceled at any time by using API
    *    cancelSearch (). A cancelled search is treated as a completed
-   *    search and the same events will be generated. However, the
-   *    search list generated may only contain a partial list.
+   *    search and the following events will be generated:
+   *    FmRxEvSearchComplete  - The search has completed.
+   *    FmRxEvRadioTuneStatus - The original frequency has been re-tuned.
    *    <p>
    *    Valid Values for argument 'mode':
    *    <ul>
