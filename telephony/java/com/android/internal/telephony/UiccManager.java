@@ -47,13 +47,12 @@ public class UiccManager extends Handler{
     private static final int EVENT_RADIO_ON = 1;
     private static final int EVENT_ICC_STATUS_CHANGED = 2;
     private static final int EVENT_GET_ICC_STATUS_DONE = 3;
-    private static final int EVENT_RADIO_OFF_OR_UNAVAILABLE = 4;
+    private static final int EVENT_RADIO_UNAVAILABLE = 4;
     private CatService[] mCatService;
 
     CommandsInterface[] mCi;
     Context mContext;
     UiccCard[] mUiccCards;
-    private boolean[] mRadioOn = {false, false};
 
     private RegistrantList mIccChangedRegistrants = new RegistrantList();
 
@@ -88,7 +87,7 @@ public class UiccManager extends Handler{
             mCi[i] = ci[i];
             mCi[i].registerForOn(this,EVENT_RADIO_ON, index);
             mCi[i].registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, index);
-            mCi[i].registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, index);
+            mCi[i].registerForNotAvailable(this, EVENT_RADIO_UNAVAILABLE, index);
             mCatService[i] = new CatService(mCi[i], null, mContext, null, i);
         }
     }
@@ -98,58 +97,45 @@ public class UiccManager extends Handler{
         AsyncResult ar;
         Integer index = getCiIndex(msg);
 
+        if (index < 0 || index >= mCi.length) {
+            Log.e(LOG_TAG, "Invalid index - " + index + " received with event " + msg.what);
+            return;
+        }
+
         switch (msg.what) {
             case EVENT_RADIO_ON:
-                if (index < 0 || index >= mRadioOn.length) {
-                    Log.d(LOG_TAG, "EVENT_RADIO_ON: Invalid index - " + index);
-                    break;
-                }
-                mRadioOn[index] = true;
                 Log.d(LOG_TAG, "Radio on -> Forcing sim status update on index : " + index);
                 sendMessage(obtainMessage(EVENT_ICC_STATUS_CHANGED, index));
                 break;
             case EVENT_ICC_STATUS_CHANGED:
-                if (index < mCi.length && mRadioOn[index]) {
-                    Log.d(LOG_TAG, "Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus on index"
-                            + index);
-                    mCi[index].getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE, index));
-                } else {
-                    Log.d(LOG_TAG, "Received EVENT_ICC_STATUS_CHANGED while radio is not ON or index is invalid. Ignoring");
-                }
+                Log.d(LOG_TAG, "Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus on index"
+                         + index);
+                mCi[index].getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE, index));
                 break;
             case EVENT_GET_ICC_STATUS_DONE:
-                if (index < mCi.length && mRadioOn[index]) {
-                    Log.d(LOG_TAG, "Received EVENT_GET_ICC_STATUS_DONE on index : " + index);
-                    ar = (AsyncResult)msg.obj;
+                Log.d(LOG_TAG, "Received EVENT_GET_ICC_STATUS_DONE on index : " + index);
+                ar = (AsyncResult)msg.obj;
 
-                    onGetIccCardStatusDone(ar, index);
+                onGetIccCardStatusDone(ar, index);
 
-                    //If UiccManager was provided with a callback when icc status update
-                    //was triggered - now is the time to call it.
-                    if (ar.userObj != null && ar.userObj instanceof AsyncResult) {
-                        AsyncResult internalAr = (AsyncResult)ar.userObj;
-                        if (internalAr.userObj != null &&
-                                internalAr.userObj instanceof Message) {
-                            Message onComplete = (Message)internalAr.userObj;
-                            if (onComplete != null) {
-                                onComplete.sendToTarget();
-                            }
+                //If UiccManager was provided with a callback when icc status update
+                //was triggered - now is the time to call it.
+                if (ar.userObj != null && ar.userObj instanceof AsyncResult) {
+                    AsyncResult internalAr = (AsyncResult)ar.userObj;
+                    if (internalAr.userObj != null &&
+                            internalAr.userObj instanceof Message) {
+                        Message onComplete = (Message)internalAr.userObj;
+                        if (onComplete != null) {
+                            onComplete.sendToTarget();
                         }
-                    } else if (ar.userObj != null && ar.userObj instanceof Message) {
-                        Message onComplete = (Message)ar.userObj;
-                        onComplete.sendToTarget();
                     }
-                } else {
-                    Log.d(LOG_TAG, "Received EVENT_GET_ICC_STATUS_DONE while radio is not ON or index is invalid. Ignoring");
+                } else if (ar.userObj != null && ar.userObj instanceof Message) {
+                    Message onComplete = (Message)ar.userObj;
+                    onComplete.sendToTarget();
                 }
                 break;
-            case EVENT_RADIO_OFF_OR_UNAVAILABLE:
-                if (index < 0 || index >= mRadioOn.length) {
-                    Log.d(LOG_TAG, "EVENT_RADIO_OFF_OR_UNAVAILABLE: Invalid index - " + index);
-                    break;
-                }
-                Log.d(LOG_TAG, "EVENT_RADIO_OFF_OR_UNAVAILABLE: index = " + index);
-                mRadioOn[index] = false;
+            case EVENT_RADIO_UNAVAILABLE:
+                Log.d(LOG_TAG, "EVENT_RADIO_UNAVAILABLE: index = " + index);
                 disposeCard(index);
                 break;
             default:
@@ -191,19 +177,15 @@ public class UiccManager extends Handler{
 
         UiccCardStatusResponse status = (UiccCardStatusResponse)ar.result;
 
-        //Update already existing card
         if (mUiccCards[index] != null && status.card != null) {
+            Log.d(LOG_TAG, "Updating existing card on index -" + index);
             mUiccCards[index].update(status.card, mContext, mCi[index]);
-        }
-
-        //Dispose of removed card
-        if (mUiccCards[index] != null && status.card == null) {
+        } else if (mUiccCards[index] != null && status.card == null) {
+            Log.d(LOG_TAG, "Disposing removed card on index -" + index);
             mUiccCards[index].dispose();
             mUiccCards[index] = null;
-        }
-
-        //Create new card
-        if (mUiccCards[index] == null && status.card != null) {
+        } else if(mUiccCards[index] == null && status.card != null) {
+            Log.d(LOG_TAG, "Creating new card on index -" + index);
             mUiccCards[index] = new UiccCard(this, status.card, mContext, mCi[index], mCatService[index]);
         }
 
