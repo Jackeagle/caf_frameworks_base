@@ -239,6 +239,12 @@ public final class BluetoothDevice implements Parcelable {
      */
     public static final int BOND_BONDED = 12;
 
+    /**
+     * This bonding state will be used, When auto pairing fails and
+     * retry the manual bonding process.
+     * @hide */
+    public static final int BOND_RETRY = 13;
+
     /** @hide */
     public static final String EXTRA_REASON = "android.bluetooth.device.extra.REASON";
     /** @hide */

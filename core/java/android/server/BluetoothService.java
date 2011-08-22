@@ -641,6 +641,9 @@ public class BluetoothService extends IBluetooth.Stub {
             case MESSAGE_AUTO_PAIRING_FAILURE_ATTEMPT_DELAY:
                 address = (String)msg.obj;
                 if (address != null) {
+                    setBondState(address,
+                        BluetoothDevice.BOND_RETRY,
+                        BluetoothDevice.UNBOND_REASON_AUTH_FAILED);
                     createBond(address);
                     return;
                 }
