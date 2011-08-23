@@ -2846,10 +2846,9 @@ public class BluetoothService extends IBluetooth.Stub {
 
         ArrayList<String> matchList = new ArrayList<String>();
         int count = 0;
-        String stringUuid = null;
+        String stringUuid;
 
-        if (uuid != null)
-            stringUuid = uuid.toString();
+        stringUuid = uuid.toString();
 
         Log.d(TAG, "Requested GATT UUID to match: " + stringUuid);
 
@@ -2860,7 +2859,7 @@ public class BluetoothService extends IBluetooth.Stub {
             if (serviceUuid != null) {
                 Log.d(TAG, "Found GATT UUID: " + serviceUuid);
 
-                if (stringUuid != null && !serviceUuid.equals(stringUuid)){
+                if (!serviceUuid.equalsIgnoreCase(stringUuid)){
                         Log.d(TAG,"UUID does not match");
                         match = false;
                 }
@@ -2891,11 +2890,13 @@ public class BluetoothService extends IBluetooth.Stub {
         String[] gattPath;
         int count = 1;
         int i;
+        boolean isScheduled = false;
 
         synchronized (this) {
             if (mGattIntentTracker.containsKey(address)) {
 
                 ArrayList<ParcelUuid> serviceUuids = mGattIntentTracker.get(address);
+                isScheduled = true;
 
                 if(serviceUuids != null) {
                     uuids = new ParcelUuid[serviceUuids.size()];
@@ -2907,16 +2908,42 @@ public class BluetoothService extends IBluetooth.Stub {
             }
         }
 
-        if (uuids != null)
+        if (!isScheduled)
+            return;
+
+        if (uuids != null) {
             count = uuids.length;
+            for (i = 0; i < count; i++) {
 
-        for (i = 0; i < count; i++) {
-            gattPath = matchGattService (address, uuids[i]);
+                gattPath = matchGattService (address, uuids[i]);
 
-            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
-            intent.putExtra(BluetoothDevice.EXTRA_UUID, uuids[i]);
-            intent.putExtra(BluetoothDevice.EXTRA_GATT, gattPath);
-            mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
+                intent.putExtra(BluetoothDevice.EXTRA_UUID, uuids[i]);
+                intent.putExtra(BluetoothDevice.EXTRA_GATT, gattPath);
+                mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+            }
+        } else {
+            Log.d(TAG, "Send intents about all services found on the remote devices");
+
+            String value = getRemoteDeviceProperty(address, "Services");
+            if (value == null) {
+                Log.e(TAG, "No GATT based services were found on " + address);
+                return;
+            }
+            Log.d(TAG, "GattServices: " + value);
+
+            String[] gattServicePaths = null;
+            // The  object paths are stored as a "," separated string.
+            gattServicePaths = value.split(",");
+
+            //Send one intent per GATT service
+            for (i  = 0; i < gattServicePaths.length; i++) {
+                String serviceUuid = getGattServiceProperty(gattServicePaths[i], "UUID");
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
+                intent.putExtra(BluetoothDevice.EXTRA_UUID, serviceUuid);
+                intent.putExtra(BluetoothDevice.EXTRA_GATT, gattServicePaths[i]);
+                mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+            }
         }
     }
 
