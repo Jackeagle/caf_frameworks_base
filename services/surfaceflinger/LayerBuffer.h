@@ -54,9 +54,10 @@ class LayerBuffer : public LayerBaseClient, public IOnQueueBuf
         Source(LayerBuffer& layer);
         virtual ~Source();
         virtual void onDraw(const Region& clip) const;
-        virtual status_t drawWithOverlay(const Region& clip, 
-                bool hdmiConnected, bool waitVsync = true,
-                bool isReconfiguring = false, bool needsClearing = false) const;
+        virtual status_t drawWithOverlay(const Region& clip,
+                bool hdmiConnected, bool waitVsync = true) const;
+        virtual status_t drawWithOverlayReconfigure(const Region& clip,
+                bool hdmiConnected, bool waitVsync = true) const;
         virtual void onTransaction(uint32_t flags);
         virtual void onVisibilityResolved(const Transform& planeTransform);
         virtual void onvalidateVisibility(const Transform& globalTransform) { }
@@ -168,9 +169,10 @@ private:
         void setBuffer(const sp<Buffer>& buffer);
 
         virtual void onDraw(const Region& clip) const;
-        virtual status_t drawWithOverlay(const Region& clip, 
-                bool hdmiConnected, bool waitVsync = true,
-                bool isReconfiguring = false, bool needsClearing = false) const;
+        virtual status_t drawWithOverlay(const Region& clip,
+                bool hdmiConnected, bool waitVsync = true) const;
+        virtual status_t drawWithOverlayReconfigure(const Region& clip,
+                bool hdmiConnected, bool waitVsync = true) const;
         virtual void postBuffer(ssize_t offset);
         virtual void unregisterBuffers(bool isReconfiguring = false);
         virtual void destroy() { }
@@ -294,7 +296,6 @@ private:
     bool            mInvalidate;
     bool            mNeedsBlending;
     bool            mIsReconfiguring;
-    mutable bool    mNeedsFBClearing;
     copybit_device_t* mBlitEngine;
 };
 

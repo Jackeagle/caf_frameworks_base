@@ -1133,9 +1133,6 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
         if(layerbuffercount == 1) {
             if (compcount != mLastCompCount)
                 compositionStateChanged = true;
-
-            if (!mOverlayUsed)
-                compositionStateChanged = true;
             mLastCompCount = compcount;
         }
         else
@@ -1203,11 +1200,9 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     mOverlayUsed = true;
                 } else if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && 
                             layerbuffercount == 1) {
-                    if ((layer->isReconfiguring()) ||
-                        (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR)) {
+                    if (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR) {
                         layer->draw(clip);
-                        mOverlayUseChanged = false;
-                        mOverlayUsed = false;
+                        mOverlayUseChanged = true;
                     }
                     else{
                         mOverlayUsed = true;
