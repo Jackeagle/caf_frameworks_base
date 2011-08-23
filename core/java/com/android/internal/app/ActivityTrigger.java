@@ -42,6 +42,11 @@ public class ActivityTrigger
     }
 
     /** &hide */
+    protected void finalize() {
+        native_at_deinit();
+    }
+
+    /** &hide */
     public void activityStartTrigger(Intent intent) {
         ComponentName cn = intent.getComponent();
         String activity = null;
@@ -63,4 +68,5 @@ public class ActivityTrigger
 
     private native void native_at_startActivity(String activity);
     private native void native_at_resumeActivity(String activity);
+    private native void native_at_deinit();
 }
