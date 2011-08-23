@@ -48,13 +48,13 @@ namespace android
 
 static void (*startActivity)(const char *)  = NULL;
 static void (*resumeActivity)(const char *) = NULL;
+static void *dlhandle                       = NULL;
 
 // ----------------------------------------------------------------------------
 
 static void
 com_android_internal_app_ActivityTrigger_native_at_init()
 {
-    void *handle;
     const char *rc;
     void (*init)(void);
     char buf[PROPERTY_VALUE_MAX];
@@ -73,22 +73,22 @@ com_android_internal_app_ActivityTrigger_native_at_init()
         return;
     }
 
-    handle = dlopen(buf, RTLD_NOW | RTLD_LOCAL);
-    if (handle == NULL) {
+    dlhandle = dlopen(buf, RTLD_NOW | RTLD_LOCAL);
+    if (dlhandle == NULL) {
         return;
     }
 
     dlerror();
 
-    *(void **) (&startActivity) = dlsym(handle, "activity_trigger_start");
+    *(void **) (&startActivity) = dlsym(dlhandle, "activity_trigger_start");
     if ((rc = dlerror()) != NULL) {
         goto cleanup;
     }
-    *(void **) (&resumeActivity) = dlsym(handle, "activity_trigger_resume");
+    *(void **) (&resumeActivity) = dlsym(dlhandle, "activity_trigger_resume");
     if ((rc = dlerror()) != NULL) {
         goto cleanup;
     }
-    *(void **) (&init) = dlsym(handle, "activity_trigger_init");
+    *(void **) (&init) = dlsym(dlhandle, "activity_trigger_init");
     if ((rc = dlerror()) != NULL) {
         goto cleanup;
     }
@@ -98,6 +98,29 @@ com_android_internal_app_ActivityTrigger_native_at_init()
 cleanup:
     startActivity  = NULL;
     resumeActivity = NULL;
+    if (dlhandle) {
+        dlclose(dlhandle);
+        dlhandle = NULL;
+    }
+}
+
+static void
+com_android_internal_app_ActivityTrigger_native_at_deinit(JNIEnv *env, jobject clazz)
+{
+    void (*deinit)(void);
+
+    if (dlhandle) {
+        startActivity  = NULL;
+        resumeActivity = NULL;
+
+        *(void **) (&deinit) = dlsym(dlhandle, "activity_trigger_deinit");
+        if (deinit) {
+            (*deinit)();
+        }
+
+        dlclose(dlhandle);
+        dlhandle       = NULL;
+    }
 }
 
 static void
@@ -127,6 +150,7 @@ com_android_internal_app_ActivityTrigger_native_at_resumeActivity(JNIEnv *env, j
 static JNINativeMethod gMethods[] = {
     {"native_at_startActivity",  "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_startActivity},
     {"native_at_resumeActivity", "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_resumeActivity},
+    {"native_at_deinit",         "()V",                   (void *)com_android_internal_app_ActivityTrigger_native_at_deinit},
 };
 
 
