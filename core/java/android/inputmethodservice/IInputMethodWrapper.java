@@ -130,6 +130,7 @@ class IInputMethodWrapper extends IInputMethod.Stub
                 synchronized (args.arg4) {
                     ((CountDownLatch)args.arg4).countDown();
                 }
+                mCaller.recycleArgs(args);
                 return;
             }
             
@@ -150,6 +151,7 @@ class IInputMethodWrapper extends IInputMethod.Stub
                 InputConnection ic = inputContext != null
                         ? new InputConnectionWrapper(inputContext) : null;
                 inputMethod.startInput(ic, (EditorInfo)args.arg2);
+                mCaller.recycleArgs(args);
                 return;
             }
             case DO_RESTART_INPUT: {
@@ -158,6 +160,7 @@ class IInputMethodWrapper extends IInputMethod.Stub
                 InputConnection ic = inputContext != null
                         ? new InputConnectionWrapper(inputContext) : null;
                 inputMethod.restartInput(ic, (EditorInfo)args.arg2);
+                mCaller.recycleArgs(args);
                 return;
             }
             case DO_CREATE_SESSION: {

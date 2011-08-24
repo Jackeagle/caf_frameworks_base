@@ -380,6 +380,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     service.mNotificationTimeout = info.notificationTimeout;
                     service.mIsDefault = (info.flags & AccessibilityServiceInfo.DEFAULT) != 0;
                 }
+                mCaller.recycleArgs(arguments);
                 return;
             default:
                 Slog.w(LOG_TAG, "Unknown message type: " + message.what);

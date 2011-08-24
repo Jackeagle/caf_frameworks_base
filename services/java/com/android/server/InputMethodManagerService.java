@@ -1330,6 +1330,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                     ((IInputMethod)args.arg1).bindInput((InputBinding)args.arg2);
                 } catch (RemoteException e) {
                 }
+                mCaller.recycleArgs(args);
                 return true;
             case MSG_SHOW_SOFT_INPUT:
                 args = (HandlerCaller.SomeArgs)msg.obj;
@@ -1338,6 +1339,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                             (ResultReceiver)args.arg2);
                 } catch (RemoteException e) {
                 }
+                mCaller.recycleArgs(args);
                 return true;
             case MSG_HIDE_SOFT_INPUT:
                 args = (HandlerCaller.SomeArgs)msg.obj;
@@ -1346,6 +1348,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                             (ResultReceiver)args.arg2);
                 } catch (RemoteException e) {
                 }
+                mCaller.recycleArgs(args);
                 return true;
             case MSG_ATTACH_TOKEN:
                 args = (HandlerCaller.SomeArgs)msg.obj;
@@ -1354,6 +1357,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                     ((IInputMethod)args.arg1).attachToken((IBinder)args.arg2);
                 } catch (RemoteException e) {
                 }
+                mCaller.recycleArgs(args);
                 return true;
             case MSG_CREATE_SESSION:
                 args = (HandlerCaller.SomeArgs)msg.obj;
@@ -1362,6 +1366,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                             (IInputMethodCallback)args.arg2);
                 } catch (RemoteException e) {
                 }
+                mCaller.recycleArgs(args);
                 return true;
             // ---------------------------------------------------------
 
@@ -1374,6 +1379,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                             (EditorInfo)args.arg3);
                 } catch (RemoteException e) {
                 }
+                mCaller.recycleArgs(args);
                 return true;
             case MSG_RESTART_INPUT:
                 args = (HandlerCaller.SomeArgs)msg.obj;
@@ -1384,6 +1390,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                             (EditorInfo)args.arg3);
                 } catch (RemoteException e) {
                 }
+                mCaller.recycleArgs(args);
                 return true;
 
             // ---------------------------------------------------------
@@ -1403,6 +1410,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                 } catch (RemoteException e) {
                     Slog.w(TAG, "Client died receiving input method " + args.arg2);
                 }
+                mCaller.recycleArgs(args);
                 return true;
         }
         return false;
