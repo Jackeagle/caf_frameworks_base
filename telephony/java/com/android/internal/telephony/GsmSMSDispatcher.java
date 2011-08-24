@@ -591,7 +591,8 @@ final class GsmSMSDispatcher extends SMSDispatcher {
                 pdus[0] = receivedPdu;
             }
 
-            dispatchBroadcastPdus(Intents.CB_SMS_RECEIVED_ACTION, pdus);
+            boolean isEmergencyMessage = SmsCbHeader.isEmergencyMessage(header.messageIdentifier);
+            dispatchBroadcastPdus(pdus, isEmergencyMessage);
 
             // Remove messages that are out of scope to prevent the map from
             // growing indefinitely, containing incomplete messages that were

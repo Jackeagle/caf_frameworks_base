@@ -517,24 +517,6 @@ public final class Telephony {
             public static final int RESULT_SMS_UNSUPPORTED = 4;
 
             /**
-             * Broadcast Action: A new Cell Broadcast SMS message has been received
-             * by the device. The intent will have the following extra
-             * values:</p>
-             *
-             * <ul>
-             *   <li><em>pdus</em> - A CB SMS pdus.</li>
-             * </ul>
-             *
-             * <p>The extra values can be extracted using
-             * {@link #getSerializableExtra("pdus")}.</p>
-             *
-             * <p>If a BroadcastReceiver encounters an error while processing
-             * this intent it should set the result code appropriately.</p>
-             */
-            public static final String CB_SMS_RECEIVED_ACTION =
-                "android.provider.Telephony.CB_SMS_RECEIVED";
-
-            /**
              * Broadcast Action: A new Emergency Cdma message has been received
              * by the device. The intent will have the following extra
              * values:</p>
