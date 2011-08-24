@@ -2074,6 +2074,8 @@ void OMXCodec::setComponentRole() {
 }
 
 OMXCodec::~OMXCodec() {
+
+    mPmemInfo.clear();
     mSource.clear();
 
     CHECK(mState == LOADED || mState == ERROR);
