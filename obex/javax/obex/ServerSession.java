@@ -671,22 +671,20 @@ public final class ServerSession extends ObexSession implements Runnable {
             }
 
             if (mSrmServer.getLocalSrmCapability() == ObexHelper.SRM_CAPABLE) {
-                /* As per GOEP TS Spec the Server should not respond with a SRM Supported Header
-                 * when the Client sends a invalid SRM header with wrong values
+                /*
+                 * As per GOEP TS Spec the Server should ignore the SRM header sent in Connect
                  */
                 Byte byteHeader = (Byte)request.getHeader(HeaderSet.SINGLE_RESPONSE_MODE);
                 if((byteHeader == ObexHelper.OBEX_SRM_SUPPORTED) ||(byteHeader == ObexHelper.OBEX_SRM_DISABLED)
                       || (byteHeader == ObexHelper.OBEX_SRM_ENABLED)) {
-                    if (VERBOSE) Log.v(TAG, "handleConnectRequest: Server SRM_SUPPORTED header added");
-                    reply.setHeader(HeaderSet.SINGLE_RESPONSE_MODE, ObexHelper.OBEX_SRM_SUPPORTED);
-
-                    if (mSrmServer.getLocalSrmParamStatus()) {
-                        if (VERBOSE) Log.v(TAG, "handleConnectRequest: Enabled the SRMP WAIT");
-                        mSrmServer.setLocalSrmpWait(ObexHelper.SRMP_ENABLED);
-                    } else {
-                        if (VERBOSE) Log.v(TAG, "handleConnectRequest: Disabled the SRMP WAIT");
-                        mSrmServer.setLocalSrmpWait(ObexHelper.SRMP_DISABLED);
-                    }
+                    if (VERBOSE) Log.v(TAG, "handleConnectRequest: SRM Header received in Connect.. Ignored");
+                }
+                if (mSrmServer.getLocalSrmParamStatus()) {
+                    if (VERBOSE) Log.v(TAG, "handleConnectRequest: Enabled the SRMP WAIT");
+                    mSrmServer.setLocalSrmpWait(ObexHelper.SRMP_ENABLED);
+                } else {
+                      if (VERBOSE) Log.v(TAG, "handleConnectRequest: Disabled the SRMP WAIT");
+                      mSrmServer.setLocalSrmpWait(ObexHelper.SRMP_DISABLED);
                 }
             }
 
