@@ -407,44 +407,46 @@ status_t AACDecoder::read(
         if(mConfig->inputBufferUsedLength == mInputBufferSize){
            LOGW("Decoder cannot process the buffer due to invalid frame");
            decoderErr = MP4AUDEC_INVALID_FRAME;
-        }
-        if ( !mTempInputBuffer ) {
-            //Allocate Temp buffer
-            uint32_t bytesToAllocate = 2 * mInputBuffer->size();
-            mTempInputBuffer = (uint8_t*)malloc( bytesToAllocate );
-            mTempBufferDataLen = 0;
-            if (mTempInputBuffer == NULL) {
-                LOGE("Could not allocate temp buffer bytesToAllocate quit playing");
-                return UNKNOWN_ERROR;
+        } else {
+            if ( !mTempInputBuffer ) {
+                //Allocate Temp buffer
+                uint32_t bytesToAllocate = 2 * mInputBuffer->size();
+                mTempInputBuffer = (uint8_t*)malloc( bytesToAllocate );
+                mTempBufferDataLen = 0;
+                if (mTempInputBuffer == NULL) {
+                   LOGE("Could not allocate temp buffer bytesToAllocate quit playing");
+                   return UNKNOWN_ERROR;
+                }
+                mTempBufferTotalSize = bytesToAllocate;
+                LOGV("Allocated tempBuffer of size %d data len %d", mTempBufferTotalSize, mTempBufferDataLen);
             }
-            mTempBufferTotalSize = bytesToAllocate;
-            LOGV("Allocated tempBuffer of size %d data len %d", mTempBufferTotalSize, mTempBufferDataLen);
-        }
-        // copy the remaining data into temp buffer
-        memcpy( mTempInputBuffer, inputBuffer, mConfig->inputBufferUsedLength );
+            // copy the remaining data into temp buffer
+            memcpy( mTempInputBuffer, inputBuffer, mConfig->inputBufferUsedLength );
 
-        if (mTempBufferDataLen != 0) {
-            //append previous remaining data back into temp buffer
-            LOGV("Appending remaining data tempDataLen %d usedLength %d", mTempBufferDataLen, mConfig->inputBufferUsedLength);
-            memcpy( mTempInputBuffer + mConfig->inputBufferUsedLength,
+            if (mTempBufferDataLen != 0) {
+                //append previous remaining data back into temp buffer
+                LOGV("Appending remaining data tempDataLen %d usedLength %d", mTempBufferDataLen, mConfig->inputBufferUsedLength);
+                memcpy( mTempInputBuffer + mConfig->inputBufferUsedLength,
                     mTempInputBuffer + mInputBufferSize,
                     mTempBufferDataLen );
-        }
+            }
 
-        mTempBufferDataLen += mConfig->inputBufferUsedLength;
-        LOGV("mTempBufferDataLen %d inputBufferUsedLength %d", mTempBufferDataLen, mConfig->inputBufferUsedLength);
-        // temp buffer has accumulated one frame size worth data
-        // copy it back to input buffer so that it is fed to decoder next
-        if ( mTempBufferDataLen >= mInputBufferSize ) {
-            LOGV("mTempBufferDataLen %d exceeded mInputBufferSize %d ", mTempBufferDataLen, mInputBufferSize);
-            memcpy((UChar*)mInputBuffer->data(), mTempInputBuffer, mInputBufferSize );
-            mTempBufferDataLen -= mInputBufferSize;
-            mInputBuffer->set_range( 0, mInputBufferSize );
-            mConfig->inputBufferUsedLength = 0;
-        }
+            mTempBufferDataLen += mConfig->inputBufferUsedLength;
+            LOGV("mTempBufferDataLen %d inputBufferUsedLength %d", mTempBufferDataLen, mConfig->inputBufferUsedLength);
+            // temp buffer has accumulated one frame size worth data
+            // copy it back to input buffer so that it is fed to decoder next
+            if ( mTempBufferDataLen >= mInputBufferSize ) {
+                LOGV("mTempBufferDataLen %d exceeded mInputBufferSize %d ", mTempBufferDataLen, mInputBufferSize);
+                memcpy((UChar*)mInputBuffer->data(), mTempInputBuffer, mInputBufferSize );
+                mTempBufferDataLen -= mInputBufferSize;
+                mInputBuffer->set_range( 0, mInputBufferSize );
+                mConfig->inputBufferUsedLength = 0;
+            }
 
-        //reset the output buffer size
-        numOutBytes = 0;
+            //reset the output buffer size
+            numOutBytes = 0;
+        } // end of else INVALID FRAME
+
     }
     if (decoderErr != MP4AUDEC_SUCCESS && decoderErr != MP4AUDEC_INCOMPLETE_FRAME) {
         LOGW("AAC decoder returned error %d, substituting silence", decoderErr);
