@@ -5156,14 +5156,6 @@ status_t QueryCodecs(
             continue;
         }
 
-        if (!strcmp(componentName, "OMX.TI.DUCATI.VIDDEC")) {
-            results->push();
-            CodecCapabilities *caps = &results->editItemAt(results->size() - 1);
-            caps->mComponentName = componentName;
-
-            continue;
-        }
-
         sp<OMXCodecObserver> observer = new OMXCodecObserver;
         IOMX::node_id node;
         status_t err = omx->allocateNode(componentName, observer, &node);
