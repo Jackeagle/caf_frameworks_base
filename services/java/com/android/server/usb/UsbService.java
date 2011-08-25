@@ -93,6 +93,9 @@ public class UsbService extends IUsbManager.Stub {
     private int mLastConnected = -1;
     private int mLastConfiguration = -1;
 
+    // Function enable is in progress
+    private boolean mSoftSwitch;
+
     // lists of enabled and disabled USB functions (for USB device mode)
     private final ArrayList<String> mEnabledFunctions = new ArrayList<String>();
     private final ArrayList<String> mDisabledFunctions = new ArrayList<String>();
@@ -133,7 +136,10 @@ public class UsbService extends IUsbManager.Stub {
             }
             mDisabledFunctions.remove(function);
 
-            if (UsbManager.USB_FUNCTION_ACCESSORY.equals(function)) {
+            if (UsbManager.USB_FUNCTION_RNDIS.equals(function)) {
+                mSoftSwitch = true;
+            } else if (UsbManager.USB_FUNCTION_ACCESSORY.equals(function)) {
+                mSoftSwitch = true;
                 readCurrentAccessoryLocked();
             }
         } else {
@@ -165,13 +171,15 @@ public class UsbService extends IUsbManager.Stub {
                             // trigger an Intent broadcast
                             if (mSystemReady) {
                                 // debounce disconnects to avoid problems bringing up USB tethering
-                                update(mConnected == 0);
+                                update((mConnected == 0) && mSoftSwitch);
                             }
                         } else if ("usb_configuration".equals(name)) {
                             mConfiguration = intState;
                             // trigger an Intent broadcast
                             if (mSystemReady) {
-                                update(mConnected == 0);
+                                update((mConnected == 0) && mSoftSwitch);
+                            if ((mConnected == 1) && mSoftSwitch)
+                                mSoftSwitch = false;
                             }
                         }
                     } catch (NumberFormatException e) {
@@ -311,30 +319,6 @@ public class UsbService extends IUsbManager.Stub {
         }
     }
 
-    public boolean rndisStatus(String path) {
-        byte[] value = new byte[2];
-        char status;
-        try {
-            File file = new File(path);
-            FileInputStream fis = new FileInputStream(file);
-            try {
-                int con = fis.read(value,0,1);
-            } catch (IOException e) {
-                Log.e(TAG, "unable to read file"+e);
-                return false;
-            }
-            Byte b1 = new Byte(value[0]);
-            status = (char) b1.intValue();
-            if (status == '1')
-                return true;
-            else
-                return false;
-        } catch(FileNotFoundException e) {
-            Log.e(TAG, "Exception File not found"+e);
-        }
-        return false;
-    }
-
     /*
      * Sends a message to update the USB connected and configured state (device mode).
      * If delayed is true, then we add a small delay in sending the message to debounce
@@ -342,7 +326,6 @@ public class UsbService extends IUsbManager.Stub {
      */
     private final void update(boolean delayed) {
         mHandler.removeMessages(MSG_UPDATE_STATE);
-        delayed = delayed && rndisStatus(USB_RNDIS_ENABLE);
         mHandler.sendEmptyMessageDelayed(MSG_UPDATE_STATE, delayed ? UPDATE_DELAY : 0);
     }
 
