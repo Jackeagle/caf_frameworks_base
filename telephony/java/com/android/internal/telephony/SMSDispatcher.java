@@ -1110,7 +1110,8 @@ public abstract class SMSDispatcher extends Handler {
             } else if (intent.getAction().equals(Intent.ACTION_DEVICE_STORAGE_NOT_FULL)) {
                 mStorageAvailable = true;
                 mCm.reportSmsMemoryStatus(true, obtainMessage(EVENT_REPORT_MEMORY_STATUS_DONE));
-            } else if (intent.getAction().equals(Intents.SMS_EMERGENCY_CB_RECEIVED_ACTION)) {
+            } else if (intent.getAction().equals(Intents.SMS_CB_RECEIVED_ACTION) ||
+                  intent.getAction().equals(Intents.SMS_EMERGENCY_CB_RECEIVED_ACTION)) {
                 // Ignore this intent. Apps will process it.
             } else {
                 // Assume the intent is one of the SMS receive intents that
@@ -1225,6 +1226,7 @@ public abstract class SMSDispatcher extends Handler {
         if (isEmergencyMessage) {
             Intent intent = new Intent(Intents.SMS_EMERGENCY_CB_RECEIVED_ACTION);
             intent.putExtra("pdus", pdus);
+            intent.putExtra("sub_id", mPhone.getSubscription());
             if (Config.LOGD)
                 Log.d(TAG, "Dispatching " + pdus.length + " emergency SMS CB pdus");
 
@@ -1232,6 +1234,7 @@ public abstract class SMSDispatcher extends Handler {
         } else {
             Intent intent = new Intent(Intents.SMS_CB_RECEIVED_ACTION);
             intent.putExtra("pdus", pdus);
+            intent.putExtra("sub_id", mPhone.getSubscription());
             if (Config.LOGD)
                 Log.d(TAG, "Dispatching " + pdus.length + " SMS CB pdus");
 
