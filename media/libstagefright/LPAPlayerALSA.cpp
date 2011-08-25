@@ -18,6 +18,7 @@
 #define LOG_NDDEBUG 0
 #define LOG_NDEBUG 0
 #define LOG_TAG "LPAPlayerALSA"
+
 #include <utils/Log.h>
 #include <utils/threads.h>
 
@@ -26,6 +27,7 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/poll.h>
+#include <sys/eventfd.h>
 #include <binder/IPCThreadState.h>
 #include <media/AudioTrack.h>
 
@@ -42,7 +44,6 @@ extern "C" {
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaErrors.h>
 
-
 #include <linux/unistd.h>
 #include <linux/msm_audio.h>
 
@@ -52,7 +53,11 @@ extern "C" {
 //#define PMEM_BUFFER_SIZE (4800 * 4)
 #define PMEM_BUFFER_COUNT 4
 
+//Values to exit poll via eventfd
+#define KILL_EVENT_THREAD 1
+#define SIGNAL_EVENT_THREAD 2
 
+#define NUM_FDS 2
 namespace android {
 int LPAPlayer::objectsAlive = 0;
 
@@ -89,6 +94,7 @@ AudioPlayer(audioSink,observer) {
     bIsA2DPEnabled = false;
     mAudioFlinger = NULL;
     AudioFlingerClient = NULL;
+    efd = -1;
 
     /* Initialize Suspend/Resume related variables */
     mQueue.start();
@@ -333,14 +339,18 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
         LOGV("pcm_open hardware 0,4 for LPA ");
 
         //Open PCM driver
-        handle = (void *)pcm_open((PCM_MMAP | DEBUG_ON | PCM_STEREO) , "hw:0,4");
+
+        if (numChannels == 1)
+            handle = (void *)pcm_open((PCM_MMAP | DEBUG_ON | PCM_MONO) , "hw:0,4");
+        else
+            handle = (void *)pcm_open((PCM_MMAP | DEBUG_ON | PCM_STEREO) , "hw:0,4");
+
         struct pcm * local_handle = (struct pcm *)handle;
         if (!local_handle) {
             LOGE("Failed to initialize ALSA hardware hw:0,4");
             return BAD_VALUE;
         }
 
-        local_handle->flags = (PCM_MMAP | DEBUG_ON | PCM_STEREO);
         struct snd_pcm_hw_params *params;
         struct snd_pcm_sw_params *sparams;
         params = (struct snd_pcm_hw_params*) calloc(1, sizeof(struct snd_pcm_hw_params));
@@ -426,21 +436,31 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
     LOGV("In seekTo(), mSeekTimeUs %lld",mSeekTimeUs);
     if (!bIsA2DPEnabled) {
         if(mIsDriverStarted) {
-            if (!isPaused) {
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,1) < 0) {
-                    LOGE("Audio Pause failed");
-                }
-            }
-            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_DROP) < 0) {
-                LOGE("Audio Flush failed");
-            }
             LOGV("Paused case, %d",isPaused);
-            if (isPaused) {
-                LOGV("AUDIO pause in seek()");
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,1) < 0) {
-                    LOGE("Audio Pause failed");
-                    return BAD_VALUE;
-                }
+
+            pthread_mutex_lock(&pmem_response_mutex);
+            pthread_mutex_lock(&pmem_request_mutex);
+            while(!pmemBuffersResponseQueue.empty()) {
+                BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
+                pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
+                pmemBuffersRequestQueue.push_back(buf);
+            }
+            pthread_mutex_unlock(&pmem_request_mutex);
+            pthread_mutex_unlock(&pmem_response_mutex);
+            LOGV("Transferred all the buffers from response queue to rquest queue to handle seek");
+            if (!isPaused) {
+                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
+                    LOGE("Reset failed!");
+
+                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_DRAIN))
+                    LOGE("Drain failed");
+                local_handle->start = 0;
+                pcm_prepare(local_handle);
+                LOGV("Reset, drain and prepare completed");
+                local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
+                sync_ptr(local_handle);
+                LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
+                pthread_cond_signal(&decoder_cv);
             }
         }
     } else {
@@ -513,7 +533,7 @@ void LPAPlayer::resume() {
                 LOGE("Driver start failed!");// TODO: How to report this error and stop playback ??
             }
             mIsDriverStarted = true;
-            LOGV("OLPA Driver Started");
+            LOGV("LPA Driver Started");
 
             pthread_cond_signal(&event_cv);
             pthread_cond_signal(&a2dp_cv);
@@ -525,9 +545,24 @@ void LPAPlayer::resume() {
 
                 LOGV("Attempting Sync resume\n");
                 struct pcm * local_handle = (struct pcm *)handle;
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,0) < 0)
-                    LOGE("AUDIO Resume failed");
-                LOGV("Sync resume done\n");
+                if (!mSeeking) {
+                    if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,0) < 0)
+                        LOGE("AUDIO Resume failed");
+                    LOGV("Sync resume done\n");
+                }
+                else {
+                    if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
+                        LOGE("Reset failed");
+                    if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_DRAIN))
+                        LOGE("Drain failed");
+                    local_handle->start = 0;
+                    pcm_prepare(local_handle);
+                    LOGV("Reset, drain and prepare completed");
+                    local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
+                    sync_ptr(local_handle);
+                    LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
+                    pthread_cond_signal(&decoder_cv);
+                }
                 if (mAudioSink.get() != NULL) {
                     mAudioSink->resumeSession();
                 }
@@ -673,7 +708,7 @@ void LPAPlayer::decoderThreadEntry() {
     }
     LOGV("decoderThreadEntry ready to work \n");
     pthread_mutex_unlock(&decoder_mutex);
-
+    pthread_cond_signal(&event_cv);
 
     void *pmem_buf; int32_t pmem_fd;
 
@@ -768,12 +803,21 @@ void LPAPlayer::decoderThreadEntry() {
                                                   (int)buf.bytesToWrite);
                     pthread_mutex_unlock(&apply_effect_mutex);
 
-
-
                     LOGV("decoderThread: Writing buffer to driver with pmem fd %d", buf.pmemFd);
                     LOGV("PCM write start");
                     struct pcm * local_handle = (struct pcm *)handle;
-                    pcm_write(local_handle, buf.localBuf, buf.bytesToWrite);
+                    pcm_write(local_handle, buf.localBuf, local_handle->period_size);
+                    if (mReachedEOS) {
+                        if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_START) < 0)
+                            LOGE("AUDIO Start failed");
+                        else
+                            local_handle->start = 1;
+                    }
+                    if (buf.bytesToWrite < PMEM_BUFFER_SIZE && pmemBuffersResponseQueue.size() == 1) {
+                        LOGV("Last buffer case");
+                        uint64_t writeValue = SIGNAL_EVENT_THREAD;
+                        write(efd, &writeValue, sizeof(uint64_t));
+                    }
                     LOGV("PCM write complete");
                 }
             }
@@ -798,7 +842,6 @@ void LPAPlayer::eventThreadEntry() {
     int err_poll = 0;
     int avail = 0;
     int i = 0;
-    struct pollfd *pfd;
 
     setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_AUDIO);
     prctl(PR_SET_NAME, (unsigned long)"LPA EventThread", 0, 0, 0);
@@ -808,27 +851,59 @@ void LPAPlayer::eventThreadEntry() {
     pthread_cond_wait(&event_cv, &event_mutex);
     LOGV("eventThreadEntry ready to work \n");
     pthread_mutex_unlock(&event_mutex);
-
-
     LOGV("Allocating poll fd");
-    pfd = ( struct pollfd *) calloc(2, sizeof(struct pollfd));
-    struct pcm * local_handle = (struct pcm *)handle;
-    pfd[0].fd = local_handle->fd;
-    pfd[0].events = (POLLOUT | POLLERR | POLLNVAL);
-    pfd[1].fd = local_handle->timer_fd;
-    pfd[1].events = (POLLIN | POLLERR | POLLNVAL);
-    LOGV("Allocated poll fd");
+    struct pollfd pfd[NUM_FDS];
 
+    struct pcm * local_handle = (struct pcm *)handle;
+    pfd[0].fd = local_handle->timer_fd;
+    pfd[0].events = (POLLIN | POLLERR | POLLNVAL);
+    LOGV("Allocated poll fd");
+    bool audioEOSPosted = false;
+    int timeout = -1;
+
+    efd = eventfd(0,0);
+    pfd[1].fd = efd;
+    pfd[1].events = (POLLIN | POLLERR | POLLNVAL);
     while (1) {
         if (killEventThread) {
             eventThreadAlive = false;
             LOGV("Event Thread is dying.");
             return;
         }
-        err_poll = poll(pfd, 2, -1);
 
+        err_poll = poll(pfd, NUM_FDS, timeout);
+
+        if (err_poll == EINTR)
+            LOGE("Timer is intrrupted");
+        if (pfd[1].revents & POLLIN) {
+            uint64_t u;
+            read(efd, &u, sizeof(uint64_t));
+            LOGE("POLLIN event occured on the event fd, value written to %llu",(unsigned long long)u);
+            pfd[1].revents = 0;
+            if (u == SIGNAL_EVENT_THREAD) {
+                BuffersAllocated tempbuf = *(pmemBuffersResponseQueue.begin());
+                timeout = 1000 * tempbuf.bytesToWrite / (numChannels * 2 * mSampleRate);
+                LOGV("Setting timeout due Last buffer seek to %d, mReachedEOS %d, pmemBuffersRequestQueue.size() %d", timeout, mReachedEOS,pmemBuffersResponseQueue.size());
+                continue;
+            }
+        }
+        if ((pfd[1].revents & POLLERR) || (pfd[1].revents & POLLNVAL))
+            LOGE("POLLERR or INVALID POLL");
+
+        LOGV("LPA event");
         if (killEventThread) {
             break;
+        }
+        if (timeout != -1 && mReachedEOS) {
+            LOGV("Posting EOS event to AwesomePlayer");
+            mObserver->postAudioEOS();
+            audioEOSPosted = true;
+            timeout = -1;
+            eventThreadAlive = false;
+            break;
+        }
+        if (!mReachedEOS) {
+            timeout = -1;
         }
         if (err_poll < 0) {
              LOGV("fatal err in poll:%d\n", err_poll);
@@ -839,11 +914,11 @@ void LPAPlayer::eventThreadEntry() {
         struct snd_timer_tread rbuf[4];
         read(local_handle->timer_fd, rbuf, sizeof(struct snd_timer_tread) * 4 );
 
-        if (!(pfd[1].revents & POLLIN))
+        if (!(pfd[0].revents & POLLIN))
              continue;
 
         pfd[0].revents = 0;
-        pfd[1].revents = 0;
+        //pfd[1].revents = 0;
         LOGV("After an event occurs");
 
         if (killEventThread) {
@@ -856,9 +931,10 @@ void LPAPlayer::eventThreadEntry() {
         BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
         pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
         /* If the rendering is complete report EOS to the AwesomePlayer */
-        if (mObserver && !asyncReset && mReachedEOS && pmemBuffersResponseQueue.empty()) {
-            LOGV("Posting EOS event to AwesomePlayer");
-            mObserver->postAudioEOS();
+        if (mObserver && !asyncReset && mReachedEOS && pmemBuffersResponseQueue.size() == 1) {
+            BuffersAllocated tempbuf = *(pmemBuffersResponseQueue.begin());
+            timeout = 1000 * tempbuf.bytesToWrite / (numChannels * 2 * mSampleRate) + 1000 * buf.bytesToWrite / (numChannels * 2 * mSampleRate);
+            LOGE("Setting timeout to %d,buf.bytesToWrite %d, mReachedEOS %d, pmemBuffersRequestQueue.size() %d", timeout, buf.bytesToWrite, mReachedEOS,pmemBuffersResponseQueue.size());
         }
         if (pmemBuffersResponseQueue.empty() && bIsA2DPEnabled) {
             LOGV("Close Session");
@@ -895,6 +971,8 @@ void LPAPlayer::eventThreadEntry() {
 
     }
     eventThreadAlive = false;
+    if (efd != -1)
+        close(efd);
     LOGV("Event Thread is dying.");
 
 }
@@ -1378,8 +1456,10 @@ void LPAPlayer::requestAndWaitForEventThreadExit() {
     if (!eventThreadAlive)
         return;
     killEventThread = true;
+    uint64_t writeValue = KILL_EVENT_THREAD;
+    LOGE("Writing to efd %d",efd);
+    write(efd, &writeValue, sizeof(uint64_t));
     if(!bIsA2DPEnabled) {
-        //pcm_close(handle);
     }
     pthread_cond_signal(&event_cv);
     pthread_join(eventThread,NULL);
