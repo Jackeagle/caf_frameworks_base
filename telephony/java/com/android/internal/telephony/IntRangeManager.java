@@ -537,11 +537,7 @@ public abstract class IntRangeManager {
      * @return true if successful, false otherwise
      */
     private boolean tryAddSingleRange(int startId, int endId, boolean selected) {
-        /*
-         * TBD : Commenting the below function so that the list does not get
-         *       cleared every time a new range is added by clients.
-         */
-        //startUpdate();
+        startUpdate();
         addRange(startId, endId, selected);
         return finishUpdate();
     }
