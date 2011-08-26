@@ -481,9 +481,9 @@ bool SurfaceFlinger::threadLoop()
         }
 
         if (mBypassState == eBypassClosePending || !(hw.canDraw())) {
-            mBypassState = eBypassClosePending;
             closeBypass();
             freeBypassBuffers();
+            mBypassState = eBypassNotInUse;
             return true;
         }
 #endif
