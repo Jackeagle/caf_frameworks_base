@@ -124,7 +124,7 @@ public class StatusBarPolicy {
     // phone
     private TelephonyManager mPhone;
     private int mPhoneSignalIconId;
-
+    private int mDatanet = TelephonyManager.NETWORK_TYPE_UNKNOWN;
     //***** Signal strength icons
     //GSM/UMTS
     private static final int[][] sSignalImages = {
@@ -1273,6 +1273,8 @@ public class StatusBarPolicy {
     }
 
     private final void updateDataNetType(int net) {
+        Slog.d(TAG, "Data network type changed to:" + net);
+        mDatanet = net;
         switch (net) {
         case TelephonyManager.NETWORK_TYPE_EDGE:
             mDataIconList = sDataNetType_e[mInetCondition];
@@ -1305,9 +1307,13 @@ public class StatusBarPolicy {
         case TelephonyManager.NETWORK_TYPE_LTE:
             mDataIconList = sDataNetType_lte[mInetCondition];
             break;
-        default:
+        case TelephonyManager.NETWORK_TYPE_GPRS:
             mDataIconList = sDataNetType_g[mInetCondition];
-        break;
+            break;
+        default:
+            Slog.d(TAG, "Unknown Data Radio, do not display data icon");
+            mDatanet = TelephonyManager.NETWORK_TYPE_UNKNOWN;
+            break;
         }
     }
 
@@ -1319,6 +1325,9 @@ public class StatusBarPolicy {
             // GSM voice, we have to check also the sim state
             iconId = R.drawable.stat_sys_no_sim;
             mService.setIcon("data_connection", iconId, 0);
+        } else if (mDatanet == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
+            // If data network type is unknown do not display data icon
+            visible = false;
         } else if ((dataRadio() == GSM) ||
                         (dataRadio() == LTE)) {
             // GSM data, we have to check also the sim state
@@ -1369,6 +1378,7 @@ public class StatusBarPolicy {
                 visible = false;
             }
         } else {
+            Slog.d(TAG, "Unknown Radio in combined service state, do not display data icon ");
             visible = false;
         }
 
