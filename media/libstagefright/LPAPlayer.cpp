@@ -1387,6 +1387,10 @@ size_t LPAPlayer::fillBuffer(void *data, size_t size) {
                 size_done = 0;
                 size_remaining = size;
 
+                if (mSeeking){
+                   mInternalSeeking = false;
+                }
+
                 mSeeking = false;
                 if (mObserver && !asyncReset && !mInternalSeeking) {
                     LOGV("fillBuffer: Posting audio seek complete event");
@@ -1571,8 +1575,11 @@ void LPAPlayer::requestAndWaitForDecoderThreadExit() {
 
     if (!decoderThreadAlive)
         return;
+
+    pthread_mutex_lock(&pmem_request_mutex);
     killDecoderThread = true;
     pthread_cond_signal(&decoder_cv);
+    pthread_mutex_unlock(&pmem_request_mutex);
     pthread_join(decoderThread,NULL);
     LOGV("decoder thread killed");
 
