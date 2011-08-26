@@ -1014,6 +1014,7 @@ public class BluetoothService extends IBluetooth.Stub {
                 return;
             }
             String []bonds = null;
+            String address = null;
             String val = getPropertyInternal("Devices");
             if (val != null) {
                 bonds = val.split(",");
@@ -1024,7 +1025,12 @@ public class BluetoothService extends IBluetooth.Stub {
             mState.clear();
             if (DBG) log("found " + bonds.length + " bonded devices");
             for (String device : bonds) {
-                mState.put(getAddressFromObjectPath(device).toUpperCase(),
+                address = getAddressFromObjectPath(device);
+                if (address == null) {
+                    Log.e(TAG, "error! address is null");
+                    continue;
+                }
+                mState.put(address.toUpperCase(),
                         BluetoothDevice.BOND_BONDED);
             }
         }
