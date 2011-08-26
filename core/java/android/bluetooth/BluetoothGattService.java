@@ -280,11 +280,13 @@ public class BluetoothGattService {
     public void close() throws Exception{
 
         mLock.writeLock().lock();
-        if (mClosed) return;
+        if (mClosed) {
+            mLock.writeLock().unlock();
+            return;
+        }
 
         deregisterWatcher();
 
-        mLock.writeLock().lock();
         try {
             mClosed = true;
             mService.closeRemoteGattService(mObjPath);
