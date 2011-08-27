@@ -158,6 +158,7 @@ LOCAL_SRC_FILES:= \
 	android_backup_FileBackupHelperBase.cpp \
 	android_backup_BackupHelperDispatcher.cpp \
 	android_content_res_ObbScanner.cpp \
+	com_android_internal_app_ActivityTrigger.cpp \
     android_content_res_Configuration.cpp \
     android_hardware_fm.cpp
 
