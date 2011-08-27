@@ -424,8 +424,6 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
     LOGV("seekTo: time_us %ld", time_us);
     if ( mReachedEOS ) {
         mReachedEOS = false;
-        LOGV("Signalling to Decoder Thread");
-        pthread_cond_signal(&decoder_cv);
     }
     mSeeking = true;
 
@@ -452,8 +450,6 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
                 if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
                     LOGE("Reset failed!");
 
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_DRAIN))
-                    LOGE("Drain failed");
                 local_handle->start = 0;
                 pcm_prepare(local_handle);
                 LOGV("Reset, drain and prepare completed");
@@ -553,8 +549,6 @@ void LPAPlayer::resume() {
                 else {
                     if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
                         LOGE("Reset failed");
-                    if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_DRAIN))
-                        LOGE("Drain failed");
                     local_handle->start = 0;
                     pcm_prepare(local_handle);
                     LOGV("Reset, drain and prepare completed");
@@ -899,8 +893,6 @@ void LPAPlayer::eventThreadEntry() {
             mObserver->postAudioEOS();
             audioEOSPosted = true;
             timeout = -1;
-            eventThreadAlive = false;
-            break;
         }
         if (!mReachedEOS) {
             timeout = -1;
