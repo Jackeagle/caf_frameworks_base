@@ -1,5 +1,6 @@
 /*
  * Copyright 2008, The Android Open Source Project
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); 
  * you may not use this file except in compliance with the License. 
@@ -17,6 +18,7 @@
 #define LOG_TAG "NetUtils"
 
 #include "jni.h"
+#include <nativehelper/JNIHelp.h>
 #include <utils/misc.h>
 #include <android_runtime/AndroidRuntime.h>
 #include <utils/Log.h>
@@ -235,6 +237,44 @@ static jboolean android_net_utils_runDhcpRenew(JNIEnv* env, jobject clazz, jstri
 
     return (jboolean)(result == 0);
 }
+
+static jbyteArray android_net_utils_ipAddrStringToByteArray(JNIEnv* env, jobject, jstring javaString) {
+    int error;
+    int address_type;
+    const char *addrStr = env->GetStringUTFChars(javaString, NULL);
+    if (addrStr == NULL) {
+        jniThrowException(env, "java/net/UnknownHostException","null argument");
+        return NULL;
+    }
+
+    if (strchr(addrStr,':') != NULL) address_type = AF_INET6;
+    else if (strchr(addrStr,'.') != NULL) address_type = AF_INET;
+    else {
+        jniThrowException(env, "java/net/UnknownHostException","IP family not recognized");
+        return NULL;
+    }
+
+    int structsz = (address_type==AF_INET) ?
+                    sizeof(struct in_addr) : sizeof(struct in6_addr);
+
+    unsigned char rawByteAddr[structsz];
+    memset(rawByteAddr, 0, structsz);
+
+    if ((error = inet_pton(address_type, addrStr, rawByteAddr)) < 1) {
+        error = errno;
+        jniThrowException(env, "java/net/UnknownHostException","inet_pton failure");
+        return NULL;
+    }
+
+    jbyteArray byteArray = env->NewByteArray(structsz);
+    if (byteArray == NULL) {
+        jniThrowException(env, "java/net/UnknownHostException","Out of memory");
+        return NULL;
+    }
+    env->SetByteArrayRegion(byteArray, 0, structsz, reinterpret_cast<jbyte*>(rawByteAddr));
+    env->ReleaseStringUTFChars(javaString, addrStr);
+    return byteArray;
+}
 // ----------------------------------------------------------------------------
 
 /*
@@ -255,7 +295,8 @@ static JNINativeMethod gNetworkUtilMethods[] = {
     { "releaseDhcpLease", "(Ljava/lang/String;)Z",  (void *)android_net_utils_releaseDhcpLease },
     { "configureNative", "(Ljava/lang/String;IIIII)Z",  (void *)android_net_utils_configureInterface },
     { "getDhcpError", "()Ljava/lang/String;", (void*) android_net_utils_getDhcpError },
-    { "runDhcpRenew", "(Ljava/lang/String;Landroid/net/DhcpInfo;)Z",  (void *)android_net_utils_runDhcpRenew}
+    { "runDhcpRenew", "(Ljava/lang/String;Landroid/net/DhcpInfo;)Z",  (void *)android_net_utils_runDhcpRenew },
+    { "ipAddrStringToByteArray", "(Ljava/lang/String;)[B",  (void *)android_net_utils_ipAddrStringToByteArray }
 };
 
 int register_android_net_NetworkUtils(JNIEnv* env)

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009,2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -75,7 +75,7 @@ public class LinkInfo implements Parcelable {
                     int revLinkBw,
                     int netId) {
         try {
-            ipAddr = InetAddress.getByName(ip);
+            ipAddr = NetworkUtils.ipAddrStringToInetAddress(ip);
         } catch (java.net.UnknownHostException e) {
         }
         availFwLinkBw = fwLinkBw;
