@@ -37,6 +37,7 @@ import com.android.internal.policy.PolicyManager;
 
 import java.util.Formatter;
 import java.util.Locale;
+import android.os.SystemClock;
 
 /**
  * A view containing controls for a MediaPlayer. Typically contains the
@@ -93,6 +94,7 @@ public class MediaController extends FrameLayout {
     private ImageButton         mRewButton;
     private ImageButton         mNextButton;
     private ImageButton         mPrevButton;
+    private long mLastSeekEventTime;
 
     public MediaController(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -483,6 +485,7 @@ public class MediaController extends FrameLayout {
     // we will simply apply the updated position without suspending regular updates.
     private OnSeekBarChangeListener mSeekListener = new OnSeekBarChangeListener() {
         public void onStartTrackingTouch(SeekBar bar) {
+            mLastSeekEventTime = 0;
             show(3600000);
 
             mDragging = true;
@@ -502,11 +505,15 @@ public class MediaController extends FrameLayout {
                 return;
             }
 
-            long duration = mPlayer.getDuration();
-            long newposition = (duration * progress) / 1000L;
-            mPlayer.seekTo( (int) newposition);
-            if (mCurrentTime != null)
-                mCurrentTime.setText(stringForTime( (int) newposition));
+            long now = SystemClock.elapsedRealtime();
+            if ((now - mLastSeekEventTime) > 250) {
+                mLastSeekEventTime = now;
+                long duration = mPlayer.getDuration();
+                long newposition = (duration * progress) / 1000L;
+                mPlayer.seekTo( (int) newposition);
+                if (mCurrentTime != null)
+                    mCurrentTime.setText(stringForTime( (int) newposition));
+            }
         }
 
         public void onStopTrackingTouch(SeekBar bar) {
