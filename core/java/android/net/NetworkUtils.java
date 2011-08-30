@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +23,7 @@ import java.net.Inet6Address;
 import java.net.UnknownHostException;
 
 import android.util.Log;
+import android.text.TextUtils;
 
 /**
  * Native methods for managing network interfaces.
@@ -241,4 +243,21 @@ public class NetworkUtils {
      * {@hide}
      */
     public native static boolean runDhcpRenew(String interfaceName, DhcpInfo ipInfo);
+
+    private native static byte[] ipAddrStringToByteArray(String ipAddr)
+      throws UnknownHostException;
+
+    /**{
+     * Helper method to convert the ip addresss in presentation format (string) to InetAddress.
+     * @param ipAddr ip address string in presentation format
+     * @return {@code InetAddress} InetAddress instance
+     * {@hide}
+     */
+    public static InetAddress ipAddrStringToInetAddress(String ipAddr)
+      throws UnknownHostException {
+        if (TextUtils.isEmpty(ipAddr) || ipAddr.equals("0")) {
+            return InetAddress.getByName(ipAddr);
+        }
+        return InetAddress.getByAddress(ipAddrStringToByteArray(ipAddr));
+    }
 }
