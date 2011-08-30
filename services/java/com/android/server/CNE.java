@@ -1675,6 +1675,10 @@ public final class CNE implements ILinkManager {
                     try {
                         LinkInfo linkInfo = new LinkInfo(ipAddr, flBwEst, rlBwEst,
                                 regInfo.activeRat);
+                        if (DBG) {
+                            Log.d(LOCAL_TAG,"DEBUG:: created LinkInfo with ip "
+                                + linkInfo.getIpAddr().getHostAddress());
+                        }
                         regInfo.notificationsSent = regInfo.notificationsSent
                                 | CNE_MASK_ON_LINK_AVAIL_SENT;
                         listener.onLinkAvail(linkInfo);
