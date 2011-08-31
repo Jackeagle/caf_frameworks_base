@@ -395,7 +395,7 @@ status_t AudioSource::read(
 
         int64_t recordDurationUs = 0;
         if ( mFormat == AudioSystem::PCM_16_BIT ){
-            recordDurationUs = (1000000LL * n >> 1) / sampleRate;
+            recordDurationUs = (1000000LL * n >> 1) / (sampleRate * mNumChannels);
         }
         else {
             recordDurationUs = bufferDurationUs( n );
