@@ -52,6 +52,7 @@ AudioPlayer::AudioPlayer(
       mFirstBufferResult(OK),
       mFirstBuffer(NULL),
       mAudioSink(audioSink),
+      mPaused(false),
       mObserver(observer) {
 }
 
@@ -78,6 +79,7 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
             return err;
         }
     }
+    mPaused = false;
 
     // We allow an optional INFO_FORMAT_CHANGED at the very beginning
     // of playback, if there is one, getFormat below will retrieve the
@@ -191,6 +193,7 @@ void AudioPlayer::pause(bool playPendingSamples) {
             mAudioTrack->pause();
         }
     }
+    mPaused = true;
     CHECK(mSource != NULL);
     mSource->pause();
 
@@ -213,6 +216,27 @@ void AudioPlayer::resume() {
 void AudioPlayer::reset() {
     CHECK(mStarted);
 
+    /* AudioSink/AudioTrack needs to be stopped before source stop to ensure any
+     * ensure any intermediate AudioSink callback is returned and callback is
+     * released. This makes sure that all buffers acquired from MediaBufferGroup
+     * are released before closing source stop which destructs MediaBufferGroup.
+     * But there is a case where AudioSink/Track keeps waiting for read call if
+     * session is closed in paused state and there no buffers available with the
+     * component to return. Closing source stop before will make sure to unblock
+     * the read call. Hence stop Sink/Track after source stop if in paused state
+     */
+    if (mPaused == false) {
+        if (mAudioSink.get() != NULL) {
+            mAudioSink->stop();
+            mAudioSink->close();
+        } else {
+            mAudioTrack->stop();
+
+            delete mAudioTrack;
+            mAudioTrack = NULL;
+        }
+    }
+
     // Make sure to release any buffer we hold onto so that the
     // source is able to stop().
 
@@ -223,7 +247,6 @@ void AudioPlayer::reset() {
 
     if (mInputBuffer != NULL) {
         LOGV("AudioPlayer releasing input buffer.");
-
         mInputBuffer->release();
         mInputBuffer = NULL;
     }
@@ -240,15 +263,22 @@ void AudioPlayer::reset() {
         usleep(1000);
     }
 
-    LOGV("Stop/close mAudioSink and mAudioTrack after mSource is successfully de-inited");
-    if (mAudioSink.get() != NULL) {
-        mAudioSink->stop();
-        mAudioSink->close();
-    } else {
-        mAudioTrack->stop();
+    /* There is a case where AudioSink/Track keeps waiting for read call if
+     * session is closed in paused state and there no buffers available with
+     * the component to return. Closing source stop before will make the read to
+     * unblock. Hence stop AudioSink/Track after source stop if in paused state.
+     */
+    if (mPaused == true) {
+        LOGV("Stop/close mAudioSink and mAudioTrack after mSource is successfully de-inited");
+        if (mAudioSink.get() != NULL) {
+            mAudioSink->stop();
+            mAudioSink->close();
+        } else {
+            mAudioTrack->stop();
 
-        delete mAudioTrack;
-        mAudioTrack = NULL;
+            delete mAudioTrack;
+            mAudioTrack = NULL;
+        }
     }
 
     IPCThreadState::self()->flushCommands();

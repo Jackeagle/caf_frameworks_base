@@ -94,6 +94,7 @@ private:
 
     sp<MediaPlayerBase::AudioSink> mAudioSink;
     AwesomePlayer *mObserver;
+    bool mPaused;
 
     static void AudioCallback(int event, void *user, void *info);
     void AudioCallback(int event, void *info);
