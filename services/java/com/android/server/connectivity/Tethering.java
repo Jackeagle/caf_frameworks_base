@@ -1169,6 +1169,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     service.addUpstreamV6Interface(iface);
                 } catch (RemoteException e) {
                     Log.e(TAG, "Unable to append v6 upstream interface");
+                } catch (NullPointerException ex) {
+                    Log.e(TAG, "Unexpected error! service is null");
                 }
             }
 
@@ -1181,6 +1183,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     service.removeUpstreamV6Interface(iface);
                 } catch (RemoteException e) {
                     Log.e(TAG, "Unable to remove v6 upstream interface");
+                } catch (NullPointerException ex) {
+                    Log.e(TAG, "Unexpected error! service is null");
                 }
             }
 

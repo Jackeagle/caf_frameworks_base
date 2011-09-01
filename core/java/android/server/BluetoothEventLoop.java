@@ -706,6 +706,10 @@ class BluetoothEventLoop {
     private void onDiscoverServicesResult(String deviceObjectPath, boolean result) {
         String address = mBluetoothService.getAddressFromObjectPath(deviceObjectPath);
         // We don't parse the xml here, instead just query Bluez for the properties.
+        if (address == null) {
+            Log.e(TAG, "Unexpected error! address is null");
+            return;
+        }
         if (result) {
             mBluetoothService.updateRemoteDevicePropertiesCache(address);
         }
