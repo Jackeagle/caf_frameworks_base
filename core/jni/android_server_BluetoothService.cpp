@@ -1155,7 +1155,11 @@ static jboolean discoverCharacteristicsNative(JNIEnv *env, jobject object,
         const char *c_path = env->GetStringUTFChars(path, NULL);
         int len = env->GetStringLength(path) + 1;
         char *context_path = (char *)calloc(len, sizeof(char));
-        strlcpy(context_path, c_path, len);  // for callback
+        if (context_path != NULL) {
+            strlcpy(context_path, c_path, len);  // for callback
+        } else {
+            return JNI_FALSE;
+        }
 
         LOGV("... Object Path = %s", c_path);
 

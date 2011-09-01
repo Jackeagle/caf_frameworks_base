@@ -125,6 +125,10 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             String action = intent.getAction();
             BluetoothDevice device =
                     intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+            if (device == null) {
+                Log.e(TAG, "Error! device is null");
+                return;
+            }
             if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
                 int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                                                BluetoothAdapter.ERROR);
