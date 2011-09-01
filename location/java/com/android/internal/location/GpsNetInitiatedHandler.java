@@ -82,6 +82,20 @@ public class GpsNetInitiatedHandler {
     public static final int GPS_ENC_SUPL_UCS2 = 3;
     public static final int GPS_ENC_UNKNOWN = -1;
 
+    // This is a lookup table implemented from GSM 7 bit default alphabet and
+    // extension table of 3GPP TS 23.038 / GSM 03.38 standard
+    private static final int lookupForGsmAsciii[] =
+       {64,  163,  36,  165,  232,   233,  249,  236,  242,  199,   10,  216,  248,
+        13,  197,  229, 63,    95,   63,   63,   63,   63,   63,   63,   63,   63,
+        63,    27,  198, 230,  223,  201,   32,   33,   34,   35,  164,   37,   38,
+        39,   40,   41,   42,   43,   44,   45,  46,   47,   48,    49,   50,   51,
+        52,   53,   54,   55,   56,   57,   58,   59,   60,   61,   62,   63,  161,
+        65,   66,   67,   68,   69,   70,   71,   72,   73,   74,   75,   76,   77,
+        78,   79,   80,   81,   82,   83,   84,   85,   86,   87,   88,   89,   90,
+        196,  214,  209,  220,  167,  191,  97,   98,   99,   100,  101,  102, 103,
+        104,  105,  106,  107,  108,  109,  110,  111,  112,  113,  114,  115, 116,
+        117,  118,  119,  120,  121,  122,  228,  246,  241,  252,  224  };
+
     private final Context mContext;
 
     // parent gps location provider
@@ -299,6 +313,7 @@ public class GpsNetInitiatedHandler {
         byte nextChar;
         byte[] stringBuf = new byte[input.length * 2];
         String result = "";
+        int numOfEscapeChars = 0;
 
         while(nPckidx < num_bytes)
         {
@@ -311,6 +326,11 @@ public class GpsNetInitiatedHandler {
              */
             nextChar = (byte) (( (cCurr << nShift) | (cPrev >> (8-nShift)) ) & 0x7F);
             stringBuf[nStridx++] = nextChar;
+            /* Need to count the number of escape characters here in order to properly
+             * format the output string
+             */
+            if(nextChar == 0x1b)
+                numOfEscapeChars++;
 
             /* Special case where the whole of the next 7-bit character fits inside
              ** the current byte of packed data.
@@ -331,9 +351,13 @@ public class GpsNetInitiatedHandler {
 
             cPrev = cCurr;
         }
+        /* We need to convert the data in unpacked 7 bit format into normal ASCII
+         * using a lookup table
+         */
+        byte[] resultIntermediate =  convertGsmIntoAscii(stringBuf) ;
 
         try {
-            result = new String(stringBuf, 0, nStridx, "US-ASCII");
+            result = new String(resultIntermediate, 0, (nStridx - numOfEscapeChars), "US-ASCII");
         }
         catch (UnsupportedEncodingException e)
         {
@@ -341,6 +365,77 @@ public class GpsNetInitiatedHandler {
         }
 
         return result;
+    }
+
+    /**
+     * Converts a byte array containing 7-bit GSM characters into
+     * the equivalent ASCII format as specified in the GSM 7 bit
+     * default alphabet and extension table of 3GPP TS 23.038 / GSM
+     * 03.38 standard
+     *
+     * @param input a 7-bit unpacked byte array
+     * @return equivalent 8-bit ASCII byte array
+     */
+    static byte[] convertGsmIntoAscii(byte input[])
+    {
+        if(input == null)
+        {
+            Log.e(TAG, "Received null input for convertGsmIntoAscii() function");
+            return input;
+        }
+        byte[] stringBuf = new byte[input.length];
+        int nStringIndex = 0;
+        int nInputIndex = 0;
+
+        while(nInputIndex < input.length)
+        {
+            stringBuf[nStringIndex] = (byte) lookupForGsmAsciii[input[nInputIndex++]];
+            if(stringBuf[nStringIndex] == 0x1b)
+            {
+                if(nInputIndex >= input.length)
+                {
+                    Log.e(TAG, "The input is malformed with ESC as last char. Aborting");
+                    return stringBuf;
+                }
+                //We got the escape charchater so we will have to use the extension table
+                //for the character coversion here. Need to get the next byte for processing
+                switch (input[nInputIndex]) {
+                   case    10:
+                       stringBuf[nStringIndex]=12;
+                       break;
+                   case    20:
+                       stringBuf[nStringIndex]='^';
+                       break;
+                   case    40:
+                       stringBuf[nStringIndex]='{';
+                       break;
+                   case    41:
+                       stringBuf[nStringIndex]='}';
+                       break;
+                   case    47:
+                       stringBuf[nStringIndex]='\\';
+                       break;
+                   case    60:
+                       stringBuf[nStringIndex]='[';
+                       break;
+                   case    61:
+                       stringBuf[nStringIndex]='~';
+                       break;
+                   case    62:
+                       stringBuf[nStringIndex]=']';
+                       break;
+                   case    64:
+                       stringBuf[nStringIndex]='|';
+                       break;
+                   default:
+                       stringBuf[nStringIndex]=0;
+                       break;
+                 }
+
+            }
+        nStringIndex++;
+        }
+    return stringBuf;
     }
 
     static String decodeUTF8String(byte[] input)
