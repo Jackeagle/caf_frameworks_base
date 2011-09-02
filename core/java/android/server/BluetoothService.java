@@ -2366,7 +2366,9 @@ public class BluetoothService extends IBluetooth.Stub {
                 mConnectionManager.setScoAudioActive(audioState == BluetoothHeadset.AUDIO_STATE_CONNECTED);
             } else if (BluetoothA2dp.ACTION_SINK_STATE_CHANGED.equals(action)) {
                 BluetoothA2dp btA2dp = new BluetoothA2dp(context);
-                mConnectionManager.setA2dpAudioActive(btA2dp.isPlayingSink());
+                if (btA2dp != null) {
+                    mConnectionManager.setA2dpAudioActive(btA2dp.isPlayingSink());
+                }
             } else if (SAP_ACCESS_ALLOWED_ACTION.equals(action)) {
                 Log.i(TAG, "Received SAP_ACCESS_ALLOWED_ACTION");
                 String address = intent.getStringExtra("address");

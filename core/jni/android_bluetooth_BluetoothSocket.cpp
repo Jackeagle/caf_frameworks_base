@@ -163,12 +163,14 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
         if (type == TYPE_RFCOMM) {
             if (setsockopt(fd, SOL_RFCOMM, RFCOMM_LM, &lm, sizeof(lm))) {
                 LOGV("setsockopt(RFCOMM_LM) failed, throwing");
+                close(fd);
                 jniThrowIOException(env, errno);
                 return;
             }
         } else if (type == TYPE_L2CAP || type == TYPE_EL2CAP) {
             if (setsockopt(fd, SOL_L2CAP, L2CAP_LM, &lm, sizeof(lm))) {
                 LOGV("setsockopt(L2CAP_LM) failed, throwing");
+                close(fd);
                 jniThrowIOException(env, errno);
                 return;
             }
@@ -179,6 +181,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
         sndbuf = RFCOMM_SO_SNDBUF;
         if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf))) {
             LOGV("setsockopt(SO_SNDBUF) failed, throwing");
+            close(fd);
             jniThrowIOException(env, errno);
             return;
         }
@@ -209,6 +212,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
             sndbuf = L2CAP_SO_SNDBUF;
             if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf))) {
                 LOGV("setsockopt(SO_SNDBUF) failed, throwing");
+                close(fd);
                 jniThrowIOException(env, errno);
                 return;
             }
@@ -216,6 +220,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
             rcvbuf = L2CAP_SO_RCVBUF;
             if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf))) {
                 LOGV("setsockopt(SO_RCVBUF) failed, throwing");
+                close(fd);
                 jniThrowIOException(env, errno);
                 return;
            }
