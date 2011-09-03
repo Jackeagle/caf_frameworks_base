@@ -493,6 +493,7 @@ void LPAPlayer::resume() {
             mSeekTimeUs = timePlayed;
             a2dpDisconnectPause = false;
             mAudioSink->start();
+            pthread_cond_signal(&decoder_cv);
             pthread_cond_signal(&a2dp_cv);
         }
         else if (a2dpDisconnectPause) {
@@ -812,6 +813,30 @@ void LPAPlayer::decoderThreadEntry() {
             pmemBuffersResponseQueue.push_back(buf);
             pthread_mutex_unlock(&pmem_response_mutex);
 
+            if (bIsA2DPEnabled && !mAudioSinkOpen) {
+                LOGV("Close Session");
+                if (mAudioSink.get() != NULL) {
+                    mAudioSink->closeSession();
+                    LOGV("mAudioSink close session");
+                } else {
+                    LOGE("close session NULL");
+                }
+
+                sp<MetaData> format = mSource->getFormat();
+                const char *mime;
+                bool success = format->findCString(kKeyMIMEType, &mime);
+                CHECK(success);
+                CHECK(!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW));
+                success = format->findInt32(kKeySampleRate, &mSampleRate);
+                CHECK(success);
+                success = format->findInt32(kKeyChannelCount, &numChannels);
+                CHECK(success);
+                LOGV("Before Audio Sink Open");
+                status_t ret = mAudioSink->open(mSampleRate, numChannels,AudioSystem::PCM_16_BIT, DEFAULT_AUDIOSINK_BUFFERCOUNT);
+                mAudioSink->start();
+                LOGV("After Audio Sink Open");
+            }
+
             if (!bIsA2DPEnabled){
                 pthread_cond_signal(&event_cv);
                 // Make sure the buffer is added to response Q before applying effects
@@ -898,7 +923,7 @@ void LPAPlayer::eventThreadEntry() {
                     LOGV("Posting EOS event to AwesomePlayer");
                     mObserver->postAudioEOS();
                 }
-                if (pmemBuffersResponseQueue.empty() && bIsA2DPEnabled) {
+                if (pmemBuffersResponseQueue.empty() && bIsA2DPEnabled && !mAudioSinkOpen) {
                     LOGV("Close Session");
                     if (mAudioSink.get() != NULL) {
                         mAudioSink->closeSession();
