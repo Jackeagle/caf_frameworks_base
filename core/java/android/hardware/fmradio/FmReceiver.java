@@ -1779,6 +1779,24 @@ public class FmReceiver extends FmTransceiver
    }
 
 /*==============================================================
+   FUNCTION:  getRmssiDelta
+   ==============================================================*/
+   /**
+   *    Gets the value of currently set RMSSI Delta
+   *
+   *    <p>
+   *    This method gets the currently set RMSSI Delta value.
+   *
+   *    <p>
+   */
+   public int getRmssiDelta()
+   {
+      int re =  mControl.getRmssiDelta(sFd);
+      Log.d (TAG, "The value of RMSSI Delta is " + re);
+      return re;
+   }
+
+/*==============================================================
    FUNCTION:  setRmssiDel
    ==============================================================*/
    /**

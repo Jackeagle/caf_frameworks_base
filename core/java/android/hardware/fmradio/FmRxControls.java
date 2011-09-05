@@ -150,6 +150,15 @@ class FmRxControls
    }
 
    /*
+    * Get RMSSI Delta
+    */
+   public int getRmssiDelta(int fd)
+   {
+      int rmssiDel =  FmReceiverJNI.getControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA);
+      return rmssiDel;
+   }
+
+   /*
     * Set RMSSI Delta
     */
    public int setRmssiDel(int fd, int delta)
