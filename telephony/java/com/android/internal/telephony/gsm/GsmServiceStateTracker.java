@@ -61,6 +61,7 @@ import com.android.internal.telephony.RegStateResponse;
 import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
+import com.android.internal.telephony.CommandsInterface.RadioTechnology;
 
 import android.view.KeyEvent;
 
@@ -147,6 +148,10 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     private String curPlmn = null;
     private int curSpnRule = 0;
 
+    private int mDataRadioTechnology = 0;
+    private int mDataSS = 0;
+    private int mTAC = -1;
+
     /** Notification type. */
     static final int CS_ENABLED = 1003;            // Access Control blocks all voice/sms service
     static final int CS_DISABLED = 1004;           // Access Control enables all voice/sms service
@@ -201,6 +206,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         cm.registerForRadioStateChanged(this, EVENT_RADIO_STATE_CHANGED, null);
 
         cm.registerForNetworkStateChanged(this, EVENT_NETWORK_STATE_CHANGED, null);
+        cm.registerForDataNetworkStateChanged(this, EVENT_NETWORK_STATE_CHANGED, null);
         cm.setOnNITZTime(this, EVENT_NITZ_TIME, null);
         cm.setOnSignalStrengthUpdate(this, EVENT_SIGNAL_STRENGTH_UPDATE, null);
         cm.registerForRestrictedStateChanged(this, EVENT_RESTRICTED_STATE_CHANGED, null);
@@ -360,6 +366,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 break;
 
             case EVENT_POLL_STATE_REGISTRATION:
+            case EVENT_POLL_STATE_DATA_REGISTRATION:
             case EVENT_POLL_STATE_OPERATOR:
             case EVENT_POLL_STATE_NETWORK_SELECTION_MODE:
                 ar = (AsyncResult) msg.obj;
@@ -457,13 +464,18 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
 
     public void updateEons() {
         boolean needsUpdate = false;
-        int lac = -1;
+        int lactac = -1;
 
-        if (cellLoc != null) lac = cellLoc.getLac();
         if (phone.mSIMRecords == null) return;
-        needsUpdate = phone.mSIMRecords.updateEons(ss.getOperatorNumeric(), lac);
+
+        lactac = getLacOrTac();
+
+        needsUpdate = phone.mSIMRecords.updateEons(ss.getOperatorNumeric(), lactac);
+        Log.d(LOG_TAG, "[EONS] updateEons() lactac = " + lactac + " , needsUpdate = " +
+                needsUpdate + " , OperatorNumeric = " + ss.getOperatorNumeric());
         if (needsUpdate) {
             String eonsLong = phone.mSIMRecords.getEons();
+            Log.d(LOG_TAG, "[EONS] updateEons() eonsLong = " + eonsLong);
             if (eonsLong != null) {
                 // Update operator long name with EONS Long.
                 ss.setOperatorName(eonsLong, ss.getOperatorAlphaShort(),
@@ -489,6 +501,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                         com.android.internal.R.string.emergency_calls_only).toString();
             }
 
+            Log.d(LOG_TAG, "[EONS] updateSpnDisplay() rule = " + rule + " , spn = " +
+                    spn + " , plmn = " + plmn);
             if (rule != curSpnRule || !TextUtils.equals(spn, curSpn)
                     || !TextUtils.equals(plmn, curPlmn)) {
 
@@ -512,6 +526,19 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             curSpnRule = rule;
             curSpn = spn;
             curPlmn = plmn;
+    }
+
+    private int getLacOrTac() {
+        int lactac = -1;
+        if ((RadioTechnology.getRadioTechFromInt
+                (mDataRadioTechnology) == RadioTechnology.RADIO_TECH_LTE) &&
+                (mDataSS == ServiceState.STATE_IN_SERVICE) &&
+                (mTAC >= 0)) {
+            lactac = mTAC;
+        } else {
+            if (cellLoc != null) lactac = cellLoc.getLac();
+        }
+        return lactac;
     }
 
     /**
@@ -611,6 +638,45 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     newSS.setRadioTechnology(type);
                 break;
 
+                case EVENT_POLL_STATE_DATA_REGISTRATION:
+                    r = (RegStateResponse)ar.result;
+                    states =  r.getValues();
+
+                    regState = 4;     //[0] registrationState
+                    int radioTechnology = -1;      //[3] radioTechnology
+                    int reasonForDenial = 0;       //[4] Denial reason if registrationState = 3
+
+                    if (states.length != 6) {
+                        throw new RuntimeException(
+                                "Warning! Wrong number of parameters returned from "
+                                + "RIL_REQUEST_DATA_REGISTRATION_STATE: expected 6 got "
+                                + states.length);
+                    }
+
+                    try {
+                        if (states[0] != null && states[0].length() > 0) {
+                            regState = Integer.parseInt(states[0]);
+                        }
+                        if (states[3] != null && states[3].length() > 0) {
+                            radioTechnology = Integer.parseInt(states[3]);
+                        }
+                        if (states[4] != null&& states[4].length() > 0) {
+                            reasonForDenial = Integer.parseInt(states[4]);
+                        }
+                        if (states[1] != null&& states[1].length() > 0) {
+                            mTAC = Integer.parseInt(states[1], 16);
+                            Log.d(LOG_TAG, "[EONS] Received TAC = " + mTAC);
+                        }
+                    } catch (NumberFormatException ex) {
+                        Log.w(LOG_TAG, "error parsing DataRegistrationState: " + ex);
+                    }
+
+                mDataRadioTechnology = radioTechnology;
+                mDataSS = regCodeToServiceState(regState);
+                Log.d(LOG_TAG, "[EONS] EVENT_POLL_STATE_DATA_REGISTRATION mDataRadioTechnology ="
+                        + mDataRadioTechnology + " , mDataSS =" + mDataSS + " , mTAC =" + mTAC);
+                break;
+
                 case EVENT_POLL_STATE_OPERATOR:
                     String opNames[] = (String[])ar.result;
 
@@ -701,6 +767,11 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 cm.getRegistrationState(
                     obtainMessage(
                         EVENT_POLL_STATE_REGISTRATION, pollingContext));
+
+                pollingContext[0]++;
+                cm.getDataRegistrationState(
+                    obtainMessage(
+                        EVENT_POLL_STATE_DATA_REGISTRATION, pollingContext));
 
                 pollingContext[0]++;
                 cm.getNetworkSelectionMode(
@@ -847,10 +918,6 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             phone.notifyServiceStateChanged(ss);
         }
 
-        if (hasChanged) {
-            updateSpnDisplay();
-        }
-
         if (hasRoamingOn) {
             roamingOnRegistrants.notifyRegistrants();
         }
@@ -871,9 +938,8 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 updateSpnDisplay();
                 break;
             case SIMRecords.EVENT_EONS:
-                int lac = -1;
-                if (cellLoc != null) lac = cellLoc.getLac();
-                boolean needsSpnUpdate = phone.mSIMRecords.updateEons(ss.getOperatorNumeric(), lac);
+                int lactac = getLacOrTac();
+                boolean needsSpnUpdate = phone.mSIMRecords.updateEons(ss.getOperatorNumeric(), lactac);
                 if (needsSpnUpdate) {
                     updateSpnDisplay();
                 }
