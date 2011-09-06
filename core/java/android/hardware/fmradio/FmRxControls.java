@@ -42,6 +42,8 @@ class FmRxControls
    static final int SEEK_BACKWARD = 1;
    static final int SCAN_FORWARD = 2;
    static final int SCAN_BACKWARD = 3;
+   static final int FM_DIGITAL_PATH = 0;
+   static final int FM_ANALOG_PATH  = 1;
    private int mSrchMode;
    private int mScanTime;
    private int mSrchDir;
@@ -76,6 +78,7 @@ class FmRxControls
    private static final int V4L2_CID_PRIVATE_TAVARUA_AF_JUMP = V4L2_CID_PRIVATE_BASE + 27;
    private static final int V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA = V4L2_CID_PRIVATE_BASE + 28;
    private static final int V4L2_CID_PRIVATE_TAVARUA_HLSI = V4L2_CID_PRIVATE_BASE + 29;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SET_AUDIO_PATH = V4L2_CID_PRIVATE_BASE + 41;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
    private static final int V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900;
@@ -91,6 +94,7 @@ class FmRxControls
    public void fmOn(int fd, int device) {
       int re;
       FmReceiverJNI.setControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_STATE, device );
+      setAudioPath(fd, false);
       re = FmReceiverJNI.SetCalibrationNative(fd);
       if (re != 0)
          Log.d(TAG,"Calibration failed");
@@ -168,6 +172,20 @@ class FmRxControls
    public int setRmssiDel(int fd, int delta)
    {
       int re =  FmReceiverJNI.setControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA, delta);
+      return re;
+   }
+
+   /*
+    * Set the audio path as analog/digital
+    */
+   public int setAudioPath(int fd, boolean value)
+   {
+      int mode;
+      if (value)
+         mode = FM_ANALOG_PATH;
+      else
+         mode = FM_DIGITAL_PATH;
+      int re =  FmReceiverJNI.setControlNative(fd, V4L2_CID_PRIVATE_TAVARUA_SET_AUDIO_PATH, mode);
       return re;
    }
 
