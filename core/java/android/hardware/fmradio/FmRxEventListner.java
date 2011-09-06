@@ -28,12 +28,12 @@
 
 package android.hardware.fmradio;
 import android.hardware.fmradio.FmReceiver;
+import android.hardware.fmradio.FmTransceiver;
 
 import android.util.Log;
 
 
 class FmRxEventListner {
-
 
     private final int EVENT_LISTEN = 1;
 
@@ -79,10 +79,18 @@ class FmRxEventListner {
                             Log.d(TAG, "Received <" +buff[index]+ ">" );
 
                             switch(buff[index]){
-
                             case 0:
                                 Log.d(TAG, "Got READY_EVENT");
-                                cb.FmRxEvEnableReceiver();
+                                if(FmTransceiver.getFMPowerState() == FmTransceiver.FMRxStarting) {
+                                    /*Set the state as FMRxOn */
+                                    FmTransceiver.setFMPowerState(FmTransceiver.FMRxOn);
+                                    cb.FmRxEvEnableReceiver();
+                                }
+                                else if (FmTransceiver.getFMPowerState() == FmTransceiver.FMTurningOff) {
+                                    /*Set the state as FMOff */
+                                    FmTransceiver.setFMPowerState(FmTransceiver.FMOff);
+                                    cb.FmRxEvDisableReceiver();
+                                }
                                 break;
                             case 1:
                                 Log.d(TAG, "Got TUNE_EVENT");
