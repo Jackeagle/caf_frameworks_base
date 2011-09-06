@@ -125,10 +125,6 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             String action = intent.getAction();
             BluetoothDevice device =
                     intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-            if (device == null) {
-                Log.e(TAG, "Error! device is null");
-                return;
-            }
             if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
                 int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                                                BluetoothAdapter.ERROR);
@@ -143,6 +139,10 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             } else if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
                 int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                                                    BluetoothDevice.ERROR);
+                if (device == null) {
+                    Log.e(TAG, "Error! device is null");
+                    return;
+                }
                 switch(bondState) {
                 case BluetoothDevice.BOND_BONDED:
                     if (getSinkPriority(device) == BluetoothA2dp.PRIORITY_UNDEFINED) {
@@ -155,6 +155,10 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 }
             } else if (action.equals(BluetoothDevice.ACTION_ACL_DISCONNECTED)) {
                 synchronized (this) {
+                    if (device == null) {
+                        Log.e(TAG, "Error! device is null");
+                        return;
+                    }
                     if (mAudioDevices.containsKey(device)) {
                         int state = mAudioDevices.get(device);
                         handleSinkStateChange(device, state, BluetoothA2dp.STATE_DISCONNECTED);
