@@ -274,7 +274,6 @@ public class FmReceiver extends FmTransceiver
    private static final int FM_RX_RSSI_LEVEL_STRONG      = -96;
    private static final int FM_RX_RSSI_LEVEL_VERY_STRONG = -90;
 
-
    /**
     * Constructor for the receiver Object
     */
@@ -407,6 +406,7 @@ public class FmReceiver extends FmTransceiver
       /* Enable the Transceiver common for both
          receiver and transmitter
          */
+      setFMPowerState(FMRxStarting);
       status = super.enable(configSettings, FmTransceiver.FM_RX);
 
       if( status == true ) {
@@ -416,6 +416,7 @@ public class FmReceiver extends FmTransceiver
       }
       else {
          status = false;
+         setFMPowerState(FMOff);
       }
       return status;
    }
@@ -440,15 +441,13 @@ public class FmReceiver extends FmTransceiver
    */
    public boolean disable(){
       boolean status;
-      //
+      setFMPowerState(FMTurningOff);
       status = unregisterClient();
-
       if( status == true ) {
           status = super.disable();
       }
-      else {
+      else
           status = false;
-      }
 
       return status;
    }
