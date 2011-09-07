@@ -133,7 +133,7 @@ private:
         inline status_t getStatus() const {
             return mBufferHeap.heap!=0 ? NO_ERROR : NO_INIT;
         }
-        inline const NativeBuffer& getBuffer() const {
+        inline NativeBuffer& getBuffer() {
             return mNativeBuffer;
         }
         /* return the current offset */
