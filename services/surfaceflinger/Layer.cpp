@@ -378,7 +378,11 @@ void Layer::onDraw(const Region& clip) const
         return;
     }
 
-    drawWithOpenGL(clip, tex);
+    if (mFlags & DisplayHardware::SLOW_CONFIG)
+        drawWithOpenGL(clip, tex);
+    else
+        drawWithOpenGLOptimized(clip, tex);
+
     const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
     if(hw.getDumpframe()){
        const_cast<DumpFrame&>(mDumpFrame).dump(this, clip);
