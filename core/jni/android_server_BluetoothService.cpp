@@ -988,6 +988,15 @@ static jboolean setDevicePropertyBooleanNative(JNIEnv *env, jobject object,
 #endif
 }
 
+static jboolean setDevicePropertyIntegerNative(JNIEnv *env, jobject object,
+                                                     jstring path, jstring key, jint value) {
+#ifdef HAVE_BLUETOOTH
+    return setDevicePropertyNative(env, object, path, key,
+                                        (void *)&value, DBUS_TYPE_UINT32);
+#else
+    return JNI_FALSE;
+#endif
+}
 
 static jboolean createDeviceNative(JNIEnv *env, jobject object,
                                                 jstring address) {
@@ -1524,6 +1533,9 @@ static JNINativeMethod sMethods[] = {
             (void *)cancelPairingUserInputNative},
     {"setDevicePropertyBooleanNative", "(Ljava/lang/String;Ljava/lang/String;I)Z",
             (void *)setDevicePropertyBooleanNative},
+    {"setDevicePropertyIntegerNative", "(Ljava/lang/String;Ljava/lang/String;I)Z",
+             (void *)setDevicePropertyIntegerNative},
+
     {"createDeviceNative", "(Ljava/lang/String;)Z", (void *)createDeviceNative},
     {"discoverServicesNative", "(Ljava/lang/String;Ljava/lang/String;)Z", (void *)discoverServicesNative},
     {"addRfcommServiceRecordNative", "(Ljava/lang/String;JJS)I", (void *)addRfcommServiceRecordNative},

@@ -602,6 +602,21 @@ public final class BluetoothDevice implements Parcelable {
     }
 
     /**
+     * Set the Bluetooth class of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param classOfDevice the Bluetooth COD value to be set
+     * @hide
+     */
+    public boolean setBluetoothClass(int classOfDevice) {
+        try {
+            return sService.setBluetoothClass(mAddress, classOfDevice);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+
+    /**
      * Get trust state of a remote device.
      * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
      * @hide
