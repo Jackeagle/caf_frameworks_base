@@ -30,6 +30,8 @@
 
 package android.telephony;
 
+import com.android.internal.telephony.gsm.SmsCbHeader;
+
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -150,7 +152,26 @@ public class GsmEmergencyMessage implements EmergencyMessage{
     }
     public static GsmEmergencyMessage createFromSmsCbMessage(SmsCbMessage src) {
         GsmEmergencyMessage message = new GsmEmergencyMessage();
-        message.mBody = src.getMessageBody();
+        if (src.getFormat() == SmsCbHeader.FORMAT_ETWS_PRIMARY) {
+            // Etws primary message doesn't have text associated with it
+            // so populate text with type of etws message.
+            switch (src.getMessageIdentifier()) {
+                case ETWS_EARTHQUAKE:
+                    message.mBody = "EARTHQUAKE";
+                    break;
+                case ETWS_TSUNAMI:
+                    message.mBody = "TSUNAMI";
+                    break;
+                case ETWS_EARTHQUAKE_AND_TSUNAMI:
+                    message.mBody = "EARTHQUAKE and TSUNAMI";
+                    break;
+                default:
+                    message.mBody = "ETWS Primary message";
+                    break;
+            }
+        } else {
+            message.mBody = src.getMessageBody();
+        }
         message.mMessageId = src.getMessageIdentifier();
         message.mLanguageCode = src.getLanguageCode();
         return message;

@@ -237,6 +237,14 @@ public class SmsCbMessage {
     }
 
     /**
+     * Get the format of this message
+     *
+     * @return message format
+     */
+    public int getFormat() {
+        return mHeader.format;
+    }
+    /**
      * Parse and unpack the body text according to the encoding in the DCS.
      * After completing successfully this method will have assigned the body
      * text into mBody, and optionally the language code into mLanguage

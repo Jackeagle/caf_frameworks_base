@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -529,6 +530,31 @@ public class IccSmsInterfaceManager extends ISms.Stub {
             mConfigList.clear();
         }
         protected void addRange(int startId, int endId, boolean selected) {
+            Iterator<SmsBroadcastConfigInfo> itr = mConfigList.iterator();
+            while (itr.hasNext()) {
+                SmsBroadcastConfigInfo curRange = (SmsBroadcastConfigInfo) itr.next();
+                /*
+                 *  If new range requested is already present then
+                 *  - If 'disable' the range then remove the entry from the list.
+                 *  - If  'selected' value is 'enabled' and not same as existing curr range's val,
+                 *    then replace with enable (true)
+                 *  - If 'enable' the range (and 'selected' vals are also same) then simply return
+                 *    and not create a dup entry.
+                 */
+                if(startId == curRange.getFromServiceId() && endId == curRange.getToServiceId()) {
+                    if(!selected) {
+                        /*
+                         * This explicit removal is to keep it consistent
+                         * with old impl. Otherwise, just replacing the 'selected' value
+                         * should suffice.
+                         */
+                        mConfigList.remove(curRange);
+                    } else if (selected != curRange.isSelected()) {
+                        curRange.setSelected(selected);
+                    }
+                    return;
+                }
+            }
             mConfigList.add(new SmsBroadcastConfigInfo(startId, endId,
                         SMS_CB_CODE_SCHEME_MIN, SMS_CB_CODE_SCHEME_MAX, selected));
         }
