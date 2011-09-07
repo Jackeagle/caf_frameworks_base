@@ -1441,6 +1441,25 @@ public class BluetoothService extends IBluetooth.Stub {
         return getProperty("Name");
     }
 
+    public synchronized String getCOD() {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        return getProperty("Class");
+    }
+
+    public boolean setBluetoothClass(String address, int classOfDevice) {
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
+            mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
+                    "Need BLUETOOTH_ADMIN permission");
+            return false;
+        }
+
+        if (!isEnabledInternal()) return false;
+
+        return setDevicePropertyIntegerNative(getObjectPathFromAddress(address), "Class",
+                classOfDevice);
+    }
+
+
     /**
      * Returns the user-friendly name of a remote device.  This value is
      * returned from our local cache, which is updated when onPropertyChange
@@ -3095,6 +3114,9 @@ public class BluetoothService extends IBluetooth.Stub {
 
     private native boolean setDevicePropertyBooleanNative(String objectPath, String key,
             int value);
+    private native boolean setDevicePropertyIntegerNative(String objectPath, String key,
+            int value);
+
     private native boolean createDeviceNative(String address);
     /*package*/ native boolean discoverServicesNative(String objectPath, String pattern);
 
