@@ -319,6 +319,8 @@ LayerBuffer::Buffer::Buffer(const ISurface::BufferHeap& buffers,
     src.img.format  = buffers.format;
     src.img.base    = (void*)(intptr_t(buffers.heap->base()) + offset);
     src.img.handle  = 0;
+    src.img.horiz_padding =buffers.hor_stride-buffers.w;
+    src.img.vert_padding =0;
 
     gralloc_module_t const * module = LayerBuffer::getGrallocModule();
     if (module && module->perform) {
@@ -638,7 +640,26 @@ void LayerBuffer::BufferSource::onDraw(const Region& clip) const
     }
 
     status_t err = NO_ERROR;
-    NativeBuffer src(ourBuffer->getBuffer());
+    NativeBuffer& src=ourBuffer->getBuffer();
+    if(src.img.format == HAL_PIXEL_FORMAT_YV12) {
+        /* converting yuv buffer using copybit stretch */
+        copybit_device_t* copybit = mLayer.mBlitEngine;
+        if (copybit ) {
+            region_iterator clip(Region(Rect(src.crop.r, src.crop.b)));
+            copybit_image_t cimage(src.img);
+            copybit->set_parameter(copybit, COPYBIT_TRANSFORM, 0);
+            copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 0xFF);
+            copybit->set_parameter(copybit, COPYBIT_DITHER, COPYBIT_ENABLE);
+            int err = copybit->stretch(copybit, &cimage, &src.img, &src.crop, &src.crop, &clip);
+            if(err <0){
+                LOGE(" copybit stretch for color conversion failed ");
+            }
+            else {
+                src.img.format =HAL_PIXEL_FORMAT_YCrCb_420_SP;
+            }
+        }
+    }
+
     const Rect transformedBounds(mLayer.getTransformedBounds());
 
 #if defined(EGL_ANDROID_image_native_buffer)
