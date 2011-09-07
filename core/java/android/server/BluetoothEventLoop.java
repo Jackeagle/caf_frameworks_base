@@ -357,6 +357,8 @@ class BluetoothEventLoop {
                     new BluetoothClass(Integer.valueOf(propValues[1])));
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
         } else if (name.equals("Connected")) {
+            Log.d(TAG, "Device property Connected: " + propValues[1]);
+
             mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
             Intent intent = null;
             if (propValues[1].equals("true")) {
@@ -408,7 +410,7 @@ class BluetoothEventLoop {
             }
             mBluetoothService.setRemoteDeviceProperty(address, name, services);
 
-            mBluetoothService.sendGattIntent(address);
+            mBluetoothService.sendGattIntent(address, BluetoothDevice.GATT_RESULT_SUCCESS);
 
         } else if (name.equals("Paired")) {
             if (propValues[1].equals("true")) {
@@ -754,6 +756,7 @@ class BluetoothEventLoop {
             // fall-through
         case CREATE_DEVICE_FAILED:
             mBluetoothService.sendUuidIntent(address);
+            mBluetoothService.sendGattIntent(address, BluetoothDevice.GATT_RESULT_FAIL);
             mBluetoothService.makeServiceChannelCallbacks(address);
             break;
         case CREATE_DEVICE_SUCCESS:

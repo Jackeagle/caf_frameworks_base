@@ -386,6 +386,23 @@ public final class BluetoothDevice implements Parcelable {
      */
     public static final String EXTRA_GATT = "android.bluetooth.device.extra.GATT";
     /**
+     * Used as an extra field in ACTION_GATT intent.
+     * Contains the result code for GATT service discovery.
+     * @hide
+     */
+    public static final String EXTRA_GATT_RESULT = "android.bluetooth.device.extra.GATT_RESULT";
+
+    /** A GATT service discovery was successful.
+     * @hide */
+    public static final int GATT_RESULT_SUCCESS = 0;
+    /** A GATT service discovery failed due to timeout.
+     * @hide */
+    public static final int GATT_RESULT_TIMEOUT = 1;
+    /** A GATT service discovery failed.
+     * @hide */
+    public static final int GATT_RESULT_FAIL = 2;
+
+    /**
      * Used as an extra field for SAP state change events.
      * @hide
      */

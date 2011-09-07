@@ -666,7 +666,7 @@ public class BluetoothService extends IBluetooth.Stub {
             case MESSAGE_GATT_INTENT:
                 address = (String)msg.obj;
                 if (address != null && mGattIntentTracker.containsKey(address)){
-                    sendGattIntent(address);
+                    sendGattIntent(address, BluetoothDevice.GATT_RESULT_TIMEOUT);
                 }
                 break;
             case MESSAGE_START_SAP_SERVER:
@@ -3077,7 +3077,7 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
    /* Broadcast the GATT services intent */
-    /*package*/ synchronized void sendGattIntent(String address) {
+    /*package*/ synchronized void sendGattIntent(String address, int result) {
         Intent intent = new Intent(BluetoothDevice.ACTION_GATT);
         ParcelUuid[] uuids = null;
         String[] gattPath;
@@ -3113,6 +3113,7 @@ public class BluetoothService extends IBluetooth.Stub {
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
                 intent.putExtra(BluetoothDevice.EXTRA_UUID, uuids[i]);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT, gattPath);
+                intent.putExtra(BluetoothDevice.EXTRA_GATT_RESULT, result);
                 mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
             }
         } else {
@@ -3135,6 +3136,7 @@ public class BluetoothService extends IBluetooth.Stub {
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
                 intent.putExtra(BluetoothDevice.EXTRA_UUID, serviceUuid);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT, gattServicePaths[i]);
+                intent.putExtra(BluetoothDevice.EXTRA_GATT_RESULT, result);
                 mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
             }
         }
