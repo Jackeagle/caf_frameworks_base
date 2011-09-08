@@ -85,6 +85,7 @@ enum ColorConvertFormat {
 };
 
 enum ColorConvertFlags {
+    COLOR_CONVERT_ALIGN_NONE = 1,
     COLOR_CONVERT_CENTER_OUTPUT = 1<<1,
     COLOR_CONVERT_ALIGN_16 =   1<<4,
     COLOR_CONVERT_ALIGN_2048 = 1<<11,
