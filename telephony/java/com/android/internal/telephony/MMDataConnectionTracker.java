@@ -134,6 +134,13 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
      private static final int DATA_CONNECTION_ACTIVE_PH_LINK_DOWN = 1;
      private static final int DATA_CONNECTION_ACTIVE_PH_LINK_UP = 2;
 
+    /**
+     * Partial Status codes for activeDCs
+     */
+     private static final int PARTIAL_STATUS_ADDR_ADDED = 0;
+     private static final int PARTIAL_STATUS_ADDR_REMOVED = 1;
+     private static final int PARTIAL_STATUS_ADDR_UPDATED = 2;
+
     // ServiceStateTracker to keep track of network service state
     DataServiceStateTracker mDsst;
 
@@ -165,6 +172,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
     // if this property is set to false, android is not going to issue ANY ipv6 data calls.
     private static final boolean SUPPORT_IPV6 = SystemProperties.getBoolean(
             "persist.telephony.support_ipv6", true);
+
+    // if this property is set to false, android is not going to issue ANY ipv4v6 data calls.
+    private static final boolean SUPPORT_IPV4V6 = SystemProperties.getBoolean(
+            "persist.telephony.support_dual", false);
 
     /*
      * If this property is set to true then android assumes that multiple PDN is
@@ -344,6 +355,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         logv("SUPPORT_IPV4 = " + SUPPORT_IPV4);
         logv("SUPPORT_IPV6 = " + SUPPORT_IPV6);
+        logv("SUPPORT_IPV4V6 = " + SUPPORT_IPV4V6);
         logv("SUPPORT_MPDN = " + SUPPORT_MPDN);
         logv("SUPPORT_MPDN_SERVICE_ARBITRATION = " + SUPPORT_MPDN_SERVICE_ARBITRATION);
         logv("SUPPORT_OMH = " + mDpt.isOmhEnabled());
@@ -767,6 +779,10 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         int activeDataCallCount = 0;
 
+        int ipResultCode = 0;
+
+        int gwResultCode = 0;
+
         for (DataConnection dc: mDataConnectionList) {
 
             if (dc.isActive() == false) {
@@ -802,15 +818,21 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
                 // Active call disconnected
                 activeDataCallCount--;
-            } else if (isIpAddrChanged(activeDC, dc)) {
-                /*
-                * TODO: Handle Gateway / DNS sever IP changes in a
-                *       similar fashion and to be  wrapped in a generic function.
-                */
-                logi("Ip address change detected on " + dc.toString());
-                logi("new IpAddr = " + activeDC.addresses + ",old IpAddr" + dc.getIpAddress());
+            } else if (((ipResultCode = dc.compareAddresses(activeDC.addresses))
+                    != dc.IPV_ADDR_NOCHANGE) ||
+                    ((gwResultCode = dc.compareGwAddresses(activeDC.gateways))
+                            != dc.IPV_ADDR_NOCHANGE)) {
+                handleIPAddressChange(dc, activeDC, ipResultCode);
+                handleGwAddressChange(dc, activeDC, gwResultCode);
 
-                tryDisconnectDataCall(dc, REASON_DATA_CONN_PROP_CHANGED);
+                if (((ipResultCode & dc.IPV4_ADDR_REMOVED) != 0) ||
+                        ((ipResultCode & dc.IPV6_ADDR_REMOVED) != 0)) {
+                    /*
+                     *  If either v4 or v6 address has been  removed , then updateDataConnections()
+                     *  will take care of retrying / setting up call again on appropriate ipv.
+                     */
+                    updateDataConnections(REASON_DATA_CONN_PROP_CHANGED);
+                }
             } else {
                 switch (activeDC.active) {
                     /*
@@ -916,17 +938,80 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         return null;
     }
 
-    private boolean isIpAddrChanged(DataCallState activeDC, DataConnection dc ) {
-        boolean ipaddrChanged = false;
-        /* If old ip address is empty or NULL, do not treat it an as Ip Addr change.
-         * The data call is just setup we are receiving the IP address for the first time
-         */
-        if (!TextUtils.isEmpty(dc.getIpAddress())) {
-            if ((!(activeDC.addresses.split("/")[0]).equals(dc.getIpAddress()))) {
-                ipaddrChanged = true;
-            }
+    private void handleIPAddressChange(DataConnection dc, DataCallState activeDC, int flags ) {
+
+        logi("handleIPAddressChange:  " + activeDC.addresses + " flags " + flags);
+
+        if(flags == dc.IPV_ADDR_NOCHANGE) {
+            return;
         }
-        return ipaddrChanged;
+
+        if (((flags & dc.IPV4_ADDR_UPDATED) != 0) ||
+                ((flags & dc.IPV6_ADDR_UPDATED) != 0)) {
+            // One of the IP addresses or both have got modified, disconnect
+            logi("tryDisconnectDataCall...");
+            tryDisconnectDataCall(dc, REASON_DATA_CONN_PROP_CHANGED);
+            return;
+        }
+
+        // Update the addresses before notifying upper layers of ip change
+        dc.updateIPAddresses(activeDC.addresses);
+        if ((flags & dc.IPV4_ADDR_ADDED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET,
+                    REASON_DATA_NETWORK_ATTACH,PARTIAL_STATUS_ADDR_ADDED);
+        }
+        if ((flags & dc.IPV6_ADDR_ADDED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET6,
+                    REASON_DATA_NETWORK_ATTACH,PARTIAL_STATUS_ADDR_ADDED);
+        }
+        if ((flags & dc.IPV4_ADDR_REMOVED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET,
+                    REASON_NETWORK_DISCONNECT,PARTIAL_STATUS_ADDR_REMOVED);
+        }
+        if ((flags & dc.IPV6_ADDR_REMOVED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET6,
+                    REASON_NETWORK_DISCONNECT,PARTIAL_STATUS_ADDR_REMOVED);
+        }
+        return;
+    }
+
+    private void handleGwAddressChange(DataConnection dc, DataCallState activeDC, int flags ) {
+        logi("handleGwAddressChange:  " + activeDC.gateways + " flags " + flags);
+
+        if(flags == dc.IPV_ADDR_NOCHANGE) {
+            return;
+        }
+
+        if (((flags & dc.IPV4_ADDR_UPDATED) != 0) ||
+                ((flags & dc.IPV6_ADDR_UPDATED) != 0)) {
+            // One of the Gw addresses or both have got modified, disconnect
+            /*
+             *  TODO : Need more graceful way to perform route updates,
+             *  than doing disconnect and re-connect
+             */
+            logi("tryDisconnectDataCall...");
+            tryDisconnectDataCall(dc, REASON_DATA_CONN_PROP_CHANGED);
+            return;
+        }
+
+        // Update the addresses before notifying upper layers of GW change
+        dc.updateGatewayAddresses(activeDC.gateways);
+        if ((flags & dc.IPV4_ADDR_ADDED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET,
+                    REASON_DATA_NETWORK_ATTACH,PARTIAL_STATUS_ADDR_ADDED);
+        }
+        if ((flags & dc.IPV6_ADDR_ADDED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET6,
+                    REASON_DATA_NETWORK_ATTACH,PARTIAL_STATUS_ADDR_ADDED);
+        }
+        if ((flags & dc.IPV4_ADDR_REMOVED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET,
+                    REASON_NETWORK_DISCONNECT,PARTIAL_STATUS_ADDR_REMOVED);
+        }
+        if ((flags & dc.IPV6_ADDR_REMOVED) != 0) {
+            notifyPartialDcStatus(dc,IPVersion.INET6,
+                    REASON_NETWORK_DISCONNECT,PARTIAL_STATUS_ADDR_REMOVED);
+        }
     }
 
     @Override
@@ -936,8 +1021,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
 
         CallbackData c = (CallbackData) ar.userObj;
 
+        DataConnectionFailCause cause = DataConnectionFailCause.NONE;
+
         /*
          * If setup is successful,  ar.result will contain the MMDataConnection instance
+         *     with possible partial failure cause.
          * if setup failure, ar.result will contain the failure reason.
          */
         if (ar.exception == null) { /* connection is up!! */
@@ -947,12 +1035,20 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             logi("  data profile  : " + c.dp.toShortString());
             logi("  service type  : " + c.ds);
             logi("  data call id  : " + c.dc.cid);
-            logi("  ip version    : " + c.ipv);
-            logi("  ip address/gw : " + c.dc.getIpAddress()+"/"+c.dc.gatewayAddress);
+            logi("  bearer type   : " + c.dc.getBearerType());
+            logi("  ip address/gw : " + c.dc.ipAddrtoString()+"/"+c.dc.gwAddrtoString());
             logi("  dns           : " + Arrays.toString(c.dc.getDnsServers()));
+            if (ar.result != null) {
+                cause = (DataConnectionFailCause) (ar.result);
+                if (cause != null && cause.isPartialFailure()) {
+                    logi("  partial fail cause    : " + cause);
+                }
+            }
             logi("--------------------------");
 
             handleConnectedDc(c.dc, c.reason);
+
+            handlePartialConnectedDc(c, cause);
 
             //we might have other things to do, so call update updateDataConnections() again.
             updateDataConnections(c.reason);
@@ -970,13 +1066,11 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         mDpt.setState(State.FAILED, c.ds, c.ipv);
         notifyDataConnection(c.ds, c.ipv, c.reason);
 
-        DataConnectionFailCause cause = (DataConnectionFailCause) (ar.result);
-
         logi("--------------------------");
         logi("Data call setup : FAILED");
         logi("  data profile  : " + c.dp.toShortString());
         logi("  service type  : " + c.ds);
-        logi("  ip version    : " + c.ipv);
+        logi("  bearer type   : " + c.dc.getBearerType());
         logi("  fail cause    : " + cause);
         logi("--------------------------");
 
@@ -1416,6 +1510,64 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
+    private void notifyPartialDcStatus(DataConnection dc, IPVersion ipv,
+            String reason, int  statusCode) {
+        logv("notifyPartialDcStatus() : " + dc + ", IPVersion :" +
+                ipv + " reason :" + reason + " statusCode = " + statusCode);
+
+        for (DataServiceType ds : DataServiceType.values()) {
+            if (mDpt.getActiveDataConnection(ds, ipv) == dc) {
+                switch (statusCode) {
+                    case PARTIAL_STATUS_ADDR_ADDED:
+                        if (dc.getDataProfile().canHandleServiceType(ds))
+                            mDpt.setServiceTypeAsActive(ds, dc, ipv);
+                        break;
+                    case PARTIAL_STATUS_ADDR_REMOVED:
+                        mDpt.setServiceTypeAsInactive(ds, ipv);
+                        break;
+                    case PARTIAL_STATUS_ADDR_UPDATED:
+                        break;
+                    default:
+                          break;
+                }
+                notifyDataConnection(ds, ipv, reason);
+            }
+        }
+    }
+
+    private void handlePartialConnectedDc(CallbackData c, DataConnectionFailCause cause) {
+            if (cause == DataConnectionFailCause.ONLY_IPV4_ALLOWED) {
+                /*
+                 * Since only IPV4 call is active and partial fail
+                 * cause code is 'only ipv4 allowed', do not attempt
+                 * ipv6 call again on this APN on this n/w technology
+                 */
+                disableDataProfile(c.dp, IPVersion.INET6);
+            } else if (cause == DataConnectionFailCause.ONLY_IPV6_ALLOWED) {
+                /*
+                 * Since only IPV6 call is active and partial fail
+                 * cause code is 'only ipv6 allowed' do not attempt
+                 * ipv4 call again on this APN on this n/w technology
+                 */
+                disableDataProfile(c.dp, IPVersion.INET);
+            } else if (cause == DataConnectionFailCause.ONLY_SINGLE_BEARER_ALLOWED) {
+                /*
+                 * TODO: Say, if ipv4 call is active and partial fail
+                 * cause code is 'single bearer only allowed',
+                 * attempt ipv6 call again on this APN
+                 * and vice versa
+                 */
+            }
+    }
+
+    private void disableDataProfile(DataProfile dp, IPVersion ipv) {
+        dp.setWorking(false, ipv);
+        for (DataServiceType ds : DataServiceType.values()) {
+            mDpt.setServiceTypeAsInactive(ds, ipv);
+            mDpt.setState(State.FAILED, ds, ipv);
+        }
+    }
+
     private void handleConnectedDc(DataConnection dc, String reason) {
 
         logv("handleConnectedDc() : " + dc);
@@ -1577,8 +1729,8 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 sb.append("cid = " + dc.cid);
                 sb.append(", state = "+dc.getStateAsString());
                 sb.append(", bearerType = "+dc.getBearerType());
-                sb.append(", ipaddress = "+dc.getIpAddress());
-                sb.append(", gw="+dc.getGatewayAddress());
+                sb.append(", ipaddress = "+dc.ipAddrtoString());
+                sb.append(", gw="+dc.gwAddrtoString());
                 sb.append(", dns="+ Arrays.toString(dc.getDnsServers()));
                 logv(sb.toString());
             }
@@ -1687,8 +1839,22 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         c.ipv = ipv;
         c.reason = reason;
 
-        //TODO: handle BearerType.IPV4V6
+        /*
+         * Decide the bearer type to use..criterion is as follows:
+         *
+         * 1. if IPV4 & IPV6 are both not active and if we have a data profile
+         * that supports dual bearer then set bearer type as dual bearer.
+         * 2. else just use the bearer type corresponding to ip version that
+         * was requested.
+         */
+
         BearerType b = ipv == IPVersion.INET ? BearerType.IP : BearerType.IPV6;
+        if (mDpt.isServiceTypeActive(ds, IPVersion.INET) == false
+                && mDpt.isServiceTypeActive(ds, IPVersion.INET6) == false
+                && dp.getBearerType() == BearerType.IPV4V6
+                && SUPPORT_IPV4V6) {
+            b = BearerType.IPV4V6;
+        }
 
         dc.connect(getRadioTechnology(), dp, b, obtainMessage(EVENT_CONNECT_DONE, c));
         return true;

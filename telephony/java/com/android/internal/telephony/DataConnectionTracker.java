@@ -525,7 +525,7 @@ public abstract class DataConnectionTracker extends Handler {
 
         DataConnection dc = mDpt.getActiveDataConnection(serviceType, ipv);
         if (dc != null) {
-            return dc.getGatewayAddress();
+            return dc.getGatewayAddress(ipv);
         }
 
         return null;
@@ -559,7 +559,7 @@ public abstract class DataConnectionTracker extends Handler {
 
         DataConnection dc = mDpt.getActiveDataConnection(serviceType, ipv);
         if (dc != null) {
-            return dc.getIpAddress();
+            return dc.getIpAddress(ipv);
         }
 
         return null;

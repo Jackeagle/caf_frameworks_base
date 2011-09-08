@@ -26,8 +26,14 @@ import com.android.internal.telephony.Phone.BearerType;
 import com.android.internal.telephony.QosSpec;
 import com.android.internal.util.HierarchicalState;
 import com.android.internal.util.HierarchicalStateMachine;
+import com.android.internal.net.IPVersion;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 import android.content.Context;
+import android.net.NetworkUtils;
 import android.os.AsyncResult;
 import android.os.Looper;
 import android.os.Message;
@@ -205,8 +211,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     protected DataProfile mDataProfile;
     protected BearerType mBearerType;
     protected String interfaceName;
-    protected String ipAddress;
-    protected String gatewayAddress;
+    protected String[] mIpAddresses;
+    protected String[] mGatewayAddress;
     protected String[] dnsServers;
     protected ArrayList<Integer> mQosFlowIds = new ArrayList<Integer>();
     protected long createTime;
@@ -214,6 +220,22 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     protected DataConnectionFailCause lastFailCause;
     protected static final String NULL_IP = "0.0.0.0";
     Object userData;
+
+    /**
+     * IPV4 address change status flags
+     */
+    public final static int IPV4_ADDR_ADDED    =  1 << 0;
+    public final static int IPV4_ADDR_UPDATED  =  1 << 1;
+    public final static int IPV4_ADDR_REMOVED  =  1 << 2;
+
+    /**
+     * IPV6 address change status flags
+     */
+    public final static int IPV6_ADDR_ADDED    =  1 << 3;
+    public final static int IPV6_ADDR_UPDATED  =  1 << 4;
+    public final static int IPV6_ADDR_REMOVED  =  1 << 5;
+
+    public final static int IPV_ADDR_NOCHANGE = 0;
 
     //***** Abstract methods
     public abstract String toString();
@@ -247,6 +269,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         this.mContext = context;
         this.cid = -1;
         this.dnsServers = new String[2];
+        this.mIpAddresses = new String[2];
+        this.mGatewayAddress = new String[2];
 
         clearSettings();
 
@@ -308,6 +332,9 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         if (cause == DataConnectionFailCause.NONE) {
             createTime = timeStamp;
             AsyncResult.forMessage(connectionCompletedMsg);
+        } else if (cause.isPartialFailure()) {
+            createTime = timeStamp;
+            AsyncResult.forMessage(connectionCompletedMsg, cause, null);
         } else {
             lastFailCause = cause;
             lastFailTime = timeStamp;
@@ -355,8 +382,10 @@ public abstract class DataConnection extends HierarchicalStateMachine {
         mDataProfile = null;
         mBearerType = null;
         interfaceName = null;
-        ipAddress = null;
-        gatewayAddress = null;
+        mIpAddresses[0] = null;
+        mIpAddresses[1] = null;
+        mGatewayAddress[0] = null;
+        mGatewayAddress[1] = null;
         dnsServers[0] = null;
         dnsServers[1] = null;
     }
@@ -386,30 +415,58 @@ public abstract class DataConnection extends HierarchicalStateMachine {
             DataCallState response = ((ArrayList<DataCallState>)ar.result).get(0);
             ConnectionParams cp = (ConnectionParams) ar.userObj;
 
+            DataConnectionFailCause f =
+                DataConnectionFailCause.getDataCallSetupFailCause(response.status);
+
             if (cp.tag != mTag) {
                 if (DBG) {
                     log("BUG: onSetupConnectionCompleted is stale cp.tag=" + cp.tag + ", mtag=" + mTag);
                 }
                 result = SetupResult.ERR_Stale;
-            } else if (response.status != 0){
+            } else if (f != DataConnectionFailCause.NONE && f.isPartialFailure() == false) {
+                /* Complete failure case */
                 result = SetupResult.ERR_Other;
-                int rilFailCause = response.status;
-                result.mFailCause = DataConnectionFailCause.getDataCallSetupFailCause(rilFailCause);
-            } else {
+                result.mFailCause = f;
+            } else { /* Success case or partial failure case */
+
 //            log("onSetupConnectionCompleted received " + response.length + " response strings:");
 //            for (int i = 0; i < response.length; i++) {
 //                log("  response[" + i + "]='" + response[i] + "'");
 //            }
+
                 cid = response.cid;
                 interfaceName = response.ifname;
                 // connection is successful, so associate this dc with
                 // ipversion and data profile we used to setup this
                 // dataconnection with.
                 mBearerType = cp.bearerType;
+
+                /* We requested for the IPV4V6 bearer type, but we have partial failure cases
+                 * to handle.
+                 */
+                if (mBearerType == BearerType.IPV4V6 && f.isPartialFailure() == true) {
+                    if (f == DataConnectionFailCause.ONLY_IPV4_ALLOWED) {
+                        mBearerType = BearerType.IP;
+                    } else if (f == DataConnectionFailCause.ONLY_IPV6_ALLOWED) {
+                        mBearerType = BearerType.IPV6;
+                    } else if (f == DataConnectionFailCause.ONLY_SINGLE_BEARER_ALLOWED) {
+                        try {
+                            mBearerType = Enum.valueOf(BearerType.class, response.type);
+                        } catch (Exception e) {
+                            /*
+                             * TODO : bearer type could be determined from the
+                             * ip address, but that is more work.
+                             */
+                            throw new RuntimeException("unrecognized bearer type - "
+                                    + response.type);
+                        }
+                    }
+                }
+
                 mDataProfile = cp.dp;
                 if (response.addresses != null) {
-                    ipAddress = response.addresses.split("/")[0];
-                    gatewayAddress = response.gateways;
+                    updateIPAddresses(response.addresses);
+                    updateGatewayAddresses(response.gateways);
                     if (response.dnses != null) {
                         dnsServers[0] = response.dnses.split(" ")[0];
                         if (response.dnses.split(" ").length > 1) {
@@ -417,12 +474,13 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                         }
                     }
                     if (DBG) {
-                        log("interface=" + interfaceName + " ipAddress=" + ipAddress
-                            + " gateway=" + gatewayAddress + " DNS1=" + dnsServers[0]
+                        log("interface=" + interfaceName + " ipAddress=" + response.addresses
+                            + " gateway=" + response.gateways + " DNS1=" + dnsServers[0]
                             + " DNS2=" + dnsServers[1]);
                     }
                     if (isDnsOk(dnsServers)) {
                         result = SetupResult.SUCCESS;
+                        result.mFailCause = f; /* report back partial failure */
                     } else {
                         result = SetupResult.ERR_BadDns;
                     }
@@ -434,6 +492,169 @@ public abstract class DataConnection extends HierarchicalStateMachine {
 
         if (DBG) log("DataConnection setup result='" + result + "' on cid=" + cid);
         return result;
+    }
+
+    /**
+     * Returns IPVersion (INET / INET6) based on the address type.
+     * If invalid address, returns null
+     *
+     * @param addrString is the String that is either
+     *  a V4 or V6.
+     */
+    private IPVersion getAddrType(String addrString) {
+        IPVersion versiontype = null;
+
+        if(addrString == null || addrString.length() == 0) {
+            return versiontype;
+        }
+        try {
+            InetAddress inetAddress =
+                NetworkUtils.ipAddrStringToInetAddress(addrString);
+            if (inetAddress instanceof Inet6Address) {
+                // Ipv6 address.
+                versiontype = IPVersion.INET6;
+            } else if (inetAddress instanceof Inet4Address) {
+                // Ipv4 address.
+                versiontype = IPVersion.INET;
+            }
+        } catch (UnknownHostException e) {
+            log(" getAddrType " + addrString + " : Exception " + e);
+        }
+        return versiontype;
+    }
+
+    /**
+     * Updates the internal array of 'mIpAddresses' based on the
+     * input string.
+     * mIpAddresses[0] - IPV4 addr
+     * mIpAddresses[1] - IPV6 addr
+     *
+     * @param addresses is the String that is sent as part of
+     * UNSOL_DATA_CALL_LIST_CHANGED evt
+     */
+    public void updateIPAddresses(String addresses) {
+        mIpAddresses = parseAddresses(addresses);
+    }
+
+    /**
+     * Updates the internal array of 'mGatewayAddress' based on the
+     * input string.
+     * mGatewayAddress[0] - IPV4 addr
+     * mGatewayAddress[1] - IPV6 addr
+     *
+     * @param addresses is the String that is sent as part of
+     * UNSOL_DATA_CALL_LIST_CHANGED evt
+     */
+    public void updateGatewayAddresses(String addresses) {
+        mGatewayAddress = parseAddresses(addresses);
+    }
+
+    /**
+     * @param addresses space delimited list of addresses
+     * @return array of addresses with val @ index 0 containing v4 address
+     * and val @ index 1 containing v6 address
+     *
+     */
+    private String[] parseAddresses(String addresses) {
+        String[] addr = new String[2];
+        addr[0] = addr[1] = null;
+
+        if (addresses == null || addresses.length() == 0) {
+            return addr;
+        }
+        String[] prefixAddr = addresses.split(" ");
+        for (int i = 0; i < prefixAddr.length; i++) {
+            String address = prefixAddr[i].split("/")[0];
+            IPVersion ipv = getAddrType(address);
+            if(null != ipv) {
+                // Set the addr only if it is valid
+                if(ipv == IPVersion.INET)
+                    addr[0] = address;
+                else if(ipv == IPVersion.INET6)
+                    addr[1] = address;
+            }
+        }
+
+        return addr;
+    }
+
+    /**
+     * logs IP addresses.
+     */
+    public String ipAddrtoString() {
+        return "IPV4  : " + mIpAddresses[0] + " , IPV6  : " + mIpAddresses[1];
+    }
+
+    /**
+     * logs GW addresses.
+     */
+    public String gwAddrtoString() {
+        return "IPV4  : " + mGatewayAddress[0] + " , IPV6  : " + mGatewayAddress[1];
+    }
+
+    /**
+     * Returns the compare result (bit masks) of IP Addresses
+     *
+     * @param addresses is the new String that needs a compare with the
+     * old ip addresses
+     */
+    public int compareAddresses(String addresses) {
+        return compare(mIpAddresses, addresses);
+    }
+
+    /**
+     * Returns the compare result (bit masks) of Gateway Addresses
+     *
+     * @param addresses is the new String that needs a compare with the
+     * old GW addresses
+     */
+    public int compareGwAddresses(String addresses) {
+        return compare(mGatewayAddress, addresses);
+    }
+
+    /**
+     * Compares the String 'addresses' that is passed as an argument
+     * and returns a flag (bit mask) indicating the new statuses of
+     * IPV4 and IPV6 addresses
+     *
+     */
+    private int compare(String[] addr, String addresses) {
+        int resultCode = IPV_ADDR_NOCHANGE;
+
+        if(addr.length == 0) {
+            /* This happens when a data call (IPV4 or IPV6) is set up
+             * successfully for the first time. The check here ensures that
+             * it is not treated as a 'ip address change scenario' only
+             * for the first time.
+             */
+            if (DBG) log("compare: No addresses");
+            return resultCode;
+        }
+
+        // create a temp array of addresses and compare it against 'addr'
+        String[] tempAddresses = parseAddresses(addresses);
+        if (DBG) log("--- IPV4  : " + tempAddresses[0] + " , IPV6  : " + tempAddresses[1] + " ---");
+
+        for (int i = 0; i < IPVersion.values().length; i++) {
+            if(tempAddresses[i] != null && addr[i] != null) {
+                if(tempAddresses[i].equals(addr[i])) {
+                    if (DBG) log("compare: MATCHED : " + i);
+                } else {
+                    if (DBG) log("compare: UPDATED : " + i);
+                    resultCode |= (i == 0) ? IPV4_ADDR_UPDATED : IPV6_ADDR_UPDATED;
+                }
+            } else if (tempAddresses[i] != null && addr[i] == null) {
+                if (DBG) log("compare: ADDED : " + i);
+                resultCode |= (i == 0) ? IPV4_ADDR_ADDED : IPV6_ADDR_ADDED;
+            } else if (tempAddresses[i] == null && addr[i] != null) {
+                if (DBG) log("compare: REMOVED : " + i);
+                resultCode |= (i == 0) ? IPV4_ADDR_REMOVED : IPV6_ADDR_REMOVED;
+            } else {
+                // None --> No action needed
+                if (DBG) log("compare: No action : " + i);
+            }
+        }
+        return resultCode;
     }
 
     /**
@@ -582,9 +803,8 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                     SetupResult result = onSetupConnectionCompleted(ar);
                     switch (result) {
                         case SUCCESS:
-                            // All is well
-                            mActiveState.setEnterNotificationParams(cp,
-                                    DataConnectionFailCause.NONE);
+                            // All is well, with possible partial failure.
+                            mActiveState.setEnterNotificationParams(cp, result.mFailCause);
                             transitionTo(mActiveState);
                             break;
                         case ERR_BadCommand:
@@ -1025,17 +1245,17 @@ public abstract class DataConnection extends HierarchicalStateMachine {
     }
 
     /**
-     * @return the ip address as a string.
+     * @return the ip address as a string for a given IPVersion.
      */
-    public String getIpAddress() {
-        return ipAddress;
+    public String getIpAddress(IPVersion ipv) {
+        return (ipv == IPVersion.INET) ? mIpAddresses[0]: mIpAddresses[1];
     }
 
     /**
-     * @return the gateway address as a string.
+     * @return the gateway address as a string for a given IPVersion.
      */
-    public String getGatewayAddress() {
-        return gatewayAddress;
+    public String getGatewayAddress(IPVersion ipv) {
+        return (ipv == IPVersion.INET) ? mGatewayAddress[0]: mGatewayAddress[1];
     }
 
     /**
