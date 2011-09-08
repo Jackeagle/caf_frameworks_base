@@ -1405,8 +1405,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (mNetAttributes[netType].isDefault()) {
                 if (!SystemProperties.get(ILinkManager.UseCne,"none").equalsIgnoreCase("vendor")) {
                     mNetTrackers[netType].addDefaultRoute();
-                } else {
-                    mNetTrackers[netType].addSrcRoutes();
                 }
             } else {
                 /* this change is in 2.3.4_r1. We dont need this because, we
@@ -1424,16 +1422,18 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 */
                 mNetTrackers[netType].addPrivateDnsRoutes();
             }
+            /* create source policy routes for all APNs to ensure sockets bound to a particular
+             * interface are routed on that interface */
+            mNetTrackers[netType].addSrcRoutes();
         } else {
             if (mNetAttributes[netType].isDefault()) {
                 if (!SystemProperties.get(ILinkManager.UseCne,"none").equalsIgnoreCase("vendor")) {
                     mNetTrackers[netType].removeDefaultRoute();
-                } else {
-                    mNetTrackers[netType].delSrcRoutes();
                 }
             } else {
                 mNetTrackers[netType].removePrivateDnsRoutes();
             }
+            mNetTrackers[netType].delSrcRoutes();
         }
     }
 
