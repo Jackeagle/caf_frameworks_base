@@ -668,12 +668,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      *
      */
     private class FeatureUser implements IBinder.DeathRecipient {
-        int mNetworkType;
-        String mFeature;
-        IBinder mBinder;
-        int mPid;
-        int mUid;
-        long mCreateTime;
+        private final int mNetworkType;
+        private final String mFeature;
+        private final IBinder mBinder;
+        private final int mPid;
+        private final int mUid;
+        private final long mCreateTime;
 
         FeatureUser(int type, String feature, IBinder binder) {
             super();
