@@ -377,17 +377,17 @@ public class MediaRecorder
     public void setVideoSize(int width, int height)
             throws IllegalStateException
     {
-        if((height == 1088) && (width == 1920)) {
-            mUseWakeLock = true;
-        }
-        else if ((height == 720) && (width == 1280)) {
-            String deviceName = SystemProperties.get("ro.product.device");
-            if ( deviceName.startsWith("msm8660") ) {
-                Log.e("MediaRecorder", "Use wakelock for 720p on 8660");
+        String deviceName = SystemProperties.get("ro.product.device");
+        if((height == 1088) && (width == 1920) && deviceName.startsWith("msm8660")) {
+                Log.w("MediaRecorder", "Use wakelock for 1080p on 8660");
                 mUseWakeLock = true;
-            }
+        }
+        else if ((height == 720) && (width == 1280) && deviceName.startsWith("msm8660")) {
+                Log.w("MediaRecorder", "Use wakelock for 720p on 8660");
+                mUseWakeLock = true;
         }
         else {
+            Log.w("MediaRecorder", "No wakelock");
             mUseWakeLock = false;
         }
         native_setVideoSize(width, height);
