@@ -201,6 +201,11 @@ class BluetoothEventLoop {
             Log.e(TAG, "ERROR: Remote device properties are null");
             return;
         }
+        if (!mBluetoothService.isEnabled()) {
+            Log.e(TAG, "Bluetooth is not on");
+            return;
+        }
+
         addDevice(address, properties);
     }
 
@@ -316,6 +321,11 @@ class BluetoothEventLoop {
     }
 
     private void onDevicePropertyChanged(String deviceObjectPath, String[] propValues) {
+        if (!mBluetoothService.isEnabled()) {
+            Log.e(TAG, "Bluetooth is not enabled");
+            return;
+        }
+
         String name = propValues[0];
         String address = mBluetoothService.getAddressFromObjectPath(deviceObjectPath);
         if (address == null) {
@@ -702,6 +712,11 @@ class BluetoothEventLoop {
     }
 
     private void onDiscoverServicesResult(String deviceObjectPath, boolean result) {
+        if (!mBluetoothService.isEnabled()) {
+            log("Bluetooth is not on");
+            return;
+        }
+
         String address = mBluetoothService.getAddressFromObjectPath(deviceObjectPath);
         // We don't parse the xml here, instead just query Bluez for the properties.
         if (address == null) {

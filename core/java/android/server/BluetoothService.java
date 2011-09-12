@@ -2175,6 +2175,11 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     /*package*/ void updateDeviceServiceChannelCache(String address) {
+        if (!isEnabledInternal()) {
+            log("Bluetooth is not on");
+            return;
+        }
+
         ParcelUuid[] deviceUuids = getRemoteUuids(address);
         // We are storing the RFCOMM channel numbers and L2CAP PSMs
         // only for the uuids we are interested in.
