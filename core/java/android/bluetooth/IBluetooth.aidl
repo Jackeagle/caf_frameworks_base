@@ -35,6 +35,7 @@ interface IBluetooth
 
     String getAddress();
     String getName();
+    String getCOD();
     boolean setName(in String name);
 
     int getScanMode();
@@ -55,6 +56,7 @@ interface IBluetooth
     String[] listBonds();
     int getBondState(in String address);
     boolean setDeviceOutOfBandData(in String address, in byte[] hash, in byte[] randomizer);
+    boolean setBluetoothClass(String address, int classOfDevice);
 
     String getRemoteName(in String address);
     int getRemoteClass(in String address);

@@ -466,6 +466,21 @@ public final class BluetoothAdapter {
     }
 
     /**
+     * Get the Class of Device (COD) of the local Bluetooth adapter.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+     *
+     * @return the Bluetooth COD, or null on error
+     * @hide
+     */
+    public String getCOD() {
+        try {
+            return mService.getCOD();
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return null;
+    }
+
+
+    /**
      * Set the friendly Bluetooth name of the local Bluetooth adapter.
      * <p>This name is visible to remote Bluetooth devices.
      * <p>Valid Bluetooth names are a maximum of 248 bytes using UTF-8
