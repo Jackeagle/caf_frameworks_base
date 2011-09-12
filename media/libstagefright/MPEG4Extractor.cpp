@@ -41,6 +41,8 @@
 
 #include <cutils/properties.h>
 
+#define NAL_CORRUPT_TRESHOLD_VALUE 10
+
 namespace android {
 
 class MPEG4Source : public MediaSource {
@@ -70,9 +72,11 @@ private:
     int32_t mTimescale;
     sp<SampleTable> mSampleTable;
     uint32_t mCurrentSampleIndex;
+    uint32_t mPreviousSampleIndex;
 
     bool mIsAVC;
     size_t mNALLengthSize;
+    uint32_t mNALLengthCorrupt;
 
     bool mStarted;
 
@@ -1604,8 +1608,10 @@ MPEG4Source::MPEG4Source(
       mTimescale(timeScale),
       mSampleTable(sampleTable),
       mCurrentSampleIndex(0),
+      mPreviousSampleIndex(-1),
       mIsAVC(false),
       mNALLengthSize(0),
+      mNALLengthCorrupt(0),
       mStarted(false),
       mGroup(NULL),
       mBuffer(NULL),
@@ -1957,6 +1963,25 @@ status_t MPEG4Source::read(
                 LOGW("ERROR - CORRUPT NAL ");
                 mBuffer->release();
                 mBuffer = NULL;
+
+                if((mPreviousSampleIndex  == (mCurrentSampleIndex -1))\
+                    ||(mPreviousSampleIndex == -1)) {
+                   mPreviousSampleIndex = mCurrentSampleIndex;
+                   mNALLengthCorrupt++;
+                }
+                else {
+                   mPreviousSampleIndex =-1;
+                   mNALLengthCorrupt=0;
+                }
+                // If the clip has more than the treshold number of continuous Nal length
+                // corruptions, abort the playback as the clip is corrupted
+                // for further playback.
+                if(mNALLengthCorrupt > NAL_CORRUPT_TRESHOLD_VALUE) {
+                  LOGE("Continuous corruption of Nallength in clip, aborting playback\n");
+                  mPreviousSampleIndex =-1;
+                  mNALLengthCorrupt=0;
+                  return ERROR_UNSUPPORTED;
+                }
 
                 srcOffset -= mNALLengthSize;
                 srcOffset += size;
