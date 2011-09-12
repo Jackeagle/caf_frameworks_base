@@ -201,6 +201,7 @@ void AudioPlayer::pause(bool playPendingSamples) {
 
 void AudioPlayer::resume() {
     CHECK(mStarted);
+    mPaused = false;
     if (mSource->isPaused()==true) {
         CHECK(mSource != NULL);
         mSource->start();
