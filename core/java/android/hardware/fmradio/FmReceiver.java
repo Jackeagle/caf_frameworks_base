@@ -38,6 +38,11 @@ import android.util.Log;
 public class FmReceiver extends FmTransceiver
 {
 
+   public static int mSearchState = 0;
+   public static final int SRCH_ABORTED = -2;
+   public static final int SRCH_FAILED = -1;
+   public static final int SRCH_COMPLETE = 0;
+   public static final int SRCH_INPROGRESS = 1;
    private static final String TAG = "FMRadio";
 
    /**
@@ -449,6 +454,65 @@ public class FmReceiver extends FmTransceiver
    }
 
    /*==============================================================
+   FUNCTION:  getSearchState
+   ==============================================================*/
+   /**
+   *    Gets the current state of the search operation.
+   *    <p>
+   *    This function is expected to be used when searchStations()
+   *    function wants to know whether any seek/scan/auto-select
+   *    operation is already in-progress.
+   *    If a seek command is issued when one is already in-progress,
+   *    we cancel the on-going seek command and start a new search
+   *    operation.
+   *    <p>
+   *    @return current state of FM Search operation:
+   *                FmReceiver.SRCH_COMPLETE
+   *                FmReceiver.SRCH_INPROGRESS
+   *                FmReceiver.SRCH_FAILED
+   *                FmReceiver.SRCH_ABORTED
+   */
+   static int getSearchState()
+   {
+      return mSearchState;
+   }
+
+   /*==============================================================
+   FUNCTION:  setSearchState
+   ==============================================================*/
+   /**
+   *    Sets the current state of the search operation.
+   *    <p>
+   *    This function is used to set the current state of the
+   *    search operation. If a seek command is issued when one
+   *    is already in-progress, we cancel the on-going seek command,
+   *    set the state of search operation to FmReceiver.SRCH_ABORTED
+   *    and start a new search.
+   *    <p>
+   *    @return none
+   */
+   static void setSearchState(int state)
+   {
+      mSearchState = state;
+      switch(mSearchState) {
+         case SRCH_COMPLETE:
+            Log.d(TAG, "setSearchState() : Current state is SRCH_COMPLETE");
+            break;
+         case SRCH_INPROGRESS:
+            Log.d(TAG, "setSearchState() : Current state is SRCH_INPROGRESS");
+            break;
+         case SRCH_FAILED:
+            Log.d(TAG, "setSearchState() : Current state is SRCH_FAILED");
+            break;
+         case SRCH_ABORTED:
+            Log.d(TAG, "setSearchState() : Current state is SRCH_ABORTED");
+            break;
+         default:
+            Log.d(TAG, "setSearchState() : Invalid Search State!!!");
+      }
+   }
+
+   /*==============================================================
    FUNCTION:  searchStations
    ==============================================================*/
    /**
@@ -552,6 +616,14 @@ public class FmReceiver extends FmTransceiver
    public boolean searchStations (int mode,
                                   int dwellPeriod,
                                   int direction){
+
+      int state = getSearchState();
+      if (state == FmReceiver.SRCH_INPROGRESS) {
+         Log.d (TAG, "Cancelling the on-going Search & starting a new search");
+         setSearchState(FmReceiver.SRCH_ABORTED);
+         cancelSearch();
+      }
+
       boolean bStatus = true;
 
       Log.d (TAG, "Basic search...");
@@ -562,24 +634,28 @@ public class FmReceiver extends FmTransceiver
       {
          Log.d (TAG, "Invalid search mode: " + mode );
          bStatus = false;
+         setSearchState(FmReceiver.SRCH_FAILED);
       }
       if ( (dwellPeriod < FM_RX_DWELL_PERIOD_1S) ||
            (dwellPeriod > FM_RX_DWELL_PERIOD_7S))
       {
          Log.d (TAG, "Invalid dwelling time: " + dwellPeriod);
          bStatus = false;
+         setSearchState(FmReceiver.SRCH_FAILED);
       }
       if ( (direction != FM_RX_SEARCHDIR_DOWN) &&
            (direction != FM_RX_SEARCHDIR_UP))
       {
          Log.d (TAG, "Invalid search direction: " + direction);
          bStatus = false;
+         setSearchState(FmReceiver.SRCH_FAILED);
       }
 
       if (bStatus)
       {
          Log.d (TAG, "searchStations: mode " + mode + "direction:  " + direction);
          mControl.searchStations(sFd, mode, dwellPeriod, direction, 0, 0);
+         setSearchState(FmReceiver.SRCH_INPROGRESS);
       }
       return true;
    }
