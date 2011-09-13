@@ -1192,6 +1192,10 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.isCspPlmnEnabled();
     }
 
+    public boolean isManualNetSelAllowed() {
+        return mActivePhone.isManualNetSelAllowed();
+    }
+
     public DataActivityState getDataActivityState() {
         return mActivePhone.getDataActivityState();
     }

@@ -1109,6 +1109,12 @@ public abstract class PhoneBase extends Handler implements Phone {
         return false;
     }
 
+    public boolean isManualNetSelAllowed() {
+        // This function should be overridden in GsmPhone.
+        // Not implemented in CdmaPhone and SIPPhone.
+        return false;
+    }
+
     /**
      * Common error logger method for unexpected calls to GSM/WCDMA-only methods.
      */

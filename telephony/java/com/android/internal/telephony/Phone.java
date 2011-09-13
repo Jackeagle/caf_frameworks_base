@@ -1964,6 +1964,12 @@ public interface Phone {
     boolean isCspPlmnEnabled();
 
     /**
+     * Checks if manual network selection is allowed
+     * @return true if manual network selection is allowed
+     * @return false if manual network selection is not allowed
+     */
+    public boolean isManualNetSelAllowed();
+    /**
      * Set the subscription info.
      */
     public void setSubscriptionInfo(Subscription subscription);
