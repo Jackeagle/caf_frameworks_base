@@ -27,6 +27,7 @@
  */
 
 package android.hardware.fmradio;
+import android.hardware.fmradio.FmReceiver;
 
 import android.util.Log;
 
@@ -69,6 +70,7 @@ class FmRxEventListner {
 
                     try {
                         int index = 0;
+                        int state = 0;
                         byte []buff = new byte[64];
                         int eventCount = FmReceiverJNI.getBufferNative (fd, buff, EVENT_LISTEN);
                         Log.d(TAG, "Received event. Count: " + eventCount);
@@ -88,7 +90,27 @@ class FmRxEventListner {
                                 break;
                             case 2:
                                 Log.d(TAG, "Got SEEK_COMPLETE_EVENT");
-                                cb.FmRxEvSearchComplete(FmReceiverJNI.getFreqNative(fd));
+                                state = FmReceiver.getSearchState();
+                                switch(state) {
+                                   case FmReceiver.SRCH_COMPLETE:
+                                      Log.d(TAG, "Current state is SRCH_COMPLETE");
+                                      break;
+                                   case FmReceiver.SRCH_INPROGRESS:
+                                      Log.d(TAG, "Current state is SRCH_INPROGRESS");
+                                      FmReceiver.setSearchState(FmReceiver.SRCH_COMPLETE);
+                                      cb.FmRxEvSearchComplete(FmReceiverJNI.getFreqNative(fd));
+                                      break;
+                                   case FmReceiver.SRCH_FAILED:
+                                      Log.d(TAG, "Current state is SRCH_FAILED");
+                                      break;
+                                   case FmReceiver.SRCH_ABORTED:
+                                      Log.d(TAG, "Current state is SRCH_ABORTED");
+                                      Log.d(TAG, "Aborting on-going seek command...");
+                                      FmReceiver.setSearchState(FmReceiver.SRCH_COMPLETE);
+                                      break;
+                                   default:
+                                      Log.d(TAG, "Invalid Search State!!!");
+                                }
                                 break;
                             case 3:
                                 Log.d(TAG, "Got SCAN_NEXT_EVENT");
