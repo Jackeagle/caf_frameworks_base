@@ -46,13 +46,14 @@
 #define SEARCH_DOWN 0
 #define SEARCH_UP 1
 #define TUNE_MULT 16000
+#define HIGH_BAND 2
+#define LOW_BAND  1
 enum search_dir_t {
     SEEK_UP,
     SEEK_DN,
     SCAN_UP,
     SCAN_DN
 };
-
 
 using namespace android;
 
@@ -347,12 +348,14 @@ static jint android_hardware_fmradio_FmReceiverJNI_getRawRdsNative
 }
 
 /* native interface */
-static void android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative(JNIEnv * env, jobject thiz, jboolean aValue)
+static jint android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative(JNIEnv * env, jobject thiz,jint fd, jint id, jboolean aValue)
 {
     int i = 0;
     char value = 0;
     int init_success = 0;
-
+    char notch[20] = {0x00};
+    struct v4l2_control control;
+    int err;
     /*Enable/Disable the WAN avoidance*/
     if (aValue)
        property_set("hw.fm.mode", "wa_enable");
@@ -363,9 +366,27 @@ static void android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative(JNIEnv *
     sleep(1);
     property_get("hw.fm.init", &value, NULL);
     if(value == '1') {
-            init_success = 1;
+       init_success = 1;
     }
     LOGE("init_success:%d after %d seconds \n", init_success, i);
+
+    property_get("notch.value", notch, NULL);
+    LOGE("Notch = %s",notch);
+    if(!strncmp("HIGH",notch,strlen("HIGH")))
+      value = HIGH_BAND;
+    else if(!strncmp("LOW",notch,strlen("LOW")))
+      value = LOW_BAND;
+    else
+      value = 0;
+
+    LOGE("Notch value : %d", value);
+    control.id = id;
+    control.value = value;
+    err = ioctl(fd, VIDIOC_S_CTRL,&control );
+    if(err < 0){
+          return FM_JNI_FAILURE;
+    }
+    return FM_JNI_SUCCESS;
 }
 
 
@@ -630,7 +651,7 @@ static JNINativeMethod gMethods[] = {
             (void*)android_hardware_fmradio_FmReceiverJNI_setMonoStereoNative},
         { "getRawRdsNative", "(I[BI)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_getRawRdsNative},
-       { "setNotchFilterNative", "(Z)V",
+       { "setNotchFilterNative", "(IIZ)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_setNotchFilterNative},
         { "startRTNative", "(ILjava/lang/String;I)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_startRTNative},
