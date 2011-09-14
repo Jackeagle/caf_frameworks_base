@@ -103,7 +103,6 @@ AudioPlayer(audioSink,observer) {
     mPauseEventPending = false;
     mPlaybackSuspended = false;
     bIsAudioRouted     = false;
-    mIsDriverStarted   = false;
     getAudioFlinger();
     LOGV("Registering client with AudioFlinger");
     mAudioFlinger->registerClient(AudioFlingerClient);
@@ -219,12 +218,10 @@ void LPAPlayer::handleA2DPSwitch() {
 
     LOGV("handleA2dpSwitch()");
     if (bIsA2DPEnabled) {
+        struct pcm * local_handle = (struct pcm *)handle;
         if (!isPaused) {
-            if(mIsDriverStarted) {
-                struct pcm * local_handle = (struct pcm *)handle;
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,1) < 0) {
-                    LOGE("AUDIO PAUSE failed");
-                }
+            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,1) < 0) {
+                LOGE("AUDIO PAUSE failed");
             }
             /* Set timePlayed to time where we are pausing */
             timePlayed += (nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted);
@@ -235,20 +232,16 @@ void LPAPlayer::handleA2DPSwitch() {
         mInternalSeeking = true;
         mReachedEOS = false;
         mSeekTimeUs = timePlayed;
-
-        if(mIsDriverStarted) {
-            mIsDriverStarted = false;
-            if (ioctl(afd, AUDIO_STOP, 0) < 0) {
-                LOGE("%s: Audio stop event failed", __func__);
-            }
-        }
+        pthread_cond_signal(&a2dp_notification_cv);
     } else {
         if (!isPaused) {
             timePlayed += (nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted);
             timeStarted = 0;
         }
-
-        a2dpDisconnectPause = true;
+        if (isPaused)
+            pthread_cond_signal(&a2dp_notification_cv);
+        else
+            a2dpDisconnectPause = true;
     }
 }
 
@@ -333,85 +326,82 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
             LOGE("Opening a routing session failed");
             return err;
         }
-        LOGV("AudioSink Opened a session(%d)",sessionId);
         bIsAudioRouted = true;
-
-        LOGV("pcm_open hardware 0,4 for LPA ");
-
-        //Open PCM driver
-
-        if (numChannels == 1)
-            handle = (void *)pcm_open((PCM_MMAP | DEBUG_ON | PCM_MONO) , "hw:0,4");
-        else
-            handle = (void *)pcm_open((PCM_MMAP | DEBUG_ON | PCM_STEREO) , "hw:0,4");
-
-        struct pcm * local_handle = (struct pcm *)handle;
-        if (!local_handle) {
-            LOGE("Failed to initialize ALSA hardware hw:0,4");
-            return BAD_VALUE;
-        }
-
-        struct snd_pcm_hw_params *params;
-        struct snd_pcm_sw_params *sparams;
-        params = (struct snd_pcm_hw_params*) calloc(1, sizeof(struct snd_pcm_hw_params));
-        if (!params) {
-          LOGV( "Aplay:Failed to allocate ALSA hardware parameters!");
-          return -1;
-        }
-        param_init(params);
-        param_set_mask(params, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_MMAP_INTERLEAVED);
-        param_set_mask(params, SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_FORMAT_S16_LE);
-        param_set_mask(params, SNDRV_PCM_HW_PARAM_SUBFORMAT,SNDRV_PCM_SUBFORMAT_STD);
-        param_set_min(params, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, PMEM_BUFFER_SIZE);
-        param_set_int(params, SNDRV_PCM_HW_PARAM_SAMPLE_BITS, 16);
-        param_set_int(params, SNDRV_PCM_HW_PARAM_FRAME_BITS,
-                    numChannels - 1 ? 32 : 16);
-        param_set_int(params, SNDRV_PCM_HW_PARAM_CHANNELS, numChannels);
-        param_set_int(params, SNDRV_PCM_HW_PARAM_RATE, mSampleRate);
-        param_set_hw_refine(local_handle, params);
-        if (param_set_hw_params(local_handle, params)) {
-         LOGV( "Aplay:cannot set hw params");
-         return -22;
-        }
-        param_dump(params);
-        local_handle->buffer_size = pcm_buffer_size(params);
-        local_handle->period_size = pcm_period_size(params);
-        local_handle->period_cnt = local_handle->buffer_size/local_handle->period_size;
-        LOGV("period_cnt = %d\n", local_handle->period_cnt);
-        LOGV("period_size = %d\n", local_handle->period_size);
-        LOGV("buffer_size = %d\n", local_handle->buffer_size);
-
-        sparams = (struct snd_pcm_sw_params*) calloc(1, sizeof(struct snd_pcm_sw_params));
-        if (!sparams) {
-         LOGV( "Aplay:Failed to allocate ALSA software parameters!\n");
-         return -1;
-        }
-        // Get the current software parameters
-        sparams->tstamp_mode = SNDRV_PCM_TSTAMP_NONE;
-        sparams->period_step = 1;
-        sparams->avail_min = (local_handle->flags & PCM_MONO) ? local_handle->period_size/2 : local_handle->period_size/4;
-        sparams->start_threshold = (local_handle->flags & PCM_MONO) ? local_handle->buffer_size/2 : local_handle->buffer_size/4;
-        sparams->stop_threshold = (local_handle->flags & PCM_MONO) ? local_handle->buffer_size/2 : local_handle->buffer_size/4;
-        sparams->xfer_align = (local_handle->flags & PCM_MONO) ? local_handle->period_size/2 : local_handle->period_size/4; /* needed for old kernels */
-        sparams->silence_size = 0;
-        sparams->silence_threshold = 0;
-        if (param_set_sw_params(local_handle, sparams)) {
-         LOGV( "Aplay:cannot set sw params");
-         return -22;
-        }
-        mmap_buffer(local_handle);
-        pcm_prepare(local_handle);
-        handle = (void *)local_handle;
-        //Map PMEM buffer
-        mIsDriverStarted = true;
-        LOGV("LPA Driver Started");
-    } else {
+    }
+    else {
         LOGV("Before Audio Sink Open");
         status_t ret = mAudioSink->open(mSampleRate, numChannels,AudioSystem::PCM_16_BIT, DEFAULT_AUDIOSINK_BUFFERCOUNT);
         mAudioSink->start();
         LOGV("After Audio Sink Open");
         mAudioSinkOpen = true;
     }
+
+    LOGV("pcm_open hardware 0,4 for LPA ");
+    //Open PCM driver
+    if (numChannels == 1)
+        handle = (void *)pcm_open((PCM_MMAP | DEBUG_ON | PCM_MONO) , "hw:0,4");
+    else
+        handle = (void *)pcm_open((PCM_MMAP | DEBUG_ON | PCM_STEREO) , "hw:0,4");
+
+    struct pcm * local_handle = (struct pcm *)handle;
+    if (!local_handle) {
+        LOGE("Failed to initialize ALSA hardware hw:0,4");
+        return BAD_VALUE;
+    }
+
+    struct snd_pcm_hw_params *params;
+    struct snd_pcm_sw_params *sparams;
+    params = (struct snd_pcm_hw_params*) calloc(1, sizeof(struct snd_pcm_hw_params));
+    if (!params) {
+      LOGV( "Aplay:Failed to allocate ALSA hardware parameters!");
+      return -1;
+    }
+    param_init(params);
+    param_set_mask(params, SNDRV_PCM_HW_PARAM_ACCESS, SNDRV_PCM_ACCESS_MMAP_INTERLEAVED);
+    param_set_mask(params, SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_FORMAT_S16_LE);
+    param_set_mask(params, SNDRV_PCM_HW_PARAM_SUBFORMAT,SNDRV_PCM_SUBFORMAT_STD);
+    param_set_min(params, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, PMEM_BUFFER_SIZE);
+    param_set_int(params, SNDRV_PCM_HW_PARAM_SAMPLE_BITS, 16);
+    param_set_int(params, SNDRV_PCM_HW_PARAM_FRAME_BITS,
+                numChannels - 1 ? 32 : 16);
+    param_set_int(params, SNDRV_PCM_HW_PARAM_CHANNELS, numChannels);
+    param_set_int(params, SNDRV_PCM_HW_PARAM_RATE, mSampleRate);
+    param_set_hw_refine(local_handle, params);
+    if (param_set_hw_params(local_handle, params)) {
+     LOGV( "Aplay:cannot set hw params");
+     return -22;
+    }
+    param_dump(params);
+    local_handle->buffer_size = pcm_buffer_size(params);
+    local_handle->period_size = pcm_period_size(params);
+    local_handle->period_cnt = local_handle->buffer_size/local_handle->period_size;
+    LOGV("period_cnt = %d\n", local_handle->period_cnt);
+    LOGV("period_size = %d\n", local_handle->period_size);
+    LOGV("buffer_size = %d\n", local_handle->buffer_size);
+
+    sparams = (struct snd_pcm_sw_params*) calloc(1, sizeof(struct snd_pcm_sw_params));
+    if (!sparams) {
+     LOGV( "Aplay:Failed to allocate ALSA software parameters!\n");
+     return -1;
+    }
+    // Get the current software parameters
+    sparams->tstamp_mode = SNDRV_PCM_TSTAMP_NONE;
+    sparams->period_step = 1;
+    sparams->avail_min = (local_handle->flags & PCM_MONO) ? local_handle->period_size/2 : local_handle->period_size/4;
+    sparams->start_threshold = (local_handle->flags & PCM_MONO) ? local_handle->buffer_size/2 : local_handle->buffer_size/4;
+    sparams->stop_threshold = (local_handle->flags & PCM_MONO) ? local_handle->buffer_size/2 : local_handle->buffer_size/4;
+    sparams->xfer_align = (local_handle->flags & PCM_MONO) ? local_handle->period_size/2 : local_handle->period_size/4; /* needed for old kernels */
+    sparams->silence_size = 0;
+    sparams->silence_threshold = 0;
+    if (param_set_sw_params(local_handle, sparams)) {
+     LOGV( "Aplay:cannot set sw params");
+     return -22;
+    }
+    mmap_buffer(local_handle);
+    pcm_prepare(local_handle);
+    handle = (void *)local_handle;
+    //Map PMEM buffer
+    LOGV("LPA Driver Started");
     mStarted = true;
 
     LOGV("Waking up decoder thread");
@@ -433,31 +423,29 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
     struct pcm * local_handle = (struct pcm *)handle;
     LOGV("In seekTo(), mSeekTimeUs %lld",mSeekTimeUs);
     if (!bIsA2DPEnabled) {
-        if(mIsDriverStarted) {
-            LOGV("Paused case, %d",isPaused);
+        LOGV("Paused case, %d",isPaused);
 
-            pthread_mutex_lock(&pmem_response_mutex);
-            pthread_mutex_lock(&pmem_request_mutex);
-            while(!pmemBuffersResponseQueue.empty()) {
-                BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
-                pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
-                pmemBuffersRequestQueue.push_back(buf);
-            }
-            pthread_mutex_unlock(&pmem_request_mutex);
-            pthread_mutex_unlock(&pmem_response_mutex);
-            LOGV("Transferred all the buffers from response queue to rquest queue to handle seek");
-            if (!isPaused) {
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
-                    LOGE("Reset failed!");
+        pthread_mutex_lock(&pmem_response_mutex);
+        pthread_mutex_lock(&pmem_request_mutex);
+        while(!pmemBuffersResponseQueue.empty()) {
+            BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
+            pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
+            pmemBuffersRequestQueue.push_back(buf);
+        }
+        pthread_mutex_unlock(&pmem_request_mutex);
+        pthread_mutex_unlock(&pmem_response_mutex);
+        LOGV("Transferred all the buffers from response queue to rquest queue to handle seek");
+        if (!isPaused) {
+            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
+                LOGE("Reset failed!");
 
-                local_handle->start = 0;
-                pcm_prepare(local_handle);
-                LOGV("Reset, drain and prepare completed");
-                local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
-                sync_ptr(local_handle);
-                LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
-                pthread_cond_signal(&decoder_cv);
-            }
+            local_handle->start = 0;
+            pcm_prepare(local_handle);
+            LOGV("Reset, drain and prepare completed");
+            local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
+            sync_ptr(local_handle);
+            LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
+            pthread_cond_signal(&decoder_cv);
         }
     } else {
         mSeeked = true;
@@ -480,7 +468,8 @@ void LPAPlayer::pause(bool playPendingSamples) {
         /* TODO: Check what needs to be in this case */
     } else {
         if (a2dpDisconnectPause) {
-
+            a2dpDisconnectPause = false;
+            pthread_cond_signal(&a2dp_notification_cv);
         } else {
             if (!bIsA2DPEnabled) {
                 LOGV("LPAPlayer::Pause - Pause driver");
@@ -510,83 +499,57 @@ void LPAPlayer::resume() {
             CHECK(mSource != NULL);
             mSource->start();
         }
-        /* TODO: Check A2dp variable */
-        if (a2dpDisconnectPause) {
-            LOGV("A2DP disconnect resume");
-            mAudioSink->pause();
-            mAudioSink->stop();
-            mAudioSink->close();
-            mAudioSinkOpen = false;
-            LOGV("resume:: opening audio session with mSampleRate %d numChannels %d sessionId %d",
-                 mSampleRate, numChannels, sessionId);
-            status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId,  mSampleRate, numChannels);
-            a2dpDisconnectPause = false;
-            mInternalSeeking = true;
-            mReachedEOS = false;
-            mSeekTimeUs = timePlayed;
 
-            if (ioctl(afd, AUDIO_START,0) < 0) {
-                LOGE("Driver start failed!");// TODO: How to report this error and stop playback ??
+        if (!bIsA2DPEnabled) {
+            LOGE("LPAPlayer::resume - Resuming Driver");
+
+            LOGV("Attempting Sync resume\n");
+            struct pcm * local_handle = (struct pcm *)handle;
+            if (!(mSeeking || mInternalSeeking)) {
+                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,0) < 0)
+                    LOGE("AUDIO Resume failed");
+                LOGV("Sync resume done\n");
             }
-            mIsDriverStarted = true;
-            LOGV("LPA Driver Started");
-
-            pthread_cond_signal(&event_cv);
-            pthread_cond_signal(&a2dp_cv);
-            pthread_cond_signal(&decoder_cv);
-
+            else {
+                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
+                    LOGE("Reset failed");
+                local_handle->start = 0;
+                pcm_prepare(local_handle);
+                LOGV("Reset, drain and prepare completed");
+                local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
+                sync_ptr(local_handle);
+                LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
+                pthread_cond_signal(&decoder_cv);
+            }
+            if (mAudioSink.get() != NULL) {
+                mAudioSink->resumeSession();
+            }
         } else {
-            if (!bIsA2DPEnabled) {
-                LOGE("LPAPlayer::resume - Resuming Driver");
+            isPaused = false;
 
-                LOGV("Attempting Sync resume\n");
-                struct pcm * local_handle = (struct pcm *)handle;
-                if (!mSeeking) {
-                    if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,0) < 0)
-                        LOGE("AUDIO Resume failed");
-                    LOGV("Sync resume done\n");
-                }
-                else {
-                    if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
-                        LOGE("Reset failed");
-                    local_handle->start = 0;
-                    pcm_prepare(local_handle);
-                    LOGV("Reset, drain and prepare completed");
-                    local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
-                    sync_ptr(local_handle);
-                    LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
-                    pthread_cond_signal(&decoder_cv);
-                }
+            if (!mAudioSinkOpen) {
                 if (mAudioSink.get() != NULL) {
-                    mAudioSink->resumeSession();
-                }
-            } else {
-                isPaused = false;
-
-                if (!mAudioSinkOpen) {
-                    if (mAudioSink.get() != NULL) {
-                        LOGV("%s mAudioSink close session", __func__);
-                        mAudioSink->closeSession();
-                    } else {
-                        LOGE("close session NULL");
-                    }
-
-                    LOGV("Resume: Before Audio Sink Open");
-                    status_t ret = mAudioSink->open(mSampleRate, numChannels,AudioSystem::PCM_16_BIT,
-                                                    DEFAULT_AUDIOSINK_BUFFERCOUNT);
-                    mAudioSink->start();
-                    LOGV("Resume: After Audio Sink Open");
-                    mAudioSinkOpen = true;
-
-                    LOGV("Resume: Waking up the decoder thread");
-                    pthread_cond_signal(&decoder_cv);
+                    LOGV("%s mAudioSink close session", __func__);
+                    mAudioSink->closeSession();
                 } else {
-                    /* If AudioSink is already open just start it */
-                    mAudioSink->start();
+                    LOGE("close session NULL");
                 }
-                LOGV("Waking up A2dp thread");
-                pthread_cond_signal(&a2dp_cv);
+
+                LOGV("Resume: Before Audio Sink Open");
+                status_t ret = mAudioSink->open(mSampleRate, numChannels,AudioSystem::PCM_16_BIT,
+                                                DEFAULT_AUDIOSINK_BUFFERCOUNT);
+                mAudioSink->start();
+                LOGV("Resume: After Audio Sink Open");
+                mAudioSinkOpen = true;
+
+                LOGV("Resume: Waking up the decoder thread");
+                pthread_cond_signal(&decoder_cv);
+            } else {
+                /* If AudioSink is already open just start it */
+                mAudioSink->start();
             }
+            LOGV("Waking up A2dp thread");
+            pthread_cond_signal(&a2dp_cv);
         }
         isPaused = false;
         /* Set timeStarted to current systemTime */
@@ -614,6 +577,8 @@ void LPAPlayer::reset() {
     requestAndWaitForEventThreadExit();
 
     requestAndWaitForA2DPThreadExit();
+
+    requestAndWaitForA2DPNotificationThreadExit();
 
     // Close the audiosink after all the threads exited to make sure
     // there is no thread writing data to audio sink or applying effect
@@ -654,7 +619,6 @@ void LPAPlayer::reset() {
     LOGE("Buffer Deallocation complete! Closing pcm handle");
     pcm_close(local_handle);
     handle = (void*)local_handle;
-    mIsDriverStarted = false;
 
     LOGV("reset() after pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
 
@@ -722,10 +686,10 @@ void LPAPlayer::decoderThreadEntry() {
              pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
 
         if (pmemBuffersRequestQueue.empty() || a2dpDisconnectPause || mReachedEOS ||
-            (bIsA2DPEnabled && !mAudioSinkOpen) || asyncReset || (!bIsA2DPEnabled && !mIsDriverStarted)) {
+            (bIsA2DPEnabled && !mAudioSinkOpen) || asyncReset ) {
             LOGV("decoderThreadEntry: a2dpDisconnectPause %d  mReachedEOS %d bIsA2DPEnabled %d "
-                 "mAudioSinkOpen %d asyncReset %d mIsDriverStarted %d", a2dpDisconnectPause,
-                 mReachedEOS, bIsA2DPEnabled, mAudioSinkOpen, asyncReset, mIsDriverStarted);
+                 "mAudioSinkOpen %d asyncReset %d ", a2dpDisconnectPause,
+                 mReachedEOS, bIsA2DPEnabled, mAudioSinkOpen, asyncReset);
             LOGV("decoderThreadEntry: waiting on decoder_cv");
             pthread_cond_wait(&decoder_cv, &pmem_request_mutex);
             pthread_mutex_unlock(&pmem_request_mutex);
@@ -928,30 +892,6 @@ void LPAPlayer::eventThreadEntry() {
             timeout = 1000 * tempbuf.bytesToWrite / (numChannels * 2 * mSampleRate) + 1000 * buf.bytesToWrite / (numChannels * 2 * mSampleRate);
             LOGE("Setting timeout to %d,buf.bytesToWrite %d, mReachedEOS %d, pmemBuffersRequestQueue.size() %d", timeout, buf.bytesToWrite, mReachedEOS,pmemBuffersResponseQueue.size());
         }
-        if (pmemBuffersResponseQueue.empty() && bIsA2DPEnabled) {
-            LOGV("Close Session");
-            if (mAudioSink.get() != NULL) {
-                mAudioSink->closeSession();
-                LOGV("mAudioSink close session");
-            } else {
-                LOGE("close session NULL");
-            }
-
-            sp<MetaData> format = mSource->getFormat();
-            const char *mime;
-            bool success = format->findCString(kKeyMIMEType, &mime);
-            CHECK(success);
-            CHECK(!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW));
-            success = format->findInt32(kKeySampleRate, &mSampleRate);
-            CHECK(success);
-            success = format->findInt32(kKeyChannelCount, &numChannels);
-            CHECK(success);
-            LOGV("Before Audio Sink Open");
-            status_t ret = mAudioSink->open(mSampleRate, numChannels,AudioSystem::PCM_16_BIT, DEFAULT_AUDIOSINK_BUFFERCOUNT);
-            mAudioSink->start();
-            LOGV("After Audio Sink Open");
-            mAudioSinkOpen = true;
-        }
 
         pthread_mutex_unlock(&pmem_response_mutex);
         // Post buffer to request Q
@@ -1046,6 +986,7 @@ void LPAPlayer::A2DPThreadEntry() {
                         pthread_cond_wait(&a2dp_cv, &a2dp_mutex);
                         pthread_mutex_unlock(&a2dp_mutex);
                     }
+
 
                     //Seeked: break out of loop, flush old buffers and write new buffers
                     LOGV("@_@bytes To write1:%d",bytesToWrite);
@@ -1159,6 +1100,83 @@ void LPAPlayer::EffectsThreadEntry() {
     effectsThreadAlive = false;
 }
 
+void *LPAPlayer::A2DPNotificationThreadWrapper(void *me) {
+    static_cast<LPAPlayer *>(me)->A2DPNotificationThreadEntry();
+    return NULL;
+}
+
+
+void LPAPlayer::A2DPNotificationThreadEntry() {
+    while (1) {
+        pthread_mutex_lock(&a2dp_notification_mutex);
+        pthread_cond_wait(&a2dp_notification_cv, &a2dp_notification_mutex);
+        pthread_mutex_unlock(&a2dp_notification_mutex);
+        if (killA2DPNotificationThread) {
+            break;
+        }
+
+        LOGV("A2DP notification has come bIsA2DPEnabled: %d", bIsA2DPEnabled);
+
+        if (bIsA2DPEnabled) {
+            struct pcm * local_handle = (struct pcm *)handle;
+            LOGV("Flushing all the buffers");
+            pthread_mutex_lock(&pmem_response_mutex);
+            pthread_mutex_lock(&pmem_request_mutex);
+            while(!pmemBuffersResponseQueue.empty()) {
+                BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
+                pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
+                pmemBuffersRequestQueue.push_back(buf);
+            }
+            pthread_mutex_unlock(&pmem_request_mutex);
+            pthread_mutex_unlock(&pmem_response_mutex);
+            LOGV("All the buffers flushed, Now flushing the driver");
+            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
+                LOGE("Reset failed!");
+            LOGV("Driver flushed and opening mAudioSink");
+            if (!mAudioSinkOpen) {
+                LOGV("Close Session");
+                if (mAudioSink.get() != NULL) {
+                    mAudioSink->closeSession();
+                    LOGV("mAudioSink close session");
+                } else {
+                    LOGE("close session NULL");
+                }
+                sp<MetaData> format = mSource->getFormat();
+                const char *mime;
+                bool success = format->findCString(kKeyMIMEType, &mime);
+                CHECK(success);
+                CHECK(!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW));
+                success = format->findInt32(kKeySampleRate, &mSampleRate);
+                CHECK(success);
+                success = format->findInt32(kKeyChannelCount, &numChannels);
+                CHECK(success);
+                LOGV("Before Audio Sink Open");
+                status_t ret = mAudioSink->open(mSampleRate, numChannels,AudioSystem::PCM_16_BIT, DEFAULT_AUDIOSINK_BUFFERCOUNT);
+                mAudioSink->start();
+                LOGV("After Audio Sink Open");
+                mAudioSinkOpen = true;
+            }
+            LOGV("Signalling to decoder cv");
+            pthread_cond_signal(&decoder_cv);
+        }
+        else {
+            mAudioSink->stop();
+            mAudioSink->close();
+            mAudioSinkOpen = false;
+            LOGV("resume:: opening audio session with mSampleRate %d numChannels %d sessionId %d",
+                 mSampleRate, numChannels, sessionId);
+            status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId,  mSampleRate, numChannels);
+            mInternalSeeking = true;
+            mReachedEOS = false;
+            mSeekTimeUs = timePlayed;
+            pthread_cond_signal(&a2dp_cv);
+        }
+    }
+    a2dpNotificationThreadAlive = false;
+    LOGV("A2DPNotificationThread is dying");
+
+}
+
 void *LPAPlayer::pmemBufferAlloc(int32_t nSize, int32_t *pmem_fd){
     int32_t pmemfd = -1;
     void  *pmem_buf = NULL;
@@ -1217,11 +1235,12 @@ void LPAPlayer::createThreads() {
     pthread_mutex_init(&a2dp_mutex, NULL);
     pthread_mutex_init(&effect_mutex, NULL);
     pthread_mutex_init(&apply_effect_mutex, NULL);
+    pthread_mutex_init(&a2dp_notification_mutex, NULL);
 
     pthread_cond_init (&event_cv, NULL);
     pthread_cond_init (&decoder_cv, NULL);
     pthread_cond_init (&a2dp_cv, NULL);
-    pthread_cond_init (&effect_cv, NULL);
+    pthread_cond_init (&a2dp_notification_cv, NULL);
 
     // Create 4 threads Effect, decoder, event and A2dp
     pthread_attr_t attr;
@@ -1232,21 +1251,28 @@ void LPAPlayer::createThreads() {
     killEventThread = false;
     killA2DPThread = false;
     killEffectsThread = false;
+    killA2DPNotificationThread = false;
 
     decoderThreadAlive = true;
     eventThreadAlive = true;
     a2dpThreadAlive = true;
     effectsThreadAlive = true;
+    a2dpNotificationThreadAlive = true;
 
     LOGV("Creating Event Thread");
     pthread_create(&eventThread, &attr, eventThreadWrapper, this);
 
     LOGV("Creating decoder Thread");
     pthread_create(&decoderThread, &attr, decoderThreadWrapper, this);
-    //TODO: Add A2dp thread
+
+    LOGV("Creating A2DP Thread");
+    pthread_create(&A2DPThread, &attr, A2DPThreadWrapper, this);
 
     LOGV("Creating Effects Thread");
     pthread_create(&EffectsThread, &attr, EffectsThreadWrapper, this);
+
+    LOGV("Creating A2DP Notification Thread");
+    pthread_create(&A2DPNotificationThread, &attr, A2DPNotificationThreadWrapper, this);
 
     pthread_attr_destroy(&attr);
 }
@@ -1476,6 +1502,15 @@ void LPAPlayer::requestAndWaitForEffectsThreadExit() {
     LOGV("effects thread killed");
 }
 
+void LPAPlayer::requestAndWaitForA2DPNotificationThreadExit() {
+    if (!a2dpNotificationThreadAlive)
+        return;
+    killA2DPNotificationThread = true;
+    pthread_cond_signal(&a2dp_notification_cv);
+    pthread_join(A2DPNotificationThread,NULL);
+    LOGV("a2dp notification thread killed");
+}
+
 void LPAPlayer::onPauseTimeOut() {
     struct msm_audio_stats stats;
     int nBytesConsumed = 0;
@@ -1501,7 +1536,6 @@ void LPAPlayer::onPauseTimeOut() {
         }
 
         // 2. Call AUDIO_STOP on the Driver.
-        mIsDriverStarted = false;
         if ( ioctl(afd, AUDIO_STOP, 0) < 0 ) {
             LOGE("AUDIO_STOP failed");
         }
