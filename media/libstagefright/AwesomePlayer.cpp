@@ -1230,6 +1230,9 @@ status_t AwesomePlayer::initVideoDecoder(uint32_t flags) {
         LOGW("Software Codec is prefered for Video");
         flags |= OMXCodec::kPreferSoftwareCodecs;
     }
+    if(mFileSource != NULL) {
+        flags |= OMXCodec::kLocalFileMode;
+    }
 
     mVideoSource = OMXCodec::Create(
             mClient.interface(), mVideoTrack->getFormat(),
