@@ -436,9 +436,9 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
         pthread_mutex_unlock(&pmem_response_mutex);
         LOGV("Transferred all the buffers from response queue to rquest queue to handle seek");
         if (!isPaused) {
-            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
-                LOGE("Reset failed!");
-
+            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,1) < 0) {
+                LOGE("Audio Pause failed");
+            }
             local_handle->start = 0;
             pcm_prepare(local_handle);
             LOGV("Reset, drain and prepare completed");
@@ -511,8 +511,6 @@ void LPAPlayer::resume() {
                 LOGV("Sync resume done\n");
             }
             else {
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
-                    LOGE("Reset failed");
                 local_handle->start = 0;
                 pcm_prepare(local_handle);
                 LOGV("Reset, drain and prepare completed");
