@@ -274,7 +274,6 @@ private:
     status_t destroySurface(const wp<LayerBaseClient>& layer);
     status_t setClientState(const sp<Client>& client,
             int32_t count, const layer_state_t* states);
-    void resetReconfigStatus();
     class LayerVector : public SortedVector< sp<LayerBase> > {
     public:
         LayerVector() { }

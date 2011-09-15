@@ -461,8 +461,6 @@ bool SurfaceFlinger::threadLoop()
             mBypassState = eBypassNotInUse;
         }
 #endif
-        resetReconfigStatus();
-
         logger.log(GraphicLog::SF_REPAINT_DONE, index);
     } else {
         if ((mHDMIOutput || mOverlayOpt) && !(hw.canDraw())) {
@@ -1068,19 +1066,6 @@ void SurfaceFlinger::freeBypassBuffers()
 #endif
 }
 
-void SurfaceFlinger::resetReconfigStatus()
-{
-    const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
-    const size_t count = layers.size();
-    for (size_t i = 0; i < count; i++)
-    {
-        const sp<LayerBase> layer = layers[i];
-        if (layer->getLayerInitFlags() & ePushBuffers) {
-            layer->resetReconfigStatus();
-        }
-    }
-}
-
 void SurfaceFlinger::composeSurfaces(const Region& dirty)
 {
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
@@ -1203,9 +1188,8 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                             layerbuffercount == 1) {
                     if (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR) {
                         layer->draw(clip);
-                        mOverlayUseChanged = true;
                     }
-                    else{
+                    else {
                         mOverlayUsed = true;
                     }
                 }
