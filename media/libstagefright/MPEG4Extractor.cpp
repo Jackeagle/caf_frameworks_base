@@ -1947,7 +1947,7 @@ status_t MPEG4Source::read(
             size_t nalLength = parseNALSize(&mSrcBuffer[srcOffset]);
             srcOffset += mNALLengthSize;
 
-            if (srcOffset + nalLength > size) {
+             if (nalLength > size - srcOffset) {
                 //If NAL Length is corrupt,
                 //return custom error ERROR_CORRUPT_NAL
                 LOGW("ERROR - CORRUPT NAL ");
