@@ -1171,6 +1171,13 @@ status_t AudioFlinger::ThreadBase::setParameters(const String8& keyValuePairs)
     return status;
 }
 
+void AudioFlinger::ThreadBase::effectConfigChanged() {
+    mAudioFlinger->mLock.lock();
+    LOGV("New effect is being added to LPA chain, Notifying LPA Player");
+    mAudioFlinger->audioConfigChanged_l(AudioSystem::EFFECT_CONFIG_CHANGED, 0, NULL);
+    mAudioFlinger->mLock.unlock();
+}
+
 void AudioFlinger::ThreadBase::sendConfigEvent(int event, int param)
 {
     Mutex::Autolock _l(mLock);
@@ -5478,8 +5485,7 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::PlaybackThread::createEffect_l(
             effect->setMode(mAudioFlinger->getMode());
 
             if(chain == mAudioFlinger->mLPAEffectChain) {
-                LOGV("New effect is being added to LPA chain, Notifying LPA Player");
-                mAudioFlinger->audioConfigChanged_l(AudioSystem::EFFECT_CONFIG_CHANGED, 0, NULL);
+                effect->setLPAFlag(true);
             }
         }
         // create effect handle and connect it to effect module
@@ -5562,10 +5568,6 @@ void AudioFlinger::PlaybackThread::removeEffect_l(const sp<EffectModule>& effect
         // remove effect chain if removing last effect
         if (chain->removeEffect_l(effect) == 0) {
             removeEffectChain_l(chain);
-        }
-        if(chain == mAudioFlinger->mLPAEffectChain) {
-            LOGV("An effect is removed from LPA chain, Notifying LPA Player");
-            mAudioFlinger->audioConfigChanged_l(AudioSystem::EFFECT_CONFIG_CHANGED, 0, NULL);
         }
     } else {
         LOGW("removeEffect_l() %p cannot promote chain for effect %p", this, effect.get());
@@ -5859,6 +5861,7 @@ size_t AudioFlinger::EffectModule::removeHandle(const wp<EffectHandle>& handle)
 
 void AudioFlinger::EffectModule::disconnect(const wp<EffectHandle>& handle)
 {
+    setEnabled(false);
     // keep a strong reference on this EffectModule to avoid calling the
     // destructor before we exit
     sp<EffectModule> keep(this);
@@ -6157,39 +6160,51 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
 
 status_t AudioFlinger::EffectModule::setEnabled(bool enabled)
 {
-    Mutex::Autolock _l(mLock);
-    LOGV("setEnabled %p enabled %d", this, enabled);
+    bool effectStateChanged = false;
+    {
+        Mutex::Autolock _l(mLock);
+        LOGV("setEnabled %p enabled %d", this, enabled);
+        if (enabled != isEnabled()) {
+            effectStateChanged = true;
+            switch (mState) {
+            // going from disabled to enabled
+            case IDLE:
+                mState = STARTING;
+                break;
+            case STOPPED:
+                mState = RESTART;
+                break;
+            case STOPPING:
+                mState = ACTIVE;
+                break;
 
-    if (enabled != isEnabled()) {
-        switch (mState) {
-        // going from disabled to enabled
-        case IDLE:
-            mState = STARTING;
-            break;
-        case STOPPED:
-            mState = RESTART;
-            break;
-        case STOPPING:
-            mState = ACTIVE;
-            break;
-
-        // going from enabled to disabled
-        case RESTART:
-            mState = STOPPED;
-            break;
-        case STARTING:
-            mState = IDLE;
-            break;
-        case ACTIVE:
-            mState = STOPPING;
-            break;
-        }
-        for (size_t i = 1; i < mHandles.size(); i++) {
-            sp<EffectHandle> h = mHandles[i].promote();
-            if (h != 0) {
-                h->setEnabled(enabled);
+            // going from enabled to disabled
+            case RESTART:
+                mState = STOPPED;
+                break;
+            case STARTING:
+                mState = IDLE;
+                break;
+            case ACTIVE:
+                mState = STOPPING;
+                break;
+            }
+            for (size_t i = 1; i < mHandles.size(); i++) {
+                sp<EffectHandle> h = mHandles[i].promote();
+                if (h != 0) {
+                    h->setEnabled(enabled);
+                }
             }
         }
+    }
+
+    /*
+       Send notification event to LPA Player when an effect for
+       LPA output is enabled or disabled.
+    */
+    if (effectStateChanged && mIsForLPA) {
+        sp<ThreadBase> thread = mThread.promote();
+        thread->effectConfigChanged();
     }
     return NO_ERROR;
 }
