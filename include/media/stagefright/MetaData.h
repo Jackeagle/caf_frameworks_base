@@ -147,7 +147,7 @@ enum {
 enum {
     kTypeWMA,
     kTypeWMAPro,
-    kTypeWMAProPlus,
+    kTypeWMALossLess,
 };
 
 class MetaData : public RefBase {
