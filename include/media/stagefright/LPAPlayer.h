@@ -112,18 +112,21 @@ private:
     pthread_t decoderThread;
     pthread_t A2DPThread;
     pthread_t EffectsThread;
+    pthread_t A2DPNotificationThread;
 
     //Kill Thread boolean
     bool killDecoderThread;
     bool killEventThread;
     bool killA2DPThread;
     bool killEffectsThread;
+    bool killA2DPNotificationThread;
 
     //Thread alive boolean
     bool decoderThreadAlive;
     bool eventThreadAlive;
     bool a2dpThreadAlive;
     bool effectsThreadAlive;
+    bool a2dpNotificationThreadAlive;
 
     //Declare the condition Variables and Mutex
     pthread_mutex_t pmem_request_mutex;
@@ -133,12 +136,15 @@ private:
     pthread_mutex_t a2dp_mutex;
     pthread_mutex_t effect_mutex;
     pthread_mutex_t apply_effect_mutex;
+    pthread_mutex_t a2dp_notification_mutex;
 
     pthread_cond_t event_cv;
     pthread_cond_t decoder_cv;
     pthread_cond_t a2dp_cv;
     pthread_cond_t effect_cv;
     pthread_cond_t event_thread_cv;
+    pthread_cond_t a2dp_notification_cv;
+
     // make sure Decoder thread has exited
     void requestAndWaitForDecoderThreadExit();
 
@@ -151,6 +157,9 @@ private:
     // make sure the Effects thread also exited
     void requestAndWaitForEffectsThreadExit();
 
+    // make sure the Effects thread also exited
+    void requestAndWaitForA2DPNotificationThreadExit();
+
     static void *eventThreadWrapper(void *me);
     void eventThreadEntry();
     static void *decoderThreadWrapper(void *me);
@@ -159,6 +168,8 @@ private:
     void A2DPThreadEntry();
     static void *EffectsThreadWrapper(void *me);
     void EffectsThreadEntry();
+    static void *A2DPNotificationThreadWrapper(void *me);
+    void A2DPNotificationThreadEntry();
 
     void createThreads();
 
