@@ -49,6 +49,8 @@ class BluetoothEventLoop {
     private boolean mInterrupted;
 
     private final HashMap<String, Integer> mPasskeyAgentRequestData;
+    private final HashMap<String, Integer> mAuthorizationRequestData;
+    private final HashMap<String, Integer> mAuthorizationAgentRequestData;
     private final BluetoothService mBluetoothService;
     private final BluetoothAdapter mAdapter;
     private final Context mContext;
@@ -105,6 +107,8 @@ class BluetoothEventLoop {
         mBluetoothService = bluetoothService;
         mContext = context;
         mPasskeyAgentRequestData = new HashMap();
+        mAuthorizationRequestData = new HashMap();
+        mAuthorizationAgentRequestData = new HashMap<String, Integer>();
         mAdapter = adapter;
         initializeNativeDataNative();
     }
@@ -119,6 +123,14 @@ class BluetoothEventLoop {
 
     /* package */ HashMap<String, Integer> getPasskeyAgentRequestData() {
         return mPasskeyAgentRequestData;
+    }
+
+    /* package */ HashMap<String, Integer> getAuthorizationRequestData() {
+        return mAuthorizationRequestData;
+    }
+
+    /* package */ HashMap<String, Integer> getAuthorizationAgentRequestData() {
+        return mAuthorizationAgentRequestData;
     }
 
     /* package */ void start() {
@@ -499,16 +511,19 @@ class BluetoothEventLoop {
         mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
     }
 
-    private boolean onAgentAuthorize(String objectPath, String deviceUuid) {
+    private void  onAgentAuthorize(String objectPath, String deviceUuid, int nativeData) {
         String address = mBluetoothService.getAddressFromObjectPath(objectPath);
         if (address == null) {
             Log.e(TAG, "Unable to get device address in onAuthAgentAuthorize");
-            return false;
+            return;
         }
 
         boolean authorized = false;
         ParcelUuid uuid = ParcelUuid.fromString(deviceUuid);
         BluetoothA2dp a2dp = new BluetoothA2dp(mContext);
+
+        BluetoothDevice device = mAdapter.getRemoteDevice(address);
+        mAuthorizationAgentRequestData.put(address, new Integer(nativeData));
 
         // Bluez sends the UUID of the local service being accessed, _not_ the
         // remote service
@@ -516,10 +531,9 @@ class BluetoothEventLoop {
                 (BluetoothUuid.isAudioSource(uuid) || BluetoothUuid.isAvrcpTarget(uuid)
                         || BluetoothUuid.isAdvAudioDist(uuid)) &&
                         !isOtherSinkInNonDisconnectingState(address)) {
-            BluetoothDevice device = mAdapter.getRemoteDevice(address);
             authorized = a2dp.getSinkPriority(device) > BluetoothA2dp.PRIORITY_OFF;
             if (authorized) {
-                Log.i(TAG, "Allowing incoming A2DP / AVRCP connection from " + address);
+                Log.i(TAG, "First check pass for incoming A2DP / AVRCP connection from " + address);
                 // Some headsets try to connect AVCTP before AVDTP - against the recommendation
                 // If AVCTP connection fails, we get stuck in IncomingA2DP state in the state
                 // machine.  We don't handle AVCTP signals currently. We only send
@@ -532,9 +546,10 @@ class BluetoothEventLoop {
                 // established. If the remote device sends AVRCP connection
                 // first DUT will accept the AVRCP connection and initiates
                 // A2DP connection from handset.
+                    a2dp.allowIncomingConnect(device, authorized);
                     Log.d(TAG,"AVRCP target connection");
                     mBluetoothService.notifyConnectA2dp(address);
-                    return true;
+                    return;
                 }
             } else {
                 Log.i(TAG, "Rejecting incoming A2DP / AVRCP connection from " + address);
@@ -543,7 +558,7 @@ class BluetoothEventLoop {
             Log.i(TAG, "Rejecting incoming " + deviceUuid + " connection from " + address);
         }
         log("onAgentAuthorize(" + objectPath + ", " + deviceUuid + ") = " + authorized);
-        return authorized;
+        if (!authorized) a2dp.allowIncomingConnect(device, authorized);
     }
 
     private boolean onAgentOutOfBandDataAvailable(String objectPath) {
