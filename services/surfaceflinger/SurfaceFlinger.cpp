@@ -2651,7 +2651,18 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
             const size_t count = layers.size();
             for (size_t i=0 ; i<count ; ++i) {
                 const sp<LayerBase>& layer(layers[i]);
+                bool isBlurSurface = false;
+                // for blur surfaces, invalidate the cache and read from the FBO
+                if (layer->getLayerInitFlags() & eFXSurfaceBlur)
+                    isBlurSurface = true;
+                if (isBlurSurface)
+                    layer->doTransaction(0);
+
                 layer->drawForSreenShot();
+
+                //refresh the cache again to read from the FB next time
+                if (isBlurSurface)
+                    layer->doTransaction(0);
             }
 
             // XXX: this is needed on tegra
