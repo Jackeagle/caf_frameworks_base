@@ -314,15 +314,6 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
         mDpt.setServiceTypeEnabled(DataServiceType.SERVICE_TYPE_DEFAULT, !dataDisabledOnBoot);
         mNoAutoAttach = dataDisabledOnBoot;
 
-        if (SystemProperties.getBoolean("persist.cust.tel.sdc.feature", false)) {
-            /* use the SOCKET_DATA_CALL_ENABLE setting do determine the boot up value of
-             * mMasterDataEnable - but only if persist.cust.tel.sdc.feature is on.
-             */
-            mMasterDataEnabled = Settings.System.getInt(
-                    mContext.getContentResolver(),
-                    Settings.System.SOCKET_DATA_CALL_ENABLE, 1) > 0;
-        }
-
         /* On startup, check with ConnectivityService(CS) if mobile data has
          * been disabled from the phone settings.  CS processes this setting on
          * startup and disables all service types via the
