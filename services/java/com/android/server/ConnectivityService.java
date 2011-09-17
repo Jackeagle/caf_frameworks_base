@@ -1981,6 +1981,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         if (ratType == CNE.CNE_RAT_WLAN){
             networkType = ConnectivityManager.TYPE_WIFI;
         } else if (ratType == CNE.CNE_RAT_WWAN) {
+            if (!getMobileDataEnabled()) {
+                if (DBG) Slog.d(TAG, "mobile data service disabled");
+                return false;
+            }
             networkType = ConnectivityManager.TYPE_MOBILE;
         } else {
             Slog.d(TAG, "Unknown RatType = " + ratType);
