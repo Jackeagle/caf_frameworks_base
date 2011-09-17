@@ -55,8 +55,8 @@ public class IccCardProxy extends Handler implements IccCard {
 
     private static final String LOG_TAG = "RIL_IccCardProxy";
 
-    private static final int EVENT_RADIO_OFF_OR_UNAVAILABLE = 1;
-    private static final int EVENT_RADIO_ON = 2;
+    private static final int EVENT_RADIO_UNAVAILABLE = 1;
+    private static final int EVENT_RADIO_AVAILABLE = 2;
     private static final int EVENT_ICC_CHANGED = 3;
     private static final int EVENT_ICC_ABSENT = 4;
     private static final int EVENT_ICC_LOCKED = 5;
@@ -83,13 +83,13 @@ public class IccCardProxy extends Handler implements IccCard {
     private Subscription mSubscriptionData = null;
     private boolean mFirstRun = true;
     private int mCardIndex = 0;
-    private boolean mRadioOn = false;
     private boolean mCdmaSubscriptionFromNv = false;
     private boolean mIsMultimodeCdmaPhone =
             SystemProperties.getBoolean("ro.config.multimode_cdma", false);
-    private boolean mQuiteMode = false; // when set to true IccCardProxy will not broadcast
+    private boolean mQuietMode = false; // when set to true IccCardProxy will not broadcast
                                         // ACTION_SIM_STATE_CHANGED intents
-    private boolean mInitialized = false;
+    private boolean mInitialized = false;// set to true when mQuietMode has been
+                                         // appropriately initialized
 
     public IccCardProxy(Context mContext, CommandsInterface cm, int cardIndex) {
         super();
@@ -101,8 +101,8 @@ public class IccCardProxy extends Handler implements IccCard {
 
         mUiccManager = UiccManager.getInstance();
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
-        cm.registerForOn(this,EVENT_RADIO_ON, null);
-        cm.registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, null);
+        cm.registerForAvailable(this,EVENT_RADIO_AVAILABLE, null);
+        cm.registerForNotAvailable(this, EVENT_RADIO_UNAVAILABLE, null);
         resetProperties();
         for (int i = 0; i < TelephonyManager.getPhoneCount(); i++) {
             TelephonyManager.setTelephonyProperty(PROPERTY_SIM_STATE, i, "ABSENT");
@@ -113,8 +113,8 @@ public class IccCardProxy extends Handler implements IccCard {
         //Cleanup icc references
         mUiccManager.unregisterForIccChanged(this);
         mUiccManager = null;
-        cm.unregisterForOn(this);
-        cm.unregisterForOffOrNotAvailable(this);
+        cm.unregisterForAvailable(this);
+        cm.unregisterForNotAvailable(this);
         mCdmaSSM.dispose(this);
         resetProperties();
     }
@@ -131,18 +131,18 @@ public class IccCardProxy extends Handler implements IccCard {
             mCurrentAppType = AppFamily.APP_FAM_3GPP;
         }
         mFirstRun = true;
-        updateQuiteMode();
+        updateQuietMode();
     }
 
-    /** This function does not necessarily updates mQuiteMode right away
+    /** This function does not necessarily updates mQuietMode right away
      * In case of 3GPP2 subscription it needs more information (subscription source)
      */
-    private void updateQuiteMode() {
-        Log.d(LOG_TAG, "Updating quite mode");
+    private void updateQuietMode() {
+        Log.d(LOG_TAG, "Updating quiet mode");
         if (mCurrentAppType == AppFamily.APP_FAM_3GPP) {
             mInitialized = true;
-            mQuiteMode = false;
-            Log.d(LOG_TAG, "3GPP subscription -> QuiteMode: " + mQuiteMode);
+            mQuietMode = false;
+            Log.d(LOG_TAG, "3GPP subscription -> QuietMode: " + mQuietMode);
             sendMessage(obtainMessage(EVENT_ICC_CHANGED));
         } else {
             //In case of 3gpp2 we need to find out if subscription used is coming from
@@ -155,13 +155,13 @@ public class IccCardProxy extends Handler implements IccCard {
 
     public void handleMessage(Message msg) {
         switch (msg.what) {
-            case EVENT_RADIO_OFF_OR_UNAVAILABLE:
-                mRadioOn = false;
+            case EVENT_RADIO_UNAVAILABLE:
+                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
                 break;
-            case EVENT_RADIO_ON:
-                mRadioOn = true;
+
+            case EVENT_RADIO_AVAILABLE:
                 if (!mInitialized) {
-                    updateQuiteMode();
+                    updateQuietMode();
                 }
                 break;
             case EVENT_ICC_CHANGED:
@@ -226,7 +226,7 @@ public class IccCardProxy extends Handler implements IccCard {
                 }
                 break;
             case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
-                updateQuiteMode();
+                updateQuietMode();
                 break;
             default:
                 Log.e(LOG_TAG, "Unhandled message with number: " + msg.what);
@@ -256,7 +256,9 @@ public class IccCardProxy extends Handler implements IccCard {
 
         mUiccCard = mUiccManager.getIccCard(mCardIndex);
         if (mUiccCard != null) {
-            Log.d(LOG_TAG,"Card State = " + mUiccCard.getCardState() + "Card Index = " + mCardIndex);
+            Log.d(LOG_TAG,"Card State = " + mUiccCard.getCardState() + " Card Index = " + mCardIndex);
+        } else {
+            Log.d(LOG_TAG,"No card available on Card Index = " + mCardIndex);
         }
 
         if (mSubscriptionData != null) {
@@ -288,20 +290,12 @@ public class IccCardProxy extends Handler implements IccCard {
                 mAppRecords = null;
             }
             if (newApplication == null) {
-                if (mRadioOn) {
-                    if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ERROR)) {
-                        broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
-                    } else if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
-                        broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
-                    } else {
-                        Log.d(LOG_TAG,"CardState neither error nor absent");
-                    }
+                if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ERROR)) {
+                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
+                } else if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
+                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
                 } else {
-                      if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
-                          broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
-                      } else {
-                          broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
-                      }
+                    Log.e(LOG_TAG,"CardState neither error nor absent, but newApplication = null");
                 }
             } else {
                 mApplication = newApplication;
@@ -319,8 +313,6 @@ public class IccCardProxy extends Handler implements IccCard {
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_CARD_IO_ERROR, null);
             } else if ((mUiccCard != null) && (mUiccCard.getCardState() == CardState.ABSENT)) {
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
-            } else {
-                Log.d(LOG_TAG,"CardState neither error nor absent when mApplication = newApplication");
             }
         }
     }
@@ -355,8 +347,8 @@ public class IccCardProxy extends Handler implements IccCard {
     /* why do external apps need to use this? */
     public void broadcastIccStateChangedIntent(String value, String reason) {
         int subId = mCardIndex;
-        if (mQuiteMode) {
-            Log.e(LOG_TAG, "QuiteMode: NOT Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
+        if (mQuietMode) {
+            Log.d(LOG_TAG, "QuietMode: NOT Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
                     + " reason " + reason);
             return;
         }
@@ -373,7 +365,7 @@ public class IccCardProxy extends Handler implements IccCard {
         }
         intent.putExtra(INTENT_KEY_SUBSCRIPTION, subId);
 
-        Log.e(LOG_TAG, "Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
+        Log.d(LOG_TAG, "Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
             + " reason " + reason + " for subscription : " + subId);
         ActivityManagerNative.broadcastStickyIntent(intent, READ_PHONE_STATE);
     }
@@ -824,16 +816,16 @@ public class IccCardProxy extends Handler implements IccCard {
             Log.d(LOG_TAG, "Cdma multimode phone detected. Forcing IccCardProxy into 3gpp mode");
             mCurrentAppType = AppFamily.APP_FAM_3GPP;
         }
-        boolean newQuiteMode = mCdmaSubscriptionFromNv
+        boolean newQuietMode = mCdmaSubscriptionFromNv
                 && (mCurrentAppType == AppFamily.APP_FAM_3GPP2) && !mIsMultimodeCdmaPhone;
-        if (mQuiteMode == false && newQuiteMode == true) {
-            // Last thing to do before switching to quite mode is
+        if (mQuietMode == false && newQuietMode == true) {
+            // Last thing to do before switching to quiet mode is
             // broadcast ICC_READY
-            Log.d(LOG_TAG, "Switching to QuiteMode.");
+            Log.d(LOG_TAG, "Switching to QuietMode.");
             broadcastIccStateChangedIntent(INTENT_VALUE_ICC_READY, null);
         }
-        mQuiteMode = newQuiteMode;
-        Log.d(LOG_TAG, "QuiteMode is " + mQuiteMode + " (app_type: " + mCurrentAppType + " nv: "
+        mQuietMode = newQuietMode;
+        Log.d(LOG_TAG, "QuietMode is " + mQuietMode + " (app_type: " + mCurrentAppType + " nv: "
                 + mCdmaSubscriptionFromNv + " multimode: " + mIsMultimodeCdmaPhone + ")");
         mInitialized = true;
         sendMessage(obtainMessage(EVENT_ICC_CHANGED));
