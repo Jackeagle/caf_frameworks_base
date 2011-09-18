@@ -340,6 +340,7 @@ public final class ServerOperation implements Operation, BaseStream {
             }
         } else {
             mSrmGetActive = mSrmServerSession.getLocalSrmStatus();
+            requestHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER, ObexHelper.OBEX_SRM_PARAM_NONE);
             sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive,mSrmGetActive);
 
             if (mSrmGetActive == ObexHelper.LOCAL_SRM_ENABLED) {
