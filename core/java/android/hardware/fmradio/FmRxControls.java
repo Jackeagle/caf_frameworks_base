@@ -230,7 +230,7 @@ class FmRxControls
    {
          int freq = 0;
          int i=0;
-         int station_num;
+         int station_num = 0;
          float real_freq = 0;
          int [] stationList;
          byte [] sList = new byte[100];
@@ -243,7 +243,9 @@ class FmRxControls
          Log.d(TAG, "lowBand: " + lowBand);
          FmReceiverJNI.getBufferNative(fd, sList, 0);
 
-         station_num = (int)sList[0];
+         if ((int)sList[0] >0) {
+             station_num = (int)sList[0];
+         }
          stationList = new int[station_num+1];
          Log.d(TAG, "station_num: " + station_num);
 
