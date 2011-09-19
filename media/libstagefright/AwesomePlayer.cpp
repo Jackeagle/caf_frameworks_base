@@ -381,6 +381,9 @@ void AwesomePlayer::reset_l() {
     if (mPrefetcher != NULL) {
         CHECK_EQ(mPrefetcher->getStrongCount(), 1);
     }
+    if (mAudioPlayer != NULL) {
+        mAudioPlayer->pause();
+    }
     mPrefetcher.clear();
 
     mAudioTrack.clear();

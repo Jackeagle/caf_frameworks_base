@@ -74,6 +74,7 @@ private:
 
     HTTPStream(const HTTPStream &);
     HTTPStream &operator=(const HTTPStream &);
+    int mRecvFailed;
 };
 
 }  // namespace android
