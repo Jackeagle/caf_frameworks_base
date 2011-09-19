@@ -338,6 +338,7 @@ status_t MediaRecorderClient::release()
     if (mRecorder != NULL) {
         delete mRecorder;
         mRecorder = NULL;
+        mListener = NULL;
         wp<MediaRecorderClient> client(this);
         mMediaPlayerService->removeMediaRecorderClient(client);
     }
