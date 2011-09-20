@@ -29,14 +29,10 @@ LOCAL_CFLAGS += -DUSE_ASHMEM
 endif
 endif
 
-ifeq ($(QCOM_TARGET_PRODUCT),qsd8650a_st1x)
-	LOCAL_CFLAGS += -DSF_MEM_SIZE=\"-Dgralloc.ashmem_size=67108864\"
-else
-ifeq ($(TARGET_BOARD_PLATFORM),msm8660)
+ifeq ($(call is-board-platform,msm8660),true)
 	LOCAL_CFLAGS += -DSF_MEM_SIZE=\"-Dgralloc.ashmem_size=67108864\"
 else
 	LOCAL_CFLAGS += -DSF_MEM_SIZE=\"-Dgralloc.ashmem_size=24117248\"
-endif
 endif
 
 LOCAL_SRC_FILES:= \
