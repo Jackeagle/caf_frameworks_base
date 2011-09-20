@@ -101,6 +101,7 @@ public final class Message implements Parcelable {
                 Message m = mPool;
                 mPool = m.next;
                 m.next = null;
+                mPoolSize--;
                 return m;
             }
         }
@@ -243,6 +244,7 @@ public final class Message implements Parcelable {
                 
                 next = mPool;
                 mPool = this;
+                mPoolSize++;
             }
         }
     }
