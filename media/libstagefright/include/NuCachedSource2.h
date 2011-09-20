@@ -53,16 +53,17 @@ private:
 
     enum {
         kPageSize            = 2 * 64 * 1024,
-        kHighWaterThreshold  = 5 * 1024 * 1024,
-        kLowWaterThreshold   = 512 * 1024,
-        kMaxHighWaterThreshold  = 5 * 1024 * 1024,
-        kMinHighWaterThreshold  = 4 * 1024 * 1024,
-        kMaxLowWaterThreshold   = 4 * 1024 * 1024,
-        kMinLowWaterThreshold   = 512 * 1024,
+        kHighWaterThreshold  = 20 * 1024 * 1024,
+        kLowWaterThreshold   = 4 * 1024 * 1024,
 
         // Read data after a 4 sec timeout whether we're actively
         // fetching or not.
         kKeepAliveIntervalUs = 4 * 1000 * 1000,
+    };
+
+    enum {
+       kMinAVInterleavingOffset = 32 * 1024,
+       kMaxAVInterleavingOffset = 2 * 1024 * 1024,
     };
 
     enum {
@@ -87,6 +88,7 @@ private:
     bool mFetching;
     int64_t mLastFetchTimeUs;
     bool mSuspended;
+    int64_t mAVOffset;
 
     void onMessageReceived(const sp<AMessage> &msg);
     void onFetch();
@@ -103,12 +105,9 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(NuCachedSource2);
 
 public:
-    void setThresholds(size_t lowWaterThreshold, size_t highWaterThreshold);
-    void getThresholds(size_t& lowWaterThreshold, size_t& highWaterThreshold);
-
-private:
-    size_t mHighWaterThreshold;
-    size_t mLowWaterThreshold;
+    bool isCacheFull();
+    void resumeFetchingIfNecessary();
+    void setAVInterleavingOffset(int64_t av_offset);
 };
 
 }  // namespace android
