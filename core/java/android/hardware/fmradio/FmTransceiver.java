@@ -104,6 +104,7 @@ public class FmTransceiver
 
    private static final int V4L2_CID_PRIVATE_BASE = 0x8000000;
    private static final int V4L2_CID_PRIVATE_TAVARUA_ANTENNA   = V4L2_CID_PRIVATE_BASE + 18;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SET_NOTCH_FILTER = V4L2_CID_PRIVATE_BASE + 40;
 
    private final String TAG = "FmTransceiver";
    private final String V4L2_DEVICE = "/dev/radio0";
@@ -474,7 +475,7 @@ public class FmTransceiver
     *
     */
    public void setNotchFilter(boolean value) {
-	FmReceiverJNI.setNotchFilterNative(value);
+	FmReceiverJNI.setNotchFilterNative(sFd, V4L2_CID_PRIVATE_TAVARUA_SET_NOTCH_FILTER, value);
    }
 
    /*==============================================================
