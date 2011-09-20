@@ -212,27 +212,16 @@ int FramebufferNativeWindow::dequeueBuffer(ANativeWindow* window,
     GraphicLog& logger(GraphicLog::getInstance());
     logger.log(GraphicLog::SF_FB_DEQUEUE_BEFORE, index);
 
-    /* This function is supposed to check whether there is atleast
-       one free buffer available.
-       fb->dequeueBuffer will check for the BufferHead being
-       available, which needs to be checked explicitly for
-       more than 2 buffer case, because in that case, fb_post
-       is not going to wait for BufferHead to be available, it will
-       wait just for the next buffer to be available.
-
-       For 2 framebuffers, there will always
-       be at least one buffer free. BufferHead being available
-       is already being checked in lockBuffer function.
-    */
-    if (fb->numFramebuffers > 2) {
-        fb->dequeueBuffer(fb, index);
-    }
-
     /* The buffer is available, return it */
     Mutex::Autolock _l(self->mutex);
     self->mBufferHead++;
     if (self->mBufferHead >= self->mNumBuffers)
         self->mBufferHead = 0;
+
+    // wait if number of free buffers is <=0
+    while (self->mNumFreeBuffers <= 0) {
+        self->mCondition.wait(self->mutex);
+    }
 
     // get this buffer
     self->mNumFreeBuffers--;
@@ -248,17 +237,20 @@ int FramebufferNativeWindow::lockBuffer(ANativeWindow* window,
         android_native_buffer_t* buffer)
 {
     FramebufferNativeWindow* self = getSelf(window);
-    Mutex::Autolock _l(self->mutex);
-    LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::lockBuffer");
+    int index = -1;
+    {
+        Mutex::Autolock _l(self->mutex);
+        LOGE_IF(!self->grDev, "[RACE] FramebufferNativeWindow::lockBuffer");
+        index = self->mCurrentBufferIndex;
+    }
 
-    const int index = self->mCurrentBufferIndex;
     GraphicLog& logger(GraphicLog::getInstance());
     logger.log(GraphicLog::SF_FB_LOCK_BEFORE, index);
 
-    // wait that the buffer we're locking is not front anymore
-    while (self->front == buffer) {
-        self->mCondition.wait(self->mutex);
-    }
+    framebuffer_device_t* fb = self->fbDev;
+    if (!fb)
+        return NO_INIT;
+    fb->lockBuffer(fb, index);
 
     logger.log(GraphicLog::SF_FB_LOCK_AFTER, index);
     return NO_ERROR;
