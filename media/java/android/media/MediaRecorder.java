@@ -19,6 +19,7 @@ package android.media;
 
 import android.media.CamcorderProfile;
 import android.hardware.Camera;
+import android.hardware.Camera.Parameters;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -82,10 +83,12 @@ public class MediaRecorder
     private EventHandler mEventHandler;
     private OnErrorListener mOnErrorListener;
     private OnInfoListener mOnInfoListener;
-
+    private boolean mDISEnabled;
     private WakeLock mWakeLock;
     private boolean mUseWakeLock;
     private PictureCallback mJpegCallback;
+    private int mWidth;
+    private int mHeight;
 
     /**
      * Default constructor.
@@ -103,6 +106,9 @@ public class MediaRecorder
 
         mWakeLock = null;
         mUseWakeLock = false;
+        mDISEnabled = false;
+        mWidth = 0;
+        mHeight = 0;
 
         /* Native setup requires a weak reference to our object.
          * It's easier to create it here than in C++.
@@ -117,7 +123,12 @@ public class MediaRecorder
      *
      * @param c the Camera to use for recording
      */
-    public native void setCamera(Camera c);
+    public void setCamera(Camera c){
+        c.lock();
+        mDISEnabled = "true".equalsIgnoreCase(c.getParameters().get("disenable"));
+        c.unlock();
+        _setCamera(c);
+    }
 
     /**
      * Sets a Surface to show a preview of recorded media (video). Calls this
@@ -377,19 +388,8 @@ public class MediaRecorder
     public void setVideoSize(int width, int height)
             throws IllegalStateException
     {
-        String deviceName = SystemProperties.get("ro.product.device");
-        if((height == 1088) && (width == 1920) && deviceName.startsWith("msm8660")) {
-                Log.w("MediaRecorder", "Use wakelock for 1080p on 8660");
-                mUseWakeLock = true;
-        }
-        else if ((height == 720) && (width == 1280) && deviceName.startsWith("msm8660")) {
-                Log.w("MediaRecorder", "Use wakelock for 720p on 8660");
-                mUseWakeLock = true;
-        }
-        else {
-            Log.w("MediaRecorder", "No wakelock");
-            mUseWakeLock = false;
-        }
+        mWidth = width;
+        mHeight = height;
         native_setVideoSize(width, height);
     }
 
@@ -611,6 +611,16 @@ public class MediaRecorder
         } else {
             throw new IOException("No valid output file");
         }
+
+        if((mHeight == 1088) && (mWidth == 1920) && mDISEnabled) {
+                Log.w("MediaRecorder", "Use wakelock for 1080p with DIS");
+                mUseWakeLock = true;
+        }
+        else if ((mHeight == 720) && (mWidth == 1280) && mDISEnabled) {
+                Log.w("MediaRecorder", "Use wakelock for 720p with DIS");
+                mUseWakeLock = true;
+        }
+
         _prepare();
     }
 
@@ -873,6 +883,7 @@ public class MediaRecorder
     @Override
     protected void finalize() { native_finalize(); }
 
+    private native void _setCamera(Camera c);
 
     private native void native_start() throws IllegalStateException;
 
