@@ -458,27 +458,27 @@ ssize_t AudioStreamInDump::read(void* buffer, ssize_t bytes)
         ret = bytes;
         if(!mFile) {
             char name[255];
-            strcpy(name, "/sdcard/music/sine440");
+            strlcpy(name, "/sdcard/music/sine440", sizeof(name));
             if (channels() == AudioSystem::CHANNEL_IN_MONO) {
-                strcat(name, "_mo");
+                strlcat(name, "_mo", sizeof(name));
             } else {
-                strcat(name, "_st");
+                strlcat(name, "_st", sizeof(name));
             }
             if (format() == AudioSystem::PCM_16_BIT) {
-                strcat(name, "_16b");
+                strlcat(name, "_16b", sizeof(name));
             } else {
-                strcat(name, "_8b");
+                strlcat(name, "_8b", sizeof(name));
             }
             if (sampleRate() < 16000) {
-                strcat(name, "_8k");
+                strlcat(name, "_8k", sizeof(name));
             } else if (sampleRate() < 32000) {
-                strcat(name, "_22k");
+                strlcat(name, "_22k", sizeof(name));
             } else if (sampleRate() < 48000) {
-                strcat(name, "_44k");
+                strlcat(name, "_44k", sizeof(name));
             } else {
-                strcat(name, "_48k");
+                strlcat(name, "_48k", sizeof(name));
             }
-            strcat(name, ".wav");
+            strlcat(name, ".wav", sizeof(name));
             mFile = fopen(name, "rb");
             LOGV("Opening input read file %s, fh %p", name, mFile);
             if (mFile) {
