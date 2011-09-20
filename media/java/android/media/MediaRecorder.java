@@ -123,8 +123,24 @@ public class MediaRecorder
      *
      * @param c the Camera to use for recording
      */
-    public void setCamera(Camera c){
-        c.lock();
+    public void setCamera(Camera c) throws RuntimeException{
+        boolean lockedInProcess = false;
+        // if already locked in current process, unlock will not cause an exception
+        try{
+            c.unlock();
+            lockedInProcess = true;
+        } catch(Exception e){}
+
+
+        // if already locked in another process, lock will cause an exception
+        try{
+            c.lock();
+            if(lockedInProcess)
+                throw new RuntimeException("Camera cannot be locked, already locked in current process");
+        } catch(Exception e){
+            throw new RuntimeException("Camera cannot be locked, already locked in current process");
+        }
+
         mDISEnabled = "true".equalsIgnoreCase(c.getParameters().get("disenable"));
         c.unlock();
         _setCamera(c);
