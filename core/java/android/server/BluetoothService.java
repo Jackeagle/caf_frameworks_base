@@ -117,6 +117,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int MESSAGE_GATT_INTENT = 7;
     private static final int MESSAGE_GATT_CHARACTERISTICS_DISCOVERY = 8;
     private static final int MESSAGE_START_SAP_SERVER = 9;
+    private static final int MESSAGE_DISCOVERABLE_CHANGE_TIMEOUT = 10;
 
     // The time (in millisecs) to delay the pairing attempt after the first
     // auto pairing attempt fails. We use an exponential delay with
@@ -401,6 +402,7 @@ public class BluetoothService extends IBluetooth.Stub {
         setBluetoothState(BluetoothAdapter.STATE_TURNING_OFF);
         mHandler.removeMessages(MESSAGE_REGISTER_SDP_RECORDS);
         mHandler.removeMessages(MESSAGE_START_DUN_SERVER);
+        mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
 
         // Allow 3 second for profiles to gracefully disconnect
         // TODO: Introduce a callback mechanism so that each profile can notify
@@ -666,6 +668,20 @@ public class BluetoothService extends IBluetooth.Stub {
                     Log.d(TAG, "Starting BT-SAP server");
                     SystemService.start("bt-sap");
                 }
+                break;
+            case MESSAGE_DISCOVERABLE_CHANGE_TIMEOUT:
+                Log.i(TAG, "discoverable change timeout");
+                if (getScanMode() != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+                    getAllProperties();
+                    int newMode = getScanMode();
+                    if (newMode == BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+                        Intent intent = new Intent(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
+                        intent.putExtra(BluetoothAdapter.EXTRA_SCAN_MODE, newMode);
+                        intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+                        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+                    }
+                }
+                break;
             }
         }
     };
@@ -1394,18 +1410,23 @@ public class BluetoothService extends IBluetooth.Stub {
         case BluetoothAdapter.SCAN_MODE_NONE:
             pairable = false;
             discoverable = false;
+            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             break;
         case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
             pairable = true;
             discoverable = false;
+            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             break;
         case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
             setDiscoverableTimeout(duration);
             pairable = true;
             discoverable = true;
+            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             if (duration > 0) {
                 Message msg = mHandler.obtainMessage(MESSAGE_DISCOVERABLE_TIMEOUT);
                 mHandler.sendMessageDelayed(msg, duration * 1000);
+                Message msgd = mHandler.obtainMessage(MESSAGE_DISCOVERABLE_CHANGE_TIMEOUT);
+                mHandler.sendMessageDelayed(msgd, 200);
             }
             if (DBG) Log.d(TAG, "BT Discoverable for " + duration + " seconds");
             break;
