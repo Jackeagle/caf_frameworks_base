@@ -245,6 +245,15 @@ public final class ObexHelper {
     private boolean mLocalSrmpActive = SRMP_DISABLED;
 
     public boolean getLocalSrmParamStatus() {
+        if (!SystemProperties.get(DEBUG_FORCE_SRMP).equals("")) {
+            if (SystemProperties.getBoolean(DEBUG_FORCE_SRMP, false)) {
+                if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRMP on");
+                mLocalSrmpActive = SRMP_ENABLED;
+            } else {
+                if (VERBOSE) Log.v(TAG, "DEBUG: Forcing SRMP off");
+                mLocalSrmpActive = SRMP_DISABLED;
+            }
+        }
         if (VERBOSE) Log.v(TAG, "getLocalSrmParamStatus: " + mLocalSrmpActive);
         return mLocalSrmpActive;
     }
