@@ -46,6 +46,7 @@ import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.Slog;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.Phone.IPVersion;
 import com.android.server.connectivity.Tethering;
 import dalvik.system.DexClassLoader;
 import java.io.FileDescriptor;
@@ -2150,4 +2151,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mNetTrackers[network].addDefaultRoute();
     }
 
+    /** {@hide}
+     * Used by LinkManager to set the default route per ipversion
+     * Forwards the request to NetworkStateTrackers.
+     */
+    public void setDefaultRoute(int network, IPVersion ipv) {
+        // add default route for this network
+        Slog.d(TAG, "setDefaultRoute, network=" +
+            network + " ipv:" + ipv + ",len=" + mNetTrackers.length);
+        mNetTrackers[network].addDefaultRoute(ipv);
+    }
 }

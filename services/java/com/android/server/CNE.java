@@ -274,6 +274,8 @@ public final class CNE {
     public static final int STATUS_NOT_INFLIGHT = 0;
     public static final int STATUS_INFLIGHT = 1;
 
+    private static NetworkInfo.State ipv6NetState = NetworkInfo.State.DISCONNECTED;
+
     static final int CNE_REGID_INVALID = -1;
     static final int CNE_ROLE_INVALID = -1;
     static final int CNE_DEFAULT_CON_REGID = 0;
@@ -517,13 +519,7 @@ public final class CNE {
                     if (str != null) {
                         ipv = Enum.valueOf(IPVersion.class, str);
                     }
-                    AddressInfo wwanAddrInfo;
-                    if (ipv == IPVersion.IPV4) {
-                        wwanAddrInfo = wwanV4AddrInfo;
-                    } else {
-                        Log.w(LOG_TAG, "IPV6 is not supported by CNE");
-                        return;
-                    }
+
                     str = intent.getStringExtra(Phone.DATA_APN_TYPE_STATE);
                     NetworkInfo.State netState = NetworkInfo.State.DISCONNECTED;
                     if (str != null) {
@@ -533,8 +529,26 @@ public final class CNE {
                         if (ipv == IPVersion.IPV4) {
                             activeWwanV4IfName = wwanV4AddrInfo.ifName;
                             activeWwanV4GatewayAddr = wwanV4AddrInfo.gatewayAddr;
+                        } else {
+                            if (ipv6NetState != netState) {
+                                ipv6NetState = netState;
+                                mService.setDefaultRoute(ConnectivityManager.TYPE_MOBILE, ipv);
+                            }
+                        }
+                    } else {
+                        if (ipv == IPVersion.IPV6) {
+                            ipv6NetState = netState;
                         }
                     }
+
+                    AddressInfo wwanAddrInfo;
+                    if (ipv == IPVersion.IPV4) {
+                        wwanAddrInfo = wwanV4AddrInfo;
+                    } else {
+                        Log.w(LOG_TAG, "IPV6 is not supported by CNE");
+                        return;
+                    }
+
                     int roaming = (int) (mTelephonyManager.isNetworkRoaming() ? 1 : 0);
                     int networkType = mTelephonyManager.getNetworkType();
                     int signalStrength = getSignalStrength(networkType);
@@ -1922,7 +1936,7 @@ public final class CNE {
                 try {
                     nms.addDstRoute(activeWlanIfName, hostRoutingIpAddr, activeWlanGatewayAddr);
                     if (mService != null) {
-                        mService.setDefaultRoute(ConnectivityManager.TYPE_MOBILE);
+                        mService.setDefaultRoute(ConnectivityManager.TYPE_MOBILE, IPVersion.IPV4);
                     }
                 } catch (Exception e) {
                     Log.w(LOCAL_TAG, "Error adding host routing");
@@ -2262,7 +2276,7 @@ public final class CNE {
             }
         }
         if (mService != null) {
-            mService.setDefaultRoute(nwId);
+            mService.setDefaultRoute(nwId, IPVersion.IPV4);
         } else {
             if (DBG) Log.w(LOCAL_TAG, "notifyDefaultNwChange: mService in NULL");
         }
