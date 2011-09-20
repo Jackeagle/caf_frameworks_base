@@ -111,7 +111,7 @@ LOCAL_LDLIBS := -lpthread -ldl
 LOCAL_MODULE:= libRS
 LOCAL_MODULE_TAGS := eng
 
-ifeq "$(findstring msm7627,$(TARGET_PRODUCT))" "msm7627"
+ifeq ($(call is-chipset-prefix-in-board-platform,msm7627),true)
 	LOCAL_CFLAGS += -mno-thumb
 endif
 
