@@ -421,6 +421,7 @@ public final class SipService extends ISipService.Stub {
 
         boolean sameType = type.equals(mNetworkType);
         if (!sameType && !connected) return;
+        if (mConnected && connected) return;
 
         boolean wasWifi = "WIFI".equalsIgnoreCase(mNetworkType);
         boolean isWifi = "WIFI".equalsIgnoreCase(type);
