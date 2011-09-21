@@ -27,6 +27,9 @@ import android.os.Registrant;
 import android.os.RegistrantList;
 import android.os.SystemProperties;
 import android.preference.PreferenceManager;
+import android.provider.Settings;
+import android.provider.Settings.Secure;
+import android.provider.Settings.SettingNotFoundException;
 import android.telephony.CellLocation;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
@@ -1726,6 +1729,39 @@ public class GSMPhone extends PhoneBase {
             Log.e(LOG_TAG, "isCspPlmnEnabled(), mSIMRecords is null.");
             return true;
         }
+    }
+
+    public boolean isManualNetSelAllowed() {
+
+        int nwMode = Phone.PREFERRED_NT_MODE;
+        try {
+            nwMode = android.provider.Settings.Secure.getIntAtIndex(mContext.getContentResolver(),
+                    android.provider.Settings.Secure.PREFERRED_NETWORK_MODE, mSubscription);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(LOG_TAG, "Could not find NETWORK_MODE !");
+            return true;
+        }
+
+        Log.d(LOG_TAG, "isManualNetSelAllowed in mode = " + nwMode);
+        /*
+         *  For multimode targets in global mode manual network
+         *  selection is disallowed
+         */
+        if (SystemProperties.getBoolean("ro.config.multimode_cdma", false)
+                && ((nwMode == Phone.NT_MODE_GLOBAL_LTE)
+                        || (nwMode == Phone.NT_MODE_GLOBAL)) ){
+            Log.d(LOG_TAG, "Manual selection not supported in mode = " + nwMode);
+            return false;
+        }
+
+        /*
+         *  Single mode phone with - GSM network modes/global mode
+         *  LTE only for 3GPP
+         *  LTE centric + 3GPP Legacy
+         *  Note: the actual enabling/disabling manual selection for these
+         *  cases will be controlled by csp
+         */
+        return true;
     }
 
     private void registerForSimRecordEvents() {
