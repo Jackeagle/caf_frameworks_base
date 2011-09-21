@@ -487,12 +487,13 @@ void LPAPlayer::resume() {
         }
         /* TODO: Check A2dp variable */
         if (bIsA2DPEnabled && a2dpDisconnectPause) {
+            isPaused = false;
             mInternalSeeking = true;
             mReachedEOS = false;
             mSeekTimeUs = timePlayed;
             a2dpDisconnectPause = false;
             mAudioSink->start();
-            pthread_cond_signal(&decoder_cv);
+            pthread_cond_signal(&a2dp_cv);
         }
         else if (a2dpDisconnectPause) {
             LOGV("A2DP disconnect resume");
@@ -1029,7 +1030,6 @@ void LPAPlayer::A2DPThreadEntry() {
             break;
         }
 
-        //TODO: Remove this
         pthread_mutex_lock(&pmem_response_mutex);
         if (pmemBuffersResponseQueue.empty() || !mAudioSinkOpen || isPaused || !bIsA2DPEnabled) {
             LOGV("A2DPThreadEntry:: responseQ empty %d mAudioSinkOpen %d isPaused %d bIsA2DPEnabled %d",
@@ -1037,21 +1037,19 @@ void LPAPlayer::A2DPThreadEntry() {
             LOGV("A2DPThreadEntry:: Waiting on a2dp_cv");
             pthread_cond_wait(&a2dp_cv, &pmem_response_mutex);
             LOGV("A2DPThreadEntry:: received signal to wake up");
-            pthread_mutex_unlock(&pmem_response_mutex);
-            continue;
-        }
-        // A2DP got disabled -- Queue up everything back to Request Queue
-        if (!bIsA2DPEnabled) {
-            pthread_mutex_lock(&pmem_request_mutex);
-            while (!pmemBuffersResponseQueue.empty()) {
-                LOGV("BUF transfer");
-                List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
-                BuffersAllocated buf = *it;
-                pmemBuffersRequestQueue.push_back(buf);
-                pmemBuffersResponseQueue.erase(it);
+            // A2DP got disabled -- Queue up everything back to Request Queue
+            if (!bIsA2DPEnabled) {
+                pthread_mutex_lock(&pmem_request_mutex);
+                while (!pmemBuffersResponseQueue.empty()) {
+                    LOGV("BUF transfer");
+                    List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
+                    BuffersAllocated buf = *it;
+                    pmemBuffersRequestQueue.push_back(buf);
+                    pmemBuffersResponseQueue.erase(it);
+                }
+                pthread_mutex_unlock(&pmem_request_mutex);
             }
             pthread_mutex_unlock(&pmem_response_mutex);
-            pthread_mutex_unlock(&pmem_request_mutex);
         }
         //A2DP is enabled -- Continue normal Playback
         else {
