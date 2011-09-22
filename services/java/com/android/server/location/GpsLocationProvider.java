@@ -510,12 +510,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
             AGpsConnectionInfo agpsConnInfo = getAGpsConnectionInfo(connType);
             if (null != agpsConnInfo &&
                 agpsConnInfo.mState == AGpsConnectionInfo.STATE_OPENING) {
-                String apnName = info.getExtraInfo();
                 if (mNetworkAvailable) {
+                    String apnName = info.getExtraInfo();
                     if (apnName == null) {
-                        /* Assign a dummy value in the case of C2K as otherwise we will have a runtime
-                           exception in the following call to native_agps_data_conn_open*/
-                        apnName = "dummy-apn";
+                        /* We use the value we read out from the database. That value itself
+                           is default to "dummy-apn" if no value from database. */
+                        apnName = default_apn;
                     }
                     agpsConnInfo.mAPN = apnName;
                     String ipv4Apn = info.getIpv4Apn();
