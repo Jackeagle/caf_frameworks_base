@@ -26,7 +26,6 @@ import static android.telephony.TelephonyManager.NETWORK_TYPE_HSDPA;
 import static android.telephony.TelephonyManager.NETWORK_TYPE_HSUPA;
 import static android.telephony.TelephonyManager.NETWORK_TYPE_HSPA;
 import android.telephony.TelephonyManager;
-import android.provider.Settings.SettingNotFoundException;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -1624,21 +1623,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         if(mInitialRadioStateChange) {
             synchronized (mStateMonitor) {
                 if (!mState.isOn()) {
-                    mNetworkMode = getPreferredNetworkMode();
-                    if (mNetworkMode < RILConstants.NETWORK_MODE_WCDMA_PREF) {
-                        if (RILJ_LOGD)
-                            riljLog("RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE not sent on init," +
-                                       " unsupported network mode in database");
-                    } else {
-                        RILRequest rrPnt = RILRequest.obtain(
-                                       RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE, null);
+                    RILRequest rrPnt = RILRequest.obtain(
+                                   RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE, null);
 
-                        rrPnt.mp.writeInt(1);
-                        rrPnt.mp.writeInt(mNetworkMode);
-                        if (RILJ_LOGD) riljLog(rrPnt.serialString() + "> "
-                            + requestToString(rrPnt.mRequest) + " : " + mNetworkMode);
-                        send(rrPnt);
-                    }
+                    rrPnt.mp.writeInt(1);
+                    rrPnt.mp.writeInt(mNetworkMode);
+                    if (RILJ_LOGD) riljLog(rrPnt.serialString() + "> "
+                        + requestToString(rrPnt.mRequest) + " : " + mNetworkMode);
+
+                    send(rrPnt);
 
                     RILRequest rrCs = RILRequest.obtain(
                                    RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE, null);
@@ -4033,20 +4026,6 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         return ssData;
     }
 
-    private int getPreferredNetworkMode() {
-        int nwMode;
-
-        try {
-            nwMode = android.provider.Settings.Secure.getIntAtIndex(
-                    mContext.getContentResolver(),
-                    android.provider.Settings.Secure.PREFERRED_NETWORK_MODE,
-                    mInstanceId);
-        } catch (SettingNotFoundException snfe) {
-            riljLog("getPreferredNetworkMode: Could not find PREFERRED_NETWORK_MODE!!");
-            nwMode = RILConstants.PREFERRED_NETWORK_MODE;
-        }
-        return nwMode;
-    }
 
     // ***** Methods for CDMA support
     public void
