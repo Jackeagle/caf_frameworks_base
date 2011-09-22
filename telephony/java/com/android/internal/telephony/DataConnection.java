@@ -408,7 +408,7 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                 mBearerType = cp.bearerType;
                 mDataProfile = cp.dp;
                 if (response.addresses != null) {
-                    ipAddress = response.addresses;
+                    ipAddress = response.addresses.split("/")[0];
                     gatewayAddress = response.gateways;
                     if (response.dnses != null) {
                         dnsServers[0] = response.dnses.split(" ")[0];
