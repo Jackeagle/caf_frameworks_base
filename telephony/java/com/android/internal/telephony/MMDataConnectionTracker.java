@@ -931,7 +931,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
          * The data call is just setup we are receiving the IP address for the first time
          */
         if (!TextUtils.isEmpty(dc.getIpAddress())) {
-            if ((!(activeDC.addresses).equals(dc.getIpAddress()))) {
+            if ((!(activeDC.addresses.split("/")[0]).equals(dc.getIpAddress()))) {
                 ipaddrChanged = true;
             }
         }
