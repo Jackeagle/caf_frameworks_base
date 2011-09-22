@@ -667,12 +667,10 @@ void LPAPlayer::decoderThreadEntry() {
     pthread_mutex_unlock(&decoder_mutex);
     pthread_cond_signal(&event_cv);
 
-    void *pmem_buf; int32_t pmem_fd;
+    int32_t pmem_fd;
 
     //TODO check PMEM_BUFFER_SIZE from handle.
-    for (int i = 0; i < PMEM_BUFFER_COUNT; i++) {
-        pmem_buf = pmemBufferAlloc(PMEM_BUFFER_SIZE, &pmem_fd);
-    }
+    pmemBufferAlloc(PMEM_BUFFER_SIZE, &pmem_fd);
     while (1) {
         pthread_mutex_lock(&pmem_request_mutex);
 
@@ -754,7 +752,7 @@ void LPAPlayer::decoderThreadEntry() {
                 // it will be re applied as the buffer already present in responseQ
                 if (!asyncReset) {
                     pthread_mutex_lock(&apply_effect_mutex);
-                    LOGV("decoderThread: applying effects on pmem buf with fd %d", buf.pmemFd);
+                    LOGV("decoderThread: applying effects on pmem buf at buf.pmemBuf %x", buf.pmemBuf);
                     mAudioFlinger->applyEffectsOn((int16_t*)buf.localBuf,
                                                   (int16_t*)buf.pmemBuf,
                                                   (int)buf.bytesToWrite);
@@ -769,7 +767,7 @@ void LPAPlayer::decoderThreadEntry() {
                         }
                         LOGV("PCM write start");
                         struct pcm * local_handle = (struct pcm *)handle;
-                        pcm_write(local_handle, buf.localBuf, local_handle->period_size);
+                        pcm_write(local_handle, buf.pmemBuf, local_handle->period_size);
                         if (mReachedEOS) {
                             if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_START) < 0)
                                 LOGE("AUDIO Start failed");
@@ -1187,24 +1185,26 @@ void *LPAPlayer::pmemBufferAlloc(int32_t nSize, int32_t *pmem_fd){
     int32_t pmemfd = -1;
     void  *pmem_buf = NULL;
     void  *local_buf = NULL;
-    //pmem_buf = (void *)handle->addr + nSize*i;
-    pmem_buf = malloc(nSize);
-    local_buf = malloc(nSize);
-    if (NULL == local_buf) {
-        return NULL;
+    int i = 0;
+    struct pcm * local_handle = (struct pcm *)handle;
+
+    for (i = 0; i < PMEM_BUFFER_COUNT; i++) {
+        pmem_buf = (int32_t *)local_handle->addr + (nSize * i/sizeof(int));
+        local_buf = malloc(nSize);
+        if (NULL == local_buf) {
+            return NULL;
+        }
+
+        // 3. Store this information for internal mapping / maintanence
+        BuffersAllocated buf(local_buf, pmem_buf, nSize, pmemfd);
+        pmemBuffersRequestQueue.push_back(buf);
+
+        // 4. Send the pmem fd information
+        LOGV("pmemBufferAlloc calling with required size %d", nSize);
+        LOGV("The PMEM that is allocated is %d and buffer is %x", pmemfd, (unsigned int)pmem_buf);
     }
-
-    // 3. Store this information for internal mapping / maintanence
-    BuffersAllocated buf(local_buf, pmem_buf, nSize, pmemfd);
-    pmemBuffersRequestQueue.push_back(buf);
-
-    // 4. Send the pmem fd information
     *pmem_fd = pmemfd;
-    LOGV("pmemBufferAlloc calling with required size %d", nSize);
-    LOGV("The PMEM that is allocated is %d and buffer is %x", pmemfd, (unsigned int)pmem_buf);
-
-    // 5. Return the virtual address
-    return pmem_buf;
+    return NULL;
 }
 
 void LPAPlayer::pmemBufferDeAlloc()
@@ -1214,7 +1214,6 @@ void LPAPlayer::pmemBufferDeAlloc()
         List<BuffersAllocated>::iterator it = pmemBuffersRequestQueue.begin();
         BuffersAllocated &pmemBuffer = *it;
         // free the local buffer corresponding to pmem buffer
-        free(pmemBuffer.pmemBuf);
         free(pmemBuffer.localBuf);
         LOGV("Removing from request Q");
         pmemBuffersRequestQueue.erase(it);
@@ -1225,7 +1224,6 @@ void LPAPlayer::pmemBufferDeAlloc()
         List<BuffersAllocated>::iterator it = pmemBuffersResponseQueue.begin();
         BuffersAllocated &pmemBuffer = *it;
         // free the local buffer corresponding to pmem buffer
-        free(pmemBuffer.pmemBuf);
         LOGV("Removing from response Q");
         pmemBuffersResponseQueue.erase(it);
     }
