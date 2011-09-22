@@ -3154,15 +3154,17 @@ public class BluetoothService extends IBluetooth.Stub {
         return paths;
     }
 
-    /*package*/ synchronized void makeDiscoverCharacteristicsCallback(String servicePath) {
+    /*package*/ synchronized void makeDiscoverCharacteristicsCallback(String servicePath, boolean result) {
         IBluetoothGattService callback = mGattServiceTracker.get(servicePath);
-        String[]  charPaths = getCharacteristicsFromCache(servicePath);
 
         Log.d(TAG, "makeDiscoverCharacteristicsCallback for service: " + servicePath);
 
         if (callback != null) {
+            String[]  charPaths = null;
+            if (result)
+                charPaths = getCharacteristicsFromCache(servicePath);
             try {
-                callback.onCharacteristicsDiscovered(charPaths);
+                callback.onCharacteristicsDiscovered(charPaths, result);
             } catch (RemoteException e) {Log.e(TAG, "", e);}
         } else
             Log.d(TAG, "Discover Characteristics Callback for  service " + servicePath + " not queued");
@@ -3443,16 +3445,16 @@ public class BluetoothService extends IBluetooth.Stub {
         }
 
         Map<String, String> properties = mGattProperties.get(path);
-        if (properties == null)
-            return;
 
-        String chars = properties.get("Characteristics");
+        if (properties != null) {
+            String chars = properties.get("Characteristics");
 
-        if (chars != null) {
-            String[] charPaths = chars.split(",");
+            if (chars != null) {
+                String[] charPaths = chars.split(",");
 
-            for (int i = 0; i < charPaths.length; i++)
-                mGattServiceTracker.remove(charPaths[i]);
+                for (int i = 0; i < charPaths.length; i++)
+                    mGattServiceTracker.remove(charPaths[i]);
+            }
         }
 
         removeGattServiceProperties(path);

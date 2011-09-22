@@ -775,10 +775,12 @@ class BluetoothEventLoop {
 
     private void onDiscoverCharacteristicsResult(String serviceObjectPath, boolean result) {
 
+        Log.d(TAG, "onDiscoverCharacteristicsResult: " + result);
+
         if (result) {
             mBluetoothService.updateGattServicePropertiesCache(serviceObjectPath);
         }
-        mBluetoothService.makeDiscoverCharacteristicsCallback(serviceObjectPath);
+        mBluetoothService.makeDiscoverCharacteristicsCallback(serviceObjectPath, result);
     }
 
     private void onSetCharacteristicPropertyResult(String path, String property, boolean result) {
