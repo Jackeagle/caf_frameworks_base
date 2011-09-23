@@ -261,7 +261,7 @@ A2dpAudioInterface::A2dpAudioStreamOut::A2dpAudioStreamOut() :
     mBluetoothEnabled(true), mDevice(0), mClosing(false), mSuspended(false)
 {
     // use any address by default
-    strcpy(mA2dpAddress, "00:00:00:00:00:00");
+    strlcpy(mA2dpAddress, "00:00:00:00:00:00", sizeof(mA2dpAddress));
     init();
 }
 
@@ -444,7 +444,7 @@ status_t A2dpAudioInterface::A2dpAudioStreamOut::setAddress(const char* address)
     if (strlen(address) != strlen("00:00:00:00:00:00"))
         return -EINVAL;
 
-    strcpy(mA2dpAddress, address);
+    strlcpy(mA2dpAddress, address, sizeof(mA2dpAddress));
     if (mData)
         a2dp_set_sink(mData, mA2dpAddress);
 
