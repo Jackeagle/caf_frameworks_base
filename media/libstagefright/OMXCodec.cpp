@@ -4232,7 +4232,8 @@ void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
         BufferInfo *info = &buffers->editItemAt(i);
 
         if (info->mMediaBuffer == buffer) {
-            CHECK((mPortStatus[kPortIndexOutput] == ENABLED) || (mPortStatus[kPortIndexOutput] == DISABLING));
+            CHECK((mPortStatus[kPortIndexOutput] == ENABLED) || (mPortStatus[kPortIndexOutput] == DISABLING)
+                 || (mPortStatus[kPortIndexOutput] == SHUTTING_DOWN));
              if(mPortStatus[kPortIndexOutput] == ENABLED)
                  fillOutputBuffer(info);
              else if(mPortStatus[kPortIndexOutput] == DISABLING) {
