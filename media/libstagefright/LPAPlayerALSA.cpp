@@ -118,9 +118,9 @@ LPAPlayer::~LPAPlayer() {
     if (mQueueStarted) {
         mQueue.stop();
     }
-    if (mStarted) {
-        reset();
-    }
+
+    reset();
+
     mAudioFlinger->deregisterClient(AudioFlingerClient);
     objectsAlive--;
 }
@@ -557,7 +557,6 @@ void LPAPlayer::resume() {
 }
 
 void LPAPlayer::reset() {
-    CHECK(mStarted);
     LOGV("Reset called!!!!!");
     asyncReset = true;
 
