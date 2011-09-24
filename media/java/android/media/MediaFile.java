@@ -41,6 +41,8 @@ public class MediaFile {
     public static final int FILE_TYPE_MP3     = 1;
     public static final int FILE_TYPE_M4A     = 2;
     public static final int FILE_TYPE_WAV     = 3;
+    public static final int FILE_TYPE_PCM     = 44;
+    public static final int FILE_TYPE_WEBMA   = 45;
     public static final int FILE_TYPE_AMR     = 4;
     public static final int FILE_TYPE_AWB     = 5;
     public static final int FILE_TYPE_WMA     = 6;
@@ -71,6 +73,7 @@ public class MediaFile {
     public static final int FILE_TYPE_MP2TS   = 28;
     public static final int FILE_TYPE_AVI     = 29;
     public static final int FILE_TYPE_DIVX    = 30;
+    public static final int FILE_TYPE_WEBM    = 46;
     private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_MP4;
     private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_DIVX;
     
@@ -134,6 +137,7 @@ public class MediaFile {
         addFileType("MP3", FILE_TYPE_MP3, "audio/mpeg");
         addFileType("M4A", FILE_TYPE_M4A, "audio/mp4");
         addFileType("WAV", FILE_TYPE_WAV, "audio/x-wav");
+        addFileType("WAV", FILE_TYPE_PCM, "audio/wav");
         addFileType("AMR", FILE_TYPE_AMR, "audio/amr");
         addFileType("AWB", FILE_TYPE_AWB, "audio/amr-wb");
         if (isWMAEnabled()) {
@@ -141,7 +145,8 @@ public class MediaFile {
         }
         addFileType("QCP", FILE_TYPE_QCP, "audio/qcp");
         addFileType("OGG", FILE_TYPE_OGG, "application/ogg");
-        addFileType("OGA", FILE_TYPE_OGG, "application/ogg");
+        addFileType("OGA", FILE_TYPE_OGG, "audio/ogg");
+        addFileType("WEBM", FILE_TYPE_WEBMA, "audio/webm");
         addFileType("AAC", FILE_TYPE_AAC, "audio/aac");
         addFileType("MKA", FILE_TYPE_MKA, "audio/x-matroska");
         addFileType("3GPP", FILE_TYPE_3GPA, "audio/3gpp");
@@ -167,6 +172,7 @@ public class MediaFile {
 
         addFileType("AVI", FILE_TYPE_AVI, "video/avi");
         addFileType("DIVX", FILE_TYPE_DIVX, "video/divx");
+        addFileType("WEBM", FILE_TYPE_WEBM, "video/webm");
         if (isWMVEnabled()) {
             addFileType("WMV", FILE_TYPE_WMV, "video/x-ms-wmv");
             addFileType("ASF", FILE_TYPE_ASF, "video/x-ms-asf");
