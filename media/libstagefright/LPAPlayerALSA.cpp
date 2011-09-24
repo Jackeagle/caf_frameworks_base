@@ -95,7 +95,6 @@ AudioPlayer(audioSink,observer) {
     mAudioFlinger = NULL;
     AudioFlingerClient = NULL;
     efd = -1;
-
     /* Initialize Suspend/Resume related variables */
     mQueue.start();
     mQueueStarted      = true;
@@ -423,29 +422,31 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
     struct pcm * local_handle = (struct pcm *)handle;
     LOGV("In seekTo(), mSeekTimeUs %lld",mSeekTimeUs);
     if (!bIsA2DPEnabled) {
-        LOGV("Paused case, %d",isPaused);
+        if (mStarted) {
+            LOGV("Paused case, %d",isPaused);
 
-        pthread_mutex_lock(&pmem_response_mutex);
-        pthread_mutex_lock(&pmem_request_mutex);
-        while(!pmemBuffersResponseQueue.empty()) {
-            BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
-            pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
-            pmemBuffersRequestQueue.push_back(buf);
-        }
-        pthread_mutex_unlock(&pmem_request_mutex);
-        pthread_mutex_unlock(&pmem_response_mutex);
-        LOGV("Transferred all the buffers from response queue to rquest queue to handle seek");
-        if (!isPaused) {
-            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
-                LOGE("Reset failed!");
-
-            local_handle->start = 0;
-            pcm_prepare(local_handle);
-            LOGV("Reset, drain and prepare completed");
-            local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
-            sync_ptr(local_handle);
-            LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
-            pthread_cond_signal(&decoder_cv);
+            pthread_mutex_lock(&pmem_response_mutex);
+            pthread_mutex_lock(&pmem_request_mutex);
+            while(!pmemBuffersResponseQueue.empty()) {
+                BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
+                pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
+                pmemBuffersRequestQueue.push_back(buf);
+            }
+            pthread_mutex_unlock(&pmem_request_mutex);
+            pthread_mutex_unlock(&pmem_response_mutex);
+            LOGV("Transferred all the buffers from response queue to rquest queue to handle seek");
+            if (!isPaused) {
+                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_PAUSE,1) < 0) {
+                    LOGE("Audio Pause failed");
+                }
+                local_handle->start = 0;
+                pcm_prepare(local_handle);
+                LOGV("Reset, drain and prepare completed");
+                local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
+                sync_ptr(local_handle);
+                LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
+                pthread_cond_signal(&decoder_cv);
+            }
         }
     } else {
         mSeeked = true;
@@ -511,8 +512,6 @@ void LPAPlayer::resume() {
                 LOGV("Sync resume done\n");
             }
             else {
-                if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_RESET))
-                    LOGE("Reset failed");
                 local_handle->start = 0;
                 pcm_prepare(local_handle);
                 LOGV("Reset, drain and prepare completed");
