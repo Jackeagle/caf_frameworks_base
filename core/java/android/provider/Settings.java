@@ -1056,6 +1056,12 @@ public final class Settings {
 	 */
 	public static final String DUALMIC = "dualmic";
 
+
+        /**
+          * Whether Data call is enabled.
+          */
+        public static final String SOCKET_DATA_CALL_ENABLE = "socket_data_call_enable";
+
         /**
           * Default file manager to show files on extrenal storage media
           * when it is mounted
