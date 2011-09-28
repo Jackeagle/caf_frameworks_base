@@ -46,6 +46,7 @@ import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.Slog;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.Phone.IPVersion;
 import com.android.server.connectivity.Tethering;
 import dalvik.system.DexClassLoader;
 import java.io.FileDescriptor;
@@ -1399,6 +1400,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (mNetAttributes[netType].isDefault()) {
                 if (!SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor")) {
                     mNetTrackers[netType].addDefaultRoute();
+                } else {
+                    mNetTrackers[netType].addSrcRoutes();
                 }
             } else {
                 // many radios add a default route even when we don't want one.
@@ -1416,7 +1419,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         } else {
             if (mNetAttributes[netType].isDefault()) {
-                mNetTrackers[netType].removeDefaultRoute();
+                if (!SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor")) {
+                    mNetTrackers[netType].removeDefaultRoute();
+                } else {
+                    mNetTrackers[netType].delSrcRoutes();
+                }
             } else {
                 mNetTrackers[netType].removePrivateDnsRoutes();
             }
@@ -2134,6 +2141,24 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
+    /** {@hide}
+     * Used by LinkManager to set the default route.
+     * Forwards the request to NetworkStateTrackers.
+     */
+    public void setDefaultRoute(int network) {
+        // add default route for this network
+        Slog.d(TAG, "setDefaultRoute, network=" + network + ",len=" + mNetTrackers.length);
+        mNetTrackers[network].addDefaultRoute();
+    }
 
-
+    /** {@hide}
+     * Used by LinkManager to set the default route per ipversion
+     * Forwards the request to NetworkStateTrackers.
+     */
+    public void setDefaultRoute(int network, IPVersion ipv) {
+        // add default route for this network
+        Slog.d(TAG, "setDefaultRoute, network=" +
+            network + " ipv:" + ipv + ",len=" + mNetTrackers.length);
+        mNetTrackers[network].addDefaultRoute(ipv);
+    }
 }

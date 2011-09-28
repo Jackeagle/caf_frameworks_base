@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +57,12 @@ public abstract class NetworkStateTracker extends Handler {
     private static boolean DBG = false;
     private static final String TAG = "NetworkStateTracker";
 
+    // Ok to start V6 routeId from 127 as V4 Id will never exceed 126 (number of NST
+    // instances)
+    private static int v4RouteIdCtr = 1;
+    private static int v6RouteIdCtr = 127;
+    private int V4RouteId = 0;
+    private int V6RouteId = 0;
     // Share the event space with ConnectivityService (which we can't see, but
     // must send events to).  If you change these, change ConnectivityService
     // too.
@@ -84,12 +91,30 @@ public abstract class NetworkStateTracker extends Handler {
         mContext = context;
         mTarget = target;
         mTeardownRequested = false;
+        V4RouteId = acquireV4RId();
+        V6RouteId = acquireV6RId();
 
         this.mNetworkInfo = new NetworkInfo(networkType, subType, typeName, subtypeName);
     }
 
     public NetworkInfo getNetworkInfo() {
         return mNetworkInfo;
+    }
+
+    /**
+     * Creates unique route Id (custom routing table Id) for INET family per NST
+     * instance
+     */
+    private synchronized int acquireV4RId() {
+      return ++v4RouteIdCtr;
+    }
+
+    /**
+     * Creates unique route Id (custom routing table Id) for INET6 family per NST
+     * instance
+     */
+    private synchronized int acquireV6RId() {
+      return ++v6RouteIdCtr;
     }
 
     /**
@@ -511,5 +536,138 @@ public abstract class NetworkStateTracker extends Handler {
      * processing, and from a safe thread.
      */
     public void interpretScanResultsAvailable() {
+    }
+
+    /**
+     * Adds a source policy based routes and corresponding rules for INET and INET6 addresses of an
+     * interface. If the route already exists, then it will replace the previous route-rule entry
+     * in rpdb.
+     */
+    public void addSrcRoutes() {
+      replaceV4SrcRoute();
+      replaceV6SrcRoute();
+    }
+
+    public void addSrcRoute(IPVersion ipv) {
+        if (ipv == null) {
+            Log.w(TAG, "ipversion is null; cannot add src route");
+        } else if (ipv == IPVersion.IPV6) {
+            replaceV6SrcRoute();
+        } else if (ipv == IPVersion.IPV4) {
+            replaceV4SrcRoute();
+        } else {
+          Log.w(TAG,"ipversion not recognized; cannot add src route");
+        }
+    }
+
+    public void replaceV4SrcRoute() {
+        InetAddress ipAddr = getIpAdress(IPVersion.IPV4);
+        InetAddress gatewayAddr = getGateway(IPVersion.IPV4);
+        String interfaceName = getInterfaceName(IPVersion.IPV4);
+        String gwString = (gatewayAddr == null) ? "0" : gatewayAddr.getHostAddress();
+
+        if ((interfaceName != null) && (ipAddr != null)) {
+            Log.i(TAG, "replaceV4SrcRoute for " + mNetworkInfo.getTypeName() +
+                " ("+ interfaceName + "), GatewayAddr=" + gwString + ", IPAddr =" + ipAddr.getHostAddress() +
+                "V4RouteId =" + V4RouteId);
+            try {
+                INetworkManagementService nms = getNetworkManagementService();
+                if (nms == null) {
+                    Log.w(TAG, "could not acquire NetworkManagementService.");
+                    return;
+                } else {
+                    nms.replaceV4SrcRoute(interfaceName, ipAddr.getHostAddress(), gwString, V4RouteId);
+                }
+            } catch (RemoteException e) {
+                Log.w(TAG, "Unable to replace V4 srouce route. Exception: " + e);
+            }
+        }
+    }
+
+    public void replaceV6SrcRoute() {
+        InetAddress ipAddr = getIpAdress(IPVersion.IPV6);
+        InetAddress gatewayAddr = getGateway(IPVersion.IPV6);
+        String interfaceName = getInterfaceName(IPVersion.IPV6);
+        String gwString = (gatewayAddr == null) ? "0" : gatewayAddr.getHostAddress();
+
+        if ((interfaceName != null) && (ipAddr != null)) {
+            Log.i(TAG, "replaceV6SrcRoute for " + mNetworkInfo.getTypeName() +
+                " ("+ interfaceName + "), GatewayAddr=" + gwString + ", IPAddr =" + ipAddr.getHostAddress() +
+                "V6RouteId =" + V6RouteId);
+            try {
+                INetworkManagementService nms = getNetworkManagementService();
+                if (nms == null) {
+                    Log.w(TAG, "could not acquire NetworkManagementService.");
+                    return;
+                } else {
+                    nms.replaceV6SrcRoute(interfaceName, ipAddr.getHostAddress(), gwString, V6RouteId);
+                }
+            } catch (RemoteException e) {
+                Log.w(TAG, "Unable to replace V6 srouce route. Exception: " + e);
+            }
+        }
+    }
+
+    public void delSrcRoutes() {
+        delV4SrcRoute();
+        delV6SrcRoute();
+    }
+
+    public void delSrcRoute(IPVersion ipv) {
+        if (ipv == null) {
+          Log.w(TAG,"ipversion is null; cannot delete src route");
+        } else if (ipv == IPVersion.IPV6) {
+            delV6SrcRoute();
+        } else if (ipv == IPVersion.IPV4) {
+            delV4SrcRoute();
+        } else {
+          Log.w(TAG,"ipversion is not recognized; cannot delete src route");
+        }
+    }
+
+    public void delV4SrcRoute() {
+        InetAddress ipAddr = getIpAdress(IPVersion.IPV4);
+        String interfaceName = getInterfaceName(IPVersion.IPV4);
+
+        if ((interfaceName != null) && (ipAddr != null)) {
+            Log.i(TAG, "delV4SrcRoute for " + mNetworkInfo.getTypeName() +
+                ",InterfaceName=" + interfaceName + ",IPAddr =" + ipAddr.getHostAddress() +
+                ",V4RouteId =" + V4RouteId);
+        }
+
+        try {
+            INetworkManagementService nms = getNetworkManagementService();
+            if (nms == null) {
+                Log.w(TAG, "could not acquire NetworkManagementService.");
+                return;
+            } else {
+                nms.delV4SrcRoute(V4RouteId);
+            }
+        } catch (RemoteException e) {
+            Log.w(TAG, "Unable to delete v4 source route. Exception: " + e);
+        }
+    }
+
+    public void delV6SrcRoute() {
+        InetAddress ipAddr = getIpAdress(IPVersion.IPV6);
+        String interfaceName = getInterfaceName(IPVersion.IPV6);
+
+        if ((interfaceName != null) && (ipAddr != null)) {
+            Log.i(TAG, "delV6SrcRoute for " + mNetworkInfo.getTypeName() +
+                ",InterfaceName=" + interfaceName + ",IPAddr =" + ipAddr.getHostAddress() +
+                ",V6RouteId =" + V6RouteId);
+        }
+
+        try {
+            INetworkManagementService nms = getNetworkManagementService();
+            if (nms == null) {
+                Log.w(TAG, "could not acquire NetworkManagementService.");
+                return;
+            } else {
+                nms.delV6SrcRoute(V6RouteId);
+            }
+        } catch (RemoteException e) {
+            Log.w(TAG, "Unable to delete v6 source route. Exception: " + e);
+        }
     }
 }
