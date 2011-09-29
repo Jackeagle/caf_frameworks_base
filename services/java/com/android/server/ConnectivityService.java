@@ -2159,6 +2159,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mNetTrackers[network].addDefaultRoute();
     }
 
+    /** {@hide}
+     * Used by LinkManager to set the default route per ipversion
+     * Forwards the request to NetworkStateTrackers.
+     */
+    public void setDefaultRoute(int network, IPVersion ipv) {
+        // add default route for this network
+        Slog.d(TAG, "setDefaultRoute, network=" +
+            network + " ipv:" + ipv + ",len=" + mNetTrackers.length);
+        mNetTrackers[network].addDefaultRoute(ipv);
+    }
+
     /*
      * LinkSocket code is below here.
      */
