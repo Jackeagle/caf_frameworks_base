@@ -75,6 +75,12 @@ public class UsbService extends IUsbManager.Stub {
             "/sys/class/usb_composite";
     private static final String USB_RNDIS_ENABLE =
             "/sys/class/usb_composite/rndis/enable";
+    private static final String USB_UEVENT_MATCH =
+            "DEVPATH=/devices/virtual/android_usb/android0";
+    private static final String NEW_USB_CONNECTED_PATH =
+            "/sys/class/android_usb/android0/state";
+    private static final String USB_ENABLED_FUNCTIONS_PATH =
+            "/sys/class/android_usb/android0/functions";
 
     private static final int MSG_UPDATE_STATE = 0;
     private static final int MSG_FUNCTION_ENABLED = 1;
@@ -159,8 +165,26 @@ public class UsbService extends IUsbManager.Stub {
             if (Log.isLoggable(TAG, Log.VERBOSE)) {
                 Slog.v(TAG, "USB UEVENT: " + event.toString());
             }
-
             synchronized (mLock) {
+                String usb_state = event.get("USB_STATE");
+                if(usb_state != null) {
+                    if ("DISCONNECTED".equals(usb_state)) {
+                        mConnected = 0;
+                        mConfiguration = 0;
+                        if (mSystemReady) {
+                            // debounce disconnects to avoid problems bringing up USB tethering
+                            update((mConnected == 0) && functionStatus("rndis"));
+                        }
+                    } else if ("CONFIGURED".equals(usb_state)) {
+                        Slog.i(TAG, "state: " + usb_state);
+                        mConnected = 1;
+                        mConfiguration = 1;
+                        if (mSystemReady) {
+                            update(mConnected == 0);
+                        }
+                    }
+                }
+
                 String name = event.get("SWITCH_NAME");
                 String state = event.get("SWITCH_STATE");
                 if (name != null && state != null) {
@@ -227,6 +251,7 @@ public class UsbService extends IUsbManager.Stub {
                 mUEventObserver.startObserving(USB_CONNECTED_MATCH);
                 mUEventObserver.startObserving(USB_CONFIGURATION_MATCH);
                 mUEventObserver.startObserving(USB_FUNCTIONS_MATCH);
+                mUEventObserver.startObserving(USB_UEVENT_MATCH);
             }
         }
     }
@@ -253,6 +278,34 @@ public class UsbService extends IUsbManager.Stub {
         } catch (Exception e) {
             Slog.e(TAG, "" , e);
         }
+
+        if (mConfiguration < 0) {
+            //This may happen if ABI has changed
+            try {
+                FileReader file = new FileReader(NEW_USB_CONNECTED_PATH);
+                int len = file.read(buffer, 0, 1024);
+                file.close();
+                String usb_state = new String(buffer, 0, len).trim();
+
+                Log.d(TAG, "state: " + usb_state);
+                if ("DISCONNECTED".equals(usb_state)) {
+                    mConnected = 0;
+                    mConfiguration = 0;
+                } else if ("CONFIGURED".equals(usb_state)) {
+                    mConnected = 1;
+                    mConfiguration = 1;
+                } else {
+                    mConnected = 1;
+                    mConfiguration = 0;
+                }
+
+            } catch (FileNotFoundException e) {
+                Slog.i(TAG, "This kernel does not have USB configuration switch support");
+            } catch (Exception e) {
+                Slog.e(TAG, "" , e);
+            }
+        }
+
         if (mConfiguration < 0) {
             // This may happen in the emulator or devices without USB device mode support
             return;
@@ -379,6 +432,30 @@ public class UsbService extends IUsbManager.Stub {
         mDeviceManager.clearDefaults(packageName);
     }
 
+    public boolean functionStatus(String match) {
+        char[] buffer = new char[1024];
+        char status;
+        try {
+            FileReader file = new FileReader(USB_ENABLED_FUNCTIONS_PATH);
+            int len = file.read(buffer, 0, 1024);
+            file.close();
+            String enabled_functions = new String(buffer, 0, len).trim();
+
+            Log.d(TAG, "Enabled functions: " + enabled_functions);
+            if (enabled_functions.indexOf(match) > -1)
+                return true;
+            else
+                return false;
+
+        } catch (FileNotFoundException e) {
+            Log.e(TAG, "Exception File not found"+e);
+        } catch (Exception e) {
+            Slog.e(TAG, "" , e);
+        }
+
+        return false;
+    }
+
     /*
      * This handler is for deferred handling of events related to device mode and accessories.
      */
@@ -391,6 +468,13 @@ public class UsbService extends IUsbManager.Stub {
             for (int i = 0; i < mDisabledFunctions.size(); i++) {
                 intent.putExtra(mDisabledFunctions.get(i), UsbManager.USB_FUNCTION_DISABLED);
             }
+        //With new USB ABI changes, check again for adb, ms and rndis
+            if (functionStatus("adb"))
+                intent.putExtra("adb", UsbManager.USB_FUNCTION_ENABLED);
+            if (functionStatus("rndis"))
+                intent.putExtra("rndis", UsbManager.USB_FUNCTION_ENABLED);
+            if (functionStatus("mass_storage"))
+                intent.putExtra("mass_storage", UsbManager.USB_FUNCTION_ENABLED);
         }
 
         @Override
