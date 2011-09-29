@@ -250,6 +250,11 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     // Is this the first radio state change?
     private boolean mInitialRadioStateChange = true;
 
+    // In case of multi sim, when the rild socket reconnects, we need to
+    // power off the modem explicitly. This flag will be set to true only
+    // in case of rild socket disconnect in multi sim mode.
+    private boolean mRilPowerOff = false;
+
     //I'd rather this be LinkedList or something
     ArrayList<RILRequest> mRequestsList = new ArrayList<RILRequest>();
 
@@ -611,6 +616,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 Log.i(LOG_TAG, "Disconnected from '" + rilSocket
                       + "' socket");
 
+                boolean multiSimEnabled = SystemProperties.getBoolean("persist.dsds.enabled", false);
+                if (multiSimEnabled) {
+                    mRilPowerOff = true;
+                }
                 setRadioState (RadioState.RADIO_UNAVAILABLE);
 
                 try {
@@ -2173,8 +2182,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     private void switchToRadioState(RadioState newState) {
-
-        if (mInitialRadioStateChange) {
+        if (mInitialRadioStateChange || mRilPowerOff) {
+            if (mRilPowerOff) Log.i(LOG_TAG, "Socket Reconnected");
             if (newState.isOn()) {
                 /* If this is our first notification, make sure the radio
                  * is powered off.  This gets the radio into a known state,
@@ -2189,6 +2198,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 setRadioState(newState);
             }
             mInitialRadioStateChange = false;
+            mRilPowerOff = false;
         } else {
             setRadioState(newState);
         }
