@@ -81,6 +81,7 @@ public interface RILConstants {
     int NETWORK_MODE_GSM_WCDMA_LTE      = 9;  /* GSM/WCDMA/LTE auto */
     int NETWORK_MODE_GLOBAL_LTE         = 10; /* CDMA/EvDo/GSM/WCDMA/LTE auto */
     int NETWORK_MODE_LTE_ONLY           = 11; /* LTE only */
+    int NETWORK_MODE_LTE_WCDMA          = 12; /* LTE/WCDMA */
     int PREFERRED_NETWORK_MODE      = NETWORK_MODE_WCDMA_PREF;
 
     /* CDMA subscription source. See ril.h RIL_REQUEST_CDMA_SET_SUBSCRIPTION */
