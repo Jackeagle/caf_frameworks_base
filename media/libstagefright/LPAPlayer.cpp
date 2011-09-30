@@ -446,7 +446,23 @@ void LPAPlayer::pause(bool playPendingSamples) {
     LOGV("pause: playPendingSamples %d", playPendingSamples);
     isPaused = true;
     if (playPendingSamples) {
-        /* TODO: Check what needs to be in this case */
+        if (!bIsA2DPEnabled) {
+            if (fsync(afd) != 0)
+                LOGE("fsync failed.");
+            if(!mPauseEventPending) {
+                LOGV("Posting an event for Pause timeout");
+                mQueue.postEventWithDelay(mPauseEvent, LPA_PAUSE_TIMEOUT_USEC);
+                mPauseEventPending = true;
+            }
+            if (mAudioSink.get() != NULL) {
+                mAudioSink->pauseSession();
+            }
+            timePlayed += (nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC)) - timeStarted);
+        }
+        else {
+            if (mAudioSink.get() != NULL)
+                mAudioSink->stop();
+        }
     } else {
         if (a2dpDisconnectPause) {
             mAudioSink->pause();
