@@ -1239,6 +1239,9 @@ public class Camera {
         public static final String EFFECT_WHITEBOARD = "whiteboard";
         public static final String EFFECT_BLACKBOARD = "blackboard";
         public static final String EFFECT_AQUA = "aqua";
+        public static final String EFFECT_EMBOSS = "emboss";
+        public static final String EFFECT_SKETCH = "sketch";
+        public static final String EFFECT_NEON = "neon";
 
         // Values for touch af/aec settings.
         public static final String TOUCH_AF_AEC_OFF = "touch-off";
