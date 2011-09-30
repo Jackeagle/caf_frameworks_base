@@ -77,12 +77,16 @@ static status_t MyConnect(
             tv.tv_sec = 0;
             tv.tv_usec = 100000ll;
             if(aflag)
-                tv.tv_usec = 1000000ll;
+                tv.tv_usec = 3000000ll;
             else
                 tv.tv_usec = 5000000ll;
 
             int nfds = ::select(s + 1, &rs, &ws, NULL, &tv);
-
+            if (0 == nfds)
+            {
+                LOGE("Select timedout as No Fds available for read or write");
+                break;
+            }
             if (nfds < 0) {
                 if (errno == EINTR) {
                     continue;
