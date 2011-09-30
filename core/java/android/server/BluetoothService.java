@@ -3543,24 +3543,15 @@ public class BluetoothService extends IBluetooth.Stub {
             if (devicePath.equals(nextServicePath.substring(0, path.indexOf("/service")))) {
                 Log.d(TAG, "removeRemoteGattService: more GATT services are running on device " + nextServicePath);
                 // There are still other GATT services used on this remote device
-                return;
             }
         }
 
-        // Do disconnect only for LE devices
-        String devType = getRemoteDeviceProperty(address, "Type");
-        if(devType == null) {
-            Log.d(TAG, "device type null????");
-            return;
-        }
-
-        if (!devType.equals("LE")) {
-            Log.d(TAG, "Device is not LE " + devType);
-            return;
-        }
-
         Log.d(TAG, "removeRemoteGattService: disconnect" + address);
-        disconnectNative(devicePath);
+
+        boolean res;
+        res = disconnectGattNative(path);
+        Log.d(TAG, "disconnectGatt " + res);
+
     }
 
     /*package*/ synchronized void  clearRemoteDeviceGattServices(String address) {
@@ -3644,5 +3635,5 @@ public class BluetoothService extends IBluetooth.Stub {
     private native boolean registerCharacteristicsWatcherNative(String path);
     private native boolean deregisterCharacteristicsWatcherNative(String path);
     private native int disConnectSapNative();
-    private native void disconnectNative(String path);
+    private native boolean disconnectGattNative(String path);
 }

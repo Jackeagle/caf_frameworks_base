@@ -1446,6 +1446,29 @@ static jboolean registerCharacteristicsWatcherNative(JNIEnv *env, jobject object
     return JNI_FALSE;
 }
 
+static jboolean disconnectGattNative(JNIEnv *env, jobject object,
+                                              jstring path) {
+    LOGV(__FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *msg, *reply;
+        DBusError err;
+        dbus_error_init(&err);
+
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        reply = dbus_func_args(env,
+                                   nat->conn, c_path,
+                                   DBUS_CHARACTERISTIC_IFACE,
+                                   "Disconnect",
+                                   DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+        return reply ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 static jboolean deregisterCharacteristicsWatcherNative(JNIEnv *env, jobject object,
                                               jstring path) {
     LOGV(__FUNCTION__);
@@ -1470,6 +1493,7 @@ static jboolean deregisterCharacteristicsWatcherNative(JNIEnv *env, jobject obje
     return JNI_FALSE;
 }
 
+
 static jboolean disConnectSapNative(JNIEnv *env, jobject object) {
 #ifdef HAVE_BLUETOOTH
     LOGV(__FUNCTION__);
@@ -1488,33 +1512,6 @@ static jboolean disConnectSapNative(JNIEnv *env, jobject object) {
     return JNI_FALSE;
 }
 
-static void disconnectNative(JNIEnv *env, jobject object,
-                                              jstring path) {
-    LOGV(__FUNCTION__);
-#ifdef HAVE_BLUETOOTH
-    native_data_t *nat = get_native_data(env, object);
-    if (nat) {
-        DBusMessage *msg, *reply;
-        DBusError err;
-        dbus_error_init(&err);
-
-        const char *c_path = env->GetStringUTFChars(path, NULL);
-        reply = dbus_func_args(env,
-                                   nat->conn, c_path,
-                                   DBUS_DEVICE_IFACE, "Disconnect",
-                                   DBUS_TYPE_INVALID);
-        env->ReleaseStringUTFChars(path, c_path);
-
-        if (!reply) {
-            if (dbus_error_is_set(&err)) {
-                LOG_AND_FREE_DBUS_ERROR(&err);
-            } else
-                LOGE("DBus reply is NULL in function %s", __FUNCTION__);
-        }
-    }
-#endif
-    return;
-}
 
 static JNINativeMethod sMethods[] = {
      /* name, signature, funcPtr */
@@ -1581,7 +1578,7 @@ static JNINativeMethod sMethods[] = {
     {"deregisterCharacteristicsWatcherNative", "(Ljava/lang/String;)Z", (void*)deregisterCharacteristicsWatcherNative},
     {"sapAuthorizeNative", "(Ljava/lang/String;ZI)Z", (void *)sapAuthorizeNative},
     {"disConnectSapNative", "()I", (void *)disConnectSapNative},
-    {"disconnectNative", "(Ljava/lang/String;)V", (void*)disconnectNative},
+    {"disconnectGattNative", "(Ljava/lang/String;)Z", (void*)disconnectGattNative},
 };
 
 int register_android_server_BluetoothService(JNIEnv *env) {
