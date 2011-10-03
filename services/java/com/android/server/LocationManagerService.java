@@ -479,14 +479,17 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         mEnabledProviders.add(passiveProvider.getName());
 
         // initialize external network location and geocoder services
-        if (mNetworkLocationProviderPackageName != null) {
+        PackageManager pm = mContext.getPackageManager();
+        if (mNetworkLocationProviderPackageName != null &&
+                pm.resolveService(new Intent(mNetworkLocationProviderPackageName), 0) != null) {
             mNetworkLocationProvider =
                 new LocationProviderProxy(mContext, LocationManager.NETWORK_PROVIDER,
                         mNetworkLocationProviderPackageName, mLocationHandler);
             addProvider(mNetworkLocationProvider);
         }
 
-        if (mGeocodeProviderPackageName != null) {
+        if (mGeocodeProviderPackageName != null &&
+                pm.resolveService(new Intent(mGeocodeProviderPackageName), 0) != null) {
             mGeocodeProvider = new GeocoderProxy(mContext, mGeocodeProviderPackageName);
         }
 
