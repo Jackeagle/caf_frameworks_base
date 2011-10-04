@@ -399,7 +399,8 @@ static int register_agent(native_data_t *nat,
     dbus_message_unref(msg);
     sender = dbus_bus_get_unique_name(nat->conn);
     LOGV("Sender is %s", sender);
-    if (sender != NULL) {
+    if ((sender != NULL) && (strlen(sender) < PROPERTY_VALUE_MAX)) {
+
                strcpy(sender_conn, sender);
                sender_conn[strlen(sender)]='\0';
                LOGV("Sender conn is %s", sender_conn);

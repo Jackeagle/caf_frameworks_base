@@ -224,6 +224,7 @@ public final class BluetoothA2dp {
      */
     public boolean isPlayingSink() {
         if (DBG) log("isPlayingSink()");
+        if (mService == null) return false;
         try {
             return mService.isPlayingSink();
         } catch (RemoteException e) {

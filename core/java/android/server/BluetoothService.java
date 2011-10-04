@@ -1218,10 +1218,16 @@ public class BluetoothService extends IBluetooth.Stub {
             } catch (IOException e) {
                 log("IOException: in copyAutoPairingData");
             } finally {
-                 try {
-                     if (in != null) in.close();
-                     if (out != null) out.close();
-                 } catch (IOException e) {}
+                if (in != null) {
+                   try {
+                       in.close();
+                   } catch (IOException e) {}
+                }
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (IOException e) {}
+                }
             }
         }
 
@@ -2432,20 +2438,30 @@ public class BluetoothService extends IBluetooth.Stub {
                 BluetoothA2dp btA2dp = new BluetoothA2dp(context);
                 if (btA2dp != null) {
                     mConnectionManager.setA2dpAudioActive(btA2dp.isPlayingSink());
+                } else {
+                    Log.e(TAG, "BluetoothA2dp service not available");
                 }
             } else if (SAP_ACCESS_ALLOWED_ACTION.equals(action)) {
                 Log.i(TAG, "Received SAP_ACCESS_ALLOWED_ACTION");
                 String address = intent.getStringExtra("address");
                 boolean alwaysAllow = intent.getBooleanExtra(SAP_EXTRA_ALWAYS_ALLOWED, false);
-                sapAuthorize(address, true);
-                if (alwaysAllow) {
-                    Log.i(TAG, "Setting trust state to true");
-                    setTrust(address,true);
+                if (address != null) {
+                    sapAuthorize(address, true);
+                    if (alwaysAllow) {
+                        Log.i(TAG, "Setting trust state to true");
+                        setTrust(address,true);
+                    }
+                } else {
+                    Log.e(TAG, "address is null");
                 }
             } else if (SAP_ACCESS_DISALLOWED_ACTION.equals(action)) {
                 Log.i(TAG, "Received SAP_ACCESS_DISALLOWED_ACTION");
                 String address = intent.getStringExtra("address");
-                sapAuthorize(address, false);
+                if (address != null) {
+                    sapAuthorize(address, false);
+                } else {
+                    Log.e(TAG, "address is null");
+                }
             }
         }
     };
