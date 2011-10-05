@@ -971,6 +971,8 @@ String8 AudioFlinger::getParameters(int ioHandle, const String8& keys)
         if (srs_params != "") srs_params += ";";
         srs_params += mAudioHardware->getParameters(keys);
         return srs_params;
+#else
+        return mAudioHardware->getParameters(keys);
 #endif
     }
 
