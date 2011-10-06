@@ -129,6 +129,9 @@ const char CameraParameters::EFFECT_POSTERIZE[] = "posterize";
 const char CameraParameters::EFFECT_WHITEBOARD[] = "whiteboard";
 const char CameraParameters::EFFECT_BLACKBOARD[] = "blackboard";
 const char CameraParameters::EFFECT_AQUA[] = "aqua";
+const char CameraParameters::EFFECT_EMBOSS[] = "emboss";
+const char CameraParameters::EFFECT_SKETCH[] = "sketch";
+const char CameraParameters::EFFECT_NEON[] = "neon";
 
 // Values for auto exposure settings.
 const char CameraParameters::TOUCH_AF_AEC_OFF[] = "touch-off";
@@ -367,7 +370,7 @@ void CameraParameters::set(const char *key, const char *value)
 void CameraParameters::set(const char *key, int value)
 {
     char str[16];
-    sprintf(str, "%d", value);
+    snprintf(str, sizeof(str), "%d", value);
     set(key, str);
 }
 
@@ -460,7 +463,7 @@ static void parseSizesList(const char *sizesStr, Vector<Size> &sizes)
 void CameraParameters::setPreviewSize(int width, int height)
 {
     char str[32];
-    sprintf(str, "%dx%d", width, height);
+    snprintf(str, sizeof(str), "%dx%d", width, height);
     set(KEY_PREVIEW_SIZE, str);
 }
 
@@ -488,7 +491,7 @@ void CameraParameters::getSupportedHfrSizes(Vector<Size> &sizes) const
 void CameraParameters::setPreviewFpsRange(int minFPS, int maxFPS)
 {
     char str[32];
-    sprintf(str,"%d,%d",minFPS,maxFPS);
+    snprintf(str, sizeof(str), "%d,%d",minFPS,maxFPS);
     set(KEY_PREVIEW_FPS_RANGE,str);
 }
 
@@ -533,7 +536,7 @@ const char *CameraParameters::getPreviewFormat() const
 void CameraParameters::setPictureSize(int width, int height)
 {
     char str[32];
-    sprintf(str, "%dx%d", width, height);
+    snprintf(str, sizeof(str),"%dx%d", width, height);
     set(KEY_PICTURE_SIZE, str);
 }
 
@@ -576,7 +579,7 @@ void CameraParameters::dump() const
 void CameraParameters::setTouchIndexAec(int x, int y)
 {
     char str[32];
-    sprintf(str, "%dx%d", x, y);
+    snprintf(str, sizeof(str), "%dx%d", x, y);
     set(KEY_TOUCH_INDEX_AEC, str);
 }
 
@@ -600,7 +603,7 @@ void CameraParameters::getTouchIndexAec(int *x, int *y) const
 void CameraParameters::setTouchIndexAf(int x, int y)
 {
     char str[32];
-    sprintf(str, "%dx%d", x, y);
+    snprintf(str, sizeof(str), "%dx%d", x, y);
     set(KEY_TOUCH_INDEX_AF, str);
 }
 

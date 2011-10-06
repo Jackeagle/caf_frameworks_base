@@ -1518,7 +1518,7 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
             sp<Client> client = mClient[i].promote();
             if (client == 0) continue;
             hasClient = true;
-            sprintf(buffer, "Client[%d] (%p) PID: %d\n",
+            snprintf(buffer, SIZE, "Client[%d] (%p) PID: %d\n",
                     i,
                     client->getCameraClient()->asBinder().get(),
                     client->mClientPid);
@@ -1539,7 +1539,7 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
             if (args[i] == String16("-v")) {
                 String8 levelStr(args[i+1]);
                 int level = atoi(levelStr.string());
-                sprintf(buffer, "Set Log Level to %d", level);
+                snprintf(buffer, SIZE, "Set Log Level to %d", level);
                 result.append(buffer);
                 setLogLevel(level);
             }
