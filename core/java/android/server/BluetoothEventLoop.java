@@ -258,6 +258,7 @@ class BluetoothEventLoop {
             mBluetoothService.setRemoteDeviceProperty(address, "UUIDs", null);
             mBluetoothService.setRemoteDeviceProperty(address, "Services", null);
             mBluetoothService.setRemoteDeviceProperty(address, "Trusted", "false");
+            mBluetoothService.clearRemoteDeviceGattServices(address);
         }
     }
 

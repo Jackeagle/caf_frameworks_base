@@ -3327,6 +3327,11 @@ public class BluetoothService extends IBluetooth.Stub {
 
         Log.d(TAG, "discoverCharacteristics");
 
+       if (!mGattServices.containsKey(path)) {
+            Log.d(TAG, "Service not present " + path);
+            return false;
+        }
+
         boolean ret = discoverCharacteristicsNative(path);
 
         return ret;
@@ -3336,6 +3341,23 @@ public class BluetoothService extends IBluetooth.Stub {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return null;
 
+        Log.d(TAG, "getCharacteristicProperties");
+
+        if (path == null) {
+            return null;
+        }
+
+        String servicePath = path.substring(0, path.indexOf("/characteristic"));
+
+        if (servicePath == null) {
+            return null;
+        }
+
+       if (!mGattServices.containsKey(servicePath)) {
+            Log.d(TAG, "Service not present " + servicePath);
+            return null;
+        }
+
         String[] propValues = (String []) getCharacteristicPropertiesNative(path);
         return propValues;
     }
@@ -3343,6 +3365,21 @@ public class BluetoothService extends IBluetooth.Stub {
     public synchronized boolean setCharacteristicProperty(String path, String key, byte[] value) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return false;
+
+        if (path == null) {
+            return false;
+        }
+
+        String servicePath = path.substring(0, path.indexOf("/characteristic"));
+
+        if (servicePath == null) {
+            return false;
+        }
+
+        if (!mGattServices.containsKey(servicePath)) {
+            Log.d(TAG, "Service not present " + servicePath);
+            return false;
+        }
 
         boolean ret = setCharacteristicPropertyNative(path, key, value, value.length);
         return ret;
@@ -3354,6 +3391,21 @@ public class BluetoothService extends IBluetooth.Stub {
 
         Log.d(TAG, "updateCharacteristicValue");
 
+        if (path == null) {
+            return false;
+        }
+
+        String servicePath = path.substring(0, path.indexOf("/characteristic"));
+
+        if (servicePath == null) {
+            return false;
+        }
+
+       if (!mGattServices.containsKey(servicePath)) {
+            Log.d(TAG, "Service not present " + servicePath);
+            return false;
+        }
+
         return updateCharacteristicValueNative(path);
     }
 
@@ -3362,6 +3414,11 @@ public class BluetoothService extends IBluetooth.Stub {
         if (!isEnabledInternal()) return false;
 
         Log.d(TAG, "registerCharacteristicsWatcher");
+
+       if (!mGattServices.containsKey(path)) {
+            Log.d(TAG, "Service not present " + path);
+            return false;
+        }
 
         if (mGattWatcherTracker.get(path) != null) {
             // Do not add this callback
@@ -3381,6 +3438,11 @@ public class BluetoothService extends IBluetooth.Stub {
     public synchronized boolean deregisterCharacteristicsWatcher(String path) {
        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return false;
+
+       if (!mGattServices.containsKey(path)) {
+            Log.d(TAG, "Service not present " + path);
+            return false;
+        }
 
         Log.d(TAG, "deregisterCharacteristicsWatcher");
 
@@ -3500,6 +3562,24 @@ public class BluetoothService extends IBluetooth.Stub {
         Log.d(TAG, "removeRemoteGattService: disconnect" + address);
         disconnectNative(devicePath);
     }
+
+    /*package*/ synchronized void  clearRemoteDeviceGattServices(String address) {
+        Log.d(TAG, "clearRemoteDeviceGattServices");
+
+       String value = getRemoteDeviceProperty(address, "Services");
+       if (value == null) {
+            return;
+        }
+
+        String[] services = null;
+        services = value.split(",");
+
+        for(int i = 0; i < services.length; i++)
+            closeRemoteGattService(services[i]);
+
+        setRemoteDeviceProperty(address, "Services", null);
+    }
+
 
     private native static void classInitNative();
     private native void initializeNativeDataNative();
