@@ -995,7 +995,20 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         portdef.nPortIndex = 0; //Input port.
         portdef.nMemRegion = OMX_QCOM_MemRegionInvalid;
         portdef.nCacheAttr = OMX_QCOM_CacheAttrNone;
-        portdef.nFramePackingFormat = OMX_QCOM_FramePacking_OnlyOneCompleteFrame;
+        int32_t WMVProfile = 0;
+        CHECK(meta->findInt32(kKeyWMVProfile,&WMVProfile));
+
+        if(WMVProfile == kTypeWMVAdvance)
+        {
+            portdef.nFramePackingFormat = OMX_QCOM_FramePacking_Arbitrary;
+            LOGV("Setting decoder in Arbitary Mode --- ADVANCE PROFILE");
+        }
+        else
+        {
+            portdef.nFramePackingFormat = OMX_QCOM_FramePacking_OnlyOneCompleteFrame;
+            LOGV("Setting decoder in Frame-By-Frame Mode --- SIMPLE Profile");
+        }
+
         char value[PROPERTY_VALUE_MAX];
         status_t err = mOMX->setParameter(mNode, (OMX_INDEXTYPE)OMX_QcomIndexPortDefn, &portdef, sizeof(OMX_QCOM_PARAM_PORTDEFINITIONTYPE));
         if (!property_get("ro.product.device", value, "1")

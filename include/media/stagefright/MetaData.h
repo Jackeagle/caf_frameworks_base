@@ -119,6 +119,7 @@ enum {
     kKeyWMABitspersample  = 'bsps',  // int64_t
     kKeyWMAVirPktSize     = 'vpks',  // int64_t
     kKeyIsDRM             = 'idrm',   // int32_t (bool)
+    kKeyWMVProfile        = 'wmvp',   //int32_t
 
     // 3D Video Flag
     kKey3D                = '3Dvf',  // bool (int32_t)
@@ -142,6 +143,11 @@ enum {
     kTypeDivXVer_4,
     kTypeDivXVer_5,
     kTypeDivXVer_6,
+};
+
+enum {
+    kTypeWMVSimple,
+    kTypeWMVAdvance,
 };
 
 enum {
