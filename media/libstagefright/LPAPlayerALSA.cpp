@@ -410,6 +410,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
 
 status_t LPAPlayer::seekTo(int64_t time_us) {
     Mutex::Autolock autoLock(mLock);
+    Mutex::Autolock autoLock1(mSeekLock);
     LOGV("seekTo: time_us %ld", time_us);
     if ( mReachedEOS ) {
         mReachedEOS = false;
@@ -760,21 +761,28 @@ void LPAPlayer::decoderThreadEntry() {
                     pthread_mutex_unlock(&apply_effect_mutex);
 
                     LOGV("decoderThread: Writing buffer to driver with pmem fd %d", buf.pmemFd);
-                    LOGV("PCM write start");
-                    struct pcm * local_handle = (struct pcm *)handle;
-                    pcm_write(local_handle, buf.localBuf, local_handle->period_size);
-                    if (mReachedEOS) {
-                        if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_START) < 0)
-                            LOGE("AUDIO Start failed");
-                        else
-                            local_handle->start = 1;
+
+                    {
+                        Mutex::Autolock autoLock(mSeekLock);
+                        if (mSeeking) {
+                            continue;
+                        }
+                        LOGV("PCM write start");
+                        struct pcm * local_handle = (struct pcm *)handle;
+                        pcm_write(local_handle, buf.localBuf, local_handle->period_size);
+                        if (mReachedEOS) {
+                            if (ioctl(local_handle->fd, SNDRV_PCM_IOCTL_START) < 0)
+                                LOGE("AUDIO Start failed");
+                            else
+                                local_handle->start = 1;
+                        }
+                        if (buf.bytesToWrite < PMEM_BUFFER_SIZE && pmemBuffersResponseQueue.size() == 1) {
+                            LOGV("Last buffer case");
+                            uint64_t writeValue = SIGNAL_EVENT_THREAD;
+                            write(efd, &writeValue, sizeof(uint64_t));
+                        }
+                        LOGV("PCM write complete");
                     }
-                    if (buf.bytesToWrite < PMEM_BUFFER_SIZE && pmemBuffersResponseQueue.size() == 1) {
-                        LOGV("Last buffer case");
-                        uint64_t writeValue = SIGNAL_EVENT_THREAD;
-                        write(efd, &writeValue, sizeof(uint64_t));
-                    }
-                    LOGV("PCM write complete");
                 }
             }
             else

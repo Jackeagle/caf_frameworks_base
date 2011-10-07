@@ -215,6 +215,7 @@ private:
     size_t mFrameSize;
 
     Mutex mLock;
+    Mutex mSeekLock;
     Mutex a2dpSwitchLock;
     Mutex resumeLock;
     int64_t mNumFramesPlayed;
