@@ -1211,6 +1211,7 @@ public class Camera {
         private static final String KEY_MEMORY_COLOR_ENHANCEMENT = "mce";
         private static final String KEY_VIDEO_HIGH_FRAME_RATE = "video-hfr";
         private static final String KEY_REDEYE_REDUCTION = "redeye-reduction";
+        private static final String KEY_HIGH_DYNAMIC_RANGE_IMAGING = "hdr";
 
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
@@ -1283,6 +1284,9 @@ public class Camera {
         public static final String VIDEO_HFR_2X = "60";
         public static final String VIDEO_HFR_3X = "90";
         public static final String VIDEO_HFR_4X = "120";
+        // Values for HDR settings.
+        public static final String HDR_ENABLE = "enable";
+        public static final String HDR_DISABLE = "disable";
 
         // Values for flash mode settings.
         /**
@@ -2967,17 +2971,17 @@ public class Camera {
          /**
          * Gets the current MCE Mode.
          *
-         * @return MCE value
+         * @return MCE_ENABLE or MCE_DISABLE
          */
         public String getMemColorEnhance() {
             return get(KEY_MEMORY_COLOR_ENHANCEMENT);
         }
 
         /**
-         * Sets the current MCE Mode.
-         *
-         * @return MCE Mode
-         */
+        * Sets the current MCE Mode.
+        *
+        * @param mce MCE_XXX string constants
+        */
         public void setMemColorEnhance(String mce) {
             set(KEY_MEMORY_COLOR_ENHANCEMENT, mce);
         }
@@ -3019,6 +3023,34 @@ public class Camera {
          */
         public List<String> getSupportedVideoHighFrameRateModes() {
             String str = get(KEY_VIDEO_HIGH_FRAME_RATE + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+        }
+         /**
+         * Gets the current HDR Mode.
+         *
+         * @return HDR_ENABLE or HDR_DISABLE
+         */
+        public String getHighDynamicRangeImaging() {
+            return get(KEY_HIGH_DYNAMIC_RANGE_IMAGING);
+        }
+
+        /**
+        * Sets the current HDR Mode.
+        *
+        * @param hdr HDR_XXX string constants
+        */
+        public void setHighDynamicRangeImaging(String hdr) {
+            set(KEY_HIGH_DYNAMIC_RANGE_IMAGING, hdr);
+        }
+
+         /**
+         * Gets the supported HDR modes.
+         *
+         * @return a List of HDR_ENABLE/DISABLE string constants. null if HDR mode
+         *         setting is not supported.
+         */
+        public List<String> getSupportedHighDynamicRangeImagingModes() {
+            String str = get(KEY_HIGH_DYNAMIC_RANGE_IMAGING + SUPPORTED_VALUES_SUFFIX);
             return split(str);
         }
 
