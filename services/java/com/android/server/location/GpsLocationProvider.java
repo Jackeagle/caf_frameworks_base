@@ -537,13 +537,13 @@ public class GpsLocationProvider implements LocationProviderInterface {
                             Log.d(TAG, "call requestRouteToHostAddress failed");
                     }
                     if (DEBUG) Log.d(TAG, "call native_agps_data_conn_open");
-                    native_agps_data_conn_open(apnName, agpsConnInfo.mBearerType);
+                    native_agps_data_conn_open(agpsConnInfo.mAgpsType, apnName, agpsConnInfo.mBearerType);
                     agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPEN;
                 } else {
                     if (DEBUG) Log.d(TAG, "call native_agps_data_conn_failed");
                     agpsConnInfo.mAPN = null;
                     agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
-                    native_agps_data_conn_failed();
+                    native_agps_data_conn_failed(agpsConnInfo.mAgpsType);
                 }
             }
         }
@@ -1314,12 +1314,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
                                 agpsConnInfo.mIPv4Addr);
                             if (route_result == false) Log.d(TAG, "call requestRouteToHostAddress failed");
                         }
-                        native_agps_data_conn_open(agpsConnInfo.mAPN, agpsConnInfo.mBearerType);
+                        native_agps_data_conn_open(agpsConnInfo.mAgpsType, agpsConnInfo.mAPN, agpsConnInfo.mBearerType);
                         agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPEN;
                     } else {
                         Log.e(TAG, "agpsConnInfo.mAPN not set when receiving Phone.APN_ALREADY_ACTIVE");
                         agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
-                        native_agps_data_conn_failed();
+                        native_agps_data_conn_failed(agpsConnInfo.mAgpsType);
                     }
                 } else if (result == Phone.APN_REQUEST_STARTED) {
                     if (DEBUG) Log.d(TAG, "Phone.APN_REQUEST_STARTED");
@@ -1327,7 +1327,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 } else {
                     if (DEBUG) Log.d(TAG, "startUsingNetworkFeature failed with "+result);
                     agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
-                    native_agps_data_conn_failed();
+                    native_agps_data_conn_failed(agpsConnInfo.mAgpsType);
                 }
                 break;
             case GPS_RELEASE_AGPS_DATA_CONN:
@@ -1335,7 +1335,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 if (agpsConnInfo.mState != AGpsConnectionInfo.STATE_CLOSED) {
                     mConnMgr.stopUsingNetworkFeature(
                             ConnectivityManager.TYPE_MOBILE, agpsConnInfo.mPHConnFeatureStr);
-                    native_agps_data_conn_closed();
+                    native_agps_data_conn_closed(agpsConnInfo.mAgpsType);
                     agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
                 }
                 break;
@@ -1697,9 +1697,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private native String native_get_internal_state();
 
     // AGPS Support
-    private native void native_agps_data_conn_open(String apn, int bearerType);
-    private native void native_agps_data_conn_closed();
-    private native void native_agps_data_conn_failed();
+    private native void native_agps_data_conn_open(int agpsType, String apn, int bearerType);
+    private native void native_agps_data_conn_closed(int agpsType);
+    private native void native_agps_data_conn_failed(int agpsType);
     private native void native_agps_ni_message(byte [] msg, int length);
     private native void native_set_agps_server(int type, String hostname, int port);
 
@@ -1722,11 +1722,11 @@ public class GpsLocationProvider implements LocationProviderInterface {
         case AGpsConnectionInfo.CONNECTION_TYPE_WWAN_ANY:
         case AGpsConnectionInfo.CONNECTION_TYPE_C2K:
             if (null == mAGpsConnections[0])
-                mAGpsConnections[0] = new AGpsConnectionInfo(ConnectivityManager.TYPE_MOBILE);
+                mAGpsConnections[0] = new AGpsConnectionInfo(ConnectivityManager.TYPE_MOBILE, connType);
             return mAGpsConnections[0];
         case AGpsConnectionInfo.CONNECTION_TYPE_SUPL:
             if (null == mAGpsConnections[1])
-                mAGpsConnections[1] = new AGpsConnectionInfo(ConnectivityManager.TYPE_MOBILE_SUPL);
+                mAGpsConnections[1] = new AGpsConnectionInfo(ConnectivityManager.TYPE_MOBILE_SUPL, connType);
             return mAGpsConnections[1];
         default:
             return null;
@@ -1753,6 +1753,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
         // SUPL vs ANY (which really is non-SUPL)
         private final int mCMConnType;
+        private final int mAgpsType;
         private final String mPHConnFeatureStr;
         private String mAPN;
         private int mIPvVerType;
@@ -1761,8 +1762,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
         private InetAddress mIPv6Addr;
         private int mBearerType;
 
-        private AGpsConnectionInfo(int connMgrConnType) {
+        private AGpsConnectionInfo(int connMgrConnType, int agpsType) {
             mCMConnType = connMgrConnType;
+            mAgpsType = agpsType;
             if (ConnectivityManager.TYPE_MOBILE_SUPL == connMgrConnType) {
                 mPHConnFeatureStr = Phone.FEATURE_ENABLE_SUPL;
             } else {
