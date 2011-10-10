@@ -60,7 +60,7 @@ namespace android {
 static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs
 static int64_t kHighWaterMarkUs = 10000000ll;  // 10secs
 static float kThresholdPaddingFactor = 0.1f;   // 10%
-static int64_t kVideoEarlyMarginUs = -50000;   //50 ms
+static int64_t kVideoEarlyMarginUs = -10000;   //10 ms
 static int64_t kVideoLateMarginUs = 200000;  //200 ms
 static const size_t kLowWaterMarkBytes = 40000;
 static const size_t kHighWaterMarkBytes = 200000;
@@ -1509,13 +1509,13 @@ void AwesomePlayer::onVideoEvent() {
     }
 
     if (latenessUs < kVideoEarlyMarginUs) {
-        // We're more than 50ms early.
+        // We're more than 10ms early.
 
         if (mStatistics) {
             logOnTime(timeUs,nowUs,latenessUs);
             mConsecutiveFramesDropped = 0;
         }
-        postVideoEvent_l(10000);
+        postVideoEvent_l(kVideoEarlyMarginUs - latenessUs);
         return;
     }
 
