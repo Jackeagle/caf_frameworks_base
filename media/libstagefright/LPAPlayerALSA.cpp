@@ -409,8 +409,8 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
 }
 
 status_t LPAPlayer::seekTo(int64_t time_us) {
-    Mutex::Autolock autoLock(mLock);
     Mutex::Autolock autoLock1(mSeekLock);
+    Mutex::Autolock autoLock(mLock);
     LOGV("seekTo: time_us %ld", time_us);
     if ( mReachedEOS ) {
         mReachedEOS = false;
@@ -428,11 +428,14 @@ status_t LPAPlayer::seekTo(int64_t time_us) {
 
             pthread_mutex_lock(&pmem_response_mutex);
             pthread_mutex_lock(&pmem_request_mutex);
-            while(!pmemBuffersResponseQueue.empty()) {
-                BuffersAllocated buf = *(pmemBuffersResponseQueue.begin());
-                pmemBuffersResponseQueue.erase(pmemBuffersResponseQueue.begin());
-                pmemBuffersRequestQueue.push_back(buf);
+            pmemBuffersResponseQueue.clear();
+            pmemBuffersRequestQueue.clear();
+            
+            List<BuffersAllocated>::iterator it = bufPool.begin();
+            for(;it!=bufPool.end();++it) {
+                 pmemBuffersRequestQueue.push_back(*it);
             }
+
             pthread_mutex_unlock(&pmem_request_mutex);
             pthread_mutex_unlock(&pmem_response_mutex);
             LOGV("Transferred all the buffers from response queue to rquest queue to handle seek");
@@ -694,21 +697,24 @@ void LPAPlayer::decoderThreadEntry() {
             continue;
         }
 
-        List<BuffersAllocated>::iterator it = pmemBuffersRequestQueue.begin();
-        BuffersAllocated buf = *it;
-        pmemBuffersRequestQueue.erase(it);
         pthread_mutex_unlock(&pmem_request_mutex);
 
         //Queue the buffers back to Request queue
         if (mReachedEOS || (bIsA2DPEnabled && !mAudioSinkOpen) || asyncReset || a2dpDisconnectPause) {
             LOGV("%s: mReachedEOS %d bIsA2DPEnabled %d ", __func__, mReachedEOS, bIsA2DPEnabled);
-            pthread_mutex_lock(&pmem_request_mutex);
-            pmemBuffersRequestQueue.push_back(buf);
-            pthread_mutex_unlock(&pmem_request_mutex);
         }
         //Queue up the buffers for writing either for A2DP or LPA Driver
         else {
             struct msm_audio_aio_buf aio_buf_local;
+            Mutex::Autolock autoLock(mSeekLock);
+
+            pthread_mutex_lock(&pmem_request_mutex);
+            List<BuffersAllocated>::iterator it = pmemBuffersRequestQueue.begin();
+            BuffersAllocated buf = *it;
+            pmemBuffersRequestQueue.erase(it);
+            pthread_mutex_unlock(&pmem_request_mutex);
+            memset(buf.localBuf, 0x0, PMEM_BUFFER_SIZE);
+            memset(buf.pmemBuf, 0x0, PMEM_BUFFER_SIZE);
 
             LOGV("Calling fillBuffer for size %d",PMEM_BUFFER_SIZE);
             buf.bytesToWrite = fillBuffer(buf.localBuf, PMEM_BUFFER_SIZE);
@@ -761,7 +767,6 @@ void LPAPlayer::decoderThreadEntry() {
                     LOGV("decoderThread: Writing buffer to driver with pmem fd %d", buf.pmemFd);
 
                     {
-                        Mutex::Autolock autoLock(mSeekLock);
                         if (mSeeking) {
                             continue;
                         }
@@ -1198,6 +1203,7 @@ void *LPAPlayer::pmemBufferAlloc(int32_t nSize, int32_t *pmem_fd){
         // 3. Store this information for internal mapping / maintanence
         BuffersAllocated buf(local_buf, pmem_buf, nSize, pmemfd);
         pmemBuffersRequestQueue.push_back(buf);
+        bufPool.push_back(buf);
 
         // 4. Send the pmem fd information
         LOGV("pmemBufferAlloc calling with required size %d", nSize);

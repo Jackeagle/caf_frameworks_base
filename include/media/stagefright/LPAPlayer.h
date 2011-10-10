@@ -102,6 +102,7 @@ private:
     };
     List<BuffersAllocated> pmemBuffersRequestQueue;
     List<BuffersAllocated> pmemBuffersResponseQueue;
+    List<BuffersAllocated> bufPool;
     List<BuffersAllocated> effectsQueue;
 
     void *pmemBufferAlloc(int32_t nSize, int32_t *pmem_fd);
