@@ -387,6 +387,7 @@ bool SurfaceFlinger::threadLoop()
 {
     waitForEvent();
 
+    Mutex::Autolock _l(mHDMIMutex);
     // call Layer's destructor
     handleDestroyLayers();
 
@@ -448,8 +449,7 @@ bool SurfaceFlinger::threadLoop()
             PostBufferSingleton::instance()->onQueueBuf();
 
             if (mOverlayOpt && mOverlayUseChanged) {
-                enableOverlayOpt(false);
-                enableOverlayOpt(true);
+                closeOverlay();
                 mOverlayUseChanged = false;
                 freeBypassBuffers();
             }
@@ -463,10 +463,8 @@ bool SurfaceFlinger::threadLoop()
 #endif
         logger.log(GraphicLog::SF_REPAINT_DONE, index);
     } else {
-        if ((mHDMIOutput || mOverlayOpt) && !(hw.canDraw())) {
-            enableOverlayOpt(false);
-            enableOverlayOpt(true);
-
+        if ((mOverlayOpt) && !(hw.canDraw())) {
+            closeOverlay();
             const DisplayHardware& hw(graphicPlane(0).displayHardware());
             if (mHDMIOutput)
                 hw.videoOverlayStarted(false);
@@ -1115,56 +1113,43 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
     mOrigResSurfAbsent = (0 == origResLayerCount);
 
-    if (mOverlayOpt || (layerbuffercount == 1)) {
-        if(layerbuffercount == 1) {
-            if (compcount != mLastCompCount)
+    if (mOverlayOpt && (layerbuffercount == 1)) {
+        if (compcount != mLastCompCount) {
                 compositionStateChanged = true;
-            mLastCompCount = compcount;
+                mLastCompCount = compcount;
         }
-        else
-            mLastCompCount = -1;
 
         const DisplayHardware& hw(graphicPlane(0).displayHardware());
         if(getOverlayEngine()) {
-            if(layerbuffercount == 1) {
-                if ((compcount == 1 && !compositionStateChanged)
-                     || (((compcount - 1) == layersNotUpdatingCount)
-                          && !compositionStateChanged)) {
+            if( ((compcount == 1) || (compcount - 1 == layersNotUpdatingCount))
+                && (!compositionStateChanged) ) {
                    canUseOverlayToDraw = true;
-                }
-                drawClip = layerBufferClip;
-                drawLayerIndex = layerbufferIndex;
             }
+            drawClip = layerBufferClip;
+            drawLayerIndex = layerbufferIndex;
         }
 
         if (canUseOverlayToDraw) {
-            if (layerbuffercount) {
-                const sp<LayerBase>& layer = layers[drawLayerIndex];
-                status_t err = NO_ERROR;
-                if ((err = layer->drawWithOverlay(drawClip, mHDMIOutput))
-                            == NO_ERROR) {
-                    mFullScreen = true;
-                    mOverlayUsed = true;
-                    layer->setBufferInUse();
-                }
-                else if (err != NO_INIT) {
-                    if (!mOverlayUsed) {
-                        enableOverlayOpt(false);
-                        enableOverlayOpt(true);
-                    }
-                }
+            const sp<LayerBase>& layer = layers[drawLayerIndex];
+            status_t err = NO_ERROR;
+            if ((err = layer->drawWithOverlay(drawClip, mHDMIOutput))
+                    == NO_ERROR) {
+                mFullScreen = true;
+                mOverlayUsed = true;
+                layer->setBufferInUse();
+                return;
             }
         }
+    } else {
+        mLastCompCount = -1;
     }
 
-    if (UNLIKELY(!mWormholeRegion.isEmpty()) && !mFullScreen) {
+    if (UNLIKELY(!mWormholeRegion.isEmpty())) {
         // should never happen unless the window manager has a bug
         // draw something...
         // For full screen mode, never draw the wormhole
             drawWormhole();
     }
-    if(mFullScreen)
-        return;
 
     if (mOverlayUsed && !s3dLayerCount && !origResLayerCount
             && layerbuffercount != 1) {
@@ -1504,16 +1489,19 @@ void SurfaceFlinger::enableHDMIOutput(int enable)
 #if defined(TARGET_USES_OVERLAY)
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     mHDMIState = static_cast<hdmi_state_t> (enable);
-    switch(enable) {
-        case HDMIFB_OPEN:
-        case HDMIHPD_ON:
-        case HDMIHPD_OFF:
-        break;
-        case HDMIOUT_ENABLE:
-        case HDMIOUT_DISABLE:
-        {
-            mHDMIOutput = enable;
-            hw.enableHDMIOutput(enable);
+    {
+        Mutex::Autolock _l(mHDMIMutex);
+        switch(enable) {
+            case HDMIFB_OPEN:
+            case HDMIHPD_ON:
+            case HDMIHPD_OFF:
+            break;
+            case HDMIOUT_ENABLE:
+            case HDMIOUT_DISABLE:
+            {
+                mHDMIOutput = enable;
+                hw.enableHDMIOutput(enable);
+            }
         }
     }
     signalEvent();
@@ -2005,18 +1993,12 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(DisplayID dpy,
     return NO_ERROR;
 }
 
-void SurfaceFlinger::enableOverlayOpt(bool start) const
+void SurfaceFlinger::closeOverlay() const
 {
 #if defined(TARGET_USES_OVERLAY)
-    if (mHDMIOutput || (!start)) {
-        const DisplayHardware& hw(graphicPlane(0).displayHardware());
-        overlay::Overlay* temp = hw.getOverlayObject();
-        temp->closeChannel();
-    }
-    if (mHDMIOutput)
-        mOverlayOpt = false;
-    else
-        mOverlayOpt = start;
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());
+    overlay::Overlay* temp = hw.getOverlayObject();
+    temp->closeChannel();
 #endif
 }
 
