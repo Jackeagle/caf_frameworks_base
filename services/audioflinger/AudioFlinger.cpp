@@ -438,6 +438,10 @@ void AudioFlinger::createSession(
             LOGV("createSession() lSessionId: %d", mLPASessionId);
             if (mLPAEffectChain != NULL) {
                 mLPAEffectChain->setLPAFlag(true);
+                // For LPA, the volume will be applied in DSP. No need for volume
+                // control in the Effect chain, so setting it to unity.
+                uint32_t volume = 0x1000000; // Equals to 1.0 in 8.24 format
+                mLPAEffectChain->setVolume_l(&volume,&volume);
             } else {
                 LOGW("There was no effectChain created for the sessionId(%d)", mLPASessionId);
             }
@@ -935,6 +939,17 @@ status_t AudioFlinger::setParameters(int ioHandle, const String8& keyValuePairs)
     // Valid LPA handle, routing gets applied for the output descriptor rather
     // than to the input descriptor.
     if ( mLPAOutput && mLPAStreamIsActive && mLPAHandle == ioHandle ) {
+        if(mLPAEffectChain != NULL) {
+            AudioParameter param = AudioParameter(keyValuePairs);
+            String8 key = String8(AudioParameter::keyRouting);
+            int device;
+            if (param.getInt(key, device) == NO_ERROR) {
+                // forward device change to effects that have requested to be
+                // aware of attached audio device.
+                LOGD("mLPAEffectChain->setDevice_l(device)");
+                mLPAEffectChain->setDevice_l(device);
+            }
+        }
         result = mLPAOutput->setParameters(keyValuePairs);
         return result;
     }
@@ -5536,6 +5551,10 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::PlaybackThread::createEffect_l(
                 LOGV("New EffectChain is created for LPA session ID %d", sessionId);
                 mAudioFlinger->mLPAEffectChain = chain;
                 chain->setLPAFlag(true);
+                // For LPA, the volume will be applied in DSP. No need for volume
+                // control in the Effect chain, so setting it to unity.
+                uint32_t volume = 0x1000000; // Equals to 1.0 in 8.24 format
+                chain->setVolume_l(&volume,&volume);
             }
         } else {
             effect = chain->getEffectFromDesc_l(desc);
@@ -6186,7 +6205,25 @@ status_t AudioFlinger::EffectModule::start_l()
                                                    &size,
                                                    &cmdStatus);
     if (status == 0) {
-        status = cmdStatus;
+        if(cmdStatus == 0) {
+            // Some of the effects are applied based on the output device.
+            // For example, BASS_BOOST will not be enabled if output device is Speaker.
+            // If the command to set device is called first and then the command
+            // to enable the effect, it is not checking the previously set device.
+            // The below command to set device after enabling the effect, ensures that
+            // output device is considered to enable/disable the effect.
+            status = (*mEffectInterface)->command(mEffectInterface,
+                                                  EFFECT_CMD_SET_DEVICE,
+                                                  sizeof(uint32_t),
+                                                  &mDevice,
+                                                  &size,
+                                                  &cmdStatus);
+            if(status == 0) {
+                status = cmdStatus;
+            }
+        } else {
+            status = cmdStatus;
+        }
     }
     return status;
 }
@@ -6372,6 +6409,7 @@ status_t AudioFlinger::EffectModule::setDevice(uint32_t device)
                                               &device,
                                               &size,
                                               &cmdStatus);
+        mDevice = device;
         if (status == NO_ERROR) {
             status = cmdStatus;
         }

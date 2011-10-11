@@ -1060,6 +1060,7 @@ private:
                                         // sending disable command.
         uint32_t mDisableWaitCnt;       // current process() calls count during disable period.
         bool     mIsForLPA;
+        uint32_t mDevice;
     };
 
     // The EffectHandle class implements the IEffect interface. It provides resources
