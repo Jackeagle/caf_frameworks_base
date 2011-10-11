@@ -29,6 +29,7 @@
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/OMXCodec.h>
+#include <media/stagefright/MediaDefs.h>
 
 namespace android {
 
@@ -287,10 +288,27 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
         return NULL;
     }
 
-    VideoFrame *frame =
-        extractVideoFrameWithCodecFlags(
-                &mClient, trackMeta, source, OMXCodec::kPreferSoftwareCodecs,
-                timeUs, option);
+    const char *mime;
+    bool success = trackMeta->findCString(kKeyMIMEType, &mime);
+    CHECK(success);
+
+    VideoFrame *frame = NULL;
+
+    if ((!strcmp(mime, MEDIA_MIMETYPE_VIDEO_DIVX))||
+            (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_DIVX311))||
+            (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_DIVX4))||
+            (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_WMV)))
+    {
+        LOGV("Software codec is not being used for %s clips for thumbnail ",
+            mime);
+    }
+    else
+    {
+        frame =
+            extractVideoFrameWithCodecFlags(
+                    &mClient, trackMeta, source, OMXCodec::kPreferSoftwareCodecs,
+                    timeUs, option);
+    }
 
     if (frame == NULL) {
         LOGV("Software decoder failed to extract thumbnail, "
