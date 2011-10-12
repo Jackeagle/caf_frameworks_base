@@ -236,6 +236,11 @@ public class IccCardProxy extends Handler implements IccCard {
 
     /* Sets subscription information */
     void setSubscriptionInfo(Subscription subscription) {
+        if (mSubscriptionData != null &&
+            subscription != null &&
+            mSubscriptionData.equals(subscription)) {
+            return;
+        }
         mSubscriptionData = subscription;
         resetProperties();
         updateIccAvailability();
