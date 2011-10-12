@@ -32,6 +32,9 @@ public enum DataConnectionFailCause {
     SERVICE_OPTION_NOT_SUBSCRIBED,
     SERVICE_OPTION_OUT_OF_ORDER,
     NSAPI_IN_USE,
+    ONLY_IPV4_ALLOWED,
+    ONLY_IPV6_ALLOWED,
+    ONLY_SINGLE_BEARER_ALLOWED,
     PROTOCOL_ERRORS,
     UNKNOWN,
 
@@ -84,6 +87,11 @@ public enum DataConnectionFailCause {
                 (this == PROTOCOL_ERRORS);
     }
 
+    public boolean isPartialFailure() {
+        return (this == ONLY_IPV4_ALLOWED) || (this == ONLY_IPV6_ALLOWED)
+                || (this == ONLY_SINGLE_BEARER_ALLOWED);
+    }
+
     public boolean canRetryAfterDcDisconnect() {
         if (isPermanentFail())
             return false;
@@ -99,6 +107,9 @@ public enum DataConnectionFailCause {
         DataConnectionFailCause cause;
 
         switch (rilCause) {
+            case PDP_FAIL_NONE:
+                cause = DataConnectionFailCause.NONE;
+                break;
             case PDP_FAIL_OPERATOR_BARRED:
                 cause = DataConnectionFailCause.OPERATOR_BARRED;
                 break;
@@ -145,8 +156,13 @@ public enum DataConnectionFailCause {
                 cause = DataConnectionFailCause.DATA_REGISTRATION_FAIL;
                 break;
             case PDP_FAIL_ONLY_IPV4_ALLOWED:
+                cause = DataConnectionFailCause.ONLY_IPV4_ALLOWED;
+                break;
             case PDP_FAIL_ONLY_IPV6_ALLOWED:
-                cause = DataConnectionFailCause.IP_VERSION_NOT_SUPPORTED;
+                cause = DataConnectionFailCause.ONLY_IPV6_ALLOWED;
+                break;
+            case PDP_FAIL_ONLY_SINGLE_BEARER_ALLOWED:
+                cause = DataConnectionFailCause.ONLY_SINGLE_BEARER_ALLOWED;
                 break;
             case PDP_FAIL_SIGNAL_LOST:
                 cause = DataConnectionFailCause.SIGNAL_LOST;
