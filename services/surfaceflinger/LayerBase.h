@@ -142,6 +142,8 @@ public:
      */
     virtual bool setBypass(bool enable) { return false; }
 
+    virtual void resetReconfigStatus() {}
+    virtual bool isReconfiguring() const { return false; }
     /**
      * onDraw - draws the surface.
      */
@@ -350,6 +352,7 @@ public:
 
         virtual status_t registerBuffers(const ISurface::BufferHeap& buffers); 
         virtual void postBuffer(ssize_t offset);
+        virtual void reconfigureBuffers();
         virtual void unregisterBuffers();
         virtual sp<OverlayRef> createOverlay(uint32_t w, uint32_t h,
                 int32_t format, int32_t orientation);
