@@ -387,7 +387,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
     sparams->tstamp_mode = SNDRV_PCM_TSTAMP_NONE;
     sparams->period_step = 1;
     sparams->avail_min = (local_handle->flags & PCM_MONO) ? local_handle->period_size/2 : local_handle->period_size/4;
-    sparams->start_threshold = (local_handle->flags & PCM_MONO) ? local_handle->buffer_size/2 : local_handle->buffer_size/4;
+    sparams->start_threshold = (local_handle->flags & PCM_MONO) ? local_handle->period_size/2 : local_handle->period_size/4;
     sparams->stop_threshold = (local_handle->flags & PCM_MONO) ? local_handle->buffer_size/2 : local_handle->buffer_size/4;
     sparams->xfer_align = (local_handle->flags & PCM_MONO) ? local_handle->period_size/2 : local_handle->period_size/4; /* needed for old kernels */
     sparams->silence_size = 0;
