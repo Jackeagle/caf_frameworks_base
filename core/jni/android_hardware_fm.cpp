@@ -210,6 +210,7 @@ static jint android_hardware_fmradio_FmReceiverJNI_startSearchNative
     struct v4l2_hw_freq_seek hw_seek;
     int err;
     hw_seek.seek_upward = dir;
+    hw_seek.type = V4L2_TUNER_RADIO;
     err = ioctl(fd,VIDIOC_S_HW_FREQ_SEEK,&hw_seek);
     if(err < 0){
         return FM_JNI_FAILURE;
