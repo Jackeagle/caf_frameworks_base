@@ -279,6 +279,9 @@ public class SurfaceView extends View {
         mSession = null;
         mLayout.token = null;
 
+        if (mParent instanceof ViewOpacityManager) {
+           ((ViewOpacityManager) mParent).releaseTransparentRegion(this);
+        }
         super.onDetachedFromWindow();
     }
 
