@@ -336,10 +336,11 @@ interface ITelephony {
      * Enable QoS
      * @param qosSpec QoS spec containing various QoS parameters
      * @param type Type of data connection (any of Phone.APN_TYPE_*)
+     * @param ipv IPVersion of the connection QoS is requested on
      * @return Phone.QOS_REQUEST_SUCCESS - success, else failure
      * {@hide}
      */
-    int enableQos(in QosSpec qosSpec, String type);
+    int enableQos(in QosSpec qosSpec, String type, String ipv);
 
     /**
      * Disable QoS
