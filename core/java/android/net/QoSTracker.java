@@ -180,17 +180,16 @@ public class QoSTracker {
          * --------------------------------------------------
          *  INITIATED, RELEASED,    |
          *  RELEASED_NETWORK,       |   QOS_STATE_INACTIVE
-         *  REQUEST_FAILED, NONE    |
+         *  NONE                    |
          * -------------------------|------------------------
-         *  ACTIVATED, NEGOTIATED,  |
+         *  ACTIVATED,              |
          *  MODIFYING, MODIFIED,    |
          *  MODIFIED_NETWORK,       |   QOS_STATE_ACTIVE
-         *  RESUMED, RELEASING,     |
+         *  RELEASING,              |
          *  RESUMED_NETWORK,        |
          *  SUSPENDING              |
          * -------------------------|------------------------
          *  SUSPENDED,              |   QOS_STATE_SUSPENDED
-         *  SUSPENDED_NETWORK       |
          * --------------------------------------------------
          */
         switch (mDetailedState) {
@@ -212,10 +211,8 @@ public class QoSTracker {
                 mState = QOS_STATE_INACTIVE;
                 break;
             case QosSpec.QosIndStates.ACTIVATED:
-            case QosSpec.QosIndStates.NEGOTIATED:
             case QosSpec.QosIndStates.MODIFIED:
             case QosSpec.QosIndStates.MODIFIED_NETWORK:
-            case QosSpec.QosIndStates.RESUMED:
             case QosSpec.QosIndStates.RESUMED_NETWORK:
                 //sometimes we need to update even if the coarse QOS_STATE does not change
                 notifyQosToSocket = true;
@@ -225,7 +222,6 @@ public class QoSTracker {
                 mState = QOS_STATE_ACTIVE;
                 break;
             case QosSpec.QosIndStates.SUSPENDED:
-            case QosSpec.QosIndStates.SUSPENDED_NETWORK:
                 mState = QOS_STATE_SUSPENDED;
                 break;
             default:
@@ -251,7 +247,6 @@ public class QoSTracker {
         dlogi("updateCapabilities got spec: " + spec);
 
         String temp = null;
-        int i;
         QosSpec.QosPipe txPipe = null;
         QosSpec.QosPipe rxPipe = null;
 
@@ -310,7 +305,8 @@ public class QoSTracker {
         }
 
         try {
-            res = (mPhone.enableQos(spec, apnType) == Phone.QOS_REQUEST_SUCCESS);
+            // Currently only IPv4 is supported
+            res = (mPhone.enableQos(spec, apnType, IPVersion.INET.toString()) == Phone.QOS_REQUEST_SUCCESS);
         } catch (RemoteException re) {
             logw("remote exception while using telephony service: " + re);
         } catch (Exception e) {
