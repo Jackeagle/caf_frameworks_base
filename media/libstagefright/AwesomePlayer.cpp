@@ -2040,7 +2040,8 @@ status_t AwesomePlayer::suspend() {
     Mutex::Autolock autoLock(mLock);
 
     if (mSuspensionState != NULL) {
-        if (mVideoBuffer[mVideoQueueLastRendered] == NULL) {
+        //This condition is required only for clips with Video
+        if (mVideoSource != NULL && mVideoBuffer[mVideoQueueLastRendered] == NULL) {
             //go into here if video is suspended again
             //after resuming without being played between
             //them
