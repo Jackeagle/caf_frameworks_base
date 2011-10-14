@@ -343,6 +343,8 @@ public:
 
     static const char KEY_VIDEO_HIGH_FRAME_RATE[];
     static const char KEY_SUPPORTED_VIDEO_HIGH_FRAME_RATE_MODES[];
+    static const char KEY_HIGH_DYNAMIC_RANGE_IMAGING[];
+    static const char KEY_SUPPORTED_HDR_IMAGING_MODES[];
 
     // Value for KEY_ZOOM_SUPPORTED or KEY_SMOOTH_ZOOM_SUPPORTED.
     static const char TRUE[];
@@ -540,6 +542,9 @@ public:
     // Values for Redeye Reduction settings.
     static const char REDEYE_REDUCTION_ENABLE[];
     static const char REDEYE_REDUCTION_DISABLE[];
+    // Values for HDR settings.
+    static const char HDR_ENABLE[];
+    static const char HDR_DISABLE[];
 
     enum {
         CAMERA_ORIENTATION_UNKNOWN = 0,

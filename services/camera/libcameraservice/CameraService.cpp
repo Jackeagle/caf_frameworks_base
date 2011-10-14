@@ -931,9 +931,10 @@ status_t CameraService::Client::takePicture() {
                   CAMERA_MSG_COMPRESSED_IMAGE);
 
     CameraParameters params(mHardware->getParameters());
-    mNumSnapshots = params.getInt("num-snaps-per-shutter");
-    if(mNumSnapshots == 0) mNumSnapshots = 1;
-    LOGI("%s: mNumSnapshots = %d", __FUNCTION__, mNumSnapshots);
+    mNumJpegSnapshots = params.getInt("num-snaps-per-shutter");
+    if(mNumJpegSnapshots == 0) mNumJpegSnapshots = 1;
+    mNumRawSnapshots = mNumJpegSnapshots;
+    LOGI("%s: mNumJpegSnapshots = %d", __FUNCTION__, mNumJpegSnapshots);
     return mHardware->takePicture();
 }
 
@@ -1309,8 +1310,6 @@ void CameraService::Client::handlePreviewData(const sp<IMemory>& mem) {
 
 // picture callback - postview image ready
 void CameraService::Client::handlePostview(const sp<IMemory>& mem) {
-    if(mNumSnapshots > 0) mNumSnapshots--;
-    if(mNumSnapshots == 0)
         disableMsgType(CAMERA_MSG_POSTVIEW_FRAME);
 
     sp<ICameraClient> c = mCameraClient;
@@ -1322,8 +1321,8 @@ void CameraService::Client::handlePostview(const sp<IMemory>& mem) {
 
 // picture callback - raw image ready
 void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
-    if(mNumSnapshots > 0) mNumSnapshots--;
-    if(mNumSnapshots == 0)
+    if(mNumRawSnapshots > 0) mNumRawSnapshots--;
+    if(mNumRawSnapshots == 0)
         disableMsgType(CAMERA_MSG_RAW_IMAGE);
     ssize_t offset;
     size_t size;
@@ -1343,8 +1342,8 @@ void CameraService::Client::handleRawPicture(const sp<IMemory>& mem) {
 
 // picture callback - compressed picture ready
 void CameraService::Client::handleCompressedPicture(const sp<IMemory>& mem) {
-    if(mNumSnapshots > 0) mNumSnapshots--;
-    if(mNumSnapshots == 0)
+    if(mNumJpegSnapshots > 0) mNumJpegSnapshots--;
+    if(mNumJpegSnapshots == 0)
         disableMsgType(CAMERA_MSG_COMPRESSED_IMAGE);
 
     sp<ICameraClient> c = mCameraClient;

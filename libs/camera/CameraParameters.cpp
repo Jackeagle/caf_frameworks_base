@@ -102,6 +102,8 @@ const char CameraParameters::KEY_VIDEO_HIGH_FRAME_RATE[] = "video-hfr";
 const char CameraParameters::KEY_SUPPORTED_VIDEO_HIGH_FRAME_RATE_MODES[] = "video-hfr-values";
 const char CameraParameters::KEY_REDEYE_REDUCTION[] = "redeye-reduction";
 const char CameraParameters::KEY_SUPPORTED_REDEYE_REDUCTION[] = "redeye-reduction-values";
+const char CameraParameters::KEY_HIGH_DYNAMIC_RANGE_IMAGING[] = "hdr";
+const char CameraParameters::KEY_SUPPORTED_HDR_IMAGING_MODES[] = "hdr-values";
 
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
@@ -258,6 +260,9 @@ const char CameraParameters::VIDEO_HFR_4X[] = "120";
 // Values for Redeye Reduction settings.
 const char CameraParameters::REDEYE_REDUCTION_ENABLE[] = "enable";
 const char CameraParameters::REDEYE_REDUCTION_DISABLE[] = "disable";
+// Values for HDR settings.
+const char CameraParameters::HDR_ENABLE[] = "enable";
+const char CameraParameters::HDR_DISABLE[] = "disable";
 
 static const char* portrait = "portrait";
 static const char* landscape = "landscape";
