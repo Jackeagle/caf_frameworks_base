@@ -519,7 +519,6 @@ void LPAPlayer::resume() {
                 local_handle->sync_ptr->flags = SNDRV_PCM_SYNC_PTR_APPL | SNDRV_PCM_SYNC_PTR_AVAIL_MIN;
                 sync_ptr(local_handle);
                 LOGV("appl_ptr= %d", local_handle->sync_ptr->c.control.appl_ptr);
-                pthread_cond_signal(&decoder_cv);
             }
             if (mAudioSink.get() != NULL) {
                 mAudioSink->resumeSession();
@@ -552,6 +551,7 @@ void LPAPlayer::resume() {
             pthread_cond_signal(&a2dp_cv);
         }
         isPaused = false;
+        pthread_cond_signal(&decoder_cv);
         /* Set timeStarted to current systemTime */
         timeStarted = nanoseconds_to_microseconds(systemTime(SYSTEM_TIME_MONOTONIC));
     }
@@ -682,7 +682,7 @@ void LPAPlayer::decoderThreadEntry() {
         LOGV("decoder pmemBuffersRequestQueue.size() = %d, pmemBuffersResponseQueue.size() = %d ",
              pmemBuffersRequestQueue.size(),pmemBuffersResponseQueue.size());
 
-        if (pmemBuffersRequestQueue.empty() || a2dpDisconnectPause || mReachedEOS ||
+        if (pmemBuffersRequestQueue.empty() || mReachedEOS || isPaused ||
             (bIsA2DPEnabled && !mAudioSinkOpen) || asyncReset ) {
             LOGV("decoderThreadEntry: a2dpDisconnectPause %d  mReachedEOS %d bIsA2DPEnabled %d "
                  "mAudioSinkOpen %d asyncReset %d ", a2dpDisconnectPause,
