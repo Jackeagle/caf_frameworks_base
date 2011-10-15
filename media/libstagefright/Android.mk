@@ -116,7 +116,7 @@ LOCAL_STATIC_LIBRARIES := \
 
 ifeq ($(BOARD_USES_ALSA_AUDIO),true)
         LOCAL_SRC_FILES += LPAPlayerALSA.cpp
-        LOCAL_C_INCLUDES += $(TOP)/hardware/msm7k/libalsa-intf
+        LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/mm-audio/libalsa-intf
         LOCAL_C_INCLUDES += $(TOP)/kernel/include/sound
         LOCAL_SHARED_LIBRARIES += libalsa-intf
 else
