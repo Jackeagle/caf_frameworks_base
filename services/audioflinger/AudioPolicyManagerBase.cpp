@@ -1028,7 +1028,7 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     // devices available by default are speaker, ear piece and microphone
     mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE;
     mAvailableOutputDevices |= AudioSystem::DEVICE_OUT_SPEAKER;
-    property_get("ro.product.device",mDeviceName,"0");
+    property_get("ro.board.platform",mDeviceName,"0");
     if( !strncmp(mDeviceName, "msm7627_", 8)) {
         if((fp = fopen("/sys/devices/system/soc/soc0/build_id","r")) == NULL){
             LOGE("Cannot open build_id file.");

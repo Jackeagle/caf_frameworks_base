@@ -1119,7 +1119,7 @@ status_t StagefrightRecorder::setupCameraSource() {
     params.setPreviewSize(mVideoWidth, mVideoHeight);
 
     char mDeviceName[PROPERTY_VALUE_MAX];
-    property_get("ro.product.device",mDeviceName,"0");
+    property_get("ro.board.platform",mDeviceName,"0");
     if( !strncmp(mDeviceName, "msm7627_", 8)) {
         if ((mVideoEncoder == VIDEO_ENCODER_H264) && (mFrameRate > 15) &&
             (((mVideoWidth * mVideoHeight) >> 8) >= (40 * 30))) {
@@ -1247,7 +1247,7 @@ status_t StagefrightRecorder::setupVideoEncoder(sp<MediaSource> *source) {
     }
 
     char mDeviceName[100];
-    property_get("ro.product.device",mDeviceName,"0");
+    property_get("ro.board.platform",mDeviceName,"0");
     if(!strncmp(mDeviceName, "msm7627a", 8)) {
        if(hfr && (width * height > 432*240)) {
            LOGE("HFR mode is supported only upto WQVGA resolution");

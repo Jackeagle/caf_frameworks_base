@@ -236,7 +236,7 @@ status_t MediaRecorderClient::prepare()
         }
 
         // For 7627 target switch to OC for voice call recording
-        property_get("ro.product.device",value,"0");
+        property_get("ro.board.platform",value,"0");
 
         int useSFforFmA2DP = false;
         if (property_get("media.stagefright.enable-fma2dp", value, NULL)

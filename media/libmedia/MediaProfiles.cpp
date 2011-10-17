@@ -392,7 +392,7 @@ MediaProfiles::getInstance()
 MediaProfiles::createDefaultH263VideoEncoderCap()
 {
     char mDeviceName[PROPERTY_VALUE_MAX] = {0};
-    property_get("ro.product.device",mDeviceName,"0");
+    property_get("ro.board.platform",mDeviceName,"0");
     if (strcmp(mDeviceName, "msm7627a") == 0)
     {
         /* increase max supported width to 864 from 800 for msm7x27a target */

@@ -464,7 +464,7 @@ uint32_t OMXCodec::getComponentQuirks(
         const char *componentName, bool isEncoder) {
     uint32_t quirks = 0;
     char mDeviceName[128];
-    property_get("ro.product.device",mDeviceName,"0");
+    property_get("ro.board.platform",mDeviceName,"0");
 
     if (!strcmp(componentName, "OMX.PV.avcdec")) {
         quirks |= kWantsNALFragments;
@@ -1029,7 +1029,7 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
 
         char value[PROPERTY_VALUE_MAX];
         status_t err = mOMX->setParameter(mNode, (OMX_INDEXTYPE)OMX_QcomIndexPortDefn, &portdef, sizeof(OMX_QCOM_PARAM_PORTDEFINITIONTYPE));
-        if (!property_get("ro.product.device", value, "1")
+        if (!property_get("ro.board.platform", value, "1")
             || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa")
             || !strcmp(value, "msm7627_7x_surf") || !strcmp(value, "msm7627_7x_ffa")
             || !strcmp(value, "msm7627a")
@@ -3185,7 +3185,7 @@ void OMXCodec::drainInputBuffers() {
 		//if we don't do this it will be a deadlock since we will be waiting for camera to be done
 		//and camera will not give any more unless we give release
         char value[PROPERTY_VALUE_MAX];
-        if (!property_get("ro.product.device", value, "1")
+        if (!property_get("ro.board.platform", value, "1")
             || !strcmp(value, "msm7627_surf") || !strcmp(value, "msm7627_ffa")
             || !strcmp(value, "msm7627a")
             || !strcmp(value, "msm7625_surf") || !strcmp(value, "msm7625_ffa"))
