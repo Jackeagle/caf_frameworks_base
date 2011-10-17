@@ -123,7 +123,9 @@ public class UiccCardApplication {
         mPin2State = as.pin2;
 
         if (as.app_type != tempAppType) {
-            mUiccApplicationRecords.dispose();
+            if (mUiccApplicationRecords != null) {
+                mUiccApplicationRecords.dispose();
+            }
             mUiccApplicationRecords = createUiccApplicationRecords(as.app_type, ur, c, ci);
         }
 
@@ -154,9 +156,10 @@ public class UiccCardApplication {
     private UiccApplicationRecords createUiccApplicationRecords(AppType type, UiccRecords ur, Context c, CommandsInterface ci) {
         if (type == AppType.APPTYPE_USIM || type == AppType.APPTYPE_SIM) {
             return new SIMRecords(this, ur, c, ci);
-        } else {
+        } else if (type == AppType.APPTYPE_RUIM || type == AppType.APPTYPE_CSIM) {
             return new RuimRecords(this, ur, c, ci);
         }
+        return null;
     }
 
     private IccFileHandler createUiccFileHandler(AppType type) {
