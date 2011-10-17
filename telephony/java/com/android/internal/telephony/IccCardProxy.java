@@ -326,23 +326,35 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     private void unregisterUiccCardEvents() {
-        mApplication.unregisterForReady(this);
-        mApplication.unregisterForLocked(this);
-        mApplication.unregisterForPersoSubstate(this);
+        if (mApplication != null) {
+            mApplication.unregisterForReady(this);
+            mApplication.unregisterForLocked(this);
+            mApplication.unregisterForPersoSubstate(this);
+        }
+
         if (mUiccCard != null) mUiccCard.unregisterForAbsent(this);
-        mAppRecords.unregisterForImsiReady(this);
-        mAppRecords.unregisterForRecordsLoaded(this);
-        mAppRecords.unregisterForRecordsEvents(this);
+
+        if (mAppRecords != null) {
+            mAppRecords.unregisterForImsiReady(this);
+            mAppRecords.unregisterForRecordsLoaded(this);
+            mAppRecords.unregisterForRecordsEvents(this);
+        }
     }
 
     private void registerUiccCardEvents() {
-        mApplication.registerForReady(this, EVENT_APP_READY, null);
-        mApplication.registerForLocked(this, EVENT_ICC_LOCKED, null);
-        mApplication.registerForPersoSubstate(this, EVENT_PERSO_LOCKED, null);
+        if (mApplication != null) {
+            mApplication.registerForReady(this, EVENT_APP_READY, null);
+            mApplication.registerForLocked(this, EVENT_ICC_LOCKED, null);
+            mApplication.registerForPersoSubstate(this, EVENT_PERSO_LOCKED, null);
+        }
+
         if (mUiccCard != null) mUiccCard.registerForAbsent(this, EVENT_ICC_ABSENT, null);
-        mAppRecords.registerForImsiReady(this, EVENT_IMSI_READY, null);
-        mAppRecords.registerForRecordsLoaded(this, EVENT_RECORDS_LOADED, null);
-        mAppRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
+
+        if (mAppRecords != null) {
+            mAppRecords.registerForImsiReady(this, EVENT_IMSI_READY, null);
+            mAppRecords.registerForRecordsLoaded(this, EVENT_RECORDS_LOADED, null);
+            mAppRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
+        }
     }
 
     private void updateStateProperty() {
