@@ -1175,6 +1175,9 @@ void LPAPlayer::A2DPNotificationThreadEntry() {
             LOGV("resume:: opening audio session with mSampleRate %d numChannels %d sessionId %d",
                  mSampleRate, numChannels, sessionId);
             status_t err = mAudioSink->openSession(AudioSystem::PCM_16_BIT, sessionId,  mSampleRate, numChannels);
+            if (mAudioSink.get() != NULL) {
+                mAudioSink->pauseSession();
+            }
             mInternalSeeking = true;
             mReachedEOS = false;
             mSeekTimeUs = timePlayed;
