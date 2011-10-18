@@ -1579,24 +1579,39 @@ class PowerManagerService extends IPowerManager.Stub
                 return;
             }
 
-            // Check to make sure all sampling rate files are readable and writable.
-            int dirCPUCoresOffset;
-
             try{
-                for (dirCPUCoresOffset = 0; dirCPUCoresOffset < dirCPUCores.length; dirCPUCoresOffset++) {
-                    File fileSamplingRate = new File(dirCPUCores[dirCPUCoresOffset].getPath() + "/" + REL_SAMPLING_RATE_PATH);
+                File fileSamplingRateGeneric = new File(CPU_DIR_PATH + "/" + REL_SAMPLING_RATE_PATH);
 
-                    if (fileSamplingRate.canRead() && fileSamplingRate.canWrite()) {
-                        BufferedReader samplingRateReader = new BufferedReader(new FileReader(fileSamplingRate));
+                if (fileSamplingRateGeneric.canRead() && fileSamplingRateGeneric.canWrite()) {
+                    BufferedReader samplingRateReaderGeneric = new BufferedReader(new FileReader(fileSamplingRateGeneric));
 
-                        if (mSamplingRateTable == null) {
-                            mSamplingRateTable = new HashMap<File, String> ();
-                            mPrintWriterTable = new HashMap<File, PrintWriter>();
+                    if (mSamplingRateTable == null) {
+                        mSamplingRateTable = new HashMap<File, String> ();
+                        mPrintWriterTable = new HashMap<File, PrintWriter>();
+                    }
+
+                    mSamplingRateTable.put(fileSamplingRateGeneric, samplingRateReaderGeneric.readLine());
+                    mPrintWriterTable.put(fileSamplingRateGeneric, new PrintWriter(fileSamplingRateGeneric));
+                    samplingRateReaderGeneric.close();
+                } else {
+                    // Check to make sure all sampling rate files are readable and writable.
+                    int dirCPUCoresOffset;
+
+                    for (dirCPUCoresOffset = 0; dirCPUCoresOffset < dirCPUCores.length; dirCPUCoresOffset++) {
+                        File fileSamplingRate = new File(dirCPUCores[dirCPUCoresOffset].getPath() + "/" + REL_SAMPLING_RATE_PATH);
+
+                        if (fileSamplingRate.canRead() && fileSamplingRate.canWrite()) {
+                            BufferedReader samplingRateReader = new BufferedReader(new FileReader(fileSamplingRate));
+
+                            if (mSamplingRateTable == null) {
+                                mSamplingRateTable = new HashMap<File, String> ();
+                                mPrintWriterTable = new HashMap<File, PrintWriter>();
+                            }
+
+                            mSamplingRateTable.put(fileSamplingRate, samplingRateReader.readLine());
+                            mPrintWriterTable.put(fileSamplingRate, new PrintWriter(fileSamplingRate));
+                            samplingRateReader.close();
                         }
-
-                        mSamplingRateTable.put(fileSamplingRate, samplingRateReader.readLine());
-                        mPrintWriterTable.put(fileSamplingRate, new PrintWriter(fileSamplingRate));
-                        samplingRateReader.close();
                     }
                 }
             } catch (Exception exception) {
