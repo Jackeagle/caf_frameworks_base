@@ -214,7 +214,10 @@ public class BluetoothGattService {
         return value;
     }
 
-    public boolean writeCharacteristicRaw(String path, byte[] value) throws Exception {
+    public boolean writeCharacteristicRaw(String path, byte[] value,
+                                          boolean reliable) throws Exception {
+
+        Log.d (TAG, "writeCharacteristicRaw " + path);
 
         if (!mHelper.discoveryDone())
             return false;
@@ -225,7 +228,7 @@ public class BluetoothGattService {
         mLock.readLock().lock();
         try {
             if (mClosed) throw new Exception ("GATT service closed");
-            return mHelper.setCharacteristicProperty(path, "Value", value);
+            return mHelper.setCharacteristicProperty(path, "Value", value, reliable);
         }  finally {
             mLock.readLock().unlock();
         }
@@ -247,7 +250,7 @@ public class BluetoothGattService {
         mLock.readLock().lock();
         try {
             if (mClosed) throw new Exception ("GATT service closed");
-            return mHelper.setCharacteristicProperty(path, "ClientConfiguration", value);
+            return mHelper.setCharacteristicProperty(path, "ClientConfiguration", value, true);
         }  finally {
             mLock.readLock().unlock();
         }
@@ -483,10 +486,10 @@ public class BluetoothGattService {
             } catch (RemoteException e) {Log.e(TAG, "", e);}
         }
 
-        public synchronized boolean setCharacteristicProperty(String path, String key, byte[] value) {
+        public synchronized boolean setCharacteristicProperty(String path, String key, byte[] value, boolean reliable) {
             Log.d(TAG, "setCharacteristicProperty");
             try {
-                return mService.setCharacteristicProperty(path, key, value);
+                return mService.setCharacteristicProperty(path, key, value, reliable);
             } catch (RemoteException e) {Log.e(TAG, "", e);}
 
             return false;

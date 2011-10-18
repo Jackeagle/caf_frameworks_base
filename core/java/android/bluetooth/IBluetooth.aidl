@@ -92,7 +92,7 @@ interface IBluetooth
     String getGattServiceName(in String path);
     boolean discoverCharacteristics(in String path);
     String[] getCharacteristicProperties(in String path);
-    boolean setCharacteristicProperty(in String path, in String key, in byte[] value);
+    boolean setCharacteristicProperty(in String path, in String key, in byte[] value, boolean reliable);
     boolean registerCharacteristicsWatcher(in String path, in IBluetoothGattService gattCallback);
     boolean updateCharacteristicValue(in String path);
     boolean deregisterCharacteristicsWatcher(in String path);

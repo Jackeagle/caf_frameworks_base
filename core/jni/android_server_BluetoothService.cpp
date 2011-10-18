@@ -1304,7 +1304,7 @@ static jobjectArray getCharacteristicPropertiesNative(JNIEnv *env, jobject objec
 }
 
 static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jstring path,
-                                         jstring key, jbyteArray value, int len) {
+                                                jstring key, jbyteArray value, int len, jboolean reliable) {
 #ifdef HAVE_BLUETOOTH
     LOGV(__FUNCTION__);
     native_data_t *nat = get_native_data(env, object);
@@ -1316,7 +1316,6 @@ static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jst
         DBusMessageIter iter;
         DBusError err;
         dbus_async_call_t *pending;
-        dbus_bool_t reply = FALSE;
 
         const char *c_key = env->GetStringUTFChars(key, NULL);
         const char *c_path = env->GetStringUTFChars(path, NULL);
@@ -1324,37 +1323,43 @@ static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jst
 
         int sz = env->GetArrayLength(value);
 
+        dbus_bool_t ret = FALSE;
 
         dbus_error_init(&err);
-        msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
-                                          c_path, DBUS_CHARACTERISTIC_IFACE, "SetProperty");
-        if (!msg) {
-            LOGE("%s: Can't allocate new method call for characteristic "
-                 "SetProperty!", __FUNCTION__);
-            env->ReleaseStringUTFChars(key, c_key);
-            env->ReleaseStringUTFChars(path, c_path);
-            env->ReleaseByteArrayElements(value, v_ptr, 0);
-            return JNI_FALSE;
-        }
+        if (reliable) {
+            msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
+                                               c_path, DBUS_CHARACTERISTIC_IFACE, "SetProperty");
 
-        dbus_message_append_args(msg, DBUS_TYPE_STRING, &c_key, DBUS_TYPE_INVALID);
-        dbus_message_iter_init_append(msg, &iter);
+            if (!msg) {
+                LOGE("%s: Can't allocate new method call for characteristic "
+                     "SetProperty!", __FUNCTION__);
+                env->ReleaseStringUTFChars(key, c_key);
+                env->ReleaseStringUTFChars(path, c_path);
+                env->ReleaseByteArrayElements(value, v_ptr, 0);
+                return JNI_FALSE;
+            }
 
-        append_array_variant(&iter, DBUS_TYPE_BYTE, (void*)v_ptr, len);
+            dbus_message_append_args(msg, DBUS_TYPE_STRING, &c_key, DBUS_TYPE_INVALID);
+            dbus_message_iter_init_append(msg, &iter);
 
-        // Setup the callback info
-        struct set_characteristic_property_t *prop;
-        prop = (set_characteristic_property_t *) calloc(1, sizeof(struct set_characteristic_property_t));
+            append_array_variant(&iter, DBUS_TYPE_BYTE, (void*)v_ptr, len);
 
-        prop->path = (char *)calloc(strlen(c_path) + 1, sizeof(char));
-        strlcpy(prop->path, c_path, strlen(c_path) + 1);
+            // Setup the callback info
+            struct set_characteristic_property_t *prop;
+            prop = (set_characteristic_property_t *) calloc(1, sizeof(struct set_characteristic_property_t));
 
-        prop->property = (char *)calloc(strlen(c_key) + 1, sizeof(char));
-        strlcpy(prop->property, c_key, strlen(c_key) + 1);
+            prop->path = (char *)calloc(strlen(c_path) + 1, sizeof(char));
+            strlcpy(prop->path, c_path, strlen(c_path) + 1);
 
-        // Make the call.
-        pending = (dbus_async_call_t *)malloc(sizeof(dbus_async_call_t));
-        if (pending) {
+            prop->property = (char *)calloc(strlen(c_key) + 1, sizeof(char));
+            strlcpy(prop->property, c_key, strlen(c_key) + 1);
+
+            // Make the call.
+            pending = (dbus_async_call_t *)malloc(sizeof(dbus_async_call_t));
+
+            if (!pending)
+                return JNI_FALSE;
+
             DBusPendingCall *call;
 
             pending->env = env;
@@ -1362,28 +1367,46 @@ static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jst
             pending->user = prop;
             pending->nat = eventLoopNat;
 
-            reply = dbus_connection_send_with_reply(nat->conn, msg,
-                                                &call,
-                                                -1);
-            if (reply == TRUE)
+            ret = dbus_connection_send_with_reply(nat->conn, msg,
+                                                    &call,
+                                                    -1);
+            if (ret == TRUE)
                 dbus_pending_call_set_notify(call,
-                                         dbus_func_args_async_callback,
-                                         pending,
-                                         NULL);
+                                             dbus_func_args_async_callback,
+                                             pending,
+                                             NULL);
+
+            if (!ret) {
+                if (dbus_error_is_set(&err)) {
+                    LOG_AND_FREE_DBUS_ERROR(&err);
+                }
+            }
+
+        } else {
+            msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
+                                               c_path, DBUS_CHARACTERISTIC_IFACE, "SetPropertyCommand");
+            if (!msg) {
+                LOGE("%s: Can't allocate new method call for characteristic "
+                     "SetProperty!", __FUNCTION__);
+                env->ReleaseStringUTFChars(key, c_key);
+                env->ReleaseStringUTFChars(path, c_path);
+                env->ReleaseByteArrayElements(value, v_ptr, 0);
+                return JNI_FALSE;
+            }
+
+            dbus_message_append_args(msg, DBUS_TYPE_STRING, &c_key, DBUS_TYPE_INVALID);
+            dbus_message_iter_init_append(msg, &iter);
+            append_array_variant(&iter, DBUS_TYPE_BYTE, (void*)v_ptr, len);
+            DBusMessage *reply = dbus_connection_send_with_reply_and_block(nat->conn, msg, -1, &err);
+            dbus_message_unref(msg);
+            ret = reply ? TRUE : FALSE;
         }
 
         env->ReleaseStringUTFChars(key, c_key);
         env->ReleaseStringUTFChars(path, c_path);
         env->ReleaseByteArrayElements(value, v_ptr, 0);
 
-        if (!reply) {
-            if (dbus_error_is_set(&err)) {
-                LOG_AND_FREE_DBUS_ERROR(&err);
-            } else
-                LOGE("DBus reply is NULL in function %s", __FUNCTION__);
-            return JNI_FALSE;
-        }
-        return JNI_TRUE;
+        return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
     return JNI_FALSE;
@@ -1573,7 +1596,7 @@ static JNINativeMethod sMethods[] = {
     {"discoverCharacteristicsNative", "(Ljava/lang/String;)Z", (void*)discoverCharacteristicsNative},
     {"updateCharacteristicValueNative", "(Ljava/lang/String;)Z", (void*)updateCharacteristicValueNative},
     {"getCharacteristicPropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getCharacteristicPropertiesNative},
-    {"setCharacteristicPropertyNative", "(Ljava/lang/String;Ljava/lang/String;[BI)Z", (void*)setCharacteristicPropertyNative},
+    {"setCharacteristicPropertyNative", "(Ljava/lang/String;Ljava/lang/String;[BIZ)Z", (void*)setCharacteristicPropertyNative},
     {"registerCharacteristicsWatcherNative", "(Ljava/lang/String;)Z", (void*)registerCharacteristicsWatcherNative},
     {"deregisterCharacteristicsWatcherNative", "(Ljava/lang/String;)Z", (void*)deregisterCharacteristicsWatcherNative},
     {"sapAuthorizeNative", "(Ljava/lang/String;ZI)Z", (void *)sapAuthorizeNative},

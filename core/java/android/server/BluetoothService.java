@@ -3382,7 +3382,7 @@ public class BluetoothService extends IBluetooth.Stub {
         return propValues;
     }
 
-    public synchronized boolean setCharacteristicProperty(String path, String key, byte[] value) {
+    public synchronized boolean setCharacteristicProperty(String path, String key, byte[] value, boolean reliable) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return false;
 
@@ -3401,7 +3401,8 @@ public class BluetoothService extends IBluetooth.Stub {
             return false;
         }
 
-        boolean ret = setCharacteristicPropertyNative(path, key, value, value.length);
+        boolean ret = setCharacteristicPropertyNative(path, key, value, value.length, reliable);
+
         return ret;
     }
 
@@ -3650,7 +3651,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private native Object[] getGattServicePropertiesNative(String path);
     private native boolean discoverCharacteristicsNative(String path);
     private native Object[] getCharacteristicPropertiesNative(String path);
-    private native boolean setCharacteristicPropertyNative(String path, String key, byte[] value, int length);
+    private native boolean setCharacteristicPropertyNative(String path, String key, byte[] value, int length, boolean reliable);
     private native boolean updateCharacteristicValueNative(String path);
     private native boolean registerCharacteristicsWatcherNative(String path);
     private native boolean deregisterCharacteristicsWatcherNative(String path);
