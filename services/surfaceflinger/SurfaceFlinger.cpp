@@ -2539,7 +2539,7 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
 
     sp<MemoryHeapBase> base(
           new MemoryHeapBase(size, flags, "screen-capture") );
-    void* const ptr = base->getBase();
+    void* ptr = base->getBase();
 
     // Use copybit for screen capture in case of c2d composition
     if (hw.getFlags() & DisplayHardware::C2D_COMPOSITION) {
@@ -2588,7 +2588,7 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
 
         // Copybit dst
         copybit_image_t dst;
-        dst.w = ((sw+31) &~31);
+        dst.w = sw;
         dst.h = sh;
         dst.format = hw.getFormat();
         dst.base = ptr;
@@ -2607,6 +2607,21 @@ status_t SurfaceFlinger::captureScreenImplLocked(DisplayID dpy,
         mBlitEngine->set_parameter(mBlitEngine, COPYBIT_PLANE_ALPHA, 0xFF);
         result = mBlitEngine->stretch(mBlitEngine, &dst, &src, &dst_rect, &src_rect, &clip);
         if (result == NO_ERROR) {
+            //if requested width is different from aligned width
+            //remove padded bits before returning the buffer
+            if (sw != aligned_sw) {
+                size_t size = sw * sh * 4;
+                sp<MemoryHeapBase> retbuf(new
+                    MemoryHeapBase(size, flags, "screen-capture-buffer"));
+                void* dstptr = retbuf->getBase();
+
+                for(uint32_t i = 0; i < sh; i++) {
+                    memcpy(dstptr, ptr, sw*4);
+                    dstptr += sw*4;
+                    ptr += aligned_sw * 4;
+                };
+                base = retbuf;
+            }
             *w = dst.w;
         }
     } else {
