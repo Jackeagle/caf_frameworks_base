@@ -79,7 +79,8 @@ LOCAL_C_INCLUDES:= \
         $(TOP)/external/tremolo \
         $(TOP)/frameworks/base/media/libstagefright/rtsp \
         $(TOP)/vendor/qcom/opensource/omx/mm-core/omxcore/inc \
-        $(TOP)/hardware/msm7k/libgralloc-qsd8k
+        $(TOP)/hardware/msm7k/libgralloc-qsd8k \
+        $(TOP)/hardware/libhardware_legacy/include
 
 LOCAL_SHARED_LIBRARIES := \
         libbinder         \
@@ -90,7 +91,8 @@ LOCAL_SHARED_LIBRARIES := \
         libsonivox        \
         libvorbisidec     \
         libsurfaceflinger_client \
-        libcamera_client
+        libcamera_client  \
+        libhardware_legacy
 
 LOCAL_STATIC_LIBRARIES := \
         libstagefright_aacdec \

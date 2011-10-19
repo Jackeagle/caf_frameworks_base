@@ -244,6 +244,7 @@ private:
     bool                        mPauseEventPending;
     bool                        mPlaybackSuspended;
     bool                        mIsDriverStarted;
+    bool                        mIsAudioRouted;
 
     sp<MediaPlayerBase::AudioSink> mAudioSink;
     AwesomePlayer *mObserver;
