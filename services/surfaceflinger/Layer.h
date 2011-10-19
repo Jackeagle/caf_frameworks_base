@@ -72,7 +72,7 @@ public:
     // LayerBase interface
     virtual void drawForSreenShot() const;
     virtual status_t drawWithOverlay(const Region& clip,
-                        bool hdmiConnected, bool ignoreFB = true) const;
+                        bool hdmiConnected, bool waitVsync = true) const;
     virtual status_t setBufferInUse() const;
     virtual status_t freeBypassBuffers() const;
     status_t clearFreezeLock() {

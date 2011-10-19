@@ -36,6 +36,8 @@
 #include "SurfaceFlinger.h"
 #include "DisplayHardware/DisplayHardware.h"
 
+#include "gralloc_priv.h"
+
 namespace android {
 
 // ---------------------------------------------------------------------------
@@ -47,7 +49,8 @@ gralloc_module_t const* LayerBuffer::sGrallocModule = 0;
 LayerBuffer::LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
         const sp<Client>& client)
     : LayerBaseClient(flinger, display, client),
-      mNeedsBlending(false), mInvalidate(false), mBlitEngine(0)
+      mNeedsBlending(false), mInvalidate(false), mIsReconfiguring(false),
+      mBlitEngine(0)
 {
     char property[PROPERTY_VALUE_MAX];
     if(property_get("debug.composition.type", property, NULL) > 0 &&
@@ -123,15 +126,63 @@ void LayerBuffer::setDirtyQueueSignal()
 void LayerBuffer::postBuffer(ssize_t offset)
 {
     sp<Source> source(getSource());
-    if (source != 0)
+    if (source != 0) {
+        if (mIsReconfiguring) {
+            // We have received the first buffer after reconfiguration,
+            // clear the reconfig. flag
+            mIsReconfiguring = false;
+        }
         source->postBuffer(offset);
+    }
+}
+
+void LayerBuffer::wait(Mutex & m, Condition& c, reconfigBufState_t& s) {
+  const nsecs_t TIMEOUT = ms2ns(20);
+  unsigned int count = 0;
+  enum { MAX_WAIT_COUNT = 50 };
+  /* we set wakeup to 3 sec. That should never deadblock */
+  while(s == RECONFIG_BUFFER_BLOCK) {
+    (void) c.waitRelative(m, TIMEOUT);
+    if(++count > MAX_WAIT_COUNT) {
+      LOGE("LayerBuffer::wait too many wait count=%d", count);
+      s = RECONFIG_BUFFER_GO;
+    }
+  }
+  // Mark it as block so no other setBuffer can sneak in
+  s = RECONFIG_BUFFER_BLOCK;
+
+}
+
+void LayerBuffer::resetReconfigStatus()
+{
+    if (mIsReconfiguring) {
+        mReconfigStatus = RECONFIG_BUFFER_GO;
+    }
+}
+
+void LayerBuffer::reconfigureBuffers()
+{
+    sp<Source> source(getSource());
+    if (source != 0) {
+        LOGD("LayerBuffer::reconfigureBuffers");
+        // Set the reconfig flag
+        mIsReconfiguring = true;
+        // wait
+        mReconfigStatus = RECONFIG_BUFFER_BLOCK;
+
+        // signal the thread loop
+        invalidate();
+        wait(mReconfigMutex, mReconfigCond, mReconfigStatus);
+        LOGD("Exit wait condition in reconfigureBuffers and return");
+    }
+    return;
 }
 
 void LayerBuffer::unregisterBuffers()
 {
     sp<Source> source(clearSource());
     if (source != 0)
-        source->unregisterBuffers();
+        source->unregisterBuffers(mIsReconfiguring);
 }
 
 uint32_t LayerBuffer::doTransaction(uint32_t flags)
@@ -155,7 +206,7 @@ void LayerBuffer::unlockPageFlip(const Transform& planeTransform,
         source->onVisibilityResolved(planeTransform);
     if(mInvalidate)
         outDirtyRegion.orSelf(getTransformedBounds());
-    LayerBase::unlockPageFlip(planeTransform, outDirtyRegion);    
+    LayerBase::unlockPageFlip(planeTransform, outDirtyRegion);
 }
 
 void LayerBuffer::validateVisibility(const Transform& globalTransform)
@@ -183,13 +234,21 @@ void LayerBuffer::onDraw(const Region& clip) const
 }
 
 status_t LayerBuffer::drawWithOverlay(const Region& clip, 
-                                  bool hdmiConnected, bool ignoreFB) const
+                                  bool hdmiConnected, bool waitVsync) const
 {
 #if defined(TARGET_USES_OVERLAY)
     sp<Source> source(getSource());
     if (LIKELY(source != 0)) {
-        return source->drawWithOverlay(clip, hdmiConnected, ignoreFB);
-    }
+        status_t ret;
+        if (mIsReconfiguring)
+            ret = source->drawWithOverlayReconfigure(clip, hdmiConnected, waitVsync);
+        else
+            ret = source->drawWithOverlay(clip, hdmiConnected, waitVsync);
+        return ret;
+    } else if (mIsReconfiguring) {
+        return NO_ERROR;
+    } else
+        LOGD("LayerBuffer::drawWithOverlay invalid src");
 #endif
     return INVALID_OPERATION;
 }
@@ -218,7 +277,7 @@ status_t LayerBuffer::registerBuffers(const ISurface::BufferHeap& buffers)
         mSource = source;
     }
     return result;
-}    
+}
 
 /**
  * This creates an "overlay" source for this surface
@@ -280,6 +339,13 @@ void LayerBuffer::SurfaceLayerBuffer::postBuffer(ssize_t offset)
     sp<LayerBuffer> owner(getOwner());
     if (owner != 0)
         owner->postBuffer(offset);
+}
+
+void LayerBuffer::SurfaceLayerBuffer::reconfigureBuffers()
+{
+    sp<LayerBuffer> owner(getOwner());
+    if (owner != 0)
+        owner->reconfigureBuffers();
 }
 
 void LayerBuffer::SurfaceLayerBuffer::unregisterBuffers()
@@ -347,14 +413,18 @@ LayerBuffer::Buffer::~Buffer()
 
 LayerBuffer::Source::Source(LayerBuffer& layer)
     : mLayer(layer)
-{    
+{
 }
-LayerBuffer::Source::~Source() {    
+LayerBuffer::Source::~Source() {
 }
 void LayerBuffer::Source::onDraw(const Region& clip) const {
 }
-status_t LayerBuffer::Source::drawWithOverlay(const Region& clip, 
-                        bool hdmiConnected, bool ignoreFB) const {
+status_t LayerBuffer::Source::drawWithOverlay(const Region& clip,
+                        bool hdmiConnected, bool waitVsync) const {
+    return INVALID_OPERATION;
+}
+status_t LayerBuffer::Source::drawWithOverlayReconfigure(const Region& clip,
+                        bool hdmiConnected, bool waitVsync) const {
     return INVALID_OPERATION;
 }
 void LayerBuffer::Source::onTransaction(uint32_t flags) {
@@ -364,7 +434,7 @@ void LayerBuffer::Source::onVisibilityResolved(
 }
 void LayerBuffer::Source::postBuffer(ssize_t offset) {
 }
-void LayerBuffer::Source::unregisterBuffers() {
+void LayerBuffer::Source::unregisterBuffers(bool isReconfiguring) {
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +512,7 @@ LayerBuffer::BufferSource::BufferSource(LayerBuffer& layer,
 
     if (buffers.hor_stride<0 || buffers.ver_stride<0) {
         LOGE("LayerBuffer::BufferSource: invalid parameters "
-             "(w=%d, h=%d, xs=%d, ys=%d)", 
+             "(w=%d, h=%d, xs=%d, ys=%d)",
              buffers.w, buffers.h, buffers.hor_stride, buffers.ver_stride);
         mStatus = BAD_VALUE;
         return;
@@ -482,7 +552,7 @@ LayerBuffer::BufferSource::~BufferSource()
 }
 
 void LayerBuffer::BufferSource::postBuffer(ssize_t offset)
-{    
+{
     ISurface::BufferHeap buffers;
     { // scope for the lock
         Mutex::Autolock _l(mBufferSourceLock);
@@ -508,12 +578,16 @@ void LayerBuffer::BufferSource::postBuffer(ssize_t offset)
     }
 }
 
-void LayerBuffer::BufferSource::unregisterBuffers()
+void LayerBuffer::BufferSource::unregisterBuffers(bool isReconfiguring)
 {
     Mutex::Autolock _l(mBufferSourceLock);
     mBufferHeap.heap.clear();
     mBuffer.clear();
-    mLayer.invalidate();
+    if (!isReconfiguring) {
+        // Since we are not in the middle of reconfiguration,
+        // signal the server
+        mLayer.invalidate();
+    }
 }
 
 sp<LayerBuffer::Buffer> LayerBuffer::BufferSource::getBuffer() const
@@ -538,8 +612,94 @@ void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer>& buffer)
   mBuffer = buffer;
 }
 
-status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip, 
-                              bool hdmiConnected, bool ignoreFB) const
+status_t LayerBuffer::BufferSource::drawWithOverlayReconfigure(
+                  const Region& clip, bool hdmiConnected, bool waitVsync) const
+{
+#if defined(TARGET_USES_OVERLAY)
+    LOGD("LayerBuffer::BufferSource::drawWithOverlayReconfigure E");
+    sp<Buffer> ourBuffer(getBuffer());
+    if (UNLIKELY(ourBuffer == 0))  {
+        // nothing to do, we don't have a buffer
+        // happens in suspend resume
+        mLayer.clearWithOpenGL(clip);
+        // return no error as no point trying to draw this null buffer on FB
+        return NO_ERROR;
+    }
+    bool needsClearFB = false;
+    Buffer::Offset& currOffset = ourBuffer->getCurrOffset();
+    // That will ensure no signaling would happen
+    mDirtyQueueBit = true;
+    // Dirty queue bit is false so no signaling would happen, only when the
+    // origin of the offset comes from the event loop and it is the same offset
+    // That is because in seek operations, same offset can come from postBuffer
+    // so the decoder is sending multiple postBuf with same offset and we want
+    // to signal in that case. (otherwise we will have a 2-3 of ui freeze)
+    if(currOffset.mOrigin == Buffer::Offset::EVENT_LOOP &&
+        currOffset == mPrevOffset) {
+      mDirtyQueueBit = false;
+    }
+    mPrevOffset = currOffset;
+    currOffset.mOrigin = Buffer::Offset::EVENT_LOOP;
+
+    NativeBuffer src(ourBuffer->getBuffer());
+    const DisplayHardware& hw(mLayer.mFlinger->
+                               graphicPlane(0).displayHardware());
+    hw.videoOverlayStarted(true);
+    overlay::Overlay* ov = hw.getOverlayObject();
+    Transform finalTransform(Transform(mLayer.getOrientation()) *
+                        Transform(mBufferHeap.transform));
+
+    int w = src.hor_stride;
+    int h = src.ver_stride;
+    int format = src.img.format;
+
+    overlay_rect crop, dst;
+    crop.x = src.crop.l;
+    crop.y = src.crop.t;
+    crop.w = src.crop.r - src.crop.l;
+    crop.h = src.crop.b - src.crop.t;
+
+    const Rect bounds(mLayer.mTransformedBounds);
+    dst.x = bounds.left;
+    dst.y = bounds.top;
+    dst.w = bounds.width();
+    dst.h = bounds.height();
+
+    private_handle_t *hnd = (private_handle_t *)src.img.handle;
+    overlay_play_info playInfo;
+    playInfo.fd = hnd->fd;
+    playInfo.offset = hnd->offset;
+    bool ret =  ov->setReconfigurationInfo(RECONFIG_ON,
+                            w, h, format, crop, dst, playInfo,
+                            finalTransform.getOrientation());
+    if (!ret) {
+        // if we fail to setup for reconfig
+        // release the lock
+        mLayer.onQueueBuf();
+        return INVALID_OPERATION;
+    }
+    if (ov->queueBuffer(src.img.handle))
+        needsClearFB = true;
+    else
+        return INVALID_OPERATION;
+
+    // Need to inform video layer here after queuing
+    // It is safe to call onQueueBuf only when waitVsync==true since in this case
+    // it is safe to let postBuffer thread (video renderer) to move ahead
+    if(waitVsync)  {
+        mLayer.onQueueBuf();
+    }
+    if (!waitVsync || needsClearFB) {
+        mLayer.clearWithOpenGL(clip);
+    }
+    LOGD("LayerBuffer::BufferSource::drawWithOverlayReconfigure X");
+    return NO_ERROR;
+#endif
+    return INVALID_OPERATION;
+}
+
+status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
+                              bool hdmiConnected, bool waitVsync) const
 {
 #if defined(TARGET_USES_OVERLAY)
     sp<Buffer> ourBuffer(getBuffer());
@@ -547,7 +707,8 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
         // nothing to do, we don't have a buffer
         // happens in suspend resume
         mLayer.clearWithOpenGL(clip);
-        return INVALID_OPERATION;
+        // return no error as no point trying to draw this null buffer on FB
+        return NO_ERROR;
     }
 
     Buffer::Offset& currOffset = ourBuffer->getCurrOffset();
@@ -570,27 +731,30 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
                                graphicPlane(0).displayHardware());
     hw.videoOverlayStarted(true);
     overlay::Overlay* ov = hw.getOverlayObject();
+    ov->resetReconfigStatus();
     int s3dFormat = mLayer.getStereoscopic3DFormat();
     Transform finalTransform(Transform(mLayer.getOrientation()) *
                         Transform(mBufferHeap.transform));
 
-    if (!ov->setSource(src.hor_stride, src.ver_stride,
-                          src.img.format|s3dFormat, finalTransform.getOrientation(),
-                          hdmiConnected, ignoreFB))
-        return INVALID_OPERATION;
-    if (!ov->setCrop(0, 0, src.crop.r, src.crop.b))
-        return INVALID_OPERATION;
-    int orientation = Transform::ROT_0;
+    int device_orientation = finalTransform.getOrientation();
     bool ret = false;
-    if (ret = ov->getOrientation(orientation)) {
-        if (orientation != finalTransform.getOrientation()) {
-            ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
-        }
-    }
-    else
-        ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
-    if (!ret)
+
+    if (!ov->setSource(src.hor_stride, src.ver_stride,
+                       src.img.format|s3dFormat, device_orientation,
+                       hdmiConnected, waitVsync)) {
+        LOGE("%s: setSource(%d %d %d %d) failed", __FUNCTION__, src.hor_stride,
+                                   src.ver_stride, src.img.format|s3dFormat,
+                                   device_orientation);
         return INVALID_OPERATION;
+    }
+    if(!ov->setParameter(OVERLAY_TRANSFORM, device_orientation)) {
+        LOGE("%s: setparam failed for orientation %d", __FUNCTION__, device_orientation);
+        return INVALID_OPERATION;
+    }
+    if (!ov->setCrop(0, 0, src.crop.r, src.crop.b)) {
+        LOGE("DWO: setCrop(0, 0, %d, %d) failed", src.crop.r, src.crop.b);
+        return INVALID_OPERATION;
+    }
     const Rect bounds(mLayer.mTransformedBounds);
     int x = bounds.left;
     int y = bounds.top;
@@ -613,28 +777,27 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
       // of errors in DWO function.
       // That one is specifically here to _faster_ release a lock when dealing
       // w/ youtube apk instead of waiting for setBuffer/wait timeout.
+      LOGE("%s: setPosition(%d, %d, %d, %d) failed", __FUNCTION__, x, y, w, h);
       mLayer.onQueueBuf();
       return INVALID_OPERATION;
     }
-
     ret = ov->queueBuffer(src.img.handle);
     if (!ret)
         return INVALID_OPERATION;
 
     // Need to inform video layer here after queuing
-    // It is safe to call onQueueBuf only when ignoreFB==true since in this case
+    // It is safe to call onQueueBuf only when waitVsync==true since in this case
     // it is safe to let postBuffer thread (video renderer) to move ahead
-    if(ignoreFB)  {
-      mLayer.onQueueBuf();
-    }
-    if (!ignoreFB)
+    if(waitVsync)
+        mLayer.onQueueBuf();
+    else
         mLayer.clearWithOpenGL(clip);
     return NO_ERROR;
 #endif
     return INVALID_OPERATION;
 }
 
-void LayerBuffer::BufferSource::onDraw(const Region& clip) const 
+void LayerBuffer::BufferSource::onDraw(const Region& clip) const
 {
     sp<Buffer> ourBuffer(getBuffer());
     if (UNLIKELY(ourBuffer == 0))  {
@@ -788,7 +951,7 @@ void LayerBuffer::BufferSource::clearTempBufferImage() const
 // ---------------------------------------------------------------------------
 
 LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
-        sp<OverlayRef>* overlayRef, 
+        sp<OverlayRef>* overlayRef,
         uint32_t w, uint32_t h, int32_t format, int32_t orientation)
     : Source(layer), mVisibilityChanged(false),
     mOverlay(0), mOverlayHandle(0), mOverlayDevice(0), mHDMIEnabled(0)
@@ -823,13 +986,13 @@ LayerBuffer::OverlaySource::OverlaySource(LayerBuffer& layer,
     }
 
     // enable dithering...
-    overlay_dev->setParameter(overlay_dev, overlay, 
+    overlay_dev->setParameter(overlay_dev, overlay,
             OVERLAY_DITHER, OVERLAY_ENABLE);
 
     mOverlay = overlay;
     mWidth = overlay->w;
     mHeight = overlay->h;
-    mFormat = overlay->format; 
+    mFormat = overlay->format;
     mWidthStride = overlay->w_stride;
     mHeightStride = overlay->h_stride;
     mInitialized = false;

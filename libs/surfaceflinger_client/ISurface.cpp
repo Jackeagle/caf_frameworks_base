@@ -142,6 +142,13 @@ public:
         remote()->transact(POST_BUFFER, data, &reply);
     }
 
+    virtual void reconfigureBuffers()
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurface::getInterfaceDescriptor());
+        remote()->transact(RECONFIGURE_BUFFERS, data, &reply);
+    }
+
     virtual void unregisterBuffers()
     {
         Parcel data, reply;
@@ -189,7 +196,12 @@ status_t BnSurface::onTransact(
             status_t err = setBufferCount(bufferCount);
             reply->writeInt32(err);
             return NO_ERROR;
-        }
+        } break;
+        case RECONFIGURE_BUFFERS: {
+            CHECK_INTERFACE(ISurface, data, reply);
+            reconfigureBuffers();
+            return NO_ERROR;
+        } break;
         case REGISTER_BUFFERS: {
             CHECK_INTERFACE(ISurface, data, reply);
             BufferHeap buffer;
