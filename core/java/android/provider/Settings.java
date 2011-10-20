@@ -1050,11 +1050,16 @@ public final class Settings {
          * These values can be OR-ed together.
          */
         public static final String STAY_ON_WHILE_PLUGGED_IN = "stay_on_while_plugged_in";
-	
+
 	/**
 	 * Whether Dual microhpone is enabled.
 	 */
 	public static final String DUALMIC = "dualmic";
+
+	/**
+	 * Whether ANC is enabled.
+	 */
+	public static final String ANC = "anc";
 
         /**
           * Default file manager to show files on extrenal storage media
