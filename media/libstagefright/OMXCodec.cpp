@@ -409,7 +409,14 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresFlushCompleteEmulation;
         quirks |= kSupportsMultipleFramesPerInputBuffer;
     }
-
+    if (!strcmp(componentName, "OMX.qcom.audio.decoder.aac")) {
+        quirks |= kRequiresAllocateBufferOnInputPorts;
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+    }
+    if (!strcmp(componentName, "OMX.qcom.audio.decoder.multiaac")) {
+        quirks |= kRequiresAllocateBufferOnInputPorts;
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+    }
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.evrc")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
@@ -550,6 +557,19 @@ void OMXCodec::findMatchingCodecs(
     }
 }
 
+
+static bool isHwAacCodecUsed(void){
+    char value[PROPERTY_VALUE_MAX];
+
+    if (property_get("media.aaccodectype", value, NULL))
+        if((atoi(value) == 0 )||(atoi(value) == 1) )
+            return true;
+
+    return false;
+
+}
+
+
 // static
 sp<MediaSource> OMXCodec::Create(
         const sp<IOMX> &omx,
@@ -603,7 +623,6 @@ sp<MediaSource> OMXCodec::Create(
               componentName= "OMX.qcom.audio.decoder.wma10Pro";
            }
         }
-
         if (!createEncoder
                 && (quirks & kOutputBuffersAreUnreadable)
                 && (flags & kClientNeedsFramebuffer)) {
@@ -853,6 +872,16 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
 
+        if(isHwAacCodecUsed()){
+            uint32_t type;
+            const void *data;
+            size_t size;
+            if (meta->findData(kKeyAacCodecSpecificData, &type, &data, &size)) {
+                    LOGV("OMXCodec::configureCodec found "
+                        "kKeyAacCodecSpecificData of size %d\n", size);
+                    addCodecSpecificData(data, size);
+            }
+        }
         setAACFormat(numChannels, sampleRate, bitRate);
     }
 
@@ -3615,7 +3644,7 @@ void OMXCodec::setAACFormat(int32_t numChannels, int32_t sampleRate, int32_t bit
 
         profile.nChannels = numChannels;
         profile.nSampleRate = sampleRate;
-        profile.eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4ADTS;
+        profile.eAACStreamFormat = OMX_AUDIO_AACStreamFormatRAW;
 
         err = mOMX->setParameter(
                 mNode, OMX_IndexParamAudioAac, &profile, sizeof(profile));
