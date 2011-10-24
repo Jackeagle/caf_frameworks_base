@@ -394,6 +394,7 @@ public class MimeTypeMap {
             sMimeTypeMap.loadEntry("audio/x-scpls", "pls");
             sMimeTypeMap.loadEntry("audio/x-sd2", "sd2");
             sMimeTypeMap.loadEntry("audio/x-wav", "wav");
+            sMimeTypeMap.loadEntry("audio/x-qcp", "qcp");
             sMimeTypeMap.loadEntry("image/bmp", "bmp");
             sMimeTypeMap.loadEntry("image/gif", "gif");
             sMimeTypeMap.loadEntry("image/ico", "cur");
