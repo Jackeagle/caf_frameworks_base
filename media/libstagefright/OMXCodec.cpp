@@ -2578,8 +2578,10 @@ void OMXCodec::on_message(const omx_message &msg) {
                     processExtraDataBlocksOfBuffer(buffer,
                             msg.u.extended_buffer_data.flags);
 
-                    CODEC_LOGV("Calling processSEIData");
-                    processSEIData();
+                    if(!mIsEncoder){
+                        CODEC_LOGV("Calling processSEIData");
+                        processSEIData();
+                    }
                 }
 
                 if (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_EOS) {
