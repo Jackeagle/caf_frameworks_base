@@ -109,6 +109,7 @@ private:
     mutable uint32_t    mFlags;
     mutable bool        mRealHeap;
     mutable Mutex       mLock;
+    mutable int         mIonFd;
 };
 
 // ----------------------------------------------------------------------------
@@ -231,6 +232,7 @@ BpMemoryHeap::BpMemoryHeap(const sp<IBinder>& impl)
     : BpInterface<IMemoryHeap>(impl),
         mHeapId(-1), mBase(MAP_FAILED), mSize(0), mFlags(0), mRealHeap(false)
 {
+    mIonFd = open("/dev/ion", O_RDONLY);
 }
 
 BpMemoryHeap::~BpMemoryHeap() {
@@ -257,6 +259,8 @@ BpMemoryHeap::~BpMemoryHeap() {
             free_heap(binder);
         }
     }
+    if (mIonFd > 0)
+        close(mIonFd);
 }
 
 void BpMemoryHeap::assertMapped() const
