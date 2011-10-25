@@ -7,9 +7,8 @@ LOCAL_MODULE_TAGS := eng
 include $(BUILD_JAVA_LIBRARY)
 
 include $(CLEAR_VARS)
-ifeq ($(TARGET_BUILD_VARIANT),eng)
-ALL_PREBUILT += $(TARGET_OUT)/bin/l2cap_test
-$(TARGET_OUT)/bin/l2cap_test : $(LOCAL_PATH)/l2cap_test | $(ACP)
-      $(transform-prebuilt-to-target)
-endif
-
+LOCAL_MODULE       := l2cap_test
+LOCAL_MODULE_TAGS  := eng
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_SRC_FILES    := $(LOCAL_MODULE)
+include $(BUILD_PREBUILT)

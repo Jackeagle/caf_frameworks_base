@@ -7,8 +7,9 @@ LOCAL_MODULE_TAGS := eng
 include $(BUILD_JAVA_LIBRARY)
 
 include $(CLEAR_VARS)
-ifeq ($(TARGET_BUILD_VARIANT),eng)
-ALL_PREBUILT += $(TARGET_OUT)/bin/spp_test
-$(TARGET_OUT)/bin/spp_test : $(LOCAL_PATH)/spp_test | $(ACP)
-	$(transform-prebuilt-to-target)
-endif
+LOCAL_MODULE       := spp_test
+LOCAL_MODULE_TAGS  := eng
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_SRC_FILES    := $(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+include $(CLEAR_VARS)
