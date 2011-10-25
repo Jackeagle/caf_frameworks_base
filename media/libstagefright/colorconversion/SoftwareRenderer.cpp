@@ -19,8 +19,12 @@
 #include <utils/Log.h>
 
 #include "../include/SoftwareRenderer.h"
+#ifdef USE_ION
+#include <binder/MemoryHeapIon.h>
+#else
 #include <binder/MemoryHeapBase.h>
 #include <binder/MemoryHeapPmem.h>
+#endif
 #include <media/stagefright/MediaDebug.h>
 #include <media/stagefright/Utils.h>
 #include <surfaceflinger/ISurface.h>
@@ -57,15 +61,22 @@ SoftwareRenderer::SoftwareRenderer(
     else {
         alignedDecodedWidth = decodedWidth;
     }
+#ifndef USE_ION
     mMemoryHeap = new MemoryHeapBase("/dev/pmem_adsp", 2 * mFrameSize);
+#else
+    mMemoryHeap = new MemoryHeapIon("/dev/ion", 2 * mFrameSize,0,(1<<ION_HEAP_ADSP_ID));
+#endif
     if (mMemoryHeap->heapID() < 0) {
         LOGI("Creating physical memory heap failed, reverting to regular heap.");
         mMemoryHeap = new MemoryHeapBase(2 * mFrameSize);
-    } else {
+    }
+#ifndef USE_ION
+ else {
         sp<MemoryHeapPmem> pmemHeap = new MemoryHeapPmem(mMemoryHeap);
         pmemHeap->slap();
         mMemoryHeap = pmemHeap;
     }
+#endif
 
     CHECK(mISurface.get() != NULL);
     CHECK(mDecodedWidth > 0);
