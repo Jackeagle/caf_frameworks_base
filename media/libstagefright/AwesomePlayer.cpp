@@ -1515,7 +1515,7 @@ void AwesomePlayer::onVideoEvent() {
             logOnTime(timeUs,nowUs,latenessUs);
             mConsecutiveFramesDropped = 0;
         }
-        postVideoEvent_l(kVideoEarlyMarginUs - latenessUs);
+        postVideoEvent_l(10000);
         return;
     }
 
