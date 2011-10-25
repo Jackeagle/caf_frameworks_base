@@ -465,7 +465,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 break;
 
             case EVENT_RADIO_TECHNOLOGY_CHANGED:
-                onRadioTechnologyChanged();
+                onRadioTechnologyChanged((AsyncResult)msg.obj);
                 break;
 
             case EVENT_DATA_CALL_LIST_CHANGED:
@@ -625,20 +625,24 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
           notifyAllDataServiceTypes(REASON_DATA_NETWORK_DETACH);
     }
 
-    protected void onRadioTechnologyChanged() {
-
+    protected void onRadioTechnologyChanged(AsyncResult asyncResult) {
         /*
          * notify radio technology changes.
          */
         notifyAllDataServiceTypes(REASON_RADIO_TECHNOLOGY_CHANGED);
+
+        boolean shouldRetryDataCall = (Boolean)asyncResult.result;
         /*
-         * Reset all service states when radio technology hand over happens. Data
+         * Reset all service states when IRAT hand over happens. Data
          * profiles not working on previous radio technologies might start
          * working now.
          */
-         mDpt.resetAllProfilesAsWorking();
-         mDpt.resetAllServiceStates();
-         updateDataConnections(REASON_RADIO_TECHNOLOGY_CHANGED);
+        if (shouldRetryDataCall) {
+            logd("Resetting all profiles and service states!");
+            mDpt.resetAllProfilesAsWorking();
+            mDpt.resetAllServiceStates();
+        }
+        updateDataConnections(REASON_RADIO_TECHNOLOGY_CHANGED);
     }
 
     @Override
