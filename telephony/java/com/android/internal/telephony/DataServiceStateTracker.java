@@ -435,6 +435,23 @@ public class DataServiceStateTracker extends Handler {
         return ret;
     }
 
+    /**
+     * Check if the radio tech change needs data call retries. Some radio tech changes
+     * (e.g tech's within the same tech generation i.e. HSDPA to HSDPA)
+     * should not cause data call retries.
+     */
+    private boolean shouldRetryDataCall(int newTech, int currTech) {
+        if (RadioTechnology.getRadioTechFromInt(newTech).isGsm2g() &&
+                RadioTechnology.getRadioTechFromInt(currTech).isGsm2g())
+            return false;
+
+        if (RadioTechnology.getRadioTechFromInt(newTech).isGsm3g() &&
+                RadioTechnology.getRadioTechFromInt(currTech).isGsm3g())
+            return false;
+
+        return true;
+    }
+
     private void pollStateDone() {
         logv("Poll ServiceState done: oldSS=[" + mSs + "] newSS=[" + mNewSS + "]");
 
@@ -483,7 +500,11 @@ public class DataServiceStateTracker extends Handler {
         }
 
         if (hasRadioTechChanged) {
-            mRadioTechChangedRegistrants.notifyRegistrants();
+            boolean shouldRetryDataCall = shouldRetryDataCall(mNewSS.getRadioTechnology(),
+                                                                mSs.getRadioTechnology());
+
+            mRadioTechChangedRegistrants.notifyRegistrants(
+                            new AsyncResult(null, shouldRetryDataCall, null));
 
             SystemProperties.set(TelephonyProperties.PROPERTY_DATA_NETWORK_TYPE,
                     networkTypeToString(mSs.getRadioTechnology()));

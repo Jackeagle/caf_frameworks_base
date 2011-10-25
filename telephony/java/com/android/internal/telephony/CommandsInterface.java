@@ -100,6 +100,15 @@ public interface CommandsInterface {
                     || this == RADIO_TECH_HSPA || this == RADIO_TECH_LTE;
         }
 
+        public boolean isGsm2g() {
+            return this == RADIO_TECH_GPRS || this == RADIO_TECH_EDGE;
+        }
+
+        public boolean isGsm3g() {
+            return this == RADIO_TECH_UMTS || this == RADIO_TECH_HSDPA
+                    || this == RADIO_TECH_HSUPA || this == RADIO_TECH_HSPA;
+        }
+
         public boolean isCdma() {
             return this == RADIO_TECH_IS95A || this == RADIO_TECH_IS95B || this == RADIO_TECH_1xRTT
                     || this == RADIO_TECH_EVDO_0 || this == RADIO_TECH_EVDO_A
