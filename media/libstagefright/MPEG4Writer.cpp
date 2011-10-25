@@ -2432,7 +2432,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         LOGI("Audio track drift time: %lld us", mOwner->getDriftTimeUs());
     }
 
-    if (err == ERROR_END_OF_STREAM) {
+    if (err == ERROR_END_OF_STREAM | (err == -ETIMEDOUT)) {
         return OK;
     }
     return err;
