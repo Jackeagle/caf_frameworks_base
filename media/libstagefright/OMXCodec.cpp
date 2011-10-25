@@ -2578,8 +2578,17 @@ void OMXCodec::onEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
 
         case OMX_EventPortSettingsChanged:
         {
-            if(mState == EXECUTING)
+            if(mState == EXECUTING){
               onPortSettingsChanged(data1);
+            }
+            else if(mState == FLUSHING){
+              LOGV("Received port reconfig while waiting for FBD\n");
+              // Seek is completed and waiting for FBD, at this instance
+              // Port reconfig is received rather than FBD.
+              // Unblock from buffer fill wait and complete the port reconfig.
+              mBufferFilled.signal();
+              onPortSettingsChanged(data1);
+            }
             else
               LOGE("Ignore PortSettingsChanged event \n");
             break;
@@ -2980,7 +2989,7 @@ status_t OMXCodec::freeBuffersOnPort(
 void OMXCodec::onPortSettingsChanged(OMX_U32 portIndex) {
     CODEC_LOGV("PORT_SETTINGS_CHANGED(%ld)", portIndex);
 
-    CHECK_EQ(mState, EXECUTING);
+    CHECK(mState == EXECUTING || mState == FLUSHING);
     CHECK_EQ(portIndex, kPortIndexOutput);
     setState(RECONFIGURING);
 
@@ -3027,6 +3036,9 @@ bool OMXCodec::flushPortAsync(OMX_U32 portIndex) {
 
 void OMXCodec::disablePortAsync(OMX_U32 portIndex) {
     CHECK(mState == EXECUTING || mState == RECONFIGURING);
+
+    if (mPortStatus[portIndex] == DISABLED || mPortStatus[portIndex] == DISABLING)
+       return;
 
     CHECK_EQ(mPortStatus[portIndex], ENABLED);
     mPortStatus[portIndex] = DISABLING;
@@ -3223,13 +3235,14 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
         }
 
         size_t remainingBytes = info->mSize - offset;
+        size_t srcBufferLength = srcBuffer->range_length();
 
-        if (srcBuffer->range_length() > remainingBytes) {
+        if (srcBufferLength > remainingBytes) {
             if (offset == 0) {
                 CODEC_LOGE(
                      "Codec's input buffers are too small to accomodate "
                      "buffer read from source (info->mSize = %d, srcLength = %d)",
-                     info->mSize, srcBuffer->range_length());
+                     info->mSize, srcBufferLength);
 
                 srcBuffer->release();
                 srcBuffer = NULL;
@@ -3255,9 +3268,16 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
                 releaseBuffer = false;
                 info->mMediaBuffer = srcBuffer;
             }
-            memcpy((uint8_t *)info->mData + offset,
-                    (const uint8_t *)srcBuffer->data() + srcBuffer->range_offset(),
-                    srcBuffer->range_length());
+            if (srcBuffer->data()) {
+                memcpy((uint8_t *)info->mData + offset,
+                        (const uint8_t *)srcBuffer->data() + srcBuffer->range_offset(),
+                        srcBufferLength);
+            } else {
+                if (srcBufferLength != 0) {
+                    LOGW("Source buffer was NULL but the size wasn't 0 bytes (is %d bytes)", srcBufferLength);
+                    srcBufferLength = 0;
+                }
+            }
         }
 
         int64_t lastBufferTimeUs;
@@ -3268,7 +3288,7 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
             timestampUs = lastBufferTimeUs;
         }
 
-        offset += srcBuffer->range_length();
+        offset += srcBufferLength;
 
         if (mIsEncoder && (mQuirks & kAvoidMemcopyInputRecordingFrames)) {
             info->mMediaBuffer = srcBuffer;
@@ -4102,6 +4122,9 @@ status_t OMXCodec::read(
 
     Mutex::Autolock autoLock(mLock);
 
+    if (mState == PAUSING) {
+        return INVALID_OPERATION;
+    }
     if (mState != EXECUTING && mState != RECONFIGURING) {
         return UNKNOWN_ERROR;
     }
@@ -4191,6 +4214,10 @@ status_t OMXCodec::read(
     }
     if(seeking)
     {
+        if(mState == RECONFIGURING){
+           LOGV("Received reconfig while in seek, wait till reconfig is complete");
+           mBufferFilled.wait(mLock);
+        }
         if(mState != EXECUTING){
            CHECK_EQ(mState, FLUSHING);
            setState(EXECUTING);

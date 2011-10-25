@@ -423,8 +423,9 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
                     mFrameSize = mAudioSink->frameSize();
                     mAudioSink->start();
                     break;
-                }
-                else {
+                } else if ((err ==INVALID_OPERATION)&&mPaused){
+                     break;
+                } else {
                      mReachedEOS = true;
                      mFinalStatus = err;
                      break;
