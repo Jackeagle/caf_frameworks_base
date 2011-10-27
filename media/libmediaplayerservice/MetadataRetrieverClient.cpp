@@ -138,8 +138,8 @@ status_t MetadataRetrieverClient::setDataSource(const char *url)
     playerType = getPlayerType(url);
 
     char curr_target[128] = {0};
-    char target[] = "msm8660_";
-    property_get("ro.product.device", curr_target, "0");
+    char target[] = "msm8660";
+    property_get("ro.board.platform", curr_target, "0");
     if((!strncmp(target, curr_target, sizeof(target) - 1)) && (playerType == PV_PLAYER)) {
         LOGW("Switch to Stagefright Player if PV player is returned in Metadata retriever");
         playerType = STAGEFRIGHT_PLAYER;
@@ -180,8 +180,8 @@ status_t MetadataRetrieverClient::setDataSource(int fd, int64_t offset, int64_t 
     player_type playerType;
     playerType = getPlayerType(fd, offset, length);
     char curr_target[128] = {0};
-    char target[] = "msm8660_";
-    property_get("ro.product.device", curr_target, "0");
+    char target[] = "msm8660";
+    property_get("ro.board.platform", curr_target, "0");
     if((!strncmp(target, curr_target, sizeof(target) - 1)) && (playerType == PV_PLAYER)) {
         LOGW("Switch to Stagefright Player if PV player is returned in Metadata retriever");
         playerType = STAGEFRIGHT_PLAYER;
