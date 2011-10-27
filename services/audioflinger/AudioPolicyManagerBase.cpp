@@ -470,6 +470,7 @@ audio_io_handle_t AudioPolicyManagerBase::getOutput(AudioSystem::stream_type str
 
         LOGV("getOutput() opening direct output device %x", device);
         AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor();
+        device = AudioSystem::DEVICE_OUT_DIRECTOUTPUT;
         outputDesc->mDevice = device;
         outputDesc->mSamplingRate = samplingRate;
         outputDesc->mFormat = format;
@@ -1790,7 +1791,6 @@ uint32_t AudioPolicyManagerBase::getDeviceForInputSource(int inputSource)
     case AUDIO_SOURCE_DEFAULT:
     case AUDIO_SOURCE_MIC:
     case AUDIO_SOURCE_VOICE_RECOGNITION:
-    case AUDIO_SOURCE_VOICE_COMMUNICATION:
         if (mForceUse[AudioSystem::FOR_RECORD] == AudioSystem::FORCE_BT_SCO &&
             mAvailableInputDevices & AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
             device = AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET;
@@ -1799,6 +1799,9 @@ uint32_t AudioPolicyManagerBase::getDeviceForInputSource(int inputSource)
         } else {
             device = AudioSystem::DEVICE_IN_BUILTIN_MIC;
         }
+        break;
+   case AUDIO_SOURCE_VOICE_COMMUNICATION:
+        device = AudioSystem::DEVICE_IN_COMMUNICATION;
         break;
     case AUDIO_SOURCE_CAMCORDER:
         if (hasBackMicrophone()) {
@@ -2030,8 +2033,11 @@ bool AudioPolicyManagerBase::needsDirectOuput(AudioSystem::stream_type stream,
                                     AudioSystem::output_flags flags,
                                     uint32_t device)
 {
+   LOGV("AudioPolicyManagerBase::needsDirectOuput stream = %d mPhoneState = %d \n", stream, mPhoneState);
    return ((flags & AudioSystem::OUTPUT_FLAG_DIRECT) ||
-          (format !=0 && !AudioSystem::isLinearPCM(format)));
+          (format !=0 && !AudioSystem::isLinearPCM(format)) ||
+          ((stream == AudioSystem::VOICE_CALL) && (channels == AudioSystem::CHANNEL_OUT_MONO)
+          && ((samplingRate == 8000 )||(samplingRate == 16000 ))));
 }
 
 uint32_t AudioPolicyManagerBase::getMaxEffectsCpuLoad()
