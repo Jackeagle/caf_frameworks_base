@@ -228,7 +228,7 @@ public:
             void                        screenAcquired(DisplayID dpy);
 
             overlay_control_device_t* getOverlayEngine() const;
-            void enableOverlayOpt(bool start) const;
+            void closeOverlay() const;
 
     status_t removeLayer(const sp<LayerBase>& layer);
     status_t addLayer(const sp<LayerBase>& layer);
@@ -457,6 +457,7 @@ private:
    // only written in the main thread, only read in other threads
    volatile     int32_t                     mSecureFrameBuffer;
    bool mHDMIOutput;
+   Mutex mHDMIMutex;
    mutable bool mOverlayOpt;
    int  mLastCompCount;
    bool mFullScreen;

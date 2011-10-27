@@ -82,7 +82,6 @@ Layer::~Layer()
     if(getStereoscopic3DFormat()) {
         const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
         hw.videoOverlayStarted(false);
-        mFlinger->enableOverlayOpt(true);
     }
 }
 
