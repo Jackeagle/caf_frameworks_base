@@ -261,4 +261,11 @@ class FmReceiverJNI {
      *         {@link #FM_JNI_FAILURE}
      */
     static native int setTxPowerLevelNative(int fd, int powLevel);
+   /**
+     * native method: Sets the calibration
+     * @param fd file descriptor of device
+     * @return {@link #FM_JNI_SUCCESS}
+     *         {@link #FM_JNI_FAILURE}
+     */
+    static native int SetCalibrationNative(int fd);
 }

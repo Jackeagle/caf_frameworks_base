@@ -48,6 +48,9 @@
 #define TUNE_MULT 16000
 #define HIGH_BAND 2
 #define LOW_BAND  1
+#define CAL_DATA_SIZE 71
+#define V4L2_CTRL_CLASS_USER 0x00980000
+#define V4L2_CID_PRIVATE_IRIS_SET_CALIBRATION (V4L2_CTRL_CLASS_USER + 0x92A)
 enum search_dir_t {
     SEEK_UP,
     SEEK_DN,
@@ -81,8 +84,6 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
     }
     //Read the driver verions
     err = ioctl(fd, VIDIOC_QUERYCAP, &cap);
-
-
     LOGD("VIDIOC_QUERYCAP returns :%d: version: %d \n", err , cap.version );
 
     if( err >= 0 ) {
@@ -93,12 +94,13 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
     } else {
        return FM_JNI_FAILURE;
     }
+
     /*Set the mode for soc downloader*/
     property_set("hw.fm.mode", "normal");
 
     property_set("ctl.start", "fm_dl");
     sleep(1);
-    for(i=0;i<6;i++) {
+    for(i=0;i<9;i++) {
         property_get("hw.fm.init", &value, NULL);
        if(value == '1') {
             init_success = 1;
@@ -113,7 +115,7 @@ static jint android_hardware_fmradio_FmReceiverJNI_acquireFdNative
        // close the fd(power down)
 
        close(fd);
-        return FM_JNI_FAILURE;
+       return FM_JNI_FAILURE;
     }
     property_set("ctl.stop", "fm_dl");
     return fd;
@@ -187,6 +189,39 @@ static jint android_hardware_fmradio_FmReceiverJNI_setControlNative
     return FM_JNI_FAILURE;
 }
 
+static jint android_hardware_fmradio_FmReceiverJNI_SetCalibrationNative
+     (JNIEnv * env, jobject thiz, jint fd, jbyteArray buff)
+{
+
+    struct v4l2_ext_control ext_ctl;
+    char tmp[CAL_DATA_SIZE] = {0x00};
+    int err;
+    FILE* cal_file;
+
+    cal_file = fopen("/data/app/Riva_fm_cal", "r" );
+    if(cal_file != NULL) {
+        ext_ctl.id = V4L2_CID_PRIVATE_IRIS_SET_CALIBRATION;
+        if (fread(&tmp[0],1,CAL_DATA_SIZE,cal_file) < CAL_DATA_SIZE)
+        {
+            LOGE("File read failed");
+            return FM_JNI_FAILURE;
+        }
+        ext_ctl.string = tmp;
+        ext_ctl.size = CAL_DATA_SIZE;
+        struct v4l2_ext_controls v4l2_ctls;
+
+        v4l2_ctls.ctrl_class = V4L2_CTRL_CLASS_USER,
+        v4l2_ctls.count   = 1,
+        v4l2_ctls.controls  = &ext_ctl;
+        err = ioctl(fd, VIDIOC_S_EXT_CTRLS, &v4l2_ctls );
+        if(err >= 0){
+            return FM_JNI_SUCCESS;
+        }
+    }else {
+        return FM_JNI_SUCCESS;
+    }
+  return FM_JNI_SUCCESS;
+}
 /* native interface */
 static jint android_hardware_fmradio_FmReceiverJNI_getControlNative
     (JNIEnv * env, jobject thiz, jint fd, jint id)
@@ -672,6 +707,8 @@ static JNINativeMethod gMethods[] = {
             (void*)android_hardware_fmradio_FmReceiverJNI_setTxPowerLevelNative},
        { "setAnalogModeNative", "(Z)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_setAnalogModeNative},
+        { "SetCalibrationNative", "(I)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_SetCalibrationNative},
 
 };
 
