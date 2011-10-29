@@ -1052,15 +1052,20 @@ public class BluetoothService extends IBluetooth.Stub {
                 return;
             }
             mState.clear();
-            if (DBG) log("found " + bonds.length + " bonded devices");
+            Log.d(TAG, "found " + bonds.length + " bonded devices");
             for (String device : bonds) {
                 address = getAddressFromObjectPath(device);
                 if (address == null) {
                     Log.e(TAG, "error! address is null");
                     continue;
                 }
-                mState.put(address.toUpperCase(),
+                String pairState = getUpdatedRemoteDeviceProperty(address, "Paired");
+                Log.d(TAG, "The paired state of the remote device is " + pairState);
+                if(pairState.equals("true")) {
+                    Log.d(TAG, "The paired state of the remote device is true");
+                    mState.put(address.toUpperCase(),
                         BluetoothDevice.BOND_BONDED);
+                }
             }
         }
 
@@ -1773,6 +1778,18 @@ public class BluetoothService extends IBluetooth.Stub {
             return true;
         }
         return false;
+    }
+
+    private String getUpdatedRemoteDeviceProperty(String address,
+                                       String property) {
+        String objectPath = getObjectPathFromAddress(address);
+        String[] propValues =  (String [])getDevicePropertiesNative(objectPath);
+        if (propValues != null) {
+            addRemoteDeviceProperties(address, propValues);
+            return getRemoteDeviceProperty(address, property);
+        }
+        Log.e(TAG, "getRemoteDeviceProperty: " + property + "not present:" + address);
+        return null;
     }
 
     /* package */ synchronized void addRemoteDeviceProperties(String address, String[] properties) {
