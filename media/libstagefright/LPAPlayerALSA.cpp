@@ -717,6 +717,10 @@ void LPAPlayer::decoderThreadEntry() {
     }
     LOGV("decoderThreadEntry ready to work \n");
     pthread_mutex_unlock(&decoder_mutex);
+    if (killDecoderThread) {
+        pthread_mutex_unlock(&pmem_request_mutex);
+        return;
+    }
     pthread_cond_signal(&event_cv);
 
     int32_t pmem_fd;
@@ -867,6 +871,13 @@ void LPAPlayer::eventThreadEntry() {
     pthread_cond_wait(&event_cv, &event_mutex);
     LOGV("eventThreadEntry ready to work \n");
     pthread_mutex_unlock(&event_mutex);
+
+    if (killEventThread) {
+        eventThreadAlive = false;
+        LOGV("Event Thread is dying.");
+        return;
+    }
+
     LOGV("Allocating poll fd");
     struct pollfd pfd[NUM_FDS];
 
