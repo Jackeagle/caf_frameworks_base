@@ -685,7 +685,9 @@ public class MediaRecorder
 
         clearWakeLock();
         // make sure none of the listeners get called anymore
-        mEventHandler.removeCallbacksAndMessages(null);
+        if (mEventHandler != null) {
+           mEventHandler.removeCallbacksAndMessages(null);
+        }
     }
 
     private native void native_reset();

@@ -1601,6 +1601,8 @@ public class FmReceiver extends FmTransceiver
    */
    public boolean registerRdsGroupProcessing (int fmGrpsToProc){
 
+      if (mRdsData == null)
+         return false;
       // Enable RDS
       int re = mRdsData.rdsOn(true);
 

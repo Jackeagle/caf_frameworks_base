@@ -291,7 +291,12 @@ public class ProgressDialog extends AlertDialog {
             if (mProgressStyle == STYLE_HORIZONTAL) {
                 super.setMessage(message);
             } else {
-                mMessageView.setText(message);
+                if (mMessageView != null) {
+                    mMessageView.setText(message);
+                }
+                else {
+                    mMessage = message;
+                }
             }
         } else {
             mMessage = message;
