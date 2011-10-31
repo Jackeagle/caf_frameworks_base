@@ -134,7 +134,7 @@ public class MediaFile {
         build_id = new String(socinfo,17,1);
         for (AudioDecoder decoder: decoders) {
             if (decoder == AudioDecoder.AUDIO_DECODER_WMA) {
-                if ("msm7630_surf".equals(SystemProperties.get("ro.product.device")))
+                if ("msm7630_surf".equals(SystemProperties.get("ro.board.platform")))
                 {
                     if (build_id.equals("0")) {
                         return false;
@@ -167,7 +167,7 @@ public class MediaFile {
         build_id = new String(socinfo,17,1);
         for (VideoDecoder decoder: decoders) {
             if (decoder == VideoDecoder.VIDEO_DECODER_WMV) {
-                if ("msm7630_surf".equals(SystemProperties.get("ro.product.device")))
+                if ("msm7630_surf".equals(SystemProperties.get("ro.board.platform")))
                 {
                     if (build_id.equals("0")) {
                         return false;
