@@ -1068,33 +1068,34 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 {
     const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
     const size_t count = layers.size();
-    int compcount = 0, layerbuffercount = 0, layerbufferIndex = -1;
+    int compCount = 0, layerBufferCount = 0, layerBufferIndex = -1;
     int layersNotUpdatingCount = 0, drawLayerIndex = -1;
     bool compositionStateChanged = false;
     Region layerBufferClip;
-    Region drawClip;
-    bool canUseOverlayToDraw = false;
+    bool canUseOverlayToDraw = (getOverlayEngine() != NULL);
+    bool overlayLayersPresent = false;
     int s3dLayerCount = 0;
     int origResLayerCount = 0;
     PostBufferSingleton::instance()->clearBufferLayerList();
 
 #if defined(TARGET_USES_OVERLAY)
+    //set up flags for composition
     for (size_t i = 0; ((i < count)  &&
-          (compcount <= 1 || layerbuffercount <= 1 || s3dLayerCount <= 1)); ++i) {
+          (compCount <= 1 || layerBufferCount <= 1 || s3dLayerCount <= 1)); ++i) {
         const sp<LayerBase>& layer = layers[i];
         const Region& visibleRegion(layer->visibleRegionScreen);
         if (!visibleRegion.isEmpty()) {
             const Region clip(dirty.intersect(visibleRegion));
             if (!clip.isEmpty()) {
-                compcount++;
+                compCount++;
 
                 if(layer->isNothingToUpdate()) {
                     layersNotUpdatingCount++;
                 }
 
                 if (layer->getLayerInitFlags() & ePushBuffers) {
-                    layerbuffercount++;
-                    layerbufferIndex = i;
+                    layerBufferCount++;
+                    layerBufferIndex = i;
                     layerBufferClip = clip;
                 }
                 if (layer->getStereoscopic3DFormat()) {
@@ -1108,31 +1109,27 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     }
 #endif
 
-    PostBufferSingleton::instance()->setPolicy(layerbuffercount);
+    PostBufferSingleton::instance()->setPolicy(layerBufferCount);
 
-    mIsLayerBufferPresent = (layerbuffercount == 1) ? true: false;
+    mIsLayerBufferPresent = (layerBufferCount == 1) ? true: false;
     mOrigResSurfAbsent = (0 == origResLayerCount);
 
-    if (mOverlayOpt && (layerbuffercount == 1)) {
-        if (compcount != mLastCompCount) {
+    //try to use fullscreen overlay mode
+    if (canUseOverlayToDraw && mOverlayOpt && layerBufferCount == 1
+               && !mOrientationChanged) {
+        // change in layers or orientation -> no fullscreen
+        if (compCount != mLastCompCount) {
                 compositionStateChanged = true;
-                mLastCompCount = compcount;
+                mLastCompCount = compCount;
         }
 
-        const DisplayHardware& hw(graphicPlane(0).displayHardware());
-        if(getOverlayEngine()) {
-            if( ((compcount == 1) || (compcount - 1 == layersNotUpdatingCount))
-                && (!compositionStateChanged) ) {
-                   canUseOverlayToDraw = true;
-            }
-            drawClip = layerBufferClip;
-            drawLayerIndex = layerbufferIndex;
-        }
-
-        if (canUseOverlayToDraw) {
-            const sp<LayerBase>& layer = layers[drawLayerIndex];
+         /* the overlay layer will not show up as an updating layer.
+               If the other (n-1) layers have not changed, use fullscreen */
+        if(((compCount == 1) || (compCount - 1 == layersNotUpdatingCount))
+            && !compositionStateChanged){
+            const sp<LayerBase>& layer = layers[layerBufferIndex];
             status_t err = NO_ERROR;
-            if ((err = layer->drawWithOverlay(drawClip, mHDMIOutput))
+            if ((err = layer->drawWithOverlay(layerBufferClip, mHDMIOutput))
                     == NO_ERROR) {
                 mFullScreen = true;
                 mOverlayUsed = true;
@@ -1147,40 +1144,44 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
     if (UNLIKELY(!mWormholeRegion.isEmpty())) {
         // should never happen unless the window manager has a bug
         // draw something...
-        // For full screen mode, never draw the wormhole
-            drawWormhole();
+        drawWormhole();
     }
 
+    //reset all flags before iterating through the layers
     if (mOverlayUsed && !s3dLayerCount && !origResLayerCount
-            && layerbuffercount != 1) {
+            && layerBufferCount != 1) {
         mOverlayUsed = false;
         mOverlayUseChanged = true;
     }
 
+    overlayLayersPresent = s3dLayerCount > 0 || origResLayerCount > 0
+                           || layerBufferCount == 1;
     PostBufferSingleton::instance()->addPushBufferLayers(layers);
+
+    //iterate over all layers for composition
     for (size_t i=0 ; i<count ; ++i) {
         const sp<LayerBase>& layer(layers[i]);
         const Region clip(dirty.intersect(layer->visibleRegionScreen));
         if (!clip.isEmpty()) {
-                if ((getOverlayEngine() != NULL) && layer->getStereoscopic3DFormat()) {
+        /* Use overlay for 3D, pushBuffers and origRes surfaces.
+              For pushBuffers, if overlay fails, fall back to default composition. */
+            if (canUseOverlayToDraw && overlayLayersPresent) {
+
+                if (layer->getStereoscopic3DFormat() ||
+                            layer->getUseOriginalSurfaceResolution()) {
                     layer->drawWithOverlay(clip, mHDMIOutput, false);
                     mOverlayUsed = true;
-                } else if (UNLIKELY( (getOverlayEngine() != NULL) &&
-                            layer->getUseOriginalSurfaceResolution() )) {
-                    layer->drawWithOverlay(clip, mHDMIOutput, false);
-                    mOverlayUsed = true;
-                } else if ((getOverlayEngine() != NULL) && (layer->getLayerInitFlags() & ePushBuffers) && 
-                            layerbuffercount == 1) {
-                    if (layer->drawWithOverlay(clip, mHDMIOutput, false) != NO_ERROR) {
+                } else if (layer->getLayerInitFlags() & ePushBuffers) {
+                    if (layer->drawWithOverlay(clip, mHDMIOutput, false)
+                                                        != NO_ERROR) {
                         layer->draw(clip);
                     }
-                    else {
+                    else
                         mOverlayUsed = true;
-                    }
-                }
-                else {
+                } else // use default composition for other layers
                     layer->draw(clip);
-                }
+            } else //use default composition for all layers
+                layer->draw(clip);
         }
     }
 }
