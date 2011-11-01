@@ -145,8 +145,11 @@ public class UiccCardApplication {
 
     synchronized void dispose() {
         mDestroyed = true;
-        mUiccApplicationRecords.dispose();
-        mUiccApplicationRecords = null;
+        if (mUiccApplicationRecords != null) {
+            mUiccApplicationRecords.dispose();
+            mUiccApplicationRecords = null;
+        }
+
         mIccFh = null;
         notifyUnavailableRegistrants();
     }
