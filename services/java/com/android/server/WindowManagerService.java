@@ -6292,9 +6292,11 @@ public class WindowManagerService extends IWindowManager.Stub
                     flags |= Surface.PUSH_BUFFERS;
                 }
 
-                if ((((mAttrs.flags & FLAG_FULLSCREEN) != 0)
-                         && mAppToken.appFullscreen) ||
-                         ((mAttrs.flags&FLAG_SHOW_WALLPAPER) != 0)) {
+                if (((mAppToken != null && mAttrs != null &&
+                        (mAttrs.flags & FLAG_FULLSCREEN) != 0)
+                        && mAppToken.appFullscreen) ||
+                        (mAttrs != null &&
+                        ((mAttrs.flags & FLAG_SHOW_WALLPAPER) != 0))) {
                     flags |= Surface.FULL_SCREEN;
                 }
 
