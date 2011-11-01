@@ -61,5 +61,6 @@ const char *MEDIA_MIMETYPE_VIDEO_SPARK = "video/spark";
 const char *MEDIA_MIMETYPE_VIDEO_VP6 = "video/vp6";
 
 const char *MEDIA_MIMETYPE_AUDIO_EVRC = "audio/evrc";
-
+const char *MEDIA_MIMETYPE_CONTAINER_MPEG2 = "video/mp2";
+const char *MEDIA_MIMETYPE_VIDEO_MPEG2 = "video/mp2v-es";
 }  // namespace android
