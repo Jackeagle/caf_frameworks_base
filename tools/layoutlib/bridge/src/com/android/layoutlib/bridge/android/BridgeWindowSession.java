@@ -69,6 +69,11 @@ public final class BridgeWindowSession implements IWindowSession {
         return 0;
     }
 
+    public void setVisualParamWrapper(IWindow arg0, byte arg1, float arg2)
+            throws RemoteException {
+        // pass for now.
+    }
+
     public void getDisplayFrame(IWindow window, Rect outDisplayFrame) {
         // pass for now.
     }

@@ -322,6 +322,10 @@ public class Surface implements Parcelable {
         setStereoscopic3DFormatNative(format);
     }
 
+    public void setVisualParam(byte paramType, float paramValue) {
+        setVisualParamNative(paramType, paramValue);
+    }
+
     /** @hide */
     public void useOriginalSurfaceResolution(boolean flag) {
         useOriginalSurfaceResolutionNative(flag);
@@ -329,6 +333,7 @@ public class Surface implements Parcelable {
 
     private native Canvas lockCanvasNative(Rect dirty);
     private native void setStereoscopic3DFormatNative(int format);
+    private native void setVisualParamNative(byte paramType, float paramValue);
     private native void useOriginalSurfaceResolutionNative(boolean flag);
 
 

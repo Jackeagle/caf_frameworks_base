@@ -36,7 +36,7 @@ struct layer_state_t {
         :   surface(0), what(0),
             x(0), y(0), z(0), w(0), h(0),
             alpha(0), tint(0), flags(0), mask(0),
-            reserved(0)
+            reserved(0), visualParamType(-1), visualParamValue(0.0f)
     {
         matrix.dsdx = matrix.dtdy = 1.0f;
         matrix.dsdy = matrix.dtdx = 0.0f;
@@ -58,6 +58,8 @@ struct layer_state_t {
             uint32_t        z;
             uint32_t        w;
             uint32_t        h;
+            int8_t          visualParamType;
+            float           visualParamValue;
             float           alpha;
             uint32_t        tint;
             uint8_t         flags;

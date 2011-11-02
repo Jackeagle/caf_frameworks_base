@@ -1713,6 +1713,9 @@ status_t SurfaceFlinger::setClientState(
                     mResizeTransationPending = true;
                 }
             }
+            if (what & eVisualParamChanged) {
+                layer->setVisualParam(s.visualParamType, s.visualParamValue);
+            }
             if (what & eAlphaChanged) {
                 if (layer->setAlpha(uint8_t(255.0f*s.alpha+0.5f)))
                     flags |= eTraversalNeeded;

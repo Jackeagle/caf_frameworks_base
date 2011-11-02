@@ -153,6 +153,7 @@ public:
     status_t    setMatrix(SurfaceID id, float dsdx, float dtdx, float dsdy, float dtdy);
     status_t    setPosition(SurfaceID id, int32_t x, int32_t y);
     status_t    setSize(SurfaceID id, uint32_t w, uint32_t h);
+    status_t    setVisualParam(SurfaceID id, int8_t paramType, float paramValue);
     status_t    destroySurface(SurfaceID sid);
 
 private:

@@ -866,6 +866,9 @@ void LayerBaseClient::dump(String8& result, char* buffer, size_t SIZE) const
     result.append(buffer);
 }
 
+void LayerBaseClient::setVisualParam(int8_t paramType, float paramValue) {
+}
+
 // ---------------------------------------------------------------------------
 
 LayerBaseClient::Surface::Surface(

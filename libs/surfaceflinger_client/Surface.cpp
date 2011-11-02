@@ -170,6 +170,12 @@ status_t SurfaceControl::setSize(uint32_t w, uint32_t h) {
     const sp<SurfaceComposerClient>& client(mClient);
     return client->setSize(mToken, w, h);
 }
+status_t SurfaceControl::setVisualParam(int8_t paramType, float paramValue) {
+    status_t err = validate();
+    if (err < 0) return err;
+    const sp<SurfaceComposerClient>& client(mClient);
+    return client->setVisualParam(mToken, paramType, paramValue);
+}
 status_t SurfaceControl::hide() {
     status_t err = validate();
     if (err < 0) return err;

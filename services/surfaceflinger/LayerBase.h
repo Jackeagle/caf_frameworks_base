@@ -329,6 +329,7 @@ public:
         return const_cast<LayerBaseClient*>(this); }
     virtual const char* getTypeId() const { return "LayerBaseClient"; }
 
+    virtual void setVisualParam(int8_t paramType, float paramValue);
     uint32_t getIdentity() const { return mIdentity; }
 
     class Surface : public BnSurface  {

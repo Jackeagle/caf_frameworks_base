@@ -110,7 +110,15 @@ public:
 
     /* pass through to buffer source. See BufferSource for details */
     virtual void setDirtyQueueSignal();
+
+    void setVisualParam(int8_t paramType, float paramValue);
+    void setVisualParamType(int8_t paramType);
+    void setVisualParamValue(float paramValue);
+    int8_t getVisualParamType() const;
+    float getVisualParamValue() const;
 private:
+    int8_t mVisualParamType;
+    float mVisualParamValue;
     struct NativeBuffer {
         copybit_image_t   img;
         copybit_rect_t    crop;

@@ -82,6 +82,12 @@ interface IWindowSession {
             out Rect outVisibleInsets, out Configuration outConfig,
             out Surface outSurface);
 
+     /**
+     * Let the window manager create a window state from the session and
+     * client, and pass the visual parameter to its surface member.
+     */
+    void setVisualParamWrapper(IWindow window, byte paramType, float paramValue);
+
     /**
      * Give the window manager a hint of the part of the window that is
      * completely transparent, allowing it to work with the surface flinger

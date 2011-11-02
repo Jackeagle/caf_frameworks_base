@@ -2280,6 +2280,15 @@ public class WindowManagerService extends IWindowManager.Stub
         return null;
     }
 
+    public void setVisualParam(Session session, IWindow client, byte paramType, float paramValue) {
+        synchronized(mWindowMap) {
+            WindowState win = windowForClientLocked(session, client, false);
+            win.mSurface.openTransaction();
+            win.mSurface.setVisualParam(paramType, paramValue);
+            win.mSurface.closeTransaction();
+        }
+    }
+
     public int relayoutWindow(Session session, IWindow client,
             WindowManager.LayoutParams attrs, int requestedWidth,
             int requestedHeight, int viewVisibility, boolean insetsPending,
@@ -5678,6 +5687,10 @@ public class WindowManagerService extends IWindowManager.Stub
 
         public void remove(IWindow window) {
             removeWindow(this, window);
+        }
+
+        public void setVisualParamWrapper(IWindow window, byte paramType, float paramValue) {
+            setVisualParam(this, window, paramType, paramValue);
         }
 
         public int relayout(IWindow window, WindowManager.LayoutParams attrs,

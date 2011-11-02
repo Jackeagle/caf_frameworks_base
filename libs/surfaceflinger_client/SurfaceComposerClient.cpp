@@ -460,6 +460,17 @@ status_t SurfaceComposerClient::setLayer(SurfaceID id, int32_t z)
     return NO_ERROR;
 }
 
+status_t SurfaceComposerClient::setVisualParam(SurfaceID id, int8_t paramType, float paramValue)
+{
+    layer_state_t* s = lockLayerState(id);
+    if (!s) return BAD_INDEX;
+    s->what |= ISurfaceComposer::eVisualParamChanged;
+    s->visualParamType = paramType;
+    s->visualParamValue = paramValue;
+    unlockLayerState();
+    return NO_ERROR;
+}
+
 status_t SurfaceComposerClient::hide(SurfaceID id)
 {
     return setFlags(id, ISurfaceComposer::eLayerHidden,

@@ -71,6 +71,7 @@ public:
     status_t    setLayer(int32_t layer);
     status_t    setPosition(int32_t x, int32_t y);
     status_t    setSize(uint32_t w, uint32_t h);
+    status_t    setVisualParam(int8_t paramType, float paramValue);
     status_t    hide();
     status_t    show(int32_t layer = -1);
     status_t    freeze();

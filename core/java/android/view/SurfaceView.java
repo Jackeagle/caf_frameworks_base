@@ -404,6 +404,13 @@ public class SurfaceView extends View {
         mWindowType = type;
     }
 
+    public void setVisualParam(byte paramType, float paramValue) {
+        try {
+            mSession.setVisualParamWrapper(mWindow, paramType, paramValue);
+        } catch (RemoteException ex) {
+        }
+    }
+
     private void updateWindow(boolean force, boolean redrawNeeded) {
         if (!mHaveFrame) {
             return;

@@ -57,6 +57,7 @@ LayerBuffer::LayerBuffer(SurfaceFlinger* flinger, DisplayID display,
                             (strncmp(property, "mdp", 3) == 0)) {
         mInvalidate = true;
     }
+    setVisualParamType(-1);
 }
 
 LayerBuffer::~LayerBuffer()
@@ -67,6 +68,27 @@ LayerBuffer::~LayerBuffer()
 
     const DisplayHardware& hw(mFlinger->graphicPlane(0).displayHardware());
     hw.videoOverlayStarted(false);
+}
+
+void LayerBuffer::setVisualParam(int8_t paramType, float paramValue) {
+    setVisualParamType(paramType);
+    setVisualParamValue(paramValue);
+}
+
+void LayerBuffer::setVisualParamType(int8_t paramType) {
+    mVisualParamType = paramType;
+}
+
+void LayerBuffer::setVisualParamValue(float paramValue) {
+    mVisualParamValue = paramValue;
+}
+
+int8_t LayerBuffer::getVisualParamType() const {
+    return mVisualParamType;
+}
+
+float LayerBuffer::getVisualParamValue() const {
+    return mVisualParamValue;
 }
 
 void LayerBuffer::onFirstRef()
@@ -783,6 +805,12 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
       mLayer.onQueueBuf();
       return INVALID_OPERATION;
     }
+
+    if (mLayer.getVisualParamType() != -1) {
+        ov->setVisualParam(mLayer.getVisualParamType(), mLayer.getVisualParamValue());
+        mLayer.setVisualParamType(-1);
+    }
+
     ret = ov->queueBuffer(src.img.handle);
     if (!ret)
         return INVALID_OPERATION;
@@ -1090,6 +1118,10 @@ void LayerBuffer::OverlaySource::onVisibilityResolved(
                 overlay_dev->getPosition(overlay_dev, mOverlay, &currX, &currY, &currW, &currH);
                 if((x != currX) || (y != currY) || (w != currW) || (h != currH))
                     overlay_dev->setPosition(overlay_dev, mOverlay, x,y,w,h);
+                if (mLayer.getVisualParamType() != -1) {
+                    overlay_dev->setVisualParam(overlay_dev, mOverlay, mLayer.getVisualParamType(), mLayer.getVisualParamValue());
+                    mLayer.setVisualParamType(-1);
+                }
                 overlay_dev->commit(overlay_dev, mOverlay);
             }
         }
