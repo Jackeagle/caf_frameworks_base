@@ -411,7 +411,9 @@ public abstract class DataConnection extends HierarchicalStateMachine {
                     if (DBG) log("DcDefaultState: msg.what=EVENT_RESET");
                     clearSettings();
                     if (msg.obj != null) {
-                        notifyDisconnectCompleted((DisconnectParams) msg.obj);
+                        // Transition to inactive but send notifications after
+                        // we've entered the mInactive state.
+                        mInactiveState.setEnterNotificationParams((DisconnectParams) msg.obj);
                     }
                     transitionTo(mInactiveState);
                     break;
