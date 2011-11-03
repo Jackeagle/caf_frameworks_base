@@ -493,8 +493,6 @@ public class StatusBarPolicy {
     String[] mSimIcon = {"no_sim_card1", "no_sim_card2"};
     private PhoneStateListener[] mPhoneStateListener;
 
-    // flag for signal strength behavior
-    private boolean mAlwaysUseCdmaRssi;
 
     // data connection
     private boolean mDataIconVisible;
