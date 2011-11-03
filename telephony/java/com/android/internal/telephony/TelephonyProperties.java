@@ -156,6 +156,8 @@ public interface TelephonyProperties
 
     static final String PROPERTY_OMH_ENABLED = "persist.omh.enabled";
 
+    static final String PROPERTY_OOS_IS_DISCONNECT = "persist.telephony.oosisdc";
+
     /**
      * Priorities associated with different data services (apn types). These
      * priorities will be used to determine which data profiles (apns) need to

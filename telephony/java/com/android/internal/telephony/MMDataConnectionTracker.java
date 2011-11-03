@@ -363,6 +363,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
                 + SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SUPPORT_EHRPD, false));
         logv("PROPERTY_SUPPORT_SVLTE1X = "
                 + SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SUPPORT_SVLTE1X, false));
+        logv("SUPPORT_OOS_IS_DISCONNECT = " + mOosIsDisconnect);
     }
 
     public void update(CommandsInterface ci, Subscription subData) {
