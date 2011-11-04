@@ -143,7 +143,7 @@ void LayerBuffer::wait(Mutex & m, Condition& c, reconfigBufState_t& s) {
   while(s == RECONFIG_BUFFER_BLOCK) {
     (void) c.waitRelative(m, TIMEOUT);
     if(++count > MAX_WAIT_COUNT) {
-      LOGE("LayerBuffer::wait too many wait count=%d", count);
+      LOGE("LayerBuffer::wait reconfig too many wait count=%d", count);
       s = RECONFIG_BUFFER_GO;
     }
   }
@@ -152,33 +152,32 @@ void LayerBuffer::wait(Mutex & m, Condition& c, reconfigBufState_t& s) {
 
 }
 
-void LayerBuffer::resetReconfigStatus()
+void LayerBuffer::resetReconfigStatus() const
 {
     if (mIsReconfiguring) {
         mReconfigStatus = RECONFIG_BUFFER_GO;
+        mIsReconfiguring = false;
     }
 }
 
 void LayerBuffer::reconfigureBuffers()
 {
-    sp<Source> source(getSource());
-    if (source != 0) {
-        LOGD("LayerBuffer::reconfigureBuffers");
+}
+
+void LayerBuffer::unregisterBuffers()
+{
+    sp<Source> src(getSource());
+    Mutex::Autolock _l(mReconfigMutex);
+    if(src != 0) {
         // Set the reconfig flag
         mIsReconfiguring = true;
         // wait
         mReconfigStatus = RECONFIG_BUFFER_BLOCK;
-
         // signal the thread loop
         invalidate();
         wait(mReconfigMutex, mReconfigCond, mReconfigStatus);
         LOGD("Exit wait condition in reconfigureBuffers and return");
     }
-    return;
-}
-
-void LayerBuffer::unregisterBuffers()
-{
     sp<Source> source(clearSource());
     if (source != 0)
         source->unregisterBuffers(mIsReconfiguring);
@@ -237,17 +236,19 @@ status_t LayerBuffer::drawWithOverlay(const Region& clip,
 {
 #if defined(TARGET_USES_OVERLAY)
     sp<Source> source(getSource());
+    Mutex::Autolock _l(mReconfigMutex);
     if (LIKELY(source != 0)) {
         status_t ret;
-        if (mIsReconfiguring)
+        if (mIsReconfiguring) {
             ret = source->drawWithOverlayReconfigure(clip, hdmiConnected, waitVsync);
+            // After we draw the reconfig Buffer, reset the reconfig state
+            resetReconfigStatus();
+        }
         else
             ret = source->drawWithOverlay(clip, hdmiConnected, waitVsync);
         return ret;
-    } else if (mIsReconfiguring) {
+    } else if (mIsReconfiguring)
         return NO_ERROR;
-    } else
-        LOGD("LayerBuffer::drawWithOverlay invalid src");
 #endif
     return INVALID_OPERATION;
 }

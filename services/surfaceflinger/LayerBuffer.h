@@ -92,7 +92,6 @@ public:
     void postBuffer(ssize_t offset);
     void reconfigureBuffers();
     void unregisterBuffers();
-    void resetReconfigStatus();
     bool isReconfiguring() const { return mIsReconfiguring; }
     sp<OverlayRef> createOverlay(uint32_t w, uint32_t h, int32_t format,
             int32_t orientation);
@@ -121,6 +120,7 @@ private:
 
     typedef enum { RECONFIG_BUFFER_GO, RECONFIG_BUFFER_BLOCK } reconfigBufState_t;
     void wait(Mutex & m, Condition& c, reconfigBufState_t& s);
+    void resetReconfigStatus() const;
 
     static gralloc_module_t const* sGrallocModule;
     static gralloc_module_t const* getGrallocModule() {
@@ -287,15 +287,15 @@ private:
     };
 
     mutable Mutex   mLock;
-    Mutex     mReconfigMutex;
+    mutable Mutex   mReconfigMutex;
     Condition mReconfigCond;
-    reconfigBufState_t mReconfigStatus;
+    mutable reconfigBufState_t mReconfigStatus;
 
     sp<Source>      mSource;
     sp<Surface>     mSurface;
     bool            mInvalidate;
     bool            mNeedsBlending;
-    bool            mIsReconfiguring;
+    mutable bool    mIsReconfiguring;
     copybit_device_t* mBlitEngine;
 };
 
