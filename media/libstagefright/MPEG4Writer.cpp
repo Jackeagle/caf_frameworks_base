@@ -309,6 +309,8 @@ private:
     void consumeInput( Frame * f, int64_t * decodeTs );
     void commitPending( );
 
+    bool trackExceedsFileDurationLimit();
+
     Track(const Track &);
     Track &operator=(const Track &);
 };
@@ -323,7 +325,8 @@ MPEG4Writer::MPEG4Writer(const char *filename)
       mOffset(0),
       mMdatOffset(0),
       mEstimatedMoovBoxSize(0),
-      mInterleaveDurationUs(1000000) {
+      mInterleaveDurationUs(1000000),
+      mNumTracksCompleted(0) {
     CHECK(mFd >= 0);
 }
 
@@ -337,7 +340,8 @@ MPEG4Writer::MPEG4Writer(int fd)
       mOffset(0),
       mMdatOffset(0),
       mEstimatedMoovBoxSize(0),
-      mInterleaveDurationUs(1000000) {
+      mInterleaveDurationUs(1000000),
+      mNumTracksCompleted(0) {
     CHECK(mFd >= 0);
 }
 
@@ -531,6 +535,7 @@ status_t MPEG4Writer::start(MetaData *param) {
         }
         return OK;
     }
+    mNumTracksCompleted = 0;
 
     if (!param ||
         !param->findInt32(kKeyTimeScale, &mTimeScale)) {
@@ -1489,6 +1494,23 @@ void MPEG4Writer::Track::commitPending( ){
     }
 }
 
+/*
+    This function checks the max duration limit reached for each track.
+    It is used for putting a check to stop recording only when all
+    tracks have reached their limit, and not just one(as it was before).
+*/
+bool MPEG4Writer::Track::trackExceedsFileDurationLimit() {
+    // No limit
+    if (mOwner->mMaxFileDurationLimitUs == 0) {
+        return false;
+    }
+
+    if (getDurationUs() >= mOwner->mMaxFileDurationLimitUs) {
+        return true;
+    }
+    return false;
+}
+
 // static
 void *MPEG4Writer::ThreadWrapper(void *me) {
     LOGV("ThreadWrapper: %p", me);
@@ -2302,9 +2324,18 @@ status_t MPEG4Writer::Track::threadEntry() {
             mOwner->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED, 0);
             break;
         }
-        if (mOwner->exceedsFileDurationLimit()) {
-            LOGE("notify FileDurationLimit exceeded");
-            mOwner->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_MAX_DURATION_REACHED, 0);
+        if (trackExceedsFileDurationLimit()) {
+            {
+              Mutex::Autolock autolock(mOwner->mLock);
+              mOwner->mNumTracksCompleted++;
+            }
+            if (mOwner->mNumTracksCompleted == mOwner->numTracks()) {
+                LOGV("notify FileDurationLimit exceeded for all tracks");
+                mOwner->notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_MAX_DURATION_REACHED, 0);
+            }
+            else {
+                LOGV("First track completed, not notifying");
+            }
             break;
         }
 

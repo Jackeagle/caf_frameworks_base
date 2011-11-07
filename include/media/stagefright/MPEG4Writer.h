@@ -155,6 +155,9 @@ private:
     void trackProgressStatus(const Track* track, int64_t timeUs, status_t err = OK);
     void writeCompositionMatrix(int32_t degrees);
 
+    // Only Stop when both tracks have been completed
+    int32_t mNumTracksCompleted;
+
     MPEG4Writer(const MPEG4Writer &);
     MPEG4Writer &operator=(const MPEG4Writer &);
 };
