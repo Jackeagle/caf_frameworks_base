@@ -64,7 +64,8 @@ LOCAL_CFLAGS += -DTARGET_USES_OVERLAY
 LOCAL_SHARED_LIBRARIES += liboverlay
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
-LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
+LOCAL_C_INCLUDES += hardware/msm7k/liboverlay \
+		    hardware/msm7k/libgralloc-qsd8k
 endif
 LOCAL_MODULE:= libsurfaceflinger
 
