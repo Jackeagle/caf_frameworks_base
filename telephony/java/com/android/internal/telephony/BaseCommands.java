@@ -79,6 +79,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mCdmaFwdBurstDtmfRegistrants = new RegistrantList();
     protected RegistrantList mCdmaFwdContDtmfStartRegistrants = new RegistrantList();
     protected RegistrantList mCdmaFwdContDtmfStopRegistrants = new RegistrantList();
+    protected RegistrantList mTetheredModeStateRegistrants = new RegistrantList();
     protected RegistrantList mQosStateChangedIndRegistrants = new RegistrantList();
     protected RegistrantList mSubscriptionStatusRegistrants = new RegistrantList();
 
@@ -534,6 +535,16 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForRingbackTone(Handler h) {
         mRingbackToneRegistrants.remove(h);
+    }
+
+    public void registerForTetheredModeStateChanged(Handler h, int what,
+            Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mTetheredModeStateRegistrants.add(r);
+    }
+
+    public void unregisterForTetheredModeStateChanged(Handler h) {
+        mTetheredModeStateRegistrants.remove(h);
     }
 
     public void registerForResendIncallMute(Handler h, int what, Object obj) {

@@ -970,6 +970,13 @@ public class CdmaDataConnectionTracker extends DataConnectionTracker {
                     }
 
                     break;
+                } else {
+                    /* Check if this was brought down due to a tethered call */
+                    if (FailCause.fromInt(dcState.status) == FailCause.TETHERED_CALL_ACTIVE) {
+                        // Mark apn as busy in a tethered call
+                        if (DBG) log("setTetheredCallOn for apn:" + mActiveApn.toString());
+                        mActiveApn.setTetheredCallOn(true);
+                    }
                 }
             }
 
@@ -1116,6 +1123,12 @@ public class CdmaDataConnectionTracker extends DataConnectionTracker {
     @Override
     protected DataConnection getActiveDataConnection(String type) {
         return mState == State.CONNECTED ? mPendingDataConnection : null;
+    }
+
+    @Override
+    protected void clearTetheredStateOnStatus() {
+        if (DBG) log("clearTetheredStateOnStatus()");
+        mActiveApn.setTetheredCallOn(false);
     }
 
     @Override
