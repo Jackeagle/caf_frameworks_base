@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Qualcomm Innovation Center, Inc.  All Rights Reserved.
+ * Copyright (C) 2009-11 Qualcomm Innovation Center, Inc.  All Rights Reserved.
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@ package com.android.internal.telephony;
 
 public class DataCallState {
     public int status;
+    public int suggestedRetryTime;
     public int cid;
     public int active;
     public String type;
@@ -33,6 +34,7 @@ public class DataCallState {
         StringBuilder sb = new StringBuilder();
         sb.append("DataCallState: {");
         sb.append("status:").append(status);
+        sb.append(",suggestedRetryTime: ").append(suggestedRetryTime);
         sb.append(",cid: ").append(cid);
         sb.append(",active: ").append(active);
         sb.append(",type: ").append(type);
