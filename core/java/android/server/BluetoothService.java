@@ -196,6 +196,9 @@ public class BluetoothService extends IBluetooth.Stub {
     private boolean mSAPenable = false;
     private boolean mFTPenable = false;
 
+    private static final String INCOMING_CONNECTION_FILE =
+      "/data/misc/bluetooth/incoming_connection.conf";
+    private HashMap<String, Pair<Integer, String>> mIncomingConnections;
 
     private static class RemoteService {
         public String address;
