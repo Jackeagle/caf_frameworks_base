@@ -200,6 +200,7 @@ public class BluetoothService extends IBluetooth.Stub {
       "/data/misc/bluetooth/incoming_connection.conf";
     private HashMap<String, Pair<Integer, String>> mIncomingConnections;
 
+
     private static class RemoteService {
         public String address;
         public ParcelUuid uuid;

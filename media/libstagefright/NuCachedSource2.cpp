@@ -338,6 +338,7 @@ void NuCachedSource2::onRead(const sp<AMessage> &msg) {
 }
 
 void NuCachedSource2::restartPrefetcherIfNecessary_l(bool force) {
+    static const size_t kGrayArea = 256 * 1024;
 
     if ((!force && mFetching) || mFinalStatus != OK) {
         return;
@@ -346,17 +347,20 @@ void NuCachedSource2::restartPrefetcherIfNecessary_l(bool force) {
     size_t maxBytes;
 
     if (!force) {
-        int64_t cacheLeft = mCacheOffset + mCache->totalSize() - mLastAccessPos;
-        if ( cacheLeft >= kLowWaterThreshold + mAVOffset ) {
-            LOGV("Dont restart prefetcher last access %lld, cache left %d", mLastAccessPos, cacheLeft);
+        if (mCacheOffset + mCache->totalSize() - mLastAccessPos
+                >= kLowWaterThreshold) {
             return;
         }
 
         maxBytes = mLastAccessPos - mCacheOffset;
+        if (maxBytes < kGrayArea) {
+            return;
+        }
+
+        maxBytes -= kGrayArea;
     } else {
         // Empty it all out.
         maxBytes = mLastAccessPos - mCacheOffset;
-        LOGV("Forcefully empty cache %d cache offset %lld", maxBytes, mCacheOffset);
     }
 
     maxBytes = (maxBytes > mAVOffset) ? maxBytes - mAVOffset : maxBytes;
