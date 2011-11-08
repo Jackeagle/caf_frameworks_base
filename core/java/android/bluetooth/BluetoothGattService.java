@@ -104,6 +104,27 @@ public class BluetoothGattService {
         return mHelper.doDiscovery();
     }
 
+    public String[] getCharacteristicPaths() {
+
+            String value = "";
+            String[] paths = null;
+            try {
+                value = mService.getGattServiceProperty(mObjPath, "Characteristics");
+                if (value == null) {
+                    Log.d(TAG, "value is null");
+                    return null;
+                }
+                Log.d(TAG, "value is : " + value);
+
+                // The Charateristic paths are stored as a "," separated string.
+                paths = value.split(",");
+
+            } catch (Exception e) {
+                Log.e(TAG, "!!!Error while calling getGattServiceProperty");
+            }
+            return paths;
+    }
+
     public ParcelUuid[] getCharacteristicUuids() {
 
         ArrayList<ParcelUuid>  uuidList = new ArrayList<ParcelUuid>();
@@ -397,13 +418,35 @@ public class BluetoothGattService {
         }
 
         public void startRemoteGattService() {
-            discoveryState = DISCOVERY_NONE;
+            setDiscoveryState(DISCOVERY_NONE);
 
             try {
                 mService.startRemoteGattService(mObjPath, this);
-            } catch (RemoteException e) {Log.e(TAG, "", e);}
 
-            doDiscovery();
+                int state = mService.getBondState(mDevice.getAddress());
+                Log.d(TAG, "Bond state of remote device : " + mDevice.getAddress() + " is " + state);
+                if(state == BluetoothDevice.BOND_BONDED) {
+                    characteristicPaths =  getCharacteristicPaths();
+                    if(characteristicPaths != null) {
+                       Log.d(TAG, "retrieved characteristic Paths from the cache");
+                       onCharacteristicsDiscovered(characteristicPaths, true);
+
+                       for(int i = 0; i< characteristicPaths.length; i++) {
+                           Log.d(TAG, "Update value for characteristics path : " + characteristicPaths[i]);
+                           try {
+                               updateCharacteristicValue(characteristicPaths[i]);
+                           } catch (Exception e) {Log.e(TAG, "", e);}
+                       }
+
+                    } else {
+                        Log.d(TAG, "doDiscovery for bonded device");
+                        doDiscovery();
+                    }
+                } else {
+                    Log.d(TAG, "doDiscovery as device is not bonded");
+                    doDiscovery();
+                }
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
         }
 
         public synchronized void onCharacteristicsDiscovered(String[] paths, boolean result)
