@@ -405,8 +405,8 @@ public class SmsMessage {
      * otherwise useful apps.
      */
 
-    /** TODO: fusion -  Not used remove? SmsMessage in gsm/cdma is public.
-     * Get an SMS-SUBMIT PDU for a destination address and a message
+    /**
+     * Get an SMS-SUBMIT PDU for a destination address and a message.
      * This method will not attempt to use any GSM national language 7 bit encodings.
      *
      * @param scAddress Service Centre address.  Null means use default.
@@ -432,8 +432,8 @@ public class SmsMessage {
         return new SubmitPdu(spb);
     }
 
-    /** TODO: fusion -  Not used remove? SmsMessage in gsm/cdma is public.
-     * Get an SMS-SUBMIT PDU for a destination address and a message
+    /**
+     * Get an SMS-SUBMIT PDU for a destination address and a message.
      * This method will not attempt to use any GSM national language 7 bit encodings.
      *
      * @param scAddress Service Centre address.  Null means use default.
@@ -456,8 +456,8 @@ public class SmsMessage {
         return new SubmitPdu(spb);
     }
 
-    /** TODO: fusion -  Not used remove? SmsMessage in gsm/cdma is public.
-     * Get an SMS-SUBMIT PDU for a data message to a destination address &amp; port
+    /**
+     * Get an SMS-SUBMIT PDU for a data message to a destination address &amp; port.
      * This method will not attempt to use any GSM national language 7 bit encodings.
      *
      * @param scAddress Service Centre address. null == use default

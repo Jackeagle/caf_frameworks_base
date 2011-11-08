@@ -115,7 +115,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int MESSAGE_START_DUN_SERVER = 6;
     private static final int MESSAGE_GATT_INTENT = 7;
     private static final int MESSAGE_GATT_CHARACTERISTICS_DISCOVERY = 8;
-
+    private static final int MESSAGE_DISCOVERABLE_CHANGE_TIMEOUT = 10;
 
     // The time (in millisecs) to delay the pairing attempt after the first
     // auto pairing attempt fails. We use an exponential delay with
@@ -1324,9 +1324,12 @@ public class BluetoothService extends IBluetooth.Stub {
             setDiscoverableTimeout(duration);
             pairable = true;
             discoverable = true;
+            mHandler.removeMessages(MESSAGE_DISCOVERABLE_TIMEOUT);
             if (duration > 0) {
                 Message msg = mHandler.obtainMessage(MESSAGE_DISCOVERABLE_TIMEOUT);
                 mHandler.sendMessageDelayed(msg, duration * 1000);
+                Message msgd = mHandler.obtainMessage(MESSAGE_DISCOVERABLE_CHANGE_TIMEOUT);
+                mHandler.sendMessageDelayed(msgd, 200);
             }
             if (DBG) Log.d(TAG, "BT Discoverable for " + duration + " seconds");
             break;

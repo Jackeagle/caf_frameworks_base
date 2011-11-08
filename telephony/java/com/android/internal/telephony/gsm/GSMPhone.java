@@ -1797,5 +1797,4 @@ public class GSMPhone extends PhoneBase {
         }
         return operatorNumeric;
     }
-
 }

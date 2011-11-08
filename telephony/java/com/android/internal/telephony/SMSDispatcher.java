@@ -137,13 +137,14 @@ public abstract class SMSDispatcher extends Handler {
 
     static final protected int EVENT_GET_ICC_SMS_DONE = 19;
 
+    /** New broadcast SMS */
+    static final protected int EVENT_NEW_BROADCAST_SMS = 20;
+
     /** Must be static as they are referenced by 3 derived instances, Ims/Cdma/GsmSMSDispatcher */
     /** true if IMS is registered, false otherwise.*/
     static protected boolean mIms = false;
     static protected RadioTechnologyFamily mImsSmsEncoding = RadioTechnologyFamily.RADIO_TECH_UNKNOWN;
     //DSDS static cannot be used
-    /** New broadcast SMS */
-    static final protected int EVENT_NEW_BROADCAST_SMS = 13;
 
     protected Phone mPhone;
 

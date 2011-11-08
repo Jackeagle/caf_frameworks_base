@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
  * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -109,7 +108,7 @@ public class SmsCbMessage {
 
     private SmsCbMessage(byte[] pdu) throws IllegalArgumentException {
         mHeader = new SmsCbHeader(pdu);
-        if (mHeader.format == mHeader.FORMAT_ETWS_PRIMARY) {
+        if (mHeader.format == SmsCbHeader.FORMAT_ETWS_PRIMARY) {
             mBody = "ETWS";
             // ETWS primary notification with security is 56 octets in length
             if (pdu.length >= SmsCbHeader.PDU_LENGTH_ETWS) {
@@ -192,14 +191,6 @@ public class SmsCbMessage {
 
     /**
      * Get the format of this message
-     *
-     * @return message format
-     */
-    public int getFormat() {
-        return mHeader.format;
-    }
-
-    /* Get the format of this message.
      * @return {@link SmsCbHeader#FORMAT_GSM}, {@link SmsCbHeader#FORMAT_UMTS}, or
      *         {@link SmsCbHeader#FORMAT_ETWS_PRIMARY}
      */
@@ -430,11 +421,6 @@ public class SmsCbMessage {
         readFromParcel(in);
     }
 
-    @Override
-    public String toString() {
-        return ("SmsCbMessage: " + mHeader.toString() + " " + mBody);
-    }
-
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeParcelable(mHeader, 0);
         dest.writeString(mBody);
@@ -510,4 +496,9 @@ public class SmsCbMessage {
         mBody = mBody + body;
     }
 
+    @Override
+    public String toString() {
+        return "SmsCbMessage{" + mHeader.toString() + ", language=" + mLanguage +
+                ", body=\"" + mBody + "\"}";
+    }
 }

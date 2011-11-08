@@ -152,7 +152,7 @@ public class GsmEmergencyMessage implements EmergencyMessage{
     }
     public static GsmEmergencyMessage createFromSmsCbMessage(SmsCbMessage src) {
         GsmEmergencyMessage message = new GsmEmergencyMessage();
-        if (src.getFormat() == SmsCbHeader.FORMAT_ETWS_PRIMARY) {
+        if (src.getMessageFormat() == SmsCbHeader.FORMAT_ETWS_PRIMARY) {
             // Etws primary message doesn't have text associated with it
             // so populate text with type of etws message.
             switch (src.getMessageIdentifier()) {

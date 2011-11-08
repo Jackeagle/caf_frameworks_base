@@ -2429,6 +2429,14 @@ class PackageManagerService extends IPackageManager.Stub {
                 if (ai != null && !list.append(ai)) {
                     break;
                 }
+
+                if (ai != null && !list.append(ai)) {
+                    break;
+                }
+            }
+
+            if (i == N) {
+                list.setLastSlice(true);
             }
 
             if (i == N) {
