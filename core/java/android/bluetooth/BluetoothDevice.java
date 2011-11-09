@@ -302,10 +302,10 @@ public final class BluetoothDevice implements Parcelable {
     public static final String EXTRA_CONNECTION_ACCESS_RESULT =
         "android.bluetooth.device.extra.CONNECTION_ACCESS_RESULT";
 
-    /** @hide */
+    /**@hide*/
     public static final int CONNECTION_ACCESS_YES = 1;
 
-    /** @hide */
+    /**@hide*/
     public static final int CONNECTION_ACCESS_NO = 2;
 
     /** A bond attempt succeeded
