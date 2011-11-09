@@ -37,6 +37,15 @@ import android.util.Log;
 public class FmTransceiver
 {
 
+   public static final int    FMOff        = 0;
+   public static final int    FMRxOn       = 1;
+   public static final int    FMTxOn       = 2;
+   public static final int    FMReset      = 3;
+   protected static final int FMRxStarting = 4;
+   protected static final int FMTxStarting = 5;
+   protected static final int FMTurningOff = 6;
+   public static int          mFMOn        = FMOff;
+
    /**
     * FMConfigure FM Radio band setting for US/Europe
     */
@@ -549,5 +558,42 @@ public class FmTransceiver
          return true;
 
        return false;
+   }
+/*==============================================================
+   FUNCTION:  setFMPowerState
+   ==============================================================*/
+   /**
+   *    Sets the FM power state
+   *
+   *    <p>
+   *    This method sets the FM power state.
+   *
+   *    <p>
+   */
+   static void setFMPowerState(int state)
+   {
+      mFMOn = state;
+   }
+/*==============================================================
+   FUNCTION:  getFMPowerState
+   ==============================================================*/
+   /**
+   *    Returns :
+   *
+   *        FMOff        - If the FM Radio is turned off
+   *        FMRxOn       - If the FM Receiver is currently turned on
+   *        FMTxOn       - If the FM Transmitter is currently turned on
+   *        FMReset      - If the FM Radio is reset
+   *
+   *    Gets the FM power state
+   *
+   *    <p>
+   *    This method gets the FM power state.
+   *
+   *    <p>
+   */
+   public static int getFMPowerState()
+   {
+      return mFMOn;
    }
 }
