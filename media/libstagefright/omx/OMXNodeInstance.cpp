@@ -27,8 +27,12 @@ Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 #include <OMX_Component.h>
 
 #include <binder/IMemory.h>
+#ifdef USE_ION
+#include <binder/MemoryHeapIon.h>
+#else
 #include <binder/MemoryHeapBase.h>
 #include <binder/MemoryHeapPmem.h>
+#endif
 #include <media/stagefright/MediaDebug.h>
 #include <media/stagefright/MediaErrors.h>
 namespace android {
@@ -457,10 +461,14 @@ void OMXNodeInstance::onMessage(const omx_message &msg) {
                }
             }
             if(master != NULL) {
+#ifdef USE_ION
+                sp<MemoryHeapIon> heap = reinterpret_cast<MemoryHeapIon *>(pPMEMInfo->pmem_fd);
+#else
                 master->setDevice("/dev/pmem_adsp");
                 uint32_t heap_flags = master->getFlags() & MemoryHeapBase::NO_CACHING;
                 sp<MemoryHeapPmem> heap = new MemoryHeapPmem(master, heap_flags);
                 heap->slap();
+#endif
                 mMem = interface_cast<IMemoryHeap>(heap);
                 mBase = (OMX_U8 *)mMem->getBase();
                 mObserver->registerBuffers(mMem);

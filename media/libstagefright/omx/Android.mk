@@ -32,6 +32,12 @@ endif
 
 LOCAL_C_INCLUDES += $(TOP)/frameworks/base/include/media/stagefright/openmax
 
+ifeq ($(TARGET_USES_ION),true)
+LOCAL_CFLAGS += -DUSE_ION
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/
+endif
+
 LOCAL_SHARED_LIBRARIES :=       \
         libbinder               \
         libmedia                \
