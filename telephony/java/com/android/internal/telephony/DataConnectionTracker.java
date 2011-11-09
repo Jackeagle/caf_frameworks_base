@@ -93,6 +93,9 @@ public abstract class DataConnectionTracker extends Handler {
     boolean mMasterDataEnabled = true;
     boolean mDnsCheckDisabled = false;
 
+    // Flag that indicates that Out Of Service is considered as data call disconnect
+    protected boolean mOosIsDisconnect = SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OOS_IS_DISCONNECT, true);
+
     // Flags introduced for FMC (fixed mobile convergence) to trigger
     // data call even when there is no service on mobile networks.
     protected boolean mCheckForConnectivity = true;
@@ -376,7 +379,8 @@ public abstract class DataConnectionTracker extends Handler {
          * on either IPV4 or IPV6.
          */
         DataState ret = DataState.DISCONNECTED;
-        if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
+        if (getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE
+                && mOosIsDisconnect) {
             // If we're out of service, open TCP sockets may still work
             // but no data will flow
             ret = DataState.DISCONNECTED;
@@ -410,7 +414,9 @@ public abstract class DataConnectionTracker extends Handler {
 
         State dsState = mDpt.getState(ds, ipv);
 
-        if (mCheckForConnectivity && getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE) {
+        if (mCheckForConnectivity
+                && getDataServiceState().getState() != ServiceState.STATE_IN_SERVICE
+                && mOosIsDisconnect) {
             // If we're out of service, open TCP sockets may still work
             // but no data will flow
             ret = DataState.DISCONNECTED;
