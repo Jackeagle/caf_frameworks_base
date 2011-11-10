@@ -148,6 +148,7 @@ public class GSMPhone extends PhoneBase {
     private String mImeiSv;
     private String mVmNumber;
     private String mMdn;
+    private String mPrlVersion;
 
     // Constructors
 
@@ -197,6 +198,9 @@ public class GSMPhone extends PhoneBase {
         mCM.registerForSubscriptionStatusChanged(this, EVENT_SUBSCRIPTION_STATUS_CHANGED, null);
         mCM.setOnSS(this, EVENT_SS, null);
 
+        if (SystemProperties.getBoolean("ro.config.multimode_cdma", false)) {
+            mCM.registerForCdmaPrlChanged(this, EVENT_CDMA_PRL_VERSION_CHANGED, null);
+        }
         // Set the default values of telephony properties.
         setProperties();
 
@@ -1488,6 +1492,18 @@ public class GSMPhone extends PhoneBase {
                 }
                 String localTemp[] = (String[])ar.result;
                 mMdn = localTemp[0];
+
+                if (localTemp.length > 4) {
+                    mPrlVersion = localTemp[4];
+                }
+                break;
+
+            case EVENT_CDMA_PRL_VERSION_CHANGED:
+                ar = (AsyncResult) msg.obj;
+                if (ar.exception == null) {
+                    int[] prl = (int[]) ar.result;
+                    mPrlVersion = Integer.toString(prl[0]);
+                }
                 break;
 
             case EVENT_SUBSCRIPTION_STATUS_CHANGED:
@@ -1762,6 +1778,10 @@ public class GSMPhone extends PhoneBase {
          *  cases will be controlled by csp
          */
         return true;
+    }
+
+    public String getCdmaPrlVersion(){
+        return mPrlVersion;
     }
 
     private void registerForSimRecordEvents() {
