@@ -76,6 +76,7 @@ private:
     int32_t mNumFramesEncoded;
     int32_t mNumFramesDropped;
     int32_t mNumGlitches;
+    bool mFatalErrorBailout;
     int64_t mGlitchDurationThresholdUs;
     bool mCollectStats;
     bool mStarted;
