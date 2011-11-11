@@ -145,6 +145,7 @@ CameraSource::CameraSource(const sp<Camera> &camera)
       mNumFramesEncoded(0),
       mNumFramesDropped(0),
       mNumGlitches(0),
+      mFatalErrorBailout(false),
       mGlitchDurationThresholdUs(200000),
       mCollectStats(false),
       mStarted(false) {
@@ -320,8 +321,13 @@ status_t CameraSource::read(
     {
         Mutex::Autolock autoLock(mLock);
         while (mStarted) {
-            while(mFramesReceived.empty()) {
+            while(mFramesReceived.empty()&& !mFatalErrorBailout) {
                 mFrameAvailableCondition.wait(mLock);
+            }
+
+            if(mFatalErrorBailout){
+                LOGE("Camera source returned error");
+                return UNKNOWN_ERROR;
             }
 
             if (!mStarted) {
@@ -416,6 +422,8 @@ void CameraSource::dataCallback( int32_t msgType, const sp<IMemory> &data ){
 void CameraSource::errorCallback( ){
   LOGV("errorCallback E");
   Mutex::Autolock autoLock(mLock);
+  mFatalErrorBailout = true;
+  mFrameAvailableCondition.signal();
   if( mListener != NULL ){
     mListener->notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_RESOURCE, 0 );
   }
