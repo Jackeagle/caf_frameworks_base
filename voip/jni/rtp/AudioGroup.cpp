@@ -770,7 +770,7 @@ bool AudioGroup::DeviceThread::threadLoop()
     if (AudioTrack::getMinFrameCount(&output, AudioSystem::VOICE_CALL,
         sampleRate) != NO_ERROR || output <= 0 ||
         AudioRecord::getMinFrameCount(&input, sampleRate,
-        AudioSystem::VOIP_PCM_INPUT, 1) != NO_ERROR || input <= 0) {
+        AudioSystem::PCM_16_BIT, 1) != NO_ERROR || input <= 0) {
         LOGE("cannot compute frame count");
         return false;
     }
@@ -826,7 +826,7 @@ bool AudioGroup::DeviceThread::threadLoop()
         int16_t input[sampleCount];
         int toWrite = sampleCount;
         int toRead = (mode == MUTED) ? 0 : sampleCount;
-        int chances = 100;
+        int chances = 10000;
 
         while (--chances > 0 && (toWrite > 0 || toRead > 0)) {
             if (toWrite > 0) {
