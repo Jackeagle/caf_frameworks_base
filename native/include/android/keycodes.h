@@ -154,6 +154,7 @@ enum {
     AKEYCODE_BUTTON_START    = 108,
     AKEYCODE_BUTTON_SELECT   = 109,
     AKEYCODE_BUTTON_MODE     = 110,
+    AKEYCODE_BUTTON_ROTATION_LOCK = 111,
 
     // NOTE: If you add a new keycode here you must also add it to several other files.
     //       Refer to frameworks/base/core/java/android/view/KeyEvent.java for the full list.

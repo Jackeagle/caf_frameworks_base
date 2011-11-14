@@ -953,6 +953,7 @@
         <enum name="KEYCODE_BUTTON_START" value="108" />
         <enum name="KEYCODE_BUTTON_SELECT" value="109" />
         <enum name="KEYCODE_BUTTON_MODE" value="110" />
+        <enum name="KEYCODE_BUTTON_ROTATION_LOCK" value="111" />
     </attr>
 
     <!-- ***************************************************************** -->
