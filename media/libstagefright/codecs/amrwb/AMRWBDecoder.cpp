@@ -184,32 +184,39 @@ status_t AMRWBDecoder::read(
         (const uint8_t *)mInputBuffer->data() + mInputBuffer->range_offset();
 
     int16 mode = ((inputPtr[0] >> 3) & 0x0f);
-    size_t frameSize = getFrameSize(mode);
-    CHECK(mInputBuffer->range_length() >= frameSize);
-
-    int16 frameType;
-    RX_State rx_state;
-    mime_unsorting(
-            const_cast<uint8_t *>(&inputPtr[1]),
-            mInputSampleBuffer,
-            &frameType, &mode, 1, &rx_state);
-
     int16_t *outPtr = (int16_t *)buffer->data();
-
     int16_t numSamplesOutput;
-    pvDecoder_AmrWb(
-            mode, mInputSampleBuffer,
-            outPtr,
-            &numSamplesOutput,
-            mDecoderBuf, frameType, mDecoderCookie);
-
-    CHECK_EQ(numSamplesOutput, kNumSamplesPerFrame);
-
-    for (int i = 0; i < kNumSamplesPerFrame; ++i) {
-        /* Delete the 2 LSBs (14-bit output) */
-        outPtr[i] &= 0xfffC;
+    size_t frameSize = getFrameSize(mode);
+    //CHECK(mInputBuffer->range_length() >= frameSize);
+    /*Fix to handle corrupt frames*/
+    if(mInputBuffer->range_length() < frameSize)
+    {
+        frameSize = mInputBuffer->range_length();
+        numSamplesOutput = kNumSamplesPerFrame;
+        memset(outPtr,0x0,kNumSamplesPerFrame*sizeof(int16_t));
     }
+    else
+    {
+        int16 frameType;
+        RX_State rx_state;
+        mime_unsorting(
+                const_cast<uint8_t *>(&inputPtr[1]),
+                mInputSampleBuffer,
+                &frameType, &mode, 1, &rx_state);
 
+        pvDecoder_AmrWb(
+                mode, mInputSampleBuffer,
+                outPtr,
+                &numSamplesOutput,
+                mDecoderBuf, frameType, mDecoderCookie);
+
+        CHECK_EQ(numSamplesOutput, kNumSamplesPerFrame);
+
+        for (int i = 0; i < kNumSamplesPerFrame; ++i) {
+                /* Delete the 2 LSBs (14-bit output) */
+                outPtr[i] &= 0xfffC;
+        }
+    }
     buffer->set_range(0, numSamplesOutput * sizeof(int16_t));
 
     mInputBuffer->set_range(
