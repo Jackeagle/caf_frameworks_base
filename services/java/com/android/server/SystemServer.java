@@ -223,6 +223,8 @@ class ServerThread extends Thread {
                 int bluetoothOn = Settings.Secure.getInt(mContentResolver,
                     Settings.Secure.BLUETOOTH_ON, 0);
                 if (bluetoothOn > 0) {
+                    SystemProperties.set("bluetooth.onboot.discov","true");
+                    Log.v(TAG, "Setting bluetooth.onboot.discov");
                     bluetooth.enable();
                 }
             }
