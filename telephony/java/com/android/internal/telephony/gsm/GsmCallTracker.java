@@ -80,6 +80,8 @@ public final class GsmCallTracker extends CallTracker {
     GsmConnection pendingMO;
     boolean hangupPendingMO;
 
+    boolean callSwitchPending = false;
+
     GSMPhone phone;
 
     boolean desiredMute = false;    // false = mute off
@@ -276,9 +278,12 @@ public final class GsmCallTracker extends CallTracker {
         // Should we bother with this check?
         if (ringingCall.getState() == GsmCall.State.INCOMING) {
             throw new CallStateException("cannot be in the incoming state");
-        } else {
+        } else if (callSwitchPending == false) {
             cm.switchWaitingOrHoldingAndActive(
                     obtainCompleteMessage(EVENT_SWITCH_RESULT));
+            callSwitchPending = true;
+        } else {
+            Log.w(LOG_TAG, "Call Switch request ignored due to pending response");
         }
     }
 
@@ -853,6 +858,7 @@ public final class GsmCallTracker extends CallTracker {
             break;
 
             case EVENT_SWITCH_RESULT:
+                callSwitchPending = false;
             case EVENT_CONFERENCE_RESULT:
             case EVENT_SEPARATE_RESULT:
             case EVENT_ECT_RESULT:

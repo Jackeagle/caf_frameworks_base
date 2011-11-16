@@ -720,10 +720,6 @@ public final class CallManager {
             Log.d(LOG_TAG, this.toString());
         }
 
-        if (!canDial(phone)) {
-            throw new CallStateException("cannot dial in current state");
-        }
-
         if ( hasActiveFgCall() ) {
             Phone activePhone = getActiveFgCall().getPhone();
             boolean hasBgCall = !(activePhone.getBackgroundCall().isIdle());
