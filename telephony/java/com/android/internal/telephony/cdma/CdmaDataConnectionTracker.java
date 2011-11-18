@@ -389,7 +389,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
         String ipProto = SystemProperties.get("persist.telephony.cdma.protocol", "IP");
         String roamingIpProto = SystemProperties.get("persist.telephony.cdma.rproto", "IP");
 
-        // TODO: home operator numeric! 
+        // TODO: home operator numeric!
         mActiveApn = (DataProfile)new DataProfileCdma(apnId, null, null, null, null,
                 RILConstants.SETUP_DATA_AUTH_PAP_CHAP, types, ipProto, roamingIpProto,
                 mPhone.getServiceState().getRadioTechnology());
@@ -607,10 +607,10 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
         if (mState == State.FAILED) {
             cleanUpAllConnections(null);
         }
-        
+
         // TODO: Request for OMH Data Profiles here and follow up with EVENT_TRY_SETUP_DATA
         // Add arbitration logic etc in CdmaDCT.
-        
+
         sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, Phone.REASON_SIM_LOADED));
     }
 
@@ -1049,6 +1049,11 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
     protected DataProfile fetchDunApn() {
         // TODO: TBD
         return null;
+    }
+
+    @Override
+    protected boolean disconnectOneLowerPriorityCall(String apnType) {
+        return false;
     }
 
     @Override
