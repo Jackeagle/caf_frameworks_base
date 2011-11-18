@@ -496,7 +496,8 @@ public class FmTransceiver
     *
     */
    public boolean setAnalogMode(boolean value) {
-        int re = FmReceiverJNI.setAnalogModeNative(value);
+        int re = mControl.setAudioPath(sFd, value);
+        re = FmReceiverJNI.setAnalogModeNative(value);
         if (re == 1)
             return true;
         return false;
