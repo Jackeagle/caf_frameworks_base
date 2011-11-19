@@ -36,15 +36,35 @@ import android.util.Log;
  */
 public class FmTransceiver
 {
+   /* Primary FM States :
+    * FM will be in one of the 4 states at any point of time
+    *    '0'  - FMState_Turned_Off
+    *    '1'  - FMState_Rx_Turned_On
+    *    '2'  - FMState_Tx_Turned_On
+    *    '3'  - FMState_Srch_InProg
+   */
+   public static final int FMState_Turned_Off   = 0;
+   public static final int FMState_Rx_Turned_On = 1;
+   public static final int FMState_Tx_Turned_On = 2;
+   public static final int FMState_Srch_InProg  = 3;
 
-   public static final int    FMOff        = 0;
-   public static final int    FMRxOn       = 1;
-   public static final int    FMTxOn       = 2;
-   public static final int    FMReset      = 3;
-   protected static final int FMRxStarting = 4;
-   protected static final int FMTxStarting = 5;
-   protected static final int FMTurningOff = 6;
-   public static int          mFMOn        = FMOff;
+   /* Intermediate FM power levels */
+   public static final int subPwrLevel_FMRx_Starting = 4;
+   public static final int subPwrLevel_FMTx_Starting = 5;
+   public static final int subPwrLevel_FMTurning_Off = 6;
+
+   /* Intermediate FM search levels :
+    * These are the sub-levels of FM Search operations : seek/scan/auto-preset.
+    * Used internally for distinguishing between the various search operations.
+   */
+   public static final int subSrchLevel_SeekInPrg      = 0;
+   public static final int subSrchLevel_ScanInProg     = 1;
+   public static final int subSrchLevel_SrchListInProg = 2;
+   public static final int subSrchLevel_SrchComplete   = 3;
+   public static final int subSrchLevel_SrchAbort      = 4;
+
+   /* Holds the current state of the FM device */
+   public static int FMState = FMState_Turned_Off;
 
    /**
     * FMConfigure FM Radio band setting for US/Europe
@@ -125,6 +145,8 @@ public class FmTransceiver
    protected FmRxRdsData mRdsData;
    protected FmTxEventListner mTxEvents;
 
+   public static final int ERROR = -1;
+
    /*==============================================================
    FUNCTION:  acquire
    ==============================================================*/
@@ -202,7 +224,7 @@ public class FmTransceiver
       if (sFd!=0)
       {
          FmReceiverJNI.closeFdNative(sFd);
-         sFd =0;
+         sFd = 0;
          Log.d(TAG, "Turned off: " + sFd);
       } else
       {
@@ -411,7 +433,7 @@ public class FmTransceiver
    public boolean disable(){
       mControl.fmOff(sFd);
 
-      //Release the device on Disable
+      /* Release the device on Disable */
       release("/dev/radio0");
       return true;
    }
@@ -573,7 +595,7 @@ public class FmTransceiver
    */
    static void setFMPowerState(int state)
    {
-      mFMOn = state;
+      FMState = state;
    }
 /*==============================================================
    FUNCTION:  getFMPowerState
@@ -595,6 +617,6 @@ public class FmTransceiver
    */
    public static int getFMPowerState()
    {
-      return mFMOn;
+      return FMState;
    }
 }
