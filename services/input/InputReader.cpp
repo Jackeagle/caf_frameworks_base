@@ -2762,7 +2762,8 @@ void TouchInputMapper::configureParameters() {
         mParameters.deviceType = Parameters::DEVICE_TYPE_TOUCH_PAD;
     } else {
         // The device is a touch pad of unknown purpose.
-        mParameters.deviceType = Parameters::DEVICE_TYPE_POINTER;
+//      mParameters.deviceType = Parameters::DEVICE_TYP_POINTER;
+        mParameters.deviceType = Parameters::DEVICE_TYPE_TOUCH_SCREEN;
     }
 
     String8 deviceTypeString;
@@ -2793,6 +2794,7 @@ void TouchInputMapper::configureParameters() {
                         && getDevice()->isExternal();
         mParameters.associatedDisplayId = 0;
     }
+
 }
 
 void TouchInputMapper::dumpParameters(String8& dump) {
