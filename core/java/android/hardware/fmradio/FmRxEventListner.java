@@ -73,7 +73,13 @@ class FmRxEventListner {
                         int state = 0;
                         byte []buff = new byte[64];
                         int eventCount = FmReceiverJNI.getBufferNative (fd, buff, EVENT_LISTEN);
-                        Log.d(TAG, "Received event. Count: " + eventCount);
+
+                        if (eventCount >= 0)
+                            Log.d(TAG, "Received event. Count: " + eventCount);
+                        else {
+                            Log.d(TAG, "Exiting the FM Rx Event Listener");
+                            break;
+                        }
 
                         for (  index = 0; index < eventCount; index++ ) {
                             Log.d(TAG, "Received <" +buff[index]+ ">" );
@@ -81,14 +87,16 @@ class FmRxEventListner {
                             switch(buff[index]){
                             case 0:
                                 Log.d(TAG, "Got READY_EVENT");
-                                if(FmTransceiver.getFMPowerState() == FmTransceiver.FMRxStarting) {
+                                if(FmTransceiver.getFMPowerState() == FmTransceiver.subPwrLevel_FMRx_Starting) {
                                     /*Set the state as FMRxOn */
-                                    FmTransceiver.setFMPowerState(FmTransceiver.FMRxOn);
+                                    FmTransceiver.setFMPowerState(FmTransceiver.FMState_Rx_Turned_On);
+                                    Log.v(TAG, "RxEvtList: CURRENT-STATE : FMRxStarting ---> NEW-STATE : FMRxOn");
                                     cb.FmRxEvEnableReceiver();
                                 }
-                                else if (FmTransceiver.getFMPowerState() == FmTransceiver.FMTurningOff) {
+                                else if (FmTransceiver.getFMPowerState() == FmTransceiver.subPwrLevel_FMTurning_Off) {
                                     /*Set the state as FMOff */
-                                    FmTransceiver.setFMPowerState(FmTransceiver.FMOff);
+                                    FmTransceiver.setFMPowerState(FmTransceiver.FMState_Turned_Off);
+                                    Log.v(TAG, "RxEvtList: CURRENT-STATE : FMTurningOff ---> NEW-STATE : FMOff");
                                     cb.FmRxEvDisableReceiver();
                                 }
                                 break;
@@ -100,24 +108,20 @@ class FmRxEventListner {
                                 Log.d(TAG, "Got SEEK_COMPLETE_EVENT");
                                 state = FmReceiver.getSearchState();
                                 switch(state) {
-                                   case FmReceiver.SRCH_COMPLETE:
-                                      Log.d(TAG, "Current state is SRCH_COMPLETE");
-                                      break;
-                                   case FmReceiver.SRCH_INPROGRESS:
-                                      Log.d(TAG, "Current state is SRCH_INPROGRESS");
-                                      FmReceiver.setSearchState(FmReceiver.SRCH_COMPLETE);
+                                   case FmTransceiver.subSrchLevel_SeekInPrg :
+                                   case FmTransceiver.subSrchLevel_ScanInProg:
+                                      Log.v(TAG, "Current state is " + state);
+                                      FmReceiver.setSearchState(FmTransceiver.subSrchLevel_SrchComplete);
+                                      Log.v(TAG, "RxEvtList: CURRENT-STATE : Search ---> NEW-STATE : FMRxOn");
                                       cb.FmRxEvSearchComplete(FmReceiverJNI.getFreqNative(fd));
                                       break;
-                                   case FmReceiver.SRCH_FAILED:
-                                      Log.d(TAG, "Current state is SRCH_FAILED");
+                                   case FmTransceiver.subSrchLevel_SrchAbort:
+                                      Log.v(TAG, "Current state is SRCH_ABORTED");
+                                      Log.v(TAG, "Aborting on-going search command...");
+                                      FmReceiver.setSearchState(FmTransceiver.subSrchLevel_SrchComplete);
+                                      Log.v(TAG, "RxEvtList: CURRENT-STATE : Search ---> NEW-STATE : FMRxOn");
+                                      cb.FmRxEvSearchCancelled();
                                       break;
-                                   case FmReceiver.SRCH_ABORTED:
-                                      Log.d(TAG, "Current state is SRCH_ABORTED");
-                                      Log.d(TAG, "Aborting on-going seek command...");
-                                      FmReceiver.setSearchState(FmReceiver.SRCH_COMPLETE);
-                                      break;
-                                   default:
-                                      Log.d(TAG, "Invalid Search State!!!");
                                 }
                                 break;
                             case 3:
@@ -165,7 +169,22 @@ class FmRxEventListner {
                                 break;
                             case 14:
                                 Log.d(TAG, "Got NEW_SRCH_LIST");
-                                cb.FmRxEvSearchListComplete ();
+                                state = FmReceiver.getSearchState();
+                                switch(state) {
+                                   case FmTransceiver.subSrchLevel_SrchListInProg:
+                                      Log.v(TAG, "FmRxEventListener: Current state is AUTO_PRESET_INPROGRESS");
+                                      FmReceiver.setSearchState(FmTransceiver.subSrchLevel_SrchComplete);
+                                      Log.v(TAG, "RxEvtList: CURRENT-STATE : Search ---> NEW-STATE : FMRxOn");
+                                      cb.FmRxEvSearchListComplete ();
+                                      break;
+                                   case FmTransceiver.subSrchLevel_SrchAbort:
+                                      Log.v(TAG, "Current state is SRCH_ABORTED");
+                                      Log.v(TAG, "Aborting on-going SearchList command...");
+                                      FmReceiver.setSearchState(FmTransceiver.subSrchLevel_SrchComplete);
+                                      Log.v(TAG, "RxEvtList: CURRENT-STATE : Search ---> NEW-STATE : FMRxOn");
+                                      cb.FmRxEvSearchCancelled();
+                                      break;
+                                }
                                 break;
                             case 15:
                                 Log.d(TAG, "Got NEW_AF_LIST");
