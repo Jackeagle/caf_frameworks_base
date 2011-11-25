@@ -39,10 +39,7 @@ public class FmReceiver extends FmTransceiver
 {
 
    public static int mSearchState = 0;
-   public static final int SRCH_ABORTED = -2;
-   public static final int SRCH_FAILED = -1;
-   public static final int SRCH_COMPLETE = 0;
-   public static final int SRCH_INPROGRESS = 1;
+
    private static final String TAG = "FMRadio";
 
    /**
@@ -401,12 +398,23 @@ public class FmReceiver extends FmTransceiver
    *
    */
    public boolean enable (FmConfig configSettings){
-      boolean status;
+      boolean status = false;
+      /*
+       * Check for FM State.
+       * If FMRx already on, then return.
+      */
+      int state = getFMState();
+      if (state == FMState_Rx_Turned_On || state == FMState_Srch_InProg) {
+         Log.d(TAG, "enable: FM already turned On and running");
+         return status;
+      }
+      else if (state == subPwrLevel_FMRx_Starting) {
+         Log.v(TAG, "FM is in the process of turning On.Pls wait for sometime.");
+         return status;
+      }
 
-      /* Enable the Transceiver common for both
-         receiver and transmitter
-         */
-      setFMPowerState(FMRxStarting);
+      setFMPowerState(subPwrLevel_FMRx_Starting);
+      Log.v(TAG, "enable: CURRENT-STATE : FMOff ---> NEW-STATE : FMRxStarting");
       status = super.enable(configSettings, FmTransceiver.FM_RX);
 
       if( status == true ) {
@@ -416,7 +424,9 @@ public class FmReceiver extends FmTransceiver
       }
       else {
          status = false;
-         setFMPowerState(FMOff);
+         Log.e(TAG, "enable: Error while turning FM On");
+         Log.e(TAG, "enable: CURRENT-STATE : FMRxStarting ---> NEW-STATE : FMOff");
+         setFMPowerState(FMState_Turned_Off);
       }
       return status;
    }
@@ -440,14 +450,70 @@ public class FmReceiver extends FmTransceiver
    *    @see #registerClient
    */
    public boolean disable(){
-      boolean status;
-      setFMPowerState(FMTurningOff);
+      boolean status = false;
+      /*
+       * Check for FM State. If search is in progress, then cancel the search prior
+       * to disabling FM.
+      */
+      int state = getFMState();
+      switch(state) {
+      case FMState_Turned_Off:
+         Log.d(TAG, "FM already tuned Off.");
+         return false;
+      case FMState_Srch_InProg:
+         Log.v(TAG, "disable: Cancelling the on going search operation prior to disabling FM");
+         setSearchState(subSrchLevel_SrchAbort);
+         cancelSearch();
+         Log.v(TAG, "disable: Wait for the state to change from : Search ---> FMRxOn");
+         try {
+            /*
+             *    The delay of 50ms here is very important.
+             *    This delay is useful for the cleanup purpose
+             *    when HS is abruptly plugged out when search
+             *    is in progress.
+            */
+            Thread.sleep(50);
+         } catch (InterruptedException e) {
+            e.printStackTrace();
+         }
+         break;
+      case subPwrLevel_FMRx_Starting:
+      /*
+       * If, FM is in the process of turning On, then wait for
+       * the turn on operation to complete before turning off.
+      */
+         Log.d(TAG, "disable: FM not yet turned On...");
+         try {
+            Thread.sleep(100);
+         } catch (InterruptedException e) {
+            e.printStackTrace();
+         }
+         /* Check for the state of FM device */
+         state = getFMState();
+         if(state == subPwrLevel_FMRx_Starting) {
+            Log.e(TAG, "disable: FM in bad state");
+            return status;
+         }
+         break;
+      case subPwrLevel_FMTurning_Off:
+      /*
+       * If, FM is in the process of turning Off, then wait for
+       * the turn off operation to complete.
+      */
+         Log.v(TAG, "disable: FM is getting turned Off.");
+            return status;
+      }
+
+      setFMPowerState(subPwrLevel_FMTurning_Off);
+      Log.v(TAG, "disable: CURRENT-STATE : FMRxOn ---> NEW-STATE : FMTurningOff");
       status = unregisterClient();
       if( status == true ) {
           status = super.disable();
       }
-      else
+      else {
           status = false;
+          Log.e(TAG, "disable: Error while turning FM Off");
+      }
 
       return status;
    }
@@ -466,10 +532,9 @@ public class FmReceiver extends FmTransceiver
    *    operation.
    *    <p>
    *    @return current state of FM Search operation:
-   *                FmReceiver.SRCH_COMPLETE
-   *                FmReceiver.SRCH_INPROGRESS
-   *                FmReceiver.SRCH_FAILED
-   *                FmReceiver.SRCH_ABORTED
+   *                SRCH_COMPLETE
+   *                SRCH_INPROGRESS
+   *                SRCH_ABORTED
    */
    static int getSearchState()
    {
@@ -485,7 +550,7 @@ public class FmReceiver extends FmTransceiver
    *    This function is used to set the current state of the
    *    search operation. If a seek command is issued when one
    *    is already in-progress, we cancel the on-going seek command,
-   *    set the state of search operation to FmReceiver.SRCH_ABORTED
+   *    set the state of search operation to SRCH_ABORTED
    *    and start a new search.
    *    <p>
    *    @return none
@@ -494,20 +559,15 @@ public class FmReceiver extends FmTransceiver
    {
       mSearchState = state;
       switch(mSearchState) {
-         case SRCH_COMPLETE:
-            Log.d(TAG, "setSearchState() : Current state is SRCH_COMPLETE");
+         case subSrchLevel_SeekInPrg:
+         case subSrchLevel_ScanInProg:
+         case subSrchLevel_SrchListInProg:
+            setFMPowerState(FMState_Srch_InProg);
             break;
-         case SRCH_INPROGRESS:
-            Log.d(TAG, "setSearchState() : Current state is SRCH_INPROGRESS");
+         case subSrchLevel_SrchComplete:
+            /* Update the state of the FM device */
+            setFMPowerState(FMState_Rx_Turned_On);
             break;
-         case SRCH_FAILED:
-            Log.d(TAG, "setSearchState() : Current state is SRCH_FAILED");
-            break;
-         case SRCH_ABORTED:
-            Log.d(TAG, "setSearchState() : Current state is SRCH_ABORTED");
-            break;
-         default:
-            Log.d(TAG, "setSearchState() : Invalid Search State!!!");
       }
    }
 
@@ -616,11 +676,12 @@ public class FmReceiver extends FmTransceiver
                                   int dwellPeriod,
                                   int direction){
 
-      int state = getSearchState();
-      if (state == FmReceiver.SRCH_INPROGRESS) {
-         Log.d (TAG, "Cancelling the on-going Search & starting a new search");
-         setSearchState(FmReceiver.SRCH_ABORTED);
-         cancelSearch();
+      int state = getFMState();
+
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "searchStations: Device currently busy in executing another command.");
+          return false;
       }
 
       boolean bStatus = true;
@@ -633,28 +694,29 @@ public class FmReceiver extends FmTransceiver
       {
          Log.d (TAG, "Invalid search mode: " + mode );
          bStatus = false;
-         setSearchState(FmReceiver.SRCH_FAILED);
       }
       if ( (dwellPeriod < FM_RX_DWELL_PERIOD_1S) ||
            (dwellPeriod > FM_RX_DWELL_PERIOD_7S))
       {
          Log.d (TAG, "Invalid dwelling time: " + dwellPeriod);
          bStatus = false;
-         setSearchState(FmReceiver.SRCH_FAILED);
       }
       if ( (direction != FM_RX_SEARCHDIR_DOWN) &&
            (direction != FM_RX_SEARCHDIR_UP))
       {
          Log.d (TAG, "Invalid search direction: " + direction);
          bStatus = false;
-         setSearchState(FmReceiver.SRCH_FAILED);
       }
 
       if (bStatus)
       {
          Log.d (TAG, "searchStations: mode " + mode + "direction:  " + direction);
          mControl.searchStations(sFd, mode, dwellPeriod, direction, 0, 0);
-         setSearchState(FmReceiver.SRCH_INPROGRESS);
+         if (mode == FM_RX_SRCH_MODE_SEEK)
+            setSearchState(subSrchLevel_SeekInPrg);
+         else if (mode == FM_RX_SRCH_MODE_SCAN)
+            setSearchState(subSrchLevel_ScanInProg);
+         Log.v(TAG, "searchStations: CURRENT-STATE : FMRxOn ---> NEW-STATE : SearchInProg");
       }
       return true;
    }
@@ -787,6 +849,12 @@ public class FmReceiver extends FmTransceiver
                                   int pty,
                                   int pi) {
       boolean bStatus = true;
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "searchStations: Device currently busy in executing another command.");
+          return false;
+      }
 
       Log.d (TAG, "RDS search...");
 
@@ -821,6 +889,7 @@ public class FmReceiver extends FmTransceiver
          Log.d (TAG, "searchStations: pty " + pty);
          Log.d (TAG, "searchStations: pi " + pi);
          mControl.searchStations(sFd, mode, dwellPeriod, direction, pty, pi);
+         setSearchState(subSrchLevel_ScanInProg);
       }
       return true;
    }
@@ -910,6 +979,13 @@ public class FmReceiver extends FmTransceiver
                                      int maximumStations,
                                      int pty){
 
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "searchStationList: Device currently busy in executing another command.");
+          return false;
+      }
+
       boolean bStatus = true;
       int re=0;
 
@@ -946,6 +1022,9 @@ public class FmReceiver extends FmTransceiver
          }
 	 else
            re = mControl.searchStationList(sFd, mode, maximumStations, direction, pty);
+
+         setSearchState(subSrchLevel_SrchListInProg);
+         Log.v(TAG, "searchStationList: CURRENT-STATE : FMRxOn ---> NEW-STATE : SearchInProg");
       }
 
       if (re == 0)
@@ -980,8 +1059,17 @@ public class FmReceiver extends FmTransceiver
    *   @see #searchStationList
    */
    public boolean cancelSearch () {
-      mControl.cancelSearch(sFd);
-      return true;
+      boolean status = false;
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Srch_InProg) {
+         Log.v(TAG, "cancelSearch: Cancelling the on going search operation");
+         setSearchState(subSrchLevel_SrchAbort);
+         mControl.cancelSearch(sFd);
+         return true;
+      } else
+         Log.d(TAG, "cancelSearch: No on going search operation to cancel");
+      return status;
    }
 
    /*==============================================================
@@ -1006,6 +1094,12 @@ public class FmReceiver extends FmTransceiver
    *
    */
    public boolean setMuteMode (int mode) {
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "setMuteMode: Device currently busy in executing another command.");
+          return false;
+      }
       switch (mode)
       {
       case FM_RX_UNMUTE:
@@ -1040,6 +1134,12 @@ public class FmReceiver extends FmTransceiver
    *           false if setStereoMode failed.
    */
    public boolean setStereoMode (boolean stereoEnable) {
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "setStereoMode: Device currently busy in executing another command.");
+          return false;
+      }
       int re = mControl.stereoControl(sFd, stereoEnable);
 
       if (re == 0)
@@ -1074,6 +1174,12 @@ public class FmReceiver extends FmTransceiver
    */
    public boolean setSignalThreshold (int threshold) {
 
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "setSignalThreshold: Device currently busy in executing another command.");
+          return false;
+      }
       boolean bStatus = true;
       int re;
       Log.d(TAG, "Signal Threshhold input: "+threshold );
@@ -1145,9 +1251,17 @@ public class FmReceiver extends FmTransceiver
    *    Get the Frequency of the Tuned Station
    *
    *    @return frequencyKHz: Tuned Station Frequency (in kHz)
-   *                       (Example: 96500 = 96.5Mhz)
+   *                          (Example: 96500 = 96.5Mhz)
+   *            ERROR       : If device is currently executing another command
    */
    public int getTunedFrequency () {
+
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "getTunedFrequency: Device currently busy in executing another command.");
+          return ERROR;
+      }
 
       int frequency = FmReceiverJNI.getFreqNative(sFd);
 
@@ -1407,9 +1521,11 @@ public class FmReceiver extends FmTransceiver
    FUNCTION:  getSignalThreshold
    ==============================================================*/
    /**
-   *   This function returns the currently set signal
-   *          threshold.
-   *
+   *   This function returns:
+   *          currently set signal threshold - if API invocation
+   *                                           is successful
+   *          ERROR                          - if device is currently
+   *                                           executing another command
    *    <p>
    *    This value used by the FM driver/hardware to determine which
    *    stations are tuned during searches and Alternative Frequency jumps.
@@ -1433,6 +1549,12 @@ public class FmReceiver extends FmTransceiver
    *    @return the signal threshold
    */
    public int getSignalThreshold () {
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "getSignalThreshold: Device currently busy in executing another command.");
+          return ERROR;
+      }
      int threshold = FM_RX_SIGNAL_STRENGTH_VERY_WEAK, signalStrength;
      int rmssiThreshold = FmReceiverJNI.getControlNative (sFd, V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH);
      Log.d(TAG, "Signal Threshhold: "+rmssiThreshold );
@@ -1531,6 +1653,12 @@ public class FmReceiver extends FmTransceiver
                                       boolean enRdsChangeFilter)
    {
 
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "setRdsGroupOptions: Device currently busy in executing another command.");
+          return false;
+      }
       // Enable RDS
       int re = mRdsData.rdsOn(true);
 
@@ -1601,6 +1729,16 @@ public class FmReceiver extends FmTransceiver
    */
    public boolean registerRdsGroupProcessing (int fmGrpsToProc){
 
+      if (mRdsData == null)
+         return false;
+
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "registerRdsGroupProcessing: Device currently busy in executing another command.");
+          return false;
+      }
+
       // Enable RDS
       int re = mRdsData.rdsOn(true);
 
@@ -1635,6 +1773,12 @@ public class FmReceiver extends FmTransceiver
    */
    public boolean enableAFjump (boolean enable) {
 
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "enableAFjump: Device currently busy in executing another command.");
+          return false;
+      }
       // Enable RDS
       int re = mRdsData.rdsOn(true);
 
@@ -1667,6 +1811,12 @@ public class FmReceiver extends FmTransceiver
    */
    public int[] getStationList ()
    {
+      int state = getFMState();
+      /* Check current state of FM device */
+      if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
+          Log.d(TAG, "getStationList: Device currently busy in executing another command.");
+          return null;
+      }
       int[] stnList = new int [100];
 
       stnList = mControl.stationList (sFd);
@@ -1856,5 +2006,82 @@ public class FmReceiver extends FmTransceiver
 
    }
 
+   /*
+    * getFMState() returns:
+    *     '0' if FM State  is OFF
+    *     '1' if FM Rx     is On
+    *     '2' if FM Tx     is On
+    *     '3' if FM device is Searching
+   */
+   public int getFMState()
+   {
+      /* Current State of FM device */
+      int currFMState = FmTransceiver.getFMPowerState();
+      return currFMState;
+   }
+
+/*==============================================================
+   FUNCTION:  setOnChannelThreshold
+   ==============================================================*/
+   /**
+   *    Sets the On channel threshold value
+   *
+   *    <p>
+   *    This method sets the On channel threshold value.
+   *
+   *    <p>
+   */
+   public void setOnChannelThreshold(int data)
+   {
+      int re =  mControl.setOnChannelThreshold(sFd, data);
+   }
+
+/*==============================================================
+   FUNCTION:  getOnChannelThreshold
+   ==============================================================*/
+   /**
+   *    Gets the On channel threshold value
+   *
+   *    <p>
+   *    This method gets the currently set On channel threshold value.
+   *
+   *    <p>
+   */
+   public int getOnChannelThreshold()
+   {
+      return mControl.getOnChannelThreshold(sFd);
+   }
+
+/*==============================================================
+   FUNCTION:  setOffChannelThreshold
+   ==============================================================*/
+   /**
+   *    Sets the Off channel threshold value
+   *
+   *    <p>
+   *    This method sets the Off channel threshold value.
+   *
+   *    <p>
+   */
+   public void setOffChannelThreshold(int data)
+   {
+      int re =  mControl.setOffChannelThreshold(sFd, data);
+   }
+
+/*==============================================================
+   FUNCTION:  getOffChannelThreshold
+   ==============================================================*/
+   /**
+   *    Gets the Off channel threshold value
+   *
+   *    <p>
+   *    This method gets the currently set Off channel threshold value.
+   *
+   *    <p>
+   */
+   public int getOffChannelThreshold()
+   {
+      return mControl.getOffChannelThreshold(sFd);
+   }
 
 }
