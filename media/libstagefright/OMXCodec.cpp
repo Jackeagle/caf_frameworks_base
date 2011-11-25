@@ -2448,19 +2448,6 @@ void OMXCodec::on_message(const omx_message &msg) {
 
             info->mOwnedByComponent = false;
 
-        if(isHwAacCodecUsed()){
-                /* For some clips Q6 sends blank frames and follows it up with PortSettingsChanged event
-                 * typically it should be the other way around, this behavior is leading to a crash in
-                 * audioplayer, fix is to release the initial blank frames as soon as they arrive.
-                 */
-                if((0 == msg.u.extended_buffer_data.range_length) && ((EXECUTING == mState))
-                        && (0 == msg.u.extended_buffer_data.timestamp)){
-                    LOGE("Releasing blank Frame:%x",info->mBuffer);
-                    fillOutputBuffer(info);
-                    break;
-                }
-        }
-
 
 #if 0
             {
