@@ -178,17 +178,8 @@ final class WebViewCore {
         Message init = sWebCoreHandler.obtainMessage(
                 WebCoreThread.INITIALIZE, this);
         sWebCoreHandler.sendMessage(init);
-        synchronized (WebViewCore.class) {
-            try {
-                // Wait for 1000 ms or notification from initialize()
-                WebViewCore.class.wait(1000);
-            } catch (InterruptedException e) {
-                Log.e(LOGTAG, "Caught exception while waiting for thread " +
-                         "INITIALIZE.");
-                Log.e(LOGTAG, Log.getStackTraceString(e));
-            }
-         }
-      }
+    }
+
     /* Initialize private data within the WebCore thread.
      */
     private void initialize() {
@@ -629,10 +620,7 @@ final class WebViewCore {
                             case INITIALIZE:
                                 WebViewCore core = (WebViewCore) msg.obj;
                                 core.initialize();
-                                synchronized (WebViewCore.class) {
-                                   WebViewCore.class.notify();
-                                 }
-                                 break;
+                                break;
 
                             case REDUCE_PRIORITY:
                                 // 3 is an adjustable number.
