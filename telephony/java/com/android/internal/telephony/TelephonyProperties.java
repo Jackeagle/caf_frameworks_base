@@ -187,4 +187,9 @@ public interface TelephonyProperties
      * Ignore RIL_UNSOL_NITZ_TIME_RECEIVED completely, used for debugging/testing.
      */
     static final String PROPERTY_IGNORE_NITZ = "telephony.test.ignore.nitz";
+
+    /**
+     * Indicates whether Out Of Service is considered as data call disconnect.
+     */
+    static final String PROPERTY_OOS_IS_DISCONNECT = "persist.telephony.oosisdc";
 }
