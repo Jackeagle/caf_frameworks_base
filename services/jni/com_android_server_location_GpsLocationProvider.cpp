@@ -106,7 +106,7 @@ static void nmea_callback(GpsUtcTime timestamp, const char* nmea, int length)
 
 static void set_capabilities_callback(uint32_t capabilities)
 {
-    LOGD("set_capabilities_callback: %ld\n", capabilities);
+    LOGD("set_capabilities_callback: %ld\n", (long ) capabilities);
     JNIEnv* env = AndroidRuntime::getJNIEnv();
     env->CallVoidMethod(mCallbacksObj, method_setEngineCapabilities, capabilities);
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
@@ -154,9 +154,14 @@ GpsXtraCallbacks sGpsXtraCallbacks = {
 static void agps_status_callback(AGpsStatus* agps_status)
 {
     JNIEnv* env = AndroidRuntime::getJNIEnv();
+    jbyteArray byteArray = env->NewByteArray(16);
+    LOG_ASSERT(byteArray, "Native could not create new byte[]");
+
+    env->SetByteArrayRegion(byteArray, 0, 16, (const jbyte *) agps_status->ipv6_addr );
     env->CallVoidMethod(mCallbacksObj, method_reportAGpsStatus,
-                        agps_status->type, agps_status->status, agps_status->ipaddr);
+                        agps_status->type, agps_status->status, agps_status->ipv4_addr, byteArray);
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
+    env->DeleteLocalRef(byteArray);
 }
 
 AGpsCallbacks sAGpsCallbacks = {
@@ -296,7 +301,7 @@ static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, 
     method_reportLocation = env->GetMethodID(clazz, "reportLocation", "(IDDDFFFJ)V");
     method_reportStatus = env->GetMethodID(clazz, "reportStatus", "(I)V");
     method_reportSvStatus = env->GetMethodID(clazz, "reportSvStatus", "()V");
-    method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(III)V");
+    method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(III[B)V");
     method_reportNmea = env->GetMethodID(clazz, "reportNmea", "(J)V");
     method_setEngineCapabilities = env->GetMethodID(clazz, "setEngineCapabilities", "(I)V");
     method_xtraDownloadRequest = env->GetMethodID(clazz, "xtraDownloadRequest", "()V");
@@ -526,7 +531,8 @@ static void android_location_GpsLocationProvider_inject_xtra_data(JNIEnv* env, j
     env->ReleasePrimitiveArrayCritical(data, bytes, JNI_ABORT);
 }
 
-static void android_location_GpsLocationProvider_agps_data_conn_open(JNIEnv* env, jobject obj, jstring apn)
+static void android_location_GpsLocationProvider_agps_data_conn_open(JNIEnv* env, jobject obj,
+        jstring apn, jint bearerType)
 {
     const AGpsInterface* interface = GetAGpsInterface(env, obj);
     if (!interface) {
@@ -538,7 +544,7 @@ static void android_location_GpsLocationProvider_agps_data_conn_open(JNIEnv* env
         return;
     }
     const char *apnStr = env->GetStringUTFChars(apn, NULL);
-    interface->data_conn_open(apnStr);
+    interface->data_conn_open(apnStr, bearerType);
     env->ReleaseStringUTFChars(apn, apnStr);
 }
 
@@ -632,7 +638,7 @@ static JNINativeMethod sMethods[] = {
     {"native_inject_location", "(DDF)V", (void*)android_location_GpsLocationProvider_inject_location},
     {"native_supports_xtra", "()Z", (void*)android_location_GpsLocationProvider_supports_xtra},
     {"native_inject_xtra_data", "([BI)V", (void*)android_location_GpsLocationProvider_inject_xtra_data},
-    {"native_agps_data_conn_open", "(Ljava/lang/String;)V", (void*)android_location_GpsLocationProvider_agps_data_conn_open},
+    {"native_agps_data_conn_open", "(Ljava/lang/String;I)V", (void*)android_location_GpsLocationProvider_agps_data_conn_open},
     {"native_agps_data_conn_closed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_closed},
     {"native_agps_data_conn_failed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_failed},
     {"native_agps_set_id","(ILjava/lang/String;)V",(void*)android_location_GpsLocationProvider_agps_set_id},
