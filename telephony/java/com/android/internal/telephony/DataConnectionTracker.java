@@ -360,6 +360,11 @@ public abstract class DataConnectionTracker extends Handler {
     /* Once disposed dont handle any messages */
     protected boolean mIsDisposed = false;
 
+    // Flags introduced for FMC (fixed mobile convergence) to trigger
+    // data call even when there is no service on mobile networks.
+    protected boolean mCheckForConnectivity = true;
+    protected boolean mCheckForSubscription = true;
+
     /** Watches for changes to the APN db. */
     private ApnChangeObserver mApnObserver;
 
@@ -739,6 +744,8 @@ public abstract class DataConnectionTracker extends Handler {
      * (e.g: MPDN not supported), disconnect a lower priority call
      */
     protected abstract boolean disconnectOneLowerPriorityCall(String apnType);
+    protected abstract void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls);
 
     protected void onDataStallAlarm(int tag) {
         loge("onDataStallAlarm: not impleted tag=" + tag);
@@ -1402,7 +1409,7 @@ public abstract class DataConnectionTracker extends Handler {
         pw.println(" sPolicyDataEnabed=" + sPolicyDataEnabled);
         pw.println(" dataEnabled:");
         for(int i=0; i < dataEnabled.length; i++) {
-            pw.printf("  dataEnabled[%d]=%b\n", i, dataEnabled[i]);
+                pw.printf("  dataEnabled[%d]=%b\n", i, dataEnabled[i]);
         }
         pw.flush();
         pw.println(" enabledCount=" + enabledCount);
@@ -1429,38 +1436,38 @@ public abstract class DataConnectionTracker extends Handler {
         Set<Entry<Integer, DataConnection> > mDcSet = mDataConnections.entrySet();
         pw.println(" mDataConnections: count=" + mDcSet.size());
         for (Entry<Integer, DataConnection> entry : mDcSet) {
-            pw.printf(" *** mDataConnection[%d] \n", entry.getKey());
-            entry.getValue().dump(fd, pw, args);
+                pw.printf(" *** mDataConnection[%d] \n", entry.getKey());
+                entry.getValue().dump(fd, pw, args);
         }
         pw.println(" ***************************************");
         pw.flush();
         Set<Entry<String, Integer>> mApnToDcIdSet = mApnToDataConnectionId.entrySet();
         pw.println(" mApnToDataConnectonId size=" + mApnToDcIdSet.size());
         for (Entry<String, Integer> entry : mApnToDcIdSet) {
-            pw.printf(" mApnToDataConnectonId[%s]=%d\n", entry.getKey(), entry.getValue());
+                pw.printf(" mApnToDataConnectonId[%s]=%d\n", entry.getKey(), entry.getValue());
         }
         pw.println(" ***************************************");
         pw.flush();
         if (mApnContexts != null) {
-            Set<Entry<String, ApnContext>> mApnContextsSet = mApnContexts.entrySet();
-            pw.println(" mApnContexts size=" + mApnContextsSet.size());
-            for (Entry<String, ApnContext> entry : mApnContextsSet) {
-                entry.getValue().dump(fd, pw, args);
-            }
-            pw.println(" ***************************************");
+                Set<Entry<String, ApnContext>> mApnContextsSet = mApnContexts.entrySet();
+                pw.println(" mApnContexts size=" + mApnContextsSet.size());
+                for (Entry<String, ApnContext> entry : mApnContextsSet) {
+            	    entry.getValue().dump(fd, pw, args);
+                }
+                pw.println(" ***************************************");
         } else {
-            pw.println(" mApnContexts=null");
+                pw.println(" mApnContexts=null");
         }
         pw.flush();
         pw.println(" mActiveApn=" + mActiveApn);
         if (mAllApns != null) {
-            pw.println(" mAllApns size=" + mAllApns.size());
-            for (int i=0; i < mAllApns.size(); i++) {
-                pw.printf(" mAllApns[%d]: %s\n", i, mAllApns.get(i));
-            }
-            pw.flush();
+                pw.println(" mAllApns size=" + mAllApns.size());
+                for (int i=0; i < mAllApns.size(); i++) {
+            	    pw.printf(" mAllApns[%d]: %s\n", i, mAllApns.get(i));
+                }
+                pw.flush();
         } else {
-            pw.println(" mAllApns=null");
+                pw.println(" mAllApns=null");
         }
         pw.println(" mPreferredApn=" + mPreferredApn);
         pw.println(" mIsPsRestricted=" + mIsPsRestricted);
@@ -1473,5 +1480,13 @@ public abstract class DataConnectionTracker extends Handler {
 
     public IccRecords getIccRecords() {
         return mIccRecords.get();
+    }
+
+    public boolean checkForConnectivity() {
+        return mCheckForConnectivity;
+    }
+
+    public boolean checkForSubscription() {
+        return mCheckForSubscription;
     }
 }

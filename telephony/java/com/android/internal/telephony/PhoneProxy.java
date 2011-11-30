@@ -1006,4 +1006,10 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone = null;
         mCommandsInterface = null;
     }
+
+    public void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
+        mActivePhone.setDataReadinessChecks(
+                      checkConnectivity, checkSubscription, tryDataCalls);
+    }
 }
