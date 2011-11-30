@@ -2956,7 +2956,7 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
 
-    /*package*/ synchronized String getGattServiceProperty(String path, String property) {
+    public synchronized String getGattServiceProperty(String path, String property) {
         Map<String, String> properties = mGattProperties.get(path);
         Log.d(TAG, "getGattServiceProperty: " + property + ", path "+ path);
         if (properties != null) {
