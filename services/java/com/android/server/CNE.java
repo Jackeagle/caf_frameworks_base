@@ -59,6 +59,7 @@ import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.text.TextUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -1391,6 +1392,11 @@ public final class CNE implements ILinkManager {
     public boolean updateWwanStatus(int type, int state, int rssi, int roaming, String ipV4Addr,
             String iface, String timeStamp) {
 
+        if (TextUtils.isEmpty(ipV4Addr) &&
+                state == NetworkStateToInt(NetworkInfo.State.CONNECTED)) {
+            Log.d(LOCAL_TAG, "UpdateWwanStatus dropping update - ipv4 Addr is not assigned yet");
+            return false;
+        }
         CNERequest rr = CNERequest.obtain(CNE_REQUEST_UPDATE_WWAN_INFO);
         if (rr == null) {
             Log.w(LOG_TAG, "updateWwanStatus: rr=NULL - no updated");
@@ -1455,6 +1461,12 @@ public final class CNE implements ILinkManager {
     /** {@hide} */
     public boolean notifyRatConnectStatus(int type, int status, String ipV4Addr) {
 
+        if (TextUtils.isEmpty(ipV4Addr) &&
+                status == NetworkStateToInt(NetworkInfo.State.CONNECTED)) {
+            Log.d(LOCAL_TAG, "notifyRatConnectStatus dropping update " +
+                   " - ipv4 Addr is not assigned yet");
+            return false;
+        }
         CNERequest rr = CNERequest.obtain(CNE_NOTIFY_RAT_CONNECT_STATUS);
 
         if (rr == null) {
