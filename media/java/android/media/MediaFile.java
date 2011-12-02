@@ -44,8 +44,6 @@ public class MediaFile {
     public static final int FILE_TYPE_MP3     = 1;
     public static final int FILE_TYPE_M4A     = 2;
     public static final int FILE_TYPE_WAV     = 3;
-    public static final int FILE_TYPE_PCM     = 44;
-    public static final int FILE_TYPE_WEBMA   = 45;
     public static final int FILE_TYPE_AMR     = 4;
     public static final int FILE_TYPE_AWB     = 5;
     public static final int FILE_TYPE_WMA     = 6;
@@ -55,13 +53,15 @@ public class MediaFile {
     public static final int FILE_TYPE_3GPA    = 10;
     public static final int FILE_TYPE_AC3     = 11;
     public static final int FILE_TYPE_QCP     = 12;
+    public static final int FILE_TYPE_PCM     = 13;
+    public static final int FILE_TYPE_WEBMA   = 14;
     private static final int FIRST_AUDIO_FILE_TYPE = FILE_TYPE_MP3;
-    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_QCP;
+    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_WEBMA;
 
     // MIDI file types
-    public static final int FILE_TYPE_MID     = 13;
-    public static final int FILE_TYPE_SMF     = 14;
-    public static final int FILE_TYPE_IMY     = 15;
+    public static final int FILE_TYPE_MID     = 15;
+    public static final int FILE_TYPE_SMF     = 16;
+    public static final int FILE_TYPE_IMY     = 17;
     private static final int FIRST_MIDI_FILE_TYPE = FILE_TYPE_MID;
     private static final int LAST_MIDI_FILE_TYPE = FILE_TYPE_IMY;
    
@@ -76,16 +76,16 @@ public class MediaFile {
     public static final int FILE_TYPE_MP2TS   = 28;
     public static final int FILE_TYPE_AVI     = 29;
     public static final int FILE_TYPE_DIVX    = 30;
-    public static final int FILE_TYPE_WEBM    = 46;
+    public static final int FILE_TYPE_WEBM    = 31;
     private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_MP4;
-    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_DIVX;
+    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_WEBM;
     
     // Image file types
-    public static final int FILE_TYPE_JPEG    = 31;
-    public static final int FILE_TYPE_GIF     = 32;
-    public static final int FILE_TYPE_PNG     = 33;
-    public static final int FILE_TYPE_BMP     = 34;
-    public static final int FILE_TYPE_WBMP    = 35;
+    public static final int FILE_TYPE_JPEG    = 32;
+    public static final int FILE_TYPE_GIF     = 33;
+    public static final int FILE_TYPE_PNG     = 34;
+    public static final int FILE_TYPE_BMP     = 35;
+    public static final int FILE_TYPE_WBMP    = 36;
     private static final int FIRST_IMAGE_FILE_TYPE = FILE_TYPE_JPEG;
     private static final int LAST_IMAGE_FILE_TYPE = FILE_TYPE_WBMP;
    
