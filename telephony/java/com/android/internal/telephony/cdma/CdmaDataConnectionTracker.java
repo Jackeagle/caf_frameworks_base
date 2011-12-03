@@ -110,8 +110,6 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
         mCdmaSSM = CdmaSubscriptionSourceManager.getInstance (p.getContext(), p.mCM, this,
                 EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
 
-        mDataConnectionTracker = this;
-
         mDpt = new CdmaDataProfileTracker(p);
         mDpt.registerForModemProfileReady(this, EVENT_MODEM_DATA_PROFILE_READY, null);
 
@@ -261,10 +259,6 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             log("(fix?) We're on the simulator; assuming data is connected");
             return true;
         }
-
-        int psState = mCdmaPhone.mSST.getCurrentDataConnectionState();
-        boolean roaming = mPhone.getServiceState().getRoaming();
-        boolean desiredPowerState = mCdmaPhone.mSST.getDesiredPowerState();
 
         if ((mState == State.IDLE || mState == State.SCANNING) &&
                 isDataAllowed() && getAnyDataEnabled() && !isEmergency()) {
@@ -481,7 +475,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             }
 
             if (mNetStatPollEnabled) {
-                mDataConnectionTracker.postDelayed(this, mNetStatPollPeriod);
+                postDelayed(this, mNetStatPollPeriod);
             }
         }
     };
@@ -566,25 +560,35 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
     }
 
     protected void onRecordsLoaded() {
-        Log.d(LOG_TAG, "OMH: onRecordsLoaded(): calling readDataProfilesFromModem()");
-        /* query for data profiles stored in the modem */
-        boolean needModemProfiles = mDpt.readDataProfilesFromModem();
-
-        if (mState == State.FAILED) {
-            cleanUpAllConnections(null);
-        }
-
-        if (!needModemProfiles) {
-            Log.d(LOG_TAG, "OMH: " + Phone.REASON_SIM_LOADED);
-            sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, Phone.REASON_SIM_LOADED));
-        }
+        triggerDataSetup(Phone.REASON_SIM_LOADED);
     }
 
     protected void onNVReady() {
+        triggerDataSetup(Phone.REASON_NV_READY);
+    }
+
+    /**
+     * Handles changes to the Data profiles database.
+     */
+    @Override
+    protected void onApnChanged() {
+        triggerDataSetup(Phone.REASON_APN_CHANGED);
+    }
+
+    private void triggerDataSetup(String reason) {
+        log("onRecordsLoaded(): calling readDataProfilesFromModem()");
+        /* query for data profiles stored in the modem */
+        mDpt.loadProfiles();
+
         if (mState == State.FAILED) {
             cleanUpAllConnections(null);
         }
-        sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA));
+
+        if (!mDpt.isOmhEnabled()) {
+            log("onRecordsLoaded(): Profiles are ready - trigger setup_data with reason: " +
+                    reason);
+            sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, reason));
+        }
     }
 
     /**
