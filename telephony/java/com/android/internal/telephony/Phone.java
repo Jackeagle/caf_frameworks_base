@@ -1874,4 +1874,9 @@ public interface Phone {
      * Remove references to external object stored in this object.
      */
     void removeReferences();
+
+    /**
+     * Returns the subscription id.
+     */
+    public int getSubscription();
 }

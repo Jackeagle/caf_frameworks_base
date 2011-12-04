@@ -59,8 +59,8 @@ import java.util.List;
 import android.content.res.Resources;
 
 
-public final class CdmaSMSDispatcher extends SMSDispatcher {
-    private static final String TAG = "CDMA";
+public class CdmaSMSDispatcher extends SMSDispatcher {
+    protected static final String TAG = "CDMA";
     private ImsSMSDispatcher mImsSMSDispatcher;
 
     private byte[] mLastDispatchedSmsFingerprint;

@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,11 +36,11 @@ import com.android.internal.telephony.cdma.CdmaSMSDispatcher;
 import com.android.internal.telephony.gsm.GsmSMSDispatcher;
 import com.android.internal.telephony.SmsMessageBase.TextEncodingDetails;
 
-public final class ImsSMSDispatcher extends SMSDispatcher {
+public class ImsSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "RIL_ImsSms";
 
-    private SMSDispatcher mCdmaDispatcher;
-    private SMSDispatcher mGsmDispatcher;
+    protected SMSDispatcher mCdmaDispatcher;
+    protected SMSDispatcher mGsmDispatcher;
 
     /** true if IMS is registered and sms is supported, false otherwise.*/
     private boolean mIms = false;
@@ -46,13 +49,19 @@ public final class ImsSMSDispatcher extends SMSDispatcher {
     public ImsSMSDispatcher(PhoneBase phone, SmsStorageMonitor storageMonitor,
             SmsUsageMonitor usageMonitor) {
         super(phone, storageMonitor, usageMonitor);
+
+        initDispatchers(phone, storageMonitor, usageMonitor);
+
+        mCm.registerForOn(this, EVENT_RADIO_ON, null);
+        mCm.registerForImsNetworkStateChanged(this, EVENT_IMS_STATE_CHANGED, null);
+    }
+
+    protected void initDispatchers(PhoneBase phone, SmsStorageMonitor storageMonitor,
+            SmsUsageMonitor usageMonitor) {
         mCdmaDispatcher = new CdmaSMSDispatcher(phone,
                 storageMonitor, usageMonitor, this);
         mGsmDispatcher = new GsmSMSDispatcher(phone,
                 storageMonitor, usageMonitor, this);
-
-        mCm.registerForOn(this, EVENT_RADIO_ON, null);
-        mCm.registerForImsNetworkStateChanged(this, EVENT_IMS_STATE_CHANGED, null);
     }
 
     /* Updates the phone object when there is a change */

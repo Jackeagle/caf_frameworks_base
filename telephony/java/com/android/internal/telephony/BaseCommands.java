@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-12, Code Aurora Forum. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +80,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mCdmaFwdContDtmfStartRegistrants = new RegistrantList();
     protected RegistrantList mCdmaFwdContDtmfStopRegistrants = new RegistrantList();
     protected RegistrantList mQosStateChangedIndRegistrants = new RegistrantList();
+    protected RegistrantList mSubscriptionStatusRegistrants = new RegistrantList();
 
     protected Registrant mGsmSmsRegistrant;
     protected Registrant mCdmaSmsRegistrant;
@@ -631,6 +635,15 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForCdmaFwdContDtmfStop(Handler h) {
         mCdmaFwdContDtmfStopRegistrants.remove(h);
+    }
+
+    public void registerForSubscriptionStatusChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mSubscriptionStatusRegistrants.add(r);
+    }
+
+    public void unregisterForSubscriptionStatusChanged(Handler h) {
+        mSubscriptionStatusRegistrants.remove(h);
     }
 
     //***** Protected Methods

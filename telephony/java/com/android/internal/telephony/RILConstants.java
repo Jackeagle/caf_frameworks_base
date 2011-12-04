@@ -56,6 +56,7 @@ public interface RILConstants {
     int ILLEGAL_SIM_OR_ME = 15;               /* network selection failure due
                                                  to wrong SIM/ME and no
                                                  retries needed */
+    int SUBSCRIPTION_NOT_SUPPORTED = 26;      /* Subscription not supported */
 
     /* NETWORK_MODE_* See ril.h RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE */
     int NETWORK_MODE_WCDMA_PREF     = 0; /* GSM/WCDMA (WCDMA preferred) */
@@ -270,6 +271,11 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_MODIFY_QOS = 115;
     int RIL_REQUEST_SUSPEND_QOS = 116;
     int RIL_REQUEST_RESUME_QOS = 117;
+    int RIL_REQUEST_SET_UICC_SUBSCRIPTION = 118;
+    int RIL_REQUEST_SET_DATA_SUBSCRIPTION = 119;
+    int RIL_REQUEST_GET_UICC_SUBSCRIPTION = 120;
+    int RIL_REQUEST_GET_DATA_SUBSCRIPTION = 121;
+    int RIL_REQUEST_SET_SUBSCRIPTION_MODE = 122;
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
     int RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED = 1001;
@@ -309,4 +315,5 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_VOICE_RADIO_TECH_CHANGED = 1035;
     int RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED = 1036;
     int RIL_UNSOL_QOS_STATE_CHANGED_IND = 1038;
+    int RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED = 1041;
 }

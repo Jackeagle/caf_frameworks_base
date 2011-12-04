@@ -58,7 +58,7 @@ import java.util.ArrayList;
 /**
  * {@hide}
  */
-public final class CdmaDataConnectionTracker extends DataConnectionTracker {
+public class CdmaDataConnectionTracker extends DataConnectionTracker {
     protected final String LOG_TAG = "CDMA";
 
     private CDMAPhone mCdmaPhone;
@@ -71,7 +71,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
     private static final int TIME_DELAYED_TO_RESTART_RADIO =
             SystemProperties.getInt("ro.cdma.timetoradiorestart", 60000);
 
-    private CdmaDataProfileTracker mDpt = null;
+    protected CdmaDataProfileTracker mDpt = null;
 
     /**
      * Pool size of CdmaDataConnection objects.
@@ -87,7 +87,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
 
     /* Constructor */
 
-    CdmaDataConnectionTracker(CDMAPhone p) {
+    protected CdmaDataConnectionTracker(CDMAPhone p) {
         super(p);
         mCdmaPhone = p;
 
@@ -286,7 +286,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
      * @param tearDown true if the underlying DataConnection should be disconnected.
      * @param reason for the clean up.
      */
-    private void cleanUpConnection(boolean tearDown, String reason, boolean doAll) {
+    protected void cleanUpConnection(boolean tearDown, String reason, boolean doAll) {
         if (DBG) log("cleanUpConnection: reason: " + reason);
 
         // Clear the reconnect alarm, if set.
@@ -1061,13 +1061,18 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
+    protected IccRecords getUiccCardApplication() {
+        return  mUiccController.getIccRecords(UiccController.APP_FAM_3GPP2);
+    }
+
     @Override
     protected void onUpdateIcc() {
         if (mUiccController == null ) {
             return;
         }
 
-        IccRecords newIccRecords = mUiccController.getIccRecords(UiccController.APP_FAM_3GPP2);
+        IccRecords newIccRecords = getUiccCardApplication();
+        if (newIccRecords == null) return;
 
         IccRecords r = mIccRecords.get();
         if (r != newIccRecords) {

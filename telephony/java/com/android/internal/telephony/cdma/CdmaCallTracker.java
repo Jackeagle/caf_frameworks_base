@@ -94,7 +94,7 @@ public final class CdmaCallTracker extends CallTracker {
     //***** Events
 
     //***** Constructors
-    CdmaCallTracker(CDMAPhone phone) {
+    public CdmaCallTracker(CDMAPhone phone) {
         this.phone = phone;
         cm = phone.mCM;
         cm.registerForCallStateChanged(this, EVENT_CALL_STATE_CHANGE, null);

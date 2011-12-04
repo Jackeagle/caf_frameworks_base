@@ -1568,6 +1568,18 @@ public final class SimulatedCommands extends BaseCommands
 
     public void sendImsGsmSms(String smscPDU, String pdu,
             int retry, int messageRef, Message response){
+    }
+
+    public void setUiccSubscription(int slotId, int appIndex, int subId, int subStatus,
+            Message response) {
+        unimplemented(response);
+    }
+
+    public void setDataSubscription (Message response) {
+        unimplemented(response);
+    }
+
+    public void setSubscriptionMode(int subscriptionMode, Message response) {
         unimplemented(response);
     }
 }

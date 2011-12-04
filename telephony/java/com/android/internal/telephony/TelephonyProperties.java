@@ -242,4 +242,15 @@ public interface TelephonyProperties
      * Type: boolean ( true = EONS enabled, false = EONS disabled)
      */
     static final String PROPERTY_EONS_ENABLED = "persist.radio.eons.enabled";
+
+    /**
+     * Property to set multi sim feature.
+     * Type:  String(dsds, dsda)
+     */
+    static final String PROPERTY_MULTI_SIM_CONFIG = "persist.multisim.config";
+
+    /**
+     * Property to start two ril daemons in case of multi sim.
+     */
+    static final String PROPERTY_MULTI_RILD = "ro.multi.rild";
 }

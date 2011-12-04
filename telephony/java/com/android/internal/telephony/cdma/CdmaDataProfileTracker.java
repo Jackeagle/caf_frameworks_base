@@ -282,12 +282,12 @@ public final class CdmaDataProfileTracker extends Handler {
         Log.d(LOG_TAG, "CdmaDataProfileTracker finalized");
     }
 
-    void registerForModemProfileReady(Handler h, int what, Object obj) {
+    public void registerForModemProfileReady(Handler h, int what, Object obj) {
         Registrant r = new Registrant(h, what, obj);
         mModemDataProfileRegistrants.add(r);
     }
 
-    void unregisterForModemProfileReady(Handler h) {
+    public void unregisterForModemProfileReady(Handler h) {
         mModemDataProfileRegistrants.remove(h);
     }
 

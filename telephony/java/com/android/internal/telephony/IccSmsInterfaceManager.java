@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import com.android.internal.telephony.SmsRawData;
 import static android.telephony.SmsManager.STATUS_ON_ICC_FREE;
 import static android.telephony.SmsManager.STATUS_ON_ICC_READ;
 import static android.telephony.SmsManager.STATUS_ON_ICC_UNREAD;
@@ -45,8 +46,8 @@ import static android.telephony.SmsManager.STATUS_ON_ICC_UNREAD;
  * access Sms in Icc.
  */
 public class IccSmsInterfaceManager extends ISms.Stub {
-    static final String LOG_TAG = "RIL_IccSms";
-    static final boolean DBG = true;
+    protected static final String LOG_TAG = "RIL_IccSms";
+    protected static final boolean DBG = true;
 
     private final Object mLock = new Object();
     private boolean mSuccess;
@@ -144,11 +145,15 @@ public class IccSmsInterfaceManager extends ISms.Stub {
     protected IccSmsInterfaceManager(PhoneBase phone){
         mPhone = phone;
         mContext = phone.getContext();
-        mDispatcher = new ImsSMSDispatcher(phone,
-                phone.mSmsStorageMonitor, phone.mSmsUsageMonitor);
+        initDispatchers();
         if(ServiceManager.getService("isms") == null) {
             ServiceManager.addService("isms", this);
         }
+    }
+
+    protected void initDispatchers() {
+        mDispatcher = new ImsSMSDispatcher(mPhone,
+                mPhone.mSmsStorageMonitor, mPhone.mSmsUsageMonitor);
     }
 
     public void dispose() {

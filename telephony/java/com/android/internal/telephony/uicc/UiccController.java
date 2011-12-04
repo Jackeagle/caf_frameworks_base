@@ -25,6 +25,7 @@ import android.os.RegistrantList;
 import android.util.Log;
 
 import com.android.internal.telephony.CommandsInterface;
+import com.android.internal.telephony.MSimConstants;
 
 /* This class is responsible for keeping all knowledge about
  * ICCs in the system. It is also used as API to get appropriate
@@ -45,16 +46,26 @@ public class UiccController extends Handler {
     private static UiccController mInstance;
 
     private Context mContext;
-    private CommandsInterface mCi;
-    private UiccCard mUiccCard;
+    private CommandsInterface[] mCi;
+    private UiccCard[] mUiccCards = new UiccCard[MSimConstants.RIL_MAX_CARDS];
 
     private RegistrantList mIccChangedRegistrants = new RegistrantList();
+
+    public static synchronized UiccController make(Context c, CommandsInterface[] ci) {
+        if (mInstance != null) {
+            throw new RuntimeException("UiccController.make() should only be called once");
+        }
+        mInstance = new UiccController(c, ci);
+        return mInstance;
+    }
 
     public static synchronized UiccController make(Context c, CommandsInterface ci) {
         if (mInstance != null) {
             throw new RuntimeException("UiccController.make() should only be called once");
         }
-        mInstance = new UiccController(c, ci);
+        CommandsInterface[] arrayCi = new CommandsInterface[1];
+        arrayCi[0] = ci;
+        mInstance = new UiccController(c, arrayCi);
         return mInstance;
     }
 
@@ -66,35 +77,59 @@ public class UiccController extends Handler {
     }
 
     public synchronized UiccCard getUiccCard() {
-        return mUiccCard;
+        return getUiccCard(MSimConstants.DEFAULT_CARD_INDEX);
+    }
+
+    public synchronized UiccCard getUiccCard(int slotId) {
+        if (slotId >= 0 && slotId < mUiccCards.length) {
+            return mUiccCards[slotId];
+        }
+        return null;
+    }
+
+    public synchronized UiccCard[] getUiccCards() {
+        // Return cloned array since we don't want to give out reference
+        // to internal data structure.
+        return mUiccCards.clone();
     }
 
     // Easy to use API
     public UiccCardApplication getUiccCardApplication(int family) {
-        if (mUiccCard != null) {
-            return mUiccCard.getApplication(family);
+        return getUiccCardApplication(MSimConstants.DEFAULT_CARD_INDEX, family);
+    }
+
+    public UiccCardApplication getUiccCardApplication(int slotId, int family) {
+        if (slotId >= 0 && slotId < mUiccCards.length) {
+            UiccCard c = mUiccCards[slotId];
+            if (c != null) {
+                return mUiccCards[slotId].getApplication(family);
+            }
         }
         return null;
     }
 
     // Easy to use API
     public IccRecords getIccRecords(int family) {
-        if (mUiccCard != null) {
-            UiccCardApplication app = mUiccCard.getApplication(family);
-            if (app != null) {
-                return app.getIccRecords();
-            }
+        return getIccRecords(MSimConstants.DEFAULT_CARD_INDEX, family);
+    }
+
+    public IccRecords getIccRecords(int slotId, int family) {
+        UiccCardApplication app = getUiccCardApplication(slotId, family);
+        if (app != null) {
+            return app.getIccRecords();
         }
         return null;
     }
 
     // Easy to use API
     public IccFileHandler getIccFileHandler(int family) {
-        if (mUiccCard != null) {
-            UiccCardApplication app = mUiccCard.getApplication(family);
-            if (app != null) {
-                return app.getIccFileHandler();
-            }
+        return getIccFileHandler(MSimConstants.DEFAULT_CARD_INDEX, family);
+    }
+
+    public IccFileHandler getIccFileHandler(int slotId, int family) {
+        UiccCardApplication app = getUiccCardApplication(slotId, family);
+        if (app != null) {
+            return app.getIccFileHandler();
         }
         return null;
     }
@@ -113,19 +148,27 @@ public class UiccController extends Handler {
 
     @Override
     public void handleMessage (Message msg) {
+        Integer index = getCiIndex(msg);
+
+        if (index < 0 || index >= mCi.length) {
+            Log.e(LOG_TAG, "Invalid index : " + index + " received with event " + msg.what);
+            return;
+        }
+
         switch (msg.what) {
             case EVENT_ICC_STATUS_CHANGED:
-                if (DBG) log("Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus");
-                mCi.getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE));
+                if (DBG) log("Received EVENT_ICC_STATUS_CHANGED, calling getIccCardStatus"
+                        + "on index " + index);
+                mCi[index].getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE, index));
                 break;
             case EVENT_GET_ICC_STATUS_DONE:
-                if (DBG) log("Received EVENT_GET_ICC_STATUS_DONE");
+                if (DBG) log("Received EVENT_GET_ICC_STATUS_DONE on index " + index);
                 AsyncResult ar = (AsyncResult)msg.obj;
-                onGetIccCardStatusDone(ar);
+                onGetIccCardStatusDone(ar, index);
                 break;
             case EVENT_RADIO_UNAVAILABLE:
                 if (DBG) log("EVENT_RADIO_UNAVAILABLE ");
-                disposeCard();
+                disposeCard(index);
                 break;
             default:
                 Log.e(LOG_TAG, " Unknown Event " + msg.what);
@@ -133,26 +176,50 @@ public class UiccController extends Handler {
     }
 
     // Destroys the card object
-    private synchronized void disposeCard() {
+    private synchronized void disposeCard(int index) {
         if (DBG) log("Disposing card");
-        if (mUiccCard != null) {
-            mUiccCard.dispose();
-            mUiccCard = null;
-            mIccChangedRegistrants.notifyRegistrants();
+        if (mUiccCards[index] != null) {
+            mUiccCards[index].dispose();
+            mUiccCards[index] = null;
+            mIccChangedRegistrants.notifyRegistrants(new AsyncResult(null, index, null));
         }
     }
 
-    private UiccController(Context c, CommandsInterface ci) {
+    private UiccController(Context c, CommandsInterface[] ci) {
         if (DBG) log("Creating UiccController");
         mContext = c;
         mCi = ci;
-        mCi.registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, null);
-        mCi.registerForNotAvailable(this, EVENT_RADIO_UNAVAILABLE, null);
-        // TODO remove this once modem correctly notifies the unsols
-        mCi.registerForOn(this, EVENT_ICC_STATUS_CHANGED, null);
+        for (int i = 0; i < mCi.length; i++) {
+            Integer index = new Integer(i);
+            mCi[i].registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, index);
+            // TODO remove this once modem correctly notifies the unsols
+            mCi[i].registerForOn(this, EVENT_ICC_STATUS_CHANGED, index);
+        }
     }
 
-    private synchronized void onGetIccCardStatusDone(AsyncResult ar) {
+    private Integer getCiIndex(Message msg) {
+        AsyncResult ar;
+        Integer index = new Integer(MSimConstants.DEFAULT_CARD_INDEX);
+
+        /*
+         * The events can be come in two ways. By explicitly sending it using
+         * sendMessage, in this case the user object passed is msg.obj and from
+         * the CommandsInterface, in this case the user object is msg.obj.userObj
+         */
+        if (msg != null) {
+            if (msg.obj != null && msg.obj instanceof Integer) {
+                index = (Integer)msg.obj;
+            } else if(msg.obj != null && msg.obj instanceof AsyncResult) {
+                ar = (AsyncResult)msg.obj;
+                if (ar.userObj != null && ar.userObj instanceof Integer) {
+                    index = (Integer)ar.userObj;
+                }
+            }
+        }
+        return index;
+    }
+
+    private synchronized void onGetIccCardStatusDone(AsyncResult ar, Integer index) {
         if (ar.exception != null) {
             Log.e(LOG_TAG,"Error getting ICC status. "
                     + "RIL_REQUEST_GET_ICC_STATUS should "
@@ -162,16 +229,16 @@ public class UiccController extends Handler {
 
         IccCardStatus status = (IccCardStatus)ar.result;
 
-        if (mUiccCard == null) {
+        if (mUiccCards[index] == null) {
             if (DBG) log("Creating a new card");
-            mUiccCard = new UiccCard(mContext, mCi, status);
+            mUiccCards[index] = new UiccCard(mContext, mCi[index], status);
         } else {
             if (DBG) log("Update already existing card");
-            mUiccCard.update(mContext, mCi , status);
+            mUiccCards[index].update(mContext, mCi[index] , status);
         }
 
         if (DBG) log("Notifying IccChangedRegistrants");
-        mIccChangedRegistrants.notifyRegistrants();
+        mIccChangedRegistrants.notifyRegistrants(new AsyncResult(null, index, null));
     }
 
     private void log(String string) {

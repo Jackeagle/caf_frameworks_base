@@ -273,4 +273,14 @@ public class TelephonyIntents {
      * QoS State Intent. Used to indicate the status of QoS for the data connection.
      */
     public static final String ACTION_QOS_STATE_IND = "android.intent.action.ACTION_QOS_STATE_IND";
+
+    /**
+     * Broadcast Action: The default subscription has changed.  This has the following
+     * extra values:</p>
+     * <ul>
+     *   <li><em>subscription</em> - A int, the current default subscription.</li>
+     * </ul>
+     */
+    public static final String ACTION_DEFAULT_SUBSCRIPTION_CHANGED
+            = "android.intent.action.ACTION_DEFAULT_SUBSCRIPTION_CHANGED";
 }

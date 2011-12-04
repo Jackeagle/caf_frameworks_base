@@ -38,6 +38,10 @@ public class CdmaSubscriptionSourceManager extends Handler {
     private static final int EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED = 1;
     private static final int EVENT_GET_CDMA_SUBSCRIPTION_SOURCE     = 2;
     private static final int EVENT_RADIO_ON                         = 3;
+    private static final int EVENT_SUBSCRIPTION_STATUS_CHANGED      = 4;
+
+    // To know subscription is activated
+    private static final int SUBSCRIPTION_ACTIVATED                 = 1;
 
     public static final int SUBSCRIPTION_SOURCE_UNKNOWN = -1;
     public static final int SUBSCRIPTION_FROM_RUIM      = 0; /* CDMA subscription from RUIM */
@@ -64,6 +68,7 @@ public class CdmaSubscriptionSourceManager extends Handler {
         mCM.registerForOn(this, EVENT_RADIO_ON, null);
         int subscriptionSource = getDefaultCdmaSubscriptionSource();
         mCdmaSubscriptionSource.set(subscriptionSource);
+        mCM.registerForSubscriptionStatusChanged(this, EVENT_SUBSCRIPTION_STATUS_CHANGED, null);
     }
 
     /**
@@ -93,6 +98,7 @@ public class CdmaSubscriptionSourceManager extends Handler {
             if (sReferenceCount <= 0) {
                 mCM.unregisterForCdmaSubscriptionChanged(this);
                 mCM.unregisterForOn(this);
+                mCM.unregisterForSubscriptionStatusChanged(this);
                 sInstance = null;
             }
         }
@@ -116,6 +122,22 @@ public class CdmaSubscriptionSourceManager extends Handler {
             break;
             case EVENT_RADIO_ON: {
                 mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+            }
+            break;
+            case EVENT_SUBSCRIPTION_STATUS_CHANGED: {
+                log("EVENT_SUBSCRIPTION_STATUS_CHANGED");
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception == null) {
+                    int actStatus = ((int[])ar.result)[0];
+                    log("actStatus = " + actStatus);
+                    if (actStatus == SUBSCRIPTION_ACTIVATED) { // Subscription Activated
+                        // In case of multi-SIM, framework should wait for the subscription ready
+                        // to send any request to RIL.  Otherwise it will return failure.
+                        log("get Cdma Subscription Source");
+                        mCM.getCdmaSubscriptionSource(
+                                obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+                    }
+                }
             }
             break;
             default:

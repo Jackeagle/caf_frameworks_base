@@ -55,10 +55,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static android.telephony.SmsMessage.MessageClass;
 
-public final class GsmSMSDispatcher extends SMSDispatcher {
+public class GsmSMSDispatcher extends SMSDispatcher {
     private static final String TAG = "GSM";
     private ImsSMSDispatcher mImsSMSDispatcher;
-    private UiccController mUiccController = null;
+    protected UiccController mUiccController = null;
     private AtomicReference<IccRecords> mIccRecords = new AtomicReference<IccRecords>();
     private AtomicReference<UiccCardApplication> mUiccApplication =
             new AtomicReference<UiccCardApplication>();
@@ -406,13 +406,16 @@ public final class GsmSMSDispatcher extends SMSDispatcher {
         }
     }
 
+    protected UiccCardApplication getUiccCardApplication() {
+        return mUiccController.getUiccCardApplication(UiccController.APP_FAM_3GPP);
+    }
+
     private void onUpdateIccAvailability() {
         if (mUiccController == null ) {
             return;
         }
 
-        UiccCardApplication newUiccApplication =
-                mUiccController.getUiccCardApplication(UiccController.APP_FAM_3GPP);
+        UiccCardApplication newUiccApplication = getUiccCardApplication();
 
         UiccCardApplication app = mUiccApplication.get();
         if (app != newUiccApplication) {
