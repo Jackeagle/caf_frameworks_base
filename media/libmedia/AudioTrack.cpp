@@ -574,6 +574,14 @@ status_t AudioTrack::setVolume(float left, float right)
         return BAD_VALUE;
     }
 
+    if(mAudioSession != -1) {
+        // LPA output
+        const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
+        float volume = (left + right) / 2;
+        status_t status = audioFlinger->setStreamVolume(mStreamType, volume, mAudioSession);
+        return NO_ERROR;
+    }
+
     mVolume[LEFT] = left;
     mVolume[RIGHT] = right;
 
