@@ -215,9 +215,9 @@ public class IccProvider extends ContentProvider {
                             new UriMatcher(UriMatcher.NO_MATCH);
 
     static {
-        URL_MATCHER.addURI("icc", "adn_sub1", ADN_SUB1);
+        URL_MATCHER.addURI("icc", "adn", ADN_SUB1);
         URL_MATCHER.addURI("icc", "adn_sub2", ADN_SUB2);
-        URL_MATCHER.addURI("icc", "fdn_sub1", FDN_SUB1);
+        URL_MATCHER.addURI("icc", "fdn", FDN_SUB1);
         URL_MATCHER.addURI("icc", "fdn_sub2", FDN_SUB2);
         URL_MATCHER.addURI("icc", "sdn", SDN);
     }
@@ -362,7 +362,7 @@ public class IccProvider extends ContentProvider {
         StringBuilder buf = new StringBuilder("content://icc/");
         switch (match) {
             case ADN_SUB1:
-                buf.append("adn_sub1/");
+                buf.append("adn/");
                 break;
 
             case ADN_SUB2:
@@ -370,7 +370,7 @@ public class IccProvider extends ContentProvider {
                 break;
 
             case FDN_SUB1:
-                buf.append("fdn_sub1/");
+                buf.append("fdn/");
                 break;
 
             case FDN_SUB2:
