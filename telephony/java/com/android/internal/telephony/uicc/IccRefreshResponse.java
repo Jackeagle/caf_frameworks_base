@@ -15,6 +15,7 @@
  */
 
 package com.android.internal.telephony.uicc;
+import com.android.internal.telephony.ATParseEx;
 
 /**
  * See also RIL_SimRefresh in include/telephony/ril.h
@@ -34,6 +35,17 @@ public class IccRefreshResponse {
                                                   from 0xA0, 0x00 -> 0x41,
                                                   0x30, 0x30, 0x30 */
                                                /* Example: a0000000871002f310ffff89080000ff */
+    public static int
+        refreshResultFromRIL(int refreshResult) throws ATParseEx {
+        switch(refreshResult) {
+
+            case 0: return REFRESH_RESULT_FILE_UPDATE;
+            case 1: return REFRESH_RESULT_INIT;
+            case 2: return REFRESH_RESULT_RESET;
+            default:
+                throw new ATParseEx("Sim Refresh response is Unknown " + refreshResult);
+        }
+    }
 
     @Override
     public String toString() {

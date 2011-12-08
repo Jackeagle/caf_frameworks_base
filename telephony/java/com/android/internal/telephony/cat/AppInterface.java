@@ -46,6 +46,13 @@ public interface AppInterface {
 
     //This is used to send ALPHA string from card to STK App.
     public static final String ALPHA_STRING = "alpha_string";
+    // This is used to send refresh-result when MSG_ID_ICC_REFRESH is received.
+    public static final String REFRESH_RESULT = "refresh_result";
+    //This is used to send card status from card to STK App.
+    public static final String CARD_STATUS = "card_status";
+    //Intent's actions are broadcasted by Telephony once IccRefresh occurs.
+    public static final String CAT_ICC_STATUS_CHANGE =
+                                    "android.intent.action.stk.icc_status_change";
     /*
      * Callback function from app to telephony to pass a result code and user's
      * input back to the ICC.
