@@ -4269,6 +4269,9 @@ status_t OMXCodec::read(
         // wait till the reconfiguration is completed
         while (mSeekTimeUs >= 0) {
                mBufferFilled.wait(mLock);
+               if(mState == EXECUTING)
+                   break;
+
         }
     }
 
