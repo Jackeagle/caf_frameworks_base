@@ -1322,7 +1322,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                                     "to torn down network " + info.getTypeName());
                             teardown(thisNet);
                         } else {
-                            handleDnsConfigurationChange(type);
+                            handleConnectivityChange(type);
                         }
                         return;
                 } else {
@@ -1403,20 +1403,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 } else {
                     mNetTrackers[netType].addSrcRoutes();
                 }
-            } else {
-                // many radios add a default route even when we don't want one.
-                // remove the default interface unless we need it for our active network
-                /* //this change from 2.3.4_r1 is not required as addDefaultRoute() function above does a replace route.
-                if (mActiveDefaultNetwork != -1) {
-                    String defaultIface = mNetTrackers[mActiveDefaultNetwork].getInterfaceName();
-                    if (defaultIface != null &&
-                            !defaultIface.equals(mNetTrackers[netType].getInterfaceName())) {
-                        mNetTrackers[netType].removeDefaultRoute();
-                    }
-                }
-                */
-                mNetTrackers[netType].addPrivateDnsRoutes();
             }
+            //Add private dns routes for default APNs to allow dns querries
+            //to be routed on respective interfaces in case of wifi-3g co-existence
+            //Does not hurt to add dns specific routes for default APNs.
+            mNetTrackers[netType].addPrivateDnsRoutes();
         } else {
             if (mNetAttributes[netType].isDefault()) {
                 if (!SystemProperties.get(CNE.UseCne,"none").equalsIgnoreCase("vendor")) {
@@ -1424,9 +1415,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 } else {
                     mNetTrackers[netType].delSrcRoutes();
                 }
-            } else {
-                mNetTrackers[netType].removePrivateDnsRoutes();
             }
+            mNetTrackers[netType].removePrivateDnsRoutes();
         }
     }
 
