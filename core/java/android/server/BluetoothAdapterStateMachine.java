@@ -24,6 +24,8 @@ import android.content.Intent;
 import android.os.Binder;
 import android.os.Message;
 import android.os.RemoteException;
+import android.os.SystemProperties;
+import android.os.SystemService;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -305,6 +307,7 @@ final class BluetoothAdapterStateMachine extends StateMachine {
             }
 
             sendMessageDelayed(PREPARE_BLUETOOTH_TIMEOUT, PREPARE_BLUETOOTH_TIMEOUT_TIME);
+            startHcidump();
             return true;
         }
     }
@@ -378,7 +381,6 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                         try {
                             Thread.sleep(100);
                         } catch (InterruptedException e) {
-                            // TODO Auto-generated catch block
                             e.printStackTrace();
                         }
                         transitionTo(mHotOff);
@@ -776,6 +778,19 @@ final class BluetoothAdapterStateMachine extends StateMachine {
         }
     }
 
+    private static final String HCIDUMP_PROP = "bluetooth.hcidump.enabled";
+    private void startHcidump() {
+        if (SystemProperties.getBoolean(HCIDUMP_PROP, false)) {
+            SystemService.start("hcidump");
+        }
+    }
+
+    private void stopHcidump() {
+        if (SystemProperties.getBoolean(HCIDUMP_PROP, false)) {
+            SystemService.stop("hcidump");
+        }
+    }
+
     private void finishSwitchingOff() {
         mBluetoothService.finishDisable();
         broadcastState(BluetoothAdapter.STATE_OFF);
@@ -783,9 +798,13 @@ final class BluetoothAdapterStateMachine extends StateMachine {
     }
 
     private void shutoffBluetooth() {
-        mBluetoothService.shutoffBluetooth();
+        // Stop event loop before Bluetooth Service shutoff to avoid
+        // race condition during tearing down eventloop and accessing
+        // eventloop from BluetoothService.
         mEventLoop.stop();
+        mBluetoothService.shutoffBluetooth();
         mBluetoothService.cleanNativeAfterShutoffBluetooth();
+        stopHcidump();
     }
 
     private void perProcessCallback(boolean on, IBluetoothStateChangeCallback c) {

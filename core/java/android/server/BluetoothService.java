@@ -477,10 +477,10 @@ public class BluetoothService extends IBluetooth.Stub {
                                     BluetoothDevice.UNBOND_REASON_AUTH_CANCELED);
         }
 
-        // Stop the profile state machine for bonded devices.
-        for (String address : mBondState.listInState(BluetoothDevice.BOND_BONDED)) {
-            removeProfileState(address);
-        }
+        // Regardless of bonded state, BluetoothDeviceProfileState must be removed
+        // after Bluetooth has been turned off
+        // They will be added back in after Bluetooth has been turned on.
+        removeAllProfileState();
 
         // update mode
         Intent intent = new Intent(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
@@ -510,6 +510,13 @@ public class BluetoothService extends IBluetooth.Stub {
         long ident = Binder.clearCallingIdentity();
         try {
             mBatteryStats.noteBluetoothOff();
+            //Balancing calls to unbind Headset service which is bound
+            //earlier via local getProfileProxy()
+            //ToDo: Need to find a way to balance the calls to bind/unbind
+            //      Headset service. There are still some clients not
+            //      ensuring this but these are outside Bluetooth on/off
+            //      path.
+            mAdapter.closeProfileProxy(BluetoothProfile.HEADSET, mHeadsetProxy);
         } catch (RemoteException e) {
         } finally {
             Binder.restoreCallingIdentity(ident);
@@ -2377,6 +2384,11 @@ public class BluetoothService extends IBluetooth.Stub {
         dumpPanProfile(pw);
         dumpApplicationServiceRecords(pw);
         dumpProfileState(pw);
+        //Balancing calls to unbind Headset service and trigger
+        //GC for service listener references
+        mAdapter.closeProfileProxy(BluetoothProfile.HEADSET, mHeadsetProxy);
+        mAdapter.closeProfileProxy(BluetoothProfile.INPUT_DEVICE, mInputDevice);
+        mAdapter.closeProfileProxy(BluetoothProfile.PAN, mPan);
     }
 
     private void dumpProfileState(PrintWriter pw) {
@@ -3020,6 +3032,15 @@ public class BluetoothService extends IBluetooth.Stub {
         mDeviceProfileState.put(address, state);
         state.start();
         return state;
+    }
+
+    synchronized void removeAllProfileState() {
+        for (BluetoothDeviceProfileState state : mDeviceProfileState.values()) {
+            if (state != null) {
+                state.quit();
+            }
+        }
+        mDeviceProfileState.clear();
     }
 
     void removeProfileState(String address) {
