@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -263,6 +264,12 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_IMS_REGISTRATION_STATE = 109;
     int RIL_REQUEST_IMS_SEND_SMS = 110;
     int RIL_REQUEST_GET_DATA_CALL_PROFILE = 111;
+    int RIL_REQUEST_SETUP_QOS = 112;
+    int RIL_REQUEST_RELEASE_QOS = 113;
+    int RIL_REQUEST_GET_QOS_STATUS = 114;
+    int RIL_REQUEST_MODIFY_QOS = 115;
+    int RIL_REQUEST_SUSPEND_QOS = 116;
+    int RIL_REQUEST_RESUME_QOS = 117;
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
     int RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED = 1001;
@@ -301,4 +308,5 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_RIL_CONNECTED = 1034;
     int RIL_UNSOL_VOICE_RADIO_TECH_CHANGED = 1035;
     int RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED = 1036;
+    int RIL_UNSOL_QOS_STATE_CHANGED_IND = 1038;
 }

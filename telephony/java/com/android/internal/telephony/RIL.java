@@ -1231,6 +1231,114 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
     public void
+    setupQosReq (int callId, ArrayList<String> qosFlows, Message result) {
+
+        RILRequest rr
+            = RILRequest.obtain(RIL_REQUEST_SETUP_QOS, result);
+
+        int qosFlowsCnt = qosFlows.size();
+
+        rr.mp.writeInt(qosFlowsCnt + 1); // num flows and callId
+        rr.mp.writeString(Integer.toString(callId));
+
+        for (String string : (String[])qosFlows.toArray(new String[0])) {
+            rr.mp.writeString(string);
+        }
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " callId:" + callId + ", " + qosFlows);
+
+        send(rr);
+
+    }
+
+    public void
+    releaseQos (int qosId, Message result) {
+
+        RILRequest rr
+            = RILRequest.obtain(RIL_REQUEST_RELEASE_QOS, result);
+
+        rr.mp.writeInt(1);
+        rr.mp.writeString(Integer.toString(qosId));
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " qosId:" + qosId + " (0x" + Integer.toHexString(qosId) + ")");
+
+        send(rr);
+
+    }
+
+    public void
+    modifyQos (int qosId, ArrayList<String> qosFlows, Message result) {
+
+        RILRequest rr
+            = RILRequest.obtain(RIL_REQUEST_MODIFY_QOS, result);
+
+        int qosFlowsCnt = qosFlows.size();
+
+        rr.mp.writeInt(qosFlowsCnt + 1); // num flows and callId
+        rr.mp.writeString(Integer.toString(qosId));
+
+        for (String string : (String[])qosFlows.toArray(new String[0])) {
+            rr.mp.writeString(string);
+        }
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " qosId:" + qosId + " (0x" + Integer.toHexString(qosId) + "), " + qosFlows);
+
+        send(rr);
+
+    }
+
+    public void
+    suspendQos (int qosId, Message result) {
+
+        RILRequest rr
+            = RILRequest.obtain(RIL_REQUEST_SUSPEND_QOS, result);
+
+        rr.mp.writeInt(1);
+        rr.mp.writeString(Integer.toString(qosId));
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " qosId:" + qosId + " (0x" + Integer.toHexString(qosId) + ")");
+
+        send(rr);
+
+    }
+
+    public void
+    resumeQos (int qosId, Message result) {
+
+        RILRequest rr
+            = RILRequest.obtain(RIL_REQUEST_RESUME_QOS, result);
+
+        rr.mp.writeInt(1);
+        rr.mp.writeString(Integer.toString(qosId));
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " qosId:" + qosId + " (0x" + Integer.toHexString(qosId) + ")");
+
+        send(rr);
+
+    }
+
+    public void
+    getQosStatus (int qosId, Message result) {
+
+        RILRequest rr
+            = RILRequest.obtain(RIL_REQUEST_GET_QOS_STATUS, result);
+
+        rr.mp.writeInt(1);
+        rr.mp.writeString(Integer.toString(qosId));
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + " qosId:" + qosId + " (0x" + Integer.toHexString(qosId) + ")");
+
+        send(rr);
+
+    }
+
+    public void
     sendSMS (String smscPDU, String pdu, Message result) {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SEND_SMS, result);
@@ -2320,6 +2428,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_RADIO_POWER: ret =  responseVoid(p); break;
             case RIL_REQUEST_DTMF: ret =  responseVoid(p); break;
             case RIL_REQUEST_SEND_SMS: ret =  responseSMS(p); break;
+            case RIL_REQUEST_SETUP_QOS: ret =  responseStrings(p); break;
+            case RIL_REQUEST_GET_QOS_STATUS: ret = responseStrings(p); break;
+            case RIL_REQUEST_RELEASE_QOS: ret = responseStrings(p); break;
+            case RIL_REQUEST_MODIFY_QOS: ret = responseStrings(p); break;
+            case RIL_REQUEST_SUSPEND_QOS: ret = responseStrings(p); break;
+            case RIL_REQUEST_RESUME_QOS: ret = responseStrings(p); break;
             case RIL_REQUEST_SEND_SMS_EXPECT_MORE: ret =  responseSMS(p); break;
             case RIL_REQUEST_SETUP_DATA_CALL: ret =  responseSetupDataCall(p); break;
             case RIL_REQUEST_SIM_IO: ret =  responseICC_IO(p); break;
@@ -2556,6 +2670,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_RIL_CONNECTED: ret = responseInts(p); break;
             case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: ret =  responseInts(p); break;
             case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: ret =  responseVoid(p); break;
+            case RIL_UNSOL_QOS_STATE_CHANGED_IND: ret = responseStrings(p); break;
 
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -2926,6 +3041,14 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 notifyRegistrantsRilConnectionChanged(((int[])ret)[0]);
                 break;
             }
+
+            case RIL_UNSOL_QOS_STATE_CHANGED_IND:
+                if (RILJ_LOGD) unsljLogRet(response, ret);
+                if (mQosStateChangedIndRegistrants != null) {
+                    mQosStateChangedIndRegistrants.notifyRegistrants(
+                                        new AsyncResult (null, ret, null));
+                }
+                break;
         }
     }
 
@@ -3723,6 +3846,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_RADIO_POWER: return "RADIO_POWER";
             case RIL_REQUEST_DTMF: return "DTMF";
             case RIL_REQUEST_SEND_SMS: return "SEND_SMS";
+            case RIL_REQUEST_SETUP_QOS: return "SETUP_QOS";
+            case RIL_REQUEST_GET_QOS_STATUS: return "GET_QOS_STATUS";
+            case RIL_REQUEST_RELEASE_QOS: return "RELEASE_QOS";
+            case RIL_REQUEST_MODIFY_QOS: return "MODIFY_QOS";
+            case RIL_REQUEST_SUSPEND_QOS: return "SUSPEND_QOS";
+            case RIL_REQUEST_RESUME_QOS: return "RESUME_QOS";
             case RIL_REQUEST_SEND_SMS_EXPECT_MORE: return "SEND_SMS_EXPECT_MORE";
             case RIL_REQUEST_SETUP_DATA_CALL: return "SETUP_DATA_CALL";
             case RIL_REQUEST_SIM_IO: return "SIM_IO";
@@ -3859,6 +3988,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_RIL_CONNECTED: return "UNSOL_RIL_CONNECTED";
             case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: return "UNSOL_VOICE_RADIO_TECH_CHANGED";
             case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
+            case RIL_UNSOL_QOS_STATE_CHANGED_IND: return "RIL_UNSOL_QOS_STATE_CHANGED";
             default: return "<unknown response>";
         }
     }

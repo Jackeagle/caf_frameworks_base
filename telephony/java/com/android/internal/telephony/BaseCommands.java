@@ -76,6 +76,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mCdmaFwdBurstDtmfRegistrants = new RegistrantList();
     protected RegistrantList mCdmaFwdContDtmfStartRegistrants = new RegistrantList();
     protected RegistrantList mCdmaFwdContDtmfStopRegistrants = new RegistrantList();
+    protected RegistrantList mQosStateChangedIndRegistrants = new RegistrantList();
 
     protected Registrant mGsmSmsRegistrant;
     protected Registrant mCdmaSmsRegistrant;
@@ -551,6 +552,15 @@ public abstract class BaseCommands implements CommandsInterface {
         mCdmaSubscriptionChangedRegistrants.remove(h);
     }
 
+    public void registerForQosStateChangedInd(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mQosStateChangedIndRegistrants.add(r);
+    }
+
+    public void unregisterForQosStateChangedInd(Handler h) {
+        mQosStateChangedIndRegistrants.remove(h);
+    }
+
     @Override
     public void registerForCdmaPrlChanged(Handler h, int what, Object obj) {
         Registrant r = new Registrant (h, what, obj);
@@ -638,11 +648,6 @@ public abstract class BaseCommands implements CommandsInterface {
         RadioState oldState;
 
         synchronized (mStateMonitor) {
-            if (false) {
-                Log.v(LOG_TAG, "setRadioState old: " + mState
-                    + " new " + newState);
-            }
-
             oldState = mState;
             mState = newState;
 

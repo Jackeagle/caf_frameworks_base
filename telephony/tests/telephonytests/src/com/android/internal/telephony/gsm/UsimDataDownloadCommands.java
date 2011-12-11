@@ -26,6 +26,7 @@ import com.android.internal.telephony.BaseCommands;
 import com.android.internal.telephony.UUSInfo;
 import com.android.internal.telephony.uicc.IccIoResult;
 
+import java.util.ArrayList;
 import junit.framework.Assert;
 
 /**
@@ -638,5 +639,23 @@ class UsimDataDownloadCommands extends BaseCommands {
 
     @Override
     public void getDataCallProfile(int appType, Message result) {
+    }
+
+    public void setupQosReq (int callId, ArrayList<String> qosFlows, Message result) {
+    }
+
+    public void releaseQos (int qosId, Message result) {
+    }
+
+    public void modifyQos (int qosId, ArrayList<String> qosFlows, Message result) {
+    }
+
+    public void suspendQos (int qosId, Message result) {
+    }
+
+    public void resumeQos (int qosId, Message result) {
+    }
+
+    public void getQosStatus (int qosId, Message result) {
     }
 }

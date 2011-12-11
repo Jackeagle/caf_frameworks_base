@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import android.telephony.SignalStrength;
 
 import com.android.internal.telephony.DataConnection;
 import com.android.internal.telephony.test.SimulatedRadioControl;
+import com.android.internal.telephony.QosSpec;
 import com.android.internal.telephony.uicc.IsimRecords;
 import com.android.internal.telephony.uicc.UsimServiceTable;
 
@@ -156,6 +157,11 @@ public interface Phone {
     static final int APN_REQUEST_FAILED     = 3;
     static final int APN_ALREADY_INACTIVE   = 4;
 
+    /**
+     * Return codes for QoS APIs
+     */
+    static final int QOS_REQUEST_SUCCESS = 0;
+    static final int QOS_REQUEST_FAILURE = 1;
 
     /**
      * Optional reasons for disconnect and connect
@@ -1400,6 +1406,56 @@ public interface Phone {
      * Report on whether data connectivity is allowed.
      */
     boolean isDataConnectivityPossible();
+
+    /**
+     * Enable QoS
+     *
+     * @param qosSpec QosSpec requested
+     * @param type Apn Type on which QoS is requested on
+     * @return true on success, else false
+     */
+    int enableQos(QosSpec qosSpec, String type);
+
+    /**
+     * Disable QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @return true on success, else false
+     */
+    int disableQos(int qosId);
+
+    /**
+     * Modify QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @param qosSpec New capabilities requested
+     * @return true on success, else false
+     */
+    int modifyQos(int qosId, QosSpec qosSpec);
+
+    /**
+     * Suspend QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @return
+     */
+    int suspendQos(int qosId);
+
+    /**
+     * Resume QoS
+     *
+     * @param qosId QoS identifier of the flow
+     * @return
+     */
+    int resumeQos(int qosId);
+
+    /**
+     * Retreive the QoS parameters of a particular QoS flow
+     *
+     * @param qosId QoS identifier
+     * @return true on success, else false
+     */
+    int getQosStatus(int qosId);
 
     /**
      * Report on whether data connectivity is allowed for an APN.
