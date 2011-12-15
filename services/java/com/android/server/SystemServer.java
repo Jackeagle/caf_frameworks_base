@@ -230,11 +230,9 @@ class ServerThread extends Thread {
                 ServiceManager.addService(BluetoothA2dpService.BLUETOOTH_A2DP_SERVICE,
                                           bluetoothA2dp);
                 /* TI HID port - start */
-                if (SystemProperties.TARGET_OMAP4) {
-                    bluetoothHid = new BluetoothHidService(context, bluetooth);
-                    ServiceManager.addService(BluetoothHidService.BLUETOOTH_HID_SERVICE,
+                bluetoothHid = new BluetoothHidService(context, bluetooth);
+                ServiceManager.addService(BluetoothHidService.BLUETOOTH_HID_SERVICE,
                                           bluetoothHid);
-                }
                 /* TI HID port - end */
 
                 int bluetoothOn = Settings.Secure.getInt(mContentResolver,

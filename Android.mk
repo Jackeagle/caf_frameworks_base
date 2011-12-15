@@ -99,6 +99,7 @@ LOCAL_SRC_FILES += \
 	core/java/android/bluetooth/IBluetoothA2dp.aidl \
 	core/java/android/bluetooth/IBluetoothCallback.aidl \
 	core/java/android/bluetooth/IBluetoothHeadset.aidl \
+	core/java/android/bluetooth/IBluetoothHid.aidl \
 	core/java/android/bluetooth/IBluetoothPbap.aidl \
 	core/java/android/content/IContentService.aidl \
 	core/java/android/content/IIntentReceiver.aidl \
@@ -191,12 +192,6 @@ LOCAL_SRC_FILES += \
 	voip/java/android/net/sip/ISipSession.aidl \
 	voip/java/android/net/sip/ISipSessionListener.aidl \
 	voip/java/android/net/sip/ISipService.aidl
-#
-#ifeq ($(TARGET_OMAP4), true)
-LOCAL_SRC_FILES += \
-       core/java/android/bluetooth/IBluetoothHid.aidl
-#endif
-
 
 # FRAMEWORKS_BASE_JAVA_SRC_DIRS comes from build/core/pathmap.mk
 LOCAL_AIDL_INCLUDES += $(FRAMEWORKS_BASE_JAVA_SRC_DIRS)

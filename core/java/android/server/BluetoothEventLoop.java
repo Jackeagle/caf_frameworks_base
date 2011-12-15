@@ -20,6 +20,7 @@ import android.bluetooth.BluetoothA2dp;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
+/*import android.bluetooth.BluetoothHid;*/
 import android.bluetooth.BluetoothUuid;
 import android.content.Context;
 import android.content.Intent;
@@ -30,11 +31,6 @@ import android.util.Log;
 
 import java.util.HashMap;
 import java.util.Set;
-
-/* TI HID port - start */
-import android.os.SystemProperties;
-/* TI HID port - end */
-
 
 
 /**
@@ -531,8 +527,7 @@ class BluetoothEventLoop {
             }
         }
         /* TI HID port - start */
-        if (mBluetoothService.isEnabled() &&
-                (BluetoothUuid.isInputHID(uuid)) && SystemProperties.TARGET_OMAP4) {
+        if (mBluetoothService.isEnabled() && (BluetoothUuid.isInputHID(uuid))) {
             authorized = true;
             Log.i(TAG, "Allowing incoming HID connection from " + address);
         /* TI HID port - end */
