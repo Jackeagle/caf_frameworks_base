@@ -239,7 +239,6 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             return JNI_FALSE;
         }
         /* TI HID port - start */
-#ifdef TARGET_OMAP4
         dbus_bus_add_match(nat->conn,
                 "type='signal',interface='org.bluez.Input'",
                 &err);
@@ -247,7 +246,6 @@ static jboolean setUpEventLoop(native_data_t *nat) {
             LOG_AND_FREE_DBUS_ERROR(&err);
             return JNI_FALSE;
         }
-#endif
         /* TI HID port - end */
 
         const char *agent_path = "/android/bluetooth/agent";
@@ -407,14 +405,12 @@ static void tearDownEventLoop(native_data_t *nat) {
             LOG_AND_FREE_DBUS_ERROR(&err);
         }
         /* TI HID port - start */
-#ifdef TARGET_OMAP4
         dbus_bus_remove_match(nat->conn,
                 "type='signal',interface='org.bluez.Input'",
                 &err);
         if (dbus_error_is_set(&err)) {
             LOG_AND_FREE_DBUS_ERROR(&err);
         }
-#endif
         /* TI HID port - end */
 
         dbus_bus_remove_match(nat->conn,
@@ -760,9 +756,7 @@ static jboolean isEventLoopRunningNative(JNIEnv *env, jobject object) {
 #ifdef HAVE_BLUETOOTH
 extern DBusHandlerResult a2dp_event_filter(DBusMessage *msg, JNIEnv *env);
 /* TI HID port - start */
-#ifdef TARGET_OMAP4
 extern DBusHandlerResult hid_event_filter(DBusMessage *msg, JNIEnv *env);
-#endif
 /* TI HID port - end */
 
 
@@ -892,9 +886,7 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
     }
 
     /* TI HID port - start */
-#ifdef TARGET_OMAP4
     hid_event_filter(msg, env);
-#endif
     /* TI HID port - end */
 
     ret = a2dp_event_filter(msg, env);

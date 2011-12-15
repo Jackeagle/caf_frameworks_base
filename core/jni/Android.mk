@@ -130,6 +130,7 @@ LOCAL_SRC_FILES:= \
 	android_server_BluetoothService.cpp \
 	android_server_BluetoothEventLoop.cpp \
 	android_server_BluetoothA2dpService.cpp \
+	android_server_BluetoothHidService.cpp \
 	android_server_Watchdog.cpp \
 	android_message_digest_sha1.cpp \
 	android_ddm_DdmHandleNativeHeap.cpp \
@@ -141,10 +142,6 @@ LOCAL_SRC_FILES:= \
 	android_backup_BackupHelperDispatcher.cpp \
 	android_content_res_ObbScanner.cpp \
     android_content_res_Configuration.cpp
-
-ifeq ($(TARGET_OMAP4), true)
-LOCAL_SRC_FILES += android_server_BluetoothHidService.cpp
-endif
 
 LOCAL_C_INCLUDES += \
 	$(JNI_H_INCLUDE) \
