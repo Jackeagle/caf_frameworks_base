@@ -502,6 +502,7 @@ void LayerBuffer::BufferSource::postBuffer(ssize_t offset)
             buffer.clear();
         setBuffer(buffer);
         mLayer.invalidate();
+        PostBufferSingleton::instance()->wait(mPostBufLock, mPostBufCond, mPostBufState);
     }
 }
 
@@ -530,7 +531,6 @@ void LayerBuffer::BufferSource::onQueueBuf()
 
 void LayerBuffer::BufferSource::setBuffer(const sp<LayerBuffer::Buffer>& buffer)
 {
-  PostBufferSingleton::instance()->wait(mPostBufLock, mPostBufCond, mPostBufState);
   Mutex::Autolock _l(mBufferSourceLock);
   mBuffer = buffer;
 }
@@ -611,9 +611,15 @@ status_t LayerBuffer::BufferSource::drawWithOverlay(const Region& clip,
         ret = ov->setParameter(OVERLAY_TRANSFORM, finalTransform.getOrientation());
     if (!ret)
         return INVALID_OPERATION;
-    ret = ov->queueBuffer(src.img.handle);
-    if (!ret)
-        return INVALID_OPERATION;
+     //While seek operation nothing is coming from postBuffer.
+     //And we are using still the same offset for draw the video frame.
+     //There is chance at decoder side they using the same offset.
+     //Hence it's better to not draw until next frame comes from postBuffer.
+     if(mDirtyQueueBit){
+         ret = ov->queueBuffer(src.img.handle);
+         if (!ret)
+             return INVALID_OPERATION;
+     }
 
     // Need to inform video layer here after queuing
     // It is safe to call onQueueBuf only when ignoreFB==true since in this case
