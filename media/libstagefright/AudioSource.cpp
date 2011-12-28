@@ -66,8 +66,7 @@ AudioSource::AudioSource(
       mPrevLostBytes(0),
       mGroup(NULL),
       mFormat(AudioSystem::PCM_16_BIT),
-      mMime(MEDIA_MIMETYPE_AUDIO_RAW),
-      mFirstFrame(false) {
+      mMime(MEDIA_MIMETYPE_AUDIO_RAW) {
 
     LOGV("sampleRate: %d, channels: %d", sampleRate, channels);
     CHECK(channels == 1 || channels == 2);
@@ -97,8 +96,7 @@ AudioSource::AudioSource( int inputSource, const sp<MetaData>& meta )
       mPrevSampleTimeUs(0),
       mTotalLostFrames(0),
       mPrevLostBytes(0),
-      mGroup(NULL),
-      mFirstFrame(false) {
+      mGroup(NULL) {
 
     const char * mime;
     CHECK( meta->findCString( kKeyMIMEType, &mime ) );
@@ -308,10 +306,6 @@ status_t AudioSource::read(
     }
 
     int64_t readTimeUs = systemTime() / 1000;
-    if (mFirstFrame == false) {
-        mStartTimeUs = readTimeUs;
-        mFirstFrame = true;
-    }
     *out = NULL;
 
     MediaBuffer *buffer;
