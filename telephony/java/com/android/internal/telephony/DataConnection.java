@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2011 The Android Open Source Project
+ * Copyright (C) 2006, 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.SystemProperties;
 import android.util.EventLog;
+
+import static com.android.internal.telephony.RILConstants.DEACTIVATE_REASON_NONE;
 
 /**
  * {@hide}
@@ -269,10 +271,15 @@ public abstract class DataConnection extends HierarchicalStateMachine {
      *          and is either a DisconnectParams or ConnectionParams.
      */
     private void tearDownData(Object o) {
+        int dcReason = DEACTIVATE_REASON_NONE;
+        if (o instanceof DisconnectParams) {
+            dcReason = ((DisconnectParams)o).onCompletedMsg.arg1; // reason
+        }
+
         if (mCM.getRadioState().isOn()) {
             if (DBG) log("tearDownData radio is on, call deactivateDataCall");
             mCM.deactivateDataCall(cid,
-                        ((DisconnectParams)o).onCompletedMsg.arg1, // reason
+                        dcReason,
                         obtainMessage(EVENT_DEACTIVATE_DONE, o));
         } else {
             if (DBG) log("tearDownData radio is off sendMessage EVENT_DEACTIVATE_DONE immediately");
