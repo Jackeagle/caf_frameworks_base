@@ -459,10 +459,10 @@ public class MMDataConnection extends DataConnection {
             // Do not apply the race condition workaround for MMS APN
             // if Proxy is an IP-address.
             // Otherwise, the default APN will not be restored anymore.
-            if (mDataProfile.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN
+            if (!(mDataProfile.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN
                     && mDataProfile
                             .canHandleServiceType(DataServiceType.SERVICE_TYPE_MMS)
-                    && isIpAddress(((ApnSetting) mDataProfile).mmsProxy)) {
+                    && isIpAddress(((ApnSetting) mDataProfile).mmsProxy))) {
                 return false;
             }
         }
