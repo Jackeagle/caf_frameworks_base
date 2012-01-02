@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright (C) 2008 The Android Open Source Project
+** Copyright (C) 2010-2011 Code Aurora Forum
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -136,14 +137,6 @@ status_t MetadataRetrieverClient::setDataSource(const char *url)
     }
     player_type playerType;
     playerType = getPlayerType(url);
-    char curr_target[128] = {0};
-    char target[] = "msm7627_";
-    property_get("ro.product.device", curr_target, "0");
-    if((!strncmp(target, curr_target, sizeof(target) - 1)) && (playerType == PV_PLAYER)) {
-      LOGW("Switch to Stagefright Player if PV player is returned in Metadata retriever");
-      playerType = STAGEFRIGHT_PLAYER;
-    }
-
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
     if (p == NULL) return NO_INIT;
@@ -179,14 +172,6 @@ status_t MetadataRetrieverClient::setDataSource(int fd, int64_t offset, int64_t 
     }
     player_type playerType;
     playerType = getPlayerType(fd, offset, length);
-    char curr_target[128] = {0};
-    char target[] = "msm7627_";
-    property_get("ro.product.device", curr_target, "0");
-    if((!strncmp(target, curr_target, sizeof(target) - 1)) && (playerType == PV_PLAYER)) {
-      LOGW("Switch to Stagefright Player if PV player is returned in Metadata retriever");
-      playerType = STAGEFRIGHT_PLAYER;
-    }
-
     LOGV("player type = %d", playerType);
     sp<MediaMetadataRetrieverBase> p = createRetriever(playerType);
     if (p == NULL) {
