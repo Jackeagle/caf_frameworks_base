@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010,2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,9 +128,9 @@ public class MMDataConnection extends DataConnection {
             // Do not apply the race condition workaround for MMS APN
             // if Proxy is an IP-address.
             // Otherwise, the default APN will not be restored anymore.
-            if (mDataProfile.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN
+            if (!(mDataProfile.getDataProfileType() == DataProfileType.PROFILE_TYPE_3GPP_APN
                     && mDataProfile.canHandleServiceType(DataServiceType.SERVICE_TYPE_MMS)
-                    && isIpAddress(((ApnSetting)mDataProfile).mmsProxy)) {
+                    && isIpAddress(((ApnSetting)mDataProfile).mmsProxy))) {
                 return false;
             }
         }
