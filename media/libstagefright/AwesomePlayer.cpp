@@ -2064,7 +2064,12 @@ status_t AwesomePlayer::suspend() {
 
     state->mFlags = mFlags & (PLAYING | AUTO_LOOPING | LOOPING | AT_EOS);
     getPosition(&state->mPositionUs);
-
+    if (mVideoTrack != NULL)
+    {
+      int64_t mEditTime = 0;
+      mVideoTrack->getFormat()->findInt64(kKeyEditOffset, &mEditTime);
+      state->mPositionUs -= mEditTime;
+    }
     if (mVideoBuffer[mVideoQueueLastRendered] != NULL) {
         size_t size = mVideoBuffer[mVideoQueueLastRendered]->range_length();
         if (size) {
