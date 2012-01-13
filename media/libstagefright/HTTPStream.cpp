@@ -36,6 +36,8 @@
 
 namespace android {
 
+#define CONNECTION_TIMEOUTCOUNT 10 * 10
+
 // static
 const char *HTTPStream::kStatusKey = ":status:";
 
@@ -129,6 +131,7 @@ static status_t MyConnect(
 static ssize_t MySendReceive(
         int s, void *data, size_t size, int flags, bool sendData) {
     ssize_t result = 0;
+    int lcount=0;
 
     if (s < 0) {
         return -1;
@@ -161,7 +164,11 @@ static ssize_t MySendReceive(
             break;
         } else if (nfds == 0) {
             // timeout
-
+        if(++lcount>CONNECTION_TIMEOUTCOUNT)
+        {
+            LOGE(" Error --> ERROR_CONNECTION_LOST ");
+            return ERROR_CONNECTION_LOST;
+        }
             continue;
         }
 
