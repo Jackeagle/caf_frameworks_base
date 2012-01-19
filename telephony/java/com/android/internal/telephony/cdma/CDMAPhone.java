@@ -92,7 +92,6 @@ public class CDMAPhone extends PhoneBase {
     // Default Emergency Callback Mode exit timer
     private static final int DEFAULT_ECM_EXIT_TIMER_VALUE = 300000;
 
-    protected static final String VM_NUMBER_CDMA = "vm_number_key_cdma";
     private String mVmNumber = null;
 
     static final int RESTART_ECM_TIMER = 0; // restart Ecm timer
@@ -127,6 +126,7 @@ public class CDMAPhone extends PhoneBase {
     protected String mMeid;
     // string to define how the carrier specifies its own ota sp number
     protected String mCarrierOtaSpNumSchema;
+    protected String mVmNumCdmaKey = "vm_number_key_cdma";
 
     // A runnable which is used to automatically exit from Ecm after a period of time.
     private Runnable mExitEcmRunnable = new Runnable() {
@@ -757,9 +757,9 @@ public class CDMAPhone extends PhoneBase {
         // Read platform settings for dynamic voicemail number
         if (getContext().getResources().getBoolean(com.android.internal
                 .R.bool.config_telephony_use_own_number_for_voicemail)) {
-            number = sp.getString(VM_NUMBER_CDMA, getLine1Number());
+            number = sp.getString(mVmNumCdmaKey, getLine1Number());
         } else {
-            number = sp.getString(VM_NUMBER_CDMA, "*86");
+            number = sp.getString(mVmNumCdmaKey, "*86");
         }
         return number;
     }
@@ -772,7 +772,7 @@ public class CDMAPhone extends PhoneBase {
     /** gets the voice mail count from preferences */
     private int getStoredVoiceMessageCount() {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
-        return (sp.getInt(VM_COUNT, 0));
+        return (sp.getInt(mVmCountKey, 0));
     }
 
     public String getVoiceMailAlphaTag() {
@@ -1417,7 +1417,7 @@ public class CDMAPhone extends PhoneBase {
         // Update the preference value of voicemail number
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         SharedPreferences.Editor editor = sp.edit();
-        editor.putString(VM_NUMBER_CDMA, number);
+        editor.putString(mVmNumCdmaKey, number);
         editor.apply();
     }
 

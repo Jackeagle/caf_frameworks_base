@@ -97,13 +97,11 @@ public class GSMPhone extends PhoneBase {
     // from this file will go into the radio log rather than the main
     // log.  (Use "adb logcat -b radio" to see them.)
     protected static final String LOG_TAG = "GSM";
-    private static final boolean LOCAL_DEBUG = true;
+    protected static final boolean LOCAL_DEBUG = true;
     private static final boolean VDBG = false; /* STOP SHIP if true */
 
     // Key used to read/write current ciphering state
     public static final String CIPHERING_KEY = "ciphering_key";
-    // Key used to read/write voice mail number
-    public static final String VM_NUMBER = "vm_number_key";
     // Key used to read/write the SIM IMSI used for storing the voice mail
     public static final String VM_SIM_IMSI = "vm_sim_imsi_key";
     // Key used to read/write if Call Forwarding is enabled
@@ -137,6 +135,9 @@ public class GSMPhone extends PhoneBase {
     protected String mImeiSv;
     private String mVmNumber;
     private String mSetCfNumber;
+
+    // Key used to read/write voice mail number
+    protected String mVmNumGsmKey = "vm_number_key";
 
 
     // Constructors
@@ -840,7 +841,7 @@ public class GSMPhone extends PhoneBase {
     protected void storeVoiceMailNumber(String number) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         SharedPreferences.Editor editor = sp.edit();
-        editor.putString(VM_NUMBER, number);
+        editor.putString(mVmNumGsmKey, number);
         editor.apply();
         setVmSimImsi(getSubscriberId());
     }
@@ -851,12 +852,12 @@ public class GSMPhone extends PhoneBase {
         String number = (r != null) ? r.getVoiceMailNumber() : "";
         if (TextUtils.isEmpty(number)) {
             SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
-            number = sp.getString(VM_NUMBER, null);
+            number = sp.getString(mVmNumGsmKey, null);
         }
         return number;
     }
 
-    private String getVmSimImsi() {
+    protected String getVmSimImsi() {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
         return sp.getString(VM_SIM_IMSI, null);
     }
@@ -1157,7 +1158,7 @@ public class GSMPhone extends PhoneBase {
      * This method stores the CF_ENABLED flag in preferences
      * @param enabled
      */
-    /*package*/ void setCallForwardingPreference(boolean enabled) {
+    protected void setCallForwardingPreference(boolean enabled) {
         if (LOCAL_DEBUG) Log.d(LOG_TAG, "Set callforwarding info to perferences");
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
         SharedPreferences.Editor edit = sp.edit();
@@ -1168,7 +1169,7 @@ public class GSMPhone extends PhoneBase {
         setVmSimImsi(getSubscriberId());
     }
 
-    private boolean getCallForwardingPreference() {
+    protected boolean getCallForwardingPreference() {
         if (LOCAL_DEBUG) Log.d(LOG_TAG, "Get callforwarding info from perferences");
 
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
@@ -1187,6 +1188,7 @@ public class GSMPhone extends PhoneBase {
             if (mIccRecords.get() != null && mIccRecords.get().isCallForwardStatusStored()) {
                 // The Sim card has the CF info
                 if (LOCAL_DEBUG) Log.d(LOG_TAG, "Callforwarding info is present on sim");
+                notifyCallForwardingIndicator();
             } else {
                 Message msg = obtainMessage(CHECK_CALLFORWARDING_STATUS);
                 sendMessage(msg);
@@ -1761,7 +1763,7 @@ public class GSMPhone extends PhoneBase {
     private int getStoredVoiceMessageCount() {
         int countVoiceMessages = 0;
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
-        String imsi = sp.getString(VM_ID, null);
+        String imsi = sp.getString(mVmId, null);
         String currentImsi = getSubscriberId();
 
         Log.d(LOG_TAG, "Voicemail count retrieval for Imsi = " + imsi +
@@ -1770,7 +1772,7 @@ public class GSMPhone extends PhoneBase {
         if ((imsi != null) && (currentImsi != null)
                 && (currentImsi.equals(imsi))) {
             // get voice mail count from preferences
-            countVoiceMessages = sp.getInt(VM_COUNT, 0);
+            countVoiceMessages = sp.getInt(mVmCountKey, 0);
             Log.d(LOG_TAG, "Voice Mail Count from preference = " + countVoiceMessages );
         }
         return countVoiceMessages;

@@ -132,11 +132,6 @@ public abstract class PhoneBase extends Handler implements Phone {
     // Key used to read/write "disable DNS server check" pref (used for testing)
     public static final String DNS_SERVER_CHECK_DISABLED_KEY = "dns_server_check_disabled_key";
 
-    // Key used for storing voice mail count
-    public static final String VM_COUNT = "vm_count_key";
-    // Key used to read/write the ID for storing the voice mail
-    public static final String VM_ID = "vm_id_key";
-
     /* Instance Variables */
     public CommandsInterface mCM;
     private int mVmCount = 0;
@@ -153,6 +148,12 @@ public abstract class PhoneBase extends Handler implements Phone {
     public SmsUsageMonitor mSmsUsageMonitor;
     protected AtomicReference<UiccCardApplication> mUiccApplication =
             new AtomicReference<UiccCardApplication>();
+
+    // Key used for storing voice mail count
+    protected String mVmCountKey = "vm_count_key";
+
+    // Key used to read/write the ID for storing the voice mail
+    protected String mVmId = "vm_id_key";
 
     // Flag that indicates that Out Of Service is considered as data call disconnect
     protected boolean mOosIsDisconnect = SystemProperties.getBoolean(
