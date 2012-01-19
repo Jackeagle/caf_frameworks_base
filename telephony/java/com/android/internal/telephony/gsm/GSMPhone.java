@@ -1193,6 +1193,7 @@ public class GSMPhone extends PhoneBase {
                 if (LOCAL_DEBUG) {
                     Log.d(LOG_TAG, "info is present on sim");
                 }
+                notifyCallForwardingIndicator();
             } else {
                 Message msg = obtainMessage(CHECK_CALLFORWARDING_STATUS);
                 sendMessage(msg);
