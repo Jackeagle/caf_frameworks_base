@@ -42,6 +42,7 @@ namespace android {
 #define CREATE_DEVICE_SUCCESS 0
 #define CREATE_DEVICE_FAILED -1
 #define SAP_UUID "0000112D-0000-1000-8000-00805F9B34FB"
+#define DUN_UUID "00001103-0000-1000-8000-00805F9B34FB"
 
 #ifdef HAVE_BLUETOOTH
 static jfieldID field_mNativeData;
@@ -88,6 +89,8 @@ static jmethodID method_onAgentAuthorize;
 static jmethodID method_onAgentCancel;
 static jmethodID method_onSapAuthorize;
 static jmethodID method_onSapStateChanged;
+static jmethodID method_onDUNAuthorize;
+static jmethodID method_onDUNStateChanged;
 
 
 static jmethodID method_onInputDevicePropertyChanged;
@@ -178,6 +181,10 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
     method_onSapAuthorize = env->GetMethodID(clazz, "onSapAuthorize",
                                                "(Ljava/lang/String;Ljava/lang/String;I)V");
     method_onSapStateChanged = env->GetMethodID(clazz, "onSapStateChanged",
+                                               "(Ljava/lang/String;Ljava/lang/String;I)V");
+    method_onDUNAuthorize = env->GetMethodID(clazz, "onDUNAuthorize",
+                                               "(Ljava/lang/String;Ljava/lang/String;I)V");
+    method_onDUNStateChanged = env->GetMethodID(clazz, "onDUNStateChanged",
                                                "(Ljava/lang/String;Ljava/lang/String;I)V");
     method_onAgentOutOfBandDataAvailable = env->GetMethodID(clazz, "onAgentOutOfBandDataAvailable",
                                                "(Ljava/lang/String;)Z");
@@ -379,6 +386,15 @@ static jboolean setUpEventLoop(native_data_t *nat) {
                 &err);
         if (dbus_error_is_set(&err)) {
             LOGE("Not able to register to get the org.qcom.sap");
+            LOG_AND_FREE_DBUS_ERROR(&err);
+            return JNI_FALSE;
+        }
+
+        dbus_bus_add_match(nat->conn,
+              "type='signal',interface='org.qcom.bluetooth.dun'",
+              &err);
+        if (dbus_error_is_set(&err)) {
+            LOGE("Not able to register to get the org.qcom.bluetooth.dun");
             LOG_AND_FREE_DBUS_ERROR(&err);
             return JNI_FALSE;
         }
@@ -635,6 +651,13 @@ static void tearDownEventLoop(native_data_t *nat) {
         dbus_bus_remove_match(nat->conn,
                 "type='signal',interface='org.qcom.sap'",
                 &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR(&err);
+        }
+
+        dbus_bus_remove_match(nat->conn,
+             "type='signal',interface='org.qcom.bluetooth.dun'",
+             &err);
         if (dbus_error_is_set(&err)) {
             LOG_AND_FREE_DBUS_ERROR(&err);
         }
@@ -1286,6 +1309,23 @@ static DBusHandlerResult event_filter(DBusConnection *conn, DBusMessage *msg,
                                        env->NewStringUTF(state),
                                        int(msg));
         goto success;
+    }  else if (dbus_message_is_signal(msg,
+                                      "org.qcom.bluetooth.dun",
+                                      "DunStateChanged")) {
+        const char *remote_device_path = dbus_message_get_path(msg);
+        const char *state;
+        LOGV("Got the DUN state changed :dev: %s \n", remote_device_path );
+        if (!dbus_message_get_args(msg, NULL,
+                                   DBUS_TYPE_OBJECT_PATH, &remote_device_path,
+                                   DBUS_TYPE_STRING, &state,
+                                   DBUS_TYPE_INVALID)) {
+            LOGE("%s: Invalid arguments for DUNStateChanged() method", __FUNCTION__);
+        }
+        env->CallVoidMethod(nat->me, method_onDUNStateChanged,
+                                       env->NewStringUTF(remote_device_path),
+                                       env->NewStringUTF(state),
+                                       int(msg));
+        goto success;
     }
 
     ret = a2dp_event_filter(msg, env);
@@ -1345,6 +1385,16 @@ DBusHandlerResult agent_event_filter(DBusConnection *conn,
             LOGV("Received SAP authorization request");
             dbus_message_ref(msg);  // increment refcount because we pass to java
             env->CallVoidMethod(nat->me, method_onSapAuthorize,
+                                       env->NewStringUTF(object_path),
+                                       env->NewStringUTF(uuid),
+                                       int(msg));
+            goto success;
+        }
+
+        if (!strcmp(uuid, DUN_UUID)) {
+            LOGV("Received DUN authorization request");
+            dbus_message_ref(msg);  // increment refcount because we pass to java
+            env->CallVoidMethod(nat->me, method_onDUNAuthorize,
                                        env->NewStringUTF(object_path),
                                        env->NewStringUTF(uuid),
                                        int(msg));

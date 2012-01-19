@@ -163,6 +163,12 @@ public class BluetoothService extends IBluetooth.Stub {
     public static final String SAP_STATECHANGE_INTENT =
             "com.android.bluetooth.sap.statechanged";
 
+    public static final String DUN_STATECHANGE_INTENT =
+            "com.android.bluetooth.dun.statechanged";
+
+    private static final String SAP_UUID = "0000112D-0000-1000-8000-00805F9B34FB";
+    private static final String DUN_UUID = "00001103-0000-1000-8000-00805F9B34FB";
+
     /** Always retrieve RFCOMM channel for these SDP UUIDs */
     private static final ParcelUuid[] RFCOMM_UUIDS = {
             BluetoothUuid.Handsfree,
@@ -860,7 +866,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
     }
 
-    private synchronized boolean enableDUN() {
+    public synchronized boolean enableDUN() {
         if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.dun", false) == false) {
             Log.e(TAG, "DUN is not supported");
             return false;
@@ -886,7 +892,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
     }
 
-    private synchronized boolean disableDUN() {
+    public synchronized boolean disableDUN() {
         if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.dun", false) == false) {
             Log.e(TAG, "DUN is not supported");
             return false;
@@ -2207,6 +2213,24 @@ public class BluetoothService extends IBluetooth.Stub {
         return sapAuthorizeNative(address, access, data.intValue());
     }
 
+    public synchronized boolean DUNAuthorize(String address, boolean access) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
+                                                "Need BLUETOOTH_ADMIN permission");
+        if (!isEnabledInternal()) return false;
+
+
+        address = address.toUpperCase();
+        Integer data = mEventLoop.getAuthorizationRequestData().remove(address);
+        if (data == null) {
+            Log.w(TAG, "DUNAuthorize(" + address + ") called but no native data available, " +
+                  "ignoring. Maybe the PasskeyAgent Request was cancelled by the remote device" +
+                  " or by bluez.\n");
+            return false;
+        }
+
+        return DUNAuthorizeNative(address, access, data.intValue());
+    }
+
     public synchronized boolean setPasskey(String address, int passkey) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                                                 "Need BLUETOOTH_ADMIN permission");
@@ -2663,14 +2687,22 @@ public class BluetoothService extends IBluetooth.Stub {
                 if (intent.getIntExtra(BluetoothDevice.EXTRA_CONNECTION_ACCESS_RESULT,
                                    BluetoothDevice.CONNECTION_ACCESS_NO) ==
                                    BluetoothDevice.CONNECTION_ACCESS_YES) {
-                    sapAuthorize(device.getAddress(), true);
+                   if (SAP_UUID.equals(intent.getStringExtra("uuid"))){
+                       sapAuthorize(device.getAddress(), true);
+                   } else if (DUN_UUID.equals(intent.getStringExtra("uuid"))) {
+                       DUNAuthorize(device.getAddress(), true);
+                   }
                     if (intent.getBooleanExtra(BluetoothDevice.EXTRA_ALWAYS_ALLOWED, false)) {
                         Log.i(TAG, "Setting trust state to true");
                         setTrust(device.getAddress(),true);
                     }
                 } else {
                     Log.i(TAG, "User did not accept the SIM access request");
-                    sapAuthorize(device.getAddress(), false);
+                    if (SAP_UUID.equals(intent.getStringExtra("uuid"))){
+                       sapAuthorize(device.getAddress(), false);
+                    } else if (DUN_UUID.equals(intent.getStringExtra("uuid"))) {
+                       DUNAuthorize(device.getAddress(), false);
+                    }
                 }
             } else if (BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED.equals(action)) {
                 Log.i(TAG, "Received ACTION_PLAYING_STATE_CHANGED");
@@ -4591,6 +4623,14 @@ public class BluetoothService extends IBluetooth.Stub {
         return;
     }
 
+    public synchronized void disconnectDUN() {
+        Log.d(TAG, "disconnectDUN");
+        int res = disConnectDUNNative();
+        Log.d(TAG, "disconnectDUN returns -" + res);
+        return;
+    }
+
+
     /*package*/ synchronized void  clearRemoteDeviceGattServices(String address) {
         Log.d(TAG, "clearRemoteDeviceGattServices");
 
@@ -4872,6 +4912,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private native boolean cancelPairingUserInputNative(String address, int nativeData);
     private native boolean setPinNative(String address, String pin, int nativeData);
     private native boolean sapAuthorizeNative(String address, boolean access, int nativeData);
+    private native boolean DUNAuthorizeNative(String address, boolean access, int nativeData);
     private native boolean setPasskeyNative(String address, int passkey, int nativeData);
     private native boolean setPairingConfirmationNative(String address, boolean confirm,
             int nativeData);
@@ -4959,4 +5000,5 @@ public class BluetoothService extends IBluetooth.Stub {
     native boolean readByTypeResponseNative(String uuid, String status, int handle, byte[] payload, int cnt, int nativeData);
     native boolean readResponseNative(String uuid, String status, byte[] payload, int cnt, int nativeData);
     native boolean writeResponseNative(String uuid, String status, int nativeData);
+    private native int disConnectDUNNative();
 }
