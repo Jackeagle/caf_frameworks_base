@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,6 +70,8 @@ class BluetoothEventLoop {
     private static final int EVENT_PAIRING_CONSENT_DELAYED_ACCEPT = 1;
     private static final int EVENT_AGENT_CANCEL = 2;
     private static final int EVENT_PAIRING_TIMEOUT = 3;
+    private static final int EVENT_SAP_USER_TIMEOUT = 4;
+    private static final int EVENT_DUN_USER_TIMEOUT = 5;
 
     private static final int CREATE_DEVICE_ALREADY_EXISTS = 1;
     private static final int CREATE_DEVICE_SUCCESS = 0;
@@ -79,7 +81,7 @@ class BluetoothEventLoop {
     // Response time out is 30 seconds. Setting the INCOMING_PAIRING_TIMEOUT to 26 seconds
     // to make sure that the pairing clean up happens from the HOST side.
     private static final int INCOMING_PAIRING_TIMEOUT = 26000;
-
+    private static final int USER_CONFIRM_TIMEOUT = 30000;
     private static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
     private static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
 
@@ -118,6 +120,25 @@ class BluetoothEventLoop {
                 address = (String) msg.obj;
                 Log.d(TAG, "Cancelling bond process");
                 mBluetoothService.cancelBondProcess(address);
+                break;
+            case EVENT_SAP_USER_TIMEOUT:
+                Log.d(TAG, "SAP user Authorization timeout");
+                Intent intent = new Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_CANCEL);
+                intent.setClassName(ACCESS_REQUEST_PACKAGE, ACCESS_REQUEST_CLASS);
+                      intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
+                      BluetoothDevice.REQUEST_TYPE_SIM_ACCESS);
+                mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                break;
+          case EVENT_DUN_USER_TIMEOUT:
+                Log.d(TAG, "DUN user Authorization timeout");
+
+                Intent intent1 = new Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_CANCEL);
+                intent1.setClassName(ACCESS_REQUEST_PACKAGE, ACCESS_REQUEST_CLASS);
+                      intent1.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
+                      BluetoothDevice. REQUEST_TYPE_DUN_ACCESS);
+                mContext.sendBroadcast(intent1, BLUETOOTH_ADMIN_PERM);
+
+                break;
             }
         }
     };
@@ -642,7 +663,6 @@ class BluetoothEventLoop {
 
         if (mBluetoothService.getBluetoothState() == BluetoothAdapter.STATE_TURNING_OFF) {
             // shutdown path
-            mBluetoothService.sapAuthorize(address, false);
             return null;
         }
         return address;
@@ -759,6 +779,7 @@ class BluetoothEventLoop {
         String address = checkAuthorizationRequestAndGetAddress(objectPath, nativeData);
         if (address == null) {
             Log.e(TAG, "address is null");
+            mBluetoothService.sapAuthorize(address, false);
             return;
         }
         /*Get the Trust state of the device*/
@@ -775,7 +796,49 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
                             BluetoothDevice.REQUEST_TYPE_SIM_ACCESS);
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, remoteDevice);
+            intent.putExtra("uuid", uuid);
+            intent.putExtra("name", mBluetoothService.getRemoteName(address));
+            intent.putExtra("address", address);
             mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+            mHandler.sendMessageDelayed(mHandler
+                   .obtainMessage(EVENT_SAP_USER_TIMEOUT),
+                    USER_CONFIRM_TIMEOUT);
+
+        }
+    }
+
+    private void onDUNAuthorize(String objectPath, String uuid, int nativeData) {
+        Log.i(TAG, "onDUNAuthorize" + objectPath + uuid);
+        String address = checkAuthorizationRequestAndGetAddress(objectPath, nativeData);
+        if (address == null) {
+            Log.e(TAG, "address is null");
+            mBluetoothService.DUNAuthorize(address, false);
+            return;
+        }
+        /*Get the Trust state of the device*/
+        boolean trusted = mBluetoothService.getTrustState(address);
+        if (trusted) {
+            /*Say as authorized to lower layers without popping up to
+            user*/
+            Log.d(TAG,"Trusted device connection");
+            mBluetoothService.DUNAuthorize(address, true);
+        } else {
+            Log.v(TAG,"Get the remote address");
+            BluetoothDevice remoteDevice = mBluetoothService.getRemoteDevice(address);
+            Intent intent = new
+                Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_REQUEST);
+            intent.setClassName(ACCESS_REQUEST_PACKAGE, ACCESS_REQUEST_CLASS);
+            intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
+                            BluetoothDevice. REQUEST_TYPE_DUN_ACCESS);
+            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, remoteDevice);
+            intent.putExtra("name", mBluetoothService.getRemoteName(address));
+            intent.putExtra("address", address);
+            intent.putExtra("uuid", uuid);
+            mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+            mHandler.sendMessageDelayed(mHandler
+                 .obtainMessage(EVENT_DUN_USER_TIMEOUT),
+                 USER_CONFIRM_TIMEOUT);
+
         }
     }
     private void onSapStateChanged(String objectPath, String state, int nativeData) {
@@ -801,6 +864,32 @@ class BluetoothEventLoop {
         intent.putExtra("state", sapState);
         mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
     }
+
+    private void onDUNStateChanged(String objectPath, String state, int nativeData) {
+        Log.i(TAG, "onDUNStateChanged" + objectPath + state);
+
+        String address = mBluetoothService.getAddressFromObjectPath(objectPath);
+        if (address == null) {
+            Log.e(TAG, "Unable to get device address , " +
+                  "returning null");
+            return;
+        }
+        address = address.toUpperCase();
+
+        int DUNState;
+        if(state.equals("Connected")) {
+                Log.v(TAG,"On DUN state changed ");
+                /*2 corresponds to CONNECTED*/
+                DUNState = 2;
+        } else  {
+                DUNState = 0;
+        }
+        Intent intent = new Intent(BluetoothService.DUN_STATECHANGE_INTENT);
+        intent.putExtra(BluetoothDevice.EXTRA_DEVICE,  mAdapter.getRemoteDevice(address));
+        intent.putExtra("state", DUNState);
+        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+    }
+
     private void onRequestPinCode(String objectPath, int nativeData, boolean secure) {
         String address = checkPairingRequestAndGetAddress(objectPath, nativeData);
         if (address == null) return;
