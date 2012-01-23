@@ -2016,9 +2016,10 @@ void AwesomePlayer::finishAsyncPrepare_l() {
 }
 
 status_t AwesomePlayer::suspend() {
-    LOGV("suspend");
-    Mutex::Autolock autoLock(mLock);
 
+    LOGV(" In AwesomePlayer Suspend ");
+    mAudioPlayer->suspend();
+    Mutex::Autolock autoLock(mLock);
     if (mSuspensionState != NULL) {
         if (mVideoBuffer[mVideoQueueLastRendered] == NULL) {
             //go into here if video is suspended again
