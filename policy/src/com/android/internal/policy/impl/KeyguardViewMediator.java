@@ -887,9 +887,6 @@ public class KeyguardViewMediator implements KeyguardViewCallback,
      */
     private boolean isWakeKeyWhenKeyguardShowing(int keyCode, boolean isDocked) {
         switch (keyCode) {
-            // ignore volume keys unless docked
-            case KeyEvent.KEYCODE_VOLUME_UP:
-            case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_MUTE:
                 return isDocked;
 
