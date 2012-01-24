@@ -204,11 +204,6 @@ parseSps (uint8_t naluSize, const uint8_t *encodedBytes, SpsInfo * info) {
 
     LOGV("profile_id = %u", profile_id);
 
-    if ( !(profile_id == 66)) {
-        LOGW("Unknown profile id %d , skip!", profile_id);
-        return UNKNOWN_ERROR;
-    }
-
     if(100 == profile_id) {
         tmp = rbsp.ue();
         if(3 == tmp) {

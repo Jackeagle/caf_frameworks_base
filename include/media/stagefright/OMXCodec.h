@@ -199,6 +199,7 @@ private:
     Condition mBufferFilled;
 
     bool mInterlaceFormatDetected;
+    bool mExtraDataInterlaceFound;
     bool m3DVideoDetected;
     bool mSendEOS;
     bool mSPSParsed;
@@ -319,6 +320,7 @@ private:
 
     status_t setWMAFormat(const sp<MetaData> &inputFormat);
     status_t freeBuffersOnOutPortIfAllAreWithUs();
+    int32_t mInterlaceFrame;
 };
 
 struct CodecProfileLevel {

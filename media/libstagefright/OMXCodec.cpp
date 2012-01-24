@@ -721,7 +721,9 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta, uint32_t flags) {
             size_t numSeqParameterSets = ptr[5] & 31;
 
             SpsInfo info;
-            if ( parseSps( size - 1, ptr + 1, &info ) == OK ) {
+            uint16_t spsSize = (((uint16_t)ptr[6]) << 8) + (uint16_t)(ptr[7]);
+
+            if ( parseSps( spsSize , ptr + 9, &info ) == OK ) {
                 mSPSParsed = true;
                 if (info.mInterlaced)
                     mInterlaceFormatDetected = true;
@@ -2049,11 +2051,13 @@ OMXCodec::OMXCodec(
       mLeftOverBuffer(NULL),
       mPmemInfo(NULL),
       mInterlaceFormatDetected(false),
+      mExtraDataInterlaceFound(false),
       m3DVideoDetected(false),
       mSendEOS(false),
       mForce3D(0),
       mFinalStatus(OK),
       mSPSParsed(false),
+      mInterlaceFrame(0),
       bInvalidState(false) {
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
@@ -3387,6 +3391,10 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
         mFinalStatus = err;
     }
 
+    if(mInterlaceFormatDetected) {
+      mInterlaceFrame++;
+    }
+
     if (signalEOS) {
         flags |= OMX_BUFFERFLAG_EOS;
         if ( mIsEncoder && ( mQuirks & kRequiresEOSMessage ) ) {
@@ -3396,7 +3404,8 @@ void OMXCodec::drainInputBuffer(BufferInfo *info) {
             }
             offset = 0;
         }
-    } else if (mThumbnailMode) {
+    } else if ((mThumbnailMode && !mInterlaceFormatDetected)
+              || (mThumbnailMode && (mInterlaceFrame >= 2))) {
         // Because we don't get an EOS after getting the first frame, we
         // need to notify the component with OMX_BUFFERFLAG_EOS, set
         // mNoMoreOutputData to false so fillOutputBuffer gets called on
@@ -5006,7 +5015,7 @@ status_t QueryCodecs(
 status_t OMXCodec::processExtraDataBlocksOfBuffer(MediaBuffer *buffer, OMX_U32 flags) {
     CODEC_LOGV("In ProcessExtraDataBlocksOfBuffer for interlace, buffer = %p, flags = %p",buffer,flags);
 
-    if (!mInterlaceFormatDetected) {
+    if (!mExtraDataInterlaceFound) {
         if (flags & OMX_BUFFERFLAG_EXTRADATA) {
             OMX_OTHER_EXTRADATATYPE *pExtra;
             OMX_STREAMINTERLACEFORMAT *pInterlaceFormat;
@@ -5064,7 +5073,7 @@ status_t OMXCodec::processExtraDataBlocksOfBuffer(MediaBuffer *buffer, OMX_U32 f
                    }
                 }
             }
-            mInterlaceFormatDetected = true;
+            mExtraDataInterlaceFound = true;
         }
     }
     return OK;
