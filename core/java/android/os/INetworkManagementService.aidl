@@ -22,6 +22,7 @@ import android.net.InterfaceConfiguration;
 import android.net.INetworkManagementEventObserver;
 import android.net.NetworkStats;
 import android.net.RouteInfo;
+import android.net.LinkAddress;
 import android.net.wifi.WifiConfiguration;
 
 /**
@@ -227,6 +228,26 @@ interface INetworkManagementService
      * Remove an upstream IPv6 interface
      */
     void removeUpstreamV6Interface(String iface);
+
+    /**
+     *  Extension of 'enableNat' interface by subnets
+     *  @param internalInterface is the tethered internal interface
+     *  @param externalInterface is the upStreaminterface that is tethered
+     *  @param subnets[] comprises of an array of LinkAdrresses
+     *  associated with a given network interface
+     */
+    void enableNatBySubnet(String internalInterface, String externalInterface,
+            in LinkAddress[] subnets);
+
+    /**
+     *  Extension of 'disableNat' interface by subnets
+     *  @param internalInterface is the tethered internal interface
+     *  @param externalInterface is the upStreaminterface that is tethered
+     *  @param subnets[] comprises of an array of LinkAdrresses
+     *  associated with a given network interface
+     */
+    void disableNatBySubnet(String internalInterface, String externalInterface,
+            in LinkAddress[] subnets);
 
     /**
      ** PPPD
