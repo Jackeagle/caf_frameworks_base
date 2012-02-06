@@ -29,6 +29,7 @@ import android.os.SystemProperties;
 import android.os.SystemService;
 import android.provider.Settings;
 import android.util.Log;
+import android.os.SystemProperties;
 
 import com.android.internal.util.IState;
 import com.android.internal.util.State;
@@ -230,7 +231,8 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                             broadcastState(BluetoothAdapter.STATE_OFF);
                         }
                     } else if (mContext.getResources().getBoolean
-                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch)) {
+                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch) &&
+                            is_hot_off_enabled()) {
                         sendMessage(TURN_HOT);
                     }
                     break;
@@ -514,14 +516,16 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                             transitionTo(mHotOff);
                             broadcastState(BluetoothAdapter.STATE_OFF);
                             if (!mContext.getResources().getBoolean
-                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch)) {
+                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch) ||
+                            !is_hot_off_enabled()) {
                                 deferMessage(obtainMessage(TURN_COLD));
                             }
                         }
                     } else {
                         if (mPublicState != BluetoothAdapter.STATE_TURNING_ON) {
                             if (mContext.getResources().getBoolean
-                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch)) {
+                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch) &&
+                            is_hot_off_enabled()) {
                                 recoverStateMachine(TURN_HOT, null);
                             } else {
                                 recoverStateMachine(TURN_COLD, null);
@@ -540,7 +544,8 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                     Log.e(TAG, "Devices failed to disconnect, reseting...");
                     deferMessage(obtainMessage(TURN_COLD));
                     if (mContext.getResources().getBoolean
-                        (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch)) {
+                        (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch) &&
+                        is_hot_off_enabled()) {
                         deferMessage(obtainMessage(TURN_HOT));
                     }
                     break;
@@ -550,7 +555,8 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                     Log.e(TAG, "Devices failed to power down, reseting...");
                     deferMessage(obtainMessage(TURN_COLD));
                     if (mContext.getResources().getBoolean
-                        (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch)) {
+                        (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch) &&
+                        is_hot_off_enabled()) {
                         deferMessage(obtainMessage(TURN_HOT));
                     }
                     break;
@@ -683,7 +689,8 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                     if (!((Boolean) message.obj)) {
                         transitionTo(mHotOff);
                         if (!mContext.getResources().getBoolean
-                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch)) {
+                            (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch) ||
+                            !is_hot_off_enabled()) {
                             deferMessage(obtainMessage(TURN_COLD));
                         }
                     } else {
@@ -702,7 +709,8 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                     Log.e(TAG, "Power-down timed out, resetting...");
                     deferMessage(obtainMessage(TURN_COLD));
                     if (mContext.getResources().getBoolean
-                        (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch)) {
+                        (com.android.internal.R.bool.config_bluetooth_adapter_quick_switch) &&
+                        is_hot_off_enabled()) {
                         deferMessage(obtainMessage(TURN_HOT));
                     }
                     break;
@@ -818,6 +826,16 @@ final class BluetoothAdapterStateMachine extends StateMachine {
      */
     int getBluetoothAdapterState() {
         return mPublicState;
+    }
+    /**
+    *Return if HOT OFF is enabled.
+    */
+    boolean is_hot_off_enabled() {
+        if ("smd".equals(SystemProperties.get("ro.qualcomm.bt.hci_transport"))) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     BluetoothEventLoop getBluetoothEventLoop() {
