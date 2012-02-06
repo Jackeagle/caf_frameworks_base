@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +57,7 @@ import android.net.LinkProperties;
 import android.net.NetworkInfo;
 import android.net.NetworkInfo.DetailedState;
 import android.net.NetworkUtils;
+import android.net.RouteInfo;
 import android.net.wifi.WpsResult.Status;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pService;
@@ -84,7 +86,11 @@ import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
 
 import java.net.InetAddress;
+import java.net.Inet6Address;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -108,7 +114,7 @@ public class WifiStateMachine extends StateMachine {
 
     private static final String TAG = "WifiStateMachine";
     private static final String NETWORKTYPE = "WIFI";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
 
     /* TODO: This is no more used with the hostapd code. Clean up */
     private static final String SOFTAP_IFACE = "wlan0";
@@ -367,6 +373,11 @@ public class WifiStateMachine extends StateMachine {
     public static final int CMD_ENABLE_P2P                = BASE + 131;
     public static final int CMD_DISABLE_P2P               = BASE + 132;
 
+    /* Update V6 addresses in connected state */
+    static final int CMD_UPDATE_IPV6_ADDRESSES            = BASE + 133;
+    /* Renew v6 address in connected state */
+    static final int CMD_RENEW_IPV6                       = BASE + 134;
+
     private static final int CONNECT_MODE   = 1;
     private static final int SCAN_ONLY_MODE = 2;
 
@@ -539,6 +550,34 @@ public class WifiStateMachine extends StateMachine {
     private boolean mReportedRunning = false;
 
     /**
+     * Keep track of whether we need to retrieve the IPv6 addresses
+     * when connected.
+     */
+    private boolean mUpdateV6Addresses = false;
+
+    /**
+     * Property for IPv6 support on Wifi
+     */
+    private static final String PROPERTY_WIFI_V6_SUPPORTED = "persist.wifi.v6";
+
+    /**
+     * Reads system property "persist.wifi.v6" to determine if
+     * IPv6 is supported.
+     */
+    private boolean mWifiV6Supported = SystemProperties.getBoolean(PROPERTY_WIFI_V6_SUPPORTED,
+            false);
+
+    /**
+     * Used for sanity check on IPv6 renewal
+     */
+    private static final int MIN_RENEWAL_TIME_SECS = 5 * 60;  // 5 minutes
+
+    private static final int IPV6_RENEW = 0;
+    private static final String ACTION_IPV6_RENEW = "android.net.wifi.IPV6_RENEW";
+    private PendingIntent mIpv6RenewalIntent;
+
+
+    /**
      * Most recently set source of starting WIFI.
      */
     private final WorkSource mRunningWifiUids = new WorkSource();
@@ -665,6 +704,29 @@ public class WifiStateMachine extends StateMachine {
 
         mSuspendWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WifiSuspend");
         mSuspendWakeLock.setReferenceCounted(false);
+
+        // Handler/receiver for when the lease timer for
+        // for IPv6 renewal expires.
+        if (mWifiV6Supported) {
+            Intent ipv6RenewalIntent = new Intent(ACTION_IPV6_RENEW);
+            mIpv6RenewalIntent = PendingIntent.getBroadcast(mContext, IPV6_RENEW, ipv6RenewalIntent, 0);
+            mContext.registerReceiver(
+                new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        if (intent.getAction().equals(ACTION_IPV6_RENEW)) {
+                            //IPv6 renew
+                            if (DBG) Log.d(TAG, "Received intent " + intent.toString()
+                                              + " Sending an IPv6 renewal " + this);
+                            mWakeLock.acquire();
+                            sendMessage(CMD_RENEW_IPV6);
+                        } else {
+                           loge("Received unexpected intent " + intent.toString());
+                        }
+                    }
+                },
+                new IntentFilter(ACTION_IPV6_RENEW));
+        }
 
         addState(mDefaultState);
             addState(mInitialState, mDefaultState);
@@ -1535,6 +1597,12 @@ public class WifiStateMachine extends StateMachine {
             mLinkProperties.setHttpProxy(mWifiConfigStore.getProxyProperties(mLastNetworkId));
         }
         mLinkProperties.setInterfaceName(mInterfaceName);
+
+        log("persist.wifi.v6:" + mWifiV6Supported);
+        if (mWifiV6Supported) {
+            log("Need to update V6 addresses");
+            mUpdateV6Addresses = true;
+        }
         if (DBG) {
             log("netId=" + mLastNetworkId  + " Link configured: " +
                     mLinkProperties.toString());
@@ -1757,6 +1825,90 @@ public class WifiStateMachine extends StateMachine {
         }
     }
 
+    private void updateV6Addresses(LinkProperties linkProperties) {
+        boolean broadcastRequired = false;
+        try {
+            NetworkInterface wlanIf =
+                NetworkInterface.getByName(mInterfaceName);
+            if (wlanIf != null) {
+                Collection<InterfaceAddress>interfaceAddresses =
+                    wlanIf.getInterfaceAddresses();
+                if (DBG) log("interfaceAddresses:" + interfaceAddresses.toString());
+
+                for (InterfaceAddress ia : interfaceAddresses) {
+                    InetAddress addr = ia.getAddress();
+                    if (!addr.isLinkLocalAddress() &&
+                                !linkProperties.getAddresses().contains(addr)) {
+                        linkProperties.addLinkAddress(new LinkAddress(ia));
+                        broadcastRequired = true;
+                    }
+                }
+
+                log("updateV6Addresses(): linkProperties=" + linkProperties.toString());
+                if (DBG) log("retrieving gateway for :" + mInterfaceName);
+
+                String gatewayInfo = null;
+                String gateway = null;
+                int lease = 0;
+                try {
+                        gatewayInfo = mNwService.getIpv6Gateway(mInterfaceName);
+                } catch (Exception e) {
+                    loge("Error in requestRtSol for interface " + mInterfaceName + ", :" + e);
+                    return;
+                }
+
+                InetAddress ia = null;
+                try {
+                    String[] gatewayInfoTokens = gatewayInfo.trim().split(" ");
+                    gateway = gatewayInfoTokens[0];
+                    lease = Integer.parseInt(gatewayInfoTokens[1]);
+                    //To handle the lease forever i.e 0xFFFFFFFF (in signed it is -1)
+                    if(lease >= 0){
+                        //Sanity check for renewal
+                        if (lease < MIN_RENEWAL_TIME_SECS) {
+                            lease = MIN_RENEWAL_TIME_SECS;
+                        }
+                        //Do it a bit earlier than half the lease duration time
+                        //48% for one hour lease time = 29 minutes
+                        mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                               SystemClock.elapsedRealtime() +
+                               lease * 480, //in milliseconds
+                               mIpv6RenewalIntent);
+                    }
+
+                    ia = NetworkUtils.numericToInetAddress(gateway);
+                } catch (NullPointerException e) {
+                    loge("Null gateway info");
+                    return;
+                } catch (NumberFormatException e) {
+                    loge("Invalid lease info");
+                    return;
+                } catch (IllegalArgumentException e) {
+                    loge("Non-numeric gateway addr=" + gatewayInfo.trim());
+                    return;
+                } catch (ArrayIndexOutOfBoundsException e) {
+                    loge("Error processing response =" + e);
+                    return;
+                }
+
+                if (DBG) log("adding gateway :" + ia.toString() +
+                                 " lease time in seconds:" + lease);
+                if (!ia.isAnyLocalAddress()) {
+                    linkProperties.addRoute(new RouteInfo(ia));
+                    broadcastRequired = true;
+                }
+            }
+        } catch (Exception e) {
+            if (DBG) log("Exception caught: " + e.toString());
+        } finally {
+            if (broadcastRequired) {
+                sendLinkConfigurationChangedBroadcast();
+            }
+        }
+
+        if (DBG) log("updateV6Addresses(): linkProperties=" + linkProperties.toString());
+    }
+
     private void handleFailedIpConfiguration() {
         loge("IP configuration failed");
 
@@ -1836,6 +1988,10 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_BLUETOOTH_ADAPTER_STATE_CHANGE:
                     mBluetoothConnectionActive = (message.arg1 !=
                             BluetoothAdapter.STATE_DISCONNECTED);
+                    break;
+                case CMD_RENEW_IPV6:
+                    loge("Failed to handle IPv6 renewal");
+                    mWakeLock.release();
                     break;
                     /* Synchronous call returns */
                 case CMD_PING_SUPPLICANT:
@@ -3061,6 +3217,11 @@ public class WifiStateMachine extends StateMachine {
                   if (message.arg1 == DhcpStateMachine.DHCP_SUCCESS) {
                       if (DBG) log("DHCP successful");
                       handleSuccessfulIpConfiguration((DhcpInfoInternal) message.obj);
+
+                      // Post a message to update v6 asynchrnously
+                      if (mWifiV6Supported) {
+                          sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
+                      }
                       transitionTo(mVerifyingLinkState);
                   } else if (message.arg1 == DhcpStateMachine.DHCP_FAILURE) {
                       if (DBG) log("DHCP failed");
@@ -3105,6 +3266,9 @@ public class WifiStateMachine extends StateMachine {
                         if (result.hasProxyChanged()) {
                             log("Reconfiguring proxy on connection");
                             configureLinkProperties();
+                            if (mWifiV6Supported) {
+                                sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
+                            }
                             sendLinkConfigurationChangedBroadcast();
                         }
                     }
@@ -3200,6 +3364,11 @@ public class WifiStateMachine extends StateMachine {
           switch(message.what) {
             case CMD_STATIC_IP_SUCCESS:
                   handleSuccessfulIpConfiguration((DhcpInfoInternal) message.obj);
+
+                  // Post a message to update v6 asynchrnously
+                  if (mWifiV6Supported) {
+                      sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
+                  }
                   transitionTo(mVerifyingLinkState);
                   break;
               case CMD_STATIC_IP_FAILURE:
@@ -3261,6 +3430,13 @@ public class WifiStateMachine extends StateMachine {
         public void enter() {
             if (DBG) log(getName() + "\n");
             EventLog.writeEvent(EVENTLOG_WIFI_STATE_CHANGED, getName());
+
+            // if we missed the command to update IPV6 address
+            // because we transitioned to another state, then
+            // re-post it to us.
+            if (mWifiV6Supported && mUpdateV6Addresses) {
+                sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
+            }
        }
         @Override
         public boolean processMessage(Message message) {
@@ -3281,6 +3457,17 @@ public class WifiStateMachine extends StateMachine {
                     sendNetworkStateChangeBroadcast(mLastBssid);
 
                     transitionTo(mVerifyingLinkState);
+                    break;
+                case CMD_UPDATE_IPV6_ADDRESSES:
+                    if (mUpdateV6Addresses) {
+                        mUpdateV6Addresses = false;
+                        updateV6Addresses(mLinkProperties);
+                    }
+                    break;
+                case CMD_RENEW_IPV6:
+                    log ("Renewing IPv6");
+                    updateV6Addresses(mLinkProperties);
+                    mWakeLock.release();
                     break;
                 default:
                     return NOT_HANDLED;

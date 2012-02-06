@@ -331,4 +331,9 @@ interface INetworkManagementService
      * Flush the DNS cache associated with the specified interface.
      */
     void flushInterfaceDnsCache(String iface);
+
+    /**
+     * Request router solicitation for the interface
+     */
+    String getIpv6Gateway(String iface);
 }

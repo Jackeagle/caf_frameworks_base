@@ -85,7 +85,7 @@ import java.util.concurrent.CountDownLatch;
 public class NetworkManagementService extends INetworkManagementService.Stub
         implements Watchdog.Monitor {
     private static final String TAG = "NetworkManagementService";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
     private static final String NETD_TAG = "NetdConnector";
 
     private static final String ADD = "add";
@@ -1305,6 +1305,30 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         } catch (NativeDaemonConnectorException e) {
             throw e.rethrowAsParcelableException();
         }
+    }
+
+    public String getIpv6Gateway(String interfaceName) {
+        String cmd = "rtsol " + interfaceName;
+        if (DBG) Log.d(TAG, "getIpv6Gateway(" + interfaceName + ")");
+
+        String rsp = null;
+
+        NativeDaemonEvent event;
+
+        try {
+            event = mConnector.execute(cmd.toString());
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException(
+                    "Unable to communicate with native dameon to request RS - " + e);
+        }
+
+        if (event.isClassOk()) {
+            rsp = event.getMessage();
+        }
+
+        if (DBG) Log.v(TAG, "getIpv6Gateway() cmd:" + cmd + " response is " + rsp);
+
+        return rsp;
     }
 
     /** {@inheritDoc} */
