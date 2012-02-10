@@ -60,8 +60,6 @@ import java.io.File;
 import java.util.Timer;
 import java.util.TimerTask;
 
-/* TI-OMAP custom package */
-import com.ti.omap.omap_mm_library.UiCloningService;
 
 class ServerThread extends Thread {
     private static final String TAG = "SystemServer";
@@ -133,13 +131,11 @@ class ServerThread extends Thread {
         /* TI HID port - end */
 
         HeadsetObserver headset = null;
-        HDMIObserver hdmi = null;
         DockObserver dock = null;
         UsbService usb = null;
         UiModeManagerService uiMode = null;
         RecognitionManagerService recognition = null;
         ThrottleService throttle = null;
-        UiCloningService uiCloning = null;
 
         // Critical services...
         try {
@@ -407,13 +403,6 @@ class ServerThread extends Thread {
                 Slog.e(TAG, "Failure starting HeadsetObserver", e);
             }
 
-            try {
-                Slog.i(TAG, "HDMI Observer");
-                // Listen for hdmi changes
-                hdmi = new HDMIObserver(context);
-            } catch (Throwable e) {
-                Slog.e(TAG, "Failure starting HDMIObserver", e);
-            }
 
             try {
                 Slog.i(TAG, "Dock Observer");
@@ -470,16 +459,6 @@ class ServerThread extends Thread {
                 Slog.e(TAG, "Failure starting DiskStats Service", e);
             }
 
-            if (SystemProperties.TARGET_OMAP4 ) {
-                if(SystemProperties.getBoolean("tv.hdmi.uicloning.enable", false)) {
-                    try {
-                        Slog.i(TAG, "UiCloningService");
-                        uiCloning = new UiCloningService(context);
-                    } catch (Throwable e) {
-                        Slog.e(TAG, "Failure starting UiCloningService", e);
-                    }
-                }
-            }
         }
 
         // make sure the ADB_ENABLED setting value matches the secure property value
