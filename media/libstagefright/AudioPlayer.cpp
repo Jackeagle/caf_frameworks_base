@@ -81,6 +81,7 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
     }
     mPaused = false;
 
+    mSuspended = false;
     // We allow an optional INFO_FORMAT_CHANGED at the very beginning
     // of playback, if there is one, getFormat below will retrieve the
     // updated format, if there isn't, we'll stash away the valid buffer
@@ -202,6 +203,7 @@ void AudioPlayer::pause(bool playPendingSamples) {
 void AudioPlayer::resume() {
     CHECK(mStarted);
     mPaused = false;
+    mSuspended = false;
     if (mSource->isPaused()==true) {
         CHECK(mSource != NULL);
         mSource->start();
@@ -212,6 +214,11 @@ void AudioPlayer::resume() {
     } else {
         mAudioTrack->start();
     }
+}
+
+void AudioPlayer::suspend() {
+    CHECK(mStarted);
+    mSuspended = true;
 }
 
 void AudioPlayer::reset() {
@@ -343,7 +350,8 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
 
     size_t size_done = 0;
     size_t size_remaining = size;
-    while (size_remaining > 0) {
+    while (size_remaining > 0 && !mSuspended) {
+        LOGV("Inside FillBuffer While loop with size_remaining == %d mSuspended = %d \n", size_remaining, mSuspended);
         MediaSource::ReadOptions options;
 
         {
@@ -467,6 +475,7 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
         size_done += copy;
         size_remaining -= copy;
     }
+    LOGV("End of FillBuffer While loop with size_remaining == %d mSuspended = %d size_done = %d \n", size_remaining, mSuspended, size_done);
 
     Mutex::Autolock autoLock(mLock);
     mNumFramesPlayed += size_done / mFrameSize;

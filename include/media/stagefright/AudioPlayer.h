@@ -51,7 +51,7 @@ public:
 
     virtual void pause(bool playPendingSamples = false);
     virtual void resume();
-
+    virtual void suspend();
     // Returns the timestamp of the last buffer played (in us).
     virtual int64_t getMediaTimeUs();
 
@@ -88,6 +88,7 @@ private:
     bool mStarted;
     bool mSourceStopped;
 
+    bool mSuspended;
     bool mIsFirstBuffer;
     status_t mFirstBufferResult;
     MediaBuffer *mFirstBuffer;
