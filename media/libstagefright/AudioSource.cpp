@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -384,7 +385,11 @@ status_t AudioSource::read(
         if (n <= 0) {
             LOGE("Read from AudioRecord returns: %ld", n);
             buffer->release();
-            return UNKNOWN_ERROR;
+            if(n == -ETIMEDOUT) {
+                return (status_t)n;
+            } else {
+                return UNKNOWN_ERROR;
+            }
         }
 
         int64_t recordDurationUs = 0;

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (C) 2010-2011 Code Aurora Forum
+ * Copyright (C) 2010-2012 Code Aurora Forum
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2515,7 +2515,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         LOGI("Audio track drift time: %lld us", mOwner->getDriftTimeUs());
     }
 
-    if (err == ERROR_END_OF_STREAM) {
+    if (err == ERROR_END_OF_STREAM || (err == -ETIMEDOUT)) {
         return OK;
     }
     return err;

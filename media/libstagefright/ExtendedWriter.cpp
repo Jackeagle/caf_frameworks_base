@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Code Aurora Forum. All rights reserved
+ * Copyright (C) 2011-2012 Code Aurora Forum. All rights reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -294,7 +294,7 @@ status_t ExtendedWriter::threadFunc() {
     fclose(mFile);
     mFile = NULL;
     mReachedEOS = true;
-    if (err == ERROR_END_OF_STREAM || mDone) {
+    if (err == ERROR_END_OF_STREAM || (err == -ETIMEDOUT)) {
         return OK;
     }
     return err;
