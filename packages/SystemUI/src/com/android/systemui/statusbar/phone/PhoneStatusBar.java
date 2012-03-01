@@ -610,6 +610,12 @@ public class PhoneStatusBar extends BaseStatusBar {
                     }
                 });
             }
+           // Ethernet Status
+           final ImageView ethernetStatus =
+                    (ImageView)mStatusBarView.findViewById(R.id.ethernet_status);
+           if (ethernetStatus != null) {
+                mNetworkController.addEthernetIconView(ethernetStatus);
+           }
         }
 
         // Quick Settings (where available, some restrictions apply)
