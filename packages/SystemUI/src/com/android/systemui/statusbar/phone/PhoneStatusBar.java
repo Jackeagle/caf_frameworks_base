@@ -361,6 +361,14 @@ public class PhoneStatusBar extends StatusBar {
 //        if (wimaxRSSI != null) {
 //            mNetworkController.addWimaxIconView(wimaxRSSI);
 //        }
+
+        // Ethernet Status
+        final ImageView ethernetStatus =
+            (ImageView)sb.findViewById(R.id.ethernet_status);
+           if (ethernetStatus != null) {
+                mNetworkController.addEthernetIconView(ethernetStatus);
+        }
+
         // Recents Panel
         mRecentTasksLoader = new RecentTasksLoader(context);
         updateRecentsPanel();

@@ -234,6 +234,12 @@ public class TabletStatusBar extends StatusBar implements
             mNetworkController.addWifiIconView(wifiRSSI);
         }
 
+        final ImageView ethernetStatus =
+            (ImageView)mNotificationPanel.findViewById(R.id.ethernet_status);
+	        if (ethernetStatus != null) {
+                mNetworkController.addEthernetIconView(ethernetStatus);
+        }
+
         mNetworkController.addDataTypeIconView(
                 (ImageView)mNotificationPanel.findViewById(R.id.network_type));
         mNetworkController.addDataDirectionOverlayIconView(
