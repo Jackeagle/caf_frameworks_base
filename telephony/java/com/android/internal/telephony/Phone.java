@@ -217,6 +217,7 @@ public interface Phone {
     static final int PHONE_TYPE_GSM = RILConstants.GSM_PHONE;
     static final int PHONE_TYPE_CDMA = RILConstants.CDMA_PHONE;
     static final int PHONE_TYPE_SIP = RILConstants.SIP_PHONE;
+    static final int PHONE_TYPE_RIL_IMS = RILConstants.RIL_IMS_PHONE;
 
     // Modes for LTE_ON_CDMA
     static final int LTE_ON_CDMA_UNKNOWN = RILConstants.LTE_ON_CDMA_UNKNOWN;

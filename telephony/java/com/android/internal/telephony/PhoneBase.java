@@ -119,6 +119,8 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected static final int EVENT_GET_NETWORKS_DONE              = 32;
     protected static final int EVENT_GET_MDN_DONE                   = 33;
     protected static final int EVENT_CDMA_PRL_VERSION_CHANGED       = 35;
+    protected static final int EVENT_IMS_STATE_CHANGED              = 36;
+    protected static final int EVENT_IMS_STATE_DONE                 = 37;
 
     // Key used to read/write current CLIR setting
     public static final String CLIR_KEY = "clir_key";
@@ -831,6 +833,7 @@ public abstract class PhoneBase extends Handler implements Phone {
         mNotifier.notifyOtaspChanged(this, otaspMode);
     }
 
+    public void notifyPreciseCallStateChanged() {}
     /**
      * @return true if a mobile originating emergency call is active
      */
@@ -1268,41 +1271,57 @@ public abstract class PhoneBase extends Handler implements Phone {
          return false;
     }
 
-    /**
-     * Answers a ringing or waiting call. Active calls, if any, go on hold.
-     * Answering occurs asynchronously, and final notification occurs via
-     * {@link #registerForPreciseCallStateChanged(android.os.Handler, int, java.lang.Object)
-     * registerForPreciseCallStateChanged()}.
-     *
-     * @exception CallStateException when no call is ringing or waiting or API
-     *                not supported
-     */
+     public int getSupportedDomain() {
+         return CallDetails.RIL_CALL_DOMAIN_CS;
+     }
+
+     public int getMaxConnectionsPerCall() { return 0; }
+
+     public int getMaxConnections() { return 0; }
+     /**
+      * Answers a ringing or waiting call. Active calls, if any, go on hold.
+      * Answering occurs asynchronously, and final notification occurs via
+      * {@link #registerForPreciseCallStateChanged(android.os.Handler, int, java.lang.Object)
+      * registerForPreciseCallStateChanged()}.
+      *
+      * @exception CallStateException when no call is ringing or waiting or API not supported
+      */
     public void acceptCall(int callType) throws CallStateException {
-        throw new CallStateException("Accept with CallType is not supported in this phone "
-                + this);
+        throw new CallStateException("Accept with CallType is not supported in this phone " + this);
     }
 
     public Connection dial(String dialString, UUSInfo uusInfo, CallDetails calldetails)
             throws CallStateException {
-        throw new CallStateException("Dail with CallDetails is not supported in this phone "
-                + this);
+        if (calldetails.call_type != CallDetails.RIL_CALL_TYPE_VOICE) {
+            throw new CallStateException("Dial with CallDetails is not supported in this phone "
+                    + this);
+        }
+        return dial(dialString, uusInfo);
     }
 
     public Connection dial(String dialString, CallDetails calldetails) throws CallStateException {
-        throw new CallStateException("Dail with CallDetails is not supported in this phone "
-                + this);
+        if (calldetails.call_type != CallDetails.RIL_CALL_TYPE_VOICE) {
+            throw new CallStateException("Dial with CallDetails is not supported in this phone "
+                    + this);
+        }
+        return dial(dialString);
     }
 
     public Connection dial(String dialString, UUSInfo uusInfo) throws CallStateException {
-        throw new CallStateException("Dail with uusInfo is not supported in this phone " + this);
+        throw new CallStateException("Dial with uusInfo is not supported in this phone " + this);
     }
 
     public void setState(State newState) {
-        // TODO Auto-generated method stub
+        Log.e(LOG_TAG, "setState unsupported for this phone");
         return;
     }
 
     public CallTracker getCallTracker() {
         return mCT;
+    }
+
+    public DisconnectCause disconnectCauseFromCode(int causeCode) {
+        Log.e(LOG_TAG, "disconnectCauseFromCode unsupported for this phone");
+        return DisconnectCause.ERROR_UNSPECIFIED;
     }
 }
