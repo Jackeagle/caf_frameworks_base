@@ -347,9 +347,11 @@ public class DownloadManager {
         /**
          * Bit flag for {@link #setAllowedNetworkTypes} corresponding to
          * {@link ConnectivityManager#TYPE_BLUETOOTH}.
+         * {@link ConnectivityManager#TYPE_ETHERNET}.
          * @hide
          */
         public static final int NETWORK_BLUETOOTH = 1 << 2;
+        public static final int NETWORK_ETHERNET = 1 << 2;
 
         private Uri mUri;
         private Uri mDestinationUri;
