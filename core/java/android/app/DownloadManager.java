@@ -344,6 +344,12 @@ public class DownloadManager {
          */
         public static final int NETWORK_WIFI = 1 << 1;
 
+        /**
+         * Bit flag for {@link #setAllowedNetworkTypes} corresponding to
+         * {@link ConnectivityManager#TYPE_ETHERNET}.
+         */
+        public static final int NETWORK_ETHERNET = 1 << 2;
+
         private Uri mUri;
         private Uri mDestinationUri;
         private List<Pair<String, String>> mRequestHeaders = new ArrayList<Pair<String, String>>();
