@@ -38,7 +38,6 @@ import android.net.NetworkStateTracker;
 import android.net.NetworkUtils;
 import android.net.LinkCapabilities;
 import android.net.NetworkInfo;
-import android.net.LinkProperties;
 import android.net.NetworkInfo.DetailedState;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -89,6 +88,8 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
     private Notification mNotification;
     private Handler mTrackerTarget;
 
+    private LinkProperties mLinkProperties;
+
     private BroadcastReceiver mEthernetStateReceiver;
 
     /* For sending events to connectivity service handler */
@@ -97,6 +98,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
 
     public EthernetStateTracker(Context context, Handler target) {
         mNetworkInfo = new NetworkInfo(ConnectivityManager.TYPE_ETHERNET, 0, "ETH", "");
+        mLinkProperties = new LinkProperties();
         if (localLOGV) Slog.v(TAG, "Starts...");
 
         if (EthernetNative.initEthernetNative() != 0) {
@@ -134,6 +136,8 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                     NetworkUtils.resetConnections(ifname, NetworkUtils.RESET_ALL_ADDRESSES);
                     if (!suspend)
                         NetworkUtils.disableInterface(ifname);
+
+                    mLinkProperties.clear();
                 }
             }
         }
@@ -207,6 +211,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                     if (!NetworkUtils.stopDhcp(mInterfaceName)) {
                         if (localLOGV) Slog.w(TAG, "Could not stop DHCP");
                     }
+                    mLinkProperties.clear();
                     configureInterface(info);
                 }
             }
@@ -386,6 +391,8 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                              if (NetworkUtils.runDhcp(mInterfaceName, mDhcpInfo)) {
                                  event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
                                  if (localLOGV) Slog.d(TAG, "DhcpHandler: DHCP request succeeded: " + mDhcpInfo.toString());
+                                 mLinkProperties = mDhcpInfo.makeLinkProperties();
+                                 mLinkProperties.setInterfaceName(mInterfaceName);
                              } else {
                                  event = EVENT_INTERFACE_CONFIGURATION_FAILED;
                                  Slog.e(TAG, "DhcpHandler: DHCP request failed: " + NetworkUtils.getDhcpError());
@@ -480,7 +487,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
      * Fetch LinkProperties for the network
      */
     public LinkProperties getLinkProperties() {
-        return new LinkProperties();
+        return new LinkProperties(mLinkProperties);
     }
 
     /**
