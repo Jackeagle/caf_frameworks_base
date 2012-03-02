@@ -92,6 +92,8 @@ extern int register_android_util_FloatMath(JNIEnv* env);
 extern int register_android_hardware_fm_fmradio(JNIEnv* env);
 #endif
 
+extern int register_android_hardware_GestureDevice(JNIEnv *env);
+
 namespace android {
 
 /*
@@ -1219,6 +1221,9 @@ static const RegJNIRec gRegJNI[] = {
 #ifndef NON_QCOM_TARGET
     REG_JNI(register_android_hardware_fm_fmradio),
 #endif
+
+    REG_JNI(register_android_hardware_GestureDevice),
+
 };
 
 /*
