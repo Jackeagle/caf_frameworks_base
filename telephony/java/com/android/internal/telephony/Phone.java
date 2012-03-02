@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
  * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +30,7 @@ import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 
 import com.android.internal.telephony.DataConnection;
+import com.android.internal.telephony.Connection.DisconnectCause;
 import com.android.internal.telephony.gsm.UsimServiceTable;
 import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.test.SimulatedRadioControl;
@@ -1888,4 +1890,30 @@ public interface Phone {
      * @return an interface to the UsimServiceTable record, or null if not available
      */
     UsimServiceTable getUsimServiceTable();
+
+    /* implement in all phones
+     * RilConnection.DisconnectCause
+            disconnectCauseFromCode(int causeCode){
+    if (phone.mCdmaSubscriptionSource == // write generic fun
+                        // toget icc status
+                        // for nv mode n
+                        // remove this check
+                        CdmaSubscriptionSourceManager.SUBSCRIPTION_FROM_RUIM
+                        && (phone.getUiccApplication() == null ||
+                        phone.getUiccApplication().getState() !=
+                        IccCardApplicationStatus.AppState.APPSTATE_READY)) {
+                    return DisconnectCause.ICC_ERROR;
+    } else if (causeCode == CallFailCause.ERROR_UNSPECIFIED) {
+                    if (phone.mSST.mRestrictedState.isCsRestricted()) {
+                        return DisconnectCause.CS_RESTRICTED;
+                    } else if (phone.mSST.mRestrictedState.isCsEmergencyRestricted()) {
+                        return DisconnectCause.CS_RESTRICTED_EMERGENCY;
+                    } else if (phone.mSST.mRestrictedState.isCsNormalRestricted()) {
+                        return DisconnectCause.CS_RESTRICTED_NORMAL;
+                    } else {
+                        return DisconnectCause.ERROR_UNSPECIFIED;
+                    }
+    }
+    }
+    */
 }

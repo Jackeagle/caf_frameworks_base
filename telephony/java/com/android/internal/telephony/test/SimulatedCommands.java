@@ -24,13 +24,13 @@ import android.os.Message;
 import android.util.Log;
 
 import com.android.internal.telephony.BaseCommands;
+import com.android.internal.telephony.CallFailCause;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.DataCallState;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.UUSInfo;
 import com.android.internal.telephony.cdma.CdmaSmsBroadcastConfigInfo;
-import com.android.internal.telephony.gsm.CallFailCause;
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SuppServiceNotification;
 
@@ -1070,7 +1070,7 @@ public final class SimulatedCommands extends BaseCommands
             String pin2, Message response) {
         iccIOForApp(command, fileid, path, p1, p2, p3, data,pin2, null, response);
     }
- 
+
     public void acknowledgeIncomingGsmSmsWithPdu(boolean success, String ackPdu,
             Message result) {
         unimplemented(result);

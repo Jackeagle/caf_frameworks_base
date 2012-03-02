@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
  * Copyright (c) 2011-2012 Code Aurora Forum. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +30,7 @@ import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Registrant;
 import android.os.RegistrantList;
 import android.os.SystemProperties;
 import android.preference.PreferenceManager;
@@ -38,6 +40,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.R;
+import com.android.internal.telephony.Connection.DisconnectCause;
 import com.android.internal.telephony.gsm.UsimServiceTable;
 import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.test.SimulatedRadioControl;
@@ -135,6 +138,11 @@ public abstract class PhoneBase extends Handler implements Phone {
     public IccRecords mIccRecords;
     public UiccCardApplication mUiccApplication;
     private int mVmCount = 0;
+    public CallTracker mCT;
+
+    public Registrant mPostDialHandler;
+    public static final int RESTART_ECM_TIMER = 0; // restart Ecm timer
+    public static final int CANCEL_ECM_TIMER = 1; // cancel Ecm timer
 
     // Key used for storing voice mail count
     protected String mVmCountKey = "vm_count_key";
@@ -291,7 +299,8 @@ public abstract class PhoneBase extends Handler implements Phone {
     @Override
     public void handleMessage(Message msg) {
         AsyncResult ar;
-
+        Log.d(LOG_TAG, "Received message " + msg +
+                "[" + msg.what + "] in phonebase.");
         if (!mIsTheCurrentActivePhone) {
             Log.e(LOG_TAG, "Received message " + msg +
                     "[" + msg.what + "] while being destroyed. Ignoring.");
@@ -373,7 +382,7 @@ public abstract class PhoneBase extends Handler implements Phone {
      * Subclasses of Phone probably want to replace this with a
      * version scoped to their packages
      */
-    protected void notifyPreciseCallStateChangedP() {
+    public void notifyPreciseCallStateChangedP() {
         AsyncResult ar = new AsyncResult(null, this, null);
         mPreciseCallStateRegistrants.notifyRegistrants(ar);
     }
@@ -1105,7 +1114,7 @@ public abstract class PhoneBase extends Handler implements Phone {
      * Subclasses of Phone probably want to replace this with a
      * version scoped to their packages
      */
-    protected void notifyNewRingingConnectionP(Connection cn) {
+    public void notifyNewRingingConnectionP(Connection cn) {
         if (!mIsVoiceCapable)
             return;
         AsyncResult ar = new AsyncResult(null, cn, null);
@@ -1199,6 +1208,22 @@ public abstract class PhoneBase extends Handler implements Phone {
         mNotifier.notifyDataConnectionFailed(this, reason, apnType);
     }
 
+    public void
+    notifyDisconnect(Connection cn) {
+        mDisconnectRegistrants.notifyResult(cn);
+    }
+
+    /**
+     * Notify any interested party of a Phone state change  {@link Phone.State}
+     */
+    public void notifyPhoneStateChanged() {
+        mNotifier.notifyPhoneState(this);
+    }
+
+    public void notifyUnknownConnection() {
+        mUnknownConnectionRegistrants.notifyResult(this);
+    }
+
     public void setDataReadinessChecks(
         boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
         mDataConnectionTracker.setDataReadinessChecks(
@@ -1233,5 +1258,19 @@ public abstract class PhoneBase extends Handler implements Phone {
     @Override
     public UsimServiceTable getUsimServiceTable() {
         return mIccRecords.getUsimServiceTable();
+    }
+
+    public void handleTimerInEmergencyCallbackMode(int action) {
+        Log.e(LOG_TAG, "handleTimerInEmergencyCallbackMode, unsupported for this phone");
+    }
+
+    /**
+     * @return true if there's no space in this call for additional
+     * connections to be added via "conference"
+     */
+     public boolean
+     isFull() {
+         Log.e(LOG_TAG, "isFull, unsupported for this phone");
+         return false;
     }
 }
