@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +18,7 @@
 
 package com.android.internal.telephony;
 
+import com.android.internal.telephony.CallModify;
 import com.android.internal.telephony.sip.SipPhone;
 
 import android.content.Context;
@@ -722,9 +725,28 @@ public final class CallManager {
      * @exception CallStateException when call is not ringing or waiting
      */
     public void acceptCall(Call ringingCall) throws CallStateException {
+        acceptCall(ringingCall, CallDetails.CALL_TYPE_VOICE);
+    }
+
+    /**
+     * Answers a ringing or waiting call, with an option to downgrade a Video
+     * call Active call, if any, go on hold. If active call can't be held, i.e.,
+     * a background call of the same channel exists, the active call will be
+     * hang up. Answering occurs asynchronously, and final notification occurs
+     * via
+     * {@link #registerForPreciseCallStateChanged(android.os.Handler, int, java.lang.Object)
+     * registerForPreciseCallStateChanged()}.
+     *
+     * @param ringingCall The call to answer
+     * @param callType The call type to use to answer the call. Values from
+     *            CallDetails.RIL_CALL_TYPE
+     * @exception CallStateException when call is not ringing or waiting
+     */
+    public void acceptCall(Call ringingCall, int callType) throws CallStateException {
         Phone ringingPhone = ringingCall.getPhone();
 
         if (VDBG) {
+            Log.d(LOG_TAG, "acceptCall api with calltype " + callType);
             Log.d(LOG_TAG, "acceptCall(" +ringingCall + " from " + ringingCall.getPhone() + ")");
             Log.d(LOG_TAG, this.toString());
         }
@@ -747,9 +769,14 @@ public final class CallManager {
             }
         }
 
-        ringingPhone.acceptCall();
+        if (ringingPhone.getPhoneType() == Phone.PHONE_TYPE_IMS) {
+            ringingPhone.acceptCall(callType);
+        } else {
+            ringingPhone.acceptCall();
+        }
 
         if (VDBG) {
+            Log.d(LOG_TAG, "Call type in acceptCall " +callType);
             Log.d(LOG_TAG, "End acceptCall(" +ringingCall + ")");
             Log.d(LOG_TAG, this.toString());
         }
@@ -930,6 +957,26 @@ public final class CallManager {
      * handled asynchronously.
      */
     public Connection dial(Phone phone, String dialString) throws CallStateException {
+        return dial(phone, dialString, CallDetails.CALL_TYPE_VOICE, null);
+    }
+
+    /**
+     * Initiate a new connection. This happens asynchronously, so you cannot
+     * assume the audio path is connected (or a call index has been assigned)
+     * until PhoneStateChanged notification has occurred.
+     *
+     * @exception CallStateException if a new outgoing call is not currently
+     *                possible because no more call slots exist or a call exists
+     *                that is dialing, alerting, ringing, or waiting. Other
+     *                errors are handled asynchronously.
+     * @param phone The phone to use to place the call
+     * @param dialString The phone number or URI that identifies the remote
+     *            party
+     * @param calldetails
+     */
+    public Connection dial(Phone phone, String dialString, int callType, String[] extras)
+            throws CallStateException {
+
         Phone basePhone = getPhoneBase(phone);
         Connection result;
 
@@ -938,12 +985,13 @@ public final class CallManager {
             Log.d(LOG_TAG, this.toString());
         }
 
-        if ( hasActiveFgCall() ) {
+        if (hasActiveFgCall()) {
             Phone activePhone = getActiveFgCall().getPhone();
             boolean hasBgCall = !(activePhone.getBackgroundCall().isIdle());
 
             if (DBG) {
-                Log.d(LOG_TAG, "hasBgCall: "+ hasBgCall + " sameChannel:" + (activePhone == basePhone));
+                Log.d(LOG_TAG, "hasBgCall: "+ hasBgCall + " sameChannel:"
+                        +(activePhone == basePhone));
             }
 
             if (activePhone != basePhone) {
@@ -957,7 +1005,11 @@ public final class CallManager {
             }
         }
 
-        result = basePhone.dial(dialString);
+        if (phone.getPhoneType() == Phone.PHONE_TYPE_IMS) {
+            result = basePhone.dial(dialString, callType, extras);
+        } else {
+            result = basePhone.dial(dialString);
+        }
 
         if (VDBG) {
             Log.d(LOG_TAG, "End dial(" + basePhone + ", "+ dialString + ")");
@@ -973,11 +1025,12 @@ public final class CallManager {
      * assigned) until PhoneStateChanged notification has occurred.
      *
      * @exception CallStateException if a new outgoing call is not currently
-     * possible because no more call slots exist or a call exists that is
-     * dialing, alerting, ringing, or waiting.  Other errors are
-     * handled asynchronously.
+     *                possible because no more call slots exist or a call exists
+     *                that is dialing, alerting, ringing, or waiting. Other
+     *                errors are handled asynchronously.
      */
-    public Connection dial(Phone phone, String dialString, UUSInfo uusInfo) throws CallStateException {
+    public Connection dial(Phone phone, String dialString, UUSInfo uusInfo)
+            throws CallStateException {
         return phone.dial(dialString, uusInfo);
     }
 
@@ -1708,6 +1761,47 @@ public final class CallManager {
         mPostDialCharacterRegistrants.remove(h);
     }
 
+    /**
+     * When the remote party in an IMS Call wants to upgrade or downgrade a
+     * call, a CallModifyRequest message is received. This function registers
+     * for that indication and sends a message to the handler when such an
+     * indication occurs. A response to the request can be send with
+     * {@link callModifyConfirm}. In order to confirm
+     *
+     * @param h The handler that will receive the message
+     * @param what The message to send
+     * @param obj User object to send with the message
+     */
+    public void registerForCallModifyRequest(Handler h, int what, Object obj) {
+    }
+
+    /**
+     * Request a modification to a current connection This will send an
+     * indication to the remote party with new call details, which the remote
+     * party can agree to or reject. To agree, they will return the same call
+     * details as proposed. To reject, they will return the current call details
+     * in the Connection ({@link Connection#getCallDetails()}) Used to convert a
+     * voice call into a Video telephony call.
+     *
+     * @param conn The connection to modify
+     * @param modifyInitiate The new call details to request and the call index
+     */
+    public void callModifyInitiate(Connection conn, CallModify modifyInitiate) {
+    }
+
+    /**
+     * Confirm a previosuly received CallModifyRequest. If the request is to be
+     * approved, the same parameters contained in the message (see
+     * {@link registerForCallModifyRequest}) will be passed in details.
+     * Otherwise, the old call details will be passed (e.g. from
+     * conn.getDetails()
+     *
+     * @param conn The connection to confirm
+     * @param modifyConfirm The call details to use and the call index
+     */
+    public void callModifyConfirm(Connection conn, CallModify modifyConfirm) {
+    }
+
     /* APIs to access foregroudCalls, backgroudCalls, and ringingCalls
      * 1. APIs to access list of calls
      * 2. APIs to check if any active call, which has connection other than
@@ -1937,6 +2031,34 @@ public final class CallManager {
         for (Call call : mRingingCalls) {
             if (call.getState().isRinging()) {
                 if (++count > 1) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return true if the IMS phone has any active calls. ie. there are active
+     *         IMS calls at present
+     */
+    public boolean isImsPhoneActive() {
+        for (Phone phone : mPhones) {
+            if (phone.getPhoneType() == Phone.PHONE_TYPE_IMS
+                    && phone.getState() != Phone.State.IDLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return true if IMS Phone is in idle state ie. there are no IMS calls
+     *         active at present
+     */
+    public boolean isImsPhoneIdle() {
+        for (Phone phone : mPhones) {
+            if (phone.getPhoneType() == Phone.PHONE_TYPE_IMS &&
+                    phone.getState() == Phone.State.IDLE) {
+                return true;
             }
         }
         return false;
