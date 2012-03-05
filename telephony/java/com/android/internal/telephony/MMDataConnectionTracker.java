@@ -1185,7 +1185,7 @@ public class MMDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
-        if (mDisconnectAllDataCalls) {
+        if (mDisconnectAllDataCalls && !mDataCallSetupPending) {
             /*
              * Someone had requested that all calls be torn down.
              * Either there is no calls to disconnect, or we have already asked
