@@ -977,7 +977,7 @@ void CameraService::Client::notifyCallback(int32_t msgType, int32_t ext1,
 
     sp<Client> client = getClientFromCookie(user);
     if (client == 0) return;
-    if (!client->lockIfMessageWanted(msgType)) return;
+//    if (!client->lockIfMessageWanted(msgType)) return;
 
     switch (msgType) {
         case CAMERA_MSG_SHUTTER:
@@ -996,7 +996,7 @@ void CameraService::Client::dataCallback(int32_t msgType,
 
     sp<Client> client = getClientFromCookie(user);
     if (client == 0) return;
-    if (!client->lockIfMessageWanted(msgType)) return;
+//    if (!client->lockIfMessageWanted(msgType)) return;
 
     if (dataPtr == 0 && metadata == NULL) {
         LOGE("Null data returned in data callback");
@@ -1029,7 +1029,7 @@ void CameraService::Client::dataCallbackTimestamp(nsecs_t timestamp,
 
     sp<Client> client = getClientFromCookie(user);
     if (client == 0) return;
-    if (!client->lockIfMessageWanted(msgType)) return;
+//    if (!client->lockIfMessageWanted(msgType)) return;
 
     if (dataPtr == 0) {
         LOGE("Null data returned in data with timestamp callback");
@@ -1050,7 +1050,7 @@ void CameraService::Client::handleShutter(void) {
     if (c != 0) {
         mLock.unlock();
         c->notifyCallback(CAMERA_MSG_SHUTTER, 0, 0);
-        if (!lockIfMessageWanted(CAMERA_MSG_SHUTTER)) return;
+//        if (!lockIfMessageWanted(CAMERA_MSG_SHUTTER)) return;
     }
     disableMsgType(CAMERA_MSG_SHUTTER);
 
