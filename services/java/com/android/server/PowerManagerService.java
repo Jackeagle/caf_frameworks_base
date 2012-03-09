@@ -51,6 +51,7 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.WorkSource;
+import android.os.SystemProperties;
 import android.provider.Settings.SettingNotFoundException;
 import android.provider.Settings;
 import android.util.EventLog;
@@ -655,6 +656,14 @@ public class PowerManagerService extends IPowerManager.Stub
                 }
             });
         updateSettingsValues();
+
+        // setPowerState() may exit before the mPowerState is updated
+        // Set wake lock if hw.nopm option is true. Also set SCREEN_ON_BIT, because
+        String hwNoPMStr = SystemProperties.get("hw.nopm");
+        boolean hwNoPM = Boolean.parseBoolean(hwNoPMStr);
+        if (hwNoPM) {
+            setStayOnSetting(BatteryManager.BATTERY_PLUGGED_AC | BatteryManager.BATTERY_PLUGGED_USB);
+        }
 
         synchronized (mHandlerThread) {
             mInitComplete = true;
@@ -2569,9 +2578,12 @@ public class PowerManagerService extends IPowerManager.Stub
      */
     public void goToSleepWithReason(long time, int reason)
     {
-        mContext.enforceCallingOrSelfPermission(android.Manifest.permission.DEVICE_POWER, null);
-        synchronized (mLocks) {
-            goToSleepLocked(time, reason);
+        // Check for STAY_ON_WHILE_PLUGGED_IN to prevent skiping of input events when ENDCALL button was pressed
+        if (mStayOnConditions == 0) {
+            mContext.enforceCallingOrSelfPermission(android.Manifest.permission.DEVICE_POWER, null);
+            synchronized (mLocks) {
+                goToSleepLocked(time, reason);
+            }
         }
     }
 
