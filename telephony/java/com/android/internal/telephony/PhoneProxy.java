@@ -452,6 +452,10 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.acceptCall();
     }
 
+    public void acceptCall(int callType) throws CallStateException {
+        mActivePhone.acceptCall(callType);
+    }
+
     public void rejectCall() throws CallStateException {
         mActivePhone.rejectCall();
     }
@@ -504,8 +508,17 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.dial(dialString);
     }
 
+    public Connection dial(String dialString, CallDetails calldetails) throws CallStateException {
+        return mActivePhone.dial(dialString, calldetails );
+    }
+
     public Connection dial(String dialString, UUSInfo uusInfo) throws CallStateException {
         return mActivePhone.dial(dialString, uusInfo);
+    }
+
+    public Connection dial(String dialString, UUSInfo uusInfo, CallDetails calldetails)
+            throws CallStateException {
+        return mActivePhone.dial(dialString, uusInfo, calldetails);
     }
 
     public boolean handlePinMmi(String dialString) {
@@ -992,5 +1005,9 @@ public class PhoneProxy extends Handler implements Phone {
     @Override
     public UsimServiceTable getUsimServiceTable() {
         return mActivePhone.getUsimServiceTable();
+    }
+
+    public CallTracker getCallTracker() {
+        return mActivePhone.getCallTracker();
     }
 }

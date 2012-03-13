@@ -78,6 +78,13 @@ public class CallDetails {
                                                             * call should be
                                                             * selected by modem
                                                             */
+    public static final int RIL_CALL_DOMAIN_NOT_SET = 4; /*
+                                                          * Init value used
+                                                          * internally by
+                                                          * telephony until
+                                                          * domain is set
+                                                          */
+
     public int call_type;
     public int call_domain;
 
@@ -85,11 +92,11 @@ public class CallDetails {
 
     public CallDetails() {
         call_type = RIL_CALL_TYPE_VOICE;
-        call_domain = RIL_CALL_DOMAIN_CS;
+        call_domain = RIL_CALL_DOMAIN_NOT_SET;
         extras = null;
     }
 
-    public CallDetails(int callType, int callDomain, int extrasLength, String[] extraparams) {
+    public CallDetails(int callType, int callDomain, String[] extraparams) {
         call_type = callType;
         call_domain = callDomain;
         extras = extraparams;// TODO check if stringcopy is required

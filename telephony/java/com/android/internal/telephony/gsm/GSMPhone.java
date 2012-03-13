@@ -56,6 +56,7 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_BASEBA
 import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.cat.CatService;
 import com.android.internal.telephony.Call;
+import com.android.internal.telephony.CallDetails;
 import com.android.internal.telephony.CallForwardInfo;
 import com.android.internal.telephony.CallStateException;
 import com.android.internal.telephony.CommandsInterface;
@@ -748,11 +749,11 @@ public class GSMPhone extends PhoneBase {
 
     public Connection
     dial(String dialString) throws CallStateException {
-        return dial(dialString, null);
+        return dial(dialString, null, null);
     }
 
     public Connection
-    dial (String dialString, UUSInfo uusInfo) throws CallStateException {
+    dial (String dialString, UUSInfo uusInfo, CallDetails calldetails) throws CallStateException {
         // Need to make sure dialString gets parsed properly
         String newDialString = PhoneNumberUtils.stripSeparators(dialString);
 

@@ -359,6 +359,9 @@ public class CDMAPhone extends PhoneBase {
     dial (String dialString) throws CallStateException {
         // Need to make sure dialString gets parsed properly
         String newDialString = PhoneNumberUtils.stripSeparators(dialString);
+        Log.d(LOG_TAG, "dialString=" + newDialString);
+        newDialString = PhoneNumberUtils.formatDialString(newDialString); // only for cdma
+        Log.d(LOG_TAG, "formated dialString=" + newDialString);
         return mCT.dial(newDialString);
     }
 

@@ -24,6 +24,7 @@ import android.os.Message;
 import android.util.Log;
 
 import com.android.internal.telephony.BaseCommands;
+import com.android.internal.telephony.CallDetails;
 import com.android.internal.telephony.CallFailCause;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.CommandsInterface;
@@ -1600,5 +1601,14 @@ public final class SimulatedCommands extends BaseCommands
 
     public void setSubscriptionMode(int subscriptionMode, Message response) {
         unimplemented(response);
+    }
+
+    public void acceptCall(Message result, int callType) {
+        unimplemented(result);
+    }
+
+    public void dial(String address, int clirMode, UUSInfo uusInfo, CallDetails callDetails,
+            Message result) {
+        unimplemented(result);
     }
 }

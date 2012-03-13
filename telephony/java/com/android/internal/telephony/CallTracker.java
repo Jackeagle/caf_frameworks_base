@@ -46,11 +46,13 @@ public abstract class CallTracker extends Handler {
     public CommandsInterface cm;
 
     public PhoneBase phone;
+    public PhoneBase imsPhone;
+
     public Call ringingCall;
     // A call that is ringing or (call) waiting
     public Call foregroundCall;
     public Call backgroundCall;
-    public Phone.State state = Phone.State.IDLE;
+    public Phone.State state = Phone.State.IDLE; //Phone state for base phone
     public boolean mIsInEmergencyCall = false;
 
     //***** Events
@@ -70,6 +72,7 @@ public abstract class CallTracker extends Handler {
     protected static final int EVENT_EXIT_ECM_RESPONSE_CDMA        = 14;
     protected static final int EVENT_CALL_WAITING_INFO_CDMA        = 15;
     protected static final int EVENT_THREE_WAY_DIAL_L2_RESULT_CDMA = 16;
+    protected static final int EVENT_MODIFY_CALL                   = 17;
 
     public abstract void acceptCall() throws CallStateException;
     public abstract void rejectCall() throws CallStateException;
@@ -86,6 +89,8 @@ public abstract class CallTracker extends Handler {
 
     public RegistrantList voiceCallEndedRegistrants = new RegistrantList();
     public RegistrantList voiceCallStartedRegistrants = new RegistrantList();
+    public RegistrantList imsCallEndedRegistrants = new RegistrantList();
+    public RegistrantList imsCallStartedRegistrants = new RegistrantList();
     public RegistrantList callWaitingRegistrants =  new RegistrantList();
 
     protected void pollCallsWhenSafe() {
@@ -163,16 +168,16 @@ public abstract class CallTracker extends Handler {
         return mIsInEmergencyCall;
     };
 
-    //***** Called from RilConnection
+    //***** Called from ConnectionBase
     public void
-    hangup (RilConnection conn) throws CallStateException {
-        throw new CallStateException ("RilConnection " + conn
+    hangup (ConnectionBase conn) throws CallStateException {
+        throw new CallStateException ("ConnectionBase " + conn
                 + "does not belong to CallTracker " + this);
     }
 
     public void
-    separate(RilConnection conn) throws CallStateException {
-        throw new CallStateException("RilConnection " + conn
+    separate(ConnectionBase conn) throws CallStateException {
+        throw new CallStateException("ConnectionBase " + conn
                 + "does not belong to CallTracker " + this);
     }
 
@@ -225,4 +230,31 @@ public abstract class CallTracker extends Handler {
         throw new CallStateException("Dial with Clirmode does not belong to CallTracker " + this);
     }
 
+    public Connection dial(String dialString, CallDetails calldetails) throws CallStateException {
+        throw new CallStateException("Dial with calldetails does not belong to CallTracker "
+                + this);
+    }
+
+    public void acceptCall(PhoneBase incomingPhone) throws CallStateException {
+        throw new CallStateException(
+                "Accept with incomingphone is not supported in this CallTracker " + this);
+    }
+
+    public void acceptCall(PhoneBase phone, int callType) throws CallStateException {
+        throw new CallStateException("Accept with CallType is not supported in this CallTracker "
+                + this);
+    }
+
+    void hangupAllCalls(int callDomain) throws CallStateException {
+        hangupAllCallsP(callDomain);
+    }
+
+    protected void hangupAllCallsP(int callDomain) throws CallStateException {
+        throw new CallStateException("hangupAllCalls is not supported in this CallTracker");
+    }
+
+    public void rejectCall(PhoneBase phone) throws CallStateException {
+        throw new CallStateException(
+                "rejectCall with PhoneBase is not supported in this CallTracker");
+    }
 }

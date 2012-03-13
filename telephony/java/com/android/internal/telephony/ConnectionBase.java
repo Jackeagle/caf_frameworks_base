@@ -41,14 +41,13 @@ import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
 /**
  * {@hide}
  */
-public class RilConnection extends Connection {
+public class ConnectionBase extends Connection {
     static final String LOG_TAG = "RILCONNECTION";
 
     //***** Instance Variables
 
-    public CallTracker owner;//upcast child objectscdmacall tracker/ gsm call tracker to parent dynamically
-    //note cannot access child only data or use RilCallTracker
-    Call parent;// Same comment upcast if required
+    public CallTracker owner;
+    Call parent;
 
 
     public String address;             // MAY BE NULL!!!
@@ -85,6 +84,7 @@ public class RilConnection extends Connection {
     int numberPresentation = Connection.PRESENTATION_ALLOWED;
     int cnapNamePresentation  = Connection.PRESENTATION_ALLOWED;//only used for cdma
     UUSInfo uusInfo = null; // only used for GSM , move it to constructor
+    public CallDetails callDetails = null;
 
 
     Handler h;
@@ -127,7 +127,7 @@ public class RilConnection extends Connection {
 
     /** This is probably an MT call that we first saw in a CLCC response */
     /*package*/
-    public RilConnection (Context context, DriverCall dc, CallTracker ct, int index) {
+    public ConnectionBase (Context context, DriverCall dc, CallTracker ct, int index) {
         createWakeLock(context);
         acquireWakeLock();
 
@@ -141,17 +141,27 @@ public class RilConnection extends Connection {
         cnapName = dc.name; //TBD if present check
         cnapNamePresentation = dc.namePresentation;
         numberPresentation = dc.numberPresentation;
-        uusInfo = dc.uusInfo; //TBD if present check
 
+        if (dc.uusInfo!= null ) // only for Gsm
+            uusInfo = dc.uusInfo;
+        if (dc.callDetails != null)
+            callDetails = dc.callDetails;
+
+        if ((callDetails != null) && (callDetails.call_domain == CallDetails.RIL_CALL_DOMAIN_PS)) {
+            parent = imsParentFromDCState(dc.state); //parent = call from ImsPhone
+        }else {
+            parent = parentFromDCState(dc.state); // parent = call from CdmaPhone
+        }
         this.index = index;
-
-        parent = parentFromDCState (dc.state);
-        parent.attach(this, dc);
+        if (parent != null ) parent.attach(this, dc);
+        else {
+            Log.e(LOG_TAG, "This ConnectionBase does not have a parent call");
+        }
     }
 
     /** This is an MO call/three way call, created when dialing */
     /*package*/
-    public RilConnection(Context context, String dialString, CallTracker ct, Call parent) {
+    public ConnectionBase(Context context, String dialString, CallTracker ct, Call parent) {
         createWakeLock(context);
         acquireWakeLock();
 
@@ -159,10 +169,6 @@ public class RilConnection extends Connection {
         h = new MyHandler(owner.getLooper());
 
         this.dialString = dialString;
-        Log.d(LOG_TAG, "dialString=" + dialString);
-        //format dialstring at CdmaCallTracker
-        Log.d(LOG_TAG, "formated dialString=" + dialString);
-
         this.address = PhoneNumberUtils.extractNetworkPortionAlt(dialString);
         this.postDialString = PhoneNumberUtils.extractPostDialPortion(dialString);
 
@@ -187,8 +193,48 @@ public class RilConnection extends Connection {
         }
     }
 
+    /** This is an MO call/three way call, created when dialing */
+    /*package*/
+    public ConnectionBase(Context context, String dialString, CallTracker ct, Call parent,
+            CallDetails moCallDetails) {
+        createWakeLock(context);
+        acquireWakeLock();
+
+        owner = ct;
+        h = new MyHandler(owner.getLooper());
+
+        this.dialString = dialString;
+        if ((moCallDetails != null)
+                && (moCallDetails.call_domain == CallDetails.RIL_CALL_DOMAIN_PS))
+            this.address = dialString;
+        else
+            this.address = PhoneNumberUtils.extractNetworkPortionAlt(dialString);
+        this.postDialString = PhoneNumberUtils.extractPostDialPortion(dialString);
+
+        index = -1;
+
+        isIncoming = false;
+        cnapName = null;
+        createTime = System.currentTimeMillis();
+        callDetails = moCallDetails;
+
+        if (parent != null) {
+            this.parent = parent;
+
+            //for the cdma three way call case, do not change parent state
+            // pass remote caller id in cdma 3 way call only
+            if (parent.state == Call.State.ACTIVE) {
+                cnapNamePresentation = Connection.PRESENTATION_ALLOWED;
+                numberPresentation = Connection.PRESENTATION_ALLOWED;
+                parent.attachFake(this, Call.State.ACTIVE);
+            } else {//MO call for Gsm & Cdma, set state to dialing
+                parent.attachFake(this, Call.State.DIALING);
+            }
+        }
+    }
+
     /** This is a Call waiting call for cdma*/
-    public RilConnection(Context context, CdmaCallWaitingNotification cw, CallTracker ct,
+    public ConnectionBase(Context context, CdmaCallWaitingNotification cw, CallTracker ct,
             Call parent) {
         createWakeLock(context);
         acquireWakeLock();
@@ -203,6 +249,27 @@ public class RilConnection extends Connection {
         isIncoming = true;
         createTime = System.currentTimeMillis();
         connectTime = 0;
+        this.parent = parent;
+        parent.attachFake(this, Call.State.WAITING);
+    }
+
+    /** This is a Call waiting call for cdma*/
+    public ConnectionBase(Context context, CdmaCallWaitingNotification cw, CallTracker ct,
+            Call parent, CallDetails moCallDetails ) {
+        createWakeLock(context);
+        acquireWakeLock();
+
+        owner = ct;
+        h = new MyHandler(owner.getLooper());
+        address = cw.number;
+        numberPresentation = cw.numberPresentation;
+        cnapName = cw.name;
+        cnapNamePresentation = cw.namePresentation;
+        index = -1;
+        isIncoming = true;
+        createTime = System.currentTimeMillis();
+        connectTime = 0;
+        callDetails = moCallDetails;
         this.parent = parent;
         parent.attachFake(this, Call.State.WAITING);
     }
@@ -321,7 +388,7 @@ public class RilConnection extends Connection {
 
     public void proceedAfterWaitChar() {
         if (postDialState != PostDialState.WAIT) {
-            Log.w(LOG_TAG, "RilConnection.proceedAfterWaitChar(): Expected "
+            Log.w(LOG_TAG, "ConnectionBase.proceedAfterWaitChar(): Expected "
                     + "getPostDialState() to be WAIT but was " + postDialState);
             return;
         }
@@ -394,7 +461,7 @@ public class RilConnection extends Connection {
 
     // TBD move this to phone & implement in cdma & gsmphone
     DisconnectCause
-    disconnectCauseFromCode(int causeCode) {
+    disconnectCauseFromCode(PhoneBase phone, int causeCode) {
         /**
          * See 22.001 Annex F.4 for mapping of cause codes
          * to local tones
@@ -448,8 +515,7 @@ public class RilConnection extends Connection {
                 return DisconnectCause.CDMA_ACCESS_BLOCKED;
             case CallFailCause.ERROR_UNSPECIFIED:
             case CallFailCause.NORMAL_CLEARING:
-            default:/*
-                PhoneBase phone = owner.phone;
+            default:
                 int serviceState = phone.getServiceState().getState();
                 if (serviceState == ServiceState.STATE_POWER_OFF) {
                     return DisconnectCause.POWER_OFF;
@@ -459,17 +525,21 @@ public class RilConnection extends Connection {
                 } else if (causeCode == CallFailCause.NORMAL_CLEARING) {
                     return DisconnectCause.NORMAL;
                 }else {
-                    // use this or move the complete function to phones
-                    //return owner.phone.disconnectCauseFromCode(causeCode);
                     return DisconnectCause.ERROR_UNSPECIFIED;
-                }*/
-                return DisconnectCause.ERROR_UNSPECIFIED;
+                }
         }
     }
 
+
     public void
     onRemoteDisconnect(int causeCode) {
-        onDisconnect(disconnectCauseFromCode(causeCode));
+        onDisconnect(owner.phone.disconnectCauseFromCode(causeCode));
+    }
+
+
+    public void
+    onRemoteDisconnect(PhoneBase phone, int causeCode) {
+        onDisconnect(phone.disconnectCauseFromCode(causeCode));
     }
 
     /** Called when the radio indicates the connection has been disconnected */
@@ -513,7 +583,11 @@ public class RilConnection extends Connection {
         boolean wasConnectingInOrOut = isConnectingInOrOut();
         boolean wasHolding = (getState() == Call.State.HOLDING);
 
-        newParent = parentFromDCState(dc.state);
+        if ((dc.callDetails != null) && (dc.callDetails.call_domain == CallDetails.RIL_CALL_DOMAIN_PS)) {
+            newParent = imsParentFromDCState(dc.state); //parent = ImsPhone
+        }else {
+        newParent = parentFromDCState(dc.state); // parent = CdmaPhone
+        }
 
         if (Phone.DEBUG_PHONE) log("parent= " +parent +", newParent= " + newParent);
 
@@ -567,7 +641,7 @@ public class RilConnection extends Connection {
 
         if (changed && !wasHolding && (getState() == Call.State.HOLDING)) {
             // We've transitioned into HOLDING
-            onStartedHolding();
+            onStartedHolding();//TBD
         }
 
         return changed;
@@ -723,8 +797,8 @@ public class RilConnection extends Connection {
         }
         releaseWakeLock();
     }
-
     void processNextPostDialChar() {
+        PhoneBase phone = getPhoneFromConnection();
         char c = 0;
         Registrant postDialHandler;
 
@@ -761,7 +835,7 @@ public class RilConnection extends Connection {
             }
         }
 
-        postDialHandler = owner.phone.mPostDialHandler;
+        postDialHandler = phone.mPostDialHandler;
 
         Message notifyMessage;
 
@@ -786,7 +860,7 @@ public class RilConnection extends Connection {
      */
     private boolean
     isConnectingInOrOut() {
-        return parent == null || parent == owner.ringingCall
+        return parent == null || parent == getPhoneFromConnection().getRingingCall()
                 || parent.state == Call.State.DIALING
                 || parent.state == Call.State.ALERTING;
     }
@@ -814,6 +888,28 @@ public class RilConnection extends Connection {
         }
     }
 
+    private Call
+    imsParentFromDCState (DriverCall.State state) {
+        if (owner.imsPhone != null) {
+            switch (state) {
+                case ACTIVE:
+                case DIALING:
+                case ALERTING:
+                    return owner.imsPhone.getForegroundCall();
+
+                case HOLDING:
+                    return owner.imsPhone.getBackgroundCall();
+
+                case INCOMING:
+                case WAITING:
+                    return owner.imsPhone.getRingingCall();
+
+                default:
+                    throw new RuntimeException("illegal call state: " + state);
+            }
+        } else
+            return null;
+    }
     /**
      * Set post dial state and acquire wake lock while switching to "started" or "wait"
      * state, the wake lock will be released if state switches out of "started" or "wait"
@@ -870,5 +966,15 @@ public class RilConnection extends Connection {
     @Override
     public UUSInfo getUUSInfo() {
         return uusInfo;
+    }
+
+    @Override
+    public CallDetails getCallDetails() {
+        return this.callDetails;
+    }
+
+    public PhoneBase getPhoneFromConnection()
+    {
+        return (PhoneBase)(parent.getPhone());
     }
 }

@@ -321,4 +321,13 @@ public abstract class Connection {
             throw new CallStateException ("Index not yet assigned");
         }
     }
+
+    public CallDetails getCallDetails() {
+        return null;
+    }
+
+    public PhoneBase getPhoneFromConnection()
+    {
+        return null;
+    }
 }

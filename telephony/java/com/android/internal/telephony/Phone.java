@@ -720,6 +720,16 @@ public interface Phone {
     void acceptCall() throws CallStateException;
 
     /**
+     * Answers a ringing or waiting call. Active calls, if any, go on hold.
+     * Answering occurs asynchronously, and final notification occurs via
+     * {@link #registerForPreciseCallStateChanged(android.os.Handler, int,
+     * java.lang.Object) registerForPreciseCallStateChanged()}.
+     *
+     * @exception CallStateException when no call is ringing or waiting
+     */
+    void acceptCall(int callType) throws CallStateException;
+
+    /**
      * Reject (ignore) a ringing call. In GSM, this means UDUB
      * (User Determined User Busy). Reject occurs asynchronously,
      * and final notification occurs via
@@ -878,6 +888,11 @@ public interface Phone {
      *                errors are handled asynchronously.
      */
     Connection dial(String dialString, UUSInfo uusInfo) throws CallStateException;
+
+    public Connection dial(String dialString, UUSInfo uusInfo, CallDetails calldetails)
+            throws CallStateException;
+
+    public Connection dial(String dialString, CallDetails calldetails) throws CallStateException;
 
     /**
      * Handles PIN MMI commands (PIN/PIN2/PUK/PUK2), which are initiated
@@ -1891,8 +1906,10 @@ public interface Phone {
      */
     UsimServiceTable getUsimServiceTable();
 
+    CallTracker getCallTracker();
+
     /* implement in all phones
-     * RilConnection.DisconnectCause
+     * ConnectionBase.DisconnectCause
             disconnectCauseFromCode(int causeCode){
     if (phone.mCdmaSubscriptionSource == // write generic fun
                         // toget icc status

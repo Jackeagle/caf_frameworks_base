@@ -41,6 +41,7 @@ import android.util.Log;
 
 import com.android.internal.R;
 import com.android.internal.telephony.Connection.DisconnectCause;
+import com.android.internal.telephony.Phone.State;
 import com.android.internal.telephony.gsm.UsimServiceTable;
 import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.test.SimulatedRadioControl;
@@ -694,13 +695,6 @@ public abstract class PhoneBase extends Handler implements Phone {
         return null;
     }
 
-    /**
-    * Get call tracker
-    */
-    public CallTracker getCallTracker() {
-        return null;
-    }
-
     @Override
     public IccCard getIccCard() {
         return null;
@@ -1272,5 +1266,43 @@ public abstract class PhoneBase extends Handler implements Phone {
      isFull() {
          Log.e(LOG_TAG, "isFull, unsupported for this phone");
          return false;
+    }
+
+    /**
+     * Answers a ringing or waiting call. Active calls, if any, go on hold.
+     * Answering occurs asynchronously, and final notification occurs via
+     * {@link #registerForPreciseCallStateChanged(android.os.Handler, int, java.lang.Object)
+     * registerForPreciseCallStateChanged()}.
+     *
+     * @exception CallStateException when no call is ringing or waiting or API
+     *                not supported
+     */
+    public void acceptCall(int callType) throws CallStateException {
+        throw new CallStateException("Accept with CallType is not supported in this phone "
+                + this);
+    }
+
+    public Connection dial(String dialString, UUSInfo uusInfo, CallDetails calldetails)
+            throws CallStateException {
+        throw new CallStateException("Dail with CallDetails is not supported in this phone "
+                + this);
+    }
+
+    public Connection dial(String dialString, CallDetails calldetails) throws CallStateException {
+        throw new CallStateException("Dail with CallDetails is not supported in this phone "
+                + this);
+    }
+
+    public Connection dial(String dialString, UUSInfo uusInfo) throws CallStateException {
+        throw new CallStateException("Dail with uusInfo is not supported in this phone " + this);
+    }
+
+    public void setState(State newState) {
+        // TODO Auto-generated method stub
+        return;
+    }
+
+    public CallTracker getCallTracker() {
+        return mCT;
     }
 }

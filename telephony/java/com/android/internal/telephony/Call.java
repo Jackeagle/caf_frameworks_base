@@ -291,24 +291,24 @@ public abstract class Call {
     }
 
     public void
-    attach(RilConnection conn, DriverCall dc) {
+    attach(ConnectionBase conn, DriverCall dc) {
         connections.add(conn);
 
         state = stateFromDCState (dc.state);
     }
 
     public void
-    attachFake(RilConnection conn, State state) {
+    attachFake(ConnectionBase conn, State state) {
         connections.add(conn);
 
         this.state = state;
     }
 
     /**
-     * Called by RilConnection when it has disconnected
+     * Called by ConnectionBase when it has disconnected
      */
     void
-    connectionDisconnected(RilConnection conn) {
+    connectionDisconnected(ConnectionBase conn) {
         if (state != State.DISCONNECTED) {
             /* If only disconnected connections remain, we are disconnected*/
 
@@ -329,9 +329,9 @@ public abstract class Call {
         }
     }
 
-    //***** Called from RilConnection
+    //***** Called from ConnectionBase
     void
-    detach(RilConnection conn) {
+    detach(ConnectionBase conn) {
         connections.remove(conn);
 
         if (connections.size() == 0) {
@@ -340,7 +340,7 @@ public abstract class Call {
     }
 
     boolean
-    update (RilConnection conn, DriverCall dc) {
+    update (ConnectionBase conn, DriverCall dc) {
         State newState;
         boolean changed = false;
 
