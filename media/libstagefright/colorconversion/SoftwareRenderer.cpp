@@ -28,6 +28,37 @@
 #include <ui/GraphicBufferMapper.h>
 #include <gui/ISurfaceTexture.h>
 
+#include <cutils/properties.h>
+#define UNLIKELY( exp ) (__builtin_expect( (exp) != 0, false ))
+
+static int mDebugFps = 0;
+
+/*
+    To print the FPS, type this command on the console before starting playback:
+    setprop debug.video.showfps 1
+    To disable the prints, type:
+    setprop debug.video.showfps 0
+
+*/
+
+static void debugShowFPS()
+{
+    static int mFrameCount = 0;
+    static int mLastFrameCount = 0;
+    static nsecs_t mLastFpsTime = 0;
+    static float mFps = 0;
+    mFrameCount++;
+    if (!(mFrameCount & 0x1F)) {
+        nsecs_t now = systemTime();
+        nsecs_t diff = now - mLastFpsTime;
+        mFps = ((mFrameCount - mLastFrameCount) * float(s2ns(1))) / diff;
+        mLastFpsTime = now;
+        mLastFrameCount = mFrameCount;
+        LOGD("%d Frames, %f FPS", mFrameCount, mFps);
+    }
+    // XXX: mFPS has the value we want
+}
+
 namespace android {
 
 SoftwareRenderer::SoftwareRenderer(
@@ -118,6 +149,12 @@ SoftwareRenderer::SoftwareRenderer(
         CHECK_EQ(0, native_window_set_buffers_transform(
                     mNativeWindow.get(), transform));
     }
+
+	char value[PROPERTY_VALUE_MAX];
+    property_get("debug.video.showfps", value, "0");
+    mDebugFps = atoi(value);
+    LOGD_IF(mDebugFps, "showfps enabled");
+
 }
 
 SoftwareRenderer::~SoftwareRenderer() {
@@ -138,6 +175,11 @@ void SoftwareRenderer::render(
         LOGW("Surface::dequeueBuffer returned error %d", err);
         return;
     }
+
+	if (UNLIKELY(mDebugFps)) {
+        debugShowFPS();
+    }
+
 
     CHECK_EQ(0, mNativeWindow->lockBuffer(mNativeWindow.get(), buf));
 
