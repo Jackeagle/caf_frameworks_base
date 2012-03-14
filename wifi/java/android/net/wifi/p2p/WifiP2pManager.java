@@ -436,6 +436,13 @@ public class WifiP2pManager {
     /** @hide */
     public static final int SHOW_PIN_REQUESTED                      = BASE + 58;
 
+    /** @hide */
+    public static final int UPDATE_WFD_SETTINGS                     = BASE + 59;
+    /** @hide */
+    public static final int UPDATE_WFD_SETTINGS_SUCCEEDED           = BASE + 60;
+    /** @hide */
+    public static final int UPDATE_WFD_SETTINGS_FAILED              = BASE + 61;
+
     /**
      * Create a new WifiP2pManager instance. Applications use
      * {@link android.content.Context#getSystemService Context.getSystemService()} to retrieve
@@ -740,6 +747,18 @@ public class WifiP2pManager {
                         WifiP2pDeviceList peers = (WifiP2pDeviceList) message.obj;
                         if (listener != null) {
                             ((PeerListListener) listener).onPeersAvailable(peers);
+                        }
+                        break;
+                    case WifiP2pManager.UPDATE_WFD_SETTINGS_SUCCEEDED:
+                        Log.d(TAG, "Update WFD settings succeeded");
+                        if(listener != null) {
+                            ((ActionListener)listener).onSuccess();
+                        }
+                        break;
+                    case WifiP2pManager.UPDATE_WFD_SETTINGS_FAILED:
+                        Log.d(TAG, "Update WFD settings failed");
+                        if(listener != null) {
+                            ((ActionListener)listener).onFailure(ERROR);
                         }
                         break;
                     case WifiP2pManager.RESPONSE_CONNECTION_INFO:
@@ -1309,6 +1328,29 @@ public class WifiP2pManager {
         } catch (RemoteException e) {
             return null;
         }
+    }
+
+    /**
+     * Update Wi-Fi Display parameters of the local device.
+     *
+     * <p> This function sets WFD parameters in the device to
+     * advertise the support for WFD when it is being
+     * discovered by another device. The application is notified of
+     * a success or failure to set specified WFD parameters through
+     * listener callbacks {@link ActionListener#onSuccess} or {@link
+     * ActionListener#onFailure}.
+     *
+     * The event WIFI_P2P_THIS_DEVICE_CHANGED_ACTION is broadcast
+     * on succesful completion of the setting.
+     *
+     * @param c is the channel created at {@link #initialize}
+     * @param wfdInfo is the custom string command to be executed
+     * @param listener for callbacks for string response
+     */
+    public void updateWFDInfo(Channel c, WfdInfo wfdInfo, ActionListener listener) {
+        if (c == null) return;
+        if (wfdInfo == null) return;
+        c.mAsyncChannel.sendMessage(UPDATE_WFD_SETTINGS, 0, c.putListener(listener), wfdInfo);
     }
 
 }

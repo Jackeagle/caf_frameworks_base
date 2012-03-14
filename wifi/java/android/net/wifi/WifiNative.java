@@ -665,6 +665,10 @@ public class WifiNative {
         return doStringCommand("P2P_PEER " + deviceAddress);
     }
 
+    public String p2pCustomCommand(String command) {
+        return doStringCommand(command);
+    }
+
     public boolean p2pServiceAdd(WifiP2pServiceInfo servInfo) {
         /*
          * P2P_SERVICE_ADD bonjour <query hexdump> <RDATA hexdump>
