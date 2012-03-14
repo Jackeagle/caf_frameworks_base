@@ -808,6 +808,7 @@ void NativeInputManager::interceptMotionBeforeQueueing(nsecs_t when, uint32_t& p
                 policyFlags |= POLICY_FLAG_BRIGHT_HERE;
             }
         } else {
+            policyFlags |= POLICY_FLAG_WAKE_DROPPED;
             JNIEnv* env = jniEnv();
             jint wmActions = env->CallIntMethod(mCallbacksObj,
                         gCallbacksClassInfo.interceptMotionBeforeQueueingWhenScreenOff,
