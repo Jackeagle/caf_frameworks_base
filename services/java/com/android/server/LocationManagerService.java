@@ -65,6 +65,7 @@ import com.android.internal.location.GpsNetInitiatedHandler;
 
 import com.android.server.location.GeocoderProxy;
 import com.android.server.location.GpsLocationProvider;
+import com.android.server.location.GpsLocationProvider.HybridLocationProvider;
 import com.android.server.location.LocationProviderInterface;
 import com.android.server.location.LocationProviderProxy;
 import com.android.server.location.MockProvider;
@@ -434,34 +435,31 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
     private final class SettingsObserver implements Observer {
         public void update(Observable o, Object arg) {
-            //Settings update only for GPS/ULP Provider
-            LocationProviderInterface p = mProvidersByName.get(LocationManager.GPS_PROVIDER);
+            //Settings update only for Hybrid Provider
+            LocationProviderInterface p = mProvidersByName.get(LocationManager.HYBRID_PROVIDER);
             if(p != null) {
-                if((p.getCapability() & LocationProviderInterface.ULP_CAPABILITY)
-                   == LocationProviderInterface.ULP_CAPABILITY) {
-                    if (LOCAL_LOGV) {
-                      Slog.d(TAG,  "SettingsObserver.update invoked and p.getCapability(): "+ p.getCapability());
-                    }
-                    //Will read the Settings values & determine if anything changed there
-                    Map<String, ContentValues> kvs = ((ContentQueryMap)o).getRows();
-                    if (null != kvs && !kvs.isEmpty()) {
-                        Log.v(TAG, "in Settings.Secure.LOCATION_PROVIDERS_ALLOWED - "
-                        +kvs.get(Settings.Secure.LOCATION_PROVIDERS_ALLOWED).toString());
-                        String providers = kvs.get(Settings.Secure.LOCATION_PROVIDERS_ALLOWED).toString();
-                        boolean gpsSetting = providers.contains("gps");
-                        boolean networkProvSetting = providers.contains("network");
-                        boolean wifiSetting =  kvs.get(Settings.Secure.WIFI_ON).toString().contains("1");
-                        boolean agpsSetting =  kvs.get(Settings.Secure.ASSISTED_GPS_ENABLED).toString().contains("1");
+                 if (LOCAL_LOGV) {
+                   Slog.d(TAG,  "SettingsObserver.update invoked and provider: "+ p.getName());
+                 }
+                 //Will read the Settings values & determine if anything changed there
+                 Map<String, ContentValues> kvs = ((ContentQueryMap)o).getRows();
+                 if (null != kvs && !kvs.isEmpty()) {
+                     Log.v(TAG, "in Settings.Secure.LOCATION_PROVIDERS_ALLOWED - "
+                     +kvs.get(Settings.Secure.LOCATION_PROVIDERS_ALLOWED).toString());
+                     String providers = kvs.get(Settings.Secure.LOCATION_PROVIDERS_ALLOWED).toString();
+                     boolean gpsSetting = providers.contains("gps");
+                     boolean networkProvSetting = providers.contains("network");
+                     boolean wifiSetting =  kvs.get(Settings.Secure.WIFI_ON).toString().contains("1");
+                     boolean agpsSetting =  kvs.get(Settings.Secure.ASSISTED_GPS_ENABLED).toString().contains("1");
 
-                        if (LOCAL_LOGV) {
-                          Slog.d(TAG,  "SettingsObserver.update invoked and setting values. Gps:"+
-                                 gpsSetting +" GNP:"+ networkProvSetting+" WiFi:"+ wifiSetting+
-                                 " Agps:"+ agpsSetting);
-                        }
-
-                        p.updateSettings(gpsSetting,networkProvSetting,wifiSetting,agpsSetting);
+                     if (LOCAL_LOGV) {
+                       Slog.d(TAG,  "SettingsObserver.update invoked and setting values. Gps:"+
+                              gpsSetting +" GNP:"+ networkProvSetting+" WiFi:"+ wifiSetting+
+                              " Agps:"+ agpsSetting);
                      }
-                }
+
+                     p.updateSettings(gpsSetting,networkProvSetting,wifiSetting,agpsSetting);
+                  }
             }
             synchronized (mLock) {
                 updateProvidersLocked();
@@ -508,6 +506,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             mNetInitiatedListener = gpsProvider.getNetInitiatedListener();
             addProvider(gpsProvider);
             mGpsLocationProvider = gpsProvider;
+            //Create a hybrid location provider if Location HAL has that capability
+            HybridLocationProvider hybridProvider = gpsProvider.getHybridProvider();
+            if(hybridProvider != null) {
+                addProvider(hybridProvider);
+            }
         }
 
         // create a passive location provider, which is always enabled
@@ -627,12 +630,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         ContentResolver resolver = mContext.getContentResolver();
         LocationProviderInterface p = mProvidersByName.get(provider);
         if(p != null) {
-            if ((LocationManager.GPS_PROVIDER.equals(provider)) &&
-                ((p.getCapability() & LocationProviderInterface.ULP_CAPABILITY) ==
-                 LocationProviderInterface.ULP_CAPABILITY)){
-
-                //Even if GPS is turned off the ULP/Hybrid engine is still active
-                //as long as GNP or WiFi service is available
+            if (LocationManager.HYBRID_PROVIDER.equals(provider)){
+                //ULP/Hybrid engine is still active as long as GNP or WiFi service is available
                 try {
                     providerSetting =
                              ((Settings.Secure.isLocationProviderEnabled(resolver,
@@ -652,7 +651,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
     private String checkPermissionsSafe(String provider, String lastPermission) {
         if (LocationManager.GPS_PROVIDER.equals(provider)
-                 || LocationManager.PASSIVE_PROVIDER.equals(provider)) {
+                 || LocationManager.PASSIVE_PROVIDER.equals(provider)
+                 || LocationManager.HYBRID_PROVIDER.equals(provider)) {
             if (mContext.checkCallingOrSelfPermission(ACCESS_FINE_LOCATION)
                     != PackageManager.PERMISSION_GRANTED) {
                 throw new SecurityException("Provider " + provider
@@ -678,7 +678,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
     private boolean isAllowedProviderSafe(String provider) {
         if ((LocationManager.GPS_PROVIDER.equals(provider)
-                || LocationManager.PASSIVE_PROVIDER.equals(provider))
+                || LocationManager.PASSIVE_PROVIDER.equals(provider)
+                || LocationManager.HYBRID_PROVIDER.equals(provider))
             && (mContext.checkCallingOrSelfPermission(ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED)) {
             return false;
@@ -903,6 +904,12 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     public String getBestProvider(Criteria criteria, boolean enabledOnly) {
 
         List<String> goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
+
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -916,6 +923,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             power = nextPower(power);
             criteria.setPowerRequirement(power);
             goodProviders = getProviders(criteria, enabledOnly);
+            //Check if we receive Hybrid as a possible provider and remove it
+            //as we want to maintain Legacy behavior for this API
+            if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+                goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+            }
         }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
@@ -927,6 +939,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             accuracy = nextAccuracy(accuracy);
             criteria.setAccuracy(accuracy);
             goodProviders = getProviders(criteria, enabledOnly);
+            //Check if we receive Hybrid as a possible provider and remove it
+            //as we want to maintain Legacy behavior for this API
+            if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+                goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+            }
         }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
@@ -935,6 +952,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         // Remove bearing requirement
         criteria.setBearingRequired(false);
         goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -942,6 +964,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         // Remove speed requirement
         criteria.setSpeedRequired(false);
         goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -949,6 +976,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         // Remove altitude requirement
         criteria.setAltitudeRequired(false);
         goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -990,6 +1022,9 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         LocationProviderInterface p = mProvidersByName.get(provider);
         if (p == null) {
             return;
+        }
+        if (LOCAL_LOGV) {
+            Slog.v(TAG, "updateProviderListenersLocked. provider: " + provider + "enabled: "+enabled);
         }
 
         ArrayList<Receiver> deadReceivers = null;
@@ -1173,15 +1208,12 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                    + " Listener: " + listener);
         }
         if (criteria != null) {
-            if (LOCAL_LOGV){
+            if (LOCAL_LOGV)
                 Slog.v(TAG, "In requestLocationUpdates. Criteria not null. Cirteria.HorizAccuracy: " + criteria.getHorizontalAccuracy()
                        + " Criteria.power "+ criteria.getPowerRequirement());
-                }
-            //If HAL has ULP capability then we handle Criteria based requests through GPS provider
-            LocationProviderInterface p = mProvidersByName.get(LocationManager.GPS_PROVIDER);
-            if((p != null) && ((p.getCapability() & LocationProviderInterface.ULP_CAPABILITY)
-                   == LocationProviderInterface.ULP_CAPABILITY)) {
-               provider = LocationManager.GPS_PROVIDER;
+            LocationProviderInterface p = mProvidersByName.get(LocationManager.HYBRID_PROVIDER);
+            if( p != null) {
+                provider = LocationManager.HYBRID_PROVIDER;
             } else {
                 // FIXME - should we consider using multiple providers simultaneously
                 // rather than only the best one?
@@ -1221,15 +1253,17 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     public void requestLocationUpdatesPI(String provider, Criteria criteria,
             long minTime, float minDistance, boolean singleShot, PendingIntent intent) {
         validatePendingIntent(intent);
+        if (LOCAL_LOGV){
+            Slog.v(TAG, "In requestLocationUpdates. provider "+provider+ "minTime: " + minTime + "single shot: " + singleShot
+                   + " Receiver: " + getReceiver(intent));
+        }
         if (criteria != null) {
             if (LOCAL_LOGV)
-                Slog.v(TAG, "In requestLocationUpdates. Criteria not null. Cirteria.accuracy: " + criteria.getAccuracy()
+                Slog.v(TAG, "In requestLocationUpdates. Criteria not null. Cirteria.HorizAccuracy: " + criteria.getHorizontalAccuracy()
                        + " Criteria.power "+ criteria.getPowerRequirement());
-            //If HAL has ULP capability then we handle Criteria based requests through GPS provider
-            LocationProviderInterface p = mProvidersByName.get(LocationManager.GPS_PROVIDER);
-            if((p != null) && ((p.getCapability() & LocationProviderInterface.ULP_CAPABILITY)
-                   == LocationProviderInterface.ULP_CAPABILITY)) {
-               provider = LocationManager.GPS_PROVIDER;
+            LocationProviderInterface p = mProvidersByName.get(LocationManager.HYBRID_PROVIDER);
+            if( p != null) {
+                provider = LocationManager.HYBRID_PROVIDER;
             } else {
                 // FIXME - should we consider using multiple providers simultaneously
                 // rather than only the best one?
@@ -1264,6 +1298,10 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
         receiver.requiredPermissions = checkPermissionsSafe(provider,
                 receiver.requiredPermissions);
+        if (LOCAL_LOGV)
+            Slog.v(TAG, "In requestLocationUpdatesLocked. provider: " + provider
+                   + " requiredPermissions: "+ receiver.requiredPermissions );
+
 
         // so wakelock calls will succeed
         final int callingUid = Binder.getCallingUid();
@@ -1360,13 +1398,9 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                     if (!providerHasListener(record.mProvider, callingUid, receiver)) {
                         LocationProviderInterface p = mProvidersByName.get(record.mProvider);
                         if (p != null) {
-                            if (((p.getCapability() & LocationProviderInterface.ULP_CAPABILITY)
-                               == LocationProviderInterface.ULP_CAPABILITY) &&
-                               (LocationManager.GPS_PROVIDER.equals(record.mProvider))) {
-                                p.updateCriteria(LocationProviderInterface.ULP_REMOVE_CRITERIA,
-                                                 record.mMinTime,record.mMinDistance,
-                                                 record.mSingleShot,record.mCriteria);
-                            }
+                            p.updateCriteria(LocationProviderInterface.ULP_REMOVE_CRITERIA,
+                                             record.mMinTime,record.mMinDistance,
+                                             record.mSingleShot,record.mCriteria);
                             p.removeListener(callingUid);
                         }
                     }
@@ -1855,14 +1889,13 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     }
 
     private static boolean shouldBroadcastSafe(Location loc, Location lastLoc, UpdateRecord record) {
-        Bundle locationExtraInfo = loc.getExtras();
 
         // Always broadcast the first update or hyrbid provider update
-        if ((lastLoc == null) || (record.mProvider.equals(LocationManager.GPS_PROVIDER) &&
-                                  (locationExtraInfo.getBoolean("ProviderSourceIsUlp") == true))){
+        if ((lastLoc == null) ||
+            (loc.getProvider().equals(LocationManager.HYBRID_PROVIDER))){
             if(LOCAL_LOGV) {
                 Slog.v(TAG, "In shouldBroadcastSafe. We will return true as last loc =null or"+
-                            "Ulp position obtained got Hybrid provider clients");
+                            "Ulp position obtained got for Hybrid provider clients");
             }
             return true;
         }
@@ -1887,41 +1920,26 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     private void handleLocationChangedLocked(Location location, boolean passive) {
         String provider = (passive ? LocationManager.PASSIVE_PROVIDER : location.getProvider());
         ArrayList<UpdateRecord> records = mRecordsByProvider.get(provider);
-        boolean ulpLocationSource = false, gnssLocationSource = false;
         if (records == null || records.size() == 0) {
-            return;
-        }
-
-        LocationProviderInterface p = mProvidersByName.get(provider);
-        if (p == null) {
             return;
         }
         if(LOCAL_LOGV) {
              Slog.v(TAG,"In handleLocationChangedLocked.For provider: "+ provider);
          }
 
-        if ((LocationManager.GPS_PROVIDER.equals(provider)) &&
-            ((p.getCapability() & LocationProviderInterface.ULP_CAPABILITY)
-             == LocationProviderInterface.ULP_CAPABILITY)){
-
-            Bundle locationExtraInfo = location.getExtras();
-            ulpLocationSource = locationExtraInfo.getBoolean("ProviderSourceIsUlp");
-            gnssLocationSource = locationExtraInfo.getBoolean("ProviderSourceIsGnss");
-            if(LOCAL_LOGV) {
-                 Slog.v(TAG,"In handleLocationChangedLocked. ulpLocationSource: "+ ulpLocationSource
-                        + " gnssLocationSource: " + gnssLocationSource);
-             }
-           }
-        //Filter ULP reports so that last known location is only populated with GPS reports
-        if( ulpLocationSource != true) {
-        // Update last known location for provider
-            Location lastLocation = mLastKnownLocation.get(provider);
-            if (lastLocation == null) {
-                mLastKnownLocation.put(provider, new Location(location));
-            } else {
-                lastLocation.set(location);
-            }
+        LocationProviderInterface p = mProvidersByName.get(provider);
+        if (p == null) {
+            return;
         }
+
+        // Update last known location for provider
+        Location lastLocation = mLastKnownLocation.get(provider);
+        if (lastLocation == null) {
+            mLastKnownLocation.put(provider, new Location(location));
+        } else {
+            lastLocation.set(location);
+        }
+
         // Fetch latest status update time
         long newStatusUpdateTime = p.getStatusUpdateTime();
 
@@ -1937,25 +1955,6 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             UpdateRecord r = records.get(i);
             Receiver receiver = r.mReceiver;
             boolean receiverDead = false;
-
-            if(LOCAL_LOGV) {
-                Slog.v(TAG,"In handleLocationChangedLocked.Iterating through the records. Index" +i
-                       + " listener: " + receiver + " Criteria: " + r.mCriteria);
-            }
-
-
-            if((ulpLocationSource == true) && (r.mCriteria == null)){
-                if(LOCAL_LOGV) {
-                    Slog.v(TAG,"In handleLocationChangedLocked.Hybrid location suppressed for Gps only app ");
-                }
-                continue;
-            }
-            if((gnssLocationSource == true) && (r.mCriteria != null)){
-                if(LOCAL_LOGV) {
-                    Slog.v(TAG,"In handleLocationChangedLocked.Gnss location suppressed for Hybrid engine app ");
-                }
-                continue;
-            }
 
             Location lastLoc = r.mLastFixBroadcast;
             if ((lastLoc == null) || shouldBroadcastSafe(location, lastLoc, r)) {
@@ -2052,14 +2051,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-
-            //Settings update only for GPS/ULP Provider
-            LocationProviderInterface p = mProvidersByName.get(LocationManager.GPS_PROVIDER);
+            //Settings update only for Hybrid Provider
+            LocationProviderInterface p = mProvidersByName.get(LocationManager.HYBRID_PROVIDER);
             if(p != null) {
-                if((p.getCapability() & LocationProviderInterface.ULP_CAPABILITY)
-                   == LocationProviderInterface.ULP_CAPABILITY) {
                     if (LOCAL_LOGV) {
-                      Slog.d(TAG,  "Battery.update invoked and p.getCapability(): " + p.getCapability());
+                      Slog.d(TAG,  "Battery.update invoked for provider: " + p.getName());
                     }
 
                     if(Intent.ACTION_POWER_CONNECTED.equals(action)) {
@@ -2067,7 +2063,6 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                     } else if(Intent.ACTION_POWER_DISCONNECTED.equals(action)) {
                         p.updateBatteryStatus(false);
                     }
-                }
             }
         }
     };
