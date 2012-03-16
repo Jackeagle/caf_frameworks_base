@@ -393,6 +393,7 @@ status_t LPAPlayer::start(bool sourceAlreadyStarted) {
             LOGE("Opening a routing session failed");
             return err;
         }
+        acquireWakeLock();
         mIsAudioRouted = true;
     }
     else {
@@ -549,7 +550,6 @@ void LPAPlayer::pause(bool playPendingSamples) {
             }
             if (!mPauseEventPending) {
                 LOGV("Posting an event for Pause timeout");
-                acquireWakeLock();
                 mQueue.postEventWithDelay(mPauseEvent, LPA_PAUSE_TIMEOUT_USEC);
                 mPauseEventPending = true;
             }
@@ -583,7 +583,6 @@ void LPAPlayer::pause(bool playPendingSamples) {
 
                 if(!mPauseEventPending) {
                     LOGV("Posting an event for Pause timeout");
-                    acquireWakeLock();
                     mQueue.postEventWithDelay(mPauseEvent, LPA_PAUSE_TIMEOUT_USEC);
                     mPauseEventPending = true;
                 }
@@ -613,7 +612,6 @@ void LPAPlayer::resume() {
                 LOGV("Resume(): Cancelling the puaseTimeout event");
                 mPauseEventPending = false;
                 mQueue.cancelEvent(mPauseEvent->eventID());
-                release_wake_lock("LPA_LOCK");
             }
             if (mAudioSinkOpen) {
                 mAudioSink->close();
@@ -625,6 +623,7 @@ void LPAPlayer::resume() {
             if (!mIsAudioRouted) {
                 LOGV("Opening a session for LPA playback");
                 status_t err = mAudioSink->openSession(AUDIO_FORMAT_PCM_16_BIT, sessionId);
+                acquireWakeLock();
                 mIsAudioRouted = true;
             }
 
@@ -653,6 +652,7 @@ void LPAPlayer::resume() {
                 if (mAudioSink.get() != NULL) {
                     LOGV("%s mAudioSink close session", __func__);
                     mAudioSink->closeSession();
+                    releaseWakeLock();
                     mIsAudioRouted = false;
                 } else {
                     LOGE("close session NULL");
@@ -753,6 +753,7 @@ void LPAPlayer::reset() {
         mAudioSink->close();
     } else {
         mAudioSink->closeSession();
+        releaseWakeLock();
     }
     mAudioSink.clear();
 
@@ -1290,6 +1291,7 @@ void LPAPlayer::A2DPNotificationThreadEntry() {
                 LOGV("Close Session");
                 if (mAudioSink.get() != NULL) {
                     mAudioSink->closeSession();
+                    releaseWakeLock();
                     LOGV("mAudioSink close session");
                     mIsAudioRouted = false;
                 } else {
@@ -1721,6 +1723,7 @@ void LPAPlayer::onPauseTimeOut() {
         // 4.) Release Wake Lock
         releaseWakeLock();
     }
+
 }
 
 } //namespace android
