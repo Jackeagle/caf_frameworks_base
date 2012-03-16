@@ -3944,11 +3944,10 @@ public class BluetoothService extends IBluetooth.Stub {
                 charPaths = getCharacteristicsFromCache(servicePath);
             try {
                 callback.onCharacteristicsDiscovered(charPaths, result);
-            } catch (RemoteException e) {
+            } catch (Exception e) {
                 Log.e(TAG, "", e);
                 forceCloseGattService(servicePath);
             }
-
         } else
             Log.d(TAG, "Discover Characteristics Callback for  service " + servicePath + " not queued");
 
@@ -3972,7 +3971,7 @@ public class BluetoothService extends IBluetooth.Stub {
         if (callback != null) {
             try {
                 callback.onSetCharacteristicProperty(charPath, property, result);
-            } catch (RemoteException e) {
+            }  catch (Exception e) {
                 Log.e(TAG, "", e);
                 forceCloseGattService(servicePath);
             }
@@ -4001,7 +4000,7 @@ public class BluetoothService extends IBluetooth.Stub {
         if (callback != null) {
             try {
                 callback.onValueChanged(charPath, value);
-            } catch (RemoteException e) {
+            } catch (Exception e) {
                 Log.e(TAG, "", e);
                 forceCloseGattService(servicePath);
             }
@@ -4025,7 +4024,7 @@ public class BluetoothService extends IBluetooth.Stub {
         if (callback != null) {
             try {
                 callback.onCharacteristicValueUpdated(charPath, result);
-            } catch (RemoteException e) {
+            } catch (Exception e) {
                 Log.e(TAG, "", e);
                 forceCloseGattService(servicePath);
             }
@@ -4305,7 +4304,6 @@ public class BluetoothService extends IBluetooth.Stub {
 
     public synchronized void closeRemoteGattService(String path) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        if (!isEnabledInternal()) return;
 
         if (!mGattServices.containsKey(path)) {
             Log.d(TAG, "removeRemoteGattService: service not found " + path);
@@ -4323,8 +4321,9 @@ public class BluetoothService extends IBluetooth.Stub {
             return;
         }
 
-
         forceCloseGattService(path);
+
+        if (!isEnabledInternal()) return;
 
         //Check if we should request GATT disconnect
         String devicePath = path.substring(0, path.indexOf("/service"));
