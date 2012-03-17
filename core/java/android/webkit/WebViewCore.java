@@ -17,8 +17,10 @@
 
 package android.webkit;
 
+import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.database.Cursor;
 import android.graphics.Point;
@@ -321,6 +323,33 @@ public final class WebViewCore {
      */
     protected void jsAlert(String url, String message) {
         mCallbackProxy.onJsAlert(url, message);
+    }
+
+    /**
+     * Set the screen orientation of the containing activity
+     * @param orientation - String containing orientation
+     */
+    protected void setScreenOrientationLock(String orientation) {
+        final int orientationValue;
+
+        if (orientation.equals("landscape")) {
+            orientationValue = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+        } else if (orientation.equals("portrait")) {
+            orientationValue = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT;
+        } else {
+            //return orientation to system settings, including any the user set
+            orientationValue = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+        }
+
+        //calling runnable on UI thread
+        final Activity containingActivity = (Activity) getContext();
+        containingActivity.runOnUiThread(
+            new Runnable() {
+                public void run() {
+                    containingActivity.setRequestedOrientation(orientationValue);
+                }
+            }
+        );
     }
 
     /**
