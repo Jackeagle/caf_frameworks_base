@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -212,6 +212,7 @@ public class IccCardProxy extends Handler implements IccCard {
                                 (PROPERTY_ICC_OPERATOR_ALPHA, sub, mAppRecords.spn);
                     }
                 }
+                break;
             case EVENT_IMSI_READY:
                 broadcastIccStateChangedIntent(IccCard.INTENT_VALUE_ICC_IMSI, null);
                 break;
