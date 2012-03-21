@@ -235,7 +235,7 @@ namespace android {
              while ((de = readdir(netdir))) {
                 if ((!strcmp(de->d_name, ".")) || (!strcmp(de->d_name, ".."))
                     ||(!strcmp(de->d_name, "lo")) || (!strcmp(de->d_name, "wmaster0")) ||
-                    (!strcmp(de->d_name, "pan0")))
+                    (!strcmp(de->d_name, "pan0"))|| (!strcmp(de->d_name, "sit0")))
                     continue;
                 snprintf(path, SYSFS_PATH_MAX,"%s/%s/phy80211", SYSFS_CLASS_NET, de->d_name);
                 if (!access(path, F_OK))
