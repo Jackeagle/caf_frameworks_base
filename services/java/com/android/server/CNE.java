@@ -1830,7 +1830,11 @@ public final class CNE {
                 handleWlanBringUp();
                 break;
             case CNE_RAT_WWAN:
-                handleWwanBringUp();
+                if(mService.getMobileDataEnabled()){
+                    handleWwanBringUp();
+                } else {
+                    if (DBG) Log.i(LOCAL_TAG, "Mobile data is disabled.");
+                }
                 break;
             default:
                 if (DBG) Log.w(LOCAL_TAG, "UnHandled Rat Type: " + ratType);
