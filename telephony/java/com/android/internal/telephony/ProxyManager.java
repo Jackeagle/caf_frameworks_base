@@ -1545,6 +1545,14 @@ public class ProxyManager extends Handler {
                         subscriptionData.subscription[phoneIndex].copyFrom(
                                 prevSubscriptionData.subscription[phoneIndex]);
 
+                        Phone currentPhone = mProxyPhones[phoneIndex];
+                        if (currentPhone.getSubscription() == mCurrentDds) {
+                            Log.d(LOG_TAG, "Enable the data connectivity on SUB:"
+                                    + currentPhone.getSubscription()
+                                    + " as the deactivate failed");
+                            currentPhone.enableDataConnectivity();
+                        }
+
                         if (mPendingDeactivateEvents == 0) {
                             processPendingActivateRequests();
                         }
