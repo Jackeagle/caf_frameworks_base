@@ -82,6 +82,7 @@ LOCAL_SRC_FILES:= \
 	android_util_Binder.cpp \
 	android_util_EventLog.cpp \
 	android_util_Log.cpp \
+	android_util_jTestFramework.cpp \
 	android_util_FloatMath.cpp \
 	android_util_Process.cpp \
 	android_util_StringBlock.cpp \
@@ -190,6 +191,7 @@ LOCAL_C_INCLUDES += \
 	external/harfbuzz/contrib \
 	external/harfbuzz/src \
 	external/zlib \
+	vendor/qcom/opensource/testframework/inc \
 	frameworks/opt/emoji \
 	libcore/include
 
@@ -242,6 +244,11 @@ LOCAL_SHARED_LIBRARIES := \
 	libz \
 	libcnefeatureconfig \
 	libgesture_client
+
+ifeq ($(TARGET_USES_TESTFRAMEWORK),true)
+	LOCAL_CFLAGS += -DCUSTOM_EVENTS_TESTFRAMEWORK
+	LOCAL_SHARED_LIBRARIES += libtestframework
+endif
 
 ifeq ($(USE_OPENGL_RENDERER),true)
 	LOCAL_SHARED_LIBRARIES += libtilerenderer libhwui
