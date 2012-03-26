@@ -45,10 +45,11 @@ namespace android
 {
 
 // ----------------------------------------------------------------------------
-
-static void (*cpu_boost)(int)           = NULL;
-static int  (*cpu_setoptions)(int, int) = NULL;
-static void *dlhandle                   = NULL;
+static void (*cpu_boost)(int)                       = NULL;
+static int  (*cpu_setoptions)(int, int)             = NULL;
+static int  (*perf_lock_acq)(int[], int)            = NULL;
+static int  (*perf_lock_rel)(int)                   = NULL;
+static void *dlhandle                               = NULL;
 
 // ----------------------------------------------------------------------------
 
@@ -88,6 +89,16 @@ org_codeaurora_performance_native_init()
     if ((rc = dlerror()) != NULL) {
         goto cleanup;
     }
+    perf_lock_acq = (int (*) (int[], int))dlsym(dlhandle, "perf_lock_acq");
+    if ((rc = dlerror()) != NULL) {
+        goto cleanup;
+    }
+
+    perf_lock_rel = (int (*) (int))dlsym(dlhandle, "perf_lock_rel");
+    if ((rc = dlerror()) != NULL) {
+        goto cleanup;
+    }
+
     init = (void (*) ())dlsym(dlhandle, "libqc_opt_init");
     if ((rc = dlerror()) != NULL) {
         goto cleanup;
@@ -98,6 +109,8 @@ org_codeaurora_performance_native_init()
 cleanup:
     cpu_boost      = NULL;
     cpu_setoptions = NULL;
+    perf_lock_acq  = NULL;
+    perf_lock_rel  = NULL;
     if (dlhandle) {
         dlclose(dlhandle);
         dlhandle = NULL;
@@ -112,6 +125,8 @@ org_codeaurora_performance_native_deinit(JNIEnv *env, jobject clazz)
     if (dlhandle) {
         cpu_boost      = NULL;
         cpu_setoptions = NULL;
+        perf_lock_acq  = NULL;
+        perf_lock_rel  = NULL;
 
         deinit = (void (*) ())dlsym(dlhandle, "libqc_opt_deinit");
         if (deinit) {
@@ -141,12 +156,42 @@ org_codeaurora_performance_native_cpu_setoptions(JNIEnv *env, jobject clazz,
     return 0;
 }
 
+static jint
+org_codeaurora_performance_native_perf_lock_acq(JNIEnv *env, jobject clazz, jintArray list)
+{
+    jint listlen = env->GetArrayLength(list);
+    jint buf[listlen];
+    int i=0;
+    env->GetIntArrayRegion(list, 0, listlen, buf);
+
+    if (dlhandle == NULL) {
+        org_codeaurora_performance_native_init();
+    }
+    if (perf_lock_acq) {
+        return (*perf_lock_acq)(buf, listlen);
+    }
+    return 0;
+}
+
+static jint
+org_codeaurora_performance_native_perf_lock_rel(JNIEnv *env, jobject clazz, jint handle)
+{
+    if (dlhandle == NULL) {
+        org_codeaurora_performance_native_init();
+    }
+    if (perf_lock_rel) {
+        return (*perf_lock_rel)(handle);
+    }
+    return 0;
+}
 
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod gMethods[] = {
     {"native_cpu_boost",      "(I)V",                  (void *)org_codeaurora_performance_native_cpu_boost},
     {"native_cpu_setoptions", "(II)I",                 (int *)org_codeaurora_performance_native_cpu_setoptions},
+    {"native_perf_lock_acq",  "([I)I",                 (int *)org_codeaurora_performance_native_perf_lock_acq},
+    {"native_perf_lock_rel",  "(I)I",                  (int *)org_codeaurora_performance_native_perf_lock_rel},
     {"native_deinit",         "()V",                   (void *)org_codeaurora_performance_native_deinit},
 };
 

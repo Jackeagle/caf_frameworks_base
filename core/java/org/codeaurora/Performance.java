@@ -39,25 +39,72 @@ public class Performance
         //Log.d(TAG, "Perf module initialized");
     }
 
+    /* The following defined constants are to be used for PerfLock APIs*/
+    /** @hide */ public static final int PWR_CLSP_A = 1100;
+    /** @hide */ public static final int HEAP_OPT_A = 2100;
+
+    /** @hide */ public static final int CPUS_ON_LVL_MAX = 3900;
+    /** @hide */ public static final int CPUS_ON_LVL_3 = 3300;
+    /** @hide */ public static final int CPUS_ON_LVL_2 = 3200;
+    /** @hide */ public static final int CPUS_ON_LVL_1 = 3100;
+
+    /** @hide */ public static final int CPU0_FREQ_LVL_NONTURBO = 4200;
+    /** @hide */ public static final int CPU0_FREQ_LVL_TURBO = 4300;
+    /** @hide */ public static final int CPU0_FREQ_LVL_MAX = 4900;
+
+    /** @hide */ public static final int CPU1_FREQ_LVL_NONTURBO = 5200;
+    /** @hide */ public static final int CPU1_FREQ_LVL_TURBO = 5300;
+    /** @hide */ public static final int CPU1_FREQ_LVL_MAX = 5900;
+
+    /* The following are the PerfLock API return values*/
+    /** @hide */ public static final int REQUEST_FAILED = 0;
+    /** @hide */ public static final int REQUEST_SUCCEEDED = 1;
+    /** @hide */ public static final int REQUEST_PENDING = 2;
+
+    private int HANDLE = 0;
+
+    /* The following two functions are the PerfLock APIs*/
     /** &hide */
-    protected void finalize() {
-        native_deinit();
+    public int perfLockAcquire(int... list) {
+        if (HANDLE == 0)
+            HANDLE = native_perf_lock_acq(list);
+        if (HANDLE > 0)
+            return REQUEST_SUCCEEDED;
+        return REQUEST_FAILED;
     }
+
+    /** &hide */
+    public int perfLockRelease() {
+        int rc = 0;
+        if (HANDLE > 0)
+            rc = native_perf_lock_rel(HANDLE);
+            if (rc > 0)
+                HANDLE = 0;
+        return rc;
+    }
+
+    /* The following are for internal use only */
+    /** @hide */ public static final int CPUOPT_CPU0_PWRCLSP = 1;
+    /** @hide */ public static final int CPUOPT_CPU0_FREQMIN = 2;
+    /** @hide */ public static final int CPUOPT_CPU1_FREQMIN = 3;
 
     /** &hide */
     public void cpuBoost(int ntasks) {
         native_cpu_boost(ntasks);
     }
 
-    /** @hide */ public static final int CPUOPT_CPU0_PWRCLSP = 1;
-    /** @hide */ public static final int CPUOPT_CPU0_FREQMIN = 2;
-    /** @hide */ public static final int CPUOPT_CPU1_FREQMIN = 3;
-
     /** &hide */
     public int cpuSetOptions(int reqType, int reqValue) {
         return native_cpu_setoptions(reqType, reqValue);
     }
 
+    /** &hide */
+    protected void finalize() {
+        native_deinit();
+    }
+
+    private native int  native_perf_lock_acq(int list[]);
+    private native int  native_perf_lock_rel(int handle);
     private native void native_cpu_boost(int ntasks);
     private native int  native_cpu_setoptions(int reqtype, int reqvalue);
     private native void native_deinit();
