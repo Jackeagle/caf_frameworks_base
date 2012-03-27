@@ -3742,6 +3742,8 @@ public class WebView extends AbsoluteLayout
                 && (mTouchMode != TOUCH_DRAG_MODE ||
                 mHeldMotionless != MOTIONLESS_TRUE))
                 || mDeferTouchMode == TOUCH_DRAG_MODE;
+        if (animateScroll)
+            invalidate();
         if (mTouchMode == TOUCH_DRAG_MODE) {
             if (mHeldMotionless == MOTIONLESS_PENDING) {
                 mPrivateHandler.removeMessages(DRAG_HELD_MOTIONLESS);
