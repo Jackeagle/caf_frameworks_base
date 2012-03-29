@@ -89,11 +89,10 @@ public class CDMAPhone extends PhoneBase {
 
     private String mVmNumber = null;
 
-    static final int RESTART_ECM_TIMER = 0; // restart Ecm timer
-    static final int CANCEL_ECM_TIMER = 1; // cancel Ecm timer
+
 
     // Instance Variables
-    CdmaCallTracker mCT;
+
     CdmaServiceStateTracker mSST;
     CdmaSubscriptionSourceManager mCdmaSSM;
     ArrayList <CdmaMmiCode> mPendingMmis = new ArrayList<CdmaMmiCode>();
@@ -131,7 +130,6 @@ public class CDMAPhone extends PhoneBase {
         }
     };
 
-    Registrant mPostDialHandler;
 
     static String PROPERTY_CDMA_HOME_OPERATOR_NUMERIC = "ro.cdma.home.operator.numeric";
 
@@ -302,7 +300,7 @@ public class CDMAPhone extends PhoneBase {
         return false;
     }
 
-    public CdmaCall getRingingCall() {
+    public Call getRingingCall() {
         return mCT.ringingCall;
     }
 
@@ -361,6 +359,9 @@ public class CDMAPhone extends PhoneBase {
     dial (String dialString) throws CallStateException {
         // Need to make sure dialString gets parsed properly
         String newDialString = PhoneNumberUtils.stripSeparators(dialString);
+        Log.d(LOG_TAG, "dialString=" + newDialString);
+        newDialString = PhoneNumberUtils.formatDialString(newDialString); // only for cdma
+        Log.d(LOG_TAG, "formated dialString=" + newDialString);
         return mCT.dial(newDialString);
     }
 
@@ -382,7 +383,7 @@ public class CDMAPhone extends PhoneBase {
         Log.e(LOG_TAG, "method registerForSuppServiceNotification is NOT supported in CDMA!");
     }
 
-    public CdmaCall getBackgroundCall() {
+    public Call getBackgroundCall() {
         return mCT.backgroundCall;
     }
 
@@ -392,9 +393,9 @@ public class CDMAPhone extends PhoneBase {
     }
 
     boolean isInCall() {
-        CdmaCall.State foregroundCallState = getForegroundCall().getState();
-        CdmaCall.State backgroundCallState = getBackgroundCall().getState();
-        CdmaCall.State ringingCallState = getRingingCall().getState();
+        Call.State foregroundCallState = getForegroundCall().getState();
+        Call.State backgroundCallState = getBackgroundCall().getState();
+        Call.State ringingCallState = getRingingCall().getState();
 
         return (foregroundCallState.isAlive() || backgroundCallState.isAlive() || ringingCallState
                 .isAlive());
@@ -504,7 +505,7 @@ public class CDMAPhone extends PhoneBase {
         return mSST.cellLoc;
     }
 
-    public CdmaCall getForegroundCall() {
+    public Call getForegroundCall() {
         return mCT.foregroundCall;
     }
 
@@ -820,7 +821,7 @@ public class CDMAPhone extends PhoneBase {
     /**
      * Notify any interested party of a Phone state change  {@link Phone.State}
      */
-    /*package*/ void notifyPhoneStateChanged() {
+    public void notifyPhoneStateChanged() {
         mNotifier.notifyPhoneState(this);
     }
 
@@ -828,7 +829,7 @@ public class CDMAPhone extends PhoneBase {
      * Notify registrants of a change in the call state. This notifies changes in {@link Call.State}
      * Use this when changes in the precise call state are needed, else use notifyPhoneStateChanged.
      */
-    /*package*/ void notifyPreciseCallStateChanged() {
+    public void notifyPreciseCallStateChanged() {
         /* we'd love it if this was package-scoped*/
         super.notifyPreciseCallStateChangedP();
     }
@@ -841,16 +842,16 @@ public class CDMAPhone extends PhoneBase {
          mNotifier.notifyCellLocation(this);
      }
 
-    /*package*/ void notifyNewRingingConnection(Connection c) {
+    void notifyNewRingingConnection(Connection c) {
         /* we'd love it if this was package-scoped*/
         super.notifyNewRingingConnectionP(c);
     }
 
-    /*package*/ void notifyDisconnect(Connection cn) {
+    public void notifyDisconnect(Connection cn) {
         mDisconnectRegistrants.notifyResult(cn);
     }
 
-    void notifyUnknownConnection() {
+    public void notifyUnknownConnection() {
         mUnknownConnectionRegistrants.notifyResult(this);
     }
 
@@ -931,7 +932,7 @@ public class CDMAPhone extends PhoneBase {
      * if action is CANCEL_ECM_TIMER, cancel Ecm timer and notify apps the timer is canceled;
      * otherwise, restart Ecm timer and notify apps the timer is restarted.
      */
-    void handleTimerInEmergencyCallbackMode(int action) {
+    public void handleTimerInEmergencyCallbackMode(int action) {
         switch(action) {
         case CANCEL_ECM_TIMER:
             removeCallbacks(mExitEcmRunnable);
