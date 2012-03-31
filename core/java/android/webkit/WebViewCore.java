@@ -34,6 +34,8 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
 import android.provider.MediaStore;
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.KeyEvent;
@@ -331,11 +333,19 @@ public final class WebViewCore {
      */
     protected void setScreenOrientationLock(String orientation) {
         final int orientationValue;
+        int sysAutoRotate = 1;
+
+        try {
+            sysAutoRotate = Settings.System.getInt(mContext.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION);
+        }
+        catch (SettingNotFoundException e) {
+            Log.e(LOGTAG, "Unable to access system settings to attain auto-rotate setting. " + e);
+        }
 
         if (orientation.equals("landscape")) {
-            orientationValue = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+            orientationValue = (sysAutoRotate == 1) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
         } else if (orientation.equals("portrait")) {
-            orientationValue = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT;
+            orientationValue = (sysAutoRotate == 1) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
         } else {
             //return orientation to system settings, including any the user set
             orientationValue = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
@@ -785,7 +795,7 @@ public final class WebViewCore {
                                 /* 1 means enabling power collapse */
                                 mPerf.cpuSetOptions(Performance.CPUOPT_CPU0_PWRCLSP,1);
                                 mPerf.cpuSetOptions(Performance.CPUOPT_CPU0_FREQMIN,0);
-  
+
                                 break;
 
                             case EventHub.ADD_PACKAGE_NAME:
