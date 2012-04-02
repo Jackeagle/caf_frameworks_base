@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -298,9 +298,13 @@ public class IccCardProxy extends Handler implements IccCard {
             return;
         }
 
-        if (mUiccCard.getCardState() == CardState.CARDSTATE_ERROR ||
-                mUiccApplication == null) {
+        if (mUiccCard.getCardState() == CardState.CARDSTATE_ERROR) {
             setExternalState(State.CARD_IO_ERROR);
+            return;
+        }
+
+        if (mUiccApplication == null) {
+            setExternalState(State.UNKNOWN);
             return;
         }
 
