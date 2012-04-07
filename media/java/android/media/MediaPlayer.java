@@ -1517,6 +1517,12 @@ public class MediaPlayer
      * their counterparts in include/media/mediaplayer.h!
      */
 
+    /*
+     * Key to read and set 3D attributes across suspend/resume cycle in VideoView
+     * {@hide}
+     */
+    public static final int KEY_PARAMETER_3D_ATTRIBUTE = 8001;
+
     // There are currently no defined keys usable from Java with get*Parameter.
     // But if any keys are defined, the order must be kept in sync with include/media/mediaplayer.h.
     // private static final int KEY_PARAMETER_... = ...;
