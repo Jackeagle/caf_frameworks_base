@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,7 +101,8 @@ public abstract class BaseCommands implements CommandsInterface {
     protected int mCdmaSubscription;
     // Type of Phone, GSM or CDMA. Set by CDMAPhone or GSMPhone.
     protected int mPhoneType;
-
+    // Stop mutliple requests while there is a pending request
+    protected boolean mRadioPowerIsInProgress = false;
 
     public BaseCommands(Context context) {
         mContext = context;  // May be null (if so we won't log statistics)
@@ -662,6 +663,7 @@ public abstract class BaseCommands implements CommandsInterface {
                 return;
             }
 
+            mRadioPowerIsInProgress = false;
             mRadioStateChangedRegistrants.notifyRegistrants();
 
             if (mState.isAvailable() && !oldState.isAvailable()) {

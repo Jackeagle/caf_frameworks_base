@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1627,7 +1627,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
-    public void
+    synchronized public void
     setRadioPower(boolean on, Message result) {
         //if radio is OFF set preferred NW type and cmda subscription
         if(mInitialRadioStateChange) {
@@ -1654,15 +1654,21 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 }
             }
         }
-        RILRequest rr
-                = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, result);
+        if (!mRadioPowerIsInProgress) {
+            mRadioPowerIsInProgress = true;
+            RILRequest rr
+                    = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, result);
 
-        rr.mp.writeInt(1);
-        rr.mp.writeInt(on ? 1 : 0);
+            rr.mp.writeInt(1);
+            rr.mp.writeInt(on ? 1 : 0);
 
-        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+            if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        send(rr);
+            send(rr);
+        } else {
+            if (RILJ_LOGD)
+                riljLog("Previous radio power request is in progress ignore current request");
+        }
     }
 
     public void setRilPowerOff(Message result) {
