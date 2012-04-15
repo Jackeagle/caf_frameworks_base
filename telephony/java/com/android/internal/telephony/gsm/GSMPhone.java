@@ -918,11 +918,11 @@ public class GSMPhone extends PhoneBase {
     }
 
     public String getSubscriberId() {
-        return (mIccRecords != null) ? mIccRecords.getIMSI() : "";
+        return (mIccRecords != null) ? mIccRecords.getIMSI() : null;
     }
 
     public String getLine1Number() {
-        return (mIccRecords != null) ? mIccRecords.getMsisdnNumber() : "";
+        return (mIccRecords != null) ? mIccRecords.getMsisdnNumber() : null;
     }
 
     @Override
