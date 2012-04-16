@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +46,7 @@ import com.android.internal.telephony.uicc.RuimRecords;
 
 import static com.android.internal.telephony.Phone.CDMA_SUBSCRIPTION_NV;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_SIM_STATE;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_MULTIMODE_CDMA;
 
 /*
  * The Phone App UI and the external world assumes that there is only one icc card,
@@ -86,7 +88,7 @@ public class IccCardProxy extends Handler implements IccCard {
     private boolean mRadioOn = false;
     private boolean mCdmaSubscriptionFromNv = false;
     private boolean mIsMultimodeCdmaPhone =
-            SystemProperties.getBoolean("ro.config.multimode_cdma", false);
+            SystemProperties.getBoolean(PROPERTY_MULTIMODE_CDMA, false);
     protected boolean mQuietMode = false; // when set to true IccCardProxy will not broadcast
                                         // ACTION_SIM_STATE_CHANGED intents
     private boolean mInitialized = false;
