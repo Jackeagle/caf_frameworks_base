@@ -125,16 +125,12 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
     /** Contains the name of the registered network in CDMA (either ONS or ERI text). */
     protected String mCurPlmn = null;
 
-    protected String mMdn;
     protected int mHomeSystemId[] = null;
     protected int mHomeNetworkId[] = null;
     protected String mMin;
-    protected String mPrlVersion;
     protected boolean mIsMinInfoReady = false;
 
     private boolean isEriTextLoaded = false;
-    protected boolean isSubscriptionFromRuim = false;
-    private CdmaSubscriptionSourceManager mCdmaSSM;
 
     /* Used only for debugging purposes. */
     private String mRegistrationDeniedReason;
@@ -244,17 +240,6 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
         cdmaForSubscriptionInfoReadyRegistrants.remove(h);
     }
 
-    /**
-     * Save current source of cdma subscription
-     * @param source - 1 for NV, 0 for RUIM
-     */
-    private void saveCdmaSubscriptionSource(int source) {
-        log("Storing cdma subscription source: " + source);
-        Secure.putInt(phone.getContext().getContentResolver(),
-                Secure.CDMA_SUBSCRIPTION_MODE,
-                source );
-    }
-
     private void getSubscriptionInfoAndStartPollingThreads() {
         cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
 
@@ -275,10 +260,6 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
         }
 
         switch (msg.what) {
-        case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
-            handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
-            break;
-
         case EVENT_RUIM_READY:
             // TODO: Consider calling setCurrentPreferredNetworkType as we do in GsmSST.
             // cm.setCurrentPreferredNetworkType();
@@ -479,14 +460,6 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             }
             break;
 
-        case EVENT_CDMA_PRL_VERSION_CHANGED:
-            ar = (AsyncResult)msg.obj;
-            if (ar.exception == null) {
-                ints = (int[]) ar.result;
-                mPrlVersion = Integer.toString(ints[0]);
-            }
-            break;
-
         default:
             super.handleMessage(msg);
         break;
@@ -494,17 +467,6 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
     }
 
     //***** Private Instance Methods
-
-    private void handleCdmaSubscriptionSource(int newSubscriptionSource) {
-        log("Subscription Source : " + newSubscriptionSource);
-        isSubscriptionFromRuim =
-            (newSubscriptionSource == CdmaSubscriptionSourceManager.SUBSCRIPTION_FROM_RUIM);
-        saveCdmaSubscriptionSource(newSubscriptionSource);
-        if (!isSubscriptionFromRuim) {
-            // NV is ready when subscription source is NV
-            sendMessage(obtainMessage(EVENT_NV_READY));
-        }
-    }
 
     @Override
     protected void setPowerStateToDesired() {
@@ -1552,17 +1514,8 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
         return false;
     }
 
-    public String getMdnNumber() {
-        return mMdn;
-    }
-
     public String getCdmaMin() {
          return mMin;
-    }
-
-    /** Returns null if NV is not yet ready */
-    public String getPrlVersion() {
-        return mPrlVersion;
     }
 
     /**

@@ -253,4 +253,16 @@ public interface TelephonyProperties
      * Property to start two ril daemons in case of multi sim.
      */
     static final String PROPERTY_MULTI_RILD = "ro.multi.rild";
+
+    /*
+     * Specify if following customization for CDMA Global phone registered on
+     * 3GPP technologies is enabled.
+     *
+     * - Translate MMI codes for CustomerSupport, Voice Mail, CLIP and CLIR to
+     *   the corresponding dialing numbers
+     * - Display CDMA PRL when camped on GSM
+     *
+     * Type: boolean ( true = multimode enabled, false = multimode disabled)
+     */
+    static final String PROPERTY_MULTIMODE_CDMA = "ro.config.multimode_cdma";
 }
