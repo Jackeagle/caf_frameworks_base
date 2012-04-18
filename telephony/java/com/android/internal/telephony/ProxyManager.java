@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1458,6 +1458,27 @@ public class ProxyManager extends Handler {
             }
             return this;
         }
+    }
+
+    public boolean isSubActive(int subscription) {
+        boolean isActive = false;
+        SubscriptionData currentSelSub = getCurrentSubscriptions();
+        if (currentSelSub.subscription[subscription].subStatus == SUB_ACTIVATED) {
+            isActive = true;
+        }
+        return isActive;
+    }
+
+    public int numSubsActive() {
+        int phoneCount = TelephonyManager.getPhoneCount();
+        int subCount = 0;
+        for (int i = 0; i < phoneCount; i++) {
+            if (isSubActive(i)) {
+                subCount++;
+            }
+        }
+        Log.d(LOG_TAG, "count of subs activated " + subCount);
+        return subCount;
     }
 
     /** Subscription, contains a information of the subscription */
