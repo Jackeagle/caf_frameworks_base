@@ -38,8 +38,7 @@
 #define MPQ_AUDIO_PAUSE_TIMEOUT_USEC 3000000
 
 namespace android {
-
-class MPQAudioPlayer : public AudioPlayer  {
+class MPQAudioPlayer : public AudioPlayer, public AudioEventObserver {
 public:
 
     MPQAudioPlayer(const sp<MediaPlayerBase::AudioSink> &audioSink, bool &initCheck,
@@ -72,6 +71,8 @@ public:
 
     static int getMPQAudioObjectsAlive();
 
+    void postEOS(int64_t delayUs);
+
 private:
 
     void* mPlaybackHandle;
@@ -93,19 +94,6 @@ private:
 	A2DP_DISCONNECT
     }mA2DpState;
 
-    //Structure to hold pmem buffer information
-    class BuffersAllocated {
-    public:
-        BuffersAllocated(void *buf1, int32_t nSize) :
-        pmemBuf(buf1), pmemBufsize(nSize)
-        {}
-        void* pmemBuf;
-        int32_t pmemBufsize;
-        uint32_t bytesToWrite;
-    };
-    List<BuffersAllocated> mInputPmemEmptyQueue;
-    List<BuffersAllocated> mInputPmemFilledQueue;
-    List<BuffersAllocated> mInputBufPool;
     void * mLocalBuf;
 
     //Structure to recieve the BT notification from the flinger.
@@ -133,11 +121,8 @@ private:
     friend class AudioFlingerMPQAudioDecodeClient;
     Mutex mAudioFlingerLock;
 
-    //event fd to signal the EOS and Kill from the userspace
-    int mEfd;
 
     //Declare all the threads
-    pthread_t mEventThread;
     pthread_t mExtractorThread;
     pthread_t mA2DPThread;
     pthread_t mA2DPNotificationThread;
@@ -155,14 +140,10 @@ private:
     bool mA2dpNotificationThreadAlive;
 
     //Declare the condition Variables and Mutex
-    Mutex mInputPmemRequestMutex;
-    Mutex mInputPmemResponseMutex;
     Mutex mExtractorMutex;
-    Mutex mEventMutex;
     Mutex mA2dpMutex;
     Mutex mA2dpNotificationMutex;
 
-    Condition mEventCv;
     Condition mExtractorCv;
     Condition mA2dpCv;
     Condition mA2dpNotificationCv;
@@ -259,9 +240,6 @@ private:
     // make sure Decoder thread has exited
     void requestAndWaitForExtractorThreadExit();
 
-    // make sure the event thread also exited
-    void requestAndWaitForEventThreadExit();
-
     // make sure the A2dp thread also exited
     void requestAndWaitForA2DPThreadExit();
 
@@ -269,8 +247,6 @@ private:
     void requestAndWaitForA2DPNotificationThreadExit();
 
     //Thread functions
-    static void *eventThreadWrapper(void *me);
-    void eventThreadEntry();
     static void *extractorThreadWrapper(void *me);
     void extractorThreadEntry();
     static void *A2DPThreadWrapper(void *me);
@@ -289,7 +265,6 @@ private:
     //Get time stamp from driver
     int64_t getAudioTimeStampUs();
 
-    bool isReadyToPostEOS(int errPoll, void *fd);
     status_t openAndConfigureCaptureDevice();
     status_t getDecoderAndFormat();
 
