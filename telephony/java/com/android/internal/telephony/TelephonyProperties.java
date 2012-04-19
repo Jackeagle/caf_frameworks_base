@@ -216,4 +216,10 @@ public interface TelephonyProperties
 
     /** The delay between sms sending retries */
     static final String PROPERTY_SMS_RETRY_DELAY = "persist.radio.sms_retry_delay";
+
+    /**
+     * Property to control alpha ID display for proactive commands
+     * Type: boolean ( true = alpha display enabled, false = alpha display disabled)
+     */
+    static final String PROPERTY_ALPHA_USRCNF = "persist.atel.noalpha.usrcnf";
 }
