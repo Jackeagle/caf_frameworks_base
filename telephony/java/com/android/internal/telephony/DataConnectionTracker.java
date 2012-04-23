@@ -270,7 +270,6 @@ public abstract class DataConnectionTracker extends Handler {
     protected State mState = State.IDLE;
     protected Handler mDataConnectionTracker = null;
 
-
     protected long mTxPkts;
     protected long mRxPkts;
     protected int mNetStatPollPeriod;
