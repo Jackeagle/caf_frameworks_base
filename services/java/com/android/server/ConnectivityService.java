@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1489,29 +1490,43 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private void handleDnsConfigurationChange(int netType) {
 
         if(isCneEnabled()) {
-            // reset dns list
-            if (DBG) Slog.d(TAG, "handleDnsConfigurationChange - numDnsEntries=" +
+            // set per pid entries
+            NetworkStateTracker nt = mNetTrackers[netType];
+            if (nt != null && nt.getNetworkInfo().isConnected() && !nt.isTeardownRequested()) {
+                String[] dnsList = nt.getNameServers();
+                if (!mNetAttributes[netType].isDefault()) {
+                    List pids = mNetRequestersPids[netType];
+                    for (int y=0; y< pids.size(); y++) {
+                        Integer pid = (Integer)pids.get(y);
+                        writePidDns(dnsList, pid.intValue());
+                    }
+                } else {
+                    // add default net's dns entries
+                    // reset dns list
+                    if (DBG) Slog.d(TAG, "handleDnsConfigurationChange - numDnsEntries=" +
                             mNumDnsEntries + ",netType=" + netType);
-            for (int i=1; i <= mNumDnsEntries; i++) {
-                if (DBG) Slog.d(TAG, "handleDnsConfigurationChange - reset set.dns-i=" + i);
-                SystemProperties.set("net.dns" + i, "");
-            }
-            mNumDnsEntries = 0;
-            int k = 1;
-            for (int x = mPriorityList.length-1; x>= 0; x--) {
-                int networkType = mPriorityList[x];
-                NetworkStateTracker netTracker = mNetTrackers[networkType];
-                if (netTracker != null && netTracker.getNetworkInfo().isConnected() &&
-                    !netTracker.isTeardownRequested()) {
-                    String[] dnsLst = netTracker.getNameServers();
-                    if (mNetAttributes[networkType].isDefault()) {
-                        if (DBG) Slog.d(TAG, "handleDnsConfigurationChange isDefault=" +
+                    for (int i=1; i <= mNumDnsEntries; i++) {
+                        if (DBG) Slog.d(TAG, "handleDnsConfigurationChange - reset set.dns-i=" + i);
+                        SystemProperties.set("net.dns" + i, "");
+                    }
+                    mNumDnsEntries = 0;
+                    int k = 1;
+                    for (int x = 0 ; x < mPriorityList.length ; x++) {
+                        int networkType = mPriorityList[x];
+                        NetworkStateTracker netTracker = mNetTrackers[networkType];
+                        if (netTracker != null && netTracker.getNetworkInfo().isConnected() &&
+                                !netTracker.isTeardownRequested()) {
+                            String[] dnsLst = netTracker.getNameServers();
+                            if (mNetAttributes[networkType].isDefault()) {
+                                if (DBG) Slog.d(TAG, "handleDnsConfigurationChange isDefault=" +
                                         networkType);
-                        for (String dns : dnsLst) {
-                            if (dns != null && !TextUtils.equals(dns, "0.0.0.0")) {
-                                if (DBG) Slog.d(TAG, "adding dns " + dns + " for " +
-                                           netTracker.getNetworkInfo().getTypeName());
-                                SystemProperties.set("net.dns" + k++, dns);
+                                for (String dns : dnsLst) {
+                                    if (dns != null && !TextUtils.equals(dns, "0.0.0.0")) {
+                                        if (DBG) Slog.d(TAG, "adding dns " + dns + " for " +
+                                                netTracker.getNetworkInfo().getTypeName());
+                                        SystemProperties.set("net.dns" + k++, dns);
+                                    }
+                                }
                             }
                         }
                         mNumDnsEntries = k;
