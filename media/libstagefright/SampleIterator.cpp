@@ -22,6 +22,8 @@
 
 #include <arpa/inet.h>
 
+#include <cutils/properties.h>
+
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaDebug.h>
 #include <media/stagefright/Utils.h>
@@ -30,6 +32,8 @@
 
 namespace android {
 
+static size_t kSSTBSize = 10000;  //table cache = 10000 bytes
+
 SampleIterator::SampleIterator(SampleTable *table)
     : mTable(table),
       mInitialized(false),
@@ -37,8 +41,18 @@ SampleIterator::SampleIterator(SampleTable *table)
       mTTSSampleIndex(0),
       mTTSSampleTime(0),
       mTTSCount(0),
-      mTTSDuration(0) {
+      mTTSDuration(0),
+      mSSTableBuffer(0),
+      mSSTBStart(0),
+      mSSTBEnd(0){
     reset();
+}
+
+SampleIterator::~SampleIterator(){
+    if (mSSTableBuffer != 0) {
+        LOGV("allocated buffer is freed");
+        free(mSSTableBuffer);
+    }
 }
 
 void SampleIterator::reset() {
@@ -214,8 +228,93 @@ status_t SampleIterator::getChunkOffset(uint32_t chunk, off64_t *offset) {
     return OK;
 }
 
+status_t SampleIterator::getSampleSizeCached(
+        uint32_t sampleIndex, size_t *size) {
+    *size = 0;
+
+    if (sampleIndex >= mTable->mNumSampleSizes) {
+        return ERROR_OUT_OF_RANGE;
+    }
+
+    if (mTable->mDefaultSampleSize > 0) {
+        *size = mTable->mDefaultSampleSize;
+        return OK;
+    }
+
+    // read into buffer if not done already
+    if (mSSTableBuffer == 0) {
+        LOGV("mSSTableBuffer not initialized, allocating buffer");
+        mSSTableBuffer = (char*)malloc(kSSTBSize);
+        if (mSSTableBuffer == 0) {
+            return ERROR_IO;
+        }
+    }
+
+    // check bounds of buffer
+    if (sampleIndex >= mSSTBEnd || sampleIndex < mSSTBStart) {
+        mSSTBStart = sampleIndex;
+        if(mTable->mSampleSizeFieldSize == 4) {
+            // always start on a byte
+            mSSTBStart = mSSTBStart & 0xFFFFFFFE;
+        }
+        uint64_t offset = mTable->mSampleSizeOffset + 12 + (mSSTBStart * mTable->mSampleSizeFieldSize) / 8;
+        size_t amount = kSSTBSize;
+        if ((mTable->mNumSampleSizes - mSSTBStart) * mTable->mSampleSizeFieldSize / 8 > kSSTBSize) {
+            mSSTBEnd = (kSSTBSize * 8) / mTable->mSampleSizeFieldSize + mSSTBStart;
+        } else {
+            amount = ((mTable->mNumSampleSizes - mSSTBStart) * mTable->mSampleSizeFieldSize) / 8;
+            if(mTable->mSampleSizeFieldSize == 4 && (mTable->mNumSampleSizes - mSSTBStart) & 0x00000001) {
+                // a byte was chopped off in truncation
+                // need to compensate for the left over sample sizes in the next byte
+                amount++;
+            }
+            mSSTBEnd = mTable->mNumSampleSizes;
+        }
+
+        if(mTable->mDataSource->readAt(offset, mSSTableBuffer, amount) < (int32_t)amount) {
+            LOGE("cannot read to buffer");
+            return ERROR_IO;
+        }
+        LOGV("buffer now contains sample size %u to %u",mSSTBStart,mSSTBEnd);
+    }
+
+    switch (mTable->mSampleSizeFieldSize) {
+        case 32:
+        {
+            uint32_t* sizes = (uint32_t*)(mSSTableBuffer);
+            *size = sizes[sampleIndex - mSSTBStart];
+            *size = ntohl(*size);
+            break;
+        }
+        case 16:
+        {
+            uint16_t* sizes = (uint16_t*)(mSSTableBuffer);
+            uint16_t x = sizes[sampleIndex - mSSTBStart];
+            *size = ntohs(x);
+            break;
+        }
+        case 8:
+        {
+            *size = mSSTableBuffer[sampleIndex - mSSTBStart];
+            break;
+        }
+        default:
+            CHECK_EQ(mTable->mSampleSizeFieldSize, 4);
+            *size = mSSTableBuffer[sampleIndex/2 - mSSTBStart];
+            *size = (sampleIndex & 1) ? *size & 0x0f : *size >> 4;
+            break;
+    }
+    return OK;
+}
+
 status_t SampleIterator::getSampleSizeDirect(
         uint32_t sampleIndex, size_t *size) {
+    char cachedMode[PROPERTY_VALUE_MAX];
+    property_get("persist.debug.si.cached", cachedMode, "0");
+    if (atoi(cachedMode) > 0){
+        return getSampleSizeCached(sampleIndex,size);
+    }
+
     *size = 0;
 
     if (sampleIndex >= mTable->mNumSampleSizes) {
