@@ -28,6 +28,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Message;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.util.AttributeSet;
 import android.util.Slog;
 import android.view.animation.AccelerateInterpolator;
@@ -333,7 +334,28 @@ public class NavigationBarView extends LinearLayout {
     }
 
     public void reorient() {
-        final int rot = mDisplay.getRotation();
+        // Read system properties to check landscape lcd
+        String lcdLandscapeStr = SystemProperties.get("lcd.landscape");
+        boolean lcdLandscape = Boolean.parseBoolean(lcdLandscapeStr);
+        int rot;
+
+        if(lcdLandscape) {
+        rot = mDisplay.getRotation();
+        // On landscape LCD, navigation bar appears on Right side (normal mode)
+        // so rotate
+            switch (rot) {
+                case Surface.ROTATION_0:
+                    rot = Surface.ROTATION_90; break;
+                case Surface.ROTATION_90:
+                    rot = Surface.ROTATION_180; break;
+                case Surface.ROTATION_180:
+                    rot = Surface.ROTATION_270; break;
+                case Surface.ROTATION_270:
+                    rot = Surface.ROTATION_0; break;
+            }
+        } else {
+            rot = mDisplay.getRotation();
+        }
         for (int i=0; i<4; i++) {
             mRotatedViews[i].setVisibility(View.GONE);
         }
