@@ -291,7 +291,8 @@ status_t MPQAudioPlayer::start(bool sourceAlreadyStarted) {
     LOGV("All Threads Created.");
 
     int sessionId = 1;
-    if(((!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_MPEG)))) {
+    if((!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_MPEG)) ||
+        (!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_WMA))) {
         LOGD("TUNNEL_SESSION_ID");
         sessionId = TUNNEL_SESSION_ID;
     }
@@ -993,7 +994,11 @@ void MPQAudioPlayer::extractorThreadEntry() {
                 continue;
             }
             mPCMStream->write(mPCMStream, mLocalBuf, bytesToWrite);
-
+            if (!mInputBufferSize) {
+                mInputBufferSize = mPCMStream->common.get_buffer_size(&mPCMStream->common);
+                LOGD("mInputBufferSize = %d",mInputBufferSize);
+                bufferAlloc(mInputBufferSize);
+            }
             if (mIsA2DPEnabled)
                 mA2dpCv.signal();
                 if (bytesToWrite <= 0)
@@ -1502,6 +1507,43 @@ size_t MPQAudioPlayer::fillBufferfromParser(void *data, size_t size) {
 
     size_t size_done = 0;
     size_t size_remaining = size;
+    if (!mFirstEncodedBuffer && (mAudioFormat == AUDIO_FORMAT_WMA)) {
+        uint32_t type;
+        int configData[WMAPARAMSSIZE];
+        size_t configSize = WMAPARAMSSIZE * sizeof(int);
+        int value;
+        sp<MetaData> format = mSource->getFormat();
+        LOGV("Extracting the WMA params");
+
+        if (format->findInt32(kKeyBitRate, &value))
+            configData[WMABITRATE] = value;
+        else configData[WMABITRATE] = 0;
+        if (format->findInt32(kKeyWMABlockAlign, &value))
+            configData[WMABLOCKALIGN] = value;
+        else configData[WMABLOCKALIGN] = 0;
+        if (format->findInt32(kKeyWMAEncodeOpt, &value))
+            configData[WMAENCODEOPTION] = value;
+        else configData[WMAENCODEOPTION] = 0;
+
+        if (format->findInt32(kKeyWMAFormatTag, &value))
+            configData[WMAFORMATTAG] = value;
+        else configData[WMAFORMATTAG] = 0;
+
+        if (format->findInt32(kKeyWMABitspersample, &value))
+            configData[WMABPS] = value;
+        else configData[WMABPS] = 0;
+
+        if (format->findInt32(kKeyWMAChannelMask, &value))
+            configData[WMACHANNELMASK] = value;
+        else configData[WMACHANNELMASK] = 0;
+
+        memcpy((char *)data,(const char *)configData, configSize);
+        size_done = configSize;
+        LOGV("size_done = %d",size_done);
+        mFirstEncodedBuffer = true;
+        return size_done;
+
+    }
 
     while (size_remaining > 0) {
         MediaSource::ReadOptions options;
@@ -1890,9 +1932,14 @@ status_t MPQAudioPlayer::configurePCM() {
              mPCMStream = mAudioFlinger->getOutputSession();
              CHECK(mPCMStream);
              LOGV("getOutputSession-- ");
-             mInputBufferSize = mPCMStream->common.get_buffer_size(&mPCMStream->common);
-             LOGD("mInputBufferSize = %d",mInputBufferSize);
-             bufferAlloc(mInputBufferSize);
+
+             if (mAudioFormat != AUDIO_FORMAT_WMA) {
+                 mInputBufferSize = mPCMStream->common.get_buffer_size(&mPCMStream->common);
+                 LOGD("mInputBufferSize = %d",mInputBufferSize);
+                 bufferAlloc(mInputBufferSize);
+             } else {
+                 bufferAlloc(WMAPARAMSSIZE*sizeof(int));
+             }
              aeObv = this;
              mPCMStream->set_observer(mPCMStream, reinterpret_cast<void *>(aeObv));
              LOGV("Hardware break");
