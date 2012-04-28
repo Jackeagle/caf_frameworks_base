@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +45,7 @@ import com.android.internal.app.ShutdownThread;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
 import com.google.android.collect.Lists;
+import com.android.internal.app.SuspendThread;
 
 import java.util.ArrayList;
 
@@ -185,6 +187,31 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         // last: silent mode
         if (SHOW_SILENT_TOGGLE) {
             mItems.add(mSilentModeAction);
+        }
+
+        boolean warmBootCapable = SystemProperties.getBoolean("ro.warmboot.capability", false);
+        Log.d(TAG, "Device WarmBoot Capability = " + warmBootCapable );
+
+        if ( warmBootCapable ) {
+            SinglePressAction suspendAction;
+            suspendAction = new SinglePressAction(
+                com.android.internal.R.drawable.ic_lock_power_off,
+                        R.string.global_action_suspend) {
+
+                public void onPress() {
+                    // Starts the SuspendActivity which enables Device to enter deep sleep "suspend2ram" state
+                    SuspendThread.suspend(mContext, false);
+                }
+
+                public boolean showDuringKeyguard() {
+                    return true;
+                }
+
+                public boolean showBeforeProvisioning() {
+                    return true;
+                }
+            };
+            mItems.add( suspendAction );
         }
 
         mAdapter = new MyAdapter();
