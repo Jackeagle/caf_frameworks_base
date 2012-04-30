@@ -996,7 +996,6 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (!mStarted) {
             if (DEBUG) Log.d(TAG, "startNavigating");
             mStarted = true;
-            mSingleShot = singleShot;
             mPositionMode = GPS_POSITION_MODE_STANDALONE;
 
              if (Settings.Secure.getInt(mContext.getContentResolver(),
@@ -1009,7 +1008,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
 
             int interval = (hasCapability(GPS_CAPABILITY_SCHEDULING) ? mFixInterval : 1000);
-            if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
+            if (!native_set_position_mode(mPositionMode, singleShot ? GPS_POSITION_RECURRENCE_SINGLE : GPS_POSITION_RECURRENCE_PERIODIC,
                     interval, 0, 0)) {
                 mStarted = false;
                 Log.e(TAG, "set_position_mode failed in startNavigating()");
