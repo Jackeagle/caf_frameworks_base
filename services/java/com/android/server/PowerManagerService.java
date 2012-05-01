@@ -57,6 +57,7 @@ import android.util.EventLog;
 import android.util.Log;
 import android.util.Slog;
 import android.view.WindowManagerPolicy;
+import android.os.SystemProperties;
 import static android.provider.Settings.System.DIM_SCREEN;
 import static android.provider.Settings.System.SCREEN_BRIGHTNESS;
 import static android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE;
@@ -266,6 +267,7 @@ public class PowerManagerService extends IPowerManager.Stub
 
     // could be either static or controllable at runtime
     private static final boolean mSpew = false;
+    private static boolean mSpewWl = false;
     private static final boolean mDebugProximitySensor = (false || mSpew);
     private static final boolean mDebugLightSensor = (false || mSpew);
     
@@ -493,6 +495,9 @@ public class PowerManagerService extends IPowerManager.Stub
 
         // assume nothing is on yet
         mUserState = mPowerState = 0;
+
+        if (SystemProperties.getInt("debug.enable.wl_log", 0) != 0)
+            mSpewWl = true;
 
         // Add ourself to the Watchdog monitors.
         Watchdog.getInstance().addMonitor(this);
@@ -787,8 +792,9 @@ public class PowerManagerService extends IPowerManager.Stub
 
     public void acquireWakeLockLocked(int flags, IBinder lock, int uid, int pid, String tag,
             WorkSource ws) {
-        if (mSpew) {
-            Slog.d(TAG, "acquireWakeLock flags=0x" + Integer.toHexString(flags) + " tag=" + tag);
+        if (mSpew || mSpewWl) {
+            Slog.d(TAG, "acquireWakeLock flags=0x" +
+                Integer.toHexString(flags) + " tag=" + tag);
         }
 
         if (ws != null && ws.size() == 0) {
@@ -954,9 +960,9 @@ public class PowerManagerService extends IPowerManager.Stub
             return;
         }
 
-        if (mSpew) {
-            Slog.d(TAG, "releaseWakeLock flags=0x"
-                    + Integer.toHexString(wl.flags) + " tag=" + wl.tag);
+        if (mSpew || mSpewWl) {
+            Slog.d(TAG, "releaseWakeLock flags=0x" +
+                Integer.toHexString(wl.flags) + " tag=" + wl.tag);
         }
 
         if (isScreenLock(wl.flags)) {
