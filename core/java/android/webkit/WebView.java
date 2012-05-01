@@ -7884,10 +7884,10 @@ public class WebView extends AbsoluteLayout
     private class SmoothRotateAnimationListener implements Animation.AnimationListener {
 
         public void onAnimationStart(Animation animation) {
-            mWebViewCore.sendMessage(EventHub.HIDE_PLUGINS_DURING_SMOOTH_ROTATE);
+            mViewManager.hideAll();
         }
         public void onAnimationEnd(Animation animation) {
-            mWebViewCore.sendMessage(EventHub.SHOW_PLUGINS_AFTER_SMOOTH_ROTATE);
+            mViewManager.showAll();
         }
         public void onAnimationRepeat(Animation animation) {
         }
