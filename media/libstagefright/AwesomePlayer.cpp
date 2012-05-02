@@ -496,6 +496,10 @@ status_t AwesomePlayer::setDataSource_l(const sp<MediaExtractor> &extractor) {
 }
 
 void AwesomePlayer::reset() {
+    //Disconnect datasource
+    if (mConnectingDataSource != NULL) {
+        mConnectingDataSource->disconnect();
+    }
     Mutex::Autolock autoLock(mLock);
     reset_l();
 }
@@ -549,6 +553,10 @@ void AwesomePlayer::reset_l() {
 
     mWVMExtractor.clear();
     mCachedSource.clear();
+    if (mConnectingDataSource != NULL) {
+        mConnectingDataSource.clear();
+    }
+
     mAudioTrack.clear();
     mVideoTrack.clear();
 
@@ -2222,7 +2230,8 @@ status_t AwesomePlayer::finishSetDataSource_l() {
             dataSource = mConnectingDataSource;
         }
 
-        mConnectingDataSource.clear();
+        //keep the connecting data source pointer, so that disconnect can be called
+        //mConnectingDataSource.clear();
 
         String8 contentType = dataSource->getMIMEType();
 
