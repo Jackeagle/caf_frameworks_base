@@ -403,9 +403,16 @@ status_t MPQAudioPlayer::seekSoftwareDecoderPlayback() {
     status_t err = OK;
     mPositionTimeRealUs = mPositionTimeMediaUs = -1;
     mNumFramesPlayed = 0;
+    mTimePaused = 0;
     //Flush not called.
     //Currently play the buffer
     if(mA2DpState == A2DP_DISABLED) {
+        err = mPCMStream->flush(mPCMStream);
+        if(err != OK) {
+            LOGE("flush returned error =%d",err);
+            return err;
+        }
+
         mExtractorCv.signal();
     }
     else if(mA2DpState == A2DP_ENABLED) {
@@ -510,7 +517,6 @@ status_t MPQAudioPlayer::pauseSoftwareDecoderPlayback() {
     if (mPlayPendingSamples) {
         //should call stop ideally
         //No pausing the driver. Allow the playback
-        //err = mPCMStream->pause(mPCMStream);
         mNumFramesPlayed = 0;
     }
     else {
@@ -525,6 +531,8 @@ status_t MPQAudioPlayer::pauseSoftwareDecoderPlayback() {
     if ((mSource->pause()) == OK) {
         mSourcePaused = true;
     }
+    mTimePaused = mSeekTimeUs + mPositionTimeMediaUs;
+
     return err;
 }
 
@@ -763,7 +771,8 @@ void MPQAudioPlayer::reset() {
 
     // make sure Extractor thread has exited
     requestAndWaitForExtractorThreadExit();
-    LOGE("Extractor Thread killed");
+    LOGV("Extractor Thread killed");
+    // make sure the event thread also has exited
 
     requestAndWaitForA2DPThreadExit();
 
@@ -772,12 +781,12 @@ void MPQAudioPlayer::reset() {
     if(mDecoderType == ESoftwareDecoder || mDecoderType== EMS11Decoder ||
         mDecoderType == EHardwareDecoder) {
         if(mPCMStream) {
+            mPCMStream->pause(mPCMStream);
             LOGV("Close the PCM Stream");
             mPCMStream->stop(mPCMStream);
         }
         mPCMStream = NULL;
     }
-
 
     // Close the audiosink after all the threads exited to make sure
     // there is no thread writing data to audio sink or applying effect
@@ -816,12 +825,17 @@ void MPQAudioPlayer::reset() {
     // The following hack is necessary to ensure that the OMX
     // component is completely released by the time we may try
     // to instantiate it again.
-    wp<MediaSource> tmp = mSource;
-    mSource.clear();
-    while (tmp.promote() != NULL) {
-        usleep(1000);
+    if(mDecoderType == ESoftwareDecoder) {
+        wp<MediaSource> tmp = mSource;
+        mSource.clear();
+        while (tmp.promote() != NULL) {
+           LOGV("reset-sleep");
+           usleep(1000);
+        }
     }
-
+    else {
+        mSource.clear();
+    }
     bufferDeAlloc();
     LOGD("Buffer Deallocation complete!");
     mPositionTimeMediaUs = -1;
@@ -914,39 +928,45 @@ void MPQAudioPlayer::extractorThreadEntry() {
                             mAudioFormat == AUDIO_FORMAT_AAC_ADIF) {
                     bytesWritten = mPCMStream->write(
                             mPCMStream, mLocalBuf, bytesToWrite);
-                    if(mDecoderType == EMS11Decoder) {
-                        uint32_t sampleRate = 0, frameCount = 0;
-                        mPCMStream->get_render_position(mPCMStream, &frameCount);
-
-                        //TODO : Need to remove the hardcoding to support 24bit
-                        // Channesl is 2  and considering 16bit PCM
-                        mFrameSize = 4;
-                        sampleRate = mPCMStream->common.get_sample_rate(
-                                &mPCMStream->common);
-                        mInputBufferSize =  mPCMStream->common.get_buffer_size(
-                                &mPCMStream->common);
-                        if(sampleRate) {
-                            LOGV("frameCount = %d, mInputBufferSize = %d, \
-                                    mFrameSize = %d, sampleRate = %d", frameCount,\
-                                    mInputBufferSize, mFrameSize, sampleRate);
-                            mPositionTimeMediaUs = (((int64_t)(((int64_t)(
-                                    (frameCount  * mInputBufferSize)/ mFrameSize))
-                                    * 1000000)) / sampleRate);
-                            mPositionTimeRealUs =
-                                   -mLatencyUs + mPositionTimeMediaUs;
-                            LOGV("mPositionTimeMediaUs = %lld",mPositionTimeMediaUs);
-                        }
-                        else {
-                            LOGV("mPositionTimeMediaUs zero");
-                            mPositionTimeMediaUs = 0;
-                        }
-                    }
                 }
                 else {
                      bytesWritten = mPCMStream->write(
                              mPCMStream, mLocalBuf, mInputBufferSize);
                 }
                 LOGV("bytesWritten = %d",(int)bytesWritten);
+                uint32_t sampleRate = 0, frameCount = 0;
+                mPCMStream->get_render_position(mPCMStream, &frameCount);
+
+                //TODO : Need to remove the hardcoding to support 24bit
+                // Channels is 2  and considering 16bit PCM
+                if(mDecoderType == EMS11Decoder) {
+                    mNumChannels = mPCMStream->common.get_channels(&mPCMStream->common);
+                    LOGV("HAL mNumChannels = %d", mNumChannels);
+                    mFrameSize = 2*mNumChannels;
+                } else {
+                    mFrameSize = mNumChannels * audio_bytes_per_sample(mAudioFormat);
+                }
+                CHECK(mFrameSize);
+                LOGV("mFrameSize = %d", mFrameSize);
+                sampleRate = mPCMStream->common.get_sample_rate(
+                        &mPCMStream->common);
+                mInputBufferSize =  mPCMStream->common.get_buffer_size(
+                        &mPCMStream->common);
+                if(sampleRate) {
+                    LOGV("frameCount = %d, mInputBufferSize = %d, \
+                            mFrameSize = %d, sampleRate = %d", frameCount,\
+                            mInputBufferSize, mFrameSize, sampleRate);
+                    mPositionTimeMediaUs = (((int64_t)(((int64_t)(
+                           (frameCount  * mInputBufferSize)/ mFrameSize))
+                            * 1000000)) / sampleRate);
+                    mPositionTimeRealUs =
+                            -mLatencyUs + mPositionTimeMediaUs;
+                    LOGV("mPositionTimeMediaUs = %lld",mPositionTimeMediaUs);
+                }
+                else {
+                    LOGV("mPositionTimeMediaUs zero");
+                    mPositionTimeMediaUs = 0;
+                }
             }
             else if(!mAudioSink->getSessionId()) {
                 LOGV("bytesToWrite = %d, mInputBufferSize = %d",\
@@ -961,10 +981,7 @@ void MPQAudioPlayer::extractorThreadEntry() {
                         memset(mLocalBuf, 0x0, AAC_AC3_BUFFER_SIZE);
                         mPCMStream->write(mPCMStream, mLocalBuf, 0);
                     }
-                    if(bytesToWrite <=0)
-                        mObserver->postAudioEOS();
-                    else
-                        mObserver->postAudioEOS( mPostEOSDelayUs);
+                    mObserver->postAudioEOS( mPostEOSDelayUs);
                     mPostedEOS = true;
                 }
             }
@@ -1228,6 +1245,7 @@ void MPQAudioPlayer::createThreads() {
 
     pthread_attr_destroy(&attr);
 }
+
 size_t MPQAudioPlayer::fillBuffer(void *data, size_t size) {
 
     switch(mDecoderType) {
@@ -1315,32 +1333,47 @@ size_t MPQAudioPlayer::fillBufferfromSoftwareDecoder(void *data, size_t size) {
                 Mutex::Autolock autoLock(mLock);
 
                 if (err != OK) {
+                    if (mObserver && !mReachedExtractorEOS) {
+                        if(mAudioSink->getSessionId()) {
+                            mPostEOSDelayUs = mLatencyUs;
+                            LOGV("mPostEOSDelayUs = %lld", mPostEOSDelayUs);
+                        }
+                        else {
+                            uint32_t numFramesPlayedOut, numFramesPendingPlayout;
+                            status_t err = mAudioSink->getPosition(&numFramesPlayedOut);
+                            if (err != OK || mNumFramesPlayed < numFramesPlayedOut) {
+                                numFramesPendingPlayout = 0;
+                            }
+                            else {
+                                numFramesPendingPlayout =
+                                        mNumFramesPlayed - numFramesPlayedOut;
+                            }
+
+                            mFrameSize = mAudioSink->frameSize();
+                            uint32_t numAdditionalFrames = size_done / mFrameSize;
+
+                            numFramesPendingPlayout += numAdditionalFrames;
+
+                            int64_t timeToCompletionUs =
+                                (1000000ll * numFramesPendingPlayout) / mSampleRate;
+
+                            LOGV("total number of frames played: %lld (%lld us)",
+                                   (mNumFramesPlayed + numAdditionalFrames),
+                                   1000000ll * (mNumFramesPlayed + numAdditionalFrames)
+                                    / mSampleRate);
+                            LOGV("%d frames left to play, %lld us (%.2f secs)",
+                                numFramesPendingPlayout,
+                               timeToCompletionUs, timeToCompletionUs / 1E6);
+                            mPostEOSDelayUs = mLatencyUs + timeToCompletionUs;
+                            LOGV("mPostEOSDelayUs = %lld", mPostEOSDelayUs);
+
+                        }
+                    }
                     LOGD("fill buffer - reached eos true");
                     mReachedExtractorEOS = true;
                     mFinalStatus = err;
                     break;
                 }
-                CHECK(mInputBuffer->meta_data()->findInt64(
-                                                      kKeyTime, &mPositionTimeMediaUs));
-                //TODO : Get Frame size talk ravi
-                //mFrameSize = mAudioSink->frameSize();
-                //audio_stream_out_t * local_pcmStream = (audio_stream_out_t*) mPCMStream;
-
-                int format = AUDIO_FORMAT_PCM_16_BIT;//local_pcmStream->format();
-                if (audio_is_linear_pcm(format)) mFrameSize = mNumChannels * audio_bytes_per_sample(format);
-                else mFrameSize = sizeof(uint8_t);
-                if(mSampleRate != 0) {
-                    mPositionTimeRealUs =
-                          ((mNumFramesPlayed + size_done / mFrameSize) * 1000000)
-                          / mSampleRate;
-                    //TODO: Do we need to return error here
-                }
-                LOGV("buffer->size() = %d, "
-                      "mPositionTimeMediaUs=%.2f mPositionTimeRealUs=%.2f",
-                      mInputBuffer->range_length(),
-                      mPositionTimeMediaUs / 1E6, mPositionTimeRealUs / 1E6);
-                //TODO: Add number of buffers  for Delay use case
-                mPostEOSDelayUs = 8 * mLatencyUs;
             }
         }
 
@@ -1368,10 +1401,10 @@ size_t MPQAudioPlayer::fillBufferfromSoftwareDecoder(void *data, size_t size) {
 
     {
         Mutex::Autolock autoLock(mLock);
-        if(mFrameSize != 0) {
+        if(mFrameSize != 0)
             mNumFramesPlayed += size_done / mFrameSize;
-        }
     }
+
 
     LOGV("fill buffer size_done = %d",size_done);
     return size_done;
@@ -1407,11 +1440,10 @@ size_t MPQAudioPlayer::fillMS11InputBufferfromParser(void *data, size_t size) {
                 //size_remaining = size;
 
                 mSeeking = false;
-                if (mObserver && !mAsyncReset && !mInternalSeeking) {
+                if (mObserver && !mAsyncReset) {
                     LOGD("fillBuffer: Posting audio seek complete event");
                     mObserver->postAudioSeekComplete();
                 }
-                mInternalSeeking = false;
             }
         }
         if (mInputBuffer == NULL) {
@@ -1629,10 +1661,7 @@ int64_t MPQAudioPlayer::getRealTimeUs() {
             mPositionTimeRealUs = 0;
             return mPositionTimeRealUs;
         case ESoftwareDecoder:
-            CHECK(mSampleRate != 0);
-            return -mLatencyUs + (mNumFramesPlayed * 1000000) / mSampleRate;
         case EMS11Decoder:
-            //TODO: get the Timestamp renderred for AC3 and AAC
             mPositionTimeRealUs =  -mLatencyUs + mSeekTimeUs + mPositionTimeMediaUs;
             return mPositionTimeRealUs;
         default:
@@ -1656,16 +1685,7 @@ int64_t MPQAudioPlayer::getMediaTimeUs() {
                 return  ( mSeekTimeUs + getAudioTimeStampUs());
             }
         case ESoftwareDecoder:
-            if (mPositionTimeMediaUs < 0 || mPositionTimeRealUs < 0) {
-                if(mSeeking) {
-                    return mSeekTimeUs;
-                }
-                return 0;
-            }
-            LOGV("getMediaTimeUs -  mPositionTimeMediaUs = %lld", mPositionTimeMediaUs);
-            return mPositionTimeMediaUs;
         case EMS11Decoder:
-            //TODO: get the Timestamp renderred for AC3 and AAC
             if (mIsPaused) {
                 LOGV("getMediaTimeUs - paused = %lld",mTimePaused);
                 return mTimePaused;
@@ -1903,11 +1923,15 @@ status_t MPQAudioPlayer::configurePCM() {
                    return BAD_VALUE;
                 }
                 mInputBufferSize = mPCMStream->common.get_buffer_size(&mPCMStream->common);
-                LOGD("mInputBufferSize = %d",mInputBufferSize);
+                LOGV("mInputBufferSize = %d",mInputBufferSize);
+                mLatencyUs = (int64_t) (mPCMStream->get_latency(mPCMStream) * 1000);
+                LOGV("mLatencyUs = %lld",mLatencyUs);
              }
              else {
                 mInputBufferSize = mAudioSink->bufferSize();
-                LOGD("get sink buffer size = %d",mInputBufferSize);
+                LOGV("get sink buffer size = %d",mInputBufferSize);
+                mLatencyUs = (int64_t)mAudioSink->latency() * 1000;
+                LOGV("Sink -mLatencyUs = %lld",mLatencyUs);
              }
              if(mDecoderType == EMS11Decoder) {
                  bufferAlloc(AAC_AC3_BUFFER_SIZE);
@@ -1924,8 +1948,6 @@ status_t MPQAudioPlayer::configurePCM() {
                  //TODO : Return No memory Error
                  return BAD_VALUE;
              }
-             //mLatencyUs = (int64_t) local_pcmStream->latency() * 1000;
-             mLatencyUs = 24000;
             break;
         case EHardwareDecoder:
              LOGV("getOutputSession = ");
