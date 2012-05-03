@@ -29,6 +29,7 @@ import android.content.IntentFilter;
 import android.os.RemoteException;
 import android.os.Handler;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.os.IBinder;
 import android.os.INetworkManagementService;
 
@@ -89,6 +90,11 @@ public class MobileDataStateTracker extends NetworkStateTracker {
     // DEFAULT and HIPRI are the same connection.  If we're one of these we need to check if
     // the other is also disconnected before we reset sockets
     private boolean mIsDefaultOrHipri = false;
+
+    private static final boolean SUPPORT_IPV4 = SystemProperties.getBoolean(
+            "persist.telephony.support_ipv4", true);
+    private static final boolean SUPPORT_IPV6 = SystemProperties.getBoolean(
+            "persist.telephony.support_ipv6", true);
 
     /**
      * Create a new MobileDataStateTracker
@@ -476,8 +482,10 @@ public class MobileDataStateTracker extends NetworkStateTracker {
          * Following will force a connectivity action event to be send, even if
          * state change has not occurred.
          */
-        mMobileInfo.get(IPVersion.IPV4).mState = DataState.CONNECTING;
-        mMobileInfo.get(IPVersion.IPV6).mState = DataState.CONNECTING;
+        mMobileInfo.get(IPVersion.IPV4).mState =
+            (SUPPORT_IPV4 ? DataState.CONNECTING : DataState.DISCONNECTED);
+        mMobileInfo.get(IPVersion.IPV6).mState =
+            (SUPPORT_IPV6 ? DataState.CONNECTING : DataState.DISCONNECTED);
 
         switch (setEnableApn(mApnType, true)) {
             case Phone.APN_ALREADY_ACTIVE:
