@@ -14567,70 +14567,93 @@ public final class ActivityManagerService extends ActivityManagerNative
             int curLevel = ComponentCallbacks2.TRIM_MEMORY_COMPLETE;
             for (i=0; i<N; i++) {
                 ProcessRecord app = mLruProcesses.get(i);
-                if (app.curAdj >= ProcessList.HOME_APP_ADJ
-                        && app.curAdj != ProcessList.SERVICE_B_ADJ
-                        && !app.killedBackground) {
-                    if (app.trimMemoryLevel < curLevel && app.thread != null) {
-                        try {
-                            app.thread.scheduleTrimMemory(curLevel);
-                        } catch (RemoteException e) {
-                        }
-                        if (false) {
-                            // For now we won't do this; our memory trimming seems
-                            // to be good enough at this point that destroying
-                            // activities causes more harm than good.
-                            if (curLevel >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE
-                                    && app != mHomeProcess && app != mPreviousProcess) {
-                                // For these apps we will also finish their activities
-                                // to help them free memory.
-                                mMainStack.destroyActivitiesLocked(app, false, "trim");
+                boolean skipProcess = false;
+
+                if (app == mHomeProcess
+                    && curLevel <= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+                    ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+                    getMemoryInfo(mi);
+                    if (!mi.lowMemory) {
+                        skipProcess = true;
+                        app.trimMemoryLevel = 0;
+                    }
+                }
+
+                if (!skipProcess) {
+                    if (app.curAdj >= ProcessList.HOME_APP_ADJ
+                            && app.curAdj != ProcessList.SERVICE_B_ADJ
+                            && !app.killedBackground) {
+                        if (app.trimMemoryLevel < curLevel && app.thread != null) {
+                            try {
+                                app.thread.scheduleTrimMemory(curLevel);
+                            } catch (RemoteException e) {
+                            }
+                            if (false) {
+                                // For now we won't do this; our memory trimming seems
+                                // to be good enough at this point that destroying
+                                // activities causes more harm than good.
+                                if (curLevel >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE
+                                        && app != mHomeProcess && app != mPreviousProcess) {
+                                    // For these apps we will also finish their activities
+                                    // to help them free memory.
+                                    mMainStack.destroyActivitiesLocked(app, false, "trim");
+                                }
                             }
                         }
-                    }
-                    app.trimMemoryLevel = curLevel;
-                    step++;
-                    if (step >= factor) {
-                        switch (curLevel) {
-                            case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
-                                curLevel = ComponentCallbacks2.TRIM_MEMORY_MODERATE;
-                                break;
-                            case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
-                                curLevel = ComponentCallbacks2.TRIM_MEMORY_BACKGROUND;
-                                break;
+                        app.trimMemoryLevel = curLevel;
+                        step++;
+                        if (step >= factor) {
+                            switch (curLevel) {
+                                case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
+                                    curLevel = ComponentCallbacks2.TRIM_MEMORY_MODERATE;
+                                    break;
+                                case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
+                                    curLevel = ComponentCallbacks2.TRIM_MEMORY_BACKGROUND;
+                                    break;
+                            }
                         }
-                    }
-                } else if (app.curAdj == ProcessList.HEAVY_WEIGHT_APP_ADJ) {
-                    if (app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
-                            && app.thread != null) {
-                        try {
-                            app.thread.scheduleTrimMemory(
-                                    ComponentCallbacks2.TRIM_MEMORY_BACKGROUND);
-                        } catch (RemoteException e) {
+                    } else if (app.curAdj == ProcessList.HEAVY_WEIGHT_APP_ADJ) {
+                        if (app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+                                && app.thread != null) {
+                            try {
+                                app.thread.scheduleTrimMemory(
+                                        ComponentCallbacks2.TRIM_MEMORY_BACKGROUND);
+                            } catch (RemoteException e) {
+                            }
                         }
-                    }
-                    app.trimMemoryLevel = ComponentCallbacks2.TRIM_MEMORY_BACKGROUND;
-                } else if ((app.curAdj > ProcessList.VISIBLE_APP_ADJ || app.systemNoUi)
-                        && app.pendingUiClean) {
-                    if (app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
-                            && app.thread != null) {
-                        try {
-                            app.thread.scheduleTrimMemory(
-                                    ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN);
-                        } catch (RemoteException e) {
+                        app.trimMemoryLevel = ComponentCallbacks2.TRIM_MEMORY_BACKGROUND;
+                    } else if ((app.curAdj > ProcessList.VISIBLE_APP_ADJ || app.systemNoUi)
+                            && app.pendingUiClean) {
+                        if (app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
+                                && app.thread != null) {
+                            try {
+                                app.thread.scheduleTrimMemory(
+                                        ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN);
+                            } catch (RemoteException e) {
+                            }
                         }
+                        app.trimMemoryLevel = ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN;
+                        app.pendingUiClean = false;
+                    } else {
+                        app.trimMemoryLevel = 0;
                     }
-                    app.trimMemoryLevel = ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN;
-                    app.pendingUiClean = false;
-                } else {
-                    app.trimMemoryLevel = 0;
                 }
             }
         } else {
             final int N = mLruProcesses.size();
             for (i=0; i<N; i++) {
                 ProcessRecord app = mLruProcesses.get(i);
+                boolean skipProcess = false;
+                if (app == mHomeProcess) {
+                    ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+                    getMemoryInfo(mi);
+                    if (!mi.lowMemory) {
+                        skipProcess = true;
+                    }
+                }
+
                 if ((app.curAdj > ProcessList.VISIBLE_APP_ADJ || app.systemNoUi)
-                        && app.pendingUiClean) {
+                        && app.pendingUiClean && !skipProcess) {
                     if (app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
                             && app.thread != null) {
                         try {
