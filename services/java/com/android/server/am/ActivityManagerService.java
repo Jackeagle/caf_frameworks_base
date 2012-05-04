@@ -3318,8 +3318,6 @@ public final class ActivityManagerService extends ActivityManagerNative
             Process.sendSignal(app.pid, Process.SIGNAL_QUIT);
         }
 
-        addErrorToDropBox("anr", app, app.processName, activity, parent, annotation,
-                cpuInfo, tracesFile, null);
 
         if (mController != null) {
             try {
@@ -3356,13 +3354,19 @@ public final class ActivityManagerService extends ActivityManagerNative
             String tracesPath = SystemProperties.get("dalvik.vm.stack-trace-file", null);
             if (tracesPath != null && tracesPath.length() != 0) {
                 File traceRenameFile = new File(tracesPath);
+                File traceRenamedFile;
                 String newTracesPath;
                 int lpos = tracesPath.lastIndexOf (".");
                 if (-1 != lpos)
                     newTracesPath = tracesPath.substring (0, lpos) + "_" + app.processName + tracesPath.substring (lpos);
                 else
                     newTracesPath = tracesPath + "_" + app.processName;
-                traceRenameFile.renameTo(new File(newTracesPath));
+                traceRenamedFile = new File(newTracesPath);
+
+                traceRenameFile.renameTo(traceRenamedFile);
+                Slog.e(TAG, "reading " + traceRenamedFile);
+                addErrorToDropBox("anr", app, app.processName, activity, parent, annotation,
+                cpuInfo, traceRenamedFile, null);
 
                 Process.sendSignal(app.pid, 6);
                 SystemClock.sleep(1000);
