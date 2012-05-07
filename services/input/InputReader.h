@@ -1215,6 +1215,9 @@ protected:
                 *outSize += sizeBias;
             }
         }
+
+        // 5-point calibration parameters
+        int fiveCal[7];
     } mCalibration;
 
     // Raw pointer axis information from the driver.

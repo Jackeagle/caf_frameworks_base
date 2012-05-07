@@ -3352,6 +3352,16 @@ void TouchInputMapper::parseCalibration() {
 
     out.haveDistanceScale = in.tryGetProperty(String8("touch.distance.scale"),
             out.distanceScale);
+
+    // Get 5-point calibration parameters
+    FILE *file = fopen("/data/system/tslib/pointercal", "r");
+    int *p = out.fiveCal;
+    if (file) {
+        fscanf(file, "%d %d %d %d %d %d %d", &p[0], &p[1], &p[2], &p[3], &p[4], &p[5], &p[6]);
+        fclose(file);
+    } else {
+        p[6] = 0;
+    }
 }
 
 void TouchInputMapper::resolveCalibration() {
@@ -4085,33 +4095,47 @@ void TouchInputMapper::cookPointerData() {
             distance = 0;
         }
 
+        float x_temp = float(in.x - mRawPointerAxes.x.minValue);
+        float y_temp = float(in.y - mRawPointerAxes.y.minValue);
+        float x_cal, y_cal;
+        int *p = mCalibration.fiveCal;
+        if (p[6]) {
+            // Apply 5-point calibration algorithm
+            x_cal = (x_temp * p[0] + y_temp * p[1] + p[2] ) / p[6];
+            y_cal = (x_temp * p[3] + y_temp * p[4] + p[5] ) / p[6];
+            ALOGV("5cal: x_temp=%f y_temp=%f x_cal=%f y_cal=%f", x_temp, y_temp, x_cal, y_cal);
+        } else {
+            x_cal = x_temp * mXScale;
+            y_cal = y_temp * mYScale;
+        }
+
         // X and Y
         // Adjust coords for surface orientation.
         float x, y;
         switch (mSurfaceOrientation) {
         case DISPLAY_ORIENTATION_90:
-            x = float(in.y - mRawPointerAxes.y.minValue) * mYScale;
-            y = float(mRawPointerAxes.x.maxValue - in.x) * mXScale;
+            x = y_cal;
+            y = mSurfaceWidth - x_cal;
             orientation -= M_PI_2;
             if (orientation < - M_PI_2) {
                 orientation += M_PI;
             }
             break;
         case DISPLAY_ORIENTATION_180:
-            x = float(mRawPointerAxes.x.maxValue - in.x) * mXScale;
-            y = float(mRawPointerAxes.y.maxValue - in.y) * mYScale;
+            x = mSurfaceWidth - x_cal;
+            y = mSurfaceHeight - y_cal;
             break;
         case DISPLAY_ORIENTATION_270:
-            x = float(mRawPointerAxes.y.maxValue - in.y) * mYScale;
-            y = float(in.x - mRawPointerAxes.x.minValue) * mXScale;
+            x = mSurfaceHeight - y_cal;
+            y = x_cal;
             orientation += M_PI_2;
             if (orientation > M_PI_2) {
                 orientation -= M_PI;
             }
             break;
         default:
-            x = float(in.x - mRawPointerAxes.x.minValue) * mXScale;
-            y = float(in.y - mRawPointerAxes.y.minValue) * mYScale;
+            x = x_cal;
+            y = y_cal;
             break;
         }
 
