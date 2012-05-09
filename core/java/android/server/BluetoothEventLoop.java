@@ -420,7 +420,10 @@ class BluetoothEventLoop {
                 }
                 value = str.toString();
             }
-            adapterProperties.setProperty(name, value);
+            String adapterObjectPath = adapterProperties.getObjectPath();
+            if ((value != null) && (value.startsWith(adapterObjectPath))) {
+               adapterProperties.setProperty(name, value);
+            }
             if (name.equals("UUIDs")) {
                 mBluetoothService.updateBluetoothState(value);
             }
