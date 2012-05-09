@@ -100,9 +100,13 @@ status_t NuPlayerDriver::prepare() {
 }
 
 status_t NuPlayerDriver::prepareAsync() {
-    notifyListener(MEDIA_PREPARED);
 
-    return OK;
+    status_t err = UNKNOWN_ERROR;
+    if (mPlayer != NULL)
+    {
+        err = mPlayer->prepareAsync();
+    }
+    return err;
 }
 
 status_t NuPlayerDriver::start() {
@@ -257,11 +261,23 @@ void NuPlayerDriver::setAudioSink(const sp<AudioSink> &audioSink) {
 }
 
 status_t NuPlayerDriver::setParameter(int key, const Parcel &request) {
-    return INVALID_OPERATION;
+
+    status_t err = UNKNOWN_ERROR;
+    if (mPlayer != NULL)
+    {
+        err = mPlayer->setParameter(key, request);
+    }
+    return err;
 }
 
 status_t NuPlayerDriver::getParameter(int key, Parcel *reply) {
-    return INVALID_OPERATION;
+
+    status_t err = UNKNOWN_ERROR;
+    if (mPlayer != NULL)
+    {
+        err = mPlayer->getParameter(key, reply);
+    }
+    return err;
 }
 
 status_t NuPlayerDriver::getMetadata(

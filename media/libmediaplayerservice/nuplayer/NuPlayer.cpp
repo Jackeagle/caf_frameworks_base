@@ -660,6 +660,29 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatPrepareAsync:
+            if (mSource == NULL)
+            {
+                LOGE("Source is null in prepareAsync\n");
+                break;
+            }
+            mSource->prepareAsync();
+            postIsPrepareDone();
+            break;
+
+        case kWhatIsPrepareDone:
+            if (mSource == NULL)
+            {
+                LOGE("Source is null when checking for prepare done\n");
+                break;
+            }
+            if (mSource->isPrepareDone()) {
+                notifyListener(MEDIA_PREPARED, 0, 0);
+            } else {
+                msg->post(100000ll);
+            }
+            break;
+
         default:
             TRESPASS();
             break;
@@ -1056,6 +1079,7 @@ void NuPlayer::flushDecoder(bool audio, bool needShutdown) {
     }
     LOGV("flushDecoder end states Audio %d, Video %d", mFlushingAudio, mFlushingVideo);
 }
+
 sp<NuPlayer::Source>
     NuPlayer::LoadCreateSource(const char * uri, const KeyedVector<String8,String8> *headers,
                                bool uidValid, uid_t uid, NuSourceType srcTyp)
@@ -1104,6 +1128,89 @@ sp<NuPlayer::Source>
 
 
     return StreamingSource;
+}
+
+status_t NuPlayer::prepareAsync() // only for DASH
+{
+    if (mLiveSourceType == kHttpDashSource) {
+        sp<AMessage> msg = new AMessage(kWhatPrepareAsync, id());
+        if (msg == NULL)
+        {
+            LOGE("Out of memory, AMessage is null for kWhatPrepareAsync\n");
+            return NO_MEMORY;
+        }
+        msg->post();
+    }
+    return OK;
+}
+
+status_t NuPlayer::getParameter(int key, Parcel *reply)
+{
+    void * data_8;
+    void * data_16;
+    size_t data_8_Size;
+    size_t data_16_Size;
+
+    status_t err = OK;
+    if (key == 8002) {
+
+        if (mSource == NULL)
+        {
+            LOGE("Source is NULL in getParameter\n");
+            return UNKNOWN_ERROR;
+        }
+        err = mSource->getParameter(key, &data_8, &data_8_Size);
+        if (err != OK)
+        {
+            LOGE("source getParameter returned error: %d\n",err);
+            return err;
+        }
+
+        data_16_Size = data_8_Size * sizeof(char16_t);
+        data_16 = malloc(data_16_Size);
+        if (data_16 == NULL)
+        {
+            LOGE("Out of memory in getParameter\n");
+            return NO_MEMORY;
+        }
+
+        utf8_to_utf16_no_null_terminator((uint8_t *)data_8, data_8_Size, (char16_t *) data_16);
+        err = reply->writeString16((char16_t *)data_16, data_8_Size);
+        free(data_16);
+    }
+    return err;
+}
+
+status_t NuPlayer::setParameter(int key, const Parcel &request)
+{
+    status_t err = OK;
+    if (key == 8002) {
+
+        size_t len = 0;
+        const char16_t* str = request.readString16Inplace(&len);
+        void * data = malloc(len + 1);
+        if (data == NULL)
+        {
+            LOGE("Out of memory in setParameter\n");
+            return NO_MEMORY;
+        }
+
+        utf16_to_utf8(str, len, (char*) data);
+        err = mSource->setParameter(key, data, len);
+        free(data);
+    }
+    return err;
+}
+
+void NuPlayer::postIsPrepareDone()
+{
+    sp<AMessage> msg = new AMessage(kWhatIsPrepareDone, id());
+    if (msg == NULL)
+    {
+        LOGE("Out of memory, AMessage is null for kWhatIsPrepareDone\n");
+        return;
+    }
+    msg->post();
 }
 
 }  // namespace android
