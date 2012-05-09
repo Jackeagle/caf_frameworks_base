@@ -1597,7 +1597,7 @@ size_t MPQAudioPlayer::fillBufferfromParser(void *data, size_t size) {
 
     size_t size_done = 0;
     size_t size_remaining = size;
-    if (!mFirstEncodedBuffer && (mAudioFormat == AUDIO_FORMAT_WMA)) {
+    if (!mFirstEncodedBuffer && (mAudioFormat == AUDIO_FORMAT_WMA || mAudioFormat == AUDIO_FORMAT_WMA_PRO)) {
         uint32_t type;
         int configData[WMAPARAMSSIZE];
         size_t configSize = WMAPARAMSSIZE * sizeof(int);
@@ -2013,7 +2013,7 @@ status_t MPQAudioPlayer::configurePCM() {
              CHECK(mPCMStream);
              LOGV("getOutputSession-- ");
 
-             if (mAudioFormat != AUDIO_FORMAT_WMA) {
+             if (mAudioFormat != AUDIO_FORMAT_WMA && mAudioFormat != AUDIO_FORMAT_WMA_PRO) {
                  mInputBufferSize = mPCMStream->common.get_buffer_size(&mPCMStream->common);
                  LOGD("mInputBufferSize = %d",mInputBufferSize);
                  bufferAlloc(mInputBufferSize);
@@ -2067,6 +2067,11 @@ status_t MPQAudioPlayer::getDecoderAndFormat() {
         LOGW("Hw Decoder - WMA");
         mAudioFormat = AUDIO_FORMAT_WMA;
         mDecoderType = EHardwareDecoder;
+        sp<MetaData> format = mSource->getFormat();
+        int version = -1;
+        CHECK(format->findInt32(kKeyWMAVersion, &version));
+        if(version==kTypeWMAPro || version==kTypeWMALossLess)
+            mAudioFormat = AUDIO_FORMAT_WMA_PRO;
     }
     /*else if(!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_DTS)) {
         LOGE("### Hw Decoder - DTS");
