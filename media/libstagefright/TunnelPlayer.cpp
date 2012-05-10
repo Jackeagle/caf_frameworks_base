@@ -49,6 +49,9 @@ extern "C" {
 #include <include/linux/msm_audio.h>
 
 #include "include/AwesomePlayer.h"
+#include <powermanager/PowerManager.h>
+static const char   mName[] = "TunnelPlayer";
+
 
 #define ION_BUFFER_SIZE (600 *1024)
 #define ION_BUFFER_COUNT 4
@@ -133,8 +136,63 @@ mObserver(observer) {
     LOGV("mInputBufferSize = %d, mInputBufferCount = %d",\
             mInputBufferSize ,mInputBufferCount);
 
+    mDeathRecipient = new PMDeathRecipient(this);
+
     mHasVideo = hasVideo;
     initCheck = true;
+}
+
+void TunnelPlayer::acquireWakeLock()
+{
+    Mutex::Autolock _l(pmLock);
+
+    if (mPowerManager == 0) {
+        // use checkService() to avoid blocking if power service is not up yet
+        sp<IBinder> binder =
+            defaultServiceManager()->checkService(String16("power"));
+        if (binder == 0) {
+            LOGW("Thread %s cannot connect to the power manager service", mName);
+        } else {
+            mPowerManager = interface_cast<IPowerManager>(binder);
+            binder->linkToDeath(mDeathRecipient);
+        }
+    }
+    if (mPowerManager != 0 && mWakeLockToken == 0) {
+        sp<IBinder> binder = new BBinder();
+        status_t status = mPowerManager->acquireWakeLock(POWERMANAGER_PARTIAL_WAKE_LOCK,
+                                                         binder,
+                                                         String16(mName));
+        if (status == NO_ERROR) {
+            mWakeLockToken = binder;
+        }
+        LOGV("acquireWakeLock() %s status %d", mName, status);
+    }
+}
+
+void TunnelPlayer::releaseWakeLock()
+{
+    Mutex::Autolock _l(pmLock);
+
+    if (mWakeLockToken != 0) {
+        LOGV("releaseWakeLock() %s", mName);
+        if (mPowerManager != 0) {
+            mPowerManager->releaseWakeLock(mWakeLockToken, 0);
+        }
+        mWakeLockToken.clear();
+    }
+}
+
+void TunnelPlayer::clearPowerManager()
+{
+    Mutex::Autolock _l(pmLock);
+    releaseWakeLock();
+    mPowerManager.clear();
+}
+
+void TunnelPlayer::PMDeathRecipient::binderDied(const wp<IBinder>& who)
+{
+    parentClass->clearPowerManager();
+    LOGW("power manager service died !!!");
 }
 
 TunnelPlayer::~TunnelPlayer() {
@@ -145,6 +203,13 @@ TunnelPlayer::~TunnelPlayer() {
 
     reset();
     mAudioFlinger->deregisterClient(mAudioFlingerClient);
+
+    releaseWakeLock();
+    if (mPowerManager != 0) {
+        sp<IBinder> binder = mPowerManager->asBinder();
+        binder->unlinkToDeath(mDeathRecipient);
+    }
+
     mTunnelObjectsAlive--;
 }
 
@@ -314,6 +379,7 @@ status_t TunnelPlayer::start(bool sourceAlreadyStarted) {
             LOGE("Opening a routing session failed");
             return err;
         }
+        acquireWakeLock();
         mIsAudioRouted = true;
     }
     else {
@@ -475,9 +541,7 @@ void TunnelPlayer::pause(bool playPendingSamples) {
         }
         if (!mIsA2DPEnabled) {
             if (!mPauseEventPending) {
-                LOGV("Posting an event for Pause timeout\
-                         - acquire_wake_lock");
-                acquire_wake_lock(PARTIAL_WAKE_LOCK, "TUNNEL_LOCK");
+                LOGV("Posting an event for Pause timeout");
                 mQueue.postEventWithDelay(mPauseEvent,
                                           TUNNEL_PAUSE_TIMEOUT_USEC);
                 mPauseEventPending = true;
@@ -510,9 +574,7 @@ void TunnelPlayer::pause(bool playPendingSamples) {
             }
             if (!mIsA2DPEnabled) {
                 if(!mPauseEventPending) {
-                    LOGV("Posting an event for Pause timeout -\
-                            acquire_wake_lock");
-                    acquire_wake_lock(PARTIAL_WAKE_LOCK, "TUNNEL_LOCK");
+                    LOGV("Posting an event for Pause timeout");
                     mQueue.postEventWithDelay(mPauseEvent,
                                               TUNNEL_PAUSE_TIMEOUT_USEC);
                     mPauseEventPending = true;
@@ -557,6 +619,7 @@ void TunnelPlayer::resume() {
                     postEOSOnError();
                     return;
                 }
+                acquireWakeLock();
                 mIsAudioRouted = true;
             }
         }
@@ -577,6 +640,7 @@ void TunnelPlayer::resume() {
                     LOGV("%s mAudioSink close session", __func__);
                     mAudioSink->closeSession();
                     mIsAudioRouted = false;
+                    releaseWakeLock();
                 } else {
                     LOGE("close session NULL");
                 }
@@ -684,6 +748,7 @@ void TunnelPlayer::reset() {
     } else {
         mAudioSink->closeSession();
         mIsAudioRouted =  false;
+        releaseWakeLock();
     }
     mAudioSink.clear();
 
@@ -1010,6 +1075,7 @@ void TunnelPlayer::A2DPNotificationThreadEntry() {
                 if (mAudioSink.get() != NULL) {
                     mAudioSink->closeSession();
                     mIsAudioRouted = false;
+                    releaseWakeLock();
                 } else {
                     LOGE("close session NULL");
                 }
@@ -1105,6 +1171,8 @@ void TunnelPlayer::A2DPNotificationThreadEntry() {
             if (mAudioSink.get() != NULL) {
                 mAudioSink->pauseSession();
             }
+            acquireWakeLock();
+            mIsAudioRouted = true;
 
             // stop capture device
             //TODO : De allocate the buffer for capture side
@@ -1603,7 +1671,7 @@ void TunnelPlayer::onPauseTimeOut() {
                 mInputIonFilledQueue.size());
         mAudioSink->closeSession();
         mIsAudioRouted = false;
-        release_wake_lock("TUNNEL_LOCK");
+        releaseWakeLock();
     }
 }
 
