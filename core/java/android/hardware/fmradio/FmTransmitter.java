@@ -146,21 +146,32 @@ public class FmTransmitter extends FmTransceiver
     *
     */
    public boolean enable (FmConfig configSettings){
-      boolean status;
+      boolean status = true;
 
-      /* Enable the Transceiver common for both
-         receiver and transmitter
-         */
+      int state = getFMState();
+      if (state == FMState_Tx_Turned_On) {
+          Log.d(TAG, "enable: FM Tx already turned On and running");
+          return status;
+      } else if (state == subPwrLevel_FMTurning_Off) {
+          Log.v(TAG, "FM is in the process of turning off.Pls wait for sometime.");
+          return status;
+      } else if(state == subPwrLevel_FMTx_Starting) {
+          Log.v(TAG, "FM is in the process of turning On.Pls wait for sometime.");
+          return status;
+      }
+      setFMPowerState(subPwrLevel_FMTx_Starting);
+      Log.v(TAG, "enable: CURRENT-STATE : FMOff ---> NEW-STATE : FMTxStarting");
       status = super.enable(configSettings, FmTransceiver.FM_TX);
-
-      /* Do transmitter Specific Enable Stuff here.*/
-      if( status == true ) {
-          registerTransmitClient(mTxCallbacks);
-          mRdsData = new FmRxRdsData(sFd);
-
+      if(status == true) {
+         registerTransmitClient(mTxCallbacks);
+         mRdsData = new FmRxRdsData(sFd);
+      } else {
+         status = false;
+         Log.e(TAG, "enable: failed to turn On FM TX");
+         Log.e(TAG, "enable: CURRENT-STATE : FMTxStarting ---> NEW-STATE : FMOff");
+         setFMPowerState(FMState_Turned_Off);
       }
       return status;
-
    }
    /*==============================================================
    FUNCTION:  setRdsOn
@@ -213,26 +224,57 @@ public class FmTransmitter extends FmTransceiver
     */
    public boolean disable(){
       boolean status = false;
+      int state;
 
+      state = getFMState();
+      switch(state) {
+         case FMState_Turned_Off:
+              Log.d(TAG, "FM already tuned Off.");
+              return true;
+         case subPwrLevel_FMTx_Starting:
+              /*
+               * If, FM is in the process of turning On, then wait for
+               * the turn on operation to complete before turning off.
+               */
+              Log.d(TAG, "disable: FM not yet turned On...");
+              try {
+                   Thread.sleep(100);
+              } catch (InterruptedException e) {
+                   e.printStackTrace();
+              }
+              /* Check for the state of FM device */
+              state = getFMState();
+              if(state == subPwrLevel_FMTx_Starting) {
+                 Log.e(TAG, "disable: FM in bad state");
+                 return status;
+              }
+              break;
+         case subPwrLevel_FMTurning_Off:
+              /*
+               * If, FM is in the process of turning Off, then wait for
+               * the turn off operation to complete.
+               */
+              Log.v(TAG, "disable: FM is getting turned Off.");
+              return status;
+      }
+      setFMPowerState(subPwrLevel_FMTurning_Off);
+      Log.v(TAG, "disable: CURRENT-STATE : FMTxOn ---> NEW-STATE : FMTurningOff");
       //Stop all the RDS transmissions if there any
-      if( mPSStarted ){
-         if( !stopPSInfo() ) {
-             Log.d(TAG, "FmTrasmitter:stopPSInfo failed\n");
+      if(mPSStarted) {
+         if(!stopPSInfo()) {
+            Log.d(TAG, "FmTrasmitter:stopPSInfo failed\n");
          }
       }
-      if( mRTStarted ) {
+      if(mRTStarted) {
         if(!stopRTInfo()) {
-        Log.d(TAG, "FmTrasmitter:stopRTInfo failed\n");
+           Log.d(TAG, "FmTrasmitter:stopRTInfo failed\n");
         }
       }
       if(!transmitRdsGroupControl(RDS_GRPS_TX_STOP) ) {
          Log.d(TAG, "FmTrasmitter:transmitRdsGroupControl failed\n");
       }
-
-      unregisterTransmitClient();
-      status = super.disable();
-
-      return status;
+      super.disable();
+      return true;
    }
 
    /*==============================================================
@@ -864,5 +906,18 @@ public class FmTransmitter extends FmTransceiver
           return false;
       }
       return bStatus;
+   }
+
+   /*
+    * getFMState() returns:
+    *     '0' if FM State  is OFF
+    *     '1' if FM Rx     is On
+    *     '2' if FM Tx     is On
+    *     '3' if FM device is Searching
+    */
+   public int getFMState() {
+      /* Current State of FM device */
+      int currFMState = FmTransceiver.getFMPowerState();
+      return currFMState;
    }
 };

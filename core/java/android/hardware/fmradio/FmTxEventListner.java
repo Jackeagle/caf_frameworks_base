@@ -41,7 +41,7 @@ class FmTxEventListner {
     private final int TXRDSDONE_EVENT = 17;              /*RDS group complete event */
     private final int RADIO_DISABLED = 18;
     private final int READY_EVENT = 0;
-
+    private byte []buff = new byte[128];
     private Thread mThread;
     private static final String TAG = "FMTxEventListner";
 
@@ -52,49 +52,71 @@ class FmTxEventListner {
 
                 Log.d(TAG, "Starting Tx Event listener " + fd);
 
-                while ((!Thread.currentThread().isInterrupted())) {
+                while((!Thread.currentThread().isInterrupted())) {
                    try {
-                       int index = 0;
-                       byte []buff = new byte[128];
-                       Log.d(TAG, "getBufferNative called");
-                       int eventCount = FmReceiverJNI.getBufferNative (fd, buff, EVENT_LISTEN);
-                       Log.d(TAG, "Received event. Count: " + eventCount);
+                        int index = 0;
+                        Log.d(TAG, "getBufferNative called");
+                        int eventCount = FmReceiverJNI.getBufferNative
+                                                       (fd, buff, EVENT_LISTEN);
+                        Log.d(TAG, "Received event. Count: " + eventCount);
 
-                       for (  index = 0; index < eventCount; index++ ) {
-                          Log.d(TAG, "Received <" +buff[index]+ ">" );
-                          switch(buff[index]){
-                         case TUNE_EVENT:
-                            Log.d(TAG, "Got TUNE_EVENT");
-                            cb.onTuneStatusChange(FmReceiverJNI.getFreqNative(fd));
-                            break;
-                         case TXRDSDAT_EVENT:
-                            Log.d(TAG, "Got TXRDSDAT_EVENT");
-                            cb.onRDSGroupsAvailable();
-                            break;
-                         case TXRDSDONE_EVENT:
-                            Log.d(TAG, "Got TXRDSDONE_EVENT");
-                            cb.onContRDSGroupsComplete();
-                            break;
-                         case RADIO_DISABLED:
-                            Log.d(TAG, "Got RADIO_DISABLED");
-                            FmTransceiver.release("/dev/radio0");
-                            Thread.currentThread().interrupt();
-                            break;
-                         case READY_EVENT:
-                            Log.d(TAG, "Got RADIO_ENABLED");
-                            break;
-                         default:
-                            Log.d(TAG, "Unknown event");
-                            break;
-                           }//switch
-                       }//for
-                  } catch ( Exception ex ) {
-                   Log.d( TAG,  "RunningThread InterruptedException");
-                   Thread.currentThread().interrupt();
-                  }//try
-            }//while
-            Log.d(TAG, "Came out of the while loop");
-        }
+                        for(index = 0; index < eventCount; index++) {
+                            Log.d(TAG, "Received <" +buff[index]+ ">" );
+                            switch(buff[index]){
+                                case READY_EVENT:
+                                   Log.d(TAG, "Got RADIO_ENABLED");
+                                   if(FmTransceiver.getFMPowerState() ==
+                                       FmTransceiver.subPwrLevel_FMTx_Starting) {
+                                      /*Set the state as FMRxOn */
+                                      FmTransceiver.setFMPowerState
+                                         (FmTransceiver.FMState_Tx_Turned_On);
+                                      Log.v(TAG, "TxEvtList: CURRENT-STATE:" +
+                                            "FMTxStarting ---> NEW-STATE : FMTxOn");
+                                      cb.FmTxEvRadioEnabled();
+                                   }
+                                   break;
+                                case TUNE_EVENT:
+                                   Log.d(TAG, "Got TUNE_EVENT");
+                                   cb.FmTxEvTuneStatusChange
+                                             (FmReceiverJNI.getFreqNative(fd));
+                                   break;
+                                case TXRDSDAT_EVENT:
+                                   Log.d(TAG, "Got TXRDSDAT_EVENT");
+                                   cb.FmTxEvRDSGroupsAvailable();
+                                   break;
+                                case TXRDSDONE_EVENT:
+                                   Log.d(TAG, "Got TXRDSDONE_EVENT");
+                                   cb.FmTxEvContRDSGroupsComplete();
+                                   break;
+                                case RADIO_DISABLED:
+                                   Log.d(TAG, "Got RADIO_DISABLED");
+                                   if(FmTransceiver.getFMPowerState() ==
+                                      FmTransceiver.subPwrLevel_FMTurning_Off) {
+                                      /*Set the state as FMOff */
+                                      FmTransceiver.setFMPowerState
+                                            (FmTransceiver.FMState_Turned_Off);
+                                      Log.v(TAG, "TxEvtList:CURRENT-STATE :" +
+                                            "FMTurningOff ---> NEW-STATE: FMOff");
+                                      FmTransceiver.release("/dev/radio0");
+                                      cb.FmTxEvRadioDisabled();
+                                      Thread.currentThread().interrupt();
+                                   } else {
+                                      Log.d(TAG, "Unexpected RADIO_DISABLED recvd");
+                                      cb.FmTxEvRadioReset();
+                                   }
+                                   break;
+                                default:
+                                   Log.d(TAG, "Unknown event");
+                                   break;
+                            }//switch
+                        }//for
+                      }catch (Exception ex) {
+                        Log.d( TAG,  "RunningThread InterruptedException");
+                        Thread.currentThread().interrupt();
+                      }//try
+               }//while
+               Log.d(TAG, "Came out of the while loop");
+          }
         };
         mThread.start();
     }
@@ -105,13 +127,11 @@ class FmTxEventListner {
         //Interrupt the thread and check for the thread status
         // and return from the run() method to stop the thread
         //properly
-        Log.d( TAG,  "stopping the Listener\n");
+        Log.d(TAG, "stopping the Listener\n");
 
-        if( mThread != null ) {
+        if(mThread != null) {
             mThread.interrupt();
         }
-
         Log.d(TAG, "Thread Stopped\n");
     }
-
 }
