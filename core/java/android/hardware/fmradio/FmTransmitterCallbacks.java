@@ -47,7 +47,7 @@ package android.hardware.fmradio;
        *  The callback indicates that the transmitter is tuned to a
        *  new frequency Typically received after setStation.
        */
-      public void onTuneStatusChange(int freq);
+      public void FmTxEvTuneStatusChange(int freq);
 
       /**
        * The callback to indicate to the application that the FM
@@ -57,14 +57,14 @@ package android.hardware.fmradio;
        * Application can start to send down the remaining groups
        * to the available group buffers upon recieving this callback.
        */
-      public void onRDSGroupsAvailable();
+      public void FmTxEvRDSGroupsAvailable();
       /**
        * The callback will indicate the succesful completion of #transmitRdsGroups.
        * This indicates that the FM driver has a complete buffer to transmit the
        * RDS/RBDS data to the Application. Application can free to switch between continuous or
        * non-continuous RDS/RBDS group transmissions.
        */
-      public void onRDSGroupsComplete();
+      public void FmTxEvRDSGroupsComplete();
      /**
        * The callback will indicate the succesful completion of #transmitRdsContGroups.
        * This indicates that the FM driver has a complete buffer to transmit the
@@ -72,11 +72,23 @@ package android.hardware.fmradio;
        * non-continuous RDS/RBDS group transmissions.
        *
        */
-      public void onContRDSGroupsComplete();
+      public void FmTxEvContRDSGroupsComplete();
      /**
        * The callback indicates that Radio has been Disabled.
        * This indicates that the FM driver has disabled the radio.
        *
        */
-      public void onRadioDisabled();
+      public void FmTxEvRadioDisabled();
+     /**
+       * The callback indicates that Radio has been Enabled.
+       * This indicates that the FM driver has Enabled the radio.
+       *
+       */
+      public void FmTxEvRadioEnabled();
+     /**
+       * The callback indicates that Radio has been Reset.
+       * This indicates that the FM driver has reset the radio.
+       *
+       */
+      public void FmTxEvRadioReset();
    };
