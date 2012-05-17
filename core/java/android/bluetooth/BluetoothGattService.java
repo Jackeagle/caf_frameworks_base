@@ -525,9 +525,12 @@ public class BluetoothGattService {
                                           int maxCeLen, int connTimeout) {
              Log.d(TAG, "gattConnect");
              try {
-                 return mService.gattConnect(mObjPath, prohibitRemoteChg, filterPolicy, scanInterval,
+                 int result =  mService.gattConnect(mDevice.getAddress(), mObjPath, prohibitRemoteChg, filterPolicy, scanInterval,
                                   scanWindow, intervalMin, intervalMax, latency,
                                   superVisionTimeout, minCeLen, maxCeLen, connTimeout);
+                if (result != BluetoothDevice.GATT_RESULT_SUCCESS)
+                     return false;
+                 else return true;
              } catch (RemoteException e) {Log.e(TAG, "", e);}
 
              return false;
@@ -536,7 +539,7 @@ public class BluetoothGattService {
         public synchronized boolean gattConnectCancel() {
              Log.d(TAG, "gattConnectCancel");
              try {
-                 return mService.gattConnectCancel(mObjPath);
+                 return mService.gattConnectCancel(mDevice.getAddress(), mObjPath);
              } catch (RemoteException e) {Log.e(TAG, "", e);}
 
              return false;
