@@ -510,15 +510,27 @@ public final class BluetoothDevice implements Parcelable {
      */
     public static final String EXTRA_GATT_RESULT = "android.bluetooth.device.extra.GATT_RESULT";
 
-    /** A GATT service discovery was successful.
+    /** A GATT request was successful.
      * @hide */
     public static final int GATT_RESULT_SUCCESS = 0;
-    /** A GATT service discovery failed due to timeout.
+    /** A GATT request failed due to timeout.
      * @hide */
     public static final int GATT_RESULT_TIMEOUT = 1;
-    /** A GATT service discovery failed.
+    /** A GATT request failed (generic cause).
      * @hide */
     public static final int GATT_RESULT_FAIL = 2;
+   /** A GATT request cannot be completed  because of busy state.
+     * @hide */
+    public static final int GATT_RESULT_BUSY = 3;
+    /** A GATT operation requested on disconnected device.
+     * @hide */
+    public static final int GATT_RESULT_NOT_CONNECTED = 4;
+    /** A GATT LE connect request on existing connection.
+     * @hide */
+    public static final int GATT_ALREADY_CONNECTED = 5;
+    /** A GATT operation not supported.
+     * @hide */
+    public static final int GATT_RESULT_NOT_SUPPORTED= 6;
 
     /**
      * Used as an extra field for SAP state change events.
