@@ -4362,32 +4362,59 @@ public class BluetoothService extends IBluetooth.Stub {
         boolean ret = discoverCharacteristicsNative(path);
 
         return ret;
-   }
-    public synchronized boolean gattConnect(String path, byte prohibitRemoteChg,
+    }
+
+    public synchronized int gattConnect(String address, String path, byte prohibitRemoteChg,
                                byte filterPolicy, int scanInterval,
                                int scanWindow, int intervalMin,
                                int intervalMax, int latency,
                                int superVisionTimeout, int minCeLen,
                                int maxCeLen, int connTimeOut) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        if (!isEnabledInternal()) return false;
+        if (!isEnabledInternal()) return BluetoothDevice.GATT_RESULT_FAIL;
 
         Log.d(TAG, "gattConnect");
+        String devPath = null;
+        int result;
 
-        return gattConnectNative(path, (int) prohibitRemoteChg, (int) filterPolicy,
-                                          scanInterval, scanWindow,
-                                          intervalMin, intervalMax,
-                                          latency, superVisionTimeout,
-                                          minCeLen, maxCeLen, connTimeOut);
+        if (path == null) {
+            /* Connect to remote LE device */
+            if (isRemoteDeviceInCache(address) && findDeviceNative(address) != null) {
+                devPath = getObjectPathFromAddress(address);
+            } else {
+                devPath = createLeDeviceNative(address);
+            }
+
+            if (devPath == null)
+                return BluetoothDevice.GATT_RESULT_FAIL;
+
+            result =  gattLeConnectNative(devPath, (int) prohibitRemoteChg, (int) filterPolicy,
+                                              scanInterval, scanWindow,
+                                              intervalMin, intervalMax,
+                                              latency, superVisionTimeout,
+                                              minCeLen, maxCeLen, connTimeOut);
+        } else /* Connect to GATT service (client initiated) */
+            result =  gattConnectNative(path, (int) prohibitRemoteChg, (int) filterPolicy,
+                                              scanInterval, scanWindow,
+                                              intervalMin, intervalMax,
+                                              latency, superVisionTimeout,
+                                              minCeLen, maxCeLen, connTimeOut);
+        return result;
     }
 
-    public synchronized boolean gattConnectCancel(String path) {
+    public synchronized boolean gattConnectCancel(String address, String path) {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         if (!isEnabledInternal()) return false;
 
         Log.d(TAG, "gattConnectCancel");
-
-        return gattConnectCancelNative(path);
+        if (path == null) {
+            if (isRemoteDeviceInCache(address) && findDeviceNative(address) != null)  {
+                path = getObjectPathFromAddress(address);
+                return gattLeConnectCancelNative(path);
+            } else
+                return false;
+        } else
+            return gattConnectCancelNative(path);
     }
 
     public synchronized String[] getCharacteristicProperties(String path) {
@@ -4969,13 +4996,19 @@ public class BluetoothService extends IBluetooth.Stub {
     native boolean releaseChannelFdNative(String channelPath);
     native boolean setAuthorizationNative(String address, boolean value, int data);
     native boolean discoverPrimaryServicesNative(String path);
+    private native String createLeDeviceNative(String address);
     private native Object[] getGattServicePropertiesNative(String path);
     private native boolean discoverCharacteristicsNative(String path);
-    private native boolean gattConnectNative(String path, int prohibitRemoteChg, int filterPolicy,
+    private native int gattConnectNative(String path, int prohibitRemoteChg, int filterPolicy,
                                              int scanInterval, int scanWindow, int intervalMin,
                                              int intervalMax, int latency, int superVisionTimeout,
                                              int minCeLen, int maxCeLen, int connTimeOut);
     private native boolean gattConnectCancelNative(String path);
+    private native int gattLeConnectNative(String path, int prohibitRemoteChg, int filterPolicy,
+                                             int scanInterval, int scanWindow, int intervalMin,
+                                             int intervalMax, int latency, int superVisionTimeout,
+                                             int minCeLen, int maxCeLen, int connTimeOut);
+    private native boolean gattLeConnectCancelNative(String path);
     private native Object[] getCharacteristicPropertiesNative(String path);
     private native boolean setCharacteristicPropertyNative(String path, String key, byte[] value, int length, boolean reliable);
     private native boolean updateCharacteristicValueNative(String path);
