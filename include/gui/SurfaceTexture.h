@@ -529,6 +529,8 @@ private:
     // Pixel Aspect Ratio specified by client.
     int wRatio;
     int hRatio;
+
+    int32_t mPreviousBufferSlot;
 };
 
 // ----------------------------------------------------------------------------
