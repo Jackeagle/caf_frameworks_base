@@ -1636,8 +1636,23 @@ public class MediaPlayer
                 return;
 
             case MEDIA_SEEK_COMPLETE:
-              if (mOnSeekCompleteListener != null)
-                  mOnSeekCompleteListener.onSeekComplete(mMediaPlayer);
+              {
+                  if (mContext != null) {
+                      Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                      intent.putExtra("duration", getDuration());
+                      intent.putExtra("time", System.currentTimeMillis());
+                      intent.putExtra("position", getCurrentPosition());
+                      intent.putExtra("uripath", mUri);
+                      if (isPlaying()) {
+                         intent.putExtra("playstate", PLAYSTATUS_PLAYING);
+                      } else {
+                         intent.putExtra("playstate", PLAYSTATUS_PAUSED);
+                      }
+                      mContext.sendBroadcast(intent);
+                    }
+                  if (mOnSeekCompleteListener != null)
+                      mOnSeekCompleteListener.onSeekComplete(mMediaPlayer);
+              }
               return;
 
             case MEDIA_SET_VIDEO_SIZE:
