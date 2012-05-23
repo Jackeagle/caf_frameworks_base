@@ -2499,7 +2499,7 @@ status_t MPEG4Source::read(
                 if (!isMalFormed) {
                     nalLength = parseNALSize(&mSrcBuffer[srcOffset]);
                     srcOffset += mNALLengthSize;
-                    isMalFormed = srcOffset + nalLength > size;
+                    isMalFormed = nalLength > size - srcOffset;
                 }
 
                 if (isMalFormed) {
