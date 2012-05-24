@@ -445,28 +445,28 @@ static jboolean android_location_GpsLocationProvider_set_position_mode(JNIEnv* e
 }
 
 static jboolean android_location_GpsLocationProvider_update_criteria(JNIEnv* env, jobject obj,
-        jint action, jlong minTime, jfloat minDistance, jboolean singleShot, jint horizontalAccuracy,
-        jint powerRequirement)
+        jint source, jint action, jlong minTime, jfloat minDistance, jboolean singleShot,
+        jint horizontalAccuracy, jint powerRequirement)
 {
     UlpLocationCriteria native_criteria;
     LOGD("JNI:Inupdate_criteria: action:%d, minTime:%ld, minDistance:%f, singleShot:%d, horizontalAccuracy:%d, powerRequirement:%d \n",
          action, minTime,minDistance, singleShot,horizontalAccuracy,powerRequirement );
     native_criteria.valid_mask = (ULP_CRITERIA_HAS_ACTION | ULP_CRITERIA_HAS_PROVIDER_SOURCE | ULP_CRITERIA_HAS_RECURRENCE_TYPE |
                                   ULP_CRITERIA_HAS_MIN_INTERVAL);
+    native_criteria.provider_source = source;
     native_criteria.action = action;
     native_criteria.min_interval = minTime;
     native_criteria.min_distance = minDistance;
     native_criteria.recurrence_type = singleShot? ULP_LOC_RECURRENCE_SINGLE:ULP_LOC_RECURRENCE_PERIODIC;
     native_criteria.preferred_horizontal_accuracy = (UlpHorzAccuracyCriteria) horizontalAccuracy;
     native_criteria.preferred_power_consumption = (UlpPowerCriteria)powerRequirement;
-    if((horizontalAccuracy != 0) || (powerRequirement != 0))
+    // Criteria will have valid values for accuracy and power requirements only for HybridProvider
+    if(source == ULP_PROVIDER_SOURCE_HYBRID)
     {
-       native_criteria.provider_source = ULP_PROVIDER_SOURCE_HYBRID;
-       native_criteria.valid_mask |= (ULP_CRITERIA_HAS_PREFERRED_HORIZONTAL_ACCURACY |
-                                  ULP_CRITERIA_HAS_PREFERRED_POWER_CONSUMPTION);
+       native_criteria.valid_mask |= ( ULP_CRITERIA_HAS_PREFERRED_HORIZONTAL_ACCURACY
+                                       | ULP_CRITERIA_HAS_PREFERRED_POWER_CONSUMPTION );
     }
-    else
-        native_criteria.provider_source = ULP_PROVIDER_SOURCE_GNSS;
+
     LOGD("JNI:Inupdate_criteria: After translation action:%d, minTime:%ld, minDistance:%f, singleShot:%d, horizontalAccuracy:%d, powerRequirement:%d \n",
          native_criteria.action, native_criteria.min_interval,native_criteria.min_distance, native_criteria.recurrence_type,native_criteria.preferred_horizontal_accuracy,native_criteria.preferred_power_consumption );
     if (sGpsInterface){
@@ -784,7 +784,7 @@ static JNINativeMethod sMethods[] = {
     {"native_init", "()Z", (void*)android_location_GpsLocationProvider_init},
     {"native_cleanup", "()V", (void*)android_location_GpsLocationProvider_cleanup},
     {"native_set_position_mode", "(IIIII)Z", (void*)android_location_GpsLocationProvider_set_position_mode},
-    {"native_update_criteria", "(IJFZII)Z", (void*)android_location_GpsLocationProvider_update_criteria},
+    {"native_update_criteria", "(IIJFZII)Z", (void*)android_location_GpsLocationProvider_update_criteria},
     {"native_update_settings", "(IZZZZZZ)Z", (void*)android_location_GpsLocationProvider_update_settings},
     {"native_start", "()Z", (void*)android_location_GpsLocationProvider_start},
     {"native_stop", "()Z", (void*)android_location_GpsLocationProvider_stop},
