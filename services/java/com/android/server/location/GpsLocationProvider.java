@@ -138,6 +138,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int LOCATION_HAS_MAP_INDEX = 0x200;
     private static final int ULP_LOCATION_IS_FROM_HYBRID = 0x1;
     private static final int ULP_LOCATION_IS_FROM_GNSS = 0x2;
+    private static final int ULP_PROVIDER_SOURCE_GNSS = 0x1;
+    private static final int ULP_PROVIDER_SOURCE_HYBRID = 0x2;
 
 // IMPORTANT - the GPS_DELETE_* symbols here must match constants in gps.h
     private static final int GPS_DELETE_EPHEMERIS = 0x00000001;
@@ -1040,14 +1042,15 @@ public class GpsLocationProvider implements LocationProviderInterface {
         }
     }
 
-    public boolean updateCriteria(int action, long minTime, float minDistance,
+   public boolean updateCriteria(int action, long minTime, float minDistance,
                                   boolean singleShot,Criteria criteria) {
         boolean return_value = false;
         if (DEBUG) Log.d(TAG, "updateCriteria with action: "+action +"minTime " + minTime +" minDistance "+
                                minDistance + " singleShot " + singleShot + " criteria: " + criteria);
 
         //This is a GPS provider app. Send the request down to the HAL
-        return_value = native_update_criteria(action, minTime, minDistance, singleShot, 0, 0);
+        return_value = native_update_criteria(ULP_PROVIDER_SOURCE_GNSS, action,
+                                              minTime, minDistance, singleShot, 0, 0);
 
         return return_value;
     }
@@ -2322,7 +2325,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private native void native_cleanup();
     private native boolean native_set_position_mode(int mode, int recurrence, int min_interval,
             int preferred_accuracy, int preferred_time);
-    private native boolean native_update_criteria(int action, long minTime, float minDistance,
+    private native boolean native_update_criteria(int source, int action, long minTime, float minDistance,
                                                   boolean singleShot, int horizontalAccuracy,
                                                   int powerRequirement);
     private native boolean native_update_settings(int currentContextType, boolean currentGpsSetting, boolean currentAgpsSetting,
@@ -2655,7 +2658,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 criteria.setPowerRequirement(Criteria.NO_REQUIREMENT);
             }
             //This is a ULP client app. Transalate criteria and push it down
-            return_value = native_update_criteria(action, minTime, minDistance, singleShot,
+            return_value = native_update_criteria(ULP_PROVIDER_SOURCE_HYBRID, action,
+                                                  minTime, minDistance, singleShot,
                                                   criteria.getHorizontalAccuracy(),
                                                   criteria.getPowerRequirement());
 
