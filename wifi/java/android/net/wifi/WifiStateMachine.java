@@ -559,18 +559,7 @@ public class WifiStateMachine extends StateMachine {
      * Used for sanity check on IPv6 renewal
      */
     private static final int MIN_RENEWAL_TIME_SECS = 5 * 60;  // 5 minutes
-    /**
-     * Used as an upper limit for releasing the wakelock during
-     * IPv6 renewal.
-     * This value is the default and is derived as follows:
-     *   (2.4 sec) default time taken to send router solicitation packets
-     * + (5.0 sec) default maximum time to receive router advertisement
-     * + (0.5 sec) processing time
-     *
-     * This value should be changed if any of the above default
-     * properties are modified.
-     */
-    private static final int MAX_IPV6_RENEWAL_TIME_MS = 8000;
+
     private static final int IPV6_RENEW = 0;
     private static final String ACTION_IPV6_RENEW = "android.net.wifi.IPV6_RENEW";
     private PendingIntent mIpv6RenewalIntent;
@@ -673,8 +662,7 @@ public class WifiStateMachine extends StateMachine {
                             //IPv6 renew
                             if (DBG) Log.d(TAG, "Received intent " + intent.toString()
                                               + " Sending an IPv6 renewal " + this);
-                            //Lock released after 8s in worst case scenario
-                            mWakeLock.acquire(MAX_IPV6_RENEWAL_TIME_MS);
+                            mWakeLock.acquire();
                             sendMessage(CMD_RENEW_IPV6);
                         } else {
                            loge("Received unexpected intent " + intent.toString());
