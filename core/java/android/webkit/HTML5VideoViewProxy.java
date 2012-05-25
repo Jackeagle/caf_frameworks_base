@@ -28,6 +28,7 @@ import android.net.http.RequestHandle;
 import android.net.http.RequestQueue;
 import android.net.http.SslCertificate;
 import android.net.http.SslError;
+import android.opengl.GLES20;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -102,6 +103,12 @@ class HTML5VideoViewProxy extends Handler
     // Cached media position used to preserve playback position when
     // resuming suspended video
     private int mCachedPosition;
+    // Texture names are tied to the HTML5VideoViewProxy lifetime so that
+    // a suspended video can re-use the same video texture when resuming
+    private int[] mTextureNames;
+    private int mVideoWidth;
+    private int mVideoHeight;
+    private int mDuration;
 
     // A helper class to control the playback. This executes on the UI thread!
     private final class VideoPlayer {
@@ -132,7 +139,7 @@ class HTML5VideoViewProxy extends Handler
             if (mHTML5VideoView != null) {
                 int currentVideoLayerId = mHTML5VideoView.getVideoLayerId();
                 SurfaceTexture surfTexture = mHTML5VideoView.getSurfaceTexture();
-                int textureName = mHTML5VideoView.getTextureName();
+                int textureName = getTextureName();
 
                 if (surfTexture != null && currentVideoLayerId != -1) {
                     int playerState = mHTML5VideoView.getCurrentState();
@@ -150,6 +157,9 @@ class HTML5VideoViewProxy extends Handler
                 mHTML5VideoView.pause();
                 mCachedPosition = getCurrentPosition();
                 mHTML5VideoView.release();
+                // Call setBaseLayer to update VideoLayerAndroid player state
+                // This is important for flagging the associated texture for recycling
+                setBaseLayer(0);
                 mHTML5VideoView = null;
                 // isVideoSelfEnded is false when video playback
                 // has ended but is not complete.
@@ -252,6 +262,8 @@ class HTML5VideoViewProxy extends Handler
         // Otherwise return false and we can reuse the previously allocated HTML5VideoView
         private boolean ensureHTML5VideoView(String url, int time, int videoLayerId, boolean autostart) {
             if (mHTML5VideoView == null) {
+                // Get new texture
+                resetTexture();
                 mHTML5VideoView = new HTML5VideoView(mProxy, videoLayerId, time, autostart);
                 mHTML5VideoView.setVideoURI(url);
                 return true;
@@ -280,14 +292,17 @@ class HTML5VideoViewProxy extends Handler
 
     //MediaPlayer.OnVideoSizeChangedListener
     public void onVideoSizeChanged(MediaPlayer mp, int width, int height) {
+        mVideoWidth = width;
+        mVideoHeight = height;
+        if (mVideoPlayer.isPrepared())
+            mDuration = mp.getDuration();
+        else
+            mDuration = 0;
         Message msg = Message.obtain(mWebCoreHandler, SIZE_CHANGED);
         Map<String, Object> map = new HashMap<String, Object>();
-        if (mVideoPlayer.isPrepared())
-            map.put("dur", new Integer(mp.getDuration()));
-        else
-            map.put("dur", new Integer(0));
-        map.put("width", new Integer(width));
-        map.put("height", new Integer(height));
+        map.put("dur", new Integer(mDuration));
+        map.put("width", new Integer(mVideoWidth));
+        map.put("height", new Integer(mVideoHeight));
         msg.obj = map;
         mWebCoreHandler.sendMessage(msg);
     }
@@ -849,10 +864,34 @@ class HTML5VideoViewProxy extends Handler
         nativePrepareExitFullscreen(mNativePointer);
     }
 
+    public int getTextureName() {
+        if (mTextureNames != null) {
+            return mTextureNames[0];
+        }
+        return 0;
+    }
+
+    // resetTexture needs to be called before assigning the texture
+    // to a SurfaceTexture or VideoTextureView in case the texture was freed
+    // by the underlying videoLayerManager
+    private void resetTexture() {
+        mTextureNames = new int[1];
+        GLES20.glGenTextures(1, mTextureNames, 0);
+    }
+
     public int getVideoLayerId() {
         return mVideoLayerId;
     }
     // End functions called from UI thread only by WebView
+
+
+    public int getVideoWidth() {
+        return mVideoWidth;
+    }
+
+    public int getVideoHeight() {
+        return mVideoHeight;
+    }
 
     /**
      * Change the volume of the playback
