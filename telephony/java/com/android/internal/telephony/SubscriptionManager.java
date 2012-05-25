@@ -738,40 +738,38 @@ public class SubscriptionManager extends Handler {
         logd("processCardInfoAvailable: cardIndex = " + cardIndex
                 + "\n Card Sub Info = " + cardSubInfo);
 
-        for (Subscription userSub : mUserPrefSubs.subscription) {
-            int subId = userSub.subId;
-            Subscription currentSub = getCurrentSubscription(SubscriptionId.values()[subId]);
+        Subscription userSub = mUserPrefSubs.subscription[cardIndex];
+        int subId = userSub.subId;
+        Subscription currentSub = getCurrentSubscription(SubscriptionId.values()[subId]);
 
-            logd("processCardInfoAvailable: subId = " + subId
-                    + "\n user pref sub = " + userSub
-                    + "\n current sub   = " + currentSub);
+        logd("processCardInfoAvailable: subId = " + subId
+                + "\n user pref sub = " + userSub
+                + "\n current sub   = " + currentSub);
 
-            if ((userSub.subStatus == SubscriptionStatus.SUB_ACTIVATED)
-                    && (currentSub.subStatus != SubscriptionStatus.SUB_ACTIVATED)
-                    && (cardSubInfo.hasSubscription(userSub))
-                    && !isPresentInActivatePendingList(userSub)){
-                logd("processCardInfoAvailable: subId = " + subId + " need to activate!!!");
+        if ((userSub.subStatus == SubscriptionStatus.SUB_ACTIVATED)
+                && (currentSub.subStatus != SubscriptionStatus.SUB_ACTIVATED)
+                && (cardSubInfo.hasSubscription(userSub))
+                && !isPresentInActivatePendingList(userSub)){
+            logd("processCardInfoAvailable: subId = " + subId + " need to activate!!!");
 
-                // Need to activate this Subscription!!! - userSub.subId
-                // Push to the queue, so that start the SET_UICC_SUBSCRIPTION
-                // only when the both cards are ready.
-                Subscription sub = new Subscription();
-                sub.copyFrom(cardSubInfo.getSubscription(userSub));
-                sub.slotId = cardIndex;
-                sub.subId = subId;
-                sub.subStatus = SubscriptionStatus.SUB_ACTIVATE;
-                mActivatePending.put(SubscriptionId.values()[subId], sub);
-            }
+            // Need to activate this Subscription!!! - userSub.subId
+            // Push to the queue, so that start the SET_UICC_SUBSCRIPTION
+            // only when the both cards are ready.
+            Subscription sub = new Subscription();
+            sub.copyFrom(cardSubInfo.getSubscription(userSub));
+            sub.slotId = cardIndex;
+            sub.subId = subId;
+            sub.subStatus = SubscriptionStatus.SUB_ACTIVATE;
+            mActivatePending.put(SubscriptionId.values()[subId], sub);
         }
 
         // If this is a new card(no user preferred subscriptions are from
         // this card), then notify a prompt to user.  Let user select
         // the subscriptions from new card!
-        mIsNewCard [cardIndex] = true;
-        for (Subscription userSub : mUserPrefSubs.subscription) {
-            if (cardSubInfo.hasSubscription(userSub)) {
-                mIsNewCard[cardIndex] = false;
-            }
+        if (cardSubInfo.hasSubscription(userSub)) {
+            mIsNewCard[cardIndex] = false;
+        } else {
+            mIsNewCard [cardIndex] = true;
         }
         logd("processCardInfoAvailable: mIsNewCard [" + cardIndex + "] = "
                 + mIsNewCard [cardIndex]);
