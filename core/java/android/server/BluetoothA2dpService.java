@@ -133,6 +133,35 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         }
     };
 
+    private String getValidUtf8String ( String str)
+    {
+        int Char, i;
+        String temp;
+
+        if (str == null) {
+            return null;
+        }
+
+        for (i = 0; i < str.length(); i++) {
+            Char = str.codePointAt(i);
+            if ((Char > 0x10FFFF) ||
+                ((Char & 0xFFFFF800) == 0xD800) ||
+                ((Char >= 0xFDD0) && (Char <= 0xFDEF)) ||
+                ((Char & 0xFFFE) == 0xFFFE)) {
+                break;
+            }
+        }
+
+        if (i != str.length()) {
+            try {
+                temp = new String(str.getBytes(), 0, i, "UTF-8");
+                str = temp;
+            } catch (Exception e) {
+                Log.e(TAG, "Exception" + e);
+            }
+        }
+        return str;
+    }
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -314,15 +343,22 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
 
                 mUri = uri;
                 try {
+                    String temp;
                     Cursor mCursor = mContext.getContentResolver().query(mUri, mCursorCols,
                                         null, null, null);
                     mCursor.moveToFirst();
-                    mTrackName = mCursor.getString(
+                    temp = mCursor.getString(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE));
-                    mArtistName = mCursor.getString(
+
+                    mTrackName = getValidUtf8String(temp);
+                    temp = mCursor.getString(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST));
-                    mAlbumName = mCursor.getString(
+
+                    mArtistName = getValidUtf8String(temp);
+                    temp = mCursor.getString(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM));
+                    mAlbumName = getValidUtf8String(temp);
+
                     long mediaNumber = mCursor.getLong(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID));
                     mMediaNumber = String.valueOf(mediaNumber);
@@ -335,7 +371,6 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     log("tmpId is " + tmpId);
                     mMediaNumber = String.valueOf(tmpId);
                     log("ID is " + mMediaNumber);
-
                     mCursor = mContext.getContentResolver().query(
                                             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                                             new String [] { MediaStore.Audio.Media._ID},
