@@ -42,6 +42,7 @@ import android.util.Log;
 import com.android.internal.R;
 import com.android.internal.telephony.Connection.DisconnectCause;
 import com.android.internal.telephony.Phone.State;
+import com.android.internal.telephony.Phone.SuppService;
 import com.android.internal.telephony.gsm.UsimServiceTable;
 import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.test.SimulatedRadioControl;
@@ -1327,5 +1328,9 @@ public abstract class PhoneBase extends Handler implements Phone {
     public DisconnectCause disconnectCauseFromCode(int causeCode) {
         Log.e(LOG_TAG, "disconnectCauseFromCode unsupported for this phone");
         return DisconnectCause.ERROR_UNSPECIFIED;
+    }
+
+    public void notifySuppServiceFailed(SuppService code) {
+        Log.e(LOG_TAG, "notifySuppServiceFailed unsupported for this phone");
     }
 }

@@ -61,8 +61,9 @@ public final class CdmaImsCallTracker extends CallTracker {
 
     //***** Constants
 
-    static final int MAX_CONNECTIONS = 2;
-    static final int MAX_CONNECTIONS_PER_CALL = 1; // TBD check this value for IMS
+    static final int MAX_CONNECTIONS = 7;//CDMA + IMS
+    static final int MAX_CONNECTIONS_PER_CALL = 1; // for CDMA
+    static final int MAX_CONNECTIONS_PER_CALL_IMS = 5; //TODO check this value for IMS
 
     //***** Instance Variables
 
@@ -196,13 +197,12 @@ public final class CdmaImsCallTracker extends CallTracker {
 
     private void
     fakeHoldForegroundBeforeDial() {
-        //this method is nop for now
+        //this method is for IMS calls only
         List<Connection> connCopy;
 
         // We need to make a copy here, since fakeHoldBeforeDial()
         // modifies the lists, and we don't want to reverse the order
-        connCopy = (List<Connection>) foregroundCall.connections.clone();
-        //TBD copy imsphone foreground call
+        connCopy = (List<Connection>) foregroundCallIms.connections.clone();
         for (int i = 0, s = connCopy.size() ; i < s ; i++) {
             ConnectionBase conn = (ConnectionBase)connCopy.get(i);
 
@@ -524,10 +524,10 @@ public final class CdmaImsCallTracker extends CallTracker {
         }
     }
 
-    //Conference calls not supported
+    //Conference calls supported only for HD calls
     public void
     conference() throws CallStateException {
-        Log.w(LOG_TAG, "Conference not supported in CDMA");
+        cm.conference(obtainCompleteMessage(EVENT_CONFERENCE_RESULT));//for IMS
     }
 
     public void
@@ -549,13 +549,13 @@ public final class CdmaImsCallTracker extends CallTracker {
         }
     }
 
-    //TBD phase 2 requirements
+    //Conference calls supported only for HD calls
     public boolean
     canConference() {
-        return foregroundCall.getState() == Call.State.ACTIVE
-                && backgroundCall.getState() == Call.State.HOLDING
-                && !backgroundCall.isFull()
-                && !foregroundCall.isFull();
+        return foregroundCallIms.getState() == Call.State.ACTIVE
+                && backgroundCallIms.getState() == Call.State.HOLDING
+                && !(foregroundCallIms.connections.size() == MAX_CONNECTIONS_PER_CALL_IMS)
+                && !(backgroundCallIms.connections.size() == MAX_CONNECTIONS_PER_CALL_IMS);
     }
 
     public boolean
@@ -1199,12 +1199,11 @@ public final class CdmaImsCallTracker extends CallTracker {
                 return Phone.SuppService.SWITCH;
             case EVENT_CONFERENCE_RESULT:
                 return Phone.SuppService.CONFERENCE;
-            case EVENT_SEPARATE_RESULT:
-                return Phone.SuppService.SEPARATE;
-            case EVENT_ECT_RESULT:
-                return Phone.SuppService.TRANSFER;
+            case EVENT_SEPARATE_RESULT:// Not Supported
+            case EVENT_ECT_RESULT:// NOT supported
+            default:
+                return Phone.SuppService.UNKNOWN;
         }
-        return Phone.SuppService.UNKNOWN;
     }
 
     private void handleRadioNotAvailable() {
@@ -1287,7 +1286,7 @@ public final class CdmaImsCallTracker extends CallTracker {
                     if (ar.exception != null) {
                         Log.i(LOG_TAG,
                                 "Exception during IMS call switching");
-                        //phone.notifySuppServiceFailed(getFailedService(msg.what));
+                        imsPhone.notifySuppServiceFailed(getFailedService(msg.what));
                     } else {
                         if (ar.userObj != null) {
                             dialPendingCall();
@@ -1369,6 +1368,14 @@ public final class CdmaImsCallTracker extends CallTracker {
                         pendingMO = null;
                     }
                 }
+                break;
+
+            case EVENT_CONFERENCE_RESULT:
+                ar = (AsyncResult) msg.obj;
+                if (ar.exception != null) {
+                    imsPhone.notifySuppServiceFailed(getFailedService(msg.what));
+                }
+                operationComplete();
                 break;
 
             default:{

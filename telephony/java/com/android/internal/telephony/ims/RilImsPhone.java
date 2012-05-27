@@ -36,6 +36,7 @@ import com.android.internal.telephony.CallFailCause;
 import com.android.internal.telephony.CallStateException;
 import com.android.internal.telephony.CallTracker;
 import com.android.internal.telephony.Connection.DisconnectCause;
+import com.android.internal.telephony.Phone.SuppService;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Connection;
 import com.android.internal.telephony.IccPhoneBookInterfaceManager;
@@ -181,13 +182,12 @@ public class RilImsPhone extends PhoneBase {
         }
     }
 
-    public boolean canConference() {
-        logUnexpectedMethodCall("canConference");
-        return false;
+    public void conference() throws CallStateException {
+        mCT.conference();
     }
 
-    public void conference() throws CallStateException {
-        logUnexpectedMethodCall("conference");
+    public boolean canConference() {
+        return mCT.canConference();
     }
 
     public boolean canTransfer() {
@@ -204,6 +204,10 @@ public class RilImsPhone extends PhoneBase {
      */
     public void notifyPhoneStateChanged() {
         mNotifier.notifyPhoneState(this);
+    }
+
+    public void notifySuppServiceFailed(SuppService code) {
+        mSuppServiceFailedRegistrants.notifyResult(code);
     }
 
     void updatePhoneState() {
@@ -235,29 +239,46 @@ public class RilImsPhone extends PhoneBase {
 
     public void clearDisconnected() {
         mCT.clearDisconnected(this);
-        /*
-        synchronized (RilImsPhone.class) {
-            ringingCall.clearDisconnected();
-            foregroundCall.clearDisconnected();
-            backgroundCall.clearDisconnected();
+    }
 
-            updatePhoneState();
-            notifyPreciseCallStateChanged();
+    public void
+    sendDtmf(char c) {
+        if (!PhoneNumberUtils.is12Key(c)) {
+            Log.e(LOG_TAG,"sendDtmf called with invalid character '" + c + "'");
+        } else {
+            if (mCT.state ==  Phone.State.OFFHOOK) {
+                mCM.sendDtmf(c, null);
+            }
         }
-        */
     }
 
-    public void sendDtmf(char c) {
-        logUnexpectedMethodCall("sendDtmf");
+    public void
+    startDtmf(char c) {
+        if (!PhoneNumberUtils.is12Key(c)) {
+            Log.e(LOG_TAG,"startDtmf called with invalid character '" + c + "'");
+        } else {
+            mCM.startDtmf(c, null);
+        }
     }
 
-    public void startDtmf(char c) {
-        logUnexpectedMethodCall("startDtmf");
+    public void
+    stopDtmf() {
+        mCM.stopDtmf(null);
     }
 
-    public void stopDtmf() {
-        logUnexpectedMethodCall("stopDtmf");
-    }
+    public void sendBurstDtmf(String dtmfString, int on, int off, Message onComplete) {
+        boolean check = true;
+        for (int itr = 0;itr < dtmfString.length(); itr++) {
+            if (!PhoneNumberUtils.is12Key(dtmfString.charAt(itr))) {
+                Log.e(LOG_TAG,"BurstDtmf invalid character '" + dtmfString.charAt(itr)+ "'");
+                check = false;
+                break;
+            }
+        }
+        if ((mCT.state ==  Phone.State.OFFHOOK)&&(check)) {
+            mCM.sendBurstDtmf(dtmfString, on, off, onComplete);
+        }
+     }
 
     public void getOutgoingCallerIdDisplay(Message onComplete) {
         // FIXME: what to reply?
