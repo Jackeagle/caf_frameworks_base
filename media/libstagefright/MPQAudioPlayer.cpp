@@ -485,7 +485,7 @@ status_t MPQAudioPlayer::pauseMS11DecoderPlayback() {
         }
 
     }
-    mTimePaused = mSeekTimeUs + mPositionTimeMediaUs;
+    mTimePaused = mSeekTimeUs + getAudioTimeStampUs();
     return err;
 }
 
@@ -831,39 +831,6 @@ void MPQAudioPlayer::extractorThreadEntry() {
                              mPCMStream, mLocalBuf, mInputBufferSize);
                 }
                 LOGV("bytesWritten = %d",(int)bytesWritten);
-                uint32_t sampleRate = 0, frameCount = 0;
-                mPCMStream->get_render_position(mPCMStream, &frameCount);
-
-                //TODO : Need to remove the hardcoding to support 24bit
-                // Channels is 2  and considering 16bit PCM
-                if(mDecoderType == EMS11Decoder) {
-                    mNumChannels = mPCMStream->common.get_channels(&mPCMStream->common);
-                    LOGV("HAL mNumChannels = %d", mNumChannels);
-                    mFrameSize = 2*mNumChannels;
-                } else {
-                    mFrameSize = mNumChannels * audio_bytes_per_sample(mAudioFormat);
-                }
-                CHECK(mFrameSize);
-                LOGV("mFrameSize = %d", mFrameSize);
-                sampleRate = mPCMStream->common.get_sample_rate(
-                        &mPCMStream->common);
-                mInputBufferSize =  mPCMStream->common.get_buffer_size(
-                        &mPCMStream->common);
-                if(sampleRate) {
-                    LOGV("frameCount = %d, mInputBufferSize = %d, \
-                            mFrameSize = %d, sampleRate = %d", frameCount,\
-                            mInputBufferSize, mFrameSize, sampleRate);
-                    mPositionTimeMediaUs = (((int64_t)(((int64_t)(
-                           (frameCount  * mInputBufferSize)/ mFrameSize))
-                            * 1000000)) / sampleRate);
-                    mPositionTimeRealUs =
-                            -mLatencyUs + mPositionTimeMediaUs;
-                    LOGV("mPositionTimeMediaUs = %lld",mPositionTimeMediaUs);
-                }
-                else {
-                    LOGV("mPositionTimeMediaUs zero");
-                    mPositionTimeMediaUs = 0;
-                }
             }
             else if(!mAudioSink->getSessionId()) {
                 LOGV("bytesToWrite = %d, mInputBufferSize = %d",\
@@ -1402,46 +1369,31 @@ int64_t MPQAudioPlayer::getRealTimeUs() {
     switch(mDecoderType) {
 
         case EHardwareDecoder:
-            mPositionTimeRealUs = 0;
-            return mPositionTimeRealUs;
-        case ESoftwareDecoder:
+            mPositionTimeRealUs = mSeekTimeUs + mPositionTimeMediaUs;
+            break;
         case EMS11Decoder:
+        case ESoftwareDecoder:
             mPositionTimeRealUs =  -mLatencyUs + mSeekTimeUs + mPositionTimeMediaUs;
-            return mPositionTimeRealUs;
+            break;
         default:
             LOGV(" Invalide Decoder return zero time");
             mPositionTimeRealUs = 0;
-            return mPositionTimeRealUs;
+            break;
     }
+    return mPositionTimeRealUs;
 }
 
 int64_t MPQAudioPlayer::getMediaTimeUs() {
 
     Mutex::Autolock autoLock(mLock);
-    switch(mDecoderType) {
 
-        case EHardwareDecoder:
-            if (mIsPaused) {
-                LOGV("getMediaTimeUs - paused = %lld",mTimePaused);
-                return mTimePaused;
-            } else {
-                LOGV("getMediaTimeUs - mSeekTimeUs = %lld", mSeekTimeUs);
-                return  ( mSeekTimeUs + getAudioTimeStampUs());
-            }
-        case ESoftwareDecoder:
-        case EMS11Decoder:
-            if (mIsPaused) {
-                LOGV("getMediaTimeUs - paused = %lld",mTimePaused);
-                return mTimePaused;
-            } else {
-                LOGV("getMediaTimeUs - mSeekTimeUs = %lld, mPositionTimeMediaUs = %lld", mSeekTimeUs,mPositionTimeMediaUs);
-                return (mPositionTimeMediaUs + mSeekTimeUs );
-            }
-            return mPositionTimeMediaUs;
-        default:
-            LOGE(" Invalide Decoder return zero time");
-            mPositionTimeMediaUs = 0;
-            return mPositionTimeMediaUs;
+    mPositionTimeMediaUs = mSeekTimeUs + getAudioTimeStampUs();
+    if (mIsPaused) {
+        LOGV("getMediaTimeUs - paused = %lld",mTimePaused);
+        return mTimePaused;
+    } else {
+        LOGV("getMediaTimeUs - mSeekTimeUs = %lld", mSeekTimeUs);
+        return mPositionTimeMediaUs;
     }
 }
 
@@ -1449,25 +1401,7 @@ bool MPQAudioPlayer::getMediaTimeMapping(
                                    int64_t *realtime_us, int64_t *mediatime_us) {
     Mutex::Autolock autoLock(mLock);
 
-    switch(mDecoderType) {
-
-        case EHardwareDecoder:
-            mPositionTimeMediaUs = (mSeekTimeUs + getAudioTimeStampUs());
-        break;
-
-        case ESoftwareDecoder:
-        //Dont do anything here
-        break;
-
-        case EMS11Decoder:
-        //Need to update the time from MS11Decoder
-        break;
-
-        default:
-            mPositionTimeRealUs = -1;
-            mPositionTimeMediaUs = -1;
-        break;
-    }
+    mPositionTimeMediaUs = (mSeekTimeUs + getAudioTimeStampUs());
 
     *realtime_us = mPositionTimeRealUs;
     *mediatime_us = mPositionTimeMediaUs;
