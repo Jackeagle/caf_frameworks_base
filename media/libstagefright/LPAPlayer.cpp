@@ -573,8 +573,8 @@ void LPAPlayer::resume() {
                         LOGV("AUDIO_GET_SESSION_ID success : decId = %d", decId);
                     }
 #else
-        sessionId = (int)afd;
-        LOGV("SESSION_ID is LPA Driver fd = %d", afd);
+                    sessionId = (int)afd;
+                    LOGV("SESSION_ID is LPA Driver fd = %d", afd);
 #endif /* LPADRIVER_SUPPORTS_SESSION_ID */
 
                     LOGV("Resume:: Opening a session for playback: sessionId = %d", sessionId);
@@ -1319,11 +1319,14 @@ void LPAPlayer::EffectsThreadEntry() {
             BuffersAllocated buf = *it;
 
             pthread_mutex_lock(&apply_effect_mutex);
-            LOGV("effectsThread: applying effects on %p fd %d", buf.memBuf, (int)buf.memFd);
-            mAudioFlinger->applyEffectsOn((int16_t*)buf.localBuf,
-                                          (int16_t*)buf.memBuf,
-                                          (int)buf.bytesToWrite);
+            if (bIsAudioRouted) {
+                 LOGV("effectsThread: applying effects on %p fd %d", buf.memBuf, (int)buf.memFd);
+                 mAudioFlinger->applyEffectsOn((int16_t*)buf.localBuf,
+                                              (int16_t*)buf.memBuf,
+                                              (int)buf.bytesToWrite);
+            }
             pthread_mutex_unlock(&apply_effect_mutex);
+            LOGV("effectsThread: applied effects on %p fd %d", buf.memBuf, (int)buf.memFd);
             effectsQueue.erase(it);
         }
     }
@@ -1689,8 +1692,10 @@ void LPAPlayer::onPauseTimeOut() {
         }
 
         // 2. Close the session
+        pthread_mutex_lock(&apply_effect_mutex);
         mAudioSink->closeSession();
         bIsAudioRouted = false;
+        pthread_mutex_unlock(&apply_effect_mutex);
 
         // 3. Call AUDIO_STOP on the Driver.
         mIsDriverStarted = false;
