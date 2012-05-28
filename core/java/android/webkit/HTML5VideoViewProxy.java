@@ -97,6 +97,9 @@ class HTML5VideoViewProxy extends Handler
     // This should be set back to -1.0f every time after the
     // function mHTML5VideoView.setVolume is called.
     private float mCachedVolume = -1.0f;
+    // Cached media position used to preserve playback position when
+    // resuming suspended video
+    private int mCachedPosition;
 
     // A helper class to control the playback. This executes on the UI thread!
     private final class VideoPlayer {
@@ -141,6 +144,7 @@ class HTML5VideoViewProxy extends Handler
         public void suspend() {
             if (mHTML5VideoView != null) {
                 mHTML5VideoView.pause();
+                mCachedPosition = getCurrentPosition();
                 mHTML5VideoView.release();
                 mHTML5VideoView = null;
                 // isVideoSelfEnded is false when video playback
@@ -152,7 +156,7 @@ class HTML5VideoViewProxy extends Handler
         }
 
         public void enterFullScreenVideo(int videoLayerId, String url, WebView webView) {
-            if (ensureHTML5VideoView(url, 0, videoLayerId, false)) {
+            if (ensureHTML5VideoView(url, mCachedPosition, videoLayerId, false)) {
                 mHTML5VideoView.prepareDataAndDisplayMode();
             }
             mHTML5VideoView.enterFullScreenVideoState(videoLayerId, webView);
