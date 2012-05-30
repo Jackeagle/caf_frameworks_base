@@ -2939,6 +2939,44 @@ static jboolean gattLeConnectCancelNative(JNIEnv *env, jobject object,
     return JNI_FALSE;
 }
 
+static jboolean gattLeDisconnectRequestNative(JNIEnv *env, jobject object,
+                                        jstring path) {
+#ifdef HAVE_BLUETOOTH
+    LOGV("%s", __FUNCTION__);
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *reply, *msg;
+        DBusError err;
+
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+
+        dbus_error_init(&err);
+        msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
+                                          c_path, DBUS_DEVICE_IFACE, "LeDisconnectReq");
+        if (!msg) {
+            LOGE("%s: Can't allocate new method call for LeDisconnectReq!", __FUNCTION__);
+            env->ReleaseStringUTFChars(path, c_path);
+            return JNI_FALSE;
+        }
+
+        reply = dbus_connection_send_with_reply_and_block(nat->conn, msg, -1, &err);
+        dbus_message_unref(msg);
+
+        env->ReleaseStringUTFChars(path, c_path);
+        if (!reply) {
+            if (dbus_error_is_set(&err)) {
+                LOG_AND_FREE_DBUS_ERROR(&err);
+            } else {
+                LOGE("DBus reply is NULL in function %s", __FUNCTION__);
+            }
+            return JNI_FALSE;
+        }
+        return JNI_TRUE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 static jboolean gattConnectNative(JNIEnv *env, jobject object,
                                            jstring path,
                                            jint prohibitRemoteChg,
@@ -3483,6 +3521,7 @@ static JNINativeMethod sMethods[] = {
     {"gattConnectNative", "(Ljava/lang/String;IIIIIIIIIII)I", (void *)gattConnectNative},
     {"gattLeConnectCancelNative", "(Ljava/lang/String;)Z", (void *)gattLeConnectCancelNative},
     {"gattLeConnectNative", "(Ljava/lang/String;IIIIIIIIIII)I", (void *)gattLeConnectNative},
+    {"gattLeDisconnectRequestNative", "(Ljava/lang/String;)Z", (void *)gattLeDisconnectRequestNative},
     {"updateCharacteristicValueNative", "(Ljava/lang/String;)Z", (void*)updateCharacteristicValueNative},
     {"getCharacteristicPropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getCharacteristicPropertiesNative},
     {"setCharacteristicPropertyNative", "(Ljava/lang/String;Ljava/lang/String;[BIZ)Z", (void*)setCharacteristicPropertyNative},

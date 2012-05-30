@@ -168,6 +168,7 @@ interface IBluetooth
     boolean registerGattAppConfiguration(in BluetoothGattAppConfiguration config,
                                          in IBluetoothGattCallback callback);
     boolean unregisterGattAppConfiguration(in BluetoothGattAppConfiguration config);
+    boolean closeGattLeConnection(in BluetoothGattAppConfiguration config, String address);
     boolean sendIndication(in BluetoothGattAppConfiguration config,
                            in int handle, in byte[] value, in boolean notify, in int sessionHandle);
     boolean discoverPrimaryResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
