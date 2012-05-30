@@ -4357,7 +4357,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
 
         return true;
-   }
+    }
 
     public synchronized boolean discoverCharacteristics(String path) {
        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
@@ -4687,6 +4687,20 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     /**** Local GATT Server handlers ****/
+    public synchronized boolean closeGattLeConnection(BluetoothGattAppConfiguration config,
+                                                      String address) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM,
+                                                "Need BLUETOOTH permission");
+        String devPath;
+        devPath = getObjectPathFromAddress(address);
+
+        if (devPath == null)
+            return false;
+
+        synchronized (mBluetoothGattProfileHandler) {
+            return mBluetoothGattProfileHandler.closeGattLeConnection(config, devPath);
+        }
+    }
 
     public boolean registerGattAppConfiguration(BluetoothGattAppConfiguration config,
                                             IBluetoothGattCallback callback) {
@@ -5031,6 +5045,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private native boolean disconnectAllConnectionsNative();
 
     //GattServer API
+    native boolean gattLeDisconnectRequestNative(String devPath);
     native Object[] getGattServersNative();
     native boolean registerGattServerNative(String objPath, int handleCount, boolean isNew);
     native boolean unregisterGattServerNative(String objPath, boolean complete);

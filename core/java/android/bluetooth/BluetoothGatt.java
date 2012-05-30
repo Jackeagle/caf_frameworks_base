@@ -243,6 +243,25 @@ public final class BluetoothGatt implements BluetoothProfile {
        return false;
     }
 
+    public boolean closeGattLeConnection(BluetoothGattAppConfiguration config,
+                                         String address) {
+       if (config == null)
+            return false;
+
+        if (mService != null) {
+            try {
+                return mService.closeGattLeConnection(config, address);
+            } catch (RemoteException e) {
+                Log.e(TAG, e.toString());
+            }
+        } else {
+            Log.w(TAG, "Proxy not attached to service");
+            Log.d(TAG, Log.getStackTraceString(new Throwable()));
+        }
+
+        return false;
+    }
+
     public boolean sendIndication(BluetoothGattAppConfiguration config,
                                   int handle, byte[] value, boolean notify, int sessionHandle) {
         boolean result = false;
