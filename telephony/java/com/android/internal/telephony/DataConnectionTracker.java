@@ -1139,7 +1139,10 @@ public abstract class DataConnectionTracker extends Handler {
                 if (dataEnabled[apnId]) {
                     dataEnabled[apnId] = false;
                     enabledCount--;
-                    didDisable = true;
+                    String type = apnIdToType(apnId);
+                    if (isApnTypeActive(type)) {
+                        didDisable = true;
+                    }
                 }
             }
             if (didDisable) {
