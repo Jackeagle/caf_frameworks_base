@@ -1931,29 +1931,7 @@ public interface Phone {
 
     CallTracker getCallTracker();
 
-    /* implement in all phones
-     * ConnectionBase.DisconnectCause
-            disconnectCauseFromCode(int causeCode){
-    if (phone.mCdmaSubscriptionSource == // write generic fun
-                        // toget icc status
-                        // for nv mode n
-                        // remove this check
-                        CdmaSubscriptionSourceManager.SUBSCRIPTION_FROM_RUIM
-                        && (phone.getUiccApplication() == null ||
-                        phone.getUiccApplication().getState() !=
-                        IccCardApplicationStatus.AppState.APPSTATE_READY)) {
-                    return DisconnectCause.ICC_ERROR;
-    } else if (causeCode == CallFailCause.ERROR_UNSPECIFIED) {
-                    if (phone.mSST.mRestrictedState.isCsRestricted()) {
-                        return DisconnectCause.CS_RESTRICTED;
-                    } else if (phone.mSST.mRestrictedState.isCsEmergencyRestricted()) {
-                        return DisconnectCause.CS_RESTRICTED_EMERGENCY;
-                    } else if (phone.mSST.mRestrictedState.isCsNormalRestricted()) {
-                        return DisconnectCause.CS_RESTRICTED_NORMAL;
-                    } else {
-                        return DisconnectCause.ERROR_UNSPECIFIED;
-                    }
-    }
-    }
-    */
+    public void registerForModifyCallRequest(Handler h, int what, Object obj);
+
+    public void unregisterForModifyCallRequest(Handler h);
 }

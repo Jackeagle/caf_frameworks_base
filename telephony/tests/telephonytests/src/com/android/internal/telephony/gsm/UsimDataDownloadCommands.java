@@ -18,6 +18,7 @@ package com.android.internal.telephony.gsm;
 
 import android.content.Context;
 import android.os.AsyncResult;
+import android.os.Handler;
 import android.os.Message;
 import android.os.SystemClock;
 import android.util.Log;
@@ -27,6 +28,7 @@ import com.android.internal.telephony.CallDetails;
 import com.android.internal.telephony.IccIoResult;
 import com.android.internal.telephony.UUSInfo;
 import com.android.internal.telephony.cdma.CdmaSmsBroadcastConfigInfo;
+import com.android.internal.telephony.CallModify;
 
 import java.util.ArrayList;
 import junit.framework.Assert;
@@ -686,5 +688,17 @@ class UsimDataDownloadCommands extends BaseCommands {
 
     public void dial(String address, int clirMode, UUSInfo uusInfo, CallDetails callDetails,
             Message result) {
+    }
+
+    public void registerForModifyCall(Handler h, int what, Object obj) {
+    }
+
+    public void unregisterForModifyCall(Handler h) {
+    }
+
+    public void modifyCallInitiate(Message result, CallModify callModify) {
+    }
+
+    public void modifyCallConfirm(Message result, CallModify callModify) {
     }
 }
