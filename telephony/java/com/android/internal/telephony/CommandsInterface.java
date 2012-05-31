@@ -1841,4 +1841,8 @@ public interface CommandsInterface {
      *          Callback message contains the information of SUCCESS/FAILURE.
     */
     public void getQosStatus (int qosId, Message result);
+
+    public void modifyCallInitiate(Message result, CallModify callModify);
+
+    public void modifyCallConfirm(Message result, CallModify callModify);
 }

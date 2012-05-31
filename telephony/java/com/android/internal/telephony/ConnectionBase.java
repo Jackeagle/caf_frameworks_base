@@ -18,6 +18,10 @@
 
 package com.android.internal.telephony;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import com.android.internal.telephony.*;
 import android.content.Context;
 import android.os.AsyncResult;
@@ -86,6 +90,7 @@ public class ConnectionBase extends Connection {
     int cnapNamePresentation  = Connection.PRESENTATION_ALLOWED;//only used for cdma
     UUSInfo uusInfo = null; // only used for GSM , move it to constructor
     public CallDetails callDetails = null;
+    private CallModify callModifyRequest = null;
 
 
     Handler h;
@@ -647,6 +652,13 @@ public class ConnectionBase extends Connection {
         newParent = parentFromDCState(dc.state); // parent = CdmaPhone
         }
 
+        CallDetails newDetails = new CallDetails(dc.callDetails);
+        if (!callDetails.equals(dc.callDetails)) {
+            Log.d(LOG_TAG, "[Connection " + index + "] Updating call Details to " + newDetails);
+            callDetails = newDetails;
+            changed = true;
+        }
+
         if (Phone.DEBUG_PHONE) log("parent= " +parent +", newParent= " + newParent);
 
         if (!equalsHandlesNulls(address, dc.number)) {
@@ -1044,5 +1056,139 @@ public class ConnectionBase extends Connection {
     public PhoneBase getPhoneFromConnection()
     {
         return (PhoneBase)(parent.getPhone());
+    }
+
+    // This function validates if the call can be modified to the given call type
+    private boolean validateCanModifyConnectionType(Message msg, int newCallType) {
+
+
+        boolean ret = false;
+        Call call = getCall();
+        boolean isCb = call != null && (call instanceof CallBase);
+        boolean isMP = call != null && (call.isMultiparty()); // Is it a Multiparty call?
+
+        ret = (isCb && (!isMP) && index >= 0 && newCallType != getCallDetails().call_type);
+
+        if (!ret && (msg != null)) {
+            AsyncResult ar;
+
+            String s = "";
+            if (!isCb) {
+                s += "Call is not CallBase. ";
+            }
+
+            if (isMP) {
+                s += "Call is Multiparty. ";
+            }
+
+            if (index < 0) {
+                s += "Index is not yet assigned. ";
+            }
+
+            if (newCallType != getCallDetails().call_type) {
+                // Call type is not same as requested. Reply with success.
+                ar = AsyncResult.forMessage(msg, null, null);
+            } else {
+                ar = AsyncResult.forMessage(msg, null, new Exception("Unable to change: " + s));
+            }
+
+            msg.obj = ar;
+            msg.sendToTarget();
+        }
+        return ret;
+    }
+
+    // MODIFY_CALL_INITIATE
+    public void changeConnectionType(Message msg,
+            int newCallType, Map<String, String>newExtras) throws CallStateException {
+
+        if (validateCanModifyConnectionType(msg, newCallType)) {
+            CallDetails call_details = new CallDetails(newCallType, getCallDetails().call_domain,
+                    CallDetails.getExtrasFromMap(newExtras));
+            int ril_call_index = index + 1;
+            CallModify callModify = new CallModify(call_details,ril_call_index);
+            owner.modifyCallInitiate(msg, callModify);
+        }
+    }
+
+    // UNSOL_MODIFY_CALL
+    public boolean onReceivedModifyCall(CallModify callModify) {
+        Log.d(LOG_TAG, "onReceivedCallModify(" + callModify + ")");
+        Message msg = null;
+        boolean ret = validateCanModifyConnectionType(msg ,callModify.call_details.call_type);
+        this.callModifyRequest = callModify;
+        return ret;
+    }
+
+    /**
+     * getConnectionType()
+     * @return The current connection type or -1 if callDetails is null
+     */
+    public int getConnectionType() {
+        if (callDetails != null) {
+            return callDetails.call_type;
+        } else {
+            return -1;
+        }
+    }
+
+    /**
+     * When a remote user requests to change the type of the connection
+     * (e.g. to upgrade from voice to video), it will be possible to
+     * query the proposed type with this method. After receiving an indication of a request
+     * (see {@link CallManager#registerForConnectionTypeChangeRequest(Handler, int, Object)}).
+     *
+     * If no request has been received, this function returns the current type.
+     * The proposed type is cleared after calling {@link #acceptConnectionTypeChange(Map)} or
+     * {@link #rejectConnectionTypeChange()}.
+     *
+     * @return The proposed connection type or the current connectionType if no request exists.
+     */
+    public int getProposedConnectionType() {
+        int ret = getConnectionType();
+
+        if (callModifyRequest != null) {
+            if (callModifyRequest.call_details != null) {
+                ret = callModifyRequest.call_details.call_type;
+            } else {
+                Log.d(LOG_TAG, "Received callModifyRequest without call details");
+            }
+        }
+
+        return ret;
+    }
+
+    /**
+     * Approve a request to change the call type. Optionally, provide new extra values.
+     *
+     * @param newExtras
+     * @throws CallStateException
+     */
+    public void acceptConnectionTypeChange(Map<String, String> newExtras)
+            throws CallStateException {
+        Log.d(LOG_TAG, "Confirming call type change request: " + callModifyRequest);
+
+        if (callModifyRequest != null) {
+            callModifyRequest.call_details.setExtrasFromMap(newExtras);
+            owner.modifyCallConfirm(null, callModifyRequest);
+            callModifyRequest = null;
+        }
+    }
+
+    /**
+     * Reject a previously received request to change the call type.
+     *
+     * @throws CallStateException
+     */
+    public void rejectConnectionTypeChange() throws CallStateException {
+        if (callModifyRequest == null) return;
+        CallModify callModify = new CallModify();
+        callModify.call_index = index + 1;
+        callModify.call_details = new CallDetails(callDetails);
+
+        Log.d(LOG_TAG, "Rejecting Change request: " + callModifyRequest + " keep as " + callModify);
+
+        owner.modifyCallConfirm(null, callModify);
+        callModifyRequest = null;
     }
 }

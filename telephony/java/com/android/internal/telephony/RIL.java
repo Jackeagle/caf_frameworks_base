@@ -1168,6 +1168,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         rr.mp.writeStringArray(callModify.call_details.extras);
     }
 
+    @Override
     public void modifyCallInitiate(Message result, CallModify callModify) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_MODIFY_CALL_INITIATE, result);
         setCallModify(rr, callModify);
@@ -1177,6 +1178,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
+    @Override
     public void modifyCallConfirm(Message result, CallModify callModify) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_MODIFY_CALL_CONFIRM, result);
         setCallModify(rr, callModify);

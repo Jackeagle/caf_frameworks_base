@@ -280,4 +280,13 @@ public abstract class CallTracker extends Handler {
     clearDisconnected(PhoneBase phone) {
         log("clearDisconnected with phone is not supported in this CallTracker"+this);
     }
+    public void modifyCallInitiate(Message msg, CallModify callModify) throws CallStateException {
+        throw new CallStateException(
+                "modifyCallInitiate is not supported in this CallTracker");
+    }
+
+    public void modifyCallConfirm(Message msg, CallModify callModify) throws CallStateException {
+        throw new CallStateException(
+                "modifyCallConfirm is not supported in this CallTracker");
+    }
 }

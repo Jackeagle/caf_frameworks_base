@@ -50,6 +50,7 @@ import com.android.internal.telephony.gsm.SIMRecords;
 import com.android.internal.telephony.QosSpec;
 
 import java.util.Locale;
+import java.util.Map;
 
 
 /**
@@ -197,6 +198,9 @@ public abstract class PhoneBase extends Handler implements Phone {
             = new RegistrantList();
 
     protected final RegistrantList mSimRecordsLoadedRegistrants
+            = new RegistrantList();
+
+    protected final RegistrantList mCallModifyRegistrants
             = new RegistrantList();
 
     protected Looper mLooper; /* to insure registrants are in correct thread*/
@@ -510,6 +514,19 @@ public abstract class PhoneBase extends Handler implements Phone {
     }
 
     public void registerForSimRecordsLoaded(Handler h, int what, Object obj) {
+    }
+
+    public void registerForModifyCallRequest(Handler h, int what, Object obj) {
+        mCallModifyRegistrants.add(h, what, obj);
+    }
+
+    public void unregisterForModifyCallRequest(Handler h) {
+        mCallModifyRegistrants.remove(h);
+    }
+
+    public void notifyModifyCallRequest(ConnectionBase c, Throwable e) {
+        AsyncResult ar = new AsyncResult(null, c, e);
+        mCallModifyRegistrants.notifyRegistrants(ar);
     }
 
     public void unregisterForSimRecordsLoaded(Handler h) {

@@ -25,6 +25,7 @@ import android.util.Log;
 
 import com.android.internal.telephony.BaseCommands;
 import com.android.internal.telephony.CallDetails;
+import com.android.internal.telephony.CallModify;
 import com.android.internal.telephony.CallFailCause;
 import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.CommandsInterface;
@@ -1610,5 +1611,11 @@ public final class SimulatedCommands extends BaseCommands
     public void dial(String address, int clirMode, UUSInfo uusInfo, CallDetails callDetails,
             Message result) {
         unimplemented(result);
+    }
+
+    public void modifyCallConfirm(Message result, CallModify callModify) {
+    }
+
+    public void modifyCallInitiate(Message result, CallModify callModify) {
     }
 }
