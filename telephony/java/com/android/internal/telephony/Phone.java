@@ -1,7 +1,9 @@
 /*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
- * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +38,7 @@ import com.android.internal.telephony.uicc.IsimRecords;
 import com.android.internal.telephony.uicc.UsimServiceTable;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Internal interface used to control the phone; SDK developers cannot
@@ -751,6 +754,14 @@ public interface Phone {
      * @throws CallStateException
      */
     int getCallType(Call call) throws CallStateException;
+
+    /**
+     * Gets call domain for IMS calls.
+     *
+     * @return one of the call domains in {@link CallDetails}
+     * @throws CallStateException
+     */
+    int getCallDomain(Call call) throws CallStateException;
 
     /**
      * Reject (ignore) a ringing call. In GSM, this means UDUB
@@ -1922,6 +1933,46 @@ public interface Phone {
      * Remove references to external object stored in this object.
      */
     void removeReferences();
+
+
+    public void registerForModifyCallRequest(Handler h, int what, Object obj);
+
+    public void unregisterForModifyCallRequest(Handler h);
+
+    public void changeConnectionType(Message msg, Connection conn,
+            int newCallType, Map<String, String> newExtras) throws CallStateException;
+
+    /**
+     * Approve a request to change the call type. Optionally, provide new extra
+     * values.
+     *
+     * @param newExtras
+     * @throws CallStateException
+     */
+    public void acceptConnectionTypeChange(Connection conn, Map<String, String> newExtras)
+            throws CallStateException;
+
+    /**
+     * Reject a previously received request to change the call type.
+     *
+     * @throws CallStateException
+     */
+    public void rejectConnectionTypeChange(Connection conn) throws CallStateException;
+
+    /**
+     * When a remote user requests to change the type of the connection (e.g. to
+     * upgrade from voice to video), it will be possible to query the proposed
+     * type with this method. After receiving an indication of a request (see
+     * {@link CallManager#registerForConnectionTypeChangeRequest(Handler, int, Object)}
+     * ). If no request has been received, this function returns the current
+     * type. The proposed type is cleared after calling
+     * {@link #acceptConnectionTypeChange(Map)} or
+     * {@link #rejectConnectionTypeChange()}.
+     *
+     * @return The proposed connection type or the current connectionType if no
+     *         request exists.
+     */
+    public int getProposedConnectionType(Connection conn) throws CallStateException;
 
     /**
      * Returns the subscription id.

@@ -27,6 +27,9 @@
 
 package com.android.internal.telephony;
 
+import java.util.Map;
+import java.util.Map.Entry;
+
 /**
  * CallDetails class takes care of all the additional details like call type
  * and domain needed for IMS calls. This class is not relevant for non-IMS calls
@@ -112,13 +115,38 @@ public class CallDetails {
     }
 
     public CallDetails(CallDetails srcCall) {
-        call_type = srcCall.call_type;
-        call_domain = srcCall.call_domain;
-        extras = srcCall.extras;
+        if (srcCall != null) {
+            call_type = srcCall.call_type;
+            call_domain = srcCall.call_domain;
+            extras = srcCall.extras;
+        }
     }
 
     public void setExtras(String[] extraparams) {
         extras = extraparams;
+    }
+
+    public static String[] getExtrasFromMap(Map<String, String> newExtras) {
+        String []extras = null;
+
+        if (newExtras == null) {
+            return null;
+        }
+
+        // TODO: Merge new extras into extras. For now, just serialize and set them
+        extras = new String[newExtras.size()];
+
+        if (extras != null) {
+            int i = 0;
+            for (Entry<String, String> entry : newExtras.entrySet()) {
+                extras[i] = "" + entry.getKey() + "=" + entry.getValue();
+            }
+        }
+        return extras;
+    }
+
+    public void setExtrasFromMap(Map<String, String> newExtras) {
+        this.extras = getExtrasFromMap(newExtras);
     }
 
     /**

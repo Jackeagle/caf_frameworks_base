@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2011-12, Code Aurora Forum. All rights reserved.
- *
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
- * for attribution purposes only
+ * for attribution purposes only.
+ *
+ * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ import com.android.internal.telephony.uicc.IccCardApplicationStatus.AppState;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.android.internal.telephony.MSimConstants.DEFAULT_SUBSCRIPTION;
@@ -199,6 +200,9 @@ public abstract class PhoneBase extends Handler implements Phone {
             = new RegistrantList();
 
     protected final RegistrantList mSimRecordsLoadedRegistrants
+            = new RegistrantList();
+
+    protected final RegistrantList mCallModifyRegistrants
             = new RegistrantList();
 
     protected Looper mLooper; /* to insure registrants are in correct thread*/
@@ -517,6 +521,19 @@ public abstract class PhoneBase extends Handler implements Phone {
     }
 
     public void registerForSimRecordsLoaded(Handler h, int what, Object obj) {
+    }
+
+    public void registerForModifyCallRequest(Handler h, int what, Object obj) {
+        mCallModifyRegistrants.add(h, what, obj);
+    }
+
+    public void unregisterForModifyCallRequest(Handler h) {
+        mCallModifyRegistrants.remove(h);
+    }
+
+    public void notifyModifyCallRequest(Connection c, Throwable e) {
+        AsyncResult ar = new AsyncResult(null, c, e);
+        mCallModifyRegistrants.notifyRegistrants(ar);
     }
 
     public void unregisterForSimRecordsLoaded(Handler h) {
@@ -1315,10 +1332,34 @@ public abstract class PhoneBase extends Handler implements Phone {
         throw new CallStateException("getCallType is not supported in this phone " + this);
     }
 
+    public int getCallDomain(Call call) throws CallStateException {
+        throw new CallStateException("getCallDomain is not supported in this phone " + this);
+    }
+
     public Connection dial(String dialString, int CallType, String[] extras)
             throws CallStateException {
         throw new CallStateException("Dial with CallDetails is not supported in this phone "
                 + this);
     }
 
+    public void changeConnectionType(Message msg, Connection conn,
+            int newCallType, Map<String, String> newExtras) throws CallStateException {
+        throw new CallStateException("changeConnectionType is not supported in this phone " + this);
+    }
+
+    public void acceptConnectionTypeChange(Connection conn, Map<String, String> newExtras)
+            throws CallStateException {
+        throw new CallStateException("acceptConnectionTypeChange is not supported in this phone "
+                + this);
+    }
+
+    public void rejectConnectionTypeChange(Connection conn) throws CallStateException {
+        throw new CallStateException("rejectConnectionTypeChange is not supported in this phone "
+                + this);
+    }
+
+    public int getProposedConnectionType(Connection conn) throws CallStateException {
+        throw new CallStateException("rejectConnectionTypeChange is not supported in this phone "
+                + this);
+    }
 }
