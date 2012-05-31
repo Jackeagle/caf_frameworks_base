@@ -37,6 +37,11 @@ public class CallModify {
         call_details = new CallDetails();
     }
 
+    public CallModify(CallDetails callDetails, int callIndex) {
+        call_index = callIndex;
+        call_details = callDetails;
+    }
+
     public void setCallDetails(CallDetails calldetails) {
         call_details = new CallDetails(calldetails);
     }

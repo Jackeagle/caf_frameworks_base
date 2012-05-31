@@ -1,7 +1,9 @@
 /*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
- * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +20,6 @@
 
 package com.android.internal.telephony;
 
-import com.android.internal.telephony.CallModify;
 import com.android.internal.telephony.sip.SipPhone;
 
 import android.content.Context;
@@ -37,6 +38,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 
 
@@ -1767,47 +1769,6 @@ public final class CallManager {
 
     public void unregisterForPostDialCharacter(Handler h){
         mPostDialCharacterRegistrants.remove(h);
-    }
-
-    /**
-     * When the remote party in an IMS Call wants to upgrade or downgrade a
-     * call, a CallModifyRequest message is received. This function registers
-     * for that indication and sends a message to the handler when such an
-     * indication occurs. A response to the request can be send with
-     * {@link callModifyConfirm}. In order to confirm
-     *
-     * @param h The handler that will receive the message
-     * @param what The message to send
-     * @param obj User object to send with the message
-     */
-    public void registerForCallModifyRequest(Handler h, int what, Object obj) {
-    }
-
-    /**
-     * Request a modification to a current connection This will send an
-     * indication to the remote party with new call details, which the remote
-     * party can agree to or reject. To agree, they will return the same call
-     * details as proposed. To reject, they will return the current call details
-     * in the Connection ({@link Connection#getCallDetails()}) Used to convert a
-     * voice call into a Video telephony call.
-     *
-     * @param conn The connection to modify
-     * @param modifyInitiate The new call details to request and the call index
-     */
-    public void callModifyInitiate(Connection conn, CallModify modifyInitiate) {
-    }
-
-    /**
-     * Confirm a previosuly received CallModifyRequest. If the request is to be
-     * approved, the same parameters contained in the message (see
-     * {@link registerForCallModifyRequest}) will be passed in details.
-     * Otherwise, the old call details will be passed (e.g. from
-     * conn.getDetails()
-     *
-     * @param conn The connection to confirm
-     * @param modifyConfirm The call details to use and the call index
-     */
-    public void callModifyConfirm(Connection conn, CallModify modifyConfirm) {
     }
 
     /* APIs to access foregroudCalls, backgroudCalls, and ringingCalls

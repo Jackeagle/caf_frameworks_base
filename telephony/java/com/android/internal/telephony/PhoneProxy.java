@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
- *
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
- * for attribution purposes only
+ * for attribution purposes only.
+ *
+ * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ import com.android.internal.telephony.uicc.UsimServiceTable;
 import com.android.internal.telephony.CallManager;
 import com.android.internal.telephony.QosSpec;
 import java.util.List;
+import java.util.Map;
 
 public class PhoneProxy extends Handler implements Phone {
     public final static Object lockForRadioTechnologyChange = new Object();
@@ -509,6 +510,10 @@ public class PhoneProxy extends Handler implements Phone {
         return mActivePhone.getCallType(call);
     }
 
+    public int getCallDomain(Call call) throws CallStateException {
+        return mActivePhone.getCallDomain(call);
+    }
+
     public void rejectCall() throws CallStateException {
         mActivePhone.rejectCall();
     }
@@ -523,6 +528,24 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void conference() throws CallStateException {
         mActivePhone.conference();
+    }
+
+    public void changeConnectionType(Message msg, Connection conn,
+            int newCallType, Map<String, String> newExtras) throws CallStateException {
+        mActivePhone.changeConnectionType(msg, conn, newCallType, newExtras);
+    }
+
+    public void acceptConnectionTypeChange(Connection conn, Map<String, String> newExtras)
+            throws CallStateException {
+        mActivePhone.acceptConnectionTypeChange(conn, newExtras);
+    }
+
+    public void rejectConnectionTypeChange(Connection conn) throws CallStateException {
+        mActivePhone.rejectConnectionTypeChange(conn);
+    }
+
+    public int getProposedConnectionType(Connection conn) throws CallStateException {
+        return mActivePhone.getProposedConnectionType(conn);
     }
 
     public void enableEnhancedVoicePrivacy(boolean enable, Message onComplete) {
@@ -1051,5 +1074,14 @@ public class PhoneProxy extends Handler implements Phone {
 
     public int getSubscription() {
         return mActivePhone.getSubscription();
+    }
+
+    public void registerForModifyCallRequest(Handler h, int what, Object obj)
+            throws CallStateException {
+        mActivePhone.registerForModifyCallRequest(h, what, obj);
+    }
+
+    public void unregisterForModifyCallRequest(Handler h) throws CallStateException {
+        mActivePhone.unregisterForModifyCallRequest(h);
     }
 }
