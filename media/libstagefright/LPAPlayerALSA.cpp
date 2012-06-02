@@ -33,6 +33,9 @@
 extern "C" {
    #include <asound.h>
    #include "alsa_audio.h"
+   #include <compress_params.h>
+   #include <compress_offload.h>
+   
 }
 
 #include <media/stagefright/LPAPlayer.h>
