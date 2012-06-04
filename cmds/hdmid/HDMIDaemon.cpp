@@ -659,6 +659,10 @@ int HDMIDaemon::processFrameworkCommand()
         int ret = sscanf(buffer, HDMI_CMD_HPDOPTION "%d", &option);
         if (ret == 1) {
             LOGD(HDMI_CMD_HPDOPTION ": %d", option);
+            //If setting HPD off(and thus HDMI) disable audio first.
+            if(option == 0) {
+                disableAudio();
+            }
             writeHPDOption(option);
         }
     } else {
