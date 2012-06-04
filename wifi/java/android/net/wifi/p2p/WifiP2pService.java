@@ -314,12 +314,6 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             } else {
                 setInitialState(mP2pNotSupportedState);
             }
-            // Unload driver module as TI solution has loadable driver module
-            if(WifiNative.unloadDriver()) {
-                logd("TI driver unloaded for P2P");
-            } else {
-                loge("Failed to unload TI driver for P2P");
-            }
         }
 
     class DefaultState extends State {
@@ -467,6 +461,14 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 loge("Failed to stop supplicant, issue kill");
                 WifiNative.killSupplicant();
             }
+
+            // Unload driver module as TI solution has loadable driver module
+            if(WifiNative.unloadDriver()) {
+                logd("TI driver unloaded for P2P");
+            } else {
+                loge("Failed to unload TI driver for P2P");
+            }
+
         }
 
         @Override
