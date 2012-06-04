@@ -181,12 +181,10 @@ class HDMIService extends IHDMIService.Stub {
         mHDMIUserOption = enableHDMI;
 
         synchronized(mListener) {
+            mListener.setHPD(getHDMIUserOption());
             if(enableHDMI == false) {
-                final boolean connected = false;
-                broadcastHDMIPluggedEvent(connected);
                 mListener.enableHDMIOutput(false);
             }
-            mListener.setHPD(getHDMIUserOption());
         }
     }
 
@@ -211,50 +209,23 @@ class HDMIService extends IHDMIService.Stub {
         return mHDMIModes;
     }
 
-    public void broadcastHDMIPluggedEvent(boolean connected) {
-        Intent intent = new Intent(WindowManagerPolicy.ACTION_HDMI_PLUGGED);
-        intent.putExtra(WindowManagerPolicy.EXTRA_HDMI_PLUGGED_STATE, connected);
-        if(connected)
-            intent.putExtra("EDID", mHDMIModes);
-        mContext.sendStickyBroadcast(intent);
-        Log.e(TAG, "Broadcasting Intent ACTION_HDMI_PLUGGED state = " + connected);
-    }
-
     public void notifyHDMIConnected(int[] modes) {
         mHDMIModes = modes;
-        if(getHDMIUserOption()) {
-            synchronized(mListener) {
-                if(mCurrHDMIMode == -1) {
-                    mCurrHDMIMode = getBestMode();
-                }
-                mListener.changeDisplayMode(mCurrHDMIMode);
-                mListener.enableHDMIOutput(true);
+        synchronized(mListener) {
+            if(mCurrHDMIMode == -1) {
+                mCurrHDMIMode = getBestMode();
             }
+            mListener.changeDisplayMode(mCurrHDMIMode);
+            mListener.enableHDMIOutput(true);
         }
     }
 
     public void notifyHDMIDisconnected() {
         mHDMIModes = null;
         mCurrHDMIMode = -1;
-        if(getHDMIUserOption()) {
-            synchronized(mListener) {
-                mListener.enableHDMIOutput(false);
-                mListener.setHPD(getHDMIUserOption());
-            }
+        synchronized(mListener) {
+            mListener.enableHDMIOutput(false);
+            mListener.setHPD(getHDMIUserOption());
         }
-    }
-
-    public void notifyHDMIAudioOn() {
-        boolean connected = true;
-        if(getHDMIUserOption()) {
-            broadcastHDMIPluggedEvent(connected);
-        }
-    }
-
-    public void notifyHDMIAudioOff() {
-        boolean connected = false;
-        if(getHDMIUserOption()) {
-            broadcastHDMIPluggedEvent(connected);
-       }
     }
 }
