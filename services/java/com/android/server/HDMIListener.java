@@ -85,12 +85,6 @@ final class HDMIListener implements Runnable {
         } else if (event.startsWith(HDMI_EVT_DISCONNECTED)) {
             mHDMIConnected = false;
             mService.notifyHDMIDisconnected();
-        } else if (event.startsWith(HDMI_EVT_AUDIO_ON)) {
-            // Notify HDMIAudio on
-            mService.notifyHDMIAudioOn();
-        } else if (event.startsWith(HDMI_EVT_AUDIO_OFF)) {
-            // Notify HDMIAudio off
-            mService.notifyHDMIAudioOff();
         }
     }
 
