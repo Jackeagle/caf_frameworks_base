@@ -61,6 +61,11 @@ public class MediaFile {
     private static final int FIRST_AUDIO_FILE_TYPE = FILE_TYPE_MP3;
     private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_PCM;
 
+    // More audio file types
+    public static final int FILE_TYPE_DTS   = 300;
+    private static final int FIRST_AUDIO_FILE_TYPE2 = FILE_TYPE_DTS;
+    private static final int LAST_AUDIO_FILE_TYPE2 = FILE_TYPE_DTS;
+
     // MIDI file types
     public static final int FILE_TYPE_MID     = 16;
     public static final int FILE_TYPE_SMF     = 17;
@@ -225,7 +230,7 @@ public class MediaFile {
         return false;
     }
 
-    private static boolean isAC3Enabled() {
+    private static boolean isMPQTarget() {
         int soc_id = 0;
         String file_info_id;
         try {
@@ -334,8 +339,9 @@ public class MediaFile {
         addFileType("ZIP", FILE_TYPE_ZIP, "application/zip");
         addFileType("MPG", FILE_TYPE_MP2PS, "video/mp2p");
         addFileType("MPEG", FILE_TYPE_MP2PS, "video/mp2p");
-        if(isAC3Enabled()) {
+        if(isMPQTarget()) {
             addFileType("AC3", FILE_TYPE_AC3, "audio/ac3");
+            addFileType("DTS", FILE_TYPE_DTS, "audio/dts");
         }
     }
 
@@ -343,7 +349,9 @@ public class MediaFile {
         return ((fileType >= FIRST_AUDIO_FILE_TYPE &&
                 fileType <= LAST_AUDIO_FILE_TYPE) ||
                 (fileType >= FIRST_MIDI_FILE_TYPE &&
-                fileType <= LAST_MIDI_FILE_TYPE));
+                fileType <= LAST_MIDI_FILE_TYPE) ||
+                (fileType >= FIRST_AUDIO_FILE_TYPE2 &&
+                fileType <= LAST_AUDIO_FILE_TYPE2));
     }
 
     public static boolean isVideoFileType(int fileType) {
