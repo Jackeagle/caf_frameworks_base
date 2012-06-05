@@ -848,7 +848,7 @@ status_t PostProc::getInputFormat()
     CHECK(mSource->getFormat()->findInt32(kKeyColorFormat, &format));
     POSTPROC_LOGV("Format is %d\n",format);
     switch (format) {
-        case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
+        case OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
             mSrcFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
             break;
