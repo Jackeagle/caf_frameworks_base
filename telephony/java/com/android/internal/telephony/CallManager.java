@@ -85,8 +85,13 @@ public final class CallManager {
     private static final int EVENT_POST_DIAL_CHARACTER = 119;
     private static final int EVENT_SUPP_SERVICE_NOTIFY = 120;
 
+    // Used to route the audio in SgLte scenarios
+    private static final int LOCAL_MODEM = 0;
+    private static final int REMOTE_MODEM = 1;
+    private static final String SGLTE = "sglte";
+
     // Maximum bit currently set for inCallAudioMode
-    private static final int MAX_IN_CALL_AUDIO_MODE_BIT = 7;
+    private static final int MAX_IN_CALL_AUDIO_MODE_BIT = 9;
     private static final String mode2Description[] = {
             "CS_ACTIVE",
             "CS_HOLD",
@@ -96,6 +101,8 @@ public final class CallManager {
             "IMS_HOLD",
             "<invalid-6>",
             "<invalid-7>",
+            "CS_ACTIVE_SESSION2",
+            "CS_HOLD_SESSION2",
     };
 
     // Singleton instance
@@ -118,6 +125,9 @@ public final class CallManager {
 
     // default phone as the first phone registered, which is PhoneBase obj
     private Phone mDefaultPhone;
+
+    // This variable tells us the type of baseband
+    private String mBaseband = SystemProperties.get(TelephonyProperties.PROPERTY_BASEBAND, "msm");
 
     // state registrants
     protected final RegistrantList mPreciseCallStateRegistrants
@@ -433,7 +443,9 @@ public final class CallManager {
 
         return ((inCallMode &
                   (AudioManager.CS_ACTIVE | AudioManager.IMS_ACTIVE |
-                          AudioManager.CS_HOLD | AudioManager.IMS_HOLD)) != 0 && !sipactive);
+                          AudioManager.CS_ACTIVE_SESSION2 | AudioManager.CS_HOLD |
+                          AudioManager.IMS_HOLD | AudioManager.CS_HOLD_SESSION2))
+                          != 0 && !sipactive);
     }
 
     private boolean hasActiveCall(Phone phone) {
@@ -462,11 +474,13 @@ public final class CallManager {
         boolean hasActiveCall = hasActiveCall(phone);
         boolean hasHoldingCall = hasHoldingCall(phone);
         boolean isFgPhone = getFgPhone().equals(phone);
+        int voiceModemIndex =
+                SystemProperties.getInt(TelephonyProperties.PROPERTY_VOICE_MODEM_INDEX, 0);
 
         Log.d(LOG_TAG, "inCallAudioModeForPhone( " + phone + " ): phoneState: " +
                        phone.getState() + " hasActiveCall: " + hasActiveCall +
                        " hasHoldingCall: " + hasHoldingCall +
-                       " isFgPhone: " + isFgPhone );
+                       " isFgPhone: " + isFgPhone + " voiceModemIndex: " + voiceModemIndex);
 
         if (phone.getState() == Phone.State.OFFHOOK) {
             if (isFgPhone && hasActiveCall){
@@ -478,7 +492,11 @@ public final class CallManager {
                         ret = AudioManager.IMS_ACTIVE;
                         break;
                     default:
-                        ret = AudioManager.CS_ACTIVE;
+                        if (voiceModemIndex != LOCAL_MODEM) {
+                            ret = AudioManager.CS_ACTIVE_SESSION2;
+                        } else {
+                            ret = AudioManager.CS_ACTIVE;
+                        }
                 }
             } else if (hasHoldingCall) {
                 switch(phone.getPhoneType()) {
@@ -489,7 +507,11 @@ public final class CallManager {
                         ret = AudioManager.IMS_HOLD;
                         break;
                     default:
-                        ret = AudioManager.CS_HOLD;
+                        if (voiceModemIndex != LOCAL_MODEM) {
+                            ret = AudioManager.CS_HOLD_SESSION2;
+                        } else {
+                            ret = AudioManager.CS_HOLD;
+                        }
                         break;
                 }
             }
@@ -544,6 +566,7 @@ public final class CallManager {
             }
         }
 
+        Log.d(LOG_TAG, "setAudioAndInCallMode inCallMode = " + inCallMode);
         if (isInCallModeActive(inCallMode)) {
             Log.d(LOG_TAG, "Calling setInCallMode(" + inCallModeToString(inCallMode) + ")");
             if (inCallMode != audioManager.getInCallMode()) {
@@ -558,7 +581,9 @@ public final class CallManager {
     public void setAudioMode() {
         boolean useInCallMode = PhoneFactory.isCallOnImsEnabled();
 
-        if (useInCallMode) {
+        Log.d(LOG_TAG, "setAudioMode useInCallMode = " + useInCallMode + ", Baseband = "
+                + mBaseband);
+        if (useInCallMode || (mBaseband.equals(SGLTE))) {
             setAudioAndInCallMode();
             return;
         }

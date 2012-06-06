@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -246,4 +247,17 @@ public interface TelephonyProperties
      * Type: boolean ( true = multimode enabled, false = multimode disabled)
      */
     static final String PROPERTY_MULTIMODE_CDMA = "ro.config.multimode_cdma";
+
+    /**
+     * Property to identify the baseband.
+     * Type: string (msm, sglte, apq )
+     */
+     static final String PROPERTY_BASEBAND = "ro.baseband";
+
+    /**
+     * Property to decide SgLte Modem Index
+     * Type: int ( 0 = local modem(MSM), 1 = remote modem(QSC))
+     * Default value 0.
+     */
+    static final String PROPERTY_VOICE_MODEM_INDEX = "persist.radio.voice.modem.index";
 }
