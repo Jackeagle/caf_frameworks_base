@@ -275,4 +275,12 @@ class FmReceiverJNI {
      *         {@link #FM_JNI_FAILURE}
      */
     static native int SetCalibrationNative(int fd);
+
+   /**
+     * native method: Configures the spur table
+     * @param fd file descriptor of device
+     * @return {@link #FM_JNI_SUCCESS}
+     *         {@link #FM_JNI_FAILURE}
+     */
+    static native int configureSpurTable(int fd);
 }
