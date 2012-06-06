@@ -654,6 +654,24 @@ static jint android_hardware_fmradio_FmReceiverJNI_stopPSNative
     return FM_JNI_SUCCESS;
 }
 
+static jint android_hardware_fmradio_FmReceiverJNI_configureSpurTable
+    (JNIEnv * env, jobject thiz, jint fd)
+{
+    LOGD("->android_hardware_fmradio_FmReceiverJNI_configureSpurTable\n");
+    int retval = 0;
+    struct v4l2_control control;
+
+    control.id = V4L2_CID_PRIVATE_UPDATE_SPUR_TABLE;
+    retval = ioctl(fd, VIDIOC_S_CTRL, &control);
+    if (retval < 0) {
+            LOGE("configureSpurTable: Failed to Write the SPUR Table\n");
+            return FM_JNI_FAILURE;
+    } else
+            LOGD("configureSpurTable: SPUR Table Configuration successful\n");
+
+    return FM_JNI_SUCCESS;
+}
+
 static jint android_hardware_fmradio_FmReceiverJNI_setPSRepeatCountNative
     (JNIEnv * env, jobject thiz, jint fd, jint repCount)
 {
@@ -751,6 +769,8 @@ static JNINativeMethod gMethods[] = {
             (void*)android_hardware_fmradio_FmReceiverJNI_setAnalogModeNative},
         { "SetCalibrationNative", "(I)I",
             (void*)android_hardware_fmradio_FmReceiverJNI_SetCalibrationNative},
+        { "configureSpurTable", "(I)I",
+            (void*)android_hardware_fmradio_FmReceiverJNI_configureSpurTable},
 
 };
 
