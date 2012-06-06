@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -222,4 +223,17 @@ public interface TelephonyProperties
      * Type: boolean ( true = alpha display enabled, false = alpha display disabled)
      */
     static final String PROPERTY_ALPHA_USRCNF = "persist.atel.noalpha.usrcnf";
+
+    /**
+     * Property to identify the baseband.
+     * Type: string (msm, sglte, apq )
+     */
+     static final String PROPERTY_BASEBAND = "ro.baseband";
+
+    /**
+     * Property to decide SgLte Modem Index
+     * Type: int ( 0 = local modem(MSM), 1 = remote modem(QSC))
+     * Default value 0.
+     */
+    static final String PROPERTY_VOICE_MODEM_INDEX = "persist.radio.voice.modem.index";
 }
