@@ -17,17 +17,24 @@
 
 package com.android.internal.telephony.cdma;
 
+import android.os.Message;
 import android.telephony.MSimTelephonyManager;
 import android.util.Log;
 
+import com.android.internal.telephony.DataConnectionTracker;
+import com.android.internal.telephony.MSimPhoneFactory;
+import com.android.internal.telephony.MSimProxyManager;
+import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.Subscription;
 import com.android.internal.telephony.UiccManager.AppFamily;
 import com.android.internal.telephony.UiccCardApplication;
-import com.android.internal.telephony.Subscription;
 
 /**
  * {@hide}
  */
 final class MSimCdmaServiceStateTracker extends CdmaServiceStateTracker {
+
+    protected static final int EVENT_ALL_DATA_DISCONNECTED = 1001;
 
     public MSimCdmaServiceStateTracker(CDMAPhone phone) {
         super(phone);
@@ -49,6 +56,76 @@ final class MSimCdmaServiceStateTracker extends CdmaServiceStateTracker {
     @Override
     protected String getSystemProperty(String property, String defValue) {
         return MSimTelephonyManager.getTelephonyProperty(property, ((MSimCDMAPhone)phone).getSubscription(), defValue);
+    }
+
+    /**
+     * Clean up existing voice and data connection then turn off radio power.
+     *
+     * Hang up the existing voice calls to decrease call drop rate.
+     */
+    @Override
+    public void powerOffRadioSafely(DataConnectionTracker dcTracker) {
+        synchronized (this) {
+            if (!mPendingRadioPowerOffAfterDataOff) {
+                int dds = MSimPhoneFactory.getDataSubscription();
+                // To minimize race conditions we call cleanUpAllConnections on
+                // both if else paths instead of before this isDisconnected test.
+                if (dcTracker.isDisconnected()
+                        && (dds == phone.getSubscription()
+                            || (dds != phone.getSubscription()
+                                && MSimProxyManager.getInstance().isDataDisconnected(dds)))) {
+                    // To minimize race conditions we do this after isDisconnected
+                    dcTracker.cleanUpAllConnections(Phone.REASON_RADIO_TURNED_OFF);
+                    if (DBG) log("Data disconnected, turn off radio right away.");
+                    hangupAndPowerOff();
+                } else {
+                    dcTracker.cleanUpAllConnections(Phone.REASON_RADIO_TURNED_OFF);
+                    if (dds != phone.getSubscription()
+                            && !MSimProxyManager.getInstance().isDataDisconnected(dds)) {
+                        if (DBG) log("Data is active on DDS.  Wait for all data disconnect");
+                        // Data is not disconnected on DDS. Wait for the data disconnect complete
+                        // before sending the RADIO_POWER off.
+                        MSimProxyManager.getInstance().registerForAllDataDisconnected(dds, this,
+                                EVENT_ALL_DATA_DISCONNECTED, null);
+                        mPendingRadioPowerOffAfterDataOff = true;
+                    }
+                    Message msg = Message.obtain(this);
+                    msg.what = EVENT_SET_RADIO_POWER_OFF;
+                    msg.arg1 = ++mPendingRadioPowerOffAfterDataOffTag;
+                    if (sendMessageDelayed(msg, 30000)) {
+                        if (DBG) log("Wait upto 30s for data to disconnect, then turn off radio.");
+                        mPendingRadioPowerOffAfterDataOff = true;
+                    } else {
+                        log("Cannot send delayed Msg, turn off radio right away.");
+                        hangupAndPowerOff();
+                        mPendingRadioPowerOffAfterDataOff = false;
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public void handleMessage(Message msg) {
+        switch (msg.what) {
+            case EVENT_ALL_DATA_DISCONNECTED:
+                int dds = MSimPhoneFactory.getDataSubscription();
+                MSimProxyManager.getInstance().unregisterForAllDataDisconnected(dds, this);
+                synchronized(this) {
+                    if (mPendingRadioPowerOffAfterDataOff) {
+                        if (DBG) log("EVENT_ALL_DATA_DISCONNECTED, turn radio off now.");
+                        hangupAndPowerOff();
+                        mPendingRadioPowerOffAfterDataOff = false;
+                    } else {
+                        log("EVENT_ALL_DATA_DISCONNECTED is stale");
+                    }
+                }
+                break;
+
+            default:
+                super.handleMessage(msg);
+                break;
+        }
     }
 
     @Override
