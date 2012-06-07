@@ -633,6 +633,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 	  }
 
 	  uint32_t entry_count = U32_AT(&buffer[4]);
+      int64_t timeUs = 0;
 
 	  if( version == 1 ){
 	    uint8_t buffer[8 + entry_count * 20];
@@ -653,8 +654,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
 	      if( media_time[i] == -1 ){
 		if( mvhdTimeScale != 0 ){
-		  int64_t editTime = ((int64_t)segment_duration[i] * 1000000 )/mvhdTimeScale;
+		  int64_t editTime = (int64_t)(segment_duration[i] * 1000000 )/mvhdTimeScale;
 		  mLastTrack->meta->setInt64( kKeyEditOffset, editTime );
+                            if (mLastTrack->meta->findInt64(kKeyDuration,&timeUs))
+                            {
+                                mLastTrack->meta->setInt64(kKeyDuration,(editTime + timeUs));
+                            }
 		}
 	      }
 	    }
@@ -683,8 +688,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
 	      if( media_time[i] == -1 ){
 		if( mvhdTimeScale != 0 ){
-		  int64_t editTime = ((int64_t)segment_duration[i] * 1000000 )/mvhdTimeScale;
+		  int64_t editTime = (int64_t)(segment_duration[i] * 1000000 )/mvhdTimeScale;
 		  mLastTrack->meta->setInt64( kKeyEditOffset, editTime );
+          if (mLastTrack->meta->findInt64(kKeyDuration,&timeUs))
+          {
+              mLastTrack->meta->setInt64(kKeyDuration,(editTime + timeUs));
+          }
 		}
 	      }
 	    }
@@ -747,6 +756,11 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             }
             mLastTrack->meta->setInt64(
                     kKeyDuration, (duration * 1000000) / mLastTrack->timescale);
+            int64_t timeUs = 0;
+            if (mLastTrack->meta->findInt64( kKeyEditOffset, &timeUs))
+            {
+                mLastTrack->meta->setInt64(kKeyDuration,(duration * 1000000) / mLastTrack->timescale + timeUs);
+            }
 
             *offset += chunk_size;
             break;
