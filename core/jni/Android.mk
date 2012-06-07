@@ -75,6 +75,7 @@ LOCAL_SRC_FILES:= \
 	android_net_NetUtils.cpp \
 	android_net_TrafficStats.cpp \
 	android_net_wifi_Wifi.cpp \
+	android_net_FeatureConfig.cpp \
 	android_nio_utils.cpp \
 	android_nfc_NdefMessage.cpp \
 	android_nfc_NdefRecord.cpp \
@@ -248,6 +249,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libharfbuzz \
 	libz \
 	libgesture_client \
+	libcnefeatureconfig \
 
 ifeq ($(TARGET_USES_TESTFRAMEWORK),true)
 	LOCAL_CFLAGS += -DCUSTOM_EVENTS_TESTFRAMEWORK
