@@ -3395,6 +3395,14 @@ public class WebView extends AbsoluteLayout
                 nativeSetPauseDrawing(mNativeClass, false);
             }
         }
+        if(mBrowserMgmtClassType != null) {
+            try {
+                mBrowserMgmtClassType.getMethod("ViewResumed",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                Log.e(LOGTAG, "method not found: ViewResumed " + e);
+            }
+        }
     }
 
     /**
