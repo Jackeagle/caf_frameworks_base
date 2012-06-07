@@ -367,6 +367,8 @@ private:
     AwesomePlayer &operator=(const AwesomePlayer &);
 
     bool isPostProcEnabled();
+
+    bool mIsLocalPlayback;
 };
 
 }  // namespace android
