@@ -98,7 +98,7 @@ public final class CdmaDataProfileTracker extends Handler {
     private int mOmhReadProfileCount = 0;
 
     private boolean mIsOmhEnabled =
-                SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, false);
+                SystemProperties.getBoolean(TelephonyProperties.PROPERTY_OMH_ENABLED, true);
 
     // Enumerated list of DataProfile from the modem.
     ArrayList<DataProfile> mOmhDataProfilesList = new ArrayList<DataProfile>();
@@ -359,10 +359,6 @@ public final class CdmaDataProfileTracker extends Handler {
      * Save the profile details received.
      */
     private void onGetDataCallProfileDone(AsyncResult ar, int context) {
-        if (ar.exception != null) {
-            log("OMH: Exception in onGetDataCallProfileDone:" + ar.exception);
-            return;
-        }
 
         if (context != mOmhReadProfileContext) {
             //we have other onReadOmhDataprofiles() on the way.
@@ -372,10 +368,16 @@ public final class CdmaDataProfileTracker extends Handler {
         // DataProfile list from the modem for a given SERVICE_TYPE. These may
         // be from RUIM in case of OMH
         ArrayList<DataProfile> dataProfileListModem = new ArrayList<DataProfile>();
-        dataProfileListModem = (ArrayList<DataProfile>)ar.result;
+        DataProfileTypeModem modemProfile = null;
 
-        DataProfileTypeModem modemProfile = (DataProfileTypeModem)ar.userObj;
-
+        if (ar.exception != null) {
+            log("OMH: Exception in onGetDataCallProfileDone:" + ar.exception);
+            dataProfileListModem = null;
+            modemProfile = null;
+        } else {
+            dataProfileListModem = (ArrayList<DataProfile>)ar.result;
+            modemProfile = (DataProfileTypeModem)ar.userObj;
+        }
         mOmhReadProfileCount--;
 
         if (dataProfileListModem != null && dataProfileListModem.size() > 0) {
