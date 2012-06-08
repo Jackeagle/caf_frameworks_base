@@ -3983,19 +3983,11 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     private synchronized String[] getRemoteGattServices(String address) {
-        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
-            return null;
-        }
-        return getGattServicesFromCache(address);
-    }
-
-   private String[] getGattServicesFromCache(String address) {
-       Log.d (TAG, "getGattServicesFromCache");
+        Log.d (TAG, "getRemoteGattServices");
 
         String value = mDeviceProperties.getProperty(address, "Services");
         if (value == null) {
-            Log.d(TAG, "getGattServicesFromCache: no services found");
+            Log.d(TAG, "getRemoteGattServicese: no services found");
             return null;
         }
 
@@ -4277,11 +4269,16 @@ public class BluetoothService extends IBluetooth.Stub {
         }
 
         if (!discovering) {
-            if (isRemoteDeviceInCache(address) && getRemoteGattServices(address) != null && findDeviceNative(address) != null) {
-                String value = mDeviceProperties.getProperty(address, "Services");
-                if (value == null) {
-                    Log.e(TAG, "No GATT based services were found on " + address);
-                    ret = false;
+            if (isRemoteDeviceInCache(address) && findDeviceNative(address) != null) {
+                if (getRemoteGattServices(address) == null) {
+                        Log.e(TAG, "No GATT based services were found on " + address);
+                        String devType = getDeviceProperties().getProperty(address, "Type");
+                        String path = getObjectPathFromAddress(address);
+                        if("LE".equals(devType)) {
+                            ret = discoverPrimaryServicesNative(path);
+                            delay = true;
+                        } else
+                            ret = false;
                 }
             } else {
                 Log.d(TAG, "Need to Create Remote Device" + address + " before accessing properties");
@@ -4930,6 +4927,7 @@ public class BluetoothService extends IBluetooth.Stub {
     native ParcelFileDescriptor getChannelFdNative(String channelPath);
     native boolean releaseChannelFdNative(String channelPath);
     native boolean setAuthorizationNative(String address, boolean value, int data);
+    native boolean discoverPrimaryServicesNative(String path);
     private native Object[] getGattServicePropertiesNative(String path);
     private native boolean discoverCharacteristicsNative(String path);
     private native boolean gattConnectNative(String path, int prohibitRemoteChg, int filterPolicy,
