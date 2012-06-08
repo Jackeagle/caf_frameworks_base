@@ -650,16 +650,15 @@ public class PhoneProxy extends Handler implements Phone {
         } else if (!mDesiredPowerState && mCi.getRadioState().isOn()) {
             Message powerOffMsg = obtainMessage(EVENT_SET_RADIO_POWER, mDesiredPowerState);
             // we want it off, but might need data to be disconnected.
-            // If this phone proxy corresponds to the DDS, then we need to disconnect
-            // the data before set the radio power off.  If this is non-DSDS, then
-            // send the message to itself to continue with the radio power off.
-            if (mPhoneSubscription == currentDds) {
-                logv("setPowerStateToDesired: DDS case: disconnect data");
-                mDct.setDataConnectionAsDesired(mDesiredPowerState, powerOffMsg);
-            } else {
-                logv("setPowerStateToDesired: non-DDS case: send message to self");
-                powerOffMsg.sendToTarget();
-            }
+            // Note: In case of DSDS, we need to ensure all the data connections are deactivated
+            // before sending the RADIO_POWER OFF request to the lower layers on any of the
+            // subscription.
+            // There is only one DCT(corresponds to the DDS) in case of DSDS and is shared by both
+            // the phone objects, so we can directly call the setDataConnectionAsDesired for both
+            // subs.  The powerOffMsg will be sent back once all the data connections are
+            // disconnected.
+            logv("setPowerStateToDesired: DDS case: disconnect data");
+            mDct.setDataConnectionAsDesired(mDesiredPowerState, powerOffMsg);
         }
     }
 
