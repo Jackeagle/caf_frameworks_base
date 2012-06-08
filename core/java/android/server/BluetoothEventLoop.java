@@ -536,6 +536,9 @@ class BluetoothEventLoop {
                           BluetoothDevice.BOND_NONE);
                 }
 
+                if (mBluetoothService.getBondState(address) == BluetoothDevice.BOND_NONE)
+                    mBluetoothService.clearRemoteDeviceGattServices(address);
+
                 intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
                 mBluetoothService.sendDeviceConnectionStateChange(
                     device, BluetoothAdapter.STATE_DISCONNECTED);
@@ -1171,11 +1174,18 @@ class BluetoothEventLoop {
         switch (result) {
         case CREATE_DEVICE_ALREADY_EXISTS:
             String path = mBluetoothService.getObjectPathFromAddress(address);
+            Log.d(TAG, "Device exists " + path);
             if (path != null) {
-                mBluetoothService.discoverServicesNative(path, "");
-                if (btDeviceClass == BluetoothClass.Device.PERIPHERAL_POINTING) {
-                    log("The device is HID pointing device,moving pairing state");
-                    mBluetoothService.setBondState(address, BluetoothDevice.BOND_BONDED);
+                Log.d(TAG, "Start service discovery " + path);
+                String devType = mBluetoothService.getUpdatedRemoteDeviceProperty(address, "Type");
+                if ((devType != null)  && "LE".equals(devType))
+                    mBluetoothService.discoverPrimaryServicesNative(path);
+                else {
+                    mBluetoothService.discoverServicesNative(path, "");
+                    if (btDeviceClass == BluetoothClass.Device.PERIPHERAL_POINTING) {
+                        log("The device is HID pointing device,moving pairing state");
+                        mBluetoothService.setBondState(address, BluetoothDevice.BOND_BONDED);
+                    }
                 }
                 break;
             }
