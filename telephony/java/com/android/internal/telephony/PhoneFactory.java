@@ -29,8 +29,8 @@ import android.os.SystemProperties;
 import com.android.internal.telephony.cdma.CDMALTEImsPhone;
 import com.android.internal.telephony.cdma.CDMAPhone;
 import com.android.internal.telephony.cdma.CDMALTEPhone;
-import com.android.internal.telephony.cdma.CdmaImsCallTracker;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
+import com.android.internal.telephony.gsm.GSMLTEImsPhone;
 import com.android.internal.telephony.gsm.GSMPhone;
 import com.android.internal.telephony.ims.RilImsPhone;
 import com.android.internal.telephony.sip.SipPhone;
@@ -151,29 +151,9 @@ public class PhoneFactory {
 
                 int phoneType = getPhoneType(networkMode);
                 if (phoneType == Phone.PHONE_TYPE_GSM) {
-                    Log.i(LOG_TAG, "Creating GSMPhone");
-                    sProxyPhone = new PhoneProxy(new GSMPhone(context,
-                            sCommandsInterface, sPhoneNotifier));
+                    sProxyPhone = getGsmPhone();
                 } else if (phoneType == Phone.PHONE_TYPE_CDMA) {
-                    switch (BaseCommands.getLteOnCdmaModeStatic()) {
-                        case Phone.LTE_ON_CDMA_TRUE:
-                            if (!PhoneFactory.isCallOnImsEnabled()) {
-                                Log.i(LOG_TAG, "Creating CDMALTEPhone");
-                                sProxyPhone = new PhoneProxy(new CDMALTEPhone(sContext,
-                                        sCommandsInterface, sPhoneNotifier));
-                            } else {
-                                Log.i(LOG_TAG, "Creating CDMALTEImsPhone");
-                                sProxyPhone = new PhoneProxy(new CDMALTEImsPhone(sContext,
-                                        sCommandsInterface, sPhoneNotifier));
-                            }
-                            break;
-                        case Phone.LTE_ON_CDMA_FALSE:
-                        default:
-                            Log.i(LOG_TAG, "Creating CDMAPhone");
-                            sProxyPhone = new PhoneProxy(new CDMAPhone(context,
-                                    sCommandsInterface, sPhoneNotifier));
-                            break;
-                    }
+                    sProxyPhone = getCdmaPhone();
                 }
 
                 sMadeDefaults = true;
@@ -257,8 +237,15 @@ public class PhoneFactory {
     }
 
     public static Phone getGsmPhone() {
+        Phone phone;
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            Phone phone = new GSMPhone(sContext, sCommandsInterface, sPhoneNotifier);
+            if (!PhoneFactory.isCallOnImsEnabled()) {
+                Log.i(LOG_TAG, "Creating GSMPhone");
+                phone = new GSMPhone(sContext, sCommandsInterface, sPhoneNotifier);
+            } else {
+                Log.i(LOG_TAG, "Creating GSMLTEImsPhone");
+                phone = new GSMLTEImsPhone(sContext, sCommandsInterface, sPhoneNotifier);
+            }
             return phone;
         }
     }

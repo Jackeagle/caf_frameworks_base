@@ -144,7 +144,6 @@ public class GSMPhone extends PhoneBase {
     public
     GSMPhone (Context context, CommandsInterface ci, PhoneNotifier notifier, boolean unitTestMode) {
         super(notifier, context, ci, unitTestMode);
-
         if (ci instanceof SimulatedRadioControl) {
             mSimulatedRadioControl = (SimulatedRadioControl) ci;
         }
@@ -152,8 +151,7 @@ public class GSMPhone extends PhoneBase {
         mUiccManager = UiccManager.getInstance();
         mUiccManager.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
         mCM.setPhoneType(Phone.PHONE_TYPE_GSM);
-        mCT = new GsmCallTracker(this);
-
+        setCallTracker();
         initSubscriptionSpecifics();
 
         if (!unitTestMode) {
@@ -203,6 +201,10 @@ public class GSMPhone extends PhoneBase {
             }
         }
         setProperties();
+    }
+
+    protected void setCallTracker() {
+        mCT = new GsmCallTracker(this);
     }
 
     protected void setProperties() {
@@ -588,7 +590,7 @@ public class GSMPhone extends PhoneBase {
                 } else {
                     if (LOCAL_DEBUG) Log.d(LOG_TAG,
                             "MmiCode 1: switchWaitingOrHoldingAndActive");
-                    mCT.switchWaitingOrHoldingAndActive();
+                    switchHoldingAndActive();
                 }
             }
         } catch (CallStateException e) {
@@ -640,7 +642,7 @@ public class GSMPhone extends PhoneBase {
                 } else {
                     if (LOCAL_DEBUG) Log.d(LOG_TAG,
                     "MmiCode 2: switchWaitingOrHoldingAndActive");
-                    mCT.switchWaitingOrHoldingAndActive();
+                    switchHoldingAndActive();
                 }
             } catch (CallStateException e) {
                 if (LOCAL_DEBUG) Log.d(LOG_TAG,

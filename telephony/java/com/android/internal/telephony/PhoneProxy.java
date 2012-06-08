@@ -132,15 +132,7 @@ public class PhoneProxy extends Handler implements Phone {
     public void updatePhoneObject(int newVoiceRadioTech) {
 
         if (mActivePhone != null) {
-            if (isImsOnLTE(newVoiceRadioTech)) {
-                if (mActivePhone.getPhoneType() == PHONE_TYPE_CDMA) {
-                    // Nothing changed. Keep phone as it is.
-                    logd("Ignoring voice radio technology changed message." +
-                            " newVoiceRadioTech = " + newVoiceRadioTech +
-                            " Active Phone = " + mActivePhone.getPhoneName());
-                    return;
-                }
-            } else if ((ServiceState.isCdma(newVoiceRadioTech) &&
+            if ((ServiceState.isCdma(newVoiceRadioTech) &&
                     mActivePhone.getPhoneType() == PHONE_TYPE_CDMA) ||
                     (ServiceState.isGsm(newVoiceRadioTech) &&
                             mActivePhone.getPhoneType() == PHONE_TYPE_GSM)) {
@@ -205,8 +197,7 @@ public class PhoneProxy extends Handler implements Phone {
         }
 
         logd("Switching Voice Phone : " + outgoingPhoneName + " >>> "
-                + (isImsOnLTE(newVoiceRadioTech) ? "CDMA"
-                        : (ServiceState.isGsm(newVoiceRadioTech) ? "GSM" : "CDMA")));
+                + (ServiceState.isGsm(newVoiceRadioTech) ? "GSM" : "CDMA"));
 
         if (oldPhone != null) {
             CallManager.getInstance().unregisterPhone(oldPhone);
@@ -235,28 +226,11 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     protected void createNewPhone(int newVoiceRadioTech) {
-        // Create a CDMA phone if the IMS is enabled and radio technology
-        // reported is LTE
-        if (isImsOnLTE(newVoiceRadioTech)) {
-            mActivePhone = PhoneFactory.getCdmaPhone();
-        } else if (ServiceState.isCdma(newVoiceRadioTech)) {
+        if (ServiceState.isCdma(newVoiceRadioTech)) {
             mActivePhone = PhoneFactory.getCdmaPhone();
         } else if (ServiceState.isGsm(newVoiceRadioTech)) {
             mActivePhone = PhoneFactory.getGsmPhone();
         }
-    }
-
-    /**
-     * Return true if the new radio technology is LTE and the IMS is enabled.
-     * IMS on LTE should create CDMALTEImsPhone and not GsmPhone. This should not
-     * be needed when we support IMS with GSM as well.
-     *
-     * @param newVoiceRadioTech
-     * @return
-     */
-    private boolean isImsOnLTE(int newVoiceRadioTech) {
-        return ((newVoiceRadioTech == ServiceState.RADIO_TECHNOLOGY_LTE)
-                && (PhoneFactory.isCallOnImsEnabled()));
     }
 
     public ServiceState getServiceState() {
