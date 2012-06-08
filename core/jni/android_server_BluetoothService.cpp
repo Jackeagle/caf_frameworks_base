@@ -1690,6 +1690,36 @@ static jstring registerHealthApplicationNative(JNIEnv *env, jobject object,
     return path;
 }
 
+static jboolean discoverPrimaryServicesNative(JNIEnv *env, jobject object,
+                                jstring path) {
+    LOGV("%s", __FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+    if (nat && eventLoopNat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        DBusError err;
+
+        dbus_error_init(&err);
+
+        DBusMessage *reply = dbus_func_args(env, nat->conn,
+                           c_path,
+                           DBUS_DEVICE_IFACE, "LeDiscoverPrimaryServices",
+                           DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+        if (!reply) {
+            if (dbus_error_is_set(&err))
+                LOG_AND_FREE_DBUS_ERROR(&err);
+            return JNI_FALSE;
+        }
+        return JNI_TRUE;
+     }
+#endif
+       return JNI_FALSE;
+}
+
 static jobjectArray getGattServersNative(JNIEnv *env, jobject object) {
     LOGE("%s", __FUNCTION__);
     jobjectArray strArray = NULL;
@@ -3299,6 +3329,7 @@ static JNINativeMethod sMethods[] = {
               (void *)getChannelApplicationNative},
     {"getChannelFdNative", "(Ljava/lang/String;)Landroid/os/ParcelFileDescriptor;", (void *)getChannelFdNative},
     {"releaseChannelFdNative", "(Ljava/lang/String;)Z", (void *)releaseChannelFdNative},
+    {"discoverPrimaryServicesNative", "(Ljava/lang/String;)Z", (void *)discoverPrimaryServicesNative},
     {"getGattServicePropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getGattServicePropertiesNative},
     {"discoverCharacteristicsNative", "(Ljava/lang/String;)Z", (void*)discoverCharacteristicsNative},
     {"gattConnectCancelNative", "(Ljava/lang/String;)Z", (void *)gattConnectCancelNative},
