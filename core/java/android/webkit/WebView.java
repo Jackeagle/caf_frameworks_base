@@ -687,10 +687,10 @@ public class WebView extends AbsoluteLayout
     private boolean mHardwareAccelSkia = false;
 
     // BrowserMgmt Plugin Handlers
-    private Class mBrowserMgmtClassType=null;
-    private Object mBrowserMgmtInst=null;
-    private Class[] args_types = null;
-    private Context[] args_val = null;
+    static private Class mBrowserMgmtClassType=null;
+    static private Object mBrowserMgmtInst=null;
+    static private Class[] args_types = null;
+    static private Context[] args_val = null;
     private boolean mFirstPaint = true;
     private final String BrowserMgmtPluginName=
         "/system/framework/browsermanagement.jar";
@@ -1137,31 +1137,33 @@ public class WebView extends AbsoluteLayout
 
     private void setupBrowserMgmtPlugin(Context context) {
 
-        try {
-            dalvik.system.PathClassLoader pluginClassLoader =
-                new dalvik.system.PathClassLoader(
-                    BrowserMgmtPluginName,ClassLoader.getSystemClassLoader());
+        if (mBrowserMgmtInst == null) {
+            //allocate mem only first time - since they are declared static
             try {
+                dalvik.system.PathClassLoader pluginClassLoader =
+                new dalvik.system.PathClassLoader(
+                BrowserMgmtPluginName,ClassLoader.getSystemClassLoader());
                 mBrowserMgmtClassType =
-                    pluginClassLoader.loadClass(BrowserMgmtClassName);
+                        pluginClassLoader.loadClass(BrowserMgmtClassName);
                 mBrowserMgmtInst = mBrowserMgmtClassType.newInstance();
                 args_types = new Class[1];
                 args_val = new Context[1];
                 args_types[0] = Context.class;
-                args_val[0] = context;
-
-                try {
-                    mBrowserMgmtClassType.getMethod("Init",args_types).
-                    invoke(mBrowserMgmtInst,(Object)args_val[0]);
-                } catch (Throwable e) {
-                    Log.e(LOGTAG, "method not found: Init " + e);
-                }
+                Log.d(LOGTAG, "BrowserMgmt First Instance  ");
             } catch (Throwable e) {
                 Log.e(LOGTAG, "BrowserMgmt Instance failed " + e);
             }
-       } catch (Throwable el) {
-            Log.e(LOGTAG, "browsermanagement jar not loaded "+el);
-       }
+            args_val[0] = context;
+
+            try {
+                mBrowserMgmtClassType.getMethod("Init",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                Log.e(LOGTAG, "method not found: Init " + e);
+            }
+        } else {
+                Log.d(LOGTAG, "BrowserMgmt Instance already available ");
+        }
     }
 
     private static class ProxyReceiver extends BroadcastReceiver {
