@@ -81,7 +81,6 @@ public abstract class CallTracker extends Handler {
     protected static final int EVENT_CALL_WAITING_INFO_CDMA        = 15;
     protected static final int EVENT_THREE_WAY_DIAL_L2_RESULT_CDMA = 16;
     protected static final int EVENT_MODIFY_CALL                   = 17;
-    protected static final int EVENT_SWITCH_RESULT_IMS             = 18;
 
     public abstract void acceptCall() throws CallStateException;
     public abstract void rejectCall() throws CallStateException;
@@ -267,9 +266,9 @@ public abstract class CallTracker extends Handler {
                 "rejectCall with PhoneBase is not supported in this CallTracker");
     }
 
-    public void switchWaitingOrHoldingAndActiveIms() throws CallStateException{
+    public void switchWaitingOrHoldingAndActive(PhoneBase phone) throws CallStateException{
         throw new CallStateException(
-                "switchWaitingOrHoldingAndActiveIms is not supported in this CallTracker");
+                "switchWaitingOrHoldingAndActive with phone not supported in CallTracker");
     }
 
     public void createImsCalls() {
@@ -280,6 +279,7 @@ public abstract class CallTracker extends Handler {
     clearDisconnected(PhoneBase phone) {
         log("clearDisconnected with phone is not supported in this CallTracker"+this);
     }
+
     public void modifyCallInitiate(Message msg, CallModify callModify) throws CallStateException {
         throw new CallStateException(
                 "modifyCallInitiate is not supported in this CallTracker");
@@ -288,5 +288,14 @@ public abstract class CallTracker extends Handler {
     public void modifyCallConfirm(Message msg, CallModify callModify) throws CallStateException {
         throw new CallStateException(
                 "modifyCallConfirm is not supported in this CallTracker");
+    }
+
+    public boolean canConference(PhoneBase phone) {
+        log("canConference with phone is not supported in this CallTracker"+this);
+        return false;
+    }
+
+    public void conference(PhoneBase phone) throws CallStateException {
+        log("conference with phone is not supported in this CallTracker" + this);
     }
 }
