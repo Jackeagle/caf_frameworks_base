@@ -262,7 +262,8 @@ status_t MPQAudioPlayer::start(bool sourceAlreadyStarted) {
 
     int sessionId = 1;
     if((!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_MPEG)) ||
-        (!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_WMA))) {
+        (!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_WMA)) ||
+        (!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_DTS))) {
         LOGD("TUNNEL_SESSION_ID");
         sessionId = TUNNEL_SESSION_ID;
     }
@@ -1368,11 +1369,11 @@ status_t MPQAudioPlayer::getDecoderAndFormat() {
         if(version==kTypeWMAPro || version==kTypeWMALossLess)
             mAudioFormat = AUDIO_FORMAT_WMA_PRO;
     }
-    /*else if(!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_DTS)) {
+    else if(!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_DTS)) {
         LOGE("### Hw Decoder - DTS");
         mAudioFormat = AUDIO_FORMAT_DTS;
         mDecoderType = EHardwareDecoder;
-    }*/
+    }
     else if(!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_MPEG)) {
         LOGW("Hw Decoder - MP3");
         mAudioFormat = AUDIO_FORMAT_MP3;
