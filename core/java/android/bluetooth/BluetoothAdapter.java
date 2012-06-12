@@ -351,6 +351,7 @@ public final class BluetoothAdapter {
     /** @hide */ public static final int HOST_PATCH_DONT_REMOVE_SERVICE = 1;
     /** @hide */ public static final int HOST_PATCH_AVOID_CONNECT_ON_PAIR = 2;
     /** @hide */ public static final int HOST_PATCH_AVOID_AUTO_CONNECT = 3;
+    /** @hide */ public static final int HOST_PATCH_ENABLE_PHOTO_ON_PBAP = 4;
 
     /**
      * Lazily initialized singleton. Guaranteed final after first object
