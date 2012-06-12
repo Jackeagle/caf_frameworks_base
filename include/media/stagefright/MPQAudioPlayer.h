@@ -246,17 +246,11 @@ private:
 
     status_t getDecoderAndFormat();
 
-    status_t seekSoftwareDecoderPlayback();
-    status_t seekHardwareDecoderPlayback();
-    status_t seekMS11DecoderPlayback();
+    status_t seekPlayback();
 
-    status_t pauseSoftwareDecoderPlayback();
-    status_t pauseHardwareDecoderPlayback();
-    status_t pauseMS11DecoderPlayback();
+    status_t pausePlayback(bool bIgnorePendingSamples);
 
-    status_t resumeSoftwareDecoderPlayback();
-    status_t resumeHardwareDecoderPlayback();
-    status_t resumeMS11DecoderPlayback();
+    status_t resumePlayback(int sessionId, bool bIgnorePendingSamples);
 
     size_t fillBufferfromSoftwareDecoder(void *data, size_t size);
     size_t fillBufferfromParser(void *data, size_t size);

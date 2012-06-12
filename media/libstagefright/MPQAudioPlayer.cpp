@@ -317,85 +317,32 @@ status_t MPQAudioPlayer::seekTo(int64_t time_us) {
     mSeeking = true;
     mSeekTimeUs = time_us;
 
-    switch(mDecoderType) {
-
-        case ESoftwareDecoder:
-            err = seekSoftwareDecoderPlayback();
-        break;
-
-
-        case EMS11Decoder:
-            err = seekMS11DecoderPlayback();
-        break;
-
-        case EHardwareDecoder:
-            err = seekHardwareDecoderPlayback();
-        break;
-        default:
-           LOGE("Invalid Decoder Type - postEOS ");
-        //TODO: Post EOS
-        return BAD_VALUE;
-    }
+    err = seekPlayback();
 
     if(err)
         LOGE("seek returned error = %d",err);
     return err;
 }
 
-status_t MPQAudioPlayer::seekSoftwareDecoderPlayback() {
-
-    status_t err = OK;
-    mPositionTimeRealUs = mPositionTimeMediaUs = -1;
-    mNumFramesPlayed = 0;
-    mTimePaused = 0;
-    //Flush not called.
-    //Currently play the buffer
-    err = mPCMStream->flush(mPCMStream);
-    if(err != OK) {
-        LOGE("flush returned error =%d",err);
-        return err;
-    }
-    mExtractorCv.signal();
-    return err;
-}
-
-
-status_t MPQAudioPlayer::seekMS11DecoderPlayback() {
+status_t MPQAudioPlayer::seekPlayback() {
 
     status_t err = OK;
     //Just give the buffer from new location
     mPositionTimeRealUs = mPositionTimeMediaUs = -1;
     mNumFramesPlayed = 0;
     mTimePaused = 0;
-    if(!mIsAACFormatAdif) {
-        err = mPCMStream->flush(mPCMStream);
-        if(err != OK) {
-            LOGE("flush returned error =%d",err);
-            return err;
+    if (mStarted) {
+        if(!mIsAACFormatAdif) {
+            err = mPCMStream->flush(mPCMStream);
+            if(err != OK) {
+                LOGE("flush returned error =%d",err);
+                return err;
+            }
+            if (!mIsPaused)
+                mExtractorCv.signal();
         }
-        mExtractorCv.signal();
     }
     return OK;
-}
-
-status_t MPQAudioPlayer::seekHardwareDecoderPlayback() {
-
-    status_t err = OK;
-    mInternalSeeking = false;
-    mPositionTimeRealUs = mPositionTimeMediaUs = -1;
-    mTimePaused = 0;
-    LOGV("In seekHardwareDecoderPlayback mSeekTimeUs %lld",mSeekTimeUs);
-
-    if (mStarted) {
-        err = mPCMStream->flush(mPCMStream);
-         if(err != OK) {
-             LOGE("flush returned error =%d",err);
-             return err;
-         }
-         if (!mIsPaused)
-            mExtractorCv.signal();
-    }
-    return err;
 }
 
 void MPQAudioPlayer::pause(bool playPendingSamples) {
@@ -407,19 +354,28 @@ void MPQAudioPlayer::pause(bool playPendingSamples) {
     LOGD("Pause: playPendingSamples %d", playPendingSamples);
     mPlayPendingSamples = playPendingSamples;
     mIsPaused = true;
-
+    bool bIgnorePendingSamples = false;
     switch(mDecoderType) {
 
         case ESoftwareDecoder:
-            err = pauseSoftwareDecoderPlayback();
+            if(mAudioSink->getSessionId()) {
+                err = pausePlayback(bIgnorePendingSamples);
+                CHECK(mSource != NULL);
+                if ((mSource->pause()) == OK)
+                    mSourcePaused = true;
+            }
         break;
 
         case EMS11Decoder:
-            err = pauseMS11DecoderPlayback();
+            err = pausePlayback(bIgnorePendingSamples);
         break;
 
         case EHardwareDecoder:
-            err = pauseHardwareDecoderPlayback();
+            mTimeout  = -1;
+            bIgnorePendingSamples = true;
+            err = pausePlayback(bIgnorePendingSamples);
+            if (mAudioSink.get() != NULL)
+                mAudioSink->pauseSession();
         break;
 
         default:
@@ -437,41 +393,12 @@ void MPQAudioPlayer::pause(bool playPendingSamples) {
     }
 }
 
-status_t MPQAudioPlayer::pauseSoftwareDecoderPlayback() {
-
-    status_t err = OK;
-    if(!mAudioSink->getSessionId())
-        return err;
-
-    CHECK(mPCMStream);
-    if (mPlayPendingSamples) {
-        //should call stop ideally
-        //No pausing the driver. Allow the playback
-        mNumFramesPlayed = 0;
-    }
-    else {
-        err = mPCMStream->pause(mPCMStream);
-        if(err != OK) {
-            LOGE("Pause returned error =%d",err);
-            return err;
-        }
-    }
-
-    CHECK(mSource != NULL);
-    if ((mSource->pause()) == OK) {
-        mSourcePaused = true;
-    }
-    mTimePaused = mSeekTimeUs + mPositionTimeMediaUs;
-
-    return err;
-}
-
-status_t MPQAudioPlayer::pauseMS11DecoderPlayback() {
+status_t MPQAudioPlayer::pausePlayback(bool bIgnorePendingSamples) {
 
     status_t err = OK;
     CHECK(mPCMStream);
 
-    if (mPlayPendingSamples) {
+    if (mPlayPendingSamples && !bIgnorePendingSamples) {
         //Should be stop ideally
         //No pausing the driver. Allow the playback
         //err = mPCMStream->pause(mPCMStream);
@@ -490,38 +417,6 @@ status_t MPQAudioPlayer::pauseMS11DecoderPlayback() {
 }
 
 
-status_t MPQAudioPlayer::pauseHardwareDecoderPlayback() {
-
-    status_t err = OK;
-    mTimeout  = -1;
-
-    if (mPlayPendingSamples) {
-        err = mPCMStream->pause(mPCMStream);
-        if(err != OK) {
-            LOGE("Pause returned error =%d",err);
-            return err;
-        }
-        //TODO : Add time out if needed.Check tunnel Player
-        if (mAudioSink.get() != NULL)
-            mAudioSink->pauseSession();
-
-        mTimePaused = mSeekTimeUs + getAudioTimeStampUs();
-    }
-    else {
-        LOGV("MPQAudioPlayer::Pause - Pause driver");
-        err = mPCMStream->pause(mPCMStream);
-        if(err != OK) {
-            LOGE("Pause returned error =%d",err);
-            return err;
-        }
-        if (mAudioSink.get() != NULL) {
-               mAudioSink->pauseSession();
-        }
-        mTimePaused = mSeekTimeUs + getAudioTimeStampUs();
-    }
-    return err;
-}
-
 void MPQAudioPlayer::resume() {
 
     Mutex::Autolock autoLock(mLock);
@@ -531,18 +426,31 @@ void MPQAudioPlayer::resume() {
 
     LOGD("Resume: mIsPaused %d",mIsPaused);
 
+    if (!mIsPaused)
+        return;
+
+    CHECK(mStarted);
+
+    bool bIgnorePendingSamples = false;
     switch(mDecoderType) {
 
         case ESoftwareDecoder:
-            err = resumeSoftwareDecoderPlayback();
+            if(mAudioSink->getSessionId()) {
+                err = resumePlayback(MPQ_AUDIO_SESSION_ID, bIgnorePendingSamples);
+                if(mSourcePaused)
+                    mSource->start();
+            }
         break;
 
         case EMS11Decoder:
-            err = resumeMS11DecoderPlayback();
+            err = resumePlayback(MPQ_AUDIO_SESSION_ID, bIgnorePendingSamples);
         break;
 
         case EHardwareDecoder:
-            err = resumeHardwareDecoderPlayback();
+            bIgnorePendingSamples = true;
+            err = resumePlayback(TUNNEL_SESSION_ID, bIgnorePendingSamples);
+            if (mAudioSink.get() != NULL)
+                mAudioSink->resumeSession();
         break;
 
         default:
@@ -565,111 +473,35 @@ void MPQAudioPlayer::resume() {
 
 }
 
-status_t MPQAudioPlayer::resumeSoftwareDecoderPlayback() {
+status_t MPQAudioPlayer::resumePlayback(int sessionId, bool bIgnorePendingSamples) {
 
     status_t err = OK;
 
-    if(!mAudioSink->getSessionId())
-        return err;
-
-    if(mIsPaused) {
-        if (!mIsAudioRouted) {
-            LOGV("Opening a session for MPQ Audio playback - Software Decoder");
-            status_t err = mAudioSink->openSession(mAudioFormat,
-                    MPQ_AUDIO_SESSION_ID, mSampleRate, mNumChannels);
-            if(err != OK) {
-                LOGE("openSession - resume = %d",err);
-                return err;
-            }
-            acquireWakeLock();
-            mIsAudioRouted = true;
-            mPCMStream = mAudioFlinger->getOutputSession();
-        }
-        CHECK(mPCMStream);
-        if(mPCMStream) {
-            err = mPCMStream->resume(mPCMStream);
-            if(err != OK && !mPlayPendingSamples) {
-                LOGE("resume PCM stream err = %d", err);
-                return err;
-            }
-        }
-        else {
-            LOGE("Invalide PCM stream");
-            err = BAD_VALUE;
-        }
-        if(mSourcePaused)
-            mSource->start();
-    }
-
-    return err;
-}
-
-status_t MPQAudioPlayer::resumeMS11DecoderPlayback() {
-
-    status_t err = OK;
-
-    if(mIsPaused) {
-        if (!mIsAudioRouted) {
-            LOGV("Opening a session for MPQ Audio playback - Software Decoder");
-            status_t err = mAudioSink->openSession(mAudioFormat,
-                    MPQ_AUDIO_SESSION_ID, mSampleRate, mNumChannels);
-            if(err != OK) {
-                LOGE("openSession - resume = %d",err);
-                return err;
-            }
-            acquireWakeLock();
-            mIsAudioRouted = true;
-            mPCMStream = mAudioFlinger->getOutputSession();
-        }
-
-        CHECK(mPCMStream);
-        if(mPCMStream) {
-            err = mPCMStream->resume(mPCMStream);
-            if(err != OK && !mPlayPendingSamples) {
-                LOGE("resume PCM stream err = %d", err);
-                return err;
-            }
-        }
-        else {
-            LOGE("Invalide PCM stream");
-            err = BAD_VALUE;
-        }
-    }
-    return err;
-
-}
-status_t MPQAudioPlayer::resumeHardwareDecoderPlayback() {
-    LOGD("Resume: mIsPaused %d",mIsPaused);
-
-    status_t err = OK;
-
-    if (mIsPaused) {
-        CHECK(mStarted);
-        LOGV("MPQ Audio Player::resume - Resuming Driver");
-            release_wake_lock("MPQ_AUDIO_LOCK");
-        if (!mIsAudioRouted) {
-            LOGV("Opening a session for MPQ Audio playback");
-            status_t err = mAudioSink->openSession(mAudioFormat, TUNNEL_SESSION_ID,
-                     mSampleRate, mNumChannels);
-            if(err != OK) {
-                LOGE("openSession - resume = %d",err);
-                return err;
-            }
-            acquireWakeLock();
-            mIsAudioRouted = true;
-        }
-        LOGV("Attempting Sync resume\n");
-        // check for internal seeking
-            err = mPCMStream->resume(mPCMStream);
-        if (err != OK) {
-            LOGE("AUDIO Resume failed = %d", err);
+    if (!mIsAudioRouted) {
+        LOGV("Opening a session for MPQ Audio playback - Software Decoder");
+        status_t err = mAudioSink->openSession(mAudioFormat, sessionId,
+                                   mSampleRate, mNumChannels);
+        if(err != OK) {
+            LOGE("openSession - resume = %d",err);
             return err;
         }
-        LOGV("Sync resume done\n");
-        if (mAudioSink.get() != NULL) {
-            mAudioSink->resumeSession();
-        }
+        acquireWakeLock();
+        mIsAudioRouted = true;
+        mPCMStream = mAudioFlinger->getOutputSession();
     }
+
+    CHECK(mPCMStream);
+    if(mPCMStream) {
+        err = mPCMStream->resume(mPCMStream);
+        if(err != OK && (!mPlayPendingSamples || bIgnorePendingSamples)) {
+            LOGE("resume PCM stream err = %d", err);
+            return err;
+        }
+    } else {
+        LOGE("Invalide PCM stream");
+        err = BAD_VALUE;
+    }
+
     return err;
 }
 
@@ -904,38 +736,16 @@ void MPQAudioPlayer::postEOS(int64_t delayUs) {
 
 void MPQAudioPlayer::bufferAlloc(int32_t nSize) {
 
-    switch (mDecoderType) {
-        case EHardwareDecoder:
-        case ESoftwareDecoder:
-            mLocalBuf = malloc(nSize);
-            if (NULL == mLocalBuf)
-                LOGE("Allocate Buffer for Software decoder failed ");
-        break;
-        case EMS11Decoder:
-            mLocalBuf = malloc(AAC_AC3_BUFFER_SIZE);
-            if (NULL == mLocalBuf)
-                LOGE("Allocate Buffer for MS11  decoder failed ");
-        break;
-        default:
-        break;
-   }
+    mLocalBuf = malloc(nSize);
+    if (NULL == mLocalBuf)
+        LOGE("Allocate Buffer for Software decoder failed ");
 }
 
 void MPQAudioPlayer::bufferDeAlloc() {
 
-    //Remove all the buffers from request queue
-    switch (mDecoderType) {
-
-        case EHardwareDecoder:
-        case ESoftwareDecoder:
-        case EMS11Decoder:
-            if(mLocalBuf) {
-                free(mLocalBuf);
-                mLocalBuf = NULL;
-            }
-        break;
-        default:
-        break;
+    if(mLocalBuf) {
+        free(mLocalBuf);
+        mLocalBuf = NULL;
     }
 }
 
