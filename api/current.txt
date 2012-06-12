@@ -9502,6 +9502,7 @@ package android.hardware {
     method public boolean isAutoExposureLockSupported();
     method public boolean isAutoWhiteBalanceLockSupported();
     method public boolean isPowerModeSupported();
+    method public boolean isSingleOutputEnabled();
     method public boolean isSmoothZoomSupported();
     method public boolean isVideoSnapshotSupported();
     method public boolean isVideoStabilizationSupported();
