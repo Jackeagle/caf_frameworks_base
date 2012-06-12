@@ -520,7 +520,6 @@ public abstract class DataConnection extends StateMachine {
         mPartialSuccess = false;
         mPendingProtocol = null;
         mApn = null;
-        resetRetryCount();
     }
 
     /**
@@ -1133,6 +1132,7 @@ public abstract class DataConnection extends StateMachine {
                 if (VDBG) log("DcActiveState: enter notifyConnectCompleted");
                 notifyConnectCompleted(mConnectionParams, mFailCause);
             }
+            resetRetryCount();
         }
 
         @Override
