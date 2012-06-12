@@ -1653,8 +1653,19 @@ status_t AwesomePlayer::initAudioDecoder() {
             (!isFormatAdif) &&
             ((!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG)) ||
             (!strcasecmp(mime,MEDIA_MIMETYPE_AUDIO_AAC)))) {
-        LOGI("Tunnel Mode Audio Enabled");
-        mIsTunnelAudio = true;
+
+        if(mVideoSource != NULL) {
+           char tunnelAVDecode[128];
+           property_get("tunnel.audiovideo.decode",tunnelAVDecode,"0");
+           if(((strncmp("true", tunnelAVDecode, 4) == 0)||(atoi(tunnelAVDecode)))) {
+               LOGD("Enable Tunnel Mode for A-V playback");
+               mIsTunnelAudio = true;
+           }
+        }
+        else {
+            LOGI("Tunnel Mode Audio Enabled");
+            mIsTunnelAudio = true;
+        }
     }
     else
        LOGE("Normal Audio Playback");
