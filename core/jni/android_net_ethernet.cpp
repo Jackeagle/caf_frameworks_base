@@ -347,9 +347,9 @@ namespace android {
         LOGI("User ask for device name on %d, list:%X, total:%d",
              index, (unsigned int)interfaces, total_int);
         info = interfaces;
-        if (total_int != 0 && index <= (total_int - 1)) {
+	  if (total_int != 0 && (total_int - index - 1) <= (total_int - 1)) {
             while (info) {
-                if (index == i) {
+		if ((total_int - index - 1) == i) {
                     LOGV("Found: %s", info->name);
                     return env->NewStringUTF(info->name);
                 }
