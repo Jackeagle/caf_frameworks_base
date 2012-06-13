@@ -662,7 +662,8 @@ void MPQAudioPlayer::extractorThreadEntry() {
                 ssize_t bytesWritten = 0;
                 if(mAudioFormat == AUDIO_FORMAT_AC3 ||
                             mAudioFormat == AUDIO_FORMAT_AAC ||
-                            mAudioFormat == AUDIO_FORMAT_AAC_ADIF) {
+                            mAudioFormat == AUDIO_FORMAT_AAC_ADIF ||
+                            mAudioFormat == AUDIO_FORMAT_EAC3) {
                     bytesWritten = mPCMStream->write(
                             mPCMStream, mLocalBuf, bytesToWrite);
                 }
@@ -1320,6 +1321,11 @@ status_t MPQAudioPlayer::getDecoderAndFormat() {
         LOGW("MS11 AC3");
        mDecoderType = EMS11Decoder;
        mAudioFormat = AUDIO_FORMAT_AC3;
+    }
+	else if (!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_EAC3)) {
+        LOGW("MS11 EAC3");
+       mDecoderType = EMS11Decoder;
+       mAudioFormat = AUDIO_FORMAT_EAC3;
     }
     else if (!strcasecmp(mMimeType.string(), MEDIA_MIMETYPE_AUDIO_AAC)) {
         LOGW("MS11 AAC");

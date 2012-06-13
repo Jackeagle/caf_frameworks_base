@@ -1649,7 +1649,8 @@ status_t AwesomePlayer::initAudioDecoder() {
                     !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC3) ||
                     !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC) ||
                     !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_WMA) ||
-                    !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_DTS)) {
+                    !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_DTS) ||
+                    !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_EAC3)) {
                 LOGI("Tunnel Mode in MPQ Audio Player");
                 mIsMPQTunnelAudio = true;
             }
