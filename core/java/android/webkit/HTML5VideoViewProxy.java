@@ -190,6 +190,9 @@ class HTML5VideoViewProxy extends Handler
                 // Here, we handle the case when we keep playing with one video
                 if (!mHTML5VideoView.isPlaying()) {
                     mHTML5VideoView.start();
+                    if (mBaseLayer != 0) {
+                        setBaseLayer(mBaseLayer);
+                    }
                 }
             }
         }
