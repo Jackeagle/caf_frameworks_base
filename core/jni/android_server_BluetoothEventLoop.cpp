@@ -44,6 +44,9 @@ namespace android {
 #define SAP_UUID "0000112D-0000-1000-8000-00805F9B34FB"
 #define DUN_UUID "00001103-0000-1000-8000-00805F9B34FB"
 
+/* Following macro definition is aligned with that defined in BlueZ */
+#define MAX_PATH_LENGTH 64
+
 #ifdef HAVE_BLUETOOTH
 static jfieldID field_mNativeData;
 
@@ -450,6 +453,7 @@ const char * get_adapter_path(DBusConnection *conn) {
     DBusMessage *msg = NULL, *reply = NULL;
     DBusError err;
     const char *device_path = NULL;
+    static char device_path_cp[MAX_PATH_LENGTH];
     int attempt = 0;
 
     for (attempt = 0; attempt < 1000 && reply == NULL; attempt ++) {
@@ -493,11 +497,15 @@ const char * get_adapter_path(DBusConnection *conn) {
         }
         goto failed;
     }
+    strncpy(device_path_cp, device_path, sizeof(device_path_cp));
     dbus_message_unref(msg);
-    return device_path;
+    dbus_message_unref(reply);
+    return device_path_cp;
 
 failed:
     dbus_message_unref(msg);
+    if (reply)
+       dbus_message_unref(reply);
     return NULL;
 }
 
