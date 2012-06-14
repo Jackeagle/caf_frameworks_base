@@ -91,6 +91,8 @@ import com.android.internal.util.State;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.connectivity.Tethering;
 import com.android.server.connectivity.Vpn;
+import com.android.server.PowerManagerService;
+import com.android.server.AlarmManagerService;
 
 import com.google.android.collect.Lists;
 import com.google.android.collect.Sets;
@@ -147,6 +149,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private boolean mTetheringConfigValid = false;
 
     private Vpn mVpn;
+
+    private PowerManagerService mPowerMgrSvc;
+    private AlarmManagerService mAlarmMgrSvc;
 
     /** Lock around {@link #mUidRules} and {@link #mMeteredIfaces}. */
     private Object mRulesLock = new Object();
@@ -3248,6 +3253,21 @@ private NetworkStateTracker makeWimaxStateTracker() {
         if (VDBG) log("requestQoS(aport)");
         if (mCneStarted == false) return false;
         return mLinkManager.requestQoS(id, localPort, localAddress);
+    }
+
+    public void updateBlockedUids(int uid, boolean isBlocked) {
+        try {
+            mAlarmMgrSvc = (AlarmManagerService)ServiceManager.getService(Context.ALARM_SERVICE);
+            mAlarmMgrSvc.updateBlockedUids(uid,isBlocked);
+        } catch (NullPointerException e) {
+            log("Could Not Update blocked Uids with alarmManager" + e);
+        }
+        try {
+            mPowerMgrSvc = (PowerManagerService)ServiceManager.getService(Context.POWER_SERVICE);
+            mPowerMgrSvc.updateBlockedUids(uid,isBlocked);
+        } catch (NullPointerException e) {
+            log("Could Not Update blocked Uids with powerManager" + e);
+        }
     }
 
     /**
