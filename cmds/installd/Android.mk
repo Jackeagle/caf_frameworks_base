@@ -14,7 +14,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_MODULE := libinstalld
 
-LOCAL_MODULE_TAGS := eng tests
+LOCAL_MODULE_TAGS := debug tests
 
 include $(BUILD_STATIC_LIBRARY)
 

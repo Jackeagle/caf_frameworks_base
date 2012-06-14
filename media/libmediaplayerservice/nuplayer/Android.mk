@@ -20,7 +20,7 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_MODULE:= libstagefright_nuplayer
 
-LOCAL_MODULE_TAGS := eng
+LOCAL_MODULE_TAGS := debug
 
 include $(BUILD_STATIC_LIBRARY)
 
