@@ -171,7 +171,12 @@ void AnotherPacketSource::queueAccessUnit(const sp<ABuffer> &buffer) {
 
     Mutex::Autolock autoLock(mLock);
     mBuffers.push_back(buffer);
+    LOGV("@@@@:: AnotherPacketSource --> size is %d ",mBuffers.size() );
     mCondition.signal();
+}
+
+int AnotherPacketSource::getQueueSize() {
+    return mBuffers.size();
 }
 
 void AnotherPacketSource::queueDiscontinuity(
