@@ -40,6 +40,7 @@ import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.UiccManager.AppFamily;
 import static com.android.internal.telephony.Phone.CDMA_SUBSCRIPTION_NV;
 
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_APN_SIM_OPERATOR_NUMERIC;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
@@ -100,6 +101,8 @@ public class MSimIccCardProxy extends IccCardProxy {
                     if (operator != null) {
                         MSimTelephonyManager.setTelephonyProperty
                                 (PROPERTY_ICC_OPERATOR_NUMERIC, sub, operator);
+                        MSimTelephonyManager.setTelephonyProperty
+                                (PROPERTY_APN_SIM_OPERATOR_NUMERIC, sub, operator);
                     } else {
                         loge("EVENT_RECORDS_LOADED Operator name is null");
                     }
