@@ -19,6 +19,7 @@ package com.android.internal.telephony.gsm;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_APN_SIM_OPERATOR_NUMERIC;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_EONS_ENABLED;
 import android.content.Context;
 import android.os.AsyncResult;
@@ -1290,6 +1291,8 @@ public class SIMRecords extends IccRecords {
         // Some fields require more than one SIM record to set
 
         setSystemProperty(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
+        setSystemProperty(PROPERTY_APN_SIM_OPERATOR_NUMERIC, operator);
+
 
         if (mImsi != null) {
             setSystemProperty(PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
