@@ -19,6 +19,7 @@ package com.android.internal.telephony.uicc;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_APN_SIM_OPERATOR_NUMERIC;
 import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Handler;
@@ -1254,6 +1255,7 @@ public class SIMRecords extends IccRecords {
         log("SIMRecords: onAllRecordsLoaded set 'gsm.sim.operator.numeric' to operator='" +
                 operator + "'");
         SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
+        SystemProperties.set(PROPERTY_APN_SIM_OPERATOR_NUMERIC, operator);
 
         if (imsi != null) {
             SystemProperties.set(PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
