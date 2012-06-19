@@ -276,8 +276,9 @@ void LayerBase::validateVisibility(const Transform& planeTransform)
             int wRatio = getLayer()->getPARWidth();
             int hRatio = getLayer()->getPARHeight();
             if (needsAspectRatio(wRatio, hRatio)) {
+                bool wideVideo = (w > h) ? true : false;
                 applyPixelAspectRatio (wRatio, hRatio, mOrientation, hw.getWidth(),
-                                       hw_h, mTransformedBounds, mVertices);
+                                   hw_h, mTransformedBounds, mVertices, wideVideo);
             }
         }
     }
