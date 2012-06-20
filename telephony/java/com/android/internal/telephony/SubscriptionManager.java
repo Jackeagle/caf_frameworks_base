@@ -450,6 +450,7 @@ public class SubscriptionManager extends Handler {
                     // Set mQueuedDds so that when the set data sub src is done, it will
                     // update the system property and enable the data connectivity.
                     mQueuedDds = mCurrentDds;
+                    mDisableDdsInProgress = true;
                     Message msgSetDdsDone = Message.obtain(this, EVENT_SET_DATA_SUBSCRIPTION_DONE,
                             new Integer(mCurrentDds));
                     // Set Data Subscription preference at RIL
@@ -660,6 +661,7 @@ public class SubscriptionManager extends Handler {
                     mQueuedDds = activeSub.subId;
                     Message callback = Message.obtain(this, EVENT_SET_DATA_SUBSCRIPTION_DONE,
                             Integer.toString(activeSub.subId));
+                    mDisableDdsInProgress = true;
                     logd("update setDataSubscription to " + activeSub.subId);
                     mCi[activeSub.subId].setDataSubscription(callback);
                     mSetDdsRequired = false;
