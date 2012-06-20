@@ -566,7 +566,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     case BluetoothA2dp.STATE_PLAYING:
                         disconnectSinkNative(mBluetoothService.getObjectPathFromAddress(
                                 device.getAddress()));
-                        handleSinkStateChange(device, state, BluetoothA2dp.STATE_DISCONNECTED);
+                        handleSinkStateChange(device, state,
+                                              BluetoothA2dp.STATE_DISCONNECTING);
                         break;
                     case BluetoothA2dp.STATE_DISCONNECTING:
                         handleSinkStateChange(device, BluetoothA2dp.STATE_DISCONNECTING,
