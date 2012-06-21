@@ -109,9 +109,6 @@ class HTML5VideoViewProxy extends Handler
         private HTML5VideoView mHTML5VideoView;
 
         private boolean isVideoSelfEnded = false;
-        // By using the baseLayer and the current video Layer ID, we can
-        // identify the exact layer on the UI thread to use the SurfaceTexture.
-        private int mBaseLayer = 0;
 
         private void setPlayerBuffering(boolean playerBuffering) {
             mHTML5VideoView.setPlayerBuffering(playerBuffering);
@@ -123,16 +120,21 @@ class HTML5VideoViewProxy extends Handler
 
         // Every time webView setBaseLayer, this will be called.
         // When we found the Video layer, then we set the Surface Texture to it.
+        // By using the baseLayer and the current video Layer ID, we can
+        // identify the exact layer on the UI thread to use the SurfaceTexture.
+        // We should never save the base layer handle since its lifetime is not
+        // guaranteed outside of the function call from WebView::setBaseLayer.
+        //
+        // This function allows layer value to be null. If layer is null, only
+        // the player state will be set in native code. This allows the proxy to
+        // save the player state in the native video layer.
         public void setBaseLayer(int layer) {
-            // Don't do this for full screen mode.
             if (mHTML5VideoView != null) {
-                mBaseLayer = layer;
-
                 int currentVideoLayerId = mHTML5VideoView.getVideoLayerId();
                 SurfaceTexture surfTexture = mHTML5VideoView.getSurfaceTexture();
                 int textureName = mHTML5VideoView.getTextureName();
 
-                if (layer != 0 && surfTexture != null && currentVideoLayerId != -1) {
+                if (surfTexture != null && currentVideoLayerId != -1) {
                     int playerState = mHTML5VideoView.getCurrentState();
                     if (mHTML5VideoView.getPlayerBuffering())
                         playerState = HTML5VideoView.STATE_BUFFERING;
@@ -190,9 +192,7 @@ class HTML5VideoViewProxy extends Handler
                 // Here, we handle the case when we keep playing with one video
                 if (!mHTML5VideoView.isPlaying()) {
                     mHTML5VideoView.start();
-                    if (mBaseLayer != 0) {
-                        setBaseLayer(mBaseLayer);
-                    }
+                    setBaseLayer(0);
                 }
             }
         }
@@ -226,9 +226,7 @@ class HTML5VideoViewProxy extends Handler
                 mHTML5VideoView.setVolume(mCachedVolume);
                 mCachedVolume = -1.0f;
             }
-            if (mBaseLayer != 0) {
-                setBaseLayer(mBaseLayer);
-            }
+            setBaseLayer(0);
         }
 
         public void end() {
