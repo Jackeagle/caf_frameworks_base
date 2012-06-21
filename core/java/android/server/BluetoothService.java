@@ -193,7 +193,7 @@ public class BluetoothService extends IBluetooth.Stub {
         IBinder binder;
         IBinder.DeathRecipient death;
     }
-    private final HashMap<Integer, ServiceRecordClient> mServiceRecordToPid;
+    private final ConcurrentHashMap<Integer, ServiceRecordClient> mServiceRecordToPid;
 
     private final HashMap<String, BluetoothDeviceProfileState> mDeviceProfileState;
     private final BluetoothProfileState mA2dpProfileState;
@@ -383,12 +383,12 @@ public class BluetoothService extends IBluetooth.Stub {
         mDeviceOobData = new HashMap<String, Pair<byte[], byte[]>>();
         mDeviceL2capPsmCache = new HashMap<String, Map<ParcelUuid, Integer>>();
         mUuidIntentTracker = new ArrayList<String>();
+        mServiceRecordToPid = new ConcurrentHashMap<Integer, ServiceRecordClient>();
         mUuidCallbackTracker = new ConcurrentHashMap<RemoteService, IBluetoothCallback>();
         mGattIntentTracker = new HashMap<String, ArrayList<ParcelUuid>>();
         mGattServiceTracker = new HashMap<String, IBluetoothGattService>();
         mGattWatcherTracker = new HashMap<String, IBluetoothGattService>();
         mGattServices = new TreeMap<String, Integer>();
-        mServiceRecordToPid = new HashMap<Integer, ServiceRecordClient>();
         mDeviceProfileState = new HashMap<String, BluetoothDeviceProfileState>();
         mA2dpProfileState = new BluetoothProfileState(mContext, BluetoothProfileState.A2DP);
         mHfpProfileState = new BluetoothProfileState(mContext, BluetoothProfileState.HFP);
@@ -656,7 +656,8 @@ public class BluetoothService extends IBluetooth.Stub {
         mAdapterProperties.clear();
 
         for (Integer srHandle : mServiceRecordToPid.keySet()) {
-            removeServiceRecordNative(srHandle);
+            Integer pid = mServiceRecordToPid.get(srHandle).pid;
+            checkAndRemoveRecord(srHandle, pid);
         }
         mServiceRecordToPid.clear();
 
