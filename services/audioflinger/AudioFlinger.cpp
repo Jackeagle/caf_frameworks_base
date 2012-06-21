@@ -6700,7 +6700,8 @@ AudioFlinger::EffectModule::EffectModule(const wp<ThreadBase>& wThread,
                                         int id,
                                         int sessionId)
     : mThread(wThread), mChain(chain), mId(id), mSessionId(sessionId), mEffectInterface(NULL),
-      mStatus(NO_INIT), mState(IDLE), mSuspended(false), mIsForLPA(false)
+      mStatus(NO_INIT), mState(IDLE), mSuspended(false), mIsForLPA(false), mSampleRate(0),
+      mChannelCount(0), mFrameCount(0)
 {
     LOGV("Constructor %p", this);
     int lStatus;
@@ -6961,7 +6962,9 @@ status_t AudioFlinger::EffectModule::configure(bool isForLPA, int sampleRate, in
 
     // TODO: handle configuration of effects replacing track process
     mIsForLPA = isForLPA;
+
     if(isForLPA) {
+        mChannelCount = channelCount;
         if (channelCount == 1) {
             channels = AUDIO_CHANNEL_OUT_MONO;
         } else {
@@ -6969,6 +6972,7 @@ status_t AudioFlinger::EffectModule::configure(bool isForLPA, int sampleRate, in
         }
         LOGV("%s: LPA ON - channels %d", __func__, channels);
     } else {
+        mChannelCount = thread->channelCount();
         if (thread->channelCount() == 1) {
             channels = AUDIO_CHANNEL_OUT_MONO;
         } else {
@@ -6990,6 +6994,7 @@ status_t AudioFlinger::EffectModule::configure(bool isForLPA, int sampleRate, in
     } else {
         mConfig.inputCfg.samplingRate = thread->sampleRate();
     }
+    mSampleRate = mConfig.inputCfg.samplingRate;
     mConfig.outputCfg.samplingRate = mConfig.inputCfg.samplingRate;
     mConfig.inputCfg.bufferProvider.cookie = NULL;
     mConfig.inputCfg.bufferProvider.getBuffer = NULL;
@@ -7020,6 +7025,7 @@ status_t AudioFlinger::EffectModule::configure(bool isForLPA, int sampleRate, in
     } else {
         mConfig.inputCfg.buffer.frameCount = thread->frameCount();
     }
+    mFrameCount = mConfig.inputCfg.buffer.frameCount;
     mConfig.outputCfg.buffer.frameCount = mConfig.inputCfg.buffer.frameCount;
 
     LOGV("configure() %p thread %p buffer %p framecount %d",
@@ -7991,7 +7997,12 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect)
             } else {
                 if (i == size - 1 && i != 0) {
                     mEffects[i - 1]->setOutBuffer(mOutBuffer);
-                    mEffects[i - 1]->configure();
+                    if (mEffects[i - 1]->isOnLPA())
+                        mEffects[i - 1]->configure(true, mEffects[i - 1]->sampleRate(),
+                                                   mEffects[i - 1]->channelCount(),
+                                                   mEffects[i - 1]->frameCount());
+                    else
+                        mEffects[i - 1]->configure();
                 }
             }
             mEffects.removeAt(i);

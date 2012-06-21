@@ -1165,6 +1165,9 @@ private:
         void             unPin() { mPinned = false; }
 
         bool             isOnLPA() { return mIsForLPA;}
+        int              sampleRate() { return mSampleRate;}
+        int              channelCount() { return mChannelCount;}
+        int              frameCount() { return mFrameCount;}
         void             setLPAFlag(bool isForLPA) {mIsForLPA = isForLPA; }
 
         status_t         dump(int fd, const Vector<String16>& args);
@@ -1199,6 +1202,9 @@ private:
         uint32_t mDisableWaitCnt;       // current process() calls count during disable period.
         bool     mSuspended;            // effect is suspended: temporarily disabled by framework
         bool     mIsForLPA;
+        int      mSampleRate;
+        int      mChannelCount;
+        int      mFrameCount;
     };
 
     // The EffectHandle class implements the IEffect interface. It provides resources
