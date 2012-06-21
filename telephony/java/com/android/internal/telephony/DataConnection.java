@@ -1819,6 +1819,11 @@ public abstract class DataConnection extends StateMachine {
         try {
             int qosId = Integer.parseInt(qosInd[0]);
 
+            if (!mQosFlowIds.contains(qosId)) {
+                log("Unknown QoS ID, Ignoring Indication");
+                return;
+            }
+
             ind.setQosId(qosId);
 
             // Converting RIL's definition of QoS state into the one defined in QosSpec
