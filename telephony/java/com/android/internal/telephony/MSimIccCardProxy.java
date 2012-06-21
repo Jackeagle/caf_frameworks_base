@@ -94,8 +94,8 @@ public class MSimIccCardProxy extends IccCardProxy {
                 break;
 
             case EVENT_RECORDS_LOADED:
-                if ((mCurrentAppType == AppFamily.APP_FAM_3GPP) && (mIccRecords != null)) {
-                    String operator = ((SIMRecords)mIccRecords).getOperatorNumeric();
+                if (mIccRecords != null) {
+                    String operator = mIccRecords.getOperatorNumeric();
                     int sub = (mSubscriptionData != null) ? mSubscriptionData.subId : 0;
                     if (operator != null) {
                         MSimTelephonyManager.setTelephonyProperty
@@ -103,7 +103,7 @@ public class MSimIccCardProxy extends IccCardProxy {
                     } else {
                         loge("EVENT_RECORDS_LOADED Operator name is null");
                     }
-                    String countryCode = ((SIMRecords)mIccRecords).getCountryCode();
+                    String countryCode = operator.substring(0,3);
                     if (countryCode != null) {
                         MSimTelephonyManager.setTelephonyProperty
                                 (PROPERTY_ICC_OPERATOR_ISO_COUNTRY, sub,
