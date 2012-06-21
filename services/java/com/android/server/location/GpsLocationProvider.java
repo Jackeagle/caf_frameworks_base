@@ -1033,7 +1033,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (minTime >= 0) {
             mFixInterval = (int)minTime;
 
-            if (mGpsStarted && hasCapability(GPS_CAPABILITY_SCHEDULING)) {
+            if (mGpsStarted && hasCapability(GPS_CAPABILITY_SCHEDULING) &&
+               (!hasCapability(LocationProviderInterface.ULP_CAPABILITY))) {
                 if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
                         mFixInterval, 0, 0)) {
                     Log.e(TAG, "set_position_mode failed in setMinTime()");
