@@ -69,6 +69,7 @@ int PostProcNativeWindow::postProc_dequeueBuffer(ANativeWindowBuffer** buffer)
 
 int PostProcNativeWindow::postProc_perform(int operation, ...)
 {
+    Mutex::Autolock lock(mLock);
     LOGV("%s:  begin", __func__);
 
     int res = NO_ERROR;
@@ -407,13 +408,16 @@ int PostProcNativeWindow::handleCancelBuffer(ANativeWindowBuffer* buffer, bool p
 
     int err = 0;
     if (postProc) {
-        CHECK(mInPostProcMode);
-        err = mNativeWindow->cancelBuffer(mNativeWindow.get(), buffer);
-        if (err < 0) {
-            LOGE("Warning cancel normal buffer failed\n");
+        if(mInPostProcMode) {
+            err = mNativeWindow->cancelBuffer(mNativeWindow.get(), buffer);
+            if (err < 0) {
+                LOGE("Warning cancel normal buffer failed\n");
+            }
+            LOGV("Cancelling buffer (%p)\n", buffer->handle);
+            callDequeueBuffer();
+        } else {
+            mFreePostProcBuffers.push_back(buffer);
         }
-        LOGV("Cancelling buffer (%p)\n", buffer->handle);
-        callDequeueBuffer();
         return err;
     }
 
