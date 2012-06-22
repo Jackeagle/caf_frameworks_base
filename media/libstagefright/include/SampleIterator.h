@@ -22,6 +22,7 @@ struct SampleTable;
 
 struct SampleIterator {
     SampleIterator(SampleTable *table);
+    ~SampleIterator();
 
     status_t seekTo(uint32_t sampleIndex);
 
@@ -32,6 +33,9 @@ struct SampleIterator {
     uint64_t getSampleTime() const { return mCurrentSampleTime; }
 
     status_t getSampleSizeDirect(
+            uint32_t sampleIndex, size_t *size);
+
+    status_t getSampleSizeCached(
             uint32_t sampleIndex, size_t *size);
 
 private:
@@ -61,6 +65,10 @@ private:
     off64_t mCurrentSampleOffset;
     size_t mCurrentSampleSize;
     uint64_t mCurrentSampleTime;
+
+    char *mSSTableBuffer;
+    uint32_t mSSTBStart;
+    uint32_t mSSTBEnd;
 
     void reset();
     status_t findChunkRange(uint32_t sampleIndex);
