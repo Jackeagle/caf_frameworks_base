@@ -92,7 +92,10 @@ status_t StagefrightPlayer::start() {
 
 status_t StagefrightPlayer::stop() {
     LOGV("stop");
-
+    int is_mpq = 0;
+    IS_TARGET_MPQ(is_mpq);
+    if(is_mpq)
+        return reset();
     return pause();  // what's the difference?
 }
 
