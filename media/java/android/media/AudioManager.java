@@ -1161,7 +1161,8 @@ public class AudioManager {
      */
     public void setInCallMode(int state) {
         IAudioService service = getService();
-        if (((state & CS_ACTIVE) != 0) && ((state & IMS_ACTIVE) != 0)) {
+        if (((state & CS_ACTIVE) != 0) && ((state & CS_ACTIVE_SESSION2) != 0) &&
+            ((state & IMS_ACTIVE) != 0)) {
               Log.e(TAG, "Invalid call state for CS & VoLTE");
               return;
         }
@@ -1231,6 +1232,19 @@ public class AudioManager {
      * @hide Mode for CS hold.
      */
     public static final int CS_HOLD               = AudioSystem.CS_HOLD;
+    /**
+     * @hide Mode for CS Session2 inactive.
+     */
+    public static final int CS_INACTIVE_SESSION2  = AudioSystem.CS_INACTIVE_SESSION2;
+    /**
+     * @hide Mode for CS Session2 active.
+     */
+    public static final int CS_ACTIVE_SESSION2    = AudioSystem.CS_ACTIVE_SESSION2;
+    /**
+     * @hide Mode for CS Session2 hold.
+     */
+    public static final int CS_HOLD_SESSION2      = AudioSystem.CS_HOLD_SESSION2;
+
     /**
      * @hide Mode for IMS inactive.
      */
