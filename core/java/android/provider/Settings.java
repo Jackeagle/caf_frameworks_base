@@ -1718,24 +1718,28 @@ public final class Settings {
         /**
           * Subscription to be used for voice call on a multi sim device. The supported values
           * are 0 = SUB1, 1 = SUB2.
+          * @hide
           */
         public static final String MULTI_SIM_VOICE_CALL_SUBSCRIPTION = "multi_sim_voice_call";
 
         /**
           * Used to provide option to user to select subscription during dial.
           * The value is 0 or 1.
+          * @hide
           */
         public static final String MULTI_SIM_VOICE_PROMPT = "multi_sim_voice_prompt";
 
         /**
           * Subscription to be used for data call on a multi sim device. The supported values
           * are 0 = SUB1, 1 = SUB2.
+          * @hide
           */
         public static final String MULTI_SIM_DATA_CALL_SUBSCRIPTION = "multi_sim_data_call";
 
         /**
           * Subscription to be used for SMS on a multi sim device. The supported values
           * are 0 = SUB1, 1 = SUB2.
+          * @hide
           */
         public static final String MULTI_SIM_SMS_SUBSCRIPTION = "multi_sim_sms";
 
@@ -2375,6 +2379,7 @@ public final class Settings {
          * name can't be found or the setting value is not an integer.
          *
          * @return The value at the given index of settings.
+         * @hide
          */
         public static int getIntAtIndex(ContentResolver cr, String name, int index)
                 throws SettingNotFoundException {
@@ -2422,6 +2427,7 @@ public final class Settings {
          * @param index The index of the list
          * @param value The new value for the setting to be added to the list.
          * @return true if the value was set, false on database errors
+         * @hide
          */
         public static boolean putIntAtIndex(ContentResolver cr, String name, int index, int value) {
             String data = "";

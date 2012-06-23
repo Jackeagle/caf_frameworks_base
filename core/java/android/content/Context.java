@@ -1688,6 +1688,7 @@ public abstract class Context {
      *
      * @see #getSystemService
      * @see android.telephony.MSimTelephonyManager
+     * @hide
      */
     public static final String MSIM_TELEPHONY_SERVICE = "phone_msim";
 
