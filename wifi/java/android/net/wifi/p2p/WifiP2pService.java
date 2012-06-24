@@ -121,6 +121,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
     public static boolean mIsWifiP2pEnabled = false;
 
+    private int startChannel = 0;
+
+    private int endChannel = 0;
+
     private static final int BASE = Protocol.BASE_WIFI_P2P_SERVICE;
 
     /* Message sent to WifiStateMachine to indicate p2p enable is pending */
@@ -227,6 +231,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
                     int startSafeChannel = intent.getIntExtra("start_safe_channel", -1);
                     int endSafeChannel = intent.getIntExtra("end_safe_channel", -1);
+                    startChannel = startSafeChannel;
+                    endChannel = endSafeChannel;
+                    Slog.d(TAG, "startChannel" + startChannel);
+                    Slog.d(TAG, "endChannel" + endSafeChannel);
 
                     if ((mIsWifiP2pEnabled) && (mP2pStateMachine.mWifiP2pInfo.groupFormed)) {
                         int currentChannel = 0;
@@ -958,11 +966,21 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     break;
                 case WifiP2pManager.CREATE_GROUP:
                     mPersistGroup = true;
-                    if (WifiNative.p2pGroupAdd()) {
-                        replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
-                    } else {
-                        replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
+                    Slog.d(TAG, "startChannel while creating P2P Group=" + startChannel);
+                    if (startChannel!=0){
+                        if (WifiNative.p2pGroupAddOnSpecifiedFreq(channelToFrequency(startChannel))) {
+                            replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
+                        } else {
+                             replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
                                 WifiP2pManager.ERROR);
+                        }
+                    } else {
+                         if (WifiNative.p2pGroupAdd()) {
+                             replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
+                         } else {
+                              replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
+                                WifiP2pManager.ERROR);
+                         }
                     }
                     transitionTo(mGroupNegotiationState);
                     break;
