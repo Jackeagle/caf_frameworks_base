@@ -116,6 +116,11 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     private static final int P2P_RESTART_TRIES = 5;
 
     private int mP2pRestartCount = 0;
+    /*
+     *@hide
+     */
+    private int mP2pPdNotify = 0;
+
 
     private String mInvitedDeviceAddress;
 
@@ -1023,6 +1028,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             switch (message.what) {
                 case WifiMonitor.P2P_GO_NEGOTIATION_REQUEST_EVENT:
                 case WifiMonitor.P2P_INVITATION_RECEIVED_EVENT:
+                case WifiMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT:
+                case WifiMonitor.P2P_PROV_DISC_ENTER_PIN_EVENT:
                     //Ignore additional connection requests
                     break;
                 case GROUP_NEGOTIATION_USER_ACCEPT:
@@ -1272,13 +1279,25 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                      sendP2pPeersChangedBroadcast();
                     break;
                 case WifiMonitor.P2P_PROV_DISC_PBC_REQ_EVENT:
-                    notifyP2pProvDiscPbcRequest((WifiP2pDevice) message.obj);
+                    if (mP2pPdNotify == 0)
+                    {
+                        mP2pPdNotify =1;
+                        notifyP2pProvDiscPbcRequest((WifiP2pDevice) message.obj);
+                    }
                     break;
                 case WifiMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT:
-                    notifyP2pProvDiscShowPinRequest((WifiP2pDevice) message.obj);
+                    if (mP2pPdNotify == 0)
+                    {
+                        mP2pPdNotify =1;
+                        notifyP2pProvDiscShowPinRequest((WifiP2pDevice) message.obj);
+                    }
                     break;
                 case WifiMonitor.P2P_PROV_DISC_ENTER_PIN_EVENT:
-                    notifyP2pProvDiscEnterPinRequest((WifiP2pDevice) message.obj);
+                    if (mP2pPdNotify == 0)
+                    {
+                        mP2pPdNotify =1;
+                        notifyP2pProvDiscEnterPinRequest((WifiP2pDevice) message.obj);
+                    }
                     break;
                 case WifiMonitor.P2P_GROUP_STARTED_EVENT:
                     Slog.e(TAG, "Duplicate group creation event notice, ignore");
@@ -1482,9 +1501,17 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         public void onClick(DialogInterface dialog, int which) {
                                 if (DBG) logd(getName() + " wps_pbc");
                                 sendMessage(WPS_PBC);
+                                if (mP2pPdNotify == 1)
+                                    mP2pPdNotify =0;
                         }
                     })
-            .setNegativeButton(r.getString(R.string.cancel), null)
+            .setNegativeButton(r.getString(R.string.cancel), new OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                        if (mP2pPdNotify ==1)
+                            mP2pPdNotify =0;
+                        }
+                    })
             .setCancelable(false)
             .create();
 
@@ -1514,6 +1541,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (mWifiP2pInfo.groupFormed){
                         if (DBG) logd(getName() + " wps_pin");
                         sendMessage(WPS_PIN, tempPin);
+                        if (mP2pPdNotify ==1)
+                            mP2pPdNotify =0;
                     } else {
                             WifiNative.p2pConnectDisplay(tempDevAddress, tempPin, join);
                          }
@@ -1522,7 +1551,13 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             .setNegativeButton(r.getString(R.string.cancel), new OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
+                        if (mWifiP2pInfo.groupFormed){
+                            if (mP2pPdNotify ==1)
+                                mP2pPdNotify =0;
+                        }
+                        else {
                             transitionTo(mInactiveState);
+                        }
                         }
                     })
             .setCancelable(false)
@@ -1551,6 +1586,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         if (DBG) logd(getName() + " wps_pin");
                         if (mWifiP2pInfo.groupFormed){
                             sendMessage(WPS_PIN, pin.getText().toString());
+                            if (mP2pPdNotify ==1)
+                                mP2pPdNotify =0;
                         }
                         else {
                             WifiNative.p2pConnectKeypad(tempDeviceAddress, pin.getText().toString(), join);
@@ -1560,7 +1597,13 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
              .setNegativeButton(r.getString(R.string.cancel), new OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                        transitionTo(mInactiveState);
+                        if (mWifiP2pInfo.groupFormed){
+                            if (mP2pPdNotify ==1)
+                                mP2pPdNotify =0;
+                        }
+                        else {
+                            transitionTo(mInactiveState);
+                        }
                         }
                     })
 
