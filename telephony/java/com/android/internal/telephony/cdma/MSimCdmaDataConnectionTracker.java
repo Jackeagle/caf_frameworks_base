@@ -247,22 +247,18 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
         onSetInternalDataEnabled(enable, null);
     }
 
-    protected void onSetInternalDataEnabled(boolean enable, Message onCompleteMsg) {
-        log("onSetInternalDataEnabled");
-        boolean prevEnabled = getAnyDataEnabled();
+    protected void onSetInternalDataEnabled(boolean enabled, Message onCompleteMsg) {
         boolean sendOnComplete = true;
-        if (mInternalDataEnabled != enable) {
-            synchronized (this) {
-                mInternalDataEnabled = enable;
-            }
-            if (prevEnabled != getAnyDataEnabled()) {
+        synchronized (mDataEnabledLock) {
+            mInternalDataEnabled = enabled;
+            if (enabled) {
+                log("onSetInternalDataEnabled: changed to enabled, try to setup data call");
+                resetAllRetryCounts();
+                onTrySetupData(Phone.REASON_DATA_ENABLED, false);
+            } else {
                 sendOnComplete = false;
-                if (!prevEnabled) {
-                    resetAllRetryCounts();
-                    onTrySetupData(Phone.REASON_DATA_ENABLED, false);
-                } else {
-                    cleanUpAllConnections(null, onCompleteMsg);
-                }
+                log("onSetInternalDataEnabled: changed to disabled, cleanUpAllConnections");
+                cleanUpAllConnections(null, onCompleteMsg);
             }
         }
 
