@@ -402,4 +402,14 @@ interface INetworkManagementService
     */
     void setChannelRange(int startchannel, int endchannel, int band);
 
+    /**
+     * get SAP Current Operating Channel
+    */
+    int getSapOperatingChannel();
+
+    /**
+     * get SAP Auto Channel Selection
+    */
+    int getSapAutoChannelSelection();
+
 }

@@ -1281,6 +1281,59 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         }
     }
 
+
+     public int getSapOperatingChannel() throws IllegalStateException{
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
+        mContext.enforceCallingOrSelfPermission(
+            android.Manifest.permission.CHANGE_WIFI_STATE, "NetworkManagementService");
+        int channel=0;
+        try {
+            ArrayList<String> OperChanResp;
+            Slog.d(TAG, "getSapOperatingChannel");
+            OperChanResp = mConnector.doCommand("softap qccmd get channel");
+            Slog.d(TAG, "getSapOperatingChannel--OperChanResp" + OperChanResp);
+            for (String line : OperChanResp) {
+               Slog.d(TAG, "Parsing the response");
+               String[] tok = line.split(" ");
+               String[] tok1 = tok[2].split("=");
+               Slog.d(TAG, "softap qccmd get channel tok1[1]" + tok1[1]);
+               channel =  Integer.parseInt(tok1[1]);
+           }
+            Slog.d(TAG, "softap qccmd get channel =" + channel);
+            return channel;
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException("Error communicating to native daemon to getSapOperatingChannel",
+                    e);
+        }
+    }
+
+    public int getSapAutoChannelSelection() throws IllegalStateException{
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
+        mContext.enforceCallingOrSelfPermission(
+            android.Manifest.permission.CHANGE_WIFI_STATE, "NetworkManagementService");
+        int autochannel=0;
+        try {
+            ArrayList<String> OperChanResp;
+            Slog.d(TAG, "getSapAutoChannelSelection");
+            OperChanResp = mConnector.doCommand("softap qccmd get autochannel");
+            Slog.d(TAG, "getSapAutoChannelSelection--OperChanResp" + OperChanResp);
+            for (String line : OperChanResp) {
+               Slog.d(TAG, "Parsing the response");
+               String[] tok = line.split(" ");
+               String[] tok1 = tok[2].split("=");
+               Slog.d(TAG, "softap qccmd get channel tok1[1]" + tok1[1]);
+               autochannel =  Integer.parseInt(tok1[1]);
+           }
+            Slog.d(TAG, "softap qccmd get autochannel =" + autochannel);
+            return autochannel;
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException("Error communicating to native daemon to getSapOperatingChannel",
+                    e);
+        }
+    }
+
     public void setAccessPoint(WifiConfiguration wifiConfig, String wlanIface, String softapIface)
             throws IllegalStateException {
         mContext.enforceCallingOrSelfPermission(
