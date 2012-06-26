@@ -30,7 +30,7 @@ c_includes := \
     external/gtest/include \
     external/stlport/stlport
 
-module_tags := eng tests
+module_tags := debug tests
 
 $(foreach file,$(test_src_files), \
     $(eval include $(CLEAR_VARS)) \
