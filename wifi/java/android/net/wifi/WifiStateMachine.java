@@ -653,20 +653,31 @@ public class WifiStateMachine extends StateMachine {
 
                   if (intent.getAction().equals(
                             TelephonyIntents.ACTION_SAFE_WIFI_CHANNELS_CHANGED)) {
-                            int currentChannel = intent.getIntExtra("current_channel", -1);
                             int startSafeChannel = intent.getIntExtra("start_safe_channel", -1);
                             int endSafeChannel = intent.getIntExtra("end_safe_channel", -1);
+                            startChannel = startSafeChannel;
+                            endChannel = endSafeChannel;
                             Log.e(TAG, "Received WIFI_CHANNELS_CHANGED broadcast--WifiStateMachine");
-                            if (currentChannel >= 0 &&
-                                (currentChannel < startSafeChannel ||
-                                 currentChannel > endSafeChannel)){
 
-                                 startChannel = startSafeChannel;
-                                 endChannel = endSafeChannel;
+                            int state = syncGetWifiApState();
+                            Log.e(TAG, "Restarting soft ap if needed. WifiAp state is " + state);
+                            if (state == WIFI_AP_STATE_ENABLED) {
 
-                                Log.e(TAG, "Operating on restricted channel. Restarting softAp--wifiStateMachine");
-                                restartSoftApIfOn();
-                            }
+                                 int autochannel = getSapAutoChannelSelection();
+                                 if (1 == autochannel){
+                                      int currentChannel = getSapOperatingChannel();
+
+                                     if (currentChannel >= 0 &&
+                                         (currentChannel < startSafeChannel ||
+                                         currentChannel > endSafeChannel)){
+
+
+                                         Log.e(TAG, "Operating on restricted channel. Restarting softAp--wifiStateMachine");
+                                         restartSoftApIfOn();
+                                     }
+                                 }
+                             }
+
                         }
                 }
             },new IntentFilter(TelephonyIntents.ACTION_SAFE_WIFI_CHANNELS_CHANGED));
@@ -819,6 +830,32 @@ public class WifiStateMachine extends StateMachine {
               mNwService.setChannelRange(startchannel, endchannel, band);
            } catch(Exception e) {
              loge("Exception in setChannelRange");
+           }
+    }
+
+    /**
+    * TODO: Function to get SAP operating Channel
+    */
+    public int getSapOperatingChannel() {
+       try {
+            return mNwService.getSapOperatingChannel();
+
+           } catch(Exception e) {
+             loge("Exception in getSapOperatingChannel");
+             return -1;
+           }
+    }
+
+    /**
+    * TODO: Function to get Auto Channel selection
+    */
+    public int getSapAutoChannelSelection() {
+       try {
+            return mNwService.getSapAutoChannelSelection();
+
+           } catch(Exception e) {
+             loge("Exception in getSapOperatingChannel");
+             return -1;
            }
     }
 
@@ -3855,16 +3892,11 @@ public class WifiStateMachine extends StateMachine {
     }
 
     private void restartSoftApIfOn() {
-        int state = syncGetWifiApState();
-        Log.e(TAG, "Restarting soft ap if needed. WifiAp state is " + state);
-        if (state == WIFI_AP_STATE_ENABLED
-                || state == WIFI_AP_STATE_ENABLING) {
-            Log.e(TAG, "Disabling wifi ap");
-            setWifiApEnabled(null, false);
-            Log.e(TAG, "Enabling wifi ap");
-            setWifiApEnabled(null, true);
-            Log.e(TAG, "Restart softap Done");
-        }
+        Log.e(TAG, "Disabling wifi ap");
+        setWifiApEnabled(null, false);
+        Log.e(TAG, "Enabling wifi ap");
+        setWifiApEnabled(null, true);
+        Log.e(TAG, "Restart softap Done");
     }
 
     private void log(String s) {
