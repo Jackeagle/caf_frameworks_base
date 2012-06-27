@@ -602,6 +602,10 @@ player_type getPlayerType(const char* url)
         return NU_PLAYER;
     }
 
+    if (!strncasecmp("rtp://", url, 6)) {
+        return NU_PLAYER;
+    }
+
     // use MidiFile for MIDI extensions
     int lenURL = strlen(url);
     for (int i = 0; i < NELEM(FILE_EXTS); ++i) {

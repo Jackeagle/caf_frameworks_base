@@ -61,6 +61,7 @@ struct AnotherPacketSource : public MediaSource {
     void setStreamInfo(unsigned streamPID, unsigned programPID, uint64_t firstPTS);
 
     status_t nextBufferIsSync(bool* isSyncFrame);
+    int getQueueSize();
 
 protected:
     virtual ~AnotherPacketSource();

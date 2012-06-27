@@ -158,6 +158,8 @@ enum {
     //Enable smooth streaming
     kKeySmoothStreaming   = 'ESmS',  //bool (int32_t)
 
+    kKeyEnableDecodeOrder = 'EDeO',  //bool (int32_t)
+
     //Use Software Decoder
     kKeyUseSWDec          = 'SwDc',  //bool (int32_t)
 

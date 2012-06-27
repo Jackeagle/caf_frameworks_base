@@ -56,6 +56,7 @@ struct NuPlayer : public AHandler {
     void seekToAsync(int64_t seekTimeUs);
 public:
     struct DASHHTTPLiveSource;
+    struct WFDSource;
 
 protected:
     virtual ~NuPlayer();
@@ -70,6 +71,7 @@ private:
     struct Source;
     struct StreamingSource;
     struct RTSPSource;
+    struct MPQHALWrapper;
 
     enum {
         kWhatSetDataSource              = '=DaS',
@@ -110,6 +112,7 @@ private:
       kHttpDashSource,
       kRtspSource,
       kStreamingSource,
+      kWfdSource,
       kDefaultSource,
     };
 
@@ -158,8 +161,8 @@ private:
     void finishReset();
     void postScanSources();
 
-    sp<Source> LoadCreateDashHttpSource(const char * uri, const KeyedVector<String8,
-                                        String8> *headers, bool uidValid, uid_t uid);
+    sp<Source> LoadCreateSource(const char * uri, const KeyedVector<String8,
+                                 String8> *headers, bool uidValid, uid_t uid, NuSourceType srcTyp);
 
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer);

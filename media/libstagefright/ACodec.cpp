@@ -1982,11 +1982,11 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
                     mCodec->mNativeWindow.get(),
                     info->mGraphicBuffer.get()) == OK) {
             info->mStatus = BufferInfo::OWNED_BY_NATIVE_WINDOW;
-        } else {
+        }else {
             mCodec->signalError();
             info->mStatus = BufferInfo::OWNED_BY_US;
         }
-    } else {
+    }else {
         info->mStatus = BufferInfo::OWNED_BY_US;
     }
 
@@ -2155,7 +2155,7 @@ void ACodec::UninitializedState::onSetup(
 
     mCodec->mInputEOSResult = OK;
 
-    int32_t value;
+    int32_t value = 0;
     if (msg->findInt32("smooth-streaming", &value) && (value == 1) &&
        !strcmp("OMX.qcom.video.decoder.avc", mCodec->mComponentName.c_str())) {
 
@@ -2175,7 +2175,25 @@ void ACodec::UninitializedState::onSetup(
             }
         }
     }
-    if(mCodec->configureCodec(mime.c_str(), msg) != (status_t)OK) {
+
+    value = 0;
+
+    if (msg->findInt32("decodeOrderEnable", &value) && (value == 1) &&
+       !strcmp("OMX.qcom.video.decoder.avc", mCodec->mComponentName.c_str())) {
+
+       QOMX_VIDEO_DECODER_PICTURE_ORDER prm;
+       InitOMXParams(&prm);
+
+       prm.eOutputPictureOrder = QOMX_VIDEO_DECODE_ORDER;
+
+       status_t err =  mCodec->mOMX->setParameter(mCodec->mNode, (OMX_INDEXTYPE)OMX_QcomIndexParamVideoDecoderPictureOrder,
+                              (OMX_PTR)&prm, sizeof(prm));
+       if (err != OK) {
+           LOGE("ERROR:: unable to set decoder in Decode Order..");
+       }
+    }
+
+   if(mCodec->configureCodec(mime.c_str(), msg) != (status_t)OK) {
         CHECK_EQ(mCodec->mOMX->freeNode(mCodec->mNode), (status_t)OK);
 
         mCodec->mNode = NULL;

@@ -10,6 +10,7 @@ LOCAL_SRC_FILES:=                       \
         NuPlayerStreamListener.cpp      \
         RTSPSource.cpp                  \
         StreamingSource.cpp             \
+        MPQHALWrapper.cpp
 
 LOCAL_C_INCLUDES := \
         $(TOP)/frameworks/base/include/media/stagefright/openmax        \
