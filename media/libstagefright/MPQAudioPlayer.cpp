@@ -1090,6 +1090,14 @@ size_t MPQAudioPlayer::fillBufferfromParser(void *data, size_t size) {
             configData[WMACHANNELMASK] = value;
         else configData[WMACHANNELMASK] = 0;
 
+        if (format->findInt32(kKeyWMAAdvEncOpt1, &value))
+            configData[WMAENCODEOPTION1] = value;
+        else configData[WMAENCODEOPTION1] = 0;
+
+        if (format->findInt32(kKeyWMAAdvEncOpt2, &value))
+            configData[WMAENCODEOPTION2] = value;
+        else configData[WMAENCODEOPTION2] = 0;
+
         memcpy((char *)data,(const char *)configData, configSize);
         size_done = configSize;
         LOGV("size_done = %d",size_done);
