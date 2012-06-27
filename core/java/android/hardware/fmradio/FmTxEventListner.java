@@ -55,6 +55,7 @@ class FmTxEventListner {
                 while((!Thread.currentThread().isInterrupted())) {
                    try {
                         int index = 0;
+                        int freq = 0;
                         Log.d(TAG, "getBufferNative called");
                         int eventCount = FmReceiverJNI.getBufferNative
                                                        (fd, buff, EVENT_LISTEN);
@@ -77,8 +78,11 @@ class FmTxEventListner {
                                    break;
                                 case TUNE_EVENT:
                                    Log.d(TAG, "Got TUNE_EVENT");
-                                   cb.FmTxEvTuneStatusChange
-                                             (FmReceiverJNI.getFreqNative(fd));
+                                   freq = FmReceiverJNI.getFreqNative(fd);
+                                   if (freq > 0)
+                                       cb.FmTxEvTuneStatusChange(freq);
+                                   else
+                                       Log.e(TAG, "get frqency cmd failed");
                                    break;
                                 case TXRDSDAT_EVENT:
                                    Log.d(TAG, "Got TXRDSDAT_EVENT");
