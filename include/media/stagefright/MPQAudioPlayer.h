@@ -40,13 +40,15 @@
 // Pause timeout = 3sec
 #define MPQ_AUDIO_PAUSE_TIMEOUT_USEC 3000000
 //Wma params configuration
-#define WMAPARAMSSIZE 6
-#define WMABITRATE 0
-#define WMABLOCKALIGN 1
-#define WMAENCODEOPTION 2
-#define WMAFORMATTAG 3
-#define WMABPS 4
-#define WMACHANNELMASK 5
+#define WMAPARAMSSIZE       8
+#define WMABITRATE          0
+#define WMABLOCKALIGN       1
+#define WMAENCODEOPTION     2
+#define WMAFORMATTAG        3
+#define WMABPS              4
+#define WMACHANNELMASK      5
+#define WMAENCODEOPTION1    6
+#define WMAENCODEOPTION2    7
 
 namespace android {
 class MPQAudioPlayer : public AudioPlayer, public AudioEventObserver {
@@ -288,4 +290,3 @@ private:
 }  // namespace android
 
 #endif  // MPQ_AUDIO_PLAYER_H_
-
