@@ -969,6 +969,8 @@ void  TunnelPlayer::eventThreadEntry() {
                     Mutex::Autolock autoLock(mLock);
                     mTimeout = ((mDurationUs -
                             (mSeekTimeUs + getAudioTimeStampUs())) / 1000);
+                    if(mTimeout < 0)
+                        mTimeout = 0;
                 }
                 LOGV("Setting timeout due Last buffer seek to %d,\
                         mReachedExtractorEOS %d, Fille Queue size() %d",\
@@ -1013,9 +1015,10 @@ void  TunnelPlayer::eventThreadEntry() {
                 /*If the rendering is complete report EOS to the AwesomePlayer*/
                 if (mObserver && !mAsyncReset && mReachedExtractorEOS &&
                         mInputIonFilledQueue.size() == 1) {
-                      mTimeout = ((mDurationUs -
-                              (mSeekTimeUs + getAudioTimeStampUs())) / 1000);
-
+                    mTimeout = ((mDurationUs -
+                             (mSeekTimeUs + getAudioTimeStampUs())) / 1000);
+                    if(mTimeout < 0)
+                        mTimeout = 0;
                     LOGD("Setting timeout to %d, mReachedExtractorEOS %d,\
                              Filled Queue size() %d", mTimeout,\
                              mReachedExtractorEOS,\
@@ -1924,6 +1927,8 @@ bool TunnelPlayer::isReadyToPostEOS(int errPoll, void *fd) {
         }
         else {
             mTimeout = ((mDurationUs - (mSeekTimeUs + getAudioTimeStampUs())) / 1000);
+            if(mTimeout < 0)
+               mTimeout = 0;
             LOGD("Recalculate timeout = %d,mSeekTimeUs=%lld,mDurationUs=%lld",mTimeout,mSeekTimeUs,mDurationUs);
             return false;
         }
