@@ -6376,7 +6376,7 @@ status_t OMXCodec::processSEIData() {
         CODEC_LOGI("In processSEIData");
 
         bool colorFormatChanged = false;
-        int width, height, colorFormat, last3DArrangement;
+        int width, height, colorFormat, last3DArrangement = 0;
         CHECK(mOutputFormat->findInt32(kKeyWidth, &width));
         CHECK(mOutputFormat->findInt32(kKeyHeight, &height));
         CHECK(mOutputFormat->findInt32(kKeyColorFormat, &colorFormat));
@@ -6428,13 +6428,17 @@ status_t OMXCodec::processSEIData() {
 
             //save the 3D format for suspend resume case
             mOutputFormat->setInt32(kKey3D, format3D);
-        } else if (mOutputFormat->findInt32(kKey3D, &last3DArrangement)) {
-            //if kKey3D exists let's force-set whatever format it reports
-            colorFormatChanged = true;
-            colorFormat |= last3DArrangement;
+        } else if ((mOutputFormat->findInt32(kKey3D, &last3DArrangement)) && last3DArrangement) {
+              //if kKey3D exists and its valid, update color format
+              colorFormatChanged = true;
+              colorFormat |= last3DArrangement;
         }
 
         if (colorFormatChanged) {
+            int32_t interlaced = 0;
+            mOutputFormat->findInt32(kKeyInterlaced, &interlaced);
+            colorFormat ^= (interlaced ? HAL_PIXEL_FORMAT_INTERLACE : 0);
+
             err = mNativeWindow.get()->perform(mNativeWindow.get(),
                                                NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY,
                                                width, height, colorFormat);
