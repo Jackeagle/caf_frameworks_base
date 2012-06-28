@@ -817,7 +817,7 @@ ToneGenerator::ToneGenerator(int streamType, float volume, bool threadCanCallJav
     LOGV("ToneGenerator constructor: streamType=%d, volume=%f\n", streamType, volume);
 
     mState = TONE_IDLE;
-
+    mpAudioTrack = 0;
     if (AudioSystem::getOutputSamplingRate(&mSamplingRate, streamType) != NO_ERROR) {
         LOGE("Unable to marshal AudioFlinger");
         return;
@@ -825,7 +825,6 @@ ToneGenerator::ToneGenerator(int streamType, float volume, bool threadCanCallJav
     mThreadCanCallJava = threadCanCallJava;
     mStreamType = streamType;
     mVolume = volume;
-    mpAudioTrack = 0;
     mpToneDesc = 0;
     mpNewToneDesc = 0;
     // Generate tone by chunks of 20 ms to keep cadencing precision
