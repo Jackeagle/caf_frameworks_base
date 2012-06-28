@@ -460,6 +460,11 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     break;
                 case WifiP2pManager.UPDATE_WFD_SETTINGS:
                     WfdInfo wfdInfo = (WfdInfo)message.obj;
+                    if (wfdInfo.sessionMgmtCtrlPort <= 0
+                            || wfdInfo.sessionMgmtCtrlPort > 65535) {
+                        wfdInfo.sessionMgmtCtrlPort =
+                            WfdInfo.DEFAULT_SESSION_MGMT_CTRL_PORT;
+                    }
 
                     String strCmd = "WFD_SET";
                     String[] cmdArray = {

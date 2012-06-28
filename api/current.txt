@@ -12705,7 +12705,7 @@ package android.net.wifi.p2p {
     method public void writeToParcel(android.os.Parcel, int);
     field public static final int COUPLED = 1; // 0x1
     field public static final android.os.Parcelable.Creator CREATOR;
-    field public static final int DEFAULT_SESSION_MGMT_CTRL_PORT = 554; // 0x22a
+    field public static final int DEFAULT_SESSION_MGMT_CTRL_PORT = 7236; // 0x1c44
     field public static final int DEVICETYPE_INVALID = 4; // 0x4
     field public static final int DEVICETYPE_PRIMARYSINK = 1; // 0x1
     field public static final int DEVICETYPE_SECONDARYSINK = 2; // 0x2
