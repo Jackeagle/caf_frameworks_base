@@ -2056,6 +2056,34 @@ public final class CallManager {
         return false;
     }
 
+    /**
+     * @return true if the IMS phone has any active calls. ie. there are active
+     *         IMS calls at present
+     */
+    public boolean isImsPhoneActive() {
+        for (Phone phone : mPhones) {
+            if (phone.getPhoneType() == Phone.PHONE_TYPE_RIL_IMS
+                    && phone.getState() != Phone.State.IDLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return true if IMS Phone is in idle state ie. there are no IMS calls
+     *         active at present
+     */
+    public boolean isImsPhoneIdle() {
+        for (Phone phone : mPhones) {
+            if (phone.getPhoneType() == Phone.PHONE_TYPE_RIL_IMS &&
+                    phone.getState() == Phone.State.IDLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Handler mHandler = new Handler() {
 
         @Override
