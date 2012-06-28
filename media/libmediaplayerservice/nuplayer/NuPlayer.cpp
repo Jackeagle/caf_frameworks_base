@@ -270,7 +270,9 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 LOGV("scanning sources haveAudio=%d, haveVideo=%d",
                      mAudioDecoder != NULL, mVideoDecoder != NULL);
 
-                instantiateDecoder(false, &mVideoDecoder);
+                if(mNativeWindow != NULL) {
+                    instantiateDecoder(false, &mVideoDecoder);
+                }
 
                 if (mAudioSink != NULL) {
                     instantiateDecoder(true, &mAudioDecoder);
@@ -291,7 +293,8 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
-                if (mAudioDecoder == NULL || mVideoDecoder == NULL) {
+                if ((mAudioDecoder == NULL && mAudioSink != NULL) ||
+                    (mVideoDecoder == NULL && mNativeWindow != NULL)) {
                     msg->post(100000ll);
                     mScanSourcesPending = true;
                 }
