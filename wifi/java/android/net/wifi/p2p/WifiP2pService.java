@@ -736,25 +736,18 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     } catch (Exception e) {
                         if (DBG) Slog.w(TAG, "Unable to bring down wlan interface: " + e);
                     }
-
                     mWakeLock.acquire();
-                    if (mWifiState != WifiManager.WIFI_STATE_ENABLED){
-                        WifiNative.loadDriver();
-                    }
-                    else{
-                        Slog.w(TAG, "Stopping Wifi Supplicant");
-                        WifiNative.stopSupplicant();
+                    if (WifiNative.loadDriver()) {
+                         if (WifiNative.startP2pSupplicant()) {
+                             mWifiMonitor.startMonitoring();
+                             mIsWifiP2pEnabled = true;
+                             transitionTo(mP2pEnablingState);
+                         }
+                    } else {
+                          notifyP2pEnableFailure();
+                          transitionTo(mP2pDisabledState);
                     }
                     mWakeLock.release();
-
-                    if (WifiNative.startP2pSupplicant()) {
-                        mWifiMonitor.startMonitoring();
-                        mIsWifiP2pEnabled = true;
-                        transitionTo(mP2pEnablingState);
-                    } else {
-                        notifyP2pEnableFailure();
-                        transitionTo(mP2pDisabledState);
-                    }
                     break;
                 case WifiP2pManager.ENABLE_P2P:
                 case WifiP2pManager.DISABLE_P2P:
