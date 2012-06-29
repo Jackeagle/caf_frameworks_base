@@ -55,41 +55,43 @@ class FmRxControls
 
 
    /* V4l2 Controls */
-   private static final int V4L2_CID_PRIVATE_BASE = 0x8000000;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCHMODE = V4L2_CID_PRIVATE_BASE + 1;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SCANDWELL = V4L2_CID_PRIVATE_BASE + 2;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCHON = V4L2_CID_PRIVATE_BASE + 3;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_STATE = V4L2_CID_PRIVATE_BASE + 4;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_TRANSMIT_MODE = V4L2_CID_PRIVATE_BASE + 5;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_MASK = V4L2_CID_PRIVATE_BASE + 6;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_REGION = V4L2_CID_PRIVATE_BASE + 7;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH = V4L2_CID_PRIVATE_BASE + 8;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCH_PTY = V4L2_CID_PRIVATE_BASE + 9;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCH_PI = V4L2_CID_PRIVATE_BASE + 10;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCH_CNT = V4L2_CID_PRIVATE_BASE + 11;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_EMPHASIS = V4L2_CID_PRIVATE_BASE + 12;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_RDS_STD = V4L2_CID_PRIVATE_BASE + 13;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SPACING = V4L2_CID_PRIVATE_BASE + 14;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_RDSON = V4L2_CID_PRIVATE_BASE + 15;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC = V4L2_CID_PRIVATE_BASE + 16;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_LP_MODE = V4L2_CID_PRIVATE_BASE + 17;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC = V4L2_CID_PRIVATE_BASE + 24;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET = V4L2_CID_PRIVATE_BASE + 25;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_MPX_DCC = V4L2_CID_PRIVATE_BASE + 26;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_AF_JUMP = V4L2_CID_PRIVATE_BASE + 27;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA = V4L2_CID_PRIVATE_BASE + 28;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_HLSI = V4L2_CID_PRIVATE_BASE + 29;
-   private static final int V4L2_CID_PRIVATE_TAVARUA_SET_AUDIO_PATH = V4L2_CID_PRIVATE_BASE + 41;
-   private static final int V4L2_CID_PRIVATE_SINR = V4L2_CID_PRIVATE_BASE + 44;
-   private static int V4L2_CID_PRIVATE_TAVARUA_ON_CHANNEL_THRESHOLD  = V4L2_CID_PRIVATE_BASE + 0x2D;
-   private static int V4L2_CID_PRIVATE_TAVARUA_OFF_CHANNEL_THRESHOLD = V4L2_CID_PRIVATE_BASE + 0x2E;
-   private static int V4L2_CID_PRIVATE_TAVARUA_SINR_THRESHOLD =  V4L2_CID_PRIVATE_BASE + 0x2F;
-   private static int V4L2_CID_PRIVATE_TAVARUA_SINR_SAMPLES =  V4L2_CID_PRIVATE_BASE + 0x30;
+   private static final int V4L2_CID_PRIVATE_BASE                          = 0x8000000;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCHMODE              = V4L2_CID_PRIVATE_BASE + 1;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SCANDWELL             = V4L2_CID_PRIVATE_BASE + 2;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCHON                = V4L2_CID_PRIVATE_BASE + 3;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_STATE                 = V4L2_CID_PRIVATE_BASE + 4;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_TRANSMIT_MODE         = V4L2_CID_PRIVATE_BASE + 5;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_MASK         = V4L2_CID_PRIVATE_BASE + 6;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_REGION                = V4L2_CID_PRIVATE_BASE + 7;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SIGNAL_TH             = V4L2_CID_PRIVATE_BASE + 8;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCH_PTY              = V4L2_CID_PRIVATE_BASE + 9;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCH_PI               = V4L2_CID_PRIVATE_BASE + 10;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SRCH_CNT              = V4L2_CID_PRIVATE_BASE + 11;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_EMPHASIS              = V4L2_CID_PRIVATE_BASE + 12;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_RDS_STD               = V4L2_CID_PRIVATE_BASE + 13;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SPACING               = V4L2_CID_PRIVATE_BASE + 14;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_RDSON                 = V4L2_CID_PRIVATE_BASE + 15;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_PROC         = V4L2_CID_PRIVATE_BASE + 16;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_LP_MODE               = V4L2_CID_PRIVATE_BASE + 17;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_IOVERC                = V4L2_CID_PRIVATE_BASE + 24;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_INTDET                = V4L2_CID_PRIVATE_BASE + 25;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_MPX_DCC               = V4L2_CID_PRIVATE_BASE + 26;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_AF_JUMP               = V4L2_CID_PRIVATE_BASE + 27;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_RSSI_DELTA            = V4L2_CID_PRIVATE_BASE + 28;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_HLSI                  = V4L2_CID_PRIVATE_BASE + 29;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SET_AUDIO_PATH        = V4L2_CID_PRIVATE_BASE + 41;
+   private static final int V4L2_CID_PRIVATE_SINR                          = V4L2_CID_PRIVATE_BASE + 44;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_ON_CHANNEL_THRESHOLD  = V4L2_CID_PRIVATE_BASE + 0x2D;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_OFF_CHANNEL_THRESHOLD = V4L2_CID_PRIVATE_BASE + 0x2E;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SINR_THRESHOLD        = V4L2_CID_PRIVATE_BASE + 0x2F;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_SINR_SAMPLES          = V4L2_CID_PRIVATE_BASE + 0x30;
+   private static final int V4L2_CID_PRIVATE_SPUR_FREQ                     = V4L2_CID_PRIVATE_BASE + 0x31;
+   private static final int V4L2_CID_PRIVATE_SPUR_FREQ_RMSSI               = V4L2_CID_PRIVATE_BASE + 0x32;
+   private static final int V4L2_CID_PRIVATE_SPUR_SELECTION                = V4L2_CID_PRIVATE_BASE + 0x33;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
-   private static final int V4L2_CID_BASE = V4L2_CTRL_CLASS_USER | 0x900;
-
-   private static final int V4L2_CID_AUDIO_MUTE = V4L2_CID_BASE + 9;
+   private static final int V4L2_CID_BASE        = V4L2_CTRL_CLASS_USER | 0x900;
+   private static final int V4L2_CID_AUDIO_MUTE  = V4L2_CID_BASE + 9;
 
    private int sOnData  ;
    private int sOffData ;
@@ -499,4 +501,37 @@ class FmRxControls
 
    }
 
+   public int updateSpurTable(int fd, int freq, int rmssi, boolean enable) {
+
+      int re;
+
+      re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_SPUR_FREQ, freq);
+      if (re < 0) {
+        Log.e(TAG, "Failed to program the Spur frequency value");
+        return re;
+      }
+
+      re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_SPUR_FREQ_RMSSI, rmssi);
+      if (re < 0) {
+        Log.e(TAG, "Failed to program the RMSSI level of the Spur frequency");
+        return re;
+      }
+
+      if (enable) {
+        re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_SPUR_SELECTION, 1);
+      }
+      else {
+        re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_SPUR_SELECTION, 0);
+      }
+      if (re < 0) {
+        Log.e(TAG, "Failed to program Spur selection");
+        return re;
+      }
+
+      return re;
+   }
+
+   public int configureSpurTable(int fd) {
+      return FmReceiverJNI.configureSpurTable(fd);
+   }
 }
