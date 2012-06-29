@@ -321,8 +321,10 @@ status_t AwesomePlayer::setDataSource_l(
 
     mUri = uri;
 
-    LOGV("PostProc Disabled");
-    mIsLocalPlayback = false;
+    if ((strncmp(uri, "http", 4) == 0) || (strncmp(uri, "widevine", 8) == 0)) {
+        LOGV("PostProc Disabled");
+        mIsLocalPlayback = false;
+    }
 
     if (headers) {
         mUriHeaders = *headers;
