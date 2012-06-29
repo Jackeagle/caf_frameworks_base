@@ -78,6 +78,9 @@ public final class BearerData {
     //private final static byte SUBPARAM_ENHANCED_VMN                     = 0x16;
     //private final static byte SUBPARAM_ENHANCED_VMN_ACK                 = 0x17;
 
+    // All other values after this are reserved.
+    private final static byte SUBPARAM_ID_LAST_DEFINED                    = 0x17;
+
     /**
      * Supported message types for CDMA SMS messages
      * (See 3GPP2 C.S0015-B, v2.0, table 4.5.1-1)
@@ -900,6 +903,27 @@ public final class BearerData {
         return decodeSuccess;
     }
 
+    private static boolean decodeReserved(
+            BearerData bData, BitwiseInputStream inStream, int subparamId)
+        throws BitwiseInputStream.AccessException, CodingException
+    {
+        boolean decodeSuccess = false;
+        int subparamLen = inStream.read(8); // SUBPARAM_LEN
+        int paramBits = subparamLen * 8;
+        if (paramBits >= 0) {
+            decodeSuccess = true;
+            inStream.skip(paramBits);
+        }
+        Log.d(LOG_TAG, "RESERVED bearer data subparameter " + subparamId + " decode "
+                + (decodeSuccess ? "succeeded" : "failed") + " (param bits = " + paramBits + ")");
+        if (!decodeSuccess) {
+            throw new CodingException("RESERVED bearer data subparameter " + subparamId
+                    + "had invalid SUBPARAM_LEN " + subparamLen);
+        }
+
+        return decodeSuccess;
+    }
+
     private static boolean decodeUserData(BearerData bData, BitwiseInputStream inStream)
         throws BitwiseInputStream.AccessException
     {
@@ -1000,6 +1024,16 @@ public final class BearerData {
             return new String(data, offset, numFields - offset, "ISO-8859-1");
         } catch (java.io.UnsupportedEncodingException ex) {
             throw new CodingException("ISO-8859-1 decode failed: " + ex);
+        }
+    }
+
+    private static String decodeShiftJis(byte[] data, int offset, int numFields)
+        throws CodingException
+    {
+        try {
+            return new String(data, offset, numFields - offset, "SHIFT_JIS");
+        } catch (java.io.UnsupportedEncodingException ex) {
+            throw new CodingException("SHIFT_JIS decode failed: " + ex);
         }
     }
 
@@ -1173,6 +1207,9 @@ public final class BearerData {
             break;
         case UserData.ENCODING_LATIN:
             userData.payloadStr = decodeLatin(userData.payload, offset, userData.numFields);
+            break;
+        case UserData.ENCODING_SHIFT_JIS:
+            userData.payloadStr = decodeShiftJis(userData.payload, offset, userData.numFields);
             break;
         default:
             throw new CodingException("unsupported user data encoding ("
@@ -1699,7 +1736,15 @@ public final class BearerData {
                 boolean decodeSuccess = false;
                 int subparamId = inStream.read(8);
                 int subparamIdBit = 1 << subparamId;
-                if ((foundSubparamMask & subparamIdBit) != 0) {
+                // int is 4 bytes. This duplicate check has a limit to Id number up to 32 (4*8)
+                // as 32th bit is the max bit in int.
+                // Per 3GPP2 C.S0015-B Table 4.5-1 Bearer Data Subparameter Identifiers:
+                // last defined subparam ID is 23 (00010111 = 0x17 = 23).
+                // Only do duplicate subparam ID check if subparam is within defined value as
+                // reserved subparams are just skipped.
+                if ((foundSubparamMask & subparamIdBit) != 0 &&
+                        (subparamId >= SUBPARAM_MESSAGE_IDENTIFIER &&
+                        subparamId <= SUBPARAM_ID_LAST_DEFINED)) {
                     throw new CodingException("illegal duplicate subparameter (" +
                                               subparamId + ")");
                 }
@@ -1759,10 +1804,13 @@ public final class BearerData {
                     decodeSuccess = decodeDepositIndex(bData, inStream);
                     break;
                 default:
-                    throw new CodingException("unsupported bearer data subparameter ("
-                                              + subparamId + ")");
+                    decodeSuccess = decodeReserved(bData, inStream, subparamId);
                 }
-                if (decodeSuccess) foundSubparamMask |= subparamIdBit;
+                if (decodeSuccess &&
+                        (subparamId >= SUBPARAM_MESSAGE_IDENTIFIER &&
+                        subparamId <= SUBPARAM_ID_LAST_DEFINED)) {
+                    foundSubparamMask |= subparamIdBit;
+                }
             }
             if ((foundSubparamMask & (1 << SUBPARAM_MESSAGE_IDENTIFIER)) == 0) {
                 throw new CodingException("missing MESSAGE_IDENTIFIER subparam");
