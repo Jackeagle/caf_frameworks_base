@@ -346,11 +346,12 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 }
 
                 mUri = uri;
+                Cursor mCursor = null;
                 try {
                     String temp;
-                    Cursor mCursor = mContext.getContentResolver().query(mUri, mCursorCols,
-                                            MediaStore.Audio.Media.IS_MUSIC + "=1", null,
-                                            MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
+                    mCursor = mContext.getContentResolver().query(mUri, mCursorCols,
+                                        MediaStore.Audio.Media.IS_MUSIC + "=1", null,
+                                        MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
                     mCursor.moveToFirst();
                     temp = mCursor.getString(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE));
@@ -372,6 +373,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     log("Album is " + mAlbumName);
                     log("ID is " + mMediaNumber);
                     mCursor.close();
+                    mCursor = null;
                     Long tmpId = (Long)getTrackId(mTrackName);
                     log("tmpId is " + tmpId);
                     mMediaNumber = String.valueOf(tmpId);
@@ -391,10 +393,14 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                                             MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
                     mMediaCount = String.valueOf(mCursor.getCount());
                     mCursor.close();
+                    mCursor = null;
                     log("Track count is " + mMediaCount);
                 } catch(Exception e) {
                     log("Exc is " + e);
-                    e.printStackTrace();
+                    // e.printStackTrace(); for debugging enable this
+                    if (mCursor != null) {
+                        mCursor.close();
+                    }
                     mTrackName = null;
                     mArtistName = null;
                     mAlbumName = null;
