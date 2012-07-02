@@ -185,7 +185,7 @@ static jboolean suspendSinkNative(JNIEnv *env, jobject object,
     if (nat) {
         const char *c_path = env->GetStringUTFChars(path, NULL);
         bool ret = dbus_func_args_async(env, nat->conn, -1, NULL, NULL, nat,
-                           c_path, "org.bluez.audio.Sink", "Suspend",
+                           c_path, "org.bluez.AudioSink", "Suspend",
                            DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(path, c_path);
         return ret ? JNI_TRUE : JNI_FALSE;
@@ -201,7 +201,7 @@ static jboolean resumeSinkNative(JNIEnv *env, jobject object,
     if (nat) {
         const char *c_path = env->GetStringUTFChars(path, NULL);
         bool ret = dbus_func_args_async(env, nat->conn, -1, NULL, NULL, nat,
-                           c_path, "org.bluez.audio.Sink", "Resume",
+                           c_path, "org.bluez.AudioSink", "Resume",
                            DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(path, c_path);
         return ret ? JNI_TRUE : JNI_FALSE;
