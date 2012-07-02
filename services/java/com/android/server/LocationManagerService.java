@@ -1020,9 +1020,6 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         if (p == null) {
             return;
         }
-        if (LOCAL_LOGV) {
-            Slog.v(TAG, "updateProviderListenersLocked. provider: " + provider + "enabled: "+enabled);
-        }
 
         ArrayList<Receiver> deadReceivers = null;
 
@@ -1053,16 +1050,10 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             if (listeners > 0) {
                 p.setMinTime(getMinTimeLocked(provider), mTmpWorkSource);
                 p.enableLocationTracking(true);
-                if (LOCAL_LOGV){
-                 Slog.v(TAG, "In updateProviderListenersLocked:after setMinTime & gps_start");
-                }
             }
         } else {
             p.enableLocationTracking(false);
             p.disable();
-            if (LOCAL_LOGV){
-                Slog.v(TAG, "In updateProviderListenersLocked:After gps stop");
-            }
         }
     }
 
@@ -1295,10 +1286,6 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
         receiver.requiredPermissions = checkPermissionsSafe(provider,
                 receiver.requiredPermissions);
-        if (LOCAL_LOGV)
-            Slog.v(TAG, "In requestLocationUpdatesLocked. provider: " + provider
-                   + " requiredPermissions: "+ receiver.requiredPermissions );
-
 
         // so wakelock calls will succeed
         final int callingUid = Binder.getCallingUid();
@@ -1425,14 +1412,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 if (p != null) {
                     if (hasOtherListener) {
                         p.setMinTime(getMinTimeLocked(provider), mTmpWorkSource);
-                        if(LOCAL_LOGV) {
-                            Slog.v(TAG, "In removeUpdatesLocked.p.setMinTime:");
-                        }
                     } else {
                         p.enableLocationTracking(false);
-                        if(LOCAL_LOGV){
-                            Slog.v(TAG, "In removeUpdatesLocked. Stop naviagation");
-                        }
                     }
                 }
             }
