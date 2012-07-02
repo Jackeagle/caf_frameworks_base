@@ -993,6 +993,7 @@ public class SubscriptionManager extends Handler {
                 && (sub.subId >= 0 && sub.subId < NUM_SUBSCRIPTIONS)
                 && (sub.slotId >= 0 && sub.slotId < NUM_SUBSCRIPTIONS)
                 && (sub.getAppIndex() >= 0
+                        && (mCardSubMgr.getCardSubscriptions(sub.slotId) != null)
                         && sub.getAppIndex() <
                         mCardSubMgr.getCardSubscriptions(sub.slotId).getLength())) {
             return true;
@@ -1007,6 +1008,7 @@ public class SubscriptionManager extends Handler {
                 && (sub.subId >= 0 && sub.subId < NUM_SUBSCRIPTIONS)
                 && (sub.slotId >= 0 && sub.slotId < NUM_SUBSCRIPTIONS)
                 && (sub.getAppIndex() >= 0
+                        && (mCardSubMgr.getCardSubscriptions(sub.slotId) != null)
                         && sub.getAppIndex() <
                         mCardSubMgr.getCardSubscriptions(sub.slotId).getLength())) {
             return true;
