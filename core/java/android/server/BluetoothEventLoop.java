@@ -432,6 +432,8 @@ class BluetoothEventLoop {
                 propValues[1].equals("true") ? new Boolean(true) : new Boolean(false));
         } else if (name.equals("DiscoverableTimeout")) {
             adapterProperties.setProperty(name, propValues[1]);
+        } else if (name.equals("Class")) {
+            adapterProperties.setProperty(name, propValues[1]);
         }
     }
 
