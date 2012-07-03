@@ -37,9 +37,11 @@ PostProc2Dto3D::~PostProc2Dto3D()
 {
     LOGV("%s:  begin", __func__);
 
-    status_t err = (mLib3dDeinit(&mLib3dContext) != from2dTo3d_ERROR_NONE ?
-            UNKNOWN_ERROR : OK);
-    CHECK(err == OK);
+    status_t err = mLib3dDeAllocResources(mLib3dContext);
+    CHECK_EQ(err, from2dTo3d_ERROR_NONE);
+
+    err = mLib3dDeinit(&mLib3dContext);
+    CHECK_EQ(err, from2dTo3d_ERROR_NONE);
 }
 
 status_t PostProc2Dto3D::Init(sp<MediaSource> decoder, sp<PostProcNativeWindow> nativeWindow, const sp<MetaData> &meta)
@@ -119,9 +121,10 @@ status_t PostProc2Dto3D::init2DTo3DLibrary()
         mLib3dSetProperty = (set_get_property_Func_t *)dlsym(mLib3dHandle,"from2dTo3d_setProperty");
         mLib3dGetProperty = (set_get_property_Func_t *)dlsym(mLib3dHandle,"from2dTo3d_getProperty");
         mLib3dAllocResources = (alloc_dealloc_resources_Func_t *)dlsym(mLib3dHandle,"from2dTo3d_allocResources");
+        mLib3dDeAllocResources = (alloc_dealloc_resources_Func_t *)dlsym(mLib3dHandle,"from2dTo3d_deAllocResources");
         mLib3dConvertFrom2dto3d = (from2dTo3d_convert_Func_t *)dlsym(mLib3dHandle,"from2dTo3d_convert");
         if (mLib3dInit == NULL || mLib3dDeinit == NULL || mLib3dSetProperty == NULL || mLib3dGetProperty == NULL ||
-            mLib3dAllocResources == NULL || mLib3dConvertFrom2dto3d == NULL) {
+            mLib3dAllocResources == NULL || mLib3dDeAllocResources == NULL || mLib3dConvertFrom2dto3d == NULL) {
             LOGE("Could not get the 2dTo3d lib function pointers\n");
             CHECK(0);
         }
