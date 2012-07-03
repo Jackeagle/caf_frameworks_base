@@ -896,7 +896,8 @@ status_t AudioFlinger::setStreamVolume(int stream, float value, int output)
     AutoMutex lock(mLock);
 
     if( (mLPAOutput != NULL) &&
-        (mLPAStreamType == stream) ) {
+        (mLPAStreamType == stream) &&
+        (mLPAHandle == (audio_io_handle_t)output) ) {
          mLPAOutput->stream->set_volume(mLPAOutput->stream,mLPALeftVol*value,
                                           mLPARightVol*value);
          mStreamTypes[stream].volume = value;
