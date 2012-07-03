@@ -202,7 +202,7 @@ public class WfdInfo implements Parcelable {
     public static final int TEARDOWN_COUPLING = 2;
 
     /** Default RTSP Control Port */
-    public static final int DEFAULT_SESSION_MGMT_CTRL_PORT = 554;
+    public static final int DEFAULT_SESSION_MGMT_CTRL_PORT = 7236;
 
     /**
      * RTSP Control Port. Valid values are between 1-65535. Default value is
