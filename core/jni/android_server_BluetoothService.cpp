@@ -1754,6 +1754,37 @@ static jboolean discoverPrimaryServicesNative(JNIEnv *env, jobject object,
        return JNI_FALSE;
 }
 
+static jstring createLeDeviceNative(JNIEnv *env, jobject object,
+                                jstring address) {
+    LOGV("%s", __FUNCTION__);
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+    if (nat && eventLoopNat) {
+        const char *c_address = env->GetStringUTFChars(address, NULL);
+        LOGV("... address = %s", c_address);
+        DBusMessage *reply = dbus_func_args(env, nat->conn,
+                           get_adapter_path(env, object),
+                           DBUS_ADAPTER_IFACE, "CreateLeDevice",
+                           DBUS_TYPE_STRING, &c_address,
+                           DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(address, c_address);
+        if (reply == NULL) {
+            return NULL;
+        }
+        char *object_path = NULL;
+        if (dbus_message_get_args(reply, NULL,
+                                  DBUS_TYPE_OBJECT_PATH, &object_path,
+                                  DBUS_TYPE_INVALID)) {
+            return (jstring) env->NewStringUTF(object_path);
+        }
+     }
+#endif
+       return NULL;
+}
+
 static jobjectArray getGattServersNative(JNIEnv *env, jobject object) {
     LOGE("%s", __FUNCTION__);
     jobjectArray strArray = NULL;
@@ -2827,6 +2858,121 @@ static jboolean discoverCharacteristicsNative(JNIEnv *env, jobject object,
     return JNI_FALSE;
 }
 
+static int gattLeConnectNative(JNIEnv *env, jobject object,
+                                           jstring path,
+                                           jint prohibitRemoteChg,
+                                           jint filterPolicy,
+                                           jint scanInterval,
+                                           jint scanWindow,
+                                           jint intervalMin,
+                                           jint intervalMax,
+                                           jint latency,
+                                           jint superVisionTimeout,
+                                           jint minCeLen,
+                                           jint maxCeLen,
+                                           jint connTimeout) {
+#ifdef HAVE_BLUETOOTH
+    LOGV("%s", __FUNCTION__);
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *reply, *msg;
+        DBusMessageIter iter;
+        DBusError err;
+        int result;
+
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+
+        dbus_error_init(&err);
+        msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
+                                          c_path, DBUS_DEVICE_IFACE, "LeConnectReq");
+        if (!msg) {
+            LOGE("%s: Can't allocate new method call for GATT ConnectReq", __FUNCTION__);
+            env->ReleaseStringUTFChars(path, c_path);
+            return GATT_OPERATION_GENERIC_FAILURE;
+        }
+
+        dbus_message_append_args(msg,
+                                 DBUS_TYPE_BYTE, &prohibitRemoteChg,
+                                 DBUS_TYPE_BYTE, &filterPolicy,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&scanInterval,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&scanWindow,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&intervalMin,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&intervalMax,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&latency,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&superVisionTimeout,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&minCeLen,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&maxCeLen,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&connTimeout,
+                                 DBUS_TYPE_INVALID);
+        dbus_message_iter_init_append(msg, &iter);
+
+        reply = dbus_connection_send_with_reply_and_block(nat->conn, msg, -1, &err);
+
+        if (!reply) {
+            result = GATT_OPERATION_GENERIC_FAILURE;
+            if (dbus_error_is_set(&err)) {
+                if (!strcmp(err.name, BLUEZ_ERROR_IFC ".InProgress"))
+                    result = GATT_OPERATION_BUSY;
+                else if (!strcmp(err.name, BLUEZ_ERROR_IFC ".AlreadyConnected"))
+                    result = GATT_ALREADY_CONNECTED;
+
+                LOG_AND_FREE_DBUS_ERROR(&err);
+            } else {
+                LOGE("DBus reply is NULL in function %s", __FUNCTION__);
+            }
+        }  else {
+            result = GATT_OPERATION_SUCCESS;
+        }
+
+        env->ReleaseStringUTFChars(path, c_path);
+        dbus_message_unref(msg);
+
+        LOGE("%s result = %d", __FUNCTION__, result);
+        return result;
+    }
+
+#endif
+    return -1;
+}
+
+static jboolean gattLeConnectCancelNative(JNIEnv *env, jobject object,
+                                        jstring path) {
+#ifdef HAVE_BLUETOOTH
+    LOGV("%s", __FUNCTION__);
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *reply, *msg;
+        DBusError err;
+
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+
+        dbus_error_init(&err);
+        msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
+                                          c_path, DBUS_DEVICE_IFACE, "LeConnectCancel");
+        if (!msg) {
+            LOGE("%s: Can't allocate new method call for LeConnectCancel!", __FUNCTION__);
+            env->ReleaseStringUTFChars(path, c_path);
+            return JNI_FALSE;
+        }
+
+        reply = dbus_connection_send_with_reply_and_block(nat->conn, msg, -1, &err);
+        dbus_message_unref(msg);
+
+        env->ReleaseStringUTFChars(path, c_path);
+        if (!reply) {
+            if (dbus_error_is_set(&err)) {
+                LOG_AND_FREE_DBUS_ERROR(&err);
+            } else {
+                LOGE("DBus reply is NULL in function %s", __FUNCTION__);
+            }
+            return JNI_FALSE;
+        }
+        return JNI_TRUE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 static jboolean gattConnectNative(JNIEnv *env, jobject object,
                                            jstring path,
                                            jint prohibitRemoteChg,
@@ -3381,10 +3527,13 @@ static JNINativeMethod sMethods[] = {
     {"getChannelFdNative", "(Ljava/lang/String;)Landroid/os/ParcelFileDescriptor;", (void *)getChannelFdNative},
     {"releaseChannelFdNative", "(Ljava/lang/String;)Z", (void *)releaseChannelFdNative},
     {"discoverPrimaryServicesNative", "(Ljava/lang/String;)Z", (void *)discoverPrimaryServicesNative},
+    {"createLeDeviceNative", "(Ljava/lang/String;)Ljava/lang/String;", (void*)createLeDeviceNative},
     {"getGattServicePropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getGattServicePropertiesNative},
     {"discoverCharacteristicsNative", "(Ljava/lang/String;)Z", (void*)discoverCharacteristicsNative},
     {"gattConnectCancelNative", "(Ljava/lang/String;)Z", (void *)gattConnectCancelNative},
-    {"gattConnectNative", "(Ljava/lang/String;IIIIIIIIIII)Z", (void *)gattConnectNative},
+    {"gattConnectNative", "(Ljava/lang/String;IIIIIIIIIII)I", (void *)gattConnectNative},
+    {"gattLeConnectCancelNative", "(Ljava/lang/String;)Z", (void *)gattLeConnectCancelNative},
+    {"gattLeConnectNative", "(Ljava/lang/String;IIIIIIIIIII)I", (void *)gattLeConnectNative},
     {"updateCharacteristicValueNative", "(Ljava/lang/String;)Z", (void*)updateCharacteristicValueNative},
     {"getCharacteristicPropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;", (void*)getCharacteristicPropertiesNative},
     {"setCharacteristicPropertyNative", "(Ljava/lang/String;Ljava/lang/String;[BIZ)Z", (void*)setCharacteristicPropertyNative},
