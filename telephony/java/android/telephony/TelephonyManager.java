@@ -96,6 +96,7 @@ public class TelephonyManager {
         return sInstance;
     }
 
+    /** @hide */
     public boolean isMultiSimEnabled() {
         return isMultiSimEnabled;
     }
@@ -104,6 +105,7 @@ public class TelephonyManager {
      * Returns the number of phones available.
      * Returns 1 for Single standby mode (Single SIM functionality)
      * Returns 2 for Dual standby mode.(Dual SIM functionality)
+     * @hide
      */
     public int getPhoneCount() {
         int phoneCount = 1;
@@ -358,6 +360,7 @@ public class TelephonyManager {
         return getCurrentPhoneType();
     }
 
+    /** @hide */
     protected int getPhoneTypeFromProperty() {
         int type =
             SystemProperties.getInt(TelephonyProperties.CURRENT_ACTIVE_PHONE,
