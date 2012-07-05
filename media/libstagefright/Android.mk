@@ -207,6 +207,7 @@ LOCAL_SHARED_LIBRARIES += \
         libdl
 
 LOCAL_CFLAGS += -Wno-multichar
+LOCAL_CFLAGS += -Werror
 
 LOCAL_MODULE:= libstagefright
 
