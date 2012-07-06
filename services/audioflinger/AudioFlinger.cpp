@@ -2177,11 +2177,20 @@ uint32_t AudioFlinger::PlaybackThread::activeSleepTimeUs()
     // A2DP output latency is not due only to buffering capacity. It also reflects encoding,
     // decoding and transfer time. So sleeping for half of the latency would likely cause
     // underruns
-    if (audio_is_a2dp_device((audio_devices_t)mDevice)) {
-        return (uint32_t)((uint32_t)((mFrameCount * 1000) / mSampleRate) * 1000);
-    } else {
-        return (uint32_t)(mOutput->stream->get_latency(mOutput->stream) * 1000) / 2;
-    }
+
+    // For concurrency with keyboard(continuous up/down key press) tones and ringtones,
+    // new track is created every 40ms or so. SoundPool only allows four tracks(froma app)
+    // at a time and stop the earliest/low priority one if the 5th track becomes active.
+    // Mixer thread allows mixing only if all active tracks  have sufficient data. The
+    // minframecount logic adds 2 bytes for interpolation and this results frame count
+    // mismatch for last buffer and mixer thread going to sleep for 48ms. The high sleep
+    // time becomes a bottleneck and causes more audio tracks being stopped in between
+    // playback. This results is cumulative sleeps and data being fed at a slower rate
+    // to kernel although data is fed at a faster rate by client causing glitches.
+    // The fix is to calculate the sleep time from frame count and sample rate which
+    // is equal to time of one output buffer.
+
+    return (uint32_t)((uint32_t)((mFrameCount * 1000) / mSampleRate) * 1000);
 }
 
 // ----------------------------------------------------------------------------
