@@ -54,6 +54,7 @@ import java.util.List;
  * information unless it has the appropriate permissions declared in
  * its manifest file. Where permissions apply, they are noted in the
  * the methods through which you access the protected information.
+ * @hide
  */
 public class MSimTelephonyManager extends TelephonyManager {
     /** @hide */

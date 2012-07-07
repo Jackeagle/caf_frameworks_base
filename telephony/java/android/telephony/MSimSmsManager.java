@@ -43,6 +43,7 @@ import java.util.List;
 /**
  * Manages SMS operations such as sending data, text, and pdu SMS messages.
  * Get this object by calling the static method MSimSmsManager.getDefault().
+ * @hide
  */
 public class MSimSmsManager {
     /** Singleton object constructed during class initialization. */
