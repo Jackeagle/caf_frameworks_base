@@ -598,6 +598,12 @@ class BluetoothEventLoop {
             if (DBG)
                 log("set trust state succeeded, value is: " + propValues[1]);
             mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
+        } else if (name.equals("LeConnParams")) {
+            mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
+            Intent intent = new Intent(BluetoothDevice.ACTION_LE_CONN_PARAMS);
+            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+            intent.putExtra(BluetoothDevice.EXTRA_CONN_INTERVAL, Integer.valueOf(propValues[1]));
+            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
         }
     }
 
