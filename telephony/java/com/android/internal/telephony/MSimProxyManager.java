@@ -120,4 +120,13 @@ public class MSimProxyManager {
     public void registerForAllDataDisconnected(int sub, Handler h, int what, Object obj) {
         ((MSimPhoneProxy) mProxyPhones[sub]).registerForAllDataDisconnected(h, what, obj);
     }
+
+    public void unregisterForAllDataDisconnected(int sub, Handler h) {
+        ((MSimPhoneProxy) mProxyPhones[sub]).unregisterForAllDataDisconnected(h);
+    }
+
+    public boolean isDataDisconnected(int sub) {
+        Phone activePhone = ((MSimPhoneProxy) mProxyPhones[sub]).getActivePhone();
+        return ((PhoneBase) activePhone).mDataConnectionTracker.isDisconnected();
+    }
 }
