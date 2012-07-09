@@ -76,6 +76,8 @@ public class MSimCDMAPhone extends CDMAPhone {
 
         Log.d(LOG_TAG, "MSimCDMAPhone: constructor: sub = " + mSubscription);
 
+        mDataConnectionTracker = new MSimCdmaDataConnectionTracker (this);
+
         mVmNumCdmaKey = mVmNumCdmaKey + mSubscription;
         mVmCountKey = mVmCountKey + mSubscription;
 
@@ -99,7 +101,6 @@ public class MSimCDMAPhone extends CDMAPhone {
         mCT = new CdmaCallTracker(this);
         mCdmaSSM = CdmaSubscriptionSourceManager.getInstance(context, mCM, this,
                 EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
-        mDataConnectionTracker = new MSimCdmaDataConnectionTracker (this);
         mRuimPhoneBookInterfaceManager = new RuimPhoneBookInterfaceManager(this);
         mSubInfo = new PhoneSubInfo(this);
         mEriManager = new EriManager(this, context, EriManager.ERI_FROM_XML);
