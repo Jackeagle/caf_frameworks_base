@@ -452,9 +452,20 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             } else {
                 LOGV("@@@@:: Nuplayer :: MESSAGE FROM ACODEC +++++++++++++++++++++++++++++++ ACodec::kWhatRenderBuffer:: %s",audio ? "audio" : "video");
                 CHECK_EQ((int)what, (int)ACodec::kWhatDrainThisBuffer);
-                renderBuffer(audio, codecRequest);
-            }
+                //check here if this is WFDSource, no need to send to the Renderer
+                //send it back to the sender for direct rendering
 
+                if(mLiveSourceType == kWfdSource) {
+                    LOGE("Ignoring renderer and sending back to the caller");
+                    sp<AMessage> reply;
+                    CHECK(codecRequest->findMessage("reply", &reply));
+
+                    reply->setInt32("render", true);
+                    reply->post();
+                }else {
+                    renderBuffer(audio, codecRequest);
+                }
+            }
             break;
         }
 

@@ -19,7 +19,7 @@
  */
 
 
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "MPQHALWrapper"
 #include <utils/Log.h>
 
