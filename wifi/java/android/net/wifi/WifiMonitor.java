@@ -543,7 +543,14 @@ public class WifiMonitor {
                       }
                  }
             } else if (tokens[0].equals(AP_STA_DISCONNECTED_STR)) {
-                mStateMachine.sendMessage(AP_STA_DISCONNECTED_EVENT, tokens[1]);
+                for (String token : tokens) {
+                      String[] nameValue = token.split("=");
+                      if (nameValue.length != 2) continue;
+                      if (nameValue[0].equals("p2p_dev_addr")) {
+                          String dev_addr = nameValue[1];
+                          mStateMachine.sendMessage(AP_STA_DISCONNECTED_EVENT, dev_addr);
+                      }
+                 }
             }
         }
 

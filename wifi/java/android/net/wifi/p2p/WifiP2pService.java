@@ -845,7 +845,6 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (mPeers.remove(device)) sendP2pPeersChangedBroadcast();
                     break;
                 case WifiP2pManager.CONNECT:
-                    boolean join = false;
                     boolean automatic = false;
                     boolean provdisc = false;
                     if (DBG) logd(getName() + " sending connect");
@@ -866,25 +865,12 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                                 automatic = true;
                                 provdisc = true;
                             } else {
-                                // To Handle the Concurrency Cases : Two interface
-                                // addresses for a device address
                                 if (mSavedConnectConfig.mInvite == 1) {
-                                    String bssInfo = WifiNative.bssInfo(mSavedConnectConfig.deviceAddress);
-                                    String[] tokens = bssInfo.split("\n");
-                                    for (String token : tokens) {
-                                        if (token.startsWith("bssid=")) {
-                                            String[] nameValue = token.split("=");
-                                            if (nameValue.length != 2) break;
-                                            mTempConnectConfig.deviceAddress = nameValue[1];
-                                            join = true;
-                                        }
-                                    }
+                                    mSavedConnectConfig.mPeergo = 1;
                                 }
-                                if ( join == true )
-                                    mConnectConfig = mTempConnectConfig;
                             }
 
-                            String pin = WifiNative.p2pConnect(mConnectConfig, join, automatic, provdisc);
+                            String pin = WifiNative.p2pConnect(mConnectConfig,automatic, provdisc);
                             try {
                                 Integer.parseInt(pin);
                                 notifyWpsPin(pin, mSavedConnectConfig.deviceAddress);
@@ -1522,11 +1508,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         Resources r = Resources.getSystem();
         final String tempDevAddress = peer.deviceAddress;
         final String tempPin = peer.pinShown;
-        final boolean join;
-        if (peer.peer_go == 1)
-            join = true;
-        else
-            join = false;
+        final int join = peer.peer_go;
         AlertDialog dialog = new AlertDialog.Builder(mContext)
             .setTitle(r.getString(R.string.wifi_p2p_dialog_title))
             .setMessage(r.getString(R.string.wifi_p2p_pin_display_message, peer.pinShown,peer.deviceAddress))
@@ -1539,8 +1521,14 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         if (mP2pPdNotify ==1)
                             mP2pPdNotify =0;
                     } else {
-                            WifiNative.p2pConnectDisplay(tempDevAddress, tempPin, join);
-                         }
+                            mSavedGoNegotiationConfig = new WifiP2pConfig();
+                            mSavedGoNegotiationConfig.mUsepin = 1;
+                            mSavedGoNegotiationConfig.wps.setup = WpsInfo.DISPLAY;
+                            mSavedGoNegotiationConfig.deviceAddress = tempDevAddress;
+                            mSavedGoNegotiationConfig.wps.pin = tempPin;
+                            mSavedGoNegotiationConfig.mPeergo = join;
+                            sendMessage(GROUP_NEGOTIATION_USER_ACCEPT);
+                       }
                     }
                     })
             .setNegativeButton(r.getString(R.string.cancel), new OnClickListener() {
@@ -1551,7 +1539,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                                 mP2pPdNotify =0;
                         }
                         else {
-                            transitionTo(mInactiveState);
+                            sendMessage(GROUP_NEGOTIATION_USER_REJECT);
                         }
                         }
                     })
@@ -1568,11 +1556,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 .inflate(R.layout.wifi_p2p_go_negotiation_request_alert, null);
         final EditText pin = (EditText) textEntryView .findViewById(R.id.wifi_p2p_wps_pin);
         final String tempDeviceAddress = peer.deviceAddress;
-        final boolean join;
-        if (peer.peer_go == 1)
-            join = true;
-        else
-            join = false;
+        final int join = peer.peer_go;
         AlertDialog dialog = new AlertDialog.Builder(mContext)
             .setTitle(r.getString(R.string.wifi_p2p_dialog_title))
             .setView(textEntryView)
@@ -1585,7 +1569,12 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                                 mP2pPdNotify =0;
                         }
                         else {
-                            WifiNative.p2pConnectKeypad(tempDeviceAddress, pin.getText().toString(), join);
+                            mSavedGoNegotiationConfig = new WifiP2pConfig();
+                            mSavedGoNegotiationConfig.wps.setup = WpsInfo.KEYPAD;
+                            mSavedGoNegotiationConfig.deviceAddress = tempDeviceAddress;
+                            mSavedGoNegotiationConfig.wps.pin = pin.getText().toString();
+                            mSavedGoNegotiationConfig.mPeergo = join ;
+                            sendMessage(GROUP_NEGOTIATION_USER_ACCEPT);
                         }
                     }
                     })
@@ -1597,7 +1586,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                                 mP2pPdNotify =0;
                         }
                         else {
-                            transitionTo(mInactiveState);
+                            sendMessage(GROUP_NEGOTIATION_USER_REJECT);
                         }
                         }
                     })
