@@ -852,6 +852,11 @@ status_t ACodec::configureCodec(
         CHECK(msg->findInt32("width", &width));
         CHECK(msg->findInt32("height", &height));
 
+        if (mSmoothStreaming) {
+            width = MAX_WIDTH;
+            height = MAX_HEIGHT;
+        }
+
         if(setupVideoDecoder(mime, width, height) != (status_t)OK ) {
             LOGE("Setup Video Decoder failed.");
             return UNKNOWN_ERROR;
@@ -1181,7 +1186,7 @@ status_t ACodec::setVideoFormatOnPort(
 
     CHECK_EQ(err, (status_t)OK);
 
-    if (portIndex == kPortIndexInput && !mSmoothStreaming) {
+    if (portIndex == kPortIndexInput) {
         // XXX Need a (much) better heuristic to compute input buffer sizes.
         const size_t X = 64 * 1024;
         if (def.nBufferSize < X) {
@@ -1191,10 +1196,8 @@ status_t ACodec::setVideoFormatOnPort(
 
     CHECK_EQ((int)def.eDomain, (int)OMX_PortDomainVideo);
 
-    if (!mSmoothStreaming) {
-        video_def->nFrameWidth = width;
-        video_def->nFrameHeight = height;
-    }
+    video_def->nFrameWidth = width;
+    video_def->nFrameHeight = height;
 
     if (portIndex == kPortIndexInput) {
         video_def->eCompressionFormat = compressionFormat;
@@ -1379,114 +1382,15 @@ void ACodec::sendFormatChange() {
 }
 
 status_t ACodec::InitSmoothStreaming() {
-
-    // get Extension index for smooth streaming
-    QOMX_INDEXEXTRADATATYPE extraDataType;
-    OMX_INDEXTYPE indexType;
-    status_t err = mOMX->getExtensionIndex(mNode, const_cast<char *>(OMX_QCOM_INDEX_PARAM_INDEXEXTRADATA), &indexType);
-    if (err != OK) {
-        LOGE("InitSmoothStreaming Error in getExtensionIndex %d", err);
-        return err;
-    }
-
-    //Enable smooth streaming
-    extraDataType.nPortIndex = kPortIndexOutput;
-    extraDataType.nIndex = OMX_IndexParamPortDefinition;
-    extraDataType.bEnabled = OMX_TRUE;
-
     // call set_parameter
-    err = mOMX->setParameter(mNode, indexType, &extraDataType, sizeof(extraDataType));
+    status_t err = mOMX->setParameter(mNode, (OMX_INDEXTYPE)OMX_QcomIndexParamEnableSmoothStreaming, &err, sizeof(int32_t));
     if (err != OMX_ErrorNone) {
         LOGE("InitSmoothStreaming setParam failed for extradata");
         return err;
     }
 
-    LOGI("InitSmoothStreaming - Smooth streaming mode enabled");
+    LOGW("InitSmoothStreaming - Smooth streaming mode enabled");
 
-    //Get buffer count for min resolution for input port
-    OMX_PARAM_PORTDEFINITIONTYPE def;
-    InitOMXParams(&def);
-    def.nPortIndex = kPortIndexInput;
-
-    OMX_VIDEO_PORTDEFINITIONTYPE *video_def = &def.format.video;
-    err = mOMX->getParameter(mNode, OMX_IndexParamPortDefinition,&def, sizeof(def));
-    if (err != OK) {
-        LOGE("InitSmoothStreaming getParam failed for input");
-        return err;
-    }
-    LOGV("ISS getParam Input buffer count actual = %lu, min %lu, size= %lu, ",
-            def.nBufferCountActual, def.nBufferCountMin, def.nBufferSize);
-
-    //set parameter for input port for min resolution for buffer count
-    video_def->nFrameWidth = MIN_WIDTH;
-    video_def->nFrameHeight = MIN_HEIGHT;
-    err = mOMX->setParameter(mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
-    if (err != OMX_ErrorNone) {
-        LOGE("InitSmoothStreaming SetParam failed for input port");
-        return err;
-    }
-    LOGV("ISS setParam Input buffer count actual = %lu, min %lu, size= %lu, ",
-            def.nBufferCountActual, def.nBufferCountMin, def.nBufferSize);
-
-    uint32_t maxBufferCnt = 0;
-    uint32_t maxBufferSize = 0;
-    InitOMXParams(&def);
-    def.nPortIndex = kPortIndexOutput;
-    err = mOMX->getParameter(mNode, OMX_IndexParamPortDefinition,&def, sizeof(def));
-    if (err != OK) {
-        LOGE("InitSmoothStreaming getParam failed for output");
-        return err;
-    }
-    LOGV("ISS getParam Output buffer count actual = %lu, min %lu, size= %lu, ",
-            def.nBufferCountActual, def.nBufferCountMin, def.nBufferSize);
-    maxBufferCnt = def.nBufferCountActual;
-
-    // Query buffer count for max resolution
-    InitOMXParams(&def);
-    def.nPortIndex = kPortIndexInput;
-    video_def = &def.format.video;
-    err = mOMX->getParameter(mNode, OMX_IndexParamPortDefinition,&def, sizeof(def));
-    if (err != OK) {
-        LOGE("InitSmoothStreaming getParam failed for input");
-        return err;
-    }
-    LOGV("ISS getParam Input buffer count actual = %lu, min %lu, size= %lu, ",
-            def.nBufferCountActual, def.nBufferCountMin, def.nBufferSize);
-
-    //set parameter for input port for max resolution for buffer count
-    video_def->nFrameWidth = MAX_WIDTH;
-    video_def->nFrameHeight = MAX_HEIGHT;
-    err = mOMX->setParameter(mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
-    if (err != OMX_ErrorNone) {
-        LOGE("InitSmoothStreaming SetParam failed for input port");
-        return err;
-    }
-
-    // query buffer size for max resolution
-    InitOMXParams(&def);
-    def.nPortIndex = kPortIndexOutput;
-    err = mOMX->getParameter(mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
-    if (err != OMX_ErrorNone) {
-        LOGE("InitSmoothStreaming OMX_GetParameter OMX_IndexParamPortDefinition failed");
-        return err;
-    }
-    LOGV("ISS getParam Output buffer count actual = %lu, min %lu, size= %lu, ",
-            def.nBufferCountActual, def.nBufferCountMin, def.nBufferSize);
-    maxBufferSize = def.nBufferSize;
-
-    InitOMXParams(&def);
-    def.nPortIndex = kPortIndexOutput;
-    def.nBufferSize = maxBufferSize;
-    def.nBufferCountActual = maxBufferCnt;
-    video_def->nFrameWidth = MAX_WIDTH;
-    video_def->nFrameHeight = MAX_HEIGHT;
-    err = mOMX->setParameter(mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
-    if (err != OMX_ErrorNone) {
-        LOGE("InitSmoothStreaming SetParam failed for input port");
-        return err;
-    }
-    LOGV("ISS final Output buffer count actual = %lu, min %lu, size= %lu, ",
-            def.nBufferCountActual, def.nBufferCountMin, def.nBufferSize);
     return OK;
 }
 
@@ -1825,46 +1729,6 @@ void ACodec::BaseState::getMoreInputDataIfPossible() {
     postFillThisBuffer(eligible);
 }
 
-void ACodec::BaseState::HandleExtraData(IOMX::buffer_id bufferID) {
-    OMX_OTHER_EXTRADATATYPE *pExtra;
-    OMX_BUFFERHEADERTYPE* pBufHdr = (OMX_BUFFERHEADERTYPE*)bufferID;
-    OMX_U32 uExtraData = (OMX_U32)pBufHdr->pBuffer + pBufHdr->nOffset + pBufHdr->nFilledLen;
-
-    uExtraData = (uExtraData + 3) & (~3); // 4 bytes aligned
-    pExtra = (OMX_OTHER_EXTRADATATYPE *)uExtraData;
-    while((uExtraData <= pBufHdr->nAllocLen) && (pExtra->eType != OMX_ExtraDataNone) &&
-          ((OMX_QCOM_EXTRADATATYPE)pExtra->eType != OMX_ExtraDataPortDef)) {
-
-        uExtraData += pExtra->nSize;
-        uExtraData = (uExtraData + 3) & (~3); // 4 bytes aligned
-        pExtra = (OMX_OTHER_EXTRADATATYPE *)uExtraData;
-    }
-
-    if((OMX_QCOM_EXTRADATATYPE)pExtra->eType == OMX_ExtraDataPortDef)
-    {
-        OMX_PARAM_PORTDEFINITIONTYPE* pPortDef;
-        pPortDef = (OMX_PARAM_PORTDEFINITIONTYPE *)pExtra->data;
-
-         //compare portDefi from extra data & output port def that we stored earlier
-        if ((pPortDef->format.video.nFrameWidth != mCodec->mOutputPortDef.format.video.nFrameWidth) ||
-                    (pPortDef->format.video.nFrameHeight != mCodec->mOutputPortDef.format.video.nFrameHeight) ||
-                    (pPortDef->format.video.nStride!= mCodec->mOutputPortDef.format.video.nStride) ||
-                    (pPortDef->format.video.nSliceHeight != mCodec->mOutputPortDef.format.video.nSliceHeight)) {
-             // set display parameteres if video size changed
-             LOGI("Resolution change detected, new size "
-               "w = %lu, h = %lu, stride = %lu, sliceht = %lu \n",
-                 pPortDef->format.video.nFrameWidth,
-                 pPortDef->format.video.nFrameHeight,
-                 pPortDef->format.video.nStride,
-                 pPortDef->format.video.nSliceHeight);
-
-             mCodec->mOutputPortDef = *pPortDef;
-             mCodec->sendFormatChange();
-        }
-    }
-}
-
-
 bool ACodec::BaseState::onOMXFillBufferDone(
         IOMX::buffer_id bufferID,
         size_t rangeOffset, size_t rangeLength,
@@ -1903,7 +1767,7 @@ bool ACodec::BaseState::onOMXFillBufferDone(
                     info->mStatus = BufferInfo::OWNED_BY_COMPONENT;
                 }
             } else {
-                if (!mCodec->mSentFormat) {
+                if (!mCodec->mSentFormat && !mCodec->mSmoothStreaming) {
                     mCodec->sendFormatChange();
                 }
 
@@ -1923,6 +1787,10 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 
                 reply->setPointer("buffer-id", info->mBufferID);
                 reply->setInt32("flags", flags);
+                if (!mCodec->mSentFormat && mCodec->mSmoothStreaming) {
+                    LOGV("Resolution will change from this buffer, set a flag");
+                    reply->setInt32("resChange", 1);
+                }
 
                 notify->setMessage("reply", reply);
 
@@ -1964,11 +1832,15 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
         mCodec->findBufferByID(kPortIndexOutput, bufferID, &index);
     CHECK_EQ((int)info->mStatus, (int)BufferInfo::OWNED_BY_DOWNSTREAM);
 
-    int32_t flags;
-    CHECK(msg->findInt32("flags", &flags));
-    if (mCodec->mSmoothStreaming && (flags & OMX_BUFFERFLAG_EXTRADATA)) {
-        HandleExtraData( bufferID );
+    if (mCodec->mSmoothStreaming && !mCodec->mSentFormat) {
+        int32_t resChange = 0;
+        if (msg->findInt32("resChange", &resChange) && resChange == 1) {
+            LOGV("Resolution change is sent to native window now ");
+            mCodec->sendFormatChange();
+            msg->setInt32("resChange", 0);
+        }
     }
+
     int32_t render;
     if (mCodec->mNativeWindow != NULL
             && msg->findInt32("render", &render) && render != 0) {
@@ -2455,7 +2327,8 @@ bool ACodec::ExecutingState::onOMXEvent(
         }
         case OMX_EventIndexsettingChanged:
         {
-            LOGV("[%s] Received OMX_EventIndexsettingChanged event ", mCodec->mComponentName.c_str());
+            LOGW("[%s] Received OMX_EventIndexsettingChanged event ", mCodec->mComponentName.c_str());
+            mCodec->mSentFormat = false;
             return true;
         }
 
