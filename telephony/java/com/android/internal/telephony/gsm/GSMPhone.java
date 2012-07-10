@@ -50,6 +50,7 @@ import static com.android.internal.telephony.CommandsInterface.CF_REASON_UNCONDI
 import static com.android.internal.telephony.CommandsInterface.SERVICE_CLASS_VOICE;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_BASEBAND_VERSION;
 
+import com.android.internal.telephony.IccCardApplicationStatus.AppState;
 import com.android.internal.telephony.cat.CatService;
 import com.android.internal.telephony.Call;
 import com.android.internal.telephony.CallForwardInfo;
@@ -70,6 +71,7 @@ import com.android.internal.telephony.PhoneSubInfo;
 import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.UUSInfo;
 import com.android.internal.telephony.UiccCard;
+import com.android.internal.telephony.UiccCardApplication;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.IccVmNotSupportedException;
@@ -709,7 +711,8 @@ public class GSMPhone extends PhoneBase {
 
         // Only look at the Network portion for mmi
         String networkPortion = PhoneNumberUtils.extractNetworkPortionAlt(newDialString);
-        GsmMmiCode mmi = GsmMmiCode.newFromDialString(networkPortion, this, mUiccCard.get());
+        GsmMmiCode mmi =
+                GsmMmiCode.newFromDialString(networkPortion, this, mUiccApplication.get());
         if (LOCAL_DEBUG) Log.d(LOG_TAG,
                                "dialing w/ mmi '" + mmi + "'...");
 
@@ -728,7 +731,7 @@ public class GSMPhone extends PhoneBase {
     }
 
     public boolean handlePinMmi(String dialString) {
-        GsmMmiCode mmi = GsmMmiCode.newFromDialString(dialString, this, mUiccCard.get());
+        GsmMmiCode mmi = GsmMmiCode.newFromDialString(dialString, this, mUiccApplication.get());
 
         if (mmi != null && mmi.isPinCommand()) {
             mPendingMMIs.add(mmi);
@@ -741,7 +744,7 @@ public class GSMPhone extends PhoneBase {
     }
 
     public void sendUssdResponse(String ussdMessge) {
-        GsmMmiCode mmi = GsmMmiCode.newFromUssdUserInput(ussdMessge, this, mUiccCard.get());
+        GsmMmiCode mmi = GsmMmiCode.newFromUssdUserInput(ussdMessge, this, mUiccApplication.get());
         mPendingMMIs.add(mmi);
         mMmiRegistrants.notifyRegistrants(new AsyncResult(null, mmi, null));
         mmi.sendUssd(ussdMessge);
@@ -1071,6 +1074,10 @@ public class GSMPhone extends PhoneBase {
         mDataConnectionTracker.setDataOnRoamingEnabled(enable);
     }
 
+    /*package*/ AppState getCurrentUiccState() {
+        return super.getCurrentUiccStateP();
+    }
+
     /**
      * Removes the given MMI from the pending list and notifies
      * registrants that it is complete.
@@ -1139,7 +1146,7 @@ public class GSMPhone extends PhoneBase {
                 mmi = GsmMmiCode.newNetworkInitiatedUssd(ussdMessage,
                                                    isUssdRequest,
                                                    GSMPhone.this,
-                                                   mUiccCard.get());
+                                                   mUiccApplication.get());
                 onNetworkInitiatedUssd(mmi);
             }
         }
@@ -1339,23 +1346,24 @@ public class GSMPhone extends PhoneBase {
             return;
         }
 
-        UiccCard newUiccCard = mUiccController.getUiccCard();
+        UiccCardApplication newUiccApplication = 
+                mUiccController.getUiccCardApplication(UiccController.APP_FAM_3GPP);
 
-        UiccCard c = mUiccCard.get();
-        if (c != newUiccCard) {
-            if (c != null) {
+        UiccCardApplication app = mUiccApplication.get();
+        if (app != newUiccApplication) {
+            if (app != null) {
                 if (LOCAL_DEBUG) log("Removing stale icc objects.");
                 if (mIccRecords.get() != null) {
                     unregisterForSimRecordEvents();
                     mSimPhoneBookIntManager.updateIccRecords(null);
                 }
                 mIccRecords.set(null);
-                mUiccCard.set(null);
+                mUiccApplication.set(null);
             }
-            if (newUiccCard != null) {
-                if (LOCAL_DEBUG) log("New card found");
-                mUiccCard.set(newUiccCard);
-                mIccRecords.set(newUiccCard.getIccRecords());
+            if (newUiccApplication != null) {
+                if (LOCAL_DEBUG) log("New Uicc application found");
+                mUiccApplication.set(newUiccApplication);
+                mIccRecords.set(newUiccApplication.getIccRecords());
                 registerForSimRecordEvents();
                 mSimPhoneBookIntManager.updateIccRecords(mIccRecords.get());
             }

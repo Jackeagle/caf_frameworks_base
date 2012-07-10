@@ -77,7 +77,13 @@ public class PhoneProxy extends Handler implements Phone {
         mCommandsInterface.registerForOn(this, EVENT_RADIO_ON, null);
         mCommandsInterface.registerForVoiceRadioTechChanged(
                              this, EVENT_VOICE_RADIO_TECH_CHANGED, null);
-        mIccCardProxy = new IccCardProxy(phone, phone.getContext(), mCommandsInterface);
+        mIccCardProxy = new IccCardProxy(phone.getContext(), mCommandsInterface);
+        if (phone.getPhoneType() == Phone.PHONE_TYPE_GSM) {
+            // For the purpose of IccCardProxy we only care about the technology family
+            mIccCardProxy.setVoiceRadioTech(ServiceState.RIL_RADIO_TECHNOLOGY_UMTS);
+        } else if (phone.getPhoneType() == Phone.PHONE_TYPE_CDMA) {
+            mIccCardProxy.setVoiceRadioTech(ServiceState.RIL_RADIO_TECHNOLOGY_1xRTT);
+        }
     }
 
     @Override

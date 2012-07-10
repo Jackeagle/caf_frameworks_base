@@ -16,6 +16,7 @@
 
 package com.android.internal.telephony;
 
+import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Looper;
@@ -38,7 +39,7 @@ public abstract class ServiceStateTracker extends Handler {
 
     protected CommandsInterface cm;
     protected UiccController mUiccController = null;
-    protected UiccCard mUiccCard = null;
+    protected UiccCardApplication mUiccApplcation = null;
     protected IccRecords mIccRecords = null;
 
     public ServiceState ss;
@@ -174,7 +175,7 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final String REGISTRATION_DENIED_GEN  = "General";
     protected static final String REGISTRATION_DENIED_AUTH = "Authentication Failure";
 
-    public ServiceStateTracker(PhoneBase p, CommandsInterface ci) {
+    public ServiceStateTracker(Context c, CommandsInterface ci) {
         cm = ci;
         mUiccController = UiccController.getInstance();
         mUiccController.registerForIccChanged(this, EVENT_ICC_CHANGED, null);

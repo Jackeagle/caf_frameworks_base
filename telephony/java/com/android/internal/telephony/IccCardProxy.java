@@ -30,8 +30,11 @@ import android.util.Log;
 import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
 
+import com.android.internal.telephony.IccCardApplicationStatus.AppState;
+import com.android.internal.telephony.IccCardApplicationStatus.PersoSubState;
+import com.android.internal.telephony.IccCardStatus.CardState;
+import com.android.internal.telephony.IccCardStatus.PinState;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
-import com.android.internal.telephony.gsm.SIMRecords;
 import com.android.internal.telephony.uicc.UiccController;
 
 import static com.android.internal.telephony.Phone.CDMA_SUBSCRIPTION_NV;
@@ -41,7 +44,8 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_SIM_ST
  * The Phone App UI and the external world assumes that there is only one icc card,
  * and one icc application available at a time. But the Uicc Controller can handle
  * multiple instances of icc objects. This class implements the icc interface to expose
- * the  first application on the first icc card, so that external apps wont break.
+ * the current (based on voice radio technology) application on the uicc card, so
+ * that external apps wont break.
  */
 
 public class IccCardProxy extends Handler implements IccCard {
@@ -70,9 +74,9 @@ public class IccCardProxy extends Handler implements IccCard {
     private int mCurrentAppType = UiccController.APP_FAM_3GPP; //default to 3gpp?
     private UiccController mUiccController = null;
     private UiccCard mUiccCard = null;
+    private UiccCardApplication mUiccApplication = null;
     private IccRecords mIccRecords = null;
     private CdmaSubscriptionSourceManager mCdmaSSM = null;
-    private boolean mFirstRun = true;
     private boolean mRadioOn = false;
     private boolean mCdmaSubscriptionFromNv = false;
     private boolean mIsMultimodeCdmaPhone =
@@ -80,8 +84,10 @@ public class IccCardProxy extends Handler implements IccCard {
     private boolean mQuietMode = false; // when set to true IccCardProxy will not broadcast
                                         // ACTION_SIM_STATE_CHANGED intents
     private boolean mInitialized = false;
+    private IccCard.State mExternalState = State.UNKNOWN;
 
-    public IccCardProxy(PhoneBase p, Context context, CommandsInterface ci) {
+    public IccCardProxy(Context context, CommandsInterface ci) {
+        log("Creating");
         this.mContext = context;
         this.mCi = ci;
         mCdmaSSM = CdmaSubscriptionSourceManager.getInstance(context,
@@ -90,10 +96,11 @@ public class IccCardProxy extends Handler implements IccCard {
         mUiccController.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
         ci.registerForOn(this,EVENT_RADIO_ON, null);
         ci.registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_UNAVAILABLE, null);
-        SystemProperties.set(PROPERTY_SIM_STATE, "ABSENT");
+        setExternalState(State.NOT_READY);
     }
 
     public void dispose() {
+        log("Disposing");
         //Cleanup icc references
         mUiccController.unregisterForIccChanged(this);
         mUiccController = null;
@@ -113,27 +120,50 @@ public class IccCardProxy extends Handler implements IccCard {
         } else {
             mCurrentAppType = UiccController.APP_FAM_3GPP2;
         }
-        mFirstRun = true;
         updateQuietMode();
     }
 
-    /** This function does not necessarily updates mQuietMode right away
+    /** This function does not necessarily update mQuietMode right away
      * In case of 3GPP2 subscription it needs more information (subscription source)
      */
     private void updateQuietMode() {
-        if (DBG) log("Updating Quiet mode");
+        if (DBG) log("Updating quiet mode");
+        boolean oldQuietMode = mQuietMode;
+        boolean newQuietMode;
         if (mCurrentAppType == UiccController.APP_FAM_3GPP) {
-            mInitialized = true;
-            mQuietMode = false;
-            if (DBG) log("3GPP subscription -> QuietMode: " + mQuietMode);
-            sendMessage(obtainMessage(EVENT_ICC_CHANGED));
+            newQuietMode = false;
+            if (DBG) log("3GPP subscription -> QuietMode: " + newQuietMode);
         } else {
             //In case of 3gpp2 we need to find out if subscription used is coming from
             //NV in which case we shouldn't broadcast any sim states changes if at the
             //same time ro.config.multimode_cdma property set to false.
-            mInitialized = false;
-            handleCdmaSubscriptionSource();
+            //mInitialized = false;
+            //handleCdmaSubscriptionSource();
+            int newSubscriptionSource = mCdmaSSM.getCdmaSubscriptionSource();
+            mCdmaSubscriptionFromNv = newSubscriptionSource == CDMA_SUBSCRIPTION_NV;
+            if (mCdmaSubscriptionFromNv && mIsMultimodeCdmaPhone) {
+                log("Cdma multimode phone detected. Forcing IccCardProxy into 3gpp mode");
+                mCurrentAppType = UiccController.APP_FAM_3GPP;
+            }
+            newQuietMode = mCdmaSubscriptionFromNv
+                    && (mCurrentAppType == UiccController.APP_FAM_3GPP2) && !mIsMultimodeCdmaPhone;
         }
+
+        if (mQuietMode == false && newQuietMode == true) {
+            // Last thing to do before switching to quiet mode is
+            // broadcast ICC_READY
+            log("Switching to QuietMode.");
+            setExternalState(State.READY);
+            mQuietMode = newQuietMode;
+        } else if (mQuietMode == true && newQuietMode == false) {
+            log("Switching out from QuietMode. Force broadcast of current state:" + mExternalState);
+            mQuietMode = newQuietMode;
+            setExternalState(mExternalState, true);
+        }
+        log("QuietMode is " + mQuietMode + " (app_type: " + mCurrentAppType + " nv: "
+                + mCdmaSubscriptionFromNv + " multimode: " + mIsMultimodeCdmaPhone + ")");
+        mInitialized = true;
+        sendMessage(obtainMessage(EVENT_ICC_CHANGED));
     }
 
     public void handleMessage(Message msg) {
@@ -150,18 +180,17 @@ public class IccCardProxy extends Handler implements IccCard {
             case EVENT_ICC_CHANGED:
                 if (mInitialized) {
                     updateIccAvailability();
-                    updateStateProperty();
                 }
                 break;
             case EVENT_ICC_ABSENT:
                 mAbsentRegistrants.notifyRegistrants();
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
+                setExternalState(State.ABSENT);
                 break;
             case EVENT_ICC_LOCKED:
                 processLockedState();
                 break;
             case EVENT_APP_READY:
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_READY, null);
+                setExternalState(State.READY);
                 break;
             case EVENT_RECORDS_LOADED:
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOADED, null);
@@ -170,80 +199,105 @@ public class IccCardProxy extends Handler implements IccCard {
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_IMSI, null);
                 break;
             case EVENT_NETWORK_LOCKED:
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOCKED,
-                        INTENT_VALUE_LOCKED_NETWORK);
                 mNetworkLockedRegistrants.notifyRegistrants();
+                setExternalState(State.NETWORK_LOCKED);
                 break;
             case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
                 updateQuietMode();
                 break;
             default:
-                Log.e(LOG_TAG, "Unhandled message with number: " + msg.what);
+                loge("Unhandled message with number: " + msg.what);
                 break;
         }
     }
 
     void updateIccAvailability() {
-        mUiccCard = mUiccController.getUiccCard();
-        IccCard.State state = State.UNKNOWN;
+        UiccCard newCard = mUiccController.getUiccCard();
+        CardState state = CardState.CARDSTATE_ABSENT;
+        UiccCardApplication newApp = null;
         IccRecords newRecords = null;
-        if (mUiccCard != null) {
-            state = mUiccCard.getState();
-            if (DBG) log("Card State = " + state);
-            newRecords = mUiccCard.getIccRecords();
+        if (newCard != null) {
+            state = newCard.getCardState();
+            newApp = newCard.getApplication(mCurrentAppType);
+            if (newApp != null) {
+                newRecords = newApp.getIccRecords();
+            }
         }
 
-        if (mFirstRun) {
-            if (mUiccCard == null || state == State.ABSENT) {
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
-            }
-            mFirstRun = false;
+        if (mIccRecords != newRecords || mUiccApplication != newApp || mUiccCard != newCard) {
+            if (DBG) log("Icc changed. Reregestering.");
+            unregisterUiccCardEvents();
+            mUiccCard = newCard;
+            mUiccApplication = newApp;
+            mIccRecords = newRecords;
+            registerUiccCardEvents();
         }
 
-        if (mIccRecords != newRecords) {
-            if (mIccRecords != null) {
-                unregisterUiccCardEvents();
-                mIccRecords = null;
-            }
-            if (newRecords == null) {
-                if (mRadioOn) {
-                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT, null);
-                } else {
-                    broadcastIccStateChangedIntent(INTENT_VALUE_ICC_NOT_READY, null);
-                }
+        updateExternalState();
+    }
+    
+    private void updateExternalState() {
+        if (mUiccCard == null || mUiccCard.getCardState() == CardState.CARDSTATE_ABSENT) {
+            if (mRadioOn) {
+                setExternalState(State.ABSENT);
             } else {
-                mIccRecords = newRecords;
-                registerUiccCardEvents();
+                setExternalState(State.NOT_READY);
             }
+            return;
+        }
+
+        if (mUiccCard.getCardState() == CardState.CARDSTATE_ERROR ||
+                mUiccApplication == null) {
+            setExternalState(State.UNKNOWN);
+            return;
+        }
+
+        switch (mUiccApplication.getState()) {
+            case APPSTATE_UNKNOWN:
+            case APPSTATE_DETECTED:
+                setExternalState(State.UNKNOWN);
+                break;
+            case APPSTATE_PIN:
+                setExternalState(State.PIN_REQUIRED);
+                break;
+            case APPSTATE_PUK:
+                setExternalState(State.PUK_REQUIRED);
+                break;
+            case APPSTATE_SUBSCRIPTION_PERSO:
+                if (mUiccApplication.getPersoSubState() == PersoSubState.PERSOSUBSTATE_SIM_NETWORK) {
+                    setExternalState(State.NETWORK_LOCKED);
+                } else {
+                    setExternalState(State.UNKNOWN);
+                }
+                break;
+            case APPSTATE_READY:
+                setExternalState(State.READY);
+                break;
         }
     }
 
     private void registerUiccCardEvents() {
-        if (mUiccCard != null) mUiccCard.registerForReady(this, EVENT_APP_READY, null);
-        if (mUiccCard != null) mUiccCard.registerForLocked(this, EVENT_ICC_LOCKED, null);
-        if (mUiccCard != null) mUiccCard.registerForNetworkLocked(this, EVENT_NETWORK_LOCKED, null);
         if (mUiccCard != null) mUiccCard.registerForAbsent(this, EVENT_ICC_ABSENT, null);
+        if (mUiccApplication != null) mUiccApplication.registerForReady(this, EVENT_APP_READY, null);
+        if (mUiccApplication != null) mUiccApplication.registerForLocked(this, EVENT_ICC_LOCKED, null);
+        if (mUiccApplication != null) mUiccApplication.registerForNetworkLocked(this, EVENT_NETWORK_LOCKED, null);
         if (mIccRecords != null) mIccRecords.registerForImsiReady(this, EVENT_IMSI_READY, null);
         if (mIccRecords != null) mIccRecords.registerForRecordsLoaded(this, EVENT_RECORDS_LOADED, null);
     }
 
     private void unregisterUiccCardEvents() {
-        if (mUiccCard != null) mUiccCard.unregisterForReady(this);
-        if (mUiccCard != null) mUiccCard.unregisterForLocked(this);
-        if (mUiccCard != null) mUiccCard.unregisterForNetworkLocked(this);
         if (mUiccCard != null) mUiccCard.unregisterForAbsent(this);
+        if (mUiccApplication != null) mUiccApplication.unregisterForReady(this);
+        if (mUiccApplication != null) mUiccApplication.unregisterForLocked(this);
+        if (mUiccApplication != null) mUiccApplication.unregisterForNetworkLocked(this);
         if (mIccRecords != null) mIccRecords.unregisterForImsiReady(this);
         if (mIccRecords != null) mIccRecords.unregisterForRecordsLoaded(this);
-    }
-
-    private void updateStateProperty() {
-        SystemProperties.set(PROPERTY_SIM_STATE, getState().toString());
     }
 
     /* why do external apps need to use this? */
     public void broadcastIccStateChangedIntent(String value, String reason) {
         if (mQuietMode) {
-            Log.e(LOG_TAG, "QuietMode: NOT Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
+            log("QuietMode: NOT Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
                     + " reason " + reason);
             return;
         }
@@ -260,8 +314,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void changeIccFdnPassword(String oldPassword, String newPassword, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.changeIccFdnPassword(oldPassword, newPassword, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.changeIccFdnPassword(oldPassword, newPassword, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -271,8 +325,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void changeIccLockPassword(String oldPassword, String newPassword, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.changeIccLockPassword(oldPassword, newPassword, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.changeIccLockPassword(oldPassword, newPassword, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -282,22 +336,24 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     private void processLockedState() {
-        if (mUiccCard == null) {
+        if (mUiccApplication == null) {
             //Don't need to do anything if non-existent application is locked
             return;
         }
-        IccCard.State appState = mUiccCard.getState();
+        PinState pin1State = mUiccApplication.getPin1State();
+        if (pin1State == PinState.PINSTATE_ENABLED_PERM_BLOCKED) {
+            setExternalState(State.PERM_DISABLED);
+            return;
+        }
+
+        AppState appState = mUiccApplication.getState();
         switch (appState) {
-            case PIN_REQUIRED:
+            case APPSTATE_PIN:
                 mPinLockedRegistrants.notifyRegistrants();
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOCKED, INTENT_VALUE_LOCKED_ON_PIN);
+                setExternalState(State.PIN_REQUIRED);
                 break;
-            case PUK_REQUIRED:
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOCKED, INTENT_VALUE_LOCKED_ON_PUK);
-                break;
-            case PERM_DISABLED:
-                broadcastIccStateChangedIntent(INTENT_VALUE_ICC_ABSENT,
-                        INTENT_VALUE_ABSENT_ON_PERM_DISABLED);
+            case APPSTATE_PUK:
+                setExternalState(State.PUK_REQUIRED);
                 break;
         }
     }
@@ -306,43 +362,32 @@ public class IccCardProxy extends Handler implements IccCard {
         return getState();
     }
 
-    public State getState() {
-        if (mCurrentAppType == UiccController.APP_FAM_3GPP2 && mCdmaSubscriptionFromNv) {
-            return State.READY;
-        }
-        if (mUiccCard != null) {
-            mUiccCard.getState();
-        }
-
-        return State.UNKNOWN;
-    }
-
     public boolean getIccFdnEnabled() {
-        Boolean retValue = mUiccCard != null ? mUiccCard.getIccFdnEnabled() : false;
+        Boolean retValue = mUiccApplication != null ? mUiccApplication.getIccFdnEnabled() : false;
         return retValue;
     }
 
     public boolean getIccLockEnabled() {
         /* defaults to true, if ICC is absent */
-        Boolean retValue = mUiccCard != null ? mUiccCard.getIccLockEnabled() : true;
+        Boolean retValue = mUiccApplication != null ? mUiccApplication.getIccLockEnabled() : true;
         return retValue;
     }
 
     public String getServiceProviderName() {
-        if (mUiccCard != null) {
-            return mUiccCard.getServiceProviderName();
+        if (mIccRecords != null) {
+            return mIccRecords.getServiceProviderName();
         }
         return null;
     }
 
     public boolean hasIccCard() {
-        if (mUiccCard != null && mUiccCard.getState().iccCardExist()) {
+        if (mUiccCard != null && mUiccCard.getCardState() != CardState.CARDSTATE_ABSENT) {
             return true;
         }
         return false;
     }
 
-    public boolean isApplicationOnIcc(IccCardApplication.AppType type) {
+    public boolean isApplicationOnIcc(IccCardApplicationStatus.AppType type) {
         Boolean retValue = mUiccCard != null ? mUiccCard.isApplicationOnIcc(type) : false;
         return retValue;
     }
@@ -413,8 +458,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void setIccFdnEnabled(boolean enabled, String password, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.setIccFdnEnabled(enabled, password, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.setIccFdnEnabled(enabled, password, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -424,8 +469,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void setIccLockEnabled(boolean enabled, String password, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.setIccLockEnabled(enabled, password, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.setIccLockEnabled(enabled, password, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -438,8 +483,8 @@ public class IccCardProxy extends Handler implements IccCard {
      * Use invokeDepersonalization from PhoneBase class instead.
      */
     public void supplyNetworkDepersonalization(String pin, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.supplyNetworkDepersonalization(pin, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.supplyNetworkDepersonalization(pin, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("CommandsInterface is not set.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -449,8 +494,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void supplyPin(String pin, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.supplyPin(pin, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.supplyPin(pin, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -460,8 +505,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void supplyPin2(String pin2, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.supplyPin2(pin2, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.supplyPin2(pin2, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -471,8 +516,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void supplyPuk(String puk, String newPin, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.supplyPuk(puk, newPin, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.supplyPuk(puk, newPin, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -482,8 +527,8 @@ public class IccCardProxy extends Handler implements IccCard {
     }
 
     public void supplyPuk2(String puk2, String newPin2, Message onComplete) {
-        if (mUiccCard != null) {
-            mUiccCard.supplyPuk2(puk2, newPin2, onComplete);
+        if (mUiccApplication != null) {
+            mUiccApplication.supplyPuk2(puk2, newPin2, onComplete);
         } else if (onComplete != null) {
             Exception e = new RuntimeException("ICC card is absent.");
             AsyncResult.forMessage(onComplete).exception = e;
@@ -492,36 +537,26 @@ public class IccCardProxy extends Handler implements IccCard {
         }
     }
 
-    /**
-     * Handles the call to get the subscription source
-     *
-     * @param holds the new CDMA subscription source value
-     */
-    private void handleCdmaSubscriptionSource() {
-        int newSubscriptionSource = mCdmaSSM.getCdmaSubscriptionSource();
-        mCdmaSubscriptionFromNv = newSubscriptionSource == CDMA_SUBSCRIPTION_NV;
-        if (mCdmaSubscriptionFromNv && mIsMultimodeCdmaPhone) {
-            if (DBG) log("Cdma multimode phone detected. Forcing IccCardProxy into 3gpp mode");
-            mCurrentAppType = UiccController.APP_FAM_3GPP;
+    private void setExternalState(State newState, boolean override) {
+        if (!override && newState == mExternalState) {
+            return;
         }
-        boolean newQuietMode = mCdmaSubscriptionFromNv
-                && (mCurrentAppType == UiccController.APP_FAM_3GPP2) && !mIsMultimodeCdmaPhone;
-        if (mQuietMode == false && newQuietMode == true) {
-            // Last thing to do before switching to Quiet mode is
-            // broadcast ICC_READY
-            if (DBG) log("Switching to QuietMode.");
-            broadcastIccStateChangedIntent(INTENT_VALUE_ICC_READY, null);
-        }
-        mQuietMode = newQuietMode;
-        if (DBG) log("QuietMode is " + mQuietMode + " (app_type: " + mCurrentAppType + " nv: "
-                + mCdmaSubscriptionFromNv + " multimode: " + mIsMultimodeCdmaPhone + ")");
-        mInitialized = true;
-        sendMessage(obtainMessage(EVENT_ICC_CHANGED));
+        mExternalState = newState;
+        SystemProperties.set(PROPERTY_SIM_STATE, mExternalState.toString());
+        broadcastIccStateChangedIntent(mExternalState.getIntentString(),
+                                       mExternalState.getReason());
+    }
+    private void setExternalState(State newState) {
+        setExternalState(newState, false);
+    }
+
+    public State getState() {
+        return mExternalState;
     }
 
     public IccFileHandler getIccFileHandler() {
-        if (mUiccCard != null) {
-            return mUiccCard.getIccFileHandler();
+        if (mUiccApplication != null) {
+            return mUiccApplication.getIccFileHandler();
         }
         return null;
     }
@@ -537,7 +572,11 @@ public class IccCardProxy extends Handler implements IccCard {
         return false;
     }
 
-    protected void log(String s) {
+    private void log(String s) {
         Log.d(LOG_TAG, s);
+    }
+
+    private void loge(String msg) {
+        Log.e(LOG_TAG, msg);
     }
 }

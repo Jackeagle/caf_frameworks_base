@@ -37,6 +37,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.R;
+import com.android.internal.telephony.IccCardApplicationStatus.AppState;
 import com.android.internal.telephony.gsm.UsimServiceTable;
 import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.test.SimulatedRadioControl;
@@ -130,9 +131,10 @@ public abstract class PhoneBase extends Handler implements Phone {
     boolean mIsVoiceCapable = true;
     protected UiccController mUiccController = null;
     public AtomicReference<IccRecords> mIccRecords = new AtomicReference<IccRecords>();
-    protected AtomicReference<UiccCard> mUiccCard = new AtomicReference<UiccCard>();
     public SmsStorageMonitor mSmsStorageMonitor;
     public SmsUsageMonitor mSmsUsageMonitor;
+    protected AtomicReference<UiccCardApplication> mUiccApplication =
+            new AtomicReference<UiccCardApplication>();
     public SMSDispatcher mSMS;
 
     /**
@@ -254,7 +256,7 @@ public abstract class PhoneBase extends Handler implements Phone {
         // Initialize device storage and outgoing SMS usage monitors for SMSDispatchers.
         mSmsStorageMonitor = new SmsStorageMonitor(this);
         mSmsUsageMonitor = new SmsUsageMonitor(context);
-        mUiccController = UiccController.getInstance(this);
+        mUiccController = UiccController.getInstance();
         mUiccController.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
     }
 
@@ -276,7 +278,7 @@ public abstract class PhoneBase extends Handler implements Phone {
         mSmsUsageMonitor = null;
         mSMS = null;
         mIccRecords.set(null);
-        mUiccCard.set(null);
+        mUiccApplication.set(null);
         mDataConnectionTracker = null;
         mUiccController = null;
     }
@@ -647,9 +649,9 @@ public abstract class PhoneBase extends Handler implements Phone {
      * Retrieves the IccFileHandler of the Phone instance
      */
     public IccFileHandler getIccFileHandler(){
-        UiccCard uiccCard = mUiccCard.get();
-        if (uiccCard == null) return null;
-        return uiccCard.getIccFileHandler();
+        UiccCardApplication uiccApplication = mUiccApplication.get();
+        if (uiccApplication == null) return null;
+        return uiccApplication.getIccFileHandler();
     }
 
     /*
@@ -677,6 +679,16 @@ public abstract class PhoneBase extends Handler implements Phone {
     public IccCard getIccCard() {
         return null;
         //throw new Exception("getIccCard Shouldn't be called from PhoneBase");
+    }
+
+    /**
+     * Subclasses of PhoneBase probably want to replace this with a
+     * version scoped to their packages
+     */
+    protected AppState getCurrentUiccStateP() {
+        UiccCardApplication uiccCardApplication = mUiccApplication.get();
+        if (uiccCardApplication == null) return AppState.APPSTATE_UNKNOWN;
+        return uiccCardApplication.getState();
     }
 
     @Override
@@ -1181,7 +1193,7 @@ public abstract class PhoneBase extends Handler implements Phone {
         pw.println(" mIsTheCurrentActivePhone=" + mIsTheCurrentActivePhone);
         pw.println(" mIsVoiceCapable=" + mIsVoiceCapable);
         pw.println(" mIccRecords=" + mIccRecords.get());
-        pw.println(" mUiccCard=" + mUiccCard.get());
+        pw.println(" mUiccApplication=" + mUiccApplication.get());
         pw.println(" mSmsStorageMonitor=" + mSmsStorageMonitor);
         pw.println(" mSmsUsageMonitor=" + mSmsUsageMonitor);
         pw.println(" mSMS=" + mSMS);
