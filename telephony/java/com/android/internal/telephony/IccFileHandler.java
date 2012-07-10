@@ -91,7 +91,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
 
      // member variables
     protected final CommandsInterface mCi;
-    protected final IccCard mParentCard;
+    protected final UiccCard mParentCard;
     protected String mAid;
 
     static class LoadLinearFixedContext {
@@ -122,7 +122,7 @@ public abstract class IccFileHandler extends Handler implements IccConstants {
     /**
      * Default constructor
      */
-    protected IccFileHandler(IccCard card, String aid, CommandsInterface ci) {
+    protected IccFileHandler(UiccCard card, String aid, CommandsInterface ci) {
         mParentCard = card;
         mAid = aid;
         mCi = ci;

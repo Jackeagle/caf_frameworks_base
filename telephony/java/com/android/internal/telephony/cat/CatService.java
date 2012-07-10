@@ -28,9 +28,9 @@ import android.os.SystemProperties;
 
 import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.CommandsInterface;
-import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccFileHandler;
 import com.android.internal.telephony.IccRecords;
+import com.android.internal.telephony.UiccCard;
 
 
 import java.io.ByteArrayOutputStream;
@@ -102,7 +102,7 @@ public class CatService extends Handler implements AppInterface {
 
     /* Intentionally private for singleton */
     private CatService(CommandsInterface ci, IccRecords ir, Context context,
-            IccFileHandler fh, IccCard ic) {
+            IccFileHandler fh, UiccCard ic) {
         if (ci == null || ir == null || context == null || fh == null
                 || ic == null) {
             throw new NullPointerException(
@@ -554,7 +554,7 @@ public class CatService extends Handler implements AppInterface {
      * @return The only Service object in the system
      */
     public static CatService getInstance(CommandsInterface ci, IccRecords ir,
-            Context context, IccFileHandler fh, IccCard ic) {
+            Context context, IccFileHandler fh, UiccCard ic) {
         synchronized (sInstanceLock) {
             if (sInstance == null) {
                 if (ci == null || ir == null || context == null || fh == null

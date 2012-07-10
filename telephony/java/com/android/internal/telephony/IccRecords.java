@@ -39,9 +39,10 @@ public abstract class IccRecords extends Handler implements IccConstants {
     protected Context mContext;
     protected CommandsInterface mCi;
     protected IccFileHandler mFh;
-    protected IccCard mParentCard;
+    protected UiccCard mParentCard;
 
     protected RegistrantList recordsLoadedRegistrants = new RegistrantList();
+    protected RegistrantList mImsiReadyRegistrants = new RegistrantList();
     protected RegistrantList mRecordsEventsRegistrants = new RegistrantList();
     protected RegistrantList mNewSmsRegistrants = new RegistrantList();
     protected RegistrantList mNetworkSelectionModeAutomaticRegistrants = new RegistrantList();
@@ -63,6 +64,7 @@ public abstract class IccRecords extends Handler implements IccConstants {
     protected String newVoiceMailTag = null;
     protected boolean isVoiceMailFixed = false;
     protected int countVoiceMessages = 0;
+    protected String imsi;
 
     protected int mncLength = UNINITIALIZED;
     protected int mailboxIndex = 0; // 0 is no mailbox dailing number associated
@@ -104,7 +106,7 @@ public abstract class IccRecords extends Handler implements IccConstants {
     }
 
     // ***** Constructor
-    public IccRecords(IccCard card, Context c, CommandsInterface ci) {
+    public IccRecords(UiccCard card, Context c, CommandsInterface ci) {
         mContext = c;
         mCi = ci;
         mFh = card.getIccFileHandler();
@@ -146,6 +148,22 @@ public abstract class IccRecords extends Handler implements IccConstants {
         recordsLoadedRegistrants.remove(h);
     }
 
+    public void registerForImsiReady(Handler h, int what, Object obj) {
+        if (mDestroyed.get()) {
+            return;
+        }
+
+        Registrant r = new Registrant(h, what, obj);
+        mImsiReadyRegistrants.add(r);
+
+        if (imsi != null) {
+            r.notifyRegistrant(new AsyncResult(null, null, null));
+        }
+    }
+    public void unregisterForImsiReady(Handler h) {
+        mImsiReadyRegistrants.remove(h);
+    }
+
     public void registerForRecordsEvents(Handler h, int what, Object obj) {
         Registrant r = new Registrant (h, what, obj);
         mRecordsEventsRegistrants.add(r);
@@ -180,6 +198,15 @@ public abstract class IccRecords extends Handler implements IccConstants {
      */
     public String getIMSI() {
         return null;
+    }
+
+    /**
+     * Imsi could be set by ServiceStateTrackers in case of cdma
+     * @param imsi
+     */
+    public void setImsi(String imsi) {
+        this.imsi = imsi;
+        mImsiReadyRegistrants.notifyRegistrants();
     }
 
     public String getMsisdnNumber() {

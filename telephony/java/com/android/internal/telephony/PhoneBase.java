@@ -130,7 +130,7 @@ public abstract class PhoneBase extends Handler implements Phone {
     boolean mIsVoiceCapable = true;
     protected UiccController mUiccController = null;
     public AtomicReference<IccRecords> mIccRecords = new AtomicReference<IccRecords>();
-    protected AtomicReference<IccCard> mIccCard = new AtomicReference<IccCard>();
+    protected AtomicReference<UiccCard> mUiccCard = new AtomicReference<UiccCard>();
     public SmsStorageMonitor mSmsStorageMonitor;
     public SmsUsageMonitor mSmsUsageMonitor;
     public SMSDispatcher mSMS;
@@ -276,7 +276,7 @@ public abstract class PhoneBase extends Handler implements Phone {
         mSmsUsageMonitor = null;
         mSMS = null;
         mIccRecords.set(null);
-        mIccCard.set(null);
+        mUiccCard.set(null);
         mDataConnectionTracker = null;
         mUiccController = null;
     }
@@ -647,9 +647,9 @@ public abstract class PhoneBase extends Handler implements Phone {
      * Retrieves the IccFileHandler of the Phone instance
      */
     public IccFileHandler getIccFileHandler(){
-        IccCard iccCard = mIccCard.get();
-        if (iccCard == null) return null;
-        return iccCard.getIccFileHandler();
+        UiccCard uiccCard = mUiccCard.get();
+        if (uiccCard == null) return null;
+        return uiccCard.getIccFileHandler();
     }
 
     /*
@@ -675,7 +675,8 @@ public abstract class PhoneBase extends Handler implements Phone {
 
     @Override
     public IccCard getIccCard() {
-        return mIccCard.get();
+        return null;
+        //throw new Exception("getIccCard Shouldn't be called from PhoneBase");
     }
 
     @Override
@@ -1180,7 +1181,7 @@ public abstract class PhoneBase extends Handler implements Phone {
         pw.println(" mIsTheCurrentActivePhone=" + mIsTheCurrentActivePhone);
         pw.println(" mIsVoiceCapable=" + mIsVoiceCapable);
         pw.println(" mIccRecords=" + mIccRecords.get());
-        pw.println(" mIccCard=" + mIccCard.get());
+        pw.println(" mUiccCard=" + mUiccCard.get());
         pw.println(" mSmsStorageMonitor=" + mSmsStorageMonitor);
         pw.println(" mSmsUsageMonitor=" + mSmsUsageMonitor);
         pw.println(" mSMS=" + mSMS);

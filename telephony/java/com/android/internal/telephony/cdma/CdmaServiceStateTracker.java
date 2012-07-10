@@ -20,13 +20,13 @@ import com.android.internal.telephony.CommandException;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.DataConnectionTracker;
 import com.android.internal.telephony.EventLogTags;
-import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.MccTable;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
+import com.android.internal.telephony.UiccCard;
 import com.android.internal.telephony.CommandsInterface.RadioState;
 
 import android.app.AlarmManager;
@@ -205,7 +205,7 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
         cm.unregisterForVoiceNetworkStateChanged(this);
         cm.unregisterForCdmaOtaProvision(this);
         phone.unregisterForEriFileLoaded(this);
-        if (mIccCard != null) {mIccCard.unregisterForReady(this);}
+        if (mUiccCard != null) {mUiccCard.unregisterForReady(this);}
         if (mIccRecords != null) {mIccRecords.unregisterForRecordsLoaded(this);}
         cm.unSetOnSignalStrengthUpdate(this);
         cm.unSetOnNITZTime(this);
@@ -396,16 +396,15 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
                     mIsMinInfoReady = true;
 
                     updateOtaspState();
-                    if (mIccCard != null) {
+                    if (!isSubscriptionFromRuim && mIccRecords != null) {
                         if (DBG) {
-                            log("GET_CDMA_SUBSCRIPTION broadcast Icc state changed");
+                            log("GET_CDMA_SUBSCRIPTION set imsi in mIccRecords");
                         }
-                        mIccCard.broadcastIccStateChangedIntent(IccCard.INTENT_VALUE_ICC_IMSI,
-                                null);
+                        mIccRecords.setImsi(getImsi());
                     } else {
                         if (DBG) {
-                            log("GET_CDMA_SUBSCRIPTION mIccCard is null (probably NV type device)" +
-                                    " can't broadcast Icc state changed");
+                            log("GET_CDMA_SUBSCRIPTION either mIccRecords is null  or NV type device" +
+                                    " - not setting Imsi in mIccRecords");
                         }
                     }
                 } else {
@@ -1698,24 +1697,24 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             return;
         }
 
-        IccCard newIccCard = mUiccController.getIccCard();
+        UiccCard newUiccCard = mUiccController.getUiccCard();
 
-        if (mIccCard != newIccCard) {
-            if (mIccCard != null) {
+        if (mUiccCard != newUiccCard) {
+            if (mUiccCard != null) {
                 log("Removing stale icc objects.");
-                mIccCard.unregisterForReady(this);
+                mUiccCard.unregisterForReady(this);
                 if (mIccRecords != null) {
                     mIccRecords.unregisterForRecordsLoaded(this);
                 }
                 mIccRecords = null;
-                mIccCard = null;
+                mUiccCard = null;
             }
-            if (newIccCard != null) {
+            if (newUiccCard != null) {
                 log("New card found");
-                mIccCard = newIccCard;
-                mIccRecords = mIccCard.getIccRecords();
+                mUiccCard = newUiccCard;
+                mIccRecords = mUiccCard.getIccRecords();
                 if (isSubscriptionFromRuim) {
-                    mIccCard.registerForReady(this, EVENT_RUIM_READY, null);
+                    mUiccCard.registerForReady(this, EVENT_RUIM_READY, null);
                     if (mIccRecords != null) {
                         mIccRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
                     }

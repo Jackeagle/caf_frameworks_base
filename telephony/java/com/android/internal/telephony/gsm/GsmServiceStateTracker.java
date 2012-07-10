@@ -29,6 +29,7 @@ import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.TelephonyProperties;
+import com.android.internal.telephony.UiccCard;
 
 import android.app.AlarmManager;
 import android.app.Notification;
@@ -239,7 +240,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         cm.unregisterForAvailable(this);
         cm.unregisterForRadioStateChanged(this);
         cm.unregisterForVoiceNetworkStateChanged(this);
-        if (mIccCard != null) {mIccCard.unregisterForReady(this);}
+        if (mUiccCard != null) {mUiccCard.unregisterForReady(this);}
         if (mIccRecords != null) {mIccRecords.unregisterForRecordsLoaded(this);}
         cm.unSetOnSignalStrengthUpdate(this);
         cm.unSetOnRestrictedStateChanged(this);
@@ -1135,7 +1136,7 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                     ((state & RILConstants.RIL_RESTRICTED_STATE_CS_EMERGENCY) != 0) ||
                     ((state & RILConstants.RIL_RESTRICTED_STATE_CS_ALL) != 0) );
             //ignore the normal call and data restricted state before SIM READY
-            if (mIccCard.getState() == IccCard.State.READY) {
+            if (mUiccCard.getState() == IccCard.State.READY) {
                 newRs.setCsNormalRestricted(
                         ((state & RILConstants.RIL_RESTRICTED_STATE_CS_NORMAL) != 0) ||
                         ((state & RILConstants.RIL_RESTRICTED_STATE_CS_ALL) != 0) );
@@ -1667,23 +1668,23 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             return;
         }
 
-        IccCard newIccCard = mUiccController.getIccCard();
+        UiccCard newUiccCard = mUiccController.getUiccCard();
 
-        if (mIccCard != newIccCard) {
-            if (mIccCard != null) {
+        if (mUiccCard != newUiccCard) {
+            if (mUiccCard != null) {
                 log("Removing stale icc objects.");
-                mIccCard.unregisterForReady(this);
+                mUiccCard.unregisterForReady(this);
                 if (mIccRecords != null) {
                     mIccRecords.unregisterForRecordsLoaded(this);
                 }
                 mIccRecords = null;
-                mIccCard = null;
+                mUiccCard = null;
             }
-            if (newIccCard != null) {
+            if (newUiccCard != null) {
                 log("New card found");
-                mIccCard = newIccCard;
-                mIccRecords = mIccCard.getIccRecords();
-                mIccCard.registerForReady(this, EVENT_SIM_READY, null);
+                mUiccCard = newUiccCard;
+                mIccRecords = mUiccCard.getIccRecords();
+                mUiccCard.registerForReady(this, EVENT_SIM_READY, null);
                 if (mIccRecords != null) {
                     mIccRecords.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
                 }

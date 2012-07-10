@@ -65,6 +65,7 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.RetryManager;
+import com.android.internal.telephony.UiccCard;
 import com.android.internal.util.AsyncChannel;
 
 import java.io.FileDescriptor;
@@ -2583,10 +2584,10 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
-        IccCard newIccCard = mUiccController.getIccCard();
+        UiccCard newUiccCard = mUiccController.getUiccCard();
         IccRecords newIccRecords = null;
-        if (newIccCard != null) {
-            newIccRecords = newIccCard.getIccRecords();
+        if (newUiccCard != null) {
+            newIccRecords = newUiccCard.getIccRecords();
         }
 
         IccRecords r = mIccRecords.get();

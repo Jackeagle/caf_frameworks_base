@@ -40,11 +40,11 @@ import com.android.internal.telephony.DataConnection;
 import com.android.internal.telephony.DataConnectionAc;
 import com.android.internal.telephony.DataConnectionTracker;
 import com.android.internal.telephony.EventLogTags;
-import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccRecords;
 import com.android.internal.telephony.RetryManager;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.UiccCard;
 import com.android.internal.util.AsyncChannel;
 import com.android.internal.telephony.RILConstants;
 
@@ -1018,10 +1018,10 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
-        IccCard newIccCard = mUiccController.getIccCard();
+        UiccCard newUiccCard = mUiccController.getUiccCard();
         IccRecords newIccRecords = null;
-        if (newIccCard != null) {
-            newIccRecords = newIccCard.getIccRecords();
+        if (newUiccCard != null) {
+            newIccRecords = newUiccCard.getIccRecords();
         }
 
         IccRecords r = mIccRecords.get();
