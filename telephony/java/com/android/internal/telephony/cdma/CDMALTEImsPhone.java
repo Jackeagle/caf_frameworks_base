@@ -29,6 +29,7 @@ import com.android.internal.telephony.CallTracker;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Connection;
 import com.android.internal.telephony.IccCardApplicationStatus;
+import com.android.internal.telephony.ImsCallTracker;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.PhoneNotifier;
@@ -68,7 +69,7 @@ public class CDMALTEImsPhone extends CDMALTEPhone {
         Log.d(LOG_TAG, "init()");
 
         mCM.setPhoneType(Phone.PHONE_TYPE_CDMA);
-        mCT = new CdmaImsCallTracker(this);
+        mCT = new ImsCallTracker(this);
         mCdmaSSM = CdmaSubscriptionSourceManager.getInstance(context, mCM, this,
                 EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
         mDataConnectionTracker = new CdmaDataConnectionTracker (this);
@@ -153,11 +154,11 @@ public class CDMALTEImsPhone extends CDMALTEPhone {
     }
 
     public int getMaxConnectionsPerCall() {
-        return CdmaImsCallTracker.MAX_CONNECTIONS_PER_CALL;
+        return ImsCallTracker.MAX_CONNECTIONS_PER_CALL_CDMA;
     }
 
     public int getMaxConnections() {
-        return CdmaImsCallTracker.MAX_CONNECTIONS;
+        return ImsCallTracker.MAX_CONNECTIONS;
     }
 
     public Connection
@@ -224,5 +225,10 @@ public class CDMALTEImsPhone extends CDMALTEPhone {
         } else {
             return DisconnectCause.ERROR_UNSPECIFIED;
         }
+    }
+
+    public void
+    switchHoldingAndActive() throws CallStateException {
+        mCT.switchWaitingOrHoldingAndActive(this);
     }
 }
