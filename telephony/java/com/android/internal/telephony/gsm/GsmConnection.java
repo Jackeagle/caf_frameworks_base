@@ -28,6 +28,7 @@ import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
 
 import com.android.internal.telephony.*;
+import com.android.internal.telephony.uicc.IccCardApplicationStatus;
 
 /**
  * {@hide}

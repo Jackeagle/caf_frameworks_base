@@ -50,10 +50,13 @@ import android.util.Log;
 
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SuppServiceNotification;
-import com.android.internal.telephony.IccCardApplicationStatus;
+import com.android.internal.telephony.uicc.IccCardApplicationStatus;
+import com.android.internal.telephony.uicc.IccCardStatus;
+import com.android.internal.telephony.uicc.IccIoResult;
+import com.android.internal.telephony.uicc.IccRefreshResponse;
+import com.android.internal.telephony.uicc.IccUtils;
 import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
-import com.android.internal.telephony.IccRefreshResponse;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -3003,14 +3006,14 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         status.mApplications = new IccCardApplicationStatus[numApplications];
         for (int i = 0 ; i < numApplications ; i++) {
             ca = new IccCardApplicationStatus();
-            ca.app_type       = ca.AppTypeFromRILInt(p.readInt());
-            ca.app_state      = ca.AppStateFromRILInt(p.readInt());
-            ca.perso_substate = ca.PersoSubstateFromRILInt(p.readInt());
+            ca.app_type       = IccCardApplicationStatus.AppTypeFromRILInt(p.readInt());
+            ca.app_state      = IccCardApplicationStatus.AppStateFromRILInt(p.readInt());
+            ca.perso_substate = IccCardApplicationStatus.PersoSubstateFromRILInt(p.readInt());
             ca.aid            = p.readString();
             ca.app_label      = p.readString();
             ca.pin1_replaced  = p.readInt();
-            ca.pin1           = ca.PinStateFromRILInt(p.readInt());
-            ca.pin2           = ca.PinStateFromRILInt(p.readInt());
+            ca.pin1           = IccCardApplicationStatus.PinStateFromRILInt(p.readInt());
+            ca.pin2           = IccCardApplicationStatus.PinStateFromRILInt(p.readInt());
             status.mApplications[i] = ca;
         }
         return status;

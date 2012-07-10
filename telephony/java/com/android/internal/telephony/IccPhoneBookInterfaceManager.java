@@ -23,6 +23,12 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.ServiceManager;
 
+import com.android.internal.telephony.uicc.AdnRecord;
+import com.android.internal.telephony.uicc.AdnRecordCache;
+import com.android.internal.telephony.uicc.IccCardApplicationStatus;
+import com.android.internal.telephony.uicc.IccConstants;
+import com.android.internal.telephony.uicc.IccRecords;
+
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -261,7 +267,7 @@ public abstract class IccPhoneBookInterfaceManager extends IIccPhoneBook.Stub {
             checkThread();
             AtomicBoolean status = new AtomicBoolean(false);
             Message response = mBaseHandler.obtainMessage(EVENT_LOAD_DONE, status);
-            adnCache.requestLoadAllAdnLike(efid, adnCache.extensionEfForEf(efid), response);
+            adnCache.requestLoadAllAdnLike(efid, AdnRecordCache.extensionEfForEf(efid), response);
             waitForResult(status);
         }
         return records;

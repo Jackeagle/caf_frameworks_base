@@ -25,11 +25,6 @@ import android.os.RegistrantList;
 import android.util.Log;
 
 import com.android.internal.telephony.CommandsInterface;
-import com.android.internal.telephony.IccCardStatus;
-import com.android.internal.telephony.IccFileHandler;
-import com.android.internal.telephony.IccRecords;
-import com.android.internal.telephony.UiccCard;
-import com.android.internal.telephony.UiccCardApplication;
 
 /* This class is responsible for keeping all knowledge about
  * ICCs in the system. It is also used as API to get appropriate

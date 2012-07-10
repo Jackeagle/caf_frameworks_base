@@ -21,8 +21,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import android.os.Message;
 import android.util.Log;
 
-import com.android.internal.telephony.IccFileHandler;
 import com.android.internal.telephony.IccPhoneBookInterfaceManager;
+import com.android.internal.telephony.uicc.IccFileHandler;
+import com.android.internal.telephony.uicc.IccRecords;
 
 /**
  * SimPhoneBookInterfaceManager to provide an inter-process communication to

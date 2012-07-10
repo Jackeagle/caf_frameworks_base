@@ -29,9 +29,9 @@ import android.util.Log;
 
 import java.util.List;
 
-import com.android.internal.telephony.IccConstants;
-import com.android.internal.telephony.AdnRecord;
 import com.android.internal.telephony.IIccPhoneBook;
+import com.android.internal.telephony.uicc.AdnRecord;
+import com.android.internal.telephony.uicc.IccConstants;
 
 
 /**

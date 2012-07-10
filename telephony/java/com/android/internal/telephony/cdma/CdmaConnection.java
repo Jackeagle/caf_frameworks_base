@@ -33,6 +33,7 @@ import android.telephony.PhoneNumberUtils;
 import android.telephony.ServiceState;
 import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.uicc.IccCardApplicationStatus;
 
 /**
  * {@hide}

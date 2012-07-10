@@ -28,9 +28,9 @@ import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 
 import com.android.internal.telephony.DataConnection;
-import com.android.internal.telephony.gsm.UsimServiceTable;
-import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.test.SimulatedRadioControl;
+import com.android.internal.telephony.uicc.IsimRecords;
+import com.android.internal.telephony.uicc.UsimServiceTable;
 
 import java.util.List;
 
