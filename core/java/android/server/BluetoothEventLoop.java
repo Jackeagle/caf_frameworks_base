@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,9 +33,13 @@ import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.PowerManager;
 import android.util.Log;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
+
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.ArrayList;
 
 
 /**
@@ -43,7 +47,7 @@ import java.util.List;
  */
 class BluetoothEventLoop {
     private static final String TAG = "BluetoothEventLoop";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
 
     private int mNativeData;
     private Thread mThread;
@@ -52,6 +56,8 @@ class BluetoothEventLoop {
 
     private final HashMap<String, Integer> mPasskeyAgentRequestData;
     private final HashMap<String, Integer> mAuthorizationAgentRequestData;
+    private final HashMap<String, Integer> mAuthorizationRequestData;
+    private final List<Integer> mGattRequestData;
     private final BluetoothService mBluetoothService;
     private final BluetoothAdapter mAdapter;
     private final BluetoothAdapterStateMachine mBluetoothState;
@@ -76,6 +82,11 @@ class BluetoothEventLoop {
 
     private static final String BLUETOOTH_ADMIN_PERM = android.Manifest.permission.BLUETOOTH_ADMIN;
     private static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
+
+    // package and class name to which we send intent to check sap access permission
+    private static final String ACCESS_REQUEST_PACKAGE = "com.android.settings";
+    private static final String ACCESS_REQUEST_CLASS =
+                         "com.android.settings.bluetooth.BluetoothPermissionRequest";
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -122,6 +133,8 @@ class BluetoothEventLoop {
         mBluetoothState = bluetoothState;
         mPasskeyAgentRequestData = new HashMap<String, Integer>();
         mAuthorizationAgentRequestData = new HashMap<String, Integer>();
+        mAuthorizationRequestData = new HashMap<String, Integer>();
+        mGattRequestData = new ArrayList<Integer>();
         mAdapter = adapter;
         //WakeLock instantiation in BluetoothEventLoop class
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
@@ -167,6 +180,14 @@ class BluetoothEventLoop {
         return mAuthorizationAgentRequestData;
     }
 
+    /* package */ HashMap<String, Integer> getAuthorizationRequestData() {
+        return mAuthorizationRequestData;
+    }
+
+    /* package */ List<Integer> getGattRequestData() {
+        return mGattRequestData;
+    }
+
     /* package */ void start() {
 
         if (!isEventLoopRunningNative()) {
@@ -191,9 +212,11 @@ class BluetoothEventLoop {
                 mBluetoothService.getDeviceProperties();
         deviceProperties.addProperties(address, properties);
         String rssi = deviceProperties.getProperty(address, "RSSI");
+        String broadcaster = deviceProperties.getProperty(address, "Broadcaster");
         String classValue = deviceProperties.getProperty(address, "Class");
         String devType = deviceProperties.getProperty(address, "Type");
         String name = deviceProperties.getProperty(address, "Name");
+        String addr = deviceProperties.getProperty(address, "Address");
         short rssiValue;
         // For incoming connections, we don't get the RSSI value. Use a default of MIN_VALUE.
         // If we accept the pairing, we will automatically show it at the top of the list.
@@ -211,18 +234,16 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
 
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
-        } else if (devType != null)  {
-            if (DBG) log("Device type: " + devType);
-            if ("LE".equals(devType)){
+        } else if (devType != null) {
+            if (DBG) log("Device " + addr + " type: " + devType + " Broadcaster: " + broadcaster);
+            if ("LE".equals(devType) && "false".equals(broadcaster)) {
                 Intent intent = new Intent(BluetoothDevice.ACTION_FOUND);
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
                 intent.putExtra(BluetoothDevice.EXTRA_RSSI, rssiValue);
                 intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
 
                 mContext.sendBroadcast(intent, BLUETOOTH_PERM);
-
             }
-
         } else {
             log ("ClassValue: " + classValue + " for remote device: " + address + " is null");
         }
@@ -304,6 +325,7 @@ class BluetoothEventLoop {
         }
         if (!mBluetoothService.isRemoteDeviceInCache(address)) {
             // Incoming connection, we haven't seen this device, add to cache.
+
             String[] properties = mBluetoothService.getRemoteDeviceProperties(address);
             if (properties != null) {
                 addDevice(address, properties);
@@ -322,7 +344,9 @@ class BluetoothEventLoop {
             mBluetoothService.setBondState(address.toUpperCase(), BluetoothDevice.BOND_NONE,
                 BluetoothDevice.UNBOND_REASON_REMOVED);
             mBluetoothService.setRemoteDeviceProperty(address, "UUIDs", null);
+            mBluetoothService.setRemoteDeviceProperty(address, "Services", null);
             mBluetoothService.setRemoteDeviceProperty(address, "Trusted", "false");
+            mBluetoothService.clearRemoteDeviceGattServices(address);
         }
     }
 
@@ -346,6 +370,7 @@ class BluetoothEventLoop {
         }
         log("Property Changed: " + propValues[0] + " : " + propValues[1]);
         String name = propValues[0];
+
         if (name.equals("Name")) {
             adapterProperties.setProperty(name, propValues[1]);
             Intent intent = new Intent(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED);
@@ -431,6 +456,20 @@ class BluetoothEventLoop {
             Log.e(TAG, "onDevicePropertyChanged: Address of the remote device in null");
             return;
         }
+
+        if (!mBluetoothService.isEnabled()) {
+            Log.e(TAG, "Bluetooth is not enabled");
+
+            if (name.equals("Connected") && propValues[1].equals("false")) {
+                Intent intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+                BluetoothDevice device = mAdapter.getRemoteDevice(address);
+                intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+                intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+                mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            }
+            return;
+        }
+
         log("Device property changed: " + address + " property: "
             + name + " value: " + propValues[1]);
 
@@ -456,7 +495,15 @@ class BluetoothEventLoop {
                     new BluetoothClass(Integer.valueOf(propValues[1])));
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        } else if (name.equals("RSSI")) {
+            mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
+            Intent intent = new Intent(BluetoothDevice.ACTION_RSSI_UPDATE);
+            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+            intent.putExtra(BluetoothDevice.EXTRA_RSSI, propValues[1]);
+            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
         } else if (name.equals("Connected")) {
+            Log.d(TAG, "Device property Connected: " + propValues[1]);
+
             mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
             Intent intent = null;
             if (propValues[1].equals("true")) {
@@ -466,6 +513,8 @@ class BluetoothEventLoop {
                 if (mBluetoothService.isBluetoothDock(address)) {
                     mBluetoothService.setLinkTimeout(address, 8000);
                 }
+                mBluetoothService.sendDeviceConnectionStateChange
+                    (device, BluetoothAdapter.STATE_CONNECTED);
             } else {
                 // Check and clean-up if bonding is in progress
                 if (mBluetoothService.getBondState(address) ==
@@ -475,6 +524,8 @@ class BluetoothEventLoop {
                 }
 
                 intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+                mBluetoothService.sendDeviceConnectionStateChange(
+                    device, BluetoothAdapter.STATE_DISCONNECTED);
             }
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
@@ -496,6 +547,21 @@ class BluetoothEventLoop {
             mBluetoothService.updateDeviceServiceChannelCache(address);
 
             mBluetoothService.sendUuidIntent(address);
+        } else if (name.equals("Services")) {
+            String services = null;
+            int len = Integer.valueOf(propValues[1]);
+            if (len > 0) {
+                StringBuilder str = new StringBuilder();
+                for (int i = 2; i < propValues.length; i++) {
+                    str.append(propValues[i]);
+                    str.append(",");
+                }
+                services = str.toString();
+            }
+            mBluetoothService.setRemoteDeviceProperty(address, name, services);
+
+            mBluetoothService.sendGattIntent(address, BluetoothDevice.GATT_RESULT_SUCCESS);
+
         } else if (name.equals("Paired")) {
             if (propValues[1].equals("true")) {
                 // If locally initiated pairing, we will
@@ -573,6 +639,24 @@ class BluetoothEventLoop {
                                               BluetoothPan.LOCAL_PANU_ROLE);
             }
         }
+    }
+
+    private String checkAuthorizationRequestAndGetAddress(String objectPath, int nativeData) {
+        String address = mBluetoothService.getAddressFromObjectPath(objectPath);
+        if (address == null) {
+            Log.e(TAG, "Unable to get device address in checkAuthorizationRequestAndGetAddress, " +
+                  "returning null");
+            return null;
+        }
+        address = address.toUpperCase();
+        mAuthorizationRequestData.put(address, new Integer(nativeData));
+
+        if (mBluetoothService.getBluetoothState() == BluetoothAdapter.STATE_TURNING_OFF) {
+            // shutdown path
+            mBluetoothService.sapAuthorize(address, false);
+            return null;
+        }
+        return address;
     }
 
     private String checkPairingRequestAndGetAddress(String objectPath, int nativeData) {
@@ -681,17 +765,56 @@ class BluetoothEventLoop {
         return;
     }
 
-    /**
-     * Called by native code on a RequestPinCode method call to
-     * org.bluez.Agent.
-     *
-     * @param objectPath the path of the device requesting a PIN code
-     * @param nativeData a native pointer to the original D-Bus message
-     */
-    private void onRequestPinCode(String objectPath, int nativeData) {
+    private void onSapAuthorize(String objectPath, String uuid, int nativeData) {
+        Log.i(TAG, "onSapAuthorize" + objectPath + uuid);
+        String address = checkAuthorizationRequestAndGetAddress(objectPath, nativeData);
+        if (address == null) {
+            Log.e(TAG, "address is null");
+            return;
+        }
+        /*Get the Trust state of the device*/
+        boolean trusted = mBluetoothService.getTrustState(address);
+        if (trusted) {
+            /*Say as authorized to lower layers without popping up to
+            user*/
+            mBluetoothService.sapAuthorize(address, true);
+        } else {
+            BluetoothDevice remoteDevice = mBluetoothService.getRemoteDevice(address);
+            Intent intent = new
+                Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_REQUEST);
+            intent.setClassName(ACCESS_REQUEST_PACKAGE, ACCESS_REQUEST_CLASS);
+            intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
+                            BluetoothDevice.REQUEST_TYPE_SIM_ACCESS);
+            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, remoteDevice);
+            mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        }
+    }
+    private void onSapStateChanged(String objectPath, String state, int nativeData) {
+        Log.i(TAG, "onSapStateChanged" + objectPath + state);
+
+        String address = mBluetoothService.getAddressFromObjectPath(objectPath);
+        if (address == null) {
+            Log.e(TAG, "Unable to get device address , " +
+                  "returning null");
+            return;
+        }
+        address = address.toUpperCase();
+
+        int sapState;
+        if(state.equals("Connected")) {
+                sapState = 1;
+        } else  {
+                sapState = 0;
+        }
+        Intent intent = new Intent(BluetoothService.SAP_STATECHANGE_INTENT);
+        intent.putExtra(BluetoothDevice.EXTRA_DEVICE,  mAdapter.getRemoteDevice(address));
+        intent.putExtra("state", sapState);
+        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+    }
+    private void onRequestPinCode(String objectPath, int nativeData, boolean secure) {
         String address = checkPairingRequestAndGetAddress(objectPath, nativeData);
         if (address == null) return;
-
+        Log.i(TAG, "Secure pairing is "+ secure);
         String pendingOutgoingAddress =
                 mBluetoothService.getPendingOutgoingBonding();
         BluetoothClass btClass = new BluetoothClass(mBluetoothService.getRemoteClass(address));
@@ -740,6 +863,7 @@ class BluetoothEventLoop {
         Intent intent = new Intent(BluetoothDevice.ACTION_PAIRING_REQUEST);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.PAIRING_VARIANT_PIN);
+        intent.putExtra(BluetoothDevice.EXTRA_SECURE_PAIRING, secure);
         mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
@@ -938,6 +1062,10 @@ class BluetoothEventLoop {
         if (address == null) return;
 
         // We don't parse the xml here, instead just query Bluez for the properties.
+        if (address == null) {
+            Log.e(TAG, "Unexpected error! address is null");
+            return;
+        }
         if (result) {
             mBluetoothService.updateRemoteDevicePropertiesCache(address);
         }
@@ -973,6 +1101,7 @@ class BluetoothEventLoop {
             // fall-through
         case CREATE_DEVICE_FAILED:
             mBluetoothService.sendUuidIntent(address);
+            mBluetoothService.sendGattIntent(address, BluetoothDevice.GATT_RESULT_FAIL);
             mBluetoothService.makeServiceChannelCallbacks(address);
             break;
         case CREATE_DEVICE_SUCCESS:
@@ -1128,6 +1257,152 @@ class BluetoothEventLoop {
         log("Health Device : devicePath: " + devicePath + ":channelPath:" + channelPath +
                 ":exists" + exists);
         mBluetoothService.onHealthDeviceChannelChanged(devicePath, channelPath, exists);
+    }
+
+    private void onDiscoverCharacteristicsResult(String serviceObjectPath, boolean result) {
+
+        Log.d(TAG, "onDiscoverCharacteristicsResult: " + result);
+
+        if (result) {
+            mBluetoothService.updateGattServicePropertiesCache(serviceObjectPath);
+        }
+        mBluetoothService.makeDiscoverCharacteristicsCallback(serviceObjectPath, result);
+    }
+
+    private void onSetCharacteristicPropertyResult(String path, String property, boolean result) {
+
+        Log.d(TAG, "onSetCharPropResult path " + path + " property = " + property);
+        Log.d(TAG, "Result = " + result);
+        mBluetoothService.makeSetCharacteristicPropertyCallback(path, property, result);
+    }
+
+    private void onIndicateResponse(String path, boolean result) {
+        Log.d(TAG, "onIndicateResponse path = " + path + " result : " + result);
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onIndicateResponse(path, result);
+    }
+
+    private void onWatcherValueChanged(String characteristicPath, String value) {
+        // TODO: Send this to upper layer
+        mBluetoothService.makeWatcherValueChangedCallback(characteristicPath, value);
+
+    }
+
+    private void onUpdateCharacteristicValueResult(String charObjectPath, boolean result) {
+
+        mBluetoothService.makeUpdateCharacteristicValueCallback(charObjectPath, result);
+    }
+
+    private void onGattDiscoverPrimaryRequest(String gattObjectPath, int start, int end, int reqHandle) {
+        Log.d(TAG, "Inside onGattDiscoverPrimaryRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattDiscoverPrimaryRequest(gattObjectPath, start, end, reqHandle);
+    }
+
+    private void onGattDiscoverPrimaryByUuidRequest(String gattObjectPath, String uuid,
+                                                    int start, int end,
+                                                    int reqHandle) {
+        Log.d(TAG, "Inside onGattDiscoverPrimaryByUuidRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattDiscoverPrimaryByUuidRequest(gattObjectPath, start, end, uuid,
+                                                              reqHandle);
+    }
+
+    private void onGattDiscoverIncludedRequest(String gattObjectPath, int start,
+                                                    int end, int reqHandle) {
+        Log.d(TAG, "Inside onGattDiscoverIncludedRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattDiscoverIncludedRequest(gattObjectPath, start, end, reqHandle);
+    }
+
+    private void onGattDiscoverCharacteristicsRequest(String gattObjectPath, int start,
+                                                    int end, int reqHandle) {
+        Log.d(TAG, "Inside onGattDiscoverCharacteristicsRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattDiscoverCharacteristicsRequest(gattObjectPath, start, end, reqHandle);
+    }
+
+    private void onGattFindInfoRequest(String gattObjectPath, int start,
+                                       int end, int reqHandle) {
+        Log.d(TAG, "Inside onGattFindInfoRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattFindInfoRequest(gattObjectPath, start, end, reqHandle);
+    }
+
+    private void onGattReadByTypeRequest(String gattObjectPath, String uuid,
+                                         String auth, int start,
+                                         int end, int reqHandle) {
+        Log.d(TAG, "Inside onGattReadByTypeRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattReadByTypeRequest(gattObjectPath, start, end,
+                                                   uuid, auth, reqHandle);
+    }
+
+    private void onGattReadRequest(String gattObjectPath, String auth, int handle, int reqHandle) {
+        Log.d(TAG, "Inside onGattReadRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattReadRequest(gattObjectPath, auth, handle, reqHandle);
+    }
+
+    private void onGattWriteRequest(String gattObjectPath, String auth,
+                                      int attrHandle, byte[] value,
+                                      int sessionHandle, int reqHandle) {
+        Log.d(TAG, "onGattWriteRequest");
+
+        mGattRequestData.add(new Integer(reqHandle));
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattWriteRequest(gattObjectPath, auth,
+                                              attrHandle, value, sessionHandle, reqHandle);
+    }
+
+    private void onGattWriteCommand(String gattObjectPath, String auth,
+                                    int attrHandle, byte[] value) {
+        Log.d(TAG, "onGattWriteCommand");
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattWriteCommand(gattObjectPath, auth,
+                                              attrHandle, value);
+    }
+
+    private void onGattSetClientConfigDescriptor(String gattObjectPath, int sessionHandle,
+                                                 int attrHandle, byte[] value) {
+        Log.d(TAG, "onGattSetClientConfigDescriptor");
+
+        BluetoothGattProfileHandler gattProfileHandler =
+            BluetoothGattProfileHandler.getInstance(mContext, mBluetoothService);
+        gattProfileHandler.onGattSetClientConfigDescriptor(gattObjectPath, sessionHandle, attrHandle, value);
     }
 
     private static void log(String msg) {

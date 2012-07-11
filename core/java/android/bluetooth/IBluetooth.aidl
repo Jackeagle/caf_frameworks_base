@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008, The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,9 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHealthAppConfiguration;
 import android.os.ParcelUuid;
 import android.os.ParcelFileDescriptor;
+import android.bluetooth.IBluetoothGattService;
+import  android.bluetooth.IBluetoothGattCallback;
+import android.bluetooth.BluetoothGattAppConfiguration;
 
 /**
  * System private API for talking with the Bluetooth service.
@@ -69,7 +72,14 @@ interface IBluetooth
     int getBondState(in String address);
     boolean setDeviceOutOfBandData(in String address, in byte[] hash, in byte[] randomizer);
     boolean setBluetoothClass(String address, int classOfDevice);
-
+    boolean registerRssiUpdateWatcher(in String address, in int rssiThreshold, in int interval,
+                                      in boolean updateOnThreshExceed);
+    boolean unregisterRssiUpdateWatcher(in String address);
+    boolean setLEConnectionParams(in String address, in byte prohibitRemoteChg, in byte filterPolicy,
+    in int scanInterval, in int scanWindow, in int intervalMin, in int intervalMax, in int latency,
+    in int superVisionTimeout, in int minCeLen, in int maxCeLen);
+    boolean updateLEConnectionParams(in String address, in byte prohibitRemoteChg,
+    in int intervalMin, in int intervalMax, in int slaveLatency, in int supervisionTimeout);
     String getRemoteName(in String address);
     String getRemoteAlias(in String address);
     boolean setRemoteAlias(in String address, in String name);
@@ -133,4 +143,46 @@ interface IBluetooth
     int getEffectiveAmpPolicy(in int policy);
     boolean setDesiredAmpPolicy(in int handle, in int policy);
     void setUseWifiForBtTransfers(in boolean useWifi);
+
+    // GATT client APIs
+    boolean getGattServices(in String address, in ParcelUuid uuid);
+    boolean gattConnect(in String path, in byte prohibitRemoteChg, in byte filterPolicy,
+     in int scanInterval, in int scanWindow, in int intervalMin, in int intervalMax, in int latency,
+     in int superVisionTimeout, in int minCeLen, in int maxCeLen, in int connTimeOut);
+    boolean gattConnectCancel(in String path);
+    String getGattServiceName(in String path);
+    boolean discoverCharacteristics(in String path);
+    String getGattServiceProperty(in String path, in String property);
+    String[] getCharacteristicProperties(in String path);
+    boolean setCharacteristicProperty(in String path, in String key, in byte[] value,
+        boolean reliable);
+    boolean registerCharacteristicsWatcher(in String path, in IBluetoothGattService gattCallback);
+    boolean updateCharacteristicValue(in String path);
+    boolean deregisterCharacteristicsWatcher(in String path);
+    boolean startRemoteGattService(in String path, IBluetoothGattService gattCallback);
+    void closeRemoteGattService(in String path);
+
+    // GATT server APIs
+    boolean registerGattAppConfiguration(in BluetoothGattAppConfiguration config,
+                                         in IBluetoothGattCallback callback);
+    boolean unregisterGattAppConfiguration(in BluetoothGattAppConfiguration config);
+    boolean sendIndication(in BluetoothGattAppConfiguration config,
+                           in int handle, in byte[] value, in boolean notify, in int sessionHandle);
+    boolean discoverPrimaryResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
+                        in int handle, in int end, in int status, in int reqHandle);
+    boolean discoverPrimaryByUuidResponse(in BluetoothGattAppConfiguration config,
+                        in int handle, in int end, in int status, in int reqHandle);
+    boolean findIncludedResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
+                        in int handle, in int start, in int end, in int status, in int reqHandle);
+    boolean discoverCharacteristicResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
+                        in int handle, in byte property, in int valueHandle, in int status, in int reqHandle);
+    boolean findInfoResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
+                        in int handle, in int status, in int reqHandle);
+    boolean readByTypeResponse(in BluetoothGattAppConfiguration config, in int handle, in ParcelUuid uuid,
+                        in byte[] payload, in int status, in int reqHandle);
+    boolean readResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
+                        in byte[] payload, in int status, in int reqHandle);                            
+    boolean writeResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
+                        in int status, in int reqHandle);
+    void disconnectSap();
 }

@@ -94,6 +94,24 @@ static Properties health_channel_properties[] = {
     {"Application", DBUS_TYPE_OBJECT_PATH},
 };
 
+static Properties gatt_service_properties[] = {
+    {"Name", DBUS_TYPE_STRING},
+    {"Description", DBUS_TYPE_STRING},
+    {"UUID", DBUS_TYPE_STRING},
+    {"Characteristics", DBUS_TYPE_ARRAY},
+};
+
+static Properties gatt_characteristic_properties[] = {
+    {"UUID", DBUS_TYPE_STRING},
+    {"Name", DBUS_TYPE_STRING},
+    {"Description", DBUS_TYPE_STRING},
+    {"Format", DBUS_TYPE_STRUCT},
+    {"Value", DBUS_TYPE_ARRAY},
+    {"Representation", DBUS_TYPE_STRING},
+    {"ClientConfiguration", DBUS_TYPE_UINT16},
+    {"Properties", DBUS_TYPE_BYTE},
+};
+
 typedef union {
     char *str_val;
     int int_val;
@@ -109,12 +127,6 @@ jfieldID get_field(JNIEnv *env, jclass clazz, const char *member,
     return field;
 }
 
-typedef struct {
-    void (*user_cb)(DBusMessage *, void *, void *);
-    void *user;
-    void *nat;
-    JNIEnv *env;
-} dbus_async_call_t;
 
 void dbus_func_args_async_callback(DBusPendingCall *call, void *data) {
 
@@ -286,6 +298,61 @@ done:
     return reply;
 }
 
+/*
+ * This generic version of the function will take the service path
+ * as an argument and call the methods on the given service, path and
+ * interface.
+ * This can be used to call any interface on any services that are
+ * connected to D-Bus
+ */
+DBusMessage * dbus_func_args_generic_timeout_valist(JNIEnv *env,
+                                            DBusConnection *conn,
+                                            int timeout_ms,
+                                            DBusError *err,
+                                            const char *service,
+                                            const char *path,
+                                            const char *ifc,
+                                            const char *func,
+                                            int first_arg_type,
+                                            va_list args) {
+
+    DBusMessage *msg = NULL, *reply = NULL;
+    const char *name;
+    bool return_error = (err != NULL);
+
+    if (!return_error) {
+        err = (DBusError*)malloc(sizeof(DBusError));
+        dbus_error_init(err);
+    }
+
+    /* Compose the command */
+    msg = dbus_message_new_method_call(service, path, ifc, func);
+
+    if (msg == NULL) {
+        ALOGE("Could not allocate D-Bus message object!");
+        goto done;
+    }
+
+    /* append arguments */
+    if (!dbus_message_append_args_valist(msg, first_arg_type, args)) {
+        ALOGE("Could not append argument to method call!");
+        goto done;
+    }
+
+    /* Make the call. */
+    reply = dbus_connection_send_with_reply_and_block(conn, msg, timeout_ms, err);
+    if (!return_error && dbus_error_is_set(err)) {
+        LOG_AND_FREE_DBUS_ERROR_WITH_MSG(err, msg);
+    }
+
+done:
+    if (!return_error) {
+        free(err);
+    }
+    if (msg) dbus_message_unref(msg);
+    return reply;
+}
+
 DBusMessage * dbus_func_args_timeout(JNIEnv *env,
                                      DBusConnection *conn,
                                      int timeout_ms,
@@ -303,6 +370,31 @@ DBusMessage * dbus_func_args_timeout(JNIEnv *env,
     va_start(lst, first_arg_type);
     ret = dbus_func_args_timeout_valist(env, conn, timeout_ms, NULL,
                                         path, ifc, func,
+                                        first_arg_type, lst);
+    va_end(lst);
+    return ret;
+}
+
+/*
+ * This generic version of the function will take the service path
+ * as an argument and call the methods on the given service, path and
+ * interface.
+ * This can be used to call any interface on any services that are
+ * connected to D-Bus
+ */
+DBusMessage * dbus_func_args_generic(JNIEnv *env,
+                             DBusConnection *conn,
+                             const char *service,
+                             const char *path,
+                             const char *ifc,
+                             const char *func,
+                             int first_arg_type,
+                             ...) {
+    DBusMessage *ret;
+    va_list lst;
+    va_start(lst, first_arg_type);
+    ret = dbus_func_args_generic_timeout_valist(env, conn, -1, NULL,
+                                        service, path, ifc, func,
                                         first_arg_type, lst);
     va_end(lst);
     return ret;
@@ -586,6 +678,37 @@ void append_dict_args(DBusMessage *reply, const char *first_key, ...)
         va_end(var_args);
 }
 
+void append_array_variant(DBusMessageIter *iter, int type, void *val,
+                            int n_elements)
+{
+    DBusMessageIter variant, array;
+    char type_sig[2] = { type, '\0' };
+    char array_sig[3] = { DBUS_TYPE_ARRAY, type, '\0' };
+
+    dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT,
+                        array_sig, &variant);
+
+    dbus_message_iter_open_container(&variant, DBUS_TYPE_ARRAY,
+                        type_sig, &array);
+
+    if (type == DBUS_TYPE_BYTE) {
+        jbyte *v_ptr = (jbyte *) val;
+        for (int i = 0; i < n_elements; i++) {
+            dbus_message_iter_append_basic(&array, type, &(v_ptr[i]));
+        }
+    } else if (type == DBUS_TYPE_STRING || type == DBUS_TYPE_OBJECT_PATH) {
+        const char ***str_array = (const char ***)val;
+        int i;
+
+        for (i = 0; i < n_elements; i++)
+            dbus_message_iter_append_basic(&array, type,
+                            &((*str_array)[i]));
+    }
+
+    dbus_message_iter_close_container(&variant, &array);
+
+    dbus_message_iter_close_container(iter, &variant);
+}
 
 int get_property(DBusMessageIter iter, Properties *properties, int max_num_properties,
                   int *prop_index, property_value *value, int *value_type, int *len) {
@@ -805,7 +928,6 @@ jobjectArray parse_properties(JNIEnv *env, DBusMessageIter *iter, Properties *pr
                 }
             }
         }
-
     }
     return strArray;
 
@@ -825,7 +947,7 @@ jobjectArray parse_property_change(JNIEnv *env, DBusMessage *msg,
     DBusError err;
     jobjectArray strArray = NULL;
     jclass stringClass= env->FindClass("java/lang/String");
-    int len = 0, prop_index = -1;
+    int i, len = 0, prop_index = -1;
     int array_index = 0, size = 0, value_type = 0;
     property_value value;
 
@@ -909,6 +1031,16 @@ jobjectArray parse_health_device_property_change(JNIEnv *env, DBusMessage *msg) 
 jobjectArray parse_health_channel_properties(JNIEnv *env, DBusMessageIter *iter) {
     return parse_properties(env, iter, (Properties *) &health_channel_properties,
                           sizeof(health_channel_properties) / sizeof(Properties));
+}
+
+jobjectArray parse_gatt_service_properties(JNIEnv *env, DBusMessageIter *iter) {
+    return parse_properties(env, iter, (Properties *) &gatt_service_properties,
+                          sizeof(gatt_service_properties) / sizeof(Properties));
+}
+
+jobjectArray parse_gatt_characteristic_properties(JNIEnv *env, DBusMessageIter *iter) {
+    return parse_properties(env, iter, (Properties *) &gatt_characteristic_properties,
+                            sizeof(gatt_characteristic_properties) / sizeof(Properties));
 }
 
 int get_bdaddr(const char *str, bdaddr_t *ba) {

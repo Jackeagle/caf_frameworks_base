@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.UUID;
+import java.util.Vector;
 
 /**
  * Represents a remote Bluetooth device. A {@link BluetoothDevice} lets you
@@ -112,6 +113,16 @@ public final class BluetoothDevice implements Parcelable {
     public static final String ACTION_CLASS_CHANGED =
             "android.bluetooth.device.action.CLASS_CHANGED";
 
+     /**
+     * Broadcast Action: RSSI update from the remote device
+     * <p>Always contains the extra fields {@link #EXTRA_DEVICE} and {@link
+     * #EXTRA_RSSI}.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_RSSI_UPDATE =
+            "android.bluetooth.device.action.RSSI_UPDATE";
     /**
      * Broadcast Action: Indicates a low level (ACL) connection has been
      * established with a remote device.
@@ -230,6 +241,10 @@ public final class BluetoothDevice implements Parcelable {
       */
     public static final String EXTRA_PREVIOUS_BOND_STATE =
             "android.bluetooth.device.extra.PREVIOUS_BOND_STATE";
+
+    /** @hide */
+    public static final String EXTRA_SECURE_PAIRING = "android.bluetooth.device.extra.SECURE";
+
     /**
      * Indicates the remote device is not bonded (paired).
      * <p>There is no shared link key with the remote device, so communication
@@ -328,6 +343,15 @@ public final class BluetoothDevice implements Parcelable {
     /**@hide*/
     public static final int REQUEST_TYPE_PHONEBOOK_ACCESS = 2;
 
+    /**@hide*/
+    public static final int REQUEST_TYPE_FILE_ACCESS = 3;
+
+    /**@hide*/
+    public static final int REQUEST_TYPE_MESSAGE_ACCESS = 4;
+
+    /**@hide*/
+    public static final int REQUEST_TYPE_SIM_ACCESS = 5;
+
     /**
      * Used as an extra field in {@link #ACTION_CONNECTION_ACCESS_REQUEST} intents,
      * Contains package name to return reply intent to.
@@ -368,6 +392,11 @@ public final class BluetoothDevice implements Parcelable {
      * A bond attempt succeeded
      * @hide
      */
+    public static final String ACTION_GATT =
+            "android.bluetooth.device.action.GATT";
+
+    /** A bond attempt succeeded
+     * @hide */
     public static final int BOND_SUCCESS = 0;
 
     /**
@@ -477,7 +506,34 @@ public final class BluetoothDevice implements Parcelable {
      * is a parcelable version of {@link UUID}.
      */
     public static final String EXTRA_UUID = "android.bluetooth.device.extra.UUID";
+    /**
+     * Used as an extra field in ACTION_GATT intent.
+     * Contains the object paths of the GATT based services on remote device.
+     * @hide
+     */
+    public static final String EXTRA_GATT = "android.bluetooth.device.extra.GATT";
+    /**
+     * Used as an extra field in ACTION_GATT intent.
+     * Contains the result code for GATT service discovery.
+     * @hide
+     */
+    public static final String EXTRA_GATT_RESULT = "android.bluetooth.device.extra.GATT_RESULT";
 
+    /** A GATT service discovery was successful.
+     * @hide */
+    public static final int GATT_RESULT_SUCCESS = 0;
+    /** A GATT service discovery failed due to timeout.
+     * @hide */
+    public static final int GATT_RESULT_TIMEOUT = 1;
+    /** A GATT service discovery failed.
+     * @hide */
+    public static final int GATT_RESULT_FAIL = 2;
+
+    /**
+     * Used as an extra field for SAP state change events.
+     * @hide
+     */
+    public static final String SAP_STATE_CHANGED = "com.android.bluetooth.sap.statechanged";
     /**
      * Lazy initialization. Guaranteed final after first object constructed, or
      * getService() called.
@@ -655,6 +711,40 @@ public final class BluetoothDevice implements Parcelable {
         return false;
     }
 
+     /**
+     * Register the watcher for monitoring RSSI of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param rssiThreshold
+     * @param interval
+     * @param updateOnThreshExceed
+     * @hide
+     */
+   public boolean registerRssiUpdateWatcher(int rssiThreshold, int interval,
+                                             boolean updateOnThreshExceed) {
+        try {
+            return sService.registerRssiUpdateWatcher(mAddress,
+                                                      rssiThreshold,
+                                                      interval,
+                                                      updateOnThreshExceed);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+     /**
+     * Unregister the watcher for monitoring RSSI of the remote
+     * device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @hide
+     */
+    public boolean unregisterRssiUpdateWatcher() {
+        try {
+            return sService.unregisterRssiUpdateWatcher(mAddress);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
     /**
      * Start the bonding (pairing) process with the remote device using the
      * Out Of Band mechanism.
@@ -778,6 +868,62 @@ public final class BluetoothDevice implements Parcelable {
         return false;
     }
 
+    /**
+     * Set the preferred connection parameters of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param connection parameters values.
+     * @hide
+     */
+    public boolean setLEConnectionParams(byte prohibitRemoteChg,
+                                         byte filterPolicy,
+                                         int scanInterval,
+                                         int scanWindow,
+                                         int intervalMin,
+                                         int intervalMax,
+                                         int latency,
+                                         int superVisionTimeout,
+                                         int minCeLen,
+                                         int maxCeLen) {
+        try {
+            return sService.setLEConnectionParams(mAddress,
+                                                  prohibitRemoteChg,
+                                                  filterPolicy,
+                                                  scanInterval,
+                                                  scanWindow,
+                                                  intervalMin,
+                                                  intervalMax,
+                                                  latency,
+                                                  superVisionTimeout,
+                                                  minCeLen,
+                                                  maxCeLen
+                                                  );
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+    /**
+     * Update the LE connection parameters of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param connection parameters values.
+     * @hide
+     */
+    public boolean updateLEConnectionParams(byte prohibitRemoteChg,
+                                            int intervalMin,
+                                            int intervalMax,
+                                            int slaveLatency,
+                                            int supervisionTimeout) {
+        try {
+            return sService.updateLEConnectionParams(mAddress,
+                                                prohibitRemoteChg,
+                                                intervalMin,
+                                                intervalMax,
+                                                slaveLatency,
+                                                supervisionTimeout);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
 
     /**
      * Get trust state of a remote device.
@@ -1159,4 +1305,62 @@ public final class BluetoothDevice implements Parcelable {
         return pinBytes;
     }
 
+   /**
+     * Broadcast Action
+     * Always contains the extra field {EXTRA_DEVICE}
+     * Always contains the extra field {EXTRA_UUID}
+     * Always contains the extra filed {EXTRA_PATH}
+     * Requires BLUETOOTH to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_GATT_SERVICE =
+            "android.bleutooth.device.action.GATT_SERVICE";
+
+  /**
+     * Broadcast Action
+     * Requires BLUETOOTH to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_GATT_SERVICE_CHANGED =
+            "android.bleutooth.device.action.GATT_SERVICES_CHANGED";
+
+   /**
+     * Get GATT-based service for a given UUID.
+     *
+     *
+     * @param uuid GATT service UUID
+     * @return False, if internal checks fail; True if the process of
+     *             retrieving information about GATT services was started.
+     *
+     * @hide
+     */
+    public boolean getGattServices(UUID uuid) {
+
+        ParcelUuid convertUuid = new ParcelUuid(uuid);
+
+        try {
+            return sService.getGattServices(mAddress, convertUuid);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
+
+    /**
+     * Get all GATT-based services on the remote device..
+     *
+     * @return False, if internal checks fail; True if the process of
+     *             retrieving information about GATT services was started.
+     *
+     * @hide
+     */
+    public boolean getGattServices() {
+
+        try {
+            return sService.getGattServices(mAddress, null);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
 }
