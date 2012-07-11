@@ -169,6 +169,8 @@ private:
     int64_t mNumFramesPlayed;
     int mAudioFormat;
     int mIsAACFormatAdif;
+    size_t mCodecSpecificDataSize;
+    void *mCodecSpecificData;
 
     //Miscellaneous variables
     //Needed for AV sync
@@ -189,7 +191,6 @@ private:
 
     //Seek variables
     bool mSeeking;
-    bool mInternalSeeking;
 
     //EOS variables
     bool mPostedEOS;
@@ -247,6 +248,8 @@ private:
     int64_t getAudioTimeStampUs();
 
     status_t getDecoderAndFormat();
+
+    void updateConfigData();
 
     status_t seekPlayback();
 
