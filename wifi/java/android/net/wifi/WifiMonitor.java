@@ -459,7 +459,7 @@ public class WifiMonitor {
 
                 String extra = WifiNative.p2pPeer(wifiP2pDevice.deviceAddress);
                     Log.d(TAG, "handlep2p Peer Found" + extra);
-                if(extra.compareToIgnoreCase("FAIL") != 0) {
+                if(extra != null && extra.compareToIgnoreCase("FAIL") != 0) {
                     Log.d(TAG, "handlep2p WFD Peer Found" + extra);
                     WfdInfo wfdInfo = new WfdInfo(extra);
                     if(wfdInfo.isWFDDevice() == true) {
@@ -498,7 +498,7 @@ public class WifiMonitor {
             } else if (dataString.startsWith(P2P_PROV_DISC_PBC_REQ_STR)) {
                 WifiP2pDevice wifiP2pDevice = new WifiP2pDevice(dataString);
                 String extra = WifiNative.p2pPeer(wifiP2pDevice.deviceAddress);
-                if(extra.compareToIgnoreCase("FAIL") != 0) {
+                if(extra != null && extra.compareToIgnoreCase("FAIL") != 0) {
                     Log.d(TAG, "Peer Found" + extra);
                     WfdInfo wfdInfo = new WfdInfo(extra);
                     if(wfdInfo.isWFDDevice() == true) {
@@ -510,7 +510,7 @@ public class WifiMonitor {
             } else if (dataString.startsWith(P2P_PROV_DISC_ENTER_PIN_STR)) {
                 WifiP2pDevice wifiP2pDevice = new WifiP2pDevice(dataString);
                 String extra = WifiNative.p2pPeer(wifiP2pDevice.deviceAddress);
-                if(extra.compareToIgnoreCase("FAIL") != 0) {
+                if(extra != null && extra.compareToIgnoreCase("FAIL") != 0) {
                     Log.d(TAG, "Peer Found" + extra);
                     WfdInfo wfdInfo = new WfdInfo(extra);
                     if(wfdInfo.isWFDDevice() == true) {
