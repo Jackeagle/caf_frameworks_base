@@ -36,7 +36,8 @@ include $(CLEAR_VARS)
 FRAMEWORKS_EXT_SUBDIRS := \
        media/mca/effect \
        media/mca/filterfw \
-       media/mca/filterpacks
+       media/mca/filterpacks \
+       core/java/android/hardware/fmradio
 
 FRAMEWORKS_EXT_SRCS := $(call find-other-java-files,$(FRAMEWORKS_EXT_SUBDIRS))
 
