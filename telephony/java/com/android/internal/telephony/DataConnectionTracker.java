@@ -1413,13 +1413,28 @@ public abstract class DataConnectionTracker extends Handler {
              */
             resetAllRetryCounts();
             clearTetheredStateOnStatus();
-            sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, 0, 0,
+            int partialRetry = Phone.DUALIP_NOT_PARTIAL_RETRY;
+            if (isAnyDcInPartialSuccess()) {
+                // Found at least one data connection with partial success, retry
+                partialRetry = Phone.DUALIP_PARTIAL_RETRY;
+                if (DBG) log("onTetheredModeStateChanged: Retry for DC with partial failure.");
+            }
+            sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, partialRetry, 0,
                     Phone.REASON_TETHERED_MODE_STATE_CHANGED));
             break;
         default:
             if (DBG)
             log("Error: Invalid Tethered mode:" + mode);
         }
+    }
+
+    protected boolean isAnyDcInPartialSuccess() {
+        for (DataConnectionAc dcac : mDataConnectionAsyncChannels.values()) {
+            if (dcac.getPartialSuccessStatusSync()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     protected void resetAllRetryCounts() {
