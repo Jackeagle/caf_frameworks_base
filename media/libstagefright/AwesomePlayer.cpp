@@ -215,7 +215,8 @@ AwesomePlayer::AwesomePlayer()
       mTextPlayer(NULL),
       mPostProcNativeWindow(NULL),
       mPostProcController(NULL),
-      mBufferingDone(false) {
+      mBufferingDone(false),
+      mIsLocalPlayback(true) {
     CHECK_EQ(mClient.connect(), (status_t)OK);
 
     DataSource::RegisterDefaultSniffers();
@@ -319,6 +320,11 @@ status_t AwesomePlayer::setDataSource_l(
     reset_l();
 
     mUri = uri;
+
+    if ((strncmp(uri, "http", 4) == 0) || (strncmp(uri, "widevine", 8) == 0)) {
+        LOGV("PostProc Disabled");
+        mIsLocalPlayback = false;
+    }
 
     if (headers) {
         mUriHeaders = *headers;
@@ -2911,8 +2917,10 @@ bool AwesomePlayer::isPostProcEnabled()
 {
     char value[PROPERTY_VALUE_MAX];
     bool postProcOn = false;
-    if (property_get(kPostProcOn, value, 0) > 0 && atoi(value) > 0) {
-        postProcOn = true;
+    if (mIsLocalPlayback) {
+        if (property_get(kPostProcOn, value, 0) > 0 && atoi(value) > 0) {
+            postProcOn = true;
+        }
     }
     return postProcOn;
 }
