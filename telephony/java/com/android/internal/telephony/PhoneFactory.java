@@ -185,6 +185,8 @@ public class PhoneFactory {
         case RILConstants.NETWORK_MODE_GSM_ONLY:
         case RILConstants.NETWORK_MODE_WCDMA_ONLY:
         case RILConstants.NETWORK_MODE_GSM_UMTS:
+        case RILConstants.NETWORK_MODE_LTE_GSM_WCDMA:
+        case RILConstants.NETWORK_MODE_LTE_WCDMA:
             return Phone.PHONE_TYPE_GSM;
 
         // Use CDMA Phone for the global mode including CDMA
