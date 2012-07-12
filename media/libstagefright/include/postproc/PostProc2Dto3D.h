@@ -49,6 +49,7 @@ private:
     set_get_property_Func_t * mLib3dSetProperty;
     set_get_property_Func_t * mLib3dGetProperty;
     alloc_dealloc_resources_Func_t *mLib3dAllocResources;
+    alloc_dealloc_resources_Func_t *mLib3dDeAllocResources;
     from2dTo3d_convert_Func_t *mLib3dConvertFrom2dto3d;
 
     void *mLib3dContext;
