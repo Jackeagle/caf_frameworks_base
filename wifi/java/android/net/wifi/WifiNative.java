@@ -436,9 +436,9 @@ public class WifiNative {
             String command = "SET p2p_pref_chan ";
             for (i = startChannel; i<=endChannel; i++){
                 strBuf.append("81:" + i);
-                for (int j = i; j<=endChannel-1; j++)
                     strBuf.append(",");
             }
+       strBuf.deleteCharAt(strBuf.length() - 1);
        command += strBuf;
        Log.e(TAG, "setPreferredChannel Command that goes to Supplicant is=" + command);
        return doBooleanCommand(command);
