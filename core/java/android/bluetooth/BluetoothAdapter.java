@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -348,6 +348,10 @@ public final class BluetoothAdapter {
 
     private static final int ADDRESS_LENGTH = 17;
 
+    /** @hide */ public static final int HOST_PATCH_DONT_REMOVE_SERVICE = 1;
+    /** @hide */ public static final int HOST_PATCH_AVOID_CONNECT_ON_PAIR = 2;
+    /** @hide */ public static final int HOST_PATCH_AVOID_AUTO_CONNECT = 3;
+
     /**
      * Lazily initialized singleton. Guaranteed final after first object
      * constructed.
@@ -357,6 +361,14 @@ public final class BluetoothAdapter {
     private final IBluetooth mService;
 
     private Handler mServiceRecordHandler;
+
+    /** @hide */
+    public boolean isHostPatchRequired (BluetoothDevice btDevice, int patch_id) {
+        try {
+            return mService.isHostPatchRequired (btDevice, patch_id);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
 
     /**
      * Get a handle to the default local Bluetooth adapter.
@@ -440,6 +452,32 @@ public final class BluetoothAdapter {
     }
 
     /**
+     * Query the registration state of a service
+     * @return true if the service is registered
+     * @hide
+     */
+    public boolean isServiceRegistered(ParcelUuid uuid) {
+       try {
+           return mService.isServiceRegistered(uuid);
+       } catch (RemoteException e) {Log.e(TAG, "", e);}
+       return false;
+    }
+
+    /**
+     * Register/deregister a service
+     * @param uuid uuid of the service to be registered
+     * @param enable true/false to register/deregister a service
+     * @return true if register/deregister is succeeded
+     * @hide
+     */
+    public boolean registerService(ParcelUuid uuid , boolean enable) {
+      try {
+          return mService.registerService(uuid, enable);
+      } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+    /**
      * Get the current state of the local Bluetooth adapter.
      * <p>Possible return values are
      * {@link #STATE_OFF},
@@ -451,6 +489,7 @@ public final class BluetoothAdapter {
      * @return current state of Bluetooth adapter
      */
     public int getState() {
+        if (mService == null) return STATE_OFF;
         try {
             return mService.getBluetoothState();
         } catch (RemoteException e) {Log.e(TAG, "", e);}
@@ -863,10 +902,13 @@ public final class BluetoothAdapter {
      */
     private static class RfcommChannelPicker {
         private static final int[] RESERVED_RFCOMM_CHANNELS =  new int[] {
+            1,   // DUN
             10,  // HFAG
             11,  // HSAG
             12,  // OPUSH
-            16,  // MAP
+            15,  // SAP
+            16,  // MAS0
+            17,  // MAS1
             19,  // PBAP
             20,  // FTP
         };

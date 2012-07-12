@@ -320,6 +320,10 @@ DBusMessage * dbus_func_args_generic_timeout_valist(JNIEnv *env,
     const char *name;
     bool return_error = (err != NULL);
 
+    if (!path || !func || !ifc) {
+        return NULL;
+    }
+
     if (!return_error) {
         err = (DBusError*)malloc(sizeof(DBusError));
         dbus_error_init(err);
@@ -392,6 +396,10 @@ DBusMessage * dbus_func_args_generic(JNIEnv *env,
                              ...) {
     DBusMessage *ret;
     va_list lst;
+    if (!path || !func || !ifc) {
+        return NULL;
+    }
+
     va_start(lst, first_arg_type);
     ret = dbus_func_args_generic_timeout_valist(env, conn, -1, NULL,
                                         service, path, ifc, func,

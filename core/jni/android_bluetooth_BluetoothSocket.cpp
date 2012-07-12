@@ -1,6 +1,6 @@
 /*
  * Copyright 2009, The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ static const int TYPE_RFCOMM = 1;
 static const int TYPE_SCO = 2;
 static const int TYPE_L2CAP = 3;
 static const int TYPE_EL2CAP = 4;
+static const int TYPE_SCO_WBS = 5;
 
 static const int RFCOMM_SO_SNDBUF = 70 * 1024;  // 70 KB send buffer
 static const int L2CAP_SO_SNDBUF = 400 * 1024;  // 400 KB send buffer
@@ -116,6 +117,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
     case TYPE_RFCOMM:
         fd = socket(PF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
         break;
+    case TYPE_SCO_WBS:
     case TYPE_SCO:
         fd = socket(PF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_SCO);
         break;
@@ -329,6 +331,7 @@ static void connectNative(JNIEnv *env, jobject obj) {
         memcpy(&addr_rc.rc_bdaddr, &bdaddress, sizeof(bdaddr_t));
 
         break;
+    case TYPE_SCO_WBS:
     case TYPE_SCO:
         struct sockaddr_sco addr_sco;
         addr = (struct sockaddr *)&addr_sco;
@@ -336,6 +339,7 @@ static void connectNative(JNIEnv *env, jobject obj) {
 
         memset(addr, 0, addr_sz);
         addr_sco.sco_family = AF_BLUETOOTH;
+        addr_sco.is_wbs = (type == TYPE_SCO_WBS);
         memcpy(&addr_sco.sco_bdaddr, &bdaddress, sizeof(bdaddr_t));
 
         break;
@@ -375,6 +379,7 @@ connect:
         if (env->ExceptionOccurred()) {
             return;
         }
+        s = get_socketData(env, obj); //Due to init socket ptr would be updated
         goto connect;
     }
     if (!ret && retry > 0)

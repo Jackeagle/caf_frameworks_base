@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -241,10 +242,10 @@ public final class BluetoothHeadset implements BluetoothProfile {
      */
     /*package*/ synchronized void close() {
         if (DBG) log("close()");
-        if (mConnection != null) {
+        if (mConnection != null && mService != null) {
             mContext.unbindService(mConnection);
-            mConnection = null;
         }
+        mConnection = null;
         mServiceListener = null;
     }
 
@@ -559,6 +560,25 @@ public final class BluetoothHeadset implements BluetoothProfile {
     public static boolean isBluetoothVoiceDialingEnabled(Context context) {
         return context.getResources().getBoolean(
                 com.android.internal.R.bool.config_bluetooth_sco_off_call);
+    }
+
+    /**
+     * Indicates if current device supports voice dialing over bluetooth SCO.
+     *
+     * @return true if voice dialing over bluetooth is supported, false otherwise.
+     * @hide
+     */
+    public boolean isBluetoothVoiceDialingSupported(BluetoothDevice device) {
+        if (mService != null && isEnabled() &&
+            isValidDevice(device)) {
+            try {
+                return mService.isBluetoothVoiceDialingEnabled(device);
+            } catch (RemoteException e) {
+                Log.e(TAG,  Log.getStackTraceString(new Throwable()));
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return false;
     }
 
     /**

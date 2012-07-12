@@ -528,7 +528,6 @@ public final class BluetoothDevice implements Parcelable {
     /** A GATT service discovery failed.
      * @hide */
     public static final int GATT_RESULT_FAIL = 2;
-
     /**
      * Used as an extra field for SAP state change events.
      * @hide
@@ -1277,6 +1276,20 @@ public final class BluetoothDevice implements Parcelable {
      */
     public BluetoothSocket createScoSocket() throws IOException {
         return new BluetoothSocket(BluetoothSocket.TYPE_SCO, -1, true, true, this, -1, null);
+    }
+
+    /**
+     * Construct a SCO socket for WBS ready to start an outgoing connection.
+     * Call #connect on the returned #BluetoothSocket to begin the connection.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}
+     *
+     * @return a SCO BluetoothSocket
+     * @throws IOException on error, for example Bluetooth not available, or
+     *                     insufficient permissions.
+     * @hide
+     */
+    public BluetoothSocket createScoWbsSocket() throws IOException {
+        return new BluetoothSocket(BluetoothSocket.TYPE_SCO_WBS, -1, true, true, this, -1, null);
     }
 
     /**

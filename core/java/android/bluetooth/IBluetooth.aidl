@@ -36,6 +36,9 @@ import android.bluetooth.BluetoothGattAppConfiguration;
 interface IBluetooth
 {
     boolean isEnabled();
+    boolean isServiceRegistered(in ParcelUuid uuid);
+    boolean registerService(in ParcelUuid uuid, boolean enable);
+
     int getBluetoothState();
     boolean enable();
     boolean enableNoAutoConnect();
@@ -185,4 +188,5 @@ interface IBluetooth
     boolean writeResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
                         in int status, in int reqHandle);
     void disconnectSap();
+    boolean isHostPatchRequired(in BluetoothDevice btDevice, in int patch_id);
 }

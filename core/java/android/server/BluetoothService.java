@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- *
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -60,9 +60,14 @@ import android.os.ParcelFileDescriptor;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemService;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.Pair;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.os.SystemClock;
 
 import com.android.internal.app.IBatteryStats;
 
@@ -85,6 +90,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Iterator;
@@ -177,7 +183,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private final HashMap<String, Map<String, String>> mDeviceFeatureCache;
 
     private final ArrayList<String> mUuidIntentTracker;
-    private final HashMap<RemoteService, IBluetoothCallback> mUuidCallbackTracker;
+    private final ConcurrentHashMap<RemoteService, IBluetoothCallback> mUuidCallbackTracker;
 
     private static class ServiceRecordClient {
         int pid;
@@ -197,6 +203,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
     private BluetoothA2dpService mA2dpService;
     private final HashMap<String, Pair<byte[], byte[]>> mDeviceOobData;
+    private HostPatchForIOP mHostPatchForIOP;
 
     private int mProfilesConnected = 0, mProfilesConnecting = 0, mProfilesDisconnecting = 0;
 
@@ -216,6 +223,22 @@ public class BluetoothService extends IBluetooth.Stub {
       "/data/misc/bluetooth/incoming_connection.conf";
     private HashMap<String, Pair<Integer, String>> mIncomingConnections;
     private HashMap<Integer, Pair<Integer, Integer>> mProfileConnectionState;
+
+    private int[] mDUNRecordHandle;
+    private boolean mDUNEnabled = false;
+
+    private int[] mFTPRecordHandle;
+    private boolean mFTPEnabled = false;
+    private int[] mSAPRecordHandle;
+    private boolean mSAPEnabled = false;
+    private int[] mMAPRecordHandle;
+    private boolean mMAPEnabled = false;
+
+    private AlarmManager mAlarmManager;
+    private Intent mDiscoverableTimeoutIntent;
+    private PendingIntent mPendingDiscoverableTimeout;
+    private static final String ACTION_BT_DISCOVERABLE_TIMEOUT =
+             "android.bluetooth.service.action.DISCOVERABLE_TIMEOUT";
 
     private static class RemoteService {
         public String address;
@@ -239,6 +262,101 @@ public class BluetoothService extends IBluetooth.Stub {
             hash = hash * 31 + (address == null ? 0 : address.hashCode());
             hash = hash * 31 + (uuid == null ? 0 : uuid.hashCode());
             return hash;
+        }
+    }
+
+    private static class HostPatchForIOP {
+        private static final String HOST_PATCH_IOP_BLACKLIST =
+                 "/etc/bluetooth/iop_device_list.conf";
+        private ArrayList <String> mDontRemoveServiceBlackList;
+        private ArrayList <String> mAvoidConnectOnPairBlackList;
+        private ArrayList <String> mAvoidAutoConnectBlackList;
+
+        public HostPatchForIOP() {
+             // Read the IOP device list into patch table
+            if(DBG) Log.d(TAG, " HostPatchForIOT: Loading from conf");
+            FileInputStream fstream = null;
+            try {
+                fstream = new FileInputStream(HOST_PATCH_IOP_BLACKLIST);
+                DataInputStream in = new DataInputStream(fstream);
+                BufferedReader file = new BufferedReader(new InputStreamReader(in));
+                String line;
+                while((line = file.readLine()) != null) {
+                    line = line.trim();
+                    if (line.length() == 0 || line.startsWith("//")) continue;
+                    String[] value = line.split(" ");
+                    if (value != null && value.length == 2) {
+                        String[] val = value[1].split(";");
+                        if (value[0].equalsIgnoreCase("sdp_missing_uuids")) {
+                            mDontRemoveServiceBlackList =
+                                new ArrayList<String>(Arrays.asList(val));
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Loaded DontRemoveService");
+                        } else if (value[0].equalsIgnoreCase("avoid_connect_after_pair")) {
+                            mAvoidConnectOnPairBlackList =
+                                new ArrayList<String>(Arrays.asList(val));
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Loaded NoConnectionOnPair");
+                        } else if (value[0].equalsIgnoreCase("avoid_autoconnect")) {
+                            mAvoidAutoConnectBlackList =
+                                new ArrayList<String>(Arrays.asList(val));
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Loaded NoAutoConnectList");
+                        }
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                Log.e(TAG, "HOST Patch conf File Not found : " + HOST_PATCH_IOP_BLACKLIST);
+            } catch (IOException e) {
+                Log.e(TAG, "IOException: read HOST Patch conf File " + e);
+            } finally {
+                if (fstream != null) {
+                    try {
+                        fstream.close();
+                    } catch (IOException e) {
+                        // Ignore
+                    }
+                }
+            }
+        }
+
+        public boolean isHostPatchRequired(String address, int patch_id) {
+            // Check the device address in patch table
+            // If the device is found in the list for the patch, return true
+            if(DBG) Log.d(TAG, " HostPatchForIOT: Checking");
+            switch (patch_id) {
+            case BluetoothAdapter.HOST_PATCH_DONT_REMOVE_SERVICE:
+                if (mDontRemoveServiceBlackList != null) {
+                    for (String blacklistAddress : mDontRemoveServiceBlackList) {
+                        if (address.regionMatches(true, 0,
+                             blacklistAddress, 0, blacklistAddress.length())) {
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Apply DontRemoveService");
+                            return true;
+                        }
+                    }
+                }
+                break;
+            case BluetoothAdapter.HOST_PATCH_AVOID_CONNECT_ON_PAIR:
+                if (mAvoidConnectOnPairBlackList != null) {
+                    for (String blacklistAddress : mAvoidConnectOnPairBlackList) {
+                        if (address.regionMatches(true, 0,
+                             blacklistAddress, 0, blacklistAddress.length())) {
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Apply DontGoforConnect");
+                            return true;
+                        }
+                    }
+                }
+                break;
+            case BluetoothAdapter.HOST_PATCH_AVOID_AUTO_CONNECT:
+                if (mAvoidAutoConnectBlackList != null) {
+                    for (String blacklistAddress : mAvoidAutoConnectBlackList) {
+                        if (address.regionMatches(true, 0,
+                            blacklistAddress, 0, blacklistAddress.length())) {
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Apply DontAutoConnect");
+                            return true;
+                        }
+                    }
+                }
+                break;
+            }
+            return false;
         }
     }
 
@@ -273,8 +391,8 @@ public class BluetoothService extends IBluetooth.Stub {
         mDeviceOobData = new HashMap<String, Pair<byte[], byte[]>>();
         mDeviceL2capPsmCache = new HashMap<String, Map<ParcelUuid, Integer>>();
         mUuidIntentTracker = new ArrayList<String>();
-        mUuidCallbackTracker = new HashMap<RemoteService, IBluetoothCallback>();
         mServiceRecordToPid = new HashMap<Integer, ServiceRecordClient>();
+        mUuidCallbackTracker = new ConcurrentHashMap<RemoteService, IBluetoothCallback>();
         mGattIntentTracker = new HashMap<String, ArrayList<ParcelUuid>>();
         mGattServiceTracker = new HashMap<String, IBluetoothGattService>();
         mGattWatcherTracker = new HashMap<String, IBluetoothGattService>();
@@ -282,14 +400,21 @@ public class BluetoothService extends IBluetooth.Stub {
         mDeviceProfileState = new HashMap<String, BluetoothDeviceProfileState>();
         mA2dpProfileState = new BluetoothProfileState(mContext, BluetoothProfileState.A2DP);
         mHfpProfileState = new BluetoothProfileState(mContext, BluetoothProfileState.HFP);
-
         mHfpProfileState.start();
         mA2dpProfileState.start();
 
         mConnectionManager = new ConnectionManager();
 
+        mHostPatchForIOP = new HostPatchForIOP();
+
         IntentFilter filter = new IntentFilter();
         registerForAirplaneMode(filter);
+
+        mAlarmManager = (AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
+        mDiscoverableTimeoutIntent = new Intent(ACTION_BT_DISCOVERABLE_TIMEOUT, null);
+        mPendingDiscoverableTimeout =
+                PendingIntent.getBroadcast(mContext, 0, mDiscoverableTimeoutIntent, 0);
+        filter.addAction(ACTION_BT_DISCOVERABLE_TIMEOUT);
 
         // Register for connection-oriented notifications
         filter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
@@ -341,6 +466,14 @@ public class BluetoothService extends IBluetooth.Stub {
         }
         mDockAddress = null;
         return null;
+    }
+
+    public boolean isHostPatchRequired (BluetoothDevice btDevice, int patch_id) {
+        if (mHostPatchForIOP != null) {
+            String address = btDevice.getAddress();
+            return mHostPatchForIOP.isHostPatchRequired(address, patch_id);
+        }
+        return false;
     }
 
     private synchronized boolean writeDockPin() {
@@ -404,6 +537,46 @@ public class BluetoothService extends IBluetooth.Stub {
     public boolean isEnabled() {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
         return isEnabledInternal();
+    }
+
+    public boolean isServiceRegistered(ParcelUuid uuid) {
+       if (DBG) Log.d(TAG, "isServiceRegistered UUID: " + uuid);
+       if (uuid == null) return false;
+
+       if (BluetoothUuid.isFileTransfer(uuid)) {
+         return mFTPEnabled;
+       } else if (BluetoothUuid.isMessageAccessServer(uuid)) {
+         return mMAPEnabled;
+       } else if (BluetoothUuid.isDun(uuid)) {
+         return mDUNEnabled;
+       } else if (BluetoothUuid.isSap(uuid)) {
+         return mSAPEnabled;
+       } else {
+         if (DBG) Log.d(TAG, "Unsupported service UUID: " + uuid);
+         return false;
+       }
+    }
+
+    public  boolean registerService(ParcelUuid uuid, boolean enable) {
+       if (DBG) Log.d(TAG, "registerService UUID: " + uuid + " " + "register = " + enable);
+       if (uuid == null) return false;
+
+       if (BluetoothUuid.isFileTransfer(uuid)) {
+         if (enable) return enableFTP();
+         return  disableFTP();
+       } else if (BluetoothUuid.isMessageAccessServer(uuid)) {
+         if (enable) return enableMAP();
+         return disableMAP();
+       } else if (BluetoothUuid.isDun(uuid)) {
+         if (enable) return enableDUN();
+         return disableDUN();
+       } else if (BluetoothUuid.isSap(uuid)) {
+         if (enable) return enableSAP();
+         return disableSAP();
+       } else {
+         if (DBG) Log.d(TAG, "Unsupported service UUID: " + uuid + " " + "register = " + enable);
+         return false;
+       }
     }
 
     private boolean isEnabledInternal() {
@@ -508,6 +681,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
         // Log bluetooth off to battery stats.
         long ident = Binder.clearCallingIdentity();
+        mBondState.deinitBondState();
         try {
             mBatteryStats.noteBluetoothOff();
             //Balancing calls to unbind Headset service which is bound
@@ -530,6 +704,14 @@ public class BluetoothService extends IBluetooth.Stub {
         if (mAdapterSdpHandles != null) removeReservedServiceRecordsNative(mAdapterSdpHandles);
         setBluetoothTetheringNative(false, BluetoothPanProfileHandler.NAP_ROLE,
                 BluetoothPanProfileHandler.NAP_BRIDGE);
+
+        /*
+         * disable QC based profiles
+         */
+        disableFTP();
+        disableDUN();
+        disableSAP();
+        disableMAP();
         tearDownNativeDataNative();
     }
 
@@ -662,6 +844,166 @@ public class BluetoothService extends IBluetooth.Stub {
         mAdapterSdpHandles = addReservedServiceRecordsNative(svcIdentifiers);
     }
 
+    private synchronized boolean enableFTP(){
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.ftp", false) == false) {
+            Log.e(TAG, "FTP is not supported");
+            return false;
+        }
+
+        if(mFTPEnabled != true){
+            int[] svcIdentifiers = new int[1];
+            svcIdentifiers[0] =  BluetoothUuid.getServiceIdentifierFromParcelUuid(BluetoothUuid.FileTransfer);
+
+            mFTPRecordHandle = addReservedServiceRecordsNative(svcIdentifiers);
+            mFTPEnabled = true;
+            return true;
+        } else {
+            Log.e(TAG, "FTP already enabled");
+            return false;
+        }
+    }
+
+    private synchronized boolean disableFTP(){
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.ftp", false) == false) {
+            Log.e(TAG, "FTP is not supported");
+            return false;
+        }
+
+        if(mFTPEnabled ==true){
+            removeReservedServiceRecordsNative(mFTPRecordHandle);
+            mFTPEnabled = false;
+            return true;
+        } else {
+            Log.e(TAG, "FTP already disabled");
+            return false;
+        }
+    }
+
+    private synchronized boolean enableDUN() {
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.dun", false) == false) {
+            Log.e(TAG, "DUN is not supported");
+            return false;
+        }
+
+        if (mDUNEnabled != true) {
+            int[] svcIdentifiers = new int[1];
+            svcIdentifiers[0] =  BluetoothUuid.getServiceIdentifierFromParcelUuid(BluetoothUuid.DUN);
+
+            mDUNRecordHandle = addReservedServiceRecordsNative(svcIdentifiers);
+            Log.e(TAG, "Starting BT-DUN server");
+            SystemService.start("bt-dun");
+            mDUNEnabled = true;
+            return true;
+        } else {
+            Log.e(TAG, "DUN already enabled");
+            return false;
+        }
+    }
+
+    private synchronized boolean disableDUN() {
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.dun", false) == false) {
+            Log.e(TAG, "DUN is not supported");
+            return false;
+        }
+
+        if (mDUNEnabled == true ) {
+            removeReservedServiceRecordsNative(mDUNRecordHandle);
+            Log.e(TAG, "Stop BT-DUN server");
+            SystemService.stop("bt-dun");
+            mDUNEnabled = false;
+            return true;
+        } else {
+            Log.e(TAG, "DUN already disabled");
+            return false;
+        }
+    }
+
+    private synchronized boolean enableSAP() {
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.sap", false) == false) {
+            Log.e(TAG, "SAP is not supported");
+            return false;
+        }
+
+        if (mSAPEnabled != true) {
+            int[] svcIdentifiers = new int[1];
+            svcIdentifiers[0] =  BluetoothUuid.getServiceIdentifierFromParcelUuid(BluetoothUuid.SAP);
+
+            mSAPRecordHandle = addReservedServiceRecordsNative(svcIdentifiers);
+            Log.i(TAG, "Starting SAP server");
+            SystemService.start("bt-sap");
+            mSAPEnabled = true;
+            return true;
+        } else {
+            Log.e(TAG, "SAP already enabled");
+            return false;
+        }
+    }
+
+    private synchronized boolean disableSAP() {
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.sap", false) == false) {
+            Log.e(TAG, "SAP is not supported");
+            return false;
+        }
+
+        if (mSAPEnabled == true) {
+            removeReservedServiceRecordsNative(mSAPRecordHandle);
+            Log.i(TAG, "Stop SAP server");
+            SystemService.stop("bt-sap");
+            mSAPEnabled = false;
+            return true;
+        } else {
+            Log.e(TAG, "SAP already disabled");
+            return false;
+        }
+    }
+
+    private synchronized boolean enableMAP() {
+        /* TODO:
+         * 1> if map property is not present it return true, Need to address
+         *    once feature property is added
+         * 2> Adds records for both MAS0 and MAS1. Need to address with
+         *    different interfaces if needed
+         */
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.map", true) == false) {
+            Log.e(TAG, "MAP is not supported");
+            return false;
+        }
+
+        if (mMAPEnabled != true) {
+            int[] svcIdentifiers = new int[1];
+            svcIdentifiers[0] =  BluetoothUuid.getServiceIdentifierFromParcelUuid(BluetoothUuid.MessageAccessServer);
+            Log.e(TAG, "calling addReservedServiceRecordsNative");
+            mMAPRecordHandle = addReservedServiceRecordsNative(svcIdentifiers);
+            mMAPEnabled = true;
+            return true;
+        } else {
+            Log.e(TAG, "MAP already enabled");
+            return false;
+        }
+    }
+
+    private synchronized boolean disableMAP() {
+        /* TODO:
+         * 1> if map property is not present it return true, Need to address
+         *    once feature property is added
+         * 2> Removes records for both MAS0 and MAS1. Need to address with
+         *    different interfaces if needed
+         */
+        if (SystemProperties.getBoolean("ro.qualcomm.bluetooth.map", true) == false) {
+            Log.e(TAG, "MAP is not supported");
+            return false;
+        }
+
+        if (mMAPEnabled == true) {
+            removeReservedServiceRecordsNative(mMAPRecordHandle);
+            mMAPEnabled = false;
+            return true;
+        } else {
+            Log.e(TAG, "MAP already disabled");
+            return false;
+        }
+    }
+
     private synchronized void updateSdpRecords() {
         ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>();
 
@@ -703,6 +1045,13 @@ public class BluetoothService extends IBluetooth.Stub {
         for (int i = 0; i < uuids.size(); i++) {
             mAdapterUuids[i] = uuids.get(i);
         }
+
+        /* Enable all QC prop profiles
+           remove once dynamic enable/disable is up*/
+        enableFTP();
+        enableDUN();
+        enableSAP();
+        enableMAP();
     }
 
     /**
@@ -943,10 +1292,21 @@ public class BluetoothService extends IBluetooth.Stub {
               mBondState.isAutoPairingAttemptsInProgress(address)) {
             pairingAttempt(address, result);
         } else {
+            if (result == BluetoothDevice.UNBOND_REASON_AUTH_FAILED &&
+                mBondState.getAttempt(address) == 1) {
+                //Dont update UI as we reattempt poping up for key
+                result = BluetoothDevice.UNBOND_REASON_REMOVED;
+                mBondState.addAutoPairingFailure(address);
+                pairingAttempt(address, result);
+            } else if (result == BluetoothDevice.UNBOND_REASON_REMOTE_DEVICE_DOWN &&
+                  mBondState.isAutoPairingAttemptsInProgress(address)) {
+                pairingAttempt(address, result);
+            } else {
+                if (mBondState.isAutoPairingAttemptsInProgress(address)) {
+                   mBondState.clearPinAttempts(address);
+                }
+             }
             setBondState(address, BluetoothDevice.BOND_NONE, result);
-            if (mBondState.isAutoPairingAttemptsInProgress(address)) {
-                mBondState.clearPinAttempts(address);
-            }
         }
     }
 
@@ -1051,6 +1411,15 @@ public class BluetoothService extends IBluetooth.Stub {
         boolean pairable;
         boolean discoverable;
 
+        //Cancel pending alarm before setting the scan mode.
+        if (mAlarmManager != null) {
+            try {
+                mAlarmManager.cancel(mPendingDiscoverableTimeout);
+            } catch (NullPointerException e) {
+                Log.e(TAG, "mAlarmManager Exception with " + e);
+            }
+        }
+
         switch (mode) {
         case BluetoothAdapter.SCAN_MODE_NONE:
             pairable = false;
@@ -1064,6 +1433,21 @@ public class BluetoothService extends IBluetooth.Stub {
             pairable = true;
             discoverable = true;
             if (DBG) Log.d(TAG, "BT Discoverable for " + duration + " seconds");
+
+            // AlarmManager needs to be set only when timeout is required.
+            // For Never Time Out case duration will be 0.
+            if (duration != 0) {
+                long mWakeupTime = SystemClock.elapsedRealtime() + (duration * 1000);
+                if (DBG) Log.d(TAG, "System Wakes up at " + mWakeupTime + " milliseconds");
+
+                try {
+                    mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, mWakeupTime,
+                                      mPendingDiscoverableTimeout);
+                } catch (NullPointerException e) {
+                    Log.e(TAG, "mAlarmManager Exception with " + e);
+                    Log.e(TAG, "BT Discoverable timeout may or maynot occur");
+                }
+            }
             break;
         default:
             Log.w(TAG, "Requested invalid scan mode " + mode);
@@ -2299,6 +2683,9 @@ public class BluetoothService extends IBluetooth.Stub {
                     mBluetoothState.sendMessage(
                         BluetoothAdapterStateMachine.ALL_DEVICES_DISCONNECTED);
                 }
+            } else if (ACTION_BT_DISCOVERABLE_TIMEOUT.equals(action)) {
+                Log.i(TAG, "ACTION_BT_DISCOVERABLE_TIMEOUT");
+                setScanMode(BluetoothAdapter.SCAN_MODE_CONNECTABLE, 0);
             }
         }
     };
