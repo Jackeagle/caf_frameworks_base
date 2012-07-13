@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -420,7 +420,8 @@ public class BluetoothService extends IBluetooth.Stub {
         filter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED);
-
+        filter.addAction(BluetoothInputDevice.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothPan.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(Intent.ACTION_DOCK_EVENT);
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
@@ -619,6 +620,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
 
         mBluetoothState.sendMessage(BluetoothAdapterStateMachine.USER_TURN_OFF, saveSetting);
+        SystemProperties.set("bluetooth.isEnabled","false");
         return true;
     }
 
@@ -750,7 +752,8 @@ public class BluetoothService extends IBluetooth.Stub {
             return false;
         }
         mAllowConnect = allowConnect;
-        mBluetoothState.sendMessage(BluetoothAdapterStateMachine.USER_TURN_ON, saveSetting);
+        mBluetoothState.sendMessage(BluetoothAdapterStateMachine.USER_TURN_ON,
+                                           saveSetting);
         return true;
     }
 
@@ -1956,7 +1959,7 @@ public class BluetoothService extends IBluetooth.Stub {
         String objectPath = getObjectPathFromAddress(address);
         String[] propValues =  (String [])getDevicePropertiesNative(objectPath);
         if (propValues != null) {
-            mDeviceProperties.addProperties(address, propValues);
+            mDeviceProperties.addProperties(address, propValues, false);
             return mDeviceProperties.getProperty(address, property);
         }
         Log.e(TAG, "getProperty: " + property + "not present:" + address);
@@ -2138,9 +2141,16 @@ public class BluetoothService extends IBluetooth.Stub {
         Map<ParcelUuid, Integer> value = mDeviceServiceChannelCache.get(address);
         if (value != null && value.containsKey(uuid))
             return value.get(uuid);
-        return -1;
-    }
 
+        Log.w(TAG, "Server Channel is -1, updating the cache");
+        int channel = getDeviceServiceChannelForUuid(address, uuid);
+        Map <ParcelUuid, Integer> rfcommValue = new HashMap<ParcelUuid, Integer>();
+        if (channel > 0) {
+            rfcommValue.put(uuid, channel);
+            mDeviceServiceChannelCache.put(address, rfcommValue);
+        }
+        return channel;
+    }
 
     /**
      * Gets the remote features list associated with the feature name.
@@ -2325,7 +2335,9 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     /*package*/ void updateDeviceServiceChannelCache(String address) {
-        if (!isEnabledInternal()) {
+        int state = getBluetoothStateInternal();
+        if ( state != BluetoothAdapter.STATE_ON &&
+             state != BluetoothAdapter.STATE_TURNING_ON) {
             log("Bluetooth is not on");
             return;
         }
@@ -2590,6 +2602,9 @@ public class BluetoothService extends IBluetooth.Stub {
             type = BluetoothAdapterStateMachine.PER_PROCESS_TURN_OFF;
         }
 
+        /* Currently BTC module is not started/stopped for per process (application)
+         usecases. But only for user action of on/off via Settings application. */
+
         mBluetoothState.sendMessage(type, callback);
         return true;
     }
@@ -2667,6 +2682,26 @@ public class BluetoothService extends IBluetooth.Stub {
                 } else {
                     Log.e(TAG, "BluetoothA2dp service not available");
                 }
+            } else if (BluetoothInputDevice.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                Log.i(TAG, "Input connection state change" + action);
+                int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
+                int prevState =
+                    intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, 0);
+                BluetoothDevice inputDevice =
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                sendConnectionStateChange(inputDevice, BluetoothProfile.INPUT_DEVICE, state,
+                                                    prevState);
+            } else if (BluetoothPan.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                Log.i(TAG, "Pan connection state change" + action);
+                int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
+                int prevState =
+                    intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, 0);
+                BluetoothDevice panDevice =
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                sendConnectionStateChange(panDevice, BluetoothProfile.PAN, state,
+                                                    prevState);
             } else if (BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY.equals(action)) {
                 Log.i(TAG, "Received ACTION_CONNECTION_ACCESS_REPLY");
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
