@@ -69,7 +69,8 @@ LOCAL_SHARED_LIBRARIES += libtestframework
 endif
 
 LOCAL_C_INCLUDES := \
-    external/skia/include/core
+    external/skia/include/core \
+    vendor/qcom/opensource/testframework/inc
 
 LOCAL_MODULE:= libui
 

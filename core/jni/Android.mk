@@ -172,6 +172,7 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/android/graphics \
 	$(LOCAL_PATH)/../../libs/hwui \
 	hardware/qcom/display/libtilerenderer \
+        vendor/qcom/opensource/testframework/inc \
 	$(LOCAL_PATH)/../../opengl/libs \
 	$(call include-path-for, bluedroid) \
 	$(call include-path-for, libhardware)/hardware \

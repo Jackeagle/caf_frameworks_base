@@ -37,7 +37,8 @@ ifeq ($(USE_OPENGL_RENDERER),true)
 		external/skia/include/images \
 		external/skia/src/ports \
 		external/skia/include/utils \
-		hardware/qcom/display/libtilerenderer
+		hardware/qcom/display/libtilerenderer \
+                vendor/qcom/opensource/testframework/inc
 
 	LOCAL_CFLAGS += -DUSE_OPENGL_RENDERER
 	LOCAL_CFLAGS += -fvisibility=hidden

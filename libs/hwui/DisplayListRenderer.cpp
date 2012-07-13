@@ -21,7 +21,7 @@
 #include "DisplayListRenderer.h"
 #include <utils/String8.h>
 #include "Caches.h"
-#include <testframework/TestFramework.h>
+#include <testframework.h>
 namespace android {
 namespace uirenderer {
 

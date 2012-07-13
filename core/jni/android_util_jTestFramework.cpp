@@ -19,7 +19,7 @@
 #include "JNIHelp.h"
 #include "android_runtime/AndroidRuntime.h"
 #include "jni.h"
-#include <testframework/TestFramework.h>
+#include <testframework.h>
 
 namespace android {
 
