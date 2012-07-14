@@ -374,6 +374,7 @@ private:
 
     status_t processSEIData();
     status_t processPARData();
+    status_t parseExtraData(BufferInfo *buffer);
     OMXCodec(const OMXCodec &);
     OMXCodec &operator=(const OMXCodec &);
     status_t setWMAFormat(const sp<MetaData> &inputFormat);

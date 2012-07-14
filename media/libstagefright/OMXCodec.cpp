@@ -3203,6 +3203,13 @@ void OMXCodec::on_message(const omx_message &msg) {
 
                 MediaBuffer *buffer = info->mMediaBuffer;
                 bool isGraphicBuffer = buffer->graphicBuffer() != NULL;
+                if (!(mFlags & kEnableGrallocUsagePrivateCPBuffer) &&
+                    (isGraphicBuffer && !strncasecmp(mMIME, "video/", 6)) &&
+                    (!strncmp(mComponentName, "OMX.qcom.", 9)) &&
+                    (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_EXTRADATA))
+                {
+                    parseExtraData(info);
+                }
 
                 if (!isGraphicBuffer
                     && msg.u.extended_buffer_data.range_offset
@@ -6326,6 +6333,86 @@ void OMXCodec::setQCELPFormat(int32_t numChannels, int32_t sampleRate, int32_t b
     else{
       LOGI("QCELP decoder \n");
     }
+}
+
+status_t OMXCodec::parseExtraData(BufferInfo *info) {
+    LOGV("Is it interlaced %s",mInterlaceFormatDetected == true ? "YES" : "NO");
+    OMX_OTHER_EXTRADATATYPE *pExtra;
+    OMX_STREAMINTERLACEFORMAT *pInterlaceFormat;
+    void* vaddr = NULL;
+    bool oldFormat = mInterlaceFormatDetected;
+    MediaBuffer *buffer = info->mMediaBuffer;
+
+    if (buffer->graphicBuffer() != 0) {
+        private_handle_t *inputHandle =
+        (private_handle_t *) buffer->graphicBuffer()->getNativeBuffer()->handle;
+        buffer->graphicBuffer()->lock(GRALLOC_USAGE_SW_READ_OFTEN |
+            GRALLOC_USAGE_SW_WRITE_OFTEN, &vaddr);
+    }
+    OMX_BUFFERHEADERTYPE *pBufferHdr = (OMX_BUFFERHEADERTYPE *)(info->mBuffer);
+
+    OMX_U8 *pTmp = (OMX_U8*)vaddr + pBufferHdr->nOffset + pBufferHdr->nFilledLen;
+    pExtra = (OMX_OTHER_EXTRADATATYPE *)(((OMX_U32)(pTmp + 3)) & ~3);
+    unsigned long int eType = pExtra->eType;
+
+    while((pExtra->eType != OMX_ExtraDataNone) && (eType != OMX_ExtraDataInterlaceFormat))
+    {
+        pExtra = (OMX_OTHER_EXTRADATATYPE *) (((OMX_U8 *) pExtra) + pExtra->nSize);
+    }
+
+    eType = pExtra->eType;
+    if(eType == OMX_ExtraDataInterlaceFormat)
+    {
+        pInterlaceFormat = (OMX_STREAMINTERLACEFORMAT *)pExtra->data;
+        if(pInterlaceFormat->bInterlaceFormat == OMX_FALSE)
+        {
+            if(pInterlaceFormat->nInterlaceFormats == OMX_InterlaceFrameProgressive)
+                mInterlaceFormatDetected = false;
+        }
+    }
+    LOGV("Is it interlaced still %s",mInterlaceFormatDetected == true ? "YES" : "NO");
+
+    OMX_PARAM_PORTDEFINITIONTYPE def;
+    InitOMXParams(&def);
+    def.nPortIndex = kPortIndexOutput;
+
+    status_t err = mOMX->getParameter(
+            mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
+    if (err != OK) {
+        return err;
+    }
+
+    int format = (def.format.video.eColorFormat ==
+                     OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka)?
+                     (int) HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED : def.format.video.eColorFormat;
+    if(def.format.video.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar)
+        format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+    if(def.format.video.eColorFormat == (OMX_COLOR_FORMATTYPE) QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka)
+        format = HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO;
+
+    format ^= (mInterlaceFormatDetected ? HAL_PIXEL_FORMAT_INTERLACE : 0);
+
+    if (!mInterlaceFormatDetected) {
+            mOutputFormat->remove(kKeyInterlaced);
+    }
+
+    if(oldFormat != mInterlaceFormatDetected)
+    {
+        err = mNativeWindow.get()->perform(mNativeWindow.get(),
+                NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY,
+                def.format.video.nStride,
+                def.format.video.nSliceHeight,
+                format);
+
+        if (err != 0) {
+             LOGV("native_window_update_buffers_geometry failed: %s (%d)",
+             strerror(-err), -err);
+             buffer->graphicBuffer()->unlock();
+             return err;
+        }
+    }
+    buffer->graphicBuffer()->unlock();
+    return OK;
 }
 
 status_t OMXCodec::processPARData() {
