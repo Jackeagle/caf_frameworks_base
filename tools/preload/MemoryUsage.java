@@ -161,6 +161,7 @@ class MemoryUsage implements Serializable {
             + ":/system/framework/core.jar"
             + ":/system/framework/ext.jar"
             + ":/system/framework/framework.jar"
+            + ":/system/framework/framework_ext.jar"
             + ":/system/framework/framework-tests.jar"
             + ":/system/framework/services.jar"
             + ":/system/framework/loadclass.jar";
