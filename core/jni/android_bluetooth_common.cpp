@@ -1,5 +1,6 @@
 /*
 ** Copyright 2006, The Android Open Source Project
+** Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -43,7 +44,6 @@ static Properties remote_device_properties[] = {
     {"Icon", DBUS_TYPE_STRING},
     {"Class", DBUS_TYPE_UINT32},
     {"UUIDs", DBUS_TYPE_ARRAY},
-    {"Services", DBUS_TYPE_ARRAY},
     {"Paired", DBUS_TYPE_BOOLEAN},
     {"Connected", DBUS_TYPE_BOOLEAN},
     {"Trusted", DBUS_TYPE_BOOLEAN},
@@ -54,7 +54,9 @@ static Properties remote_device_properties[] = {
     {"LegacyPairing", DBUS_TYPE_BOOLEAN},
     {"RSSI", DBUS_TYPE_INT16},
     {"TX", DBUS_TYPE_UINT32},
-    {"Broadcaster", DBUS_TYPE_BOOLEAN}
+    {"Type", DBUS_TYPE_STRING},
+    {"Broadcaster", DBUS_TYPE_BOOLEAN},
+    {"Services", DBUS_TYPE_ARRAY}
 };
 
 static Properties adapter_properties[] = {
@@ -69,6 +71,7 @@ static Properties adapter_properties[] = {
     {"Discovering", DBUS_TYPE_BOOLEAN},
     {"Devices", DBUS_TYPE_ARRAY},
     {"UUIDs", DBUS_TYPE_ARRAY},
+    {"Type", DBUS_TYPE_STRING},
 };
 
 static Properties input_properties[] = {
@@ -154,6 +157,10 @@ static dbus_bool_t dbus_func_args_async_valist(JNIEnv *env,
     dbus_async_call_t *pending;
     dbus_bool_t reply = FALSE;
 
+    if (!path || !func || !ifc) {
+        return FALSE;
+    }
+
     /* Compose the command */
     msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC, path, ifc, func);
 
@@ -208,8 +215,11 @@ dbus_bool_t dbus_func_args_async(JNIEnv *env,
                                  ...) {
     dbus_bool_t ret;
     va_list lst;
-    va_start(lst, first_arg_type);
+    if (!path || !func || !ifc) {
+        return FALSE;
+    }
 
+    va_start(lst, first_arg_type);
     ret = dbus_func_args_async_valist(env, conn,
                                       timeout_ms,
                                       reply, user, nat,
@@ -238,6 +248,10 @@ DBusMessage * dbus_func_args_timeout_valist(JNIEnv *env,
     DBusMessage *msg = NULL, *reply = NULL;
     const char *name;
     bool return_error = (err != NULL);
+
+    if (!path || !func || !ifc) {
+        return NULL;
+    }
 
     if (!return_error) {
         err = (DBusError*)malloc(sizeof(DBusError));
@@ -282,6 +296,10 @@ DBusMessage * dbus_func_args_timeout(JNIEnv *env,
                                      ...) {
     DBusMessage *ret;
     va_list lst;
+    if (!path || !func || !ifc) {
+        return NULL;
+    }
+
     va_start(lst, first_arg_type);
     ret = dbus_func_args_timeout_valist(env, conn, timeout_ms, NULL,
                                         path, ifc, func,
@@ -299,6 +317,10 @@ DBusMessage * dbus_func_args(JNIEnv *env,
                              ...) {
     DBusMessage *ret;
     va_list lst;
+    if (!path || !func || !ifc) {
+        return NULL;
+    }
+
     va_start(lst, first_arg_type);
     ret = dbus_func_args_timeout_valist(env, conn, -1, NULL,
                                         path, ifc, func,
@@ -317,6 +339,10 @@ DBusMessage * dbus_func_args_error(JNIEnv *env,
                                    ...) {
     DBusMessage *ret;
     va_list lst;
+    if (!path || !func || !ifc) {
+        return NULL;
+    }
+
     va_start(lst, first_arg_type);
     ret = dbus_func_args_timeout_valist(env, conn, -1, err,
                                         path, ifc, func,
@@ -561,8 +587,8 @@ void append_dict_args(DBusMessage *reply, const char *first_key, ...)
 }
 
 
-int get_property(DBusMessageIter iter, Properties *properties,
-                  int max_num_properties, int *prop_index, property_value *value, int *len) {
+int get_property(DBusMessageIter iter, Properties *properties, int max_num_properties,
+                  int *prop_index, property_value *value, int *value_type, int *len) {
     DBusMessageIter prop_val, array_val_iter;
     char *property = NULL;
     uint32_t array_type;
@@ -598,6 +624,18 @@ int get_property(DBusMessageIter iter, Properties *properties,
         dbus_message_iter_get_basic(&prop_val, &value->str_val);
         *len = 1;
         break;
+    case DBUS_TYPE_BYTE:
+        uint8_t uint8_val;
+        dbus_message_iter_get_basic(&prop_val, &uint8_val);
+        value->int_val = uint8_val;
+        *len = 1;
+        break;
+    case DBUS_TYPE_UINT16:
+        uint16_t uint16_val;
+        dbus_message_iter_get_basic(&prop_val, &uint16_val);
+        value->int_val = uint16_val;
+        *len = 1;
+        break;
     case DBUS_TYPE_UINT32:
     case DBUS_TYPE_INT16:
     case DBUS_TYPE_BOOLEAN:
@@ -610,6 +648,7 @@ int get_property(DBusMessageIter iter, Properties *properties,
         array_type = dbus_message_iter_get_arg_type(&array_val_iter);
         *len = 0;
         value->array_val = NULL;
+        *value_type = array_type;
         if (array_type == DBUS_TYPE_OBJECT_PATH ||
             array_type == DBUS_TYPE_STRING){
             j = 0;
@@ -628,6 +667,26 @@ int get_property(DBusMessageIter iter, Properties *properties,
                j ++;
             } while(dbus_message_iter_next(&array_val_iter));
             value->array_val = tmp;
+        } else if (array_type == DBUS_TYPE_BYTE) {
+            char * tempPtr;
+            char * tmpValueArray;
+            int size = 0;
+            dbus_message_iter_get_fixed_array(&array_val_iter, &tempPtr, &size);
+
+            tmpValueArray = (char *) malloc(sizeof(char) * ( (2*size) + 1 ));
+            if (!tmpValueArray) {
+                return -1;
+            }
+
+            char *tmpPos = tmpValueArray;
+
+            for ( j=0; j<size; j++) {
+                sprintf(tmpPos, "%02x", tempPtr[j]);
+                tmpPos+=2;
+            }
+            tmpValueArray[2*size] = '\0';
+            value->str_val = tmpValueArray;
+            *len = 1;
         }
         break;
     default:
@@ -637,7 +696,8 @@ int get_property(DBusMessageIter iter, Properties *properties,
 }
 
 void create_prop_array(JNIEnv *env, jobjectArray strArray, Properties *property,
-                       property_value *value, int len, int *array_index ) {
+                       property_value *value, int value_type, int len,
+                       int *array_index ) {
     char **prop_val = NULL;
     char buf[32] = {'\0'}, buf1[32] = {'\0'};
     int i;
@@ -648,7 +708,8 @@ void create_prop_array(JNIEnv *env, jobjectArray strArray, Properties *property,
     set_object_array_element(env, strArray, name, *array_index);
     *array_index += 1;
 
-    if (prop_type == DBUS_TYPE_UINT32 || prop_type == DBUS_TYPE_INT16) {
+    if (prop_type == DBUS_TYPE_UINT32 || prop_type == DBUS_TYPE_INT16 ||
+        prop_type == DBUS_TYPE_UINT16 || prop_type == DBUS_TYPE_BYTE) {
         sprintf(buf, "%d", value->int_val);
         set_object_array_element(env, strArray, buf, *array_index);
         *array_index += 1;
@@ -658,15 +719,21 @@ void create_prop_array(JNIEnv *env, jobjectArray strArray, Properties *property,
         set_object_array_element(env, strArray, buf, *array_index);
         *array_index += 1;
     } else if (prop_type == DBUS_TYPE_ARRAY) {
-        // Write the length first
-        sprintf(buf1, "%d", len);
-        set_object_array_element(env, strArray, buf1, *array_index);
-        *array_index += 1;
-
-        prop_val = value->array_val;
-        for (i = 0; i < len; i++) {
-            set_object_array_element(env, strArray, prop_val[i], *array_index);
+        if (value_type == DBUS_TYPE_BYTE) {
+            set_object_array_element(env, strArray, (const char *) value->str_val,
+                                     *array_index);
             *array_index += 1;
+        } else {
+            // Write the length first
+            sprintf(buf1, "%d", len);
+            set_object_array_element(env, strArray, buf1, *array_index);
+            *array_index += 1;
+
+            prop_val = value->array_val;
+            for (i = 0; i < len; i++) {
+                set_object_array_element(env, strArray, prop_val[i], *array_index);
+                *array_index += 1;
+            }
         }
     } else {
         set_object_array_element(env, strArray, (const char *) value->str_val, *array_index);
@@ -679,10 +746,11 @@ jobjectArray parse_properties(JNIEnv *env, DBusMessageIter *iter, Properties *pr
     DBusMessageIter dict_entry, dict;
     jobjectArray strArray = NULL;
     property_value value;
-    int i, size = 0,array_index = 0;
+    int i, size = 0,array_index = 0, value_type;
     int len = 0, prop_type = DBUS_TYPE_INVALID, prop_index = -1, type;
     struct {
         property_value value;
+        int value_type;
         int len;
         bool used;
     } values[max_num_properties];
@@ -701,16 +769,19 @@ jobjectArray parse_properties(JNIEnv *env, DBusMessageIter *iter, Properties *pr
     dbus_message_iter_recurse(iter, &dict);
     do {
         len = 0;
+        value_type = 0;
         if (dbus_message_iter_get_arg_type(&dict) != DBUS_TYPE_DICT_ENTRY)
             goto failure;
         dbus_message_iter_recurse(&dict, &dict_entry);
 
         if (!get_property(dict_entry, properties, max_num_properties, &prop_index,
-                          &value, &len)) {
+                          &value, &value_type, &len)) {
             size += 2;
-            if (properties[prop_index].type == DBUS_TYPE_ARRAY)
+            if (properties[prop_index].type == DBUS_TYPE_ARRAY &&
+                value_type != DBUS_TYPE_BYTE)
                 size += len;
             values[prop_index].value = value;
+            values[prop_index].value_type = value_type;
             values[prop_index].len = len;
             values[prop_index].used = true;
         } else {
@@ -722,12 +793,17 @@ jobjectArray parse_properties(JNIEnv *env, DBusMessageIter *iter, Properties *pr
 
     for (i = 0; i < max_num_properties; i++) {
         if (values[i].used) {
-            create_prop_array(env, strArray, &properties[i], &values[i].value, values[i].len,
-                              &array_index);
+            create_prop_array(env, strArray, &properties[i], &values[i].value,
+                              values[i].value_type, values[i].len, &array_index);
 
-            if (properties[i].type == DBUS_TYPE_ARRAY && values[i].used
-                   && values[i].value.array_val != NULL)
-                free(values[i].value.array_val);
+            if (properties[i].type == DBUS_TYPE_ARRAY && values[i].used) {
+                if (values[i].value_type == DBUS_TYPE_BYTE &&
+                    values[i].value.str_val != NULL) {
+                    free(values[i].value.str_val);
+                } else if (values[i].value.array_val != NULL) {
+                    free(values[i].value.array_val);
+                }
+            }
         }
 
     }
@@ -750,7 +826,7 @@ jobjectArray parse_property_change(JNIEnv *env, DBusMessage *msg,
     jobjectArray strArray = NULL;
     jclass stringClass= env->FindClass("java/lang/String");
     int len = 0, prop_index = -1;
-    int array_index = 0, size = 0;
+    int array_index = 0, size = 0, value_type = 0;
     property_value value;
 
     dbus_error_init(&err);
@@ -758,18 +834,26 @@ jobjectArray parse_property_change(JNIEnv *env, DBusMessage *msg,
         goto failure;
 
     if (!get_property(iter, properties, max_num_properties,
-                      &prop_index, &value, &len)) {
+                      &prop_index, &value, &value_type, &len)) {
         size += 2;
-        if (properties[prop_index].type == DBUS_TYPE_ARRAY)
+        if (properties[prop_index].type == DBUS_TYPE_ARRAY &&
+            value_type != DBUS_TYPE_BYTE) {
             size += len;
+        }
+
         strArray = env->NewObjectArray(size, stringClass, NULL);
 
         create_prop_array(env, strArray, &properties[prop_index],
-                          &value, len, &array_index);
+                          &value, value_type, len, &array_index);
 
-        if (properties[prop_index].type == DBUS_TYPE_ARRAY && value.array_val != NULL)
-             free(value.array_val);
-
+        if (properties[prop_index].type == DBUS_TYPE_ARRAY) {
+            if (value_type == DBUS_TYPE_BYTE &&
+                value.str_val != NULL) {
+                free(value.str_val);
+            } else if (value.array_val != NULL) {
+                free(value.array_val);
+            }
+        }
         return strArray;
     }
 failure:
