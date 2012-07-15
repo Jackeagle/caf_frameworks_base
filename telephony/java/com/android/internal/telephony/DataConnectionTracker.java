@@ -55,8 +55,13 @@ import com.android.internal.telephony.DataProfile;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map.Entry;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -311,6 +316,21 @@ public abstract class DataConnectionTracker extends Handler {
 
     /** Phone.APN_TYPE_* ===> ApnContext */
     protected ConcurrentHashMap<String, ApnContext> mApnContexts;
+
+    /** Priorities for APN_TYPEs. package level access, used by ApnContext */
+    static LinkedHashMap<String, Integer> mApnPriorities =
+        new LinkedHashMap<String, Integer>() {
+            {
+                put(Phone.APN_TYPE_CBS,     7);
+                put(Phone.APN_TYPE_IMS,     6);
+                put(Phone.APN_TYPE_FOTA,    5);
+                put(Phone.APN_TYPE_HIPRI,   4);
+                put(Phone.APN_TYPE_DUN,     3);
+                put(Phone.APN_TYPE_SUPL,    2);
+                put(Phone.APN_TYPE_MMS,     1);
+                put(Phone.APN_TYPE_DEFAULT, 0);
+            }
+        };
 
     /* Currently active APN */
     protected DataProfile mActiveApn;
@@ -676,6 +696,10 @@ public abstract class DataConnectionTracker extends Handler {
     protected abstract void onCleanUpAllConnections(String cause);
     protected abstract boolean isDataPossible(String apnType);
     protected abstract void onUpdateIcc();
+    /* If multiple calls (mms, supl etc) cannot be supported at the same time
+     * (e.g: MPDN not supported), disconnect a lower priority call
+     */
+    protected abstract boolean disconnectOneLowerPriorityCall(String apnType);
 
     protected void onDataStallAlarm(int tag) {
         loge("onDataStallAlarm: not impleted tag=" + tag);
@@ -1194,6 +1218,25 @@ public abstract class DataConnectionTracker extends Handler {
                 }
             }
         }
+    }
+
+    /* Return the list of ApnContexts based on their priorities */
+    protected List<ApnContext> getPrioritySortedApnContextList() {
+
+        ArrayList<ApnContext> sortedList = new ArrayList<ApnContext>();
+
+        /*
+         *  Get the prioritized enumerated APN Types and retrieve the APN
+         *  context associated with it from the list of APN contexts
+         */
+        Iterator apnTypes = mApnPriorities.keySet().iterator();
+        while(apnTypes.hasNext()) {
+            ApnContext apnContext = mApnContexts.get(apnTypes.next());
+            if (apnContext != null)
+                sortedList.add(apnContext);
+        }
+
+        return sortedList;
     }
 
     protected String getReryConfig(boolean forDefault) {
