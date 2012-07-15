@@ -54,6 +54,11 @@ struct NuPlayer : public AHandler {
 
     // Will notify the driver through "notifySeekComplete" once finished.
     void seekToAsync(int64_t seekTimeUs);
+
+    status_t prepareAsync();
+    status_t getParameter(int key, Parcel *reply);
+    status_t setParameter(int key, const Parcel &request);
+
 public:
     struct DASHHTTPLiveSource;
     struct WFDSource;
@@ -87,6 +92,8 @@ private:
         kWhatSeek                       = 'seek',
         kWhatPause                      = 'paus',
         kWhatResume                     = 'rsme',
+        kWhatPrepareAsync               = 'pras',
+        kWhatIsPrepareDone              = 'prdn',
     };
 
     wp<NuPlayerDriver> mDriver;
@@ -164,7 +171,7 @@ private:
     sp<Source> LoadCreateSource(const char * uri, const KeyedVector<String8,
                                  String8> *headers, bool uidValid, uid_t uid, NuSourceType srcTyp);
 
-
+    void postIsPrepareDone();
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer);
 };
 
