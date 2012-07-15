@@ -124,6 +124,11 @@ public class CdmaLteServiceStateTracker extends CdmaServiceStateTracker {
 
             mLteSS.setRadioTechnology(type);
             mLteSS.setState(regCodeToServiceState(regState));
+            mDataRoaming = regCodeIsRoaming(regState);
+            mLteSS.setRoaming(mDataRoaming);
+
+            if (mDataRoaming) newSS.setRoaming(true);
+            newSS.setDataState(mLteSS.getState());
         } else {
             super.handlePollStateResultMessage(what, ar);
         }
@@ -280,6 +285,7 @@ public class CdmaLteServiceStateTracker extends CdmaServiceStateTracker {
         newSS.setStateOutOfService();
         mLteSS.setStateOutOfService();
 
+
         if ((hasMultiApnSupport)
                 && (phone.mDataConnectionTracker instanceof CdmaDataConnectionTracker)) {
             if (DBG) log("GsmDataConnectionTracker Created");
@@ -318,7 +324,8 @@ public class CdmaLteServiceStateTracker extends CdmaServiceStateTracker {
                 String eriText;
                 // Now the CDMAPhone sees the new ServiceState so it can get the
                 // new ERI text
-                if (ss.getState() == ServiceState.STATE_IN_SERVICE) {
+                if ((ss.getState() == ServiceState.STATE_IN_SERVICE) ||
+                        (mDataConnectionState == ServiceState.STATE_IN_SERVICE)) {
                     eriText = phone.getCdmaEriText();
                 } else if (ss.getState() == ServiceState.STATE_POWER_OFF) {
                     eriText = (mIccRecords != null) ? mIccRecords.getServiceProviderName() : null;
