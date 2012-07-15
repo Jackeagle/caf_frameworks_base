@@ -155,7 +155,7 @@ SurfaceTexture::SurfaceTexture(GLuint tex, bool allowSynchronousMode,
     mNextBufferInfo.width = 0;
     mNextBufferInfo.height = 0;
     mNextBufferInfo.format = 0;
-
+    mPreviousBufferSlot = -1;
 }
 
 SurfaceTexture::~SurfaceTexture() {
@@ -851,6 +851,8 @@ status_t SurfaceTexture::updateTexImage() {
             glBindTexture(mTexTarget, mTexName);
             glEGLImageTargetTexture2DOES(mTexTarget, (GLeglImageOES)image);
 
+            mPreviousBufferSlot = buf;
+
             bool failed = false;
             while ((error = glGetError()) != GL_NO_ERROR) {
                 ST_LOGE("error binding external texture image %p (slot %d): %#04x",
@@ -859,6 +861,14 @@ status_t SurfaceTexture::updateTexImage() {
             }
             if (failed) {
                 return -EINVAL;
+            }
+        } else {
+            if (mPreviousBufferSlot >= 0 && mPreviousBufferSlot < mBufferCount) {
+                if (mNextBufferInfo.width && mNextBufferInfo.height &&
+                    mNextBufferInfo.format) {
+                    unlock_lastGpuSupportedBuffer((void*)(mSlots[mPreviousBufferSlot].mGraphicBuffer->handle));
+                    mPreviousBufferSlot = -1;
+                }
             }
         }
 
@@ -1060,6 +1070,7 @@ void SurfaceTexture::freeAllBuffersLocked() {
         freeBufferLocked(i);
     }
     mGraphicBufferAlloc->freeAllGraphicBuffersExcept(-1);
+    mPreviousBufferSlot = -1;
 }
 
 void SurfaceTexture::freeAllBuffersExceptHeadLocked() {
@@ -1077,6 +1088,7 @@ void SurfaceTexture::freeAllBuffersExceptHeadLocked() {
         }
     }
     mGraphicBufferAlloc->freeAllGraphicBuffersExcept(head);
+    mPreviousBufferSlot = -1;
 }
 
 status_t SurfaceTexture::drainQueueLocked() {
