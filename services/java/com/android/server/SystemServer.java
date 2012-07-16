@@ -427,6 +427,7 @@ class ServerThread extends Thread {
                 networkPolicy.bindConnectivityManager(connectivity);
                 wifi.checkAndStartWifi();
                 wifiP2p.connectivityServiceReady();
+                connectivity.startCne();
             } catch (Throwable e) {
                 reportWtf("starting Connectivity Service", e);
             }

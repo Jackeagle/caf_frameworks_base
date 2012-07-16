@@ -762,6 +762,7 @@ public class PowerManagerService extends IPowerManager.Stub
         WorkSource ws;
         boolean activated = true;
         int minState;
+        boolean isReleasedInternal = false;
     }
 
     private void updateWakeLockLocked() {
@@ -1000,6 +1001,30 @@ public class PowerManagerService extends IPowerManager.Stub
         }
     }
 
+    /* updates the blocked uids, so if a wake lock is acquired for it
+     * can be released.
+     */
+    public void updateBlockedUids(int uid, boolean isBlocked) {
+        synchronized(mLocks){
+            if (mSpew) Slog.v(TAG, "updateBlockedUids: uid = "+uid +"isBlocked = "+isBlocked);
+            for (int index=0; index < mLocks.size(); index++){
+                WakeLock wl = mLocks.get(index);
+                if(wl != null){
+                    if (wl.uid == uid || wl.uid == 1000){
+                        /* release the wakelock for the blocked uid and uid 1000(package android)
+                         * optimisation needs to be done to handle uid 1000 better.
+                        */
+                        if(isBlocked){
+                            releaseWakeLockLocked(wl.binder,wl.flags,false);
+                            wl.isReleasedInternal = true;
+                            if (mSpew) Slog.v(TAG, "Internally releasing it");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public void releaseWakeLock(IBinder lock, int flags) {
         int uid = Binder.getCallingUid();
         if (uid != Process.myUid()) {
@@ -1016,7 +1041,13 @@ public class PowerManagerService extends IPowerManager.Stub
         if (wl == null) {
             return;
         }
-
+        if(wl.isReleasedInternal){
+            if (mSpew){
+                Slog.v(TAG, "Already internally released for uid = " + wl.uid +
+                    "pid = " + wl.pid);
+            }
+            return;
+        }
         if (mSpew) {
             Slog.d(TAG, "releaseWakeLock flags=0x"
                     + Integer.toHexString(wl.flags) + " tag=" + wl.tag);
@@ -1799,7 +1830,7 @@ public class PowerManagerService extends IPowerManager.Stub
                         + " noChangeLights=" + noChangeLights
                         + " reason=" + reason);
             }
-            
+
             if (noChangeLights) {
                 newState = (newState & ~LIGHTS_MASK) | (mPowerState & LIGHTS_MASK);
             }

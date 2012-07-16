@@ -26,6 +26,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
@@ -58,10 +59,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
     // The threshold for how long an alarm can be late before we print a
     // warning message.  The time duration is in milliseconds.
     private static final long LATE_ALARM_THRESHOLD = 10 * 1000;
-    
+
     private static final int RTC_WAKEUP_MASK = 1 << AlarmManager.RTC_WAKEUP;
     private static final int RTC_MASK = 1 << AlarmManager.RTC;
-    private static final int ELAPSED_REALTIME_WAKEUP_MASK = 1 << AlarmManager.ELAPSED_REALTIME_WAKEUP; 
+    private static final int ELAPSED_REALTIME_WAKEUP_MASK = 1 << AlarmManager.ELAPSED_REALTIME_WAKEUP;
     private static final int ELAPSED_REALTIME_MASK = 1 << AlarmManager.ELAPSED_REALTIME;
     private static final int TIME_CHANGED_MASK = 1 << 16;
 
@@ -73,20 +74,23 @@ class AlarmManagerService extends IAlarmManager.Stub {
     private static final boolean localLOGV = false;
     private static final int ALARM_EVENT = 1;
     private static final String TIMEZONE_PROPERTY = "persist.sys.timezone";
-    
+
     private static final Intent mBackgroundIntent
             = new Intent().addFlags(Intent.FLAG_FROM_BACKGROUND);
-    
+
     private final Context mContext;
-    
+
     private Object mLock = new Object();
-    
+
     private final ArrayList<Alarm> mRtcWakeupAlarms = new ArrayList<Alarm>();
     private final ArrayList<Alarm> mRtcAlarms = new ArrayList<Alarm>();
     private final ArrayList<Alarm> mElapsedRealtimeWakeupAlarms = new ArrayList<Alarm>();
     private final ArrayList<Alarm> mElapsedRealtimeAlarms = new ArrayList<Alarm>();
     private final IncreasingTimeOrder mIncreasingTimeOrder = new IncreasingTimeOrder();
-    
+
+    private final ArrayList<Integer> mTriggeredUids = new ArrayList<Integer>();
+    private final ArrayList<Integer> mBlockedUids = new ArrayList<Integer>();
+
     private int mDescriptor;
     private int mBroadcastRefCount = 0;
     private PowerManager.WakeLock mWakeLock;
@@ -98,11 +102,11 @@ class AlarmManagerService extends IAlarmManager.Stub {
     private final ResultReceiver mResultReceiver = new ResultReceiver();
     private final PendingIntent mTimeTickSender;
     private final PendingIntent mDateChangeSender;
-    
+
     private static final class FilterStats {
         int count;
     }
-    
+
     private static final class BroadcastStats {
         long aggregateTime;
         int numWakeup;
@@ -111,10 +115,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
         HashMap<Intent.FilterComparison, FilterStats> filterStats
                 = new HashMap<Intent.FilterComparison, FilterStats>();
     }
-    
+
     private final HashMap<String, BroadcastStats> mBroadcastStats
             = new HashMap<String, BroadcastStats>();
-    
+
     public AlarmManagerService(Context context) {
         mContext = context;
         mDescriptor = init();
@@ -128,27 +132,27 @@ class AlarmManagerService extends IAlarmManager.Stub {
 
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
-        
+
         mTimeTickSender = PendingIntent.getBroadcast(context, 0,
                 new Intent(Intent.ACTION_TIME_TICK).addFlags(
                         Intent.FLAG_RECEIVER_REGISTERED_ONLY), 0);
         Intent intent = new Intent(Intent.ACTION_DATE_CHANGED);
         intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
         mDateChangeSender = PendingIntent.getBroadcast(context, 0, intent, 0);
-        
+
         // now that we have initied the driver schedule the alarm
         mClockReceiver= new ClockReceiver();
         mClockReceiver.scheduleTimeTickEvent();
         mClockReceiver.scheduleDateChangedEvent();
         mUninstallReceiver = new UninstallReceiver();
-        
+
         if (mDescriptor != -1) {
             mWaitThread.start();
         } else {
             Slog.w(TAG, "Failed to open alarm driver. Falling back to a handler.");
         }
     }
-    
+
     protected void finalize() throws Throwable {
         try {
             close(mDescriptor);
@@ -156,12 +160,12 @@ class AlarmManagerService extends IAlarmManager.Stub {
             super.finalize();
         }
     }
-    
+
     public void set(int type, long triggerAtTime, PendingIntent operation) {
         setRepeating(type, triggerAtTime, 0, operation);
     }
-    
-    public void setRepeating(int type, long triggerAtTime, long interval, 
+
+    public void setRepeating(int type, long triggerAtTime, long interval,
             PendingIntent operation) {
         if (operation == null) {
             Slog.w(TAG, "set/setRepeating ignored because there is no intent");
@@ -185,8 +189,8 @@ class AlarmManagerService extends IAlarmManager.Stub {
             }
         }
     }
-    
-    public void setInexactRepeating(int type, long triggerAtTime, long interval, 
+
+    public void setInexactRepeating(int type, long triggerAtTime, long interval,
             PendingIntent operation) {
         if (operation == null) {
             Slog.w(TAG, "setInexactRepeating ignored because there is no intent");
@@ -251,10 +255,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
             String current = SystemProperties.get(TIMEZONE_PROPERTY);
             if (current == null || !current.equals(zone.getID())) {
                 if (localLOGV) Slog.v(TAG, "timezone changed: " + current + ", new=" + zone.getID());
-                timeZoneWasChanged = true; 
+                timeZoneWasChanged = true;
                 SystemProperties.set(TIMEZONE_PROPERTY, zone.getID());
             }
-            
+
             // Update the kernel timezone information
             // Kernel tracks time offsets as 'minutes west of GMT'
             int gmtOffset = zone.getOffset(System.currentTimeMillis());
@@ -262,7 +266,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
         }
 
         TimeZone.setDefault(null);
-        
+
         if (timeZoneWasChanged) {
             Intent intent = new Intent(Intent.ACTION_TIMEZONE_CHANGED);
             intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
@@ -270,7 +274,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             mContext.sendBroadcast(intent);
         }
     }
-    
+
     public void remove(PendingIntent operation) {
         if (operation == null) {
             return;
@@ -279,7 +283,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             removeLocked(operation);
         }
     }
-    
+
     public void removeLocked(PendingIntent operation) {
         removeLocked(mRtcWakeupAlarms, operation);
         removeLocked(mRtcAlarms, operation);
@@ -295,7 +299,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
 
         // iterator over the list removing any it where the intent match
         Iterator<Alarm> it = alarmList.iterator();
-        
+
         while (it.hasNext()) {
             Alarm alarm = it.next();
             if (alarm.operation.equals(operation)) {
@@ -303,7 +307,49 @@ class AlarmManagerService extends IAlarmManager.Stub {
             }
         }
     }
-    
+
+    public void updateBlockedUids(int uid, boolean isBlocked) {
+        if (localLOGV) Slog.v(TAG, "UpdateBlockedUids: uid = "+uid +"isBlocked = "+isBlocked);
+        synchronized(mLock){
+            if(isBlocked){
+                for( int i=0; i< mTriggeredUids.size(); i++){
+                    if(mTriggeredUids.contains(new Integer(uid))){
+                        if (localLOGV){
+                            Slog.v(TAG,"TriggeredUids has this uid, mBroadcastRefCount="
+                                +mBroadcastRefCount);
+                        }
+                        mTriggeredUids.remove(new Integer(uid));
+                        mBlockedUids.add(new Integer(uid));
+                        if(mBroadcastRefCount > 0){
+                            mBroadcastRefCount--;
+                            if (mBroadcastRefCount == 0) {
+                                /* all the uids for which the alarms are triggered
+                                 * are either blocked or have called onSendFinished.
+                                */
+                                mWakeLock.release();
+                                if (localLOGV) Slog.v(TAG, "AM WakeLock Released Internally");
+                            }
+                        } else {
+                            if (localLOGV){
+                                Slog.v(TAG, "Trying to decrement mBroadcastRefCount past zero");
+                            }
+                        }
+                    } else {
+                        //no more matching uids break from the for loop
+                        break;
+                    }
+                }
+            } else {
+                for(int i =0; i<mBlockedUids.size(); i++) {
+                    if(!mBlockedUids.remove(new Integer(uid))) {
+                        //no more matching uids break from the for loop
+                        break;
+                     }
+                }
+            }
+        }
+    }
+
     public void removeLocked(String packageName) {
         removeLocked(mRtcWakeupAlarms, packageName);
         removeLocked(mRtcAlarms, packageName);
@@ -319,7 +365,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
 
         // iterator over the list removing any it where the intent match
         Iterator<Alarm> it = alarmList.iterator();
-        
+
         while (it.hasNext()) {
             Alarm alarm = it.next();
             if (alarm.operation.getTargetPackage().equals(packageName)) {
@@ -327,7 +373,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             }
         }
     }
-    
+
     public boolean lookForPackageLocked(String packageName) {
         return lookForPackageLocked(mRtcWakeupAlarms, packageName)
                 || lookForPackageLocked(mRtcAlarms, packageName)
@@ -343,7 +389,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
         }
         return false;
     }
-    
+
     private ArrayList<Alarm> getAlarmList(int type) {
         switch (type) {
             case AlarmManager.RTC_WAKEUP:              return mRtcWakeupAlarms;
@@ -351,13 +397,13 @@ class AlarmManagerService extends IAlarmManager.Stub {
             case AlarmManager.ELAPSED_REALTIME_WAKEUP: return mElapsedRealtimeWakeupAlarms;
             case AlarmManager.ELAPSED_REALTIME:        return mElapsedRealtimeAlarms;
         }
-        
+
         return null;
     }
-    
+
     private int addAlarmLocked(Alarm alarm) {
         ArrayList<Alarm> alarmList = getAlarmList(alarm.type);
-        
+
         int index = Collections.binarySearch(alarmList, alarm, mIncreasingTimeOrder);
         if (index < 0) {
             index = 0 - index - 1;
@@ -378,10 +424,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 position += 1;
             }
         }
-        
+
         return index;
     }
-    
+
     public long timeToNextAlarm() {
         long nextAlarm = Long.MAX_VALUE;
         synchronized (mLock) {
@@ -398,7 +444,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
         }
         return nextAlarm;
     }
-    
+
     private void setLocked(Alarm alarm)
     {
         if (mDescriptor != -1)
@@ -413,19 +459,19 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 alarmSeconds = alarm.when / 1000;
                 alarmNanoseconds = (alarm.when % 1000) * 1000 * 1000;
             }
-            
+
             set(mDescriptor, alarm.type, alarmSeconds, alarmNanoseconds);
         }
         else
         {
             Message msg = Message.obtain();
             msg.what = ALARM_EVENT;
-            
+
             mHandler.removeMessages(ALARM_EVENT);
             mHandler.sendMessageAtTime(msg, alarm.when);
         }
     }
-    
+
     @Override
     protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.DUMP)
@@ -435,7 +481,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     + ", uid=" + Binder.getCallingUid());
             return;
         }
-        
+
         synchronized (mLock) {
             pw.println("Current Alarm Manager state:");
             if (mRtcWakeupAlarms.size() > 0 || mRtcAlarms.size() > 0) {
@@ -463,10 +509,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     dumpAlarmList(pw, mElapsedRealtimeAlarms, "  ", "ELAPSED", now);
                 }
             }
-            
+
             pw.println(" ");
             pw.print("  Broadcast ref count: "); pw.println(mBroadcastRefCount);
-            
+
             pw.println(" ");
             pw.println("  Alarm Stats:");
             for (Map.Entry<String, BroadcastStats> be : mBroadcastStats.entrySet()) {
@@ -495,7 +541,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             a.dump(pw, prefix + "  ", now);
         }
     }
-    
+
     private native int init();
     private native void close(int fd);
     private native void set(int fd, int type, long seconds, long nanoseconds);
@@ -508,7 +554,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
     {
         Iterator<Alarm> it = alarmList.iterator();
         ArrayList<Alarm> repeats = new ArrayList<Alarm>();
-        
+
         while (it.hasNext())
         {
             Alarm alarm = it.next();
@@ -519,7 +565,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 // don't fire alarms in the future
                 break;
             }
-            
+
             // If the alarm is late, then print a warning message.
             // Note that this can happen if the user creates a new event on
             // the Calendar app with a reminder that is in the past. In that
@@ -540,10 +586,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 alarm.count += (now - alarm.when) / alarm.repeatInterval;
             }
             triggerList.add(alarm);
-            
+
             // remove the alarm from the list
             it.remove();
-            
+
             // if it repeats queue it up to be read-added to the list
             if (alarm.repeatInterval > 0) {
                 repeats.add(alarm);
@@ -557,12 +603,12 @@ class AlarmManagerService extends IAlarmManager.Stub {
             alarm.when += alarm.count * alarm.repeatInterval;
             addAlarmLocked(alarm);
         }
-        
+
         if (alarmList.size() > 0) {
             setLocked(alarmList.get(0));
         }
     }
-    
+
     /**
      * This Comparator sorts Alarms into increasing time order.
      */
@@ -579,20 +625,24 @@ class AlarmManagerService extends IAlarmManager.Stub {
             return 0;
         }
     }
-    
+
     private static class Alarm {
         public int type;
         public int count;
         public long when;
         public long repeatInterval;
         public PendingIntent operation;
-        
+        public int uid;
+        public int pid;
+
         public Alarm() {
             when = 0;
             repeatInterval = 0;
             operation = null;
+            uid = Binder.getCallingUid();
+            pid = Binder.getCallingPid();
         }
-        
+
         @Override
         public String toString()
         {
@@ -615,22 +665,22 @@ class AlarmManagerService extends IAlarmManager.Stub {
             pw.print(prefix); pw.print("operation="); pw.println(operation);
         }
     }
-    
+
     private class AlarmThread extends Thread
     {
         public AlarmThread()
         {
             super("AlarmManager");
         }
-        
+
         public void run()
         {
             while (true)
             {
                 int result = waitForAlarm(mDescriptor);
-                
+
                 ArrayList<Alarm> triggerList = new ArrayList<Alarm>();
-                
+
                 if ((result & TIME_CHANGED_MASK) != 0) {
                     remove(mTimeTickSender);
                     mClockReceiver.scheduleTimeTickEvent();
@@ -639,7 +689,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                             | Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
                     mContext.sendBroadcast(intent);
                 }
-                
+
                 synchronized (mLock) {
                     final long nowRTC = System.currentTimeMillis();
                     final long nowELAPSED = SystemClock.elapsedRealtime();
@@ -649,16 +699,16 @@ class AlarmManagerService extends IAlarmManager.Stub {
 
                     if ((result & RTC_WAKEUP_MASK) != 0)
                         triggerAlarmsLocked(mRtcWakeupAlarms, triggerList, nowRTC);
-                    
+
                     if ((result & RTC_MASK) != 0)
                         triggerAlarmsLocked(mRtcAlarms, triggerList, nowRTC);
-                    
+
                     if ((result & ELAPSED_REALTIME_WAKEUP_MASK) != 0)
                         triggerAlarmsLocked(mElapsedRealtimeWakeupAlarms, triggerList, nowELAPSED);
-                    
+
                     if ((result & ELAPSED_REALTIME_MASK) != 0)
                         triggerAlarmsLocked(mElapsedRealtimeAlarms, triggerList, nowELAPSED);
-                    
+
                     // now trigger the alarms
                     Iterator<Alarm> it = triggerList.iterator();
                     while (it.hasNext()) {
@@ -669,7 +719,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                                     mBackgroundIntent.putExtra(
                                             Intent.EXTRA_ALARM_COUNT, alarm.count),
                                     mResultReceiver, mHandler);
-                            
+
                             // we have an active broadcast so stay awake.
                             if (mBroadcastRefCount == 0) {
                                 setWakelockWorkSource(alarm.operation);
@@ -677,7 +727,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                             }
                             mInFlight.add(alarm.operation);
                             mBroadcastRefCount++;
-                            
+                            mTriggeredUids.add(new Integer(alarm.uid));
                             BroadcastStats bs = getStatsLocked(alarm.operation);
                             if (bs.nesting == 0) {
                                 bs.startTime = nowELAPSED;
@@ -724,10 +774,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
         public static final int ALARM_EVENT = 1;
         public static final int MINUTE_CHANGE_EVENT = 2;
         public static final int DATE_CHANGE_EVENT = 3;
-        
+
         public AlarmHandler() {
         }
-        
+
         public void handleMessage(Message msg) {
             if (msg.what == ALARM_EVENT) {
                 ArrayList<Alarm> triggerList = new ArrayList<Alarm>();
@@ -738,7 +788,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     triggerAlarmsLocked(mElapsedRealtimeWakeupAlarms, triggerList, nowRTC);
                     triggerAlarmsLocked(mElapsedRealtimeAlarms, triggerList, nowRTC);
                 }
-                
+
                 // now trigger the alarms without the lock held
                 Iterator<Alarm> it = triggerList.iterator();
                 while (it.hasNext())
@@ -757,7 +807,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             }
         }
     }
-    
+
     class ClockReceiver extends BroadcastReceiver {
         public ClockReceiver() {
             IntentFilter filter = new IntentFilter();
@@ -765,7 +815,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             filter.addAction(Intent.ACTION_DATE_CHANGED);
             mContext.registerReceiver(this, filter);
         }
-        
+
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(Intent.ACTION_TIME_TICK)) {
@@ -781,7 +831,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             	scheduleDateChangedEvent();
             }
         }
-        
+
         public void scheduleTimeTickEvent() {
             Calendar calendar = Calendar.getInstance();
             final long currentTime = System.currentTimeMillis();
@@ -797,7 +847,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + tickEventDelay,
                     mTimeTickSender);
         }
-	
+
         public void scheduleDateChangedEvent() {
             Calendar calendar = Calendar.getInstance();
             calendar.setTimeInMillis(System.currentTimeMillis());
@@ -806,11 +856,11 @@ class AlarmManagerService extends IAlarmManager.Stub {
             calendar.set(Calendar.SECOND, 0);
             calendar.set(Calendar.MILLISECOND, 0);
             calendar.add(Calendar.DAY_OF_MONTH, 1);
-      
+
             set(AlarmManager.RTC, calendar.getTimeInMillis(), mDateChangeSender);
         }
     }
-    
+
     class UninstallReceiver extends BroadcastReceiver {
         public UninstallReceiver() {
             IntentFilter filter = new IntentFilter();
@@ -824,7 +874,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             sdFilter.addAction(Intent.ACTION_EXTERNAL_APPLICATIONS_UNAVAILABLE);
             mContext.registerReceiver(this, sdFilter);
         }
-        
+
         @Override
         public void onReceive(Context context, Intent intent) {
             synchronized (mLock) {
@@ -864,7 +914,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
             }
         }
     }
-    
+
     private final BroadcastStats getStatsLocked(PendingIntent pi) {
         String pkg = pi.getTargetPackage();
         BroadcastStats bs = mBroadcastStats.get(pkg);
@@ -874,7 +924,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
         }
         return bs;
     }
-    
+
     class ResultReceiver implements PendingIntent.OnFinished {
         public void onSendFinished(PendingIntent pi, Intent intent, int resultCode,
                 String resultData, Bundle resultExtras) {
@@ -895,19 +945,41 @@ class AlarmManagerService extends IAlarmManager.Stub {
                         fs.count++;
                     }
                 }
-                mInFlight.removeFirst();
-                mBroadcastRefCount--;
-                if (mBroadcastRefCount == 0) {
-                    mWakeLock.release();
+                String pkg = null;
+                int uid = 0;
+                try {
+                    pkg = pi.getTargetPackage();
+                    final PackageManager pm = mContext.getPackageManager();
+                    ApplicationInfo appInfo =
+                        pm.getApplicationInfo(pkg, PackageManager.GET_META_DATA);
+                    uid = appInfo.uid;
+                    mTriggeredUids.remove(new Integer(uid));
+                } catch (PackageManager.NameNotFoundException ex){
+                    Slog.w(TAG, "onSendFinished NameNotFoundException Pkg = " + pkg);
+                }
+                if(mBlockedUids.contains(new Integer(uid))){
+                    mBlockedUids.remove(new Integer(uid));
                 } else {
-                    // the next of our alarms is now in flight.  reattribute the wakelock.
-                    final PendingIntent nowInFlight = mInFlight.peekFirst();
-                    if (nowInFlight != null) {
-                        setWakelockWorkSource(nowInFlight);
+                    if(mBroadcastRefCount > 0){
+                        mInFlight.removeFirst();
+                        mBroadcastRefCount--;
+                        if (mBroadcastRefCount == 0) {
+                            mWakeLock.release();
+                        } else {
+                            // the next of our alarms is now in flight.  reattribute the wakelock.
+                            final PendingIntent nowInFlight = mInFlight.peekFirst();
+                            if (nowInFlight != null) {
+                                setWakelockWorkSource(nowInFlight);
+                            } else {
+                                // should never happen
+                                Slog.e(TAG, "Alarm wakelock still held but sent queue empty");
+                                mWakeLock.setWorkSource(null);
+                            }
+                        }
                     } else {
-                        // should never happen
-                        Slog.e(TAG, "Alarm wakelock still held but sent queue empty");
-                        mWakeLock.setWorkSource(null);
+                        if(localLOGV) {
+                            Slog.e(TAG,"Trying to decrement mBroadcastRefCnt past zero");
+                        }
                     }
                 }
             }
