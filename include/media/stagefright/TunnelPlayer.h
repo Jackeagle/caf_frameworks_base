@@ -304,6 +304,8 @@ private:
 
     status_t flush(void *handle);
 
+    bool waitonA2dpConditionVariable(status_t * a2dpThreadErrorStatus);
+
     TunnelPlayer(const TunnelPlayer &);
     TunnelPlayer &operator=(const TunnelPlayer &);
 };

@@ -1068,7 +1068,7 @@ void TunnelPlayer::A2DPNotificationThreadEntry() {
         }
 
         status_t err = OK;
-        LOGV("A2DP notification has come mIsA2DPEnabled: %d", mIsA2DPEnabled);
+        LOGD("A2DP notification has come mIsA2DPEnabled: %d", mIsA2DPEnabled);
 
         if(mIsA2DPEnabled) {
 
@@ -1254,9 +1254,7 @@ void TunnelPlayer::A2DPThreadEntry() {
 
             Mutex::Autolock autolock(mA2dpMutex);
             struct pcm * capture_handle = (struct pcm *)mCaptureHandle;
-
-            if (!mAudioSinkOpen || mIsPaused || !mIsA2DPEnabled ||
-                    mReachedDecoderEOS || !capture_handle || (err != NO_ERROR)) {
+            if(waitonA2dpConditionVariable(&err)) {
                 LOGD("A2DPThreadEntry:: mAudioSinkOpen %d isPaused %d\
                        bIsA2DPEnabled %d",\
                        mAudioSinkOpen, mIsPaused,\
@@ -2050,6 +2048,30 @@ status_t TunnelPlayer::flush(void * handle) {
 
      }
     return err;
+}
+
+bool TunnelPlayer::waitonA2dpConditionVariable(status_t * a2dpThreadErrorStatus) {
+
+            //For A2DP thread to be running the following conditions has to be satisfied
+            struct pcm * capture_handle = (struct pcm *)mCaptureHandle;
+            if ( // Audio Sink needs to be open to write data to BT
+                !mAudioSinkOpen ||
+                // A2DP thread should not be running playback is paused
+                mIsPaused ||
+               // A2DP thread should be running only if  BT is enabled
+                !mIsA2DPEnabled ||
+                // A2DP thread should be enabled  only if decoder has not played out data
+                mReachedDecoderEOS ||
+                // A2DP thread should run only if there is a valid proxy handle.
+                !capture_handle ||
+                // A2DP thread should not be running if it is in error state.
+                (*a2dpThreadErrorStatus != NO_ERROR) ||
+                // A2DP thread should not be running if TunnelPlayer is not started.
+                !mStarted) {
+                return true;
+            }
+            else
+                return false;
 }
 
 } //namespace android
