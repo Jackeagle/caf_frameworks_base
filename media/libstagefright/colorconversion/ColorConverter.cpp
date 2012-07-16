@@ -24,7 +24,6 @@
 #include <media/stagefright/MediaErrors.h>
 #include <dlfcn.h>
 
-#include <OMX_QCOMExtns.h>
 #include <QOMX_AudioExtensions.h>
 
 namespace android {
@@ -52,7 +51,7 @@ bool ColorConverter::isValid() const {
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
         case OMX_COLOR_FormatYUV420SemiPlanar:
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
-        case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
+        case OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
             return true;
 
         default:
@@ -128,7 +127,7 @@ status_t ColorConverter::convert(
             err = convertTIYUV420PackedSemiPlanar(src, dst);
             break;
 
-        case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
+        case OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
             {
                 void * lib = dlopen("libmm-color-convertor.so", RTLD_NOW);
 
