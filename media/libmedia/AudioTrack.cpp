@@ -898,8 +898,7 @@ status_t AudioTrack::createTrack_l(
     }
 
     mNotificationFramesAct = mNotificationFramesReq;
-    if (((audio_stream_type_t)mStreamType != AUDIO_STREAM_VOICE_CALL)
-          && (!audio_is_linear_pcm(format))) {
+    if (!audio_is_linear_pcm(format)) {
         if (sharedBuffer != 0) {
             frameCount = sharedBuffer->size();
         }
