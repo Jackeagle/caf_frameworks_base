@@ -268,7 +268,7 @@ public class WifiNative {
 
     /* p2p_connect <peer device address> <pbc|pin|PIN#> [label|display|keypad]
         [persistent] [join|auth] [go_intent=<0..15>] [freq=<in MHz>] */
-    public static String p2pConnect(WifiP2pConfig config, boolean joinExistingGroup, boolean autoconnect, boolean provdisc) {
+    public static String p2pConnect(WifiP2pConfig config, boolean autoconnect, boolean provdisc) {
         if (config == null) return null;
         List<String> args = new ArrayList<String>();
         WpsInfo wps = config.wps;
@@ -280,7 +280,10 @@ public class WifiNative {
                 break;
             case WpsInfo.DISPLAY:
                 //TODO: pass the pin back for display
-                args.add("pin");
+                if (config.mUsepin ==1)
+                    args.add(wps.pin);
+                else
+                    args.add("pin");
                 args.add("display");
                 break;
             case WpsInfo.KEYPAD:
@@ -299,7 +302,7 @@ public class WifiNative {
         /* Persist unless there is an explicit request to not do so*/
         //if (config.persist != WifiP2pConfig.Persist.NO) args.add("persistent");
 
-        if (joinExistingGroup) args.add("join");
+        if (config.mPeergo == 1) args.add("join");
         if (autoconnect) args.add("auto");
         if (provdisc) args.add("provdisc");
 
@@ -403,19 +406,6 @@ public class WifiNative {
         return WifiNative.doBooleanCommand("SET config_methods " + config_method);
     }
 
-    public static String p2pConnectDisplay(String deviceAddress, String pin, boolean join) {
-        if (join)
-            return doStringCommand("P2P_CONNECT " + deviceAddress + " " + pin + " display" + " join");
-        else
-            return doStringCommand("P2P_CONNECT " + deviceAddress + " " + pin + " display");
-    }
-
-    public static String p2pConnectKeypad(String deviceAddress, String pin, boolean join) {
-        if(join)
-            return doStringCommand("P2P_CONNECT " + deviceAddress + " " + pin + " keypad" + " join");
-        else
-            return doStringCommand("P2P_CONNECT " + deviceAddress + " " + pin + " keypad");
-    }
 
    public static String pinFromPeerDevice(String deviceAddress) {
           return doStringCommand("P2P_PROV_DISC " + deviceAddress + " display" + " auto");
