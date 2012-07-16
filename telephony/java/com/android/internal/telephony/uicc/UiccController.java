@@ -40,6 +40,7 @@ public class UiccController extends Handler {
 
     private static final int EVENT_ICC_STATUS_CHANGED = 1;
     private static final int EVENT_GET_ICC_STATUS_DONE = 2;
+    private static final int EVENT_RADIO_UNAVAILABLE = 3;
 
     private static UiccController mInstance;
 
@@ -122,8 +123,22 @@ public class UiccController extends Handler {
                 AsyncResult ar = (AsyncResult)msg.obj;
                 onGetIccCardStatusDone(ar);
                 break;
+            case EVENT_RADIO_UNAVAILABLE:
+                if (DBG) log("EVENT_RADIO_UNAVAILABLE ");
+                disposeCard();
+                break;
             default:
                 Log.e(LOG_TAG, " Unknown Event " + msg.what);
+        }
+    }
+
+    // Destroys the card object
+    private synchronized void disposeCard() {
+        if (DBG) log("Disposing card");
+        if (mUiccCard != null) {
+            mUiccCard.dispose();
+            mUiccCard = null;
+            mIccChangedRegistrants.notifyRegistrants();
         }
     }
 
@@ -132,6 +147,7 @@ public class UiccController extends Handler {
         mContext = c;
         mCi = ci;
         mCi.registerForIccStatusChanged(this, EVENT_ICC_STATUS_CHANGED, null);
+        mCi.registerForNotAvailable(this, EVENT_RADIO_UNAVAILABLE, null);
         // TODO remove this once modem correctly notifies the unsols
         mCi.registerForOn(this, EVENT_ICC_STATUS_CHANGED, null);
     }
@@ -147,10 +163,10 @@ public class UiccController extends Handler {
         IccCardStatus status = (IccCardStatus)ar.result;
 
         if (mUiccCard == null) {
-            //Create new card
+            if (DBG) log("Creating a new card");
             mUiccCard = new UiccCard(mContext, mCi, status);
         } else {
-            //Update already existing card
+            if (DBG) log("Update already existing card");
             mUiccCard.update(mContext, mCi , status);
         }
 
