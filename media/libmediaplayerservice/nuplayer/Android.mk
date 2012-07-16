@@ -10,11 +10,12 @@ LOCAL_SRC_FILES:=                       \
         NuPlayerStreamListener.cpp      \
         RTSPSource.cpp                  \
         StreamingSource.cpp             \
-        MPQHALWrapper.cpp
+        MPQHALWrapper.cpp               \
+        NuPlayerStats.cpp
 
 LOCAL_C_INCLUDES := \
         $(TOP)/frameworks/base/include/media/stagefright/openmax        \
-	$(TOP)/frameworks/base/media/libstagefright/include             \
+        $(TOP)/frameworks/base/media/libstagefright/include             \
         $(TOP)/frameworks/base/media/libstagefright/mpeg2ts             \
         $(TOP)/frameworks/base/media/libstagefright/httplive            \
         $(TOP)/frameworks/base/media/libstagefright/rtsp                \

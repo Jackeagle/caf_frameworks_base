@@ -66,10 +66,16 @@ NuPlayer::NuPlayer()
       mNumFramesTotal(0ll),
       mNumFramesDropped(0ll),
       mPauseIndication(false),
-      mLiveSourceType(kDefaultSource) {
+      mLiveSourceType(kDefaultSource),
+      mStats(NULL) {
+
 }
 
 NuPlayer::~NuPlayer() {
+    if(mStats != NULL) {
+        mStats->logFpsSummary();
+        mStats = NULL;
+    }
 }
 
 void NuPlayer::setUID(uid_t uid) {
@@ -247,6 +253,10 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             mRenderer = new Renderer(
                     mAudioSink,
                     new AMessage(kWhatRendererNotify, id()));
+
+            // for qualcomm statistics processing
+            mStats = new NuPlayerStats();
+            mRenderer->registerStats(mStats);
 
             looper()->registerHandler(mRenderer);
 
@@ -566,6 +576,10 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatSeek:
         {
+            if(mStats != NULL) {
+                mStats->notifySeek();
+            }
+
             Mutex::Autolock autoLock(mLock);
             int64_t seekTimeUs = -1, newSeekTime = -1;
             status_t nRet = OK;
@@ -624,6 +638,10 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                    LOGV("Video is not there, set it to shutdown");
                    mFlushingVideo = SHUT_DOWN;
                }
+            }
+
+            if(mStats != NULL) {
+                mStats->logSeek(seekTimeUs);
             }
 
             if (mDriver != NULL) {
@@ -799,6 +817,9 @@ status_t NuPlayer::instantiateDecoder(bool audio, sp<Decoder> *decoder) {
         const char *mime;
         CHECK(meta->findCString(kKeyMIMEType, &mime));
         mVideoIsAVC = !strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime);
+        if(mStats != NULL) {
+            mStats->setMime(mime);
+        }
 
         //TO-DO:: Similarly set here for Decode order
         if (mVideoIsAVC &&
@@ -945,6 +966,7 @@ status_t NuPlayer::feedDecoderInputData(bool audio, const sp<AMessage> &msg) {
             return OK;
         }
 
+        dropAccessUnit = false;
         if (!audio) {
             ++mNumFramesTotal;
 
@@ -956,15 +978,21 @@ status_t NuPlayer::feedDecoderInputData(bool audio, const sp<AMessage> &msg) {
                     LOGD("MEDIA_INFO_NETWORK_BANDWIDTH nBytesLost (%d)",nBytesLost);
                 }
             }
-        }
 
-        dropAccessUnit = false;
-        if (!audio
-                && mVideoLateByUs > 100000ll
-                && mVideoIsAVC
-                && !IsAVCReferenceFrame(accessUnit)) {
-            dropAccessUnit = true;
-            ++mNumFramesDropped;
+            if(mStats != NULL) {
+                mStats->incrementTotalFrames();
+            }
+
+            if (mVideoLateByUs > 100000ll
+                    && mVideoIsAVC
+                    && !IsAVCReferenceFrame(accessUnit)) {
+                dropAccessUnit = true;
+                ++mNumFramesDropped;
+
+                if(mStats != NULL) {
+                    mStats->incrementDroppedFrames();
+                }
+            }
         }
     } while (dropAccessUnit);
 

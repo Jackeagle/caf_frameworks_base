@@ -23,6 +23,7 @@
 #include <media/stagefright/NativeWindowWrapper.h>
 #include <gui/SurfaceTextureClient.h>
 #include <surfaceflinger/Surface.h>
+#include "NuPlayerStats.h"
 
 namespace android {
 
@@ -170,8 +171,10 @@ private:
 
     sp<Source> LoadCreateSource(const char * uri, const KeyedVector<String8,
                                  String8> *headers, bool uidValid, uid_t uid, NuSourceType srcTyp);
-
     void postIsPrepareDone();
+    // for qualcomm statistics profiling
+    sp<NuPlayerStats> mStats;
+
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer);
 };
 
