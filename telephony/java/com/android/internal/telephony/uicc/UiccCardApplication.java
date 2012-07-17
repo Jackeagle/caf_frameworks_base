@@ -50,6 +50,7 @@ public class UiccCardApplication {
     private PinState      mPin1State;
     private PinState      mPin2State;
     private boolean       mIccFdnEnabled = false; // Default to disabled.
+    private boolean       mIccFdnAvailable = true; // Default is enabled.
     private boolean mDesiredFdnEnabled;
 
     private CommandsInterface mCi;
@@ -191,9 +192,17 @@ public class UiccCardApplication {
         }
 
         int[] ints = (int[])ar.result;
-        if(ints.length != 0) {
-            mIccFdnEnabled = (0!=ints[0]);
-            if (DBG) log("Query facility lock : "  + mIccFdnEnabled);
+        if (ints.length != 0) {
+            //0 - Available & Disabled, 1-Available & Enabled, 2-Unavailable.
+            if (ints[0] == 2) {
+                mIccFdnEnabled = false;
+                mIccFdnAvailable = false;
+            } else {
+                mIccFdnEnabled = (ints[0] == 1) ? true : false;
+                mIccFdnAvailable = true;
+            }
+            log("Query facility FDN : FDN service available: "+ mIccFdnAvailable
+                    +" enabled: "  + mIccFdnEnabled);
         } else {
             loge("Bogus facility lock response");
         }
