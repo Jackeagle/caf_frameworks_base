@@ -42,15 +42,12 @@ public class LocationProviderProxy implements LocationProviderInterface {
 
     private static final String TAG = "LocationProviderProxy";
 
-    public static final String SERVICE_ACTION =
-        "com.android.location.service.NetworkLocationProvider";
-
     private final Context mContext;
     private final String mName;
     private final Intent mIntent;
     private final Handler mHandler;
     private final Object mMutex = new Object();  // synchronizes access to non-final members
-    private Connection mServiceConnection;  // never null after ctor
+    private Connection mServiceConnection = new Connection();  // never null
 
     // cached values set by the location manager
     private boolean mLocationTracking = false;
@@ -61,26 +58,28 @@ public class LocationProviderProxy implements LocationProviderInterface {
     private NetworkInfo mNetworkInfo;
 
     // constructor for proxying location providers implemented in a separate service
-    public LocationProviderProxy(Context context, String name, String packageName,
+    public LocationProviderProxy(Context context, String name, String serviceName,
             Handler handler) {
         mContext = context;
         mName = name;
-        mIntent = new Intent(SERVICE_ACTION);
+        mIntent = new Intent(serviceName);
         mHandler = handler;
-        reconnect(packageName);
+        mContext.bindService(mIntent, mServiceConnection,
+                Context.BIND_AUTO_CREATE | Context.BIND_NOT_FOREGROUND
+                | Context.BIND_ALLOW_OOM_MANAGEMENT);
     }
 
-    /** Bind to service. Will reconnect if already connected */
-    public void reconnect(String packageName) {
+    /**
+     * When unbundled NetworkLocationService package is updated, we
+     * need to unbind from the old version and re-bind to the new one.
+     */
+    public void reconnect() {
         synchronized (mMutex) {
-            if (mServiceConnection != null) {
-                mContext.unbindService(mServiceConnection);
-            }
+            mContext.unbindService(mServiceConnection);
             mServiceConnection = new Connection();
-            mIntent.setPackage(packageName);
             mContext.bindService(mIntent, mServiceConnection,
-                    Context.BIND_AUTO_CREATE | Context.BIND_NOT_FOREGROUND |
-                    Context.BIND_ALLOW_OOM_MANAGEMENT);
+                    Context.BIND_AUTO_CREATE | Context.BIND_NOT_FOREGROUND
+                    | Context.BIND_ALLOW_OOM_MANAGEMENT);
         }
     }
 
@@ -469,5 +468,12 @@ public class LocationProviderProxy implements LocationProviderInterface {
                 }
             }
         }
+    }
+    public boolean updateCriteria(int action, long minTime, float minDistance,
+               boolean singleShot,Criteria criteria) {
+        return true;
+    }
+    public int getCapability(){
+        return 0;
     }
 }

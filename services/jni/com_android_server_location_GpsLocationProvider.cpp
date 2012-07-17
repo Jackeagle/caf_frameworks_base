@@ -41,15 +41,20 @@ static jmethodID method_setEngineCapabilities;
 static jmethodID method_xtraDownloadRequest;
 static jmethodID method_reportNiNotification;
 static jmethodID method_requestRefLocation;
+static jmethodID method_requestNetworkLocation;
+static jmethodID method_requestPhoneContext;
 static jmethodID method_requestSetID;
 static jmethodID method_requestUtcTime;
 
 static const GpsInterface* sGpsInterface = NULL;
+static const UlpNetworkInterface* sUlpNetworkInterface = NULL;
 static const GpsXtraInterface* sGpsXtraInterface = NULL;
 static const AGpsInterface* sAGpsInterface = NULL;
 static const GpsNiInterface* sGpsNiInterface = NULL;
 static const GpsDebugInterface* sGpsDebugInterface = NULL;
 static const AGpsRilInterface* sAGpsRilInterface = NULL;
+static const InjectRawCmdInterface* sInjectRawCmdInterface = NULL;
+static const UlpPhoneContextInterface* sUlpPhoneContextInterface = NULL;
 
 // temporary storage for GPS callbacks
 static GpsSvStatus  sGpsSvStatus;
@@ -68,14 +73,82 @@ static void checkAndClearExceptionFromCallback(JNIEnv* env, const char* methodNa
     }
 }
 
+/*=============================================================================================
+ * Function description:
+ *  Helper function to convert a 16 byte array to a 16 byte number in the form of two
+ *  longs (most significant 8 bytes, and least significant 8 bytes)
+ *
+ * Parameters:
+ *    bytes, the 16 byte array
+ *    most, pointer to the most siginificant 8 bytes
+ *    least, pointer to the least siginificant 8 bytes
+ *
+ * Return value:
+ *    error code: 0: success
+ =============================================================================================*/
+#define UUID_STRING_LENGTH (32+4+1) // 16 * 2 + 4 (-) + 1 null ending
+static void convert_uuid_from_byte_array_to_string (unsigned char* uuid_byte_array, char *uuid_string_buf)
+{
+    memset (uuid_string_buf, 0, UUID_STRING_LENGTH);
+    snprintf (uuid_string_buf, UUID_STRING_LENGTH,
+              "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+              (*(uuid_byte_array+0) & 0xff),
+              (*(uuid_byte_array+1) & 0xff),
+              (*(uuid_byte_array+2) & 0xff),
+              (*(uuid_byte_array+3) & 0xff),
+              (*(uuid_byte_array+4) & 0xff),
+              (*(uuid_byte_array+5) & 0xff),
+              (*(uuid_byte_array+6) & 0xff),
+              (*(uuid_byte_array+7) & 0xff),
+              (*(uuid_byte_array+8) & 0xff),
+              (*(uuid_byte_array+9) & 0xff),
+              (*(uuid_byte_array+10) & 0xff),
+              (*(uuid_byte_array+11) & 0xff),
+              (*(uuid_byte_array+12) & 0xff),
+              (*(uuid_byte_array+13) & 0xff),
+              (*(uuid_byte_array+14) & 0xff),
+              (*(uuid_byte_array+15) & 0xff));
+    ALOGD ("UUID string = %s\n", uuid_string_buf);
+}
+
 static void location_callback(GpsLocation* location)
 {
     JNIEnv* env = AndroidRuntime::getJNIEnv();
+
+    jbyteArray byteArray = env->NewByteArray(location->rawDataSize);
+    ALOG_ASSERT(byteArray, "Native could not create new byte[]");
+    env->SetByteArrayRegion(byteArray, 0, location->rawDataSize, (const jbyte *) location->rawData );
+
+    jstring java_string_map_url = NULL;
+    if ((location->flags & GPS_LOCATION_HAS_MAP_URL) == GPS_LOCATION_HAS_MAP_URL) {
+      java_string_map_url = env->NewStringUTF(location->map_url);
+    }
+
+    jstring java_string_map_index = NULL;
+    if ((location->flags & GPS_LOCATION_HAS_MAP_INDEX) == GPS_LOCATION_HAS_MAP_INDEX) {
+
+      char uuid_string_buf  [UUID_STRING_LENGTH];
+      convert_uuid_from_byte_array_to_string (location->map_index, uuid_string_buf);
+      java_string_map_index = env->NewStringUTF(uuid_string_buf);
+    }
+
     env->CallVoidMethod(mCallbacksObj, method_reportLocation, location->flags,
             (jdouble)location->latitude, (jdouble)location->longitude,
             (jdouble)location->altitude,
             (jfloat)location->speed, (jfloat)location->bearing,
-            (jfloat)location->accuracy, (jlong)location->timestamp);
+            (jfloat)location->accuracy, (jlong)location->timestamp,location->position_source,
+             byteArray, (jboolean)location->is_indoor, (jfloat)location->floor_number,
+             java_string_map_url, java_string_map_index);
+
+    env->DeleteLocalRef(byteArray);
+    if (java_string_map_url != NULL) {
+        env->DeleteLocalRef(java_string_map_url);
+    }
+
+    if (java_string_map_index != NULL) {
+      env->DeleteLocalRef(java_string_map_index);
+    }
+
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
 }
 
@@ -165,14 +238,26 @@ static void agps_status_callback(AGpsStatus* agps_status)
     JNIEnv* env = AndroidRuntime::getJNIEnv();
 
     uint32_t ipaddr;
+    jbyteArray byteArray = env->NewByteArray(16);
+
+    ALOG_ASSERT(byteArray, "Native could not create new byte[]");
+
     // ipaddr field was not included in original AGpsStatus
-    if (agps_status->size >= sizeof(AGpsStatus))
-        ipaddr = agps_status->ipaddr;
-    else
+    if (agps_status->size >= sizeof(AGpsStatus)) {
+        ipaddr = agps_status->ipv4_addr;
+        env->SetByteArrayRegion(byteArray, 0, 16, (const jbyte *) agps_status->ipv6_addr );
+    } else {
         ipaddr = 0xFFFFFFFF;
+        char c = 0;
+        env->SetByteArrayRegion(byteArray, 0, 1, (const jbyte *) &c );
+    }
+
     env->CallVoidMethod(mCallbacksObj, method_reportAGpsStatus,
-                        agps_status->type, agps_status->status, ipaddr);
+                        agps_status->type, agps_status->status,
+                        agps_status->ipv4_addr, byteArray);
+
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
+    env->DeleteLocalRef(byteArray);
 }
 
 AGpsCallbacks sAGpsCallbacks = {
@@ -232,17 +317,42 @@ AGpsRilCallbacks sAGpsRilCallbacks = {
     agps_request_ref_location,
     create_thread_callback,
 };
+//ULP Network Location Callback
+static void ulp_network_location_request (UlpNetworkRequestPos* req)
+{
+    JNIEnv* env = AndroidRuntime::getJNIEnv();
+    env->CallVoidMethod(mCallbacksObj, method_requestNetworkLocation, req->request_type,req->interval_ms,req->desired_position_source );
+    checkAndClearExceptionFromCallback(env, __FUNCTION__);
+}
+
+UlpNetworkLocationCallbacks sUlpNetworkLocationCallbacks = {
+    ulp_network_location_request,
+};
+
+static void ulp_request_phone_context(UlpPhoneContextRequest *req)
+{
+    JNIEnv* env = AndroidRuntime::getJNIEnv();
+    env->CallVoidMethod(mCallbacksObj, method_requestPhoneContext,req->context_type ,
+                        req->request_type );
+    checkAndClearExceptionFromCallback(env, __FUNCTION__);
+}
+
+UlpPhoneContextCallbacks sUlpPhoneContextCallbacks = {
+    ulp_request_phone_context,
+};
 
 static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, jclass clazz) {
     int err;
     hw_module_t* module;
 
-    method_reportLocation = env->GetMethodID(clazz, "reportLocation", "(IDDDFFFJ)V");
+    method_reportLocation = env->GetMethodID(clazz, "reportLocation", "(IDDDFFFJI[BZFLjava/lang/String;Ljava/lang/String;)V");
     method_reportStatus = env->GetMethodID(clazz, "reportStatus", "(I)V");
     method_reportSvStatus = env->GetMethodID(clazz, "reportSvStatus", "()V");
-    method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(III)V");
+    method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(III[B)V");
     method_reportNmea = env->GetMethodID(clazz, "reportNmea", "(J)V");
     method_setEngineCapabilities = env->GetMethodID(clazz, "setEngineCapabilities", "(I)V");
+    method_requestNetworkLocation = env->GetMethodID(clazz, "requestNetworkLocation", "(III)V");
+    method_requestPhoneContext = env->GetMethodID(clazz, "requestPhoneContext", "(II)V");
     method_xtraDownloadRequest = env->GetMethodID(clazz, "xtraDownloadRequest", "()V");
     method_reportNiNotification = env->GetMethodID(clazz, "reportNiNotification",
             "(IIIIILjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V");
@@ -270,11 +380,25 @@ static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, 
             (const GpsDebugInterface*)sGpsInterface->get_extension(GPS_DEBUG_INTERFACE);
         sAGpsRilInterface =
             (const AGpsRilInterface*)sGpsInterface->get_extension(AGPS_RIL_INTERFACE);
+        sInjectRawCmdInterface =
+            (const InjectRawCmdInterface*)sGpsInterface->get_extension(ULP_RAW_CMD_INTERFACE);
+        sUlpNetworkInterface =
+            (const UlpNetworkInterface*)sGpsInterface->get_extension(ULP_NETWORK_INTERFACE);
+        sUlpPhoneContextInterface =
+            (const UlpPhoneContextInterface*)sGpsInterface->get_extension(ULP_PHONE_CONTEXT_INTERFACE);
     }
 }
 
 static jboolean android_location_GpsLocationProvider_is_supported(JNIEnv* env, jclass clazz) {
     return (sGpsInterface != NULL);
+}
+
+static jint android_location_GpsLocationProvider_has_ulp_capability(JNIEnv* env, jclass clazz) {
+    //We expect JNI to return bit map for ULP capability if present in the HAL
+    if(sUlpNetworkInterface != NULL)
+        return ULP_CAPABILITY;
+    else
+        return 0;
 }
 
 static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject obj)
@@ -297,7 +421,11 @@ static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject o
         sGpsNiInterface->init(&sGpsNiCallbacks);
     if (sAGpsRilInterface)
         sAGpsRilInterface->init(&sAGpsRilCallbacks);
-
+    if (sUlpPhoneContextInterface)
+        sUlpPhoneContextInterface->init(&sUlpPhoneContextCallbacks);
+    if (sUlpNetworkInterface)
+        if (sUlpNetworkInterface->init(&sUlpNetworkLocationCallbacks) != 0)
+            sUlpNetworkInterface = NULL;
     return true;
 }
 
@@ -317,6 +445,58 @@ static jboolean android_location_GpsLocationProvider_set_position_mode(JNIEnv* e
         return false;
 }
 
+static jboolean android_location_GpsLocationProvider_update_criteria(JNIEnv* env, jobject obj,
+        jint source, jint action, jlong minTime, jfloat minDistance, jboolean singleShot,
+        jint horizontalAccuracy, jint powerRequirement)
+{
+    UlpLocationCriteria native_criteria;
+    ALOGD("JNI:Inupdate_criteria: action:%d, minTime:%ld, minDistance:%f, singleShot:%d, horizontalAccuracy:%d, powerRequirement:%d \n",
+         action, minTime,minDistance, singleShot,horizontalAccuracy,powerRequirement );
+    native_criteria.valid_mask = (ULP_CRITERIA_HAS_ACTION | ULP_CRITERIA_HAS_PROVIDER_SOURCE | ULP_CRITERIA_HAS_RECURRENCE_TYPE |
+                                  ULP_CRITERIA_HAS_MIN_INTERVAL);
+    native_criteria.provider_source = source;
+    native_criteria.action = action;
+    native_criteria.min_interval = minTime;
+    native_criteria.min_distance = minDistance;
+    native_criteria.recurrence_type = singleShot? ULP_LOC_RECURRENCE_SINGLE:ULP_LOC_RECURRENCE_PERIODIC;
+    native_criteria.preferred_horizontal_accuracy = (UlpHorzAccuracyCriteria) horizontalAccuracy;
+    native_criteria.preferred_power_consumption = (UlpPowerCriteria)powerRequirement;
+    // Criteria will have valid values for accuracy and power requirements only for HybridProvider
+    if(source == ULP_PROVIDER_SOURCE_HYBRID)
+    {
+       native_criteria.valid_mask |= ( ULP_CRITERIA_HAS_PREFERRED_HORIZONTAL_ACCURACY
+                                       | ULP_CRITERIA_HAS_PREFERRED_POWER_CONSUMPTION );
+    }
+
+    ALOGD("JNI:Inupdate_criteria: After translation action:%d, minTime:%ld, minDistance:%f, singleShot:%d, horizontalAccuracy:%d, powerRequirement:%d \n",
+         native_criteria.action, native_criteria.min_interval,native_criteria.min_distance, native_criteria.recurrence_type,native_criteria.preferred_horizontal_accuracy,native_criteria.preferred_power_consumption );
+    if (sGpsInterface){
+        ALOGD("JNI:Inupdate_criteria:Before call to interface->update_criteria(native_criteria)");
+        return (sGpsInterface->update_criteria(native_criteria) == 0);
+    } else
+        return false;
+}
+
+static jboolean android_location_GpsLocationProvider_update_settings(JNIEnv* env, jobject obj,
+        jint currentContextType, jboolean currentGpsSetting, jboolean currentAgpsSetting,
+        jboolean currentNetworkProvSetting, jboolean currentWifiSetting,
+        jboolean currentBatteryCharging, jboolean currentEnhLocationServicesSetting )
+{
+    if (sUlpPhoneContextInterface->ulp_phone_context_settings_update ) {
+        UlpPhoneContextSettings settings;
+        settings.context_type = currentContextType;
+        settings.is_gps_enabled = currentGpsSetting;
+        settings.is_agps_enabled = currentAgpsSetting;
+        settings.is_network_position_available = currentNetworkProvSetting;
+        settings.is_wifi_setting_enabled = currentWifiSetting;
+        settings.is_battery_charging = currentBatteryCharging;
+        settings.is_enh_location_services_enabled = currentEnhLocationServicesSetting;
+        return sUlpPhoneContextInterface->ulp_phone_context_settings_update(&settings);
+    }
+    else
+        return false;
+
+}
 static jboolean android_location_GpsLocationProvider_start(JNIEnv* env, jobject obj)
 {
     if (sGpsInterface)
@@ -454,9 +634,38 @@ static void android_location_GpsLocationProvider_inject_location(JNIEnv* env, jo
         sGpsInterface->inject_location(latitude, longitude, accuracy);
 }
 
+static void android_location_GpsLocationProvider_send_network_location(JNIEnv* env, jobject obj,
+        jdouble latitude, jdouble longitude, jfloat accuracy)
+{
+    ALOGD("send_network_location.\n");
+    if(sUlpNetworkInterface != NULL) {
+        UlpNetworkPositionReport position_report;
+        position_report.valid_flag = ULP_NETWORK_POSITION_REPORT_HAS_POSITION;
+        position_report.position.latitude = latitude;
+        position_report.position.longitude = longitude;
+        position_report.position.HEPE = accuracy;
+        position_report.position.pos_source = ULP_NETWORK_POSITION_SRC_UNKNOWN;
+        sUlpNetworkInterface->ulp_send_network_position(&position_report);
+    }
+}
+
 static jboolean android_location_GpsLocationProvider_supports_xtra(JNIEnv* env, jobject obj)
 {
     return (sGpsXtraInterface != NULL);
+}
+
+static jboolean android_location_GpsLocationProvider_inject_raw_command(JNIEnv* env, jobject obj, jbyteArray data, jint length)
+{
+    jboolean result = false;
+
+    if (sInjectRawCmdInterface) {
+        if (data != NULL) {
+            jbyte* bytes = env->GetByteArrayElements(data, 0);
+            result = sInjectRawCmdInterface->inject_raw_cmd((char *)bytes, length);
+            env->ReleaseByteArrayElements(data, bytes, 0);
+        }
+    }
+    return result;
 }
 
 static void android_location_GpsLocationProvider_inject_xtra_data(JNIEnv* env, jobject obj,
@@ -472,7 +681,8 @@ static void android_location_GpsLocationProvider_inject_xtra_data(JNIEnv* env, j
     env->ReleasePrimitiveArrayCritical(data, bytes, JNI_ABORT);
 }
 
-static void android_location_GpsLocationProvider_agps_data_conn_open(JNIEnv* env, jobject obj, jstring apn)
+static void android_location_GpsLocationProvider_agps_data_conn_open(JNIEnv* env, jobject obj,
+        jint agpsType, jstring apn, jint bearerType)
 {
     if (!sAGpsInterface) {
         ALOGE("no AGPS interface in agps_data_conn_open");
@@ -483,26 +693,28 @@ static void android_location_GpsLocationProvider_agps_data_conn_open(JNIEnv* env
         return;
     }
     const char *apnStr = env->GetStringUTFChars(apn, NULL);
-    sAGpsInterface->data_conn_open(apnStr);
+    sAGpsInterface->data_conn_open(agpsType, apnStr, bearerType);
     env->ReleaseStringUTFChars(apn, apnStr);
 }
 
-static void android_location_GpsLocationProvider_agps_data_conn_closed(JNIEnv* env, jobject obj)
+static void android_location_GpsLocationProvider_agps_data_conn_closed(JNIEnv* env, jobject obj,
+        jint agpsType)
 {
     if (!sAGpsInterface) {
         ALOGE("no AGPS interface in agps_data_conn_open");
         return;
     }
-    sAGpsInterface->data_conn_closed();
+    sAGpsInterface->data_conn_closed(agpsType);
 }
 
-static void android_location_GpsLocationProvider_agps_data_conn_failed(JNIEnv* env, jobject obj)
+static void android_location_GpsLocationProvider_agps_data_conn_failed(JNIEnv* env, jobject obj,
+        jint agpsType)
 {
     if (!sAGpsInterface) {
         ALOGE("no AGPS interface in agps_data_conn_open");
         return;
     }
-    sAGpsInterface->data_conn_failed();
+    sAGpsInterface->data_conn_failed(agpsType);
 }
 
 static void android_location_GpsLocationProvider_set_agps_server(JNIEnv* env, jobject obj,
@@ -569,9 +781,12 @@ static JNINativeMethod sMethods[] = {
      /* name, signature, funcPtr */
     {"class_init_native", "()V", (void *)android_location_GpsLocationProvider_class_init_native},
     {"native_is_supported", "()Z", (void*)android_location_GpsLocationProvider_is_supported},
+    {"native_has_ulp_capability", "()I", (void*)android_location_GpsLocationProvider_has_ulp_capability},
     {"native_init", "()Z", (void*)android_location_GpsLocationProvider_init},
     {"native_cleanup", "()V", (void*)android_location_GpsLocationProvider_cleanup},
     {"native_set_position_mode", "(IIIII)Z", (void*)android_location_GpsLocationProvider_set_position_mode},
+    {"native_update_criteria", "(IIJFZII)Z", (void*)android_location_GpsLocationProvider_update_criteria},
+    {"native_update_settings", "(IZZZZZZ)Z", (void*)android_location_GpsLocationProvider_update_settings},
     {"native_start", "()Z", (void*)android_location_GpsLocationProvider_start},
     {"native_stop", "()Z", (void*)android_location_GpsLocationProvider_stop},
     {"native_delete_aiding_data", "(I)V", (void*)android_location_GpsLocationProvider_delete_aiding_data},
@@ -579,11 +794,13 @@ static JNINativeMethod sMethods[] = {
     {"native_read_nmea", "([BI)I", (void*)android_location_GpsLocationProvider_read_nmea},
     {"native_inject_time", "(JJI)V", (void*)android_location_GpsLocationProvider_inject_time},
     {"native_inject_location", "(DDF)V", (void*)android_location_GpsLocationProvider_inject_location},
+    {"native_send_network_location", "(DDF)V", (void*)android_location_GpsLocationProvider_send_network_location},
     {"native_supports_xtra", "()Z", (void*)android_location_GpsLocationProvider_supports_xtra},
     {"native_inject_xtra_data", "([BI)V", (void*)android_location_GpsLocationProvider_inject_xtra_data},
-    {"native_agps_data_conn_open", "(Ljava/lang/String;)V", (void*)android_location_GpsLocationProvider_agps_data_conn_open},
-    {"native_agps_data_conn_closed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_closed},
-    {"native_agps_data_conn_failed", "()V", (void*)android_location_GpsLocationProvider_agps_data_conn_failed},
+    {"native_inject_raw_command", "([BI)Z", (void*)android_location_GpsLocationProvider_inject_raw_command},
+    {"native_agps_data_conn_open", "(ILjava/lang/String;I)V", (void*)android_location_GpsLocationProvider_agps_data_conn_open},
+    {"native_agps_data_conn_closed", "(I)V", (void*)android_location_GpsLocationProvider_agps_data_conn_closed},
+    {"native_agps_data_conn_failed", "(I)V", (void*)android_location_GpsLocationProvider_agps_data_conn_failed},
     {"native_agps_set_id","(ILjava/lang/String;)V",(void*)android_location_GpsLocationProvider_agps_set_id},
     {"native_agps_set_ref_location_cellid","(IIIII)V",(void*)android_location_GpsLocationProvider_agps_set_reference_location_cellid},
     {"native_set_agps_server", "(ILjava/lang/String;I)V", (void*)android_location_GpsLocationProvider_set_agps_server},

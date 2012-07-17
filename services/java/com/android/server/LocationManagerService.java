@@ -44,6 +44,7 @@ import android.location.INetInitiatedListener;
 import android.location.Location;
 import android.location.LocationManager;
 import android.location.LocationProvider;
+import android.location.GeoFenceParams;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -61,16 +62,20 @@ import android.provider.Settings;
 import android.util.Log;
 import android.util.Slog;
 import android.util.PrintWriterPrinter;
+import android.content.ContentValues;
 
 import com.android.internal.content.PackageMonitor;
 import com.android.internal.location.GpsNetInitiatedHandler;
 
 import com.android.server.location.GeocoderProxy;
 import com.android.server.location.GpsLocationProvider;
+import com.android.server.location.GpsLocationProvider.HybridLocationProvider;
 import com.android.server.location.LocationProviderInterface;
 import com.android.server.location.LocationProviderProxy;
 import com.android.server.location.MockProvider;
 import com.android.server.location.PassiveProvider;
+import com.android.server.location.GeoFencerBase;
+import com.android.server.location.GeoFencerProxy;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -129,8 +134,12 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     private final Context mContext;
     private PackageManager mPackageManager;  // final after initialize()
     private String mNetworkLocationProviderPackageName;  // only used on handler thread
-    private String mGeocodeProviderPackageName;  // only used on handler thread
+    private final String mNetworkLocationProviderPackageName1;
+    private final String mNetworkLocationProviderPackageName2;
+    private final String mGeocodeProviderPackageName;
+    private final String mGeoFencerPackageName;
     private GeocoderProxy mGeocodeProvider;
+    private GeoFencerBase mGeoFencer;
     private IGpsStatusProvider mGpsStatusProvider;
     private INetInitiatedListener mNetInitiatedListener;
     private LocationWorkerHandler mLocationHandler;
@@ -138,6 +147,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     // Cache the real providers for use in addTestProvider() and removeTestProvider()
      LocationProviderProxy mNetworkLocationProvider;
      LocationProviderInterface mGpsLocationProvider;
+     LocationProviderInterface mHybridLocationProvider;
+
 
     // Handler messages
     private static final int MESSAGE_LOCATION_CHANGED = 1;
@@ -147,7 +158,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     private final static String WAKELOCK_KEY = "LocationManagerService";
     private PowerManager.WakeLock mWakeLock = null;
     private int mPendingBroadcasts;
-    
+
     /**
      * List of all receivers.
      */
@@ -182,8 +193,6 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     // Proximity listeners
     private Receiver mProximityReceiver = null;
     private ILocationListener mProximityListener = null;
-    private HashMap<PendingIntent,ProximityAlert> mProximityAlerts =
-        new HashMap<PendingIntent,ProximityAlert>();
     private HashSet<ProximityAlert> mProximitiesEntered =
         new HashSet<ProximityAlert>();
 
@@ -488,6 +497,12 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             mNetInitiatedListener = gpsProvider.getNetInitiatedListener();
             addProvider(gpsProvider);
             mGpsLocationProvider = gpsProvider;
+            //Create a hybrid location provider if Location HAL has that capability
+            HybridLocationProvider hybridProvider = gpsProvider.getHybridProvider();
+            if(hybridProvider != null) {
+                addProvider(hybridProvider);
+                mHybridLocationProvider = hybridProvider;
+            }
         }
 
         // create a passive location provider, which is always enabled
@@ -495,32 +510,40 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         addProvider(passiveProvider);
         mEnabledProviders.add(passiveProvider.getName());
 
-        // initialize external network location and geocoder services.
-        // The initial value of mNetworkLocationProviderPackageName and
-        // mGeocodeProviderPackageName is just used to determine what
-        // signatures future mNetworkLocationProviderPackageName and
-        // mGeocodeProviderPackageName packages must have. So alternate
-        // providers can be installed under a different package name
-        // so long as they have the same signature as the original
-        // provider packages.
-        if (mNetworkLocationProviderPackageName != null) {
-            String packageName = findBestPackage(LocationProviderProxy.SERVICE_ACTION,
-                    mNetworkLocationProviderPackageName);
-            if (packageName != null) {
-                mNetworkLocationProvider = new LocationProviderProxy(mContext,
-                        LocationManager.NETWORK_PROVIDER,
-                        packageName, mLocationHandler);
-                mNetworkLocationProviderPackageName = packageName;
-                addProvider(mNetworkLocationProvider);
-            }
+        // initialize external network location and geocoder services
+        PackageManager pm = mContext.getPackageManager();
+        if (mNetworkLocationProviderPackageName1 != null &&
+                pm.resolveService(new Intent(mNetworkLocationProviderPackageName1), 0) != null) {
+            mNetworkLocationProvider =
+                new LocationProviderProxy(mContext, LocationManager.NETWORK_PROVIDER,
+                        mNetworkLocationProviderPackageName1, mLocationHandler);
+            addProvider(mNetworkLocationProvider);
+
+            mNetworkLocationProviderPackageName = mNetworkLocationProviderPackageName1;
         }
-        if (mGeocodeProviderPackageName != null) {
-            String packageName = findBestPackage(GeocoderProxy.SERVICE_ACTION,
-                    mGeocodeProviderPackageName);
-            if (packageName != null) {
-                mGeocodeProvider = new GeocoderProxy(mContext, packageName);
-                mGeocodeProviderPackageName = packageName;
-            }
+        else if (mNetworkLocationProviderPackageName2 != null &&
+                pm.resolveService(new Intent(mNetworkLocationProviderPackageName2), 0) != null) {
+            mNetworkLocationProvider =
+                new LocationProviderProxy(mContext, LocationManager.NETWORK_PROVIDER,
+                        mNetworkLocationProviderPackageName2, mLocationHandler);
+            addProvider(mNetworkLocationProvider);
+
+            mNetworkLocationProviderPackageName = mNetworkLocationProviderPackageName2;
+        }
+        if (LOCAL_LOGV) {
+            Slog.v(TAG, "Loaded NLP: " + mNetworkLocationProviderPackageName);
+        }
+
+        if (mGeocodeProviderPackageName != null &&
+                pm.resolveService(new Intent(mGeocodeProviderPackageName), 0) != null) {
+            mGeocodeProvider = new GeocoderProxy(mContext, mGeocodeProviderPackageName);
+        }
+
+        if (mGeoFencerPackageName != null &&
+                pm.resolveService(new Intent(mGeoFencerPackageName), 0) != null) {
+            mGeoFencer = GeoFencerProxy.getGeoFencerProxy(mContext, mGeoFencerPackageName);
+        } else {
+            mGeoFencer = new ProximityAlerter();
         }
 
         updateProvidersLocked();
@@ -575,11 +598,21 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         mContext = context;
         Resources resources = context.getResources();
 
-        mNetworkLocationProviderPackageName = resources.getString(
-                com.android.internal.R.string.config_networkLocationProviderPackageName);
-        mGeocodeProviderPackageName = resources.getString(
-                com.android.internal.R.string.config_geocodeProviderPackageName);
+        mNetworkLocationProviderPackageName1 = resources.getString(
+                com.android.internal.R.string.config_networkLocationProvider1);
 
+        mNetworkLocationProviderPackageName2 = resources.getString(
+                com.android.internal.R.string.config_networkLocationProvider2);
+
+        if (LOCAL_LOGV) {
+            Slog.v(TAG, "NLP[1]: " + mNetworkLocationProviderPackageName1);
+            Slog.v(TAG, "NLP[2]: " + mNetworkLocationProviderPackageName2);
+        }
+
+        mGeocodeProviderPackageName = resources.getString(
+                com.android.internal.R.string.config_geocodeProvider);
+        mGeoFencerPackageName = resources.getString(
+                com.android.internal.R.string.config_geofenceProvider);
         mPackageMonitor.register(context, null, true);
 
         if (LOCAL_LOGV) {
@@ -588,7 +621,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     }
 
     void systemReady() {
-        // we defer starting up the service until the system is ready 
+        // we defer starting up the service until the system is ready
         Thread thread = new Thread(null, this, "LocationManagerService");
         thread.start();
     }
@@ -615,10 +648,14 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
         // listen for settings changes
         ContentResolver resolver = mContext.getContentResolver();
-        Cursor settingsCursor = resolver.query(Settings.Secure.CONTENT_URI, null,
-                "(" + Settings.System.NAME + "=?)",
-                new String[]{Settings.Secure.LOCATION_PROVIDERS_ALLOWED},
-                null);
+        Cursor settingsCursor = resolver.query(Settings.Secure.CONTENT_URI,
+                new String[] {Settings.System.NAME,Settings.System.VALUE},
+                "(" + Settings.System.NAME + "=?) or ("
+                    + Settings.System.NAME + "=?) or ("
+                    + Settings.System.NAME + "=?) ",
+                new String[]{Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
+                    Settings.Secure.WIFI_ON, Settings.Secure.ASSISTED_GPS_ENABLED},
+                    null);
         mSettings = new ContentQueryMap(settingsCursor, Settings.System.NAME, true, mLocationHandler);
         SettingsObserver settingsObserver = new SettingsObserver();
         mSettings.addObserver(settingsObserver);
@@ -634,6 +671,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     }
 
     private boolean isAllowedBySettingsLocked(String provider) {
+        boolean providerSetting = false;
         if (mEnabledProviders.contains(provider)) {
             return true;
         }
@@ -642,13 +680,31 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         }
         // Use system settings
         ContentResolver resolver = mContext.getContentResolver();
-
-        return Settings.Secure.isLocationProviderEnabled(resolver, provider);
+        LocationProviderInterface p = mProvidersByName.get(provider);
+        if(p != null) {
+            if (LocationManager.HYBRID_PROVIDER.equals(provider)){
+                //ULP/Hybrid engine is still active as long as GNP or WiFi service is available
+                try {
+                    providerSetting =
+                             ((Settings.Secure.isLocationProviderEnabled(resolver,
+                               LocationManager.GPS_PROVIDER)) ||
+                             ((Settings.Secure.isLocationProviderEnabled(resolver,
+                               LocationManager.NETWORK_PROVIDER)) ||
+                             (Settings.Secure.getInt(resolver,Settings.Secure.WIFI_ON) == 1)));
+                }catch (Exception e) {
+                    Slog.e(TAG, "isAllowedBySettingsLocked got exception:", e);
+                }
+            } else {
+                providerSetting = Settings.Secure.isLocationProviderEnabled(resolver, provider);
+            }
+        }
+        return providerSetting;
     }
 
     private String checkPermissionsSafe(String provider, String lastPermission) {
         if (LocationManager.GPS_PROVIDER.equals(provider)
-                 || LocationManager.PASSIVE_PROVIDER.equals(provider)) {
+                 || LocationManager.PASSIVE_PROVIDER.equals(provider)
+                 || LocationManager.HYBRID_PROVIDER.equals(provider)) {
             if (mContext.checkCallingOrSelfPermission(ACCESS_FINE_LOCATION)
                     != PackageManager.PERMISSION_GRANTED) {
                 throw new SecurityException("Provider " + provider
@@ -674,7 +730,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
     private boolean isAllowedProviderSafe(String provider) {
         if ((LocationManager.GPS_PROVIDER.equals(provider)
-                || LocationManager.PASSIVE_PROVIDER.equals(provider))
+                || LocationManager.PASSIVE_PROVIDER.equals(provider)
+                || LocationManager.HYBRID_PROVIDER.equals(provider))
             && (mContext.checkCallingOrSelfPermission(ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED)) {
             return false;
@@ -897,7 +954,14 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
      * @return name of the provider that best matches the requirements
      */
     public String getBestProvider(Criteria criteria, boolean enabledOnly) {
+
         List<String> goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
+
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -911,6 +975,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             power = nextPower(power);
             criteria.setPowerRequirement(power);
             goodProviders = getProviders(criteria, enabledOnly);
+            //Check if we receive Hybrid as a possible provider and remove it
+            //as we want to maintain Legacy behavior for this API
+            if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+                goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+            }
         }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
@@ -922,6 +991,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             accuracy = nextAccuracy(accuracy);
             criteria.setAccuracy(accuracy);
             goodProviders = getProviders(criteria, enabledOnly);
+            //Check if we receive Hybrid as a possible provider and remove it
+            //as we want to maintain Legacy behavior for this API
+            if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+                goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+            }
         }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
@@ -930,6 +1004,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         // Remove bearing requirement
         criteria.setBearingRequired(false);
         goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -937,6 +1016,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         // Remove speed requirement
         criteria.setSpeedRequired(false);
         goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -944,6 +1028,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         // Remove altitude requirement
         criteria.setAltitudeRequired(false);
         goodProviders = getProviders(criteria, enabledOnly);
+        //Check if we receive Hybrid as a possible provider and remove it
+        //as we want to maintain Legacy behavior for this API
+        if(goodProviders.contains(LocationManager.HYBRID_PROVIDER)) {
+            goodProviders.remove(LocationManager.HYBRID_PROVIDER);
+        }
         if (!goodProviders.isEmpty()) {
             return best(goodProviders).getName();
         }
@@ -988,7 +1077,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         }
 
         ArrayList<Receiver> deadReceivers = null;
-        
+
         ArrayList<UpdateRecord> records = mRecordsByProvider.get(provider);
         if (records != null) {
             final int N = records.size();
@@ -1010,7 +1099,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 removeUpdatesLocked(deadReceivers.get(i));
             }
         }
-        
+
         if (enabled) {
             p.enable();
             if (listeners > 0) {
@@ -1055,18 +1144,20 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         final int mUid;
         Location mLastFixBroadcast;
         long mLastStatusBroadcast;
+        Criteria mCriteria;
 
         /**
          * Note: must be constructed with lock held.
          */
         UpdateRecord(String provider, long minTime, float minDistance, boolean singleShot,
-            Receiver receiver, int uid) {
+            Receiver receiver, int uid, Criteria criteria) {
             mProvider = provider;
             mReceiver = receiver;
             mMinTime = minTime;
             mMinDistance = minDistance;
             mSingleShot = singleShot;
             mUid = uid;
+            mCriteria = criteria;
 
             ArrayList<UpdateRecord> records = mRecordsByProvider.get(provider);
             if (records == null) {
@@ -1103,6 +1194,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             pw.println(prefix + "mSingleShot=" + mSingleShot);
             pw.println(prefix + "mUid=" + mUid);
             pw.println(prefix + "mLastFixBroadcast:");
+            pw.println(prefix + "mCriteria.getPowerRequirement: " + mCriteria.getPowerRequirement()
+                        + " mCriteria.getAccuracy: " + mCriteria.getAccuracy());
             if (mLastFixBroadcast != null) {
                 mLastFixBroadcast.dump(new PrintWriterPrinter(pw), prefix + "  ");
             }
@@ -1148,29 +1241,36 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 }
            }
         }
-        for (ProximityAlert alert : mProximityAlerts.values()) {
-            if (alert.mUid == uid) {
-                return true;
-            }
-        }
-        return false;
+        return mGeoFencer.hasCaller(uid);
     }
 
     public void requestLocationUpdates(String provider, Criteria criteria,
         long minTime, float minDistance, boolean singleShot, ILocationListener listener) {
+        if (LOCAL_LOGV){
+            Slog.v(TAG, "In requestLocationUpdates. provider "+provider+ "minTime: " + minTime + "single shot: " + singleShot
+                   + " Listener: " + listener);
+        }
         if (criteria != null) {
-            // FIXME - should we consider using multiple providers simultaneously
-            // rather than only the best one?
-            // Should we do anything different for single shot fixes?
-            provider = getBestProvider(criteria, true);
-            if (provider == null) {
-                throw new IllegalArgumentException("no providers found for criteria");
+            if (LOCAL_LOGV)
+                Slog.v(TAG, "In requestLocationUpdates. Criteria not null. Cirteria.HorizAccuracy: " + criteria.getHorizontalAccuracy()
+                       + " Criteria.power "+ criteria.getPowerRequirement());
+            LocationProviderInterface p = mProvidersByName.get(LocationManager.HYBRID_PROVIDER);
+            if( p != null) {
+                provider = LocationManager.HYBRID_PROVIDER;
+            } else {
+                // FIXME - should we consider using multiple providers simultaneously
+                // rather than only the best one?
+                // Should we do anything different for single shot fixes?
+                provider = getBestProvider(criteria, true);
+                if (provider == null) {
+                    throw new IllegalArgumentException("no providers found for criteria");
+                }
             }
         }
         try {
             synchronized (mLock) {
                 requestLocationUpdatesLocked(provider, minTime, minDistance, singleShot,
-                        getReceiver(listener));
+                        getReceiver(listener),criteria);
             }
         } catch (SecurityException se) {
             throw se;
@@ -1196,19 +1296,31 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     public void requestLocationUpdatesPI(String provider, Criteria criteria,
             long minTime, float minDistance, boolean singleShot, PendingIntent intent) {
         validatePendingIntent(intent);
+        if (LOCAL_LOGV){
+            Slog.v(TAG, "In requestLocationUpdates. provider "+provider+ "minTime: " + minTime + "single shot: " + singleShot
+                   + " Receiver: " + getReceiver(intent));
+        }
         if (criteria != null) {
-            // FIXME - should we consider using multiple providers simultaneously
-            // rather than only the best one?
-            // Should we do anything different for single shot fixes?
-            provider = getBestProvider(criteria, true);
-            if (provider == null) {
-                throw new IllegalArgumentException("no providers found for criteria");
+            if (LOCAL_LOGV)
+                Slog.v(TAG, "In requestLocationUpdates. Criteria not null. Cirteria.HorizAccuracy: " + criteria.getHorizontalAccuracy()
+                       + " Criteria.power "+ criteria.getPowerRequirement());
+            LocationProviderInterface p = mProvidersByName.get(LocationManager.HYBRID_PROVIDER);
+            if( p != null) {
+                provider = LocationManager.HYBRID_PROVIDER;
+            } else {
+                // FIXME - should we consider using multiple providers simultaneously
+                // rather than only the best one?
+                // Should we do anything different for single shot fixes?
+                provider = getBestProvider(criteria, true);
+                if (provider == null) {
+                    throw new IllegalArgumentException("no providers found for criteria");
+                }
             }
         }
         try {
             synchronized (mLock) {
                 requestLocationUpdatesLocked(provider, minTime, minDistance, singleShot,
-                        getReceiver(intent));
+                        getReceiver(intent),criteria);
             }
         } catch (SecurityException se) {
             throw se;
@@ -1220,13 +1332,13 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     }
 
     private void requestLocationUpdatesLocked(String provider, long minTime, float minDistance,
-            boolean singleShot, Receiver receiver) {
+            boolean singleShot, Receiver receiver, Criteria criteria) {
 
         LocationProviderInterface p = mProvidersByName.get(provider);
         if (p == null) {
-            throw new IllegalArgumentException("requested provider " + provider +
-                    " doesn't exisit");
+            throw new IllegalArgumentException("provider=" + provider);
         }
+
         receiver.mRequiredPermissions = checkPermissionsSafe(provider,
                 receiver.mRequiredPermissions);
 
@@ -1237,7 +1349,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         long identity = Binder.clearCallingIdentity();
         try {
             UpdateRecord r = new UpdateRecord(provider, minTime, minDistance, singleShot,
-                    receiver, callingUid);
+                    receiver, callingUid, criteria);
             UpdateRecord oldRecord = receiver.mUpdateRecords.put(provider, r);
             if (oldRecord != null) {
                 oldRecord.disposeLocked();
@@ -1247,6 +1359,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 p.addListener(callingUid);
             }
 
+            p.updateCriteria(LocationProviderInterface.ULP_ADD_CRITERIA, minTime, minDistance,singleShot,criteria);
             boolean isProviderEnabled = isAllowedBySettingsLocked(provider);
             if (isProviderEnabled) {
                 long minTimeForProvider = getMinTimeLocked(provider);
@@ -1327,6 +1440,9 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                     if (!providerHasListener(record.mProvider, callingUid, receiver)) {
                         LocationProviderInterface p = mProvidersByName.get(record.mProvider);
                         if (p != null) {
+                            p.updateCriteria(LocationProviderInterface.ULP_REMOVE_CRITERIA,
+                                             record.mMinTime,record.mMinDistance,
+                                             record.mSingleShot,record.mCriteria);
                             p.removeListener(callingUid);
                         }
                     }
@@ -1354,10 +1470,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 LocationProviderInterface p = mProvidersByName.get(provider);
                 if (p != null) {
                     if (hasOtherListener) {
-                        long minTime = getMinTimeLocked(provider);
-                        Slog.i(TAG, "remove " + provider + " (pid " + callingPid +
-                                "), next minTime = " + minTime);
-                        p.setMinTime(minTime, mTmpWorkSource);
+                        p.setMinTime(getMinTimeLocked(provider), mTmpWorkSource);
                     } else {
                         Slog.i(TAG, "remove " + provider + " (pid " + callingPid +
                                 "), disabled");
@@ -1417,7 +1530,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             if (p == null) {
                 return false;
             }
-    
+
             return p.sendExtraCommand(command, extras);
         }
     }
@@ -1438,35 +1551,27 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         }
     }
 
-    class ProximityAlert {
-        final int  mUid;
-        final double mLatitude;
-        final double mLongitude;
-        final float mRadius;
-        final long mExpiration;
-        final PendingIntent mIntent;
+    class ProximityAlert extends GeoFenceParams{
         final Location mLocation;
 
-        public ProximityAlert(int uid, double latitude, double longitude,
+        public ProximityAlert(double latitude, double longitude,
             float radius, long expiration, PendingIntent intent) {
-            mUid = uid;
-            mLatitude = latitude;
-            mLongitude = longitude;
-            mRadius = radius;
-            mExpiration = expiration;
-            mIntent = intent;
+            super(latitude, longitude, radius,
+                  expiration != -1 ? expiration + System.currentTimeMillis() : expiration,
+                  intent);
 
             mLocation = new Location("");
             mLocation.setLatitude(latitude);
             mLocation.setLongitude(longitude);
         }
 
-        long getExpiration() {
-            return mExpiration;
-        }
+        public ProximityAlert(GeoFenceParams geofence) {
+            super(geofence.mUid, geofence.mLatitude, geofence.mLongitude,
+                  geofence.mRadius, geofence.mExpiration, geofence.mIntent);
 
-        PendingIntent getIntent() {
-            return mIntent;
+            mLocation = new Location("");
+            mLocation.setLatitude(geofence.mLatitude);
+            mLocation.setLongitude(geofence.mLongitude);
         }
 
         boolean isInProximity(double latitude, double longitude, float accuracy) {
@@ -1475,23 +1580,63 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             loc.setLongitude(longitude);
 
             double radius = loc.distanceTo(mLocation);
-            return radius <= Math.max(mRadius,accuracy);
+            return radius <= Math.max(super.mRadius,accuracy);
         }
-        
+
         @Override
         public String toString() {
             return "ProximityAlert{"
                     + Integer.toHexString(System.identityHashCode(this))
-                    + " uid " + mUid + mIntent + "}";
+                    + " uid " + getCallerUid() + getIntent() + "}";
         }
-        
-        void dump(PrintWriter pw, String prefix) {
-            pw.println(prefix + this);
-            pw.println(prefix + "mLatitude=" + mLatitude + " mLongitude=" + mLongitude);
-            pw.println(prefix + "mRadius=" + mRadius + " mExpiration=" + mExpiration);
-            pw.println(prefix + "mIntent=" + mIntent);
+
+        @Override
+        public void dump(PrintWriter pw, String prefix) {
+            super.dump(pw, prefix);
             pw.println(prefix + "mLocation:");
             mLocation.dump(new PrintWriterPrinter(pw), prefix + "  ");
+        }
+    }
+
+    class ProximityAlerter extends GeoFencerBase{
+        @Override
+        public void add(double latitude, double longitude,
+                 float radius, long expiration,
+                 PendingIntent intent) {
+            super.add((GeoFenceParams)new ProximityAlert(latitude, longitude,
+                                                   radius, expiration, intent));
+        }
+        @Override
+        public void add(GeoFenceParams geofence) {
+            super.add((GeoFenceParams)new ProximityAlert(geofence));
+        }
+
+        @Override
+        protected boolean start(GeoFenceParams geoFence) {
+            if (mProximityReceiver == null) {
+                mProximityListener = new ProximityListener();
+                mProximityReceiver = new Receiver(mProximityListener);
+
+                for (int i = mProviders.size() - 1; i >= 0; i--) {
+                    LocationProviderInterface provider = mProviders.get(i);
+                    requestLocationUpdatesLocked(provider.getName(), 1000L, 1.0f,
+                                                 false, mProximityReceiver, null);
+                }
+            }
+            return true;
+        }
+
+        @Override
+        protected boolean stop(PendingIntent intent) {
+            ProximityAlert alert = (ProximityAlert)getGeoFence(intent);
+            mProximitiesEntered.remove(alert);
+
+            if (getNumbOfGeoFences() == 0) {
+                removeUpdatesLocked(mProximityReceiver);
+                mProximityReceiver = null;
+                mProximityListener = null;
+            }
+            return true;
         }
     }
 
@@ -1518,7 +1663,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             float accuracy = loc.getAccuracy();
             ArrayList<PendingIntent> intentsToRemove = null;
 
-            for (ProximityAlert alert : mProximityAlerts.values()) {
+            for (GeoFenceParams fence : mGeoFencer.getAllGeoFences()) {
+                ProximityAlert alert = (ProximityAlert)fence;
                 PendingIntent intent = alert.getIntent();
                 long expiration = alert.getExpiration();
 
@@ -1594,9 +1740,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             // Remove expired alerts
             if (intentsToRemove != null) {
                 for (PendingIntent i : intentsToRemove) {
-                    ProximityAlert alert = mProximityAlerts.get(i);
-                    mProximitiesEntered.remove(alert);
-                    removeProximityAlertLocked(i);
+                    mGeoFencer.remove(i);
                 }
             }
         }
@@ -1662,23 +1806,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             throw new SecurityException("Requires ACCESS_FINE_LOCATION permission");
         }
 
-        if (expiration != -1) {
-            expiration += System.currentTimeMillis();
-        }
-        ProximityAlert alert = new ProximityAlert(Binder.getCallingUid(),
-                latitude, longitude, radius, expiration, intent);
-        mProximityAlerts.put(intent, alert);
-
-        if (mProximityReceiver == null) {
-            mProximityListener = new ProximityListener();
-            mProximityReceiver = new Receiver(mProximityListener);
-
-            for (int i = mProviders.size() - 1; i >= 0; i--) {
-                LocationProviderInterface provider = mProviders.get(i);
-                requestLocationUpdatesLocked(provider.getName(), 1000L, 1.0f,
-                        false, mProximityReceiver);
-            }
-        }
+        mGeoFencer.add(latitude, longitude, radius, expiration, intent);
     }
 
     public void removeProximityAlert(PendingIntent intent) {
@@ -1700,14 +1828,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             Slog.v(TAG, "removeProximityAlert: intent = " + intent);
         }
 
-        mProximityAlerts.remove(intent);
-        if (mProximityAlerts.size() == 0) {
-            if (mProximityReceiver != null) {
-                removeUpdatesLocked(mProximityReceiver);
-            }
-            mProximityReceiver = null;
-            mProximityListener = null;
-        }
+        mGeoFencer.remove(intent);
      }
 
     /**
@@ -1819,14 +1940,20 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     }
 
     private static boolean shouldBroadcastSafe(Location loc, Location lastLoc, UpdateRecord record) {
-        // Always broadcast the first update
-        if (lastLoc == null) {
+
+        // Always broadcast the first update or hyrbid provider update
+        if ((lastLoc == null) ||
+            (loc.getProvider().equals(LocationManager.HYBRID_PROVIDER))){
+            if(LOCAL_LOGV) {
+                Slog.v(TAG, "In shouldBroadcastSafe. We will return true as last loc =null or"+
+                            "Ulp position obtained got for Hybrid provider clients");
+            }
             return true;
         }
 
-        // Check whether sufficient time has passed
-        long minTime = record.mMinTime;
-        if (loc.getTime() - lastLoc.getTime() < minTime - MAX_PROVIDER_SCHEDULING_JITTER) {
+        // Don't broadcast same location again regardless of condition
+        // TODO - we should probably still rebroadcast if user explicitly sets a minTime > 0
+        if (loc.getTime() == lastLoc.getTime()) {
             return false;
         }
 
@@ -1847,6 +1974,9 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         if (records == null || records.size() == 0) {
             return;
         }
+        if(LOCAL_LOGV) {
+             Slog.v(TAG,"In handleLocationChangedLocked.For provider: "+ provider);
+         }
 
         LocationProviderInterface p = mProvidersByName.get(provider);
         if (p == null) {
@@ -1869,7 +1999,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         int status = p.getStatus(extras);
 
         ArrayList<Receiver> deadReceivers = null;
-        
+
         // Broadcast location or status to all listeners
         final int N = records.size();
         for (int i=0; i<N; i++) {
@@ -1912,7 +2042,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 }
             }
         }
-        
+
         if (deadReceivers != null) {
             for (int i=deadReceivers.size()-1; i>=0; i--) {
                 removeUpdatesLocked(deadReceivers.get(i));
@@ -1937,7 +2067,9 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                             // notify other providers of the new location
                             for (int i = mProviders.size() - 1; i >= 0; i--) {
                                 LocationProviderInterface p = mProviders.get(i);
-                                if (!provider.equals(p.getName())) {
+                                //We want to suppress location updates from Hybrid provider
+                                if ((!provider.equals(LocationManager.HYBRID_PROVIDER)) &&
+                                    (!provider.equals(p.getName()))) {
                                     p.updateLocation(location);
                                 }
                             }
@@ -1949,33 +2081,16 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                     }
                 } else if (msg.what == MESSAGE_PACKAGE_UPDATED) {
                     String packageName = (String) msg.obj;
+                    String packageDot = packageName + ".";
 
-                    // reconnect to external providers if there is a better package
-                    if (mNetworkLocationProviderPackageName != null &&
-                            mPackageManager.resolveService(
-                            new Intent(LocationProviderProxy.SERVICE_ACTION)
-                            .setPackage(packageName), 0) != null) {
-                        // package implements service, perform full check
-                        String bestPackage = findBestPackage(
-                                LocationProviderProxy.SERVICE_ACTION,
-                                mNetworkLocationProviderPackageName);
-                        if (packageName.equals(bestPackage)) {
-                            mNetworkLocationProvider.reconnect(bestPackage);
-                            mNetworkLocationProviderPackageName = packageName;
-                        }
+                    // reconnect to external providers after their packages have been updated
+                    if (mNetworkLocationProvider != null &&
+                        mNetworkLocationProviderPackageName.startsWith(packageDot)) {
+                        mNetworkLocationProvider.reconnect();
                     }
-                    if (mGeocodeProviderPackageName != null &&
-                            mPackageManager.resolveService(
-                            new Intent(GeocoderProxy.SERVICE_ACTION)
-                            .setPackage(packageName), 0) != null) {
-                        // package implements service, perform full check
-                        String bestPackage = findBestPackage(
-                                GeocoderProxy.SERVICE_ACTION,
-                                mGeocodeProviderPackageName);
-                        if (packageName.equals(bestPackage)) {
-                            mGeocodeProvider.reconnect(bestPackage);
-                            mGeocodeProviderPackageName = packageName;
-                        }
+                    if (mGeocodeProvider != null &&
+                        mGeocodeProviderPackageName.startsWith(packageDot)) {
+                        mGeocodeProvider.reconnect();
                     }
                 }
             } catch (Exception e) {
@@ -2024,29 +2139,15 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                                     }
                                 }
                             }
-                            ArrayList<ProximityAlert> removedAlerts = null;
-                            for (ProximityAlert i : mProximityAlerts.values()) {
-                                if (i.mUid == uid) {
-                                    if (queryRestart) {
-                                        setResultCode(Activity.RESULT_OK);
-                                        return;
-                                    }
-                                    if (removedAlerts == null) {
-                                        removedAlerts = new ArrayList<ProximityAlert>();
-                                    }
-                                    if (!removedAlerts.contains(i)) {
-                                        removedAlerts.add(i);
-                                    }
-                                }
+                            if (queryRestart && mGeoFencer.hasCaller(uid)) {
+                                setResultCode(Activity.RESULT_OK);
+                                return;
+                            } else {
+                                mGeoFencer.removeCaller(uid);
                             }
                             if (removedRecs != null) {
                                 for (int i=removedRecs.size()-1; i>=0; i--) {
                                     removeUpdatesLocked(removedRecs.get(i));
-                                }
-                            }
-                            if (removedAlerts != null) {
-                                for (int i=removedAlerts.size()-1; i>=0; i--) {
-                                    removeProximityAlertLocked(removedAlerts.get(i).mIntent);
                                 }
                             }
                         }
@@ -2060,10 +2161,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 } else {
                     mNetworkState = LocationProvider.TEMPORARILY_UNAVAILABLE;
                 }
-
-                final ConnectivityManager connManager = (ConnectivityManager) context
-                        .getSystemService(Context.CONNECTIVITY_SERVICE);
-                final NetworkInfo info = connManager.getActiveNetworkInfo();
+                NetworkInfo info =
+                    (NetworkInfo)intent.getExtra(ConnectivityManager.EXTRA_NETWORK_INFO);
 
                 // Notify location providers of current network state
                 synchronized (mLock) {
@@ -2169,7 +2268,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         if (mContext.checkCallingPermission(ACCESS_MOCK_LOCATION) !=
             PackageManager.PERMISSION_GRANTED) {
             throw new SecurityException("Requires ACCESS_MOCK_LOCATION permission");
-        }            
+        }
     }
 
     public void addTestProvider(String name, boolean requiresNetwork, boolean requiresSatellite,
@@ -2189,7 +2288,8 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 supportsSpeed, supportsBearing, powerRequirement, accuracy);
             // remove the real provider if we are replacing GPS or network provider
             if (LocationManager.GPS_PROVIDER.equals(name)
-                    || LocationManager.NETWORK_PROVIDER.equals(name)) {
+                    || LocationManager.NETWORK_PROVIDER.equals(name)
+                    || LocationManager.HYBRID_PROVIDER.equals(name)) {
                 LocationProviderInterface p = mProvidersByName.get(name);
                 if (p != null) {
                     p.enableLocationTracking(false);
@@ -2198,6 +2298,14 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             }
             if (mProvidersByName.get(name) != null) {
                 throw new IllegalArgumentException("Provider \"" + name + "\" already exists");
+            }
+
+            PackageManager pm = mContext.getPackageManager();
+            if (mGeoFencerPackageName != null &&
+                pm.resolveService(new Intent(mGeoFencerPackageName), 0) != null) {
+                GeoFencerBase oldFencer = mGeoFencer;
+                mGeoFencer = new ProximityAlerter();
+                mGeoFencer.transferService(oldFencer);
             }
             addProvider(provider);
             mMockProviders.put(name, provider);
@@ -2224,6 +2332,17 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             } else if (LocationManager.NETWORK_PROVIDER.equals(provider) &&
                     mNetworkLocationProvider != null) {
                 addProvider(mNetworkLocationProvider);
+            } else if (LocationManager.HYBRID_PROVIDER.equals(provider) &&
+                    mHybridLocationProvider != null) {
+                addProvider(mHybridLocationProvider);
+            }
+
+            PackageManager pm = mContext.getPackageManager();
+            if (mGeoFencerPackageName != null &&
+                pm.resolveService(new Intent(mGeoFencerPackageName), 0) != null) {
+                GeoFencerBase oldFencer = mGeoFencer;
+                mGeoFencer = GeoFencerProxy.getGeoFencerProxy(mContext, mGeoFencerPackageName);
+                mGeoFencer.transferService(oldFencer);
             }
             mLastKnownLocation.put(provider, null);
             updateProvidersLocked();
@@ -2320,7 +2439,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             Slog.d(TAG, log);
         }
     }
-    
+
     protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.DUMP)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -2329,7 +2448,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                     + ", uid=" + Binder.getCallingUid());
             return;
         }
-        
+
         synchronized (mLock) {
             pw.println("Current Location Manager state:");
             pw.println("  sProvidersLoaded=" + sProvidersLoaded);
@@ -2361,14 +2480,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 pw.println("    " + i.getKey() + ":");
                 i.getValue().dump(new PrintWriterPrinter(pw), "      ");
             }
-            if (mProximityAlerts.size() > 0) {
-                pw.println("  Proximity Alerts:");
-                for (Map.Entry<PendingIntent, ProximityAlert> i
-                        : mProximityAlerts.entrySet()) {
-                    pw.println("    " + i.getKey() + ":");
-                    i.getValue().dump(pw, "      ");
-                }
-            }
+            mGeoFencer.dump(pw, "");
             if (mProximitiesEntered.size() > 0) {
                 pw.println("  Proximities Entered:");
                 for (ProximityAlert i : mProximitiesEntered) {
@@ -2383,14 +2495,14 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 for (String i : mEnabledProviders) {
                     pw.println("    " + i);
                 }
-                
+
             }
             if (mDisabledProviders.size() > 0) {
                 pw.println("  Disabled Providers:");
                 for (String i : mDisabledProviders) {
                     pw.println("    " + i);
                 }
-                
+
             }
             if (mMockProviders.size() > 0) {
                 pw.println("  Mock Providers:");
