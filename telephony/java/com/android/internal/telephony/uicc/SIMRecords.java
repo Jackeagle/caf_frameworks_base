@@ -229,7 +229,6 @@ public class SIMRecords extends IccRecords {
         adnCache.reset();
 
         log("SIMRecords: onRadioOffOrNotAvailable set 'gsm.sim.operator.numeric' to operator=null");
-        SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, null);
         SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, null);
         SystemProperties.set(PROPERTY_ICC_OPERATOR_ISO_COUNTRY, null);
 
