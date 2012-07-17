@@ -32,7 +32,12 @@ import java.util.ArrayList;
 
 import android.os.Bundle;
 
+import android.os.SystemProperties;
+
 import com.qualcomm.snapdragon.util.QCCapabilitiesInterface;
+
+
+
 
 /**
  * {@hide} Information about a Qaulcomm face identified through camera face
@@ -63,6 +68,10 @@ public class QCFace extends android.hardware.Camera.Face implements
     private int reyeBlink = 0;
     private int leftrightGaze = 0;
     private int topbottomGaze = 0;
+
+    private static final String STR_TRUE = "true";
+    private static final String STR_FALSE = "false";
+    private static final String STR_FACIAL_PROCESSING = "ro.qc.sdk.camera.facialproc";
 
     /**
      * The smilie degree for the detection of the face.
@@ -206,21 +215,26 @@ public class QCFace extends android.hardware.Camera.Face implements
 
     @Override
     public Bundle getCapabilities() {
-        Bundle constantFieldBundle = new Bundle();
-        ArrayList<String> methodList = new ArrayList<String>();
-        methodList.add("getSmileDegree");
-        methodList.add("getSmileScore");
-        methodList.add("getBlinkDetected");
-        methodList.add("getFaceRecognized");
-        methodList.add("getGazeAngle");
-        methodList.add("getUpDownDirection");
-        methodList.add("getLeftRightDirection");
-        methodList.add("getRollDirection");
-        methodList.add("getLeftRightGazeDegree");
-        methodList.add("getTopBottomGazeDegree");
-        methodList.add("getLeftEyeBlinkDegree");
-        methodList.add("getRightEyeBlinkDegree");
-        methodList.add("getQCFaceInfo");
+        String propertyVal = SystemProperties.get(STR_FACIAL_PROCESSING);
+
+        ArrayList<String> methodList = null;
+        if (propertyVal.equalsIgnoreCase(STR_TRUE))
+        {
+            methodList = new ArrayList<String>();
+            methodList.add("getSmileDegree");
+            methodList.add("getSmileScore");
+            methodList.add("getBlinkDetected");
+            methodList.add("getFaceRecognized");
+            methodList.add("getGazeAngle");
+            methodList.add("getUpDownDirection");
+            methodList.add("getLeftRightDirection");
+            methodList.add("getRollDirection");
+            methodList.add("getLeftRightGazeDegree");
+            methodList.add("getTopBottomGazeDegree");
+            methodList.add("getLeftEyeBlinkDegree");
+            methodList.add("getRightEyeBlinkDegree");
+            methodList.add("getQCFaceInfo");
+        }
 
         Bundle capabilitiesBundle = new Bundle();
         capabilitiesBundle.putStringArrayList(
