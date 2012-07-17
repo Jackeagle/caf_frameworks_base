@@ -834,4 +834,18 @@ public class ConnectivityManager {
         } catch (RemoteException e) {}
         return false;
     }
+
+    /**
+     * This function will be used by apps to request to start the ANDSF parser
+     * @param filePath location of ANDSF file
+     * @return true if successful, false otherwise
+     * @hide
+     */
+    public boolean updateOperatorPolicy(String filePath) {
+        try {
+            return mService.updateOperatorPolicy(filePath);
+        } catch (RemoteException e) {}
+        return false;
+    }
+
 }
