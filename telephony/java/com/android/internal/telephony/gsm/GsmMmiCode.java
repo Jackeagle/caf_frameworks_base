@@ -900,7 +900,7 @@ public final class GsmMmiCode extends Handler implements MmiCode {
                 if ((ar.exception == null) && (msg.arg1 == 1)) {
                     boolean cffEnabled = (msg.arg2 == 1);
                     if (mIccRecords != null) {
-                        mIccRecords.setVoiceCallForwardingFlag(1, cffEnabled);
+                        mIccRecords.setVoiceCallForwardingFlag(1, cffEnabled, dialingNumber);
                     }
                 }
 
@@ -1220,7 +1220,7 @@ public final class GsmMmiCode extends Handler implements MmiCode {
                         == CommandsInterface.SERVICE_CLASS_VOICE) {
             boolean cffEnabled = (info.status == 1);
             if (mIccRecords != null) {
-                mIccRecords.setVoiceCallForwardingFlag(1, cffEnabled);
+                mIccRecords.setVoiceCallForwardingFlag(1, cffEnabled, info.number);
             }
         }
 
