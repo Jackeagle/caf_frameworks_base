@@ -47,6 +47,27 @@ struct fields_t {
     jmethodID   post_event;
     jmethodID   rect_constructor;
     jmethodID   face_constructor;
+    /* ###QOALCOMM_CAMERA_ADDS_ON_START### */
+    jfieldID    face_id;
+    jfieldID    face_leftEye;
+    jfieldID    face_rightEye;
+    jfieldID    face_mouth;
+    jfieldID    face_sm_degree;
+    jfieldID    face_sm_score;
+    jfieldID    face_blink_detected;
+    jfieldID    face_gaze_angle;
+    jfieldID    face_updown_dir;
+    jfieldID    face_leftright_dir;
+    jfieldID    face_roll_dir;
+    jfieldID    face_leye_blink;
+    jfieldID    face_reye_blink;
+    jfieldID    face_left_right_gaze;
+    jfieldID    face_top_bottom_gaze;
+    jfieldID    face_recognized;
+    jfieldID    point_x;
+    jfieldID    point_y;
+    jmethodID   point_constructor;
+    /* ###QOALCOMM_CAMERA_ADDS_ON_END### */
 };
 
 static fields_t fields;
@@ -80,6 +101,10 @@ private:
     sp<Camera>  mCamera;                // strong reference to native object
     jclass      mFaceClass;  // strong reference to Face class
     jclass      mRectClass;  // strong reference to Rect class
+    /* ###QOALCOMM_CAMERA_ADDS_ON_START### */
+    jclass      mPointClass; // strong reference to Point class
+    bool        mIsQcFace;
+    /* ###QOALCOMM_CAMERA_ADDS_ON_END### */
     Mutex       mLock;
 
     /*
@@ -130,11 +155,25 @@ JNICameraContext::JNICameraContext(JNIEnv* env, jobject weak_this, jclass clazz,
     mCameraJClass = (jclass)env->NewGlobalRef(clazz);
     mCamera = camera;
 
-    jclass faceClazz = env->FindClass("android/hardware/Camera$Face");
-    mFaceClass = (jclass) env->NewGlobalRef(faceClazz);
+    /* ###QOALCOMM_CAMERA_ADDS_ON_START### */
+    jclass qcfaceClazz = env->FindClass("com/qualcomm/camera/QCFace");
+    if (NULL != qcfaceClazz) {
+        mFaceClass = (jclass) env->NewGlobalRef(qcfaceClazz);
+        mIsQcFace = true;
+    } else {
+        jclass faceClazz = env->FindClass("android/hardware/Camera$Face");
+        mFaceClass = (jclass) env->NewGlobalRef(faceClazz);
+        mIsQcFace = false;
+    }
+    /* ###QOALCOMM_CAMERA_ADDS_ON_END### */
 
     jclass rectClazz = env->FindClass("android/graphics/Rect");
     mRectClass = (jclass) env->NewGlobalRef(rectClazz);
+
+    /* ###QOALCOMM_CAMERA_ADDS_ON_START### */
+    jclass pointClazz = env->FindClass("android/graphics/Point");
+    mPointClass = (jclass) env->NewGlobalRef(pointClazz);
+    /* ###QOALCOMM_CAMERA_ADDS_ON_END### */
 
     mManualBufferMode = false;
     mManualCameraCallbackSet = false;
@@ -162,6 +201,12 @@ void JNICameraContext::release()
         env->DeleteGlobalRef(mRectClass);
         mRectClass = NULL;
     }
+    /* ###QOALCOMM_CAMERA_ADDS_ON_START### */
+    if (mPointClass != NULL) {
+        env->DeleteGlobalRef(mPointClass);
+        mPointClass = NULL;
+    }
+    /* ###QOALCOMM_CAMERA_ADDS_ON_END### */
     clearCallbackBuffers_l(env);
     mCamera.clear();
 }
@@ -348,8 +393,48 @@ void JNICameraContext::postMetadata(JNIEnv *env, int32_t msgType, camera_frame_m
         env->SetObjectField(face, fields.face_rect, rect);
         env->SetIntField(face, fields.face_score, metadata->faces[i].score);
 
+        /* ###QOALCOMM_CAMERA_ADDS_ON_START### */
+        jobject point1 = env->NewObject(mPointClass, fields.point_constructor);
+        env->SetIntField(point1, fields.point_x, metadata->faces[i].left_eye[0]);
+        env->SetIntField(point1, fields.point_y, metadata->faces[i].left_eye[1]);
+        env->SetObjectField(face, fields.face_leftEye, point1);
+
+        jobject point2 = env->NewObject(mPointClass, fields.point_constructor);
+        env->SetIntField(point2, fields.point_x, metadata->faces[i].right_eye[0]);
+        env->SetIntField(point2, fields.point_y, metadata->faces[i].right_eye[1]);
+        env->SetObjectField(face, fields.face_rightEye, point2);
+
+        jobject point3 = env->NewObject(mPointClass, fields.point_constructor);
+        env->SetIntField(point3, fields.point_x, metadata->faces[i].mouth[0]);
+        env->SetIntField(point3, fields.point_y, metadata->faces[i].mouth[1]);
+        env->SetObjectField(face, fields.face_mouth, point3);
+
+        env->SetIntField(face, fields.face_id, metadata->faces[i].id);
+
+        if (mIsQcFace) {
+            env->SetIntField(face, fields.face_sm_degree, metadata->faces[i].smile_degree);
+            env->SetIntField(face, fields.face_sm_score, metadata->faces[i].smile_score);
+            env->SetIntField(face, fields.face_blink_detected, metadata->faces[i].blink_detected);
+            env->SetIntField(face, fields.face_recognized, metadata->faces[i].face_recognised);
+            env->SetIntField(face, fields.face_gaze_angle, metadata->faces[i].gaze_angle);
+            env->SetIntField(face, fields.face_updown_dir, metadata->faces[i].updown_dir);
+            env->SetIntField(face, fields.face_leftright_dir, metadata->faces[i].leftright_dir);
+            env->SetIntField(face, fields.face_roll_dir, metadata->faces[i].roll_dir);
+            env->SetIntField(face, fields.face_leye_blink, metadata->faces[i].leye_blink);
+            env->SetIntField(face, fields.face_reye_blink, metadata->faces[i].reye_blink);
+            env->SetIntField(face, fields.face_left_right_gaze, metadata->faces[i].left_right_gaze);
+            env->SetIntField(face, fields.face_top_bottom_gaze, metadata->faces[i].top_bottom_gaze);
+        }
+        /* ###QOALCOMM_CAMERA_ADDS_ON_END### */
+
         env->DeleteLocalRef(face);
         env->DeleteLocalRef(rect);
+
+        /* ###QOALCOMM_CAMERA_ADDS_ON_START### */
+        env->DeleteLocalRef(point1);
+        env->DeleteLocalRef(point2);
+        env->DeleteLocalRef(point3);
+        /* ###QOALCOMM_CAMERA_ADDS_ON_END### */
     }
     env->CallStaticVoidMethod(mCameraJClass, fields.post_event,
             mCameraJObjectWeak, msgType, 0, 0, obj);
@@ -611,6 +696,38 @@ static void android_hardware_Camera_setHasPreviewCallback(JNIEnv *env, jobject t
     context->setCallbackMode(env, installed, manualBuffer);
 }
 
+ static void android_hardware_Camera_sendHistogramData(JNIEnv *env, jobject thiz)
+ {
+   ALOGV("setHistogramMode: mode:" );
+   JNICameraContext* context;
+   status_t rc;
+   sp<Camera> camera = get_native_camera(env, thiz, &context);
+   if (camera == 0) return;
+
+   rc = camera->sendCommand(CAMERA_CMD_HISTOGRAM_SEND_DATA, 0, 0);
+
+   if (rc != NO_ERROR) {
+      jniThrowException(env, "java/lang/RuntimeException", "set histogram mode failed");
+     }
+ }
+ static void android_hardware_Camera_setHistogramMode(JNIEnv *env, jobject thiz, jboolean mode)
+ {
+   ALOGV("sendHistogramData: mode:%d", (int)mode);
+   JNICameraContext* context;
+   status_t rc;
+   sp<Camera> camera = get_native_camera(env, thiz, &context);
+   if (camera == 0) return;
+
+   if(mode == true)
+      rc = camera->sendCommand(CAMERA_CMD_HISTOGRAM_ON, 0, 0);
+   else
+      rc = camera->sendCommand(CAMERA_CMD_HISTOGRAM_OFF, 0, 0);
+
+   if (rc != NO_ERROR) {
+      jniThrowException(env, "java/lang/RuntimeException", "set histogram mode failed");
+     }
+ }
+
 static void android_hardware_Camera_addCallbackBuffer(JNIEnv *env, jobject thiz, jbyteArray bytes, int msgType) {
     ALOGV("addCallbackBuffer: 0x%x", msgType);
 
@@ -866,6 +983,12 @@ static JNINativeMethod camMethods[] = {
   { "native_takePicture",
     "(I)V",
     (void *)android_hardware_Camera_takePicture },
+  { "native_setHistogramMode",
+    "(Z)V",
+    (void *)android_hardware_Camera_setHistogramMode },
+  { "native_sendHistogramData",
+    "()V",
+    (void *)android_hardware_Camera_sendHistogramData },
   { "native_setParameters",
     "(Ljava/lang/String;)V",
     (void *)android_hardware_Camera_setParameters },
@@ -933,6 +1056,8 @@ static int find_fields(JNIEnv *env, field *fields, int count)
 // Get all the required offsets in java class and register native functions
 int register_android_hardware_Camera(JNIEnv *env)
 {
+    memset(&fields, 0, sizeof(fields));
+
     field fields_to_find[] = {
         { "android/hardware/Camera", "mNativeContext",   "I", &fields.context },
         { "android/view/Surface",    ANDROID_VIEW_SURFACE_JNI_ID, "I", &fields.surface },
@@ -940,12 +1065,42 @@ int register_android_hardware_Camera(JNIEnv *env)
           ANDROID_GRAPHICS_SURFACETEXTURE_JNI_ID, "I", &fields.surfaceTexture },
         { "android/hardware/Camera$CameraInfo", "facing",   "I", &fields.facing },
         { "android/hardware/Camera$CameraInfo", "orientation",   "I", &fields.orientation },
-        { "android/hardware/Camera$Face", "rect", "Landroid/graphics/Rect;", &fields.face_rect },
-        { "android/hardware/Camera$Face", "score", "I", &fields.face_score },
         { "android/graphics/Rect", "left", "I", &fields.rect_left },
         { "android/graphics/Rect", "top", "I", &fields.rect_top },
         { "android/graphics/Rect", "right", "I", &fields.rect_right },
         { "android/graphics/Rect", "bottom", "I", &fields.rect_bottom },
+        { "android/graphics/Point", "x", "I", &fields.point_x },
+        { "android/graphics/Point", "y", "I", &fields.point_y },
+    };
+
+    field facefields_to_find[] = {
+        { "android/hardware/Camera$Face", "rect", "Landroid/graphics/Rect;", &fields.face_rect },
+        { "android/hardware/Camera$Face", "score", "I", &fields.face_score },
+        { "android/hardware/Camera$Face", "id", "I", &fields.face_id },
+        { "android/hardware/Camera$Face", "leftEye", "Landroid/graphics/Point;", &fields.face_leftEye },
+        { "android/hardware/Camera$Face", "rightEye", "Landroid/graphics/Point;", &fields.face_rightEye },
+        { "android/hardware/Camera$Face", "mouth", "Landroid/graphics/Point;", &fields.face_mouth },
+    };
+
+    field qcfacefields_to_find[] = {
+        { "com/qualcomm/camera/QCFace", "rect", "Landroid/graphics/Rect;", &fields.face_rect },
+        { "com/qualcomm/camera/QCFace", "score", "I", &fields.face_score },
+        { "com/qualcomm/camera/QCFace", "id", "I", &fields.face_id },
+        { "com/qualcomm/camera/QCFace", "leftEye", "Landroid/graphics/Point;", &fields.face_leftEye },
+        { "com/qualcomm/camera/QCFace", "rightEye", "Landroid/graphics/Point;", &fields.face_rightEye },
+        { "com/qualcomm/camera/QCFace", "mouth", "Landroid/graphics/Point;", &fields.face_mouth },
+        { "com/qualcomm/camera/QCFace", "smileDegree", "I", &fields.face_sm_degree },
+        { "com/qualcomm/camera/QCFace", "smileScore", "I", &fields.face_sm_score },
+        { "com/qualcomm/camera/QCFace", "blinkDetected", "I", &fields.face_blink_detected },
+        { "com/qualcomm/camera/QCFace", "faceRecognized", "I", &fields.face_recognized },
+        { "com/qualcomm/camera/QCFace", "gazeAngle", "I", &fields.face_gaze_angle },
+        { "com/qualcomm/camera/QCFace", "updownDir", "I", &fields.face_updown_dir },
+        { "com/qualcomm/camera/QCFace", "leftrightDir", "I", &fields.face_leftright_dir },
+        { "com/qualcomm/camera/QCFace", "rollDir", "I", &fields.face_roll_dir },
+        { "com/qualcomm/camera/QCFace", "leyeBlink", "I", &fields.face_leye_blink },
+        { "com/qualcomm/camera/QCFace", "reyeBlink", "I", &fields.face_reye_blink },
+        { "com/qualcomm/camera/QCFace", "leftrightGaze", "I", &fields.face_left_right_gaze },
+        { "com/qualcomm/camera/QCFace", "topbottomGaze", "I", &fields.face_top_bottom_gaze },
     };
 
     if (find_fields(env, fields_to_find, NELEM(fields_to_find)) < 0)
@@ -966,11 +1121,27 @@ int register_android_hardware_Camera(JNIEnv *env)
         return -1;
     }
 
-    clazz = env->FindClass("android/hardware/Camera$Face");
-    fields.face_constructor = env->GetMethodID(clazz, "<init>", "()V");
-    if (fields.face_constructor == NULL) {
-        ALOGE("Can't find android/hardware/Camera$Face.Face()");
+    clazz = env->FindClass("android/graphics/Point");
+    fields.point_constructor = env->GetMethodID(clazz, "<init>", "()V");
+    if (fields.point_constructor == NULL) {
+        ALOGE("Can't find android/graphics/Point.Point()");
         return -1;
+    }
+
+    clazz = env->FindClass("com/qualcomm/camera/QCFace");
+    if (NULL != clazz) {
+        fields.face_constructor = env->GetMethodID(clazz, "<init>", "()V");
+        if (find_fields(env, qcfacefields_to_find, NELEM(qcfacefields_to_find)) < 0)
+            return -1;
+    } else {
+        clazz = env->FindClass("android/hardware/Camera$Face");
+        fields.face_constructor = env->GetMethodID(clazz, "<init>", "()V");
+        if (fields.face_constructor == NULL) {
+            ALOGE("Can't find android/hardware/Camera$Face.Face()");
+            return -1;
+        }
+        if (find_fields(env, facefields_to_find, NELEM(fields_to_find)) < 0)
+            return -1;
     }
 
     // Register native functions
