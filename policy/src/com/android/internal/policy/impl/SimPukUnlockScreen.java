@@ -24,6 +24,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 
 import com.android.internal.telephony.ITelephony;
+import com.android.internal.telephony.Phone;
 import com.android.internal.widget.LockPatternUtils;
 
 import android.text.Editable;
@@ -155,13 +156,13 @@ public class SimPukUnlockScreen extends LinearLayout implements KeyguardScreen,
             mPin = pin;
         }
 
-        abstract void onSimLockChangedResponse(boolean success);
+        abstract void onSimLockChangedResponse(final int result);
 
         @Override
         public void run() {
             try {
-                final boolean result = ITelephony.Stub.asInterface(ServiceManager
-                        .checkService("phone")).supplyPuk(mPuk, mPin);
+                final int result = ITelephony.Stub.asInterface(ServiceManager
+                        .checkService("phone")).supplyPukReportResult(mPuk, mPin);
 
                 post(new Runnable() {
                     public void run() {
@@ -171,7 +172,7 @@ public class SimPukUnlockScreen extends LinearLayout implements KeyguardScreen,
             } catch (RemoteException e) {
                 post(new Runnable() {
                     public void run() {
-                        onSimLockChangedResponse(false);
+                        onSimLockChangedResponse(Phone.PIN_GENERAL_FAILURE);
                     }
                 });
             }
@@ -242,19 +243,41 @@ public class SimPukUnlockScreen extends LinearLayout implements KeyguardScreen,
 
         new CheckSimPuk(mPukText.getText().toString(),
                 mPinText.getText().toString()) {
-            void onSimLockChangedResponse(final boolean success) {
+            void onSimLockChangedResponse(final int result) {
                 mPinText.post(new Runnable() {
                     public void run() {
                         if (mSimUnlockProgressDialog != null) {
                             mSimUnlockProgressDialog.hide();
                         }
-                        if (success) {
+                        if (result == Phone.PIN_RESULT_SUCCESS) {
                             // before closing the keyguard, report back that
                             // the sim is unlocked so it knows right away
                             mUpdateMonitor.reportSimUnlocked();
                             mCallback.goToUnlockScreen();
                         } else {
-                            mHeaderText.setText(R.string.badPuk);
+                            if (result == Phone.PIN_PASSWORD_INCORRECT) {
+                                try {
+                                    //Displays No. of attempts remaining to unlock PIN1 in case
+                                    // of wrong entry.
+                                    int attemptsRemaining = ITelephony.Stub.asInterface(
+                                                ServiceManager.checkService("phone"))
+                                                .getIccPin1RetryCount();
+                                    if (attemptsRemaining >= 0) {
+                                        String displayMessage = getContext().getString
+                                                (R.string.keyguard_password_wrong_puk_code) +
+                                                getContext().getString(R.string.pinpuk_attempts)
+                                                + attemptsRemaining;
+                                        mHeaderText.setText(displayMessage);
+                                    } else {
+                                        mHeaderText.setText(R.string
+                                                            .keyguard_password_wrong_puk_code);
+                                    }
+                                } catch (RemoteException ex) {
+                                    mHeaderText.setText(R.string.keyguard_password_puk_failed);
+                                }
+                            } else {
+                                mHeaderText.setText(R.string.keyguard_password_puk_failed);
+                            }
                             mPukText.setText("");
                             mPinText.setText("");
                         }
