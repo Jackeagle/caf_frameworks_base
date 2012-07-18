@@ -3487,28 +3487,9 @@ private NetworkStateTracker makeWimaxStateTracker() {
     public boolean updateOperatorPolicy(String filePath)
     {
         log("Updating Operator Policy");
-        Object andsfParser;
-        if ( mContext != null ) {
+        if( isCneStarted() ){
             try {
-                PathClassLoader andsfClassLoader = new PathClassLoader(
-                        "/system/framework/com.quicinc.cne.jar",
-                        ClassLoader.getSystemClassLoader());
-                Class andsfClass = andsfClassLoader
-                        .loadClass("com.quicinc.cne.andsf.AndsfParser");
-
-                Constructor andsfConstructor = andsfClass
-                        .getConstructor(new Class[] { Context.class });
-                Slog.d("ANDSF", "Updating Operator Policy");
-                andsfParser = andsfConstructor.newInstance(mContext);
-
-                Method myMethod = andsfClass.getMethod("updateAndsf",
-                        new Class[] { String.class });
-
-                Boolean passed = (Boolean) myMethod.invoke(andsfParser,
-                        new Object[] { "data/connectivity/andsfCne.xml" });
-
-                return passed;
-
+                return mLinkManager.updateOperatorPolicy(filePath);
             } catch (Exception e) { // ignored; lives in system server
                 loge("update operator policy error" + e);
             }
