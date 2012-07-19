@@ -81,7 +81,8 @@ public class CdmaDataConnection extends DataConnection {
 
         // TODO: The data profile's profile ID must be set when it is created.
         int dataProfile;
-        if ((cp.apn != null) && (cp.apn.types.length > 0) && (cp.apn.types[0] != null) &&
+        if ((cp.apn != null) && (cp.apn.types != null) &&
+                (cp.apn.types.length > 0) && (cp.apn.types[0] != null) &&
                 (cp.apn.types[0].equals(Phone.APN_TYPE_DUN))) {
             if (DBG) log("CdmaDataConnection using DUN");
             dataProfile = RILConstants.DATA_PROFILE_TETHERED;
