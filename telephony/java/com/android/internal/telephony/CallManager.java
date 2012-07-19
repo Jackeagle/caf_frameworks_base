@@ -37,6 +37,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 
 
@@ -84,6 +85,7 @@ public final class CallManager {
     private static final int EVENT_SERVICE_STATE_CHANGED = 118;
     private static final int EVENT_POST_DIAL_CHARACTER = 119;
     private static final int EVENT_SUPP_SERVICE_NOTIFY = 120;
+    private static final int EVENT_MODIFY_CALL_REQUEST = 121;
 
     // Maximum bit currently set for inCallAudioMode
     private static final int MAX_IN_CALL_AUDIO_MODE_BIT = 7;
@@ -184,6 +186,9 @@ public final class CallManager {
     = new RegistrantList();
 
     protected final RegistrantList mPostDialCharacterRegistrants
+    = new RegistrantList();
+
+    protected final RegistrantList mCallModifyRegistrants
     = new RegistrantList();
 
     private CallManager() {
@@ -626,6 +631,10 @@ public final class CallManager {
             phone.registerForSuppServiceNotification(mHandler, EVENT_SUPP_SERVICE_NOTIFY, null);
         }
 
+        if (phone.getPhoneType() == Phone.PHONE_TYPE_RIL_IMS) {
+            phone.registerForModifyCallRequest(mHandler, EVENT_MODIFY_CALL_REQUEST, null);
+        }
+
         // for events supported only by GSM and CDMA phone
         if (phone.getPhoneType() == Phone.PHONE_TYPE_GSM ||
                 phone.getPhoneType() == Phone.PHONE_TYPE_CDMA) {
@@ -672,6 +681,10 @@ public final class CallManager {
             phone.unregisterForSubscriptionInfoReady(mHandler);
             phone.unregisterForCallWaiting(mHandler);
             phone.unregisterForEcmTimerReset(mHandler);
+        }
+
+        if (phone.getPhoneType() == Phone.PHONE_TYPE_RIL_IMS) {
+            phone.unregisterForModifyCallRequest(mHandler);
         }
     }
 
@@ -1785,41 +1798,78 @@ public final class CallManager {
      * When the remote party in an IMS Call wants to upgrade or downgrade a
      * call, a CallModifyRequest message is received. This function registers
      * for that indication and sends a message to the handler when such an
-     * indication occurs. A response to the request can be send with
-     * {@link callModifyConfirm}. In order to confirm
+     * indication occurs. A response to the request can be sent with
+     * {@link ConnectionBase#acceptConnectionTypeChange(Map)} to accept the proposal, or
+     * {@link ConnectionBase#rejectConnectionTypeChange()}
      *
      * @param h The handler that will receive the message
      * @param what The message to send
      * @param obj User object to send with the message
      */
-    public void registerForCallModifyRequest(Handler h, int what, Object obj) {
+    public void registerForConnectionTypeChangeRequest(Handler h, int what, Object obj) {
+        mCallModifyRegistrants.addUnique(h, what, obj);
+    }
+
+    public void unregisterForConnectionTypeChangeRequest(Handler h) {
+        mCallModifyRegistrants.remove(h);
+    }
+
+    private void notifyConnectionTypeChangeRequest(AsyncResult ar) {
+        mCallModifyRegistrants.notifyRegistrants(ar);
     }
 
     /**
      * Request a modification to a current connection This will send an
      * indication to the remote party with new call details, which the remote
-     * party can agree to or reject. To agree, they will return the same call
-     * details as proposed. To reject, they will return the current call details
-     * in the Connection ({@link Connection#getCallDetails()}) Used to convert a
-     * voice call into a Video telephony call.
+     * party can agree to or reject.
+     * Used to upgrade/downgrade IMS call.
      *
+     * @param result A message to be returned with the result of the action.
      * @param conn The connection to modify
-     * @param modifyInitiate The new call details to request and the call index
+     * @param newCallType The new call type
+     * @param extras A map containing extra parameters
      */
-    public void callModifyInitiate(Connection conn, CallModify modifyInitiate) {
+    public void changeConnectionType(Message result, Connection conn,int newCallType,
+            Map<String, String> newExtras) throws CallStateException {
+
+        if (!(conn instanceof ConnectionBase)) {
+            throw new CallStateException("Unable to modify the type of this call");
+        }
+
+        ConnectionBase connb = (ConnectionBase) conn;
+        connb.changeConnectionType(result, newCallType, newExtras);
+    }
+
+    public void acceptConnectionTypeChange(Connection conn,
+            Map<String, String> newExtras) throws CallStateException {
+        if (!(conn instanceof ConnectionBase)) {
+            throw new CallStateException("Wrong connection type");
+        }
+        ConnectionBase cb = (ConnectionBase) conn;
+        cb.acceptConnectionTypeChange(newExtras);
+    }
+
+    public void rejectConnectionTypeChange(Connection conn) throws CallStateException {
+        if (!(conn instanceof ConnectionBase)) {
+            throw new CallStateException("Wrong connection type");
+        }
+        ConnectionBase cb = (ConnectionBase) conn;
+        cb.rejectConnectionTypeChange();
     }
 
     /**
-     * Confirm a previosuly received CallModifyRequest. If the request is to be
-     * approved, the same parameters contained in the message (see
-     * {@link registerForCallModifyRequest}) will be passed in details.
-     * Otherwise, the old call details will be passed (e.g. from
-     * conn.getDetails()
+     * Simpler version of
+     * {@link #changeConnectionType(Message, Connection, int, Map)} that doesn't
+     * take extras
      *
-     * @param conn The connection to confirm
-     * @param modifyConfirm The call details to use and the call index
+     * @param result
+     * @param conn
+     * @param newCallType
+     * @throws CallStateException
      */
-    public void callModifyConfirm(Connection conn, CallModify modifyConfirm) {
+    public void changeConnectionType(Message result, Connection conn,
+            int newCallType) throws CallStateException {
+        changeConnectionType(result, conn, newCallType, null);
     }
 
     /* APIs to access foregroudCalls, backgroudCalls, and ringingCalls
@@ -2195,6 +2245,10 @@ public final class CallManager {
                         notifyMsg.sendToTarget();
                     }
                     break;
+                case EVENT_MODIFY_CALL_REQUEST:
+                    Log.d(LOG_TAG, "CallModifyRequest received");
+                    AsyncResult ar = (AsyncResult) msg.obj;
+                    notifyConnectionTypeChangeRequest(ar);
             }
         }
     };

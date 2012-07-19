@@ -1045,4 +1045,12 @@ public class PhoneProxy extends Handler implements Phone {
     public CallTracker getCallTracker() {
         return mActivePhone.getCallTracker();
     }
+
+    public void registerForModifyCallRequest(Handler h, int what, Object obj) {
+        mActivePhone.registerForModifyCallRequest(h, what, obj);
+    }
+
+    public void unregisterForModifyCallRequest(Handler h) {
+        mActivePhone.unregisterForModifyCallRequest(h);
+    }
 }
