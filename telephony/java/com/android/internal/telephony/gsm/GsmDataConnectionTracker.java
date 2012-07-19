@@ -151,6 +151,14 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
     private static final boolean SUPPORT_MPDN = SystemProperties.getBoolean(
             "persist.telephony.mpdn", true);
 
+    // Holds the cdma operator numeric.  Used only in case of CDMA NV eHRPD case.
+    // The value is from the property ro.cdma.home.operator.numeric
+    private String mCdmaHomeOperatorNumeric = SystemProperties.get(
+            "ro.cdma.home.operator.numeric", null);
+
+    private boolean mUseNvOperatorForEhrpd = SystemProperties.getBoolean(
+            "persist.radio.use_nv_for_ehrpd", false);
+
     @Override
     protected void onActionIntentReconnectAlarm(Intent intent) {
         String reason = intent.getStringExtra(INTENT_RECONNECT_ALARM_EXTRA_REASON);
@@ -214,6 +222,15 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
         broadcastMessenger();
 
         log("SUPPORT_MPDN = " + SUPPORT_MPDN);
+        log("mCdmaHomeOperatorNumeric = " + mCdmaHomeOperatorNumeric);
+        log("mUseNvOperatorForEhrpd = " + mUseNvOperatorForEhrpd);
+
+        int radioTech  = mPhone.getServiceState().getRadioTechnology();
+        if (mUseNvOperatorForEhrpd && radioTech == ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD &&
+                mCdmaHomeOperatorNumeric != null) {
+            if (DBG) log("Subscription from NV and EHRPD: createAllApnList");
+            createAllApnList();
+        }
     }
 
     @Override
@@ -629,10 +646,14 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
         boolean desiredPowerState = mPhone.getServiceStateTracker().getDesiredPowerState();
         IccRecords r = mIccRecords.get();
         boolean recordsLoaded = (r != null) ? r.getRecordsLoaded() : false;
+        int radioTech  = mPhone.getServiceState().getRadioTechnology();
 
         boolean allowed =
                     (gprsState == ServiceState.STATE_IN_SERVICE || mAutoAttachOnCreation) &&
-                    recordsLoaded &&
+                    ((mUseNvOperatorForEhrpd &&
+                      radioTech == ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD &&
+                      mCdmaHomeOperatorNumeric != null) ||
+                     recordsLoaded) &&
                     (mPhone.getState() == Phone.State.IDLE ||
                      mPhone.getServiceStateTracker().isConcurrentVoiceAndDataAllowed()) &&
                     internalDataEnabled &&
@@ -644,7 +665,10 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
             if (!((gprsState == ServiceState.STATE_IN_SERVICE) || mAutoAttachOnCreation)) {
                 reason += " - gprs= " + gprsState;
             }
-            if (!recordsLoaded) reason += " - SIM not loaded";
+            if (mUseNvOperatorForEhrpd && radioTech == ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD &&
+                    mCdmaHomeOperatorNumeric == null)
+                reason += " - Cdma Home Operator Numeric not available";
+            if (!mUseNvOperatorForEhrpd && !recordsLoaded) reason += " - SIM not loaded";
             if (mPhone.getState() != Phone.State.IDLE &&
                     !mPhone.getServiceStateTracker().isConcurrentVoiceAndDataAllowed()) {
                 reason += " - PhoneState= " + mPhone.getState();
@@ -2399,8 +2423,8 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
      */
     private void createAllApnList() {
         mAllApns = new ArrayList<DataProfile>();
-        IccRecords r = mIccRecords.get();
-        String operator = (r != null) ? r.getOperatorNumeric() : "";
+        String operator = getOperatorNumeric();
+
         if (operator != null) {
             String selection = "numeric = '" + operator + "'";
             // query only enabled apn.
@@ -2516,8 +2540,7 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
             }
         }
 
-        IccRecords r = mIccRecords.get();
-        String operator = (r != null) ? r.getOperatorNumeric() : "";
+        String operator = getOperatorNumeric();
         int radioTech = mPhone.getServiceState().getRilRadioTechnology();
 
         if (canSetPreferApn && mPreferredApn != null &&
@@ -2781,6 +2804,27 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
     protected void setDataReadinessChecks(
             boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
         // Not used for GSM
+    }
+
+    private String getOperatorNumeric() {
+        int radioTech = mPhone.getServiceState().getRadioTechnology();
+        String operatorNumeric;
+        String source;
+        IccRecords r = mIccRecords.get();
+        if (mUseNvOperatorForEhrpd && radioTech == ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD) {
+            operatorNumeric = mCdmaHomeOperatorNumeric;
+            source = "ro.cdma.home.operator_numeric";
+        } else if (r == null) {
+            operatorNumeric = null;
+            source = "IccRecords == null";
+        } else {
+            operatorNumeric = r.getOperatorNumeric();
+            source = "IccRecords";
+        }
+        log("getOperatorNumeric = " + operatorNumeric + " from " + source +
+                " (mUseNvOperatorForEhrpd=" + mUseNvOperatorForEhrpd + " radioTech=" +
+                radioTech + ")");
+        return operatorNumeric;
     }
 
     @Override
