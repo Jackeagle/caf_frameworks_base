@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2011-2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1073,7 +1074,10 @@ public class NetworkController extends BroadcastReceiver {
                 mHasMobileDataFeature ? mDataSignalIconId : mWifiIconId;
             mContentDescriptionCombinedSignal = mHasMobileDataFeature
                 ? mContentDescriptionDataType : mContentDescriptionWifi;
+        }
 
+        if (!mDataConnected) {
+            Slog.d(TAG, "refreshViews: Data not connected!! Set no data type icon");
             mDataTypeIconId = 0;
             if (isCdma()) {
                 if (isCdmaEri()) {
