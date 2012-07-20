@@ -338,6 +338,15 @@ public final class GsmSMSDispatcher extends SMSDispatcher {
         //   this is not a retry case after sms over IMS failed
         //     indicated by mImsRetry > 0
         if (0 == tracker.mImsRetry && !isIms()) {
+            if (tracker.mRetryCount > 0) {
+                // per TS 23.040 Section 9.2.3.6:  If TP-MTI SMS-SUBMIT (0x01) type
+                //   TP-RD (bit 2) is 1 for retry
+                //   and TP-MR is set to previously failed sms TP-MR
+                if (((0x01 & pdu[0]) == 0x01)) {
+                    pdu[0] |= 0x04; // TP-RD
+                    pdu[1] = (byte) tracker.mMessageRef; // TP-MR
+                }
+            }
             mCm.sendSMS(IccUtils.bytesToHexString(smsc),
                     IccUtils.bytesToHexString(pdu), reply);
         } else {
