@@ -160,9 +160,7 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
         }
         DataConnectionAc dcac = apnContext.getDataConnectionAc();
         if (tearDown) {
-            boolean isConnected = (apnContext.getState() != State.IDLE
-                                   && apnContext.getState() != State.FAILED);
-            if (!isConnected) {
+            if (apnContext.isDisconnected()) {
                 // The request is tearDown and but ApnContext is not connected.
                 // If apnContext is not enabled anymore, break the linkage to the DCAC/DC.
                 apnContext.setState(State.IDLE);
@@ -225,7 +223,6 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
                 cancelReconnectAlarm(dcac);
             }
         }
-
     }
 
     /**
@@ -282,22 +279,19 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
         onSetInternalDataEnabled(enable, null);
     }
 
-    protected void onSetInternalDataEnabled(boolean enable, Message onCompleteMsg) {
-        log("onSetInternalDataEnabled");
-        boolean prevEnabled = getAnyDataEnabled();
+    protected void onSetInternalDataEnabled(boolean enabled, Message onCompleteMsg) {
         boolean sendOnComplete = true;
-        if (mInternalDataEnabled != enable) {
-            synchronized (this) {
-                mInternalDataEnabled = enable;
-            }
-            if (prevEnabled != getAnyDataEnabled()) {
+
+        synchronized (mDataEnabledLock) {
+            mInternalDataEnabled = enabled;
+            if (enabled) {
+                log("onSetInternalDataEnabled: changed to enabled, try to setup data call");
+                resetAllRetryCounts();
+                onTrySetupData(Phone.REASON_DATA_ENABLED, false);
+            } else {
                 sendOnComplete = false;
-                if (!prevEnabled) {
-                    resetAllRetryCounts();
-                    onTrySetupData(Phone.REASON_DATA_ENABLED, false);
-                } else {
-                    cleanUpAllConnections(null, onCompleteMsg);
-                }
+                log("onSetInternalDataEnabled: changed to disabled, cleanUpAllConnections");
+                cleanUpAllConnections(null, onCompleteMsg);
             }
         }
 
