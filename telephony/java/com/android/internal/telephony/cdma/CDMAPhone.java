@@ -108,6 +108,7 @@ public class CDMAPhone extends PhoneBase {
     PhoneSubInfo mSubInfo;
     EriManager mEriManager;
     WakeLock mWakeLock;
+    UiccCard mRuimCard = null;
 
     // mEriFileLoadedRegistrants are informed after the ERI text has been loaded
     private final RegistrantList mEriFileLoadedRegistrants = new RegistrantList();
@@ -254,6 +255,7 @@ public class CDMAPhone extends PhoneBase {
         mSST = null;
         mEriManager = null;
         mExitEcmRunnable = null;
+        mRuimCard = null;
         super.removeReferences();
     }
 
@@ -1085,10 +1087,12 @@ public class CDMAPhone extends PhoneBase {
                 }
                 mIccRecords.set(null);
                 mUiccApplication.set(null);
+                mRuimCard = null;
             }
             if (newUiccApplication != null) {
                 log("New Uicc application found");
                 mUiccApplication.set(newUiccApplication);
+                mRuimCard = mUiccApplication.get().getCard();
                 mIccRecords.set(newUiccApplication.getIccRecords());
                 registerForRuimRecordEvents();
                 mRuimPhoneBookInterfaceManager.updateIccRecords(mIccRecords.get());
@@ -1490,6 +1494,10 @@ public class CDMAPhone extends PhoneBase {
         }
         r.unregisterForRecordsEvents(this);
         r.unregisterForRecordsLoaded(this);
+    }
+
+    public UiccCard getUiccCard() {
+        return mRuimCard;
     }
 
     protected void log(String s) {

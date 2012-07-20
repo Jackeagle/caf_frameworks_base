@@ -43,6 +43,7 @@ import com.android.internal.telephony.uicc.IccFileHandler;
 import com.android.internal.telephony.uicc.IccRecords;
 import com.android.internal.telephony.uicc.IsimRecords;
 import com.android.internal.telephony.uicc.SIMRecords;
+import com.android.internal.telephony.uicc.UiccCard;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.UsimServiceTable;
@@ -705,6 +706,11 @@ public abstract class PhoneBase extends Handler implements Phone {
         return null;
         //throw new Exception("getIccCard Shouldn't be called from PhoneBase");
     }
+
+    public UiccCard getUiccCard() {
+        return null;
+    }
+
 
     /**
      * Subclasses of PhoneBase probably want to replace this with a
