@@ -151,9 +151,9 @@ public class PhoneFactory {
 
                 int phoneType = getPhoneType(networkMode);
                 if (phoneType == Phone.PHONE_TYPE_GSM) {
-                    sProxyPhone = getGsmPhone();
+                    sProxyPhone = new PhoneProxy(getGsmPhone());
                 } else if (phoneType == Phone.PHONE_TYPE_CDMA) {
-                    sProxyPhone = getCdmaPhone();
+                    sProxyPhone = new PhoneProxy(getCdmaPhone());
                 }
 
                 sMadeDefaults = true;
