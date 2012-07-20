@@ -59,7 +59,6 @@ import com.android.internal.telephony.CallStateException;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Connection;
 import com.android.internal.telephony.IccPhoneBookInterfaceManager;
-import com.android.internal.telephony.IccSmsInterfaceManager;
 import com.android.internal.telephony.MmiCode;
 import com.android.internal.telephony.OperatorInfo;
 import com.android.internal.telephony.Phone;
@@ -112,7 +111,6 @@ public class GSMPhone extends PhoneBase {
     GsmServiceStateTracker mSST;
     ArrayList <GsmMmiCode> mPendingMMIs = new ArrayList<GsmMmiCode>();
     SimPhoneBookInterfaceManager mSimPhoneBookIntManager;
-    SimSmsInterfaceManager mSimSmsIntManager;
     PhoneSubInfo mSubInfo;
 
 
@@ -146,12 +144,9 @@ public class GSMPhone extends PhoneBase {
         mCM.setPhoneType(Phone.PHONE_TYPE_GSM);
         mCT = new GsmCallTracker(this);
         mSST = new GsmServiceStateTracker (this);
-        mSMS = new GsmSMSDispatcher(this, mSmsStorageMonitor, mSmsUsageMonitor);
-
         mDataConnectionTracker = new GsmDataConnectionTracker (this);
         if (!unitTestMode) {
             mSimPhoneBookIntManager = new SimPhoneBookInterfaceManager(this);
-            mSimSmsIntManager = new SimSmsInterfaceManager(this, mSMS);
             mSubInfo = new PhoneSubInfo(this);
         }
 
@@ -222,7 +217,6 @@ public class GSMPhone extends PhoneBase {
             mDataConnectionTracker.dispose();
             mSST.dispose();
             mSimPhoneBookIntManager.dispose();
-            mSimSmsIntManager.dispose();
             mSubInfo.dispose();
         }
     }
@@ -232,7 +226,6 @@ public class GSMPhone extends PhoneBase {
         Log.d(LOG_TAG, "removeReferences");
         mSimulatedRadioControl = null;
         mSimPhoneBookIntManager = null;
-        mSimSmsIntManager = null;
         mSubInfo = null;
         mCT = null;
         mSST = null;
@@ -1306,11 +1299,6 @@ public class GSMPhone extends PhoneBase {
                 }
                 break;
 
-            case EVENT_NEW_ICC_SMS:
-                ar = (AsyncResult)msg.obj;
-                mSMS.dispatchMessage((SmsMessage)ar.result);
-                break;
-
             case EVENT_SET_NETWORK_AUTOMATIC:
                 // Automatic network selection from EF_CSP SIM record
                 ar = (AsyncResult) msg.obj;
@@ -1491,13 +1479,6 @@ public class GSMPhone extends PhoneBase {
     }
 
     /**
-     * Retrieves the IccSmsInterfaceManager of the GSMPhone
-     */
-    public IccSmsInterfaceManager getIccSmsInterfaceManager(){
-        return mSimSmsIntManager;
-    }
-
-    /**
      * Retrieves the IccPhoneBookInterfaceManager of the GSMPhone
      */
     public IccPhoneBookInterfaceManager getIccPhoneBookInterfaceManager(){
@@ -1576,7 +1557,6 @@ public class GSMPhone extends PhoneBase {
         }
         r.registerForNetworkSelectionModeAutomatic(
                 this, EVENT_SET_NETWORK_AUTOMATIC, null);
-        r.registerForNewSms(this, EVENT_NEW_ICC_SMS, null);
         r.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
         r.registerForRecordsLoaded(this, EVENT_SIM_RECORDS_LOADED, null);
     }
@@ -1587,7 +1567,6 @@ public class GSMPhone extends PhoneBase {
             return;
         }
         r.unregisterForNetworkSelectionModeAutomatic(this);
-        r.unregisterForNewSms(this);
         r.unregisterForRecordsEvents(this);
         r.unregisterForRecordsLoaded(this);
     }
@@ -1600,7 +1579,6 @@ public class GSMPhone extends PhoneBase {
         pw.println(" mSST=" + mSST);
         pw.println(" mPendingMMIs=" + mPendingMMIs);
         pw.println(" mSimPhoneBookIntManager=" + mSimPhoneBookIntManager);
-        pw.println(" mSimSmsIntManager=" + mSimSmsIntManager);
         pw.println(" mSubInfo=" + mSubInfo);
         if (VDBG) pw.println(" mImei=" + mImei);
         if (VDBG) pw.println(" mImeiSv=" + mImeiSv);

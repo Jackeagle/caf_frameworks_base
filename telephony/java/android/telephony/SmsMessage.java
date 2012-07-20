@@ -78,6 +78,12 @@ public class SmsMessage {
     public static final int MAX_USER_DATA_SEPTETS_WITH_HEADER = 153;
 
     /**
+     * Indicates unknown format SMS message.
+     * @hide pending API council approval
+     */
+    public static final String FORMAT_UNKNOWN = "unknown";
+
+    /**
      * Indicates a 3GPP format SMS message.
      * @hide pending API council approval
      */
@@ -130,12 +136,24 @@ public class SmsMessage {
      * into the new method {@code createFromPdu(byte[], String)} which takes an
      * extra format parameter. This is required in order to correctly decode the PDU on
      * devices that require support for both 3GPP and 3GPP2 formats at the same time,
-     * such as dual-mode GSM/CDMA and CDMA/LTE phones.
+     * such as dual-mode GSM/CDMA and CDMA/LTE phones.  Guess format based on Voice
+     * technology first, if it fails use other format.
      */
     public static SmsMessage createFromPdu(byte[] pdu) {
+         SmsMessage message = null;
+
+        // cdma(3gpp2) vs gsm(3gpp) format info was not given,
+        // guess from active voice phone type
         int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
         String format = (PHONE_TYPE_CDMA == activePhone) ? FORMAT_3GPP2 : FORMAT_3GPP;
-        return createFromPdu(pdu, format);
+        message = createFromPdu(pdu, format);
+
+        if (null == message || null == message.mWrappedSmsMessage) {
+            // decoding pdu failed based on activePhone type, must be other format
+            format = (PHONE_TYPE_CDMA == activePhone) ? FORMAT_3GPP : FORMAT_3GPP2;
+            message = createFromPdu(pdu, format);
+        }
+        return message;
     }
 
     /**
@@ -201,9 +219,8 @@ public class SmsMessage {
      */
     public static SmsMessage createFromEfRecord(int index, byte[] data) {
         SmsMessageBase wrappedMessage;
-        int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
 
-        if (PHONE_TYPE_CDMA == activePhone) {
+        if (isCdmaVoice()) {
             wrappedMessage = com.android.internal.telephony.cdma.SmsMessage.createFromEfRecord(
                     index, data);
         } else {
@@ -222,9 +239,7 @@ public class SmsMessage {
      * We should probably deprecate it and remove the obsolete test case.
      */
     public static int getTPLayerLengthForPDU(String pdu) {
-        int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
-
-        if (PHONE_TYPE_CDMA == activePhone) {
+        if (isCdmaVoice()) {
             return com.android.internal.telephony.cdma.SmsMessage.getTPLayerLengthForPDU(pdu);
         } else {
             return com.android.internal.telephony.gsm.SmsMessage.getTPLayerLengthForPDU(pdu);
@@ -258,8 +273,8 @@ public class SmsMessage {
      *         class).
      */
     public static int[] calculateLength(CharSequence msgBody, boolean use7bitOnly) {
-        int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
-        TextEncodingDetails ted = (PHONE_TYPE_CDMA == activePhone) ?
+        // this function is for MO SMS
+        TextEncodingDetails ted = (useCdmaFormatForMoSms()) ?
             com.android.internal.telephony.cdma.SmsMessage.calculateLength(msgBody, use7bitOnly) :
             com.android.internal.telephony.gsm.SmsMessage.calculateLength(msgBody, use7bitOnly);
         int ret[] = new int[4];
@@ -281,8 +296,8 @@ public class SmsMessage {
      * @hide
      */
     public static ArrayList<String> fragmentText(String text) {
-        int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
-        TextEncodingDetails ted = (PHONE_TYPE_CDMA == activePhone) ?
+        // This function is for MO SMS
+        TextEncodingDetails ted = (useCdmaFormatForMoSms()) ?
             com.android.internal.telephony.cdma.SmsMessage.calculateLength(text, false) :
             com.android.internal.telephony.gsm.SmsMessage.calculateLength(text, false);
 
@@ -324,7 +339,7 @@ public class SmsMessage {
         while (pos < textLen) {
             int nextPos = 0;  // Counts code units.
             if (ted.codeUnitSize == ENCODING_7BIT) {
-                if (activePhone == PHONE_TYPE_CDMA && ted.msgCount == 1) {
+                if (useCdmaFormatForMoSms() && ted.msgCount == 1) {
                     // For a singleton CDMA message, the encoding must be ASCII...
                     nextPos = pos + Math.min(limit, textLen - pos);
                 } else {
@@ -397,9 +412,8 @@ public class SmsMessage {
     public static SubmitPdu getSubmitPdu(String scAddress,
             String destinationAddress, String message, boolean statusReportRequested) {
         SubmitPduBase spb;
-        int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
 
-        if (PHONE_TYPE_CDMA == activePhone) {
+        if (useCdmaFormatForMoSms()) {
             spb = com.android.internal.telephony.cdma.SmsMessage.getSubmitPdu(scAddress,
                     destinationAddress, message, statusReportRequested, null);
         } else {
@@ -427,9 +441,8 @@ public class SmsMessage {
             String destinationAddress, short destinationPort, byte[] data,
             boolean statusReportRequested) {
         SubmitPduBase spb;
-        int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
 
-        if (PHONE_TYPE_CDMA == activePhone) {
+        if (useCdmaFormatForMoSms()) {
             spb = com.android.internal.telephony.cdma.SmsMessage.getSubmitPdu(scAddress,
                     destinationAddress, destinationPort, data, statusReportRequested);
         } else {
@@ -676,5 +689,31 @@ public class SmsMessage {
      */
     public boolean isReplyPathPresent() {
         return mWrappedSmsMessage.isReplyPathPresent();
+    }
+
+    /**
+     * Determines whether or not to use CDMA format for MO SMS.
+     * If SMS over IMS is supported, then format is based on IMS SMS format,
+     * otherwise format is based on current phone type.
+     *
+     * @return true if Cdma format should be used for MO SMS, false otherwise.
+     */
+    private static boolean useCdmaFormatForMoSms() {
+        if (!SmsManager.getDefault().isImsSmsSupported()) {
+            // use Voice technology to determine SMS format.
+            return isCdmaVoice();
+        }
+        // IMS is registered with SMS support, check the SMS format supported
+        return (FORMAT_3GPP2.equals(SmsManager.getDefault().getImsSmsFormat()));
+    }
+
+    /**
+     * Determines whether or not to current phone type is cdma.
+     *
+     * @return true if current phone type is cdma, false otherwise.
+     */
+    private static boolean isCdmaVoice() {
+        int activePhone = TelephonyManager.getDefault().getCurrentPhoneType();
+        return (PHONE_TYPE_CDMA == activePhone);
     }
 }

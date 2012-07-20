@@ -670,6 +670,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     }
 
 
+    public void getImsRegistrationState(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_IMS_REGISTRATION_STATE, result);
+
+        if (RILJ_LOGD) {
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        }
+        send(rr);
+    }
+
     @Override public void
     setOnNITZTime(Handler h, int what, Object obj) {
         super.setOnNITZTime(h, what, obj);
@@ -1210,30 +1219,32 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
+    private void
+    constructGsmSendSmsRilRequest (RILRequest rr, String smscPDU, String pdu) {
+        rr.mp.writeInt(2);
+        rr.mp.writeString(smscPDU);
+        rr.mp.writeString(pdu);
+    }
+
     public void
     sendSMS (String smscPDU, String pdu, Message result) {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SEND_SMS, result);
 
-        rr.mp.writeInt(2);
-        rr.mp.writeString(smscPDU);
-        rr.mp.writeString(pdu);
+        constructGsmSendSmsRilRequest(rr, smscPDU, pdu);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
         send(rr);
     }
 
-    public void
-    sendCdmaSms(byte[] pdu, Message result) {
+    private void
+    constructCdmaSendSmsRilRequest(RILRequest rr, byte[] pdu) {
         int address_nbr_of_digits;
         int subaddr_nbr_of_digits;
         int bearerDataLength;
         ByteArrayInputStream bais = new ByteArrayInputStream(pdu);
         DataInputStream dis = new DataInputStream(bais);
-
-        RILRequest rr
-                = RILRequest.obtain(RIL_REQUEST_CDMA_SEND_SMS, result);
 
         try {
             rr.mp.writeInt(dis.readInt()); //teleServiceId
@@ -1265,6 +1276,45 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             if (RILJ_LOGD) riljLog("sendSmsCdma: conversion from input stream to object failed: "
                     + ex);
         }
+    }
+
+    public void
+    sendCdmaSms(byte[] pdu, Message result) {
+        RILRequest rr
+                = RILRequest.obtain(RIL_REQUEST_CDMA_SEND_SMS, result);
+
+        constructCdmaSendSmsRilRequest(rr, pdu);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void
+    sendImsGsmSms (String smscPDU, String pdu, int retry, int messageRef,
+            Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_IMS_SEND_SMS, result);
+
+        rr.mp.writeInt(1); //RIL_IMS_SMS_Format.FORMAT_3GPP
+        rr.mp.writeByte((byte)retry);
+        rr.mp.writeInt(messageRef);
+
+        constructGsmSendSmsRilRequest(rr, smscPDU, pdu);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void
+    sendImsCdmaSms(byte[] pdu, int retry, int messageRef, Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_IMS_SEND_SMS, result);
+
+        rr.mp.writeInt(2); //RIL_IMS_SMS_Format.FORMAT_3GPP2
+        rr.mp.writeByte((byte)retry);
+        rr.mp.writeInt(messageRef);
+
+        constructCdmaSendSmsRilRequest(rr, pdu);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
@@ -2350,6 +2400,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU: ret = responseVoid(p); break;
             case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS: ret = responseICC_IO(p); break;
             case RIL_REQUEST_VOICE_RADIO_TECH: ret = responseInts(p); break;
+            case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
+            case RIL_REQUEST_IMS_SEND_SMS: ret =  responseSMS(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -2499,6 +2551,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
             case RIL_UNSOL_RIL_CONNECTED: ret = responseInts(p); break;
             case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: ret =  responseInts(p); break;
+            case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: ret =  responseVoid(p); break;
 
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -2516,6 +2569,12 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 if (RILJ_LOGD) unsljLogMore(response, newState.toString());
 
                 switchToRadioState(newState);
+            break;
+            case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED:
+                if (RILJ_LOGD) unsljLog(response);
+
+                mImsNetworkStateChangedRegistrants
+                    .notifyRegistrants(new AsyncResult(null, null, null));
             break;
             case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
                 if (RILJ_LOGD) unsljLog(response);
@@ -3715,6 +3774,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU: return "RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU";
             case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS: return "RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS";
             case RIL_REQUEST_VOICE_RADIO_TECH: return "RIL_REQUEST_VOICE_RADIO_TECH";
+            case RIL_REQUEST_IMS_REGISTRATION_STATE: return "RIL_REQUEST_IMS_REGISTRATION_STATE";
+            case RIL_REQUEST_IMS_SEND_SMS: return "RIL_REQUEST_IMS_SEND_SMS";
             default: return "<unknown request>";
         }
     }
@@ -3764,7 +3825,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE: return "UNSOL_EXIT_EMERGENCY_CALLBACK_MODE";
             case RIL_UNSOL_RIL_CONNECTED: return "UNSOL_RIL_CONNECTED";
             case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: return "UNSOL_VOICE_RADIO_TECH_CHANGED";
-            default: return "<unknown reponse>";
+            case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED";
+            default: return "<unknown response>";
         }
     }
 

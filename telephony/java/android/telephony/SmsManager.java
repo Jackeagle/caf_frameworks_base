@@ -488,6 +488,50 @@ public final class SmsManager {
         return messages;
     }
 
+    /**
+     * SMS over IMS is supported if IMS is registered and SMS is supported
+     * on IMS.
+     *
+     * @return true if SMS over IMS is supported, false otherwise
+     *
+     * @see #getImsSmsFormat()
+     */
+    boolean isImsSmsSupported() {
+        boolean boSupported = false;
+        try {
+            ISms iccISms = ISms.Stub.asInterface(ServiceManager.getService("isms"));
+            if (iccISms != null) {
+                boSupported = iccISms.isImsSmsSupported();
+            }
+        } catch (RemoteException ex) {
+            // ignore it
+        }
+        return boSupported;
+    }
+
+    /**
+     * Gets SMS format supported on IMS.  SMS over IMS format is
+     * either 3GPP or 3GPP2.
+     *
+     * @return SmsMessage.FORMAT_3GPP,
+     *         SmsMessage.FORMAT_3GPP2
+     *      or SmsMessage.FORMAT_UNKNOWN
+     *
+     * @see #isImsSmsSupported()
+     */
+    String getImsSmsFormat() {
+        String format = SmsMessage.FORMAT_UNKNOWN;
+        try {
+            ISms iccISms = ISms.Stub.asInterface(ServiceManager.getService("isms"));
+            if (iccISms != null) {
+                format = iccISms.getImsSmsFormat();
+            }
+        } catch (RemoteException ex) {
+            // ignore it
+        }
+        return format;
+    }
+
     // see SmsMessage.getStatusOnIcc
 
     /** Free space (TS 51.011 10.5.3 / 3GPP2 C.S0023 3.4.27). */
