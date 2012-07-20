@@ -671,8 +671,12 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private void onGetPlayStatusRequest(String path) {
         if(DBG) Log.d(TAG, "onGetPlayStatusRequest"+path);
         mPlayStatusRequestPath = path;
+        int playStatus = mPlayStatus;
         log("onGetPlayStatus Request position is " + mPosition);
-        if (mPlayStatus == STATUS_PLAYING) {
+        if ((mPlayingA2dpDevice == null) && (mPlayStatus == STATUS_PLAYING)) {
+            log("Some error in Player to update proper status");
+            playStatus = STATUS_PAUSED;
+        } else if (mPlayStatus == STATUS_PLAYING) {
             long curTime = System.currentTimeMillis();
             long timeElapsed = curTime - mReportTime;
             log("TimeElapsed is " + timeElapsed);
@@ -680,7 +684,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             mReportTime = curTime;
         }
         log("Updated position " + mPosition);
-        sendPlayStatusNative(path, (int)Integer.valueOf(mDuration), (int)mPosition, mPlayStatus);
+        sendPlayStatusNative(path, (int)Integer.valueOf(mDuration), (int)mPosition, playStatus);
     }
 
     private void onListPlayerAttributeRequest(String path) {
