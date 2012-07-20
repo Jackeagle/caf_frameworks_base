@@ -178,7 +178,7 @@ public class RilImsPhone extends PhoneBase {
     public void switchHoldingAndActive() throws CallStateException {
         if (DEBUG) Log.d(LOG_TAG, " ~~~~~~  switch fg and bg");
         synchronized (RilImsPhone.class) {
-            mCT.switchWaitingOrHoldingAndActiveIms();
+            mCT.switchWaitingOrHoldingAndActive(this);
         }
     }
 
@@ -187,7 +187,7 @@ public class RilImsPhone extends PhoneBase {
     }
 
     public boolean canConference() {
-        return mCT.canConference();
+        return mCT.canConference(this);
     }
 
     public boolean canTransfer() {
