@@ -398,13 +398,17 @@ public final class CallManager {
                 int newAudioMode = AudioManager.MODE_IN_CALL;
                 if (offhookPhone instanceof SipPhone) {
                     // enable IN_COMMUNICATION audio mode instead for sipPhone
+                    Log.d(LOG_TAG, "setAudioMode Set audio mode for SIP call!");
                     newAudioMode = AudioManager.MODE_IN_COMMUNICATION;
                 }
-                if (audioManager.getMode() != newAudioMode) {
+                int currMode = audioManager.getMode();
+                if (currMode != newAudioMode) {
                     // request audio focus before setting the new mode
-                    if (VDBG) Log.d(LOG_TAG, "requestAudioFocus on STREAM_VOICE_CALL");
+                    Log.d(LOG_TAG, "requestAudioFocus on STREAM_VOICE_CALL");
                     audioManager.requestAudioFocusForCall(AudioManager.STREAM_VOICE_CALL,
                             AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                    Log.d(LOG_TAG, "setAudioMode Setting audio mode from "
+                            + currMode + " to " + newAudioMode);
                     audioManager.setMode(newAudioMode);
                 }
                 break;
