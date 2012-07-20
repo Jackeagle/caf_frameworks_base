@@ -222,7 +222,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         15, // STREAM_BLUETOOTH_SCO
         7,  // STREAM_SYSTEM_ENFORCED
         15, // STREAM_DTMF
-        15  // STREAM_TTS
+        15, // STREAM_TTS
+        15  // STREAM_FM
     };
     /* mStreamVolumeAlias[] indicates for each stream if it uses the volume settings
      * of another stream: This avoids multiplying the volume settings for hidden
@@ -242,7 +243,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         AudioSystem.STREAM_BLUETOOTH_SCO,   // STREAM_BLUETOOTH_SCO
         AudioSystem.STREAM_RING,            // STREAM_SYSTEM_ENFORCED
         AudioSystem.STREAM_RING,            // STREAM_DTMF
-        AudioSystem.STREAM_MUSIC            // STREAM_TTS
+        AudioSystem.STREAM_MUSIC,           // STREAM_TTS
+        AudioSystem.STREAM_FM
     };
     private final int[] STREAM_VOLUME_ALIAS_NON_VOICE = new int[] {
         AudioSystem.STREAM_VOICE_CALL,      // STREAM_VOICE_CALL
@@ -467,6 +469,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 new IntentFilter(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         intentFilter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
         intentFilter.addAction(Intent.ACTION_DOCK_EVENT);
+        intentFilter.addAction(Intent.ACTION_FM);
+        intentFilter.addAction(Intent.ACTION_FM_TX);
         intentFilter.addAction(Intent.ACTION_USB_AUDIO_ACCESSORY_PLUG);
         intentFilter.addAction(Intent.ACTION_USB_AUDIO_DEVICE_PLUG);
         intentFilter.addAction(Intent.ACTION_BOOT_COMPLETED);
@@ -645,6 +649,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         mMuteAffectedStreams = System.getInt(cr,
                 System.MUTE_STREAMS_AFFECTED,
                 ((1 << AudioSystem.STREAM_MUSIC)|(1 << AudioSystem.STREAM_RING)|(1 << AudioSystem.STREAM_SYSTEM)));
+
+        mMuteAffectedStreams |= (1 << AudioSystem.STREAM_FM);
 
         boolean masterMute = System.getInt(cr, System.VOLUME_MASTER_MUTE, 0) == 1;
         AudioSystem.setMasterMute(masterMute);
@@ -3670,6 +3676,35 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     if (packageName != null) {
                         removeMediaButtonReceiverForPackage(packageName);
                     }
+                }
+            } else if (action.equals(Intent.ACTION_FM)){
+               Log.v(TAG, "FM Intent received");
+               state = intent.getIntExtra("state", 0);
+               if(state == 1){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
+                            AudioSystem.DEVICE_STATE_AVAILABLE,
+                            "");
+                    mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_FM), "");
+                }else if(state == 0){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
+                            AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                            "");
+                    mConnectedDevices.remove(AudioSystem.DEVICE_OUT_FM);
+                }
+            }else if (action.equals(Intent.ACTION_FM_TX)){
+               state = intent.getIntExtra("state", 0);
+               Log.v(TAG, "FM Tx Intent received "+state);
+               boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_FM_TX);
+               if(state == 1 && !isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM_TX,
+                            AudioSystem.DEVICE_STATE_AVAILABLE,
+                            "");
+                    mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_FM_TX), "");
+                }else if(state == 0 && isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM_TX,
+                            AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                            "");
+                    mConnectedDevices.remove(AudioSystem.DEVICE_OUT_FM_TX);
                 }
             } else if (action.equals(Intent.ACTION_SCREEN_ON)) {
                 AudioSystem.setParameters("screen_state=on");

@@ -53,13 +53,15 @@ public class AudioSystem
     public static final int STREAM_DTMF = 8;
     /* @hide The audio stream for text to speech (TTS) */
     public static final int STREAM_TTS = 9;
+    /* @hide The audio stream for FM */
+    public static final int STREAM_FM = 10;
     /**
      * @deprecated Use {@link #numStreamTypes() instead}
      */
     public static final int NUM_STREAMS = 5;
 
     // Expose only the getter method publicly so we can change it in the future
-    private static final int NUM_STREAM_TYPES = 10;
+    private static final int NUM_STREAM_TYPES = 11;
     public static final int getNumStreamTypes() { return NUM_STREAM_TYPES; }
 
     /*
@@ -214,8 +216,9 @@ public class AudioSystem
     public static final int DEVICE_OUT_DGTL_DOCK_HEADSET = 0x1000;
     public static final int DEVICE_OUT_USB_ACCESSORY = 0x2000;
     public static final int DEVICE_OUT_USB_DEVICE = 0x4000;
-
-    public static final int DEVICE_OUT_DEFAULT = 0x8000;
+    public static final int DEVICE_OUT_FM = 0x8000;
+    public static final int DEVICE_OUT_FM_TX = 0x10000;
+    public static final int DEVICE_OUT_DEFAULT = 0x80000;
     public static final int DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE |
                                               DEVICE_OUT_SPEAKER |
                                               DEVICE_OUT_WIRED_HEADSET |
@@ -231,6 +234,8 @@ public class AudioSystem
                                               DEVICE_OUT_DGTL_DOCK_HEADSET |
                                               DEVICE_OUT_USB_ACCESSORY |
                                               DEVICE_OUT_USB_DEVICE |
+                                              DEVICE_OUT_FM |
+                                              DEVICE_OUT_FM_TX |
                                               DEVICE_OUT_DEFAULT);
     public static final int DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP |
                                                    DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
@@ -242,14 +247,14 @@ public class AudioSystem
                                                   DEVICE_OUT_USB_DEVICE);
 
     // input devices
-    public static final int DEVICE_IN_COMMUNICATION = 0x10000;
-    public static final int DEVICE_IN_AMBIENT = 0x20000;
-    public static final int DEVICE_IN_BUILTIN_MIC1 = 0x40000;
-    public static final int DEVICE_IN_BUILTIN_MIC2 = 0x80000;
-    public static final int DEVICE_IN_MIC_ARRAY = 0x100000;
-    public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = 0x200000;
-    public static final int DEVICE_IN_WIRED_HEADSET = 0x400000;
-    public static final int DEVICE_IN_AUX_DIGITAL = 0x800000;
+    public static final int DEVICE_IN_COMMUNICATION = 0x100000;
+    public static final int DEVICE_IN_AMBIENT = 0x200000;
+    public static final int DEVICE_IN_BUILTIN_MIC1 = 0x400000;
+    public static final int DEVICE_IN_BUILTIN_MIC2 = 0x800000;
+    public static final int DEVICE_IN_MIC_ARRAY = 0x1000000;
+    public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = 0x2000000;
+    public static final int DEVICE_IN_WIRED_HEADSET = 0x4000000;
+    public static final int DEVICE_IN_AUX_DIGITAL = 0x8000000;
     public static final int DEVICE_IN_DEFAULT = 0x80000000;
 
     // device states, must match AudioSystem::device_connection_state
@@ -272,6 +277,8 @@ public class AudioSystem
     public static final String DEVICE_OUT_DGTL_DOCK_HEADSET_NAME = "digital_dock";
     public static final String DEVICE_OUT_USB_ACCESSORY_NAME = "usb_accessory";
     public static final String DEVICE_OUT_USB_DEVICE_NAME = "usb_device";
+    public static final String DEVICE_OUT_FM_NAME = "fm";
+    public static final String DEVICE_OUT_FM_TX_NAME = "fm_tx";
 
     public static String getDeviceName(int device)
     {
@@ -306,6 +313,10 @@ public class AudioSystem
             return DEVICE_OUT_USB_ACCESSORY_NAME;
         case DEVICE_OUT_USB_DEVICE:
             return DEVICE_OUT_USB_DEVICE_NAME;
+        case DEVICE_OUT_FM:
+            return DEVICE_OUT_FM_NAME;
+        case DEVICE_OUT_FM_TX:
+            return DEVICE_OUT_FM_TX_NAME;
         case DEVICE_IN_DEFAULT:
         default:
             return "";
