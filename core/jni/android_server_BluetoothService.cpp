@@ -756,6 +756,40 @@ static jboolean sapAuthorizeNative(JNIEnv *env, jobject object, jstring address,
     return JNI_FALSE;
 }
 
+static jboolean DUNAuthorizeNative(JNIEnv *env, jobject object, jstring address,
+                         jboolean access, int nativeData) {
+#ifdef HAVE_BLUETOOTH
+    LOGV("DUNAuthorizeNative %s %d", (char*)address, access);
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *msg = (DBusMessage *)nativeData;
+        DBusMessage *reply;
+        if (access) {
+            reply = dbus_message_new_method_return(msg);
+            if (!reply) {
+                LOGE("%s: Cannot create message reply to authorize DUN "
+                     "D-Bus\n", __FUNCTION__);
+                dbus_message_unref(msg);
+                return JNI_FALSE;
+            }
+        } else {
+            reply = dbus_message_new_error(msg,
+                    "org.bluez.Error.Rejected", "Authorization rejected");
+            if (!reply) {
+                LOGE("%s: Cannot create message reply\n", __FUNCTION__);
+                return JNI_FALSE;
+            }
+
+        }
+
+        dbus_connection_send(nat->conn, reply, NULL);
+        dbus_message_unref(msg);
+        dbus_message_unref(reply);
+        return JNI_TRUE;
+    }
+#endif
+    return JNI_FALSE;
+}
 
 
 
@@ -3198,6 +3232,23 @@ static jboolean disconnectAllConnectionsNative(JNIEnv *env, jobject object) {
                                    "DisconnectAllConnections",
                                    DBUS_TYPE_INVALID);
         return reply ? JNI_TRUE : JNI_FALSE;
+   }
+    #endif
+    return JNI_FALSE;
+}
+static jboolean disConnectDUNNative(JNIEnv *env, jobject object) {
+#ifdef HAVE_BLUETOOTH
+    LOGV("%s", __FUNCTION__);
+    native_data_t *nat = get_native_data(env, object);
+    if (nat) {
+        DBusMessage *reply = dbus_func_args_generic(env, nat->conn,
+                           "org.qcom.bluetooth.dun",
+                           "/DunService",
+                           "org.qcom.bluetooth.dun", "DisConnect",
+                           DBUS_TYPE_INVALID);
+
+        LOGV("%s: DUN Disconnect returned %s", reply);
+        return reply ?  JNI_TRUE: JNI_FALSE;
     }
 #endif
     return JNI_FALSE;
@@ -3327,6 +3378,8 @@ static JNINativeMethod sMethods[] = {
     {"readByTypeResponseNative", "(Ljava/lang/String;Ljava/lang/String;I[BII)Z", (void *)readByTypeResponseNative},
     {"readResponseNative", "(Ljava/lang/String;Ljava/lang/String;[BII)Z", (void *)readResponseNative},
     {"writeResponseNative", "(Ljava/lang/String;Ljava/lang/String;I)Z", (void *)writeResponseNative},
+    {"DUNAuthorizeNative", "(Ljava/lang/String;ZI)Z", (void *)DUNAuthorizeNative},
+    {"disConnectDUNNative", "()I", (void *)disConnectDUNNative},
 };
 
 
