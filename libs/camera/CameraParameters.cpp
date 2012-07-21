@@ -130,6 +130,9 @@ const char CameraParameters::KEY_POWER_MODE[] = "power-mode";
 /*only effective when KEY_AE_BRACKET_HDR set to ae_bracketing*/
 //const char CameraParameters::KEY_AE_BRACKET_SETTING_KEY[] = "ae-bracket-setting";
 
+const char CameraParameters::KEY_QC_SUPPORTED_CAMERA_FEATURES[] = "qc-camera-features";
+const char CameraParameters::KEY_QC_MAX_NUM_REQUESTED_FACES[] = "qc-max-num-requested-faces";
+
 const char CameraParameters::TRUE[] = "true";
 const char CameraParameters::FALSE[] = "false";
 const char CameraParameters::FOCUS_DISTANCE_INFINITY[] = "Infinity";
