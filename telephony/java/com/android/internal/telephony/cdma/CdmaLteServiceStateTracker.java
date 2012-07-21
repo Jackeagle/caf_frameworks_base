@@ -444,10 +444,16 @@ public class CdmaLteServiceStateTracker extends CdmaServiceStateTracker {
 
     @Override
     public boolean isConcurrentVoiceAndDataAllowed() {
-        if (mLteSS.getRadioTechnology() != ServiceState.RADIO_TECHNOLOGY_1xRTT)
+        if (networkType == ServiceState.RADIO_TECHNOLOGY_LTE) {
             return SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SVDATA, false);
-        else
-            return (mLteSS.getCssIndicator() == 1);
+        } else if (networkType == ServiceState.RADIO_TECHNOLOGY_EVDO_0
+                || networkType == ServiceState.RADIO_TECHNOLOGY_EVDO_A
+                || networkType == ServiceState.RADIO_TECHNOLOGY_EVDO_B
+                || networkType == ServiceState.RADIO_TECHNOLOGY_EHRPD) {
+            return SystemProperties.getBoolean(TelephonyProperties.PROPERTY_SVDO, false);
+        } else {
+            return (ss.getCssIndicator() == 1);
+        }
     }
 
     /**
