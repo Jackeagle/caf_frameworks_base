@@ -80,6 +80,7 @@ extern int register_android_hardware_SerialPort(JNIEnv *env);
 extern int register_android_hardware_UsbDevice(JNIEnv *env);
 extern int register_android_hardware_UsbDeviceConnection(JNIEnv *env);
 extern int register_android_hardware_UsbRequest(JNIEnv *env);
+extern int register_android_hardware_GestureDevice(JNIEnv *env);
 
 extern int register_android_media_AudioRecord(JNIEnv *env);
 extern int register_android_media_AudioSystem(JNIEnv *env);
@@ -1196,6 +1197,7 @@ static const RegJNIRec gRegJNI[] = {
 
     REG_JNI(register_android_animation_PropertyValuesHolder),
     REG_JNI(register_com_android_internal_content_NativeLibraryHelper),
+    REG_JNI(register_android_hardware_GestureDevice),
 };
 
 /*
