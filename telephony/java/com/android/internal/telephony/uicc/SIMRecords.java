@@ -20,6 +20,7 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OP
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_APN_SIM_OPERATOR_NUMERIC;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_EONS_ENABLED;
 import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Handler;
@@ -32,11 +33,13 @@ import android.util.Log;
 import com.android.internal.telephony.BaseCommands;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.MccTable;
+import com.android.internal.telephony.OperatorInfo;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.SmsMessageBase;
 import com.android.internal.telephony.gsm.SimTlv;
 import com.android.internal.telephony.gsm.SmsMessage;
+import com.android.internal.telephony.gsm.Eons;
 
 import java.util.ArrayList;
 
@@ -57,6 +60,12 @@ public class SIMRecords extends IccRecords {
 
 
     SpnOverride mSpnOverride;
+
+    Eons mEons;
+
+    /** EONS enabled flag. */
+    private boolean mEonsEnabled =
+            SystemProperties.getBoolean(PROPERTY_EONS_ENABLED, true);
 
     // ***** Cached SIM State; cleared on channel close
 
@@ -152,6 +161,9 @@ public class SIMRecords extends IccRecords {
     private static final int EVENT_SIM_REFRESH = 31;
     private static final int EVENT_GET_CFIS_DONE = 32;
     private static final int EVENT_GET_CSP_CPHS_DONE = 33;
+    private static final int EVENT_GET_ALL_OPL_RECORDS_DONE = 34;
+    private static final int EVENT_GET_ALL_PNN_RECORDS_DONE = 35;
+    private static final int EVENT_GET_SPN = 36;
 
     // Lookup table for carriers known to produce SIMs which incorrectly indicate MNC length.
 
@@ -185,6 +197,8 @@ public class SIMRecords extends IccRecords {
 
         mVmConfig = new VoiceMailConstants();
         mSpnOverride = new SpnOverride();
+
+        mEons = new Eons();
 
         recordsRequested = false;  // No load request is made till SIM ready
 
@@ -229,6 +243,7 @@ public class SIMRecords extends IccRecords {
         pnnHomeName = null;
 
         adnCache.reset();
+        mEons.reset();
 
         log("SIMRecords: onRadioOffOrNotAvailable set 'gsm.sim.operator.numeric' to operator=null");
         SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, null);
@@ -1130,6 +1145,56 @@ public class SIMRecords extends IccRecords {
                 handleEfCspData(data);
                 break;
 
+            case EVENT_GET_ALL_OPL_RECORDS_DONE:
+                isRecordLoadResponse = true;
+                ar = (AsyncResult)msg.obj;
+
+                if (ar.exception != null) {
+                    Log.e(LOG_TAG, "[EONS] Exception in fetching OPL Records: " + ar.exception);
+                    mEons.resetOplData();
+                    break;
+                }
+
+                mEons.setOplData((ArrayList<byte[]>)ar.result);
+                mRecordsEventsRegistrants.notifyResult(EVENT_EONS);
+                break;
+
+            case EVENT_GET_ALL_PNN_RECORDS_DONE:
+                isRecordLoadResponse = true;
+                ar = (AsyncResult)msg.obj;
+
+                if (ar.exception != null) {
+                    Log.e(LOG_TAG, "[EONS] Exception in fetching PNN Records: " + ar.exception);
+                    mEons.resetPnnData();
+                    break;
+                }
+
+                mEons.setPnnData((ArrayList<byte[]>)ar.result);
+                mRecordsEventsRegistrants.notifyResult(EVENT_EONS);
+                break;
+
+             case EVENT_GET_SPN:
+                isRecordLoadResponse = true;
+                ar = (AsyncResult)msg.obj;
+
+                if (ar.exception != null) {
+                    Log.e(LOG_TAG, "[EONS] Exception in reading EF_SPN: " + ar.exception);
+                    spnDisplayCondition = -1;
+                    break;
+                }
+
+                data = (byte[]) ar.result;
+                spnDisplayCondition = 0xff & data[0];
+                spn = IccUtils.adnStringFieldToString(data, 1, data.length - 1);
+
+                SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, spn);
+
+                // When device enters or exits Home Zone, certain operators update
+                // EF_SPN file. This helps to know if the device is in Home Zone or
+                // not. Hence SPN display should be updated on EF_SPN refresh.
+                mRecordsEventsRegistrants.notifyResult(EVENT_SPN);
+                break;
+
             default:
                 super.handleMessage(msg);   // IccRecords handles generic record load responses
 
@@ -1180,9 +1245,33 @@ public class SIMRecords extends IccRecords {
                 mFh.loadEFTransparent(EF_CFF_CPHS,
                 obtainMessage(EVENT_GET_CFF_DONE));
                 break;
+            case EF_OPL:
+                if (DBG) log("[EONS] SIM Refresh for EF_OPL");
+                if (mEonsEnabled) {
+                    if (DBG) log("[EONS] Update EF_OPL Records");
+                    recordsToLoad++;
+                    mFh.loadEFLinearFixedAll(EF_OPL,
+                          obtainMessage(EVENT_GET_ALL_OPL_RECORDS_DONE));
+                }
+                break;
+            case EF_PNN:
+                if (DBG) log("[EONS] SIM Refresh for EF_PNN");
+                if (mEonsEnabled) {
+                    if (DBG) log("[EONS] Update EF_PNN Records");
+                    recordsToLoad++;
+                    mFh.loadEFLinearFixedAll(EF_PNN,
+                          obtainMessage(EVENT_GET_ALL_PNN_RECORDS_DONE));
+                }
+                break;
+            case EF_SPN:
+                if (DBG) log("[EONS] SIM Refresh for EF_SPN");
+                recordsToLoad++;
+                mFh.loadEFTransparent(EF_SPN,
+                        obtainMessage(EVENT_GET_SPN));
+                break;
             default:
-                // For now, fetch all records if this is not a
-                // voicemail number.
+                // For now, fetch all records if this is not
+                // one of the above handled files.
                 // TODO: Handle other cases, instead of fetching all.
                 adnCache.reset();
                 fetchSimRecords();
@@ -1414,6 +1503,14 @@ public class SIMRecords extends IccRecords {
 
         mFh.loadEFLinearFixed(EF_PNN, 1, obtainMessage(EVENT_GET_PNN_DONE));
         recordsToLoad++;
+
+        if (mEonsEnabled) {
+            mFh.loadEFLinearFixedAll(EF_OPL, obtainMessage(EVENT_GET_ALL_OPL_RECORDS_DONE));
+            recordsToLoad++;
+
+            mFh.loadEFLinearFixedAll(EF_PNN, obtainMessage(EVENT_GET_ALL_PNN_RECORDS_DONE));
+            recordsToLoad++;
+        }
 
         mFh.loadEFTransparent(EF_SST, obtainMessage(EVENT_GET_SST_DONE));
         recordsToLoad++;
@@ -1658,6 +1755,38 @@ public class SIMRecords extends IccRecords {
     private boolean isCphsMailboxEnabled() {
         if (mCphsInfo == null)  return false;
         return ((mCphsInfo[1] & CPHS_SST_MBN_MASK) == CPHS_SST_MBN_ENABLED );
+    }
+
+    /**
+     * Get the EONS name derived from EF_OPL/EF_PNN or EF_CPHS_ONS/EF_CPHS_ONS_SHORT
+     * files for registered operator.
+     * @return Enhanced Operator Name String (EONS) if it can be derived and
+     * null otherwise.
+     */
+    public String getEons() {
+        return mEons.getEons();
+    }
+
+    /**
+     * When there is a change in LAC or Service State, update EONS
+     * for registered plmn.
+     * @param regOperator is the registered operator PLMN
+     * @param lac is current lac
+     * @return returns true if operator name display needs updation, false
+     * otherwise
+     */
+    public boolean updateEons(String regOperator, int lac) {
+        return mEons.updateEons(regOperator, lac, getOperatorNumeric());
+    }
+
+    /**
+     * Fetch EONS for Available Networks from EF_PNN data.
+     * @param avlNetworks, ArrayList of Available Networks
+     * @return ArrayList Available Networks with EONS if
+     * success, otherwise null
+     */
+    public ArrayList<OperatorInfo> getEonsForAvailableNetworks(ArrayList<OperatorInfo> avlNetworks) {
+        return mEons.getEonsForAvailableNetworks(avlNetworks);
     }
 
     protected void log(String s) {

@@ -85,6 +85,7 @@ public abstract class IccRecords extends Handler implements IccConstants {
     public static final int EVENT_MWI = 0; // Message Waiting indication
     public static final int EVENT_CFI = 1; // Call Forwarding indication
     public static final int EVENT_SPN = 2; // Service Provider Name
+    public static final int EVENT_EONS = 3;
 
     public static final int EVENT_GET_ICC_RECORD_DONE = 100;
 
