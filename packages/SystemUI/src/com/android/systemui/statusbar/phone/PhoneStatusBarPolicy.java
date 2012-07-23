@@ -239,7 +239,7 @@ public class PhoneStatusBarPolicy {
                 simState = IccCard.State.PUK_REQUIRED;
             }
             else {
-                simState = IccCard.State.NETWORK_LOCKED;
+                simState = IccCard.State.PERSO_LOCKED;
             }
         } else {
             simState = IccCard.State.UNKNOWN;

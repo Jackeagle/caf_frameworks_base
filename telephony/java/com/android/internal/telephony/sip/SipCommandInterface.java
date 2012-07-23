@@ -66,7 +66,7 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
             String newPwd, Message result) {
     }
 
-    public void supplyNetworkDepersonalization(String netpin, Message result) {
+    public void supplyDepersonalization(String netpin, int type,  Message result) {
     }
 
     public void getCurrentCalls(Message result) {

@@ -146,13 +146,13 @@ public class KeyguardUpdateMonitor {
                     state = IccCard.State.PIN_REQUIRED;
                 } else if (IccCard.INTENT_VALUE_LOCKED_ON_PUK.equals(lockedReason)) {
                     state = IccCard.State.PUK_REQUIRED;
+                } else if (IccCard.INTENT_VALUE_LOCKED_PERSO.equals(lockedReason)) {
+                    state = IccCard.State.PERSO_LOCKED;
                 } else {
                     state = IccCard.State.UNKNOWN;
                 }
             } else if (IccCard.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
                 state = IccCard.State.CARD_IO_ERROR;
-            } else if (IccCard.INTENT_VALUE_LOCKED_NETWORK.equals(stateExtra)) {
-                state = IccCard.State.NETWORK_LOCKED;
             } else {
                 state = IccCard.State.UNKNOWN;
             }
