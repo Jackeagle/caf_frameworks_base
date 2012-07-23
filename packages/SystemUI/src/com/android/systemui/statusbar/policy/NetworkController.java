@@ -843,11 +843,7 @@ public class NetworkController extends BroadcastReceiver {
             mContentDescriptionWifi = mContext.getString(
                     AccessibilityContentDescriptions.WIFI_CONNECTION_STRENGTH[mWifiLevel]);
         } else {
-            if (mDataAndWifiStacked) {
-                mWifiIconId = 0;
-            } else {
-                mWifiIconId = mWifiEnabled ? WifiIcons.WIFI_SIGNAL_STRENGTH[0][0] : 0;
-            }
+            mWifiIconId = 0;
             mContentDescriptionWifi = mContext.getString(R.string.accessibility_no_wifi);
         }
     }
