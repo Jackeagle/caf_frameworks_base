@@ -608,7 +608,9 @@ public final class RuimRecords extends IccRecords {
         String operator = getOperatorNumeric();
         log("RuimRecords: onAllRecordsLoaded set 'gsm.sim.operator.numeric' to operator='" +
                 operator + "'");
-        SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
+        if (operator != null) {
+            SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
+        }
 
         if (mImsi != null) {
             SystemProperties.set(PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
