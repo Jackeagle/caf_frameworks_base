@@ -593,6 +593,12 @@
   <java-symbol type="string" name="mmiComplete" />
   <java-symbol type="string" name="mmiError" />
   <java-symbol type="string" name="mmiFdnError" />
+  <java-symbol type="string" name="stkCcSsToDial" />
+  <java-symbol type="string" name="stkCcSsToSs" />
+  <java-symbol type="string" name="stkCcSsToUssd" />
+  <java-symbol type="string" name="stkCcUssdToDial" />
+  <java-symbol type="string" name="stkCcUssdToSs" />
+  <java-symbol type="string" name="stkCcUssdToUssd" />
   <java-symbol type="string" name="month" />
   <java-symbol type="string" name="month_day" />
   <java-symbol type="string" name="month_day_year" />

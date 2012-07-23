@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -163,6 +164,7 @@ public class GSMPhone extends PhoneBase {
         mCM.setOnUSSD(this, EVENT_USSD, null);
         mCM.setOnSuppServiceNotification(this, EVENT_SSN, null);
         mSST.registerForNetworkAttached(this, EVENT_REGISTERED_TO_NETWORK, null);
+        mCM.setOnSS(this, EVENT_SS, null);
 
         if (false) {
             try {
@@ -224,6 +226,7 @@ public class GSMPhone extends PhoneBase {
             mSST.unregisterForNetworkAttached(this); //EVENT_REGISTERED_TO_NETWORK
             mCM.unSetOnUSSD(this);
             mCM.unSetOnSuppServiceNotification(this);
+            mCM.unSetOnSS(this);
 
             mPendingMMIs.clear();
 
@@ -1128,7 +1131,7 @@ public class GSMPhone extends PhoneBase {
          * The exception is cancellation of an incoming USSD-REQUEST, which is
          * not on the list.
          */
-        if (mPendingMMIs.remove(mmi) || mmi.isUssdRequest()) {
+        if (mPendingMMIs.remove(mmi) || mmi.isUssdRequest() || mmi.isSsInfo()) {
             mMmiCompleteRegistrants.notifyRegistrants(
                 new AsyncResult(null, mmi, null));
         }
@@ -1401,6 +1404,16 @@ public class GSMPhone extends PhoneBase {
                 } else {
                     Log.e(LOG_TAG, "[EONS] In EVENT_GET_NETWORKS_DONE, onComplete is null!");
                 }
+                break;
+
+            case EVENT_SS:
+                ar = (AsyncResult)msg.obj;
+                Log.d(LOG_TAG, "Event EVENT_SS received");
+                // SS data is already being handled through MMI codes.
+                // So, this result if processed as MMI response would help
+                // in re-using the existing functionality.
+                GsmMmiCode mmi = new GsmMmiCode(this, mUiccApplication.get());
+                mmi.processSsData(ar);
                 break;
 
              default:
