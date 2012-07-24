@@ -239,6 +239,8 @@ public class MediaRecorder
 
         /** QCP file format */
         public static final int QCP = 9;
+        /** WAVE file format*/
+        public static final int WAVE = 10;
     };
 
     /**
