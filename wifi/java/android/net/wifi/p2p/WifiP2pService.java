@@ -911,11 +911,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     break;
                  case WifiMonitor.P2P_PROV_DISC_FAILURE_EVENT:
                     WifiP2pDevice device = (WifiP2pDevice) message.obj;
-                    mSavedConnectConfig.deviceAddress = device.deviceAddress;
-                    updateDeviceStatus(mSavedConnectConfig.deviceAddress, WifiP2pDevice.FAILED);
-                    mSavedConnectConfig = null;
+                    updateDeviceStatus(device.deviceAddress, WifiP2pDevice.FAILED);
                     sendP2pPeersChangedBroadcast();
-                    // transitionTo(mInactiveState);
                     break;
                 default:
                     return NOT_HANDLED;
