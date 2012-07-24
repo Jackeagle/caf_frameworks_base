@@ -25,6 +25,7 @@ import android.os.Message;
 import android.os.SystemProperties;
 import android.provider.Telephony.Sms;
 import android.provider.Telephony.Sms.Intents;
+import android.telephony.CellLocation;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.SmsCbLocation;
 import android.telephony.SmsCbMessage;
@@ -511,9 +512,14 @@ public final class GsmSMSDispatcher extends SMSDispatcher {
 
             SmsCbHeader header = new SmsCbHeader(receivedPdu);
             String plmn = SystemProperties.get(TelephonyProperties.PROPERTY_OPERATOR_NUMERIC);
-            GsmCellLocation cellLocation = (GsmCellLocation) mPhone.getCellLocation();
-            int lac = cellLocation.getLac();
-            int cid = cellLocation.getCid();
+            int lac = -1;
+            int cid = -1;
+            CellLocation cl = mPhone.getCellLocation();
+            if (cl instanceof GsmCellLocation) {
+                GsmCellLocation cellLocation = (GsmCellLocation)cl;
+                lac = cellLocation.getLac();
+                cid = cellLocation.getCid();
+            }
 
             SmsCbLocation location;
             switch (header.getGeographicalScope()) {

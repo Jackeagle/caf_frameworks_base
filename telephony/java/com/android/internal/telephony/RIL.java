@@ -62,6 +62,7 @@ import com.android.internal.telephony.uicc.IccRefreshResponse;
 import com.android.internal.telephony.uicc.IccUtils;
 import com.android.internal.telephony.cdma.CdmaCallWaitingNotification;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
+import com.android.internal.telephony.cdma.CdmaSmsBroadcastConfigInfo;
 import com.android.internal.telephony.cdma.DataProfileOmh;
 
 import java.io.ByteArrayInputStream;
@@ -4158,6 +4159,40 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         }
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    public void setCdmaBroadcastConfig(CdmaSmsBroadcastConfigInfo[] configs, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG, response);
+
+        // Convert to 1 service category per config (the way RIL takes is)
+        ArrayList<CdmaSmsBroadcastConfigInfo> processedConfigs =
+            new ArrayList<CdmaSmsBroadcastConfigInfo>();
+        for (CdmaSmsBroadcastConfigInfo config : configs) {
+            for (int i = config.getFromServiceCategory(); i <= config.getToServiceCategory(); i++) {
+                processedConfigs.add(new CdmaSmsBroadcastConfigInfo(i,
+                        i,
+                        config.getLanguage(),
+                        config.isSelected()));
+            }
+        }
+
+        CdmaSmsBroadcastConfigInfo[] rilConfigs = processedConfigs.toArray(configs);
+        rr.mp.writeInt(rilConfigs.length);
+        for(int i = 0; i < rilConfigs.length; i++) {
+            rr.mp.writeInt(rilConfigs[i].getFromServiceCategory());
+            rr.mp.writeInt(rilConfigs[i].getLanguage());
+            rr.mp.writeInt(rilConfigs[i].isSelected() ? 1 : 0);
+        }
+
+        if (RILJ_LOGD) {
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                    + " with " + rilConfigs.length + "configs : ");
+            for (int i = 0; i < rilConfigs.length; i++) {
+                riljLog(rilConfigs[i].toString());
+            }
+        }
 
         send(rr);
     }
