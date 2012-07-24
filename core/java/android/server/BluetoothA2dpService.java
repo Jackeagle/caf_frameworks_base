@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +28,8 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothUuid;
+import android.media.Metadata;
+import android.media.MediaPlayer;
 import android.bluetooth.IBluetoothA2dp;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -40,12 +43,17 @@ import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.provider.Settings;
 import android.util.Log;
+import android.net.Uri;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
+import android.database.Cursor;
+import android.provider.MediaStore;
+import android.media.MediaMetadataRetriever;
 
 
 public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
@@ -81,7 +89,10 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private String mMediaNumber = DEFAULT_METADATA_NUMBER;
     private String mMediaCount = DEFAULT_METADATA_NUMBER;
     private String mDuration = DEFAULT_METADATA_NUMBER;
-    private int mPlayStatus = (int)Integer.valueOf(DEFAULT_METADATA_NUMBER);
+    private String mGenre = DEFAULT_METADATA_STRING;
+    private Long mReportTime = System.currentTimeMillis();
+    private Uri mUri = null;
+    private int mPlayStatus = STATUS_STOPPED;
     private long mPosition = (long)Long.valueOf(DEFAULT_METADATA_NUMBER);
 
     /* AVRCP1.3 Events */
@@ -107,6 +118,16 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private String mPlayStatusRequestPath = "/";
 
     private final static int MESSAGE_PLAYSTATUS_TIMEOUT = 1;
+
+    private String[] mCursorCols = new String[] {
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.ARTIST,
+            MediaStore.Audio.Media.ALBUM,
+            MediaStore.Audio.Media.TITLE,
+    };
+
+    private static final String ACTION_METADATA_CHANGED  =
+        "android.media.MediaPlayer.action.METADATA_CHANGED";
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -255,6 +276,88 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 mPlayStatus = convertedPlayStatus(playStatus, mPosition);
                 if(DBG) Log.d(TAG, "Sending Playstatus");
                 sendPlayStatus(mPlayStatusRequestPath);
+            } else if (action.equals(ACTION_METADATA_CHANGED)) {
+                Uri uri = intent.getParcelableExtra("uripath");
+                log("uri is " + uri + "mUri is " + mUri);
+
+                if (uri == null)
+                    return;
+
+                if (uri.toString().startsWith("content://media/internal")) {
+                    log("Internal audio file data, ignoring");
+                    return;
+                }
+
+                String tempMediaNumber = mMediaNumber;
+
+                mReportTime = intent.getLongExtra("time", 0);
+                mDuration = String.valueOf(intent.getIntExtra("duration", 0));
+                mPosition = intent.getIntExtra("position", 0);
+                int playStatus = intent.getIntExtra("playstate", 0);
+                log("PlaySatus is " + playStatus);
+
+                if (playStatus != mPlayStatus) {
+                    mPlayStatus = playStatus;
+                    for (String path: getConnectedSinksPaths()) {
+                        sendEvent(path, EVENT_PLAYSTATUS_CHANGED, (long)mPlayStatus);
+                    }
+                }
+
+                log("Metadata received");
+                log("Duration " + mDuration);
+                log("position " + mPosition);
+                log("playstate is " + mPlayStatus);
+
+                if (uri == mUri) {
+                    log("Update for same Uri, ignoring");
+                    return;
+                }
+
+                mUri = uri;
+                try {
+                    Cursor mCursor = mContext.getContentResolver().query(mUri, mCursorCols,
+                                        null, null, null);
+                    mCursor.moveToFirst();
+                    mTrackName = mCursor.getString(
+                        mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE));
+                    mArtistName = mCursor.getString(
+                        mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST));
+                    mAlbumName = mCursor.getString(
+                        mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM));
+                    long mediaNumber = mCursor.getLong(
+                        mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID));
+                    mMediaNumber = String.valueOf(mediaNumber);
+                    log("Title is " + mTrackName);
+                    log("Artist is " + mArtistName);
+                    log("Album is " + mAlbumName);
+                    log("ID is " + mMediaNumber);
+                    mCursor.close();
+                    Long tmpId = (Long)getTrackId(mTrackName);
+                    log("tmpId is " + tmpId);
+                    mMediaNumber = String.valueOf(tmpId);
+                    log("ID is " + mMediaNumber);
+                    if (!tempMediaNumber.equals(mMediaNumber)) {
+                        /* file change happened */
+                        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                        mmr.setDataSource(mContext, mUri);
+                        mGenre = mmr.extractMetadata(mmr.METADATA_KEY_GENRE);
+                        log("Genre is " + mGenre);
+                    }
+                    mCursor = mContext.getContentResolver().query(
+                                            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                                            new String [] { MediaStore.Audio.Media._ID},
+                                            MediaStore.Audio.Media.IS_MUSIC + "=1", null,
+                                            MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
+                    mMediaCount = String.valueOf(mCursor.getCount());
+                    mCursor.close();
+                    log("Track count is " + mMediaCount);
+                } catch(Exception e) {log("Exc is " + e);}
+
+                log("end of parsing mData");
+                for (String path: getConnectedSinksPaths()) {
+                    sendMetaData(path);
+                    sendEvent(path, EVENT_TRACK_CHANGED, Long.valueOf(mMediaNumber));
+                }
             }
         }
     };
@@ -270,11 +373,22 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     }
 
     private synchronized void sendMetaData(String path) {
+
+        if (mTrackName == null || mTrackName.isEmpty())
+            mTrackName = DEFAULT_METADATA_STRING;
+        if (mArtistName == null || mArtistName.isEmpty())
+            mArtistName = DEFAULT_METADATA_STRING;
+        if (mAlbumName == null || mAlbumName.isEmpty())
+            mAlbumName = DEFAULT_METADATA_STRING;
+        if (mGenre == null || mGenre.isEmpty())
+            mGenre = DEFAULT_METADATA_STRING;
+
         if(DBG) {
             Log.d(TAG, "sendMetaData "+ path);
             Log.d(TAG, "Meta data info is trackname: "+ mTrackName+" artist: "+mArtistName);
             Log.d(TAG, "mMediaNumber: "+mMediaNumber+" mediaCount "+mMediaCount);
             Log.d(TAG, "mPostion "+ mPosition+" album: "+mAlbumName+ "duration "+mDuration);
+            Log.d(TAG, "mGenre "+ mGenre);
         }
         sendMetaDataNative(path);
     }
@@ -292,9 +406,16 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private void onGetPlayStatusRequest(String path) {
         if(DBG) Log.d(TAG, "onGetPlayStatusRequest"+path);
         mPlayStatusRequestPath = path;
-        mContext.sendBroadcast(new Intent(PLAYSTATUS_REQUEST));
-        mHandler.sendMessageDelayed(
-            mHandler.obtainMessage(MESSAGE_PLAYSTATUS_TIMEOUT), 130);
+        log("onGetPlayStatus Request position is " + mPosition);
+        if (mPlayStatus == STATUS_PLAYING) {
+            long curTime = System.currentTimeMillis();
+            long timeElapsed = curTime - mReportTime;
+            log("TimeElapsed is " + timeElapsed);
+            mPosition += timeElapsed;
+            mReportTime = curTime;
+        }
+        log("Updated position " + mPosition);
+        sendPlayStatusNative(path, (int)Integer.valueOf(mDuration), (int)mPosition, mPlayStatus);
     }
 
     private boolean isPhoneDocked(BluetoothDevice device) {
@@ -337,9 +458,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         mIntentFilter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
         mIntentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         mIntentFilter.addAction(AudioManager.VOLUME_CHANGED_ACTION);
-        mIntentFilter.addAction(PLAYSTATE_CHANGED);
-        mIntentFilter.addAction(META_CHANGED);
-        mIntentFilter.addAction(PLAYSTATUS_RESPONSE);
+        mIntentFilter.addAction(ACTION_METADATA_CHANGED);
         mContext.registerReceiver(mReceiver, mIntentFilter);
 
         mAudioDevices = new HashMap<BluetoothDevice, Integer>();
@@ -403,6 +522,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         }
         mAudioManager.setParameters(BLUETOOTH_ENABLED+"=true");
         mAudioManager.setParameters("A2dpSuspended=false");
+        mPlayingA2dpDevice = null;
     }
 
     private synchronized void onBluetoothDisable() {
@@ -460,8 +580,15 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         if (DBG) log("connectSink(" + device + ")");
         if (!isConnectSinkFeasible(device)) return false;
 
+        int state;
         for (BluetoothDevice sinkDevice : mAudioDevices.keySet()) {
-            if (getConnectionState(sinkDevice) != BluetoothProfile.STATE_DISCONNECTED) {
+            state = getConnectionState(sinkDevice);
+            if (state != BluetoothProfile.STATE_DISCONNECTED) {
+                if (device.equals(sinkDevice) &&
+                    ((state == BluetoothProfile.STATE_CONNECTING) ||
+                     (state == BluetoothProfile.STATE_CONNECTED))) {
+                     return true; // already connecting to same device.
+                }
                 disconnect(sinkDevice);
             }
         }
@@ -830,6 +957,45 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             }
         }
     }
+
+    private long getTrackId(String trackName) {
+        long trackId = 0;
+
+        if (trackName == null)
+            return trackId;
+
+        try {
+            Cursor musicCursor = mContext.getContentResolver().query(
+                                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                                    new String[] {MediaStore.Audio.Media.TITLE},
+                                    MediaStore.Audio.Media.IS_MUSIC + "=1",
+                                    null, null);
+            int totalTracks = musicCursor.getCount();
+            musicCursor.moveToFirst();
+            int index = 0;
+            for (; index < totalTracks; index++){
+                trackId++;
+                String title = musicCursor.getString(
+                        musicCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE));
+                if (title == null)
+                    continue;
+
+                if(title.equals(trackName)){
+                    musicCursor.close();
+                    break;
+                }
+                musicCursor.moveToNext();
+            }
+            if (index == totalTracks) {
+                log("Record not found");
+                musicCursor.close();
+                trackId = 0;
+            }
+        } catch(Exception e) {log("Exception is " + e);}
+        log("trackId is " + trackId);
+        return trackId;
+    }
+
 
     @Override
     protected synchronized void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
