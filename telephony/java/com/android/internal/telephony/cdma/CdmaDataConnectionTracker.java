@@ -258,6 +258,10 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             notifyOffApnsOfAvailability(reason);
             return retValue;
         } else {
+            if (!mRequestedApnType.equals(Phone.APN_TYPE_DEFAULT)
+                    && (mState == State.IDLE || mState == State.SCANNING)) {
+                mPhone.notifyDataConnectionFailed(reason, mRequestedApnType);
+            }
             notifyOffApnsOfAvailability(reason);
             return false;
         }
