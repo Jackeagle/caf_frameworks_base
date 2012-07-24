@@ -36,7 +36,7 @@ public class LinkCapabilities implements Parcelable {
     private static final boolean DBG = false;
 
     /** The Map of Keys to Values */
-    private HashMap<Integer, String> mCapabilities;
+    protected HashMap<Integer, String> mCapabilities;
 
 
     /**
@@ -54,6 +54,11 @@ public class LinkCapabilities implements Parcelable {
     public static final class Key {
         /** No constructor */
         private Key() {}
+
+        /**
+         * A string containing the socket's role
+         */
+        public final static int RW_ROLE = 0;
 
         /**
          * An integer representing the network type.
@@ -129,6 +134,7 @@ public class LinkCapabilities implements Parcelable {
          * Values will be strings such as "wlan0", "rmnet0"
          */
         public final static int RO_PHYSICAL_INTERFACE = 10;
+
     }
 
     /**
@@ -166,6 +172,24 @@ public class LinkCapabilities implements Parcelable {
         public static final String VIDEO_CHAT_360P = "video.chat.360p";
         /** Video Chat Application at 480p */
         public static final String VIDEO_CHAT_480P = "video.chat.480i";
+    }
+
+    /**
+     * Status of QoS if the specified role is QoS specific. This class will
+     * represent the values for the {@code key RO_QOS_STATE}
+     */
+    public static final class QosStatus {
+        /** Represents the state when request for QoS fails */
+        public static final String QOS_STATE_FAILED = "failed";
+
+        /** Represents the state when QoS is available */
+        public static final String QOS_STATE_ACTIVE = "active";
+
+        /** Represents the state when QoS is released or not available */
+        public static final String QOS_STATE_INACTIVE = "inactive";
+
+        /** Represents the state when QoS is suspended */
+        public static final String QOS_STATE_SUSPENDED = "suspended";
     }
 
     /**
