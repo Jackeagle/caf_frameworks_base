@@ -112,6 +112,7 @@ public class GSMPhone extends PhoneBase {
     ArrayList <GsmMmiCode> mPendingMMIs = new ArrayList<GsmMmiCode>();
     SimPhoneBookInterfaceManager mSimPhoneBookIntManager;
     PhoneSubInfo mSubInfo;
+    UiccCard mSimCard = null;
 
 
     Registrant mPostDialHandler;
@@ -230,6 +231,7 @@ public class GSMPhone extends PhoneBase {
         mSubInfo = null;
         mCT = null;
         mSST = null;
+        mSimCard = null;
         super.removeReferences();
     }
 
@@ -1378,10 +1380,12 @@ public class GSMPhone extends PhoneBase {
                 }
                 mIccRecords.set(null);
                 mUiccApplication.set(null);
+                mSimCard = null;
             }
             if (newUiccApplication != null) {
                 if (LOCAL_DEBUG) log("New Uicc application found");
                 mUiccApplication.set(newUiccApplication);
+                mSimCard = mUiccApplication.get().getCard();
                 mIccRecords.set(newUiccApplication.getIccRecords());
                 registerForSimRecordEvents();
                 mSimPhoneBookIntManager.updateIccRecords(mIccRecords.get());
@@ -1590,6 +1594,10 @@ public class GSMPhone extends PhoneBase {
         r.unregisterForNetworkSelectionModeAutomatic(this);
         r.unregisterForRecordsEvents(this);
         r.unregisterForRecordsLoaded(this);
+    }
+
+    public UiccCard getUiccCard() {
+        return mSimCard;
     }
 
     @Override
