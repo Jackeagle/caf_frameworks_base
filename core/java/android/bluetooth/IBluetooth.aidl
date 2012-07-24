@@ -189,4 +189,7 @@ interface IBluetooth
                         in int status, in int reqHandle);
     void disconnectSap();
     boolean isHostPatchRequired(in BluetoothDevice btDevice, in int patch_id);
+    void disconnectDUN();
+    boolean disableDUN();
+    boolean enableDUN();
 }

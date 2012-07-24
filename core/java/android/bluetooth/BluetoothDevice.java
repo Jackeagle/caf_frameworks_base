@@ -352,6 +352,9 @@ public final class BluetoothDevice implements Parcelable {
     /**@hide*/
     public static final int REQUEST_TYPE_SIM_ACCESS = 5;
 
+    /**@hide*/
+    public static final int REQUEST_TYPE_DUN_ACCESS = 6;
+
     /**
      * Used as an extra field in {@link #ACTION_CONNECTION_ACCESS_REQUEST} intents,
      * Contains package name to return reply intent to.
@@ -533,6 +536,12 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public static final String SAP_STATE_CHANGED = "com.android.bluetooth.sap.statechanged";
+
+    /**
+     * Used as an extra field for DUN state change events.
+     * @hide
+     */
+    public static final String DUN_STATE_CHANGED = "com.android.bluetooth.dun.statechanged";
     /**
      * Lazy initialization. Guaranteed final after first object constructed, or
      * getService() called.
