@@ -143,6 +143,9 @@ public class WifiP2pDevice implements Parcelable {
         "(?:[0-9a-f]{2}:){5}[0-9a-f]{2} p2p_dev_addr=((?:[0-9a-f]{2}:){5}[0-9a-f]{2})"
     );
 
+    /** Device WFD support Info */
+
+    public WfdInfo wfdInfo;
 
     public WifiP2pDevice() {
     }
@@ -209,6 +212,12 @@ public class WifiP2pDevice implements Parcelable {
         if (tokens[0].startsWith("P2P-DEVICE-FOUND")) {
             status = AVAILABLE;
         }
+
+        /** Look for WFD information in device information string */
+        wfdInfo = new WfdInfo(string);
+        if(wfdInfo.isWFDDevice() != true) {
+            wfdInfo = null;
+        }
     }
 
     /** Returns true if WPS push button configuration is supported */
@@ -258,6 +267,9 @@ public class WifiP2pDevice implements Parcelable {
         sbuf.append("\n grpcapab: ").append(groupCapability);
         sbuf.append("\n devcapab: ").append(deviceCapability);
         sbuf.append("\n status: ").append(status);
+        if(wfdInfo != null) {
+           sbuf.append("\n").append(wfdInfo.toString());
+        }
         return sbuf.toString();
     }
 
@@ -277,6 +289,7 @@ public class WifiP2pDevice implements Parcelable {
             deviceCapability = source.deviceCapability;
             groupCapability = source.groupCapability;
             status = source.status;
+            wfdInfo = source.wfdInfo;
         }
     }
 
@@ -290,6 +303,7 @@ public class WifiP2pDevice implements Parcelable {
         dest.writeInt(deviceCapability);
         dest.writeInt(groupCapability);
         dest.writeInt(status);
+        dest.writeValue(wfdInfo);
     }
 
     /** Implement the Parcelable interface */
@@ -305,6 +319,7 @@ public class WifiP2pDevice implements Parcelable {
                 device.deviceCapability = in.readInt();
                 device.groupCapability = in.readInt();
                 device.status = in.readInt();
+                device.wfdInfo = (WfdInfo) in.readValue(null);
                 return device;
             }
 
