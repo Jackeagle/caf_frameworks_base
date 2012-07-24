@@ -41,6 +41,12 @@ namespace android {
 static jmethodID method_onSinkPropertyChanged;
 static jmethodID method_onConnectSinkResult;
 static jmethodID method_onGetPlayStatusRequest;
+static jmethodID method_onListPlayerAttributeRequest;
+static jmethodID method_onListPlayerAttributeValues;
+static jmethodID method_onGetPlayerAttributeValues;
+static jmethodID method_onSetPlayerAttributeValues;
+static jmethodID method_onListPlayerAttributesText;
+static jmethodID method_onListAttributeValuesText;
 static jfieldID field_mTrackName;
 static jfieldID field_mArtistName;
 static jfieldID field_mAlbumName;
@@ -299,6 +305,59 @@ static jboolean sendPlayStatusNative(JNIEnv *env, jobject object, jstring path,
     return JNI_FALSE;
 }
 
+static jboolean sendPlayerSettingsNative(JNIEnv *env, jobject object, jstring path,
+                          jstring response, jint len, jbyteArray values) {
+#ifdef HAVE_BLUETOOTH
+    LOGV(__FUNCTION__);
+    if (nat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        const char *c_response = env->GetStringUTFChars(response, NULL);
+        jbyte *u_values = env->GetByteArrayElements(values, NULL);
+        bool ret = dbus_func_args_async(env, nat->conn, -1, onStatusReply, NULL, nat,
+                           c_path, "org.bluez.Control", c_response,
+                           DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &u_values, len,
+                           DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+        env->ReleaseStringUTFChars(response, c_response);
+        env->ReleaseByteArrayElements(values, u_values, 0);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+static jboolean sendSettingsTextNative(JNIEnv *env, jobject object, jstring path,
+                   jstring response, jint len, jbyteArray values, jobjectArray strings) {
+#ifdef HAVE_BLUETOOTH
+    LOGV(__FUNCTION__);
+    if (nat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        const char *c_response = env->GetStringUTFChars(response, NULL);
+        jbyte *u_values = env->GetByteArrayElements(values, NULL);
+        char const** c_strings = (char const**)malloc(sizeof(char*)*len);
+        for (int i = 0; i < len; i++) {
+            c_strings[i] = env->GetStringUTFChars(
+                            (jstring)env->GetObjectArrayElement(strings, i),
+                             NULL);
+        }
+        bool ret = dbus_func_args_async(env, nat->conn, -1, onStatusReply, NULL, nat,
+                           c_path, "org.bluez.Control", c_response,
+                           DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &u_values, len,
+                           DBUS_TYPE_ARRAY, DBUS_TYPE_STRING, &c_strings, len,
+                           DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+        env->ReleaseStringUTFChars(response, c_response);
+        env->ReleaseByteArrayElements(values, u_values, 0);
+        for (int i = 0; i < len; i++) {
+            env->ReleaseStringUTFChars((jstring)env->GetObjectArrayElement(strings, i), c_strings[i]);
+        }
+
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 static jboolean sendEventNative(JNIEnv *env, jobject object,
                                      jstring path, jint event_id, jlong data) {
 #ifdef HAVE_BLUETOOTH
@@ -375,6 +434,125 @@ DBusHandlerResult a2dp_event_filter(DBusMessage *msg, JNIEnv *env) {
         env->DeleteLocalRef(path);
         result = DBUS_HANDLER_RESULT_HANDLED;
         return result;
+    } else if (dbus_message_is_signal(msg, "org.bluez.Control",
+                                      "ListPlayerAttributes")) {
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+
+        env->CallVoidMethod(nat->me, method_onListPlayerAttributeRequest, path);
+        env->DeleteLocalRef(path);
+        result = DBUS_HANDLER_RESULT_HANDLED;
+        return result;
+    } else if (dbus_message_is_signal(msg, "org.bluez.Control",
+                                      "ListAttributeValues")) {
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+        jbyte attrib;
+        if (dbus_message_get_args(msg, &err,
+                                DBUS_TYPE_BYTE, &attrib,
+                                DBUS_TYPE_INVALID)) {
+            env->CallVoidMethod(nat->me,
+                                method_onListPlayerAttributeValues,
+                                path,
+                                attrib);
+        }
+        env->DeleteLocalRef(path);
+        result = DBUS_HANDLER_RESULT_HANDLED;
+        return result;
+    } else if (dbus_message_is_signal(msg, "org.bluez.Control",
+                                      "GetAttributeValues")) {
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+        uint8_t *attribArray;
+        int len;
+        jbyteArray jAttribs;
+        if (dbus_message_get_args(msg, &err,
+                                DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+                                &attribArray, &len,
+                                DBUS_TYPE_INVALID)) {
+            jAttribs = env->NewByteArray(len);
+            env->SetByteArrayRegion(jAttribs, 0, len,(jbyte *)attribArray);
+
+            env->CallVoidMethod(nat->me,
+                                method_onGetPlayerAttributeValues,
+                                path,
+                                jAttribs);
+            env->DeleteLocalRef(jAttribs);
+        }
+        env->DeleteLocalRef(path);
+        result = DBUS_HANDLER_RESULT_HANDLED;
+        return result;
+    } else if (dbus_message_is_signal(msg, "org.bluez.Control",
+                                      "SetAttributeValues")) {
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+        jbyte* attribArray;
+        int len;
+        jbyteArray jAttribs;
+        if (dbus_message_get_args(msg, &err,
+                                DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+                                &attribArray, &len,
+                                DBUS_TYPE_INVALID)) {
+            jAttribs = env->NewByteArray(len);
+            env->SetByteArrayRegion(jAttribs, 0, len,(jbyte *)attribArray);
+            env->CallVoidMethod(nat->me,
+                                method_onSetPlayerAttributeValues,
+                                path,
+                                jAttribs);
+            env->DeleteLocalRef(jAttribs);
+        }
+        env->DeleteLocalRef(path);
+        result = DBUS_HANDLER_RESULT_HANDLED;
+        return result;
+    } else if (dbus_message_is_signal(msg, "org.bluez.Control",
+                                      "ListPlayerAttributesText")) {
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+        uint8_t *attribArray;
+        int len;
+        jbyteArray jAttribs;
+        if (dbus_message_get_args(msg, &err,
+                                DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+                                &attribArray, &len,
+                                DBUS_TYPE_INVALID)) {
+            jAttribs = env->NewByteArray(len);
+            env->SetByteArrayRegion(jAttribs, 0, len,(jbyte *)attribArray);
+
+            env->CallVoidMethod(nat->me,
+                                method_onListPlayerAttributesText,
+                                path,
+                                jAttribs);
+            env->DeleteLocalRef(jAttribs);
+        }
+        env->DeleteLocalRef(path);
+        result = DBUS_HANDLER_RESULT_HANDLED;
+        return result;
+    } else if (dbus_message_is_signal(msg, "org.bluez.Control",
+                                      "ListAttributeValuesText")) {
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+        uint8_t *valueArray;
+        int len;
+        jbyteArray jValues;
+        jbyte attrib;
+        if (dbus_message_get_args(msg, &err,
+                                DBUS_TYPE_BYTE, &attrib,
+                                DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+                                &valueArray, &len,
+                                DBUS_TYPE_INVALID)) {
+            jValues = env->NewByteArray(len);
+            env->SetByteArrayRegion(jValues, 0, len,(jbyte *)valueArray);
+
+            env->CallVoidMethod(nat->me,
+                                method_onListAttributeValuesText,
+                                path,
+                                attrib,
+                                jValues);
+            env->DeleteLocalRef(jValues);
+        }
+        env->DeleteLocalRef(path);
+        result = DBUS_HANDLER_RESULT_HANDLED;
+        return result;
     }else {
         LOGV("... ignored");
     }
@@ -383,6 +561,7 @@ DBusHandlerResult a2dp_event_filter(DBusMessage *msg, JNIEnv *env) {
              " leaving for VM",
              dbus_message_get_interface(msg), dbus_message_get_member(msg),
              dbus_message_get_path(msg), __FUNCTION__);
+        env->ExceptionDescribe();
     }
 
     return result;
@@ -446,6 +625,8 @@ static JNINativeMethod sMethods[] = {
     {"sendMetaDataNative", "(Ljava/lang/String;)Z", (void*)sendMetaDataNative},
     {"sendEventNative", "(Ljava/lang/String;IJ)Z", (void*)sendEventNative},
     {"sendPlayStatusNative", "(Ljava/lang/String;III)Z", (void*)sendPlayStatusNative},
+    {"sendPlayerSettingsNative", "(Ljava/lang/String;Ljava/lang/String;I[B)Z", (void*)sendPlayerSettingsNative},
+    {"sendSettingsTextNative", "(Ljava/lang/String;Ljava/lang/String;I[B[Ljava/lang/String;)Z", (void*)sendSettingsTextNative},
 };
 
 int register_android_server_BluetoothA2dpService(JNIEnv *env) {
@@ -462,6 +643,18 @@ int register_android_server_BluetoothA2dpService(JNIEnv *env) {
                                                          "(Ljava/lang/String;Z)V");
     method_onGetPlayStatusRequest = env->GetMethodID(clazz, "onGetPlayStatusRequest",
                                           "(Ljava/lang/String;)V");
+    method_onListPlayerAttributeRequest = env->GetMethodID(clazz, "onListPlayerAttributeRequest",
+                                          "(Ljava/lang/String;)V");
+    method_onListPlayerAttributeValues = env->GetMethodID(clazz, "onListPlayerAttributeValues",
+                                          "(Ljava/lang/String;B)V");
+    method_onGetPlayerAttributeValues = env->GetMethodID(clazz, "onGetPlayerAttributeValues",
+                                          "(Ljava/lang/String;[B)V");
+    method_onSetPlayerAttributeValues = env->GetMethodID(clazz, "onSetPlayerAttributeValues",
+                                          "(Ljava/lang/String;[B)V");
+    method_onListPlayerAttributesText = env->GetMethodID(clazz, "onListPlayerAttributesText",
+                                          "(Ljava/lang/String;[B)V");
+    method_onListAttributeValuesText = env->GetMethodID(clazz, "onListAttributeValuesText",
+                                          "(Ljava/lang/String;B[B)V");
     field_mTrackName = env->GetFieldID(clazz, "mTrackName", "Ljava/lang/String;");
     field_mArtistName = env->GetFieldID(clazz, "mArtistName", "Ljava/lang/String;");
     field_mAlbumName = env->GetFieldID(clazz, "mAlbumName", "Ljava/lang/String;");
