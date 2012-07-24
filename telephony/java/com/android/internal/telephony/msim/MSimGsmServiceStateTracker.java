@@ -24,6 +24,7 @@ import android.content.res.Resources;
 import android.os.Message;
 import android.provider.Telephony.Intents;
 import android.telephony.MSimTelephonyManager;
+import android.telephony.ServiceState;
 import android.text.TextUtils;
 import android.util.Log;
 

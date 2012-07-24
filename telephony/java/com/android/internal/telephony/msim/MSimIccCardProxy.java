@@ -270,7 +270,8 @@ public class MSimIccCardProxy extends IccCardProxy {
         mExternalState = newState;
         MSimTelephonyManager.setTelephonyProperty(PROPERTY_SIM_STATE,
                 mCardIndex, getState().toString());
-        broadcastIccStateChangedIntent(mExternalState.getIntentString(), null);
+        broadcastIccStateChangedIntent(mExternalState.getIntentString(),
+                mExternalState.getReason());
         // TODO: Need to notify registrants for other states as well.
         if ( State.ABSENT == mExternalState) {
             mAbsentRegistrants.notifyRegistrants();

@@ -1349,7 +1349,9 @@
   <java-symbol type="string" name="global_action_toggle_silent_mode" />
   <java-symbol type="string" name="invalidPuk" />
   <java-symbol type="string" name="keyguard_password_enter_pin_code" />
+  <java-symbol type="string" name="keyguard_password_enter_pin_code_for_subscription" />
   <java-symbol type="string" name="keyguard_password_enter_puk_code" />
+  <java-symbol type="string" name="keyguard_password_enter_puk_code_for_subscription" />
   <java-symbol type="string" name="keyguard_password_wrong_pin_code" />
   <java-symbol type="string" name="lockscreen_carrier_default" />
   <java-symbol type="string" name="lockscreen_charged" />

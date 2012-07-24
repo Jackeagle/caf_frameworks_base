@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +54,7 @@ import android.os.Parcelable;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
@@ -81,7 +86,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
     static final boolean DEBUG_CONFIGURATION = false;
 
     // time after launching EmergencyDialer before the screen goes blank.
-    private static final int EMERGENCY_CALL_TIMEOUT = 10000;
+    protected static final int EMERGENCY_CALL_TIMEOUT = 10000;
 
     // intent action for launching emergency dialer activity.
     static final String ACTION_EMERGENCY_DIAL = "com.android.phone.EmergencyDialer.DIAL";
@@ -89,29 +94,29 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
     private static final boolean DEBUG = false;
     private static final String TAG = "LockPatternKeyguardView";
 
-    private final KeyguardUpdateMonitor mUpdateMonitor;
-    private final KeyguardWindowController mWindowController;
+    protected final KeyguardUpdateMonitor mUpdateMonitor;
+    protected final KeyguardWindowController mWindowController;
 
-    private View mLockScreen;
-    private View mUnlockScreen;
+    protected View mLockScreen;
+    protected View mUnlockScreen;
 
-    private boolean mScreenOn;
-    private boolean mWindowFocused = false;
-    private boolean mEnableFallback = false; // assume no fallback UI until we know better
+    protected volatile boolean mScreenOn = false;
+    private volatile boolean mWindowFocused = false;
+    protected boolean mEnableFallback = false; // assume no fallback UI until we know better
 
-    private boolean mShowLockBeforeUnlock = false;
+    protected boolean mShowLockBeforeUnlock = false;
 
     // Interface to a biometric sensor that can optionally be used to unlock the device
-    private BiometricSensorUnlock mBiometricUnlock;
+    protected BiometricSensorUnlock mBiometricUnlock;
     private final Object mBiometricUnlockStartupLock = new Object();
     // Long enough to stay visible while dialer comes up
     // Short enough to not be visible if the user goes back immediately
-    private final int BIOMETRIC_AREA_EMERGENCY_DIALER_TIMEOUT = 1000;
+    protected final int BIOMETRIC_AREA_EMERGENCY_DIALER_TIMEOUT = 1000;
 
-    private boolean mRequiresSim;
+    protected boolean mRequiresSim;
     // True if the biometric unlock should not be displayed.  For example, if there is an overlay on
     // lockscreen or the user is plugging in / unplugging the device.
-    private boolean mSuppressBiometricUnlock;
+    protected boolean mSuppressBiometricUnlock;
     //True if a dialog is currently displaying on top of this window
     //Unlike other overlays, this does not close with a power button cycle
     private boolean mHasDialog = false;
@@ -123,7 +128,12 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
     // The music control widget
     private TransportControlView mTransportControlView;
 
-    private Parcelable mSavedState;
+    protected Parcelable mSavedState;
+
+    /**
+     * The current {@link KeyguardScreen} will use this to communicate back to us.
+     */
+    KeyguardScreenCallback mKeyguardScreenCallback;
 
     /**
      * Either a lock screen (an informational keyguard screen), or an unlock
@@ -174,33 +184,33 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
     /**
      * The current mode.
      */
-    private Mode mMode = Mode.LockScreen;
+    protected Mode mMode = Mode.LockScreen;
 
     /**
      * Keeps track of what mode the current unlock screen is (cached from most recent computation in
      * {@link #getUnlockMode}).
      */
-    private UnlockMode mUnlockScreenMode = UnlockMode.Unknown;
+    protected UnlockMode mUnlockScreenMode = UnlockMode.Unknown;
 
-    private boolean mForgotPattern;
+    protected boolean mForgotPattern;
 
     /**
      * If true, it means we are in the process of verifying that the user
      * can get past the lock screen per {@link #verifyUnlock()}
      */
-    private boolean mIsVerifyUnlockOnly = false;
+    protected boolean mIsVerifyUnlockOnly = false;
 
     /**
      * Used to lookup the state of the lock pattern
      */
-    private final LockPatternUtils mLockPatternUtils;
+    protected LockPatternUtils mLockPatternUtils;
 
     /**
      * The current configuration.
      */
-    private Configuration mConfiguration;
+    protected Configuration mConfiguration;
 
-    private Runnable mRecreateRunnable = new Runnable() {
+    protected Runnable mRecreateRunnable = new Runnable() {
         public void run() {
             Mode mode = mMode;
             // If we were previously in a locked state but now it's Unknown, it means the phone
@@ -264,7 +274,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
      * @return Whether we are stuck on the lock screen because the sim is
      *   missing.
      */
-    private boolean stuckOnLockScreenBecauseSimMissing() {
+    protected boolean stuckOnLockScreenBecauseSimMissing() {
         return mRequiresSim
                 && (!mUpdateMonitor.isDeviceProvisioned())
                 && (mUpdateMonitor.getSimState() == IccCard.State.ABSENT ||
@@ -274,159 +284,169 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
     /**
      * The current {@link KeyguardScreen} will use this to communicate back to us.
      */
-    KeyguardScreenCallback mKeyguardScreenCallback = new KeyguardScreenCallback() {
+    protected void keyguardScreenCallback() {
+        mKeyguardScreenCallback = new KeyguardScreenCallback() {
 
-        public void goToLockScreen() {
-            mForgotPattern = false;
-            if (mIsVerifyUnlockOnly) {
-                // navigating away from unlock screen during verify mode means
-                // we are done and the user failed to authenticate.
-                mIsVerifyUnlockOnly = false;
-                getCallback().keyguardDone(false);
-            } else {
-                updateScreen(Mode.LockScreen, false);
-            }
-        }
-
-        public void goToUnlockScreen() {
-            final IccCard.State simState = mUpdateMonitor.getSimState();
-            if (stuckOnLockScreenBecauseSimMissing()
-                     || (simState == IccCard.State.PUK_REQUIRED
-                         && !mLockPatternUtils.isPukUnlockScreenEnable())){
-                // stuck on lock screen when sim missing or
-                // puk'd but puk unlock screen is disabled
-                return;
-            }
-            if (!isSecure()) {
-                getCallback().keyguardDone(true);
-            } else {
-                updateScreen(Mode.UnlockScreen, false);
-            }
-        }
-
-        public void forgotPattern(boolean isForgotten) {
-            if (mEnableFallback) {
-                mForgotPattern = isForgotten;
-                updateScreen(Mode.UnlockScreen, false);
-            }
-        }
-
-        public boolean isSecure() {
-            return LockPatternKeyguardView.this.isSecure();
-        }
-
-        public boolean isVerifyUnlockOnly() {
-            return mIsVerifyUnlockOnly;
-        }
-
-        public void recreateMe(Configuration config) {
-            if (DEBUG) Log.v(TAG, "recreateMe()");
-            removeCallbacks(mRecreateRunnable);
-            post(mRecreateRunnable);
-        }
-
-        public void takeEmergencyCallAction() {
-            mSuppressBiometricUnlock = true;
-
-            if (mBiometricUnlock != null) {
-                if (mBiometricUnlock.isRunning()) {
-                    // Continue covering backup lock until dialer comes up or call is resumed
-                    mBiometricUnlock.show(BIOMETRIC_AREA_EMERGENCY_DIALER_TIMEOUT);
-                }
-
-                // We must ensure the biometric unlock is stopped when emergency call is pressed
-                mBiometricUnlock.stop();
-            }
-
-            pokeWakelock(EMERGENCY_CALL_TIMEOUT);
-            if (TelephonyManager.getDefault().getCallState()
-                    == TelephonyManager.CALL_STATE_OFFHOOK) {
-                mLockPatternUtils.resumeCall();
-            } else {
-                Intent intent = new Intent(ACTION_EMERGENCY_DIAL);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-                getContext().startActivity(intent);
-            }
-        }
-
-        public void pokeWakelock() {
-            getCallback().pokeWakelock();
-        }
-
-        public void pokeWakelock(int millis) {
-            getCallback().pokeWakelock(millis);
-        }
-
-        public void keyguardDone(boolean authenticated) {
-            getCallback().keyguardDone(authenticated);
-            mSavedState = null; // clear state so we re-establish when locked again
-        }
-
-        public void keyguardDoneDrawing() {
-            // irrelevant to keyguard screen, they shouldn't be calling this
-        }
-
-        public void reportFailedUnlockAttempt() {
-            mUpdateMonitor.reportFailedAttempt();
-            final int failedAttempts = mUpdateMonitor.getFailedAttempts();
-            if (DEBUG) Log.d(TAG, "reportFailedPatternAttempt: #" + failedAttempts +
-                " (enableFallback=" + mEnableFallback + ")");
-
-            final boolean usingPattern = mLockPatternUtils.getKeyguardStoredPasswordQuality()
-                    == DevicePolicyManager.PASSWORD_QUALITY_SOMETHING;
-
-            final int failedAttemptsBeforeWipe = mLockPatternUtils.getDevicePolicyManager()
-                    .getMaximumFailedPasswordsForWipe(null);
-
-            final int failedAttemptWarning = LockPatternUtils.FAILED_ATTEMPTS_BEFORE_RESET
-                    - LockPatternUtils.FAILED_ATTEMPTS_BEFORE_TIMEOUT;
-
-            final int remainingBeforeWipe = failedAttemptsBeforeWipe > 0 ?
-                    (failedAttemptsBeforeWipe - failedAttempts)
-                    : Integer.MAX_VALUE; // because DPM returns 0 if no restriction
-
-            if (remainingBeforeWipe < LockPatternUtils.FAILED_ATTEMPTS_BEFORE_WIPE_GRACE) {
-                // If we reach this code, it means the user has installed a DevicePolicyManager
-                // that requests device wipe after N attempts.  Once we get below the grace
-                // period, we'll post this dialog every time as a clear warning until the
-                // bombshell hits and the device is wiped.
-                if (remainingBeforeWipe > 0) {
-                    showAlmostAtWipeDialog(failedAttempts, remainingBeforeWipe);
+            public void goToLockScreen() {
+                mForgotPattern = false;
+                if (mIsVerifyUnlockOnly) {
+                    // navigating away from unlock screen during verify mode means
+                    // we are done and the user failed to authenticate.
+                    mIsVerifyUnlockOnly = false;
+                    getCallback().keyguardDone(false);
                 } else {
-                    // Too many attempts. The device will be wiped shortly.
-                    Slog.i(TAG, "Too many unlock attempts; device will be wiped!");
-                    showWipeDialog(failedAttempts);
+                    updateScreen(Mode.LockScreen, false);
                 }
-            } else {
-                boolean showTimeout =
-                    (failedAttempts % LockPatternUtils.FAILED_ATTEMPTS_BEFORE_TIMEOUT) == 0;
-                if (usingPattern && mEnableFallback) {
-                    if (failedAttempts == failedAttemptWarning) {
-                        showAlmostAtAccountLoginDialog();
-                        showTimeout = false; // don't show both dialogs
-                    } else if (failedAttempts >= LockPatternUtils.FAILED_ATTEMPTS_BEFORE_RESET) {
-                        mLockPatternUtils.setPermanentlyLocked(true);
-                        updateScreen(mMode, false);
-                        // don't show timeout dialog because we show account unlock screen next
-                        showTimeout = false;
+            }
+
+            public void goToUnlockScreen() {
+                final IccCard.State simState = mUpdateMonitor.getSimState();
+                if (stuckOnLockScreenBecauseSimMissing()
+                         || (simState == IccCard.State.PUK_REQUIRED
+                             && !mLockPatternUtils.isPukUnlockScreenEnable())){
+                    // stuck on lock screen when sim missing or
+                    // puk'd but puk unlock screen is disabled
+                    return;
+                }
+                if (!isSecure()) {
+                    getCallback().keyguardDone(true);
+                } else {
+                    updateScreen(Mode.UnlockScreen, false);
+                }
+            }
+
+            public void updatePinUnlockCancel(int subscription) {
+            }
+
+            public void updatePukUnlockCancel(int subscription) {
+            }
+
+            public void forgotPattern(boolean isForgotten) {
+                if (mEnableFallback) {
+                    mForgotPattern = isForgotten;
+                    updateScreen(Mode.UnlockScreen, false);
+                }
+            }
+
+            public boolean isSecure() {
+                return LockPatternKeyguardView.this.isSecure();
+            }
+
+            public boolean isVerifyUnlockOnly() {
+                return mIsVerifyUnlockOnly;
+            }
+
+            public void recreateMe(Configuration config) {
+                if (DEBUG) Log.v(TAG, "recreateMe()");
+                removeCallbacks(mRecreateRunnable);
+                post(mRecreateRunnable);
+            }
+
+            public void takeEmergencyCallAction() {
+                mSuppressBiometricUnlock = true;
+
+                if (mBiometricUnlock != null) {
+                    if (mBiometricUnlock.isRunning()) {
+                        // Continue covering backup lock until dialer comes up or call is resumed
+                        mBiometricUnlock.show(BIOMETRIC_AREA_EMERGENCY_DIALER_TIMEOUT);
+                    }
+
+                    // We must ensure the biometric unlock is stopped when emergency call is pressed
+                    mBiometricUnlock.stop();
+                }
+
+                pokeWakelock(EMERGENCY_CALL_TIMEOUT);
+                if (TelephonyManager.getDefault().getCallState()
+                        == TelephonyManager.CALL_STATE_OFFHOOK) {
+                    mLockPatternUtils.resumeCall();
+                } else {
+                    Intent intent = new Intent(ACTION_EMERGENCY_DIAL);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                    getContext().startActivity(intent);
+                }
+            }
+
+            public void pokeWakelock() {
+                getCallback().pokeWakelock();
+            }
+
+            public void pokeWakelock(int millis) {
+                getCallback().pokeWakelock(millis);
+            }
+
+            public void keyguardDone(boolean authenticated) {
+                getCallback().keyguardDone(authenticated);
+                mSavedState = null; // clear state so we re-establish when locked again
+            }
+
+            public void keyguardDoneDrawing() {
+                // irrelevant to keyguard screen, they shouldn't be calling this
+            }
+
+            public void reportFailedUnlockAttempt() {
+                mUpdateMonitor.reportFailedAttempt();
+                final int failedAttempts = mUpdateMonitor.getFailedAttempts();
+                if (DEBUG) Log.d(TAG, "reportFailedPatternAttempt: #" + failedAttempts +
+                    " (enableFallback=" + mEnableFallback + ")");
+
+                final boolean usingPattern = mLockPatternUtils.getKeyguardStoredPasswordQuality()
+                        == DevicePolicyManager.PASSWORD_QUALITY_SOMETHING;
+
+                final int failedAttemptsBeforeWipe = mLockPatternUtils.getDevicePolicyManager()
+                        .getMaximumFailedPasswordsForWipe(null);
+
+                final int failedAttemptWarning = LockPatternUtils.FAILED_ATTEMPTS_BEFORE_RESET
+                        - LockPatternUtils.FAILED_ATTEMPTS_BEFORE_TIMEOUT;
+
+                final int remainingBeforeWipe = failedAttemptsBeforeWipe > 0 ?
+                        (failedAttemptsBeforeWipe - failedAttempts)
+                        : Integer.MAX_VALUE; // because DPM returns 0 if no restriction
+
+                if (remainingBeforeWipe < LockPatternUtils.FAILED_ATTEMPTS_BEFORE_WIPE_GRACE) {
+                    // If we reach this code, it means the user has installed a DevicePolicyManager
+                    // that requests device wipe after N attempts.  Once we get below the grace
+                    // period, we'll post this dialog every time as a clear warning until the
+                    // bombshell hits and the device is wiped.
+                    if (remainingBeforeWipe > 0) {
+                        showAlmostAtWipeDialog(failedAttempts, remainingBeforeWipe);
+                    } else {
+                        // Too many attempts. The device will be wiped shortly.
+                        Slog.i(TAG, "Too many unlock attempts; device will be wiped!");
+                        showWipeDialog(failedAttempts);
+                    }
+                } else {
+                    boolean showTimeout =
+                        (failedAttempts % LockPatternUtils.FAILED_ATTEMPTS_BEFORE_TIMEOUT) == 0;
+                    if (usingPattern && mEnableFallback) {
+                        if (failedAttempts == failedAttemptWarning) {
+                            showAlmostAtAccountLoginDialog();
+                            showTimeout = false; // don't show both dialogs
+                        } else if (failedAttempts >= LockPatternUtils
+                                .FAILED_ATTEMPTS_BEFORE_RESET) {
+                            mLockPatternUtils.setPermanentlyLocked(true);
+                            updateScreen(mMode, false);
+                            // don't show timeout dialog because we show account unlock screen next
+                            showTimeout = false;
+                        }
+                    }
+                    if (showTimeout) {
+                        showTimeoutDialog();
                     }
                 }
-                if (showTimeout) {
-                    showTimeoutDialog();
-                }
+                mLockPatternUtils.reportFailedPasswordAttempt();
             }
-            mLockPatternUtils.reportFailedPasswordAttempt();
-        }
 
-        public boolean doesFallbackUnlockScreenExist() {
-            return mEnableFallback;
-        }
+            public boolean doesFallbackUnlockScreenExist() {
+                return mEnableFallback;
+            }
 
-        public void reportSuccessfulUnlockAttempt() {
-            mLockPatternUtils.reportSuccessfulPasswordAttempt();
-        }
-    };
+            public void reportSuccessfulUnlockAttempt() {
+                mLockPatternUtils.reportSuccessfulPasswordAttempt();
+            }
+        };
+        updateScreen(getInitialMode(), false);
+    }
 
     /**
      * @param context Used to inflate, and create views.
@@ -452,7 +472,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         mPluggedIn = mUpdateMonitor.isDevicePluggedIn();
         mScreenOn = ((PowerManager)context.getSystemService(Context.POWER_SERVICE)).isScreenOn();
         mUpdateMonitor.registerInfoCallback(mInfoCallback);
-
+        keyguardScreenCallback();
         /**
          * We'll get key events the current screen doesn't use. see
          * {@link KeyguardViewBase#onKeyDown(int, android.view.KeyEvent)}
@@ -460,7 +480,6 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         setFocusableInTouchMode(true);
         setDescendantFocusability(FOCUS_AFTER_DESCENDANTS);
 
-        updateScreen(getInitialMode(), false);
         maybeEnableFallback(context);
     }
 
@@ -515,7 +534,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         }
     }
 
-    private void maybeEnableFallback(Context context) {
+    protected void maybeEnableFallback(Context context) {
         // Ask the account manager if we have an account that can be used as a
         // fallback in case the user forgets his pattern.
         AccountAnalyzer accountAnalyzer = new AccountAnalyzer(AccountManager.get(context));
@@ -642,7 +661,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         }
     }
 
-    private void recreateLockScreen() {
+    protected void recreateLockScreen() {
         if (mLockScreen != null) {
             ((KeyguardScreen) mLockScreen).onPause();
             ((KeyguardScreen) mLockScreen).cleanUp();
@@ -654,7 +673,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         addView(mLockScreen);
     }
 
-    private void recreateUnlockScreen(UnlockMode unlockMode) {
+    protected void recreateUnlockScreen(UnlockMode unlockMode) {
         if (mUnlockScreen != null) {
             ((KeyguardScreen) mUnlockScreen).onPause();
             ((KeyguardScreen) mUnlockScreen).cleanUp();
@@ -803,7 +822,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         }
     }
 
-    private boolean isSecure() {
+    protected boolean isSecure() {
         UnlockMode unlockMode = getUnlockMode();
         boolean secure = false;
         switch (unlockMode) {
@@ -831,7 +850,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         return secure;
     }
 
-    private void updateScreen(Mode mode, boolean force) {
+    protected void updateScreen(Mode mode, boolean force) {
 
         if (DEBUG_CONFIGURATION) Log.v(TAG, "**** UPDATE SCREEN: mode=" + mode
                 + " last mode=" + mMode + ", force = " + force, new RuntimeException());
@@ -848,7 +867,9 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         // Re-create the unlock screen if necessary.
         final UnlockMode unlockMode = getUnlockMode();
         if (mode == Mode.UnlockScreen && unlockMode != UnlockMode.Unknown) {
-            if (force || mUnlockScreen == null || unlockMode != mUnlockScreenMode) {
+            if (force || mUnlockScreen == null || unlockMode != mUnlockScreenMode ||
+                    (getUnlockMode() == UnlockMode.SimPin) ||
+                    (getUnlockMode() == UnlockMode.SimPuk)) {
                 recreateUnlockScreen(unlockMode);
             }
         }
@@ -920,7 +941,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
                     mConfiguration,
                     mUpdateMonitor,
                     mKeyguardScreenCallback,
-                    mLockPatternUtils);
+                    mLockPatternUtils, MSimTelephonyManager.getDefault().getDefaultSubscription());
         } else if (unlockMode == UnlockMode.SimPin) {
             unlockView = new SimUnlockScreen(
                     mContext,
@@ -968,7 +989,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         return unlockView;
     }
 
-    private void initializeTransportControlView(View view) {
+    protected void initializeTransportControlView(View view) {
         mTransportControlView = (TransportControlView) view.findViewById(R.id.transport);
         if (mTransportControlView == null) {
             if (DEBUG) Log.w(TAG, "Couldn't find transport control widget");
@@ -995,7 +1016,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
                 (unlockMode == UnlockMode.Pattern || unlockMode == UnlockMode.Password));
     }
 
-    private void initializeBiometricUnlockView(View view) {
+    protected void initializeBiometricUnlockView(View view) {
         boolean restartBiometricUnlock = false;
 
         if (mBiometricUnlock != null) {
@@ -1061,7 +1082,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
     /**
      * Given the current state of things, what should the unlock screen be?
      */
-    private UnlockMode getUnlockMode() {
+    protected UnlockMode getUnlockMode() {
         final IccCard.State simState = mUpdateMonitor.getSimState();
         UnlockMode currentMode;
         if (simState == IccCard.State.PIN_REQUIRED) {
@@ -1108,7 +1129,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         dialog.show();
     }
 
-    private void showTimeoutDialog() {
+    protected void showTimeoutDialog() {
         int timeoutInSeconds = (int) LockPatternUtils.FAILED_ATTEMPT_TIMEOUT_MS / 1000;
         int messageId = R.string.lockscreen_too_many_failed_attempts_dialog_message;
         if (getUnlockMode() == UnlockMode.Password) {
@@ -1125,7 +1146,7 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         showDialog(null, message);
     }
 
-    private void showAlmostAtAccountLoginDialog() {
+    protected void showAlmostAtAccountLoginDialog() {
         final int timeoutInSeconds = (int) LockPatternUtils.FAILED_ATTEMPT_TIMEOUT_MS / 1000;
         final int count = LockPatternUtils.FAILED_ATTEMPTS_BEFORE_RESET
                 - LockPatternUtils.FAILED_ATTEMPTS_BEFORE_TIMEOUT;
@@ -1134,14 +1155,14 @@ public class LockPatternKeyguardView extends KeyguardViewBase {
         showDialog(null, message);
     }
 
-    private void showAlmostAtWipeDialog(int attempts, int remaining) {
+    protected void showAlmostAtWipeDialog(int attempts, int remaining) {
         int timeoutInSeconds = (int) LockPatternUtils.FAILED_ATTEMPT_TIMEOUT_MS / 1000;
         String message = mContext.getString(
                 R.string.lockscreen_failed_attempts_almost_at_wipe, attempts, remaining);
         showDialog(null, message);
     }
 
-    private void showWipeDialog(int attempts) {
+    protected void showWipeDialog(int attempts) {
         String message = mContext.getString(
                 R.string.lockscreen_failed_attempts_now_wiping, attempts);
         showDialog(null, message);

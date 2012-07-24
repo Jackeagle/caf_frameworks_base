@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +33,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Rect;
+import android.telephony.MSimTelephonyManager;
+import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.LoginFilter;
@@ -111,8 +117,13 @@ public class AccountUnlockScreen extends RelativeLayout implements KeyguardScree
 
         mUpdateMonitor = updateMonitor;
 
-        mKeyguardStatusViewManager = new KeyguardStatusViewManager(this, updateMonitor,
-                lockPatternUtils, callback, true);
+        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+            mKeyguardStatusViewManager = new MSimKeyguardStatusViewManager(this, updateMonitor,
+                    lockPatternUtils, callback, true);
+        } else {
+            mKeyguardStatusViewManager = new KeyguardStatusViewManager(this, updateMonitor,
+                    lockPatternUtils, callback, true);
+        }
     }
 
     public void afterTextChanged(Editable s) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2011-12 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012 Code Aurora Forum. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only
@@ -171,9 +171,30 @@ interface ITelephonyMSim {
      *  Blocks until a result is determined.
      * @param puk The puk to check.
      *        pin The new pin to be set in SIM
+     * @param subscription user preferred subscription.
      * @return whether the operation was a success.
      */
-    boolean supplyPuk(String puk, String pin);
+    boolean supplyPuk(String puk, String pin, int subscription);
+
+    /**
+     * Supply a pin to unlock the SIM.  Blocks until a result is determined.
+     * Returns a specific success/error code.
+     * @param pin The pin to check.
+     * @param subscription user preferred subscription.
+     * @return Phone.PIN_RESULT_SUCCESS on success. Otherwise error code
+     */
+    int supplyPinReportResult(String pin, int subscription);
+
+     /**
+     * Supply puk to unlock the SIM and set SIM pin to new pin.
+     * Blocks until a result is determined.
+     * Returns a specific success/error code.
+     * @param puk The puk to check
+     *        pin The pin to check.
+     * @param subscription user preferred subscription.
+     * @return Phone.PIN_RESULT_SUCCESS on success. Otherwise error code
+     */
+    int supplyPukReportResult(String puk, String pin, int subscription);
 
     /**
      * Handles PIN MMI commands (PIN/PIN2/PUK/PUK2), which are initiated
@@ -302,6 +323,14 @@ interface ITelephonyMSim {
      */
     int getLteOnCdmaMode(int subscription);
 
+     /**
+     * Gets the number of attempts remaining for PIN1/PUK1 unlock
+     * for a subscription.
+     * @param subscription user preferred subscription.
+     * Gets the number of attempts remaining for PIN1/PUK1 unlock.
+     */
+    int getIccPin1RetryCount(int subscription);
+
     /**
      * Returns the all observed cell information of the device.
      */
@@ -330,5 +359,7 @@ interface ITelephonyMSim {
      * @return true if success
      */
     boolean setPreferredDataSubscription(int subscription);
+
+    boolean isSimPukLocked(int subscription);
 }
 
