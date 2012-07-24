@@ -92,7 +92,6 @@ public class CDMAPhone extends PhoneBase {
     // Default Emergency Callback Mode exit timer
     private static final int DEFAULT_ECM_EXIT_TIMER_VALUE = 300000;
 
-    static final String VM_COUNT_CDMA = "vm_count_key_cdma";
     private static final String VM_NUMBER_CDMA = "vm_number_key_cdma";
     private String mVmNumber = null;
 
@@ -214,7 +213,7 @@ public class CDMAPhone extends PhoneBase {
         updateCurrentCarrierInProvider(operatorNumeric);
 
         // Notify voicemails.
-        notifier.notifyMessageWaitingChanged(this);
+        updateVoiceMail();
     }
 
     @Override
@@ -364,11 +363,6 @@ public class CDMAPhone extends PhoneBase {
 
     public SignalStrength getSignalStrength() {
         return mSST.mSignalStrength;
-    }
-
-    public boolean
-    getMessageWaitingIndicator() {
-        return (getVoiceMessageCount() > 0);
     }
 
     public List<? extends MmiCode>
@@ -758,20 +752,15 @@ public class CDMAPhone extends PhoneBase {
         return number;
     }
 
-    /* Returns Number of Voicemails
-     * @hide
-     */
-    public int getVoiceMessageCount() {
-        IccRecords r = mIccRecords.get();
-        int voicemailCount =  (r != null) ? r.getVoiceMessageCount() : 0;
-        // If mRuimRecords.getVoiceMessageCount returns zero, then there is possibility
-        // that phone was power cycled and would have lost the voicemail count.
-        // So get the count from preferences.
-        if (voicemailCount == 0) {
-            SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
-            voicemailCount = sp.getInt(VM_COUNT_CDMA, 0);
-        }
-        return voicemailCount;
+    // pending voice mail count updated after phone creation
+    private void updateVoiceMail() {
+        setVoiceMessageCount(getStoredVoiceMessageCount());
+    }
+
+    /** gets the voice mail count from preferences */
+    private int getStoredVoiceMessageCount() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
+        return (sp.getInt(VM_COUNT, 0));
     }
 
     public String getVoiceMailAlphaTag() {
@@ -1013,11 +1002,6 @@ public class CDMAPhone extends PhoneBase {
             }
             break;
 
-            case EVENT_ICC_RECORD_EVENTS:
-                ar = (AsyncResult)msg.obj;
-                processIccRecordEvents((Integer)ar.result);
-                break;
-
             case  EVENT_EXIT_EMERGENCY_CALLBACK_RESPONSE:{
                 handleExitEmergencyCallbackMode(msg);
             }
@@ -1109,18 +1093,6 @@ public class CDMAPhone extends PhoneBase {
                 registerForRuimRecordEvents();
                 mRuimPhoneBookInterfaceManager.updateIccRecords(mIccRecords.get());
             }
-        }
-    }
-
-    private void processIccRecordEvents(int eventCode) {
-        switch (eventCode) {
-            case RuimRecords.EVENT_MWI:
-                notifyMessageWaitingIndicator();
-                break;
-
-            default:
-                Log.e(LOG_TAG,"Unknown icc records event code " + eventCode);
-                break;
         }
     }
 
@@ -1508,7 +1480,6 @@ public class CDMAPhone extends PhoneBase {
         if (r == null) {
             return;
         }
-        r.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
         r.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
     }
 
