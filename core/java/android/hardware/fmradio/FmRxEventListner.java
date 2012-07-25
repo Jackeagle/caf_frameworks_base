@@ -74,6 +74,7 @@ class FmRxEventListner {
                         int index = 0;
                         int state = 0;
                         Arrays.fill(buff, (byte)0x00);
+                        int freq = 0;
                         int eventCount = FmReceiverJNI.getBufferNative (fd, buff, EVENT_LISTEN);
 
                         if (eventCount >= 0)
@@ -102,7 +103,11 @@ class FmRxEventListner {
                                 break;
                             case 1:
                                 Log.d(TAG, "Got TUNE_EVENT");
-                                cb.FmRxEvRadioTuneStatus(FmReceiverJNI.getFreqNative(fd));
+                                freq = FmReceiverJNI.getFreqNative(fd);
+                                if (freq > 0)
+                                    cb.FmRxEvRadioTuneStatus(freq);
+                                else
+                                    Log.e(TAG, "get frequency command failed");
                                 break;
                             case 2:
                                 Log.d(TAG, "Got SEEK_COMPLETE_EVENT");
