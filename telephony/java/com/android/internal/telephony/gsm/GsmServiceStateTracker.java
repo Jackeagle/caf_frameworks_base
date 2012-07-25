@@ -496,11 +496,11 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
     }
 
     protected void updateSpnDisplay() {
-        if (phone.mIccRecords == null) {
+        if (mIccRecords == null) {
             return;
         }
-        int rule = phone.mIccRecords.get().getDisplayRule(ss.getOperatorNumeric());
-        String spn = phone.mIccRecords.get().getServiceProviderName();
+        int rule = mIccRecords.getDisplayRule(ss.getOperatorNumeric());
+        String spn = mIccRecords.getServiceProviderName();
         String plmn = ss.getOperatorAlphaLong();
 
         // For emergency calls only, pass the EmergencyCallsOnly string via EXTRA_PLMN
