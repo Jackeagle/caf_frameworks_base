@@ -274,6 +274,16 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
         return true;
     }
 
+    public boolean setInternalDataEnabledFlag(boolean enable) {
+        if (DBG)
+            log("setInternalDataEnabledFlag(" + enable + ")");
+
+        if (mInternalDataEnabled != enable) {
+            mInternalDataEnabled = enable;
+        }
+        return true;
+    }
+
     @Override
     protected void onSetInternalDataEnabled(boolean enable) {
         onSetInternalDataEnabled(enable, null);
@@ -299,6 +309,18 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
             if (onCompleteMsg != null) {
                 onCompleteMsg.sendToTarget();
             }
+        }
+    }
+
+    @Override
+    protected void onDataSetupComplete(AsyncResult ar) {
+        super.onDataSetupComplete(ar);
+
+        /* If flag is set to false after SETUP_DATA_CALL is invoked, we need
+         * to clean data connections.
+         */
+        if (!mInternalDataEnabled) {
+            cleanUpAllConnections(null);
         }
     }
 
