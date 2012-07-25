@@ -2215,4 +2215,13 @@ public class FmReceiver extends FmTransceiver
       return mControl.getSINRsamples(sFd);
    }
 
+   public int updateSpurFreq(int freq, int rmssi, boolean enable)
+   {
+       return mControl.updateSpurTable(sFd, freq, rmssi, enable);
+   }
+
+   public int configureSpurTable()
+   {
+       return mControl.configureSpurTable(sFd);
+   }
 }
