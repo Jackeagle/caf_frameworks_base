@@ -218,7 +218,8 @@ public class AudioSystem
     public static final int DEVICE_OUT_USB_DEVICE = 0x4000;
     public static final int DEVICE_OUT_FM = 0x8000;
     public static final int DEVICE_OUT_FM_TX = 0x10000;
-    public static final int DEVICE_OUT_DEFAULT = 0x80000;
+    public static final int DEVICE_OUT_PROXY = 0x80000;
+    public static final int DEVICE_OUT_DEFAULT = DEVICE_OUT_SPEAKER;
     public static final int DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE |
                                               DEVICE_OUT_SPEAKER |
                                               DEVICE_OUT_WIRED_HEADSET |
@@ -236,6 +237,7 @@ public class AudioSystem
                                               DEVICE_OUT_USB_DEVICE |
                                               DEVICE_OUT_FM |
                                               DEVICE_OUT_FM_TX |
+                                              DEVICE_OUT_PROXY |
                                               DEVICE_OUT_DEFAULT);
     public static final int DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP |
                                                    DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
@@ -255,7 +257,9 @@ public class AudioSystem
     public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = 0x2000000;
     public static final int DEVICE_IN_WIRED_HEADSET = 0x4000000;
     public static final int DEVICE_IN_AUX_DIGITAL = 0x8000000;
-    public static final int DEVICE_IN_DEFAULT = 0x80000000;
+    public static final int DEVICE_IN_ANC_HEADSET = 0x10000000;
+    public static final int DEVICE_IN_PROXY = 0x80000000;
+    public static final int DEVICE_IN_DEFAULT = DEVICE_IN_BUILTIN_MIC1;
 
     // device states, must match AudioSystem::device_connection_state
     public static final int DEVICE_STATE_UNAVAILABLE = 0;
@@ -279,6 +283,7 @@ public class AudioSystem
     public static final String DEVICE_OUT_USB_DEVICE_NAME = "usb_device";
     public static final String DEVICE_OUT_FM_NAME = "fm";
     public static final String DEVICE_OUT_FM_TX_NAME = "fm_tx";
+    public static final String DEVICE_OUT_PROXY_NAME = "proxy";
 
     public static String getDeviceName(int device)
     {
@@ -317,6 +322,8 @@ public class AudioSystem
             return DEVICE_OUT_FM_NAME;
         case DEVICE_OUT_FM_TX:
             return DEVICE_OUT_FM_TX_NAME;
+        case DEVICE_OUT_PROXY:
+            return DEVICE_OUT_PROXY_NAME;
         case DEVICE_IN_DEFAULT:
         default:
             return "";
