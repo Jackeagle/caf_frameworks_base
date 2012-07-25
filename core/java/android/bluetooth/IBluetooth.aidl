@@ -149,10 +149,10 @@ interface IBluetooth
 
     // GATT client APIs
     boolean getGattServices(in String address, in ParcelUuid uuid);
-    boolean gattConnect(in String path, in byte prohibitRemoteChg, in byte filterPolicy,
+    int gattConnect(in String address, in String path, in byte prohibitRemoteChg, in byte filterPolicy,
      in int scanInterval, in int scanWindow, in int intervalMin, in int intervalMax, in int latency,
      in int superVisionTimeout, in int minCeLen, in int maxCeLen, in int connTimeOut);
-    boolean gattConnectCancel(in String path);
+    boolean gattConnectCancel(in String address, in String path);
     String getGattServiceName(in String path);
     boolean discoverCharacteristics(in String path);
     String getGattServiceProperty(in String path, in String property);
@@ -169,6 +169,7 @@ interface IBluetooth
     boolean registerGattAppConfiguration(in BluetoothGattAppConfiguration config,
                                          in IBluetoothGattCallback callback);
     boolean unregisterGattAppConfiguration(in BluetoothGattAppConfiguration config);
+    boolean closeGattLeConnection(in BluetoothGattAppConfiguration config, String address);
     boolean sendIndication(in BluetoothGattAppConfiguration config,
                            in int handle, in byte[] value, in boolean notify, in int sessionHandle);
     boolean discoverPrimaryResponse(in BluetoothGattAppConfiguration config, in ParcelUuid uuid,
