@@ -27,7 +27,6 @@ import com.android.internal.telephony.GsmAlphabet;
 import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.gsm.SmsCbHeader;
 
-import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 
 /**
@@ -506,27 +505,4 @@ public class SmsCbMessage {
             return new SmsCbMessage[size];
         }
     };
-
-    /**
-     * Returns a byte array that can be use to uniquely identify a received CB message.
-     * 3GPP TS 23.041  2 General description:
-     * Each page of such CBS message will have the same message identifier
-     * (indicating the source of the message), and the same serial number. Using this information,
-     *  the MS/UE is able to identify and ignore re-broadcasts of already received messages.
-     *
-     * @return byte array uniquely identifying the message.
-     * @hide
-     */
-    public byte[] getIncomingCbFingerprint() {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-
-        // per 3GPP TS 23.041 9.4.1.2.1 Serial number contains
-        // GS, Message Code, and Update Number
-        output.write(getGeographicalScope());
-        output.write(getMessageCode());
-        output.write(getUpdateNumber());
-        output.write(getMessageIdentifier());
-
-        return output.toByteArray();
-    }
 }
