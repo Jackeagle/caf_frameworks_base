@@ -472,11 +472,6 @@ class BluetoothEventLoop {
      *  values.
      */
     private void onDevicePropertyChanged(String deviceObjectPath, String[] propValues) {
-        if (!mBluetoothService.isEnabled()) {
-            Log.e(TAG, "Bluetooth is not enabled");
-            return;
-        }
-
         String name = propValues[0];
         String address = mBluetoothService.getAddressFromObjectPath(deviceObjectPath);
         if (address == null) {
