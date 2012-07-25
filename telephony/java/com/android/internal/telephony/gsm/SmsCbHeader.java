@@ -86,14 +86,13 @@ public class SmsCbHeader implements Parcelable, SmsCbConstants {
         if (pdu.length <= PDU_LENGTH_GSM) {
             // can be ETWS or GSM format.
             // Per TS23.041 9.4.1.2 and 9.4.1.3.2, GSM and ETWS format both
-            // contain serial number which contains GS, Message Code, and Update Number
-            // per 9.4.1.2.1, and message identifier in same octets
-            geographicalScope = (pdu[0] & 0xc0) >>> 6;
-            messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >>> 4);
-            updateNumber = pdu[1] & 0x0f;
+            // contain message identifier in same octets
             messageIdentifier = ((pdu[2] & 0xff) << 8) | (pdu[3] & 0xff);
             if (isEtwsMessage(messageIdentifier)) {
                 format = FORMAT_ETWS_PRIMARY;
+                geographicalScope = -1; // not applicable
+                messageCode = -1;
+                updateNumber = -1;
                 dataCodingScheme = -1;
                 pageIndex = -1;
                 nrOfPages = -1;
@@ -103,6 +102,9 @@ public class SmsCbHeader implements Parcelable, SmsCbConstants {
             } else {
                 // GSM pdus are no more than 88 bytes
                 format = FORMAT_GSM;
+                geographicalScope = (pdu[0] & 0xc0) >>> 6;
+                messageCode = ((pdu[0] & 0x3f) << 4) | ((pdu[1] & 0xf0) >>> 4);
+                updateNumber = pdu[1] & 0x0f;
                 dataCodingScheme = pdu[4] & 0xff;
 
                 // Check for invalid page parameter
