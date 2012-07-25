@@ -660,6 +660,7 @@ public class BluetoothService extends IBluetooth.Stub {
         mProfilesConnected = 0;
         mProfilesConnecting = 0;
         mProfilesDisconnecting = 0;
+        mDeviceConnected = 0; //reset the connection counter
         mAdapterConnectionState = BluetoothAdapter.STATE_DISCONNECTED;
         mAdapterUuids = null;
         mAdapterSdpHandles = null;
