@@ -721,14 +721,14 @@ public class FmReceiver extends FmTransceiver
                                   int direction){
 
       int state = getFMState();
+      boolean bStatus = true;
+      int re;
 
       /* Check current state of FM device */
       if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
           Log.d(TAG, "searchStations: Device currently busy in executing another command.");
           return false;
       }
-
-      boolean bStatus = true;
 
       Log.d (TAG, "Basic search...");
 
@@ -755,21 +755,27 @@ public class FmReceiver extends FmTransceiver
       if (bStatus)
       {
          Log.d (TAG, "searchStations: mode " + mode + "direction:  " + direction);
-         mControl.searchStations(sFd, mode, dwellPeriod, direction, 0, 0);
-
-         state = getFMState();
-         if (state == FMState_Turned_Off) {
-            Log.d(TAG, "searchStations: CURRENT-STATE : FMState_Off (unexpected)");
-            return false;
-         }
 
          if (mode == FM_RX_SRCH_MODE_SEEK)
-            setSearchState(subSrchLevel_SeekInPrg);
+             setSearchState(subSrchLevel_SeekInPrg);
          else if (mode == FM_RX_SRCH_MODE_SCAN)
-            setSearchState(subSrchLevel_ScanInProg);
+             setSearchState(subSrchLevel_ScanInProg);
          Log.v(TAG, "searchStations: CURRENT-STATE : FMRxOn ---> NEW-STATE : SearchInProg");
+
+         re = mControl.searchStations(sFd, mode, dwellPeriod, direction, 0, 0);
+         if (re != 0) {
+             Log.e(TAG, "search station failed");
+             if (getFMState() == FMState_Srch_InProg)
+                 setSearchState(subSrchLevel_SrchComplete);
+             return false;
+         }
+         state = getFMState();
+         if (state == FMState_Turned_Off) {
+             Log.d(TAG, "searchStations: CURRENT-STATE : FMState_Off (unexpected)");
+             return false;
+         }
       }
-      return true;
+      return bStatus;
    }
 
    /*==============================================================
@@ -901,6 +907,8 @@ public class FmReceiver extends FmTransceiver
                                   int pi) {
       boolean bStatus = true;
       int state = getFMState();
+      int re;
+
       /* Check current state of FM device */
       if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
           Log.d(TAG, "searchStations: Device currently busy in executing another command.");
@@ -939,10 +947,16 @@ public class FmReceiver extends FmTransceiver
          Log.d (TAG, "searchStations: direction " + direction);
          Log.d (TAG, "searchStations: pty " + pty);
          Log.d (TAG, "searchStations: pi " + pi);
-         mControl.searchStations(sFd, mode, dwellPeriod, direction, pty, pi);
          setSearchState(subSrchLevel_ScanInProg);
+         re = mControl.searchStations(sFd, mode, dwellPeriod, direction, pty, pi);
+         if (re != 0) {
+             Log.e(TAG, "scan station failed");
+             if (getFMState() == FMState_Srch_InProg)
+                 setSearchState(subSrchLevel_SrchComplete);
+             bStatus = false;
+         }
       }
-      return true;
+      return bStatus;
    }
 
    /*==============================================================
@@ -1031,14 +1045,14 @@ public class FmReceiver extends FmTransceiver
                                      int pty){
 
       int state = getFMState();
+      boolean bStatus = true;
+      int re = 0;
+
       /* Check current state of FM device */
       if (state == FMState_Turned_Off || state == FMState_Srch_InProg) {
           Log.d(TAG, "searchStationList: Device currently busy in executing another command.");
           return false;
       }
-
-      boolean bStatus = true;
-      int re=0;
 
       Log.d (TAG, "searchStations: mode " + mode);
       Log.d (TAG, "searchStations: direction " + direction);
@@ -1067,21 +1081,25 @@ public class FmReceiver extends FmTransceiver
 
       if (bStatus)
       {
-         if ( (mode == FM_RX_SRCHLIST_MODE_STRONGEST) || (mode == FM_RX_SRCHLIST_MODE_WEAKEST) ) {
-            mode = (mode == FM_RX_SRCHLIST_MODE_STRONGEST)? FM_RX_SRCHLIST_MODE_STRONG: FM_RX_SRCHLIST_MODE_WEAK;
-           re = mControl.searchStationList(sFd, mode, 0, direction, pty);
-         }
-	 else
-           re = mControl.searchStationList(sFd, mode, maximumStations, direction, pty);
-
          setSearchState(subSrchLevel_SrchListInProg);
          Log.v(TAG, "searchStationList: CURRENT-STATE : FMRxOn ---> NEW-STATE : SearchInProg");
+         if ((mode == FM_RX_SRCHLIST_MODE_STRONGEST) || (mode == FM_RX_SRCHLIST_MODE_WEAKEST)) {
+             mode = (mode == FM_RX_SRCHLIST_MODE_STRONGEST)?
+                               FM_RX_SRCHLIST_MODE_STRONG: FM_RX_SRCHLIST_MODE_WEAK;
+            re = mControl.searchStationList(sFd, mode, 0, direction, pty);
+         }
+         else
+            re = mControl.searchStationList(sFd, mode, maximumStations, direction, pty);
+
+         if (re != 0) {
+             Log.e(TAG, "search station list failed");
+             if (getFMState() == FMState_Srch_InProg)
+                 setSearchState(subSrchLevel_SrchComplete);
+             bStatus =  false;
+         }
       }
 
-      if (re == 0)
-        return true;
-
-      return false;
+      return bStatus;
    }
 
 
