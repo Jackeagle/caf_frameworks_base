@@ -58,8 +58,9 @@ public class MediaFile {
     public static final int FILE_TYPE_QCP     = 13;
     public static final int FILE_TYPE_WEBMA   = 14;
     public static final int FILE_TYPE_PCM     = 15;
+    public static final int FILE_TYPE_EC3     = 16;
     private static final int FIRST_AUDIO_FILE_TYPE = FILE_TYPE_MP3;
-    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_PCM;
+    private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_EC3;
 
     // More audio file types
     public static final int FILE_TYPE_DTS   = 300;
@@ -342,6 +343,7 @@ public class MediaFile {
         if(isMPQTarget()) {
             addFileType("AC3", FILE_TYPE_AC3, "audio/ac3");
             addFileType("DTS", FILE_TYPE_DTS, "audio/dts");
+            addFileType("EC3", FILE_TYPE_EC3, "audio/ec3");
         }
     }
 
