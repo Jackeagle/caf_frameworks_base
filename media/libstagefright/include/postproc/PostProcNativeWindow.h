@@ -26,6 +26,12 @@ Copyright (c) 2012 Code Aurora Forum. All rights reserved.
 #include <utils/List.h>
 #include <utils/threads.h>
 
+struct PostProcNativeWindowBuffer
+{
+    ANativeWindowBuffer * buffer;
+    bool isFree;
+};
+
 namespace android {
 
 enum {
@@ -82,13 +88,17 @@ private:
 
     void callDequeueBuffer();
     bool checkForPostProcBuffer(ANativeWindowBuffer *buf);
+    ANativeWindowBuffer* getFreePostProcNativeWindowBuffer(bool postProc);
+    void pushPostProcNativeWindowBufferToFreeList(ANativeWindowBuffer *buf, bool postProc);
+    void releaseAllBuffers();
+    void releaseBuffers(bool postProc);
 
 private:
-    Vector<ANativeWindowBuffer*> mPostProcBuffers;
-    Vector<ANativeWindowBuffer*> mNormalBuffers;
+    Vector<PostProcNativeWindowBuffer*> mPostProcBuffers;
+    Vector<PostProcNativeWindowBuffer*> mNormalBuffers;
 
-    List<ANativeWindowBuffer*> mFreePostProcBuffers;
-    List<ANativeWindowBuffer*> mFreeNormalBuffers;
+    List<int> mFreePostProcBuffers;
+    List<int> mFreeNormalBuffers;
 
     sp<ANativeWindow> mNativeWindow;
     size_t mPostProcBufferSize;
