@@ -185,6 +185,83 @@ public final class BluetoothGatt implements BluetoothProfile {
         return result;
     }
 
+    /**
+     * Establish GATT connection to LE device
+     *
+     * @hide
+     */
+     public int gattConnectLe(
+                                    String address,
+                                    byte prohibitRemoteChg,
+                                    byte filterPolicy,
+                                    int scanInterval,
+                                    int scanWindow,
+                                    int intervalMin,
+                                    int intervalMax,
+                                    int latency,
+                                    int superVisionTimeout,
+                                    int minCeLen,
+                                    int maxCeLen, int connTimeout) {
+
+         Log.d(TAG, "Establish LE GATT Connection");
+
+        if (mService != null) {
+            try {
+                return mService.gattConnect(address, null, prohibitRemoteChg, filterPolicy, scanInterval,
+                                            scanWindow, intervalMin, intervalMax, latency,
+                                            superVisionTimeout, minCeLen, maxCeLen, connTimeout);
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
+        } else {
+            Log.w(TAG, "Proxy not attached to service");
+            Log.d(TAG, Log.getStackTraceString(new Throwable()));
+        }
+
+        return BluetoothDevice.GATT_RESULT_FAIL;
+    }
+
+   /**
+     * Cancel GATT connection creation
+     *
+     * @hide
+     */
+    public boolean gattConnectLeCancel(BluetoothGattAppConfiguration config,
+                                             String address) {
+        Log.d(TAG, "Cancel LE GATT Connection creation");
+
+       if (config == null || address == null)
+            return false;
+
+       if (mService != null) {
+           try {
+               return mService.gattConnectCancel(address, null);
+           } catch (RemoteException e) {Log.e(TAG, "", e);}
+       } else {
+            Log.w(TAG, "Proxy not attached to service");
+            Log.d(TAG, Log.getStackTraceString(new Throwable()));
+        }
+
+       return false;
+    }
+
+    public boolean closeGattLeConnection(BluetoothGattAppConfiguration config,
+                                         String address) {
+       if (config == null)
+            return false;
+
+        if (mService != null) {
+            try {
+                return mService.closeGattLeConnection(config, address);
+            } catch (RemoteException e) {
+                Log.e(TAG, e.toString());
+            }
+        } else {
+            Log.w(TAG, "Proxy not attached to service");
+            Log.d(TAG, Log.getStackTraceString(new Throwable()));
+        }
+
+        return false;
+    }
+
     public boolean sendIndication(BluetoothGattAppConfiguration config,
                                   int handle, byte[] value, boolean notify, int sessionHandle) {
         boolean result = false;

@@ -249,6 +249,14 @@ int unregister_gatt_path(event_loop_native_data_t *nat, const char *gatt_path);
 #define HEALTH_OPERATION_NOT_FOUND             6004
 #define HEALTH_OPERATION_NOT_ALLOWED           6005
 
+#define GATT_OPERATION_SUCCESS               0
+#define GATT_OPERATION_TIMEOUT                1
+#define GATT_OPERATION_GENERIC_FAILURE   2
+#define GATT_OPERATION_BUSY                     3
+#define GATT_OPERATION_NOT_CONNECTED   4
+#define GATT_ALREADY_CONNECTED              5
+#define GATT_OPERATION_NOT_SUPPORTED   6
+
 #endif
 } /* namespace android */
 

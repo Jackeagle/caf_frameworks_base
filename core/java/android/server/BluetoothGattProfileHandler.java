@@ -78,6 +78,7 @@ final class BluetoothGattProfileHandler {
     private static final int MESSAGE_READ_BY_TYPE_RESP = 9;
     private static final int MESSAGE_READ_RESP = 10;
     private static final int MESSAGE_WRITE_RESP = 11;
+    private static final int MESSAGE_DISCONNECT_LE = 12;
 
     private static final String UUID = "uuid";
     private static final String HANDLE = "handle";
@@ -90,6 +91,7 @@ final class BluetoothGattProfileHandler {
     private static final String PAYLOAD = "payload";
     private static final String SESSION = "session";
     private static final String NOTIFY = "notify";
+    private static final String PATH = "PATH";
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -136,7 +138,8 @@ final class BluetoothGattProfileHandler {
                 }
 
                 break;
-            case MESSAGE_UNREGISTER_APPLICATION:
+
+           case MESSAGE_UNREGISTER_APPLICATION:
                 Log.d(TAG, "GATT: MESSAGE_UNREGISTER_APPLICATION");
 
                 result = mBluetoothService.unregisterGattServerNative(path, true);
@@ -154,7 +157,19 @@ final class BluetoothGattProfileHandler {
 
                 break;
 
-            case MESSAGE_SEND_INDICATION:
+            case MESSAGE_DISCONNECT_LE:
+                Log.d(TAG, "GATT: MESSAGE_DISCONNECT_LE");
+
+                String devPath = msg.getData().getString(PATH);
+
+                result = mBluetoothService.gattLeDisconnectRequestNative(devPath);
+
+                if (!result)
+                    Log.e(TAG, "Failed to handle GATT LE disconnect request for " + devPath);
+
+                break;
+
+             case MESSAGE_SEND_INDICATION:
                 boolean notify;
                 int sessionHandle;
                 Log.d(TAG, "GATT: MESSAGE_SEND_INDICATION");
@@ -349,6 +364,27 @@ final class BluetoothGattProfileHandler {
            Log.e(TAG, "unregisterAppConfiguration: GATT app not registered");
            return false;
        }
+    }
+
+    boolean closeGattLeConnection(BluetoothGattAppConfiguration config,
+                                  String devPath) {
+       String path = config.getPath();
+
+       Log.d(TAG, "closeGattLeConnection");
+       if (!mAppConfigs.containsKey(path)) {
+            Log.e(TAG, "sendIndication: GATT app not registered");
+            return false;
+        }
+
+        Bundle b = new Bundle();
+        b.putString(PATH, devPath);
+
+        Message msg = mHandler.obtainMessage(MESSAGE_DISCONNECT_LE);
+        msg.obj = config;
+        msg.setData(b);
+        mHandler.sendMessage(msg);
+
+        return true;
     }
 
     boolean sendIndication(BluetoothGattAppConfiguration config,
