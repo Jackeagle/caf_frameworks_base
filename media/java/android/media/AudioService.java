@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -168,6 +169,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     private SettingsObserver mSettingsObserver;
 
     private int mMode;
+    private int mState;
     // protects mRingerMode
     private final Object mSettingsLock = new Object();
 
@@ -443,6 +445,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
 
         mVolumePanel = new VolumePanel(context, this);
         mMode = AudioSystem.MODE_NORMAL;
+        mState = 0;
         mForcedUseForComm = AudioSystem.FORCE_NONE;
         createAudioSystemThread();
         readPersistedSettings();
@@ -1267,10 +1270,12 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         private IBinder mCb; // To be notified of client's death
         private int mPid;
         private int mMode = AudioSystem.MODE_NORMAL; // Current mode set by this client
+        private int mState;
 
         SetModeDeathHandler(IBinder cb, int pid) {
             mCb = cb;
             mPid = pid;
+            mState = 0;
         }
 
         public void binderDied() {
@@ -1297,10 +1302,25 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
 
         public void setMode(int mode) {
             mMode = mode;
+            if (mode == AudioSystem.MODE_IN_CALL) {
+                mState = AudioSystem.CS_ACTIVE;
+            }
+            else {
+                mState = 0;
+            }
+        }
+
+        public void setInCallMode(int state) {
+            mMode = AudioSystem.MODE_IN_CALL;
+            mState = state;
         }
 
         public int getMode() {
             return mMode;
+        }
+
+        public int getInCallMode() {
+            return mState;
         }
 
         public IBinder getBinder() {
@@ -1329,6 +1349,24 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         // SCO connections not started by the application changing the mode
         if (newModeOwnerPid != 0) {
              disconnectBluetoothSco(newModeOwnerPid);
+        }
+    }
+
+
+    public void setInCallMode(int state, IBinder cb) {
+        if (!checkAudioSettingsPermission("setInCallMode()")) {
+            return;
+        }
+
+        int newModeOwnerPid = 0;
+        synchronized(mSetModeDeathHandlers) {
+            newModeOwnerPid = setInCallModeInt(state, cb, Binder.getCallingPid());
+        }
+
+        // when entering RINGTONE, IN_CALL or IN_COMMUNICATION mode, clear all
+        // SCO connections not started by the application changing the mode
+        if (newModeOwnerPid != 0) {
+            disconnectBluetoothSco(newModeOwnerPid);
         }
     }
 
@@ -1382,7 +1420,95 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             }
 
             if (mode != mMode) {
+                //Update the new states for setMode api is called
+                if (mode == AudioSystem.MODE_IN_CALL) {
+                    mState = AudioSystem.CS_ACTIVE;
+                } else {
+                    mState = 0;
+                }
                 status = AudioSystem.setPhoneState(mode);
+                if (status == AudioSystem.AUDIO_STATUS_OK) {
+                    // automatically handle audio focus for mode changes
+                    //handleFocusForCalls(mMode, mode, cb);
+                    mMode = mode;
+                } else {
+                    if (hdlr != null) {
+                        mSetModeDeathHandlers.remove(hdlr);
+                        cb.unlinkToDeath(hdlr, 0);
+                    }
+                    // force reading new top of mSetModeDeathHandlers stack
+                    mode = AudioSystem.MODE_NORMAL;
+                }
+            } else {
+                status = AudioSystem.AUDIO_STATUS_OK;
+            }
+        } while (status != AudioSystem.AUDIO_STATUS_OK && !mSetModeDeathHandlers.isEmpty());
+
+        if (status == AudioSystem.AUDIO_STATUS_OK) {
+            if (mode != AudioSystem.MODE_NORMAL) {
+                if (mSetModeDeathHandlers.isEmpty()) {
+                    Log.e(TAG, "setMode() different from MODE_NORMAL with empty mode client stack");
+                } else {
+                    newModeOwnerPid = mSetModeDeathHandlers.get(0).getPid();
+                }
+            }
+            int streamType = getActiveStreamType(AudioManager.USE_DEFAULT_STREAM_TYPE);
+            int device = getDeviceForStream(streamType);
+            int index = mStreamStates[mStreamVolumeAlias[streamType]].getIndex(device, false);
+            setStreamVolumeInt(STREAM_VOLUME_ALIAS[streamType], index, device, true, false);
+        }
+        return newModeOwnerPid;
+    }
+
+    int setInCallModeInt(int state, IBinder cb, int pid) {
+        int newModeOwnerPid = 0;
+        int mode;
+        if (state != 0) {
+            mode = AudioSystem.MODE_IN_CALL;
+        } else {
+            mode = AudioSystem.MODE_NORMAL;
+        }
+        if (cb == null) {
+            Log.e(TAG, "setModeInt() called with null binder");
+            return newModeOwnerPid;
+        }
+
+        SetModeDeathHandler hdlr = null;
+        Iterator iter = mSetModeDeathHandlers.iterator();
+        while (iter.hasNext()) {
+            SetModeDeathHandler h = (SetModeDeathHandler)iter.next();
+            if (h.getPid() == pid) {
+                hdlr = h;
+                // Remove from client list so that it is re-inserted at top of list
+                iter.remove();
+                hdlr.getBinder().unlinkToDeath(hdlr, 0);
+                break;
+            }
+        }
+        int status = AudioSystem.AUDIO_STATUS_OK;
+        do {
+            if (hdlr == null) {
+                hdlr = new SetModeDeathHandler(cb, pid);
+            }
+            // Register for client death notification
+            try {
+                cb.linkToDeath(hdlr, 0);
+            } catch (RemoteException e) {
+                // Client has died!
+                Log.w(TAG, "setMode() could not link to "+cb+" binder death");
+            }
+            // Last client to call setMode() is always at top of client list
+            // as required by SetModeDeathHandler.binderDied()
+            mSetModeDeathHandlers.add(0, hdlr);
+            hdlr.setInCallMode(state);
+            if (state != mState) {
+                status = AudioSystem.setInCallPhoneState(state);
+                mState = state;
+            } else {
+                status = AudioSystem.AUDIO_STATUS_OK;
+            }
+
+            if (mode != mMode) {
                 if (status == AudioSystem.AUDIO_STATUS_OK) {
                     mMode = mode;
                 } else {
@@ -1423,6 +1549,11 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     /** @see AudioManager#getMode() */
     public int getMode() {
         return mMode;
+    }
+
+    /** @see AudioManager#getInCallMode() */
+    public int getInCallMode() {
+        return mState;
     }
 
     /** @see AudioManager#playSoundEffect(int) */
