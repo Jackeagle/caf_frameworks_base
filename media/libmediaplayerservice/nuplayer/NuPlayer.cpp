@@ -947,6 +947,15 @@ status_t NuPlayer::feedDecoderInputData(bool audio, const sp<AMessage> &msg) {
 
         if (!audio) {
             ++mNumFramesTotal;
+
+            if (mLiveSourceType == kWfdSource) {
+                int32_t nBytesLost =0;
+                accessUnit->meta()->findInt32("bytesLost",&nBytesLost);
+                if (nBytesLost) {
+                    notifyListener(MEDIA_INFO, MEDIA_INFO_NETWORK_BANDWIDTH, nBytesLost);
+                    LOGD("MEDIA_INFO_NETWORK_BANDWIDTH nBytesLost (%d)",nBytesLost);
+                }
+            }
         }
 
         dropAccessUnit = false;
