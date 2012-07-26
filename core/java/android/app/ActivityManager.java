@@ -367,7 +367,7 @@ public class ActivityManager {
      * @hide
      */
     static public boolean isHighEndGfx(Display display) {
-        MemInfoReader reader = new MemInfoReader();
+        /*MemInfoReader reader = new MemInfoReader();
         reader.readMemInfo();
         if (reader.getTotalSize() >= (512*1024*1024)) {
             // If the device has at least 512MB RAM available to the kernel,
@@ -381,7 +381,7 @@ public class ActivityManager {
             // If this is a sufficiently large screen, then there are enough
             // pixels on it that we'd really like to use hw drawing.
             return true;
-        }
+        }*/
         return false;
     }
 
