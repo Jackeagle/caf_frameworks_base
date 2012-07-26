@@ -32,6 +32,9 @@
 #include <include/linux/msm_audio.h>
 
 #include <include/TimedEventQueue.h>
+#include <binder/BinderService.h>
+#include <binder/MemoryDealer.h>
+#include <powermanager/IPowerManager.h>
 
 // Pause timeout = 3sec
 #define TUNNEL_PAUSE_TIMEOUT_USEC 3000000
@@ -75,6 +78,33 @@ public:
     static int mTunnelObjectsAlive;
 
 private:
+
+    void clearPowerManager();
+
+    class PMDeathRecipient : public IBinder::DeathRecipient {
+        public:
+            PMDeathRecipient(void *obj){parentClass = (TunnelPlayer *)obj;}
+            virtual     ~PMDeathRecipient() {}
+
+            // IBinder::DeathRecipient
+            virtual     void        binderDied(const wp<IBinder>& who);
+
+        private:
+            TunnelPlayer *parentClass;
+            PMDeathRecipient(const PMDeathRecipient&);
+            PMDeathRecipient& operator = (const PMDeathRecipient&);
+
+        friend class TunnelPlayer;
+    };
+
+    friend class PMDeathRecipient;
+
+    void        acquireWakeLock();
+    void        releaseWakeLock();
+
+    sp<IPowerManager>       mPowerManager;
+    sp<IBinder>             mWakeLockToken;
+    sp<PMDeathRecipient>    mDeathRecipient;
 
     //Structure to hold ion buffer information
     class BuffersAllocated {
@@ -152,6 +182,7 @@ private:
     Condition mA2dpNotificationCv;
 
     //global lock for Tunnel Player
+    Mutex pmLock;
     Mutex mLock;
     Mutex mSeekLock;
 
