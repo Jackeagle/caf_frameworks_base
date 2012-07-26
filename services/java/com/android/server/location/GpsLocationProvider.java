@@ -613,22 +613,15 @@ public class GpsLocationProvider implements LocationProviderInterface {
                     }
                     agpsConnInfo.mAPN = apnName;
 
-                    LinkProperties lp = mConnMgr.getLinkProperties(agpsConnInfo.mCMConnType);
-                    Collection<LinkAddress> las = lp.getLinkAddresses();
-                    boolean isV4 = false;
-                    boolean isV6 = false;
-                    for (LinkAddress la : las) {
-                        if (la.getAddress() instanceof Inet6Address) {
-                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
-                            isV6 = true;
-                        } else {
-                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
-                            isV4 = true;
-                        }
-                        if (isV4 && isV6) {
-                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
-                            break;
-                        }
+                    String ipProtocol = getIpProtocol(agpsConnInfo.mAPN);
+                    if (null == ipProtocol) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
+                    } else if (ipProtocol.equals("IPV6")) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
+                    } else if (ipProtocol.equals("IPV4V6")) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
+                    } else {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
                     }
 
                     if (agpsConnInfo.mIPv4Addr != null) {
@@ -2308,6 +2301,31 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
         }
         return apn;
+    }
+
+    private String getIpProtocol(String apn) {
+        TelephonyManager phone = (TelephonyManager)
+                mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        String operator =  phone.getNetworkOperator();
+        String ipProtocol = null;
+        String selection = "numeric = '" + operator + "'";
+        selection += " and apn = '" + apn + "'";
+        selection += " and carrier_enabled = 1";
+
+        Cursor cursor = mContext.getContentResolver().query(Carriers.CONTENT_URI,
+                new String[] {Carriers.PROTOCOL}, selection, null, Carriers.DEFAULT_SORT_ORDER);
+
+        if (null != cursor) {
+            try {
+                if (cursor.moveToFirst()) {
+                    ipProtocol = cursor.getString(0);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+
+        return ipProtocol;
     }
 
     // for GPS SV statistics
