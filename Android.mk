@@ -37,7 +37,13 @@ FRAMEWORKS_EXT_SUBDIRS := \
        media/mca/effect \
        media/mca/filterfw \
        media/mca/filterpacks \
-       core/java/android/hardware/fmradio
+       core/java/android/hardware/fmradio \
+       core/tests/utillib/src/android/test \
+       core/java/android/test \
+       core/java/android/gesture \
+       core/java/android/speech/srec \
+       media/java/android/media/videoeditor \
+       media/java/android/media/audiofx
 
 FRAMEWORKS_EXT_SRCS := $(call find-other-java-files,$(FRAMEWORKS_EXT_SUBDIRS))
 
