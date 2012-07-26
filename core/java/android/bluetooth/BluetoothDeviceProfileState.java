@@ -518,23 +518,24 @@ public final class BluetoothDeviceProfileState extends StateMachine {
 
     @Override
     protected void quitting() {
-        mContext.unregisterReceiver(mBroadcastReceiver);
-        mBroadcastReceiver = null;
-        mAdapter.closeProfileProxy(BluetoothProfile.HEADSET, mHeadsetService);
-        mBluetoothProfileServiceListener = null;
-        mOutgoingHandsfree = null;
-        mPbap = null;
-        mPbapService.close();
-        mPbapService = null;
-        mIncomingHid = null;
-        mOutgoingHid = null;
-        mIncomingHandsfree = null;
-        mOutgoingHandsfree = null;
-        mIncomingA2dp = null;
-        mOutgoingA2dp = null;
-        mBondedDevice = null;
-
-        super.quitting();
+        if (mBroadcastReceiver != null) {
+            mContext.unregisterReceiver(mBroadcastReceiver);
+            mBroadcastReceiver = null;
+            mAdapter.closeProfileProxy(BluetoothProfile.HEADSET, mHeadsetService);
+            mBluetoothProfileServiceListener = null;
+            mOutgoingHandsfree = null;
+            mPbap = null;
+            mPbapService.close();
+            mPbapService = null;
+            mIncomingHid = null;
+            mOutgoingHid = null;
+            mIncomingHandsfree = null;
+            mOutgoingHandsfree = null;
+            mIncomingA2dp = null;
+            mOutgoingA2dp = null;
+            mBondedDevice = null;
+      }
+      super.quitting();
     }
 
     private class OutgoingHandsfree extends State {
