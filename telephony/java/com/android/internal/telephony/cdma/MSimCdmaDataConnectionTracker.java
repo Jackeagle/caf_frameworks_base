@@ -339,7 +339,7 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
     public void registerForAllDataDisconnected(Handler h, int what, Object obj) {
         mAllDataDisconnectedRegistrants.addUnique(h, what, obj);
 
-        if (!isDisconnected()) {
+        if (isDisconnected()) {
             log("notify All Data Disconnected");
             mAllDataDisconnectedRegistrants.notifyRegistrants();
         }
