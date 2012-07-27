@@ -26,6 +26,7 @@ import android.os.Message;
 import com.android.internal.telephony.BaseCommands;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.UUSInfo;
+import com.android.internal.telephony.cdma.CdmaSmsBroadcastConfigInfo;
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 
 /**
@@ -415,6 +416,9 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
     }
 
     public void setCdmaBroadcastConfig(int[] configValuesArray, Message response) {
+    }
+
+    public void setCdmaBroadcastConfig(CdmaSmsBroadcastConfigInfo[] configs, Message response) {
     }
 
     public void setCdmaBroadcastActivation(boolean activate, Message response) {
