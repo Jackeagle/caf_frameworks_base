@@ -89,6 +89,7 @@ status_t PostProc::start(MetaData *params)
     CHECK_EQ(mState, LOADED);
     mOutputBuffers.clear();
     mPostProcBuffers.clear();
+    mFreePostProcBuffers.clear();
 
     mLastBufferFormat = 0;
     mReadError = OK;
@@ -492,7 +493,7 @@ status_t PostProc::findFreePostProcBuffer(MediaBuffer **buffer)
         return dequeuePostProcBufferFromNativeWindow(buffer);
     }
 
-    while (mPostProcBuffers.empty()) {
+    while (mFreePostProcBuffers.empty()) {
         status_t err = mPostProcBufferCondition.waitRelative(mLock, kPostProcBufferAvailableTimeOutNs);
         POSTPROC_LOGV("Got out of the wait for post proc buffer\n");
         if (mState == SEEKING || mState == STOPPED || mState == PAUSED) {
@@ -503,8 +504,12 @@ status_t PostProc::findFreePostProcBuffer(MediaBuffer **buffer)
             return err;
         }
     }
-    *buffer = *mPostProcBuffers.begin();
-    mPostProcBuffers.erase(mPostProcBuffers.begin());
+
+    int index = *mFreePostProcBuffers.begin();
+    PostProcBuffer * ppBuf = (&mPostProcBuffers)->editItemAt(index);
+    ppBuf->isFree = false;
+    (*buffer) = ppBuf->buffer;
+    mFreePostProcBuffers.erase(mFreePostProcBuffers.begin());
     return OK;
 }
 
@@ -582,7 +587,7 @@ status_t PostProc::dequeuePostProcBufferFromNativeWindow(MediaBuffer **buffer)
         err = mNativeWindow.get()->postProc_dequeueBuffer(&buf);
         if (err == NO_MEMORY && buf == NULL) {
             POSTPROC_LOGV("Wait for post proc buffer \n");
-            status_t err = mPostProcBufferCondition.waitRelative(mLock, kPostProcBufferAvailableTimeOutNs);
+            err = mPostProcBufferCondition.waitRelative(mLock, kPostProcBufferAvailableTimeOutNs);
             POSTPROC_LOGV("Got out of the wait for post proc buffer\n");
             if (mState == SEEKING || mState == STOPPED || mState == PAUSED) {
                 return OK;
@@ -599,8 +604,7 @@ status_t PostProc::dequeuePostProcBufferFromNativeWindow(MediaBuffer **buffer)
         }
     }
 
-    sp<GraphicBuffer> graphicBuffer(new GraphicBuffer(buf, false));
-    *buffer = new MediaBuffer(graphicBuffer);
+    (*buffer) = getPostProcBufferByNativeHandle(buf);
     return OK;
 }
 
@@ -650,7 +654,11 @@ status_t PostProc::allocatePostProcBuffers()
             nh->data[4] = (int)data;
             MediaBuffer * buffer = new MediaBuffer((void *)packet, mBufferSize);
             POSTPROC_LOGV("allocated buffer of size = %d, fd = %d\n", mBufferSize, fd);
-            mPostProcBuffers.push_back(buffer);
+            PostProcBuffer * ppBuf = new PostProcBuffer();
+            ppBuf->buffer = buffer;
+            ppBuf->isFree = true;
+            mPostProcBuffers.push(ppBuf);
+            mFreePostProcBuffers.push_back(i);
         }
         return err;
     }
@@ -665,10 +673,20 @@ void PostProc::releasePostProcBuffers()
 #ifdef USE_ION
     if (mNativeWindow == NULL) {
         POSTPROC_LOGV("buffer q size is %d, total number of buffers is %d\n",mPostProcBuffers.size(), mNumBuffers);
-        CHECK_EQ(mPostProcBuffers.size(), mNumBuffers);
-        while (!mPostProcBuffers.empty()) {
+        CHECK_EQ(mFreePostProcBuffers.size(), mNumBuffers);
+    } else {
+        CHECK_EQ(mFreePostProcBuffers.size(), 0);
+    }
+    Vector<PostProcBuffer *> * ppBuffers = &mPostProcBuffers;
+    PostProcBuffer * ppBuf = NULL;
 
-            MediaBuffer * buffer = *mPostProcBuffers.begin();
+    for (size_t i = 0; i < ppBuffers->size(); ++i) {
+        ppBuf = ppBuffers->editItemAt(i);
+
+        MediaBuffer * buffer = ppBuf->buffer;
+
+        if (mNativeWindow == NULL) {
+            CHECK(ppBuf->isFree);
             encoder_media_buffer_type * packet = (encoder_media_buffer_type *)buffer->data();
             native_handle_t * nh = const_cast<native_handle_t *>(packet->meta_handle);
             ion_handle * hnd = (ion_handle *)nh->data[3];
@@ -683,13 +701,17 @@ void PostProc::releasePostProcBuffers()
             }
             native_handle_delete(nh);
             delete packet;
-            buffer->setObserver(NULL);
-            CHECK_EQ(buffer->refcount(), 0);
-            buffer->release();
-            mPostProcBuffers.erase(mPostProcBuffers.begin());
+        } else {
+            CHECK(!ppBuf->isFree);
         }
-        mPostProcBuffers.clear();
+        buffer->setObserver(NULL);
+        CHECK_EQ(buffer->refcount(), 0);
+        buffer->release();
+        buffer = NULL;
+        delete ppBuf;
     }
+    mPostProcBuffers.clear();
+    mFreePostProcBuffers.clear();
 #endif
     return;
 }
@@ -722,7 +744,7 @@ void PostProc::flushPostProcBuffer(MediaBuffer *buffer)
     buffer->setObserver(NULL);
     CHECK_EQ(buffer->refcount(), 0);
     if (mNativeWindow == NULL) {
-         mPostProcBuffers.push_back(buffer);
+         pushPostProcBufferToFreeList(buffer);
     } else {
         int rendered = 0;
         if (!buffer->meta_data()->findInt32(kKeyRendered, &rendered)) {
@@ -730,17 +752,63 @@ void PostProc::flushPostProcBuffer(MediaBuffer *buffer)
         }
         if (!rendered) {
             POSTPROC_LOGV("Cancel Post Proc buffer as buffer not rendered\n");
-            status_t err = mNativeWindow.get()->postProc_cancelBuffer(buffer->graphicBuffer().get());
+            status_t err = mNativeWindow.get()->postProc_cancelBuffer(buffer->graphicBuffer()->getNativeBuffer());
 
             if (err != OK) {
                 POSTPROC_LOGE("Warning Cancel Post Proc buffer failed\n");
             }
         }
-        buffer->release();
     }
     return;
 }
 
+MediaBuffer * PostProc::getPostProcBufferByNativeHandle(ANativeWindowBuffer *buf)
+{
+    // lock acquired in findFreePostProcBuffer, called from dequeuePostProcBufferFromNativeWindow
+    POSTPROC_LOGV("%s:  start", __func__);
+
+    Vector<PostProcBuffer *> * ppBuffers = &mPostProcBuffers;
+    PostProcBuffer * ppBuf = NULL;
+
+    for (size_t i = 0; i < ppBuffers->size(); ++i) {
+        ppBuf = ppBuffers->editItemAt(i);
+        if (ppBuf->buffer->graphicBuffer()->getNativeBuffer()->handle == buf->handle) {
+            ppBuf->isFree = false;
+            return ppBuf->buffer;
+        }
+    }
+
+    if (ppBuffers->size() < mNumBuffers) {
+        POSTPROC_LOGV("Got a new native window buffer : %p", buf);
+        sp<GraphicBuffer> graphicBuffer(new GraphicBuffer(buf, false));
+        MediaBuffer * buffer = new MediaBuffer(graphicBuffer);
+        ppBuf = new PostProcBuffer();
+        ppBuf->isFree = false;
+        ppBuf->buffer = buffer;
+        mPostProcBuffers.push(ppBuf);
+        return buffer;
+    }
+    CHECK(!"Should not be here");
+}
+
+void PostProc::pushPostProcBufferToFreeList(MediaBuffer *buffer)
+{
+    // called from flushPostProcBuffer
+    POSTPROC_LOGV("%s:  begin", __func__);
+
+    Vector<PostProcBuffer *> * ppBuffers = &mPostProcBuffers;
+    PostProcBuffer * ppBuf = NULL;
+
+    for (size_t i = 0; i < ppBuffers->size(); ++i) {
+        ppBuf = ppBuffers->editItemAt(i);
+        if (ppBuf->buffer == buffer) {
+            ppBuf->isFree = true;
+            mFreePostProcBuffers.push_back(i);
+            break;
+        }
+    }
+    return;
+}
 
 int PostProc::allocateIonBuffer(size_t size, int *handle)
 {
@@ -760,7 +828,6 @@ int PostProc::allocateIonBuffer(size_t size, int *handle)
     }
     fd_data.handle = alloc_data.handle;
     *handle = (int)fd_data.handle;
-    POSTPROC_LOGV("handle is %d\n",*handle);
     rc = ioctl(mIonFd,ION_IOC_MAP,&fd_data);
     if (rc) {
         POSTPROC_LOGE("Failed to MAP ion memory\n");
