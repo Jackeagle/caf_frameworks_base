@@ -63,6 +63,7 @@ import android.util.EventLog;
 import android.util.Log;
 import android.util.Slog;
 import android.view.Display;
+import com.android.internal.app.ActivityTrigger;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -319,7 +320,10 @@ final class ActivityStack {
 
     final Handler mHandler;
 
+    static final ActivityTrigger mActivityTrigger = new ActivityTrigger();
+
     final class ActivityStackHandler extends Handler {
+
         //public Handler() {
         //    if (localLOGV) Slog.v(TAG, "Handler started!");
         //}
@@ -1497,6 +1501,8 @@ final class ActivityStack {
 
         if (DEBUG_SWITCH) Slog.v(TAG, "Resuming " + next);
 
+        mActivityTrigger.activityResumeTrigger(next.intent);
+
         // If we are currently pausing an activity, then don't do anything
         // until that is done.
         if (mPausingActivity != null) {
@@ -2508,6 +2514,7 @@ final class ActivityStack {
             final int userId = aInfo != null ? UserHandle.getUserId(aInfo.applicationInfo.uid) : 0;
             Slog.i(TAG, "START u" + userId + " {" + intent.toShortString(true, true, true, false)
                     + "} from pid " + (callerApp != null ? callerApp.pid : callingPid));
+            mActivityTrigger.activityStartTrigger(intent);
         }
 
         ActivityRecord sourceRecord = null;
