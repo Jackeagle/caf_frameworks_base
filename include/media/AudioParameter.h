@@ -48,6 +48,9 @@ public:
     static const char *keyInputSource;
     static const char *keyHandleFm;
     static const char *keyVoipCheck;
+    static const char *keyFluenceType;
+    static const char *keySurroundRecording;
+
     String8 toString();
 
     status_t add(const String8& key, const String8& value);
