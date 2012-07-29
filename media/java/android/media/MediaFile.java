@@ -29,7 +29,10 @@ import android.mtp.MtpConstants;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-
+import java.io.File;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import android.util.Log;
 /**
  * MediaScanner helper class.
  *
@@ -183,6 +186,36 @@ public class MediaFile {
         return false;
     }
 
+    private static boolean isMPQTarget() {
+        int soc_id = 0;
+        String file_info_id;
+        try {
+            File socFile = new File("/sys/devices/system/soc/soc0/id");
+            if(socFile != null) {
+                FileReader inputSocFile = new FileReader(socFile);
+                if(inputSocFile != null) {
+                   BufferedReader socBufferReader = new BufferedReader(inputSocFile);
+                   if(socBufferReader != null) {
+                       file_info_id =socBufferReader.readLine();
+                       Log.w("MediaFile", "String id = " + file_info_id);
+                       soc_id = Integer.parseInt(file_info_id);
+                       socBufferReader.close();
+                   }
+                   inputSocFile.close();
+                }
+            }
+        } catch(Exception e) {
+            Log.e("MediaFile","Exception in FileReader");
+        }
+        Log.w("MediaFile", "integer id = " + soc_id);
+        if(soc_id == 130) {
+            Log.w("MediaFile",  "MPQ Audio Decode true");
+            return true;
+        }
+        Log.w("MediaFile",  "MPQ Audio Decode false" );
+        return false;
+    }
+
     static {
         addFileType("MP3", FILE_TYPE_MP3, "audio/mpeg", MtpConstants.FORMAT_MP3);
         addFileType("MPGA", FILE_TYPE_MP3, "audio/mpeg", MtpConstants.FORMAT_MP3);
@@ -192,7 +225,7 @@ public class MediaFile {
         addFileType("AMR", FILE_TYPE_AMR, "audio/amr");
         addFileType("AWB", FILE_TYPE_AWB, "audio/amr-wb");
         addFileType("DIVX", FILE_TYPE_DIVX, "video/divx");
-        if (isWMAEnabled()) {
+        if (isWMAEnabled() || isMPQTarget()) {
             addFileType("WMA", FILE_TYPE_WMA, "audio/x-ms-wma", MtpConstants.FORMAT_WMA);
         }
         addFileType("QCP", FILE_TYPE_QCP, "audio/qcelp");
@@ -263,6 +296,11 @@ public class MediaFile {
         addFileType("ZIP", FILE_TYPE_ZIP, "application/zip");
         addFileType("MPG", FILE_TYPE_MP2PS, "video/mp2p");
         addFileType("MPEG", FILE_TYPE_MP2PS, "video/mp2p");
+        if(isMPQTarget()) {
+            addFileType("AC3", FILE_TYPE_AC3, "audio/ac3");
+            addFileType("EC3", FILE_TYPE_EC3, "audio/ec3");
+            addFileType("DTS", FILE_TYPE_DTS, "audio/dts");
+        }
     }
 
     public static boolean isAudioFileType(int fileType) {
