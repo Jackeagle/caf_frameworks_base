@@ -114,6 +114,10 @@ public class GSMPhone extends PhoneBase {
     PhoneSubInfo mSubInfo;
     UiccCard mSimCard = null;
 
+    /** EONS enabled flag. */
+    private boolean mEonsEnabled =
+            SystemProperties.getBoolean(TelephonyProperties.PROPERTY_EONS_ENABLED, true);
+
 
     Registrant mPostDialHandler;
 
@@ -1003,7 +1007,13 @@ public class GSMPhone extends PhoneBase {
 
     public void
     getAvailableNetworks(Message response) {
-        mCM.getAvailableNetworks(response);
+        Message msg;
+        if (mEonsEnabled) {
+            msg = obtainMessage(EVENT_GET_NETWORKS_DONE,response);
+        } else {
+            msg = response;
+        }
+        mCM.getAvailableNetworks(msg);
     }
 
     /**
@@ -1356,6 +1366,34 @@ public class GSMPhone extends PhoneBase {
                 }
                 break;
 
+            case EVENT_GET_NETWORKS_DONE:
+                ArrayList<OperatorInfo> eonsNetworkNames = null;
+
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception == null && mIccRecords != null) {
+                    eonsNetworkNames =
+                      ((SIMRecords)mIccRecords.get()).getEonsForAvailableNetworks((ArrayList<OperatorInfo>)ar.result);
+                }
+
+                if (mIccRecords == null && ar.exception == null) {
+                    Log.w(LOG_TAG, "getEonsForAvailableNetworks() aborted. icc absent?");
+                }
+
+                if (eonsNetworkNames != null) {
+                    Log.i(LOG_TAG, "[EONS] Populated EONS for available networks.");
+                } else {
+                    eonsNetworkNames = (ArrayList<OperatorInfo>)ar.result;
+                }
+
+                onComplete = (Message) ar.userObj;
+                if (onComplete != null) {
+                    AsyncResult.forMessage(onComplete, eonsNetworkNames, ar.exception);
+                    onComplete.sendToTarget();
+                } else {
+                    Log.e(LOG_TAG, "[EONS] In EVENT_GET_NETWORKS_DONE, onComplete is null!");
+                }
+                break;
+
              default:
                  super.handleMessage(msg);
         }
@@ -1400,6 +1438,14 @@ public class GSMPhone extends PhoneBase {
                 break;
             case IccRecords.EVENT_MWI:
                 notifyMessageWaitingIndicator();
+                break;
+            case SIMRecords.EVENT_SPN:
+                mSST.updateSpnDisplay();
+                break;
+            case SIMRecords.EVENT_EONS:
+                if (mEonsEnabled) {
+                    mSST.updateEons();
+                }
                 break;
         }
     }

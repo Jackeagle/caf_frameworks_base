@@ -236,4 +236,10 @@ public interface TelephonyProperties
      * Default value 0.
      */
     static final String PROPERTY_VOICE_MODEM_INDEX = "persist.radio.voice.modem.index";
+
+    /**
+     * Property to control EONS.
+     * Type: boolean ( true = EONS enabled, false = EONS disabled)
+     */
+    static final String PROPERTY_EONS_ENABLED = "persist.radio.eons.enabled";
 }

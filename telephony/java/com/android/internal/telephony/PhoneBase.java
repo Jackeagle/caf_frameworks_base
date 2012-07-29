@@ -106,6 +106,7 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected static final int EVENT_SET_CLIR_COMPLETE              = 18;
     protected static final int EVENT_REGISTERED_TO_NETWORK          = 19;
     protected static final int EVENT_SET_VM_NUMBER_DONE             = 20;
+
     // Events for CDMA support
     protected static final int EVENT_GET_DEVICE_IDENTITY_DONE       = 21;
     protected static final int EVENT_RUIM_RECORDS_LOADED            = 22;
@@ -118,6 +119,7 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected static final int EVENT_SET_NETWORK_AUTOMATIC          = 28;
     protected static final int EVENT_ICC_RECORD_EVENTS              = 29;
     protected static final int EVENT_ICC_CHANGED                    = 30;
+    protected static final int EVENT_GET_NETWORKS_DONE              = 31;
 
     // Key used to read/write current CLIR setting
     public static final String CLIR_KEY = "clir_key";
