@@ -264,7 +264,7 @@ public class IccCardProxy extends Handler implements IccCard {
 
         if (mUiccCard.getCardState() == CardState.CARDSTATE_ERROR ||
                 mUiccApplication == null) {
-            setExternalState(State.UNKNOWN);
+            setExternalState(State.CARD_IO_ERROR);
             return;
         }
 
@@ -383,9 +383,36 @@ public class IccCardProxy extends Handler implements IccCard {
         return retValue;
     }
 
+    public boolean getIccFdnAvailable() {
+        boolean retValue = mUiccApplication != null ? mUiccApplication.getIccFdnAvailable() : false;
+        return retValue;
+    }
+
     public boolean getIccLockEnabled() {
         /* defaults to false, if ICC is absent/deactivated */
         Boolean retValue = mUiccApplication != null ? mUiccApplication.getIccLockEnabled() : false;
+        return retValue;
+    }
+
+    public int getIccPin1RetryCount() {
+        int retValue = mUiccApplication != null ? mUiccApplication.getIccPin1RetryCount() : -1;
+        return retValue;
+    }
+
+    public int getIccPin2RetryCount() {
+        int retValue = mUiccApplication != null ? mUiccApplication.getIccPin2RetryCount() : -1;
+        return retValue;
+    }
+
+    public boolean getIccPin2Blocked() {
+        /* defaults to disabled */
+        Boolean retValue = mUiccApplication != null ? mUiccApplication.getIccPin2Blocked() : false;
+        return retValue;
+    }
+
+    public boolean getIccPuk2Blocked() {
+        /* defaults to disabled */
+        Boolean retValue = mUiccApplication != null ? mUiccApplication.getIccPuk2Blocked() : false;
         return retValue;
     }
 

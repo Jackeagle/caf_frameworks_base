@@ -37,8 +37,13 @@ public class UiccCardApplication {
     private static final String LOG_TAG = "RIL_UiccCardApplication";
     private static final boolean DBG = true;
 
-    private static final int EVENT_QUERY_FACILITY_FDN_DONE = 1;
-    private static final int EVENT_CHANGE_FACILITY_FDN_DONE = 2;
+    private static final int EVENT_PIN1PUK1_DONE = 1;
+    private static final int EVENT_CHANGE_FACILITY_LOCK_DONE = 2;
+    private static final int EVENT_CHANGE_PIN1_DONE = 3;
+    private static final int EVENT_CHANGE_PIN2_DONE = 4;
+    private static final int EVENT_QUERY_FACILITY_FDN_DONE = 5;
+    private static final int EVENT_CHANGE_FACILITY_FDN_DONE = 6;
+    private static final int EVENT_PIN2PUK2_DONE = 7;
 
     private UiccCard mUiccCard; //parent
     private AppState      mAppState;
@@ -52,6 +57,8 @@ public class UiccCardApplication {
     private boolean       mIccFdnEnabled = false; // Default to disabled.
     private boolean       mIccFdnAvailable = true; // Default is enabled.
     private boolean mDesiredFdnEnabled;
+    private int mPin1RetryCount = -1;
+    private int mPin2RetryCount = -1;
 
     private CommandsInterface mCi;
     private Context mContext;
@@ -177,8 +184,8 @@ public class UiccCardApplication {
         serviceClassX = CommandsInterface.SERVICE_CLASS_VOICE +
                         CommandsInterface.SERVICE_CLASS_DATA +
                         CommandsInterface.SERVICE_CLASS_FAX;
-        mCi.queryFacilityLock (
-                CommandsInterface.CB_FACILITY_BA_FD, "", serviceClassX,
+        mCi.queryFacilityLockForApp (
+                CommandsInterface.CB_FACILITY_BA_FD, "", serviceClassX, mAid,
                 mHandler.obtainMessage(EVENT_QUERY_FACILITY_FDN_DONE));
     }
     /**
@@ -208,6 +215,23 @@ public class UiccCardApplication {
         }
     }
 
+    /**
+     * Parse the error response to obtain No of attempts remaining to unlock PIN1/PUK1
+     */
+    private void parsePinPukErrorResult(AsyncResult ar, boolean isPin1) {
+        int[] intArray = (int[]) ar.result;
+        int length = intArray.length;
+        mPin1RetryCount = -1;
+        mPin2RetryCount = -1;
+        if (length > 0) {
+            if (isPin1) {
+                mPin1RetryCount = intArray[0];
+            } else {
+                mPin2RetryCount = intArray[0];
+            }
+        }
+    }
+
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg){
@@ -220,9 +244,41 @@ public class UiccCardApplication {
             }
 
             switch (msg.what) {
+                case EVENT_PIN1PUK1_DONE:
+                case EVENT_PIN2PUK2_DONE:
+                    // a PIN/PUK/PIN2/PUK2/Network Personalization
+                    // request has completed. ar.userObj is the response Message
+                    ar = (AsyncResult)msg.obj;
+                    // TODO should abstract these exceptions
+                    if ((ar.exception != null) && (ar.result != null)) {
+                        if (msg.what == EVENT_PIN1PUK1_DONE) {
+                            parsePinPukErrorResult(ar, true);
+                        } else {
+                            parsePinPukErrorResult(ar, false);
+                        }
+                    }
+                    AsyncResult.forMessage(((Message)ar.userObj)).exception
+                                                        = ar.exception;
+                    ((Message)ar.userObj).sendToTarget();
+                    break;
                 case EVENT_QUERY_FACILITY_FDN_DONE:
                     ar = (AsyncResult)msg.obj;
                     onQueryFdnEnabled(ar);
+                    break;
+                case EVENT_CHANGE_FACILITY_LOCK_DONE:
+                    ar = (AsyncResult)msg.obj;
+                    if (ar.exception == null) {
+                        log("EVENT_CHANGE_FACILITY_LOCK_DONE ");
+                    } else {
+                        if (ar.result != null) {
+                            parsePinPukErrorResult(ar, true);
+                        }
+                        loge("Error change facility sim lock with exception "
+                            + ar.exception);
+                    }
+                    AsyncResult.forMessage(((Message)ar.userObj)).exception
+                                                        = ar.exception;
+                    ((Message)ar.userObj).sendToTarget();
                     break;
                 case EVENT_CHANGE_FACILITY_FDN_DONE:
                     ar = (AsyncResult)msg.obj;
@@ -232,8 +288,37 @@ public class UiccCardApplication {
                         if (DBG) log("EVENT_CHANGE_FACILITY_FDN_DONE: " +
                                 "mIccFdnEnabled=" + mIccFdnEnabled);
                     } else {
+                        if (ar.result != null) {
+                            parsePinPukErrorResult(ar, false);
+                        }
                         loge("Error change facility fdn with exception "
                                 + ar.exception);
+                    }
+                    AsyncResult.forMessage(((Message)ar.userObj)).exception
+                                                        = ar.exception;
+                    ((Message)ar.userObj).sendToTarget();
+                    break;
+                case EVENT_CHANGE_PIN1_DONE:
+                    ar = (AsyncResult)msg.obj;
+                    if(ar.exception != null) {
+                        loge("Error in change icc app password with exception"
+                            + ar.exception);
+                        if (ar.result != null) {
+                            parsePinPukErrorResult(ar, true);
+                        }
+                    }
+                    AsyncResult.forMessage(((Message)ar.userObj)).exception
+                                                        = ar.exception;
+                    ((Message)ar.userObj).sendToTarget();
+                    break;
+                case EVENT_CHANGE_PIN2_DONE:
+                    ar = (AsyncResult)msg.obj;
+                    if(ar.exception != null) {
+                        loge("Error in change icc app password with exception"
+                            + ar.exception);
+                        if (ar.result != null) {
+                            parsePinPukErrorResult(ar, false);
+                        }
                     }
                     AsyncResult.forMessage(((Message)ar.userObj)).exception
                                                         = ar.exception;
@@ -408,19 +493,22 @@ public class UiccCardApplication {
      *
      */
     public void supplyPin (String pin, Message onComplete) {
-        mCi.supplyIccPin(pin, onComplete);
+        mCi.supplyIccPinForApp(pin, mAid, mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
     }
 
     public void supplyPuk (String puk, String newPin, Message onComplete) {
-        mCi.supplyIccPuk(puk, newPin, onComplete);
+        mCi.supplyIccPukForApp(puk, newPin, mAid,
+                mHandler.obtainMessage(EVENT_PIN1PUK1_DONE, onComplete));
     }
 
     public void supplyPin2 (String pin2, Message onComplete) {
-        mCi.supplyIccPin2(pin2, onComplete);
+        mCi.supplyIccPin2ForApp(pin2, mAid,
+                mHandler.obtainMessage(EVENT_PIN2PUK2_DONE, onComplete));
     }
 
     public void supplyPuk2 (String puk2, String newPin2, Message onComplete) {
-        mCi.supplyIccPuk2(puk2, newPin2, onComplete);
+        mCi.supplyIccPuk2ForApp(puk2, newPin2, mAid,
+                mHandler.obtainMessage(EVENT_PIN2PUK2_DONE, onComplete));
     }
 
     public void supplyNetworkDepersonalization (String pin, Message onComplete) {
@@ -455,6 +543,29 @@ public class UiccCardApplication {
         return mIccFdnEnabled;
      }
 
+    /**
+     * Check whether fdn (fixed dialing number) service is available.
+     * @return true if ICC fdn service available
+     *         false if ICC fdn service not available
+     */
+    public boolean getIccFdnAvailable() {
+        return mIccFdnAvailable;
+    }
+
+     /**
+     * @return No. of Attempts remaining to unlock PIN1/PUK1
+     */
+     public int getIccPin1RetryCount() {
+         return mPin1RetryCount;
+     }
+
+     /**
+      * @return No. of Attempts remaining to unlock PIN2/PUK2
+     */
+     public int getIccPin2RetryCount() {
+         return mPin2RetryCount;
+     }
+
      /**
       * Set the ICC pin lock enabled or disabled
       * When the operation is complete, onComplete will be sent to its handler
@@ -475,7 +586,7 @@ public class UiccCardApplication {
 
          mCi.setFacilityLockForApp(CommandsInterface.CB_FACILITY_BA_SIM,
                  enabled, password, serviceClassX, mAid,
-                 onComplete);
+                 mHandler.obtainMessage(EVENT_CHANGE_FACILITY_LOCK_DONE, onComplete));
      }
 
      /**
@@ -539,6 +650,20 @@ public class UiccCardApplication {
         if (DBG) log("Change Pin2 old: " + oldPassword + " new: " + newPassword);
         mCi.changeIccPin2ForApp(oldPassword, newPassword, mAid,
                 onComplete);
+    }
+
+    /**
+     * @return true if ICC card is PIN2 blocked
+     */
+    public boolean getIccPin2Blocked() {
+        return mPin2State == PinState.PINSTATE_ENABLED_BLOCKED;
+    }
+
+    /**
+     * @return true if ICC card is PUK2 blocked
+     */
+    public boolean getIccPuk2Blocked() {
+        return mPin2State == PinState.PINSTATE_ENABLED_PERM_BLOCKED;
     }
 
     private void log(String msg) {
