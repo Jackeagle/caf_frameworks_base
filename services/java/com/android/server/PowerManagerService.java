@@ -2324,6 +2324,14 @@ public class PowerManagerService extends IPowerManager.Stub
                     Message msg = mScreenBrightnessHandler
                             .obtainMessage(ANIMATE_LIGHTS, mask, newValue);
                     mScreenBrightnessHandler.sendMessageDelayed(msg, delay);
+                } else {
+                    final boolean doScreenAnimation = (mask & (SCREEN_BRIGHT_BIT | SCREEN_ON_BIT)) != 0;
+                    final boolean turnOff = currentValue == PowerManager.BRIGHTNESS_OFF;
+                    if (turnOff && doScreenAnimation) {
+                        // Cancel all pending animations since we're turning off
+                        mScreenBrightnessHandler.removeCallbacksAndMessages(null);
+                        screenOffFinishedAnimatingLocked(mScreenOffReason);
+                    }
                 }
             }
         }
@@ -2385,15 +2393,8 @@ public class PowerManagerService extends IPowerManager.Stub
 
                 if (target != currentValue) {
                     final boolean doScreenAnim = (mask & (SCREEN_BRIGHT_BIT | SCREEN_ON_BIT)) != 0;
-                    final boolean turningOff = endValue == PowerManager.BRIGHTNESS_OFF;
-                    if (turningOff && doScreenAnim) {
-                        // Cancel all pending animations since we're turning off
-                        mScreenBrightnessHandler.removeCallbacksAndMessages(null);
-                        screenOffFinishedAnimatingLocked(mScreenOffReason);
-                        duration = 200; // TODO: how long should this be?
-                    }
                     if (doScreenAnim) {
-                        animateInternal(mask, turningOff, 0);
+                        animateInternal(mask, false , 0);
                     }
                     // TODO: Handle keyboard light animation when we have devices that support it
                 }
