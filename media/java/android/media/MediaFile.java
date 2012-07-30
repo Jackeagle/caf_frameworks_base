@@ -266,7 +266,7 @@ public class MediaFile {
         if (isWMAEnabled()) {
             addFileType("WMA", FILE_TYPE_WMA, "audio/x-ms-wma", MtpConstants.FORMAT_WMA);
         }
-        addFileType("QCP", FILE_TYPE_QCP, "audio/qcp");
+        addFileType("QCP", FILE_TYPE_QCP, "audio/qcelp");
         addFileType("OGG", FILE_TYPE_OGG, "application/ogg", MtpConstants.FORMAT_OGG);
         addFileType("OGA", FILE_TYPE_OGG, "audio/ogg", MtpConstants.FORMAT_OGG);
         addFileType("WEBM", FILE_TYPE_WEBMA, "audio/webm");
