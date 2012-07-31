@@ -1198,7 +1198,7 @@ public class SIMRecords extends IccRecords {
                 spnDisplayCondition = 0xff & data[0];
                 spn = IccUtils.adnStringFieldToString(data, 1, data.length - 1);
 
-                SystemProperties.set(PROPERTY_ICC_OPERATOR_ALPHA, spn);
+                setSystemProperty(PROPERTY_ICC_OPERATOR_ALPHA, spn);
 
                 // When device enters or exits Home Zone, certain operators update
                 // EF_SPN file. This helps to know if the device is in Home Zone or

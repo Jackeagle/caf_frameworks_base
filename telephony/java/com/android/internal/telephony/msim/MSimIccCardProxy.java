@@ -65,7 +65,7 @@ public class MSimIccCardProxy extends IccCardProxy {
     private static final int EVENT_SUBSCRIPTION_ACTIVATED = 501;
     private static final int EVENT_SUBSCRIPTION_DEACTIVATED = 502;
 
-    private int mCardIndex;
+    private Integer mCardIndex = null;
     private Subscription mSubscriptionData = null;
 
     public MSimIccCardProxy(Context context, CommandsInterface ci, int cardIndex) {
@@ -81,6 +81,7 @@ public class MSimIccCardProxy extends IccCardProxy {
                 this, EVENT_SUBSCRIPTION_DEACTIVATED, null);
 
         resetProperties();
+        setExternalState(State.NOT_READY, false);
     }
 
     @Override
@@ -122,10 +123,10 @@ public class MSimIccCardProxy extends IccCardProxy {
                                     PROPERTY_ICC_OPERATOR_ISO_COUNTRY, sub,
                                     MccTable.countryCodeForMcc(Integer.parseInt(countryCode)));
                         } else {
-                            Log.e(LOG_TAG, "EVENT_RECORDS_LOADED Country code is null");
+                            loge("EVENT_RECORDS_LOADED Country code is null");
                         }
                     } else {
-                        Log.e(LOG_TAG, "EVENT_RECORDS_LOADED Operator name is null");
+                        loge("EVENT_RECORDS_LOADED Operator name is null");
                     }
                 }
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOADED, null);
@@ -174,13 +175,13 @@ public class MSimIccCardProxy extends IccCardProxy {
         IccRecords newRecords = null;
         if (newCard != null) {
             state = newCard.getCardState();
-            Log.d(LOG_TAG,"Card State = " + state);
+            log("Card State = " + state);
             newApp = newCard.getApplication(mCurrentAppType);
             if (newApp != null) {
                 newRecords = newApp.getIccRecords();
             }
         } else {
-            Log.d(LOG_TAG,"No card available");
+            log("No card available");
         }
 
         if (mIccRecords != newRecords || mUiccApplication != newApp || mUiccCard != newCard) {
@@ -190,6 +191,7 @@ public class MSimIccCardProxy extends IccCardProxy {
             mUiccApplication = newApp;
             mIccRecords = newRecords;
             registerUiccCardEvents();
+            updateActiveRecord();
         }
 
         updateExternalState();
@@ -231,6 +233,11 @@ public class MSimIccCardProxy extends IccCardProxy {
 
     @Override
     public void broadcastIccStateChangedIntent(String value, String reason) {
+        if (mCardIndex == null) {
+            loge("broadcastIccStateChangedIntent: Card Index is not set; Return!!");
+            return;
+        }
+
         int subId = mCardIndex;
         if (mQuietMode) {
             log("QuietMode: NOT Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
@@ -252,6 +259,11 @@ public class MSimIccCardProxy extends IccCardProxy {
 
     @Override
     protected void setExternalState(State newState, boolean override) {
+        if (mCardIndex == null) {
+            loge("setExternalState: Card Index is not set; Return!!");
+            return;
+        }
+
         if (!override && newState == mExternalState) {
             return;
         }
@@ -267,11 +279,11 @@ public class MSimIccCardProxy extends IccCardProxy {
 
     @Override
     protected void log(String msg) {
-        if (DBG) Log.d(LOG_TAG, msg);
+        if (DBG) Log.d(LOG_TAG, "[CardIndex:" + mCardIndex + "]" + msg);
     }
 
     @Override
     protected void loge(String msg) {
-        Log.e(LOG_TAG, msg);
+        Log.e(LOG_TAG, "[CardIndex:" + mCardIndex + "]" + msg);
     }
 }

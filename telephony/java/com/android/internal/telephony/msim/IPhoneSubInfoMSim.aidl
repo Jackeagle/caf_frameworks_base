@@ -45,6 +45,11 @@ interface IPhoneSubInfoMSim {
     String getSubscriberId(int subscription);
 
     /**
+     * Retrieves the serial number of a given subscription.
+     */
+    String getIccSerialNumber(int subscription);
+
+    /**
      * Retrieves the phone number string for line 1 of a subcription.
      */
     String getLine1Number(int subscription);

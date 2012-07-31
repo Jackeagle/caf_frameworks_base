@@ -104,8 +104,8 @@ public class NetworkController extends BroadcastReceiver {
     String mContentDescriptionDataType;
 
     // wifi
-    final WifiManager mWifiManager;
-    AsyncChannel mWifiChannel;
+    protected WifiManager mWifiManager;
+    protected AsyncChannel mWifiChannel;
     boolean mWifiEnabled, mWifiConnected;
     int mWifiRssi, mWifiLevel;
     String mWifiSsid;
@@ -140,7 +140,7 @@ public class NetworkController extends BroadcastReceiver {
     protected boolean mLastAirplaneMode = true;
 
     // our ui
-    Context mContext;
+    protected Context mContext;
     ArrayList<ImageView> mPhoneSignalIconViews = new ArrayList<ImageView>();
     ArrayList<ImageView> mDataDirectionIconViews = new ArrayList<ImageView>();
     ArrayList<ImageView> mDataDirectionOverlayIconViews = new ArrayList<ImageView>();
@@ -206,14 +206,7 @@ public class NetworkController extends BroadcastReceiver {
                 com.android.internal.R.string.lockscreen_carrier_default);
         mNetworkName = mNetworkNameDefault;
 
-        // wifi
-        mWifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
-        Handler handler = new WifiHandler();
-        mWifiChannel = new AsyncChannel();
-        Messenger wifiMessenger = mWifiManager.getWifiServiceMessenger();
-        if (wifiMessenger != null) {
-            mWifiChannel.connect(mContext, handler, wifiMessenger);
-        }
+        createWifiHandler();
 
         // broadcasts
         IntentFilter filter = new IntentFilter();
@@ -244,6 +237,17 @@ public class NetworkController extends BroadcastReceiver {
 
     public boolean hasMobileDataFeature() {
         return mHasMobileDataFeature;
+    }
+
+    protected void createWifiHandler() {
+        // wifi
+        mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
+        Handler handler = new WifiHandler();
+        mWifiChannel = new AsyncChannel();
+        Messenger wifiMessenger = mWifiManager.getWifiServiceMessenger();
+        if (wifiMessenger != null) {
+            mWifiChannel.connect(mContext, handler, wifiMessenger);
+        }
     }
 
     protected void registerPhoneStateListener(Context context) {

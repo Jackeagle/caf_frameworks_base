@@ -37,6 +37,7 @@ import android.telephony.ServiceState;
 
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.PhoneProxy;
 import com.android.internal.telephony.uicc.UiccController;
 
@@ -143,6 +144,15 @@ public class MSimProxyManager {
 
     public void registerForAllDataDisconnected(int sub, Handler h, int what, Object obj) {
         ((MSimPhoneProxy) mProxyPhones[sub]).registerForAllDataDisconnected(h, what, obj);
+    }
+
+    public void unregisterForAllDataDisconnected(int sub, Handler h) {
+        ((MSimPhoneProxy) mProxyPhones[sub]).unregisterForAllDataDisconnected(h);
+    }
+
+    public boolean isDataDisconnected(int sub) {
+        Phone activePhone = ((MSimPhoneProxy) mProxyPhones[sub]).getActivePhone();
+        return ((PhoneBase) activePhone).mDataConnectionTracker.isDisconnected();
     }
 
     private void logd(String string) {

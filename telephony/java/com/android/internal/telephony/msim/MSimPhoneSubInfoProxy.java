@@ -72,6 +72,20 @@ public class MSimPhoneSubInfoProxy extends IPhoneSubInfoMSim.Stub {
         }
     }
 
+    /**
+     * Retrieves the serial number of the ICC, if applicable.
+     */
+    public String getIccSerialNumber(int subscription) {
+        PhoneSubInfoProxy phoneSubInfoProxy = getPhoneSubInfoProxy(subscription);
+        if (phoneSubInfoProxy != null) {
+            return getPhoneSubInfoProxy(subscription).getIccSerialNumber();
+        } else {
+            Log.e(TAG,"getIccSerialNumber phoneSubInfoProxy is" +
+                      " null for Subscription:"+subscription);
+            return null;
+        }
+    }
+
     public String getLine1Number(int subscription) {
         PhoneSubInfoProxy phoneSubInfoProxy = getPhoneSubInfoProxy(subscription);
         if (phoneSubInfoProxy != null) {

@@ -344,20 +344,30 @@ public class MSimTelephonyManager {
      *
      * @see #SIM_STATE_UNKNOWN
      * @see #SIM_STATE_ABSENT
+     * @see #SIM_STATE_PIN_REQUIRED
+     * @see #SIM_STATE_PUK_REQUIRED
+     * @see #SIM_STATE_NETWORK_LOCKED
+     * @see #SIM_STATE_READY
      * @see #SIM_STATE_CARD_IO_ERROR
      */
     public int getSimState(int slotId) {
 
         String prop =
             getTelephonyProperty(TelephonyProperties.PROPERTY_SIM_STATE, slotId, "");
+
         if ("ABSENT".equals(prop)) {
             return TelephonyManager.SIM_STATE_ABSENT;
-        }
-        else if ("CARD_IO_ERROR".equals(prop)) {
-            //return TelephonyManager.SIM_STATE_CARD_IO_ERROR; TODO Suresh
-            return TelephonyManager.SIM_STATE_UNKNOWN;
-        }
-        else {
+        } else if ("PIN_REQUIRED".equals(prop)) {
+            return TelephonyManager.SIM_STATE_PIN_REQUIRED;
+        } else if ("PUK_REQUIRED".equals(prop)) {
+            return TelephonyManager.SIM_STATE_PUK_REQUIRED;
+        } else if ("PERSO_LOCKED".equals(prop)) {
+            return TelephonyManager.SIM_STATE_NETWORK_LOCKED;
+        } else if ("READY".equals(prop)) {
+            return TelephonyManager.SIM_STATE_READY;
+        } else if ("CARD_IO_ERROR".equals(prop)) {
+            return TelephonyManager.SIM_STATE_CARD_IO_ERROR;
+        } else {
             return TelephonyManager.SIM_STATE_UNKNOWN;
         }
     }
@@ -381,6 +391,24 @@ public class MSimTelephonyManager {
         } catch (NullPointerException ex) {
             // This could happen before phone restarts due to crashing
             return Phone.LTE_ON_CDMA_UNKNOWN;
+        }
+    }
+
+    /**
+     * Returns the serial number for the given subscription, if applicable. Return null if it is
+     * unavailable.
+     * <p>
+     * Requires Permission:
+     *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
+     */
+    public String getSimSerialNumber(int subscription) {
+        try {
+            return getMSimSubscriberInfo().getIccSerialNumber(subscription);
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            // This could happen before phone restarts due to crashing
+            return null;
         }
     }
 

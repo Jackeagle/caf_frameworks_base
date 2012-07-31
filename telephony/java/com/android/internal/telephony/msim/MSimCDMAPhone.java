@@ -50,6 +50,7 @@ import com.android.internal.telephony.MccTable;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneNotifier;
 import com.android.internal.telephony.PhoneSubInfo;
+import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.telephony.TelephonyIntents;
 
@@ -59,7 +60,6 @@ import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 import com.android.internal.telephony.uicc.IccRecords;
 
-import static com.android.internal.telephony.ServiceStateTracker.EVENT_ICC_CHANGED;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC;
@@ -185,7 +185,7 @@ public class MSimCDMAPhone extends CDMAPhone {
         setProperties();
 
         onUpdateIccAvailability();
-        mSST.sendMessage(obtainMessage(EVENT_ICC_CHANGED));
+        mSST.sendMessage(mSST.obtainMessage(ServiceStateTracker.EVENT_ICC_CHANGED));
         ((MSimCdmaServiceStateTracker)mSST).updateCdmaSubscription();
         ((MSimCdmaDataConnectionTracker)mDataConnectionTracker).updateRecords();
 

@@ -31,6 +31,9 @@ import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.net.wimax.WimaxManagerConstants;
 import android.os.Binder;
+import android.os.Handler;
+import android.os.Message;
+import android.os.Messenger;
 import android.os.RemoteException;
 import android.provider.Settings;
 import android.provider.Telephony;
@@ -48,6 +51,7 @@ import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.cdma.EriInfo;
+import com.android.internal.util.AsyncChannel;
 
 import com.android.systemui.R;
 
@@ -180,6 +184,18 @@ public class MSimNetworkController extends NetworkController {
         mLastCombinedSignalIconId = mMSimLastCombinedSignalIconId[mDefaultSubscription];
         mLastDataTypeIconId = mMSimLastDataTypeIconId[mDefaultSubscription];
         mLastSimIconId = mMSimLastSimIconId[mDefaultSubscription];
+    }
+
+    @Override
+    protected void createWifiHandler() {
+        // wifi
+        mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
+        Handler handler = new MSimWifiHandler();
+        mWifiChannel = new AsyncChannel();
+        Messenger wifiMessenger = mWifiManager.getWifiServiceMessenger();
+        if (wifiMessenger != null) {
+            mWifiChannel.connect(mContext, handler, wifiMessenger);
+        }
     }
 
     @Override
@@ -350,6 +366,26 @@ public class MSimNetworkController extends NetworkController {
         return mMSimPhoneStateListener;
     }
 
+    // ===== Wifi ===================================================================
+
+    class MSimWifiHandler extends WifiHandler {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case WifiManager.DATA_ACTIVITY_NOTIFICATION:
+                    if (msg.arg1 != mWifiActivity) {
+                        mWifiActivity = msg.arg1;
+                        refreshViews(MSimTelephonyManager.getDefault().
+                                getPreferredDataSubscription());
+                    }
+                    break;
+                default:
+                    super.handleMessage(msg);
+                    break;
+            }
+        }
+    }
+
     @Override
     protected void updateSimState(Intent intent) {
         IccCard.State simState;
@@ -435,8 +471,8 @@ public class MSimNetworkController extends NetworkController {
                 }
 
                 // Though mPhone is a Manager, this call is not an IPC
-                if ((isCdma(subscription) && isCdmaEri(subscription))
-                        || mPhone.isNetworkRoaming(subscription)) {
+                if ((isCdma(subscription) && isCdmaEri(subscription)) ||
+                        mPhone.isNetworkRoaming(subscription)) {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_ROAMING[mInetCondition];
                 } else {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH[mInetCondition];
@@ -566,7 +602,7 @@ public class MSimNetworkController extends NetworkController {
                 mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_roam;
             }
         } else if (mPhone.isNetworkRoaming(subscription)) {
-                mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_roam;
+            mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_roam;
         }
     }
 
@@ -670,8 +706,8 @@ public class MSimNetworkController extends NetworkController {
         // yuck - this should NOT be done by the status bar
         long ident = Binder.clearCallingIdentity();
         try {
-            mBatteryStats.notePhoneDataConnectionState(mPhone.getNetworkType(subscription),
-                    visible);
+            mBatteryStats.notePhoneDataConnectionState(mPhone.
+                    getNetworkType(subscription), visible);
         } catch (RemoteException e) {
         } finally {
             Binder.restoreCallingIdentity(ident);

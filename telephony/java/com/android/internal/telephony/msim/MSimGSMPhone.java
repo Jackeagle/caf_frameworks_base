@@ -39,13 +39,13 @@ import com.android.internal.telephony.msim.SubscriptionManager;
 import com.android.internal.telephony.gsm.GSMPhone;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneNotifier;
+import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyProperties;
 
 import com.android.internal.telephony.uicc.IccRecords;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 
-import static com.android.internal.telephony.ServiceStateTracker.EVENT_ICC_CHANGED;
 import static com.android.internal.telephony.MSimConstants.EVENT_SUBSCRIPTION_ACTIVATED;
 import static com.android.internal.telephony.MSimConstants.EVENT_SUBSCRIPTION_DEACTIVATED;
 
@@ -126,7 +126,7 @@ public class MSimGSMPhone extends GSMPhone {
         setProperties();
 
         onUpdateIccAvailability();
-        mSST.sendMessage(obtainMessage(EVENT_ICC_CHANGED));
+        mSST.sendMessage(mSST.obtainMessage(ServiceStateTracker.EVENT_ICC_CHANGED));
         ((MSimGsmDataConnectionTracker)mDataConnectionTracker).updateRecords();
 
         // read the subscription specifics now

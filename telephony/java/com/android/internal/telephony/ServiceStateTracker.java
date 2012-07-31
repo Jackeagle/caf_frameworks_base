@@ -88,8 +88,8 @@ public abstract class ServiceStateTracker extends Handler {
     protected RegistrantList mPsRestrictDisabledRegistrants = new RegistrantList();
 
     /* Radio power off pending flag and tag counter */
-    private boolean mPendingRadioPowerOffAfterDataOff = false;
-    private int mPendingRadioPowerOffAfterDataOffTag = 0;
+    protected boolean mPendingRadioPowerOffAfterDataOff = false;
+    protected int mPendingRadioPowerOffAfterDataOffTag = 0;
 
     protected  static final boolean DBG = true;
 
