@@ -44,12 +44,14 @@ import android.os.PowerManager.WakeLock;
 import android.provider.Settings;
 import android.util.Log;
 import android.net.Uri;
+import android.telephony.TelephonyManager;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.ArrayList;
 
 import android.database.Cursor;
 import android.provider.MediaStore;
@@ -118,6 +120,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private String mPlayStatusRequestPath = "/";
 
     private final static int MESSAGE_PLAYSTATUS_TIMEOUT = 1;
+    private final static int MESSAGE_PLAYERSETTINGS_TIMEOUT = 2;
 
     private String[] mCursorCols = new String[] {
             MediaStore.Audio.Media._ID,
@@ -126,8 +129,76 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             MediaStore.Audio.Media.TITLE,
     };
 
+    TelephonyManager tmgr;
     private static final String ACTION_METADATA_CHANGED  =
         "android.media.MediaPlayer.action.METADATA_CHANGED";
+
+    private static final String PLAYERSETTINGS_REQUEST = "com.android.music.playersettingsrequest";
+    private static final String PLAYERSETTINGS_RESPONSE = "com.android.music.playersettingsresponse";
+
+    private class PlayerSettings {
+        public byte attr;
+        public byte [] attrIds;
+        public String path;
+    };
+
+    private PlayerSettings mPlayerSettings = new PlayerSettings();
+    private class localPlayerSettings {
+        public byte eq_value;
+        public byte repeat_value;
+        public byte shuffle_value;
+        public byte scan_value;
+    };
+    private localPlayerSettings settingValues = new localPlayerSettings();
+    private static final String COMMAND = "command";
+    private static final String CMDGET = "get";
+    private static final String CMDSET = "set";
+    private static final String EXTRA_GET_COMMAND = "commandExtra";
+    private static final String EXTRA_GET_RESPONSE = "Response";
+
+    private static final int GET_ATTRIBUTE_IDS = 0;
+    private static final int GET_VALUE_IDS = 1;
+    private static final int GET_ATTRIBUTE_TEXT = 2;
+    private static final int GET_VALUE_TEXT     = 3;
+    private static final int GET_ATTRIBUTE_VALUES = 4;
+    private static final int NOTIFY_ATTRIBUTE_VALUES = 5;
+    private static final int GET_INVALID = 0xff;
+
+    private static final String EXTRA_ATTRIBUTE_ID = "Attribute";
+    private static final String EXTRA_VALUE_STRING_ARRAY = "ValueStrings";
+    private static final String EXTRA_ATTRIB_VALUE_PAIRS = "AttribValuePairs";
+    private static final String EXTRA_ATTRIBUTE_STRING_ARRAY = "AttributeStrings";
+    private static final String EXTRA_VALUE_ID_ARRAY = "Values";
+    private static final String EXTRA_ATTIBUTE_ID_ARRAY = "Attributes";
+
+    public static final int VALUE_SHUFFLEMODE_OFF = 1;
+    public static final int VALUE_SHUFFLEMODE_ALL = 2;
+    public static final int VALUE_REPEATMODE_OFF = 1;
+    public static final int VALUE_REPEATMODE_SINGLE = 2;
+    public static final int VALUE_REPEATMODE_ALL = 3;
+    public static final int VALUE_INVALID = 0;
+
+    public static final int ATTRIBUTE_EQUALIZER = 1;
+    public static final int ATTRIBUTE_REPEATMODE = 2;
+    public static final int ATTRIBUTE_SHUFFLEMODE = 3;
+    public static final int ATTRIBUTE_SCANMODE = 4;
+
+
+    private byte [] def_attrib = new byte [] {ATTRIBUTE_REPEATMODE, ATTRIBUTE_SHUFFLEMODE};
+    private byte [] value_repmode = new byte [] { VALUE_REPEATMODE_OFF,
+                                                  VALUE_REPEATMODE_SINGLE,
+                                                  VALUE_REPEATMODE_ALL };
+
+    private byte [] value_shufmode = new byte [] { VALUE_SHUFFLEMODE_OFF,
+                                                  VALUE_SHUFFLEMODE_ALL };
+    private byte [] value_default = new byte [] {0};
+    private final String UPDATE_ATTRIBUTES = "UpdateSupportedAttributes";
+    private final String UPDATE_VALUES = "UpdateSupportedValues";
+    private final String UPDATE_ATTRIB_VALUE = "UpdateCurrentValues";
+    private final String UPDATE_ATTRIB_TEXT = "UpdateAttributesText";
+    private final String UPDATE_VALUE_TEXT = "UpdateValuesText";
+    private ArrayList <Integer> mPendingCmds;
+
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -136,10 +207,113 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 case MESSAGE_PLAYSTATUS_TIMEOUT:
                     Log.i(TAG, "Timed outM - Sending Playstatus");
                     sendPlayStatus(mPlayStatusRequestPath);
+                    break;
+                case MESSAGE_PLAYERSETTINGS_TIMEOUT:
+                    synchronized (mPendingCmds) {
+                        Integer val = new Integer(msg.arg1);
+                        if (!mPendingCmds.contains(val)) {
+                            break;
+                        }
+                        mPendingCmds.remove(val);
+                    }
+                    switch (msg.arg1) {
+                        case GET_ATTRIBUTE_IDS:
+                            if (mPlayerSettings.path != null) {
+                                sendPlayerSettingsNative(mPlayerSettings.path,
+                                     UPDATE_ATTRIBUTES, def_attrib.length, def_attrib);
+                            }
+                            break;
+                        case GET_VALUE_IDS:
+                            switch (mPlayerSettings.attr) {
+                                case ATTRIBUTE_REPEATMODE:
+                                    if (mPlayerSettings.path != null) {
+                                        sendPlayerSettingsNative(mPlayerSettings.path,
+                                          UPDATE_VALUES, value_repmode.length, value_repmode);
+                                    }
+                                    break;
+                                case ATTRIBUTE_SHUFFLEMODE:
+                                    if (mPlayerSettings.path != null) {
+                                        sendPlayerSettingsNative(mPlayerSettings.path,
+                                             UPDATE_VALUES, value_shufmode.length, value_shufmode);
+                                    }
+                                    break;
+                                default:
+                                    if (mPlayerSettings.path != null) {
+                                        sendPlayerSettingsNative(mPlayerSettings.path,
+                                            UPDATE_VALUES, value_default.length, value_default);
+                                    }
+                                    break;
+                            }
+                        break;
+                        case GET_ATTRIBUTE_VALUES:
+                            int j = 0;
+                            byte [] retVal = new byte [mPlayerSettings.attrIds.length*2];
+                            for (int i = 0; i < mPlayerSettings.attrIds.length; i++) {
+                                 retVal[j++] = mPlayerSettings.attrIds[i];
+                                 if (mPlayerSettings.attrIds[i] == ATTRIBUTE_REPEATMODE) {
+                                     retVal[j++] = settingValues.repeat_value;
+                                 } else if (mPlayerSettings.attrIds[i] == ATTRIBUTE_SHUFFLEMODE) {
+                                     retVal[j++] = settingValues.shuffle_value;
+                                 } else {
+                                     retVal[j++] = 0x0;
+                                 }
+                            }
+                            if (mPlayerSettings.path != null) {
+                                sendPlayerSettingsNative(mPlayerSettings.path,
+                                          UPDATE_ATTRIB_VALUE, retVal.length, retVal);
+                            }
+                        break;
+                        case GET_ATTRIBUTE_TEXT:
+                        case GET_VALUE_TEXT:
+                            String [] values = new String [mPlayerSettings.attrIds.length];
+                            String msgVal = (msg.what == GET_ATTRIBUTE_TEXT) ? UPDATE_ATTRIB_TEXT :
+                                             UPDATE_VALUE_TEXT;
+                            for (int i = 0; i < mPlayerSettings.attrIds.length; i++) {
+                                values[i] = "";
+                            }
+                            if (mPlayerSettings.path != null) {
+                                sendSettingsTextNative(mPlayerSettings.path,
+                                                   msgVal, values.length,
+                                                   mPlayerSettings.attrIds, values);
+                            }
+                        break;
+                    }
+                    break;
+                default :
+                    break;
             }
         }
     };
 
+    private String getValidUtf8String ( String str)
+    {
+        int Char, i;
+        String temp;
+
+        if (str == null) {
+            return null;
+        }
+
+        for (i = 0; i < str.length(); i++) {
+            Char = str.codePointAt(i);
+            if ((Char > 0x10FFFF) ||
+                ((Char & 0xFFFFF800) == 0xD800) ||
+                ((Char >= 0xFDD0) && (Char <= 0xFDEF)) ||
+                ((Char & 0xFFFE) == 0xFFFE)) {
+                break;
+            }
+        }
+
+        if (i != str.length()) {
+            try {
+                temp = new String(str.getBytes(), 0, i, "UTF-8");
+                str = temp;
+            } catch (Exception e) {
+                Log.e(TAG, "Exception" + e);
+            }
+        }
+        return str;
+    }
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -283,7 +457,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 if (uri == null)
                     return;
 
-                if (uri.toString().startsWith("content://media/internal")) {
+                if (!uri.toString().startsWith("content://media/external")) {
                     log("Internal audio file data, ignoring");
                     return;
                 }
@@ -299,6 +473,9 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 if (playStatus != mPlayStatus) {
                     mPlayStatus = playStatus;
                     for (String path: getConnectedSinksPaths()) {
+                        if (mPlayStatus == STATUS_PLAYING) {
+                            resumeSinkNative(path);
+                        }
                         sendEvent(path, EVENT_PLAYSTATUS_CHANGED, (long)mPlayStatus);
                     }
                 }
@@ -308,22 +485,31 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 log("position " + mPosition);
                 log("playstate is " + mPlayStatus);
 
-                if (uri == mUri) {
+                if (uri.equals(mUri)) {
                     log("Update for same Uri, ignoring");
                     return;
                 }
 
                 mUri = uri;
+                Cursor mCursor = null;
                 try {
-                    Cursor mCursor = mContext.getContentResolver().query(mUri, mCursorCols,
-                                        null, null, null);
+                    String temp;
+                    mCursor = mContext.getContentResolver().query(mUri, mCursorCols,
+                                        MediaStore.Audio.Media.IS_MUSIC + "=1", null,
+                                        MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
                     mCursor.moveToFirst();
-                    mTrackName = mCursor.getString(
+                    temp = mCursor.getString(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE));
-                    mArtistName = mCursor.getString(
+
+                    mTrackName = getValidUtf8String(temp);
+                    temp = mCursor.getString(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST));
-                    mAlbumName = mCursor.getString(
+
+                    mArtistName = getValidUtf8String(temp);
+                    temp = mCursor.getString(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM));
+                    mAlbumName = getValidUtf8String(temp);
+
                     long mediaNumber = mCursor.getLong(
                         mCursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID));
                     mMediaNumber = String.valueOf(mediaNumber);
@@ -332,6 +518,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     log("Album is " + mAlbumName);
                     log("ID is " + mMediaNumber);
                     mCursor.close();
+                    mCursor = null;
                     Long tmpId = (Long)getTrackId(mTrackName);
                     log("tmpId is " + tmpId);
                     mMediaNumber = String.valueOf(tmpId);
@@ -340,7 +527,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                         /* file change happened */
                         MediaMetadataRetriever mmr = new MediaMetadataRetriever();
                         mmr.setDataSource(mContext, mUri);
-                        mGenre = mmr.extractMetadata(mmr.METADATA_KEY_GENRE);
+                        temp = mmr.extractMetadata(mmr.METADATA_KEY_GENRE);
+                        mGenre = getValidUtf8String(temp);
                         log("Genre is " + mGenre);
                     }
                     mCursor = mContext.getContentResolver().query(
@@ -350,13 +538,82 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                                             MediaStore.Audio.Media.DEFAULT_SORT_ORDER);
                     mMediaCount = String.valueOf(mCursor.getCount());
                     mCursor.close();
+                    mCursor = null;
                     log("Track count is " + mMediaCount);
-                } catch(Exception e) {log("Exc is " + e);}
+                } catch(Exception e) {
+                    log("Exc is " + e);
+                    // e.printStackTrace(); for debugging enable this
+                    if (mCursor != null) {
+                        mCursor.close();
+                    }
+                    mTrackName = null;
+                    mArtistName = null;
+                    mAlbumName = null;
+                    mGenre = null;
+                }
 
                 log("end of parsing mData");
                 for (String path: getConnectedSinksPaths()) {
                     sendMetaData(path);
                     sendEvent(path, EVENT_TRACK_CHANGED, Long.valueOf(mMediaNumber));
+                }
+            } else if (action.equals(PLAYERSETTINGS_RESPONSE)) {
+                int getResponse = intent.getIntExtra(EXTRA_GET_RESPONSE,
+                                                      GET_INVALID);
+                byte [] data;
+                String [] text;
+                synchronized (mPendingCmds) {
+                    Integer val = new Integer(getResponse);
+                    if (mPendingCmds.contains(val)) {
+                        mHandler.removeMessages(MESSAGE_PLAYERSETTINGS_TIMEOUT);
+                        mPendingCmds.remove(val);
+                    }
+                }
+                switch (getResponse) {
+                    case GET_ATTRIBUTE_IDS:
+                        data = intent.getByteArrayExtra(EXTRA_ATTIBUTE_ID_ARRAY);
+                        if (mPlayerSettings.path != null) {
+                            sendPlayerSettingsNative(mPlayerSettings.path,
+                                           UPDATE_ATTRIBUTES, data.length, data);
+                        }
+                    break;
+                    case GET_VALUE_IDS:
+                        data = intent.getByteArrayExtra(EXTRA_VALUE_ID_ARRAY);
+                        if (mPlayerSettings.path != null) {
+                            sendPlayerSettingsNative(mPlayerSettings.path,
+                                               UPDATE_VALUES, data.length, data);
+                        }
+                    break;
+                    case GET_ATTRIBUTE_VALUES:
+                    case NOTIFY_ATTRIBUTE_VALUES:
+                        data = intent.getByteArrayExtra(EXTRA_ATTRIB_VALUE_PAIRS);
+                        updateLocalPlayerSettings(data);
+                        if (mPlayerSettings.path != null) {
+                            sendPlayerSettingsNative(mPlayerSettings.path,
+                                             UPDATE_ATTRIB_VALUE, data.length, data);
+                        } else { //only for notification there can be no path set
+                            for (String path: getConnectedSinksPaths()) {
+                                sendPlayerSettingsNative(path,
+                                             UPDATE_ATTRIB_VALUE, data.length, data);
+                            }
+                        }
+                    break;
+                    case GET_ATTRIBUTE_TEXT:
+                        text = intent.getStringArrayExtra(EXTRA_ATTRIBUTE_STRING_ARRAY);
+                        if (mPlayerSettings.path != null) {
+                           sendSettingsTextNative(mPlayerSettings.path,
+                                            UPDATE_ATTRIB_TEXT, text.length,
+                                            mPlayerSettings.attrIds, text);
+                        }
+                    break;
+                    case GET_VALUE_TEXT:
+                        text = intent.getStringArrayExtra(EXTRA_VALUE_STRING_ARRAY);
+                        if (mPlayerSettings.path != null) {
+                            sendSettingsTextNative(mPlayerSettings.path,
+                                             UPDATE_VALUE_TEXT, text.length,
+                                             mPlayerSettings.attrIds, text);
+                        }
+                    break;
                 }
             }
         }
@@ -418,6 +675,114 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         sendPlayStatusNative(path, (int)Integer.valueOf(mDuration), (int)mPosition, mPlayStatus);
     }
 
+    private void onListPlayerAttributeRequest(String path) {
+        if(DBG) Log.d(TAG, "onListPlayerAttributeRequest"+path);
+        mPlayerSettings.path = path;
+        Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
+        intent.putExtra(COMMAND, CMDGET);
+        intent.putExtra(EXTRA_GET_COMMAND, GET_ATTRIBUTE_IDS);
+        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+
+        Message msg = mHandler.obtainMessage();
+        msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
+        msg.arg1 = GET_ATTRIBUTE_IDS;
+        mPendingCmds.add(new Integer(msg.arg1));
+        mHandler.sendMessageDelayed(msg, 130);
+    }
+
+    private void onListPlayerAttributeValues(String path, byte attr ) {
+        if(DBG) Log.d(TAG, "onListPlayerAttributeValues"+path);
+        mPlayerSettings.path = path;
+        mPlayerSettings.attr = attr;
+
+        Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
+        Message msg = mHandler.obtainMessage();
+
+        intent.putExtra(COMMAND, CMDGET);
+        intent.putExtra(EXTRA_GET_COMMAND, GET_VALUE_IDS);
+        intent.putExtra(EXTRA_ATTRIBUTE_ID, attr);
+        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+
+        msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
+        msg.arg1 = GET_VALUE_IDS;
+        mPendingCmds.add(new Integer(msg.arg1));
+        mHandler.sendMessageDelayed(msg, 130);
+    }
+
+    private void onGetPlayerAttributeValues(String path, byte[] attrIds ) {
+        if(DBG) Log.d(TAG, "onGetPlayerAttributeValues"+path);
+        mPlayerSettings.path = path;
+        mPlayerSettings.attrIds = new byte [attrIds.length];
+
+        Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
+        Message msg = mHandler.obtainMessage();
+
+        intent.putExtra(COMMAND, CMDGET);
+        intent.putExtra(EXTRA_GET_COMMAND, GET_ATTRIBUTE_VALUES);
+        intent.putExtra(EXTRA_ATTIBUTE_ID_ARRAY, attrIds);
+        for (int i = 0; i < attrIds.length; i++)
+            mPlayerSettings.attrIds[i] = attrIds[i];
+        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+
+        msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
+        msg.arg1 = GET_ATTRIBUTE_VALUES;
+        mPendingCmds.add(new Integer(msg.arg1));
+        mHandler.sendMessageDelayed(msg, 130);
+    }
+
+    private void onSetPlayerAttributeValues(String path, byte[] attrValues ) {
+        if(DBG) Log.d(TAG, "onListPlayerAttributeValues"+path);
+        Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
+        Message msg = mHandler.obtainMessage();
+
+        intent.putExtra(COMMAND, CMDSET);
+        intent.putExtra(EXTRA_ATTRIB_VALUE_PAIRS, attrValues);
+        mPlayerSettings.path = path;
+
+        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+    }
+
+    private void onListPlayerAttributesText(String path, byte[] attrIds ) {
+        if(DBG) Log.d(TAG, "onListPlayerAttributesText"+path);
+        Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
+        Message msg = mHandler.obtainMessage();
+
+        intent.putExtra(COMMAND, CMDGET);
+        intent.putExtra(EXTRA_GET_COMMAND, GET_ATTRIBUTE_TEXT);
+        intent.putExtra(EXTRA_ATTIBUTE_ID_ARRAY, attrIds);
+        mPlayerSettings.path = path;
+        mPlayerSettings.attrIds = new byte [attrIds.length];
+        for (int i = 0; i < attrIds.length; i++)
+            mPlayerSettings.attrIds[i] = attrIds[i];
+
+        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
+        msg.arg1 = GET_ATTRIBUTE_TEXT;
+        mPendingCmds.add(new Integer(msg.arg1));
+        mHandler.sendMessageDelayed(msg, 130);
+    }
+
+    private void onListAttributeValuesText(String path, byte attr, byte[] valIds ) {
+        if(DBG) Log.d(TAG, "onListattributeValuesText"+path);
+        Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
+        Message msg = mHandler.obtainMessage();
+
+        intent.putExtra(COMMAND, CMDGET);
+        intent.putExtra(EXTRA_GET_COMMAND, GET_VALUE_TEXT);
+        intent.putExtra(EXTRA_ATTRIBUTE_ID, attr);
+        intent.putExtra(EXTRA_VALUE_ID_ARRAY, valIds);
+        mPlayerSettings.path = path;
+        mPlayerSettings.attrIds = new byte [valIds.length];
+        for (int i = 0; i < valIds.length; i++)
+            mPlayerSettings.attrIds[i] = valIds[i];
+
+        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
+        msg.arg1 = GET_VALUE_TEXT;
+        mPendingCmds.add(new Integer(msg.arg1));
+        mHandler.sendMessageDelayed(msg, 130);
+    }
+
     private boolean isPhoneDocked(BluetoothDevice device) {
         // This works only because these broadcast intents are "sticky"
         Intent i = mContext.registerReceiver(null, new IntentFilter(Intent.ACTION_DOCK_EVENT));
@@ -459,14 +824,19 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         mIntentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         mIntentFilter.addAction(AudioManager.VOLUME_CHANGED_ACTION);
         mIntentFilter.addAction(ACTION_METADATA_CHANGED);
+        mIntentFilter.addAction(PLAYERSETTINGS_RESPONSE);
         mContext.registerReceiver(mReceiver, mIntentFilter);
 
         mAudioDevices = new HashMap<BluetoothDevice, Integer>();
+        mPendingCmds = new ArrayList<Integer>();
 
         if (mBluetoothService.isEnabled())
             onBluetoothEnable();
         mTargetA2dpState = -1;
+        tmgr = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
         mBluetoothService.setA2dpService(this);
+        settingValues.repeat_value = 1;
+        settingValues.shuffle_value = 1;
     }
 
     @Override
@@ -538,7 +908,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     case BluetoothA2dp.STATE_PLAYING:
                         disconnectSinkNative(mBluetoothService.getObjectPathFromAddress(
                                 device.getAddress()));
-                        handleSinkStateChange(device, state, BluetoothA2dp.STATE_DISCONNECTED);
+                        handleSinkStateChange(device, state,
+                                              BluetoothA2dp.STATE_DISCONNECTING);
                         break;
                     case BluetoothA2dp.STATE_DISCONNECTING:
                         handleSinkStateChange(device, BluetoothA2dp.STATE_DISCONNECTING,
@@ -821,8 +1192,18 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 handleSinkStateChange(device, BluetoothA2dp.STATE_DISCONNECTED, state);
             } else {
                 if (state == BluetoothA2dp.STATE_PLAYING && mPlayingA2dpDevice == null) {
-                   mPlayingA2dpDevice = device;
-                   handleSinkPlayingStateChange(device, state, BluetoothA2dp.STATE_NOT_PLAYING);
+                    if (tmgr.getCallState() == TelephonyManager.CALL_STATE_IDLE) {
+                        mPlayingA2dpDevice = device;
+                        handleSinkPlayingStateChange(device, state, BluetoothA2dp.STATE_NOT_PLAYING);
+                    } else {
+                       log("suspend Sink");
+                       // During call active a2dp device is in suspended state
+                       // so audio will not be routed to A2dp. To avoid IOP
+                       // issues send a SUSPEND on A2dp if remote device asks
+                       // for PLAY during call active state.
+                       suspendSinkNative(mBluetoothService.getObjectPathFromAddress(
+                                device.getAddress()));
+                    }
                 } else if (state == BluetoothA2dp.STATE_CONNECTED && mPlayingA2dpDevice != null) {
                     mPlayingA2dpDevice = null;
                     handleSinkPlayingStateChange(device, BluetoothA2dp.STATE_NOT_PLAYING,
@@ -851,6 +1232,9 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 // We will only have 1 device with AUTO_CONNECT priority
                 // To be backward compatible set everyone else to have PRIORITY_ON
                 adjustOtherSinkPriorities(device);
+                mPlayerSettings.path =
+                  mBluetoothService.getObjectPathFromAddress(device.getAddress());
+                updateLocalSettingsToBluez();
             }
 
             int delay = mAudioManager.setBluetoothA2dpDeviceConnectionState(device, state);
@@ -996,6 +1380,58 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         return trackId;
     }
 
+    private void updateLocalPlayerSettings( byte[] data) {
+        for (int i = 0; i < data.length; i += 2) {
+           switch (data[i]) {
+               case ATTRIBUTE_EQUALIZER:
+                    settingValues.eq_value = data[i+1];
+               break;
+               case ATTRIBUTE_REPEATMODE:
+                    settingValues.repeat_value = data[i+1];
+               break;
+               case ATTRIBUTE_SHUFFLEMODE:
+                    settingValues.shuffle_value = data[i+1];
+               break;
+               case ATTRIBUTE_SCANMODE:
+                    settingValues.scan_value = data[i+1];
+               break;
+           }
+        }
+    }
+
+    private void updateLocalSettingsToBluez() {
+       int validSettings = 0;
+       if (settingValues.eq_value > VALUE_INVALID)  validSettings++;
+       if (settingValues.repeat_value > VALUE_REPEATMODE_OFF)  validSettings++;
+       if (settingValues.shuffle_value > VALUE_SHUFFLEMODE_OFF)  validSettings++;
+       if (settingValues.scan_value > VALUE_INVALID)  validSettings++;
+       if (validSettings == 0) return;
+
+       byte [] retValarray = new byte[validSettings * 2];
+       int i = 0;
+
+       if (settingValues.repeat_value > VALUE_REPEATMODE_OFF) {
+           retValarray[i++] = ATTRIBUTE_REPEATMODE;
+           retValarray[i++] = settingValues.repeat_value;
+       }
+       if (settingValues.shuffle_value > VALUE_SHUFFLEMODE_OFF) {
+           retValarray[i++] = ATTRIBUTE_SHUFFLEMODE;
+           retValarray[i++] = settingValues.shuffle_value;
+       }
+       if (settingValues.eq_value > VALUE_INVALID) {
+           retValarray[i++] = ATTRIBUTE_EQUALIZER;
+           retValarray[i++] = settingValues.eq_value;
+       }
+       if (settingValues.scan_value > VALUE_INVALID) {
+           retValarray[i++] = ATTRIBUTE_SCANMODE;
+           retValarray[i++] = settingValues.scan_value;
+       }
+       Intent updateIntent = new Intent(PLAYERSETTINGS_RESPONSE);
+       updateIntent.putExtra(EXTRA_GET_RESPONSE, NOTIFY_ATTRIBUTE_VALUES);
+       updateIntent.putExtra(EXTRA_ATTRIB_VALUE_PAIRS, retValarray);
+       mContext.sendBroadcast(updateIntent);
+    }
+
 
     @Override
     protected synchronized void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
@@ -1026,4 +1462,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private synchronized native boolean sendEventNative(String path, int eventId, long data);
     private synchronized native boolean sendPlayStatusNative(String path, int duration,
                                                              int position, int playStatus);
+    private synchronized native boolean sendPlayerSettingsNative(String path,
+                                                           String response, int len, byte [] data);
+    private synchronized native boolean sendSettingsTextNative(String path,
+                                                      String response, int len, byte [] data, String []text);
 }
