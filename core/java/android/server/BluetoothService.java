@@ -3435,6 +3435,7 @@ public class BluetoothService extends IBluetooth.Stub {
 
     /*package*/boolean notifyIncomingHidConnection(String address) {
         BluetoothDeviceProfileState state = mDeviceProfileState.get(address);
+        if (state == null)  state = addProfileState(address, false);
         if (state == null) {
             return false;
         }
@@ -3501,10 +3502,17 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     BluetoothDeviceProfileState addProfileState(String address, boolean setTrust) {
-        BluetoothDeviceProfileState state =
-            new BluetoothDeviceProfileState(mContext, address, this, mA2dpService, setTrust);
-        mDeviceProfileState.put(address, state);
-        state.start();
+        BluetoothDeviceProfileState state ;
+        synchronized (mDeviceProfileState) {
+            if (mDeviceProfileState.containsKey(address)) {
+                state = mDeviceProfileState.get(address);
+                return state;
+            }
+            state =
+                new BluetoothDeviceProfileState(mContext, address, this, mA2dpService, setTrust);
+            mDeviceProfileState.put(address, state);
+            state.start();
+         }
         return state;
     }
 
@@ -3572,6 +3580,20 @@ public class BluetoothService extends IBluetooth.Stub {
         }
     }
 
+    public boolean notifyConnectA2dp(String address) {
+        BluetoothDeviceProfileState state =
+             mDeviceProfileState.get(address);
+        if (state == null)  state = addProfileState(address, false);
+        if (state != null) {
+            Message msg = new Message();
+            msg.what = BluetoothDeviceProfileState.CONNECT_OTHER_PROFILES;
+            msg.arg1 = BluetoothDeviceProfileState.CONNECT_A2DP_OUTGOING;
+            state.sendMessage(msg);
+            return true;
+        }
+        return false;
+    }
+
     public boolean notifyIncomingConnection(String address, boolean rejected) {
         synchronized (this) {
             if (!mAllowConnect) {
@@ -3580,6 +3602,7 @@ public class BluetoothService extends IBluetooth.Stub {
             }
         }
         BluetoothDeviceProfileState state = mDeviceProfileState.get(address);
+        if (state == null)  state = addProfileState(address, false);
         if (state != null) {
             Message msg = new Message();
             if (rejected) {
@@ -3608,6 +3631,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
 
        BluetoothDeviceProfileState state = mDeviceProfileState.get(address);
+       if (state == null)  state = addProfileState(address, false);
        if (state != null) {
            Message msg = new Message();
            if (rejected) {
