@@ -81,7 +81,7 @@ public class MediaFile {
     public static final int FILE_TYPE_WEBM    = 30;
     public static final int FILE_TYPE_DIVX    = 31;
     private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_MP4;
-    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_WEBM;
+    private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_DIVX;
     
     // More video file types
     public static final int FILE_TYPE_MP2PS   = 200;
