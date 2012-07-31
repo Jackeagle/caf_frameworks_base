@@ -353,25 +353,24 @@ int PostProcNativeWindow::handleDequeueBuffer(ANativeWindowBuffer** buffer, bool
     Mutex::Autolock lock(mLock);
 
     int err = 0;
+    *buffer = NULL;
 
     if (mDqGotAnError) {
         return mDqError;
     }
-    *buffer = NULL;
+
     if (postProc) {
         if (!mFreePostProcBuffers.empty()) {
-            *buffer = *mFreePostProcBuffers.begin();
-            LOGV("Found a buffer in free post proc q (%p)\n", (*buffer)->handle);
-            mFreePostProcBuffers.erase(mFreePostProcBuffers.begin());
+            (*buffer) = getFreePostProcNativeWindowBuffer(true);
+            LOGV("Found a buffer in free post proc q (%p)\n", (*buffer));
             return 0;
         } else {
             return NO_MEMORY; //signal to post proc to wait
         }
     } else {
         if (!mFreeNormalBuffers.empty()) {
-            LOGV("Found a buffer in free normal q \n");
-            *buffer = *mFreeNormalBuffers.begin();
-            mFreeNormalBuffers.erase(mFreeNormalBuffers.begin());
+            (*buffer) = getFreePostProcNativeWindowBuffer(false);
+            LOGV("Found a buffer in free normal q (%p)\n", (*buffer));
             return 0;
         } else if (mNormalBuffers.size() < mNormalBufferCount) {
             err = mNativeWindow->dequeueBuffer(mNativeWindow.get(), buffer);
@@ -379,11 +378,15 @@ int PostProcNativeWindow::handleDequeueBuffer(ANativeWindowBuffer** buffer, bool
                 LOGE("Initial dequeue for normal buffer failed\n");
                 return err;
             }
-            LOGV("Dqd normal buffer \n");
-            mNormalBuffers.push(*buffer);
+            PostProcNativeWindowBuffer * ppNWBuffer = new PostProcNativeWindowBuffer;
+            ppNWBuffer->isFree = false;
+            ppNWBuffer->buffer = (*buffer);
+            mNormalBuffers.push(ppNWBuffer);
             mNumNormalBuffersWithNativeWindow--;
             // Once all the normal buffers have been dequeue, we will dequeue post proc buffers
             if (mNormalBuffers.size() == mNormalBufferCount) {
+                int postProcBuffersAllocatedSoFar = 0;
+                CHECK_EQ(mPostProcBuffers.size(), postProcBuffersAllocatedSoFar);
                 while(mPostProcBuffers.size() < mPostProcBufferCount) {
                     ANativeWindowBuffer* buf;
                     err = mNativeWindow->dequeueBuffer(mNativeWindow.get(), &buf);
@@ -391,9 +394,12 @@ int PostProcNativeWindow::handleDequeueBuffer(ANativeWindowBuffer** buffer, bool
                         LOGE("Initial dequeue for post proc buffer failed\n");
                         return err;
                     }
-                    LOGV("Dqd post proc buffer \n");
-                    mPostProcBuffers.push(buf);
-                    mFreePostProcBuffers.push_back(buf);
+                    PostProcNativeWindowBuffer * ppNWBuf = new PostProcNativeWindowBuffer;
+                    ppNWBuf->isFree = true;
+                    ppNWBuf->buffer = (buf);
+                    mPostProcBuffers.push(ppNWBuf);
+                    mFreePostProcBuffers.push_back(postProcBuffersAllocatedSoFar);
+                    postProcBuffersAllocatedSoFar++;
                 }
             }
             return 0;
@@ -413,10 +419,10 @@ int PostProcNativeWindow::handleCancelBuffer(ANativeWindowBuffer* buffer, bool p
             if (err < 0) {
                 LOGE("Warning cancel normal buffer failed\n");
             }
-            LOGV("Cancelling buffer (%p)\n", buffer->handle);
+            LOGV("PostProc buffer(handle) Cancelled to NW : %p\n", buffer->handle);
             callDequeueBuffer();
         } else {
-            mFreePostProcBuffers.push_back(buffer);
+            pushPostProcNativeWindowBufferToFreeList(buffer, true);
         }
         return err;
     }
@@ -426,39 +432,21 @@ int PostProcNativeWindow::handleCancelBuffer(ANativeWindowBuffer* buffer, bool p
         if (err < 0) {
             LOGE("Warning cancel normal buffer failed\n");
         }
-        LOGV("Normal buffer cancelled to NW\n");
+        LOGV("Normal buffer(handle) cancelled to NW : %p\n", buffer->handle);
         mNumNormalBuffersWithNativeWindow++;
         size_t numPostProcBuffersWithNativeWindow = (mPostProcBufferCount -  mFreePostProcBuffers.size());
         if (mNumNormalBuffersWithNativeWindow + numPostProcBuffersWithNativeWindow > mMinUndequeuedBufs) {
             callDequeueBuffer();
         }
     } else {
-        mFreeNormalBuffers.push_back(buffer);
+        pushPostProcNativeWindowBufferToFreeList(buffer, false);
     }
 
     //When all normal buffers have been cancelled to PostProcNativeWindow or the actual NativeWindow, cancel all PostProc buffers back to actual NativeWindow.
     if (mFreeNormalBuffers.size() + mNumNormalBuffersWithNativeWindow == mNormalBufferCount) {
         LOGV("Normal buffers with native window : %d. free list size : %d, total buffer count: %d\n",mNumNormalBuffersWithNativeWindow, mFreeNormalBuffers.size(), mNormalBufferCount);
 
-        while(!mFreeNormalBuffers.empty()) {
-            LOGV("Cancel all normal buffers with us\n");
-            err = mNativeWindow->cancelBuffer(mNativeWindow.get(), *mFreeNormalBuffers.begin());
-            if (err < 0) {
-                LOGE("Warning cancel normal buffer failed\n");
-            }
-            mFreeNormalBuffers.erase(mFreeNormalBuffers.begin());
-            mNumNormalBuffersWithNativeWindow++;
-        }
-        mNormalBuffers.clear();
-        LOGV("Cancel all post proc buffers as all normal buffers have been cancelled\n");
-        while(!mFreePostProcBuffers.empty()) {
-            err = mNativeWindow->cancelBuffer(mNativeWindow.get(), *mFreePostProcBuffers.begin());
-            if (err < 0) {
-                LOGE("Warning cancel post proc buffer failed\n");
-            }
-            mFreePostProcBuffers.erase(mFreePostProcBuffers.begin());
-        }
-        mPostProcBuffers.clear();
+        releaseAllBuffers();
     }
     return err;
 }
@@ -468,12 +456,9 @@ int PostProcNativeWindow::handleQueueBuffer(ANativeWindowBuffer* buffer)
     Mutex::Autolock lock(mLock);
 
     int err = 0;
-    Vector<ANativeWindowBuffer *> *ppBuffers = &mPostProcBuffers;
-    ANativeWindowBuffer * ppBuf = NULL;
-
     bool isPostProcBuffer = checkForPostProcBuffer(buffer);
 
-    LOGV("Queue buffer (%p) \n", buffer->handle);
+    LOGV("Queue buffer(handle) : %p\n", buffer->handle);
     err = mNativeWindow->queueBuffer(mNativeWindow.get(), buffer);
     if (err < 0) {
         LOGE("Queue buffer failed\n");
@@ -503,30 +488,91 @@ void PostProcNativeWindow::callDequeueBuffer()
     }
 
     if (checkForPostProcBuffer(buf)) {
-        LOGV("Dqd Post Proc buffer\n");
-        mFreePostProcBuffers.push_back(buf);
+        pushPostProcNativeWindowBufferToFreeList(buf, true);
         return;
     }
 
     // assumption that if you come here its a normal buffer
-    LOGV("Dqd Normal buffer\n");
     mNumNormalBuffersWithNativeWindow--;
-    mFreeNormalBuffers.push_back(buf);
+    pushPostProcNativeWindowBufferToFreeList(buf, false);
 }
 
 bool PostProcNativeWindow::checkForPostProcBuffer(ANativeWindowBuffer *buf)
 {
-    Vector<ANativeWindowBuffer *> *ppBuffers = &mPostProcBuffers;
-    ANativeWindowBuffer * ppBuf;
+    Vector<PostProcNativeWindowBuffer *> *ppNWBuffers = &mPostProcBuffers;
+    PostProcNativeWindowBuffer * ppNWBuf;
 
-    ppBuf = NULL;
-    for (size_t i = 0; i < ppBuffers->size(); ++i) {
-        ppBuf = ppBuffers->editItemAt(i);
-        if (ppBuf->handle == buf->handle) {
+    ppNWBuf = NULL;
+    for (size_t i = 0; i < ppNWBuffers->size(); ++i) {
+        ppNWBuf = ppNWBuffers->editItemAt(i);
+        if (ppNWBuf->buffer->handle == buf->handle) {
             return true;
         }
     }
     return false;
+}
+
+ANativeWindowBuffer* PostProcNativeWindow::getFreePostProcNativeWindowBuffer(bool postProc)
+{
+    Vector<PostProcNativeWindowBuffer *> *ppNWBuffers = (postProc) ? &mPostProcBuffers : &mNormalBuffers;
+    List<int> * freeBuffers = (postProc) ? &mFreePostProcBuffers : &mFreeNormalBuffers;
+    int index = *(freeBuffers->begin());
+    PostProcNativeWindowBuffer * ppNWBuf = ppNWBuffers->editItemAt(index);
+    ppNWBuf->isFree = false;
+    freeBuffers->erase(freeBuffers->begin());
+    return ppNWBuf->buffer;
+}
+
+void PostProcNativeWindow::pushPostProcNativeWindowBufferToFreeList(ANativeWindowBuffer *buf, bool postProc) {
+
+    Vector<PostProcNativeWindowBuffer *> *ppNWBuffers = (postProc) ? &mPostProcBuffers : &mNormalBuffers;
+    List<int> * freeBuffers = (postProc) ? &mFreePostProcBuffers : &mFreeNormalBuffers;
+    PostProcNativeWindowBuffer * ppNWBuf;
+
+    ppNWBuf = NULL;
+    for (size_t i = 0; i < ppNWBuffers->size(); ++i) {
+        ppNWBuf = ppNWBuffers->editItemAt(i);
+        if (ppNWBuf->buffer->handle == buf->handle) {
+            ppNWBuf->isFree = true;
+            freeBuffers->push_back(i);
+            return;
+        }
+    }
+    CHECK(!"Should not be here!");
+}
+
+void PostProcNativeWindow::releaseAllBuffers()
+{
+    releaseBuffers(false);
+    releaseBuffers(true);
+}
+
+void PostProcNativeWindow::releaseBuffers(bool postProc)
+{
+    status_t err;
+    Vector<PostProcNativeWindowBuffer *> *ppNWBuffers = (postProc) ? &mPostProcBuffers : &mNormalBuffers;
+    List<int> * freeBuffers = (postProc) ? &mFreePostProcBuffers : &mFreeNormalBuffers;
+    PostProcNativeWindowBuffer * ppNWBuf;
+
+    ppNWBuf = NULL;
+    int numBuffersCancelled = 0;
+    for (size_t i = 0; i < ppNWBuffers->size(); ++i) {
+        ppNWBuf = ppNWBuffers->editItemAt(i);
+        if (ppNWBuf->isFree) {
+            err = mNativeWindow->cancelBuffer(mNativeWindow.get(), ppNWBuf->buffer);
+            if (err < 0) {
+                LOGE("Warning cancel normal buffer failed\n");
+            }
+            numBuffersCancelled++;
+        }
+        delete ppNWBuf;
+    }
+    CHECK_EQ(numBuffersCancelled, freeBuffers->size());
+    if (!postProc) {
+        mNumNormalBuffersWithNativeWindow += numBuffersCancelled;
+    }
+    freeBuffers->clear();
+    ppNWBuffers->clear();
 }
 
 }

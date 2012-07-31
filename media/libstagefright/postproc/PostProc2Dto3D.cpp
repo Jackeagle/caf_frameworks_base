@@ -84,9 +84,9 @@ status_t PostProc2Dto3D::setBufferInfo(const sp<MetaData> &meta)
                     | HAL_3D_OUT_SIDE_BY_SIDE | HAL_3D_IN_SIDE_BY_SIDE_L_R);
     mNumBuffers = NUMBER_3D_BUFFERS;
 
-    mBufferSize = ALIGN(width * height * BYTES_PER_PIXEL, ALIGN8K);
-    mStride = width;
+    mStride = ALIGN(width, ALIGN16);
     mSlice = height;
+    mBufferSize = ALIGN(mStride * mSlice * BYTES_PER_PIXEL, ALIGN8K);
     return OK;
 }
 
@@ -152,9 +152,9 @@ status_t PostProc2Dto3D::configure2DTo3DLibrary()
 
     dim.width = mWidth;
     dim.height = mHeight;
-    dim.srcLumaStride = ALIGN(mWidth, ALIGN32); //Input format is SemiPlanar
-    dim.srcCbCrStride = ALIGN(mWidth, ALIGN32);
-    dim.dstLumaStride = mWidth * 3; // YUV444I is one plane
+    dim.srcLumaStride = ALIGN(mStride, ALIGN32); //Input format is SemiPlanar
+    dim.srcCbCrStride = ALIGN(mStride, ALIGN32);
+    dim.dstLumaStride = mStride * 3; // YUV444I is one plane
     dim.dstCbCrStride = NULL;
 
     LOGV("width = %d, height = %d, \
@@ -233,10 +233,10 @@ status_t PostProc2Dto3D::convert2DTo3D(MediaBuffer* inputBuffer, MediaBuffer* ou
     from2dTo3d_ErrorType lib3dErr =
         mLib3dConvertFrom2dto3d(mLib3dContext,
                 (unsigned char *)srcLuma,
-                (unsigned char *)srcLuma + (ALIGN(mWidth, ALIGN32) * mHeight),
+                (unsigned char *)srcLuma + (ALIGN(mStride, ALIGN32) * mSlice),
                 NULL,
                 (unsigned char *)dstLuma,
-                (unsigned char *)dstLuma + (mWidth * mHeight),
+                (unsigned char *)dstLuma + (mStride * mSlice),
                 NULL);
     CHECK_EQ(lib3dErr, from2dTo3d_ERROR_NONE); // return err
 

@@ -56,6 +56,12 @@ struct OutputBuffer
     bool isPostProcBuffer;
 };
 
+struct PostProcBuffer
+{
+    MediaBuffer * buffer;
+    bool isFree;
+};
+
 typedef encoder_media_buffer_type post_proc_media_buffer_type;
 
 namespace android {
@@ -124,9 +130,11 @@ private:
     status_t notifyNativeWindow();
     status_t dequeuePostProcBufferFromNativeWindow(MediaBuffer **buffer);
     status_t allocatePostProcBuffers();
-    void flushPostProcBuffer(MediaBuffer *buffer);
     void releasePostProcBuffers();
     void releaseQueuedBuffers();
+    void flushPostProcBuffer(MediaBuffer *buffer);
+    MediaBuffer* getPostProcBufferByNativeHandle(ANativeWindowBuffer *buf);
+    void pushPostProcBufferToFreeList(MediaBuffer *buffer);
     int allocateIonBuffer(uint32_t size, int *handle);
     status_t getInputFormat();
     void updateInputFormat();
@@ -154,7 +162,8 @@ private:
     Condition mPostProcBufferCondition;
 
     List<OutputBuffer *> mOutputBuffers;
-    List<MediaBuffer *> mPostProcBuffers;
+    Vector<PostProcBuffer *> mPostProcBuffers;
+    List<int> mFreePostProcBuffers;
 
     bool mLastBufferWasPostProcessedInThread;
     bool mLastBufferWasPostProcessedInRead;
