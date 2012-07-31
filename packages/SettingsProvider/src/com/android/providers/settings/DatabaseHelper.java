@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1329,6 +1330,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadSetting(stmt, Settings.System.VOLUME_MUSIC,
                     AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_MUSIC]);
+            loadSetting(stmt, Settings.System.VOLUME_FM,
+                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_FM]);
             loadSetting(stmt, Settings.System.VOLUME_RING,
                     AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_RING]);
             loadSetting(stmt, Settings.System.VOLUME_SYSTEM,
