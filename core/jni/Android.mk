@@ -156,11 +156,12 @@ LOCAL_SRC_FILES:= \
 	android_app_backup_FullBackup.cpp \
 	android_content_res_ObbScanner.cpp \
 	android_content_res_Configuration.cpp \
-    	android_animation_PropertyValuesHolder.cpp \
+	android_animation_PropertyValuesHolder.cpp \
 	android_hardware_GestureDevice.cpp
 ifeq ($(call is-vendor-board-platform,QCOM),true)
 LOCAL_SRC_FILES += android_hardware_fm.cpp \
-	com_android_internal_app_ActivityTrigger.cpp
+	com_android_internal_app_ActivityTrigger.cpp \
+	org_codeaurora_Performance.cpp
 endif
 
 LOCAL_C_INCLUDES += \
