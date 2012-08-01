@@ -194,19 +194,29 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
                                        == CdmaSubscriptionSourceManager.SUBSCRIPTION_FROM_NV);
 
         IccRecords r = mIccRecords.get();
-        boolean allowed =
+        boolean allowed = true;
+
+        if (mCheckForConnectivity) {
+            allowed = allowed &&
                     (psState == ServiceState.STATE_IN_SERVICE ||
                             mAutoAttachOnCreation) &&
-                    (subscriptionFromNv ||
-                            (r != null && r.getRecordsLoaded())) &&
                     (mCdmaPhone.mSST.isConcurrentVoiceAndDataAllowed() ||
                             mPhone.getState() == Phone.State.IDLE) &&
                     !roaming &&
-                    internalDataEnabled &&
-                    desiredPowerState &&
-                    !mPendingRestartRadio &&
-                    ((mPhone.getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE) ||
+                    internalDataEnabled;
+        }
+
+        if (mCheckForSubscription) {
+            allowed = allowed &&
+                (subscriptionFromNv || r != null && r.getRecordsLoaded());
+        }
+
+        allowed = allowed &&
+                desiredPowerState &&
+                !mPendingRestartRadio &&
+                ((mPhone.getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE) ||
                             !mCdmaPhone.needsOtaServiceProvisioning());
+
         if (!allowed && DBG) {
             String reason = "";
             if (!((psState == ServiceState.STATE_IN_SERVICE) || mAutoAttachOnCreation)) {
@@ -227,6 +237,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
             if (mCdmaPhone.needsOtaServiceProvisioning()) reason += " - needs Provisioning";
             log("Data not allowed due to" + reason);
         }
+
         return allowed;
     }
 
@@ -1081,6 +1092,20 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
     @Override
     protected boolean disconnectOneLowerPriorityCall(String apnType) {
         return false;
+    }
+
+    protected void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
+        mCheckForConnectivity = checkConnectivity;
+        mCheckForSubscription = checkSubscription;
+
+        if (DBG) log("FMC: mCheckForConnectivity:" + mCheckForConnectivity +
+                "mCheckForSubscription:" + mCheckForSubscription);
+
+        if (tryDataCalls) {
+            sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA,
+                    Phone.REASON_DATA_READINESS_CHECKS_MODIFIED));
+        }
     }
 
     @Override

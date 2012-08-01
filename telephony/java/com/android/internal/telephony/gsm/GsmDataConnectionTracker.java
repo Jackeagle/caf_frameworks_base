@@ -2720,6 +2720,11 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
+    protected void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls) {
+        // Not used for GSM
+    }
+
     @Override
     protected DataConnection getActiveDataConnection(String type) {
         return mApnContexts.get(type).getState() ==

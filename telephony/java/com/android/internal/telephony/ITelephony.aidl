@@ -371,5 +371,17 @@ interface ITelephony {
      * Returns the all observed cell information of the device.
      */
     List<CellInfo> getAllCellInfo();
+
+    /**
+     * Modify data readiness checks performed during data call setup
+     *
+     * @param checkConnectivity - check for network state in service,
+                                  roaming and data in roaming enabled.
+     * @param checkSubscription - check for icc/nv ready and icc records loaded.
+     * @param tryDataCalls - set to true to attempt data calls if data call is not already active.
+     *
+     */
+    void setDataReadinessChecks(
+            boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls);
 }
 
