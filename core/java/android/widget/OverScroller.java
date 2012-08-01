@@ -18,6 +18,7 @@ package android.widget;
 
 import android.content.Context;
 import android.hardware.SensorManager;
+import android.os.SystemProperties;
 import android.util.FloatMath;
 import android.util.Log;
 import android.view.ViewConfiguration;
@@ -791,14 +792,16 @@ public class OverScroller {
         private double getSplineFlingDistance(int velocity) {
             final double l = getSplineDeceleration(velocity);
             final double decelMinusOne = DECELERATION_RATE - 1.0;
-            return mFlingFriction * PHYSICAL_COEF * Math.exp(DECELERATION_RATE / decelMinusOne * l);
+            return mFlingFriction * PHYSICAL_COEF * Math.exp(DECELERATION_RATE / decelMinusOne * l)
+                    * Float.parseFloat(SystemProperties.get("ro.fling.distance.coef", "1.0f"));
         }
 
         /* Returns the duration, expressed in milliseconds */
         private int getSplineFlingDuration(int velocity) {
             final double l = getSplineDeceleration(velocity);
             final double decelMinusOne = DECELERATION_RATE - 1.0;
-            return (int) (1000.0 * Math.exp(l / decelMinusOne));
+            return (int) (1000.0 * Math.exp(l / decelMinusOne)
+                    * Float.parseFloat(SystemProperties.get("ro.fling.duration.coef", "1.0f")));
         }
 
         private void fitOnBounceCurve(int start, int end, int velocity) {
