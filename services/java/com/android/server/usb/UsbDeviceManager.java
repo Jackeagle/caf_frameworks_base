@@ -97,7 +97,9 @@ public class UsbDeviceManager {
     // Delay for debouncing USB disconnects.
     // We often get rapid connect/disconnect events when enabling USB functions,
     // which need debouncing.
-    private static final int UPDATE_DELAY = 1000;
+    private static final int UPDATE_DELAY = 5000;
+    // Function enable is in progress
+    private boolean mSoftSwitch;
 
     private static final String BOOT_MODE_PROPERTY = "ro.bootmode";
 
@@ -383,6 +385,7 @@ public class UsbDeviceManager {
                 connected = 1;
                 configured = 0;
             } else if ("CONFIGURED".equals(state)) {
+                mSoftSwitch = false;
                 connected = 1;
                 configured = 1;
             } else {
@@ -394,7 +397,7 @@ public class UsbDeviceManager {
             msg.arg1 = connected;
             msg.arg2 = configured;
             // debounce disconnects to avoid problems bringing up USB tethering
-            sendMessageDelayed(msg, (connected == 0) ? UPDATE_DELAY : 0);
+            sendMessageDelayed(msg, ((connected == 0) && mSoftSwitch) ? UPDATE_DELAY : 0);
         }
 
         private boolean waitForState(String state) {
@@ -439,6 +442,7 @@ public class UsbDeviceManager {
                     functions = removeFunction(functions, UsbManager.USB_FUNCTION_ADB);
                 }
                 if (!mDefaultFunctions.equals(functions)) {
+                    mSoftSwitch = true;
                     if (!setUsbConfig("none")) {
                         Slog.e(TAG, "Failed to disable USB");
                         // revert to previous configuration if we fail
@@ -471,6 +475,7 @@ public class UsbDeviceManager {
                     functions = removeFunction(functions, UsbManager.USB_FUNCTION_ADB);
                 }
                 if (!mCurrentFunctions.equals(functions)) {
+                    mSoftSwitch = true;
                     if (!setUsbConfig("none")) {
                         Slog.e(TAG, "Failed to disable USB");
                         // revert to previous configuration if we fail
