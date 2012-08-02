@@ -1791,6 +1791,7 @@ public class Camera {
         private static final String KEY_VIDEO_SNAPSHOT_SUPPORTED = "video-snapshot-supported";
         private static final String KEY_VIDEO_STABILIZATION = "video-stabilization";
         private static final String KEY_VIDEO_STABILIZATION_SUPPORTED = "video-stabilization-supported";
+        private static final String KEY_SINGLE_ISP_OUTPUT_ENABLED = "single-isp-output-enabled";
 
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
@@ -3658,6 +3659,24 @@ public class Camera {
          */
         public boolean isVideoStabilizationSupported() {
             String str = get(KEY_VIDEO_STABILIZATION_SUPPORTED);
+            return TRUE.equals(str);
+        }
+
+        /**
+         * Returns true if single output is enabled.
+         * If true, Camcorder application must use
+         * same resolution for both preview and video.
+         * If false, Camcorder application can use
+         * preview resolution which need not be equal
+         * to video resolution.
+         * But the selected preview resolution aspect ratio
+         * should match with the selected video resolution
+         * aspect ratio
+         *
+         * @return true if single output is enabled.
+         */
+        public boolean isSingleOutputEnabled(){
+            String str = get(KEY_SINGLE_ISP_OUTPUT_ENABLED);
             return TRUE.equals(str);
         }
 
