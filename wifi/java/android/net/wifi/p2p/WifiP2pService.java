@@ -116,6 +116,11 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     private static final int P2P_RESTART_TRIES = 5;
 
     private int mP2pRestartCount = 0;
+    /*
+     *@hide
+     */
+    private int mP2pPdNotify = 0;
+
 
     private String mInvitedDeviceAddress;
 
@@ -840,7 +845,6 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (mPeers.remove(device)) sendP2pPeersChangedBroadcast();
                     break;
                 case WifiP2pManager.CONNECT:
-                    boolean join = false;
                     boolean automatic = false;
                     boolean provdisc = false;
                     if (DBG) logd(getName() + " sending connect");
@@ -861,25 +865,12 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                                 automatic = true;
                                 provdisc = true;
                             } else {
-                                // To Handle the Concurrency Cases : Two interface
-                                // addresses for a device address
                                 if (mSavedConnectConfig.mInvite == 1) {
-                                    String bssInfo = WifiNative.bssInfo(mSavedConnectConfig.deviceAddress);
-                                    String[] tokens = bssInfo.split("\n");
-                                    for (String token : tokens) {
-                                        if (token.startsWith("bssid=")) {
-                                            String[] nameValue = token.split("=");
-                                            if (nameValue.length != 2) break;
-                                            mTempConnectConfig.deviceAddress = nameValue[1];
-                                            join = true;
-                                        }
-                                    }
+                                    mSavedConnectConfig.mPeergo = 1;
                                 }
-                                if ( join == true )
-                                    mConnectConfig = mTempConnectConfig;
                             }
 
-                            String pin = WifiNative.p2pConnect(mConnectConfig, join, automatic, provdisc);
+                            String pin = WifiNative.p2pConnect(mConnectConfig,automatic, provdisc);
                             try {
                                 Integer.parseInt(pin);
                                 notifyWpsPin(pin, mSavedConnectConfig.deviceAddress);
@@ -1018,6 +1009,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             switch (message.what) {
                 case WifiMonitor.P2P_GO_NEGOTIATION_REQUEST_EVENT:
                 case WifiMonitor.P2P_INVITATION_RECEIVED_EVENT:
+                case WifiMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT:
+                case WifiMonitor.P2P_PROV_DISC_ENTER_PIN_EVENT:
                     //Ignore additional connection requests
                     break;
                 case GROUP_NEGOTIATION_USER_ACCEPT:
@@ -1267,13 +1260,25 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                      sendP2pPeersChangedBroadcast();
                     break;
                 case WifiMonitor.P2P_PROV_DISC_PBC_REQ_EVENT:
-                    notifyP2pProvDiscPbcRequest((WifiP2pDevice) message.obj);
+                    if (mP2pPdNotify == 0)
+                    {
+                        mP2pPdNotify =1;
+                        notifyP2pProvDiscPbcRequest((WifiP2pDevice) message.obj);
+                    }
                     break;
                 case WifiMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT:
-                    notifyP2pProvDiscShowPinRequest((WifiP2pDevice) message.obj);
+                    if (mP2pPdNotify == 0)
+                    {
+                        mP2pPdNotify =1;
+                        notifyP2pProvDiscShowPinRequest((WifiP2pDevice) message.obj);
+                    }
                     break;
                 case WifiMonitor.P2P_PROV_DISC_ENTER_PIN_EVENT:
-                    notifyP2pProvDiscEnterPinRequest((WifiP2pDevice) message.obj);
+                    if (mP2pPdNotify == 0)
+                    {
+                        mP2pPdNotify =1;
+                        notifyP2pProvDiscEnterPinRequest((WifiP2pDevice) message.obj);
+                    }
                     break;
                 case WifiMonitor.P2P_GROUP_STARTED_EVENT:
                     Slog.e(TAG, "Duplicate group creation event notice, ignore");
@@ -1477,9 +1482,17 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         public void onClick(DialogInterface dialog, int which) {
                                 if (DBG) logd(getName() + " wps_pbc");
                                 sendMessage(WPS_PBC);
+                                if (mP2pPdNotify == 1)
+                                    mP2pPdNotify =0;
                         }
                     })
-            .setNegativeButton(r.getString(R.string.cancel), null)
+            .setNegativeButton(r.getString(R.string.cancel), new OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                        if (mP2pPdNotify ==1)
+                            mP2pPdNotify =0;
+                        }
+                    })
             .setCancelable(false)
             .create();
 
@@ -1495,11 +1508,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         Resources r = Resources.getSystem();
         final String tempDevAddress = peer.deviceAddress;
         final String tempPin = peer.pinShown;
-        final boolean join;
-        if (peer.peer_go == 1)
-            join = true;
-        else
-            join = false;
+        final int join = peer.peer_go;
         AlertDialog dialog = new AlertDialog.Builder(mContext)
             .setTitle(r.getString(R.string.wifi_p2p_dialog_title))
             .setMessage(r.getString(R.string.wifi_p2p_pin_display_message, peer.pinShown,peer.deviceAddress))
@@ -1509,15 +1518,29 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (mWifiP2pInfo.groupFormed){
                         if (DBG) logd(getName() + " wps_pin");
                         sendMessage(WPS_PIN, tempPin);
+                        if (mP2pPdNotify ==1)
+                            mP2pPdNotify =0;
                     } else {
-                            WifiNative.p2pConnectDisplay(tempDevAddress, tempPin, join);
-                         }
+                            mSavedGoNegotiationConfig = new WifiP2pConfig();
+                            mSavedGoNegotiationConfig.mUsepin = 1;
+                            mSavedGoNegotiationConfig.wps.setup = WpsInfo.DISPLAY;
+                            mSavedGoNegotiationConfig.deviceAddress = tempDevAddress;
+                            mSavedGoNegotiationConfig.wps.pin = tempPin;
+                            mSavedGoNegotiationConfig.mPeergo = join;
+                            sendMessage(GROUP_NEGOTIATION_USER_ACCEPT);
+                       }
                     }
                     })
             .setNegativeButton(r.getString(R.string.cancel), new OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                            transitionTo(mInactiveState);
+                        if (mWifiP2pInfo.groupFormed){
+                            if (mP2pPdNotify ==1)
+                                mP2pPdNotify =0;
+                        }
+                        else {
+                            sendMessage(GROUP_NEGOTIATION_USER_REJECT);
+                        }
                         }
                     })
             .setCancelable(false)
@@ -1533,11 +1556,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 .inflate(R.layout.wifi_p2p_go_negotiation_request_alert, null);
         final EditText pin = (EditText) textEntryView .findViewById(R.id.wifi_p2p_wps_pin);
         final String tempDeviceAddress = peer.deviceAddress;
-        final boolean join;
-        if (peer.peer_go == 1)
-            join = true;
-        else
-            join = false;
+        final int join = peer.peer_go;
         AlertDialog dialog = new AlertDialog.Builder(mContext)
             .setTitle(r.getString(R.string.wifi_p2p_dialog_title))
             .setView(textEntryView)
@@ -1546,16 +1565,29 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         if (DBG) logd(getName() + " wps_pin");
                         if (mWifiP2pInfo.groupFormed){
                             sendMessage(WPS_PIN, pin.getText().toString());
+                            if (mP2pPdNotify ==1)
+                                mP2pPdNotify =0;
                         }
                         else {
-                            WifiNative.p2pConnectKeypad(tempDeviceAddress, pin.getText().toString(), join);
+                            mSavedGoNegotiationConfig = new WifiP2pConfig();
+                            mSavedGoNegotiationConfig.wps.setup = WpsInfo.KEYPAD;
+                            mSavedGoNegotiationConfig.deviceAddress = tempDeviceAddress;
+                            mSavedGoNegotiationConfig.wps.pin = pin.getText().toString();
+                            mSavedGoNegotiationConfig.mPeergo = join ;
+                            sendMessage(GROUP_NEGOTIATION_USER_ACCEPT);
                         }
                     }
                     })
              .setNegativeButton(r.getString(R.string.cancel), new OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                        transitionTo(mInactiveState);
+                        if (mWifiP2pInfo.groupFormed){
+                            if (mP2pPdNotify ==1)
+                                mP2pPdNotify =0;
+                        }
+                        else {
+                            sendMessage(GROUP_NEGOTIATION_USER_REJECT);
+                        }
                         }
                     })
 

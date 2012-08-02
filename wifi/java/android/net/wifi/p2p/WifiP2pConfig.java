@@ -60,6 +60,19 @@ public class WifiP2pConfig implements Parcelable {
 
     public int mInvite = 0;
 
+   /**
+    * Flag Indicating if peer is a GO
+    * @hide
+    */
+
+    public int mPeergo = 0;
+
+   /**
+     * Indicates if the pin has to be used
+     * @hide
+     */
+    public int mUsepin = 0;
+
     /**
      * Indicates whether the configuration is saved
      * @hide
@@ -127,6 +140,8 @@ public class WifiP2pConfig implements Parcelable {
         sbuf.append("\n persist: ").append(persist.toString());
         sbuf.append("\n mInitiator: ").append(mInitiator);
         sbuf.append("\n mInvite: ").append(mInvite);
+        sbuf.append("\n mPeergo: ").append(mPeergo);
+        sbuf.append("\n mUsepin: ").append(mUsepin);
         return sbuf.toString();
     }
 
@@ -144,6 +159,8 @@ public class WifiP2pConfig implements Parcelable {
             persist = source.persist;
             mInitiator = source.mInitiator;
             mInvite = source.mInvite;
+            mPeergo = source.mPeergo;
+            mUsepin = source.mUsepin;
         }
     }
 
@@ -155,6 +172,8 @@ public class WifiP2pConfig implements Parcelable {
         dest.writeString(persist.name());
         dest.writeInt(mInitiator);
         dest.writeInt(mInvite);
+        dest.writeInt(mPeergo);
+        dest.writeInt(mUsepin);
     }
 
     /** Implement the Parcelable interface */
@@ -168,6 +187,8 @@ public class WifiP2pConfig implements Parcelable {
                 config.persist = Persist.valueOf(in.readString());
                 config.mInitiator = in.readInt();
                 config.mInvite = in.readInt();
+                config.mPeergo = in.readInt();
+                config.mUsepin = in.readInt();
                 return config;
             }
 
