@@ -175,6 +175,7 @@ public class BluetoothService extends IBluetooth.Stub {
             BluetoothUuid.Handsfree,
             BluetoothUuid.HSP,
             BluetoothUuid.ObexObjectPush,
+            BluetoothUuid.MessageNotificationServer,
             BluetoothUuid.DirectPrinting,
             BluetoothUuid.ReferencePrinting,
             BluetoothUuid.PrintingStatus };
@@ -822,10 +823,11 @@ public class BluetoothService extends IBluetooth.Stub {
                 // is entered wrongly twice we should abort.
                 if (attempt > 0 && attempt <= 2) {
                     mBondState.attempt(address);
-                    setBondState(address,
-                        BluetoothDevice.BOND_RETRY,
-                        BluetoothDevice.UNBOND_REASON_AUTH_FAILED);
-                    createBond(address);
+                    if (true == createBond(address)) {
+                       setBondState(address,
+                            BluetoothDevice.BOND_RETRY,
+                            BluetoothDevice.UNBOND_REASON_AUTH_FAILED);
+                    }
                     return;
                 }
                 if (attempt > 0) mBondState.clearPinAttempts(address);
@@ -1313,13 +1315,6 @@ public class BluetoothService extends IBluetooth.Stub {
             if (mBondState.isAutoPairingAttemptsInProgress(address)) {
                 mBondState.clearPinAttempts(address);
             }
-        } else if (result == BluetoothDevice.UNBOND_REASON_AUTH_FAILED &&
-                mBondState.getAttempt(address) == 1) {
-            mBondState.addAutoPairingFailure(address);
-            pairingAttempt(address, result);
-        } else if (result == BluetoothDevice.UNBOND_REASON_REMOTE_DEVICE_DOWN &&
-              mBondState.isAutoPairingAttemptsInProgress(address)) {
-            pairingAttempt(address, result);
         } else {
             if (result == BluetoothDevice.UNBOND_REASON_AUTH_FAILED &&
                 mBondState.getAttempt(address) == 1) {
@@ -1334,7 +1329,7 @@ public class BluetoothService extends IBluetooth.Stub {
                 if (mBondState.isAutoPairingAttemptsInProgress(address)) {
                    mBondState.clearPinAttempts(address);
                 }
-             }
+            }
             setBondState(address, BluetoothDevice.BOND_NONE, result);
         }
     }
@@ -2678,15 +2673,6 @@ public class BluetoothService extends IBluetooth.Stub {
                     editor.putBoolean(SHARED_PREFERENCE_DOCK_ADDRESS + mDockAddress, true);
                     editor.apply();
                 }
-            } else if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
-                ContentResolver resolver = context.getContentResolver();
-                int airplaneModeOn = Settings.System.getInt(resolver,
-                        Settings.System.AIRPLANE_MODE_ON, 0);
-                int bluetoothOn = Settings.Secure.getInt(resolver,
-                        Settings.Secure.BLUETOOTH_ON, 0);
-                if (airplaneModeOn == 0 && bluetoothOn != 0) {
-                    enable();
-                }
             } else if (BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED.equals(action)) {
                 int audioState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE,
                         BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
@@ -2764,6 +2750,23 @@ public class BluetoothService extends IBluetooth.Stub {
                         BluetoothA2dp.STATE_PLAYING);
                 mConnectionManager.setA2dpAudioActive(playingState == BluetoothA2dp.STATE_PLAYING);
             } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (device == null) {
+                    return;
+                }
+                // There are no services for HID and PAN profiles. So having
+                // Broadcast Listeners there can cause leak as we dont have
+                // point to unregister Listener. Currently handling the device
+                // connection state change to update the Profile States.
+                if (getInputDeviceConnectionState(device) !=
+                           BluetoothInputDevice.STATE_DISCONNECTED) {
+                    handleInputDevicePropertyChange(device.getAddress(), false);
+                }
+                if (getPanDeviceConnectionState(device) != BluetoothPan.STATE_DISCONNECTED &&
+                    mBluetoothPanProfileHandler != null) {
+                        handlePanDeviceStateChange(device,  BluetoothPan.STATE_DISCONNECTED,
+                                   mBluetoothPanProfileHandler.getPanDeviceRole(device));
+                }
                 if ((listConnectionNative() == 0) &&
                     (getBluetoothStateInternal() == BluetoothAdapter.STATE_TURNING_OFF)) {
                     Log.i(TAG, "All connections disconnected");
@@ -3571,6 +3574,12 @@ public class BluetoothService extends IBluetooth.Stub {
         }
         for (String path : bonds) {
             String address = getAddressFromObjectPath(path);
+            if ((mHostPatchForIOP != null) &&
+                (mHostPatchForIOP.isHostPatchRequired(address,
+                 BluetoothAdapter.HOST_PATCH_AVOID_AUTO_CONNECT))) {
+                 Log.w(TAG, "No autoconnect with specific carkit : " + address);
+                 continue;
+            }
             BluetoothDeviceProfileState state = mDeviceProfileState.get(address);
             if (state != null) {
                 Message msg = new Message();
@@ -3844,15 +3853,21 @@ public class BluetoothService extends IBluetooth.Stub {
     private boolean updateCountersAndCheckForConnectionStateChange(int state, int prevState) {
         switch (prevState) {
             case BluetoothProfile.STATE_CONNECTING:
-                mProfilesConnecting--;
+                if (mProfilesConnecting > 0) { // always expected to be > 0
+                    mProfilesConnecting--;
+                }
                 break;
 
             case BluetoothProfile.STATE_CONNECTED:
-                mProfilesConnected--;
+                if (mProfilesConnected > 0) { // always expected to be > 0
+                    mProfilesConnected--;
+                }
                 break;
 
             case BluetoothProfile.STATE_DISCONNECTING:
-                mProfilesDisconnecting--;
+                if (mProfilesDisconnecting > 0) { // always expected to be > 0
+                    mProfilesDisconnecting--;
+                }
                 break;
         }
 
@@ -4073,19 +4088,11 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     private synchronized String[] getRemoteGattServices(String address) {
-        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
-            return null;
-        }
-        return getGattServicesFromCache(address);
-    }
-
-   private String[] getGattServicesFromCache(String address) {
-       Log.d (TAG, "getGattServicesFromCache");
+        Log.d (TAG, "getRemoteGattServices");
 
         String value = mDeviceProperties.getProperty(address, "Services");
         if (value == null) {
-            Log.d(TAG, "getGattServicesFromCache: no services found");
+            Log.d(TAG, "getRemoteGattServicese: no services found");
             return null;
         }
 
@@ -4367,11 +4374,16 @@ public class BluetoothService extends IBluetooth.Stub {
         }
 
         if (!discovering) {
-            if (isRemoteDeviceInCache(address) && getRemoteGattServices(address) != null && findDeviceNative(address) != null) {
-                String value = mDeviceProperties.getProperty(address, "Services");
-                if (value == null) {
-                    Log.e(TAG, "No GATT based services were found on " + address);
-                    ret = false;
+            if (isRemoteDeviceInCache(address) && findDeviceNative(address) != null) {
+                if (getRemoteGattServices(address) == null) {
+                        Log.e(TAG, "No GATT based services were found on " + address);
+                        String devType = getDeviceProperties().getProperty(address, "Type");
+                        String path = getObjectPathFromAddress(address);
+                        if("LE".equals(devType)) {
+                            ret = discoverPrimaryServicesNative(path);
+                            delay = true;
+                        } else
+                            ret = false;
                 }
             } else {
                 Log.d(TAG, "Need to Create Remote Device" + address + " before accessing properties");

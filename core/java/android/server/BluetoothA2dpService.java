@@ -456,10 +456,16 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
 
                 if (uri == null)
                     return;
+                /*Ignore posting track change intent for uri location content://media/internal/ */
+                String uriPath = uri.toString();
+                String[] value = uriPath.split("//");
 
-                if (!uri.toString().startsWith("content://media/external")) {
-                    log("Internal audio file data, ignoring");
-                    return;
+                if (value != null) {
+                    String[] value1 = value[1].split("/");
+                    if ((value1[0].equals("media")) && (!value1[1].equals("external"))) {
+                        log("Internal audio file data, ignoring");
+                        return;
+                    }
                 }
 
                 String tempMediaNumber = mMediaNumber;
@@ -857,6 +863,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             return BluetoothA2dp.STATE_CONNECTED;
         if (value.equalsIgnoreCase("playing"))
             return BluetoothA2dp.STATE_PLAYING;
+        if (value.equalsIgnoreCase("disconnecting"))
+            return BluetoothA2dp.STATE_DISCONNECTING;
         return -1;
     }
 
@@ -971,7 +979,6 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         if (!mBluetoothService.isEnabled()) return false;
 
         int state = mAudioDevices.get(device);
-
         // ignore if there are any active sinks
         if (getDevicesMatchingConnectionStates(new int[] {
                 BluetoothA2dp.STATE_CONNECTING,
@@ -1033,8 +1040,10 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
 
         switch (state) {
             case BluetoothA2dp.STATE_DISCONNECTED:
-            case BluetoothA2dp.STATE_DISCONNECTING:
                 return false;
+              // already in disconnecting state not a failure case.
+            case BluetoothA2dp.STATE_DISCONNECTING:
+                return true;
         }
         // State is CONNECTING or CONNECTED or PLAYING
         handleSinkStateChange(device, state, BluetoothA2dp.STATE_DISCONNECTING);
