@@ -64,4 +64,6 @@ public interface ILinkManager {
     boolean resumeQoS(int id);
 
     boolean removeQosRegistration(int id);
+
+    boolean updateOperatorPolicy(String filepath);
 }

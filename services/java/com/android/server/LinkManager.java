@@ -361,4 +361,13 @@ class LinkManager implements ILinkManager {
         return false;
     }
 
+    /**
+     * parse an ANDSF compliant configuration file.
+     */
+    public boolean updateOperatorPolicy(String filepath){
+        if (DBG) Log.v(TAG, "updateOperatorPolicy(String filepath)" +
+                       " not supported in LinkManager");
+        return false;
+    }
+
 }
