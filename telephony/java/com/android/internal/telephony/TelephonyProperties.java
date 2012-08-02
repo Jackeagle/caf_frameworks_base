@@ -184,9 +184,14 @@ public interface TelephonyProperties
     static final String PROPERTY_TEST_CSIM = "persist.radio.test-csim";
 
     /**
-     * Set to true to indicates support for simultaneous voice and data.
+     * Set to true to indicates support for simultaneous voice and data (svlte case).
      */
     static final String PROPERTY_SVDATA = "ro.ril.svlte1x";
+
+    /**
+     * Set to true to indicates support for simultaneous voice and data (svdo case).
+     */
+    static final String PROPERTY_SVDO = "ro.ril.svdo";
 
     /**
      * Indicates whether sms should be sent in synchronous manner.
