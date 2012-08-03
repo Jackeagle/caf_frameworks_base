@@ -1303,12 +1303,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 p.addListener(callingUid);
             }
 
+            p.updateCriteria(LocationProviderInterface.ULP_ADD_CRITERIA, minTime, minDistance,singleShot,criteria);
             boolean isProviderEnabled = isAllowedBySettingsLocked(provider);
             if (isProviderEnabled) {
                 long minTimeForProvider = getMinTimeLocked(provider);
                 p.setMinTime(minTimeForProvider, mTmpWorkSource);
-                p.updateCriteria(LocationProviderInterface.ULP_ADD_CRITERIA, minTime, minDistance,singleShot,criteria);
-
                 // try requesting single shot if singleShot is true, and fall back to
                 // regular location tracking if requestSingleShotFix() is not supported
                 if (!singleShot || !p.requestSingleShotFix()) {
