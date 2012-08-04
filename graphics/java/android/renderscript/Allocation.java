@@ -609,8 +609,11 @@ public class Allocation extends BaseObj {
         eSize *= mType.mElement.mArraySizes[component_number];
 
         if (data.length != eSize) {
-            throw new RSIllegalArgumentException("Field packer sizelength " + data.length +
+             Log.e("size mismatch","Field packer sizelength " + data.length +
                                                " does not match component size " + eSize + ".");
+             // Using patched slang will not trigger the exception
+             if (data.length != 12 || eSize != 16)
+               throw new RSIllegalArgumentException("not match");
         }
 
         mRS.nAllocationElementData1D(getIDSafe(), xoff, mSelectedLOD,
