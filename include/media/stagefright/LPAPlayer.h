@@ -179,7 +179,6 @@ private:
     pthread_mutex_t effect_mutex;
     pthread_mutex_t apply_effect_mutex;
     pthread_mutex_t a2dp_notification_mutex;
-    pthread_mutex_t pause_mutex;
 
     pthread_cond_t event_cv;
     pthread_cond_t decoder_cv;
@@ -187,7 +186,9 @@ private:
     pthread_cond_t effect_cv;
     pthread_cond_t event_thread_cv;
     pthread_cond_t a2dp_notification_cv;
-    pthread_cond_t pause_cv;
+
+    Condition pause_cv;
+    Mutex pause_mutex;
 
     // make sure Decoder thread has exited
     void requestAndWaitForDecoderThreadExit();
