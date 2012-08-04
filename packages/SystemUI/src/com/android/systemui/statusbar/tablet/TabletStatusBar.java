@@ -302,7 +302,7 @@ public class TabletStatusBar extends BaseStatusBar implements
                     (TextView)mBarContents.findViewById(R.id.network_text));
         } else {
             if (mobileRSSI != null) {
-                mMSimNetworkController.addPhoneSignalIconView(mobileRSSI);
+                mNetworkController.addPhoneSignalIconView(mobileRSSI);
             }
             if (wifiRSSI != null) {
                 mNetworkController.addWifiIconView(wifiRSSI);
