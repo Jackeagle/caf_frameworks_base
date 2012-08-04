@@ -1145,7 +1145,7 @@ void LPAPlayer::A2DPThreadEntry() {
                 bytesWritten = mAudioSink->write(data, writeLen);
                 if ( bytesWritten != writeLen ) {
                     //Paused - Wait till resume
-                    if (isPaused && bIsA2DPEnabled) {
+                    if (isPaused && bIsA2DPEnabled && !asyncReset) {
                         LOGV("Pausing A2DP playback");
                         pthread_mutex_lock(&a2dp_mutex);
                         pthread_cond_wait(&a2dp_cv, &a2dp_mutex);
