@@ -218,6 +218,8 @@ public class AudioSystem
     public static final int DEVICE_OUT_USB_DEVICE = 0x4000;
     public static final int DEVICE_OUT_FM = 0x8000;
     public static final int DEVICE_OUT_FM_TX = 0x10000;
+    public static final int DEVICE_OUT_ANC_HEADSET = 0x20000;
+    public static final int DEVICE_OUT_ANC_HEADPHONE = 0x40000;
     public static final int DEVICE_OUT_PROXY = 0x80000;
     public static final int DEVICE_OUT_DEFAULT = DEVICE_OUT_SPEAKER;
     public static final int DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE |
@@ -237,6 +239,8 @@ public class AudioSystem
                                               DEVICE_OUT_USB_DEVICE |
                                               DEVICE_OUT_FM |
                                               DEVICE_OUT_FM_TX |
+                                              DEVICE_OUT_ANC_HEADSET |
+                                              DEVICE_OUT_ANC_HEADPHONE |
                                               DEVICE_OUT_PROXY |
                                               DEVICE_OUT_DEFAULT);
     public static final int DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP |
@@ -283,6 +287,8 @@ public class AudioSystem
     public static final String DEVICE_OUT_USB_DEVICE_NAME = "usb_device";
     public static final String DEVICE_OUT_FM_NAME = "fm";
     public static final String DEVICE_OUT_FM_TX_NAME = "fm_tx";
+    public static final String DEVICE_OUT_ANC_HEADSET_NAME = "anc_headset";
+    public static final String DEVICE_OUT_ANC_HEADPHONE_NAME = "anc_headphone";
     public static final String DEVICE_OUT_PROXY_NAME = "proxy";
 
     public static String getDeviceName(int device)
@@ -322,6 +328,10 @@ public class AudioSystem
             return DEVICE_OUT_FM_NAME;
         case DEVICE_OUT_FM_TX:
             return DEVICE_OUT_FM_TX_NAME;
+        case DEVICE_OUT_ANC_HEADSET:
+            return DEVICE_OUT_ANC_HEADSET_NAME;
+        case DEVICE_OUT_ANC_HEADPHONE:
+            return DEVICE_OUT_ANC_HEADPHONE_NAME;
         case DEVICE_OUT_PROXY:
             return DEVICE_OUT_PROXY_NAME;
         case DEVICE_IN_DEFAULT:
