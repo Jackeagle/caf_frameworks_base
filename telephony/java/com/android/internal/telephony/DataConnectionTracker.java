@@ -569,6 +569,9 @@ public abstract class DataConnectionTracker extends Handler {
         mUiccController = UiccController.getInstance();
         mUiccController.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
+        mPhone.mCM.registerForTetheredModeStateChanged(this,
+                EVENT_TETHERED_MODE_STATE_CHANGED, null);
+
         IntentFilter filter = new IntentFilter();
         filter.addAction(getActionIntentReconnectAlarm());
         filter.addAction(Intent.ACTION_SCREEN_ON);
@@ -616,6 +619,7 @@ public abstract class DataConnectionTracker extends Handler {
         mDataRoamingSettingObserver.unregister(mPhone.getContext());
         mUiccController.unregisterForIccChanged(this);
         mPhone.getContext().getContentResolver().unregisterContentObserver(this.mApnObserver);
+        mPhone.mCM.unregisterForTetheredModeStateChanged(this);
     }
 
     protected void broadcastMessenger() {
@@ -746,6 +750,7 @@ public abstract class DataConnectionTracker extends Handler {
     protected abstract boolean disconnectOneLowerPriorityCall(String apnType);
     protected abstract void setDataReadinessChecks(
             boolean checkConnectivity, boolean checkSubscription, boolean tryDataCalls);
+    protected abstract void clearTetheredStateOnStatus();
 
     protected void onDataStallAlarm(int tag) {
         loge("onDataStallAlarm: not impleted tag=" + tag);
@@ -861,6 +866,9 @@ public abstract class DataConnectionTracker extends Handler {
                 break;
             case EVENT_APN_CHANGED:
                 onApnChanged();
+                break;
+            case EVENT_TETHERED_MODE_STATE_CHANGED:
+                onTetheredModeStateChanged((AsyncResult) msg.obj);
                 break;
             default:
                 Log.e("DATA", "Unidentified event msg=" + msg);
@@ -1393,6 +1401,44 @@ public abstract class DataConnectionTracker extends Handler {
             } else {
                 return SystemProperties.get("ro.gsm.2nd_data_retry_config");
             }
+        }
+    }
+
+    private void onTetheredModeStateChanged(AsyncResult ar) {
+        int[] ret = (int[]) ar.result;
+
+        if (ret == null || ret.length != 1) {
+            if (DBG)
+                log("Error: Invalid Tethered mode received");
+            return;
+        }
+
+        int mode = ret[0];
+        if (DBG)
+            log("onTetheredModeStateChanged: mode:" + mode);
+
+        switch (mode) {
+        case RILConstants.RIL_TETHERED_MODE_ON:
+            // Indicates that an internal data call was created in the modem.
+            if (DBG)
+                log("Unsol Indication: RIL_TETHERED_MODE_ON");
+            break;
+        case RILConstants.RIL_TETHERED_MODE_OFF:
+            if (DBG)
+                log("Unsol Indication: RIL_TETHERED_MODE_OFF");
+            /*
+             * This indicates that an internal modem data call (e.g. tethered)
+             * had ended. Reset the retry count for all Data Connections and
+             * attempt to bring up all data calls
+             */
+            resetAllRetryCounts();
+            clearTetheredStateOnStatus();
+            sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, 0, 0,
+                    Phone.REASON_TETHERED_MODE_STATE_CHANGED));
+            break;
+        default:
+            if (DBG)
+            log("Error: Invalid Tethered mode:" + mode);
         }
     }
 
