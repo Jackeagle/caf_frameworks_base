@@ -476,6 +476,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         intentFilter.addAction(Intent.ACTION_BOOT_COMPLETED);
         intentFilter.addAction(Intent.ACTION_SCREEN_ON);
         intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        intentFilter.addAction(Intent.ACTION_WIFI_DISPLAY);
 
         // Register a configuration change listener only if requested by system properties
         // to monitor orientation changes (off by default)
@@ -3712,6 +3713,21 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 AudioSystem.setParameters("screen_state=off");
             } else if (action.equalsIgnoreCase(Intent.ACTION_CONFIGURATION_CHANGED)) {
                 handleConfigurationChanged(context);
+            } else if (action.equals(Intent.ACTION_WIFI_DISPLAY)){
+               state = intent.getIntExtra("state", 0);
+               Log.v(TAG, "WiFi Display device state "+state);
+               boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_PROXY);
+               if(state == 1 && !isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_PROXY,
+                            AudioSystem.DEVICE_STATE_AVAILABLE,
+                            "");
+                    mConnectedDevices.put( new Integer(AudioSystem.DEVICE_OUT_PROXY), "");
+                }else if(state == 0 && isConnected){
+                    AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_PROXY,
+                            AudioSystem.DEVICE_STATE_UNAVAILABLE,
+                            "");
+                    mConnectedDevices.remove(AudioSystem.DEVICE_OUT_PROXY);
+                }
             }
         }
     }
