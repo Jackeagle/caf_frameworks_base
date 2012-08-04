@@ -1025,7 +1025,9 @@ public class Element extends BaseObj {
             }
 
             if (element.mVectorSize == 3) {
-                mSkipPadding = 1;
+                //No skip padding. Slang doesn't skip and emits the +1 component index
+                //in reflected "mAllocation.setFromFieldPacker"
+                mSkipPadding =0;
             } else {
                 mSkipPadding = 0;
             }
