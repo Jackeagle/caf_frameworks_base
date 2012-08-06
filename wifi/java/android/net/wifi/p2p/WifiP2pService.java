@@ -1276,6 +1276,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         mDhcpStateMachine = null;
                     }
 
+                    clearInterfaceAddress(mGroup.getInterface());
                     mGroup = null;
                     mWifiNative.p2pFlush();
                     mServiceDiscReqId = null;
@@ -1497,6 +1498,21 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         }
 
         logd("Stopped Dhcp server");
+    }
+
+    private void clearInterfaceAddress(String mInterfaceName) {
+        InterfaceConfiguration ifcg = null;
+        Slog.d(TAG,"Clear the interface config to allow dhcp correctly configure new ip settings");
+        try {
+           ifcg = mNwService.getInterfaceConfig(mInterfaceName);
+            if (ifcg != null) {
+                ifcg.setLinkAddress(new LinkAddress(NetworkUtils.numericToInetAddress(
+                            "0.0.0.0"), 0));
+                mNwService.setInterfaceConfig(mInterfaceName, ifcg);
+            }
+        } catch (Exception e) {
+           loge("Error resetting interface " + mInterfaceName + ", :" + e);
+       }
     }
 
     private void notifyP2pEnableFailure() {
