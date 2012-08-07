@@ -2810,15 +2810,20 @@ public class GsmDataConnectionTracker extends DataConnectionTracker {
             return;
         }
 
-        if (isAnyDcInPartialSuccess()) {
-            // Found at least one data connection with partial success, retry
-            if (dcac.getReconnectIntentSync() != null) {
-                cancelReconnectAlarm(dcac);
+        for (DataConnection dc : mDataConnections.values()) {
+            dcac = mDataConnectionAsyncChannels.get(dc.getDataConnectionId());
+            if (dcac.getPartialSuccessStatusSync()) {
+                // Found at least one data connection with partial success, if retry timer
+                // is running, cancel it and retry immediately.
+                if (dcac.getReconnectIntentSync() != null) {
+                    cancelReconnectAlarm(dcac);
+                }
+                sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, Phone.DUALIP_PARTIAL_RETRY, 0,
+                        Phone.REASON_RAT_CHANGED));
+                resetAllRetryCounts();
+                if (DBG) log("Retry for DC with partial failure. DC:" + dc.toString());
+                break;
             }
-            sendMessage(obtainMessage(EVENT_TRY_SETUP_DATA, Phone.DUALIP_PARTIAL_RETRY, 0,
-                    Phone.REASON_RAT_CHANGED));
-            resetAllRetryCounts();
-            if (DBG) log("Retry for DC with partial failure.");
         }
     }
 
