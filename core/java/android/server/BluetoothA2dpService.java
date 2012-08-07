@@ -463,11 +463,13 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 String uriPath = uri.toString();
                 String[] value = uriPath.split("//");
 
-                if (value != null) {
+                if (value != null && value.length > 1) {
                     String[] value1 = value[1].split("/");
-                    if ((value1[0].equals("media")) && (!value1[1].equals("external"))) {
-                        log("Internal audio file data, ignoring");
-                        return;
+                    if(value1 != null && value1.length > 1) {
+                       if ((value1[0].equals("media")) && (!value1[1].equals("external"))) {
+                           log("Internal audio file data, ignoring");
+                           return;
+                       }
                     }
                 }
 
