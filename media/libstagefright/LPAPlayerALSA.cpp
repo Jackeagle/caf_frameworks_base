@@ -1247,7 +1247,11 @@ void LPAPlayer::EffectsThreadEntry() {
         }
         // If effectQ is empty just wait for a signal
         // Else dequeue a buffer, apply effects and delete it from effectQ
-        if(effectsQueue.empty() || asyncReset || bIsA2DPEnabled || isPaused) {
+        if(asyncReset) {
+            LOGV("exit from effects thread on reset");
+            pthread_mutex_unlock(&effect_mutex);
+            break;
+        } else if(effectsQueue.empty() || bIsA2DPEnabled || isPaused) {
             LOGV("EffectQ is empty or Reset called or A2DP enabled, waiting for signal");
             pthread_cond_wait(&effect_cv, &effect_mutex);
             LOGV("effectsThread: received signal to wake up");
