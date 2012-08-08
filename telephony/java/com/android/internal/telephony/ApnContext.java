@@ -100,12 +100,15 @@ public class ApnContext {
         if (DBG) {
             log("setDataConnectionAc: old dcac=" + mDataConnectionAc + " new dcac=" + dcac);
         }
+        if (mDataConnectionAc == dcac) {
+            // Nothing needs to be done
+            return;
+        }
+        if (mDataConnectionAc != null) {
+            mDataConnectionAc.removeApnContextSync(this);
+        }
         if (dcac != null) {
             dcac.addApnContextSync(this);
-        } else {
-            if (mDataConnectionAc != null) {
-                mDataConnectionAc.removeApnContextSync(this);
-            }
         }
         mDataConnectionAc = dcac;
     }
