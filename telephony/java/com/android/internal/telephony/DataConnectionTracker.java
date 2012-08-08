@@ -1299,18 +1299,15 @@ public abstract class DataConnectionTracker extends Handler {
 
     protected void onSetUserDataEnabled(boolean enabled) {
         synchronized (mDataEnabledLock) {
-            final boolean prevEnabled = getAnyDataEnabled();
             if (mUserDataEnabled != enabled) {
                 mUserDataEnabled = enabled;
                 Settings.Secure.putInt(mPhone.getContext().getContentResolver(),
                         Settings.Secure.MOBILE_DATA, enabled ? 1 : 0);
-                if (prevEnabled != getAnyDataEnabled()) {
-                    if (!prevEnabled) {
-                        resetAllRetryCounts();
-                        onTrySetupData(Phone.REASON_DATA_ENABLED, false);
-                    } else {
-                        onCleanUpAllConnections(Phone.REASON_DATA_DISABLED);
-                    }
+                if (!enabled) {
+                    onCleanUpAllConnections(Phone.REASON_DATA_DISABLED);
+                } else if (getAnyDataEnabled()) {
+                    resetAllRetryCounts();
+                    onTrySetupData(Phone.REASON_DATA_ENABLED, false);
                 }
             }
         }
@@ -1321,16 +1318,13 @@ public abstract class DataConnectionTracker extends Handler {
 
     protected void onSetPolicyDataEnabled(boolean enabled) {
         synchronized (mDataEnabledLock) {
-            final boolean prevEnabled = getAnyDataEnabled();
             if (sPolicyDataEnabled != enabled) {
                 sPolicyDataEnabled = enabled;
-                if (prevEnabled != getAnyDataEnabled()) {
-                    if (!prevEnabled) {
-                        resetAllRetryCounts();
-                        onTrySetupData(Phone.REASON_DATA_ENABLED, false);
-                    } else {
-                        onCleanUpAllConnections(Phone.REASON_DATA_DISABLED);
-                    }
+                if (!enabled) {
+                    onCleanUpAllConnections(Phone.REASON_DATA_DISABLED);
+                } else if (getAnyDataEnabled()) {
+                    resetAllRetryCounts();
+                    onTrySetupData(Phone.REASON_DATA_ENABLED, false);
                 }
             }
         }
