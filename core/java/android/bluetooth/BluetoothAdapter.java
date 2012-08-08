@@ -1499,4 +1499,66 @@ public final class BluetoothAdapter {
         }
         return true;
     }
+
+    /**
+     * Clear the Preferred Devices List.
+     *
+     * <p>Clears all the devices in the Preferred devices list.
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+     *
+     * @param pListCallback The callback to notify the application regarding
+     * whether the Preferred devices list has been cleared or not.
+     * @return false, if internal checks fail; True if the process of
+     *         clearing preferred devices list was started.
+     * @hide
+     */
+    public boolean clearPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallback) {
+        Log.d(TAG, "BT adapter clearPreferredDeviceList");
+        try {
+            return mService.clearPreferredDeviceList(pListCallback);
+        } catch (RemoteException e) {
+            Log.e(TAG, "clearPreferredDeviceList", e);
+        }
+        return false;
+    }
+    /**
+     * Create Connection request to the devices in the Preferred Devices list
+     *
+     * @param pListCallback The callback to notify the application regarding
+     * whether the create connection request for the devices in the Preferred devices
+     * list has been sent or not.
+     * @return false, if internal checks fail; True if the process of
+     *         creating connection request to preferred devices list was started.
+     * @hide
+     */
+    public boolean gattConnectToPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallback) {
+        Log.d(TAG, "BT adapter gattConnectToPreferredDeviceList");
+        try {
+            return mService.gattConnectToPreferredDeviceList(pListCallback);
+        } catch (RemoteException e) {
+            Log.e(TAG, "gattConnectToPreferredDeviceList", e);
+        }
+        return false;
+    }
+     /**
+      * Cancel create connection request to the devices in the Preferred
+      * devices list
+      *
+      * @param pListCallback The callback to notify the application regarding
+      * whether the cancel create connection request for the devices in the Preferred devices
+      * list has been sent or not.
+      * @return false, if internal checks fail; True if the process of
+      *         cancel create connection request to preferred devices list was started.
+      * @hide
+      */
+    public boolean gattCancelConnectToPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallback) {
+        Log.d(TAG, "BT adapter gattCancelConnectToPreferredDeviceList");
+        try {
+            return mService.gattCancelConnectToPreferredDeviceList(pListCallback);
+        } catch (RemoteException e) {
+            Log.e(TAG, "gattCancelConnectToPreferredDeviceList", e);
+        }
+        return false;
+    }
 }

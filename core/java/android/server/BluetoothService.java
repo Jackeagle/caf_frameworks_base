@@ -45,6 +45,7 @@ import android.bluetooth.IBluetoothStateChangeCallback;
 import android.bluetooth.IBluetoothGattService;
 import android.bluetooth.IBluetoothGattCallback;
 import android.bluetooth.BluetoothGattAppConfiguration;
+import android.bluetooth.IBluetoothPreferredDeviceListCallback;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -228,6 +229,8 @@ public class BluetoothService extends IBluetooth.Stub {
     private boolean mSAPEnabled = false;
     private int[] mMAPRecordHandle;
     private boolean mMAPEnabled = false;
+
+    public IBluetoothPreferredDeviceListCallback sPListCallBack;
 
     private static class RemoteService {
         public String address;
@@ -1268,6 +1271,48 @@ public class BluetoothService extends IBluetooth.Stub {
             setBondState(address, BluetoothDevice.BOND_NONE, result);
         }
     }
+
+    synchronized void onAddToPreferredDeviceListResult(int result) {
+        try {
+            sPListCallBack.onAddDeviceToPreferredList(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "onAddToPreferredDeviceListResult", e);}
+        }
+    }
+    synchronized void onRemoveFromPreferredDeviceListResult(int result) {
+        try {
+            sPListCallBack.onRemoveDeviceFromPreferredList(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "onRemoveFromPreferredDeviceListResult", e);}
+        }
+    }
+    synchronized void onClearPreferredDeviceListResult(int result) {
+        try {
+            sPListCallBack.onClearPreferredDeviceList(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "onClearPreferredDeviceListResult", e);}
+        }
+    }
+    synchronized void onGattConnectToPreferredDeviceListResult(int result) {
+        try {
+            sPListCallBack.onGattConnectToPreferredDeviceList(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "onGattConnectToPreferredDeviceListResult", e);}
+        }
+    }
+    synchronized void onGattCancelConnectToPreferredDeviceListResult(int result) {
+        try {
+            sPListCallBack.onGattCancelConnectToPreferredDeviceList(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "onGattCancelConnectToPreferredDeviceListResult", e);}
+        }
+    }
+
 
     /*package*/ synchronized String getPendingOutgoingBonding() {
         return mBondState.getPendingOutgoingBonding();
@@ -4848,7 +4893,54 @@ public class BluetoothService extends IBluetooth.Stub {
             return mBluetoothGattProfileHandler.writeResponse(config, uuidStr, status, reqHandle);
             }
     }
+    public boolean addToPreferredDeviceList(String address, IBluetoothPreferredDeviceListCallback pListCallBack) {
+        Log.d(TAG, "addToPreferredDeviceList");
+        sPListCallBack = pListCallBack;
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        String path = getObjectPathFromAddress(address);
 
+        synchronized (mBluetoothGattProfileHandler) {
+            return mBluetoothGattProfileHandler.addToPreferredDeviceList(path);
+        }
+    }
+
+    public boolean removeFromPreferredDeviceList(String address, IBluetoothPreferredDeviceListCallback pListCallBack) {
+        Log.d(TAG, "removeFromPreferredDeviceList");
+        sPListCallBack = pListCallBack;
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        String path = getObjectPathFromAddress(address);
+
+        synchronized (mBluetoothGattProfileHandler) {
+            return mBluetoothGattProfileHandler.removeFromPreferredDeviceList(path);
+        }
+    }
+
+    public boolean clearPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallBack) {
+        Log.d(TAG, "clearPreferredDeviceList");
+        sPListCallBack = pListCallBack;
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        synchronized (mBluetoothGattProfileHandler) {
+            return mBluetoothGattProfileHandler.clearPreferredDeviceList();
+        }
+    }
+    public boolean gattConnectToPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallBack) {
+        Log.d(TAG, "gattConnectToPreferredDeviceList");
+        sPListCallBack = pListCallBack;
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+
+        synchronized (mBluetoothGattProfileHandler) {
+            return mBluetoothGattProfileHandler.gattConnectToPreferredDeviceList();
+        }
+    }
+    public boolean gattCancelConnectToPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallBack) {
+        Log.d(TAG, "gattCancelConnectToPreferredDeviceList");
+        sPListCallBack = pListCallBack;
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+
+        synchronized (mBluetoothGattProfileHandler) {
+            return mBluetoothGattProfileHandler.gattCancelConnectToPreferredDeviceList();
+        }
+    }
     private native static void classInitNative();
     private native void initializeNativeDataNative();
     private native boolean setupNativeDataNative();
@@ -4977,4 +5069,10 @@ public class BluetoothService extends IBluetooth.Stub {
     native boolean readByTypeResponseNative(String uuid, String status, int handle, byte[] payload, int cnt, int nativeData);
     native boolean readResponseNative(String uuid, String status, byte[] payload, int cnt, int nativeData);
     native boolean writeResponseNative(String uuid, String status, int nativeData);
+    //White list API
+    native boolean addToPreferredDeviceListNative(String path);
+    native boolean removeFromPreferredDeviceListNative(String path);
+    native boolean clearPreferredDeviceListNative();
+    native boolean gattConnectToPreferredDeviceListNative();
+    native boolean gattCancelConnectToPreferredDeviceListNative();
 }

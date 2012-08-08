@@ -1143,6 +1143,52 @@ class BluetoothEventLoop {
         }
     }
 
+    private void onAddToPreferredDeviceListResult(int result) {
+        Log.d(TAG,"Result of onAddToPreferredDeviceListResult callback event loop java:"+result);
+        try {
+            mBluetoothService.onAddToPreferredDeviceListResult(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "", e);}
+        }
+    }
+    private void onRemoveFromPreferredDeviceListResult(int result) {
+        Log.d(TAG,"Result of onRemoveFromPreferredDeviceListResult callback event loop java:"+result);
+        try {
+            mBluetoothService.onRemoveFromPreferredDeviceListResult(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "", e);}
+        }
+    }
+    private void onClearPreferredDeviceListResult(int result) {
+        Log.d(TAG,"Result of onClearPreferredDeviceListResult callback event loop java:"+result);
+        try {
+            mBluetoothService.onClearPreferredDeviceListResult(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "", e);}
+        }
+    }
+    private void onGattConnectToPreferredDeviceListResult(int result) {
+        Log.d(TAG,"Result of onGattConnectToPreferredDeviceListResult callback event loop java:"+result);
+        try {
+            mBluetoothService.onGattConnectToPreferredDeviceListResult(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "", e);}
+        }
+    }
+    private void onGattCancelConnectToPreferredDeviceListResult(int result) {
+        Log.d(TAG,"Result of onGattCancelConnectToPreferredDeviceListResult callback event loop java:"+result);
+        try {
+            mBluetoothService.onGattCancelConnectToPreferredDeviceListResult(result);
+        }
+        catch(Exception e) {
+            {Log.e(TAG, "", e);}
+        }
+    }
+
     /**
      * Called by native code for the async response to a Connect
      * method call to org.bluez.Input.
