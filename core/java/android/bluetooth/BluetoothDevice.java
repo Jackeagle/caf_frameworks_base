@@ -1415,4 +1415,39 @@ public final class BluetoothDevice implements Parcelable {
 
         return false;
     }
+    /**
+     * Add device to Preferred devices list
+     * @param pListCallback The callback to notify the application regarding
+     * whether the add device to Preferred devices list request has been sent or not.
+     *
+     * @return false, if internal checks fail; True if the process of
+     *         adding device to preferred devices list was started.
+     *
+     * @hide
+     */
+    public boolean addToPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallback) {
+        Log.d(TAG, "BT device addToPreferredDeviceList");
+        try {
+            return sService.addToPreferredDeviceList(mAddress, pListCallback);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
+    /**
+     * Remove device from Preferred devices list
+     * @param pListCallback The callback to notify the application regarding
+     * whether the remove device from Preferred devices list request has been sent or not.
+     * @return False, if internal checks fail; True if the process of
+     * removing device from preferred devices list was started.
+     *
+     * @hide
+     */
+    public boolean removeFromPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallback) {
+        Log.d(TAG, "BT device removeFromPreferredDeviceList");
+        try {
+            return sService.removeFromPreferredDeviceList(mAddress, pListCallback);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
 }
