@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -417,6 +418,28 @@ public interface CommandsInterface {
      */
     void setSuppServiceNotifications(boolean enable, Message result);
     //void unSetSuppServiceNotifications(Handler h);
+
+    /**
+     * Sets the handler for Alpha Notification during STK Call Control.
+     * Unlike the register* methods, there's only one notification handler
+     *
+     * @param h Handler for notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void setOnCatCcAlphaNotify(Handler h, int what, Object obj);
+    void unSetOnCatCcAlphaNotify(Handler h);
+
+    /**
+     * Sets the handler for notifying SS Data during STK Call Control.
+     * Unlike the register* methods, there's only one notification handler
+     *
+     * @param h Handler for notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void setOnSS(Handler h, int what, Object obj);
+    void unSetOnSS(Handler h);
 
     /**
      * Sets the handler for Event Notifications for CDMA Display Info.

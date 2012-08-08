@@ -25,12 +25,14 @@ public interface AppInterface {
 
     /*
      * Intent's actions which are broadcasted by the Telephony once a new CAT
-     * proactive command, session end arrive.
+     * proactive command, session end, ALPHA during STK CC arrive.
      */
     public static final String CAT_CMD_ACTION =
                                     "android.intent.action.stk.command";
     public static final String CAT_SESSION_END_ACTION =
                                     "android.intent.action.stk.session_end";
+    public static final String CAT_ALPHA_NOTIFY_ACTION =
+                                    "android.intent.action.stk.alpha_notify";
 
     // This is broadcast from the ActivityManagerService when the screen
     // switches to idle or busy state
@@ -42,6 +44,8 @@ public interface AppInterface {
     public static final String CHECK_SCREEN_IDLE_ACTION =
                                     "android.intent.action.stk.check_screen_idle";
 
+    //This is used to send ALPHA string from card to STK App.
+    public static final String ALPHA_STRING = "alpha_string";
     /*
      * Callback function from app to telephony to pass a result code and user's
      * input back to the ICC.

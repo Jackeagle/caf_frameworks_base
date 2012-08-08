@@ -57,6 +57,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
+import com.android.internal.telephony.gsm.SsData;
 import com.android.internal.telephony.gsm.SuppServiceNotification;
 import com.android.internal.telephony.uicc.IccCardApplicationStatus;
 import com.android.internal.telephony.uicc.IccCardStatus;
@@ -2760,6 +2761,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_TETHERED_MODE_STATE_CHANGED: ret = responseInts(p); break;
             case RIL_UNSOL_QOS_STATE_CHANGED_IND: ret = responseStrings(p); break;
             case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED: ret =  responseInts(p); break;
+            case RIL_UNSOL_ON_SS: ret =  responseSSData(p); break;
+            case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: ret =  responseString(p); break;
 
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -3098,6 +3101,24 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
                 if (mCdmaSubscriptionChangedRegistrants != null) {
                     mCdmaSubscriptionChangedRegistrants.notifyRegistrants(
+                                        new AsyncResult (null, ret, null));
+                }
+                break;
+
+            case RIL_UNSOL_ON_SS:
+                if (RILJ_LOGD) unsljLogRet(response, ret);
+
+                if (mSSRegistrant != null) {
+                    mSSRegistrant.notifyRegistrant(
+                                        new AsyncResult (null, ret, null));
+                }
+                break;
+
+            case RIL_UNSOL_STK_CC_ALPHA_NOTIFY:
+                if (RILJ_LOGD) unsljLogRet(response, ret);
+
+                if (mCatCcAlphaRegistrant != null) {
+                    mCatCcAlphaRegistrant.notifyRegistrant(
                                         new AsyncResult (null, ret, null));
                 }
                 break;
@@ -4114,6 +4135,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_QOS_STATE_CHANGED_IND: return "RIL_UNSOL_QOS_STATE_CHANGED";
             case RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED:
                     return "RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED";
+            case RIL_UNSOL_ON_SS: return "UNSOL_ON_SS";
+            case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: return "UNSOL_STK_CC_ALPHA_NOTIFY";
             default: return "<unknown response>";
         }
     }
@@ -4142,6 +4165,45 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
     private void unsljLogvRet(int response, Object ret) {
         riljLogv("[UNSL]< " + responseToString(response) + " " + retToString(response, ret));
+    }
+
+    private Object
+    responseSSData(Parcel p) {
+        int num;
+        SsData ssData = new SsData();
+
+        ssData.serviceType = ssData.ServiceTypeFromRILInt(p.readInt());
+        ssData.requestType = ssData.RequestTypeFromRILInt(p.readInt());
+        ssData.teleserviceType = ssData.TeleserviceTypeFromRILInt(p.readInt());
+        ssData.serviceClass = p.readInt(); // This is service class sent in the SS request.
+        ssData.result = p.readInt(); // This is the result of the SS request.
+        num = p.readInt();
+
+        if (ssData.serviceType.isTypeCF() &&
+            ssData.requestType.isTypeInterrogation()) {
+            ssData.cfInfo = new CallForwardInfo[num];
+
+            for (int i = 0; i < num; i++) {
+                ssData.cfInfo[i] = new CallForwardInfo();
+
+                ssData.cfInfo[i].status = p.readInt();
+                ssData.cfInfo[i].reason = p.readInt();
+                ssData.cfInfo[i].serviceClass = p.readInt();
+                ssData.cfInfo[i].toa = p.readInt();
+                ssData.cfInfo[i].number = p.readString();
+                ssData.cfInfo[i].timeSeconds = p.readInt();
+
+                riljLog("[SS Data] CF Info " + i + " : " +  ssData.cfInfo[i]);
+            }
+        } else {
+            ssData.ssInfo = new int[num];
+            for (int i = 0; i < num; i++) {
+                ssData.ssInfo[i] = p.readInt();
+                riljLog("[SS Data] SS Info " + i + " : " +  ssData.ssInfo[i]);
+            }
+        }
+
+        return ssData;
     }
 
 
