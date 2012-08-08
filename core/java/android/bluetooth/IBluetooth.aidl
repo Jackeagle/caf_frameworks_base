@@ -27,6 +27,7 @@ import android.os.ParcelFileDescriptor;
 import android.bluetooth.IBluetoothGattService;
 import  android.bluetooth.IBluetoothGattCallback;
 import android.bluetooth.BluetoothGattAppConfiguration;
+import android.bluetooth.IBluetoothPreferredDeviceListCallback;
 
 /**
  * System private API for talking with the Bluetooth service.
@@ -193,4 +194,10 @@ interface IBluetooth
     void disconnectDUN();
     boolean disableDUN();
     boolean enableDUN();
+    // WhiteList APIs
+    boolean addToPreferredDeviceList(in String address, in IBluetoothPreferredDeviceListCallback pListCallBack);
+    boolean removeFromPreferredDeviceList(in String address, in IBluetoothPreferredDeviceListCallback pListCallBack);
+    boolean clearPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
+    boolean gattConnectToPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
+    boolean gattCancelConnectToPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
 }
