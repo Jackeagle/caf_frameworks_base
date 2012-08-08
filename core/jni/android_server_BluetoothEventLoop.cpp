@@ -59,6 +59,13 @@ static jmethodID method_onNetworkDeviceConnected;
 
 static jmethodID method_onCreatePairedDeviceResult;
 static jmethodID method_onCreateDeviceResult;
+
+static jmethodID method_onAddToPreferredDeviceListResult;
+static jmethodID method_onRemoveFromPreferredDeviceListResult;
+static jmethodID method_onClearPreferredDeviceListResult;
+static jmethodID method_onGattConnectToPreferredDeviceListResult;
+static jmethodID method_onGattCancelConnectToPreferredDeviceListResult;
+
 static jmethodID method_onDiscoverServicesResult;
 static jmethodID method_onGetDeviceServiceChannelResult;
 
@@ -141,6 +148,19 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
                                                          "(Ljava/lang/String;I)V");
     method_onCreateDeviceResult = env->GetMethodID(clazz, "onCreateDeviceResult",
                                                          "(Ljava/lang/String;I)V");
+
+    method_onAddToPreferredDeviceListResult = env->GetMethodID(clazz, "onAddToPreferredDeviceListResult",
+                                                             "(I)V");
+    method_onRemoveFromPreferredDeviceListResult = env->GetMethodID(clazz, "onRemoveFromPreferredDeviceListResult",
+                                                                 "(I)V");
+    method_onClearPreferredDeviceListResult = env->GetMethodID(clazz, "onClearPreferredDeviceListResult",
+                                                                 "(I)V");
+    method_onGattConnectToPreferredDeviceListResult = env->GetMethodID(clazz, "onGattConnectToPreferredDeviceListResult",
+                                                                 "(I)V");
+    method_onGattCancelConnectToPreferredDeviceListResult = env->GetMethodID(clazz,
+                                                                 "onGattCancelConnectToPreferredDeviceListResult",
+                                                                 "(I)V");
+
     method_onDiscoverServicesResult = env->GetMethodID(clazz, "onDiscoverServicesResult",
                                                          "(Ljava/lang/String;Z)V");
 
@@ -2080,6 +2100,119 @@ void onCreateDeviceResult(DBusMessage *msg, void *user, void *n) {
                         addr,
                         result);
     env->DeleteLocalRef(addr);
+    free(user);
+}
+
+void onAddToPreferredDeviceListResult(DBusMessage *msg, void *user, void *n) {
+    native_data_t *nat = (native_data_t *)n;
+    const char *address= (const char *)user;
+    DBusError err;
+    dbus_error_init(&err);
+    JNIEnv *env;
+    nat->vm->GetEnv((void**)&env, nat->envVer);
+
+    jint result = CREATE_DEVICE_SUCCESS;
+    if (dbus_set_error_from_message(&err, msg)) {
+        if (dbus_error_has_name(&err, "org.bluez.Error.AlreadyExists")) {
+            result = CREATE_DEVICE_ALREADY_EXISTS;
+        } else {
+            result = CREATE_DEVICE_FAILED;
+        }
+        LOG_AND_FREE_DBUS_ERROR(&err);
+    }
+
+    env->CallVoidMethod(nat->me,
+                        method_onAddToPreferredDeviceListResult,
+                        result);
+    free(user);
+}
+void onRemoveFromPreferredDeviceListResult(DBusMessage *msg, void *user, void *n) {
+    native_data_t *nat = (native_data_t *)n;
+    const char *address= (const char *)user;
+    DBusError err;
+    dbus_error_init(&err);
+    JNIEnv *env;
+    nat->vm->GetEnv((void**)&env, nat->envVer);
+
+    jint result = CREATE_DEVICE_SUCCESS;
+    if (dbus_set_error_from_message(&err, msg)) {
+        if (dbus_error_has_name(&err, "org.bluez.Error.AlreadyExists")) {
+            result = CREATE_DEVICE_ALREADY_EXISTS;
+        } else {
+            result = CREATE_DEVICE_FAILED;
+        }
+        LOG_AND_FREE_DBUS_ERROR(&err);
+    }
+    env->CallVoidMethod(nat->me,
+                        method_onRemoveFromPreferredDeviceListResult,
+                        result);
+    free(user);
+}
+void onClearPreferredDeviceListResult(DBusMessage *msg, void *user, void *n) {
+    native_data_t *nat = (native_data_t *)n;
+    const char *address= (const char *)user;
+    DBusError err;
+    dbus_error_init(&err);
+    JNIEnv *env;
+    nat->vm->GetEnv((void**)&env, nat->envVer);
+
+    jint result = CREATE_DEVICE_SUCCESS;
+    if (dbus_set_error_from_message(&err, msg)) {
+        if (dbus_error_has_name(&err, "org.bluez.Error.AlreadyExists")) {
+            result = CREATE_DEVICE_ALREADY_EXISTS;
+        } else {
+            result = CREATE_DEVICE_FAILED;
+        }
+        LOG_AND_FREE_DBUS_ERROR(&err);
+    }
+
+    env->CallVoidMethod(nat->me,
+                        method_onClearPreferredDeviceListResult,
+                        result);
+    free(user);
+}
+void onGattConnectToPreferredDeviceListResult(DBusMessage *msg, void *user, void *n) {
+    native_data_t *nat = (native_data_t *)n;
+    const char *address= (const char *)user;
+    DBusError err;
+    dbus_error_init(&err);
+    JNIEnv *env;
+    nat->vm->GetEnv((void**)&env, nat->envVer);
+
+    jint result = CREATE_DEVICE_SUCCESS;
+    if (dbus_set_error_from_message(&err, msg)) {
+        if (dbus_error_has_name(&err, "org.bluez.Error.AlreadyExists")) {
+            result = CREATE_DEVICE_ALREADY_EXISTS;
+        } else {
+            result = CREATE_DEVICE_FAILED;
+        }
+        LOG_AND_FREE_DBUS_ERROR(&err);
+    }
+    env->CallVoidMethod(nat->me,
+                        method_onGattConnectToPreferredDeviceListResult,
+                        result);
+    free(user);
+}
+void onGattCancelConnectToPreferredDeviceListResult(DBusMessage *msg, void *user, void *n) {
+    native_data_t *nat = (native_data_t *)n;
+    const char *address= (const char *)user;
+    DBusError err;
+    dbus_error_init(&err);
+    JNIEnv *env;
+    nat->vm->GetEnv((void**)&env, nat->envVer);
+    jint result = CREATE_DEVICE_SUCCESS;
+
+    if (dbus_set_error_from_message(&err, msg)) {
+        if (dbus_error_has_name(&err, "org.bluez.Error.AlreadyExists")) {
+            result = CREATE_DEVICE_ALREADY_EXISTS;
+        } else {
+            result = CREATE_DEVICE_FAILED;
+        }
+        LOG_AND_FREE_DBUS_ERROR(&err);
+    }
+    env->CallVoidMethod(nat->me,
+                        method_onGattCancelConnectToPreferredDeviceListResult,
+                        result);
     free(user);
 }
 

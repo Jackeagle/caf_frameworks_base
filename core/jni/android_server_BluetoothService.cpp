@@ -96,6 +96,12 @@ void onSetCharacteristicPropertyResult(DBusMessage *msg, void *user, void *nat);
 void onUpdateCharacteristicValueResult(DBusMessage *msg, void *user, void *nat);
 void onIndicateResponse(DBusMessage *msg, void *user, void *nat);
 
+void onAddToPreferredDeviceListResult(DBusMessage *msg, void *user, void *nat);
+void onRemoveFromPreferredDeviceListResult(DBusMessage *msg, void *user, void *nat);
+void onClearPreferredDeviceListResult(DBusMessage *msg, void *user, void *nat);
+void onGattConnectToPreferredDeviceListResult(DBusMessage *msg, void *user, void *nat);
+void onGattCancelConnectToPreferredDeviceListResult(DBusMessage *msg, void *user, void *nat);
+
 
 /** Get native data stored in the opaque (Java code maintained) pointer mNativeData
  *  Perform quick sanity check, if there are any problems return NULL
@@ -1262,6 +1268,147 @@ static jboolean createDeviceNative(JNIEnv *env, jobject object,
 #endif
     return JNI_FALSE;
 }
+
+static jboolean addToPreferredDeviceListNative(JNIEnv *env, jobject object,
+                                                jstring path) {
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+
+    if (nat && eventLoopNat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        void *c_var;
+        int len = env->GetStringLength(path) + 1;
+        char *context_path = (char *)calloc(len, sizeof(char));
+        if (context_path != NULL) {
+            strlcpy(context_path, c_path, len);  // for callback
+        } else {
+            return JNI_FALSE;
+        }
+
+        bool ret = dbus_func_args_async(env, nat->conn, -1,
+                                        onAddToPreferredDeviceListResult,
+                                        context_path,
+                                        eventLoopNat,
+                                        c_path,
+                                        DBUS_DEVICE_IFACE,
+                                        "AddToWhiteList",
+                                        DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+static jboolean removeFromPreferredDeviceListNative(JNIEnv *env, jobject object,
+                                                jstring path) {
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+
+    if (nat && eventLoopNat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+        void *c_var;
+        int len = env->GetStringLength(path) + 1;
+        char *context_path = (char *)calloc(len, sizeof(char));
+        if (context_path != NULL) {
+            strlcpy(context_path, c_path, len);  // for callback
+        } else {
+            return JNI_FALSE;
+        }
+
+        bool ret = dbus_func_args_async(env, nat->conn, -1,
+                                        onRemoveFromPreferredDeviceListResult,
+                                        context_path,
+                                        eventLoopNat,
+                                        c_path,
+                                        DBUS_DEVICE_IFACE,
+                                        "RemoveFromWhiteList",
+                                        DBUS_TYPE_INVALID);
+        env->ReleaseStringUTFChars(path, c_path);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+static jboolean clearPreferredDeviceListNative(JNIEnv *env, jobject object) {
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+
+    if (nat && eventLoopNat) {
+        char *context_path = NULL;
+
+        bool ret = dbus_func_args_async(env, nat->conn, -1,
+                                        onClearPreferredDeviceListResult,
+                                        context_path,
+                                        eventLoopNat,
+                                        get_adapter_path(env, object),
+                                        DBUS_ADAPTER_IFACE,
+                                        "ClearLeWhiteList",
+                                        DBUS_TYPE_INVALID);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+static jboolean gattConnectToPreferredDeviceListNative(JNIEnv *env, jobject object) {
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+
+    if (nat && eventLoopNat) {
+        char *context_path = NULL;
+
+        bool ret = dbus_func_args_async(env, nat->conn, -1,
+                                        onGattConnectToPreferredDeviceListResult,
+                                        context_path,
+                                        eventLoopNat,
+                                        get_adapter_path(env, object),
+                                        DBUS_ADAPTER_IFACE,
+                                        "CreateLeConnWhiteList",
+                                        DBUS_TYPE_INVALID);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
+static jboolean gattCancelConnectToPreferredDeviceListNative(JNIEnv *env, jobject object) {
+#ifdef HAVE_BLUETOOTH
+    native_data_t *nat = get_native_data(env, object);
+    jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
+    struct event_loop_native_data_t *eventLoopNat =
+            get_EventLoop_native_data(env, eventLoop);
+
+    if (nat && eventLoopNat) {
+        char *context_path = NULL;
+
+        bool ret = dbus_func_args_async(env, nat->conn, -1,
+                                        onGattCancelConnectToPreferredDeviceListResult,
+                                        context_path,
+                                        eventLoopNat,
+                                        get_adapter_path(env, object),
+                                        DBUS_ADAPTER_IFACE,
+                                        "CancelCreateLeConnWhiteList",
+                                        DBUS_TYPE_INVALID);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 
 static jboolean discoverServicesNative(JNIEnv *env, jobject object,
                                                jstring path, jstring pattern) {
@@ -3626,6 +3773,12 @@ static JNINativeMethod sMethods[] = {
     {"writeResponseNative", "(Ljava/lang/String;Ljava/lang/String;I)Z", (void *)writeResponseNative},
     {"DUNAuthorizeNative", "(Ljava/lang/String;ZI)Z", (void *)DUNAuthorizeNative},
     {"disConnectDUNNative", "()I", (void *)disConnectDUNNative},
+    //WhiteList APIs
+    {"addToPreferredDeviceListNative", "(Ljava/lang/String;)Z", (void *)addToPreferredDeviceListNative},
+    {"removeFromPreferredDeviceListNative", "(Ljava/lang/String;)Z", (void *)removeFromPreferredDeviceListNative},
+    {"clearPreferredDeviceListNative", "()Z", (void *)clearPreferredDeviceListNative},
+    {"gattConnectToPreferredDeviceListNative", "()Z", (void *)gattConnectToPreferredDeviceListNative},
+    {"gattCancelConnectToPreferredDeviceListNative", "()Z", (void *)gattCancelConnectToPreferredDeviceListNative},
 };
 
 
