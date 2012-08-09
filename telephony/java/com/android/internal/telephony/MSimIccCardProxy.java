@@ -100,17 +100,19 @@ public class MSimIccCardProxy extends IccCardProxy {
                     if (operator != null) {
                         MSimTelephonyManager.setTelephonyProperty
                                 (PROPERTY_ICC_OPERATOR_NUMERIC, sub, operator);
+
+                        String countryCode = operator.substring(0,3);
+                        if (countryCode != null) {
+                            MSimTelephonyManager.setTelephonyProperty
+                                    (PROPERTY_ICC_OPERATOR_ISO_COUNTRY, sub,
+                                     MccTable.countryCodeForMcc(Integer.parseInt(countryCode)));
+                        } else {
+                            loge("EVENT_RECORDS_LOADED Country code is null");
+                        }
                     } else {
                         loge("EVENT_RECORDS_LOADED Operator name is null");
                     }
-                    String countryCode = operator.substring(0,3);
-                    if (countryCode != null) {
-                        MSimTelephonyManager.setTelephonyProperty
-                                (PROPERTY_ICC_OPERATOR_ISO_COUNTRY, sub,
-                                 MccTable.countryCodeForMcc(Integer.parseInt(countryCode)));
-                    } else {
-                        loge("EVENT_RECORDS_LOADED Country code is null");
-                    }
+
                 }
                 broadcastIccStateChangedIntent(INTENT_VALUE_ICC_LOADED, null);
                 break;
