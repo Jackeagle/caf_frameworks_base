@@ -1100,6 +1100,63 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         }
     }
 
+    public void enableNatBySubnet(String internalInterface, String externalInterface,
+            LinkAddress[] subnets) {
+        String cmd = String.format("nat enable %s %s %s", internalInterface,
+                externalInterface, getSubnetsString(subnets));
+        String rsp = null;
+        NativeDaemonEvent event;
+        if (DBG)
+            Log.d(TAG, "enableNatBySubnet : " + cmd);
+        try {
+            event = mConnector.execute(cmd);
+        } catch (NativeDaemonConnectorException e) {
+            throw e.rethrowAsParcelableException();
+        }
+
+        if (event.isClassOk()) {
+            rsp = event.getMessage();
+        }
+
+        if (DBG) Log.v(TAG, "enableNatBySubnet() cmd:" + cmd + " response is " + rsp);
+
+    }
+
+    public void disableNatBySubnet(String internalInterface, String externalInterface,
+            LinkAddress[] subnets) {
+        String cmd = String.format("nat disable %s %s %s", internalInterface,
+                externalInterface, getSubnetsString(subnets));
+        String rsp = null;
+        NativeDaemonEvent event;
+        if (DBG)
+            Log.d(TAG, "disableNatBySubnet : " + cmd);
+        try {
+            event = mConnector.execute(cmd);
+        } catch (NativeDaemonConnectorException e) {
+            throw e.rethrowAsParcelableException();
+        }
+
+        if (event.isClassOk()) {
+            rsp = event.getMessage();
+        }
+
+        if (DBG) Log.v(TAG, "disableNatBySubnet() cmd:" + cmd + " response is " + rsp);
+
+    }
+
+    private String getSubnetsString(LinkAddress[] subnets) {
+        if (subnets == null) {
+            return "0";
+        }
+
+        String cmd = "";
+        cmd += subnets.length;
+        for (int i = 0; i < subnets.length; i++) {
+            cmd += " " + subnets[i].toString();
+        }
+        return cmd;
+    }
+
     @Override
     public String[] listTtys() {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
