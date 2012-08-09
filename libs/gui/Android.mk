@@ -30,7 +30,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libGLESv2 \
         libQcomUI
 
-LOCAL_C_INCLUDES := hardware/qcom/display/libqcomui
+LOCAL_C_INCLUDES := hardware/qcom/display/libqcomui \
+                    vendor/qcom/opensource/testframework/inc
 
 ifeq ($(TARGET_USES_TESTFRAMEWORK),true)
 LOCAL_CFLAGS += -DGFX_TESTFRAMEWORK

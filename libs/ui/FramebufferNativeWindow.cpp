@@ -40,7 +40,7 @@
 #include <hardware/gralloc.h>
 
 #include <private/ui/android_natives_priv.h>
-#include <testframework/TestFramework.h>
+#include <testframework.h>
 // ----------------------------------------------------------------------------
 namespace android {
 // ----------------------------------------------------------------------------

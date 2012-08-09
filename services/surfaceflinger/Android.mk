@@ -65,7 +65,8 @@ LOCAL_C_INCLUDES := \
 	$(call include-path-for, corecg graphics)
 
 LOCAL_C_INCLUDES += hardware/libhardware/modules/gralloc \
-                    hardware/qcom/display/libqcomui
+                    hardware/qcom/display/libqcomui \
+                    vendor/qcom/opensource/testframework/inc
 
 LOCAL_MODULE:= libsurfaceflinger
 

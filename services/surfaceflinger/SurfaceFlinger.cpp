@@ -45,7 +45,7 @@
 #include <pixelflinger/pixelflinger.h>
 #include <GLES/gl.h>
 
-#include <testframework/TestFramework.h>
+#include <testframework.h>
 
 #include "clz.h"
 #include "GLExtensions.h"

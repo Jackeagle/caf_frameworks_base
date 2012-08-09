@@ -24,7 +24,7 @@
 #include <utils/Log.h>
 #include <qcom_ui.h>
 
-#include <testframework/TestFramework.h>
+#include <testframework.h>
 
 namespace android {
 
