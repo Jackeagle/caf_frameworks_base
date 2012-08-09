@@ -108,6 +108,7 @@ public:
         data.writeInterfaceToken(ISurfaceTexture::getInterfaceDescriptor());
         data.writeInt32(buf);
         data.writeInt64(timestamp);
+        data.writeInt32(*outTransform);
         status_t result = remote()->transact(QUEUE_BUFFER, data, &reply);
         if (result != NO_ERROR) {
             return result;
@@ -278,7 +279,8 @@ status_t BnSurfaceTexture::onTransact(
             CHECK_INTERFACE(ISurfaceTexture, data, reply);
             int buf = data.readInt32();
             int64_t timestamp = data.readInt64();
-            uint32_t outWidth, outHeight, outTransform;
+            uint32_t outTransform = data.readInt32();
+            uint32_t outWidth, outHeight;
             status_t result = queueBuffer(buf, timestamp,
                     &outWidth, &outHeight, &outTransform);
             reply->writeInt32(outWidth);

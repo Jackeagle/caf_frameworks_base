@@ -565,6 +565,7 @@ status_t SurfaceTexture::queueBuffer(int buf, int64_t timestamp,
 
     { // scope for the lock
         Mutex::Autolock lock(mMutex);
+        mNextTransform = *outTransform;
         if (mAbandoned) {
             ST_LOGE("queueBuffer: SurfaceTexture has been abandoned!");
             return NO_INIT;
