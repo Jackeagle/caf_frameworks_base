@@ -231,10 +231,10 @@ public class UiccController extends Handler {
 
         if (mUiccCards[index] == null) {
             if (DBG) log("Creating a new card");
-            mUiccCards[index] = new UiccCard(mContext, mCi[index], status);
+            mUiccCards[index] = new UiccCard(mContext, mCi[index], status, index);
         } else {
             if (DBG) log("Update already existing card");
-            mUiccCards[index].update(mContext, mCi[index] , status);
+            mUiccCards[index].update(mContext, mCi[index] , status, index);
         }
 
         if (DBG) log("Notifying IccChangedRegistrants");
