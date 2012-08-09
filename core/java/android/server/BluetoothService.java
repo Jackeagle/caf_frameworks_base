@@ -4342,9 +4342,13 @@ public class BluetoothService extends IBluetooth.Stub {
             } else {
                 serviceUuids = new ArrayList<ParcelUuid>();
             }
-
-            serviceUuids.add(uuid);
-            mGattIntentTracker.put(address, serviceUuids);
+            if(uuid != null) {
+                serviceUuids.add(uuid);
+                mGattIntentTracker.put(address, serviceUuids);
+            }
+            else {
+                mGattIntentTracker.put(address, null);
+            }
         }
 
         if (!discovering) {
