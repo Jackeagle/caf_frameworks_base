@@ -263,6 +263,7 @@ public class AudioSystem
     public static final int DEVICE_IN_AUX_DIGITAL = 0x8000000;
     public static final int DEVICE_IN_ANC_HEADSET = 0x10000000;
     public static final int DEVICE_IN_PROXY = 0x80000000;
+    public static final int DEVICE_IN_ANLG_DOCK_HEADSET = DEVICE_IN_PROXY;
     public static final int DEVICE_IN_DEFAULT = DEVICE_IN_BUILTIN_MIC1;
 
     // device states, must match AudioSystem::device_connection_state
