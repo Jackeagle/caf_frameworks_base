@@ -76,18 +76,18 @@ public class CatService extends Handler implements AppInterface {
     // Service members.
     // Protects singleton instance lazy initialization.
     private static final Object sInstanceLock = new Object();
-    private static CatService sInstance;
-    private static HandlerThread handlerThread;
+    private HandlerThread mHandlerThread;
     private CommandsInterface mCmdIf;
     private Context mContext;
+    private int mSlotId;
     private CatCmdMessage mCurrntCmd = null;
     private CatCmdMessage mMenuCmd = null;
+    private IconLoader mIconLoader = null;
 
     private RilMessageDecoder mMsgDecoder = null;
     private boolean mStkAppInstalled = false;
 
-    private UiccController mUiccController;
-    private CardState mCardState;
+    private CardState mCardState = CardState.CARDSTATE_ABSENT;
 
     // Service constants.
     static final int MSG_ID_SESSION_END              = 1;
@@ -96,7 +96,6 @@ public class CatService extends Handler implements AppInterface {
     static final int MSG_ID_CALL_SETUP               = 4;
     static final int MSG_ID_REFRESH                  = 5;
     static final int MSG_ID_RESPONSE                 = 6;
-    static final int MSG_ID_SIM_READY                = 7;
     static final int MSG_ID_ALPHA_NOTIFY             = 8;
 
     static final int MSG_ID_RIL_MSG_DECODED          = 10;
@@ -117,17 +116,20 @@ public class CatService extends Handler implements AppInterface {
     static final String STK_DEFAULT = "Default Message";
 
     /* Intentionally private for singleton */
-    private CatService(CommandsInterface ci, UiccCardApplication ca, IccRecords ir,
-            Context context, IccFileHandler fh, UiccCard ic) {
+    public CatService(CommandsInterface ci, Context context, int slotId) {
+        IccFileHandler fh = null;
         if (ci == null || context == null) {
             throw new NullPointerException(
                     "Service: Input parameters must not be null");
         }
         mCmdIf = ci;
         mContext = context;
+        mSlotId = slotId;
+        mHandlerThread = new HandlerThread("Cat Telephony service" + slotId);
+        mHandlerThread.start();
 
         // Get the RilMessagesDecoder for decoding the messages.
-        mMsgDecoder = RilMessageDecoder.getInstance(this, fh);
+        mMsgDecoder = RilMessageDecoder.getInstance();
 
         // Register ril events handling.
         mCmdIf.setOnCatSessionEnd(this, MSG_ID_SESSION_END, null);
@@ -139,20 +141,11 @@ public class CatService extends Handler implements AppInterface {
 
         mCmdIf.registerForIccRefresh(this, MSG_ID_ICC_REFRESH, null);
 
-        mIccRecords = ir;
-        mUiccApplication = ca;
-
-        mUiccController = UiccController.getInstance();
-        if (mUiccController != null) {
-            mUiccController.registerForIccChanged(this, MSG_ID_ICC_CHANGED, null);
-        } else {
-            CatLog.d(this, "UiccController instance is null");
-        }
-
         // Check if STK application is availalbe
         mStkAppInstalled = isStkAppInstalled();
 
-        CatLog.d(this, "Running CAT service. STK app installed:" + mStkAppInstalled);
+        CatLog.d(this, "Running CAT service on Slotid: " + mSlotId + 
+                ". STK app installed:" + mStkAppInstalled);
     }
 
     public void dispose() {
@@ -166,12 +159,47 @@ public class CatService extends Handler implements AppInterface {
         mCmdIf.unSetOnCatCallSetUp(this);
         mCmdIf.unSetOnCatCcAlphaNotify(this);
         mCmdIf.unregisterForIccRefresh(this);
-        mUiccController.unregisterForIccChanged(this);
-        sInstance = null;
-        handlerThread.quit();
-        handlerThread = null;
+        mHandlerThread.quit();
+        mHandlerThread = null;
 
         this.removeCallbacksAndMessages(null);
+    }
+
+    public void update(UiccCardApplication ca, CardState newState) {
+
+        CatLog.d(this,"New Card State = " + newState + " " + "Old Card State = " + mCardState);
+
+        if (mCardState == CardState.CARDSTATE_PRESENT &&
+            newState != CardState.CARDSTATE_PRESENT) {
+            // Card moved to ABSENT state.
+            broadcastCardStateAndIccRefreshResp(newState, null);
+        } else if (mCardState != CardState.CARDSTATE_PRESENT &&
+            newState == CardState.CARDSTATE_PRESENT) {
+            // Card moved to PRESENT STATE.
+            mCmdIf.reportStkServiceIsRunning(null);
+        }
+        mCardState = newState;
+
+        IccRecords ir = null;
+        IccFileHandler fh = null;
+        mUiccApplication = ca;
+        if (mUiccApplication != null) {
+            fh = mUiccApplication.getIccFileHandler();
+            ir = mUiccApplication.getIccRecords();
+        }
+        if ((ir != null) && (mIccRecords != ir)) {
+            CatLog.d(this, "Reinitialize the Service with IccRecords");
+            mIccRecords = ir;
+        }
+
+        if (fh != null) {
+            CatLog.d(this, "Reinitialize the Service with new IccFilehandler");
+            if (mIconLoader != null) {
+                mIconLoader.updateIccFileHandler(fh);
+            } else {
+                mIconLoader = new IconLoader(fh, mSlotId);
+            }
+        }
     }
 
     protected void finalize() {
@@ -407,6 +435,8 @@ public class CatService extends Handler implements AppInterface {
         mCurrntCmd = cmdMsg;
         Intent intent = new Intent(AppInterface.CAT_CMD_ACTION);
         intent.putExtra("STK CMD", cmdMsg);
+        intent.putExtra("SLOT_ID", mSlotId);
+        CatLog.d(this, "Sending CmdMsg: "+cmdMsg+ " on slotid:"+ mSlotId);
         mContext.sendBroadcast(intent);
     }
 
@@ -415,10 +445,11 @@ public class CatService extends Handler implements AppInterface {
      *
      */
     private void handleSessionEnd() {
-        CatLog.d(this, "SESSION END");
+        CatLog.d(this, "SESSION END on "+ mSlotId);
 
         mCurrntCmd = mMenuCmd;
         Intent intent = new Intent(AppInterface.CAT_SESSION_END_ACTION);
+        intent.putExtra("SLOT_ID", mSlotId);
         mContext.sendBroadcast(intent);
     }
 
@@ -626,10 +657,10 @@ public class CatService extends Handler implements AppInterface {
         /* TODO: eventDownload should be extended for other Envelope Commands */
         switch (event) {
             case IDLE_SCREEN_AVAILABLE_EVENT:
-                CatLog.d(sInstance, " Sending Idle Screen Available event download to ICC");
+                CatLog.d(this, " Sending Idle Screen Available event download to ICC");
                 break;
             case LANGUAGE_SELECTION_EVENT:
-                CatLog.d(sInstance, " Sending Language Selection event download to ICC");
+                CatLog.d(this, " Sending Language Selection event download to ICC");
                 tag = 0x80 | ComprehensionTlvTag.LANGUAGE.value();
                 buf.write(tag);
                 // Language length should be 2 byte
@@ -659,76 +690,10 @@ public class CatService extends Handler implements AppInterface {
         mCmdIf.sendEnvelope(hexString, null);
     }
 
-    /**
-     * Used for instantiating/updating the Service from the GsmPhone or CdmaPhone constructor.
-     *
-     * @param ci CommandsInterface object
-     * @param ir IccRecords object
-     * @param context phone app context
-     * @param fh Icc file handler
-     * @param ic Icc card
-     * @return The only Service object in the system
-     */
-    public static CatService getInstance(CommandsInterface ci,
-            Context context, UiccCard ic) {
-        UiccCardApplication ca = null;
-        IccFileHandler fh = null;
-        IccRecords ir = null;
-        if (ic != null) {
-            /* Since Cat is not tied to any application, but rather is Uicc application
-             * in itself - just get any FileHandler and IccRecords object
-             */
-            ca = ic.getApplicationIndex(0);
-            if (ca != null) {
-                fh = ca.getIccFileHandler();
-                ir = ca.getIccRecords();
-            }
-        }
-        synchronized (sInstanceLock) {
-            if (sInstance == null) {
-                if (ci == null || ca == null || ir == null || context == null || fh == null
-                        || ic == null) {
-                    return null;
-                }
-                handlerThread = new HandlerThread("Cat Telephony service");
-                handlerThread.start();
-                sInstance = new CatService(ci, ca, ir, context, fh, ic);
-                CatLog.d(sInstance, "NEW sInstance");
-            } else if ((ir != null) && (mIccRecords != ir)) {
-                if (mUiccApplication != null) {
-                    mUiccApplication.unregisterForReady(sInstance);
-                }
-                CatLog.d(sInstance, "Reinitialize the Service with SIMRecords and UiccCardApplication");
-                mIccRecords = ir;
-                mUiccApplication = ca;
-
-                CatLog.d(sInstance, "sr changed reinitialize and return current sInstance");
-            }
-            if (fh != null) {
-                CatLog.d(sInstance, "Reinitialize the Service with new IccFilehandler");
-                IconLoader mIconLoader = IconLoader.getInstance(null,null);
-                if (mIconLoader != null) {
-                    mIconLoader.updateIccFileHandler(fh);
-                }
-            }
-
-            CatLog.d(sInstance, "Return current sInstance");
-            return sInstance;
-        }
-    }
-
-    /**
-     * Used by application to get an AppInterface object.
-     *
-     * @return The only Service object in the system
-     */
-    public static AppInterface getInstance() {
-        return getInstance(null, null, null);
-    }
-
     @Override
     public void handleMessage(Message msg) {
 
+        CatLog.d(this, msg.what + "arrived on slotid: "+ mSlotId);
         switch (msg.what) {
         case MSG_ID_SESSION_END:
         case MSG_ID_PROACTIVE_COMMAND:
@@ -742,14 +707,17 @@ public class CatService extends Handler implements AppInterface {
                     try {
                         data = (String) ar.result;
                     } catch (ClassCastException e) {
+                        CatLog.d(this,"Exception caught for proactive cmd");
                         break;
                     }
                 }
             }
-            mMsgDecoder.sendStartDecodingMessageParams(new RilMessage(msg.what, data));
+            mMsgDecoder.sendStartDecodingMessageParams( this, mIconLoader,
+                    new RilMessage(msg.what, data));
             break;
         case MSG_ID_CALL_SETUP:
-            mMsgDecoder.sendStartDecodingMessageParams(new RilMessage(msg.what, null));
+            mMsgDecoder.sendStartDecodingMessageParams( this, mIconLoader,
+                    new RilMessage(msg.what, null));
             break;
         case MSG_ID_RIL_MSG_DECODED:
             handleRilMsg((RilMessage) msg.obj);
@@ -757,16 +725,12 @@ public class CatService extends Handler implements AppInterface {
         case MSG_ID_RESPONSE:
             handleCmdResponse((CatResponseMessage) msg.obj);
             break;
-        case MSG_ID_ICC_CHANGED:
-            CatLog.d(this, "MSG_ID_ICC_CHANGED");
-            updateIccAvailability();
-            break;
         case MSG_ID_ICC_REFRESH:
             if (msg.obj != null) {
                 AsyncResult ar = (AsyncResult) msg.obj;
                 if (ar != null && ar.result != null) {
-                    broadcastCardStateAndIccRefreshResp(CardState.CARDSTATE_PRESENT,
-                                  (IccRefreshResponse) ar.result);
+                    broadcastCardStateAndIccRefreshResp(CardState.
+                            CARDSTATE_PRESENT, (IccRefreshResponse) ar.result);
                 } else {
                     CatLog.d(this,"Icc REFRESH with exception: " + ar.exception);
                 }
@@ -783,6 +747,7 @@ public class CatService extends Handler implements AppInterface {
                     CatLog.d(this, "Broadcasting STK Alpha message from card: " + alphaString);
                     Intent intent = new Intent(AppInterface.CAT_ALPHA_NOTIFY_ACTION);
                     intent.putExtra(AppInterface.ALPHA_STRING, alphaString);
+                    intent.putExtra("SLOT_ID", mSlotId);
                     mContext.sendBroadcast(intent);
                 } else {
                     CatLog.d(this, "STK Alpha message: ar.result is null");
@@ -821,6 +786,7 @@ public class CatService extends Handler implements AppInterface {
         // In case of CARD_ABSENT, StkAppService
         // will clean up the Idle mode Text and Stk toolkit icon
         intent.putExtra(AppInterface.CARD_STATUS, cardStatus);
+        intent.putExtra("SLOT_ID", mSlotId);
         CatLog.d(this, "Sending Card Status: "
                 + cardState + " " + "cardStatus: " + cardStatus);
 
@@ -972,27 +938,5 @@ public class CatService extends Handler implements AppInterface {
         int numReceiver = broadcastReceivers == null ? 0 : broadcastReceivers.size();
 
         return (numReceiver > 0);
-    }
-
-    void updateIccAvailability() {
-        CardState newState = CardState.CARDSTATE_ABSENT;
-        if(null == mUiccController)
-            return;
-        UiccCard newCard = mUiccController.getUiccCard();
-        if (newCard != null) {
-            newState = newCard.getCardState();
-        }
-        CardState oldState = mCardState;
-        mCardState = newState;
-        CatLog.d(this,"New Card State = " + newState + " " + "Old Card State = " + oldState);
-        if (oldState == CardState.CARDSTATE_PRESENT &&
-                newState != CardState.CARDSTATE_PRESENT) {
-            broadcastCardStateAndIccRefreshResp(newState, null);
-        } else if (oldState != CardState.CARDSTATE_PRESENT &&
-                newState == CardState.CARDSTATE_PRESENT) {
-            // Card moved to PRESENT STATE.
-            mCmdIf.reportStkServiceIsRunning(null);
-        }
-
     }
 }

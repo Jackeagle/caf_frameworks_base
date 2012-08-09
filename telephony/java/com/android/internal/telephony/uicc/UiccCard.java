@@ -73,9 +73,9 @@ public class UiccCard {
     private static final int EVENT_CARD_REMOVED = 13;
     private static final int EVENT_CARD_ADDED = 14;
 
-    UiccCard(Context c, CommandsInterface ci, IccCardStatus ics) {
+    UiccCard(Context c, CommandsInterface ci, IccCardStatus ics, int slotId) {
         if (DBG) log("Creating");
-        update(c, ci, ics);
+        update(c, ci, ics, slotId);
     }
 
     void dispose() {
@@ -85,11 +85,14 @@ public class UiccCard {
                 app.dispose();
             }
         }
+        if (mCatService != null) {
+            mCatService.dispose();
+        }
         mCatService = null;
         mUiccApplications = null;
     }
 
-    void update(Context c, CommandsInterface ci, IccCardStatus ics) {
+    void update(Context c, CommandsInterface ci, IccCardStatus ics, int slotId) {
         if (mDestroyed) {
             loge("Updated after destroyed! Fix me!");
             return;
@@ -121,13 +124,23 @@ public class UiccCard {
             }
         }
 
-        if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
-            if (mCatService == null)
-                // Initialize or Reinitialize CatService
-                mCatService = CatService.getInstance(mCi,
-                                                     mContext,
-                                                     this);
+        if (mCatService == null) {
+                // Create CatService
+                mCatService = new CatService(mCi, mContext, slotId);
         }
+
+        if (mCatService != null) {
+            if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
+                // Initialize or Reinitialize CatService
+                mCatService.update(mUiccApplications[0], mCardState);
+            } else {
+                mCatService.update(null, mCardState);
+            }
+        } else {
+            // This is an error case.
+            loge("CatService is null");
+        }
+
         sanitizeApplicationIndexes();
 
         // The following logic does not account for Sim being powered down
@@ -317,6 +330,10 @@ public class UiccCard {
             }
         }
         return count;
+    }
+
+    public CatService getCatService() {
+        return mCatService;
     }
 
     private void log(String msg) {
