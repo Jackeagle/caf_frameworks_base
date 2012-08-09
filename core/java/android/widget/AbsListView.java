@@ -67,6 +67,7 @@ import android.view.inputmethod.InputMethodManager;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.codeaurora.Performance;
 /**
  * Base class that can be used to implement virtualized lists of items. A list does
  * not have a spatial definition here. For instance, subclases of this class can
@@ -494,6 +495,8 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 
     private static final boolean PROFILE_FLINGING = false;
     private boolean mFlingProfilingStarted = false;
+
+    Performance mPerf = new Performance();
 
     /**
      * The StrictMode "critical time span" objects to catch animation
@@ -3664,6 +3667,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         }
 
         void start(int initialVelocity) {
+            mPerf.perfLockAcquire(mPerf.HEAP_OPT_A);
             int initialY = initialVelocity < 0 ? Integer.MAX_VALUE : 0;
             mLastFlingY = initialY;
             mScroller.fling(0, initialY, 0, initialVelocity,
@@ -3746,6 +3750,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                 mFlingStrictSpan.finish();
                 mFlingStrictSpan = null;
             }
+            mPerf.perfLockRelease();
         }
 
         void flywheelTouch() {
