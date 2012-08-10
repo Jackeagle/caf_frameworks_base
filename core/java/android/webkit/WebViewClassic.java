@@ -7295,13 +7295,13 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
                     String url = (String) msg.obj;
                     if (mHTML5VideoViewManager != null) {
-                        mHTML5VideoViewManager.enterFullScreenVideo(layerId, url);
+                        mHTML5VideoViewManager.enterFullscreenVideo(layerId, url);
                     }
                     break;
 
                 case EXIT_FULLSCREEN_VIDEO:
                     if (mHTML5VideoViewManager != null) {
-                        mHTML5VideoViewManager.exitFullScreenVideo();
+                        mHTML5VideoViewManager.exitFullscreenVideo();
                     }
                     break;
 
