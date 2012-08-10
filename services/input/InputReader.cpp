@@ -1449,14 +1449,6 @@ void SingleTouchMotionAccumulator::clearAbsoluteAxes() {
     mAbsTiltY = 0;
 }
 
-#ifdef BEAGLEBONE
-
-/* Taken from touchscreen driver */
-#define AM335X_TS_YMIN                 0xDC
-#define AM335X_TS_YMAX                 0xF43
-
-#endif
-
 void SingleTouchMotionAccumulator::process(const RawEvent* rawEvent) {
     if (rawEvent->type == EV_ABS) {
         switch (rawEvent->scanCode) {
@@ -1464,11 +1456,7 @@ void SingleTouchMotionAccumulator::process(const RawEvent* rawEvent) {
             mAbsX = rawEvent->value;
             break;
         case ABS_Y:
-#ifdef BEAGLEBONE
-            mAbsY = AM335X_TS_YMAX - rawEvent->value + AM335X_TS_YMIN;
-#else
             mAbsY = rawEvent->value;
-#endif
             break;
         case ABS_PRESSURE:
             mAbsPressure = rawEvent->value;

@@ -39,10 +39,6 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_C_INCLUDES := \
     external/skia/include/core
 
-ifeq ($(TARGET_PRODUCT),beaglebone)
-LOCAL_CFLAGS  += -DBEAGLEBONE
-endif
-
 LOCAL_MODULE:= libinput
 
 LOCAL_MODULE_TAGS := optional
