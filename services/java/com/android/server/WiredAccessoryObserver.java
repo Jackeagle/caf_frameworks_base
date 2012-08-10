@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,11 +45,16 @@ class WiredAccessoryObserver extends UEventObserver {
     private static final boolean LOG = true;
     private static final int BIT_HEADSET = (1 << 0);
     private static final int BIT_HEADSET_NO_MIC = (1 << 1);
-    private static final int BIT_USB_HEADSET_ANLG = (1 << 2);
-    private static final int BIT_USB_HEADSET_DGTL = (1 << 3);
-    private static final int BIT_HDMI_AUDIO = (1 << 4);
-    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_NO_MIC|
+    private static final int BIT_HEADSET_MIC_ONLY = (1 << 2);
+    private static final int BIT_ANCHEADSET = (1 << 3);
+    private static final int BIT_ANCHEADSET_NO_MIC = (1 << 4);
+    private static final int BIT_ANCHEADSET_MIC_ONLY = (1 << 5);
+    private static final int BIT_USB_HEADSET_ANLG = (1 << 6);
+    private static final int BIT_USB_HEADSET_DGTL = (1 << 7);
+    private static final int BIT_HDMI_AUDIO = (1 << 8);
+    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_NO_MIC|BIT_HEADSET_MIC_ONLY|
                                                    BIT_USB_HEADSET_ANLG|BIT_USB_HEADSET_DGTL|
+                                                   BIT_ANCHEADSET|BIT_ANCHEADSET_NO_MIC|BIT_ANCHEADSET_MIC_ONLY|
                                                    BIT_HDMI_AUDIO);
     private static final int HEADSETS_WITH_MIC = BIT_HEADSET;
 
@@ -79,11 +85,8 @@ class WiredAccessoryObserver extends UEventObserver {
         }
 
         public int computeNewHeadsetState(int headsetState, int switchState) {
-            int preserveMask = ~(mState1Bits | mState2Bits);
-            int setBits = ((switchState == 1) ? mState1Bits :
-                          ((switchState == 2) ? mState2Bits : 0));
-
-            return ((headsetState & preserveMask) | setBits);
+            int setBits = mState1Bits | mState2Bits;
+            return (setBits & switchState);
         }
     }
 
@@ -92,7 +95,7 @@ class WiredAccessoryObserver extends UEventObserver {
         UEventInfo uei;
 
         // Monitor h2w
-        uei = new UEventInfo("h2w", BIT_HEADSET, BIT_HEADSET_NO_MIC);
+        uei = new UEventInfo("h2w", (BIT_HEADSET | BIT_ANCHEADSET), (BIT_HEADSET_NO_MIC | BIT_ANCHEADSET_NO_MIC));
         if (uei.checkSwitchExists()) {
             retVal.add(uei);
         } else {
@@ -226,7 +229,8 @@ class WiredAccessoryObserver extends UEventObserver {
         int delay = 0;
         int usb_headset_anlg = headsetState & BIT_USB_HEADSET_ANLG;
         int usb_headset_dgtl = headsetState & BIT_USB_HEADSET_DGTL;
-        int h2w_headset = headsetState & (BIT_HEADSET | BIT_HEADSET_NO_MIC);
+        int h2w_headset = headsetState & (BIT_HEADSET | BIT_HEADSET_NO_MIC |
+                                          BIT_ANCHEADSET|BIT_ANCHEADSET_NO_MIC);
         boolean h2wStateChange = true;
         boolean usbStateChange = true;
         // reject all suspect transitions: only accept state changes from:
@@ -296,6 +300,10 @@ class WiredAccessoryObserver extends UEventObserver {
                 device = AudioManager.DEVICE_OUT_DGTL_DOCK_HEADSET;
             } else if (headset == BIT_HDMI_AUDIO) {
                 device = AudioManager.DEVICE_OUT_AUX_DIGITAL;
+            } else if (headset == BIT_ANCHEADSET) {
+                device = AudioManager.DEVICE_OUT_ANC_HEADSET;
+            } else if (headset == BIT_ANCHEADSET_NO_MIC) {
+                device =  AudioManager.DEVICE_OUT_ANC_HEADPHONE;
             } else {
                 Slog.e(TAG, "setDeviceState() invalid headset type: "+headset);
                 return;
