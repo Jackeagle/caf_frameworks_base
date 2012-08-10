@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -100,9 +100,10 @@ class HTML5VideoViewManager
     public void exitFullscreenVideo() {
         assert (mUiThread == Thread.currentThread());
         Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
+        // Only one video can be in fullscreen mode
+        // As soon as the fullscreen video is found we exit the loop
         while (iter.hasNext()) {
-            HTML5VideoViewProxy proxy = iter.next();
-            proxy.webKitExitFullscreen();
+            iter.next().webkitExitFullscreen();
         }
     }
 }
