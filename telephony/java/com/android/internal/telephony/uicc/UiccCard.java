@@ -80,7 +80,6 @@ public class UiccCard {
 
     void dispose() {
         if (DBG) log("Disposing card");
-        if (mCatService != null) mCatService.dispose();
         for (UiccCardApplication app : mUiccApplications) {
             if (app != null) {
                 app.dispose();
@@ -123,17 +122,12 @@ public class UiccCard {
         }
 
         if (mUiccApplications.length > 0 && mUiccApplications[0] != null) {
-            // Initialize or Reinitialize CatService
-            mCatService = CatService.getInstance(mCi,
-                                                 mContext,
-                                                 this);
-        } else {
-            if (mCatService != null) {
-                mCatService.dispose();
-            }
-            mCatService = null;
+            if (mCatService == null)
+                // Initialize or Reinitialize CatService
+                mCatService = CatService.getInstance(mCi,
+                                                     mContext,
+                                                     this);
         }
-
         sanitizeApplicationIndexes();
 
         // The following logic does not account for Sim being powered down
