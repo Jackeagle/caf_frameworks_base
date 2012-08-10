@@ -260,6 +260,7 @@
   <java-symbol type="bool" name="config_voice_capable" />
   <java-symbol type="bool" name="preferences_prefer_dual_pane" />
   <java-symbol type="bool" name="skip_restoring_network_selection" />
+  <java-symbol type="bool" name="skip_radio_power_off_on_sim_refresh_reset" />
   <java-symbol type="bool" name="split_action_bar_is_narrow" />
   <java-symbol type="bool" name="config_useMasterVolume" />
   <java-symbol type="bool" name="config_enableWallpaperService" />
