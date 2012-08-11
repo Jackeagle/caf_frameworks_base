@@ -1792,6 +1792,8 @@ public class Camera {
         private static final String KEY_VIDEO_STABILIZATION = "video-stabilization";
         private static final String KEY_VIDEO_STABILIZATION_SUPPORTED = "video-stabilization-supported";
         private static final String KEY_SINGLE_ISP_OUTPUT_ENABLED = "single-isp-output-enabled";
+        private static final String KEY_QC_SUPPORTED_CAMERA_FEATURES = "qc-camera-features";
+        private static final String KEY_QC_MAX_NUM_REQUESTED_FACES = "qc-max-num-requested-faces";
 
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
@@ -3677,7 +3679,27 @@ public class Camera {
          */
         public boolean isSingleOutputEnabled(){
             String str = get(KEY_SINGLE_ISP_OUTPUT_ENABLED);
-            return TRUE.equals(str);
+            return TRUE.equals(str);}
+         /** @hide
+         * Gets the bitwise flag indicating which camera features are
+         * supported. This is a read-only flag.
+         *
+         * @return flag indicating camera features supported
+         * bit 0: facial feature
+         */
+         public int getSupportedCameraFeatures() {
+             return getInt(KEY_QC_SUPPORTED_CAMERA_FEATURES, 0);
+         }
+
+        /**
+         * @hide
+         * Sets the max number of faces being requested by the
+         * application. This value is passed down to HAL but might be
+         * rejected due to memory limitations. This is a write-only flag.
+         *
+         */
+        public void setMaxFacesRequested(int value) {
+            set(KEY_QC_MAX_NUM_REQUESTED_FACES, value);
         }
 
         // Splits a comma delimited string to an ArrayList of String.
