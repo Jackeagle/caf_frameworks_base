@@ -29,10 +29,15 @@
 
 package android.net;
 
+/** {@hide}
+*/
 public class FeatureConfig {
     public static int CNE = 1;
+
     public static int FMC = 2;
+
     public static int WQE = 3;
+
     public static int NSRM = 4;
 
     /**
@@ -41,5 +46,5 @@ public class FeatureConfig {
      * @return {@code true} if feature enabled, {@code false} if disabled or not found
      */
     public native static boolean isEnabled(int feature);
-
 }
+
