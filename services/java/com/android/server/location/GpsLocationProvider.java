@@ -86,6 +86,7 @@ import java.net.Inet6Address;
 import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.List;
 
 /**
  * A GPS implementation of LocationProvider used by LocationManager.
@@ -355,6 +356,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     private final ConnectivityManager mConnMgr;
     private final GpsNetInitiatedHandler mNIHandler;
+    private LocationManager mLocMgr;
 
     // Wakelocks
     private final static String WAKELOCK_KEY = "GpsLocationProvider";
@@ -1071,14 +1073,13 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     private void handleNativeNetworkLocationRequest(int type, int interval)
     {
-        LocationManager lm = (LocationManager) mContext.getSystemService(Context.LOCATION_SERVICE);
         switch(type) {
             case ULP_NETWORK_POS_START_PERIODIC_REQUEST:
                 Log.d(TAG, "handleNativeNetworkLocationRequest NLP start from GP");
-                lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER ,interval, 0, mNetworkLocationListener);
+                mLocMgr.requestLocationUpdates(LocationManager.NETWORK_PROVIDER ,interval, 0, mNetworkLocationListener);
                 break;
             case ULP_NETWORK_POS_GET_LAST_KNOWN_LOCATION_REQUEST:
-                Location location = lm.getLastKnownLocation("LocationManager.NETWORK_PROVIDER");
+                Location location = mLocMgr.getLastKnownLocation("LocationManager.NETWORK_PROVIDER");
                 synchronized (mHandler) {
                 mHandler.removeMessages(UPDATE_NETWORK_LOCATION);
                 Message m = Message.obtain(mHandler, UPDATE_NETWORK_LOCATION);
@@ -1088,9 +1089,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 }
                 break;
              case ULP_NETWORK_POS_STOP_REQUEST:
-                 Log.d(TAG, "handleNativeNetworkLocationRequest NLP stop from GP");
-                 lm.removeUpdates(mNetworkLocationListener);
-                 break;
+                Log.d(TAG, "handleNativeNetworkLocationRequest NLP stop from GP");
+                mLocMgr.removeUpdates(mNetworkLocationListener);
+                break;
              default:
                   Log.e(TAG, "handleNativeNetworkLocationRequest. Inccorect request sent in: "+type);
 
@@ -1153,16 +1154,20 @@ public class GpsLocationProvider implements LocationProviderInterface {
           if((mRequestContextType & ULP_PHONE_CONTEXT_NETWORK_POSITION_SETTING)
                == ULP_PHONE_CONTEXT_NETWORK_POSITION_SETTING)
           {
+              List<String> providers = mLocMgr.getAllProviders();
+              boolean networkLocProvAvailable = (providers.contains(LocationManager.NETWORK_PROVIDER)== true);
               if(updateType == ULP_PHONE_CONTEXT_UPDATE_TYPE_SINGLE) {
                   currentNetworkProvSetting =
-                      Settings.Secure.isLocationProviderEnabled(resolver, LocationManager.NETWORK_PROVIDER );
+                      (Settings.Secure.isLocationProviderEnabled(resolver, LocationManager.NETWORK_PROVIDER ) &&
+                       networkLocProvAvailable);
                   wasNetworkProviderSettingAvailable = true;
               }else
               {
                   if(settingsValues.containsKey("networkProvSetting"))
                   {
                       wasNetworkProviderSettingAvailable = true;
-                      currentNetworkProvSetting = settingsValues.getBoolean("networkProvSetting");
+                      currentNetworkProvSetting = (settingsValues.getBoolean("networkProvSetting") &&
+                                                   networkLocProvAvailable);
                   }
               }
           }
@@ -2469,6 +2474,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
             mSettings = new ContentQueryMap(settingsCursor, Settings.System.NAME, true, mHandler);
             SettingsObserver settingsObserver = new SettingsObserver();
             mSettings.addObserver(settingsObserver);
+
+            mLocMgr = (LocationManager) mContext.getSystemService(Context.LOCATION_SERVICE);
         }
 
         public String getName() {
