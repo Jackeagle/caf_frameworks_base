@@ -303,6 +303,8 @@ public class MediaFile {
         }
         if(isMPQTarget()) {
             addFileType("DTS", FILE_TYPE_DTS, "audio/dts");
+            addFileType("DTSHD", FILE_TYPE_DTS, "audio/dts");
+            addFileType("CPT", FILE_TYPE_DTS, "audio/dts");
         }
     }
 
