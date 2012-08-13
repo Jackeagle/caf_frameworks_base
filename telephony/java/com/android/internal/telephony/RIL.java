@@ -586,7 +586,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 mSocket = s;
                 Log.i(LOG_TAG, "Connected to '" + rilSocket + "' socket");
 
-                String str = (mInstanceId == null || mInstanceId == 0) ? "SUB1" : "SUB2";
+                String str = (mInstanceId == null || mInstanceId == 0 || multiRild == true) ? "SUB1" : "SUB2";
 
                 // It's possible that RIL(2) connects before RIL(1).
                 // In such cases, rild should be able to identify
