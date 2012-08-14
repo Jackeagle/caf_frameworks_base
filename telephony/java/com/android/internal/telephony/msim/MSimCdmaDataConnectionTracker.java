@@ -49,7 +49,7 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
     /** Subscription id */
     protected int mSubscription;
 
-    protected MSimCDMAPhone mPhone;
+    protected MSimCDMALTEPhone mPhone;
 
     /**
      * List of messages that are waiting to be posted, when data call disconnect
@@ -61,7 +61,7 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
 
     protected int mDisconnectPendingCount = 0;
 
-    MSimCdmaDataConnectionTracker(MSimCDMAPhone p) {
+    MSimCdmaDataConnectionTracker(MSimCDMALTEPhone p) {
         super(p);
         mPhone = p;
         mSubscription = mPhone.getSubscription();
@@ -320,6 +320,7 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
         if (isActiveDataSubscription()) {
             log("update(): Active DDS, register for all events now!");
             registerForAllEvents();
+            onUpdateIcc();
 
             mUserDataEnabled = Settings.Secure.getInt(mPhone.getContext().getContentResolver(),
                     Settings.Secure.MOBILE_DATA, 1) == 1;
