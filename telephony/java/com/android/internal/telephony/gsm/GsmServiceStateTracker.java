@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +36,8 @@ import com.android.internal.telephony.uicc.UiccCard;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.IccCardApplicationStatus.AppState;
+import com.android.internal.telephony.CommandsInterface.RadioState;
+import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
 
 import android.app.AlarmManager;
 import android.app.AlertDialog;
@@ -170,6 +173,10 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
     private boolean mEonsEnabled =
             SystemProperties.getBoolean(TelephonyProperties.PROPERTY_EONS_ENABLED, true);
 
+    /** Multimode related */
+    private boolean mIsMultimodeCdmaPhone =
+            SystemProperties.getBoolean(TelephonyProperties.PROPERTY_MULTIMODE_CDMA, false);
+
     /** Notification type. */
     static final int PS_ENABLED = 1001;            // Access Control blocks data service
     static final int PS_DISABLED = 1002;           // Access Control enables data service
@@ -254,6 +261,15 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
         // Gsm doesn't support OTASP so its not needed
         phone.notifyOtaspChanged(OTASP_NOT_NEEDED);
         Log.i(LOG_TAG,"Is EONS enabled: " + mEonsEnabled);
+
+        // For CDMA global phone registered on 3GPP get the CDMA subscription
+        // for voice mail number translation and also get the PRL version to be
+        // displayed to the user
+        if (mIsMultimodeCdmaPhone) {
+            mCdmaSSM = CdmaSubscriptionSourceManager.getInstance(phone.getContext(), cm, this,
+                    EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
+            cm.registerForCdmaPrlChanged(this, EVENT_CDMA_PRL_VERSION_CHANGED, null);
+        }
     }
 
     public void dispose() {
@@ -274,6 +290,11 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
         cm.unSetOnNITZTime(this);
         cr.unregisterContentObserver(this.mAutoTimeObserver);
         cr.unregisterContentObserver(this.mAutoTimeZoneObserver);
+
+        if (mIsMultimodeCdmaPhone) {
+            mCdmaSSM.dispose(this);
+            cm.unregisterForCdmaPrlChanged(this);
+        }
     }
 
     protected void finalize() {
@@ -305,7 +326,7 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
             case EVENT_SIM_READY:
                 // Set the network type, in case the radio does not restore it.
                 cm.setCurrentPreferredNetworkType();
-
+                log("EVENT_SIM_READY received");
                 boolean skipRestoringSelection = phone.getContext().getResources().getBoolean(
                         com.android.internal.R.bool.skip_restoring_network_selection);
 
@@ -316,9 +337,17 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
                 pollState();
                 // Signal strength polling stops when radio is off
                 queueNextSignalStrengthPoll();
+
+                getSubscriptionInfo();
                 break;
 
             case EVENT_RADIO_STATE_CHANGED:
+                // Register for CDMA subscription source for CDMA global phone registered
+                // on 3GPP
+                if(mIsMultimodeCdmaPhone && (cm.getRadioState() == RadioState.RADIO_ON)) {
+                    handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
+                }
+
                 // This will do nothing in the radio not
                 // available case
                 setPowerStateToDesired();
@@ -479,6 +508,27 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
                 ar = (AsyncResult) msg.obj;
 
                 onRestrictedStateChanged(ar);
+                break;
+
+            case EVENT_NV_READY:
+                // For Non-RUIM phones, the subscription information is stored in
+                // Non Volatile. Here when Non-Volatile is ready, we can poll the CDMA
+                // subscription info.
+                log("EVENT_NV_READY received");
+                getSubscriptionInfo();
+                break;
+
+            case EVENT_POLL_STATE_CDMA_SUBSCRIPTION:
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception != null || ar.result == null) {
+                    Log.e(LOG_TAG, "Error while fetching Mdn");
+                    break;
+                }
+                String localTemp[] = (String[])ar.result;
+                mMdn = localTemp[0];
+                if (localTemp.length > 4) {
+                    mPrlVersion = localTemp[4];
+                }
                 break;
 
             default:
@@ -1885,4 +1935,14 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
         }
     };
 
+    /**
+     * Get CDMA subscription information if the CDMA device
+     * is registered on 3GPP network and the multimode property
+     * is set to true
+     */
+    private void getSubscriptionInfo() {
+        if (mIsMultimodeCdmaPhone) {
+            cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
+        }
+    }
 }

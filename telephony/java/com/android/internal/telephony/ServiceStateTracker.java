@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 package com.android.internal.telephony;
 
 import android.content.Context;
+import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
 import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Looper;
@@ -178,6 +180,11 @@ public abstract class ServiceStateTracker extends Handler {
     protected static final String REGISTRATION_DENIED_GEN  = "General";
     protected static final String REGISTRATION_DENIED_AUTH = "Authentication Failure";
 
+    protected boolean isSubscriptionFromRuim = false;
+    protected CdmaSubscriptionSourceManager mCdmaSSM;
+    protected String mMdn;
+    protected String mPrlVersion;
+
     public ServiceStateTracker(Context c, CommandsInterface ci) {
         cm = ci;
         mUiccController = UiccController.getInstance();
@@ -310,6 +317,24 @@ public abstract class ServiceStateTracker extends Handler {
 
             case EVENT_ICC_CHANGED:
                 onUpdateIccAvailability();
+                break;
+
+            case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
+                handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
+                break;
+
+            case EVENT_CDMA_PRL_VERSION_CHANGED:
+                AsyncResult ar;
+                int[] result;
+
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception != null || ar.result == null) {
+                    log("Error while fetching Prl");
+                    break;
+                }
+
+                result = (int[]) ar.result;
+                mPrlVersion = Integer.toString(result[0]);
                 break;
 
             default:
@@ -598,6 +623,25 @@ public abstract class ServiceStateTracker extends Handler {
         if (Thread.currentThread() != getLooper().getThread()) {
             throw new RuntimeException(
                     "ServiceStateTracker must be used from within one thread");
+        }
+    }
+
+    public String getMdnNumber() {
+        return mMdn;
+    }
+
+    /** Returns null if NV is not yet ready */
+    public String getPrlVersion() {
+        return mPrlVersion;
+    }
+
+    protected void handleCdmaSubscriptionSource(int newSubscriptionSource) {
+        log("Subscription Source : " + newSubscriptionSource);
+        isSubscriptionFromRuim =
+            (newSubscriptionSource == CdmaSubscriptionSourceManager.SUBSCRIPTION_FROM_RUIM);
+        if (!isSubscriptionFromRuim) {
+            // NV is ready when subscription source is NV
+            sendMessage(obtainMessage(EVENT_NV_READY));
         }
     }
 }
