@@ -468,21 +468,35 @@ class BluetoothEventLoop {
      */
     private void onDevicePropertyChanged(String deviceObjectPath, String[] propValues) {
         String name = propValues[0];
+        byte[] connProp = null;
         String address = mBluetoothService.getAddressFromObjectPath(deviceObjectPath);
         if (address == null) {
             Log.e(TAG, "onDevicePropertyChanged: Address of the remote device in null");
             return;
         }
 
+        if (name.equals("Connected")) {
+            int strLen = propValues[1].length();
+            connProp = new byte[strLen/2];
+            for(int i = 0; i < connProp.length; i++) {
+                int pos = i * 2;
+                int value = Integer.parseInt(propValues[1].substring(pos, pos+2), 16);
+                connProp[i] = (byte) value;
+                Log.d(TAG, " Connected property at index : "
+                      + i + "is :" + connProp[i]);
+            }
+        }
+
         if (!mBluetoothService.isEnabled()) {
             Log.e(TAG, "Bluetooth is not enabled");
 
-            if (name.equals("Connected") && propValues[1].equals("false")) {
+            if (name.equals("Connected") && (connProp[0] == 0)) {
                 Intent intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED);
                 BluetoothDevice device = mAdapter.getRemoteDevice(address);
                 mBluetoothService.sendDeviceConnectionStateChange(
                     device, BluetoothAdapter.STATE_DISCONNECTED);
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+                intent.putExtra(BluetoothDevice.EXTRA_REASON, connProp[1]);
                 intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
                 mContext.sendBroadcast(intent, BLUETOOTH_PERM);
             }
@@ -519,9 +533,13 @@ class BluetoothEventLoop {
         } else if (name.equals("Connected")) {
             Log.d(TAG, "Device property Connected: " + propValues[1]);
 
-            mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
+            if(connProp[0] == 0)
+                mBluetoothService.setRemoteDeviceProperty(address, name, "false");
+            else
+                mBluetoothService.setRemoteDeviceProperty(address, name, "true");
+
             Intent intent = null;
-            if (propValues[1].equals("true")) {
+            if (connProp[0] == 1) {
                 intent = new Intent(BluetoothDevice.ACTION_ACL_CONNECTED);
                 // Set the link timeout to 8000 slots (5 sec timeout)
                 // for bluetooth docks.
@@ -546,6 +564,7 @@ class BluetoothEventLoop {
                     device, BluetoothAdapter.STATE_DISCONNECTED);
             }
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+            intent.putExtra(BluetoothDevice.EXTRA_REASON, connProp[1]);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
         } else if (name.equals("UUIDs")) {
