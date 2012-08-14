@@ -26,11 +26,12 @@ import android.telephony.MSimTelephonyManager;
 import android.text.TextUtils;
 
 import com.android.internal.telephony.cdma.CDMAPhone;
-import com.android.internal.telephony.cdma.CdmaServiceStateTracker;
+import com.android.internal.telephony.cdma.CdmaLteServiceStateTracker;
 import com.android.internal.telephony.DataConnectionTracker;
 import com.android.internal.telephony.msim.Subscription;
 import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 
@@ -39,16 +40,16 @@ import android.util.Log;
 /**
  * {@hide}
  */
-final class MSimCdmaServiceStateTracker extends CdmaServiceStateTracker {
+final class MSimCdmaLteServiceStateTracker extends CdmaLteServiceStateTracker {
     static final String LOG_TAG = "CDMA";
     protected static final int EVENT_ALL_DATA_DISCONNECTED = 1001;
-    public MSimCdmaServiceStateTracker(CDMAPhone phone) {
+    public MSimCdmaLteServiceStateTracker(MSimCDMALTEPhone phone) {
         super(phone);
     }
 
     @Override
     protected UiccCardApplication getUiccCardApplication() {
-        Subscription subscriptionData = ((MSimCDMAPhone)phone).getSubscriptionInfo();
+        Subscription subscriptionData = ((MSimCDMALTEPhone)phone).getSubscriptionInfo();
         if(subscriptionData != null) {
             return  mUiccController.getUiccCardApplication(
                     subscriptionData.slotId, UiccController.APP_FAM_3GPP2);
@@ -164,12 +165,22 @@ final class MSimCdmaServiceStateTracker extends CdmaServiceStateTracker {
     }
 
     @Override
+    protected DataConnectionTracker getNewGsmDataConnectionTracker(PhoneBase phone) {
+        return new MSimGsmDataConnectionTracker(phone);
+    }
+
+    @Override
+    protected DataConnectionTracker getNewCdmaDataConnectionTracker(CDMAPhone phone) {
+        return new MSimCdmaDataConnectionTracker((MSimCDMALTEPhone)phone);
+    }
+
+    @Override
     protected void log(String s) {
-        Log.d(LOG_TAG, "[MSimCdmaSST] [SUB : " + phone.getSubscription() + "] " + s);
+        Log.d(LOG_TAG, "[MSimCdmaLteSST] [SUB : " + phone.getSubscription() + "] " + s);
     }
 
     @Override
     protected void loge(String s) {
-        Log.e(LOG_TAG, "[MSimCdmaSST] [SUB : " + phone.getSubscription() + "] " + s);
+        Log.e(LOG_TAG, "[MSimCdmaLteSST] [SUB : " + phone.getSubscription() + "] " + s);
     }
 }

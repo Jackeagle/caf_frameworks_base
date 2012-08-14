@@ -28,6 +28,7 @@ import android.database.SQLException;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.provider.Telephony;
+import android.os.AsyncResult;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -39,7 +40,8 @@ import android.net.Uri;
 import android.telephony.MSimTelephonyManager;
 
 import com.android.internal.telephony.CommandsInterface;
-import com.android.internal.telephony.cdma.CDMAPhone;
+import com.android.internal.telephony.CommandException;
+import com.android.internal.telephony.cdma.CDMALTEPhone;
 import com.android.internal.telephony.cdma.CdmaCallTracker;
 import com.android.internal.telephony.cdma.CdmaSubscriptionSourceManager;
 import com.android.internal.telephony.cdma.CdmaSMSDispatcher;
@@ -47,6 +49,7 @@ import com.android.internal.telephony.cdma.EriManager;
 import com.android.internal.telephony.cdma.RuimPhoneBookInterfaceManager;
 import com.android.internal.telephony.cdma.RuimSmsInterfaceManager;
 import com.android.internal.telephony.MccTable;
+import com.android.internal.telephony.OperatorInfo;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneNotifier;
 import com.android.internal.telephony.PhoneSubInfo;
@@ -59,6 +62,7 @@ import com.android.internal.telephony.msim.SubscriptionManager;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 import com.android.internal.telephony.uicc.IccRecords;
+import com.android.internal.telephony.uicc.IsimRecords;
 
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
@@ -68,30 +72,30 @@ import static com.android.internal.telephony.MSimConstants.SUBSCRIPTION_KEY;
 import static com.android.internal.telephony.MSimConstants.EVENT_SUBSCRIPTION_ACTIVATED;
 import static com.android.internal.telephony.MSimConstants.EVENT_SUBSCRIPTION_DEACTIVATED;
 
-public class MSimCDMAPhone extends CDMAPhone {
+public class MSimCDMALTEPhone extends CDMALTEPhone {
     static final String LOG_TAG = "CDMA";
 
     private Subscription mSubscriptionData; // to store subscription information
     private int mSubscription = 0;
 
     // Constructors
-    public MSimCDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier,
+    public MSimCDMALTEPhone(Context context, CommandsInterface ci, PhoneNotifier notifier,
             int subscription) {
         this(context, ci, notifier, false, subscription);
     }
 
-    public MSimCDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier,
+    public MSimCDMALTEPhone(Context context, CommandsInterface ci, PhoneNotifier notifier,
             boolean unitTestMode, int subscription) {
-        super(context, ci, notifier, unitTestMode);
+        super(context, ci, notifier);
 
         mSubscription = subscription;
 
-        Log.d(LOG_TAG, "MSimCDMAPhone: constructor: sub = " + mSubscription);
+        Log.d(LOG_TAG, "MSimCDMALTEPhone: constructor: sub = " + mSubscription);
+
+        mDataConnectionTracker = new MSimCdmaDataConnectionTracker(this);
 
         mVmNumCdmaKey = mVmNumCdmaKey + mSubscription;
         mVmCountKey = mVmCountKey + mSubscription;
-
-        mDataConnectionTracker = new MSimCdmaDataConnectionTracker (this);
 
         SubscriptionManager subMgr = SubscriptionManager.getInstance();
         subMgr.registerForSubscriptionActivated(mSubscription,
@@ -102,7 +106,7 @@ public class MSimCDMAPhone extends CDMAPhone {
 
     @Override
     protected void initSstIcc() {
-        mSST = new MSimCdmaServiceStateTracker(this);
+        mSST = new MSimCdmaLteServiceStateTracker(this);
     }
 
     @Override
@@ -186,7 +190,7 @@ public class MSimCDMAPhone extends CDMAPhone {
 
         onUpdateIccAvailability();
         mSST.sendMessage(mSST.obtainMessage(ServiceStateTracker.EVENT_ICC_CHANGED));
-        ((MSimCdmaServiceStateTracker)mSST).updateCdmaSubscription();
+        ((MSimCdmaLteServiceStateTracker)mSST).updateCdmaSubscription();
         ((MSimCdmaDataConnectionTracker)mDataConnectionTracker).updateRecords();
 
         // read the subscription specifics now
@@ -293,7 +297,7 @@ public class MSimCDMAPhone extends CDMAPhone {
         if (mCdmaSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
             operatorNumeric = SystemProperties.get("ro.cdma.home.operator.numeric");
         } else if (mCdmaSubscriptionSource == CDMA_SUBSCRIPTION_RUIM_SIM
-                && mIccRecords != null && mIccRecords.get() != null) { //TODO Suresh
+                && mIccRecords != null && mIccRecords.get() != null) {
             operatorNumeric = mIccRecords.get().getOperatorNumeric();
         } else {
             Log.e(LOG_TAG, "getOperatorNumeric: Cannot retrieve operatorNumeric:"
@@ -344,4 +348,99 @@ public class MSimCDMAPhone extends CDMAPhone {
         ((MSimCdmaDataConnectionTracker)mDataConnectionTracker)
                 .unregisterForAllDataDisconnected(h);
     }
+
+    /* Override the LTE specific methods from CDMALTEPhone - START */
+    @Override
+    public void selectNetworkManually(OperatorInfo network, Message response) {
+        Log.e(LOG_TAG, "selectNetworkManually: not possible in CDMA");
+        if (response != null) {
+            CommandException ce = new CommandException(CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(response).exception = ce;
+            response.sendToTarget();
+        }
+    }
+
+    @Override
+    public String getSubscriberId() {
+        return mSST.getImsi();
+    }
+
+    @Override
+    public String getImei() {
+        Log.e(LOG_TAG, "IMEI is not available in CDMA");
+        return null;
+    }
+
+    @Override
+    public String getDeviceSvn() {
+        Log.d(LOG_TAG, "getDeviceSvn(): return 0");
+        return "0";
+    }
+
+    @Override
+    public IsimRecords getIsimRecords() {
+        Log.e(LOG_TAG, "getIsimRecords() is only supported on LTE devices");
+        return null;
+    }
+
+    @Override
+    public String getMsisdn() {
+        Log.e(LOG_TAG, "Error! getMsisdn() in MSimCDMALTEPhone should not be " +
+                "called, GSMPhone inactive.");
+        return null;
+    }
+
+    @Override
+    public void getAvailableNetworks(Message response) {
+        Log.e(LOG_TAG, "getAvailableNetworks: not possible in CDMA");
+        if (response != null) {
+            CommandException ce = new CommandException(CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(response).exception = ce;
+            response.sendToTarget();
+        }
+    }
+
+    @Override
+    public void requestIsimAuthentication(String nonce, Message result) {
+        Log.e(LOG_TAG, "requestIsimAuthentication() is only supported on LTE devices");
+    }
+
+    @Override
+    protected void onUpdateIccAvailability() {
+        if (mUiccController == null ) {
+            return;
+        }
+
+        UiccCardApplication newUiccApplication = getUiccCardApplication();
+
+        UiccCardApplication app = mUiccApplication.get();
+        if (app != newUiccApplication) {
+            if (app != null) {
+                log("Removing stale icc objects.");
+                if (mIccRecords.get() != null) {
+                    unregisterForRuimRecordEvents();
+                    mRuimPhoneBookInterfaceManager.updateIccRecords(null);
+                }
+                mIccRecords.set(null);
+                mUiccApplication.set(null);
+                mRuimCard = null;
+            }
+            if (newUiccApplication != null) {
+                log("New Uicc application found");
+                mUiccApplication.set(newUiccApplication);
+                mRuimCard = mUiccApplication.get().getCard();
+                mIccRecords.set(newUiccApplication.getIccRecords());
+                registerForRuimRecordEvents();
+                mRuimPhoneBookInterfaceManager.updateIccRecords(mIccRecords.get());
+            }
+        }
+    }
+
+    @Override
+    protected void log(String s) {
+        Log.d(LOG_TAG, "[MSimCDMALTEPhone] " + s);
+    }
+
+    /* Override the LTE specific methods from CDMALTEPhone - END */
+
 }

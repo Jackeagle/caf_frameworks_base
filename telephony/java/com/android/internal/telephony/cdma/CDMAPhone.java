@@ -107,7 +107,7 @@ public class CDMAPhone extends PhoneBase {
     protected PhoneSubInfo mSubInfo;
     protected EriManager mEriManager;
     protected WakeLock mWakeLock;
-    UiccCard mRuimCard = null;
+    protected UiccCard mRuimCard = null;
 
     // mEriFileLoadedRegistrants are informed after the ERI text has been loaded
     private final RegistrantList mEriFileLoadedRegistrants = new RegistrantList();
