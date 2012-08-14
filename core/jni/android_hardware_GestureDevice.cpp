@@ -341,11 +341,11 @@ static void android_hardware_gesturedev_GestureDevice_native_stopGesture(JNIEnv 
     c->stopGesture();
 }
 
-static void android_hardware_gesturedev_GestureDevice_native_setParameters(JNIEnv *env, jobject thiz, jstring params)
+static jint android_hardware_gesturedev_GestureDevice_native_setParameters(JNIEnv *env, jobject thiz, jstring params)
 {
     LOGV("setParameters");
     sp<GestureDevice> c = get_native_gesture_device(env, thiz, NULL);
-    if (c == 0) return;
+    if (c == 0) return NO_INIT;
 
     const jchar* str = env->GetStringCritical(params, 0);
     String8 params8;
@@ -353,10 +353,7 @@ static void android_hardware_gesturedev_GestureDevice_native_setParameters(JNIEn
         params8 = String8(str, env->GetStringLength(params));
         env->ReleaseStringCritical(params, str);
     }
-    if (c->setParameters(params8) != NO_ERROR) {
-        jniThrowRuntimeException(env, "setParameters failed");
-        return;
-    }
+    return c->setParameters(params8);
 }
 
 static jstring android_hardware_gesturedev_GestureDevice_native_getParameters(JNIEnv *env, jobject thiz)
@@ -389,7 +386,7 @@ static JNINativeMethod gestureDeviceMethods[] = {
     "()V",
     (void *)android_hardware_gesturedev_GestureDevice_native_stopGesture },
   { "native_setParameters",
-    "(Ljava/lang/String;)V",
+    "(Ljava/lang/String;)I",
     (void *)android_hardware_gesturedev_GestureDevice_native_setParameters },
   { "native_getParameters",
     "()Ljava/lang/String;",

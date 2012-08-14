@@ -45,7 +45,7 @@ public class GestureDevice {
 
     private native final void native_release();
 
-    private native final void native_setParameters(String params);
+    private native final int native_setParameters(String params);
 
     private native final String native_getParameters();
 
@@ -222,13 +222,13 @@ public class GestureDevice {
      * 
      * @param params
      *            the Parameters to use for this Gesture device service
-     * @throws RuntimeException
+     * returns error code if operation fails
      *             if any parameter is invalid or not supported, or the gesture
      *             processing is already running..
      * @see #getParameters()
      */
-    public synchronized void setParameters(GestureParameters params) {
-        native_setParameters(params.flatten());
+    public synchronized int setParameters(GestureParameters params) {
+        return native_setParameters(params.flatten());
     }
 
     /**
