@@ -89,6 +89,11 @@ public class Performance
     /** @hide */ public static final int CPUOPT_CPU1_FREQMIN = 3;
 
     /** &hide */
+    public int pulseFreqBoost(int duration, int freq) {
+        return native_pulse_freq_boost(duration, freq);
+    }
+
+    /** &hide */
     public void cpuBoost(int ntasks) {
         native_cpu_boost(ntasks);
     }
@@ -105,6 +110,7 @@ public class Performance
 
     private native int  native_perf_lock_acq(int list[]);
     private native int  native_perf_lock_rel(int handle);
+    private native int  native_pulse_freq_boost(int duration, int freq);
     private native void native_cpu_boost(int ntasks);
     private native int  native_cpu_setoptions(int reqtype, int reqvalue);
     private native void native_deinit();
