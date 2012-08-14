@@ -3208,7 +3208,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 if (RILJ_LOGD) unsljLogRet(response, ret);
 
                 // Initial conditions
-                //setRadioPower(false, null);
+                setRadioPower(false, null);
                 //setPreferredNetworkType(mPreferredNetworkType, null);
                 //setCdmaSubscriptionSource(mCdmaSubscription, null);
                 notifyRegistrantsRilConnectionChanged(((int[])ret)[0]);
