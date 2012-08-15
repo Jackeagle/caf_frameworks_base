@@ -262,6 +262,8 @@ public class AudioSystem
     public static final int DEVICE_IN_WIRED_HEADSET = 0x4000000;
     public static final int DEVICE_IN_AUX_DIGITAL = 0x8000000;
     public static final int DEVICE_IN_ANC_HEADSET = 0x10000000;
+    public static final int DEVICE_IN_FM_RX = 0x20000000;
+    public static final int DEVICE_IN_FM_RX_A2DP = 0x40000000;
     public static final int DEVICE_IN_PROXY = 0x80000000;
     public static final int DEVICE_IN_ANLG_DOCK_HEADSET = DEVICE_IN_PROXY;
     public static final int DEVICE_IN_DEFAULT = DEVICE_IN_BUILTIN_MIC1;
