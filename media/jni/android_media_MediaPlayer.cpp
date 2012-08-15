@@ -55,6 +55,7 @@ struct fields_t {
     jfieldID    surface_texture;
 
     jmethodID   post_event;
+    jmethodID   qc_post_event;
 };
 static fields_t fields;
 
@@ -112,12 +113,32 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
         if (mParcel != NULL) {
             Parcel* nativeParcel = parcelForJavaObject(env, mParcel);
             nativeParcel->setData(obj->data(), obj->dataSize());
-            env->CallStaticVoidMethod(mClass, fields.post_event, mObject,
+            if( (fields.qc_post_event != NULL) &&
+                ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT) ) )
+            {
+              ALOGD("JNIMediaPlayerListener::notify calling qc_post_event");
+              env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
+                      msg, ext1, ext2, mParcel);
+            }
+            else
+            {
+              env->CallStaticVoidMethod(mClass, fields.post_event, mObject,
                     msg, ext1, ext2, mParcel);
+            }
         }
     } else {
+        if( (fields.qc_post_event != NULL) &&
+          ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT) ) )
+      {
+        ALOGD("JNIMediaPlayerListener::notify calling qc_post_event");
+        env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
+                msg, ext1, ext2, NULL);
+      }
+      else
+      {
         env->CallStaticVoidMethod(mClass, fields.post_event, mObject,
                 msg, ext1, ext2, NULL);
+      }
     }
     if (env->ExceptionCheck()) {
         ALOGW("An exception occurred while notifying an event.");
@@ -600,12 +621,19 @@ static void
 android_media_MediaPlayer_native_init(JNIEnv *env)
 {
     jclass clazz;
-
+    jclass qcmediaclazz = NULL;
     clazz = env->FindClass("android/media/MediaPlayer");
     if (clazz == NULL) {
         return;
     }
-
+    fields.qc_post_event = NULL;
+    //check if QCMediaPlayer class exists..
+    qcmediaclazz = env->FindClass("com/qualcomm/qcmedia/QCMediaPlayer");
+    if (qcmediaclazz == NULL){
+      //Clear the exception as QCMediaPlayer is optional...
+      env->ExceptionClear();
+      ALOGE("QCMediaPlayer could not be located....");
+    }
     fields.context = env->GetFieldID(clazz, "mNativeContext", "I");
     if (fields.context == NULL) {
         return;
@@ -613,6 +641,12 @@ android_media_MediaPlayer_native_init(JNIEnv *env)
 
     fields.post_event = env->GetStaticMethodID(clazz, "postEventFromNative",
                                                "(Ljava/lang/Object;IIILjava/lang/Object;)V");
+    if(qcmediaclazz != NULL){
+      //Set up the event handler as we were able to detect QCMediaPlayer.
+      fields.qc_post_event = env->GetStaticMethodID(qcmediaclazz, "QCMediaPlayerNativeEventHandler",
+                                                                  "(Ljava/lang/Object;IIILjava/lang/Object;)V");
+      ALOGE("setting up fields.qc_post_event");
+    }
     if (fields.post_event == NULL) {
         return;
     }
@@ -626,13 +660,29 @@ android_media_MediaPlayer_native_init(JNIEnv *env)
 static void
 android_media_MediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
 {
+    jclass clazz = NULL;
     ALOGV("native_setup");
     sp<MediaPlayer> mp = new MediaPlayer();
     if (mp == NULL) {
         jniThrowException(env, "java/lang/RuntimeException", "Out of memory");
         return;
     }
-
+    if(fields.qc_post_event != NULL){
+      //We were able to detect QCMediaPlayer earlier..
+      clazz = env->FindClass("com/qualcomm/qcmedia/QCMediaPlayer");
+      if (clazz != NULL){
+        if(env->IsInstanceOf(thiz,clazz)){
+          ALOGE("Using QCMediaPlayer....");
+        }
+        else{
+          fields.qc_post_event = NULL;
+          ALOGE("Not Using QCMediaPlayer,setting qc_post_event to NULL...");
+        }
+      }else{
+        //clear exception in case FindClass fails above...
+        env->ExceptionClear();
+      }
+    }
     // create new listener and give it to MediaPlayer
     sp<JNIMediaPlayerListener> listener = new JNIMediaPlayerListener(env, thiz, weak_this);
     mp->setListener(listener);
