@@ -470,7 +470,7 @@ public class IccSmsInterfaceManager extends ISms.Stub {
         System.arraycopy(pdu, 0, data, 1, pdu.length);
 
         // Pad out with 0xFF's.
-        for (int j = pdu.length+1; j < IccConstants.SMS_RECORD_LENGTH; j++) {
+        for (int j = pdu.length+1; j < data.length; j++) {
             data[j] = -1;
         }
 
