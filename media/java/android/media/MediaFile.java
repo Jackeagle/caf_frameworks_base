@@ -25,6 +25,7 @@ import android.media.DecoderCapabilities;
 import android.media.DecoderCapabilities.VideoDecoder;
 import android.media.DecoderCapabilities.AudioDecoder;
 import android.mtp.MtpConstants;
+import android.os.SystemProperties;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -296,9 +297,11 @@ public class MediaFile {
         addFileType("ZIP", FILE_TYPE_ZIP, "application/zip");
         addFileType("MPG", FILE_TYPE_MP2PS, "video/mp2p");
         addFileType("MPEG", FILE_TYPE_MP2PS, "video/mp2p");
-        if(isMPQTarget()) {
+        if ("true".equals(SystemProperties.get("ac3.decode", "false")) || isMPQTarget()) {
             addFileType("AC3", FILE_TYPE_AC3, "audio/ac3");
-            addFileType("EC3", FILE_TYPE_EC3, "audio/ec3");
+            addFileType("EC3", FILE_TYPE_EC3, "audio/eac3");
+        }
+        if(isMPQTarget()) {
             addFileType("DTS", FILE_TYPE_DTS, "audio/dts");
         }
     }
