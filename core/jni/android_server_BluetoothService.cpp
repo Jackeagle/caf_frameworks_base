@@ -2977,7 +2977,7 @@ static jboolean gattLeDisconnectRequestNative(JNIEnv *env, jobject object,
     return JNI_FALSE;
 }
 
-static jboolean gattConnectNative(JNIEnv *env, jobject object,
+static int gattConnectNative(JNIEnv *env, jobject object,
                                            jstring path,
                                            jint prohibitRemoteChg,
                                            jint filterPolicy,
@@ -2997,6 +2997,7 @@ static jboolean gattConnectNative(JNIEnv *env, jobject object,
         DBusMessage *reply, *msg;
         DBusMessageIter iter;
         DBusError err;
+        int result;
 
         const char *c_path = env->GetStringUTFChars(path, NULL);
         LOGE("the dbus object path: %s", c_path);
@@ -3007,7 +3008,7 @@ static jboolean gattConnectNative(JNIEnv *env, jobject object,
         if (!msg) {
             LOGE("%s: Can't allocate new method call for device ConnectReq!", __FUNCTION__);
             env->ReleaseStringUTFChars(path, c_path);
-            return JNI_FALSE;
+            return GATT_OPERATION_GENERIC_FAILURE;
         }
 
         dbus_message_append_args(msg,
@@ -3030,17 +3031,26 @@ static jboolean gattConnectNative(JNIEnv *env, jobject object,
 
         env->ReleaseStringUTFChars(path, c_path);
         if (!reply) {
+            result = GATT_OPERATION_GENERIC_FAILURE;
             if (dbus_error_is_set(&err)) {
+                if (!strcmp(err.name, BLUEZ_ERROR_IFC ".InProgress"))
+                    result = GATT_OPERATION_BUSY;
+                else if (!strcmp(err.name, BLUEZ_ERROR_IFC ".AlreadyConnected"))
+                    result = GATT_ALREADY_CONNECTED;
+
                 LOG_AND_FREE_DBUS_ERROR(&err);
             } else {
                 LOGE("DBus reply is NULL in function %s", __FUNCTION__);
             }
-            return JNI_FALSE;
+        } else {
+            result = GATT_OPERATION_SUCCESS;
         }
-        return JNI_TRUE;
+
+        LOGE("%s result = %d", __FUNCTION__, result);
+        return result;
     }
 #endif
-    return JNI_FALSE;
+    return -1;
 }
 
 static jboolean gattConnectCancelNative(JNIEnv *env, jobject object,
