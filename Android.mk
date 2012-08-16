@@ -138,7 +138,6 @@ LOCAL_SRC_FILES += \
 	core/java/android/hardware/usb/IUsbManager.aidl \
 	core/java/android/net/IConnectivityManager.aidl \
 	core/java/android/net/IFmcEventListener.aidl \
-	core/java/android/net/IFmcEventListener.aidl \
 	core/java/android/net/ILinkSocketMessageHandler.aidl \
 	core/java/android/net/IThrottleManager.aidl \
 	core/java/android/net/INetworkManagementEventObserver.aidl \
