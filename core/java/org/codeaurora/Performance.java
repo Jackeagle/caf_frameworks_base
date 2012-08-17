@@ -66,17 +66,20 @@ public class Performance
     /* The following two functions are the PerfLock APIs*/
     /** &hide */
     public int perfLockAcquire(int... list) {
-        if (HANDLE == 0)
-            HANDLE = native_perf_lock_acq(list);
-        if (HANDLE > 0)
-            return REQUEST_SUCCEEDED;
-        return REQUEST_FAILED;
+        int rc = 0;
+        rc = native_perf_lock_acq(list);
+        if (rc == 0)
+            return REQUEST_FAILED;
+        if (rc > 1000) {
+            HANDLE = rc;
+        }
+        return REQUEST_SUCCEEDED;
     }
 
     /** &hide */
     public int perfLockRelease() {
         int rc = 0;
-        if (HANDLE > 0)
+        if (HANDLE > 1000)
             rc = native_perf_lock_rel(HANDLE);
             if (rc > 0)
                 HANDLE = 0;
