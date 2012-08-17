@@ -488,6 +488,12 @@ bool SurfaceFlinger::threadLoop()
         // pretend we did the post
         hw.compositionComplete();
         usleep(16667); // 60 fps period
+
+        //If the draw is skipped by any chance, we need to force
+        //composition atleast once.
+        HWComposer& hwc(hw.getHwComposer());
+        hwc.perform(EVENT_FORCE_COMPOSITION, 1);
+
 #ifdef GFX_TESTFRAMEWORK
         lastTimeStamp = systemTime();
 #endif
