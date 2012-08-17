@@ -253,4 +253,10 @@ public interface TelephonyProperties
      * Property to start two ril daemons in case of multi sim.
      */
     static final String PROPERTY_MULTI_RILD = "ro.multi.rild";
+
+    /**
+     * Property to enable MMS Mode.
+     * Type: string ( default = silent, enable to = prompt )
+     */
+    static final String PROPERTY_MMS_TRANSACTION = "mms.transaction";
 }
