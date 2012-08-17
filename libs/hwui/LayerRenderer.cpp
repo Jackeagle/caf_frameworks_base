@@ -246,7 +246,7 @@ Layer* LayerRenderer::createLayer(uint32_t width, uint32_t height, bool isOpaque
     glEnable(GL_SCISSOR_TEST);
 
     glBindFramebuffer(GL_FRAMEBUFFER, previousFbo);
-    TILERENDERING_START(previousFbo);
+    TILERENDERING_START(previousFbo, true);
 
     return layer;
 }
