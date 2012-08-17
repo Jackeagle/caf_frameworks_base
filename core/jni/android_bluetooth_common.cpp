@@ -56,7 +56,8 @@ static Properties remote_device_properties[] = {
     {"TX", DBUS_TYPE_UINT32},
     {"Type", DBUS_TYPE_STRING},
     {"Broadcaster", DBUS_TYPE_BOOLEAN},
-    {"Services", DBUS_TYPE_ARRAY}
+    {"Services", DBUS_TYPE_ARRAY},
+    {"LeConnParams", DBUS_TYPE_UINT16}
 };
 
 static Properties adapter_properties[] = {

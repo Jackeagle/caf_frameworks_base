@@ -124,6 +124,18 @@ public final class BluetoothDevice implements Parcelable {
     public static final String ACTION_RSSI_UPDATE =
             "android.bluetooth.device.action.RSSI_UPDATE";
     /**
+     * Broadcast Action: Negotiated connection parameters update
+     * for the connection between the Gatt server and the remote GATT
+     * client device
+     * <p>Always contains the extra fields {@link #EXTRA_CONN_INTERVAL}
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_LE_CONN_PARAMS =
+            "android.bluetooth.device.action.LE_CONN_PARAMS";
+
+    /**
      * Broadcast Action: Indicates a low level (ACL) connection has been
      * established with a remote device.
      * <p>Always contains the extra field {@link #EXTRA_DEVICE}.
@@ -203,6 +215,11 @@ public final class BluetoothDevice implements Parcelable {
      * Bluetooth hardware.
      */
     public static final String EXTRA_RSSI = "android.bluetooth.device.extra.RSSI";
+    /**
+     * Used as an UINT 16 extra field in {ACTION_LE_CONN_PARAMS} intent.
+     * It contains the negotiated connection interval value after establishing LE connection.
+     * @hide */
+    public static final String EXTRA_CONN_INTERVAL = "android.bluetooth.device.extra.CONN_INTERVAL";
 
     /**
      * Used as an Parcelable {@link BluetoothClass} extra field in {@link
