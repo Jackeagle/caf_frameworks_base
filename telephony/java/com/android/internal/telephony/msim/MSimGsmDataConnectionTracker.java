@@ -51,7 +51,7 @@ import java.util.Collection;
 public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker {
 
     /** Subscription id */
-    protected int mSubscription;
+    protected Integer mSubscription;
 
     /**
      * List of messages that are waiting to be posted, when data call disconnect
@@ -66,8 +66,9 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
     MSimGsmDataConnectionTracker(PhoneBase p) {
         super(p);
         mSubscription = mPhone.getSubscription();
-        mInternalDataEnabled = mSubscription == MSimPhoneFactory.getDataSubscription();
+        mInternalDataEnabled = isActiveDataSubscription();
         log("mInternalDataEnabled (is data sub?) = " + mInternalDataEnabled);
+        broadcastMessenger();
     }
 
     protected void registerForAllEvents() {
@@ -363,7 +364,9 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
 
     /** Returns true if this is current DDS. */
     protected boolean isActiveDataSubscription() {
-        return (mSubscription == MSimPhoneFactory.getDataSubscription());
+        return (mSubscription != null
+                ? mSubscription == MSimPhoneFactory.getDataSubscription()
+                : false);
     }
 
     // setAsCurrentDataConnectionTracker
