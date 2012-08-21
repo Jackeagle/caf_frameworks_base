@@ -47,7 +47,7 @@ import java.util.ArrayList;
 public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTracker {
 
     /** Subscription id */
-    protected int mSubscription;
+    protected Integer mSubscription;
 
     protected MSimCDMAPhone mPhone;
 
@@ -65,8 +65,9 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
         super(p);
         mPhone = p;
         mSubscription = mPhone.getSubscription();
-        mInternalDataEnabled = mSubscription == MSimPhoneFactory.getDataSubscription();
+        mInternalDataEnabled = isActiveDataSubscription();
         log("mInternalDataEnabled (is data sub?) = " + mInternalDataEnabled);
+        broadcastMessenger();
     }
 
     protected void registerForAllEvents() {
@@ -307,7 +308,9 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
 
     /** Returns true if this is current DDS. */
     protected boolean isActiveDataSubscription() {
-        return (mSubscription == MSimPhoneFactory.getDataSubscription());
+        return (mSubscription != null
+                ? mSubscription == MSimPhoneFactory.getDataSubscription()
+                : false);
     }
 
     public void updateRecords() {

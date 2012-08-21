@@ -50,7 +50,7 @@ import java.util.Collection;
 public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker {
 
     /** Subscription id */
-    protected int mSubscription;
+    protected Integer mSubscription;
 
     protected MSimGSMPhone mPhone;
 
@@ -68,8 +68,9 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
         super(p);
         mPhone = p;
         mSubscription = mPhone.getSubscription();
-        mInternalDataEnabled = mSubscription == MSimPhoneFactory.getDataSubscription();
+        mInternalDataEnabled = isActiveDataSubscription();
         log("mInternalDataEnabled (is data sub?) = " + mInternalDataEnabled);
+        broadcastMessenger();
     }
 
     protected void registerForAllEvents() {
@@ -355,7 +356,9 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
 
     /** Returns true if this is current DDS. */
     protected boolean isActiveDataSubscription() {
-        return (mSubscription == MSimPhoneFactory.getDataSubscription());
+        return (mSubscription != null
+                ? mSubscription == MSimPhoneFactory.getDataSubscription()
+                : false);
     }
 
     // setAsCurrentDataConnectionTracker
