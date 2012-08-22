@@ -81,7 +81,7 @@ interface IBluetooth
     boolean unregisterRssiUpdateWatcher(in String address);
     boolean setLEConnectionParams(in String address, in byte prohibitRemoteChg, in byte filterPolicy,
     in int scanInterval, in int scanWindow, in int intervalMin, in int intervalMax, in int latency,
-    in int superVisionTimeout, in int minCeLen, in int maxCeLen);
+    in int superVisionTimeout, in int minCeLen, in int maxCeLen, in int connTimeOut);
     boolean updateLEConnectionParams(in String address, in byte prohibitRemoteChg,
     in int intervalMin, in int intervalMax, in int slaveLatency, in int supervisionTimeout);
     String getRemoteName(in String address);
