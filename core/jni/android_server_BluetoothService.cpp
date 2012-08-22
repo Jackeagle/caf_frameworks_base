@@ -1099,7 +1099,8 @@ static jboolean setLEConnectionParamNative(JNIEnv *env, jobject object,
                                            jint latency,
                                            jint superVisionTimeout,
                                            jint minCeLen,
-                                           jint maxCeLen) {
+                                           jint maxCeLen,
+                                           jint connTimeout) {
 #ifdef HAVE_BLUETOOTH
     LOGV("%s", __FUNCTION__);
     native_data_t *nat = get_native_data(env, object);
@@ -1131,6 +1132,7 @@ static jboolean setLEConnectionParamNative(JNIEnv *env, jobject object,
                                  DBUS_TYPE_UINT16, (uint16_t *)&superVisionTimeout,
                                  DBUS_TYPE_UINT16, (uint16_t *)&minCeLen,
                                  DBUS_TYPE_UINT16, (uint16_t *)&maxCeLen,
+                                 DBUS_TYPE_UINT16, (uint16_t *)&connTimeout,
                                  DBUS_TYPE_INVALID);
         dbus_message_iter_init_append(msg, &iter);
 
@@ -3667,7 +3669,7 @@ static JNINativeMethod sMethods[] = {
              (void *)setDevicePropertyIntegerNative},
     {"updateLEConnectionParametersNative", "(Ljava/lang/String;IIIII)Z",
              (void *)updateLEConnectionParametersNative},
-    {"setLEConnectionParamNative", "(Ljava/lang/String;IIIIIIIIII)Z",
+    {"setLEConnectionParamNative", "(Ljava/lang/String;IIIIIIIIIII)Z",
              (void *)setLEConnectionParamNative},
     {"registerRssiUpdateWatcherNative", "(Ljava/lang/String;IIZ)Z",
              (void *)registerRssiUpdateWatcherNative},

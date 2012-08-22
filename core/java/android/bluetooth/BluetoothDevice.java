@@ -910,7 +910,8 @@ public final class BluetoothDevice implements Parcelable {
                                          int latency,
                                          int superVisionTimeout,
                                          int minCeLen,
-                                         int maxCeLen) {
+                                         int maxCeLen,
+                                         int connTimeout) {
         try {
             return sService.setLEConnectionParams(mAddress,
                                                   prohibitRemoteChg,
@@ -922,7 +923,8 @@ public final class BluetoothDevice implements Parcelable {
                                                   latency,
                                                   superVisionTimeout,
                                                   minCeLen,
-                                                  maxCeLen
+                                                  maxCeLen,
+                                                  connTimeout
                                                   );
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
