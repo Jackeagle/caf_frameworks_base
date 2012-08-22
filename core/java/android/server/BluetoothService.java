@@ -1626,7 +1626,7 @@ public class BluetoothService extends IBluetooth.Stub {
                                          int scanWindow, int intervalMin,
                                          int intervalMax, int latency,
                                          int superVisionTimeout, int minCeLen,
-                                         int maxCeLen) {
+                                         int maxCeLen, int connTimeout) {
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                     "Need BLUETOOTH_ADMIN permission");
@@ -1635,12 +1635,26 @@ public class BluetoothService extends IBluetooth.Stub {
 
         if (!isEnabledInternal()) return false;
 
-        return setLEConnectionParamNative(getObjectPathFromAddress(address),
+        String devPath = null;
+        if (isRemoteDeviceInCache(address) && findDeviceNative(address) != null) {
+            Log.d(TAG, "Find LE device");
+            devPath = getObjectPathFromAddress(address);
+        } else {
+            Log.d(TAG, "Create LE device");
+            devPath = createLeDeviceNative(address);
+        }
+
+        if (devPath == null) {
+            Log.d(TAG, "Device path is null");
+            return false;
+        }
+
+        return setLEConnectionParamNative(devPath,
                                           (int) prohibitRemoteChg, (int) filterPolicy,
                                           scanInterval, scanWindow,
                                           intervalMin, intervalMax,
                                           latency, superVisionTimeout,
-                                          minCeLen, maxCeLen);
+                                          minCeLen, maxCeLen, connTimeout);
     }
 
     public boolean updateLEConnectionParams(String address,
@@ -5130,7 +5144,7 @@ public class BluetoothService extends IBluetooth.Stub {
             int supervisionTimeout);
     private native boolean setLEConnectionParamNative(String objectPath, int prohibitRemoteChg,
             int filterPolicy, int scanInterval, int scanWindow, int intervalMin, int intervalMax,
-            int latency, int superVisionTimeout, int minCeLen, int maxCeLen);
+            int latency, int superVisionTimeout, int minCeLen, int maxCeLen, int connTimeout);
     private native boolean registerRssiUpdateWatcherNative(String objectPath,
             int rssiThreshold, int interval, boolean updateOnThreshExceed);
     private native boolean unregisterRssiUpdateWatcherNative(String objectPath);
