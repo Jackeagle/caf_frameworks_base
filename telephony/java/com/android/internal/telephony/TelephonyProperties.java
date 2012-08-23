@@ -265,4 +265,10 @@ public interface TelephonyProperties
      * Type: boolean ( true = multimode enabled, false = multimode disabled)
      */
     static final String PROPERTY_MULTIMODE_CDMA = "ro.config.multimode_cdma";
+
+    /**
+     * Property to enable MMS Mode.
+     * Type: string ( default = silent, enable to = prompt )
+     */
+    static final String PROPERTY_MMS_TRANSACTION = "mms.transaction";
 }
