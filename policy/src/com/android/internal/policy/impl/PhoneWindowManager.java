@@ -2730,7 +2730,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         } // synchronized(mHeadsetLock)
     }
 
-    private synchronized final void update() {
+    private final void update() {
 
         // Retain only relevant bits
         int headsetState = mHeadsetJackState & SUPPORTED_HEADSETS;
