@@ -25,8 +25,13 @@
 #include <qcom_ui.h>
 
 #include <testframework/TestFramework.h>
+#include <utils/KeyedVector.h>
 
 namespace android {
+
+static KeyedVector<const SurfaceTextureClient*, int> sBufferSizeSet;
+static KeyedVector<const SurfaceTextureClient*, int> sBufferTransform;
+static KeyedVector<const SurfaceTextureClient*, int> sQueueBufferStatus;
 
 #ifdef GFX_TESTFRAMEWORK
     //holds time stats for dequeue, lock, queue operations on buffers
@@ -52,6 +57,9 @@ SurfaceTextureClient::~SurfaceTextureClient() {
     if (mConnectedToCpu) {
         SurfaceTextureClient::disconnect(NATIVE_WINDOW_API_CPU);
     }
+    sBufferSizeSet.removeItem(this);
+    sBufferTransform.removeItem(this);
+    sQueueBufferStatus.removeItem(this);
 }
 
 void SurfaceTextureClient::init() {
@@ -66,6 +74,9 @@ void SurfaceTextureClient::init() {
 
     const_cast<int&>(ANativeWindow::minSwapInterval) = 0;
     const_cast<int&>(ANativeWindow::maxSwapInterval) = 1;
+    sBufferSizeSet.add(this, 0);
+    sBufferTransform.add(this, 0);
+    sQueueBufferStatus.add(this, 0);
 
     mReqWidth = 0;
     mReqHeight = 0;
@@ -119,7 +130,7 @@ int SurfaceTextureClient::hook_queueBuffer(ANativeWindow* window,
 
 int SurfaceTextureClient::hook_query(const ANativeWindow* window,
                                 int what, int* value) {
-    const SurfaceTextureClient* c = getSelf(window);
+    SurfaceTextureClient* c = (SurfaceTextureClient*)getSelf(window);
     return c->query(what, value);
 }
 
@@ -184,7 +195,8 @@ int SurfaceTextureClient::dequeueBuffer(android_native_buffer_t** buffer) {
              "BUFFER:STC dequeue end bufSlot=%d buffer=%p",
              buf, mSlots[buf]->handle);
 #endif
-
+    // Set the value, since the buffer has been dequeued.
+    sQueueBufferStatus.replaceValueFor(this, 1);
     return OK;
 }
 
@@ -196,6 +208,8 @@ int SurfaceTextureClient::cancelBuffer(android_native_buffer_t* buffer) {
         return i;
     }
     mSurfaceTexture->cancelBuffer(i);
+    // Reset the value, since the buffer has been cancelled.
+    sQueueBufferStatus.replaceValueFor(this, 0);
     return OK;
 }
 
@@ -270,11 +284,14 @@ int SurfaceTextureClient::queueBuffer(android_native_buffer_t* buffer) {
     if (i < 0) {
         return i;
     }
+    uint32_t currentTransform = sBufferTransform.valueFor(this);
+
     status_t err = mSurfaceTexture->queueBuffer(i, timestamp,
-            &mDefaultWidth, &mDefaultHeight, &mTransformHint);
+            &mDefaultWidth, &mDefaultHeight, &currentTransform);
     if (err != OK)  {
         LOGE("queueBuffer: error queuing buffer to SurfaceTexture, %d", err);
     }
+    mTransformHint = currentTransform;
 #ifdef GFX_TESTFRAMEWORK
     sQueueEndTime[i] = systemTime();
     TF_PRINT(TF_EVENT_STOP, "STClient", eventID, "BUFFER:STC queue end, buffer=%p",
@@ -291,6 +308,8 @@ int SurfaceTextureClient::queueBuffer(android_native_buffer_t* buffer) {
                  i, getpid(), gettid());
     }
 #endif
+    // Reset the value, since the buffer has been queued.
+    sQueueBufferStatus.replaceValueFor(this, 0);
     return err;
 }
 
@@ -326,7 +345,22 @@ int SurfaceTextureClient::query(int what, int* value) const {
                 *value = mDefaultHeight;
                 return NO_ERROR;
             case NATIVE_WINDOW_TRANSFORM_HINT:
+            {
+                int queueStatus = sQueueBufferStatus.valueFor(this);
+                // Check the queue status. If the value is 0, we have
+                // already done a queue and the local variable is up to
+                // date. Use the local value. (set the variable during
+                // dequeue and reset it on queue)
+                if (queueStatus == 0) {
+                    *value = mTransformHint;
+                    return NO_ERROR;
+                }
                 return mSurfaceTexture->query(what, value);
+            }
+            default:
+                if (NATIVE_WINDOW_SET_BUFFERS_SIZE == what) {
+	            sBufferSizeSet.replaceValueFor(this, 1);
+                }
         }
     }
     return mSurfaceTexture->query(what, value);
@@ -438,8 +472,13 @@ int SurfaceTextureClient::dispatchSetBuffersGeometry(va_list args) {
     if (err != 0) {
         return err;
     }
-    LOGV("Resetting the Buffer size to 0 after SET GEOMETRY");
-    err = performQcomOperation(NATIVE_WINDOW_SET_BUFFERS_SIZE, 0, 0, 0);
+    // Do the extra IPC only if the buffer size was set before
+    int isBufferSizeSet = sBufferSizeSet.valueFor(this);
+    if (isBufferSizeSet) {
+        LOGV("Resetting the Buffer size to 0 after SET GEOMETRY");
+        err = performQcomOperation(NATIVE_WINDOW_SET_BUFFERS_SIZE, 0, 0, 0);
+        sBufferSizeSet.replaceValueFor(this, 0);
+    }
     if (err != 0) {
         return err;
     }
@@ -453,8 +492,13 @@ int SurfaceTextureClient::dispatchSetBuffersDimensions(va_list args) {
     if (err != 0) {
         return err;
     }
-    LOGV("Resetting the Buffer size to 0 after SET DIMENSIONS");
-    return performQcomOperation(NATIVE_WINDOW_SET_BUFFERS_SIZE, 0, 0, 0);
+    int isBufferSizeSet = sBufferSizeSet.valueFor(this);
+    if (isBufferSizeSet) {
+        LOGV("Resetting the Buffer size to 0 after SET DIMENSIONS");
+        err = performQcomOperation(NATIVE_WINDOW_SET_BUFFERS_SIZE, 0, 0, 0);
+        sBufferSizeSet.replaceValueFor(this, 0);
+    }
+    return err;
 }
 
 int SurfaceTextureClient::dispatchSetBuffersFormat(va_list args) {
@@ -613,9 +657,8 @@ int SurfaceTextureClient::setScalingMode(int mode)
 int SurfaceTextureClient::setBuffersTransform(int transform)
 {
     LOGV("SurfaceTextureClient::setBuffersTransform");
-    Mutex::Autolock lock(mMutex);
-    status_t err = mSurfaceTexture->setTransform(transform);
-    return err;
+    sBufferTransform.replaceValueFor(this, transform);
+    return NO_ERROR;
 }
 
 int SurfaceTextureClient::setBuffersTimestamp(int64_t timestamp)
