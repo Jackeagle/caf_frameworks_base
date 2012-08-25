@@ -798,19 +798,24 @@ public final class WebViewCore {
                                 break;
 
                             case REDUCE_PRIORITY:
+
                                 sWebCoreHandler.removeMessages(WebCoreThread.RESUME_PRIORITY);
                                 tid = nativeGetTextureGeneratorThreadID();
                                 if (tid > 0) {
                                     try {
                                         Process.setThreadPriority(tid,Process.THREAD_PRIORITY_FOREGROUND);
-                                    } catch (IllegalArgumentException ex){
-                                        Log.e(LOGTAG, "Thread does not exist");
+                                    } catch (Exception ex){
+                                        Log.e(LOGTAG, "setThreadPriority failed: " + ex);
                                     }
                                 }
                                     // 10 is an adjustable number.
-                                Process.setThreadPriority(
-                                    Process.THREAD_PRIORITY_DEFAULT + 10 *
-                                    Process.THREAD_PRIORITY_LESS_FAVORABLE);
+                                try {
+                                     Process.setThreadPriority(
+                                             Process.THREAD_PRIORITY_DEFAULT + 10 *
+                                             Process.THREAD_PRIORITY_LESS_FAVORABLE);
+                                } catch (Exception ex){
+                                    Log.e(LOGTAG, "setThreadPriority failed: " + ex);
+                                }
 
                                 sWebCoreHandler.sendMessageDelayed(Message.obtain(null,
                                     WebCoreThread.RESUME_PRIORITY), mResumeTimerDuration);
@@ -827,12 +832,18 @@ public final class WebViewCore {
                                 if (tid > 0) {
                                     try {
                                         Process.setThreadPriority(tid,Process.THREAD_PRIORITY_DEFAULT);
-                                    } catch (IllegalArgumentException ex) {
-                                        Log.e(LOGTAG, "Thread does not exist");
+                                    } catch (Exception ex) {
+                                        Log.e(LOGTAG, "setThreadPriority failed: " + ex);
                                     }
                                 }
-                                Process.setThreadPriority(
-                                        Process.THREAD_PRIORITY_DEFAULT);
+
+                                try {
+                                    Process.setThreadPriority(
+                                            Process.THREAD_PRIORITY_DEFAULT);
+                                }
+                                catch (Exception ex){
+                                    Log.e(LOGTAG, "setThreadPriority failed: " + ex);
+                                }
 
                                 if (core != null)
                                 {
