@@ -2401,8 +2401,12 @@ public class PowerManagerService extends IPowerManager.Stub
 
                 if (target != currentValue) {
                     final boolean doScreenAnim = (mask & (SCREEN_BRIGHT_BIT | SCREEN_ON_BIT)) != 0;
+                    final boolean turningOff = endValue == PowerManager.BRIGHTNESS_OFF;
+                    if (turningOff && doScreenAnim) {
+                        duration = 200; // TODO: how long should this be?
+                    }
                     if (doScreenAnim) {
-                        animateInternal(mask, false , 0);
+                        animateInternal(mask, turningOff, 0);
                     }
                     // TODO: Handle keyboard light animation when we have devices that support it
                 }
