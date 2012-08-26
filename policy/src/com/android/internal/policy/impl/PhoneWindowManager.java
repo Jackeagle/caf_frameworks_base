@@ -4002,6 +4002,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
 
             final int preferredRotation;
+            boolean fixHdmiOrientation = true; //by default fix HDMI orientation
+                                               //to landscapse
+            //read the system property if we need to use sensor orientation for
+            //hdmi
+            String hdmiOrientationProp = SystemProperties.get("hdmi.Landscape");
+            if (! "".equals(hdmiOrientationProp)) {
+                if (hdmiOrientationProp.equals("0"))
+                    fixHdmiOrientation = false;
+            }
             if (mLidState == LID_OPEN && mLidOpenRotation >= 0) {
                 // Ignore sensor when lid switch is open and rotation is forced.
                 preferredRotation = mLidOpenRotation;
@@ -4021,7 +4030,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 // enable 180 degree rotation while docked.
                 preferredRotation = mDeskDockEnablesAccelerometer
                         ? sensorRotation : mDeskDockRotation;
-            } else if (mHdmiPlugged) {
+            } else if (mHdmiPlugged && fixHdmiOrientation) {
                 // Ignore sensor when plugged into HDMI.
                 // Note that the dock orientation overrides the HDMI orientation.
                 preferredRotation = mHdmiRotation;
