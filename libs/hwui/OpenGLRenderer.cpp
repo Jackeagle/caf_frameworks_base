@@ -642,7 +642,8 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
     TILERENDERING_END(previousFbo);
     glBindFramebuffer(GL_FRAMEBUFFER, layer->getFbo());
     TILERENDERING_START(layer->getFbo(), clip.left, clip.top,
-                        clip.right, clip.bottom, mWidth, mHeight);
+                        clip.right, clip.bottom,
+                        bounds.getWidth(), bounds.getHeight());
     layer->bindTexture();
 
     // Initialize the texture if needed
