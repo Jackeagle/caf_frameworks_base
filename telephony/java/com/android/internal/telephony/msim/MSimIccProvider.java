@@ -114,7 +114,12 @@ public class MSimIccProvider extends IccProvider {
         int match = URL_MATCHER.match(url);
         switch (match) {
             case ADN_SUB1:
+                subscription = MSimConstants.SUB1;
+                efType = IccConstants.EF_ADN;
+                break;
+
             case ADN_SUB2:
+                subscription = MSimConstants.SUB2;
                 efType = IccConstants.EF_ADN;
                 break;
 
@@ -182,12 +187,22 @@ public class MSimIccProvider extends IccProvider {
         int match = URL_MATCHER.match(url);
         switch (match) {
             case ADN_SUB1:
+                subscription = MSimConstants.SUB1;
+                efType = IccConstants.EF_ADN;
+                break;
+
             case ADN_SUB2:
+                subscription = MSimConstants.SUB2;
                 efType = IccConstants.EF_ADN;
                 break;
 
             case FDN_SUB1:
+                subscription = MSimConstants.SUB1;
+                efType = IccConstants.EF_FDN;
+                break;
+
             case FDN_SUB2:
+                subscription = MSimConstants.SUB2;
                 efType = IccConstants.EF_FDN;
                 break;
 
@@ -239,8 +254,6 @@ public class MSimIccProvider extends IccProvider {
             return 0;
         }
 
-        subscription = (match == FDN_SUB1) ? MSimConstants.SUB1 : MSimConstants.SUB2;
-
         boolean success = deleteIccRecordFromEf(efType, tag, number, emails, pin2, subscription);
         if (!success) {
             return 0;
@@ -260,7 +273,11 @@ public class MSimIccProvider extends IccProvider {
         int match = URL_MATCHER.match(url);
         switch (match) {
             case ADN_SUB1:
+                subscription = MSimConstants.SUB1;
+                efType = IccConstants.EF_ADN;
+                break;
             case ADN_SUB2:
+                subscription = MSimConstants.SUB2;
                 efType = IccConstants.EF_ADN;
                 break;
 
