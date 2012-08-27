@@ -523,7 +523,11 @@ public class SubscriptionManager extends Handler {
                     .getCommandError();
                 if (error != null &&
                         error ==  CommandException.Error.SUBSCRIPTION_NOT_SUPPORTED) {
-                    cause = SUB_DEACTIVATE_NOT_SUPPORTED;
+                    if (setSubParam.subStatus == SubscriptionStatus.SUB_ACTIVATE) {
+                        cause = SUB_ACTIVATE_NOT_SUPPORTED;
+                    } else if (setSubParam.subStatus == SubscriptionStatus.SUB_DEACTIVATE) {
+                        cause = SUB_DEACTIVATE_NOT_SUPPORTED;
+                    }
                 }
             }
 
