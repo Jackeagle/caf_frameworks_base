@@ -431,6 +431,10 @@ public class UsbDeviceManager {
         }
 
         private void setEnabledFunctions(String functions, boolean makeDefault) {
+           String mExtraFunctions = SystemProperties.get("sys.usb.config.extra");
+           if (!mExtraFunctions.equals("") && (functions != null)) {
+               functions = addFunction(functions, mExtraFunctions);
+           }
 
             // Do not update persystent.sys.usb.config if the device is booted up
             // with OEM specific mode.
