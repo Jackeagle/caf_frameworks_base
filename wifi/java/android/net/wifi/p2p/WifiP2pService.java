@@ -193,6 +193,9 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     /* the package name of foreground application. */
     private String mForegroundAppPkgName;
 
+    /**@hide*/
+    public static boolean doConcurrentScan = true;
+
     /* Is chosen as a unique range to avoid conflict with
        the range defined in Tethering.java */
     private static final String[] DHCP_RANGE = {"192.168.49.2", "192.168.49.254"};
@@ -878,6 +881,16 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         resp.setSrcDevice(dev);
                         sendServiceResponse(resp);
                     }
+                    break;
+               case WifiP2pManager.DISABLE_CONCURRENT_SCAN:
+                    if (DBG) logd("Disable concuuernt scan in p2pEnabledState");
+                     doConcurrentScan = false;
+                     replyToMessage(message, WifiP2pManager.DISABLE_CONCURRENT_SCAN_SUCCEEDED);
+                    break;
+               case WifiP2pManager.ENABLE_CONCURRENT_SCAN:
+                    if (DBG) logd("Enable concuuernt scan in p2pEnabledState");
+                     doConcurrentScan = true;
+                     replyToMessage(message, WifiP2pManager.ENABLE_CONCURRENT_SCAN_SUCCEEDED);
                     break;
                 default:
                     return NOT_HANDLED;

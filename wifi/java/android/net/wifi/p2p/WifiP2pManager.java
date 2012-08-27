@@ -443,6 +443,19 @@ public class WifiP2pManager {
     /** @hide */
     public static final int UPDATE_WFD_SETTINGS_FAILED              = BASE + 61;
 
+    /** @hide */
+    public static final int DISABLE_CONCURRENT_SCAN                 = BASE + 62;
+    /** @hide */
+    public static final int DISABLE_CONCURRENT_SCAN_SUCCEEDED       = BASE + 63;
+    /** @hide */
+    public static final int DISABLE_CONCURRENT_SCAN_FAILED          = BASE + 64;
+    /** @hide */
+    public static final int ENABLE_CONCURRENT_SCAN                 = BASE + 65;
+    /** @hide */
+    public static final int ENABLE_CONCURRENT_SCAN_SUCCEEDED       = BASE + 66;
+    /** @hide */
+    public static final int ENABLE_CONCURRENT_SCAN_FAILED          = BASE + 67;
+
     /**
      * Create a new WifiP2pManager instance. Applications use
      * {@link android.content.Context#getSystemService Context.getSystemService()} to retrieve
@@ -975,6 +988,26 @@ public class WifiP2pManager {
     public void connect(Channel c, WifiP2pConfig config, ActionListener listener) {
         checkChannel(c);
         c.mAsyncChannel.sendMessage(CONNECT, 0, c.putListener(listener), config);
+    }
+    /**
+     * Disable concurrent scan while p2p is active
+     *
+     * @param c is the channel created at {@link #initialize}
+     * @hide
+     */
+    public void disableConcurrentScan(Channel c,ActionListener listener) {
+        checkChannel(c);
+        c.mAsyncChannel.sendMessage(DISABLE_CONCURRENT_SCAN, 0, c.putListener(listener));
+    }
+    /**
+     * Disable concurrent scan while p2p is active
+     *
+     * @param c is the channel created at {@link #initialize}
+     * @hide
+     */
+    public void enableConcurrentScan(Channel c,ActionListener listener) {
+        checkChannel(c);
+        c.mAsyncChannel.sendMessage(ENABLE_CONCURRENT_SCAN, 0, c.putListener(listener));
     }
 
     /**
