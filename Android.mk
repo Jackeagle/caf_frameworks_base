@@ -247,7 +247,8 @@ LOCAL_SRC_FILES += \
 	telephony/java/com/android/internal/telephony/IExtendedNetworkService.aidl \
 	voip/java/android/net/sip/ISipSession.aidl \
 	voip/java/android/net/sip/ISipSessionListener.aidl \
-	voip/java/android/net/sip/ISipService.aidl
+	voip/java/android/net/sip/ISipService.aidl \
+	core/java/android/bluetooth/IBluetoothPreferredDeviceListCallback.aidl
 #
 
 

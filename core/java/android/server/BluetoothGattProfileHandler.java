@@ -79,6 +79,11 @@ final class BluetoothGattProfileHandler {
     private static final int MESSAGE_READ_RESP = 10;
     private static final int MESSAGE_WRITE_RESP = 11;
     private static final int MESSAGE_DISCONNECT_LE = 12;
+    private static final int MESSAGE_ADD_TO_PREFERRED_DEVICE_LIST = 13;
+    private static final int MESSAGE_REMOVE_FROM_PREFERRED_DEVICE_LIST = 14;
+    private static final int MESSAGE_CLEAR_PREFERRED_DEVICE_LIST = 15;
+    private static final int MESSAGE_CREATE_CONN_REQ_PREFERRED_DEVICE_LIST = 16;
+    private static final int MESSAGE_CANCEL_CREATE_CONN_REQ_PREFERRED_DEVICE_LIST = 17;
 
     private static final String UUID = "uuid";
     private static final String HANDLE = "handle";
@@ -102,7 +107,10 @@ final class BluetoothGattProfileHandler {
             byte property;
             String uuid;
             boolean result = true;
-            String path = config.getPath();
+            String path = null;
+            if(config != null) {
+                path = config.getPath();
+            }
             int payloadLen = 0;
             String errorString;
 
@@ -324,6 +332,50 @@ final class BluetoothGattProfileHandler {
                 else
                     status = BluetoothGatt.GATT_FAILURE;
                 break;
+
+            case MESSAGE_ADD_TO_PREFERRED_DEVICE_LIST:
+                path = msg.getData().getString(PATH);
+                result  = mBluetoothService.addToPreferredDeviceListNative(path);
+                if (!result)
+                    status = BluetoothGatt.GATT_SUCCESS;
+                else
+                    status = BluetoothGatt.GATT_FAILURE;
+                break;
+
+            case MESSAGE_REMOVE_FROM_PREFERRED_DEVICE_LIST:
+                path = msg.getData().getString(PATH);
+
+                result  = mBluetoothService.removeFromPreferredDeviceListNative(path);
+                if (!result)
+                    status = BluetoothGatt.GATT_SUCCESS;
+                else
+                    status = BluetoothGatt.GATT_FAILURE;
+                break;
+
+            case MESSAGE_CLEAR_PREFERRED_DEVICE_LIST:
+                result  = mBluetoothService.clearPreferredDeviceListNative();
+                if (!result)
+                    status = BluetoothGatt.GATT_SUCCESS;
+                else
+                    status = BluetoothGatt.GATT_FAILURE;
+                break;
+
+            case MESSAGE_CREATE_CONN_REQ_PREFERRED_DEVICE_LIST:
+                result  = mBluetoothService.gattConnectToPreferredDeviceListNative();
+                if (!result)
+                    status = BluetoothGatt.GATT_SUCCESS;
+                else
+                    status = BluetoothGatt.GATT_FAILURE;
+                break;
+
+            case MESSAGE_CANCEL_CREATE_CONN_REQ_PREFERRED_DEVICE_LIST:
+                result  = mBluetoothService.gattCancelConnectToPreferredDeviceListNative();
+                if (!result)
+                    status = BluetoothGatt.GATT_SUCCESS;
+                else
+                    status = BluetoothGatt.GATT_FAILURE;
+                break;
+
             }
         }
     };
@@ -612,6 +664,50 @@ final class BluetoothGattProfileHandler {
 
         return true;
     }
+
+    boolean addToPreferredDeviceList(String  path) {
+        Log.d(TAG, " addToPreferredDeviceList path : " + path);
+        Bundle b = new Bundle();
+        b.putString(PATH, path);
+
+        Message msg = mHandler.obtainMessage(MESSAGE_ADD_TO_PREFERRED_DEVICE_LIST);
+        msg.setData(b);
+        mHandler.sendMessage(msg);
+        return true;
+    }
+
+    boolean removeFromPreferredDeviceList(String  path) {
+        Log.d(TAG, " removeFromPreferredDeviceList path : " + path);
+        Bundle b = new Bundle();
+        b.putString(PATH, path);
+
+        Message msg = mHandler.obtainMessage(MESSAGE_REMOVE_FROM_PREFERRED_DEVICE_LIST);
+        msg.setData(b);
+        mHandler.sendMessage(msg);
+        return true;
+    }
+
+    boolean clearPreferredDeviceList() {
+        Log.d(TAG, " clearPreferredDeviceList  : ");
+        Message msg = mHandler.obtainMessage(MESSAGE_CLEAR_PREFERRED_DEVICE_LIST);
+        mHandler.sendMessage(msg);
+        return true;
+    }
+
+    boolean gattConnectToPreferredDeviceList() {
+        Log.d(TAG, " gattConnectToPreferredDeviceList  : ");
+        Message msg = mHandler.obtainMessage(MESSAGE_CREATE_CONN_REQ_PREFERRED_DEVICE_LIST);
+        mHandler.sendMessage(msg);
+        return true;
+    }
+
+    boolean gattCancelConnectToPreferredDeviceList() {
+        Log.d(TAG, " gattCancelConnectToPreferredDeviceList : ");
+        Message msg = mHandler.obtainMessage(MESSAGE_CANCEL_CREATE_CONN_REQ_PREFERRED_DEVICE_LIST);
+        mHandler.sendMessage(msg);
+        return true;
+    }
+
 
     /*package*/ synchronized void onGattDiscoverPrimaryRequest(String path, int start, int end, int reqHandle) {
          Log.d(TAG, "onGattDiscoverPrimaryRequest - path : "  + path + "start :  " + start + " end : " + end );
