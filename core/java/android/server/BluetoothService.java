@@ -1845,16 +1845,6 @@ public class BluetoothService extends IBluetooth.Stub {
         BluetoothClass btClass = new BluetoothClass(getRemoteClass(address));
         int btDeviceClass = btClass.getDeviceClass();
 
-        if (btDeviceClass == BluetoothClass.Device.PERIPHERAL_POINTING) {
-            Log.i(TAG, "The device is HID pointing device, skipping pairing");
-            if (!createDeviceNative(address)) {
-                Log.e(TAG, "CreateDeviceNative failed for " + address);
-                return false;
-            }
-            mBondState.setBondState(address, BluetoothDevice.BOND_BONDING);
-            return true;
-        }
-
         if (!createPairedDeviceNative(address, 60000  /*1 minute*/ )) {
             return false;
         }
