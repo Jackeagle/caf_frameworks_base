@@ -19,6 +19,7 @@ package android.net.wifi;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pService;
 import android.text.TextUtils;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
@@ -116,7 +117,14 @@ public class WifiNative {
     }
 
     public boolean scan() {
-       return doBooleanCommand("SCAN");
+        if (WifiP2pService.doConcurrentScan) {
+            if (DBG) Log.d(mTAG, "doConcurrentScan is true");
+                return doBooleanCommand("SCAN");
+        }
+        else {
+            if (DBG) Log.d(mTAG, "doConcurrentScan is false");
+                return false;
+        }
     }
 
     public boolean setScanMode(boolean setActive) {
