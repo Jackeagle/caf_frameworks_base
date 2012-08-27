@@ -462,9 +462,6 @@ status_t MediaPlayer::reset_l()
         } else {
             mCurrentState = MEDIA_PLAYER_IDLE;
         }
-        // setDataSource has to be called again to create a
-        // new mediaplayer.
-        mPlayer = 0;
         return ret;
     }
     clear_l();
