@@ -78,9 +78,6 @@ const static int64_t kBufferFilledEventTimeOutNs = 3000000000LL;
 // component in question is buggy or not.
 const static uint32_t kMaxColorFormatSupported = 1000;
 
-static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
-
 struct CodecInfo {
     const char *mime;
     const char *codec;
@@ -104,7 +101,7 @@ class ColorFormatInfo {
                 return preferredColorFormat[REMOTE];
             } else {
                 if(!strcmp(colorformat, "yamato")) {
-                    return QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka;
+                    return OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka;
                 }
                 return preferredColorFormat[LOCAL];
             }
@@ -113,24 +110,24 @@ class ColorFormatInfo {
 
 const int32_t ColorFormatInfo::preferredColorFormat[] = {
 #ifdef TARGET7x30
-    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
-    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+    OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
+    OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
 #endif
 #ifdef TARGET8x60
-    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
-    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+    OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
+    OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
 #endif
 #ifdef TARGET7x27
     OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
-    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+    OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka
 #endif
 #ifdef TARGET7x27A
-    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka,
-    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+    OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka,
+    OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka
 #endif
 #ifdef TARGET8x50
     OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
-    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+    OMX_QOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka
 #endif
 };
 
@@ -2093,8 +2090,8 @@ status_t OMXCodec::setVideoOutputFormat(
                || format.eColorFormat == OMX_COLOR_FormatCbYCrY
                || format.eColorFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar
                || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar
-               || format.eColorFormat == (OMX_COLOR_FORMATTYPE) QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
-              || format.eColorFormat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka);
+               || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+               || format.eColorFormat == OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka);
 
         err = mOMX->setParameter(
                 mNode, OMX_IndexParamVideoPortFormat,
@@ -2609,11 +2606,11 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
     }
 
     int format = (def.format.video.eColorFormat ==
-                  QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka)?
+                  OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka)?
                  (int) HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED : def.format.video.eColorFormat;
-    if(def.format.video.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar)
+    if (def.format.video.eColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar)
         format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
-    if(def.format.video.eColorFormat == (OMX_COLOR_FORMATTYPE) QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka)
+    if (def.format.video.eColorFormat == OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka)
         format = HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO;
 
     format ^= (mInterlaceFormatDetected ? HAL_PIXEL_FORMAT_INTERLACE : 0);
@@ -5552,10 +5549,10 @@ static const char *colorFormatString(OMX_COLOR_FORMATTYPE type) {
         return "OMX_TI_COLOR_FormatYUV420PackedSemiPlanar";
     } else if (type == OMX_QCOM_COLOR_FormatYVU420SemiPlanar) {
         return "OMX_QCOM_COLOR_FormatYVU420SemiPlanar";
-    } else if (type == (OMX_COLOR_FORMATTYPE) QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka) {
-        return "QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka";
-    } else if (type == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) {
-        return "QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka";
+    } else if (type == OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka) {
+        return "OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka";
+    } else if (type == OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) {
+        return "OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka";
     }
     /*else if (type ==  OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace) {
         return "OMX_QCOM_COLOR_FormatYVU420SemiPlanarInterlace";
@@ -6381,7 +6378,7 @@ status_t OMXCodec::processSEIData() {
         CHECK(mOutputFormat->findInt32(kKeyHeight, &height));
         CHECK(mOutputFormat->findInt32(kKeyColorFormat, &colorFormat));
 
-        colorFormat = (colorFormat == QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) ?
+        colorFormat = (colorFormat == OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka) ?
             HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED : colorFormat;
 
         //We don't want to continue checking every buffer, so we mark as 3D detected

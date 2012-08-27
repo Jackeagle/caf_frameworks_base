@@ -214,7 +214,7 @@ status_t PostProcC2DColorConversion::convertUsingC2D(MediaBuffer* inputBuffer, M
 ColorConvertFormat PostProcC2DColorConversion::getC2DFormat(int32_t format)
 {
     switch (format) {
-        case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
+        case OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
             return YCbCr420Tile;
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:

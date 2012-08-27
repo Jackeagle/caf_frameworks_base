@@ -39,7 +39,6 @@ Copyright (c) 2012, Code Aurora Forum. All rights reserved.
 #include <dlfcn.h>
 #include <utils/Log.h>
 #include <PostProcControllerInterface.h>
-#include <OMX_QCOMExtns.h>
 
 #define ALIGN8K 8192
 #define ALIGN4K 4096
