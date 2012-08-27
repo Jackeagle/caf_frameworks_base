@@ -397,4 +397,20 @@ interface INetworkManagementService
      * Request router solicitation for the interface
      */
     String getIpv6Gateway(String iface);
+
+    /**
+     * Set SAP Channel Range
+    */
+    void setChannelRange(int startchannel, int endchannel, int band);
+
+    /**
+     * Get SAP Current Operating Channel
+    */
+    int getSapOperatingChannel();
+
+    /**
+     * Get SAP Auto Channel Selection
+    */
+    int getSapAutoChannelSelection();
+
 }
