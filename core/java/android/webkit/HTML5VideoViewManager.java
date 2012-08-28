@@ -85,24 +85,24 @@ class HTML5VideoViewManager
         }
     }
 
-    public void enterFullScreenVideo(int layerId, String url) {
+    public void enterFullscreenVideo(int layerId, String url) {
         assert (mUiThread == Thread.currentThread());
         Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
         while (iter.hasNext()) {
             HTML5VideoViewProxy proxy = iter.next();
             if (proxy.getVideoLayerId() == layerId)
-                proxy.prepareEnterFullscreen();
+                proxy.webkitEnterFullscreen();
             else
                 proxy.pauseAndDispatch();
         }
     }
 
-    public void exitFullScreenVideo() {
+    public void exitFullscreenVideo() {
         assert (mUiThread == Thread.currentThread());
         Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
         while (iter.hasNext()) {
             HTML5VideoViewProxy proxy = iter.next();
-            proxy.prepareExitFullscreen();
+            proxy.webKitExitFullscreen();
         }
     }
 }

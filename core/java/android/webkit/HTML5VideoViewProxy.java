@@ -161,16 +161,25 @@ class HTML5VideoViewProxy extends Handler
             }
         }
 
-        public void enterFullScreenVideo(String url, float x, float y, float w, float h) {
+        public void enterFullscreenVideo(String url, float x, float y, float w, float h) {
             if (ensureHTML5VideoView(url, mCachedPosition, false)) {
                 mHTML5VideoView.prepareDataAndDisplayMode();
             }
-            mHTML5VideoView.enterFullScreenVideoState(mWebView, x, y, w, h);
+            mHTML5VideoView.enterFullscreenVideoState(mWebView, x, y, w, h);
         }
 
-        public void exitFullScreenVideo(float x, float y, float w, float h) {
+        public void exitFullscreenVideo(float x, float y, float w, float h) {
             if (mHTML5VideoView != null) {
-                mHTML5VideoView.exitFullScreenVideoState(x, y, w, h);
+                mHTML5VideoView.exitFullscreenVideoState(x, y, w, h);
+            }
+        }
+
+        public void webkitExitFullscreenVideo() {
+            if (!mHTML5VideoView.fullscreenExited() && mHTML5VideoView.isFullscreenMode()) {
+                WebChromeClient client = mWebView.getWebChromeClient();
+                if (client != null) {
+                    client.onHideCustomView();
+                }
             }
         }
 
@@ -234,7 +243,7 @@ class HTML5VideoViewProxy extends Handler
 
         public void end() {
             if (mHTML5VideoView != null)
-                mHTML5VideoView.showControllerInFullScreen();
+                mHTML5VideoView.showControllerInFullscreen();
             if (mProxy != null) {
                 if (isVideoSelfEnded)
                     mProxy.dispatchOnEnded();
@@ -328,7 +337,7 @@ class HTML5VideoViewProxy extends Handler
         mWebCoreHandler.sendMessage(msg);
     }
 
-    public void dispatchOnStopFullScreen() {
+    public void dispatchOnStopFullscreen() {
         Message msg = Message.obtain(mWebCoreHandler, STOPFULLSCREEN);
         mWebCoreHandler.sendMessage(msg);
     }
@@ -430,13 +439,13 @@ class HTML5VideoViewProxy extends Handler
             }
             case ENTER_FULLSCREEN: {
                 InlineVideoInfo info = (InlineVideoInfo)msg.obj;
-                mVideoPlayer.enterFullScreenVideo(info.getUrl(),
+                mVideoPlayer.enterFullscreenVideo(info.getUrl(),
                         info.getX(), info.getY(), info.getWidth(), info.getHeight());
                 break;
             }
             case EXIT_FULLSCREEN: {
                 InlineVideoInfo info = (InlineVideoInfo)msg.obj;
-                mVideoPlayer.exitFullScreenVideo(info.getX(), info.getY(),
+                mVideoPlayer.exitFullscreenVideo(info.getX(), info.getY(),
                         info.getWidth(), info.getHeight());
                 break;
             }
@@ -839,12 +848,16 @@ class HTML5VideoViewProxy extends Handler
         mVideoPlayer.suspend();
     }
 
-    public void prepareEnterFullscreen() {
+    public void webkitEnterFullscreen() {
         nativePrepareEnterFullscreen(mNativePointer);
     }
 
     public void prepareExitFullscreen() {
         nativePrepareExitFullscreen(mNativePointer);
+    }
+
+    public void webKitExitFullscreen() {
+        mVideoPlayer.webkitExitFullscreenVideo();
     }
 
     public int getVideoLayerId() {

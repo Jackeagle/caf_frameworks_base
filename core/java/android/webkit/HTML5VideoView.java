@@ -549,7 +549,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         // Otherwise data will return invalid values
         if (mIsFullscreen && mCurrentState == STATE_PREPARED) {
             if (mMediaController == null) {
-                MediaController mc = new FullScreenMediaController(mProxy.getContext(), mLayout);
+                MediaController mc = new FullscreenMediaController(mProxy.getContext(), mLayout);
                 mc.setSystemUiVisibility(mLayout.getSystemUiVisibility());
                 mMediaController = mc;
                 mMediaController.setMediaPlayer(this);
@@ -590,6 +590,10 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
             mMediaController.show();
     }
 
+    public boolean fullscreenExited() {
+        return (mLayout == null);
+    }
+
     private final WebChromeClient.CustomViewCallback mCallback =
         new WebChromeClient.CustomViewCallback() {
             public void onCustomViewHidden() {
@@ -618,7 +622,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         return false;
     }
 
-    public void enterFullScreenVideoState(WebViewClassic webView, float x, float y, float w, float h) {
+    public void enterFullscreenVideoState(WebViewClassic webView, float x, float y, float w, float h) {
         if (mIsFullscreen == true)
             return;
         mIsFullscreen = true;
@@ -668,7 +672,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         }
     }
 
-    public void exitFullScreenVideoState(float x, float y, float w, float h) {
+    public void exitFullscreenVideoState(float x, float y, float w, float h) {
         if (mIsFullscreen == false) {
             return;
         }
@@ -701,6 +705,10 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         }
     }
 
+    public boolean isFullscreenMode() {
+        return mIsFullscreen;
+    }
+
     // MediaController FUNCTIONS:
     public boolean canPause() {
         return mCanPause;
@@ -731,7 +739,10 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         return mStartWhenPrepared;
     }
 
-    public void showControllerInFullScreen() {
+    public void showControllerInFullscreen() {
+        if (mMediaController != null) {
+            mMediaController.show(0);
+        }
     }
 
     // Other listeners functions:
@@ -748,11 +759,11 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         return false;
     }
 
-    static class FullScreenMediaController extends MediaController {
+    static class FullscreenMediaController extends MediaController {
 
         View mVideoView;
 
-        public FullScreenMediaController(Context context, View video) {
+        public FullscreenMediaController(Context context, View video) {
             super(context);
             mVideoView = video;
         }
@@ -815,7 +826,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     }
 
     private void finishExitingFullscreen() {
-        mProxy.dispatchOnStopFullScreen();
+        mProxy.dispatchOnStopFullscreen();
         mLayout.removeView(mTextureView);
         mTextureView = null;
         if (mProgressView != null) {
