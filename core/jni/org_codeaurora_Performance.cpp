@@ -49,6 +49,7 @@ static void (*cpu_boost)(int)                       = NULL;
 static int  (*cpu_setoptions)(int, int)             = NULL;
 static int  (*perf_lock_acq)(int[], int)            = NULL;
 static int  (*perf_lock_rel)(int)                   = NULL;
+static int  (*pulse_freq_boost)(int, int)           = NULL;
 static void *dlhandle                               = NULL;
 
 // ----------------------------------------------------------------------------
@@ -99,6 +100,11 @@ org_codeaurora_performance_native_init()
         goto cleanup;
     }
 
+    pulse_freq_boost = (int (*) (int, int))dlsym(dlhandle, "pulse_freq_boost");
+    if ((rc = dlerror()) != NULL) {
+        goto cleanup;
+    }
+
     init = (void (*) ())dlsym(dlhandle, "libqc_opt_init");
     if ((rc = dlerror()) != NULL) {
         goto cleanup;
@@ -111,6 +117,7 @@ cleanup:
     cpu_setoptions = NULL;
     perf_lock_acq  = NULL;
     perf_lock_rel  = NULL;
+    pulse_freq_boost = NULL;
     if (dlhandle) {
         dlclose(dlhandle);
         dlhandle = NULL;
@@ -127,6 +134,7 @@ org_codeaurora_performance_native_deinit(JNIEnv *env, jobject clazz)
         cpu_setoptions = NULL;
         perf_lock_acq  = NULL;
         perf_lock_rel  = NULL;
+        pulse_freq_boost = NULL;
 
         deinit = (void (*) ())dlsym(dlhandle, "libqc_opt_deinit");
         if (deinit) {
@@ -185,6 +193,17 @@ org_codeaurora_performance_native_perf_lock_rel(JNIEnv *env, jobject clazz, jint
     return 0;
 }
 
+static jint
+org_codeaurora_performance_native_pulse_freq_boost(JNIEnv *env, jobject clazz, jint duration, jint freq)
+{
+    if (dlhandle == NULL) {
+        org_codeaurora_performance_native_init();
+    }
+    if (pulse_freq_boost) {
+        return (*pulse_freq_boost)(duration, freq);
+    }
+    return 0;
+}
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod gMethods[] = {
@@ -192,6 +211,7 @@ static JNINativeMethod gMethods[] = {
     {"native_cpu_setoptions", "(II)I",                 (int *)org_codeaurora_performance_native_cpu_setoptions},
     {"native_perf_lock_acq",  "([I)I",                 (int *)org_codeaurora_performance_native_perf_lock_acq},
     {"native_perf_lock_rel",  "(I)I",                  (int *)org_codeaurora_performance_native_perf_lock_rel},
+    {"native_pulse_freq_boost","(II)I",                (int *)org_codeaurora_performance_native_pulse_freq_boost},
     {"native_deinit",         "()V",                   (void *)org_codeaurora_performance_native_deinit},
 };
 
