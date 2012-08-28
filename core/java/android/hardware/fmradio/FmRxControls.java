@@ -417,7 +417,7 @@ class FmRxControls
 
 
    /* configure various search parameters and start search */
-   public void searchStations (int fd, int mode, int dwell,
+   public int searchStations (int fd, int mode, int dwell,
                                int dir, int pty, int pi){
       int re = 0;
 
@@ -429,21 +429,35 @@ class FmRxControls
 
 
       re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_SRCHMODE, mode);
-
+      if (re != 0) {
+          Log.e(TAG, "setting of search mode failed");
+          return re;
+      }
       re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_SCANDWELL, dwell);
-
+      if (re != 0) {
+          Log.e(TAG, "setting of scan dwell time failed");
+          return re;
+      }
       if (pty != 0)
       {
          re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_SRCH_PTY, pty);
+         if (re != 0) {
+             Log.e(TAG, "setting of PTY failed");
+             return re;
+         }
       }
 
       if (pi != 0)
       {
          re = FmReceiverJNI.setControlNative (fd, V4L2_CID_PRIVATE_TAVARUA_SRCH_PI, pi);
+         if (re != 0) {
+             Log.e(TAG, "setting of PI failed");
+             return re;
+         }
       }
 
       re = FmReceiverJNI.startSearchNative (fd, dir );
-
+      return re;
    }
 
    /* force mono/stereo mode */
