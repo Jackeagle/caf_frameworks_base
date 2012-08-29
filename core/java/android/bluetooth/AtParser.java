@@ -195,6 +195,10 @@ public class AtParser {
         ArrayList<Object> out = new ArrayList<Object>();
         while (i <= input.length()) {
             j = findChar(',', input, i);
+            if (j == 0) {
+                // Only comma is an argument. Should not be processed.
+                return null;
+           }
 
             String arg = input.substring(i, j);
             try {
@@ -326,6 +330,10 @@ public class AtParser {
                         } else {
                             type = TYPE_SET;
                         }
+                    } else if ((i + 1) == endIndex) {
+                          //Invalid command as there is no string argument after "=". e.g. "AT+VTS="
+                          result.addResult(new AtCommandResult(AtCommandResult.ERROR));
+                          break;
                     } else {
                         type = TYPE_SET;
                     }
@@ -347,6 +355,11 @@ public class AtParser {
                 case TYPE_SET:
                     Object[] args =
                             generateArgs(input.substring(i + 1, endIndex));
+                    if (args == null) {
+                        //Invalid command as there are no arguments after "=". e.g. "AT+VTS=,"
+                        result.addResult(new AtCommandResult(AtCommandResult.ERROR));
+                        break;
+                    }
                     result.addResult(handler.handleSetCommand(args));
                     break;
                 }
