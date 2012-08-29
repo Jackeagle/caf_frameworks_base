@@ -1575,6 +1575,15 @@ public class AudioManager {
         return -1;
     }
 
+     /**
+      * Checks whether FM stream is active.
+      *
+      * @return true if FM is active.
+      */
+    public boolean isFMActive() {
+        return AudioSystem.isStreamActive(STREAM_FM, 0);
+    }
+
     /**
      * Checks whether any music is active.
      *
@@ -1591,8 +1600,8 @@ public class AudioManager {
      * Note: only AudioManager.STREAM_MUSIC is supported at the moment
      */
     public void adjustLocalOrRemoteStreamVolume(int streamType, int direction) {
-        if (streamType != STREAM_MUSIC) {
-            Log.w(TAG, "adjustLocalOrRemoteStreamVolume() doesn't support stream " + streamType);
+        if (streamType != STREAM_MUSIC && streamType != STREAM_FM) {
+            Log.e(TAG, "adjustLocalOrRemoteStreamVolume() doesn't support stream " + streamType);
         }
         IAudioService service = getService();
         try {

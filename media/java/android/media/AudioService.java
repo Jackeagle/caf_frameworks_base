@@ -694,6 +694,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             adjustRemoteVolume(AudioSystem.STREAM_MUSIC, direction, 0);
         } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0)) {
             adjustStreamVolume(AudioSystem.STREAM_MUSIC, direction, 0);
+        } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_FM, 0)) {
+            adjustStreamVolume(AudioSystem.STREAM_FM, direction, 0);
         }
     }
 
@@ -2362,6 +2364,10 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     if (DEBUG_VOL)
                         Log.v(TAG, "getActiveStreamType: Forcing STREAM_MUSIC stream active");
                     return AudioSystem.STREAM_MUSIC;
+                } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_FM, 0)) {
+                    if (DEBUG_VOL)
+                        Log.v(TAG, "getActiveStreamType: Forcing STREAM_FM...");
+                    return AudioSystem.STREAM_FM;
                 } else {
                     if (DEBUG_VOL)
                         Log.v(TAG, "getActiveStreamType: Forcing STREAM_RING b/c default");
@@ -2371,6 +2377,10 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 if (DEBUG_VOL)
                     Log.v(TAG, "getActiveStreamType: Forcing STREAM_MUSIC stream active");
                 return AudioSystem.STREAM_MUSIC;
+            } else if (AudioSystem.isStreamActive(AudioSystem.STREAM_FM, 0)) {
+                if (DEBUG_VOL)
+                    Log.v(TAG, "getActiveStreamType: Forcing STREAM_FM...");
+                return AudioSystem.STREAM_FM;
             } else {
                 if (DEBUG_VOL) Log.v(TAG, "getActiveStreamType: Returning suggested type "
                         + suggestedStreamType);
