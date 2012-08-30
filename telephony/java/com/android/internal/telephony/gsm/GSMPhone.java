@@ -923,7 +923,7 @@ public class GSMPhone extends PhoneBase {
 
     @Override
     public String getMsisdn() {
-        return mIccRecords.getMsisdnNumber();
+        return (mIccRecords != null) ? mIccRecords.getMsisdnNumber() : null;
     }
 
     public String getMdn() {
@@ -931,7 +931,7 @@ public class GSMPhone extends PhoneBase {
     }
 
     public String getLine1AlphaTag() {
-        return (mIccRecords != null) ? mIccRecords.getMsisdnAlphaTag() : "";
+        return (mIccRecords != null) ? mIccRecords.getMsisdnAlphaTag() : null;
     }
 
     public void setLine1Number(String alphaTag, String number, Message onComplete) {
