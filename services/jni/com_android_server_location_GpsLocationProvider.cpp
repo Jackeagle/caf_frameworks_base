@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011,2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -252,9 +253,27 @@ static void agps_status_callback(AGpsStatus* agps_status)
         env->SetByteArrayRegion(byteArray, 0, 1, (const jbyte *) &c );
     }
 
-    env->CallVoidMethod(mCallbacksObj, method_reportAGpsStatus,
-                        agps_status->type, agps_status->status,
-                        agps_status->ipv4_addr, byteArray);
+    jstring ssid_string = NULL;
+    jstring password_string = NULL;
+    if (agps_status->ssid[0] != '\0') {
+      ssid_string = env->NewStringUTF(agps_status->ssid);
+      if (agps_status->password[0] != '\0') {
+        password_string = env->NewStringUTF(agps_status->password);
+      }
+    }
+    ALOGE("agps_status_callback with ssid=%s, string = 0x%p, password = %s, password string = 0x%p",
+         agps_status->ssid,
+         (void *)ssid_string,
+         agps_status->password,
+         (void *)password_string);
+    env->CallVoidMethod(mCallbacksObj,
+                        method_reportAGpsStatus,
+                        agps_status->type,
+                        agps_status->status,
+                        agps_status->ipv4_addr,
+                        byteArray,
+                        ssid_string,
+                        password_string);
 
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
     env->DeleteLocalRef(byteArray);
@@ -348,7 +367,7 @@ static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, 
     method_reportLocation = env->GetMethodID(clazz, "reportLocation", "(IDDDFFFJI[BZFLjava/lang/String;Ljava/lang/String;)V");
     method_reportStatus = env->GetMethodID(clazz, "reportStatus", "(I)V");
     method_reportSvStatus = env->GetMethodID(clazz, "reportSvStatus", "()V");
-    method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(III[B)V");
+    method_reportAGpsStatus = env->GetMethodID(clazz, "reportAGpsStatus", "(III[BLjava/lang/String;Ljava/lang/String;)V");
     method_reportNmea = env->GetMethodID(clazz, "reportNmea", "(J)V");
     method_setEngineCapabilities = env->GetMethodID(clazz, "setEngineCapabilities", "(I)V");
     method_requestNetworkLocation = env->GetMethodID(clazz, "requestNetworkLocation", "(III)V");
