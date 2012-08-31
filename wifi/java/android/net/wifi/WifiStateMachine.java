@@ -137,6 +137,7 @@ public class WifiStateMachine extends StateMachine {
     /* Chipset supports background scan */
     private final boolean mBackgroundScanSupported;
 
+    private Thread mUpdatev6AddrThread = null;
     private String mInterfaceName;
     /* Tethering interface could be seperate from wlan interface */
     private String mTetherInterfaceName;
@@ -185,6 +186,14 @@ public class WifiStateMachine extends StateMachine {
      * Tether state change notification time out
      */
     private static final int TETHER_NOTIFICATION_TIME_OUT_MSECS = 5000;
+
+    /**
+     * V6 gateway thread retry time out to join
+     */
+    private static final int V6_GATEWAY_THREAD_JOIN_RETRY_TIME_OUT_MSECS = 5000;
+
+    /* Tracks sequence number to retry time out */
+    private int mV6RetryToken = 0;
 
     /* Tracks sequence number on a tether notification time out */
     private int mTetherToken = 0;
@@ -292,6 +301,8 @@ public class WifiStateMachine extends StateMachine {
     static final int CMD_TETHER_NOTIFICATION_TIMED_OUT    = BASE + 30;
 
     static final int CMD_BLUETOOTH_ADAPTER_STATE_CHANGE   = BASE + 31;
+
+    static final int CMD_V6_GATEWAY_THREAD_JOIN_RETRY_TIMED_OUT   = BASE + 32;
 
     /* Supplicant commands */
     /* Is supplicant alive ? */
@@ -549,11 +560,6 @@ public class WifiStateMachine extends StateMachine {
      */
     private boolean mReportedRunning = false;
 
-    /**
-     * Keep track of whether we need to retrieve the IPv6 addresses
-     * when connected.
-     */
-    private boolean mUpdateV6Addresses = false;
 
     /**
      * Property for IPv6 support on Wifi
@@ -1599,10 +1605,6 @@ public class WifiStateMachine extends StateMachine {
         mLinkProperties.setInterfaceName(mInterfaceName);
 
         log("persist.wifi.v6:" + mWifiV6Supported);
-        if (mWifiV6Supported) {
-            log("Need to update V6 addresses");
-            mUpdateV6Addresses = true;
-        }
         if (DBG) {
             log("netId=" + mLastNetworkId  + " Link configured: " +
                     mLinkProperties.toString());
@@ -1856,7 +1858,6 @@ public class WifiStateMachine extends StateMachine {
                     loge("Error in requestRtSol for interface " + mInterfaceName + ", :" + e);
                     return;
                 }
-
                 InetAddress ia = null;
                 try {
                     String[] gatewayInfoTokens = gatewayInfo.trim().split(" ");
@@ -1907,6 +1908,64 @@ public class WifiStateMachine extends StateMachine {
         }
 
         if (DBG) log("updateV6Addresses(): linkProperties=" + linkProperties.toString());
+    }
+
+    private void performV6GatewayOp() {
+        /*
+         * Interrupt the already running thread if it is still alive. This ensures
+         * that at any given point in time there can be only one and only thread active.
+         * Since interrupting a thread may not result in its death immediately, keep retrying
+         * by sending delayed messages until thread is dead.
+         */
+        interruptV6GatewayThreadIfAlive();
+        if (mUpdatev6AddrThread != null && mUpdatev6AddrThread.isAlive()) {
+            postGetV6GatewayCmd();
+            return;
+        }
+        acquireV6Gateway();
+    }
+
+    private void postGetV6GatewayCmd() {
+        if (mUpdatev6AddrThread == null) return;
+
+        if (mUpdatev6AddrThread.isAlive() && mUpdatev6AddrThread.isInterrupted()) {
+            /* Send ourselves a delayed message to retry if v6 thread is still alive.
+             * Wait / Retry till it dies gracefully. Also remove any outstanding
+             * previous RETRY requests. (just in case)
+             */
+            removeMessages(CMD_V6_GATEWAY_THREAD_JOIN_RETRY_TIMED_OUT);
+            sendMessageDelayed(obtainMessage(CMD_V6_GATEWAY_THREAD_JOIN_RETRY_TIMED_OUT,
+                    ++mV6RetryToken, 0), V6_GATEWAY_THREAD_JOIN_RETRY_TIME_OUT_MSECS);
+        }
+    }
+
+    private void interruptV6GatewayThreadIfAlive() {
+        if (mUpdatev6AddrThread == null) return;
+        try  {
+            if ( !mUpdatev6AddrThread.isInterrupted() && mUpdatev6AddrThread.isAlive()) {
+                mUpdatev6AddrThread.interrupt();
+
+                // start on a clean slate
+                mAlarmManager.cancel(mIpv6RenewalIntent);
+            } else {
+                log ("Old Thread is Already Interrupted - ignore");
+            }
+
+        } catch (Exception e) {
+            log ("Exception " + e);
+            // ignore
+        }
+    }
+
+    private void acquireV6Gateway() {
+        if (DBG) log ("Starting new thread to acquire V6 Gateway address... ");
+        mUpdatev6AddrThread = new Thread("UpdateV6 Gateway Addr") {
+            @Override
+            public void run() {
+                updateV6Addresses(mLinkProperties);
+            }
+        };
+        mUpdatev6AddrThread.start();
     }
 
     private void handleFailedIpConfiguration() {
@@ -3217,11 +3276,6 @@ public class WifiStateMachine extends StateMachine {
                   if (message.arg1 == DhcpStateMachine.DHCP_SUCCESS) {
                       if (DBG) log("DHCP successful");
                       handleSuccessfulIpConfiguration((DhcpInfoInternal) message.obj);
-
-                      // Post a message to update v6 asynchrnously
-                      if (mWifiV6Supported) {
-                          sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
-                      }
                       transitionTo(mVerifyingLinkState);
                   } else if (message.arg1 == DhcpStateMachine.DHCP_FAILURE) {
                       if (DBG) log("DHCP failed");
@@ -3266,9 +3320,6 @@ public class WifiStateMachine extends StateMachine {
                         if (result.hasProxyChanged()) {
                             log("Reconfiguring proxy on connection");
                             configureLinkProperties();
-                            if (mWifiV6Supported) {
-                                sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
-                            }
                             sendLinkConfigurationChangedBroadcast();
                         }
                     }
@@ -3364,11 +3415,6 @@ public class WifiStateMachine extends StateMachine {
           switch(message.what) {
             case CMD_STATIC_IP_SUCCESS:
                   handleSuccessfulIpConfiguration((DhcpInfoInternal) message.obj);
-
-                  // Post a message to update v6 asynchrnously
-                  if (mWifiV6Supported) {
-                      sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
-                  }
                   transitionTo(mVerifyingLinkState);
                   break;
               case CMD_STATIC_IP_FAILURE:
@@ -3434,7 +3480,7 @@ public class WifiStateMachine extends StateMachine {
             // if we missed the command to update IPV6 address
             // because we transitioned to another state, then
             // re-post it to us.
-            if (mWifiV6Supported && mUpdateV6Addresses) {
+            if (mWifiV6Supported) {
                 sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
             }
        }
@@ -3459,15 +3505,21 @@ public class WifiStateMachine extends StateMachine {
                     transitionTo(mVerifyingLinkState);
                     break;
                 case CMD_UPDATE_IPV6_ADDRESSES:
-                    if (mUpdateV6Addresses) {
-                        mUpdateV6Addresses = false;
-                        updateV6Addresses(mLinkProperties);
-                    }
+                    log ("Update V6 Gateway Address");
+                    performV6GatewayOp();
                     break;
                 case CMD_RENEW_IPV6:
                     log ("Renewing IPv6");
-                    updateV6Addresses(mLinkProperties);
+                    performV6GatewayOp();
                     mWakeLock.release();
+                    break;
+                case CMD_V6_GATEWAY_THREAD_JOIN_RETRY_TIMED_OUT:
+                    if (message.arg1 == mV6RetryToken) {
+                        if (DBG) log ("V6 Gateway thread still active. Retry!");
+                        sendMessage(CMD_UPDATE_IPV6_ADDRESSES);
+                    } else {
+                        loge("V6 G/W thread timed-out: Stale Update - ignore"); //ignore
+                    }
                     break;
                 default:
                     return NOT_HANDLED;
@@ -3476,6 +3528,10 @@ public class WifiStateMachine extends StateMachine {
         }
         @Override
         public void exit() {
+            if (mWifiV6Supported) {
+                interruptV6GatewayThreadIfAlive();
+                removeMessages(CMD_V6_GATEWAY_THREAD_JOIN_RETRY_TIMED_OUT);
+            }
             /* Request a CS wakelock during transition to mobile */
             checkAndSetConnectivityInstance();
             mCm.requestNetworkTransitionWakelock(TAG);
