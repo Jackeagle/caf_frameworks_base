@@ -46,6 +46,10 @@ ifeq ($(USE_OPENGL_RENDERER),true)
 	LOCAL_SHARED_LIBRARIES := libcutils libutils libGLESv2 libskia libui libtilerenderer
 	LOCAL_MODULE := libhwui
 	LOCAL_MODULE_TAGS := optional
+
+	ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
+	    LOCAL_WHOLE_STATIC_LIBRARIES += libqcfontrenderer
+	endif
 	
 	include $(BUILD_SHARED_LIBRARY)
 
