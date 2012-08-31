@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2012 Code Aurora Forum. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -522,9 +526,7 @@ final class NativeDaemonConnector implements Runnable, Handler.Callback, Watchdo
                     mResponses.add(found);
                 }
                 found.responses.add(response);
-            }
-            synchronized (found) {
-                found.notify();
+                mResponses.notifyAll();
             }
         }
 
@@ -562,13 +564,11 @@ final class NativeDaemonConnector implements Runnable, Handler.Callback, Watchdo
                         found = new Response(cmdNum, origCmd);
                         mResponses.add(found);
                     }
-                }
-                try {
-                    synchronized (found) {
-                        found.wait(endTime - nowTime);
+                    try {
+                        mResponses.wait(endTime - nowTime);
+                    } catch (InterruptedException e) {
+                        // loop around to check if we're done or if it's time to stop waiting
                     }
-                } catch (InterruptedException e) {
-                    // loop around to check if we're done or if it's time to stop waiting
                 }
             }
         }
