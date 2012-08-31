@@ -763,11 +763,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 mWakeLock.setWorkSource(new WorkSource(uid));
                 return;
             }
+            // Something went wrong; fall back to attributing the lock to the OS
+            mWakeLock.setWorkSource(null);
         } catch (Exception e) {
         }
-
-        // Something went wrong; fall back to attributing the lock to the OS
-        mWakeLock.setWorkSource(null);
     }
 
     private class AlarmHandler extends Handler {
@@ -961,24 +960,29 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     mBlockedUids.remove(new Integer(uid));
                 } else {
                     if(mBroadcastRefCount > 0){
-                        mInFlight.removeFirst();
                         mBroadcastRefCount--;
                         if (mBroadcastRefCount == 0) {
                             mWakeLock.release();
-                        } else {
-                            // the next of our alarms is now in flight.  reattribute the wakelock.
-                            final PendingIntent nowInFlight = mInFlight.peekFirst();
-                            if (nowInFlight != null) {
-                                setWakelockWorkSource(nowInFlight);
-                            } else {
-                                // should never happen
-                                Slog.e(TAG, "Alarm wakelock still held but sent queue empty");
-                                mWakeLock.setWorkSource(null);
-                            }
                         }
                     } else {
                         if(localLOGV) {
                             Slog.e(TAG,"Trying to decrement mBroadcastRefCnt past zero");
+                        }
+                    }
+                }
+                mInFlight.removeFirst();
+                if (mBroadcastRefCount != 0) {
+                    // the next of our alarms is now in flight.  reattribute the wakelock.
+                    final PendingIntent nowInFlight = mInFlight.peekFirst();
+                    if (nowInFlight != null) {
+                        setWakelockWorkSource(nowInFlight);
+                    } else {
+                        // should never happen
+                        Slog.e(TAG, "Alarm wakelock still held but sent queue empty");
+                        try {
+                            mWakeLock.setWorkSource(null);
+                        } catch (IllegalArgumentException ex) {
+                            ex.printStackTrace();
                         }
                     }
                 }
