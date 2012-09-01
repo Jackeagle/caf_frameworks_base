@@ -42,6 +42,7 @@ import android.net.EthernetDataTracker;
 import android.net.IConnectivityManager;
 import android.net.LinkCapabilities;
 import android.net.IFmcEventListener;
+import android.net.ExtraLinkCapabilities;
 import android.net.INetworkPolicyListener;
 import android.net.INetworkPolicyManager;
 import android.net.INetworkStatsService;
@@ -3468,6 +3469,133 @@ private NetworkStateTracker makeWimaxStateTracker() {
         }
         mHandler.sendMessage(mHandler.obtainMessage(
                     ConnectivityServiceHSM.HSM_EVENT_REPRIORITIZE_DNS, type, INVALID_MSG_ARG));
+    }
+    /*
+     * LinkSocket code is below here.
+     */
+
+    /**
+     * Starts the process of getting a new link for the LinkSocket in a different thread.
+     *
+     *  @return A unique id that the socket will use for further communication.
+     */
+    public int requestLink(LinkCapabilities capabilities, String remoteIPAddress, IBinder binder) {
+        if (VDBG) log("requestLink(capabilities, callback)");
+        if (mCneStarted == false) return 0;
+        return mLinkManager.requestLink(capabilities, remoteIPAddress, binder);
+    }
+
+    /**
+     * Dissociates a LinkSocket with a given link.
+     */
+    public void releaseLink(int id) {
+        if (VDBG) log("releaseLink(id=" + id + ")");
+        if (mCneStarted == false) return;
+        mLinkManager.releaseLink(id);
+    }
+
+    /**
+     * Triggers QoS transaction using the specified local port
+     */
+    public boolean requestQoS(int id, int localPort, String localAddress) {
+        if (VDBG) log("requestQoS(aport)");
+        if (mCneStarted == false) return false;
+        return mLinkManager.requestQoS(id, localPort, localAddress);
+    }
+
+    /**
+     * Triggers QoS suspend
+     */
+    public boolean suspendQoS(int id) {
+        if (VDBG) log("suspendQoS()");
+        if (mCneStarted == false) return false;
+        return mLinkManager.suspendQoS(id);
+    }
+
+    /**
+     * Triggers QoS resume
+     */
+    public boolean resumeQoS(int id) {
+        if (VDBG) log("resumeQoS()");
+        if (mCneStarted == false) return false;
+        return mLinkManager.resumeQoS(id);
+    }
+
+    /**
+     * Removes Qos Registration from link manager
+     */
+    public boolean removeQosRegistration(int id) {
+        if (VDBG) log("removeQosRegistration");
+        if (mCneStarted == false) return false;
+        return mLinkManager.removeQosRegistration(id);
+    }
+
+    public LinkCapabilities requestCapabilities(int id, int[] capability_keys) {
+        if (VDBG) log("requestCapabilities(id=" + id + ", capabilities)");
+        if (mCneStarted == false) return null;
+
+        int netType;
+        ExtraLinkCapabilities cap = new ExtraLinkCapabilities();
+        for (int key : capability_keys) {
+            String temp = null;
+            switch (key) {
+                case LinkCapabilities.Key.RO_MIN_AVAILABLE_FWD_BW:
+                    if ((temp = mLinkManager.getMinAvailableForwardBandwidth(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_MIN_AVAILABLE_FWD_BW,temp);
+                    break;
+                case LinkCapabilities.Key.RO_MAX_AVAILABLE_FWD_BW:
+                    if ((temp = mLinkManager.getMaxAvailableForwardBandwidth(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_MAX_AVAILABLE_FWD_BW, temp);
+                    break;
+                case LinkCapabilities.Key.RO_MIN_AVAILABLE_REV_BW:
+                    if ((temp = mLinkManager.getMinAvailableReverseBandwidth(id)) != null)
+                       cap.put(LinkCapabilities.Key.RO_MIN_AVAILABLE_REV_BW, temp);
+                    break;
+                case LinkCapabilities.Key.RO_MAX_AVAILABLE_REV_BW:
+                    if ((temp = mLinkManager.getMaxAvailableReverseBandwidth(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_MAX_AVAILABLE_REV_BW, temp);
+                    break;
+                case LinkCapabilities.Key.RO_CURRENT_FWD_LATENCY:
+                    if ((temp = mLinkManager.getCurrentFwdLatency(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_CURRENT_FWD_LATENCY, temp);
+                    break;
+                case LinkCapabilities.Key.RO_CURRENT_REV_LATENCY:
+                    if ((temp = mLinkManager.getCurrentRevLatency(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_CURRENT_REV_LATENCY, temp);
+                    break;
+                case LinkCapabilities.Key.RO_NETWORK_TYPE:
+                    cap.put(LinkCapabilities.Key.RO_NETWORK_TYPE,
+                            Integer.toString(mLinkManager.getNetworkType(id)));
+                    break;
+                case LinkCapabilities.Key.RO_BOUND_INTERFACE:
+                    netType = mLinkManager.getNetworkType(id);
+                    if (netType > 0) {
+                        cap.put(LinkCapabilities.Key.RO_BOUND_INTERFACE,
+                                mNetTrackers[netType].getLinkProperties().getInterfaceName());
+                    } else {
+                        cap.put(LinkCapabilities.Key.RO_BOUND_INTERFACE, "unknown");
+                    }
+                    break;
+                case LinkCapabilities.Key.RO_PHYSICAL_INTERFACE:
+                    netType = mLinkManager.getNetworkType(id);
+                    if (netType > 0) {
+                        cap.put(LinkCapabilities.Key.RO_PHYSICAL_INTERFACE,
+                                mNetTrackers[netType].getLinkProperties().getInterfaceName());
+                    } else {
+                        cap.put(LinkCapabilities.Key.RO_PHYSICAL_INTERFACE, "unknown");
+                    }
+                    break;
+               case LinkCapabilities.Key.RO_QOS_STATE:
+                    if ((temp = mLinkManager.getQosState(id)) != null)
+                        cap.put(LinkCapabilities.Key.RO_QOS_STATE, temp);
+                    break;
+            }
+        }
+        return cap;
+    }
+
+    public void setTrackedCapabilities(int id, int[] capabilities) {
+        if (VDBG) log("setTrackedCapabilities(id=" + id + ", capabilities)");
     }
 
 

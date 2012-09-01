@@ -18,6 +18,7 @@
 package android.net;
 
 import android.net.LinkProperties;
+import android.net.LinkCapabilities;
 import android.net.NetworkInfo;
 import android.net.NetworkQuotaInfo;
 import android.net.NetworkState;
@@ -134,4 +135,22 @@ interface IConnectivityManager
     /* CNE */
 
     boolean updateOperatorPolicy(String filePath);
+
+    /* LinkSocket */
+
+    int requestLink(in LinkCapabilities capabilities, String remoteIPAddress, IBinder callback);
+
+    void releaseLink(int id);
+
+    LinkCapabilities requestCapabilities(int id, in int[] capability_keys);
+
+    boolean requestQoS(int id, int localPort, String localAddress);
+
+    boolean suspendQoS(int id);
+
+    boolean resumeQoS(int id);
+
+    boolean removeQosRegistration(int id);
+
+    void setTrackedCapabilities(int id, in int[] capabilities);
 }
