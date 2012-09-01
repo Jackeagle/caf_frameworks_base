@@ -1439,7 +1439,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 status = AudioSystem.setPhoneState(mode);
                 if (status == AudioSystem.AUDIO_STATUS_OK) {
                     // automatically handle audio focus for mode changes
-                    //handleFocusForCalls(mMode, mode, cb);
+                    handleFocusForCalls(mMode, mode, cb);
                     mMode = mode;
                 } else {
                     if (hdlr != null) {
@@ -1520,6 +1520,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
 
             if (mode != mMode) {
                 if (status == AudioSystem.AUDIO_STATUS_OK) {
+                    // automatically handle audio focus for mode changes
+                    handleFocusForCalls(mMode, mode, cb);
                     mMode = mode;
                 } else {
                     if (hdlr != null) {
@@ -1554,6 +1556,40 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             updateStreamVolumeAlias(true /*updateVolumes*/);
         }
         return newModeOwnerPid;
+    }
+
+    /** pre-condition: oldMode != newMode */
+    private void handleFocusForCalls(int oldMode, int newMode, IBinder cb) {
+        // if ringing
+        if (newMode == AudioSystem.MODE_RINGTONE) {
+            // if not ringing silently
+            int ringVolume = AudioService.this.getStreamVolume(AudioManager.STREAM_RING);
+            if (ringVolume > 0) {
+                // request audio focus for the communication focus entry
+                requestAudioFocus(AudioManager.STREAM_RING,
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT, cb,
+                        null /* IAudioFocusDispatcher allowed to be null only for this clientId */,
+                        IN_VOICE_COMM_FOCUS_ID /*clientId*/,
+                        "system");
+
+            }
+        }
+        // if entering call
+        else if ((newMode == AudioSystem.MODE_IN_CALL)
+                || (newMode == AudioSystem.MODE_IN_COMMUNICATION)) {
+            // request audio focus for the communication focus entry
+            // (it's ok if focus was already requested during ringing)
+            requestAudioFocus(AudioManager.STREAM_RING,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT, cb,
+                    null /* IAudioFocusDispatcher allowed to be null only for this clientId */,
+                    IN_VOICE_COMM_FOCUS_ID /*clientId*/,
+                    "system");
+        }
+        // if exiting call
+        else if (newMode == AudioSystem.MODE_NORMAL) {
+            // abandon audio focus for communication focus entry
+            abandonAudioFocus(null, IN_VOICE_COMM_FOCUS_ID);
+        }
     }
 
     /** @see AudioManager#getMode() */
