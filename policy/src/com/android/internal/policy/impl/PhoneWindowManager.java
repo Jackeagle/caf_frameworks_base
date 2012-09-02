@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3360,6 +3361,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     /**
+    * @return Whether FM is being played right now.
+    */
+    boolean isFMActive() {
+        final AudioManager am = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) {
+            Log.w(TAG, "isFMActive: couldn't get AudioManager reference");
+            return false;
+        }
+        return am.isFMActive();
+    }
+
+    /**
      * Tell the audio service to adjust the volume appropriate to the event.
      * @param keycode
      */
@@ -3593,6 +3606,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         // application, handle the volume change here.
                         handleVolumeKey(AudioManager.STREAM_MUSIC, keyCode);
                         break;
+                    } else if (isFMActive() && (result & ACTION_PASS_TO_USER) == 0) {
+                        handleVolumeKey(AudioManager.STREAM_FM, keyCode);
                     }
                 }
                 break;
