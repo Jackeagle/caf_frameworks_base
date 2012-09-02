@@ -753,8 +753,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
     //      CONNECTIVITY_ACTION. Only to accomodate interface
     //      switch during HO.
     //      @see bug/4455071
-    public void handleTetherIfaceChange() {
-        mTetherMasterSM.sendMessage(TetherMasterSM.CMD_UPSTREAM_CHANGED);
+    public void handleTetherIfaceChange(NetworkInfo info) {
+        mTetherMasterSM.sendMessage(TetherMasterSM.CMD_UPSTREAM_CHANGED, info);
     }
 
     class TetherInterfaceSM extends StateMachine {
@@ -1313,8 +1313,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 Log.d(TAG, "adding v6 interface " + iface);
                 try {
                     service.addUpstreamV6Interface(iface);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Unable to append v6 upstream interface");
+                } catch (Exception e) {
+                    Log.e(TAG, "Unable to append v6 upstream interface", e);
                 }
             }
 
@@ -1325,8 +1325,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 Log.d(TAG, "removing v6 interface " + iface);
                 try {
                     service.removeUpstreamV6Interface(iface);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Unable to remove v6 upstream interface");
+                } catch (Exception e) {
+                    Log.e(TAG, "Unable to remove v6 upstream interface", e);
                 }
             }
 
@@ -1545,7 +1545,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                             try {
                                 LinkProperties props = cm.getLinkProperties(info.getType());
                                 removeUpstreamV6Interface(props.getInterfaceName());
-                            } catch(RemoteException e) {
+                            } catch(Exception e) {
                                 Log.e(TAG, "Exception querying ConnectivityManager", e);
                             }
                         }
