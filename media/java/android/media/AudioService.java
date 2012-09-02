@@ -3478,6 +3478,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     // sent if none of these devices is connected.
     int mBecomingNoisyIntentDevices =
             AudioSystem.DEVICE_OUT_WIRED_HEADSET | AudioSystem.DEVICE_OUT_WIRED_HEADPHONE |
+            AudioSystem.DEVICE_OUT_ANC_HEADSET | AudioSystem.DEVICE_OUT_ANC_HEADPHONE |
             AudioSystem.DEVICE_OUT_ALL_A2DP;
 
     // must be called before removing the device from mConnectedDevices
@@ -3530,6 +3531,14 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         } else if (device == AudioSystem.DEVICE_OUT_AUX_DIGITAL) {
             connType = AudioRoutesInfo.MAIN_HDMI;
             intent.setAction(Intent.ACTION_HDMI_AUDIO_PLUG);
+        } else if (device == AudioSystem.DEVICE_OUT_ANC_HEADSET) {
+            connType = AudioRoutesInfo.MAIN_HEADSET;
+            intent.setAction(Intent.ACTION_HEADSET_PLUG);
+            intent.putExtra("microphone", 1);
+        } else if (device == AudioSystem.DEVICE_OUT_ANC_HEADPHONE) {
+            connType = AudioRoutesInfo.MAIN_HEADPHONES;
+            intent.setAction(Intent.ACTION_HEADSET_PLUG);
+            intent.putExtra("microphone", 0);
         }
 
         synchronized (mCurAudioRoutes) {
