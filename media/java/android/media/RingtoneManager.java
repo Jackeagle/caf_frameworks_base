@@ -593,7 +593,25 @@ public class RingtoneManager {
      */
     public static Ringtone getRingtone(final Context context, Uri ringtoneUri) {
         // Don't set the stream type
-        return getRingtone(context, ringtoneUri, -1);
+        Ringtone r = getRingtone(context, ringtoneUri, -1);
+        if (r == null) {
+            int ringtoneType = getDefaultType(ringtoneUri);
+            if (ringtoneType == -1 || getActualDefaultRingtoneUri(context, ringtoneType) != null) {
+                try {
+                    AssetFileDescriptor afd = context.getResources().openRawResourceFd(
+                                             com.android.internal.R.raw.fallbackring);
+                    if (afd != null) {
+                        r = new Ringtone(context);
+                        r.open(afd);
+                        afd.close();
+                        return r;
+                    }
+                } catch (Exception ioe) {
+                    Log.e(TAG, "Failed to open fallback ringtone");
+                } 
+             }
+        }
+        return r;
     }
 
     /**
@@ -618,23 +636,6 @@ public class RingtoneManager {
         } catch (Exception ex) {
             Log.e(TAG, "Failed to open ringtone " + ringtoneUri);
         }
-
-        // Ringtone doesn't exist, use the fallback ringtone.
-        try {
-            AssetFileDescriptor afd = context.getResources().openRawResourceFd(
-                    com.android.internal.R.raw.fallbackring);
-            if (afd != null) {
-                Ringtone r = new Ringtone(context);
-                r.open(afd);
-                afd.close();
-                return r;
-            }
-        } catch (Exception ex) {
-            Log.e(TAG, "unable to find a usable fallback ringtone");
-        }
-
-        // we should never get here
-        Log.e(TAG, "unable to find a usable ringtone");
         return null;
     }
     
