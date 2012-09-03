@@ -835,7 +835,8 @@ final class BluetoothAdapterStateMachine extends StateMachine {
     *Return if HOT OFF is enabled.
     */
     boolean is_hot_off_enabled() {
-        if ("smd".equals(SystemProperties.get("ro.qualcomm.bt.hci_transport"))) {
+        if (("smd".equals(SystemProperties.get("ro.qualcomm.bt.hci_transport"))) &&
+           !("ath3k".equals(SystemProperties.get("qcom.bluetooth.soc")))) {
             return true;
         } else {
             return false;
