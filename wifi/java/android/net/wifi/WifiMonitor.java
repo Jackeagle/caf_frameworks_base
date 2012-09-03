@@ -571,7 +571,7 @@ public class WifiMonitor {
 
                 String extra = mWifiNative.p2pPeer(wifiP2pDevice.deviceAddress);
                     Log.d(TAG, "handlep2p Peer Found" + extra);
-                if(extra.compareToIgnoreCase("FAIL") != 0) {
+                if(extra != null && extra.compareToIgnoreCase("FAIL") != 0) {
                     Log.d(TAG, "handlep2p WFD Peer Found" + extra);
                     WfdInfo wfdInfo = new WfdInfo(extra);
                     if(wfdInfo.isWFDDevice() == true) {
