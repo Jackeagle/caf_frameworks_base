@@ -74,6 +74,7 @@ private:
     jclass      mClass;     // Reference to MediaPlayer class
     jobject     mObject;    // Weak ref to MediaPlayer Java object to call on
     jobject     mParcel;
+    jobject     mParcelCodecConf;
 };
 
 JNIMediaPlayerListener::JNIMediaPlayerListener(JNIEnv* env, jobject thiz, jobject weak_thiz)
@@ -93,6 +94,7 @@ JNIMediaPlayerListener::JNIMediaPlayerListener(JNIEnv* env, jobject thiz, jobjec
     // The reference is only used as a proxy for callbacks.
     mObject  = env->NewGlobalRef(weak_thiz);
     mParcel = env->NewGlobalRef(createJavaParcelObject(env));
+    mParcelCodecConf = env->NewGlobalRef(createJavaParcelObject(env));
 }
 
 JNIMediaPlayerListener::~JNIMediaPlayerListener()
@@ -104,6 +106,9 @@ JNIMediaPlayerListener::~JNIMediaPlayerListener()
 
     recycleJavaParcelObject(env, mParcel);
     env->DeleteGlobalRef(mParcel);
+
+    recycleJavaParcelObject(env, mParcelCodecConf);
+    env->DeleteGlobalRef(mParcelCodecConf);
 }
 
 void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *obj)
@@ -117,8 +122,22 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
                 ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT) ) )
             {
               ALOGD("JNIMediaPlayerListener::notify calling qc_post_event");
-              env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
-                      msg, ext1, ext2, mParcel);
+              if (ext2 == 1) // only in case of codec config frame
+              {
+                if (mParcelCodecConf != NULL) {
+                   Parcel* nativeParcelLocal = parcelForJavaObject(env, mParcelCodecConf);
+                   nativeParcelLocal->setData(obj->data(), obj->dataSize());
+                   env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
+                                            msg, ext1, ext2, mParcelCodecConf);
+                   ALOGD("JNIMediaPlayerListener::notify qc_post_event done (Codec Conf)");
+                }
+              }
+              else
+              {
+                   env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
+                                             msg, ext1, ext2, mParcel);
+                   ALOGD("JNIMediaPlayerListener::notify qc_post_event done");
+              }
             }
             else
             {
