@@ -560,6 +560,10 @@ static jobject doScreenshot(JNIEnv* env, jobject clazz, jint width, jint height,
         jint minLayer, jint maxLayer, bool allLayers)
 {
     ScreenshotPixelRef* pixels = new ScreenshotPixelRef(NULL);
+
+    if (!pixels)
+        return 0;
+
     if (pixels->update(width, height, minLayer, maxLayer, allLayers) != NO_ERROR) {
         delete pixels;
         return 0;
@@ -572,6 +576,10 @@ static jobject doScreenshot(JNIEnv* env, jobject clazz, jint width, jint height,
     ssize_t bpr = s * android::bytesPerPixel(f);
 
     SkBitmap* bitmap = new SkBitmap();
+
+    if (!bitmap)
+        return 0;
+
     bitmap->setConfig(convertPixelFormat(f), w, h, bpr);
     if (f == PIXEL_FORMAT_RGBX_8888) {
         bitmap->setIsOpaque(true);
