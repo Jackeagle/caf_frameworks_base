@@ -40,6 +40,9 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.microedition.khronos.egl.EGL10;
+import javax.microedition.khronos.egl.EGLContext;
+
 /**
  * <p>Proxy for HTML5 video views.</p>
  */
@@ -65,6 +68,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int SET_VOLUME          = 109;
     private static final int LOAD                = 110;
     private static final int LOAD_METADATA       = 111;
+    private static final int ENTER_FULLSCREEN    = 112;
 
     // Message Ids to be handled on the WebCore thread
     private static final int PREPARED          = 200;
@@ -100,6 +104,13 @@ class HTML5VideoViewProxy extends Handler
     // Cached media position used to preserve playback position when
     // resuming suspended video
     private int mCachedPosition;
+
+    // Retry interval for attemping to start media session without
+    // a current EGL context
+    private static final long RETRY_INTERVAL = 16; // millisecods
+    // Set maximum retries to equivalent of 500 milliseconds
+    private static final int MAX_RETRIES     = 500 / (int) RETRY_INTERVAL;
+    int mNumRetries = 0;
 
     // A helper class to control the playback. This executes on the UI thread!
     private final class VideoPlayer {
@@ -258,6 +269,10 @@ class HTML5VideoViewProxy extends Handler
         public boolean isPrepared() {
             return mHTML5VideoView.getCurrentState() >= HTML5VideoView.STATE_PREPARED;
         }
+
+        public boolean hasHTML5VideoView() {
+            return (mHTML5VideoView != null);
+        }
     }
     private VideoPlayer mVideoPlayer;
 
@@ -337,16 +352,40 @@ class HTML5VideoViewProxy extends Handler
         sendMessage(obtainMessage(TIMEUPDATE));
     }
 
+    // Validates the EGL currrent context before handling message.
+    // If no current EGL context is available, requeue the message
+    // for a later time.
+    private boolean validateEglContext(Message msg) {
+        EGL10 sEgl = (EGL10) EGLContext.getEGL();
+        if (sEgl.eglGetCurrentContext() == EGL10.EGL_NO_CONTEXT) {
+            // Post invalidate to trigger GL context creation
+            getWebView().invalidate();
+            if (mNumRetries < MAX_RETRIES) {
+                sendMessageDelayed(Message.obtain(msg), RETRY_INTERVAL);
+                ++mNumRetries;
+            } else {
+                sendMessage(obtainMessage(ERROR));
+                mNumRetries = 0;
+                Log.e(LOGTAG, "Unable to start video without EGL context");
+            }
+            return false;
+        }
+        mNumRetries = 0;
+        return true;
+    }
+
     // Handler for the messages from WebCore or Timer thread to the UI thread.
     @Override
     public void handleMessage(Message msg) {
         // This executes on the UI thread.
         switch (msg.what) {
             case PLAY: {
-                String url = (String) msg.obj;
-                int videoLayerID = msg.arg1;
-                int seekPosition = msg.arg2;
-                mVideoPlayer.play(url, seekPosition, videoLayerID);
+                if (mVideoPlayer.hasHTML5VideoView() || validateEglContext(msg)) {
+                    String url = (String) msg.obj;
+                    int videoLayerID = msg.arg1;
+                    int seekPosition = msg.arg2;
+                    mVideoPlayer.play(url, seekPosition, videoLayerID);
+                }
                 break;
             }
             case LOAD_METADATA: {
@@ -356,9 +395,19 @@ class HTML5VideoViewProxy extends Handler
                 break;
             }
             case LOAD: {
-                String url = (String) msg.obj;
-                int videoLayerID = msg.arg1;
-                mVideoPlayer.load(url, videoLayerID);
+                if (mVideoPlayer.hasHTML5VideoView() || validateEglContext(msg)) {
+                    String url = (String) msg.obj;
+                    int videoLayerID = msg.arg1;
+                    mVideoPlayer.load(url, videoLayerID);
+                }
+                break;
+            }
+            case ENTER_FULLSCREEN: {
+                if (mVideoPlayer.hasHTML5VideoView() || validateEglContext(msg)) {
+                    String url = (String) msg.obj;
+                    int videoLayerID = msg.arg1;
+                    mVideoPlayer.enterFullScreenVideo(videoLayerID, url, mWebView);
+                }
                 break;
             }
             case SEEK: {
@@ -774,7 +823,15 @@ class HTML5VideoViewProxy extends Handler
     }
 
     public void enterFullScreenVideo(int layerId, String url) {
-        mVideoPlayer.enterFullScreenVideo(layerId, url, mWebView);
+        if (mVideoPlayer.hasHTML5VideoView()) {
+            mVideoPlayer.enterFullScreenVideo(layerId, url, mWebView);
+            return;
+        }
+        // Queue the message in case we are unable to handle it right away
+        Message message = obtainMessage(ENTER_FULLSCREEN);
+        message.arg1 = layerId;
+        message.obj = url;
+        sendMessage(message);
     }
 
     public int getVideoLayerId() {
