@@ -847,6 +847,7 @@ public final class WebViewCore {
     static class JSInterfaceData {
         Object mObject;
         String mInterfaceName;
+        boolean mRequireAnnotation;
     }
 
     static class JSKeyData {
@@ -1520,7 +1521,7 @@ public final class WebViewCore {
                         case ADD_JS_INTERFACE:
                             JSInterfaceData jsData = (JSInterfaceData) msg.obj;
                             mBrowserFrame.addJavascriptInterface(jsData.mObject,
-                                    jsData.mInterfaceName);
+                                    jsData.mInterfaceName, jsData.mRequireAnnotation);
                             break;
 
                         case REMOVE_JS_INTERFACE:
