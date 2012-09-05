@@ -249,7 +249,6 @@ class BrowserFrame extends Handler {
         mWebViewCore = w;
 
         mSearchBox = new SearchBoxImpl(mWebViewCore, mCallbackProxy);
-        mJavaScriptObjects.put(SearchBoxImpl.JS_INTERFACE_NAME, mSearchBox);
 
         AssetManager am = context.getAssets();
         nativeCreateFrame(w, am, proxy.getBackForwardList());
@@ -602,8 +601,6 @@ class BrowserFrame extends Handler {
             }
         }
         mRemovedJavaScriptObjects.clear();
-
-        stringByEvaluatingJavaScriptFromString(SearchBoxImpl.JS_BRIDGE);
     }
 
     /**
