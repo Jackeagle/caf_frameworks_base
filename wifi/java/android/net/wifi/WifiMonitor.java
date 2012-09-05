@@ -17,7 +17,6 @@
 package android.net.wifi;
 
 import android.net.NetworkInfo;
-import android.net.wifi.p2p.WfdInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pGroup;
@@ -570,20 +569,7 @@ public class WifiMonitor {
          */
         private void handleP2pEvents(String dataString) {
             if (dataString.startsWith(P2P_DEVICE_FOUND_STR)) {
-                WifiP2pDevice wifiP2pDevice = new WifiP2pDevice(dataString);
-
-                String extra = mWifiNative.p2pPeer(wifiP2pDevice.deviceAddress);
-                    Log.d(TAG, "handlep2p Peer Found" + extra);
-                if(extra != null && extra.compareToIgnoreCase("FAIL") != 0) {
-                    Log.d(TAG, "handlep2p WFD Peer Found" + extra);
-                    WfdInfo wfdInfo = new WfdInfo(extra);
-                    if(wfdInfo.isWFDDevice() == true) {
-                        Log.d(TAG, "handlep2p WFD Peer Found");
-                        wifiP2pDevice.wfdInfo = wfdInfo;
-                    }
-                }
-                mStateMachine.sendMessage(P2P_DEVICE_FOUND_EVENT, wifiP2pDevice);
-
+                mStateMachine.sendMessage(P2P_DEVICE_FOUND_EVENT, new WifiP2pDevice(dataString));
             } else if (dataString.startsWith(P2P_DEVICE_LOST_STR)) {
                 mStateMachine.sendMessage(P2P_DEVICE_LOST_EVENT, new WifiP2pDevice(dataString));
             } else if (dataString.startsWith(P2P_FIND_STOPPED_STR)) {
