@@ -216,6 +216,8 @@ android_media_AudioRecord_setup(JNIEnv *env, jobject thiz, jobject weak_this,
     int bytesPerSample;
     if(audioFormat == javaAudioRecordFields.PCM8)
         bytesPerSample = 1;
+    else if(audioFormat == javaAudioRecordFields.AMRWB)
+        bytesPerSample = 61;
     else
         bytesPerSample = 2;
     audio_format_t format = (audio_format_t)getformatrec(audioFormat);
@@ -554,7 +556,15 @@ static jint android_media_AudioRecord_get_min_buff_size(JNIEnv *env,  jobject th
     if (result != NO_ERROR) {
         return -1;
     }
-    return frameCount * nbChannels * (audioFormat == javaAudioRecordFields.PCM8 ? 1 : 2);
+    int bytesPerSample;
+    if(audioFormat == javaAudioRecordFields.PCM8)
+        bytesPerSample = 1;
+    else if(audioFormat == javaAudioRecordFields.AMRWB)
+        bytesPerSample = 61;
+    else
+        bytesPerSample = 2;
+
+    return frameCount * nbChannels * bytesPerSample;
 }
 
 
