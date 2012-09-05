@@ -170,7 +170,7 @@ public abstract class DataConnection extends StateMachine {
         public boolean isPermanentFail() {
             return (this == OPERATOR_BARRED) || (this == MISSING_UNKNOWN_APN) ||
                    (this == UNKNOWN_PDP_ADDRESS_TYPE) || (this == USER_AUTHENTICATION) ||
-                   (this == SERVICE_OPTION_NOT_SUPPORTED) ||
+                   (this == ACTIVATION_REJECT_GGSN) || (this == SERVICE_OPTION_NOT_SUPPORTED) ||
                    (this == SERVICE_OPTION_NOT_SUBSCRIBED) || (this == NSAPI_IN_USE) ||
                    (this == PROTOCOL_ERRORS);
         }
