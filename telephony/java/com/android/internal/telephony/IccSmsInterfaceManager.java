@@ -457,7 +457,12 @@ public class IccSmsInterfaceManager extends ISms.Stub {
      * @return byte array for the record.
      */
     protected byte[] makeSmsRecordData(int status, byte[] pdu) {
-        byte[] data = new byte[IccConstants.SMS_RECORD_LENGTH];
+        byte[] data;
+        if (Phone.PHONE_TYPE_GSM == mPhone.getPhoneType()) {
+            data = new byte[IccConstants.SMS_RECORD_LENGTH];
+        } else {
+            data = new byte[IccConstants.CDMA_SMS_RECORD_LENGTH];
+        }
 
         // Status bits for this record.  See TS 51.011 10.5.3
         data[0] = (byte)(status & 7);
