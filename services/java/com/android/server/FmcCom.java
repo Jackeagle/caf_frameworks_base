@@ -42,7 +42,7 @@ public abstract class FmcCom implements Runnable {
 
 	/* Private */
     private final static String TAG = "FmcCom";
-    private final static String SOCKET_PATH = "/data/radio/ds_fmc_app_call_mgr_sock";
+    private final static String SOCKET_PATH = "/dev/socket/ds_fmc_app_call_mgr_sock";
 
     /* Protected */
     protected static final boolean DBG = true;
