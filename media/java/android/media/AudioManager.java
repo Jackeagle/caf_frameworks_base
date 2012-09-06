@@ -2422,8 +2422,6 @@ public class AudioManager {
      *  used in the future in a set method to select whatever default device is chosen by the
      *  platform-specific implementation.
      */
-    public static final int DEVICE_OUT_ANC_HEADSET = AudioSystem.DEVICE_OUT_ANC_HEADSET;
-    public static final int DEVICE_OUT_ANC_HEADPHONE = AudioSystem.DEVICE_OUT_ANC_HEADPHONE;
     public static final int DEVICE_OUT_DEFAULT = AudioSystem.DEVICE_OUT_DEFAULT;
 
     /**
