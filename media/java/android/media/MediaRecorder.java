@@ -178,7 +178,9 @@ public class MediaRecorder
          *  is applied.
          */
         public static final int VOICE_COMMUNICATION = 7;
+        /** @hide */
         public static final int FM_RX = 8;
+        /** @hide */
         public static final int FM_RX_A2DP = 9;
     }
 
