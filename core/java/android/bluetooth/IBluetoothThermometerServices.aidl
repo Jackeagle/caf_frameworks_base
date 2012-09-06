@@ -32,6 +32,9 @@ import android.os.ParcelUuid;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.IBluetoothThermometerCallBack;
 
+/**
+ *@hide
+ */
 interface IBluetoothThermometerServices {
     boolean startThermometerService(in BluetoothDevice btDevice, in ParcelUuid serviceUuid, in IBluetoothThermometerCallBack callBack);
     String getServiceName(in ParcelUuid serviceUuid);
