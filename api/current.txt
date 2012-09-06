@@ -10605,20 +10605,13 @@ package android.media {
     field public static final deprecated int CHANNEL_CONFIGURATION_MONO = 2; // 0x2
     field public static final deprecated int CHANNEL_CONFIGURATION_STEREO = 3; // 0x3
     field public static final int CHANNEL_INVALID = 0; // 0x0
-    field public static final int CHANNEL_IN_5POINT1 = 4128768; // 0x3f0000
     field public static final int CHANNEL_IN_BACK = 32; // 0x20
-    field public static final int CHANNEL_IN_BACK_LEFT = 1048576; // 0x100000
     field public static final int CHANNEL_IN_BACK_PROCESSED = 512; // 0x200
-    field public static final int CHANNEL_IN_BACK_RIGHT = 2097152; // 0x200000
     field public static final int CHANNEL_IN_DEFAULT = 1; // 0x1
     field public static final int CHANNEL_IN_FRONT = 16; // 0x10
-    field public static final int CHANNEL_IN_FRONT_CENTER = 262144; // 0x40000
-    field public static final int CHANNEL_IN_FRONT_LEFT = 65536; // 0x10000
     field public static final int CHANNEL_IN_FRONT_PROCESSED = 256; // 0x100
-    field public static final int CHANNEL_IN_FRONT_RIGHT = 131072; // 0x20000
     field public static final int CHANNEL_IN_LEFT = 4; // 0x4
     field public static final int CHANNEL_IN_LEFT_PROCESSED = 64; // 0x40
-    field public static final int CHANNEL_IN_LOW_FREQUENCY = 524288; // 0x80000
     field public static final int CHANNEL_IN_MONO = 16; // 0x10
     field public static final int CHANNEL_IN_PRESSURE = 1024; // 0x400
     field public static final int CHANNEL_IN_RIGHT = 8; // 0x8
@@ -10645,12 +10638,7 @@ package android.media {
     field public static final int CHANNEL_OUT_QUAD = 204; // 0xcc
     field public static final int CHANNEL_OUT_STEREO = 12; // 0xc
     field public static final int CHANNEL_OUT_SURROUND = 1052; // 0x41c
-    field public static final int ENCODING_AMRNB = 100; // 0x64
-    field public static final int ENCODING_AMRWB = 101; // 0x65
     field public static final int ENCODING_DEFAULT = 1; // 0x1
-    field public static final int ENCODING_EVRC = 102; // 0x66
-    field public static final int ENCODING_EVRCB = 103; // 0x67
-    field public static final int ENCODING_EVRCWB = 104; // 0x68
     field public static final int ENCODING_INVALID = 0; // 0x0
     field public static final int ENCODING_PCM_16BIT = 2; // 0x2
     field public static final int ENCODING_PCM_8BIT = 3; // 0x3
@@ -11484,10 +11472,7 @@ package android.media {
     field public static final int AMR_NB = 1; // 0x1
     field public static final int AMR_WB = 2; // 0x2
     field public static final int DEFAULT = 0; // 0x0
-    field public static final int EVRC = 6; // 0x6
     field public static final int HE_AAC = 4; // 0x4
-    field public static final int LPCM = 8; // 0x8
-    field public static final int QCELP = 7; // 0x7
   }
 
   public final class MediaRecorder.AudioSource {
@@ -11515,11 +11500,8 @@ package android.media {
     field public static final int AMR_WB = 4; // 0x4
     field public static final int DEFAULT = 0; // 0x0
     field public static final int MPEG_4 = 2; // 0x2
-    field public static final int QCP = 9; // 0x9
     field public static final deprecated int RAW_AMR = 3; // 0x3
     field public static final int THREE_GPP = 1; // 0x1
-    field public static final int THREE_GPP2 = 10; // 0xa
-    field public static final int WAVE = 11; // 0xb
   }
 
   public final class MediaRecorder.VideoEncoder {
