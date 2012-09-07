@@ -4251,8 +4251,9 @@ public class BluetoothService extends IBluetooth.Stub {
             //Send one intent per GATT service
             for (i  = 0; i < gattServicePaths.length; i++) {
                 String serviceUuid = getGattServiceProperty(gattServicePaths[i], "UUID");
+                ParcelUuid svcUuid = ParcelUuid.fromString(serviceUuid);
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
-                intent.putExtra(BluetoothDevice.EXTRA_UUID, serviceUuid);
+                intent.putExtra(BluetoothDevice.EXTRA_UUID, svcUuid);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT, gattServicePaths[i]);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT_RESULT, result);
                 mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
