@@ -1480,6 +1480,10 @@ public class CDMAPhone extends PhoneBase {
     }
 
     public void prepareEri() {
+        if (mEriManager == null) {
+            Log.e(LOG_TAG, "Trying to access stale objects");
+            return;
+        }
         mEriManager.loadEriFile();
         if(mEriManager.isEriFileLoaded()) {
             // when the ERI file is loaded
