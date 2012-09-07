@@ -2458,7 +2458,11 @@ private NetworkStateTracker makeWimaxStateTracker() {
                 String network = nt.getNetworkInfo().getTypeName();
                 synchronized (mDnsLock) {
                     if (!mDnsOverridden) {
-                        changed = updateDns(network, p.getInterfaceName(), dnses, "");
+                        String domain = "";
+                        if (TextUtils.isEmpty (p.getDomainName ()) == false) {
+                            domain = p.getDomainName ();
+                        }
+                        changed = updateDns(network, p.getInterfaceName(), dnses, domain);
                     }
                 }
             } else {

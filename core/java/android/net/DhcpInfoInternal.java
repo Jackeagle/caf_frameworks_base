@@ -120,6 +120,11 @@ public class DhcpInfoInternal {
         } else {
             Log.d(TAG, "makeLinkProperties with empty dns2!");
         }
+        if (TextUtils.isEmpty(domainName) == false) {
+            p.setDomainName (domainName);
+        } else {
+            Log.d(TAG, "makeLinkProperties with empty domainName!");
+        }
         return p;
     }
 
@@ -142,6 +147,10 @@ public class DhcpInfoInternal {
             for (RouteInfo route : orig.getRoutes()) {
                 addRoute(route);
             }
+        }
+
+        if (TextUtils.isEmpty(domainName)) {
+            domainName = orig.domainName;
         }
     }
 

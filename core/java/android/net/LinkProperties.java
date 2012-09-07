@@ -56,6 +56,7 @@ public class LinkProperties implements Parcelable {
     private Collection<InetAddress> mDnses = new ArrayList<InetAddress>();
     private Collection<RouteInfo> mRoutes = new ArrayList<RouteInfo>();
     private ProxyProperties mHttpProxy;
+    private String mDomainName;
 
     public static class CompareResult<T> {
         public Collection<T> removed = new ArrayList<T>();
@@ -85,6 +86,7 @@ public class LinkProperties implements Parcelable {
             for (RouteInfo r : source.getRoutes()) mRoutes.add(r);
             mHttpProxy = (source.getHttpProxy() == null)  ?
                 null : new ProxyProperties(source.getHttpProxy());
+            mDomainName = source.mDomainName;
         }
     }
 
@@ -134,12 +136,20 @@ public class LinkProperties implements Parcelable {
         return mHttpProxy;
     }
 
+    public void setDomainName(String domainName) {
+        mDomainName = domainName;
+    }
+    public String getDomainName() {
+        return mDomainName;
+    }
+
     public void clear() {
         mIfaceName = null;
         mLinkAddresses.clear();
         mDnses.clear();
         mRoutes.clear();
         mHttpProxy = null;
+        mDomainName = null;
     }
 
     /**
