@@ -46,6 +46,8 @@ public class DhcpInfoInternal {
      */
     public String vendorInfo;
 
+    public String domainName;
+
     private Collection<RouteInfo> mRoutes;
 
     public DhcpInfoInternal() {
@@ -89,6 +91,7 @@ public class DhcpInfoInternal {
         info.dns2 = convertToInt(dns2);
         info.serverAddress = convertToInt(serverAddress);
         info.leaseDuration = leaseDuration;
+        info.domainName = domainName;
         return info;
     }
 
@@ -161,6 +164,7 @@ public class DhcpInfoInternal {
                 " mRoutes: " + routeString +
                 " dns: " + dns1 + "," + dns2 +
                 " dhcpServer: " + serverAddress +
-                " leaseDuration: " + leaseDuration;
+                " leaseDuration: " + leaseDuration +
+                " domainName: " + domainName;
     }
 }

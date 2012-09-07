@@ -33,7 +33,7 @@ public class DhcpInfo implements Parcelable {
 
     public int serverAddress;
     public int leaseDuration;
-
+    public String domainName;
     public DhcpInfo() {
         super();
     }
@@ -48,6 +48,7 @@ public class DhcpInfo implements Parcelable {
             dns2 = source.dns2;
             serverAddress = source.serverAddress;
             leaseDuration = source.leaseDuration;
+            domainName = source.domainName;
         }
     }
 
@@ -61,7 +62,7 @@ public class DhcpInfo implements Parcelable {
         str.append(" dns2 "); putAddress(str, dns2);
         str.append(" DHCP server "); putAddress(str, serverAddress);
         str.append(" lease ").append(leaseDuration).append(" seconds");
-
+        str.append(" Domain Name ").append(domainName);
         return str.toString();
     }
 
@@ -83,6 +84,7 @@ public class DhcpInfo implements Parcelable {
         dest.writeInt(dns2);
         dest.writeInt(serverAddress);
         dest.writeInt(leaseDuration);
+        dest.writeString(domainName);
     }
 
     /** Implement the Parcelable interface {@hide} */
@@ -97,6 +99,7 @@ public class DhcpInfo implements Parcelable {
                 info.dns2 = in.readInt();
                 info.serverAddress = in.readInt();
                 info.leaseDuration = in.readInt();
+                info.domainName = in.readString();
                 return info;
             }
 

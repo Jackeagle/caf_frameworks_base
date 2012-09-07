@@ -36,7 +36,8 @@ int dhcp_do_request(const char *ifname,
                     const char *dns2,
                     const char *server,
                     uint32_t *lease,
-                    const char *vendorInfo);
+                    const char *vendorInfo,
+                    const char *domainName);
 
 int dhcp_do_request_renew(const char *ifname,
                     const char *ipaddr,
@@ -46,7 +47,8 @@ int dhcp_do_request_renew(const char *ifname,
                     const char *dns2,
                     const char *server,
                     uint32_t *lease,
-                    const char *vendorInfo);
+                    const char *vendorInfo,
+                    const char *domainName);
 
 int dhcp_stop(const char *ifname);
 int dhcp_release_lease(const char *ifname);
@@ -71,6 +73,7 @@ static struct fieldIds {
     jfieldID serverAddress;
     jfieldID leaseDuration;
     jfieldID vendorInfo;
+    jfieldID domainName;
 } dhcpInfoInternalFieldIds;
 
 static jint android_net_utils_enableInterface(JNIEnv* env, jobject clazz, jstring ifname)
@@ -120,16 +123,17 @@ static jboolean android_net_utils_runDhcpCommon(JNIEnv* env, jobject clazz, jstr
     char  server[PROPERTY_VALUE_MAX];
     uint32_t lease;
     char vendorInfo[PROPERTY_VALUE_MAX];
+    char domainName[PROPERTY_VALUE_MAX];
 
     const char *nameStr = env->GetStringUTFChars(ifname, NULL);
     if (nameStr == NULL) return (jboolean)false;
 
     if (renew) {
         result = ::dhcp_do_request_renew(nameStr, ipaddr, gateway, &prefixLength,
-                dns1, dns2, server, &lease, vendorInfo);
+                dns1, dns2, server, &lease, vendorInfo, domainName);
     } else {
         result = ::dhcp_do_request(nameStr, ipaddr, gateway, &prefixLength,
-                dns1, dns2, server, &lease, vendorInfo);
+                dns1, dns2, server, &lease, vendorInfo, domainName);
     }
 
     env->ReleaseStringUTFChars(ifname, nameStr);
@@ -166,6 +170,8 @@ static jboolean android_net_utils_runDhcpCommon(JNIEnv* env, jobject clazz, jstr
                 env->NewStringUTF(server));
         env->SetIntField(info, dhcpInfoInternalFieldIds.leaseDuration, lease);
         env->SetObjectField(info, dhcpInfoInternalFieldIds.vendorInfo, env->NewStringUTF(vendorInfo));
+        env->SetObjectField(info, dhcpInfoInternalFieldIds.domainName,
+                env->NewStringUTF(domainName));
     }
     return (jboolean)(result == 0);
 }
@@ -236,7 +242,7 @@ int register_android_net_NetworkUtils(JNIEnv* env)
     dhcpInfoInternalFieldIds.serverAddress = env->GetFieldID(dhcpInfoInternalClass, "serverAddress", "Ljava/lang/String;");
     dhcpInfoInternalFieldIds.leaseDuration = env->GetFieldID(dhcpInfoInternalClass, "leaseDuration", "I");
     dhcpInfoInternalFieldIds.vendorInfo = env->GetFieldID(dhcpInfoInternalClass, "vendorInfo", "Ljava/lang/String;");
-
+    dhcpInfoInternalFieldIds.domainName = env->GetFieldID(dhcpInfoInternalClass, "domainName", "Ljava/lang/String;");
     return AndroidRuntime::registerNativeMethods(env,
             NETUTILS_PKG_NAME, gNetworkUtilMethods, NELEM(gNetworkUtilMethods));
 }
