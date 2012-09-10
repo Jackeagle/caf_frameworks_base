@@ -2091,8 +2091,17 @@ public class Intent implements Parcelable, Cloneable {
     public static final String ACTION_FM_TX =
             "android.intent.action.FMTX";
 
-    public static final String ACTION_WIFI_DISPLAY =
-            "android.intent.action.WIFI_DISPLAY";
+    /**
+     * Broadcast Action: WiFi Display audio is enabled or disabled
+     *
+     * <p>The intent will have the following extra values:
+     * <ul>
+     *   <li><em>state</em> - 0 for disabled, 1 for enabled. </li>
+     * </ul>
+     * @hide
+     */
+    public static final String ACTION_WIFI_DISPLAY_AUDIO =
+            "qualcomm.intent.action.WIFI_DISPLAY_AUDIO";
 
     /**
      * Broadcast Action: WiFi Display video is enabled or disabled
