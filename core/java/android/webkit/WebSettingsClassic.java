@@ -127,6 +127,7 @@ public class WebSettingsClassic extends WebSettings {
     private boolean         mForceUserScalable = false;
     private boolean         mPasswordEchoEnabled = true;
     private boolean         mWebGLEnabled = true;
+    private boolean         mWOFFEnabled = true;
 
     // AutoFill Profile data
     public static class AutoFillProfile {
@@ -1686,6 +1687,16 @@ public class WebSettingsClassic extends WebSettings {
 
     public synchronized AutoFillProfile getAutoFillProfile() {
         return mAutoFillProfile;
+    }
+
+    /**
+     * @hide
+     */
+    public synchronized void setWOFFEnabled(boolean flag) {
+        if (mWOFFEnabled != flag) {
+            mWOFFEnabled = flag;
+            postSync();
+        }
     }
 
     int getDoubleTapToastCount() {
