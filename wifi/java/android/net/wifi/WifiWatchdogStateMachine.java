@@ -881,6 +881,11 @@ public class WifiWatchdogStateMachine extends StateMachine {
             //test to avoid any wifi connectivity issues
             loge("ARP test initiation failure: " + se);
             success = true;
+        } catch (IllegalArgumentException e) {
+            // Consider this exception as a
+            // successful Arp as well
+            loge("ARP test initiation failure: " + e);
+            success = true;
         }
 
         return success;
