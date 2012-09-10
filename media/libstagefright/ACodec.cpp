@@ -625,7 +625,6 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
         info.mStatus = BufferInfo::OWNED_BY_US;
         info.mData = new ABuffer(0);
         info.mGraphicBuffer = graphicBuffer;
-        mBuffers[kPortIndexOutput].push(info);
 
         IOMX::buffer_id bufferId;
         err = mOMX->useGraphicBuffer(mNode, kPortIndexOutput, graphicBuffer,
@@ -636,6 +635,7 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
             break;
         }
 
+        mBuffers[kPortIndexOutput].push(info);
         mBuffers[kPortIndexOutput].editItemAt(i).mBufferID = bufferId;
 
         LOGV("[%s] Registered graphic buffer with ID %p (pointer = %p)",
