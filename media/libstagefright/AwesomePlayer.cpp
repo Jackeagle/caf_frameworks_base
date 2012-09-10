@@ -2135,6 +2135,16 @@ void AwesomePlayer::onVideoEvent() {
 
         mVideoBuffer->meta_data()->setInt64(kKeyLateness, latenessUs);
 
+        int64_t corrupted = 0;
+        if(mVideoBuffer->meta_data()->findInt64(kKeyCorrupt, &corrupted))
+        {
+            LOGE("Corrupted frame recd. dropping");
+            mVideoBuffer->release();
+            mVideoBuffer = NULL;
+            postVideoEvent_l();
+            return;
+        }
+
         if (latenessUs > kVideoTooLateMarginUs
                 && mAudioPlayer != NULL
                 && mAudioPlayer->getMediaTimeMapping(
