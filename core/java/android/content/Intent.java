@@ -2113,6 +2113,18 @@ public class Intent implements Parcelable, Cloneable {
             "qualcomm.intent.action.WIFI_DISPLAY_AUDIO";
 
     /**
+     * Broadcast Action: WiFi Display video is enabled or disabled
+     *
+     * <p>The intent will have the following extra values:
+     * <ul>
+     *   <li><em>state</em> - 0 for disabled, 1 for enabled. </li>
+     * </ul>
+     * @hide
+     */
+    public static final String ACTION_WIFI_DISPLAY_VIDEO =
+            "qualcomm.intent.action.WIFI_DISPLAY_VIDEO";
+
+    /**
      * Broadcast Action: An analog audio speaker/headset plugged in or unplugged.
      *
      * <p>The intent will have the following extra values:
