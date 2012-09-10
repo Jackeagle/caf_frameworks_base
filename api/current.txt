@@ -12385,7 +12385,6 @@ package android.net {
     method public void writeToParcel(android.os.Parcel, int);
     field public int dns1;
     field public int dns2;
-    field public java.lang.String domainName;
     field public int gateway;
     field public int ipAddress;
     field public int leaseDuration;

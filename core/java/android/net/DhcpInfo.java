@@ -33,6 +33,10 @@ public class DhcpInfo implements Parcelable {
 
     public int serverAddress;
     public int leaseDuration;
+
+    /**
+    * @hide
+    */
     public String domainName;
     public DhcpInfo() {
         super();
