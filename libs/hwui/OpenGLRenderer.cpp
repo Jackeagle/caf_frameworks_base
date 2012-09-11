@@ -539,9 +539,6 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
     // Bind texture to FBO
     TILERENDERING_END(previousFbo);
     glBindFramebuffer(GL_FRAMEBUFFER, layer->getFbo());
-    TILERENDERING_START(layer->getFbo(), clip.left, clip.top,
-                        clip.right, clip.bottom,
-                        bounds.getWidth(), bounds.getHeight());
     layer->bindTexture();
 
     // Initialize the texture if needed
@@ -557,9 +554,8 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         LOGE("Framebuffer incomplete (GL error code 0x%x)", status);
-        TILERENDERING_END(layer->getFbo(), true);
         glBindFramebuffer(GL_FRAMEBUFFER, previousFbo);
-        TILERENDERING_START(previousFbo);
+        TILERENDERING_START(previousFbo, true);
         layer->deleteTexture();
         mCaches.fboCache.put(layer->getFbo());
         delete layer;
@@ -567,6 +563,10 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
         return false;
     }
 #endif
+
+    TILERENDERING_START(layer->getFbo(), clip.left, clip.bottom - bounds.getHeight(),
+                      bounds.getWidth() + clip.left, clip.bottom,
+                      bounds.getWidth(), bounds.getHeight());
 
     // Clear the FBO, expand the clear region by 1 to get nice bilinear filtering
     glScissor(clip.left - 1.0f, bounds.getHeight() - clip.bottom - 1.0f,
