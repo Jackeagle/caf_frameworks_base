@@ -123,19 +123,21 @@ public class KeyguardUpdateMonitor {
      */
     private static class SimArgs {
         public final IccCard.State simState;
-        public static int sSubscription;
+        public int subscription;
 
-        SimArgs(IccCard.State state) {
+        SimArgs(IccCard.State state, int sub) {
             simState = state;
+            subscription = sub;
         }
 
         static SimArgs fromIntent(Intent intent) {
             IccCard.State state;
+            int subscription;
             if (!TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(intent.getAction())) {
                 throw new IllegalArgumentException("only handles intent ACTION_SIM_STATE_CHANGED");
             }
-            sSubscription = intent.getIntExtra(MSimConstants.SUBSCRIPTION_KEY, 0);
-            Log.d(TAG,"ACTION_SIM_STATE_CHANGED intent received on sub = " + sSubscription);
+            subscription = intent.getIntExtra(MSimConstants.SUBSCRIPTION_KEY, 0);
+            Log.d(TAG,"ACTION_SIM_STATE_CHANGED intent received on sub = " + subscription);
             String stateExtra = intent.getStringExtra(IccCard.INTENT_KEY_ICC_STATE);
             if (IccCard.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
                 final String absentReason = intent
@@ -166,7 +168,7 @@ public class KeyguardUpdateMonitor {
             } else {
                 state = IccCard.State.UNKNOWN;
             }
-            return new SimArgs(state);
+            return new SimArgs(state, subscription);
         }
 
         public String toString() {
@@ -441,7 +443,7 @@ public class KeyguardUpdateMonitor {
      */
     private void handleSimStateChange(SimArgs simArgs) {
         final IccCard.State state = simArgs.simState;
-        final int subscription = simArgs.sSubscription;
+        final int subscription = simArgs.subscription;
 
         Log.d(TAG, "handleSimStateChange: intentValue = " + simArgs + " "
                 + "state resolved to " + state.toString() + " "
@@ -737,12 +739,12 @@ public class KeyguardUpdateMonitor {
     public void reportSimUnlocked() {
         int subscription = MSimTelephonyManager.getDefault().getDefaultSubscription();
         mSimState[subscription] = IccCard.State.READY;
-        handleSimStateChange(new SimArgs(mSimState[subscription]));
+        handleSimStateChange(new SimArgs(mSimState[subscription], subscription));
     }
 
     public void reportSimUnlocked(int subscription) {
         mSimState[subscription] = IccCard.State.READY;
-        handleSimStateChange(new SimArgs(mSimState[subscription]));
+        handleSimStateChange(new SimArgs(mSimState[subscription], subscription));
     }
 
     public boolean isDevicePluggedIn() {
