@@ -35,6 +35,9 @@ public class SystemProperties
     private static native boolean native_get_boolean(String key, boolean def);
     private static native void native_set(String key, String def);
 
+/*NFC_TI_DEVICE*/
+    public static final boolean NFCTI_ENHANCEMENT = native_get_boolean("com.ti.nfcti_enhancement", true);
+
     /**
      * Get the value for the given key.
      * @return an empty string if the key isn't found
