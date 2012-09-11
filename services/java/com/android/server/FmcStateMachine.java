@@ -443,9 +443,9 @@ public class FmcStateMachine extends StateMachine {
                 if (bypass) {
                     // bypass connectivity and subscription
                     // checking, and bring up data call
-                    //FMC-FEATURE phone.setDataReadinessChecks(false, false, true);
+                    phone.setDataReadinessChecks(false, false, true);
                 } else {
-                    //FMC-FEATURE phone.setDataReadinessChecks(true, true, false);
+                    phone.setDataReadinessChecks(true, true, false);
                 }
             } catch (/*FMC-FEATURE Remote*/Exception e) {
                 Log.w(this.getName(), "remoteException while calling setDataReadinessChecks");
