@@ -58,7 +58,7 @@ public class MSimPhoneProxy extends PhoneProxy {
     @Override
     protected void createNewPhone(int newVoiceRadioTech) {
         if (ServiceState.isCdma(newVoiceRadioTech)) {
-            logd("MSimPhoneProxy: deleteAndCreatePhone: Creating MSimCdmaPhone");
+            logd("MSimPhoneProxy: deleteAndCreatePhone: Creating MSimCDMALTEPhone");
             mActivePhone = MSimPhoneFactory.getMSimCdmaPhone(mSubscription);
         } else if (ServiceState.isGsm(newVoiceRadioTech)) {
             logd("MSimPhoneProxy: deleteAndCreatePhone: Creating MSimGsmPhone");
@@ -93,8 +93,8 @@ public class MSimPhoneProxy extends PhoneProxy {
     }
 
     public boolean updateCurrentCarrierInProvider() {
-        if (mActivePhone instanceof MSimCDMAPhone) {
-            return ((MSimCDMAPhone)mActivePhone).updateCurrentCarrierInProvider();
+        if (mActivePhone instanceof MSimCDMALTEPhone) {
+            return ((MSimCDMALTEPhone)mActivePhone).updateCurrentCarrierInProvider();
         } else if (mActivePhone instanceof MSimGSMPhone) {
             return ((MSimGSMPhone)mActivePhone).updateCurrentCarrierInProvider();
         } else {
@@ -105,8 +105,8 @@ public class MSimPhoneProxy extends PhoneProxy {
 
     public void updateDataConnectionTracker() {
         logd("Updating Data Connection Tracker");
-        if (mActivePhone instanceof MSimCDMAPhone) {
-            ((MSimCDMAPhone)mActivePhone).updateDataConnectionTracker();
+        if (mActivePhone instanceof MSimCDMALTEPhone) {
+            ((MSimCDMALTEPhone)mActivePhone).updateDataConnectionTracker();
         } else if (mActivePhone instanceof MSimGSMPhone) {
             ((MSimGSMPhone)mActivePhone).updateDataConnectionTracker();
         } else {
@@ -120,8 +120,8 @@ public class MSimPhoneProxy extends PhoneProxy {
 
     public boolean setInternalDataEnabledFlag(boolean enable) {
         boolean flag = false;
-        if (mActivePhone instanceof MSimCDMAPhone) {
-            flag = ((MSimCDMAPhone)mActivePhone).setInternalDataEnabledFlag(enable);
+        if (mActivePhone instanceof MSimCDMALTEPhone) {
+            flag = ((MSimCDMALTEPhone)mActivePhone).setInternalDataEnabledFlag(enable);
         } else if (mActivePhone instanceof MSimGSMPhone) {
             flag = ((MSimGSMPhone)mActivePhone).setInternalDataEnabledFlag(enable);
         } else {
@@ -131,8 +131,8 @@ public class MSimPhoneProxy extends PhoneProxy {
     }
 
     public void setInternalDataEnabled(boolean enable, Message onCompleteMsg) {
-        if (mActivePhone instanceof MSimCDMAPhone) {
-            ((MSimCDMAPhone)mActivePhone).setInternalDataEnabled(enable, onCompleteMsg);
+        if (mActivePhone instanceof MSimCDMALTEPhone) {
+            ((MSimCDMALTEPhone)mActivePhone).setInternalDataEnabled(enable, onCompleteMsg);
         } else if (mActivePhone instanceof MSimGSMPhone) {
             ((MSimGSMPhone)mActivePhone).setInternalDataEnabled(enable, onCompleteMsg);
         } else {
@@ -141,8 +141,8 @@ public class MSimPhoneProxy extends PhoneProxy {
     }
 
     public void registerForAllDataDisconnected(Handler h, int what, Object obj) {
-        if (mActivePhone instanceof MSimCDMAPhone) {
-            ((MSimCDMAPhone)mActivePhone).registerForAllDataDisconnected(h, what, obj);
+        if (mActivePhone instanceof MSimCDMALTEPhone) {
+            ((MSimCDMALTEPhone)mActivePhone).registerForAllDataDisconnected(h, what, obj);
         } else if (mActivePhone instanceof MSimGSMPhone) {
             ((MSimGSMPhone)mActivePhone).registerForAllDataDisconnected(h, what, obj);
         } else {
@@ -151,8 +151,8 @@ public class MSimPhoneProxy extends PhoneProxy {
     }
 
     public void unregisterForAllDataDisconnected(Handler h) {
-        if (mActivePhone instanceof MSimCDMAPhone) {
-            ((MSimCDMAPhone)mActivePhone).unregisterForAllDataDisconnected(h);
+        if (mActivePhone instanceof MSimCDMALTEPhone) {
+            ((MSimCDMALTEPhone)mActivePhone).unregisterForAllDataDisconnected(h);
         } else if (mActivePhone instanceof MSimGSMPhone) {
             ((MSimGSMPhone)mActivePhone).unregisterForAllDataDisconnected(h);
         } else {
