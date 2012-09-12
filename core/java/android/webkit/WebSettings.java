@@ -196,7 +196,7 @@ public class WebSettings {
     private long            mMaximumDecodedImageSize = 0; // 0 means default
     private boolean         mPrivateBrowsingEnabled = false;
     private boolean         mSyntheticLinksEnabled = true;
-    private boolean         mMediaPreloadEnabled = false;
+    private boolean         mMediaPreloadEnabled = true;
     // HTML5 API flags
     private boolean         mAppCacheEnabled = false;
     private boolean         mDatabaseEnabled = false;
