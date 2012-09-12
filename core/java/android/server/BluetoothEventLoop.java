@@ -557,6 +557,8 @@ class BluetoothEventLoop {
                           BluetoothDevice.BOND_NONE);
                 }
 
+                mBluetoothService.clearGattServicesRefCount(address);
+
                 if (mBluetoothService.getBondState(address) == BluetoothDevice.BOND_NONE)
                     mBluetoothService.clearRemoteDeviceGattServices(address);
 
