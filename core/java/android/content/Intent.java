@@ -1997,7 +1997,7 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     public static final String ACTION_FM =
-            "android.intent.action.FM";
+            "qualcomm.intent.action.FM";
 
     /**
      * Intents indicating the FM Tx switching on or off
@@ -2009,7 +2009,7 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     public static final String ACTION_FM_TX =
-            "android.intent.action.FMTX";
+            "qualcomm.intent.action.FMTX";
 
     public static final String ACTION_WIFI_DISPLAY =
             "android.intent.action.WIFI_DISPLAY";
