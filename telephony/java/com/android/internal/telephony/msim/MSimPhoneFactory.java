@@ -155,8 +155,8 @@ public class MSimPhoneFactory extends PhoneFactory {
                         sProxyPhones[i] = new MSimPhoneProxy(new MSimGSMPhone(context,
                                 sCommandsInterfaces[i], sPhoneNotifier, i));
                     } else if (phoneType == Phone.PHONE_TYPE_CDMA) {
-                        Log.i(LOG_TAG, "Creating MSimCDMAPhone sub = " + i);
-                        sProxyPhones[i] = new MSimPhoneProxy(new MSimCDMAPhone(context,
+                        Log.i(LOG_TAG, "Creating MSimCDMALTEPhone sub = " + i);
+                        sProxyPhones[i] = new MSimPhoneProxy(new MSimCDMALTEPhone(context,
                                 sCommandsInterfaces[i], sPhoneNotifier, i));
                     }
                 }
@@ -177,7 +177,7 @@ public class MSimPhoneFactory extends PhoneFactory {
     public static Phone getMSimCdmaPhone(int subscription) {
         Phone phone;
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            phone = new MSimCDMAPhone(sContext, sCommandsInterfaces[subscription],
+            phone = new MSimCDMALTEPhone(sContext, sCommandsInterfaces[subscription],
                     sPhoneNotifier, subscription);
         }
         return phone;

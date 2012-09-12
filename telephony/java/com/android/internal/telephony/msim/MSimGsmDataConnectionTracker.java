@@ -34,6 +34,7 @@ import com.android.internal.telephony.DataConnection;
 import com.android.internal.telephony.DataConnectionAc;
 import com.android.internal.telephony.uicc.IccRecords;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.msim.Subscription;
 import com.android.internal.telephony.msim.MSimPhoneFactory;
 
@@ -52,8 +53,6 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
     /** Subscription id */
     protected int mSubscription;
 
-    protected MSimGSMPhone mPhone;
-
     /**
      * List of messages that are waiting to be posted, when data call disconnect
      * is complete
@@ -64,9 +63,8 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
 
     protected int mDisconnectPendingCount = 0;
 
-    MSimGsmDataConnectionTracker(MSimGSMPhone p) {
+    MSimGsmDataConnectionTracker(PhoneBase p) {
         super(p);
-        mPhone = p;
         mSubscription = mPhone.getSubscription();
         mInternalDataEnabled = mSubscription == MSimPhoneFactory.getDataSubscription();
         log("mInternalDataEnabled (is data sub?) = " + mInternalDataEnabled);
@@ -257,11 +255,21 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
 
     @Override
     protected IccRecords getUiccCardApplication() {
-        Subscription subscriptionData = mPhone.getSubscriptionInfo();
-        if(subscriptionData != null) {
-            return  mUiccController.getIccRecords(subscriptionData.slotId,
-                    UiccController.APP_FAM_3GPP);
+        Subscription subscriptionData = null;
+        int appType = UiccController.APP_FAM_3GPP;
+
+        if (mPhone instanceof MSimCDMALTEPhone) {
+            subscriptionData = ((MSimCDMALTEPhone)mPhone).getSubscriptionInfo();
+            appType = UiccController.APP_FAM_3GPP2;
+        } else if (mPhone instanceof MSimGSMPhone) {
+            subscriptionData = ((MSimGSMPhone)mPhone).getSubscriptionInfo();
+            appType = UiccController.APP_FAM_3GPP;
         }
+
+        if(subscriptionData != null) {
+            return  mUiccController.getIccRecords(subscriptionData.slotId, appType);
+        }
+
         return null;
     }
 
@@ -368,7 +376,15 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
 
             mUserDataEnabled = Settings.Secure.getInt(mPhone.getContext().getContentResolver(),
                     Settings.Secure.MOBILE_DATA, 1) == 1;
-            mPhone.updateCurrentCarrierInProvider();
+
+            if (mPhone instanceof MSimCDMALTEPhone) {
+                ((MSimCDMALTEPhone)mPhone).updateCurrentCarrierInProvider();
+            } else if (mPhone instanceof MSimGSMPhone) {
+                ((MSimGSMPhone)mPhone).updateCurrentCarrierInProvider();
+            } else {
+                log("Phone object is not MultiSim. This should not hit!!!!");
+            }
+
             broadcastMessenger();
         } else {
             unregisterForAllEvents();
