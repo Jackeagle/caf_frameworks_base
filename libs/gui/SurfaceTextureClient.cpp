@@ -196,7 +196,9 @@ int SurfaceTextureClient::dequeueBuffer(android_native_buffer_t** buffer) {
              buf, mSlots[buf]->handle);
 #endif
     // Set the value, since the buffer has been dequeued.
-    sQueueBufferStatus.replaceValueFor(this, 1);
+    ssize_t index = sQueueBufferStatus.indexOfKey(this);
+    sQueueBufferStatus.replaceValueAt(index, 1);
+
     return OK;
 }
 
@@ -209,7 +211,9 @@ int SurfaceTextureClient::cancelBuffer(android_native_buffer_t* buffer) {
     }
     mSurfaceTexture->cancelBuffer(i);
     // Reset the value, since the buffer has been cancelled.
-    sQueueBufferStatus.replaceValueFor(this, 0);
+    ssize_t index = sQueueBufferStatus.indexOfKey(this);
+    sQueueBufferStatus.replaceValueAt(index, 0);
+
     return OK;
 }
 
@@ -309,7 +313,9 @@ int SurfaceTextureClient::queueBuffer(android_native_buffer_t* buffer) {
     }
 #endif
     // Reset the value, since the buffer has been queued.
-    sQueueBufferStatus.replaceValueFor(this, 0);
+    ssize_t index = sQueueBufferStatus.indexOfKey(this);
+    sQueueBufferStatus.replaceValueAt(index, 0);
+
     return err;
 }
 
@@ -359,7 +365,8 @@ int SurfaceTextureClient::query(int what, int* value) const {
             }
             default:
                 if (NATIVE_WINDOW_SET_BUFFERS_SIZE == what) {
-	            sBufferSizeSet.replaceValueFor(this, 1);
+                   ssize_t index = sBufferSizeSet.indexOfKey(this);
+                   sBufferSizeSet.replaceValueAt(index, 1);
                 }
         }
     }
@@ -477,7 +484,8 @@ int SurfaceTextureClient::dispatchSetBuffersGeometry(va_list args) {
     if (isBufferSizeSet) {
         LOGV("Resetting the Buffer size to 0 after SET GEOMETRY");
         err = performQcomOperation(NATIVE_WINDOW_SET_BUFFERS_SIZE, 0, 0, 0);
-        sBufferSizeSet.replaceValueFor(this, 0);
+        ssize_t index = sBufferSizeSet.indexOfKey(this);
+        sBufferSizeSet.replaceValueAt(index, 0);
     }
     if (err != 0) {
         return err;
@@ -496,7 +504,8 @@ int SurfaceTextureClient::dispatchSetBuffersDimensions(va_list args) {
     if (isBufferSizeSet) {
         LOGV("Resetting the Buffer size to 0 after SET DIMENSIONS");
         err = performQcomOperation(NATIVE_WINDOW_SET_BUFFERS_SIZE, 0, 0, 0);
-        sBufferSizeSet.replaceValueFor(this, 0);
+        ssize_t index = sBufferSizeSet.indexOfKey(this);
+        sBufferSizeSet.replaceValueAt(index, 0);
     }
     return err;
 }
@@ -657,7 +666,8 @@ int SurfaceTextureClient::setScalingMode(int mode)
 int SurfaceTextureClient::setBuffersTransform(int transform)
 {
     LOGV("SurfaceTextureClient::setBuffersTransform");
-    sBufferTransform.replaceValueFor(this, transform);
+    ssize_t index = sBufferTransform.indexOfKey(this);
+    sBufferTransform.replaceValueAt(index, transform);
     return NO_ERROR;
 }
 
