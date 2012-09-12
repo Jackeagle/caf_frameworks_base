@@ -333,7 +333,8 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
 
     // This configures the SurfaceTexture OnFrameAvailableListener in inline mode
     private void setInlineFrameAvailableListener() {
-        getSurfaceTexture().setOnFrameAvailableListener(this);
+        if (mSurfaceTexture != null)
+            mSurfaceTexture.setOnFrameAvailableListener(this);
     }
 
     public int getVideoLayerId() {
@@ -380,6 +381,8 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         }
     }
 
+    // HTML5VideoViewProxy::validateEglContext() should be called before
+    // calling this function
     public void decideDisplayMode() {
         SurfaceTexture surfaceTexture = getSurfaceTexture();
         Surface surface = new Surface(surfaceTexture);
@@ -387,7 +390,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         surface.release();
     }
 
-    // SurfaceTexture will be created lazily here
+    // SurfaceTexture will be created lazily here if EGL context is available
     public SurfaceTexture getSurfaceTexture() {
         // Create the surface texture.
         if (mSurfaceTexture == null) {
@@ -395,7 +398,10 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
                 mTextureNames = new int[1];
                 GLES20.glGenTextures(1, mTextureNames, 0);
             }
-            mSurfaceTexture = new SurfaceTexture(mTextureNames[0]);
+            if (mTextureNames[0] == 0)
+                Log.e(LOGTAG, "Bad GL texture name");
+            else
+                mSurfaceTexture = new SurfaceTexture(mTextureNames[0]);
         }
         return mSurfaceTexture;
     }
@@ -552,7 +558,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         mPlayer.setOnBufferingUpdateListener(mBufferingUpdateListener);
 
         assert(mSurfaceTexture != null);
-        mTextureView = new MyVideoTextureView(mProxy.getContext(), getSurfaceTexture(),
+        mTextureView = new MyVideoTextureView(mProxy.getContext(), mSurfaceTexture,
                 getTextureName(), mSurfaceTextureReady);
         mTextureView.setOnTouchListener(this);
 
