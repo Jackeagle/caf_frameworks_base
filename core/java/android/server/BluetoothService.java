@@ -4789,6 +4789,28 @@ public class BluetoothService extends IBluetooth.Stub {
         setRemoteDeviceProperty(address, "Services", null);
     }
 
+    /*package*/ synchronized void  clearGattServicesRefCount(String address) {
+        Log.d(TAG, "clearGattServicesRefCount for dev " + address);
+
+        String value = mDeviceProperties.getProperty(address, "Services");
+        if (value == null) {
+            Log.e(TAG, "No GATT based services were found on " + address);
+            return;
+        }
+
+        String[] gattServicePaths = null;
+        // The  object paths are stored as a "," separated string.
+        gattServicePaths = value.split(",");
+
+        for (int i  = 0; i < gattServicePaths.length; i++) {
+            if(mGattServices.remove(gattServicePaths[i]) != null) {
+                Log.d(TAG, "Clearing ref count for " + gattServicePaths[i]);
+                mGattServices.put(gattServicePaths[i], 0);
+            }
+        }
+
+    }
+
     /**** Local GATT Server handlers ****/
     public synchronized boolean closeGattLeConnection(BluetoothGattAppConfiguration config,
                                                       String address) {
