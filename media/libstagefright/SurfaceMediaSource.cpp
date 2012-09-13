@@ -59,7 +59,7 @@ SurfaceMediaSource::SurfaceMediaSource(uint32_t bufW, uint32_t bufH) :
 
     mUsageQuirks = 0;
     char value[PROPERTY_VALUE_MAX] = {0};
-    if (property_get("ro.product.device", value, "0")) {
+    if (property_get("ro.board.platform", value, "0")) {
         if (!strncmp(value, "msm8660", sizeof("msm8660") - 1)) {
             #ifdef USE_ION
                 mUsageQuirks = (GRALLOC_USAGE_PRIVATE_MM_HEAP |
