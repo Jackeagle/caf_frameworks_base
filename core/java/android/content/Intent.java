@@ -1988,17 +1988,26 @@ public class Intent implements Parcelable, Cloneable {
             "android.intent.action.HEADSET_PLUG";
 
     /**
-     * Intents indicating the FM Rx and FM Tx swithing on or off
+     * Intents indicating the FM Rx switching on or off
      * <p>The intent will have the following extra values:
      * <ul>
      *   <li><em>state</em> - 0 for switched off, 1 for switched on. </li>
      * </ul>
      * </ul>
+     * @hide
      */
-
     public static final String ACTION_FM =
             "android.intent.action.FM";
 
+    /**
+     * Intents indicating the FM Tx switching on or off
+     * <p>The intent will have the following extra values:
+     * <ul>
+     *   <li><em>state</em> - 0 for switched off, 1 for switched on. </li>
+     * </ul>
+     * </ul>
+     * @hide
+     */
     public static final String ACTION_FM_TX =
             "android.intent.action.FMTX";
 
