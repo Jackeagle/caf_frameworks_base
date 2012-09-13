@@ -479,7 +479,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         intentFilter.addAction(Intent.ACTION_BOOT_COMPLETED);
         intentFilter.addAction(Intent.ACTION_SCREEN_ON);
         intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
-        intentFilter.addAction(Intent.ACTION_WIFI_DISPLAY);
+        intentFilter.addAction(Intent.ACTION_WIFI_DISPLAY_AUDIO);
 
         // Register a configuration change listener only if requested by system properties
         // to monitor orientation changes (off by default)
@@ -3796,7 +3796,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 AudioSystem.setParameters("screen_state=off");
             } else if (action.equalsIgnoreCase(Intent.ACTION_CONFIGURATION_CHANGED)) {
                 handleConfigurationChanged(context);
-            } else if (action.equals(Intent.ACTION_WIFI_DISPLAY)){
+            } else if (action.equals(Intent.ACTION_WIFI_DISPLAY_AUDIO)){
                state = intent.getIntExtra("state", 0);
                Log.v(TAG, "WiFi Display device state "+state);
                boolean isConnected = mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_PROXY);
