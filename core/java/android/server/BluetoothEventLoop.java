@@ -364,10 +364,10 @@ class BluetoothEventLoop {
         if (address != null) {
             mBluetoothService.setBondState(address.toUpperCase(), BluetoothDevice.BOND_NONE,
                 BluetoothDevice.UNBOND_REASON_REMOVED);
+            mBluetoothService.clearRemoteDeviceGattServices(address);
             mBluetoothService.setRemoteDeviceProperty(address, "UUIDs", null);
             mBluetoothService.setRemoteDeviceProperty(address, "Services", null);
             mBluetoothService.setRemoteDeviceProperty(address, "Trusted", "false");
-            mBluetoothService.clearRemoteDeviceGattServices(address);
         }
     }
 
