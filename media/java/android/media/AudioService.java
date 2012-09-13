@@ -258,7 +258,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         AudioSystem.STREAM_BLUETOOTH_SCO,   // STREAM_BLUETOOTH_SCO
         AudioSystem.STREAM_MUSIC,           // STREAM_SYSTEM_ENFORCED
         AudioSystem.STREAM_MUSIC,           // STREAM_DTMF
-        AudioSystem.STREAM_MUSIC            // STREAM_TTS
+        AudioSystem.STREAM_MUSIC,           // STREAM_TTS
+        AudioSystem.STREAM_FM
     };
     private int[] mStreamVolumeAlias;
 
@@ -273,7 +274,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             "STREAM_BLUETOOTH_SCO",
             "STREAM_SYSTEM_ENFORCED",
             "STREAM_DTMF",
-            "STREAM_TTS"
+            "STREAM_TTS",
+            "STREAM_FM"
     };
 
     private final AudioSystem.ErrorCallback mAudioSystemCallback = new AudioSystem.ErrorCallback() {
