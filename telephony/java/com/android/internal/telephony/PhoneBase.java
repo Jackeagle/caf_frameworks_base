@@ -1305,4 +1305,16 @@ public abstract class PhoneBase extends Handler implements Phone {
     public int getSubscription() {
         return DEFAULT_SUBSCRIPTION;
     }
+
+    // IMS APIs - Implemented only in ImsPhone
+    public void acceptCall(int callType) throws CallStateException {
+        throw new CallStateException("Accept with CallType is not supported in this phone " + this);
+    }
+
+    public Connection dial(String dialString, int CallType, String[] extras)
+            throws CallStateException {
+        throw new CallStateException("Dial with CallDetails is not supported in this phone "
+                + this);
+    }
+
 }

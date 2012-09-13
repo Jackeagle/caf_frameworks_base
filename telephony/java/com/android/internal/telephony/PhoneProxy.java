@@ -501,6 +501,10 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.acceptCall();
     }
 
+    public void acceptCall(int callType) throws CallStateException {
+        mActivePhone.acceptCall(callType);
+    }
+
     public void rejectCall() throws CallStateException {
         mActivePhone.rejectCall();
     }
@@ -555,6 +559,11 @@ public class PhoneProxy extends Handler implements Phone {
 
     public Connection dial(String dialString, UUSInfo uusInfo) throws CallStateException {
         return mActivePhone.dial(dialString, uusInfo);
+    }
+
+    public Connection dial(String dialString, int callType, String[] extras)
+            throws CallStateException {
+        return mActivePhone.dial(dialString, callType, extras);
     }
 
     public boolean handlePinMmi(String dialString) {
