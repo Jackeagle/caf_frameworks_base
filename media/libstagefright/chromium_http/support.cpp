@@ -92,6 +92,51 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(AutoPrioritySaver);
 };
 
+static void SetHttpTransactionInfo(GURL url) {
+    char proxy_host[PROPERTY_VALUE_MAX];
+    char proxy_port[PROPERTY_VALUE_MAX];
+    char proxy_excl_list[PROPERTY_VALUE_MAX];
+
+    const char* url_host = url.host().c_str();
+
+    bool host_in_list = false;
+    char * tok;
+    //Getting proxy information if available
+    property_get("net.http.proxy.host", proxy_host, "//////");
+    property_get("net.http.proxy.port", proxy_port, "//////");
+    property_get("net.http.proxy.excl.list", proxy_excl_list, "//////");
+    tok = strtok(proxy_excl_list, " ,");
+    while(tok != NULL)
+    {
+        host_in_list = strstr(url_host, tok) != NULL;
+        if(host_in_list)break;
+        tok = strtok(NULL, " ,");
+    }
+    if(strcmp(proxy_host, "//////") && !host_in_list) {
+        if(strcmp(proxy_port, "//////")) {
+	    strcat(proxy_host,":");
+	    strcat(proxy_host, proxy_port);
+	}
+	gReqContext->set_proxy_service(net::ProxyService::CreateFixed(proxy_host));
+    } else {
+        gReqContext->set_proxy_service(net::ProxyService::CreateWithoutProxyResolver(
+	new net::ProxyConfigServiceAndroid, gReqContext->net_log()));
+    }
+    //Moved here from SfRequestContext::SfRequestContext() to be able to update proxy information
+    gReqContext->set_http_transaction_factory(new net::HttpCache(
+                                                  gReqContext->host_resolver(),
+	                                          new net::CertVerifier(),
+	                                          gReqContext->dnsrr_resolver(),
+	                                          gReqContext->dns_cert_checker(),
+	                                          gReqContext->proxy_service(),
+	                                          gReqContext->ssl_config_service(),
+	                                          net::HttpAuthHandlerFactory::CreateDefault(gReqContext->host_resolver()),
+	                                          gReqContext->network_delegate(),
+	                                          gReqContext->net_log(),
+	                                          NULL));  // backend_factory
+}
+
+
 static void InitializeNetworkThreadIfNecessary() {
     Mutex::Autolock autoLock(gNetworkThreadLock);
 
@@ -181,6 +226,8 @@ SfRequestContext::SfRequestContext() {
     set_ssl_config_service(
         net::SSLConfigService::CreateSystemSSLConfigService());
 
+    /*Commented out and moved to SetHttpTransactionInfo, in order to be able to update proxy information 
+      so that streaming behind a proxy does not break
     set_proxy_service(net::ProxyService::CreateWithoutProxyResolver(
         new net::ProxyConfigServiceAndroid, net_log()));
 
@@ -195,6 +242,7 @@ SfRequestContext::SfRequestContext() {
             network_delegate(),
             net_log(),
             NULL));  // backend_factory
+    */
 
     set_cookie_store(new net::CookieMonster(NULL, NULL));
 }
@@ -470,7 +518,7 @@ void SfDelegate::onInitiateConnection(
 
         mURLRequest->SetExtraRequestHeaders(headers);
     }
-
+    SetHttpTransactionInfo(url);
     mURLRequest->set_context(gReqContext);
 
     mURLRequest->Start();
