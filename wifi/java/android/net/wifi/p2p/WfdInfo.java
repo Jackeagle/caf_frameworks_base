@@ -40,6 +40,8 @@ import android.util.Log;
 /**
  * A class representing Wireless Display Service Capability information about a
  * Wi-Fi p2p device {@see WifiP2pDevice}
+ *
+ * @hide
  */
 public class WfdInfo implements Parcelable {
 
