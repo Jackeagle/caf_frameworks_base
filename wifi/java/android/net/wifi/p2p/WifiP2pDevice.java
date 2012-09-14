@@ -129,8 +129,8 @@ public class WifiP2pDevice implements Parcelable {
     /** Device connection status */
     public int status = UNAVAILABLE;
 
-    /** Device WFD support Info */
-
+    /** Device WFD support Info
+     * @hide */
     public WfdInfo wfdInfo;
 
     public WifiP2pDevice() {
