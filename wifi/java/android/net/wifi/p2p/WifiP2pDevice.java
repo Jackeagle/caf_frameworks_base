@@ -143,8 +143,8 @@ public class WifiP2pDevice implements Parcelable {
         "(?:[0-9a-f]{2}:){5}[0-9a-f]{2} p2p_dev_addr=((?:[0-9a-f]{2}:){5}[0-9a-f]{2})"
     );
 
-    /** Device WFD support Info */
-
+    /** Device WFD support Info
+     * @hide */
     public WfdInfo wfdInfo;
 
     public WifiP2pDevice() {

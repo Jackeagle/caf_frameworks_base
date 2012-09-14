@@ -1379,6 +1379,7 @@ public class WifiP2pManager {
      * @param c is the channel created at {@link #initialize}
      * @param wfdInfo is the custom string command to be executed
      * @param listener for callbacks for string response
+     * @hide
      */
     public void updateWFDInfo(Channel c, WfdInfo wfdInfo, ActionListener listener) {
         if (c == null) return;
