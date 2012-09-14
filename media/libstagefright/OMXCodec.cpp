@@ -804,7 +804,7 @@ sp<MediaSource> OMXCodec::Create(
 			mSecureStart = true;
 			 sp<ISurfaceComposer> composer(ComposerService::getComposerService());
 			composer->perform(BnSurfaceComposer::EVENT_SC_OPEN_SECURE_START, 0);
-			sendBroadCastEvent(String16("android.intent.action.SECURE_START"));
+			sendBroadCastEvent(String16("qualcomm.intent.action.SECURE_START"));
 		}
 
         status_t err = omx->allocateNode(componentName, observer, &node);
@@ -816,7 +816,7 @@ sp<MediaSource> OMXCodec::Create(
 			        sp<ISurfaceComposer> composer(ComposerService::getComposerService());
 			        composer->perform(BnSurfaceComposer::EVENT_SC_OPEN_SECURE_END, 0);
 				//send secure start done event
-				sendBroadCastEvent(String16("android.intent.action.SECURE_START_DONE"));
+				sendBroadCastEvent(String16("qualcomm.intent.action.SECURE_START_DONE"));
 			}
 
             sp<OMXCodec> codec = new OMXCodec(
@@ -2292,7 +2292,7 @@ OMXCodec::~OMXCodec() {
 	sp<ISurfaceComposer> composer(ComposerService::getComposerService());
 	composer->perform(BnSurfaceComposer::EVENT_SC_CLOSE_SECURE_START, 0);
         //send secure end event
-        sendBroadCastEvent(String16("android.intent.action.SECURE_END"));
+        sendBroadCastEvent(String16("qualcomm.intent.action.SECURE_END"));
     }
 	status_t err = mOMX->freeNode(mNode);
     if (!strncasecmp(mComponentName,"OMX.qcom",8) && (mFlags & kUseSecureInputBuffers) && (!mIsEncoder) && (!strncasecmp(mMIME, "video/", 6)) )
@@ -2300,7 +2300,7 @@ OMXCodec::~OMXCodec() {
 	sp<ISurfaceComposer> composer(ComposerService::getComposerService());
 	composer->perform(BnSurfaceComposer::EVENT_SC_CLOSE_SECURE_END, 0);
         //send secure end done event
-        sendBroadCastEvent(String16("android.intent.action.SECURE_END_DONE"));
+        sendBroadCastEvent(String16("qualcomm.intent.action.SECURE_END_DONE"));
         mSecureStart = false;
     }
 
