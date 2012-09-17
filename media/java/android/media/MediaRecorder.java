@@ -232,9 +232,9 @@ public class MediaRecorder
         /** @hide H.264/AAC data encapsulated in MPEG2/TS */
         public static final int OUTPUT_FORMAT_MPEG2TS = 8;
 
-        /** QCP file format */
+        /** @hide QCP file format */
         public static final int QCP = 9;
-        /** 3GPP2 media file format*/
+        /** @hide 3GPP2 media file format*/
         public static final int THREE_GPP2 = 10;
     };
 
@@ -258,9 +258,9 @@ public class MediaRecorder
         public static final int AAC_PLUS = 4;
         /** enhanced AAC plus audio codec */
         public static final int EAAC_PLUS = 5;
-        /** EVRC audio codec */
+        /** @hide EVRC audio codec */
         public static final int EVRC = 6;
-        /** QCELP audio codec */
+        /** @hide QCELP audio codec */
         public static final int QCELP =7;
     }
 
