@@ -271,4 +271,9 @@ public interface TelephonyProperties
      * Type: string ( default = silent, enable to = prompt )
      */
     static final String PROPERTY_MMS_TRANSACTION = "mms.transaction";
+
+    /**
+     * Property to store default subscription.
+     */
+    static final String PROPERTY_DEFAULT_SUBSCRIPTION = "persist.default.subscription";
 }
