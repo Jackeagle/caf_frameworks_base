@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +40,7 @@ final class JWebCoreJavaBridge extends Handler {
     // Instant timer is used to implement a timer that needs to fire almost
     // immediately.
     private boolean mHasInstantTimer;
+    private boolean mHasActiveTimer;
 
     private boolean mTimerPaused;
     private boolean mHasDeferredTimers;
@@ -89,6 +91,7 @@ final class JWebCoreJavaBridge extends Handler {
     private void fireSharedTimer() { 
         // clear the flag so that sharedTimerFired() can set a new timer
         mHasInstantTimer = false;
+        mHasActiveTimer = false;
         sharedTimerFired();
     }
 
@@ -231,11 +234,20 @@ final class JWebCoreJavaBridge extends Handler {
             if (mHasInstantTimer) {
                 return;
             } else {
+                if (mHasActiveTimer) {
+                    removeMessages(TIMER_MESSAGE);
+                }
                 mHasInstantTimer = true;
+                mHasActiveTimer = true;
                 Message msg = obtainMessage(TIMER_MESSAGE);
                 sendMessageDelayed(msg, timemillis);
             }
         } else {
+            if (mHasActiveTimer) {
+                removeMessages(TIMER_MESSAGE);
+                mHasInstantTimer = false;
+            }
+            mHasActiveTimer = true;
             Message msg = obtainMessage(TIMER_MESSAGE);
             sendMessageDelayed(msg, timemillis);
         }
@@ -250,6 +262,7 @@ final class JWebCoreJavaBridge extends Handler {
         }
         removeMessages(TIMER_MESSAGE);
         mHasInstantTimer = false;
+        mHasActiveTimer = false;
         mHasDeferredTimers = false;
     }
 
