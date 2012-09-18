@@ -10847,7 +10847,6 @@ package android.media {
     method public boolean isBluetoothA2dpOn();
     method public boolean isBluetoothScoAvailableOffCall();
     method public boolean isBluetoothScoOn();
-    method public boolean isFMActive();
     method public boolean isMicrophoneMute();
     method public boolean isMusicActive();
     method public boolean isSpeakerphoneOn();
@@ -10891,8 +10890,6 @@ package android.media {
     field public static final int AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK = -3; // 0xfffffffd
     field public static final int AUDIOFOCUS_REQUEST_FAILED = 0; // 0x0
     field public static final int AUDIOFOCUS_REQUEST_GRANTED = 1; // 0x1
-    field public static final int DEVICE_OUT_ANC_HEADPHONE = 262144; // 0x40000
-    field public static final int DEVICE_OUT_DEFAULT = 2; // 0x2
     field public static final java.lang.String EXTRA_RINGER_MODE = "android.media.EXTRA_RINGER_MODE";
     field public static final java.lang.String EXTRA_SCO_AUDIO_PREVIOUS_STATE = "android.media.extra.SCO_AUDIO_PREVIOUS_STATE";
     field public static final java.lang.String EXTRA_SCO_AUDIO_STATE = "android.media.extra.SCO_AUDIO_STATE";
