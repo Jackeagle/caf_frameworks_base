@@ -1579,6 +1579,7 @@ public class AudioManager {
       * Checks whether FM stream is active.
       *
       * @return true if FM is active.
+      * @hide
       */
     public boolean isFMActive() {
         return AudioSystem.isStreamActive(STREAM_FM, 0);
@@ -2423,7 +2424,9 @@ public class AudioManager {
      *  platform-specific implementation.
      */
     public static final int DEVICE_OUT_ANC_HEADSET = AudioSystem.DEVICE_OUT_ANC_HEADSET;
+    /** @hide **/
     public static final int DEVICE_OUT_ANC_HEADPHONE = AudioSystem.DEVICE_OUT_ANC_HEADPHONE;
+    /** @hide **/
     public static final int DEVICE_OUT_DEFAULT = AudioSystem.DEVICE_OUT_DEFAULT;
 
     /**
