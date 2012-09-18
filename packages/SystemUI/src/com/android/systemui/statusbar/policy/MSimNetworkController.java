@@ -270,8 +270,10 @@ public class MSimNetworkController extends NetworkController {
             refreshViews(mDefaultSubscription);
         } else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
             updateSimState(intent);
-            updateDataIcon(mDefaultSubscription);
-            refreshViews(mDefaultSubscription);
+            for (int sub = 0; sub < MSimTelephonyManager.getDefault().getPhoneCount(); sub++) {
+                updateDataIcon(sub);
+                refreshViews(sub);
+            }
         } else if (action.equals(Telephony.Intents.SPN_STRINGS_UPDATED_ACTION)) {
             final int subscription = intent.getIntExtra(MSimConstants.SUBSCRIPTION_KEY, 0);
             Slog.d(TAG, "Received SPN update on sub :" + subscription);
@@ -345,8 +347,14 @@ public class MSimNetworkController extends NetworkController {
                     Slog.d(TAG, "onDataConnectionStateChanged received on subscription :"
                     + mSubscription + "state=" + state + " type=" + networkType);
                 }
-                mDataState = state;
-                mDataNetType = networkType;
+
+                // DSDS case: Data is active only on DDS. Ignore the Data Connection
+                // State changed notifications of the other NON-DDS.
+                if (mSubscription ==
+                        MSimTelephonyManager.getDefault().getPreferredDataSubscription()) {
+                    mDataState = state;
+                    mDataNetType = networkType;
+                }
                 updateDataNetType(mSubscription);
                 updateDataIcon(mSubscription);
                 refreshViews(mSubscription);
@@ -491,109 +499,118 @@ public class MSimNetworkController extends NetworkController {
     }
 
     private final void updateDataNetType(int subscription) {
-        if (mIsWimaxEnabled && mWimaxConnected) {
-            // wimax is a special 4g network not handled by telephony
-            mDataIconList = TelephonyIcons.DATA_4G[mInetCondition];
-            mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_4g;
-            mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                    R.string.accessibility_data_connection_4g);
+        // DSDS case: Data is active only on DDS. Clear the icon for NON-DDS
+        int dataSub = MSimTelephonyManager.getDefault().getPreferredDataSubscription();
+        if (subscription != dataSub) {
+            Slog.d(TAG,"updateDataNetType: SUB" + subscription
+                    + " is not DDS(=SUB" + dataSub + ")!");
+            mMSimDataTypeIconId[subscription] = 0;
         } else {
-            Slog.d(TAG,"updateDataNetType sub = " + subscription
-                    + " mDataNetType = " + mDataNetType);
-            switch (mDataNetType) {
-                case TelephonyManager.NETWORK_TYPE_UNKNOWN:
-                    if (DEBUG) {
-                        Slog.e(TAG, "updateDataNetType NETWORK_TYPE_UNKNOWN");
-                    }
-                    if (!mShowAtLeastThreeGees) {
-                        mDataIconList = TelephonyIcons.DATA_G[mInetCondition];
+            if (mIsWimaxEnabled && mWimaxConnected) {
+                // wimax is a special 4g network not handled by telephony
+                mDataIconList = TelephonyIcons.DATA_4G[mInetCondition];
+                mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_4g;
+                mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                        R.string.accessibility_data_connection_4g);
+            } else {
+                Slog.d(TAG,"updateDataNetType sub = " + subscription
+                        + " mDataNetType = " + mDataNetType);
+                switch (mDataNetType) {
+                    case TelephonyManager.NETWORK_TYPE_UNKNOWN:
+                        if (DEBUG) {
+                            Slog.e(TAG, "updateDataNetType NETWORK_TYPE_UNKNOWN");
+                        }
+                        if (!mShowAtLeastThreeGees) {
+                            mDataIconList = TelephonyIcons.DATA_G[mInetCondition];
+                            mMSimDataTypeIconId[subscription] = 0;
+                            mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                    R.string.accessibility_data_connection_gprs);
+                            break;
+                        } else {
+                            // fall through
+                        }
+                    case TelephonyManager.NETWORK_TYPE_EDGE:
+                        if (!mShowAtLeastThreeGees) {
+                            mDataIconList = TelephonyIcons.DATA_E[mInetCondition];
+                            mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_e;
+                            mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                    R.string.accessibility_data_connection_edge);
+                            break;
+                        } else {
+                            // fall through
+                        }
+                    case TelephonyManager.NETWORK_TYPE_UMTS:
+                        mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
+                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
+                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                R.string.accessibility_data_connection_3g);
+                        break;
+                    case TelephonyManager.NETWORK_TYPE_HSDPA:
+                    case TelephonyManager.NETWORK_TYPE_HSUPA:
+                    case TelephonyManager.NETWORK_TYPE_HSPA:
+                    case TelephonyManager.NETWORK_TYPE_HSPAP:
+                        if (mHspaDataDistinguishable) {
+                            mDataIconList = TelephonyIcons.DATA_H[mInetCondition];
+                            mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_h;
+                            mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                    R.string.accessibility_data_connection_3_5g);
+                        } else {
+                            mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
+                            mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
+                            mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                    R.string.accessibility_data_connection_3g);
+                        }
+                        break;
+                    case TelephonyManager.NETWORK_TYPE_CDMA:
+                        // display 1xRTT for IS95A/B
+                        mDataIconList = TelephonyIcons.DATA_1X[mInetCondition];
+                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_1x;
+                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                R.string.accessibility_data_connection_cdma);
+                        break;
+                    case TelephonyManager.NETWORK_TYPE_1xRTT:
+                        mDataIconList = TelephonyIcons.DATA_1X[mInetCondition];
+                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_1x;
+                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                R.string.accessibility_data_connection_cdma);
+                        break;
+                    case TelephonyManager.NETWORK_TYPE_EVDO_0: //fall through
+                    case TelephonyManager.NETWORK_TYPE_EVDO_A:
+                    case TelephonyManager.NETWORK_TYPE_EVDO_B:
+                    case TelephonyManager.NETWORK_TYPE_EHRPD:
+                        mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
+                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
+                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                R.string.accessibility_data_connection_3g);
+                        break;
+                    case TelephonyManager.NETWORK_TYPE_LTE:
+                        mDataIconList = TelephonyIcons.DATA_4G[mInetCondition];
+                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_4g;
+                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                R.string.accessibility_data_connection_4g);
+                        break;
+                    case TelephonyManager.NETWORK_TYPE_GPRS:
+                        if (!mShowAtLeastThreeGees) {
+                            mDataIconList = TelephonyIcons.DATA_G[mInetCondition];
+                            mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_g;
+                            mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                    R.string.accessibility_data_connection_gprs);
+                        } else {
+                            mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
+                            mMSimDataTypeIconId[subscription] =
+                                R.drawable.stat_sys_data_connected_3g;
+                            mMSimContentDescriptionDataType[subscription] = mContext.getString(
+                                    R.string.accessibility_data_connection_3g);
+                        }
+                        break;
+                    default:
+                        if (DEBUG) {
+                            Slog.e(TAG, "updateDataNetType unknown radio:" + mDataNetType);
+                        }
+                        mDataNetType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
                         mMSimDataTypeIconId[subscription] = 0;
-                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                                R.string.accessibility_data_connection_gprs);
                         break;
-                    } else {
-                        // fall through
-                    }
-                case TelephonyManager.NETWORK_TYPE_EDGE:
-                    if (!mShowAtLeastThreeGees) {
-                        mDataIconList = TelephonyIcons.DATA_E[mInetCondition];
-                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_e;
-                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                                R.string.accessibility_data_connection_edge);
-                        break;
-                    } else {
-                        // fall through
-                    }
-                case TelephonyManager.NETWORK_TYPE_UMTS:
-                    mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
-                    mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
-                    mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                            R.string.accessibility_data_connection_3g);
-                    break;
-                case TelephonyManager.NETWORK_TYPE_HSDPA:
-                case TelephonyManager.NETWORK_TYPE_HSUPA:
-                case TelephonyManager.NETWORK_TYPE_HSPA:
-                case TelephonyManager.NETWORK_TYPE_HSPAP:
-                    if (mHspaDataDistinguishable) {
-                        mDataIconList = TelephonyIcons.DATA_H[mInetCondition];
-                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_h;
-                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                                R.string.accessibility_data_connection_3_5g);
-                    } else {
-                        mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
-                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
-                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                                R.string.accessibility_data_connection_3g);
-                    }
-                    break;
-                case TelephonyManager.NETWORK_TYPE_CDMA:
-                    // display 1xRTT for IS95A/B
-                    mDataIconList = TelephonyIcons.DATA_1X[mInetCondition];
-                    mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_1x;
-                    mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                            R.string.accessibility_data_connection_cdma);
-                    break;
-                case TelephonyManager.NETWORK_TYPE_1xRTT:
-                    mDataIconList = TelephonyIcons.DATA_1X[mInetCondition];
-                    mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_1x;
-                    mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                            R.string.accessibility_data_connection_cdma);
-                    break;
-                case TelephonyManager.NETWORK_TYPE_EVDO_0: //fall through
-                case TelephonyManager.NETWORK_TYPE_EVDO_A:
-                case TelephonyManager.NETWORK_TYPE_EVDO_B:
-                case TelephonyManager.NETWORK_TYPE_EHRPD:
-                    mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
-                    mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
-                    mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                            R.string.accessibility_data_connection_3g);
-                    break;
-                case TelephonyManager.NETWORK_TYPE_LTE:
-                    mDataIconList = TelephonyIcons.DATA_4G[mInetCondition];
-                    mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_4g;
-                    mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                            R.string.accessibility_data_connection_4g);
-                    break;
-                case TelephonyManager.NETWORK_TYPE_GPRS:
-                    if (!mShowAtLeastThreeGees) {
-                        mDataIconList = TelephonyIcons.DATA_G[mInetCondition];
-                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_g;
-                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                                R.string.accessibility_data_connection_gprs);
-                    } else {
-                        mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
-                        mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
-                        mMSimContentDescriptionDataType[subscription] = mContext.getString(
-                                R.string.accessibility_data_connection_3g);
-                    }
-                    break;
-                default:
-                    if (DEBUG) {
-                        Slog.e(TAG, "updateDataNetType unknown radio:" + mDataNetType);
-                    }
-                    mDataNetType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
-                    mMSimDataTypeIconId[subscription] = 0;
-                    break;
+                }
             }
         }
 
@@ -636,12 +653,14 @@ public class MSimNetworkController extends NetworkController {
         Slog.d(TAG,"updateDataIcon subscription =" + subscription);
         int iconId = 0;
         boolean visible = true;
-        int dataSub = Settings.System.getInt(mContext.getContentResolver(),
-            Settings.System.MULTI_SIM_DATA_CALL_SUBSCRIPTION, 0);
+
+        int dataSub = MSimTelephonyManager.getDefault().getPreferredDataSubscription();
         Slog.d(TAG,"updateDataIcon dataSub =" + dataSub);
-        // Update icon only if DDS in properly set and "subscription" matches DDS.
+        // DSDS case: Data is active only on DDS. Clear the icon for NON-DDS
         if (subscription != dataSub) {
-            Slog.d(TAG,"updateDataIcon return");
+            mMSimDataConnected[subscription] = false;
+            Slog.d(TAG,"updateDataIconi: SUB" + subscription
+                     + " is not DDS.  Clear the mMSimDataConnected Flag and return");
             return;
         }
 
@@ -780,10 +799,12 @@ public class MSimNetworkController extends NetworkController {
         }
 
         // We want to update all the icons, all at once, for any condition change
-        updateDataNetType(mDefaultSubscription);
         updateWimaxIcons();
-        updateDataIcon(mDefaultSubscription);
-        updateTelephonySignalStrength(mDefaultSubscription);
+        for (int sub = 0; sub < MSimTelephonyManager.getDefault().getPhoneCount(); sub++) {
+            updateDataNetType(sub);
+            updateDataIcon(sub);
+            updateTelephonySignalStrength(sub);
+        }
         updateWifiIcons();
     }
 
