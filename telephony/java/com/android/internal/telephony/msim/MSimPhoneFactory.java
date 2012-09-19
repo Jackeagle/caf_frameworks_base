@@ -40,6 +40,7 @@ import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.sip.SipPhone;
 import com.android.internal.telephony.sip.SipPhoneFactory;
 import com.android.internal.telephony.TelephonyIntents;
+import static com.android.internal.telephony.TelephonyProperties.PROPERTY_DEFAULT_SUBSCRIPTION;
 import com.android.internal.telephony.uicc.UiccController;
 
 /**
@@ -213,8 +214,7 @@ public class MSimPhoneFactory extends PhoneFactory {
      * are active the first instance "0" is set as default subscription
      */
     public static void setDefaultSubscription(int subscription) {
-        Settings.System.putInt(sContext.getContentResolver(),
-                Settings.System.DEFAULT_SUBSCRIPTION, subscription);
+        SystemProperties.set(PROPERTY_DEFAULT_SUBSCRIPTION, Integer.toString(subscription));
 
         // Set the default phone in base class
         if (subscription >= 0 && subscription < sProxyPhones.length) {
@@ -234,15 +234,7 @@ public class MSimPhoneFactory extends PhoneFactory {
 
     /* Gets the default subscription */
     public static int getDefaultSubscription() {
-        int subscription = 0;
-        try {
-            subscription = Settings.System.getInt(sContext.getContentResolver(),
-                    Settings.System.DEFAULT_SUBSCRIPTION);
-        } catch (SettingNotFoundException snfe) {
-            // Settings Exception Reading Default Subscription
-        }
-
-        return subscription;
+        return SystemProperties.getInt(PROPERTY_DEFAULT_SUBSCRIPTION, 0);
     }
 
     /* Gets User preferred Voice subscription setting*/
