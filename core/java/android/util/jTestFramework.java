@@ -17,6 +17,9 @@
 
 package android.util;
 
+/**
+* @hide
+*/
 public class jTestFramework {
     //event type
     public static final int  TF_EVENT_JAVA_START = 0x08;
