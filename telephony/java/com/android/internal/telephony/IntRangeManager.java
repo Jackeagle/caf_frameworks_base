@@ -204,8 +204,9 @@ public abstract class IntRangeManager {
 
         for (int startIndex = 0; startIndex < len; startIndex++) {
             IntRange range = mRanges.get(startIndex);
-            if ((startId) == range.startId && (endId) == range.endId) {
+            if ((startId) >= range.startId && (endId) <= range.endId) {
                 // exact same range:  new [1, 1] existing [1, 1]
+                // range already enclosed in existing: new [3, 3], [1,3]
                 // no radio update necessary.
                 // duplicate "client" check is done in insert, attempt to insert.
                 range.insert(new ClientRange(startId, endId, client));
