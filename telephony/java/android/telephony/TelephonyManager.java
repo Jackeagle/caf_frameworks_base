@@ -414,15 +414,7 @@ public class TelephonyManager {
      * @hide
      */
     public static int getDefaultSubscription() {
-        int subscription = 0;
-        try {
-            subscription = Settings.System.getInt(sContext.getContentResolver(),
-                    Settings.System.DEFAULT_SUBSCRIPTION);
-        } catch (SettingNotFoundException snfe) {
-            // Settings Exception Reading Default Subscription
-        }
-
-        return subscription;
+        return  SystemProperties.getInt(TelephonyProperties.PROPERTY_DEFAULT_SUBSCRIPTION, 0);
     }
 
 
