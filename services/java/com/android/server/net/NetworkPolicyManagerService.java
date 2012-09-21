@@ -117,6 +117,8 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
+import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
 import android.text.format.Formatter;
 import android.text.format.Time;
@@ -159,7 +161,6 @@ import java.util.List;
 import java.util.Map;
 
 import libcore.io.IoUtils;
-
 /**
  * Service that maintains low-level network policy rules, using
  * {@link NetworkStatsService} statistics to drive those rules.
@@ -695,12 +696,29 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 // mobile templates are relevant when SIM is ready and
                 // subscriberId matches.
                 if (tele.getSimState() == SIM_STATE_READY) {
-                    return Objects.equal(tele.getSubscriberId(), template.getSubscriberId());
+                    //dual sim data traffic statistics
+                    if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                        String subId = getActiveSubscriberId();
+                        return Objects.equal(subId, template.getSubscriberId());
+                    } else {
+                        return Objects.equal(tele.getSubscriberId(), template.getSubscriberId());
+                    }
                 } else {
                     return false;
                 }
         }
         return true;
+    }
+
+    private String getActiveSubscriberId() {
+        int sub = -1;
+        try {
+            sub = Settings.System.getInt(mContext.getContentResolver(),
+                    Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(TAG, "Read current data port value exception.", snfe);
+        }
+        return MSimTelephonyManager.getDefault().getSubscriberId(sub);
     }
 
     /**
