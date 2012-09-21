@@ -522,6 +522,9 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
                     return;
                 }
                 mIsFullscreen = false;
+                // Pause the video during exit fullscreen to keep the
+                // browser behaviour consistent with stock browser
+                pause();
                 mProxy.dispatchOnStopFullScreen();
                 mLayout.removeView(mTextureView);
                 mTextureView = null;
