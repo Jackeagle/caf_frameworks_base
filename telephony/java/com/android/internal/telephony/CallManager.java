@@ -488,6 +488,9 @@ public final class CallManager {
                     case Phone.PHONE_TYPE_SIP:
                         Log.e(LOG_TAG, "inCallAudioModeForPhone is meaningless for SIP");
                         break;
+                    case Phone.PHONE_TYPE_IMS:
+                        ret = AudioManager.IMS_ACTIVE;
+                        break;
                     default:
                         if (voiceModemIndex != LOCAL_MODEM) {
                             ret = AudioManager.CS_ACTIVE_SESSION2;
@@ -499,6 +502,9 @@ public final class CallManager {
                 switch(phone.getPhoneType()) {
                     case Phone.PHONE_TYPE_SIP:
                         Log.e(LOG_TAG, "inCallAudioModeForPhone is meaningless for SIP");
+                        break;
+                    case Phone.PHONE_TYPE_IMS:
+                        ret = AudioManager.IMS_HOLD;
                         break;
                     default:
                         if (voiceModemIndex != LOCAL_MODEM) {
@@ -573,7 +579,9 @@ public final class CallManager {
     }
 
     public void setAudioMode() {
-        boolean useInCallMode = (mBaseband.equals(SGLTE));
+        boolean useInCallMode = (mBaseband.equals(SGLTE))
+                || SystemProperties.getBoolean(TelephonyProperties.CALLS_ON_IMS_ENABLED_PROPERTY,
+                        false);
 
         Log.d(LOG_TAG, "setAudioMode useInCallMode = " + useInCallMode + ", Baseband = "
                 + mBaseband);
