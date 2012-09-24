@@ -161,7 +161,9 @@ enum {
     //Use Software Decoder
     kKeyUseSWDec          = 'SwDc',  //bool (int32_t)
 
-    kKeyInterlaced        = 'Inlc'  // bool (int32_t)
+    kKeyInterlaced        = 'Inlc',  // bool (int32_t)
+
+    kKeyCorrupt= 'Crpt'  // bool (int32_t)
 };
 
 enum {
