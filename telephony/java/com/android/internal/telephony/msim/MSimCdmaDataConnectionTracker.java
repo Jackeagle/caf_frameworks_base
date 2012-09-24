@@ -91,7 +91,10 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
         mPhone.mCM.unregisterForAvailable(this);
         mPhone.mCM.unregisterForOffOrNotAvailable(this);
         IccRecords r = mIccRecords.get();
-        if (r != null) { r.unregisterForRecordsLoaded(this);}
+        if (r != null) {
+            r.unregisterForRecordsLoaded(this);
+            mIccRecords.set(null);
+        }
         mPhone.mCM.unregisterForDataNetworkStateChanged(this);
         mPhone.getCallTracker().unregisterForVoiceCallEnded(this);
         mPhone.getCallTracker().unregisterForVoiceCallStarted(this);
@@ -314,7 +317,9 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
     }
 
     public void updateRecords() {
-        onUpdateIcc();
+        if (isActiveDataSubscription()) {
+            onUpdateIcc();
+        }
     }
 
     // setAsCurrentDataConnectionTracker
