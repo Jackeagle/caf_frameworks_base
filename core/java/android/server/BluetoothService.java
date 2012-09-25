@@ -3700,18 +3700,11 @@ public class BluetoothService extends IBluetooth.Stub {
                 }
             }
 
-            if((state == BluetoothProfile.STATE_DISCONNECTED) &&
-               (mDeviceConnected != 0)) {
-               //Check if there are any connected devices
-               Log.d(TAG, "Device count : " + mDeviceConnected);
+            if((state == BluetoothProfile.STATE_DISCONNECTED ||
+                state == BluetoothProfile.STATE_DISCONNECTING) &&
+               (mDeviceConnected > 0)) {
+               Log.d(TAG, "More Gatt profiles are connected count : " + mDeviceConnected);
                return;
-            }
-
-            //Need to maintain BT icon turning off BR/EDR profile is disconnecting.
-            if((state == BluetoothProfile.STATE_DISCONNECTING) &&
-               (mDeviceConnected > 1)) {
-                Log.d(TAG, "Device count : " + mDeviceConnected);
-                return;
             }
 
             Intent intent = new Intent(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
@@ -3731,12 +3724,16 @@ public class BluetoothService extends IBluetooth.Stub {
         // Since this is a binder call check if Bluetooth is on still
         if (getBluetoothStateInternal() == BluetoothAdapter.STATE_OFF) return;
 
+        String devType = getDeviceProperties().getProperty(device.getAddress(), "Type");
+        if (!"LE".equals(devType)) return;
+
         if (updateDeviceCountersAndCheckForConnStateChange(state)) {
-            String devType = getDeviceProperties().getProperty(device.getAddress(), "Type");
-            //For LE gatt client profiles, the BT icon shows as connected when connected for
-            //pairing with the remote device. But for BR/EDR profiles, the icon shows status
-            //connected only when it is connected to the profile after pairing.
-            if((state == BluetoothAdapter.STATE_CONNECTED) && (!"LE".equals(devType))) return;
+
+            if ((state == BluetoothAdapter.STATE_DISCONNECTED) &&
+               (mProfilesConnected > 0)) {
+                Log.d(TAG, "More BR/EDR profiles connected count: " + mProfilesConnected);
+                return;
+            }
 
             Intent connStateIntent = null;
             connStateIntent = new Intent(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
