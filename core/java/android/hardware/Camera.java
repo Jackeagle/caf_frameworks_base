@@ -888,6 +888,9 @@ public class Camera {
     }
     private native final void native_cancelAutoFocus();
 
+    /** @hide
+    *
+    **/
     public final void encodeData()
     {
         native_encodeData();
