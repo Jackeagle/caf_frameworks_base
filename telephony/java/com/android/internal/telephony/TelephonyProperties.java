@@ -276,4 +276,9 @@ public interface TelephonyProperties
      * Property to store default subscription.
      */
     static final String PROPERTY_DEFAULT_SUBSCRIPTION = "persist.default.subscription";
+
+    /**
+     * Specify if Android supports VoLTE/VT calls on IMS
+     */
+    public static final String CALLS_ON_IMS_ENABLED_PROPERTY = "persist.radio.calls.on.ims";
 }
