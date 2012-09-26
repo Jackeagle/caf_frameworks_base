@@ -1453,13 +1453,15 @@ public class GSMPhone extends PhoneBase {
             case EVENT_GET_NETWORKS_DONE:
                 ArrayList<OperatorInfo> eonsNetworkNames = null;
 
+                IccRecords iccRecords = mIccRecords.get();
                 ar = (AsyncResult)msg.obj;
-                if (ar.exception == null && mIccRecords != null) {
+                if (ar.exception == null && iccRecords != null) {
                     eonsNetworkNames =
-                      ((SIMRecords)mIccRecords.get()).getEonsForAvailableNetworks((ArrayList<OperatorInfo>)ar.result);
+                            ((SIMRecords)iccRecords).getEonsForAvailableNetworks(
+                            (ArrayList<OperatorInfo>)ar.result);
                 }
 
-                if (mIccRecords == null && ar.exception == null) {
+                if (iccRecords == null && ar.exception == null) {
                     Log.w(LOG_TAG, "getEonsForAvailableNetworks() aborted. icc absent?");
                 }
 
