@@ -2033,7 +2033,7 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     public static final String ACTION_WIFI_DISPLAY_VIDEO =
-            "android.intent.action.WIFI_DISPLAY_VIDEO";
+            "qualcomm.intent.action.WIFI_DISPLAY_VIDEO";
 
     /**
      * Broadcast Action: An analog audio speaker/headset plugged in or unplugged.
