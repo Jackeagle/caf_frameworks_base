@@ -83,10 +83,10 @@ public class MediaRecorder
     }
 
     private final static String TAG = "MediaRecorder";
-    private final static String IOBUSY_VOTE = "com.android.server.CpuGovernorService.action.IOBUSY_VOTE";
-    private final static String IOBUSY_UNVOTE = "com.android.server.CpuGovernorService.action.IOBUSY_UNVOTE";
-    private static final String DOWN_FACTOR_DECREASE = "com.android.server.CpuGovernorService.action.DOWN_FACTOR_DECREASE";
-    private static final String DOWN_FACTOR_RESTORE = "com.android.server.CpuGovernorService.action.DOWN_FACTOR_RESTORE";
+    private final static String IOBUSY_VOTE = "com.qualcomm.CpuGovernorService.action.IOBUSY_VOTE";
+    private final static String IOBUSY_UNVOTE = "com.qualcomm.CpuGovernorService.action.IOBUSY_UNVOTE";
+    private static final String DOWN_FACTOR_DECREASE = "com.qualcomm.CpuGovernorService.action.DOWN_FACTOR_DECREASE";
+    private static final String DOWN_FACTOR_RESTORE = "com.qualcomm.CpuGovernorService.action.DOWN_FACTOR_RESTORE";
     // The two fields below are accessed by native methods
     @SuppressWarnings("unused")
     private int mNativeContext;
@@ -677,6 +677,8 @@ public class MediaRecorder
      *
      * @throws IllegalStateException if it is called before
      * prepare().
+     *
+     * @hide
      */
     public native void native_start() throws IllegalStateException;
 
@@ -691,6 +693,8 @@ public class MediaRecorder
      * the output file is not properly constructed when this happens.
      *
      * @throws IllegalStateException if it is called before start()
+     *
+     * @hide
      */
     public native void native_stop() throws IllegalStateException;
 
@@ -701,7 +705,7 @@ public class MediaRecorder
                 Intent ioBusyVoteIntent = new Intent(IOBUSY_VOTE);
                 Intent downFactorVoteIntent = new Intent(DOWN_FACTOR_DECREASE);
                 // Vote for io_is_busy to be turned off.
-                ioBusyVoteIntent.putExtra("com.android.server.CpuGovernorService.voteType", 0);
+                ioBusyVoteIntent.putExtra("com.qualcomm.CpuGovernorService.voteType", 0);
                 application.sendBroadcast(ioBusyVoteIntent);
                 // Vote for sampling down factor to be decreased to 1
                 application.sendBroadcast(downFactorVoteIntent);
@@ -720,7 +724,7 @@ public class MediaRecorder
                 Intent ioBusyUnVoteIntent = new Intent(IOBUSY_UNVOTE);
                 Intent downFactorVoteIntent = new Intent(DOWN_FACTOR_RESTORE);
                 // Remove vote for io_is_busy to be turned off.
-                ioBusyUnVoteIntent.putExtra("com.android.server.CpuGovernorService.voteType", 0);
+                ioBusyUnVoteIntent.putExtra("com.qualcomm.CpuGovernorService.voteType", 0);
                 application.sendBroadcast(ioBusyUnVoteIntent);
                 // Vote for sampling down factor to be restored to original value
                 application.sendBroadcast(downFactorVoteIntent);

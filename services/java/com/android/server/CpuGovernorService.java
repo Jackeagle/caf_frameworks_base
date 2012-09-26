@@ -113,7 +113,7 @@ class CpuGovernorService {
                     }
                 }
             } else if (intent.getAction().equals(IOBusyVoteProcessor.ACTION_IOBUSY_VOTE)) {
-                int voteType = intent.getExtras().getInt("com.android.server.CpuGovernorService.voteType");
+                int voteType = intent.getExtras().getInt("com.qualcomm.CpuGovernorService.voteType");
                 Log.i(TAG, "IOBUSY vote: " + voteType);
 
                 while (!changeAdded) {
@@ -136,7 +136,7 @@ class CpuGovernorService {
                     mIOBusyVoteChangeProcessor.setNotificationPending(true);
                 }
             } else if (intent.getAction().equals(IOBusyVoteProcessor.ACTION_IOBUSY_UNVOTE)) {
-                int voteType = intent.getExtras().getInt("com.android.server.CpuGovernorService.voteType");
+                int voteType = intent.getExtras().getInt("com.qualcomm.CpuGovernorService.voteType");
                 Log.i(TAG, "IOBUSY unvote: " + voteType);
 
                 while (!changeAdded) {
@@ -222,10 +222,10 @@ class IOBusyVoteProcessor implements Runnable {
     public static final int IO_IS_BUSY_UNVOTE_OFF = 4;
     public static final int DOWN_FACTOR_RESTORE = 5;
     public static final int DOWN_FACTOR_DECREASE = 6;
-    public static final String ACTION_IOBUSY_VOTE = "com.android.server.CpuGovernorService.action.IOBUSY_VOTE";
-    public static final String ACTION_IOBUSY_UNVOTE = "com.android.server.CpuGovernorService.action.IOBUSY_UNVOTE";
-    public static final String ACTION_DOWN_FACTOR_DECREASE = "com.android.server.CpuGovernorService.action.DOWN_FACTOR_DECREASE";
-    public static final String ACTION_DOWN_FACTOR_RESTORE = "com.android.server.CpuGovernorService.action.DOWN_FACTOR_RESTORE";
+    public static final String ACTION_IOBUSY_VOTE = "com.qualcomm.CpuGovernorService.action.IOBUSY_VOTE";
+    public static final String ACTION_IOBUSY_UNVOTE = "com.qualcomm.CpuGovernorService.action.IOBUSY_UNVOTE";
+    public static final String ACTION_DOWN_FACTOR_DECREASE = "com.qualcomm.CpuGovernorService.action.DOWN_FACTOR_DECREASE";
+    public static final String ACTION_DOWN_FACTOR_RESTORE = "com.qualcomm.CpuGovernorService.action.DOWN_FACTOR_RESTORE";
     public void setNotificationPending(boolean notificationPending) {
         mNotificationPending = notificationPending;
     }
