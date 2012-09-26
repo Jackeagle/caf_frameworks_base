@@ -538,8 +538,6 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         if (!isFullscreen()) {
             return;
         }
-        // Pause video on exit fullscreen to be consistent with stock android browser
-        pause();
         HTML5VideoFullscreen.instance().exitFullscreen(mProxy, x, y, w, h);
     }
 
