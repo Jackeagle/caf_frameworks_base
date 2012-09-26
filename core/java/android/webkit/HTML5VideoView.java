@@ -516,7 +516,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     }
 
 
-     public void enterFullscreenVideoState(WebViewClassic webView, float x, float y, float w, float h) {
+    public void enterFullscreenVideoState(WebViewClassic webView, float x, float y, float w, float h) {
         detachInlineGLContext();
         if (mSurfaceTextureState != SURFACE_TEXTURE_STATE_DETACHED) {
             Log.w(LOGTAG, "Unable to enter Fullscreen at this time");
