@@ -85,8 +85,10 @@ class WiredAccessoryObserver extends UEventObserver {
         }
 
         public int computeNewHeadsetState(int headsetState, int switchState) {
-            int setBits = mState1Bits | mState2Bits;
-            return (setBits & switchState);
+            int setBits = ((switchState == 1) ? mState1Bits :
+                          ((switchState == 2) ? mState2Bits : ((switchState == 8) ? 8 : 0)));
+            Slog.e(TAG, "computeNewHeadsetState:setBits"+setBits);
+            return setBits;
         }
     }
 
@@ -95,7 +97,7 @@ class WiredAccessoryObserver extends UEventObserver {
         UEventInfo uei;
 
         // Monitor h2w
-        uei = new UEventInfo("h2w", (BIT_HEADSET | BIT_ANCHEADSET), (BIT_HEADSET_NO_MIC | BIT_ANCHEADSET_NO_MIC));
+        uei = new UEventInfo("h2w", BIT_HEADSET, BIT_HEADSET_NO_MIC);
         if (uei.checkSwitchExists()) {
             retVal.add(uei);
         } else {
