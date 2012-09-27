@@ -330,16 +330,6 @@ public class WifiP2pManager {
         public void onPeersAvailable(WifiP2pDeviceList peers);
     }
 
-    /** Interface for callback invocation when a custom string
-     *  response is available */
-    public interface StringResponseListener {
-        /**
-         * The requested string response is available
-         * @param string The response string
-         */
-        public void onResponseAvailable(String string);
-    }
-
     /** Interface for callback invocation when connection info is available */
     public interface ConnectionInfoListener {
         /**
