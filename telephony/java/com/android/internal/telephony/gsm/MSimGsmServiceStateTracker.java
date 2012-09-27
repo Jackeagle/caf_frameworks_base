@@ -19,6 +19,7 @@ package com.android.internal.telephony.gsm;
 
 import android.content.Intent;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.provider.Telephony.Intents;
 import android.telephony.MSimTelephonyManager;
 import android.util.Log;
@@ -28,8 +29,11 @@ import com.android.internal.telephony.MSimPhoneFactory;
 import com.android.internal.telephony.MSimProxyManager;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.Subscription;
+import com.android.internal.telephony.SubscriptionManager;
 import com.android.internal.telephony.UiccCardApplication;
 import com.android.internal.telephony.UiccManager.AppFamily;
+
+import static com.android.internal.telephony.MSimConstants.DEFAULT_SUBSCRIPTION;
 
 /**
  * {@hide}
@@ -122,6 +126,22 @@ final class MSimGsmServiceStateTracker extends GsmServiceStateTracker {
                     } else {
                         log("EVENT_ALL_DATA_DISCONNECTED is stale");
                     }
+                }
+                break;
+
+            case EVENT_NITZ_TIME:
+                if(!(SystemProperties.getBoolean("persist.timed.enable", false))) {
+                    SubscriptionManager subMgr = SubscriptionManager.getInstance();
+                    log("EVENT_NITZ_TIME received phone type ::" + MSimTelephonyManager.
+                            getDefault().getCurrentPhoneType(DEFAULT_SUBSCRIPTION) +
+                            "is cdma sub active ::" + subMgr.isSubActive(DEFAULT_SUBSCRIPTION));
+                    if (MSimTelephonyManager.PHONE_TYPE_CDMA == MSimTelephonyManager.
+                            getDefault().getCurrentPhoneType(DEFAULT_SUBSCRIPTION) &&
+                            subMgr.isSubActive(DEFAULT_SUBSCRIPTION)) {
+                        log("EVENT_NITZ_TIME received in c + g ignore updating time");
+                    }
+                } else {
+                    super.handleMessage(msg);
                 }
                 break;
 
