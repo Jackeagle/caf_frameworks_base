@@ -1213,6 +1213,12 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         transitionTo(mGroupNegotiationState);
                     }
                     break;
+                 case WifiMonitor.P2P_PROV_DISC_FAILURE_EVENT:
+                     if (DBG) logd("Received P2P_PROV_DISC_FAILURE_EVENT");
+                     mPeers.updateStatus(mSavedPeerConfig.deviceAddress, WifiP2pDevice.FAILED);
+                     sendP2pPeersChangedBroadcast();
+                     transitionTo(mInactiveState);
+                     break;
                 default:
                     return NOT_HANDLED;
             }
