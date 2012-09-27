@@ -2324,6 +2324,11 @@ public final class WebViewCore {
                 core.mDrawIsPaused = false;
                 // always redraw on resume to reenable gif animations
                 core.mDrawIsScheduled = false;
+                if (core.mIsMultitabManagementOn && core.mIsLastDrawSkipped) {
+                    if (DebugFlags.WEB_VIEW_CORE)
+                        Log.v(LOGTAG, "resumeUpdatePicture : invokes contentDraw ");
+                    core.contentDraw();
+                }
             }
         }
     }
