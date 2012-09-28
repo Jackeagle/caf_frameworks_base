@@ -154,17 +154,18 @@ public class CamcorderProfile
      * Time lapse quality level corresponding to the QVGA (320 x 240) resolution.
      */
     public static final int QUALITY_TIME_LAPSE_QVGA = 1007;
-    /**
+
+    /** @hide
      * Time lapse quality level corresponding to the FWVGA (864 x 480) resolution.
      */
     public static final int QUALITY_TIME_LAPSE_FWVGA = 1008;
 
-    /**
+    /** @hide
      * Time lapse quality level corresponding to the WVGA (800 x 480) resolution.
      */
     public static final int QUALITY_TIME_LAPSE_WVGA = 1009;
 
-    /**
+    /** @hide
      * Time lapse quality level corresponding to the VGA (640 x 480) resolution.
      */
     public static final int QUALITY_TIME_LAPSE_VGA = 1010;
