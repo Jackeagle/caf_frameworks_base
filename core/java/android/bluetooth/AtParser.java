@@ -90,7 +90,7 @@ public class AtParser {
     private static final int TYPE_READ = 1;     // AT+FOO?
     private static final int TYPE_SET = 2;      // AT+FOO=
     private static final int TYPE_TEST = 3;     // AT+FOO=?
-
+    private static boolean at_bia = false;      //AT+BIA is an special command
     private HashMap<String, AtCommandHandler> mExtHandlers;
     private HashMap<Character, AtCommandHandler> mBasicHandlers;
 
@@ -195,9 +195,19 @@ public class AtParser {
         ArrayList<Object> out = new ArrayList<Object>();
         while (i <= input.length()) {
             j = findChar(',', input, i);
-            if (j == 0) {
+            if ((j == 0) && (at_bia == false)) {
                 // Only comma is an argument. Should not be processed.
                 return null;
+           }
+           if ((at_bia == true) && (i == j) && (input.charAt(i) == ',')) {
+               //Adding a default value value of 1 for all indicators which are
+               //not sent for updates
+               out.add(new Integer(1));
+               i = j + 1;
+               if (i >= input.length())
+                   break;
+
+               continue;
            }
 
             String arg = input.substring(i, j);
@@ -209,6 +219,7 @@ public class AtParser {
 
             i = j + 1; // move past comma
         }
+        at_bia = false;
         return out.toArray();
     }
 
@@ -308,6 +319,13 @@ public class AtParser {
                             new AtCommandResult(AtCommandResult.ERROR));
                     return result;
                 }
+                //AT+BIA requires special parsing. As per current
+                //parser implemenation, modifying the parsing logic
+                //to handle scenarios like AT+BIA=1,,,,,0,, etc.
+                if (commandName.equalsIgnoreCase("+BIA")) {
+                    at_bia = true;
+                }
+
                 AtCommandHandler handler = mExtHandlers.get(commandName);
 
                 // Search for end of this command - this is usually the end of
