@@ -141,6 +141,9 @@ public final class WebViewCore {
     private int mHighMemoryUsageThresholdMb;
     private int mHighUsageDeltaMb;
 
+    private boolean mIsMultitabManagementOn = true;
+    private boolean mIsLastDrawSkipped = false;
+
     private int mChromeCanFocusDirection;
     private int mTextSelectionChangeReason = TextSelectionData.REASON_UNKNOWN;
 
@@ -255,6 +258,11 @@ public final class WebViewCore {
                     mNativeClass, 0).sendToTarget();
         }
 
+        mIsMultitabManagementOn = android.os.SystemProperties.getBoolean(
+                                  "browser.multitab.management", true);
+        if (DebugFlags.WEB_VIEW_CORE) {
+               Log.d(LOGTAG,"MultitabManagement is "+ mIsMultitabManagementOn);
+        }
     }
 
     /* Handle the initialization of WebViewCore during subwindow creation. This
@@ -1432,6 +1440,10 @@ public final class WebViewCore {
 
                         case ON_RESUME:
                             nativeResume(mNativeClass);
+                            if (mIsMultitabManagementOn) {
+                                if (mIsLastDrawSkipped)
+                                    webkitDraw();
+                            }
                             break;
 
                         case FREE_MEMORY:
@@ -2392,6 +2404,14 @@ public final class WebViewCore {
             }
             // only fire an event if this is our first request
             if (mDrawIsScheduled) return;
+            if (mIsMultitabManagementOn) {
+                if (mDrawIsPaused) {
+                    mIsLastDrawSkipped = true;
+                    return;
+                }
+                mIsLastDrawSkipped = false;
+            }
+
             mDrawIsScheduled = true;
             mEventHub.sendMessage(Message.obtain(null, EventHub.WEBKIT_DRAW));
         }
