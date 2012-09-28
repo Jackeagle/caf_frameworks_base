@@ -293,9 +293,12 @@ public class IccCardProxy extends Handler implements IccCard {
             return;
         }
 
-        if (mUiccCard.getCardState() == CardState.CARDSTATE_ERROR ||
-                mUiccApplication == null) {
+        if (mUiccCard.getCardState() == CardState.CARDSTATE_ERROR ) {
             setExternalState(State.CARD_IO_ERROR);
+            return;
+        }
+        if (mUiccApplication == null) {
+            setExternalState(State.NOT_READY);
             return;
         }
 
