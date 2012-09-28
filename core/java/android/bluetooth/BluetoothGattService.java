@@ -16,6 +16,7 @@
 
 package android.bluetooth;
 
+import android.os.Handler;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.util.Log;
@@ -59,6 +60,8 @@ public class BluetoothGattService {
 
     private final ServiceHelper mHelper;
 
+    private final Handler mRemoteGattServiceHandler;
+
     public BluetoothGattService(BluetoothDevice device, ParcelUuid uuid, String path,
                                 IBluetoothGattProfile callback) {
         mDevice = device;
@@ -72,7 +75,16 @@ public class BluetoothGattService {
 
         mHelper = new ServiceHelper();
         mService = BluetoothDevice.getService();
-        mHelper.startRemoteGattService();
+
+        mRemoteGattServiceHandler = new Handler();
+        boolean hasGattServiceStarted = mRemoteGattServiceHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "Inside run for disc char");
+                mHelper.startRemoteGattService();
+            }
+        }, 1000);
+        Log.d(TAG, "Remote Gatt service started : " + hasGattServiceStarted);
     }
 
     public boolean gattConnect(byte prohibitRemoteChg,
