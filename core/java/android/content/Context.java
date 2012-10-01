@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012 The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2088,6 +2092,17 @@ public abstract class Context {
      * @see android.telephony.TelephonyManager
      */
     public static final String TELEPHONY_SERVICE = "phone";
+
+    /**
+     * Use with {@link #getSystemService} to retrieve a
+     * {android.telephony.MSimTelephonyManager} for handling the management
+     * of the telephony features of the multi sim device.
+     *
+     * @see #getSystemService
+     * @see android.telephony.MSimTelephonyManager
+     * @hide
+     */
+    public static final String MSIM_TELEPHONY_SERVICE = "phone_msim";
 
     /**
      * Use with {@link #getSystemService} to retrieve a

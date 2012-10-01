@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2012 The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -213,4 +217,20 @@ public interface TelephonyProperties
      * Property that can be used to set the IP version for CDMA when roaming
      */
     static final String PROPERTY_CDMA_ROAMING_IPPROTOCOL = "persist.telephony.cdma.rproto";
+
+    /**
+     * Property to set multi sim feature.
+     * Type:  String(dsds, dsda)
+     */
+    static final String PROPERTY_MULTI_SIM_CONFIG = "persist.multisim.config";
+
+    /**
+     * Property to start two ril daemons in case of multi sim.
+     */
+    static final String PROPERTY_MULTI_RILD = "ro.multi.rild";
+
+    /**
+     * Property to store default subscription.
+     */
+    static final String PROPERTY_DEFAULT_SUBSCRIPTION = "persist.default.subscription";
 }
