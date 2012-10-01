@@ -12704,10 +12704,6 @@ package android.net.wifi.p2p {
     method public abstract void onPeersAvailable(android.net.wifi.p2p.WifiP2pDeviceList);
   }
 
-  public static abstract interface WifiP2pManager.StringResponseListener {
-    method public abstract void onResponseAvailable(java.lang.String);
-  }
-
 }
 
 package android.nfc {
