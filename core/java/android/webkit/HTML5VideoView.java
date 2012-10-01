@@ -516,7 +516,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     }
 
 
-     public void enterFullscreenVideoState(WebViewClassic webView, float x, float y, float w, float h) {
+    public void enterFullscreenVideoState(WebViewClassic webView, float x, float y, float w, float h) {
         detachInlineGLContext();
         if (mSurfaceTextureState != SURFACE_TEXTURE_STATE_DETACHED) {
             Log.w(LOGTAG, "Unable to enter Fullscreen at this time");
@@ -538,8 +538,6 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         if (!isFullscreen()) {
             return;
         }
-        // Pause video on exit fullscreen to be consistent with stock android browser
-        pause();
         HTML5VideoFullscreen.instance().exitFullscreen(mProxy, x, y, w, h);
     }
 
