@@ -210,16 +210,17 @@ public class Camera {
          */
         public static final int CAMERA_FACING_FRONT = 1;
 
-        /**
+         /* ### QC ADD-ONS: START */
+        /** @hide
          * The facing of the camera is the same as that of the screen.
          */
         public static final int CAMERA_SUPPORT_MODE_ZSL = 2;
 
-        /**
+        /** @hide
          * The facing of the camera is the same as that of the screen.
          */
         public static final int CAMERA_SUPPORT_MODE_NONZSL = 3;
-
+         /* ### QC ADD-ONS: END */
         /**
          * The direction that the camera faces. It should be
          * CAMERA_FACING_BACK or CAMERA_FACING_FRONT.
@@ -908,7 +909,7 @@ public class Camera {
          */
         void onShutter();
     }
-    /**
+    /** @hide
      * Handles the callback for when Camera Data is available.
      * data is read from the camera.
      */
@@ -922,7 +923,7 @@ public class Camera {
         void onCameraData(int[] data, Camera camera);
     };
 
-    /**
+    /** @hide
      * Set camera histogram mode and registers a callback function to run.
      *  Only valid after startPreview() has been called.
      *
@@ -935,7 +936,7 @@ public class Camera {
     }
     private native final void native_setHistogramMode(boolean mode);
 
-    /**
+    /** @hide
      * Set camera histogram command to send data.
      *
      */
@@ -945,7 +946,7 @@ public class Camera {
     }
     private native final void native_sendHistogramData();
 
-    /**
+    /** @hide
      * Handles the callback for when Camera Meta Data is available.
      * Meta data is read from the camera.
      */
@@ -959,7 +960,7 @@ public class Camera {
         void onCameraMetaData(int[] data, Camera camera);
     };
 
-    /**
+    /** @hide
      * Set camera face detection mode and registers a callback function to run.
      *  Only valid after startPreview() has been called.
      *
@@ -972,7 +973,7 @@ public class Camera {
     }
     private native final void native_setFaceDetectionCb(boolean mode);
 
-    /**
+    /** @hide
      * Set camera face detection command to send meta data.
      */
     public final void sendMetaData()
@@ -1551,7 +1552,7 @@ public class Camera {
          */
         public int weight;
     }
-	 /**
+	 /** @hide
      * Handles the Touch Co-ordinate.
      */
 	public class Coordinate {
@@ -1729,12 +1730,27 @@ public class Camera {
         public static final String EFFECT_AQUA = "aqua";
 
         // Values for touch af/aec settings.
+		/** @hide
+		*
+		**/
         public static final String TOUCH_AF_AEC_OFF = "touch-off";
+		/** @hide
+		*
+		**/
         public static final String TOUCH_AF_AEC_ON = "touch-on";
 
         // Values for auto exposure settings.
+		/** @hide
+		*
+		**/
         public static final String AUTO_EXPOSURE_FRAME_AVG = "frame-average";
+		/** @hide
+		*
+		**/
         public static final String AUTO_EXPOSURE_CENTER_WEIGHTED = "center-weighted";
+		/** @hide
+		*
+		**/
         public static final String AUTO_EXPOSURE_SPOT_METERING = "spot-metering";
         // Values for antibanding settings.
         public static final String ANTIBANDING_AUTO = "auto";
@@ -1742,49 +1758,127 @@ public class Camera {
         public static final String ANTIBANDING_60HZ = "60hz";
         public static final String ANTIBANDING_OFF = "off";
         //Values for ISO settings
-
+        /** @hide
+		*
+		**/    
         public static final String ISO_AUTO = "auto";
+		/** @hide
+		*
+		**/
         public static final String ISO_HJR = "ISO_HJR";
+		/** @hide
+		*
+		**/
         public static final String ISO_100 = "ISO100";
+		/** @hide
+		*
+		**/
         public static final String ISO_200 = "ISO200";
+		/** @hide
+		*
+		**/
         public static final String ISO_400 = "ISO400";
+		/** @hide
+		*
+		**/
         public static final String ISO_800 = "ISO800";
+		/** @hide
+		*
+		**/
         public static final String ISO_1600 = "ISO1600";
 
         //Values for Lens Shading
-
+        /** @hide
+		*
+		**/ 
         public static final String LENSSHADE_ENABLE = "enable";
+		/** @hide
+		*
+		**/
         public static final String LENSSHADE_DISABLE= "disable";
-
+        
+		/** @hide
+		*
+		**/
         public static final String HISTOGRAM_ENABLE = "enable";
+		/** @hide
+		*
+		**/
         public static final String HISTOGRAM_DISABLE= "disable";
 
+        /** @hide
+		*
+		**/    
         public static final String SKIN_TONE_ENHANCEMENT_ENABLE = "enable";
+		/** @hide
+		*
+		**/
         public static final String SKIN_TONE_ENHANCEMENT_DISABLE= "disable";
 
         // Values for MCE settings.
+		/** @hide
+		*
+		**/
         public static final String MCE_ENABLE = "enable";
+		/** @hide
+		*
+		**/
         public static final String MCE_DISABLE = "disable";
 
         // Values for ZSL settings.
+		/** @hide
+		*
+		**/
         public static final String ZSL_ON = "on";
+		/** @hide
+		*
+		**/
         public static final String ZSL_OFF = "off";
 
         // Values for HDR Bracketing settings.
+		/** @hide
+		*
+		**/
         public static final String AE_BRACKET_HDR_OFF = "Off";
+		/** @hide
+		*
+		**/
         public static final String AE_BRACKET_HDR = "HDR";
+		/** @hide
+		*
+		**/
         public static final String AE_BRACKET = "AE-Bracket";
 
         // Values for HDR Bracketing settings.
+		/** @hide
+		*
+		**/
         public static final String LOW_POWER = "Low_Power";
+		/** @hide
+		*
+		**/
         public static final String NORMAL_POWER = "Normal_Power";
 
         // Values for HFR settings.
+		/** @hide
+		*
+		**/
         public static final String VIDEO_HFR_OFF = "off";
+		/** @hide
+		*
+		**/
         public static final String VIDEO_HFR_2X = "60";
+		/** @hide
+		*
+		**/
         public static final String VIDEO_HFR_3X = "90";
+		/** @hide
+		*
+		**/
         public static final String VIDEO_HFR_4X = "120";
-
+        /** @hide
+		*
+		**/
         public static final String KEY_AE_BRACKET_HDR = "ae-bracket-hdr";
 
         // Values for flash mode settings.
@@ -1816,7 +1910,7 @@ public class Camera {
          */
         public static final String FLASH_MODE_TORCH = "torch";
 
-        /**
+        /** @hide
          * Scene mode is off.
          */
         public static final String SCENE_MODE_ASD = "asd";
@@ -1897,11 +1991,23 @@ public class Camera {
          * Capture the naturally warm color of scenes lit by candles.
          */
         public static final String SCENE_MODE_CANDLELIGHT = "candlelight";
+        /** @hide
+        * SCENE_MODE_BACKLIGHT
+        **/
         public static final String SCENE_MODE_BACKLIGHT = "backlight";
+        /** @hide
+        * SCENE_MODE_FLOWERS
+        **/
         public static final String SCENE_MODE_FLOWERS = "flowers";
 
         // Values for auto scene detection settings.
+		/** @hide
+		*
+		**/
         public static final String SCENE_DETECT_OFF = "off";
+		/** @hide
+		*
+		**/
         public static final String SCENE_DETECT_ON = "on";
 
         /**
@@ -1937,7 +2043,7 @@ public class Camera {
          */
         public static final String FOCUS_MODE_FIXED = "fixed";
 
-        /**
+        /** @hide
          * Normal focus mode. Applications should call
          * {@link #autoFocus(AutoFocusCallback)} to start the focus in this
          * mode.
@@ -2043,23 +2149,59 @@ public class Camera {
         private static final String PIXEL_FORMAT_NV12 = "nv12";
 
         //Values for Continuous AF
-
+        /** @hide
+		*
+		**/ 
         public static final String CONTINUOUS_AF_OFF = "caf-off";
+		/** @hide
+		*
+		**/
         public static final String CONTINUOUS_AF_ON = "caf-on";
+		/** @hide
+		*
+		**/
         public static final String DENOISE_OFF = "denoise-off";
+		/** @hide
+		*
+		**/
         public static final String DENOISE_ON = "denoise-on";
+		
 	// Values for Redeye Reduction settings.
+	    /** @hide
+		*
+		**/
         public static final String REDEYE_REDUCTION_ENABLE = "enable";
+		/** @hide
+		*
+		**/
         public static final String REDEYE_REDUCTION_DISABLE = "disable";
 
         // Values for selectable zone af settings.
+		/** @hide
+		*
+		**/
         public static final String SELECTABLE_ZONE_AF_AUTO = "auto";
+		/** @hide
+		*
+		**/
         public static final String SELECTABLE_ZONE_AF_SPOTMETERING = "spot-metering";
+		/** @hide
+		*
+		**/
         public static final String SELECTABLE_ZONE_AF_CENTER_WEIGHTED = "center-weighted";
+		/** @hide
+		*
+		**/
         public static final String SELECTABLE_ZONE_AF_FRAME_AVERAGE = "frame-average";
 
         // Values for Face Detection settings.
+		/** @hide
+		*
+		**/
         public static final String FACE_DETECTION_OFF = "off";
+		/** @hide
+		*
+		**/
         public static final String FACE_DETECTION_ON = "on";
 
         private HashMap<String, String> mMap;
@@ -2253,7 +2395,7 @@ public class Camera {
             return splitSize(str);
         }
 
-	/**
+	/** @hide
          * Gets the supported preview sizes in high frame rate recording mode.
          *
          * @return a list of Size object. This method will always return a list
@@ -2715,7 +2857,7 @@ public class Camera {
             }
         }
 
-        /**
+        /** @hide
          * Sets GPS latitude reference coordinate. This will be stored in JPEG EXIF
          * header.
          * @param latRef GPS latitude reference coordinate.
@@ -2734,7 +2876,7 @@ public class Camera {
             set(KEY_GPS_LATITUDE, Double.toString(latitude));
         }
 
-        /**
+        /** @hide
          * Sets GPS longitude reference coordinate. This will be stored in JPEG EXIF
          * header.
          * @param lonRef GPS longitude reference coordinate.
@@ -2753,7 +2895,7 @@ public class Camera {
             set(KEY_GPS_LONGITUDE, Double.toString(longitude));
         }
 
-        /**
+        /** @hide
          * Sets GPS altitude reference. This will be stored in JPEG EXIF header.
          * @param altRef reference GPS altitude in meters.
          */
@@ -2790,7 +2932,7 @@ public class Camera {
             set(KEY_GPS_PROCESSING_METHOD, processing_method);
         }
 
-        /**
+        /** @hide
          * Sets system timestamp. This will be stored in JPEG EXIF header.
          *
          * @param dateTime current timestamp (UTC in seconds since January 1,
@@ -2800,7 +2942,7 @@ public class Camera {
             set(KEY_EXIF_DATETIME, dateTime);
         }
 
-        /**
+        /** @hide
          * Sets GPS Status. This will be stored in JPEG EXIF header.
          *
          * @param status GPS status (UTC in seconds since January 1,
@@ -2913,7 +3055,7 @@ public class Camera {
             return split(str);
         }
 
-        /**
+        /** @hide
          * Gets the current Touch AF/AEC setting.
          *
          * @return one of TOUCH_AF_AEC_XXX string constant. null if Touch AF/AEC
@@ -2924,7 +3066,7 @@ public class Camera {
             return get(KEY_TOUCH_AF_AEC);
         }
 
-        /**
+        /** @hide
          * Sets the current TOUCH AF/AEC setting.
          *
          * @param value TOUCH_AF_AEC_XXX string constants.
@@ -2934,7 +3076,7 @@ public class Camera {
             set(KEY_TOUCH_AF_AEC, value);
         }
 
-       /**
+       /** @hide
          * Gets the supported Touch AF/AEC setting.
          *
          * @return a List of TOUCH_AF_AEC_XXX string constants. null if TOUCH AF/AEC
@@ -2946,7 +3088,7 @@ public class Camera {
             return split(str);
         }
 
-        /**
+        /** @hide
          * Sets the touch co-ordinate for Touch AEC.
          *
          * @param x  the x co-ordinate of the touch event
@@ -2958,7 +3100,7 @@ public class Camera {
             set(KEY_TOUCH_INDEX_AEC, v);
         }
 
-        /**
+        /** @hide
          * Returns the touch co-ordinates of the touch event.
          *
          * @return a Index object with the x and y co-ordinated
@@ -2970,7 +3112,7 @@ public class Camera {
             return strToCoordinate(pair);
         }
 
-        /**
+        /** @hide
          * Sets the touch co-ordinate for Touch AF.
          *
          * @param x  the x co-ordinate of the touch event
@@ -2982,7 +3124,7 @@ public class Camera {
             set(KEY_TOUCH_INDEX_AF, v);
         }
 
-        /**
+        /** @hide
          * Returns the touch co-ordinates of the touch event.
          *
          * @return a Index object with the x and y co-ordinated
@@ -2994,7 +3136,7 @@ public class Camera {
             return strToCoordinate(pair);
         }
 
-        /**
+        /** @hide
          * Get Sharpness level
          *
          * @return sharpness level
@@ -3003,7 +3145,7 @@ public class Camera {
             return getInt(KEY_SHARPNESS);
         }
 
-        /**
+        /** @hide
          * Set Sharpness Level
          *
          * @param sharpness level
@@ -3016,7 +3158,7 @@ public class Camera {
             set(KEY_SHARPNESS, String.valueOf(sharpness));
         }
 
-        /**
+        /** @hide
          * Get Max Sharpness Level
          *
          * @return max sharpness level
@@ -3025,7 +3167,7 @@ public class Camera {
             return getInt(KEY_MAX_SHARPNESS);
         }
 
-        /**
+        /** @hide
          * Get Contrast level
          *
          * @return contrast level
@@ -3034,7 +3176,7 @@ public class Camera {
             return getInt(KEY_CONTRAST);
         }
 
-        /**
+        /** @hide
          * Set Contrast Level
          *
          * @param contrast level
@@ -3047,7 +3189,7 @@ public class Camera {
             set(KEY_CONTRAST, String.valueOf(contrast));
         }
 
-        /**
+        /** @hide
          * Get Max Contrast Level
          *
          * @return max contrast level
@@ -3056,7 +3198,7 @@ public class Camera {
             return getInt(KEY_MAX_CONTRAST);
         }
 
-        /**
+        /** @hide
          * Get Saturation level
          *
          * @return saturation level
@@ -3065,7 +3207,7 @@ public class Camera {
             return getInt(KEY_SATURATION);
         }
 
-        /**
+        /** @hide
          * Set Saturation Level
          *
          * @param saturation level
@@ -3078,7 +3220,7 @@ public class Camera {
             set(KEY_SATURATION, String.valueOf(saturation));
         }
 
-        /**
+        /** @hide
          * Get Max Saturation Level
          *
          * @return max contrast level
@@ -3087,7 +3229,7 @@ public class Camera {
             return getInt(KEY_MAX_SATURATION);
         }
 
-        /**
+        /** @hide
          * Gets the current redeye reduction setting.
          *
          * @return one of REDEYE_REDUCTION_XXX string constant. null if redeye reduction
@@ -3098,7 +3240,7 @@ public class Camera {
             return get(KEY_REDEYE_REDUCTION);
         }
 
-	/**
+	   /** @hide
          * Sets the redeye reduction. Other parameters may be changed after changing
          * redeye reduction. After setting redeye reduction,
          * applications should call getParameters to know if some parameters are
@@ -3110,7 +3252,7 @@ public class Camera {
         public void setRedeyeReductionMode(String value) {
             set(KEY_REDEYE_REDUCTION, value);
         }
-        /**
+        /** @hide
          * Gets the supported redeye reduction modes.
          *
          * @return a List of REDEYE_REDUCTION_XXX string constant. null if redeye reduction
@@ -3157,7 +3299,7 @@ public class Camera {
             return split(str);
         }
 
-        /**
+        /** @hide
          * Gets the frame rate mode setting.
          *
          * @return one of FRAME_RATE_XXX_MODE string constant. null if this
@@ -3167,7 +3309,7 @@ public class Camera {
             return get(KEY_PREVIEW_FRAME_RATE_MODE);
         }
 
-        /**
+        /** @hide
          * Sets the frame rate mode.
          *
          * @param value FRAME_RATE_XXX_MODE string constants.
@@ -3176,7 +3318,7 @@ public class Camera {
             set(KEY_PREVIEW_FRAME_RATE_MODE, value);
         }
 
-        /**
+        /** @hide
          * Gets the supported frame rate modes.
          *
          * @return a List of FRAME_RATE_XXX_MODE string constant. null if this
@@ -3240,7 +3382,7 @@ public class Camera {
             return split(str);
         }
 
-        /**
+        /** @hide
          * Gets the current auto scene detection setting.
          *
          * @return one of SCENE_DETECT_XXX string constant. null if auto scene detection
@@ -3251,7 +3393,7 @@ public class Camera {
             return get(KEY_SCENE_DETECT);
         }
 
-        /**
+        /** @hide
          * Sets the auto scene detect. Other parameters may be changed after changing
          * scene detect. After setting auto scene detection,
          * applications should call getParameters to know if some parameters are
@@ -3264,7 +3406,7 @@ public class Camera {
             set(KEY_SCENE_DETECT, value);
         }
 
-        /**
+        /** @hide
          * Gets the supported auto scene detection modes.
          *
          * @return a List of SCENE_DETECT_XXX string constant. null if scene detection
@@ -3291,7 +3433,7 @@ public class Camera {
             return get(KEY_FLASH_MODE);
         }
 
-        /**
+        /** @hide
          * Gets the current hdr bracketing mode setting.
          *
          * @return current hdr bracketing mode.
@@ -3313,7 +3455,7 @@ public class Camera {
             set(KEY_FLASH_MODE, value);
         }
 
-         /**
+         /** @hide
          * Sets the Power mode.
          *
          * @param value Power mode.
@@ -3323,7 +3465,7 @@ public class Camera {
             set(KEY_POWER_MODE, value);
         }
 
-         /**
+         /** @hide
          * Gets the current power mode setting.
          *
          * @return current power mode. null if power mode setting is not
@@ -3335,7 +3477,7 @@ public class Camera {
             return get(KEY_POWER_MODE);
         }
 
-        /**
+        /** @hide
          * Set HDR-Bracketing Level
          *
          * @param value HDR-Bracketing
@@ -3700,7 +3842,7 @@ public class Camera {
             return TRUE.equals(str);
         }
 
-        /**
+        /** @hide
          * Gets the current ISO setting.
          *
          * @return one of ISO_XXX string constant. null if ISO
@@ -3710,7 +3852,7 @@ public class Camera {
             return get(KEY_ISO_MODE);
         }
 
-        /**
+        /** @hide
          * Sets the ISO.
          *
          * @param iso ISO_XXX string constant.
@@ -3719,7 +3861,7 @@ public class Camera {
             set(KEY_ISO_MODE, iso);
         }
 
-         /**
+         /** @hide
          * Gets the supported ISO values.
          *
          * @return a List of FLASH_MODE_XXX string constants. null if flash mode
@@ -3730,7 +3872,7 @@ public class Camera {
             return split(str);
         }
 
-         /**
+         /** @hide
          * Gets the current LensShade Mode.
          *
          * @return LensShade Mode
@@ -3738,7 +3880,7 @@ public class Camera {
         public String getLensShade() {
             return get(KEY_LENSSHADE);
         }
-        /**
+        /** @hide
          * Sets the current LensShade Mode.
          *
          * @return LensShade Mode
@@ -3747,7 +3889,7 @@ public class Camera {
             set(KEY_LENSSHADE, lensshade);
         }
 
-         /**
+         /** @hide
          * Gets the supported Lensshade modes.
          *
          * @return a List of LENS_MODE_XXX string constants. null if lens mode
@@ -3758,7 +3900,7 @@ public class Camera {
             return split(str);
         }
 
-         /**
+         /** @hide
          * Gets the supported Histogram modes.
          *
          * @return a List of HISTOGRAM_XXX string constants. null if histogram mode
@@ -3769,7 +3911,7 @@ public class Camera {
             return split(str);
         }
 
-         /**
+         /** @hide
          * Gets the supported Skin Tone Enhancement modes.
          *
          * @return a List of SKIN_TONE_ENHANCEMENT_XXX string constants. null if skin tone enhancement
@@ -3780,7 +3922,7 @@ public class Camera {
           return split(str);
         }
 
-         /**
+         /** @hide
          * Gets the current auto exposure setting.
          *
          * @return one of AUTO_EXPOSURE_XXX string constant. null if auto exposure
@@ -3790,7 +3932,7 @@ public class Camera {
             return get(KEY_AUTO_EXPOSURE);
         }
 
-        /**
+        /** @hide
          * Sets the current auto exposure setting.
          *
          * @param value AUTO_EXPOSURE_XXX string constants.
@@ -3799,7 +3941,7 @@ public class Camera {
             set(KEY_AUTO_EXPOSURE, value);
         }
 
-       /**
+       /** @hide
          * Gets the supported auto exposure setting.
          *
          * @return a List of AUTO_EXPOSURE_XXX string constants. null if auto exposure
@@ -3810,7 +3952,7 @@ public class Camera {
             return split(str);
         }
 
-         /**
+         /** @hide
          * Gets the current MCE Mode.
          *
          * @return MCE value
@@ -3819,7 +3961,7 @@ public class Camera {
             return get(KEY_MEMORY_COLOR_ENHANCEMENT);
         }
 
-        /**
+        /** @hide
          * Sets the current MCE Mode.
          *
          * @return MCE Mode
@@ -3828,7 +3970,7 @@ public class Camera {
             set(KEY_MEMORY_COLOR_ENHANCEMENT, mce);
         }
 
-         /**
+         /** @hide
          * Gets the supported MCE modes.
          *
          * @return a List of MCE_ENABLE/DISABLE string constants. null if MCE mode
@@ -3839,7 +3981,7 @@ public class Camera {
             return split(str);
         }
 
-         /**
+         /** @hide
          * Gets the current ZSL Mode.
          *
          * @return ZSL mode value
@@ -3848,7 +3990,7 @@ public class Camera {
             return get(KEY_ZSL);
          }
 
-         /**
+         /** @hide
          * Sets the current ZSL Mode. ZSL mode is set as a 0th bit in KEY_CAMERA_MODE.
          *
          * @return null
@@ -3857,7 +3999,7 @@ public class Camera {
             set(KEY_ZSL, zsl);
         }
 
-         /**
+         /** @hide
          * Gets the supported ZSL modes.
          *
          * @return a List of ZSL_OFF/OFF string constants. null if ZSL mode
@@ -3868,7 +4010,7 @@ public class Camera {
             return split(str);
         }
 
-          /**
+          /** @hide
           * Gets the current Camera Mode Flag. Camera mode includes a
           * flag(byte) which indicates different camera modes.
           * For now support for ZSL added at bit0
@@ -3879,7 +4021,7 @@ public class Camera {
             return get(KEY_CAMERA_MODE);
          }
 
-          /**
+          /** @hide
           * Sets the current Camera Mode.
           *
           * @return null
@@ -3888,7 +4030,7 @@ public class Camera {
             set(KEY_CAMERA_MODE, cameraMode);
          }
 
-         /**
+         /** @hide
          * Gets the current HFR Mode.
          *
          * @return VIDEO_HFR_XXX string constants
@@ -3897,7 +4039,7 @@ public class Camera {
             return get(KEY_VIDEO_HIGH_FRAME_RATE);
         }
 
-        /**
+        /** @hide
          * Sets the current HFR Mode.
          *
          * @param hfr VIDEO_HFR_XXX string constants
@@ -3906,7 +4048,7 @@ public class Camera {
             set(KEY_VIDEO_HIGH_FRAME_RATE, hfr);
         }
 
-         /**
+         /** @hide
          * Gets the supported HFR modes.
          *
          * @return a List of VIDEO_HFR_XXX string constants. null if hfr mode
@@ -4011,7 +4153,7 @@ public class Camera {
         public List<Area> getFocusAreas() {
             return splitArea(get(KEY_FOCUS_AREAS));
         }
-        /**
+        /** @hide
          * Gets the current DENOISE  setting.
          *
          * @return one of DENOISE_XXX string constant. null if Denoise
@@ -4021,7 +4163,7 @@ public class Camera {
          public String getDenoise() {
          return get(KEY_DENOISE);
          }
-        /**
+        /** @hide
          * Gets the current Continuous AF setting.
          *
          * @return one of CONTINUOUS_AF_XXX string constant. null if continuous AF
@@ -4041,7 +4183,7 @@ public class Camera {
         public void setFocusAreas(List<Area> focusAreas) {
             set(KEY_FOCUS_AREAS, focusAreas);
         }
-        /**
+        /** @hide
          * Sets the current Denoise  mode.
          * @param value DENOISE_XXX string constants.
          *
@@ -4050,7 +4192,7 @@ public class Camera {
          public void setDenoise(String value) {
              set(KEY_DENOISE, value);
          }
-        /**
+        /** @hide
          * Sets the current Continuous AF mode.
          * @param value CONTINUOUS_AF_XXX string constants.
          *
@@ -4115,7 +4257,7 @@ public class Camera {
             return splitArea(get(KEY_METERING_AREAS));
         }
 
-        /**
+        /** @hide
          * Gets the supported Continuous AF modes.
          *
          * @return a List of CONTINUOUS_AF_XXX string constant. null if continuous AF
@@ -4126,7 +4268,7 @@ public class Camera {
             String str = get(KEY_CONTINUOUS_AF + SUPPORTED_VALUES_SUFFIX);
             return split(str);
         }
-        /**
+        /** @hide
          * Gets the supported DENOISE  modes.
          *
          * @return a List of DENOISE_XXX string constant. null if DENOISE
@@ -4149,7 +4291,7 @@ public class Camera {
          public void setMeteringAreas(List<Area> meteringAreas) {
             set(KEY_METERING_AREAS, meteringAreas);
         }
-        /**
+        /** @hide
          * Gets the current selectable zone af setting.
          *
          * @return one of SELECTABLE_ZONE_AF_XXX string constant. null if selectable zone af
@@ -4171,7 +4313,7 @@ public class Camera {
          public int getMaxNumDetectedFaces() {
             return getInt(KEY_MAX_NUM_DETECTED_FACES_HW, 0);
         }
-        /**
+        /** @hide
          * Sets the current selectable zone af setting.
          *
          * @param value SELECTABLE_ZONE_AF_XXX string constants.
@@ -4202,7 +4344,7 @@ public class Camera {
             set(KEY_RECORDING_HINT, hint ? TRUE : FALSE);
         }
 
-        /**
+        /** @hide
          * Gets the supported selectable zone af setting.
          *
          * @return a List of SELECTABLE_ZONE_AF_XXX string constants. null if selectable zone af
@@ -4241,7 +4383,7 @@ public class Camera {
             return TRUE.equals(str);
         }
 
-        /**
+        /** @hide
          * @return true if full size video snapshot is supported.
          */
         public boolean isPowerModeSupported() {
@@ -4249,7 +4391,7 @@ public class Camera {
             return TRUE.equals(str);
         }
 
-        /**
+        /** @hide
          * Gets the current face detection setting.
          *
          * @return one of FACE_DETECTION_XXX string constant. null if face detection
@@ -4284,7 +4426,7 @@ public class Camera {
             set(KEY_VIDEO_STABILIZATION, toggle ? TRUE : FALSE);
         }
 
-        /**
+        /** @hide
          * Sets the auto scene detect. Other settings like Touch AF/AEC might be
          * changed after setting face detection.
          *
@@ -4321,7 +4463,7 @@ public class Camera {
             return TRUE.equals(str);
         }
 
-        /**
+        /** @hide
          * Gets the supported face detection modes.
          *
          * @return a List of FACE_DETECTION_XXX string constant. null if face detection
