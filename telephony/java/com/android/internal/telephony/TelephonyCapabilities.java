@@ -123,7 +123,8 @@ public class TelephonyCapabilities {
      */
     public static boolean supportsConferenceCallManagement(Phone phone) {
         return ((phone.getPhoneType() == Phone.PHONE_TYPE_GSM)
-                || (phone.getPhoneType() == Phone.PHONE_TYPE_SIP));
+                || (phone.getPhoneType() == Phone.PHONE_TYPE_SIP)
+                || (phone.getPhoneType() == Phone.PHONE_TYPE_IMS));
     }
 
     /**
@@ -137,7 +138,8 @@ public class TelephonyCapabilities {
      */
     public static boolean supportsHoldAndUnhold(Phone phone) {
         return ((phone.getPhoneType() == Phone.PHONE_TYPE_GSM)
-                || (phone.getPhoneType() == Phone.PHONE_TYPE_SIP));
+                || (phone.getPhoneType() == Phone.PHONE_TYPE_SIP)
+                || (phone.getPhoneType() == Phone.PHONE_TYPE_IMS));
     }
 
     /**
@@ -156,7 +158,8 @@ public class TelephonyCapabilities {
      */
     public static boolean supportsAnswerAndHold(Phone phone) {
         return ((phone.getPhoneType() == Phone.PHONE_TYPE_GSM)
-                || (phone.getPhoneType() == Phone.PHONE_TYPE_SIP));
+                || (phone.getPhoneType() == Phone.PHONE_TYPE_SIP)
+                || (phone.getPhoneType() == Phone.PHONE_TYPE_IMS));
     }
 
     /**
