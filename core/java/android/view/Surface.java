@@ -76,6 +76,9 @@ public class Surface implements Parcelable {
         return lockCanvasNative(dirty);
     }
 
+    /**
+    * @hide
+    */
     public void setStereoscopic3DFormat(int format) {
         setStereoscopic3DFormatNative(format);
     }
