@@ -20,7 +20,6 @@ import android.content.pm.ActivityInfo;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.LocaleUtil;
-import android.util.Slog;
 
 import java.util.Locale;
 
@@ -215,7 +214,15 @@ public final class Configuration implements Parcelable, Comparable<Configuration
     public static final int ORIENTATION_PORTRAIT = 1;
     public static final int ORIENTATION_LANDSCAPE = 2;
     public static final int ORIENTATION_SQUARE = 3;
+
+    /**
+    * @hide
+    */
     public static final int ORIENTATION_REVERSE_PORTRAIT = 4;
+
+    /**
+    * @hide
+    */
     public static final int ORIENTATION_REVERSE_LANDSCAPE = 5;
 
     /**
@@ -224,6 +231,10 @@ public final class Configuration implements Parcelable, Comparable<Configuration
      * or {@link #ORIENTATION_SQUARE}.
      */
     public int orientation;
+
+    /**
+    * @hide
+    */
     public int altOrientation;
 
     public static final int UI_MODE_TYPE_MASK = 0x0f;
