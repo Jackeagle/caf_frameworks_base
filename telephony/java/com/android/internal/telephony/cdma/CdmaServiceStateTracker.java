@@ -428,12 +428,16 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             break;
 
         case EVENT_NITZ_TIME:
-            ar = (AsyncResult) msg.obj;
+            if (SystemProperties.getBoolean("persist.timed.enable", false)) {
+                ar = (AsyncResult) msg.obj;
 
-            String nitzString = (String)((Object[])ar.result)[0];
-            long nitzReceiveTime = ((Long)((Object[])ar.result)[1]).longValue();
+                String nitzString = (String)((Object[])ar.result)[0];
+                long nitzReceiveTime = ((Long)((Object[])ar.result)[1]).longValue();
 
-            setTimeFromNITZString(nitzString, nitzReceiveTime);
+                setTimeFromNITZString(nitzString, nitzReceiveTime);
+            } else {
+                log("EVENT_NITZ_TIME received, ignore updating time");
+            }
             break;
 
         case EVENT_SIGNAL_STRENGTH_UPDATE:
