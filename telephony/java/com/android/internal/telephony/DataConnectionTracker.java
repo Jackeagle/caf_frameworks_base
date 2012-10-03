@@ -201,7 +201,7 @@ public abstract class DataConnectionTracker extends Handler {
     // TODO: move away from static state once 5587429 is fixed.
     protected static boolean sPolicyDataEnabled = true;
 
-    private boolean[] dataEnabled = new boolean[APN_NUM_TYPES];
+    protected boolean[] dataEnabled = new boolean[APN_NUM_TYPES];
 
     private int enabledCount = 0;
 
