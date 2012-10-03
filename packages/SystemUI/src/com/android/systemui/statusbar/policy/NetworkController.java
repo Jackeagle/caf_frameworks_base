@@ -614,6 +614,7 @@ public class NetworkController extends BroadcastReceiver {
                 case TelephonyManager.NETWORK_TYPE_EVDO_A:
                 case TelephonyManager.NETWORK_TYPE_EVDO_B:
                 case TelephonyManager.NETWORK_TYPE_EHRPD:
+                case TelephonyManager.NETWORK_TYPE_TD_SCDMA:
                     mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
                     mDataTypeIconId = R.drawable.stat_sys_data_connected_3g;
                     mContentDescriptionDataType = mContext.getString(
