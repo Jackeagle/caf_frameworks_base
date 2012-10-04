@@ -303,6 +303,9 @@ public class MSimNetworkController extends NetworkController {
             refreshViews(MSimTelephonyManager.getDefault().getDefaultSubscription());
         } else if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
             updateAirplaneMode();
+            for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+                updateSimIcon(i);
+            }
             refreshViews(MSimTelephonyManager.getDefault().getDefaultSubscription());
         } else if (action.equals(WimaxManagerConstants.NET_4G_STATE_CHANGED_ACTION) ||
                 action.equals(WimaxManagerConstants.SIGNAL_LEVEL_CHANGED_ACTION) ||
