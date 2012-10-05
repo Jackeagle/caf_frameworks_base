@@ -561,13 +561,7 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                     }
                     break;
                 case CONNECT_A2DP_INCOMING:
-                    // accept incoming A2DP, retry HFP_OUTGOING
                     transitionTo(mIncomingA2dp);
-
-                    if (mStatus) {
-                        deferMsg.what = mCommand;
-                        deferMessage(deferMsg);
-                    }
                     break;
                 case CONNECT_A2DP_OUTGOING:
                     deferMessage(message);
