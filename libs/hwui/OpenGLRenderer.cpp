@@ -265,9 +265,9 @@ void OpenGLRenderer::resume() {
     dirtyClip();
 
     mCaches.activeTexture(0);
-    TILERENDERING_END(previousFbo);
+    TILERENDERING_END(previousFbo, snapshot->fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, snapshot->fbo);
-    TILERENDERING_START(snapshot->fbo, 0, 0,
+    TILERENDERING_START(snapshot->fbo, previousFbo, 0, 0,
                         snapshot->viewport.getWidth(),
                         snapshot->viewport.getHeight(),
                         snapshot->viewport.getWidth(),
@@ -639,7 +639,7 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
     snapshot->orthoMatrix.load(mOrthoMatrix);
 
     // Bind texture to FBO
-    TILERENDERING_END(previousFbo);
+    TILERENDERING_END(previousFbo, layer->getFbo());
     glBindFramebuffer(GL_FRAMEBUFFER, layer->getFbo());
     layer->bindTexture();
 
@@ -657,7 +657,7 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         ALOGE("Framebuffer incomplete (GL error code 0x%x)", status);
         glBindFramebuffer(GL_FRAMEBUFFER, previousFbo);
-        TILERENDERING_START(previousFbo, true);
+        TILERENDERING_START(previousFbo, layer->getFbo(), true);
         layer->deleteTexture();
         mCaches.fboCache.put(layer->getFbo());
         delete layer;
@@ -666,7 +666,7 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
     }
 #endif
 
-    TILERENDERING_START(layer->getFbo(), clip.left, clip.bottom - bounds.getHeight(),
+    TILERENDERING_START(layer->getFbo(), previousFbo, clip.left, clip.bottom - bounds.getHeight(),
                       bounds.getWidth() + clip.left, clip.bottom,
                       bounds.getWidth(), bounds.getHeight());
 
@@ -696,13 +696,13 @@ void OpenGLRenderer::composeLayer(sp<Snapshot> current, sp<Snapshot> previous) {
     const bool fboLayer = current->flags & Snapshot::kFlagIsFboLayer;
 
     if (fboLayer) {
-        TILERENDERING_END(current->fbo);
+        TILERENDERING_END(current->fbo, previous->fbo);
         // Detach the texture from the FBO
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
 
         // Unbind current FBO and restore previous one
         glBindFramebuffer(GL_FRAMEBUFFER, previous->fbo);
-        TILERENDERING_START(previous->fbo, true);
+        TILERENDERING_START(previous->fbo, current->fbo, true);
     }
 
     Layer* layer = current->layer;
