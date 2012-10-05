@@ -1794,7 +1794,7 @@ public class Camera {
         private static final String KEY_SINGLE_ISP_OUTPUT_ENABLED = "single-isp-output-enabled";
         private static final String KEY_QC_SUPPORTED_CAMERA_FEATURES = "qc-camera-features";
         private static final String KEY_QC_MAX_NUM_REQUESTED_FACES = "qc-max-num-requested-faces";
-
+        private static final String KEY_QC_HDR_SUPPORTED = "hdr-supported";
         // Parameter key suffix for supported values.
         private static final String SUPPORTED_VALUES_SUFFIX = "-values";
 
@@ -3234,6 +3234,15 @@ public class Camera {
          */
         public boolean isAutoExposureLockSupported() {
             String str = get(KEY_AUTO_EXPOSURE_LOCK_SUPPORTED);
+            return TRUE.equals(str);
+        }
+
+	/** @hide
+	* Returns true if Hdr supported. Application should call this
+	* before setting no.of snapshots when HDR supported.
+        */
+	public boolean isHdrSupported() {
+            String str = get(KEY_QC_HDR_SUPPORTED);
             return TRUE.equals(str);
         }
 
