@@ -1523,8 +1523,16 @@ public final class Settings {
          */
         public static final String VOLUME_MUSIC = "volume_music";
 
+        /**
+         * FM volume (float in the range 0.0f to 1.0f).
+         * @hide
+         */
         public static final String VOLUME_FM = "volume_fm";
 
+        /**
+         * Dummy string. Dummy string for padding
+         * @hide
+         */
         public static final String DUMMY_STRING_FOR_PADDING = "";
 
         /**
