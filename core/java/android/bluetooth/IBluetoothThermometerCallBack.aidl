@@ -30,6 +30,9 @@ package android.bluetooth;
 
 import android.os.Bundle;
 
+/**
+ *@hide
+ */
 oneway interface IBluetoothThermometerCallBack {
     /**
     * Call from Thermometer service on operation status and value changed
