@@ -554,8 +554,11 @@ class GsmServiceStateTracker extends ServiceStateTracker {
             phone.mCT.backgroundCall.hangupIfAlive();
             phone.mCT.foregroundCall.hangupIfAlive();
         }
-
-        cm.setRadioPower(false, null);
+        if (!mDesiredPowerState && cm.getRadioState().isOn()) {
+            cm.setRadioPower(false, null);
+        } else {
+            log("hangupAndPowerOff ignore setting radio to OFF as current radio state is OFF");
+        }
     }
 
     private void processIccRecordEvents(int eventCode) {
