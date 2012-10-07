@@ -176,6 +176,7 @@ public class TelephonyCapabilities {
      * something more appropriate.
      */
     public static boolean supportsAdn(int phoneType) {
-        return phoneType == Phone.PHONE_TYPE_GSM;
+        return ((phoneType == Phone.PHONE_TYPE_GSM)
+                || (phoneType == Phone.PHONE_TYPE_CDMA));
     }
 }
