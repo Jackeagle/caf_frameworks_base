@@ -96,7 +96,10 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
         mPhone.mCM.unregisterForAvailable(this);
         mPhone.mCM.unregisterForOffOrNotAvailable(this);
         mPhone.mCM.unregisterForDataCallListChanged(this);
-        if (mIccRecords != null) { mIccRecords.unregisterForRecordsLoaded(this);}
+        if (mIccRecords != null) {
+            mIccRecords.unregisterForRecordsLoaded(this);
+            mIccRecords = null;
+        }
         mPhone.getCallTracker().unregisterForVoiceCallEnded(this);
         mPhone.getCallTracker().unregisterForVoiceCallStarted(this);
         mPhone.getServiceStateTracker().unregisterForDataConnectionAttached(this);
