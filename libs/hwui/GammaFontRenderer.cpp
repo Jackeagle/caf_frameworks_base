@@ -23,6 +23,8 @@
 namespace android {
 namespace uirenderer {
 
+extern FontRenderer *createFontRendererEx()__attribute__((weak));
+
 ///////////////////////////////////////////////////////////////////////////////
 // Constructors/destructor
 ///////////////////////////////////////////////////////////////////////////////
@@ -125,7 +127,12 @@ void GammaFontRenderer::flush() {
 FontRenderer* GammaFontRenderer::getRenderer(Gamma gamma) {
     FontRenderer* renderer = mRenderers[gamma];
     if (!renderer) {
-        renderer = new FontRenderer();
+        if (createFontRendererEx) {
+            renderer = createFontRendererEx();
+        }
+        else {
+            renderer = new FontRenderer;
+        }
         mRenderers[gamma] = renderer;
         renderer->setGammaTable(&mGammaTable[gamma * 256]);
     }

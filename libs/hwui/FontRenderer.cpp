@@ -30,6 +30,9 @@
 namespace android {
 namespace uirenderer {
 
+extern void flushAndInvalidateEx(FontRenderer *ptr,
+                                 uint32_t lineHeight)
+                                 __attribute__((weak));
 ///////////////////////////////////////////////////////////////////////////////
 // Defines
 ///////////////////////////////////////////////////////////////////////////////
@@ -639,8 +642,12 @@ void FontRenderer::cacheBitmap(const SkGlyph& glyph, CachedGlyphInfo* cachedGlyp
 
     // If the new glyph didn't fit, flush the state so far and invalidate everything
     if (!bitmapFit) {
-        flushAllAndInvalidate();
-
+        if (flushAndInvalidateEx) {
+            flushAndInvalidateEx(this, glyph.fHeight);
+        }
+        else {
+            flushAllAndInvalidate();
+        }
         // Try to fit it again
         for (uint32_t i = 0; i < mCacheLines.size(); i++) {
             bitmapFit = mCacheLines[i]->fitBitmap(glyph, &startX, &startY);

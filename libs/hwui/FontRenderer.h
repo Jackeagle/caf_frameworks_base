@@ -162,6 +162,7 @@ public:
     void render(SkPaint* paint, const char *text, uint32_t start, uint32_t len,
             int numGlyphs, SkPath* path, float hOffset, float vOffset);
 
+    void invalidateTextureCache(CacheTextureLine *cacheLine = NULL);
     /**
      * Creates a new font associated with the specified font state.
      */
@@ -193,7 +194,7 @@ protected:
     // Cache of glyphs
     DefaultKeyedVector<glyph_t, CachedGlyphInfo*> mCachedGlyphs;
 
-    void invalidateTextureCache(CacheTextureLine *cacheLine = NULL);
+
 
     CachedGlyphInfo* cacheGlyph(SkPaint* paint, glyph_t glyph);
     void updateGlyphCache(SkPaint* paint, const SkGlyph& skiaGlyph, CachedGlyphInfo* glyph);
@@ -236,9 +237,11 @@ protected:
 class FontRenderer {
 public:
     FontRenderer();
-    ~FontRenderer();
+    virtual ~FontRenderer();
 
     void flushLargeCaches();
+
+    void flushAllAndInvalidate();
 
     void setGammaTable(const uint8_t* gammaTable) {
         mGammaTable = gammaTable;
@@ -254,6 +257,8 @@ public:
     // bounds is an out parameter
     bool renderTextOnPath(SkPaint* paint, const Rect* clip, const char *text, uint32_t startIndex,
             uint32_t len, int numGlyphs, SkPath* path, float hOffset, float vOffset, Rect* bounds);
+
+    CacheTexture* createCacheTexture(int width, int height, bool allocate);
 
     struct DropShadow {
         DropShadow() { };
@@ -292,7 +297,7 @@ public:
         return mCurrentCacheTexture->mTextureId;
     }
 
-    uint32_t getCacheSize() const {
+    virtual uint32_t getCacheSize() const {
         uint32_t size = 0;
         if (mCacheTextureSmall != NULL && mCacheTextureSmall->mTexture != NULL) {
             size += mCacheTextureSmall->mWidth * mCacheTextureSmall->mHeight;
@@ -316,12 +321,10 @@ protected:
 
     void allocateTextureMemory(CacheTexture* cacheTexture);
     void deallocateTextureMemory(CacheTexture* cacheTexture);
-    void initTextTexture();
-    CacheTexture* createCacheTexture(int width, int height, bool allocate);
+    virtual void initTextTexture();
     void cacheBitmap(const SkGlyph& glyph, CachedGlyphInfo* cachedGlyph,
             uint32_t *retOriginX, uint32_t *retOriginY);
 
-    void flushAllAndInvalidate();
     void initVertexArrayBuffers();
 
     void checkInit();
