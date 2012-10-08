@@ -254,9 +254,9 @@ public class MediaRecorder
         public static final int AMR_WB = 2;
         /** AAC audio codec */
         public static final int AAC = 3;
-        /** enhanced AAC audio codec */
+        /** @hide enhanced AAC audio codec */
         public static final int AAC_PLUS = 4;
-        /** enhanced AAC plus audio codec */
+        /** @hide enhanced AAC plus audio codec */
         public static final int EAAC_PLUS = 5;
         /** @hide EVRC audio codec */
         public static final int EVRC = 6;
