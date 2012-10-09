@@ -340,6 +340,34 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
         }
     }
 
+    @Override
+    public synchronized int disableApnType(String type) {
+        if (isActiveDataSubscription()) {
+            return super.disableApnType(type);
+        } else {
+            if(type.equals(Phone.APN_TYPE_DEFAULT)) {
+                log("disableApnType(): NOT active DDS, dataEnabled as false for default");
+                int apnId = apnTypeToId(type);
+                dataEnabled[apnId] = false;
+            }
+            return Phone.APN_REQUEST_FAILED;
+        }
+    }
+
+    @Override
+    public synchronized int enableApnType(String apnType) {
+        if (isActiveDataSubscription()) {
+            return super.enableApnType(apnType);
+        } else {
+            if(apnType.equals(Phone.APN_TYPE_DEFAULT)) {
+                log("enableApnType(): NOT active DDS, dataEnabled as true for default");
+                int apnId = apnTypeToId(apnType);
+                dataEnabled[apnId] = true;
+            }
+            return Phone.APN_REQUEST_FAILED;
+        }
+    }
+
     protected void notifyDataDisconnectComplete() {
         log("notifyDataDisconnectComplete");
         for (Message m: mDisconnectAllCompleteMsgList) {
