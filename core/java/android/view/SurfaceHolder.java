@@ -45,19 +45,19 @@ public interface SurfaceHolder {
     @Deprecated
     public static final int SURFACE_TYPE_PUSH_BUFFERS = 3;
 
-    /**
+    /** @hide
      * Stereoscopic Side-by-Side Half 3D format
      */
     public static final int STEREOSCOPIC_3D_FORMAT_SIDE_BY_SIDE_HALF_L_R = 0x10000;
-    /**
+    /** @hide
      * Stereoscopic Top Bottom 3D format
      */
     public static final int STEREOSCOPIC_3D_FORMAT_TOP_BOTTOM   = 0x20000;
-    /**
+    /** @hide
      * Stereoscopic Interleaved 3D format
      */
     public static final int STEREOSCOPIC_3D_FORMAT_INTERLEAVED  = 0x40000;
-    /**
+    /** @hide
      * Stereoscopic Side-by-Side Full 3D format
      */
     public static final int STEREOSCOPIC_3D_FORMAT_SIDE_BY_SIDE_R_L = 0x80000;
