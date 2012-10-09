@@ -198,7 +198,7 @@ public class BluetoothService extends IBluetooth.Stub {
         IBinder binder;
         IBinder.DeathRecipient death;
     }
-    private final HashMap<Integer, ServiceRecordClient> mServiceRecordToPid;
+    private final ConcurrentHashMap<Integer, ServiceRecordClient> mServiceRecordToPid;
     private final HashMap<String, ArrayList<ParcelUuid>> mGattIntentTracker;
     private final HashMap<String, IBluetoothGattService> mGattServiceTracker;
     private final HashMap<String, IBluetoothGattService> mGattWatcherTracker;
@@ -402,7 +402,7 @@ public class BluetoothService extends IBluetooth.Stub {
         mDeviceOobData = new HashMap<String, Pair<byte[], byte[]>>();
         mDeviceL2capPsmCache = new HashMap<String, Map<ParcelUuid, Integer>>();
         mUuidIntentTracker = new ArrayList<String>();
-        mServiceRecordToPid = new HashMap<Integer, ServiceRecordClient>();
+        mServiceRecordToPid = new ConcurrentHashMap<Integer, ServiceRecordClient>();
         mUuidCallbackTracker = new ConcurrentHashMap<RemoteService, IBluetoothCallback>();
         mGattIntentTracker = new HashMap<String, ArrayList<ParcelUuid>>();
         mGattServiceTracker = new HashMap<String, IBluetoothGattService>();
@@ -682,7 +682,8 @@ public class BluetoothService extends IBluetooth.Stub {
         mAdapterProperties.clear();
 
         for (Integer srHandle : mServiceRecordToPid.keySet()) {
-            removeServiceRecordNative(srHandle);
+            Integer pid = mServiceRecordToPid.get(srHandle).pid;
+            checkAndRemoveRecord(srHandle, pid);
         }
         mServiceRecordToPid.clear();
 
