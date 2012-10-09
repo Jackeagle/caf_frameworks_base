@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009,2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009,2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *        * Redistributions in binary form must reproduce the above copyright
  *            notice, this list of conditions and the following disclaimer in the
  *            documentation and/or other materials provided with the distribution.
- *        * Neither the name of Code Aurora nor
+ *        * Neither the name of The Linux Foundation nor
  *            the names of its contributors may be used to endorse or promote
  *            products derived from this software without specific prior written
  *            permission.
@@ -40,8 +40,8 @@ public class FmReceiver extends FmTransceiver
 
    public static int mSearchState = 0;
 
-   static final int STD_BUF_SIZE = 128;
-
+   static final int STD_BUF_SIZE = 256;
+   static final int GRP_3A = 64;
    private static final String TAG = "FMRadio";
 
    /**
@@ -280,6 +280,16 @@ public class FmReceiver extends FmTransceiver
    private static final int FM_RX_RSSI_LEVEL_STRONG      = -96;
    private static final int FM_RX_RSSI_LEVEL_VERY_STRONG = -90;
 
+   /**
+     * BUF_TYPE
+     */
+   private static final int BUF_ERT = 12;
+   private static final int BUF_RTPLUS = 11;
+
+   private static final int LEN_IND = 0;
+   private static final int RT_OR_ERT_IND = 1;
+   private static final int ENCODE_TYPE_IND = 1;
+   private static final int ERT_DIR_IND = 2;
    /**
     * Constructor for the receiver Object
     */
@@ -1442,6 +1452,73 @@ public class FmReceiver extends FmTransceiver
       return mRdsData;
    }
 
+   public FmRxRdsData getRTPlusInfo() {
+      byte []rt_plus = new byte[STD_BUF_SIZE];
+      int bytes_read;
+      String rt = "";
+      int rt_len;
+      int i, j = 2;
+      byte tag_code, tag_len, tag_start_pos;
+
+      bytes_read = FmReceiverJNI.getBufferNative(sFd, rt_plus, BUF_RTPLUS);
+      if (bytes_read > 0) {
+          if (rt_plus[RT_OR_ERT_IND] == 0)
+              rt = mRdsData.getRadioText();
+          else
+              rt = mRdsData.getERadioText();
+          if ((rt != "") && (rt != null)) {
+              rt_len = rt.length();
+              mRdsData.setTagNums(0);
+              for (i = 1; (i <= 2) && (j < rt_plus[LEN_IND]); i++) {
+                  tag_code = rt_plus[j++];
+                  tag_start_pos = rt_plus[j++];
+                  tag_len = rt_plus[j++];
+                  if (((tag_len + tag_start_pos) <= rt_len) && (tag_code > 0)) {
+                      mRdsData.setTagValue(rt.substring(tag_start_pos,
+                                            (tag_len + tag_start_pos)), i);
+                      mRdsData.setTagCode(tag_code, i);
+                  }
+              }
+          } else {
+              mRdsData.setTagNums(0);
+          }
+      } else {
+              mRdsData.setTagNums(0);
+      }
+      return mRdsData;
+   }
+
+   public FmRxRdsData getERTInfo() {
+      byte [] raw_ert = new byte[STD_BUF_SIZE];
+      byte [] ert_text;
+      int i;
+      String s = "";
+      String encoding_type = "UCS-2";
+      int bytes_read;
+
+      bytes_read = FmReceiverJNI.getBufferNative(sFd, raw_ert, BUF_ERT);
+      if (bytes_read > 0) {
+          ert_text = new byte[raw_ert[LEN_IND]];
+          for(i = 3; (i - 3) < raw_ert[LEN_IND]; i++) {
+              ert_text[i - 3] = raw_ert[i];
+          }
+          if (raw_ert[ENCODE_TYPE_IND] == 1)
+              encoding_type = "UTF-8";
+          try {
+               s = new String (ert_text, encoding_type);
+          } catch (Exception e) {
+               e.printStackTrace();
+          }
+          mRdsData.setERadioText(s);
+          if (raw_ert[ERT_DIR_IND] == 0)
+              mRdsData.setFormatDir(false);
+          else
+              mRdsData.setFormatDir(true);
+          Log.d(TAG, "eRT: " + s + "dir: " +raw_ert[ERT_DIR_IND]);
+      }
+      return mRdsData;
+   }
+
    /*==============================================================
    FUNCTION:  getAFInfo
    ==============================================================*/
@@ -1743,6 +1820,10 @@ public class FmReceiver extends FmTransceiver
 
    }
 
+   public boolean setRawRdsGrpMask()
+   {
+      return super.setRDSGrpMask(GRP_3A);
+   }
    /*==============================================================
    FUNCTION:  registerRdsGroupProcessing
    ==============================================================*/
