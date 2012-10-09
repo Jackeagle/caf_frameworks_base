@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009,2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009,2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of Code Aurora nor
+ *    * Neither the name of The Linux Foundation nor
  *      the names of its contributors may be used to endorse or promote
  *      products derived from this software without specific prior written
  *      permission.
@@ -37,7 +37,7 @@ class FmRxEventListner {
 
     private final int EVENT_LISTEN = 1;
 
-    private final int STD_BUF_SIZE = 128;
+    private final int STD_BUF_SIZE = 256;
 
     private enum FmRxEvents {
       READY_EVENT,
@@ -209,14 +209,26 @@ class FmRxEventListner {
                                     cb.FmRxEvRadioReset();
                                 }
                                 break;
+                            case 19:
+                                FmTransceiver.setRDSGrpMask(0);
+                                break;
+                            case 20:
+                                Log.d(TAG, "got RT plus event");
+                                cb.FmRxEvRTPlus();
+                                break;
+                            case 21:
+                                Log.d(TAG, "got eRT event");
+                                cb.FmRxEvERTInfo();
+                                break;
                             default:
                                 Log.d(TAG, "Unknown event");
                                 break;
                             }
                         }//end of for
                     } catch ( Exception ex ) {
-                          Log.d( TAG,  "RunningThread InterruptedException");
-                          Thread.currentThread().interrupt();
+                        Log.d( TAG,  "RunningThread InterruptedException");
+                        ex.printStackTrace();
+                        Thread.currentThread().interrupt();
                     }
                 }
             }
