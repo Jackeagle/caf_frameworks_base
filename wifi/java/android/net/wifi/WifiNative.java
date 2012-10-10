@@ -769,7 +769,7 @@ public class WifiNative {
        strBuf.deleteCharAt(strBuf.length() - 1);
        command += strBuf;
        Log.d(mTAG, "setPreferredChannel Command that goes to Supplicant is=" + command);
-       return doBooleanCommand(command);
+       return doBooleanCommand(command) && doBooleanCommand("SAVE_CONFIG");
    }
 
   /** Set Operating reg class*/
