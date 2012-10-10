@@ -44,7 +44,8 @@ FRAMEWORKS_EXT_SUBDIRS := \
        core/java/android/speech/srec \
        media/java/android/media/videoeditor \
        media/java/android/media/audiofx \
-       telephony/java/com/android/internal/telephony/msim
+       telephony/java/com/android/internal/telephony/msim \
+       core/java/com/qualcomm/qcmedia
 
 FRAMEWORKS_EXT_SRCS := $(call find-other-java-files,$(FRAMEWORKS_EXT_SUBDIRS))
 
