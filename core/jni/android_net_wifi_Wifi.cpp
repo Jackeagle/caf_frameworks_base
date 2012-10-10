@@ -27,6 +27,7 @@
 
 #define WIFI_PKG_NAME "android/net/wifi/WifiNative"
 #define BUF_SIZE 256
+#define STRING_BUF_SIZE 4096
 #define EVENT_BUF_SIZE 2048
 
 namespace android {
@@ -85,20 +86,37 @@ static jboolean doBooleanCommand(const char *ifname, const char* expect, const c
 
 // Send a command to the supplicant, and return the reply as a String
 static jstring doStringCommand(JNIEnv* env, const char *ifname, const char* fmt, ...) {
-    char buf[BUF_SIZE];
     va_list args;
+    char *buf = (char *) malloc(STRING_BUF_SIZE * sizeof(char));
+
+    if (buf == NULL)
+        return NULL;
+
     va_start(args, fmt);
-    int byteCount = vsnprintf(buf, sizeof(buf), fmt, args);
+    int byteCount = vsnprintf(buf, STRING_BUF_SIZE, fmt, args);
     va_end(args);
-    if (byteCount < 0 || byteCount >= BUF_SIZE) {
+    if (byteCount < 0 || byteCount >= STRING_BUF_SIZE) {
+        free (buf);
         return NULL;
     }
-    char reply[4096];
-    if (doCommand(ifname, buf, reply, sizeof(reply)) != 0) {
+
+    char *reply = (char *) malloc (STRING_BUF_SIZE * sizeof(char));
+    if (reply == NULL) {
+        free (buf);
         return NULL;
     }
+
+    if (doCommand(ifname, buf, reply, STRING_BUF_SIZE) != 0) {
+        free(buf);
+        free(reply);
+        return NULL;
+    }
+
+    free(buf);
+
     // TODO: why not just NewStringUTF?
-    String16 str((char *)reply);
+    String16 str(reply);
+    free(reply);
     return env->NewString((const jchar *)str.string(), str.size());
 }
 
