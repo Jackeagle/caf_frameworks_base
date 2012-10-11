@@ -1207,10 +1207,11 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_com_android_internal_content_NativeLibraryHelper),
     REG_JNI(register_android_hardware_GestureDevice),
 
-#ifndef NON_QCOM_TARGET
-    REG_JNI(register_android_hardware_fm_fmradio),
     REG_JNI(register_com_android_internal_app_ActivityTrigger),
     REG_JNI(register_org_codeaurora_Performance),
+
+#ifndef NON_QCOM_TARGET
+    REG_JNI(register_android_hardware_fm_fmradio),
 #endif
 
 };
