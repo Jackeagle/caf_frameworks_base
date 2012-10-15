@@ -505,6 +505,10 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.acceptCall(callType);
     }
 
+    public int getCallType(Call call) throws CallStateException {
+        return mActivePhone.getCallType(call);
+    }
+
     public void rejectCall() throws CallStateException {
         mActivePhone.rejectCall();
     }
