@@ -21,6 +21,7 @@ import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.DataConnectionTracker;
 import com.android.internal.telephony.EventLogTags;
 import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.IccCard.State;
 import com.android.internal.telephony.MccTable;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.RestrictedState;
@@ -539,9 +540,8 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
 
         needsUpdate = ((SIMRecords)mIccRecords).updateEons(ss.getOperatorNumeric(), lactac);
         Log.d(LOG_TAG, "[EONS] updateEons() lactac = " + lactac + " , needsUpdate = " +
-                needsUpdate + " , OperatorNumeric = " + ss.getOperatorNumeric() +
-                " , Emergency Only = " + mEmergencyOnly);
-        if (needsUpdate || mEmergencyOnly) {
+                needsUpdate + " , OperatorNumeric = " + ss.getOperatorNumeric());
+        if (needsUpdate) {
             String eonsLong = ((SIMRecords)mIccRecords).getEons();
             Log.d(LOG_TAG, "[EONS] updateEons() eonsLong = " + eonsLong);
             if (eonsLong != null) {
@@ -949,7 +949,9 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
             mNitzUpdatedTime = false;
         }
 
-         if (mEonsEnabled) {
+        IccCard iccCard = phone.getIccCard();
+        if (mEonsEnabled && (iccCard != null) &&
+                    (iccCard.getIccCardState() == State.READY)) {
             Log.i(LOG_TAG,"Network State Changed, get EONS and update operator name display");
             updateEons();
         } else {
