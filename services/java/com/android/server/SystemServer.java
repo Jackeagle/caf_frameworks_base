@@ -28,8 +28,6 @@ import android.content.pm.IPackageManager;
 import android.content.res.Configuration;
 import android.media.AudioService;
 import android.net.wifi.p2p.WifiP2pService;
-import android.net.ethernet.EthernetManager;
-import android.net.ethernet.EthernetStateTracker;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.os.SchedulingPolicyService;
@@ -129,7 +127,6 @@ class ServerThread extends Thread {
         ConnectivityService connectivity = null;
         WifiP2pService wifiP2p = null;
         WifiService wifi = null;
-        EthernetService ethernet = null;
         NsdService serviceDiscovery= null;
         IPackageManager pm = null;
         Context context = null;
@@ -422,14 +419,6 @@ class ServerThread extends Thread {
                 reportWtf("starting Wi-Fi Service", e);
             }
 
-           try {
-                Slog.i(TAG, "Ethernet Service");
-                ethernet = new EthernetService(context);
-                ServiceManager.addService(Context.ETHERNET_SERVICE, ethernet);
-            } catch (Throwable e) {
-                reportWtf("starting Ethernt Service", e);
-            }
-
             try {
                 Slog.i(TAG, "Connectivity Service");
                 connectivity = new ConnectivityService(
@@ -439,7 +428,6 @@ class ServerThread extends Thread {
                 networkPolicy.bindConnectivityManager(connectivity);
                 wifi.checkAndStartWifi();
                 wifiP2p.connectivityServiceReady();
-                ethernet.checkAndStartEthernet();
             } catch (Throwable e) {
                 reportWtf("starting Connectivity Service", e);
             }
