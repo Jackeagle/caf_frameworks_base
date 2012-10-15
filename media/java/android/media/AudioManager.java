@@ -1322,6 +1322,7 @@ public class AudioManager {
       * Checks whether FM stream is active.
       *
       * @return true if FM is active.
+      * @hide
       */
     public boolean isFMActive() {
         return AudioSystem.isStreamActive(STREAM_FM, 0);
