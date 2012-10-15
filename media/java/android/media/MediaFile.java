@@ -63,8 +63,9 @@ public class MediaFile {
     // More audio file types
     public static final int FILE_TYPE_DTS   = 300;
     public static final int FILE_TYPE_EC3   = 301;
+    public static final int FILE_TYPE_MP2   = 302;
     private static final int FIRST_AUDIO_FILE_TYPE2 = FILE_TYPE_DTS;
-    private static final int LAST_AUDIO_FILE_TYPE2 = FILE_TYPE_EC3;
+    private static final int LAST_AUDIO_FILE_TYPE2 = FILE_TYPE_MP2;
 
     // MIDI file types
     public static final int FILE_TYPE_MID     = 16;
@@ -305,6 +306,8 @@ public class MediaFile {
             addFileType("DTS", FILE_TYPE_DTS, "audio/dts");
             addFileType("DTSHD", FILE_TYPE_DTS, "audio/dts");
             addFileType("CPT", FILE_TYPE_DTS, "audio/dts");
+            addFileType("MP2", FILE_TYPE_MP2, "audio/mpeg-L1");
+            addFileType("MP2", FILE_TYPE_MP2, "audio/mpeg-L2");
         }
     }
 
