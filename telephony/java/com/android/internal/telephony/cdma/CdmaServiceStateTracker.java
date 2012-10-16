@@ -1527,7 +1527,11 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
         phone.mCT.ringingCall.hangupIfAlive();
         phone.mCT.backgroundCall.hangupIfAlive();
         phone.mCT.foregroundCall.hangupIfAlive();
-        cm.setRadioPower(false, null);
+        if (!mDesiredPowerState && cm.getRadioState().isOn()) {
+            cm.setRadioPower(false, null);
+        } else {
+            log("hangupAndPowerOff ignore setting radio to OFF as current radio state is OFF");
+        }
     }
 
     protected void parseSidNid (String sidStr, String nidStr) {
