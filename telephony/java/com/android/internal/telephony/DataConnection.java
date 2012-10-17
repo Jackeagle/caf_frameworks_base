@@ -681,7 +681,12 @@ public abstract class DataConnection extends StateMachine {
 
             /* If only v4 or v6 got connected, its partial success */
             if ((isIpv4Connected && !isIpv6Connected) || (!isIpv4Connected && isIpv6Connected)) {
-                mPartialSuccess = true;
+                if (SystemProperties.getBoolean("persist.enable_partial_retry", true)) {
+                    if (DBG) log("partial retry enabled.");
+                    mPartialSuccess = true;
+                } else {
+                    if (DBG) log("partial retry disabled.");
+                }
                 if (DBG) {
                     log("Warning: partial data call failure, isIpv4Connected:" +
                             isIpv4Connected + " isIpv6Connected:" + isIpv6Connected);
