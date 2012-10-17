@@ -295,6 +295,7 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
             mCdmaSSM.dispose(this);
             cm.unregisterForCdmaPrlChanged(this);
         }
+        phone.getContext().unregisterReceiver(mIntentReceiver);
     }
 
     protected void finalize() {
