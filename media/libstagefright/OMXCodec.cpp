@@ -3206,7 +3206,7 @@ void OMXCodec::on_message(const omx_message &msg) {
 
                 MediaBuffer *buffer = info->mMediaBuffer;
                 bool isGraphicBuffer = buffer->graphicBuffer() != NULL;
-                if (!(mFlags & kEnableGrallocUsagePrivateCPBuffer) &&
+                if (mOMXLivesLocally && !(mFlags & kEnableGrallocUsagePrivateCPBuffer) &&
                     (isGraphicBuffer && !strncasecmp(mMIME, "video/", 6)) &&
                     (!strncmp(mComponentName, "OMX.qcom.", 9)) &&
                     (msg.u.extended_buffer_data.flags & OMX_BUFFERFLAG_EXTRADATA))
