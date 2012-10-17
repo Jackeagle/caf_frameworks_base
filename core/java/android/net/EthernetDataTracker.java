@@ -25,6 +25,7 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.util.Log;
+import android.os.SystemProperties;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -259,6 +260,13 @@ public class EthernetDataTracker implements NetworkStateTracker {
      * Re-enable connectivity to a network after a {@link #teardown()}.
      */
     public boolean reconnect() {
+	/*Workaround for beagleboard, because mLinkup flag was not updated for this time*/
+        String name="beagleboard";
+        String devicename = SystemProperties.get("ro.product.device");
+        if (name.equals(devicename)) {
+            mLinkUp=true;
+        }
+
         if (mLinkUp) {
             mTeardownRequested.set(false);
             runDhcp();
