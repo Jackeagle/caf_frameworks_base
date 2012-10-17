@@ -157,6 +157,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     /* User rejected a peer request */
     private static final int PEER_CONNECTION_USER_REJECT    =   BASE + 3;
 
+    public static final int DRIVER_HUNG_EVENT_IN_WIFIDIRECT =   BASE + 4;
+
     private final boolean mP2pSupported;
 
     private WifiP2pDevice mThisDevice = new WifiP2pDevice();
@@ -1400,6 +1402,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     break;
                 case WifiMonitor.P2P_GROUP_STARTED_EVENT:
                     Slog.e(TAG, "Duplicate group creation event notice, ignore");
+                    break;
+                case WifiMonitor.DRIVER_HUNG_EVENT:
+                    Slog.e(TAG, "Received Driver HUNG event");
+                    mWifiChannel.sendMessage(DRIVER_HUNG_EVENT_IN_WIFIDIRECT);
                     break;
                 default:
                     return NOT_HANDLED;

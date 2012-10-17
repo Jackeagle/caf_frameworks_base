@@ -2234,6 +2234,10 @@ public class WifiStateMachine extends StateMachine {
                 case WifiWatchdogStateMachine.RSSI_FETCH:
                     replyToMessage(message, WifiWatchdogStateMachine.RSSI_FETCH_FAILED);
                     break;
+                case WifiP2pService.DRIVER_HUNG_EVENT_IN_WIFIDIRECT:
+                    setWifiEnabled(false);
+                    setWifiEnabled(true);
+                    break;
                 default:
                     loge("Error! unhandled message" + message);
                     break;
