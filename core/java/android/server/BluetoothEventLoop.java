@@ -88,7 +88,7 @@ class BluetoothEventLoop {
     // package and class name to which we send intent to check sap access permission
     private static final String ACCESS_REQUEST_PACKAGE = "com.android.settings";
     private static final String ACCESS_REQUEST_CLASS =
-                         "com.android.settings.bluetooth.BluetoothPermissionRequest";
+                         "com.qualcomm.settings.bluetooth.BluetoothPermissionRequest";
 
     private final Handler mHandler = new Handler() {
         @Override
