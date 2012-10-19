@@ -2860,6 +2860,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                                     int streamTypeAlias = mStreamVolumeAlias[mStreamType];
                                     int device = getDeviceForStream(streamTypeAlias);
                                     setIndex(0, device, false /* lastAudible */);
+                                    device = ((Integer)entry.getKey()).intValue();
+                                    setIndex(0, device, false /* lastAudible */);
                                 }
                                 sendMsg(mAudioHandler,
                                         MSG_SET_ALL_VOLUMES,
