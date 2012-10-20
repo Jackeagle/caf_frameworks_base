@@ -299,7 +299,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private enum DownloadStates {
         PendingNetwork, Downloading, Idle;
     };
-    private DownloadStates mInjectNtpTimePending = DownloadStates.PendingNetwork;
+    private DownloadStates mInjectNtpTimePending = DownloadStates.Idle;
     private DownloadStates mDownloadXtraDataPending = DownloadStates.Idle;
 
     // set to true if the GPS engine does not do on-demand NTP time requests
@@ -2358,6 +2358,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
         if (!hasCapability(GPS_CAPABILITY_ON_DEMAND_TIME) && !mPeriodicTimeInjection) {
             mPeriodicTimeInjection = true;
+            mInjectNtpTimePending = DownloadStates.PendingNetwork;
             requestUtcTime();
         }
     }
