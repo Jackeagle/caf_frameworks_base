@@ -253,7 +253,7 @@ public class ApnContext {
         // We don't print mDataConnection because its recursive.
         return "{mApnType=" + mApnType + " mState=" + getState() + " mWaitingApns=" + mWaitingApns +
                 " mWaitingApnsPermanentFailureCountDown=" + mWaitingApnsPermanentFailureCountDown +
-                " mDataConnectionAc=" + mDataConnectionAc +
+                " mDataProfile=" + mDataProfile + " mDataConnectionAc=" + mDataConnectionAc +
                 " mReason=" + mReason + " mRetryCount=" + mRetryCount +
                 " mDataEnabled=" + mDataEnabled + " mDependencyMet=" + mDependencyMet + "}";
     }
