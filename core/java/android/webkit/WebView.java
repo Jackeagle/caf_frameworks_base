@@ -429,6 +429,40 @@ public class WebView extends AbsoluteLayout
 
     }
 
+    /**
+     * A wrapper around text to speech.
+     */
+     private static class TextToSpeechWrapper {
+        private TextToSpeech mTextToSpeech;
+        public TextToSpeechWrapper(Context context) {
+            final String pkgName = context.getPackageName();
+            mTextToSpeech = new TextToSpeech(context, null, null, pkgName + ".**webview**");
+        }
+
+        @JavascriptInterface
+        @SuppressWarnings("unused")
+        public boolean isSpeaking() {
+            return mTextToSpeech.isSpeaking();
+        }
+
+        @JavascriptInterface
+        @SuppressWarnings("unused")
+        public int speak(String text, int queueMode, HashMap<String, String> params) {
+            return mTextToSpeech.speak(text, queueMode, params);
+        }
+
+        @JavascriptInterface
+        @SuppressWarnings("unused")
+        public int stop() {
+            return mTextToSpeech.stop();
+        }
+
+        @SuppressWarnings("unused")
+        protected void shutdown() {
+            mTextToSpeech.shutdown();
+        }
+    }
+
     // A final CallbackProxy shared by WebViewCore and BrowserFrame.
     private final CallbackProxy mCallbackProxy;
 
@@ -877,7 +911,7 @@ public class WebView extends AbsoluteLayout
     private static final String PATTERN_MATCH_AXS_URL_PARAMETER = "(\\?axs=(0|1))|(&axs=(0|1))";
 
     // TextToSpeech instance exposed to JavaScript to the injected screenreader.
-    private TextToSpeech mTextToSpeech;
+    private TextToSpeechWrapper mTextToSpeech;
 
     // variable to cache the above pattern in case accessibility is enabled.
     private Pattern mMatchAxsUrlParameterPattern;
@@ -1360,12 +1394,8 @@ public class WebView extends AbsoluteLayout
             // exposing the TTS for now ...
             final Context ctx = getContext();
             if (ctx != null) {
-                final String packageName = ctx.getPackageName();
-                if (packageName != null) {
-                    mTextToSpeech = new TextToSpeech(getContext(), null, null,
-                            packageName + ".**webview**");
-                    addJavascriptInterface(mTextToSpeech, ALIAS_ACCESSIBILITY_JS_INTERFACE);
-                }
+                mTextToSpeech = new TextToSpeechWrapper(ctx);
+                addJavascriptInterface(mTextToSpeech, ALIAS_ACCESSIBILITY_JS_INTERFACE, true);
             }
         }
     }
@@ -4204,6 +4234,11 @@ public class WebView extends AbsoluteLayout
      *                      JavaScript.
      */
     public void addJavascriptInterface(Object obj, String interfaceName) {
+        addJavascriptInterface(obj, interfaceName, false);
+    }
+
+    private void addJavascriptInterface(Object obj, String interfaceName,
+                                        boolean requireAnnotation) {
         checkThread();
         if (obj == null) {
             return;
@@ -4211,6 +4246,7 @@ public class WebView extends AbsoluteLayout
         WebViewCore.JSInterfaceData arg = new WebViewCore.JSInterfaceData();
         arg.mObject = obj;
         arg.mInterfaceName = interfaceName;
+        arg.mRequireAnnotation = requireAnnotation;
         mWebViewCore.sendMessage(EventHub.ADD_JS_INTERFACE, arg);
     }
 
