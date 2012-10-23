@@ -311,8 +311,12 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
         // TODO: This should support partial invalidation too.
-        if (mProxy != null && mProxy.isMediaVisible())
-            mProxy.getWebView().invalidate();
+        if (mProxy != null) {
+            if (mProxy.isMediaVisible())
+                mProxy.getWebView().invalidate();
+
+            mProxy.onAvailableVideoFrame();
+        }
     }
 
     public void retrieveMetadata(HTML5VideoViewProxy proxy) {
