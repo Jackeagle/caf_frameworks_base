@@ -116,8 +116,6 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
     JNIEnv *env = AndroidRuntime::getJNIEnv();
     if (obj && obj->dataSize() > 0) {
         if (mParcel != NULL) {
-            Parcel* nativeParcel = parcelForJavaObject(env, mParcel);
-            nativeParcel->setData(obj->data(), obj->dataSize());
             if( (fields.qc_post_event != NULL) &&
                 ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT) ) )
             {
@@ -134,15 +132,20 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
               }
               else
               {
-                   env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
-                                             msg, ext1, ext2, mParcel);
-                   ALOGD("JNIMediaPlayerListener::notify qc_post_event done");
+                 jobject mTempJParcel = createJavaParcelObject(env);
+                 Parcel* javaparcel= parcelForJavaObject(env, mTempJParcel);
+                 javaparcel->setData(obj->data(), obj->dataSize());
+                 env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
+                                            msg, ext1, ext2, mTempJParcel);
+                 ALOGD("JNIMediaPlayerListener::notify qc_post_event done");
               }
             }
             else
             {
-              env->CallStaticVoidMethod(mClass, fields.post_event, mObject,
-                    msg, ext1, ext2, mParcel);
+                Parcel* nativeParcel = parcelForJavaObject(env, mParcel);
+                nativeParcel->setData(obj->data(), obj->dataSize());
+                env->CallStaticVoidMethod(mClass, fields.post_event, mObject,
+                      msg, ext1, ext2, mParcel);
             }
         }
     } else {
