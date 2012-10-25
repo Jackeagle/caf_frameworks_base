@@ -228,6 +228,12 @@ public final class BluetoothDevice implements Parcelable {
      */
     public static final String EXTRA_RSSI = "android.bluetooth.device.extra.RSSI";
     /**
+     * Used as a String extra field in {ACTION_FOUND} intent.
+     * It contains the comma separated uuid string values of services.
+     * @hide
+     */
+    public static final String EXTRA_UUIDS = "android.bluetooth.device.extra.UUIDS";
+    /**
      * Used as an UINT 16 extra field in {ACTION_LE_CONN_PARAMS} intent.
      * It contains the negotiated connection interval value after establishing LE connection.
      * @hide */
