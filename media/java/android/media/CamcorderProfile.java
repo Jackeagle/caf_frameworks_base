@@ -170,10 +170,14 @@ public class CamcorderProfile
      */
     public static final int QUALITY_TIME_LAPSE_VGA = 1010;
 
+    /** @hide
+     * Time lapse quality level corresponding to the WQVGA (432 x 240) resolution.
+     */
+    public static final int QUALITY_TIME_LAPSE_WQVGA = 1011;
+
     // Start and end of timelapse quality list
     private static final int QUALITY_TIME_LAPSE_LIST_START = QUALITY_TIME_LAPSE_LOW;
-    private static final int QUALITY_TIME_LAPSE_LIST_END = QUALITY_TIME_LAPSE_VGA;
-
+    private static final int QUALITY_TIME_LAPSE_LIST_END = QUALITY_TIME_LAPSE_WQVGA;
     /**
      * Default recording duration in seconds before the session is terminated.
      * This is useful for applications like MMS has limited file size requirement.
