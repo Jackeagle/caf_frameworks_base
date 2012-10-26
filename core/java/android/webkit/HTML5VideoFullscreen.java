@@ -248,8 +248,8 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
             if (mFullscreenProxy.getWebView().getViewManager() != null)
                 mFullscreenProxy.getWebView().getViewManager().hideAll();
             // Add progress view
-            if (mProgressView == null) {
-                mProgressView = client.getVideoLoadingProgressView();
+            mProgressView = client.getVideoLoadingProgressView();
+            if (mProgressView != null) {
                 mLayout.addView(mProgressView, WRAP_CONTENT_PARAMS);
             }
         }
@@ -458,11 +458,12 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         if (!proxy.isFullscreen())
             return;
 
-        assert(mProgressView != null);
-        if (playerBuffering)
-            mProgressView.setVisibility(View.VISIBLE);
-        else
-            mProgressView.setVisibility(View.GONE);
+        if (mProgressView != null) {
+            if (playerBuffering)
+                mProgressView.setVisibility(View.VISIBLE);
+            else
+                mProgressView.setVisibility(View.GONE);
+        }
     }
 
     static class FullScreenMediaController extends MediaController {
