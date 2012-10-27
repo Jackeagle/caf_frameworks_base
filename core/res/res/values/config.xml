@@ -258,6 +258,8 @@
         <item>0</item>
         <item>1</item>
         <item>5</item>
+        <item>7</item>
+        <item>9</item>
     </integer-array>
 
     <!-- Integer indicating upstream type retry limit count -->
