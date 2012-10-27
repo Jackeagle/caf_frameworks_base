@@ -885,6 +885,7 @@ public class WifiWatchdogStateMachine extends StateMachine {
             // Consider this exception as a
             // successful Arp as well
             loge("ARP test initiation failure: " + e);
+            // ArpPeer throws exception for IPv6 address
             success = true;
         }
 
