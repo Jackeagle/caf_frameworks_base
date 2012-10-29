@@ -33,6 +33,7 @@ public class SignalStrength implements Parcelable {
 
     private static final String LOG_TAG = "SignalStrength";
     private static final boolean DBG = true;
+    private static final boolean VDBG = false;
 
     /** @hide */
     public static final int SIGNAL_STRENGTH_NONE_OR_UNKNOWN = 0;
@@ -224,7 +225,7 @@ public class SignalStrength implements Parcelable {
      * @hide
      */
     public SignalStrength(Parcel in) {
-        if (DBG) log("Size of signalstrength parcel:" + in.dataSize());
+        if (VDBG) log("Size of signalstrength parcel:" + in.dataSize());
 
         if (in.dataAvail() > 0) mGsmSignalStrength = in.readInt();
         if (in.dataAvail() > 0) mGsmBitErrorRate = in.readInt();
@@ -296,7 +297,7 @@ public class SignalStrength implements Parcelable {
      * @hide
      */
     public void validateInput() {
-        if (DBG) log("Signal before validate=" + this);
+        if (VDBG) log("Signal before validate=" + this);
         // TS 27.007 8.5
         mGsmSignalStrength = mGsmSignalStrength >= 0 ? mGsmSignalStrength : 99;
         // BER no change;
@@ -319,7 +320,7 @@ public class SignalStrength implements Parcelable {
                 ? -mTdScdmaRscp : SignalStrength.INVALID;
 
         // Cqi no change
-        if (DBG) log("Signal after validate=" + this);
+        if (VDBG) log("Signal after validate=" + this);
     }
 
     /**
