@@ -309,7 +309,7 @@ public class MediaRecorder
      * Gets the maximum value for audio sources.
      * @see android.media.MediaRecorder.AudioSource
      */
-    public static final int getAudioSourceMax() { return AudioSource.VOICE_COMMUNICATION; }
+    public static final int getAudioSourceMax() { return AudioSource.FM_RX_A2DP; }
 
     /**
      * Sets the video source to be used for recording. If this method is not
