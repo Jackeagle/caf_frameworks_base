@@ -115,8 +115,9 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
 {
     JNIEnv *env = AndroidRuntime::getJNIEnv();
     if (obj && obj->dataSize() > 0) {
-        if (mParcel != NULL) {
-            Parcel* nativeParcel = parcelForJavaObject(env, mParcel);
+        jobject jParcel = createJavaParcelObject(env);
+        if (jParcel != NULL) {
+            Parcel* nativeParcel = parcelForJavaObject(env, jParcel);
             nativeParcel->setData(obj->data(), obj->dataSize());
             if( (fields.qc_post_event != NULL) &&
                 ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT) ) )
