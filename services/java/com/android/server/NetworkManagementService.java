@@ -34,6 +34,8 @@ import static com.android.server.NetworkManagementService.NetdResponseCode.Tethe
 import static com.android.server.NetworkManagementService.NetdResponseCode.TetherStatusResult;
 import static com.android.server.NetworkManagementService.NetdResponseCode.TetheringStatsResult;
 import static com.android.server.NetworkManagementService.NetdResponseCode.TtyListResult;
+import android.provider.Settings;
+import static android.provider.Settings.Secure.NETSTATS_ENABLED;
 import static com.android.server.NetworkManagementSocketTagger.PROP_QTAGUID_ENABLED;
 
 import android.content.Context;
@@ -291,9 +293,13 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     private void prepareNativeDaemon() {
         mBandwidthControlEnabled = false;
 
-        // only enable bandwidth control when support exists
+        // only enable bandwidth control when support exists , and requested by
+        // system setting
         final boolean hasKernelSupport = new File("/proc/net/xt_qtaguid/ctrl").exists();
-        if (hasKernelSupport) {
+        final boolean shouldEnable =
+                Settings.Secure.getInt(mContext.getContentResolver(), NETSTATS_ENABLED, 1) != 0;
+
+        if (hasKernelSupport && shouldEnable) {
             Slog.d(TAG, "enabling bandwidth control");
             try {
                 mConnector.execute("bandwidth", "enable");
@@ -302,7 +308,8 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                 Log.wtf(TAG, "problem enabling bandwidth controls", e);
             }
         } else {
-            Slog.d(TAG, "not enabling bandwidth control");
+            Slog.d(TAG, "not enabling bandwidth control - " +
+                    "hasKernelSupport: " + hasKernelSupport + " shouldEnable: " + shouldEnable);
         }
 
         SystemProperties.set(PROP_QTAGUID_ENABLED, mBandwidthControlEnabled ? "1" : "0");
