@@ -540,6 +540,7 @@ public class MediaPlayer
 
     /* {@hide}
     */
+    private Object mContextLock = new Object();
     private Context mContext = null;
 
     /* {@hide}
@@ -1396,7 +1397,9 @@ public class MediaPlayer
     public void release() {
         stayAwake(false);
         updateSurfaceScreenOn();
-        mContext = null;
+        synchronized(mContextLock) {
+           mContext = null;
+        }
         mUri = null;
         mOnPreparedListener = null;
         mOnBufferingUpdateListener = null;
@@ -2083,21 +2086,23 @@ public class MediaPlayer
 
             case MEDIA_SEEK_COMPLETE:
               {
-                  if (mContext != null) {
-                      Intent intent = new Intent(ACTION_METADATA_CHANGED);
-                      intent.putExtra("duration", getDuration());
-                      intent.putExtra("time", System.currentTimeMillis());
-                      intent.putExtra("position", getCurrentPosition());
-                      intent.putExtra("uripath", mUri);
-                      if (isPlaying()) {
-                         intent.putExtra("playstate", PLAYSTATUS_PLAYING);
-                      } else {
-                         intent.putExtra("playstate", PLAYSTATUS_PAUSED);
-                      }
-                      mContext.sendBroadcast(intent);
+                synchronized(mContextLock) {
+                    if (mContext != null) {
+                        Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                        intent.putExtra("duration", getDuration());
+                        intent.putExtra("time", System.currentTimeMillis());
+                        intent.putExtra("position", getCurrentPosition());
+                        intent.putExtra("uripath", mUri);
+                        if (isPlaying()) {
+                            intent.putExtra("playstate", PLAYSTATUS_PLAYING);
+                        } else {
+                            intent.putExtra("playstate", PLAYSTATUS_PAUSED);
+                        }
+                        mContext.sendBroadcast(intent);
                     }
-                  if (mOnSeekCompleteListener != null)
-                      mOnSeekCompleteListener.onSeekComplete(mMediaPlayer);
+                }
+                if (mOnSeekCompleteListener != null)
+                    mOnSeekCompleteListener.onSeekComplete(mMediaPlayer);
               }
               return;
 
