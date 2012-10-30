@@ -607,22 +607,15 @@ public class GpsLocationProvider implements LocationProviderInterface {
                     }
                     agpsConnInfo.mAPN = apnName;
 
-                    LinkProperties lp = mConnMgr.getLinkProperties(agpsConnInfo.mCMConnType);
-                    Collection<LinkAddress> las = lp.getLinkAddresses();
-                    boolean isV4 = false;
-                    boolean isV6 = false;
-                    for (LinkAddress la : las) {
-                        if (la.getAddress() instanceof Inet6Address) {
-                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
-                            isV6 = true;
-                        } else {
-                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
-                            isV4 = true;
-                        }
-                        if (isV4 && isV6) {
-                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
-                            break;
-                        }
+                    String ipProtocol = getIpProtocol(agpsConnInfo.mAPN);
+                    if (null == ipProtocol) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
+                    } else if (ipProtocol.equals("IPV6")) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
+                    } else if (ipProtocol.equals("IPV4V6")) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
+                    } else {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
                     }
 
                     if (agpsConnInfo.mIPv4Addr != null) {
@@ -1837,23 +1830,44 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
                 if (result == Phone.APN_ALREADY_ACTIVE) {
                     if (DEBUG) Log.d(TAG, "Phone.APN_ALREADY_ACTIVE");
-                    if (agpsConnInfo.mAPN != null) {
-                        if (agpsConnInfo.mIPv4Addr != null) {
-                            boolean route_result;
-                            if (DEBUG)
-                                Log.d(TAG, "agpsConnInfo.mIPv4Addr " + agpsConnInfo.mIPv4Addr.toString());
-                            route_result = mConnMgr.requestRouteToHostAddress(
-                                agpsConnInfo.mCMConnType,
-                                agpsConnInfo.mIPv4Addr);
-                            if (route_result == false) Log.d(TAG, "call requestRouteToHostAddress failed");
+
+                    if (agpsConnInfo.mAPN == null) {
+                        NetworkInfo info;
+                        if (type == AGpsConnectionInfo.CONNECTION_TYPE_SUPL) {
+                            info = mConnMgr.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_SUPL);
+                        } else {
+                            info = mConnMgr.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
                         }
-                        native_agps_data_conn_open(agpsConnInfo.mAgpsType, agpsConnInfo.mAPN, agpsConnInfo.mBearerType);
-                        agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPEN;
-                    } else {
-                        Log.e(TAG, "agpsConnInfo.mAPN not set when receiving Phone.APN_ALREADY_ACTIVE");
-                        agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
-                        native_agps_data_conn_failed(agpsConnInfo.mAgpsType);
+                        if (info != null) {
+                            agpsConnInfo.mAPN = info.getExtraInfo();
+                        }
+                        if (agpsConnInfo.mAPN == null) {
+                            agpsConnInfo.mAPN = "dummy-apn";
+                        }
                     }
+
+                    String ipProtocol = getIpProtocol(agpsConnInfo.mAPN);
+                    if (null == ipProtocol) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
+                    } else if (ipProtocol.equals("IPV6")) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
+                    } else if (ipProtocol.equals("IPV4V6")) {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
+                    } else {
+                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
+                    }
+
+                    if (agpsConnInfo.mIPv4Addr != null) {
+                        boolean route_result;
+                        if (DEBUG)
+                            Log.d(TAG, "agpsConnInfo.mIPv4Addr " + agpsConnInfo.mIPv4Addr.toString());
+                        route_result = mConnMgr.requestRouteToHostAddress(
+                            agpsConnInfo.mCMConnType,
+                            agpsConnInfo.mIPv4Addr);
+                        if (route_result == false) Log.d(TAG, "call requestRouteToHostAddress failed");
+                    }
+                    native_agps_data_conn_open(agpsConnInfo.mAgpsType, agpsConnInfo.mAPN, agpsConnInfo.mBearerType);
+                    agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPEN;
                 } else if (result == Phone.APN_REQUEST_STARTED) {
                     if (DEBUG) Log.d(TAG, "Phone.APN_REQUEST_STARTED");
                     // Nothing to do here
@@ -2298,6 +2312,31 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
         }
         return apn;
+    }
+
+    private String getIpProtocol(String apn) {
+        TelephonyManager phone = (TelephonyManager)
+                mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        String operator =  phone.getNetworkOperator();
+        String ipProtocol = null;
+        String selection = "numeric = '" + operator + "'";
+        selection += " and apn = '" + apn + "'";
+        selection += " and carrier_enabled = 1";
+
+        Cursor cursor = mContext.getContentResolver().query(Carriers.CONTENT_URI,
+                new String[] {Carriers.PROTOCOL}, selection, null, Carriers.DEFAULT_SORT_ORDER);
+
+        if (null != cursor) {
+            try {
+                if (cursor.moveToFirst()) {
+                    ipProtocol = cursor.getString(0);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+
+        return ipProtocol;
     }
 
     // for GPS SV statistics
