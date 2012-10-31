@@ -30,6 +30,7 @@ public class StorageVolume implements Parcelable {
 
     private final String mPath;
     private final int mDescriptionId;
+    private final String mDescription;
     private final boolean mRemovable;
     private final boolean mEmulated;
     private final int mMtpReserveSpace;
@@ -52,7 +53,19 @@ public class StorageVolume implements Parcelable {
         mMtpReserveSpace = mtpReserveSpace;
         mAllowMassStorage = allowMassStorage;
         mMaxFileSize = maxFileSize;
+        mDescription = null;
     }
+    public StorageVolume(String path, String description, boolean removable,
+            boolean emulated, int mtpReserveSpace, boolean allowMassStorage, long maxFileSize) {
+        mPath = path;
+        mDescription = description;
+        mRemovable = removable;
+        mEmulated = emulated;
+        mMtpReserveSpace = mtpReserveSpace;
+        mAllowMassStorage = allowMassStorage;
+        mMaxFileSize = maxFileSize;
+        mDescriptionId = 0;
+   }
 
     // for parcelling only
     private StorageVolume(String path, int descriptionId, boolean removable,
@@ -66,6 +79,7 @@ public class StorageVolume implements Parcelable {
         mAllowMassStorage = allowMassStorage;
         mStorageId = storageId;
         mMaxFileSize = maxFileSize;
+        mDescription = null;
     }
 
     /**
@@ -83,7 +97,14 @@ public class StorageVolume implements Parcelable {
      * @return the volume description
      */
     public String getDescription(Context context) {
-        return context.getResources().getString(mDescriptionId);
+        if (mDescriptionId != 0)
+            return context.getResources().getString(mDescriptionId);
+        else
+            return getDescription();
+    }
+
+    private String getDescription() {
+        return mDescription;
     }
 
     public int getDescriptionId() {
