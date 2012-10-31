@@ -2489,11 +2489,11 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             // selection if not the speaker.
             if ((device & AudioSystem.DEVICE_OUT_SPEAKER) != 0) {
                 device = AudioSystem.DEVICE_OUT_SPEAKER;
-            }
-            else if((device & AudioSystem.DEVICE_OUT_WIRED_HEADSET) != 0) {
+            } else if ((device & AudioSystem.DEVICE_OUT_WIRED_HEADSET) != 0) {
                 device = AudioSystem.DEVICE_OUT_WIRED_HEADSET;
-            }
-            else {
+            } else if ((device & AudioSystem.DEVICE_OUT_WIRED_HEADPHONE) != 0) {
+                device = AudioSystem.DEVICE_OUT_WIRED_HEADPHONE;
+            } else {
                 device &= AudioSystem.DEVICE_OUT_ALL_A2DP;
             }
 
