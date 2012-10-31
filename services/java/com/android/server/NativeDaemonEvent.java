@@ -102,7 +102,7 @@ public class NativeDaemonEvent {
     }
 
     private static boolean isClassUnsolicited(int code) {
-        return code >= 600 && code < 700;
+        return code >= 600 && code < 1000;
     }
 
     /**
