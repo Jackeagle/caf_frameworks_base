@@ -57,9 +57,9 @@ public abstract class GeoFencerBase {
     }
 
     public void add(double latitude, double longitude,
-                 float radius, long expiration, PendingIntent intent) {
+                 float radius, long expiration, PendingIntent intent, String  packageName) {
         add(new GeoFenceParams(latitude, longitude, radius,
-                                     expiration, intent));
+                                     expiration, intent, packageName));
     }
 
     public void add(GeoFenceParams geoFence) {
