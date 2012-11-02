@@ -262,6 +262,9 @@
         <item>9</item>
     </integer-array>
 
+    <!-- Integer indicating upstream type retry limit count -->
+    <integer translatable="false" name="config_tether_upstream_retry_limit">5</integer>
+
     <!-- If the DUN connection for this CDMA device supports more than just DUN -->
     <!-- traffic you should list them here. -->
     <!-- If this device is not CDMA this is ignored.  If this list is empty on -->
