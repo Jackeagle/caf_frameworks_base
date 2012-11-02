@@ -48,6 +48,7 @@ public class GeoFenceParams implements Parcelable {
     public final float mRadius;
     public final long mExpiration;
     public final PendingIntent mIntent;
+    public final String mPackageName;
 
     public static final Parcelable.Creator<GeoFenceParams> CREATOR = new Parcelable.Creator<GeoFenceParams>() {
         public GeoFenceParams createFromParcel(Parcel in) {
@@ -61,17 +62,18 @@ public class GeoFenceParams implements Parcelable {
     };
 
     public GeoFenceParams(double lat, double lon, float r,
-                          long expire, PendingIntent intent) {
-        this(Binder.getCallingUid(), lat, lon, r, expire, intent);
+                          long expire, PendingIntent intent, String PackageName) {
+        this(Binder.getCallingUid(), lat, lon, r, expire, intent, PackageName);
     }
 
     public GeoFenceParams(int uid, double lat, double lon, float r,
-                          long expire, PendingIntent intent) {
+                          long expire, PendingIntent intent, String PackageName) {
         mUid = uid;
         mLatitude = lat;
         mLongitude = lon;
         mRadius = r;
         mExpiration = expire;
+        mPackageName = PackageName;
         mIntent = intent;
     }
 
@@ -82,6 +84,7 @@ public class GeoFenceParams implements Parcelable {
         mRadius = in.readFloat();
         mExpiration = in.readLong();
         mIntent = in.readParcelable(null);
+        mPackageName = in.readString();
     }
 
     @Override
@@ -97,6 +100,7 @@ public class GeoFenceParams implements Parcelable {
         dest.writeFloat(mRadius);
         dest.writeLong(mExpiration);
         dest.writeParcelable(mIntent, 0);
+        dest.writeString(mPackageName);
     }
 
     @Override
