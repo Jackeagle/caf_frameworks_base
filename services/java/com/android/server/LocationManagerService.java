@@ -58,6 +58,7 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.os.WorkSource;
 import android.provider.Settings;
 import android.util.Log;
@@ -140,9 +141,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
     private final Context mContext;
     private PackageManager mPackageManager;  // final after initialize()
     private String mNetworkLocationProviderPackageName;  // only used on handler thread
-    private final String mNetworkLocationProviderPackageName1;
-    private final String mNetworkLocationProviderPackageName2;
-    private final String mGeocodeProviderPackageName;
+    private String mGeocodeProviderPackageName;  // only used on handler thread
     private final String mGeoFencerPackageName;
     private GeocoderProxy mGeocodeProvider;
     private GeoFencerBase mGeoFencer;
@@ -523,37 +522,37 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         addProvider(passiveProvider);
         mEnabledProviders.add(passiveProvider.getName());
 
-        // initialize external network location and geocoder services
-        PackageManager pm = mContext.getPackageManager();
-        if (mNetworkLocationProviderPackageName1 != null &&
-                pm.resolveService(new Intent(mNetworkLocationProviderPackageName1), 0) != null) {
-            mNetworkLocationProvider =
-                new LocationProviderProxy(mContext, LocationManager.NETWORK_PROVIDER,
-                        mNetworkLocationProviderPackageName1, mLocationHandler);
-            addProvider(mNetworkLocationProvider);
-
-            mNetworkLocationProviderPackageName = mNetworkLocationProviderPackageName1;
-        }
-        else if (mNetworkLocationProviderPackageName2 != null &&
-                pm.resolveService(new Intent(mNetworkLocationProviderPackageName2), 0) != null) {
-            mNetworkLocationProvider =
-                new LocationProviderProxy(mContext, LocationManager.NETWORK_PROVIDER,
-                        mNetworkLocationProviderPackageName2, mLocationHandler);
-            addProvider(mNetworkLocationProvider);
-
-            mNetworkLocationProviderPackageName = mNetworkLocationProviderPackageName2;
-        }
-        if (LOCAL_LOGV) {
-            Slog.v(TAG, "Loaded NLP: " + mNetworkLocationProviderPackageName);
+        // initialize external network location and geocoder services.
+        // The initial value of mNetworkLocationProviderPackageName and
+        // mGeocodeProviderPackageName is just used to determine what
+        // signatures future mNetworkLocationProviderPackageName and
+        // mGeocodeProviderPackageName packages must have. So alternate
+        // providers can be installed under a different package name
+        // so long as they have the same signature as the original
+        // provider packages.
+        if (mNetworkLocationProviderPackageName != null) {
+            String packageName = findBestPackage(LocationProviderProxy.SERVICE_ACTION,
+                    mNetworkLocationProviderPackageName);
+            if (packageName != null) {
+                mNetworkLocationProvider = new LocationProviderProxy(mContext,
+                        LocationManager.NETWORK_PROVIDER,
+                        packageName, mLocationHandler);
+                mNetworkLocationProviderPackageName = packageName;
+                addProvider(mNetworkLocationProvider);
+            }
         }
 
-        if (mGeocodeProviderPackageName != null &&
-                pm.resolveService(new Intent(mGeocodeProviderPackageName), 0) != null) {
-            mGeocodeProvider = new GeocoderProxy(mContext, mGeocodeProviderPackageName);
+        if (mGeocodeProviderPackageName != null) {
+            String packageName = findBestPackage(GeocoderProxy.SERVICE_ACTION,
+                    mGeocodeProviderPackageName);
+            if (packageName != null) {
+                mGeocodeProvider = new GeocoderProxy(mContext, packageName);
+                mGeocodeProviderPackageName = packageName;
+            }
         }
 
         if (mGeoFencerPackageName != null &&
-                pm.resolveService(new Intent(mGeoFencerPackageName), 0) != null) {
+                mPackageManager.resolveService(new Intent(mGeoFencerPackageName), 0) != null) {
             mGeoFencer = GeoFencerProxy.getGeoFencerProxy(mContext, mGeoFencerPackageName);
         } else {
             mGeoFencer = new ProximityAlerter();
@@ -611,19 +610,18 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
         mContext = context;
         Resources resources = context.getResources();
 
-        mNetworkLocationProviderPackageName1 = resources.getString(
-                com.android.internal.R.string.config_networkLocationProvider1);
+        mNetworkLocationProviderPackageName = resources.getString(
+                com.android.internal.R.string.config_networkLocationProviderPackageName);
 
-        mNetworkLocationProviderPackageName2 = resources.getString(
-                com.android.internal.R.string.config_networkLocationProvider2);
-
-        if (LOCAL_LOGV) {
-            Slog.v(TAG, "NLP[1]: " + mNetworkLocationProviderPackageName1);
-            Slog.v(TAG, "NLP[2]: " + mNetworkLocationProviderPackageName2);
+        String oem_nlp_package_name = SystemProperties.get("persist.loc.nlp_name", "");
+        if (!oem_nlp_package_name.equals("")) {
+            mNetworkLocationProviderPackageName = oem_nlp_package_name;
         }
+        Slog.i(TAG, "NLP package name: " + mNetworkLocationProviderPackageName);
 
         mGeocodeProviderPackageName = resources.getString(
-                com.android.internal.R.string.config_geocodeProvider);
+                com.android.internal.R.string.config_geocodeProviderPackageName);
+
         mGeoFencerPackageName = resources.getString(
                 com.android.internal.R.string.config_geofenceProvider);
         mPackageMonitor.register(context, null, true);
@@ -1622,7 +1620,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                  float radius, long expiration,
                  PendingIntent intent, String packageName) {
             super.add((GeoFenceParams)new ProximityAlert(latitude, longitude,
-                                                   radius, expiration, intent, 
+                                                   radius, expiration, intent,
                                                    packageName));
         }
         @Override
@@ -2116,16 +2114,34 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                     }
                 } else if (msg.what == MESSAGE_PACKAGE_UPDATED) {
                     String packageName = (String) msg.obj;
-                    String packageDot = packageName + ".";
 
-                    // reconnect to external providers after their packages have been updated
-                    if (mNetworkLocationProvider != null &&
-                        mNetworkLocationProviderPackageName.startsWith(packageDot)) {
-                        mNetworkLocationProvider.reconnect();
+                    // reconnect to external providers if there is a better package
+                    if (mNetworkLocationProviderPackageName != null &&
+                            mPackageManager.resolveService(
+                            new Intent(LocationProviderProxy.SERVICE_ACTION)
+                            .setPackage(packageName), 0) != null) {
+                        // package implements service, perform full check
+                        String bestPackage = findBestPackage(
+                                LocationProviderProxy.SERVICE_ACTION,
+                                mNetworkLocationProviderPackageName);
+                        if (packageName.equals(bestPackage)) {
+                            mNetworkLocationProvider.reconnect(bestPackage);
+                            mNetworkLocationProviderPackageName = packageName;
+                        }
                     }
-                    if (mGeocodeProvider != null &&
-                        mGeocodeProviderPackageName.startsWith(packageDot)) {
-                        mGeocodeProvider.reconnect();
+
+                    if (mGeocodeProviderPackageName != null &&
+                            mPackageManager.resolveService(
+                            new Intent(GeocoderProxy.SERVICE_ACTION)
+                            .setPackage(packageName), 0) != null) {
+                        // package implements service, perform full check
+                        String bestPackage = findBestPackage(
+                                GeocoderProxy.SERVICE_ACTION,
+                                mGeocodeProviderPackageName);
+                        if (packageName.equals(bestPackage)) {
+                            mGeocodeProvider.reconnect(bestPackage);
+                            mGeocodeProviderPackageName = packageName;
+                        }
                     }
                 }
             } catch (Exception e) {
