@@ -216,7 +216,8 @@ android_media_AudioRecord_setup(JNIEnv *env, jobject thiz, jobject weak_this,
     int bytesPerSample;
     if(audioFormat == javaAudioRecordFields.PCM8)
         bytesPerSample = 1;
-    else if(audioFormat == javaAudioRecordFields.AMRWB)
+    else if((audioFormat == javaAudioRecordFields.AMRWB) &&
+            ((uint32_t)source != AUDIO_SOURCE_VOICE_COMMUNICATION))
         bytesPerSample = 61;
     else
         bytesPerSample = 2;
