@@ -66,7 +66,6 @@ public class DhcpInfo implements Parcelable {
         str.append(" dns2 "); putAddress(str, dns2);
         str.append(" DHCP server "); putAddress(str, serverAddress);
         str.append(" lease ").append(leaseDuration).append(" seconds");
-        str.append(" Domain Name ").append(domainName);
         return str.toString();
     }
 
