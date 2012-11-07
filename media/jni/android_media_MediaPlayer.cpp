@@ -61,6 +61,8 @@ static fields_t fields;
 
 static Mutex sLock;
 
+#define MAX_NUM_PARCELS 5
+
 // ----------------------------------------------------------------------------
 // ref-counted object for callbacks
 class JNIMediaPlayerListener: public MediaPlayerListener
@@ -74,6 +76,8 @@ private:
     jclass      mClass;     // Reference to MediaPlayer class
     jobject     mObject;    // Weak ref to MediaPlayer Java object to call on
     jobject     mParcel;
+    jobject     mParcelArray[MAX_NUM_PARCELS];
+    int         mParcelIndex;
     jobject     mParcelCodecConf;
 };
 
@@ -95,6 +99,11 @@ JNIMediaPlayerListener::JNIMediaPlayerListener(JNIEnv* env, jobject thiz, jobjec
     mObject  = env->NewGlobalRef(weak_thiz);
     mParcel = env->NewGlobalRef(createJavaParcelObject(env));
     mParcelCodecConf = env->NewGlobalRef(createJavaParcelObject(env));
+
+    mParcelIndex = 0;
+    for (int i = 0; i < MAX_NUM_PARCELS; i++) {
+        mParcelArray[i] = env->NewGlobalRef(createJavaParcelObject(env));
+    }
 }
 
 JNIMediaPlayerListener::~JNIMediaPlayerListener()
@@ -109,6 +118,11 @@ JNIMediaPlayerListener::~JNIMediaPlayerListener()
 
     recycleJavaParcelObject(env, mParcelCodecConf);
     env->DeleteGlobalRef(mParcelCodecConf);
+
+    for (int i = 0; i < MAX_NUM_PARCELS; i++) {
+        recycleJavaParcelObject(env, mParcelArray[i]);
+        env->DeleteGlobalRef(mParcelArray[i]);
+    }
 }
 
 void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *obj)
@@ -132,8 +146,9 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
               }
               else
               {
-                 jobject mTempJParcel = createJavaParcelObject(env);
-                 Parcel* javaparcel= parcelForJavaObject(env, mTempJParcel);
+                 jobject mTempJParcel = mParcelArray[mParcelIndex];
+                 mParcelIndex = (mParcelIndex + 1) % MAX_NUM_PARCELS;
+                 Parcel* javaparcel = parcelForJavaObject(env, mTempJParcel);
                  javaparcel->setData(obj->data(), obj->dataSize());
                  env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
                                             msg, ext1, ext2, mTempJParcel);
