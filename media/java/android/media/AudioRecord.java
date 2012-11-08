@@ -340,7 +340,8 @@ public class AudioRecord
         int bytesPerSample;
         if(mAudioFormat == AudioFormat.ENCODING_PCM_8BIT)
             bytesPerSample = 1;
-        else if(mAudioFormat == AudioFormat.ENCODING_AMRWB)
+        else if((mAudioFormat == AudioFormat.ENCODING_AMRWB) &&
+                (mRecordSource != MediaRecorder.AudioSource.VOICE_COMMUNICATION))
             bytesPerSample = 61;
         else
             bytesPerSample = 2;
