@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009,2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of Code Aurora nor
+ *    * Neither the name of The Linux Foundation nor
  *      the names of its contributors may be used to endorse or promote
  *      products derived from this software without specific prior written
  *      permission.
@@ -36,8 +36,17 @@ import android.util.Log;
 public class FmRxRdsData {
 
 
-    private String mRadioText;
+    private String mRadioText = "";
     private String mPrgmServices;
+    private String mERadioText = "";
+    // false means left-right
+    // true means right-left
+    private boolean formatting_dir = false;
+    private byte []mTagCode = new byte[2];
+    private String []mTag = new String[2];
+    private int tag_nums = 0;
+    private static final int MAX_NUM_TAG = 2;
+    private boolean rt_ert_flag;
     private int mPrgmId;
     private int mPrgmType;
     private int mFd;
@@ -58,6 +67,8 @@ public class FmRxRdsData {
     private static final int RDS_AF_AUTO  = 1 << 6;
     private static final int RDS_PS_ALL   = 1 << 4;
     private static final int RDS_AF_JUMP  = 0x1;
+    private static final int MAX_TAG_CODES = 64;
+
     private static final String LOGTAG="FmRxRdsData";
 
 
@@ -187,14 +198,12 @@ public class FmRxRdsData {
         mRadioText = x;
     }
 
-
     public String getPrgmServices () {
         return mPrgmServices;
     }
     public void setPrgmServices (String x) {
         mPrgmServices = x;
     }
-
 
     public int getPrgmId () {
         return mPrgmId;
@@ -209,5 +218,45 @@ public class FmRxRdsData {
     public void setPrgmType (int x) {
          mPrgmType = x;
     }
-
+    public String getERadioText () {
+         return mERadioText;
+    }
+    public void setERadioText (String x) {
+         mERadioText = x;
+    }
+    public boolean getFormatDir() {
+         return formatting_dir;
+    }
+    public void setFormatDir(boolean dir) {
+         formatting_dir = dir;
+    }
+    public void setTagValue (String x, int tag_num) {
+        if ((tag_num > 0) && (tag_num <= MAX_NUM_TAG)) {
+            mTag[tag_num - 1] = x;
+            tag_nums++;
+        }
+    }
+    public void setTagCode (byte tag_code, int tag_num) {
+        if ((tag_num > 0) && (tag_num <= MAX_NUM_TAG))
+            mTagCode[tag_num - 1] = tag_code;
+    }
+    public String getTagValue (int tag_num) {
+        if ((tag_num > 0) && (tag_num <= MAX_NUM_TAG))
+            return mTag[tag_num - 1];
+        else
+            return "";
+    }
+    public byte getTagCode (int tag_num) {
+        if ((tag_num > 0) && (tag_num <= MAX_NUM_TAG))
+            return mTagCode[tag_num - 1];
+        else
+            return 0;
+    }
+    public int getTagNums() {
+        return tag_nums;
+    }
+    public void setTagNums(int x) {
+        if ((x >= 0) && (x <= MAX_NUM_TAG))
+            tag_nums = x;
+    }
 }
