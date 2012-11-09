@@ -246,10 +246,7 @@ public class TabletStatusBar extends BaseStatusBar implements
                 // HWComposer is unable to handle SW-rendered RGBX_8888 layers.
                 PixelFormat.RGB_565);
 
-        // We explicitly leave FLAG_HARDWARE_ACCELERATED out of the flags.  The status bar occupies
-        // very little screen real-estate and is updated fairly frequently.  By using CPU rendering
-        // for the status bar, we prevent the GPU from having to wake up just to do these small
-        // updates, which should help keep power consumption down.
+        setHardwareAcceleration(lp);
 
         lp.gravity = getStatusBarGravity();
         lp.setTitle("SystemBar");
@@ -1720,6 +1717,11 @@ public class TabletStatusBar extends BaseStatusBar implements
         return mNotificationPanel.getVisibility() == View.VISIBLE
                 || (mDisabled & StatusBarManager.DISABLE_HOME) != 0;
     }
+
+    protected void setHardwareAcceleration(WindowManager.LayoutParams lp) {
+	    lp.format = PixelFormat.OPAQUE;
+		lp.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
+	}
 }
 
 
