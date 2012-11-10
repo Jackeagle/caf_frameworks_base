@@ -27,6 +27,10 @@
 
 package com.android.internal.telephony;
 
+/**
+ * CallDetails class takes care of all the additional details like call type
+ * and domain needed for IMS calls. This class is not relevant for non-IMS calls
+ */
 public class CallDetails {
 
     /*
@@ -54,6 +58,15 @@ public class CallDetails {
                                                * Video call-audio & video in
                                                * both directions
                                                */
+
+    public static final int CALL_TYPE_UNKNOWN = 10; /*
+                                                     * Unknown Call type, may be
+                                                     * used for answering call
+                                                     * with same call type as
+                                                     * incoming call. This is
+                                                     * only for telephony, not
+                                                     * meant to be passed to RIL
+                                                     */
 
     public static final int CALL_DOMAIN_UNKNOWN = 0; /*
                                                       * Unknown domain. Sent by

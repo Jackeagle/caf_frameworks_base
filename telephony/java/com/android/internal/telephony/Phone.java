@@ -745,6 +745,14 @@ public interface Phone {
     void acceptCall(int callType) throws CallStateException;
 
     /**
+     * Gets call type for IMS calls.
+     *
+     * @return one of the call types in {@link CallDetails}
+     * @throws CallStateException
+     */
+    int getCallType(Call call) throws CallStateException;
+
+    /**
      * Reject (ignore) a ringing call. In GSM, this means UDUB
      * (User Determined User Busy). Reject occurs asynchronously,
      * and final notification occurs via
