@@ -213,6 +213,8 @@ public class MobileDataStateTracker implements NetworkStateTracker {
                 }
                 if (mMobileDataState != state) {
                     mMobileDataState = state;
+                    mLinkProperties = intent.getParcelableExtra(
+                            Phone.DATA_LINK_PROPERTIES_KEY);
                     switch (state) {
                         case DISCONNECTED:
                             if(isTeardownRequested()) {
@@ -234,8 +236,6 @@ public class MobileDataStateTracker implements NetworkStateTracker {
                             setDetailedState(DetailedState.SUSPENDED, reason, apnName);
                             break;
                         case CONNECTED:
-                            mLinkProperties = intent.getParcelableExtra(
-                                    Phone.DATA_LINK_PROPERTIES_KEY);
                             if (mLinkProperties == null) {
                                 loge("CONNECTED event did not supply link properties.");
                                 mLinkProperties = new LinkProperties();
