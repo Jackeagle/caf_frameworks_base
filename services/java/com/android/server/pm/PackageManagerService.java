@@ -882,7 +882,8 @@ public class PackageManagerService extends IPackageManager.Stub {
         mSettings = new Settings();
         mSettings.addSharedUserLPw("android.uid.system",
                 Process.SYSTEM_UID, ApplicationInfo.FLAG_SYSTEM);
-        mSettings.addSharedUserLPw("android.uid.phone", RADIO_UID, ApplicationInfo.FLAG_SYSTEM);
+        mSettings.addSharedUserLPw("android.uid.phone", RADIO_UID,
+                ApplicationInfo.FLAG_SYSTEM, new int[] {3004, 3009, 3005});
         mSettings.addSharedUserLPw("android.uid.log", LOG_UID, ApplicationInfo.FLAG_SYSTEM);
         mSettings.addSharedUserLPw("android.uid.nfc", NFC_UID, ApplicationInfo.FLAG_SYSTEM);
        mSettings.addSharedUserLPw("android.uid.fm_radio",
