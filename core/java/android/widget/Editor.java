@@ -2891,6 +2891,14 @@ public class Editor {
             mPasteTextView.setVisibility(canPaste ? View.VISIBLE : View.GONE);
             mReplaceTextView.setVisibility(canSuggest ? View.VISIBLE : View.GONE);
 
+            // Reset the resource to update strings when changing locale
+            if (canPaste) {
+                mPasteTextView.setText(com.android.internal.R.string.paste);
+            }
+            if (canSuggest) {
+                mReplaceTextView.setText(com.android.internal.R.string.replace);
+            }
+
             if (!canPaste && !canSuggest) return;
 
             super.show();
