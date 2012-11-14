@@ -481,9 +481,6 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 if (playStatus != mPlayStatus) {
                     mPlayStatus = playStatus;
                     for (String path: getConnectedSinksPaths()) {
-                        if (mPlayStatus == STATUS_PLAYING) {
-                            resumeSinkNative(path);
-                        }
                         sendEvent(path, EVENT_PLAYSTATUS_CHANGED, (long)mPlayStatus);
                     }
                 }
