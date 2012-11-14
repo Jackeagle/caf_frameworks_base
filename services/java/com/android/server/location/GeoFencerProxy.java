@@ -97,10 +97,14 @@ public class GeoFencerProxy extends GeoFencerBase {
 
     public void removeCaller(int uid) {
         super.removeCaller(uid);
-        try {
-            mGeoFencer.clearGeoFenceUser(uid);
-        } catch (RemoteException re) {
+        if(mGeoFencer != null) {
+            try {
+                mGeoFencer.clearGeoFenceUser(uid);
+            } catch (RemoteException re) {
+            }
         }
+        else
+            Log.e(TAG, "removeCaller - mGeoFencer is null");
     }
 
     private boolean ensureGeoFencer() {
