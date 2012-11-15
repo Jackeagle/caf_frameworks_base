@@ -1858,7 +1858,7 @@ public final class Settings {
           * @hide
          */
         public static final String[] USER_PREFERRED_SUBS = {"user_preferred_sub1",
-                "user_preferred_sub2"};
+                "user_preferred_sub2", "user_preferred_sub3"};
 
         /**
          * CDMA only settings

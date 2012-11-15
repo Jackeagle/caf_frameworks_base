@@ -51,6 +51,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Registrant;
 import android.os.RegistrantList;
+import android.telephony.MSimTelephonyManager;
 import android.util.Log;
 
 
@@ -149,7 +150,9 @@ public class CardSubscriptionManager extends Handler {
 
     private CommandsInterface[] mCi;
     private UiccController mUiccController;
-    private boolean[] mRadioOn = {false, false};
+    private int mNumPhones = MSimTelephonyManager.getDefault().getPhoneCount();
+    private boolean[] mRadioOn = new boolean[mNumPhones];
+
     private int mUpdateUiccStatusContext = 0;
 
     private RegistrantList[] mCardInfoUnavailableRegistrants;
@@ -159,7 +162,7 @@ public class CardSubscriptionManager extends Handler {
     // The subscription information of all the cards
     private SubscriptionData[] mCardSubData = null;
     private ArrayList<CardInfo> mUiccCardList =
-            new ArrayList<CardInfo>(MSimConstants.RIL_MAX_CARDS);
+            new ArrayList<CardInfo>(mNumPhones);
     private boolean mAllCardsInfoAvailable = false;
 
     //***** Class Methods
@@ -192,19 +195,20 @@ public class CardSubscriptionManager extends Handler {
 
             // Register for SIM Refresh events
             mCi[i].registerForIccRefresh(this, EVENT_SIM_REFRESH, new Integer(i));
+            mRadioOn[i] = false;
         }
 
         mUiccController.registerForIccChanged(this, EVENT_ICC_CHANGED, null);
 
-        mCardSubData = new SubscriptionData[MSimConstants.RIL_MAX_CARDS];
-        mUiccCardList = new ArrayList<CardInfo>(MSimConstants.RIL_MAX_CARDS);
-        for (int i = 0; i < MSimConstants.RIL_MAX_CARDS; i++) {
+        mCardSubData = new SubscriptionData[mNumPhones];
+        mUiccCardList = new ArrayList<CardInfo>(mNumPhones);
+        for (int i = 0; i < mNumPhones; i++) {
             mUiccCardList.add(new CardInfo(null));
         }
 
-        mCardInfoUnavailableRegistrants = new RegistrantList[MSimConstants.RIL_MAX_CARDS];
-        mCardInfoAvailableRegistrants = new RegistrantList[MSimConstants.RIL_MAX_CARDS];
-        for (int i = 0; i < MSimConstants.RIL_MAX_CARDS; i++) {
+        mCardInfoUnavailableRegistrants = new RegistrantList[mNumPhones];
+        mCardInfoAvailableRegistrants = new RegistrantList[mNumPhones];
+        for (int i = 0; i < mNumPhones; i++) {
             mCardInfoUnavailableRegistrants [i] = new RegistrantList();
             mCardInfoAvailableRegistrants [i] = new RegistrantList();
         }
@@ -260,7 +264,7 @@ public class CardSubscriptionManager extends Handler {
                     + " refreshResult = " + state.refreshResult);
 
             if (state.refreshResult == IccRefreshResponse.REFRESH_RESULT_RESET
-                    && (slot >= 0 && slot < MSimConstants.RIL_MAX_CARDS)) {
+                    && (slot >= 0 && slot < mNumPhones)) {
                 resetCardInfo(slot);
                 notifyCardInfoNotAvailable(slot, CardUnavailableReason.REASON_SIM_REFRESH_RESET);
             }
@@ -697,7 +701,7 @@ public class CardSubscriptionManager extends Handler {
     }
 
     public boolean isAllCardsUpdated() {
-        for (int cardIndex = 0; cardIndex < MSimConstants.RIL_MAX_CARDS; cardIndex++) {
+        for (int cardIndex = 0; cardIndex < mNumPhones; cardIndex++) {
             CardInfo cardInfo = mUiccCardList.get(cardIndex);
             SubscriptionData cardSub = mCardSubData[cardIndex];
 

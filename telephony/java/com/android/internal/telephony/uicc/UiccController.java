@@ -22,6 +22,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Registrant;
 import android.os.RegistrantList;
+import android.telephony.MSimTelephonyManager;
 import android.util.Log;
 
 import com.android.internal.telephony.CommandsInterface;
@@ -47,7 +48,7 @@ public class UiccController extends Handler {
 
     private Context mContext;
     private CommandsInterface[] mCi;
-    private UiccCard[] mUiccCards = new UiccCard[MSimConstants.RIL_MAX_CARDS];
+    private UiccCard[] mUiccCards = new UiccCard[MSimTelephonyManager.getDefault().getPhoneCount()];
 
     private RegistrantList mIccChangedRegistrants = new RegistrantList();
 

@@ -67,6 +67,18 @@ public class MSimTelephonyManager {
     protected static String multiSimConfig =
             SystemProperties.get(TelephonyProperties.PROPERTY_MULTI_SIM_CONFIG);
 
+    /** Enum indicating multisim variants
+     *  DSDS - Dual SIM Dual Standby
+     *  DSDA - Dual SIM Dual Active
+     *  TSTS - Triple SIM Triple Standby
+     **/
+    public enum MultiSimVariants {
+        DSDS,
+        DSDA,
+        TSTS,
+        UNKNOWN
+    };
+
     /** @hide */
     public MSimTelephonyManager(Context context) {
         if (sContext == null) {
@@ -100,7 +112,27 @@ public class MSimTelephonyManager {
     }
 
     public boolean isMultiSimEnabled() {
-        return (multiSimConfig.equals("dsds") || multiSimConfig.equals("dsda"));
+        return (multiSimConfig.equals("dsds") || multiSimConfig.equals("dsda") ||
+            multiSimConfig.equals("tsts"));
+    }
+
+    /**
+     * Returns the multi SIM variant
+     * Returns DSDS for Dual SIM Dual Standby
+     * Returns DSDA for Dual SIM Dual Active
+     * Returns TSTS for Triple SIM Triple Standby
+     * Returns UNKNOWN for others
+     */
+    public MultiSimVariants getMultiSimConfiguration() {
+        if (multiSimConfig.equals("dsds")) {
+            return MultiSimVariants.DSDS;
+        } else if (multiSimConfig.equals("dsda")) {
+            return MultiSimVariants.DSDA;
+        } else if (multiSimConfig.equals("tsts")) {
+            return MultiSimVariants.TSTS;
+        } else {
+            return MultiSimVariants.UNKNOWN;
+        }
     }
 
     /**
@@ -110,8 +142,14 @@ public class MSimTelephonyManager {
      */
     public int getPhoneCount() {
         int phoneCount = 1;
-        if (isMultiSimEnabled()) {
-            phoneCount = MSimConstants.MAX_PHONE_COUNT_DS;
+        switch (getMultiSimConfiguration()) {
+            case DSDS:
+            case DSDA:
+                phoneCount = MSimConstants.MAX_PHONE_COUNT_DUAL_SIM;
+                break;
+            case TSTS:
+                phoneCount = MSimConstants.MAX_PHONE_COUNT_TRI_SIM;
+                break;
         }
         return phoneCount;
     }
