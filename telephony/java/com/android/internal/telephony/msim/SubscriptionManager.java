@@ -113,6 +113,7 @@ public class SubscriptionManager extends Handler {
     private static final int EVENT_ALL_DATA_DISCONNECTED = 8;
     private static final int EVENT_RADIO_ON = 9;
     private static final int EVENT_RADIO_OFF_OR_NOT_AVAILABLE = 10;
+    private static final int EVENT_PROCESS_AVAILABLE_CARDS = 11;
 
 
     // Set Subscription Return status
@@ -331,6 +332,11 @@ public class SubscriptionManager extends Handler {
                 processAllDataDisconnected((AsyncResult)msg.obj);
                 break;
 
+            case EVENT_PROCESS_AVAILABLE_CARDS:
+                Log.d(LOG_TAG, "EVENT_PROCESS_AVAILABLE_CARDS");
+                processAvailableCards();
+                break;
+
             default:
                 break;
         }
@@ -346,24 +352,33 @@ public class SubscriptionManager extends Handler {
      * @param ar
      */
     private void processAllDataDisconnected(AsyncResult ar) {
+        if (ar == null) {
+            logd("processAllDataDisconnected: ar is null!! return!!");
+            return;
+        }
+
+        Integer sub = (Integer)ar.userObj;
+        logd("processAllDataDisconnected: sub = " + sub);
+        MSimProxyManager.getInstance().unregisterForAllDataDisconnected(sub, this);
+
         /*
          * Check if the DDS switch is in progress. If so update the DDS
          * subscription.
          */
         if (mDisableDdsInProgress) {
             processDisableDataConnectionDone(ar);
+            return;
         }
 
-        Integer sub = (Integer)ar.userObj;
         SubscriptionId subId = SubscriptionId.values()[sub];
-        logd("processAllDataDisconnected: sub = " + sub
-                + " - subscriptionReadiness[" + sub + "] = "
+        logd("processAllDataDisconnected: subscriptionReadiness[" + sub + "] = "
                 + getCurrentSubscriptionReadiness(subId));
         if (!getCurrentSubscriptionReadiness(subId)) {
             resetCurrentSubscription(subId);
             // Update the subscription preferences
             updateSubPreferences();
             notifySubscriptionDeactivated(sub);
+            triggerUpdateFromAvaialbleCards();
         }
     }
 
@@ -493,6 +508,7 @@ public class SubscriptionManager extends Handler {
                 resetCurrentSubscription(SubscriptionId.values()[subId]);
                 updateSubPreferences();
                 notifySubscriptionDeactivated(subId);
+                triggerUpdateFromAvaialbleCards();
             }
         } else {
             logd("handleSubscriptionStatusChanged INVALID");
@@ -737,6 +753,39 @@ public class SubscriptionManager extends Handler {
             processActivateRequests();
         }
 
+        notifyIfAnyNewCardsAvailable();
+    }
+
+    /**
+     * Sends a message to itself to process the available cards
+     */
+    private void triggerUpdateFromAvaialbleCards() {
+        sendMessage(obtainMessage(EVENT_PROCESS_AVAILABLE_CARDS));
+    }
+
+    /**
+     * Handles EVENT_PROCESS_AVAILABLE_CARDS
+     */
+    private void processAvailableCards() {
+        if (!isAllRadioOn()) {
+           logd("processAvailableCards: Radio Not Available ");
+           return;
+        }
+        if (mSetSubscriptionInProgress) {
+           logd("processAvailableCards: set subscription in progress!!");
+           return;
+        }
+
+        for (int cardIndex = 0; cardIndex < MSimConstants.RIL_MAX_CARDS; cardIndex++) {
+            updateActivatePendingList(cardIndex);
+        }
+
+        processActivateRequests();
+
+        notifyIfAnyNewCardsAvailable();
+    }
+
+    private void notifyIfAnyNewCardsAvailable() {
         if (isNewCardAvailable()) {
             // NEW CARDs Available!!!
             // Notify the USER HERE!!!
@@ -744,6 +793,51 @@ public class SubscriptionManager extends Handler {
             for (int i = 0; i < mIsNewCard.length; i++) {
                 mIsNewCard[i] = false;
             }
+        }
+    }
+
+    private void updateActivatePendingList(int cardIndex) {
+        if (mCardInfoAvailable[cardIndex]) {
+            SubscriptionData cardSubInfo = mCardSubMgr.getCardSubscriptions(cardIndex);
+
+            logd("updateActivatePendingList: cardIndex = " + cardIndex
+                    + "\n Card Sub Info = " + cardSubInfo);
+
+            Subscription userSub = mUserPrefSubs.subscription[cardIndex];
+            int subId = userSub.subId;
+            Subscription currentSub = getCurrentSubscription(SubscriptionId.values()[subId]);
+
+            logd("updateActivatePendingList: subId = " + subId
+                    + "\n user pref sub = " + userSub
+                    + "\n current sub   = " + currentSub);
+
+            if ((userSub.subStatus == SubscriptionStatus.SUB_ACTIVATED)
+                    && (currentSub.subStatus != SubscriptionStatus.SUB_ACTIVATED)
+                    && (cardSubInfo.hasSubscription(userSub))
+                    && !isPresentInActivatePendingList(userSub)){
+                logd("updateActivatePendingList: subId = " + subId + " need to activate!!!");
+
+                // Need to activate this Subscription!!! - userSub.subId
+                // Push to the queue, so that start the SET_UICC_SUBSCRIPTION
+                // only when the both cards are ready.
+                Subscription sub = new Subscription();
+                sub.copyFrom(cardSubInfo.getSubscription(userSub));
+                sub.slotId = cardIndex;
+                sub.subId = subId;
+                sub.subStatus = SubscriptionStatus.SUB_ACTIVATE;
+                mActivatePending.put(SubscriptionId.values()[subId], sub);
+            }
+
+            // If this is a new card(no user preferred subscriptions are from
+            // this card), then notify a prompt to user.  Let user select
+            // the subscriptions from new card!
+            if (cardSubInfo.hasSubscription(userSub)) {
+                mIsNewCard[cardIndex] = false;
+            } else {
+                mIsNewCard [cardIndex] = true;
+            }
+            logd("updateActivatePendingList: mIsNewCard [" + cardIndex + "] = "
+                    + mIsNewCard [cardIndex]);
         }
     }
 
@@ -762,50 +856,13 @@ public class SubscriptionManager extends Handler {
 
         mCardInfoAvailable[cardIndex] = true;
 
+        logd("processCardInfoAvailable: CARD:" + cardIndex + " is available");
+
         // Card info on slot cardIndex is available.
         // Check if any user preferred subscriptions are available in
         // this card.  If there is any, and which are not yet activated,
         // activate them!
-        SubscriptionData cardSubInfo = mCardSubMgr.getCardSubscriptions(cardIndex);
-
-        logd("processCardInfoAvailable: cardIndex = " + cardIndex
-                + "\n Card Sub Info = " + cardSubInfo);
-
-        Subscription userSub = mUserPrefSubs.subscription[cardIndex];
-        int subId = userSub.subId;
-        Subscription currentSub = getCurrentSubscription(SubscriptionId.values()[subId]);
-
-        logd("processCardInfoAvailable: subId = " + subId
-                + "\n user pref sub = " + userSub
-                + "\n current sub   = " + currentSub);
-
-        if ((userSub.subStatus == SubscriptionStatus.SUB_ACTIVATED)
-                && (currentSub.subStatus != SubscriptionStatus.SUB_ACTIVATED)
-                && (cardSubInfo.hasSubscription(userSub))
-                && !isPresentInActivatePendingList(userSub)){
-            logd("processCardInfoAvailable: subId = " + subId + " need to activate!!!");
-
-            // Need to activate this Subscription!!! - userSub.subId
-            // Push to the queue, so that start the SET_UICC_SUBSCRIPTION
-            // only when the both cards are ready.
-            Subscription sub = new Subscription();
-            sub.copyFrom(cardSubInfo.getSubscription(userSub));
-            sub.slotId = cardIndex;
-            sub.subId = subId;
-            sub.subStatus = SubscriptionStatus.SUB_ACTIVATE;
-            mActivatePending.put(SubscriptionId.values()[subId], sub);
-        }
-
-        // If this is a new card(no user preferred subscriptions are from
-        // this card), then notify a prompt to user.  Let user select
-        // the subscriptions from new card!
-        if (cardSubInfo.hasSubscription(userSub)) {
-            mIsNewCard[cardIndex] = false;
-        } else {
-            mIsNewCard [cardIndex] = true;
-        }
-        logd("processCardInfoAvailable: mIsNewCard [" + cardIndex + "] = "
-                + mIsNewCard [cardIndex]);
+        updateActivatePendingList(cardIndex);
 
         if (!isAllCardsInfoAvailable()) {
             logd("All cards info not available!! Waiting for all info before processing");
@@ -819,14 +876,7 @@ public class SubscriptionManager extends Handler {
             processActivateRequests();
         }
 
-        if (isNewCardAvailable()) {
-            // NEW CARDs Available!!!
-            // Notify the USER HERE!!!
-            notifyNewCardsAvailable();
-            for (int i = 0; i < mIsNewCard.length; i++) {
-                mIsNewCard[i] = false;
-            }
-        }
+        notifyIfAnyNewCardsAvailable();
     }
 
     private boolean isPresentInActivatePendingList(Subscription userSub) {
