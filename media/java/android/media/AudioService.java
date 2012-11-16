@@ -3484,7 +3484,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     int mBecomingNoisyIntentDevices =
             AudioSystem.DEVICE_OUT_WIRED_HEADSET | AudioSystem.DEVICE_OUT_WIRED_HEADPHONE |
             AudioSystem.DEVICE_OUT_ANC_HEADSET | AudioSystem.DEVICE_OUT_ANC_HEADPHONE |
-            AudioSystem.DEVICE_OUT_ALL_A2DP;
+            AudioSystem.DEVICE_OUT_ALL_A2DP | AudioSystem.DEVICE_OUT_ALL_USB;
 
     // must be called before removing the device from mConnectedDevices
     private int checkSendBecomingNoisyIntent(int device, int state) {
@@ -3669,7 +3669,11 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                         + (action.equals(Intent.ACTION_USB_AUDIO_ACCESSORY_PLUG) ?
                               "ACTION_USB_AUDIO_ACCESSORY_PLUG" : "ACTION_USB_AUDIO_DEVICE_PLUG")
                         + ", state = " + state + ", card: " + alsaCard + ", device: " + alsaDevice);
-                handleDeviceConnection((state == 1), device, params);
+                if(state==1) {
+                    handleDeviceConnection((state ==1 ), device, params);
+                } else {
+                    setWiredDeviceConnectionState(device, state, params);
+                }
             } else if (action.equals(TtyIntent.TTY_ENABLED_CHANGE_ACTION)) {
                 String tty_mode;
                 switch (Settings.Secure.getInt(mContentResolver,
