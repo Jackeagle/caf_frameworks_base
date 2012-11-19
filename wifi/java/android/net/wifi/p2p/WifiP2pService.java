@@ -1185,6 +1185,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (mGroup.isGroupOwner()) {
                         startDhcpServer(mGroup.getInterface());
                         mIsGroupOwner = true;
+                        mWifiNative.setP2pDiscInterval(2, 3, 40);
+
                     } else {
                         // Set group idle only for a client on the group interface to speed up
                         // disconnect when GO is gone. Setting group idle time for a group owner
@@ -1315,6 +1317,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (mGroup.isGroupOwner()) {
                         mIsGroupOwner = false;
                         stopDhcpServer();
+                        mWifiNative.setP2pDiscInterval(2, 3, -1);
                     } else {
                         if (DBG) logd("stop DHCP client");
                         mDhcpStateMachine.sendMessage(DhcpStateMachine.CMD_STOP_DHCP);

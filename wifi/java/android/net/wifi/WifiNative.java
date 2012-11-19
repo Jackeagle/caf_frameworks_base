@@ -797,4 +797,8 @@ public class WifiNative {
       return doBooleanCommand("SET p2p_oper_channel " + channel);
   }
 
+  public boolean setP2pDiscInterval(int minDisc, int maxDisc, int maxTus) {
+      return doBooleanCommand("P2P_SET disc_int=" + minDisc + " " + maxDisc + " " + maxTus);
+  }
+
 }
