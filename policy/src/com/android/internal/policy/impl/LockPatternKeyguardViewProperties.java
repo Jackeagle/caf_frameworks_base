@@ -75,7 +75,6 @@ public class LockPatternKeyguardViewProperties implements KeyguardViewProperties
             simState[i] = mUpdateMonitor.getSimState(i);
             // isPinLocked returns true if SIM is PIN/PUK Locked.
             isSimPinSecure = isSimPinSecure || (simState[i].isPinLocked()
-                    || simState[i] == IccCard.State.ABSENT
                     || simState[i] == IccCard.State.PERM_DISABLED);
             if (isSimPinSecure) break;
         }
