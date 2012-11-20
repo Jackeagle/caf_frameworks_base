@@ -2108,7 +2108,8 @@ public class PhoneStatusBar extends BaseStatusBar {
                     | WindowManager.LayoutParams.FLAG_SPLIT_TOUCH,
                 PixelFormat.TRANSLUCENT);
 
-        lp.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
+        //Disable HW Acceleration to save memory
+        //lp.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
 
         lp.gravity = getStatusBarGravity();
         lp.setTitle("StatusBar");
