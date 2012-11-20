@@ -22,8 +22,10 @@ package com.android.internal.telephony.msim;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.provider.Telephony.Intents;
 import android.telephony.MSimTelephonyManager;
+import android.telephony.TelephonyManager;
 import android.telephony.ServiceState;
 import android.text.TextUtils;
 import android.util.Log;
@@ -34,9 +36,12 @@ import com.android.internal.telephony.gsm.GSMPhone;
 import com.android.internal.telephony.gsm.GsmServiceStateTracker;
 import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.msim.Subscription;
+import com.android.internal.telephony.msim.SubscriptionManager;
 import com.android.internal.telephony.uicc.SIMRecords;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 import com.android.internal.telephony.uicc.UiccController;
+
+import static com.android.internal.telephony.MSimConstants.DEFAULT_SUBSCRIPTION;
 
 /**
  * {@hide}
@@ -173,6 +178,22 @@ public final class MSimGsmServiceStateTracker extends GsmServiceStateTracker {
                     } else {
                         log("EVENT_ALL_DATA_DISCONNECTED is stale");
                     }
+                }
+                break;
+
+            case EVENT_NITZ_TIME:
+                if(!(SystemProperties.getBoolean("persist.timed.enable", false))) {
+                    SubscriptionManager subMgr = SubscriptionManager.getInstance();
+                    log("EVENT_NITZ_TIME received phone type ::" + MSimTelephonyManager.
+                            getDefault().getCurrentPhoneType(DEFAULT_SUBSCRIPTION) +
+                            "is cdma sub active ::" + subMgr.isSubActive(DEFAULT_SUBSCRIPTION));
+                    if (TelephonyManager.PHONE_TYPE_CDMA == MSimTelephonyManager.
+                            getDefault().getCurrentPhoneType(DEFAULT_SUBSCRIPTION) &&
+                            subMgr.isSubActive(DEFAULT_SUBSCRIPTION)) {
+                        log("EVENT_NITZ_TIME received in c + g ignore updating time");
+                    }
+                } else {
+                    super.handleMessage(msg);
                 }
                 break;
 
