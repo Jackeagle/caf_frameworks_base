@@ -149,7 +149,15 @@ LOCAL_SRC_FILES:= \
 	android_app_backup_FullBackup.cpp \
 	android_content_res_ObbScanner.cpp \
 	android_content_res_Configuration.cpp \
-    android_animation_PropertyValuesHolder.cpp
+    android_animation_PropertyValuesHolder.cpp \
+	android_bluetooth_HeadsetBase.cpp \
+	android_bluetooth_common.cpp \
+	android_bluetooth_BluetoothAudioGateway.cpp \
+	android_bluetooth_BluetoothSocket.cpp \
+	android_bluetooth_c.c \
+	android_server_BluetoothService.cpp \
+	android_server_BluetoothEventLoop.cpp \
+	android_server_BluetoothA2dpService.cpp
 
 LOCAL_C_INCLUDES += \
 	$(JNI_H_INCLUDE) \
@@ -233,6 +241,14 @@ LOCAL_LDLIBS += -lpthread -ldl
 
 ifeq ($(WITH_MALLOC_LEAK_CHECK),true)
 	LOCAL_CFLAGS += -DMALLOC_LEAK_CHECK
+endif
+
+ifeq ($(BOARD_HAVE_BLUETOOTH),true)
+LOCAL_C_INCLUDES += \
+	external/dbus \
+	system/bluetooth/bluez-clean-headers
+LOCAL_CFLAGS += -DHAVE_BLUETOOTH
+LOCAL_SHARED_LIBRARIES += libbluedroid libdbus
 endif
 
 LOCAL_MODULE:= libandroid_runtime

@@ -90,14 +90,16 @@ LOCAL_SRC_FILES += \
 	core/java/android/bluetooth/IBluetooth.aidl \
 	core/java/android/bluetooth/IBluetoothA2dp.aidl \
 	core/java/android/bluetooth/IBluetoothCallback.aidl \
+	core/java/android/bluetooth/IBluetoothGattService.aidl \
+	core/java/android/bluetooth/IBluetoothGattProfile.aidl \
+	core/java/android/bluetooth/IBluetoothGattCallback.aidl \
+	core/java/android/bluetooth/IBluetoothThermometerCallBack.aidl \
+	core/java/android/bluetooth/IBluetoothThermometerServices.aidl \
+	core/java/android/bluetooth/IBluetoothLEProximityServices.aidl \
+	core/java/android/bluetooth/IBluetoothLEFindMeServices.aidl \
 	core/java/android/bluetooth/IBluetoothHeadset.aidl \
 	core/java/android/bluetooth/IBluetoothHeadsetPhone.aidl \
-	core/java/android/bluetooth/IBluetoothHealth.aidl \
 	core/java/android/bluetooth/IBluetoothHealthCallback.aidl \
-	core/java/android/bluetooth/IBluetoothInputDevice.aidl \
-	core/java/android/bluetooth/IBluetoothPan.aidl \
-	core/java/android/bluetooth/IBluetoothManager.aidl \
-	core/java/android/bluetooth/IBluetoothManagerCallback.aidl \
 	core/java/android/bluetooth/IBluetoothPbap.aidl \
 	core/java/android/bluetooth/IBluetoothStateChangeCallback.aidl \
 	core/java/android/content/IClipboard.aidl \
@@ -223,7 +225,8 @@ LOCAL_SRC_FILES += \
 	wifi/java/android/net/wifi/p2p/IWifiP2pManager.aidl \
 	voip/java/android/net/sip/ISipSession.aidl \
 	voip/java/android/net/sip/ISipSessionListener.aidl \
-	voip/java/android/net/sip/ISipService.aidl
+	voip/java/android/net/sip/ISipService.aidl \
+	core/java/android/bluetooth/IBluetoothPreferredDeviceListCallback.aidl
 #
 
 
@@ -273,6 +276,7 @@ aidl_files := \
 	frameworks/base/core/java/android/app/PendingIntent.aidl \
 	frameworks/base/core/java/android/bluetooth/BluetoothDevice.aidl \
 	frameworks/base/core/java/android/bluetooth/BluetoothHealthAppConfiguration.aidl \
+	frameworks/base/core/java/android/bluetooth/BluetoothGattAppConfiguration.aidl \
 	frameworks/base/core/java/android/content/ComponentName.aidl \
 	frameworks/base/core/java/android/content/Intent.aidl \
 	frameworks/base/core/java/android/content/IntentSender.aidl \

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +30,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.UUID;
+import java.util.Vector;
 
 /**
  * Represents a remote Bluetooth device. A {@link BluetoothDevice} lets you
@@ -111,6 +113,28 @@ public final class BluetoothDevice implements Parcelable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_CLASS_CHANGED =
             "android.bluetooth.device.action.CLASS_CHANGED";
+
+     /**
+     * Broadcast Action: RSSI update from the remote device
+     * <p>Always contains the extra fields {@link #EXTRA_DEVICE} and {@link
+     * #EXTRA_RSSI}.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_RSSI_UPDATE =
+            "android.bluetooth.device.action.RSSI_UPDATE";
+    /**
+     * Broadcast Action: Negotiated connection parameters update
+     * for the connection between the Gatt server and the remote GATT
+     * client device
+     * <p>Always contains the extra fields {@link #EXTRA_CONN_INTERVAL}
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_LE_CONN_PARAMS =
+            "android.bluetooth.device.action.LE_CONN_PARAMS";
 
     /**
      * Broadcast Action: Indicates a low level (ACL) connection has been
@@ -204,6 +228,17 @@ public final class BluetoothDevice implements Parcelable {
      * Bluetooth hardware.
      */
     public static final String EXTRA_RSSI = "android.bluetooth.device.extra.RSSI";
+    /**
+     * Used as a String extra field in {ACTION_FOUND} intent.
+     * It contains the comma separated uuid string values of services.
+     * @hide
+     */
+    public static final String EXTRA_UUIDS = "android.bluetooth.device.extra.UUIDS";
+    /**
+     * Used as an UINT 16 extra field in {ACTION_LE_CONN_PARAMS} intent.
+     * It contains the negotiated connection interval value after establishing LE connection.
+     * @hide */
+    public static final String EXTRA_CONN_INTERVAL = "android.bluetooth.device.extra.CONN_INTERVAL";
 
     /**
      * Used as a Parcelable {@link BluetoothClass} extra field in {@link
@@ -230,6 +265,10 @@ public final class BluetoothDevice implements Parcelable {
       */
     public static final String EXTRA_PREVIOUS_BOND_STATE =
             "android.bluetooth.device.extra.PREVIOUS_BOND_STATE";
+
+    /** @hide */
+    public static final String EXTRA_SECURE_PAIRING = "android.bluetooth.device.extra.SECURE";
+
     /**
      * Indicates the remote device is not bonded (paired).
      * <p>There is no shared link key with the remote device, so communication
@@ -251,6 +290,12 @@ public final class BluetoothDevice implements Parcelable {
      * </i>
      */
     public static final int BOND_BONDED = 12;
+
+    /**
+     * This bonding state will be used, When auto pairing fails and
+     * retry the manual bonding process.
+     * @hide */
+    public static final int BOND_RETRY = 13;
 
     /** @hide */
     public static final String EXTRA_REASON = "android.bluetooth.device.extra.REASON";
@@ -322,6 +367,18 @@ public final class BluetoothDevice implements Parcelable {
     /**@hide*/
     public static final int REQUEST_TYPE_PHONEBOOK_ACCESS = 2;
 
+    /**@hide*/
+    public static final int REQUEST_TYPE_FILE_ACCESS = 3;
+
+    /**@hide*/
+    public static final int REQUEST_TYPE_MESSAGE_ACCESS = 4;
+
+    /**@hide*/
+    public static final int REQUEST_TYPE_SIM_ACCESS = 5;
+
+    /**@hide*/
+    public static final int REQUEST_TYPE_DUN_ACCESS = 6;
+
     /**
      * Used as an extra field in {@link #ACTION_CONNECTION_ACCESS_REQUEST} intents,
      * Contains package name to return reply intent to.
@@ -362,6 +419,11 @@ public final class BluetoothDevice implements Parcelable {
      * A bond attempt succeeded
      * @hide
      */
+    public static final String ACTION_GATT =
+            "android.bluetooth.device.action.GATT";
+
+    /** A bond attempt succeeded
+     * @hide */
     public static final int BOND_SUCCESS = 0;
 
     /**
@@ -471,7 +533,52 @@ public final class BluetoothDevice implements Parcelable {
      * is a parcelable version of {@link UUID}.
      */
     public static final String EXTRA_UUID = "android.bluetooth.device.extra.UUID";
+    /**
+     * Used as an extra field in ACTION_GATT intent.
+     * Contains the object paths of the GATT based services on remote device.
+     * @hide
+     */
+    public static final String EXTRA_GATT = "android.bluetooth.device.extra.GATT";
+    /**
+     * Used as an extra field in ACTION_GATT intent.
+     * Contains the result code for GATT service discovery.
+     * @hide
+     */
+    public static final String EXTRA_GATT_RESULT = "android.bluetooth.device.extra.GATT_RESULT";
 
+    /** A GATT request was successful.
+     * @hide */
+    public static final int GATT_RESULT_SUCCESS = 0;
+    /** A GATT request failed due to timeout.
+     * @hide */
+    public static final int GATT_RESULT_TIMEOUT = 1;
+    /** A GATT request failed (generic cause).
+     * @hide */
+    public static final int GATT_RESULT_FAIL = 2;
+   /** A GATT request cannot be completed  because of busy state.
+     * @hide */
+    public static final int GATT_RESULT_BUSY = 3;
+    /** A GATT operation requested on disconnected device.
+     * @hide */
+    public static final int GATT_RESULT_NOT_CONNECTED = 4;
+    /** A GATT LE connect request on existing connection.
+     * @hide */
+    public static final int GATT_ALREADY_CONNECTED = 5;
+    /** A GATT operation not supported.
+     * @hide */
+    public static final int GATT_RESULT_NOT_SUPPORTED= 6;
+
+    /**
+     * Used as an extra field for SAP state change events.
+     * @hide
+     */
+    public static final String SAP_STATE_CHANGED = "com.android.bluetooth.sap.statechanged";
+
+    /**
+     * Used as an extra field for DUN state change events.
+     * @hide
+     */
+    public static final String DUN_STATE_CHANGED = "com.android.bluetooth.dun.statechanged";
     /**
      * Lazy initialization. Guaranteed final after first object constructed, or
      * getService() called.
@@ -484,29 +591,16 @@ public final class BluetoothDevice implements Parcelable {
     /*package*/ static IBluetooth getService() {
         synchronized (BluetoothDevice.class) {
             if (sService == null) {
-                BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-                sService = adapter.getBluetoothService(mStateChangeCallback);
+                IBinder b = ServiceManager.getService(BluetoothAdapter.BLUETOOTH_SERVICE);
+                if (b == null) {
+                    throw new RuntimeException("Bluetooth service not available");
+                }
+                sService = IBluetooth.Stub.asInterface(b);
             }
         }
         return sService;
     }
 
-    static IBluetoothManagerCallback mStateChangeCallback = new IBluetoothManagerCallback.Stub() {
-
-        public void onBluetoothServiceUp(IBluetooth bluetoothService)
-                throws RemoteException {
-            synchronized (BluetoothDevice.class) {
-                sService = bluetoothService;
-            }
-        }
-
-        public void onBluetoothServiceDown()
-            throws RemoteException {
-            synchronized (BluetoothDevice.class) {
-                sService = null;
-            }
-        }
-    };
     /**
      * Create a new BluetoothDevice
      * Bluetooth MAC address must be upper case, such as "00:11:22:33:AA:BB",
@@ -575,7 +669,6 @@ public final class BluetoothDevice implements Parcelable {
      * @return Bluetooth hardware address as string
      */
     public String getAddress() {
-        if (DBG) Log.d(TAG, "mAddress: " + mAddress);
         return mAddress;
     }
 
@@ -595,7 +688,7 @@ public final class BluetoothDevice implements Parcelable {
             return null;
         }
         try {
-            return sService.getRemoteName(this);
+            return sService.getRemoteName(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return null;
     }
@@ -613,7 +706,7 @@ public final class BluetoothDevice implements Parcelable {
             return null;
         }
         try {
-            return sService.getRemoteAlias(this);
+            return sService.getRemoteAlias(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return null;
     }
@@ -634,7 +727,7 @@ public final class BluetoothDevice implements Parcelable {
             return false;
         }
         try {
-            return sService.setRemoteAlias(this, alias);
+            return sService.setRemoteAlias(mAddress, alias);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
@@ -669,12 +762,43 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public boolean createBond() {
-        if (sService == null) {
-            Log.e(TAG, "BT not enabled. Cannot create bond to Remote Device");
-            return false;
-        }
+        if (sService == null) {            Log.e(TAG, "BT not enabled. Cannot create bond to Remote Device");            return false;        }
         try {
-            return sService.createBond(this);
+            return sService.createBond(mAddress);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+     /**
+     * Register the watcher for monitoring RSSI of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param rssiThreshold
+     * @param interval
+     * @param updateOnThreshExceed
+     * @hide
+     */
+   public boolean registerRssiUpdateWatcher(int rssiThreshold, int interval,
+                                             boolean updateOnThreshExceed) {
+        try {
+            return sService.registerRssiUpdateWatcher(mAddress,
+                                                      rssiThreshold,
+                                                      interval,
+                                                      updateOnThreshExceed);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+     /**
+     * Unregister the watcher for monitoring RSSI of the remote
+     * device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @hide
+     */
+    public boolean unregisterRssiUpdateWatcher() {
+        try {
+            return sService.unregisterRssiUpdateWatcher(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
@@ -699,11 +823,9 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public boolean createBondOutOfBand(byte[] hash, byte[] randomizer) {
-        //TODO(BT)
-        /*
         try {
-            return sService.createBondOutOfBand(this, hash, randomizer);
-        } catch (RemoteException e) {Log.e(TAG, "", e);}*/
+            return sService.createBondOutOfBand(mAddress, hash, randomizer);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
 
@@ -721,11 +843,9 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public boolean setDeviceOutOfBandData(byte[] hash, byte[] randomizer) {
-      //TODO(BT)
-      /*
       try {
-        return sService.setDeviceOutOfBandData(this, hash, randomizer);
-      } catch (RemoteException e) {Log.e(TAG, "", e);} */
+        return sService.setDeviceOutOfBandData(mAddress, hash, randomizer);
+      } catch (RemoteException e) {Log.e(TAG, "", e);}
       return false;
     }
 
@@ -742,7 +862,7 @@ public final class BluetoothDevice implements Parcelable {
             return false;
         }
         try {
-            return sService.cancelBondProcess(this);
+            return sService.cancelBondProcess(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
@@ -763,7 +883,7 @@ public final class BluetoothDevice implements Parcelable {
             return false;
         }
         try {
-            return sService.removeBond(this);
+            return sService.removeBond(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
@@ -784,7 +904,7 @@ public final class BluetoothDevice implements Parcelable {
             return BOND_NONE;
         }
         try {
-            return sService.getBondState(this);
+            return sService.getBondState(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         catch (NullPointerException npe) {
             // Handle case where bluetooth service proxy
@@ -807,11 +927,84 @@ public final class BluetoothDevice implements Parcelable {
             return null;
         }
         try {
-            int classInt = sService.getRemoteClass(this);
+            int classInt = sService.getRemoteClass(mAddress);
             if (classInt == BluetoothClass.ERROR) return null;
             return new BluetoothClass(classInt);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return null;
+    }
+
+    /**
+     * Set the Bluetooth class of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param classOfDevice the Bluetooth COD value to be set
+     * @hide
+     */
+    public boolean setBluetoothClass(int classOfDevice) {
+        try {
+            return sService.setBluetoothClass(mAddress, classOfDevice);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+    /**
+     * Set the preferred connection parameters of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param connection parameters values.
+     * @hide
+     */
+    public boolean setLEConnectionParams(byte prohibitRemoteChg,
+                                         byte filterPolicy,
+                                         int scanInterval,
+                                         int scanWindow,
+                                         int intervalMin,
+                                         int intervalMax,
+                                         int latency,
+                                         int superVisionTimeout,
+                                         int minCeLen,
+                                         int maxCeLen,
+                                         int connTimeout) {
+        try {
+            return sService.setLEConnectionParams(mAddress,
+                                                  prohibitRemoteChg,
+                                                  filterPolicy,
+                                                  scanInterval,
+                                                  scanWindow,
+                                                  intervalMin,
+                                                  intervalMax,
+                                                  latency,
+                                                  superVisionTimeout,
+                                                  minCeLen,
+                                                  maxCeLen,
+                                                  connTimeout
+                                                  );
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
+    }
+
+    /**
+     * Update the LE connection parameters of the remote device.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     *
+     * @param connection parameters values.
+     * @hide
+     */
+    public boolean updateLEConnectionParams(byte prohibitRemoteChg,
+                                            int intervalMin,
+                                            int intervalMax,
+                                            int slaveLatency,
+                                            int supervisionTimeout) {
+        try {
+            return sService.updateLEConnectionParams(mAddress,
+                                                prohibitRemoteChg,
+                                                intervalMin,
+                                                intervalMax,
+                                                slaveLatency,
+                                                supervisionTimeout);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+        return false;
     }
 
     /**
@@ -820,13 +1013,11 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public boolean getTrustState() {
-        //TODO(BT)
-        /*
         try {
-            return sService.getTrustState(this);
+            return sService.getTrustState(mAddress);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
-        }*/
+        }
         return false;
     }
 
@@ -837,13 +1028,11 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public boolean setTrust(boolean value) {
-        //TODO(BT)
-        /*
         try {
-            return sService.setTrust(this, value);
+            return sService.setTrust(mAddress, value);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
-        }*/
+        }
         return false;
     }
 
@@ -865,7 +1054,7 @@ public final class BluetoothDevice implements Parcelable {
              return null;
          }
         try {
-            return sService.getRemoteUuids(this);
+            return sService.getRemoteUuids(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return null;
     }
@@ -887,40 +1076,49 @@ public final class BluetoothDevice implements Parcelable {
       */
      public boolean fetchUuidsWithSdp() {
         try {
-            return sService.fetchRemoteUuids(this);
+            return sService.fetchRemoteUuids(mAddress, null, null);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
-            return false;
+        return false;
     }
 
     /** @hide */
     public int getServiceChannel(ParcelUuid uuid) {
-        //TODO(BT)
-        /*
          try {
-             return sService.getRemoteServiceChannel(this, uuid);
-         } catch (RemoteException e) {Log.e(TAG, "", e);}*/
+             return sService.getRemoteServiceChannel(mAddress, uuid);
+         } catch (RemoteException e) {Log.e(TAG, "", e);}
          return BluetoothDevice.ERROR;
     }
 
     /** @hide */
+    public int getL2capPsm(ParcelUuid uuid) {
+         try {
+             return sService.getRemoteL2capPsm(mAddress, uuid);
+         } catch (RemoteException e) {Log.e(TAG, "", e);}
+         return BluetoothDevice.ERROR;
+    }
+
+    /** @hide */
+    public String getFeature(String feature) {
+         try {
+             return sService.getRemoteFeature(mAddress, feature);
+         } catch (RemoteException e) {Log.e(TAG, "", e);}
+         return null;
+    }
+
+    /** @hide */
     public boolean setPin(byte[] pin) {
-        if (sService == null) {
-            Log.e(TAG, "BT not enabled. Cannot set Remote Device pin");
-            return false;
-        }
+        if (sService == null) {            Log.e(TAG, "BT not enabled. Cannot set Remote Device pin");            return false;        }
         try {
-            return sService.setPin(this, true, pin.length, pin);
+            return sService.setPin(mAddress, pin);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
 
     /** @hide */
     public boolean setPasskey(int passkey) {
-        //TODO(BT)
-        /*
         try {
-            return sService.setPasskey(this, true, 4, passkey);
-        } catch (RemoteException e) {Log.e(TAG, "", e);}*/
+            return sService.setPasskey(mAddress, passkey);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
 
@@ -931,18 +1129,16 @@ public final class BluetoothDevice implements Parcelable {
             return false;
         }
         try {
-            return sService.setPairingConfirmation(this, confirm);
+            return sService.setPairingConfirmation(mAddress, confirm);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
 
     /** @hide */
     public boolean setRemoteOutOfBandData() {
-        // TODO(BT)
-        /*
         try {
-          return sService.setRemoteOutOfBandData(this);
-      } catch (RemoteException e) {Log.e(TAG, "", e);}*/
+          return sService.setRemoteOutOfBandData(mAddress);
+      } catch (RemoteException e) {Log.e(TAG, "", e);}
       return false;
     }
 
@@ -953,18 +1149,16 @@ public final class BluetoothDevice implements Parcelable {
             return false;
         }
         try {
-            return sService.cancelBondProcess(this);
+            return sService.cancelPairingUserInput(mAddress);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
 
     /** @hide */
     public boolean isBluetoothDock() {
-        // TODO(BT)
-        /*
         try {
-            return sService.isBluetoothDock(this);
-        } catch (RemoteException e) {Log.e(TAG, "", e);}*/
+            return sService.isBluetoothDock(mAddress);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
 
@@ -995,6 +1189,86 @@ public final class BluetoothDevice implements Parcelable {
      */
     public BluetoothSocket createRfcommSocket(int channel) throws IOException {
         return new BluetoothSocket(BluetoothSocket.TYPE_RFCOMM, -1, true, true, this, channel,
+                null);
+    }
+
+    /**
+     * Create an L2Cap {@link BluetoothSocket} ready to start a secure
+     * outgoing connection to this remote device on given channel.
+     * <p>The remote device will be authenticated and communication on this
+     * socket will be encrypted.
+     * <p>Use {@link BluetoothSocket#connect} to intiate the outgoing
+     * connection.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+     *
+     * @param psm L2Cap psm to connect to
+     * @return a L2Cap BluetoothSocket ready for an outgoing connection
+     * @throws IOException on error, for example Bluetooth not available, or
+     *                     insufficient permissions
+     * @hide
+     */
+    public BluetoothSocket createL2capSocket(int psm) throws IOException {
+        return new BluetoothSocket(BluetoothSocket.TYPE_L2CAP, -1, true, true, this, psm,
+                null);
+    }
+
+    /**
+     * Create an L2Cap {@link BluetoothSocket} ready to start an insecure
+     * outgoing connection to this remote device on given channel.
+     * <p>The remote device not will be authenticated and communication on this
+     * socket will not be encrypted.
+     * <p>Use {@link BluetoothSocket#connect} to intiate the outgoing
+     * connection.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+     *
+     * @param psm L2Cap psm to connect to
+     * @return a L2Cap BluetoothSocket ready for an outgoing connection
+     * @throws IOException on error, for example Bluetooth not available, or
+     *                     insufficient permissions
+     * @hide
+     */
+    public BluetoothSocket createInsecureL2capSocket(int psm) throws IOException {
+        return new BluetoothSocket(BluetoothSocket.TYPE_L2CAP, -1, false, false, this, psm,
+                null);
+    }
+
+    /**
+     * Create an EL2CAP {@link BluetoothSocket} ready to start a secure
+     * outgoing connection to this remote device on given channel.
+     * <p>The remote device will be authenticated and communication on this
+     * socket will be encrypted.
+     * <p>Use {@link BluetoothSocket#connect} to intiate the outgoing
+     * connection.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+     *
+     * @param psm L2Cap psm to connect to
+     * @return a L2Cap BluetoothSocket ready for an outgoing connection
+     * @throws IOException on error, for example Bluetooth not available, or
+     *                     insufficient permissions
+     * @hide
+     */
+    public BluetoothSocket createEl2capSocket(int psm) throws IOException {
+        return new BluetoothSocket(BluetoothSocket.TYPE_EL2CAP, -1, true, true, this, psm,
+                null);
+    }
+
+    /**
+     * Create an EL2CAP {@link BluetoothSocket} ready to start an insecure
+     * outgoing connection to this remote device on given channel.
+     * <p>The remote device not will be authenticated and communication on this
+     * socket will not be encrypted.
+     * <p>Use {@link BluetoothSocket#connect} to intiate the outgoing
+     * connection.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+     *
+     * @param psm L2Cap psm to connect to
+     * @return a L2Cap BluetoothSocket ready for an outgoing connection
+     * @throws IOException on error, for example Bluetooth not available, or
+     *                     insufficient permissions
+     * @hide
+     */
+    public BluetoothSocket createInsecureEl2capSocket(int psm) throws IOException {
+        return new BluetoothSocket(BluetoothSocket.TYPE_EL2CAP, -1, false, false, this, psm,
                 null);
     }
 
@@ -1101,6 +1375,20 @@ public final class BluetoothDevice implements Parcelable {
     }
 
     /**
+     * Construct a SCO socket for WBS ready to start an outgoing connection.
+     * Call #connect on the returned #BluetoothSocket to begin the connection.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}
+     *
+     * @return a SCO BluetoothSocket
+     * @throws IOException on error, for example Bluetooth not available, or
+     *                     insufficient permissions.
+     * @hide
+     */
+    public BluetoothSocket createScoWbsSocket() throws IOException {
+        return new BluetoothSocket(BluetoothSocket.TYPE_SCO_WBS, -1, true, true, this, -1, null);
+    }
+
+    /**
      * Check that a pin is valid and convert to byte array.
      *
      * Bluetooth pin's are 1 to 16 bytes of UTF-8 characters.
@@ -1126,4 +1414,97 @@ public final class BluetoothDevice implements Parcelable {
         return pinBytes;
     }
 
+   /**
+     * Broadcast Action
+     * Always contains the extra field {EXTRA_DEVICE}
+     * Always contains the extra field {EXTRA_UUID}
+     * Always contains the extra filed {EXTRA_PATH}
+     * Requires BLUETOOTH to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_GATT_SERVICE =
+            "android.bleutooth.device.action.GATT_SERVICE";
+
+  /**
+     * Broadcast Action
+     * Requires BLUETOOTH to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_GATT_SERVICE_CHANGED =
+            "android.bleutooth.device.action.GATT_SERVICES_CHANGED";
+
+   /**
+     * Get GATT-based service for a given UUID.
+     *
+     *
+     * @param uuid GATT service UUID
+     * @return False, if internal checks fail; True if the process of
+     *             retrieving information about GATT services was started.
+     *
+     * @hide
+     */
+    public boolean getGattServices(UUID uuid) {
+
+        ParcelUuid convertUuid = new ParcelUuid(uuid);
+
+        try {
+            return sService.getGattServices(mAddress, convertUuid);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
+
+    /**
+     * Get all GATT-based services on the remote device..
+     *
+     * @return False, if internal checks fail; True if the process of
+     *             retrieving information about GATT services was started.
+     *
+     * @hide
+     */
+    public boolean getGattServices() {
+
+        try {
+            return sService.getGattServices(mAddress, null);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
+    /**
+     * Add device to Preferred devices list
+     * @param pListCallback The callback to notify the application regarding
+     * whether the add device to Preferred devices list request has been sent or not.
+     *
+     * @return false, if internal checks fail; True if the process of
+     *         adding device to preferred devices list was started.
+     *
+     * @hide
+     */
+    public boolean addToPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallback) {
+        Log.d(TAG, "BT device addToPreferredDeviceList");
+        try {
+            return sService.addToPreferredDeviceList(mAddress, pListCallback);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
+    /**
+     * Remove device from Preferred devices list
+     * @param pListCallback The callback to notify the application regarding
+     * whether the remove device from Preferred devices list request has been sent or not.
+     * @return False, if internal checks fail; True if the process of
+     * removing device from preferred devices list was started.
+     *
+     * @hide
+     */
+    public boolean removeFromPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallback) {
+        Log.d(TAG, "BT device removeFromPreferredDeviceList");
+        try {
+            return sService.removeFromPreferredDeviceList(mAddress, pListCallback);
+        } catch (RemoteException e) {Log.e(TAG, "", e);}
+
+        return false;
+    }
 }

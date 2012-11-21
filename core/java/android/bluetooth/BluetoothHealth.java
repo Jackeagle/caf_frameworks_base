@@ -16,10 +16,7 @@
 
 package android.bluetooth;
 
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
@@ -97,37 +94,6 @@ public final class BluetoothHealth implements BluetoothProfile {
     public static final int HEALTH_OPERATION_NOT_FOUND = 6004;
     /** @hide */
     public static final int HEALTH_OPERATION_NOT_ALLOWED = 6005;
-
-    final private IBluetoothStateChangeCallback mBluetoothStateChangeCallback =
-            new IBluetoothStateChangeCallback.Stub() {
-                public void onBluetoothStateChange(boolean up) {
-                    if (DBG) Log.d(TAG, "onBluetoothStateChange: up=" + up);
-                    if (!up) {
-                        if (VDBG) Log.d(TAG,"Unbinding service...");
-                        synchronized (mConnection) {
-                            try {
-                                mService = null;
-                                mContext.unbindService(mConnection);
-                            } catch (Exception re) {
-                                Log.e(TAG,"",re);
-                            }
-                        }
-                    } else {
-                        synchronized (mConnection) {
-                            try {
-                                if (mService == null) {
-                                    if (VDBG) Log.d(TAG,"Binding service...");
-                                    if (!mContext.bindService(new Intent(IBluetoothHealth.class.getName()), mConnection, 0)) {
-                                        Log.e(TAG, "Could not bind to Bluetooth Health Service");
-                                    }
-                                }
-                            } catch (Exception re) {
-                                Log.e(TAG,"",re);
-                            }
-                        }
-                    }
-                }
-        };
 
 
     /**
@@ -462,73 +428,34 @@ public final class BluetoothHealth implements BluetoothProfile {
     /** Health App Configuration un-registration failure */
     public static final int APP_CONFIG_UNREGISTRATION_FAILURE = 3;
 
-    private Context mContext;
     private ServiceListener mServiceListener;
-    private IBluetoothHealth mService;
+    private IBluetooth mService;
     BluetoothAdapter mAdapter;
 
     /**
      * Create a BluetoothHealth proxy object.
      */
-    /*package*/ BluetoothHealth(Context context, ServiceListener l) {
-        mContext = context;
+    /*package*/ BluetoothHealth(Context mContext, ServiceListener l) {
+        IBinder b = ServiceManager.getService(BluetoothAdapter.BLUETOOTH_SERVICE);
         mServiceListener = l;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
-        IBluetoothManager mgr = mAdapter.getBluetoothManager();
-        if (mgr != null) {
-            try {
-                mgr.registerStateChangeCallback(mBluetoothStateChangeCallback);
-            } catch (RemoteException e) {
-                Log.e(TAG,"",e);
+        if (b != null) {
+            mService = IBluetooth.Stub.asInterface(b);
+            if (mServiceListener != null) {
+                mServiceListener.onServiceConnected(BluetoothProfile.HEALTH, this);
             }
-        }
+        } else {
+            Log.w(TAG, "Bluetooth Service not available!");
 
-        if (!context.bindService(new Intent(IBluetoothHealth.class.getName()), mConnection, 0)) {
-            Log.e(TAG, "Could not bind to Bluetooth Health Service");
+            // Instead of throwing an exception which prevents people from going
+            // into Wireless settings in the emulator. Let it crash later when it is actually used.
+            mService = null;
         }
     }
 
     /*package*/ void close() {
-        if (VDBG) log("close()");
-        IBluetoothManager mgr = mAdapter.getBluetoothManager();
-        if (mgr != null) {
-            try {
-                mgr.unregisterStateChangeCallback(mBluetoothStateChangeCallback);
-            } catch (Exception e) {
-                Log.e(TAG,"",e);
-            }
-        }
-
-        synchronized (mConnection) {
-            if (mService != null) {
-                try {
-                    mService = null;
-                    mContext.unbindService(mConnection);
-                } catch (Exception re) {
-                    Log.e(TAG,"",re);
-                }
-            }
-        }
         mServiceListener = null;
     }
-
-    private ServiceConnection mConnection = new ServiceConnection() {
-        public void onServiceConnected(ComponentName className, IBinder service) {
-            if (DBG) Log.d(TAG, "Proxy object connected");
-            mService = IBluetoothHealth.Stub.asInterface(service);
-
-            if (mServiceListener != null) {
-                mServiceListener.onServiceConnected(BluetoothProfile.HEALTH, BluetoothHealth.this);
-            }
-        }
-        public void onServiceDisconnected(ComponentName className) {
-            if (DBG) Log.d(TAG, "Proxy object disconnected");
-            mService = null;
-            if (mServiceListener != null) {
-                mServiceListener.onServiceDisconnected(BluetoothProfile.HEALTH);
-            }
-        }
-    };
 
     private boolean isEnabled() {
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();

@@ -33,4 +33,12 @@ interface IBluetoothA2dp {
     boolean setPriority(in BluetoothDevice device, int priority);
     int getPriority(in BluetoothDevice device);
     boolean isA2dpPlaying(in BluetoothDevice device);
+
+    // Internal APIs
+    boolean suspendSink(in BluetoothDevice device);
+    boolean resumeSink(in BluetoothDevice device);
+    boolean connectSinkInternal(in BluetoothDevice device);
+    boolean disconnectSinkInternal(in BluetoothDevice device);
+    boolean allowIncomingConnect(in BluetoothDevice device, boolean value);
+
 }
