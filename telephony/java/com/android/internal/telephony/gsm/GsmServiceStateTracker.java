@@ -539,8 +539,9 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
 
         needsUpdate = ((SIMRecords)mIccRecords).updateEons(ss.getOperatorNumeric(), lactac);
         Log.d(LOG_TAG, "[EONS] updateEons() lactac = " + lactac + " , needsUpdate = " +
-                needsUpdate + " , OperatorNumeric = " + ss.getOperatorNumeric());
-        if (needsUpdate) {
+                needsUpdate + " , OperatorNumeric = " + ss.getOperatorNumeric() +
+                " , Emergency Only = " + mEmergencyOnly);
+        if (needsUpdate || mEmergencyOnly) {
             String eonsLong = ((SIMRecords)mIccRecords).getEons();
             Log.d(LOG_TAG, "[EONS] updateEons() eonsLong = " + eonsLong);
             if (eonsLong != null) {
