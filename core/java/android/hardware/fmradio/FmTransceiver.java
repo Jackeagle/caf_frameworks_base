@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of Code Aurora nor
+ *    * Neither the name of The Linux Foundation nor
  *      the names of its contributors may be used to endorse or promote
  *      products derived from this software without specific prior written
  *      permission.
@@ -133,6 +133,7 @@ public class FmTransceiver
 
    private static final int V4L2_CID_PRIVATE_BASE = 0x8000000;
    private static final int V4L2_CID_PRIVATE_TAVARUA_ANTENNA   = V4L2_CID_PRIVATE_BASE + 18;
+   private static final int V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_MASK = V4L2_CID_PRIVATE_BASE + 6;
    private static final int V4L2_CID_PRIVATE_TAVARUA_SET_NOTCH_FILTER = V4L2_CID_PRIVATE_BASE + 40;
 
    private final String TAG = "FmTransceiver";
@@ -629,5 +630,15 @@ public class FmTransceiver
    public static int getFMPowerState()
    {
       return FMState;
+   }
+   public static boolean setRDSGrpMask(int mask)
+   {
+      int re;
+      re = FmReceiverJNI.setControlNative(sFd,
+                   V4L2_CID_PRIVATE_TAVARUA_RDSGROUP_MASK, mask);
+      if (re == 0)
+          return true;
+      else
+          return false;
    }
 }
