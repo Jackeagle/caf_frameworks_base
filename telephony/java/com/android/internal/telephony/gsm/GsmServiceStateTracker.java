@@ -606,7 +606,6 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
                 ss.setOperatorName(eonsLong, ss.getOperatorAlphaShort(),
                       ss.getOperatorNumeric());
             }
-            updateSpnDisplay();
         }
     }
 
@@ -1006,15 +1005,10 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
             mNitzUpdatedTime = false;
         }
 
-        IccCard iccCard = phone.getIccCard();
-        if (mEonsEnabled && (iccCard != null) &&
-                    (iccCard.getIccCardState() == State.READY)) {
-            Log.i(LOG_TAG,"Network State Changed, get EONS and update operator name display");
+        if (mEonsEnabled) {
             updateEons();
-        } else {
-            Log.i(LOG_TAG,"Network State Changed, update operator name display");
-            updateSpnDisplay();
         }
+        updateSpnDisplay();
 
         if (hasChanged) {
             String operatorNumeric;
