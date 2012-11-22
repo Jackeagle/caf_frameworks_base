@@ -275,6 +275,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean mHeadsetIntent = false;
     private final Object mHeadsetLock = new Object();
 
+    private String SOC_ID_FILE = "/sys/devices/system/soc/soc0/id";
+    private int soc_id = -1;
+    private boolean isHdmiPrimary = false;
+
     /**
      * These are the system UI flags that, when changing, can cause the layout
      * of the screen to change.
@@ -4002,6 +4006,38 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+    boolean isTargetHdmiPrimary() {
+        if(soc_id == -1) {
+            /* Figure out if the target is hdmi_primary */
+            if (new File(SOC_ID_FILE).exists()) {
+                FileReader reader = null;
+                try {
+                    reader = new FileReader(SOC_ID_FILE);
+                    char[] buf = new char[15];
+                    int n = reader.read(buf);
+                    if (n > 1) {
+                        soc_id = Integer.parseInt(new String(buf, 0, n-1));
+                    }
+                } catch (IOException ex) {
+                    Slog.w(TAG, "Couldn't get soc_id from " + SOC_ID_FILE + ": " + ex);
+                } catch (NumberFormatException ex) {
+                    Slog.w(TAG, "Couldn't read soc_id from " + SOC_ID_FILE + ": " + ex);
+                } finally {
+                    if (reader != null) {
+                        try {
+                            reader.close();
+                        } catch (IOException ex) {
+                        }
+                    }
+                }
+            }
+            if(soc_id == 130) {
+                isHdmiPrimary = true;
+            }
+        }
+        return isHdmiPrimary;
+    }
+
     @Override
     public int rotationForOrientationLw(int orientation, int lastRotation) {
         if (false) {
@@ -4018,7 +4054,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             if (sensorRotation < 0) {
                 sensorRotation = lastRotation;
             }
-
             final int preferredRotation;
             boolean fixHdmiOrientation = true; //by default fix HDMI orientation
                                                //to landscapse
@@ -4029,7 +4064,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (hdmiOrientationProp.equals("0"))
                     fixHdmiOrientation = false;
             }
-            if (mLidState == LID_OPEN && mLidOpenRotation >= 0) {
+            if(isTargetHdmiPrimary()) {
+                /* Do exactly what the application asked us to do.
+                 * Donot override preference
+                 */
+                preferredRotation = -1;
+            } else if (mLidState == LID_OPEN && mLidOpenRotation >= 0) {
                 // Ignore sensor when lid switch is open and rotation is forced.
                 preferredRotation = mLidOpenRotation;
             } else if (mDockMode == Intent.EXTRA_DOCK_STATE_CAR
