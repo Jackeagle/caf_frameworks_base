@@ -588,8 +588,7 @@ public final class CallManager {
         switch (getState()) {
             case RINGING:
                 if (audioManager.getMode() != AudioManager.MODE_RINGTONE) {
-                    // only request audio focus if the ringtone is going to be heard
-                    if (audioManager.getStreamVolume(AudioManager.STREAM_RING) > 0) {
+                    if (audioManager.getStreamVolume(AudioManager.STREAM_RING) >= 0) {
                         if (VDBG) Log.d(LOG_TAG, "requestAudioFocus on STREAM_RING");
                         audioManager.requestAudioFocusForCall(AudioManager.STREAM_RING,
                                 AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
