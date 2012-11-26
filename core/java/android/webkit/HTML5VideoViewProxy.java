@@ -269,7 +269,7 @@ class HTML5VideoViewProxy extends Handler
 
         public void end() {
             if (mHTML5VideoView != null)
-                HTML5VideoFullscreen.instance().showMediaControls(mProxy, true);
+                HTML5VideoFullscreen.instance().showMediaControls(mProxy);
             if (mProxy != null) {
                 if (isVideoSelfEnded)
                     mProxy.dispatchOnEnded();
