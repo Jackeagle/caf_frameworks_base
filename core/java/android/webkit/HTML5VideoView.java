@@ -142,7 +142,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
             mProxy.dispatchOnPlaying();
             if (isFullscreen()) {
                 HTML5VideoFullscreen.instance().switchProgressView(mProxy, false);
-                HTML5VideoFullscreen.instance().showMediaControls(mProxy, false);
+                HTML5VideoFullscreen.instance().showMediaControls(mProxy);
             }
         } else
             setStartWhenPrepared(true);
@@ -160,10 +160,8 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
         // MediaController.
         mProxy.dispatchOnPaused();
 
-        if (isFullscreen()) {
-            // If paused, should show the controller for ever!
-            HTML5VideoFullscreen.instance().showMediaControls(mProxy, true);
-        }
+        if (isFullscreen())
+            HTML5VideoFullscreen.instance().showMediaControls(mProxy);
 
         // Delete the Timer to stop it since there is no stop call.
         if (mTimer != null) {
@@ -460,7 +458,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
             attachMediaController();
             mPlayer.setOnBufferingUpdateListener(mBufferingUpdateListener);
             HTML5VideoFullscreen.instance().switchProgressView(mProxy, false);
-            HTML5VideoFullscreen.instance().showMediaControls(mProxy, !getStartWhenPrepared());
+            HTML5VideoFullscreen.instance().showMediaControls(mProxy);
         }
 
         if (mPauseDuringPreparing || !getStartWhenPrepared())
@@ -588,7 +586,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     public void onEnterFullscreen() {
         if (mCurrentState == STATE_PREPARED) {
             attachMediaController();
-            HTML5VideoFullscreen.instance().showMediaControls(mProxy, !isPlaying());
+            HTML5VideoFullscreen.instance().showMediaControls(mProxy);
         }
     }
 
