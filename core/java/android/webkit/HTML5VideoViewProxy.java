@@ -1,6 +1,9 @@
 /*
+ * Copyright (c) 2011, 2012, The Linux Foundation. All rights reserved.
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2011, 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +70,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int LOAD_METADATA       = 111;
     private static final int ENTER_FULLSCREEN    = 112;
     private static final int EXIT_FULLSCREEN     = 113;
+    private static final int SET_VISIBILITY      = 114;
 
     // Message Ids to be handled on the WebCore thread
     private static final int PREPARED          = 200;
@@ -110,6 +114,9 @@ class HTML5VideoViewProxy extends Handler
         // Cached media position used to preserve playback position when
         // resuming suspended video
         private int mCachedPosition;
+
+        // True if the inline video is visible on the web page.
+        private boolean mMediaIsVisible;
 
         private void setPlayerBuffering(boolean playerBuffering) {
             mHTML5VideoView.setPlayerBuffering(playerBuffering);
@@ -290,6 +297,14 @@ class HTML5VideoViewProxy extends Handler
         public boolean isPrepared() {
             return mHTML5VideoView.getCurrentState() >= HTML5VideoView.STATE_PREPARED;
         }
+
+        public void setMediaIsVisible(boolean visible) {
+            mMediaIsVisible = visible;
+        }
+
+        public boolean isMediaVisible() {
+            return mMediaIsVisible;
+        }
     }
     private VideoPlayer mVideoPlayer;
 
@@ -466,6 +481,11 @@ class HTML5VideoViewProxy extends Handler
                 InlineVideoInfo info = (InlineVideoInfo)msg.obj;
                 mVideoPlayer.exitFullscreenVideo(info.getX(), info.getY(),
                         info.getWidth(), info.getHeight());
+                break;
+            }
+            case SET_VISIBILITY: {
+                boolean visible = ((Boolean)msg.obj).booleanValue();
+                mVideoPlayer.setMediaIsVisible(visible);
                 break;
             }
         }
@@ -803,6 +823,16 @@ class HTML5VideoViewProxy extends Handler
         // Load the poster asynchronously
         mPosterDownloader = new PosterDownloader(url, this);
         mPosterDownloader.start();
+    }
+
+    public void setVisibility(boolean visible) {
+        Message message = obtainMessage(SET_VISIBILITY);
+        message.obj = Boolean.valueOf(visible);
+        sendMessage(message);
+    }
+
+    public boolean isMediaVisible() {
+        return mVideoPlayer.isMediaVisible();
     }
 
     public void enterFullscreen(String url, float x, float y, float w, float h) {
