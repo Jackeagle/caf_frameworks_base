@@ -200,4 +200,8 @@ interface IBluetooth
     boolean clearPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
     boolean gattConnectToPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
     boolean gattCancelConnectToPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
+    boolean addToPreferredDeviceListWrapper(in BluetoothDevice btDevObj, in IBluetoothPreferredDeviceListCallback pListCallBack,
+            in String caller);
+    boolean gattCancelConnectToPreferredDeviceListWrapper(in IBluetoothPreferredDeviceListCallback pListCallBack,
+            in BluetoothDevice btDevice, in String caller);
 }
