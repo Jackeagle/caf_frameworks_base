@@ -66,4 +66,7 @@ public interface ILinkManager {
     boolean removeQosRegistration(int id);
 
     boolean updateOperatorPolicy(String filepath);
+
+    boolean notifyWlanConnectivityUp();
+
 }
