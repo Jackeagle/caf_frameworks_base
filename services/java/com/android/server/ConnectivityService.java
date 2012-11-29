@@ -4799,6 +4799,8 @@ private NetworkStateTracker makeWimaxStateTracker() {
                 handleConnectivityChange(type, false); // private handler
                 if (type != otherDefaultNet) { // squelch broadcast for other default net
                     sendConnectedBroadcastDelayed(info, getConnectivityChangeDelay());
+                } else if (type == TYPE_WIFI) {
+                    mLinkManager.notifyWlanConnectivityUp();
                 }
 
                 // notify battery stats service about this network
