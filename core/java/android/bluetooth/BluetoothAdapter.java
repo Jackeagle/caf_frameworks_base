@@ -1609,4 +1609,48 @@ public final class BluetoothAdapter {
         }
         return false;
     }
+    /**
+     * Automatic connection request to the devices in the Preferred
+     * devices list
+     *
+     * @param pListCallback The callback to notify the application regarding
+     * whether the Auto Connect request has been sent or not.
+     * @return false, if internal checks fail; True if the process of
+     *         auto connection request for devices in preferred devices list was started.
+     * @hide
+     */
+   public boolean gattAutoConnect(IBluetoothPreferredDeviceListCallback pListCallback,
+           BluetoothDevice btDevice) {
+       Log.d(TAG, "BT adapter gattAutoConnect");
+       boolean status = false;
+       try {
+           //call add device to preferred devices list
+           status = mService.addToPreferredDeviceListWrapper(btDevice, pListCallback, "AutoConnect");
+       } catch (RemoteException e) {
+           Log.e(TAG, "gattAutoConnect", e);
+       }
+       return status;
+   }
+   /**
+    * Automatic connection cancel request to the devices in the Preferred
+    * devices list
+    *
+    * @param pListCallback The callback to notify the application regarding
+    * whether the Auto Connect cancel request has been sent or not.
+    * @return false, if internal checks fail; True if the process of
+    *         auto connect cancel request for devices in preferred devices list was started.
+   * @hide
+   */
+   public boolean gattAutoConnectCancel(IBluetoothPreferredDeviceListCallback pListCallback,
+           BluetoothDevice btDevice) {
+       Log.d(TAG, "BT adapter gattAutoConnectCancel");
+       boolean status = false;
+       try {
+           //Stop the scan
+           status = mService.gattCancelConnectToPreferredDeviceListWrapper(pListCallback, btDevice, "AutoConnectCancel");
+       } catch (RemoteException e) {
+           Log.e(TAG, "gattAutoConnectCancel", e);
+       }
+       return status;
+   }
 }
