@@ -1381,8 +1381,10 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                         boolean isV6Connected = false;
                         try {
                             info = cm.getNetworkInfo(netType.intValue());
-                            props = cm.getLinkProperties(info.getType());
-                            isV6Connected = isIpv6Connected(cm, props);
+                            if (info != null) {
+                                props = cm.getLinkProperties(info.getType());
+                                isV6Connected = isIpv6Connected(cm, props);
+                            }
                         } catch (RemoteException e) { }
                         if ((info != null) && info.isConnected()) {
                             upType = netType.intValue();
