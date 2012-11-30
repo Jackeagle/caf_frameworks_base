@@ -529,6 +529,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 // failure causes supplicant issues. Ignore right now.
                 case WifiMonitor.P2P_GROUP_FORMATION_FAILURE_EVENT:
                     break;
+                case WifiMonitor.DRIVER_HUNG_EVENT:
+                    Slog.e(TAG, "Received Driver HUNG event");
+                    mWifiChannel.sendMessage(DRIVER_HUNG_EVENT_IN_WIFIDIRECT);
+                    break;
                 default:
                     loge("Unhandled message " + message);
                     return NOT_HANDLED;
