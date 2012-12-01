@@ -625,7 +625,7 @@ public class CdmaConnection extends Connection {
        disconnected = true;
     }
 
-    private void
+    /*package*/ void
     onStartedHolding() {
         holdingStartTime = SystemClock.elapsedRealtime();
     }
