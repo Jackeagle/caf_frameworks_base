@@ -82,11 +82,6 @@ import java.io.OutputStream;
         if ((offset | count) < 0 || count > b.length - offset) {
             throw new IndexOutOfBoundsException("invalid offset or length");
         }
-
-        /* Ensure that everything is written out... */
-        int written = 0;
-        while (written < count) {
-            written += mSocket.write(b, offset + written, count - written);
-        }
+        mSocket.write(b, offset, count);
     }
 }

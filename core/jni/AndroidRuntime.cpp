@@ -174,13 +174,6 @@ extern int register_android_content_res_Configuration(JNIEnv* env);
 extern int register_android_animation_PropertyValuesHolder(JNIEnv *env);
 extern int register_com_android_internal_content_NativeLibraryHelper(JNIEnv *env);
 
-extern int register_android_bluetooth_HeadsetBase(JNIEnv* env);
-extern int register_android_bluetooth_BluetoothAudioGateway(JNIEnv* env);
-extern int register_android_bluetooth_BluetoothSocket(JNIEnv *env);
-extern int register_android_server_BluetoothService(JNIEnv* env);
-extern int register_android_server_BluetoothEventLoop(JNIEnv *env);
-extern int register_android_server_BluetoothA2dpService(JNIEnv* env);
-
 static AndroidRuntime* gCurRuntime = NULL;
 
 static void doThrow(JNIEnv* env, const char* exc, const char* msg = NULL)
@@ -1219,13 +1212,6 @@ static const RegJNIRec gRegJNI[] = {
 
     REG_JNI(register_android_animation_PropertyValuesHolder),
     REG_JNI(register_com_android_internal_content_NativeLibraryHelper),
-
-    REG_JNI(register_android_bluetooth_HeadsetBase),
-    REG_JNI(register_android_bluetooth_BluetoothAudioGateway),
-    REG_JNI(register_android_bluetooth_BluetoothSocket),
-    REG_JNI(register_android_server_BluetoothService),
-    REG_JNI(register_android_server_BluetoothEventLoop),
-    REG_JNI(register_android_server_BluetoothA2dpService),
 };
 
 /*

@@ -38,8 +38,6 @@ import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
-import android.server.BluetoothA2dpService;
-import android.server.BluetoothService;
 import android.server.search.SearchManagerService;
 import android.service.dreams.DreamService;
 import android.util.DisplayMetrics;
@@ -66,7 +64,6 @@ import com.android.server.power.PowerManagerService;
 import com.android.server.power.ShutdownThread;
 import com.android.server.usb.UsbService;
 import com.android.server.wm.WindowManagerService;
-import android.provider.Settings;
 
 import dalvik.system.VMRuntime;
 import dalvik.system.Zygote;
@@ -143,8 +140,7 @@ class ServerThread extends Thread {
         IPackageManager pm = null;
         Context context = null;
         WindowManagerService wm = null;
-        BluetoothService bluetooth = null;
-        BluetoothA2dpService bluetoothA2dp = null;
+        BluetoothManagerService bluetooth = null;
         DockObserver dock = null;
         UsbService usb = null;
         SerialService serial = null;
@@ -336,24 +332,9 @@ class ServerThread extends Thread {
             } else if (factoryTest == SystemServer.FACTORY_TEST_LOW_LEVEL) {
                 Slog.i(TAG, "No Bluetooth Service (factory test)");
             } else {
-                Slog.i(TAG, "Bluetooth Service");
-                bluetooth = new BluetoothService(context);
-                ServiceManager.addService(BluetoothAdapter.BLUETOOTH_SERVICE, bluetooth);
-                bluetooth.initAfterRegistration();
-
-                if (!"0".equals(SystemProperties.get("system_init.startaudioservice"))) {
-                    bluetoothA2dp = new BluetoothA2dpService(context, bluetooth);
-                    ServiceManager.addService(BluetoothA2dpService.BLUETOOTH_A2DP_SERVICE,
-                                              bluetoothA2dp);
-                    bluetooth.initAfterA2dpRegistration();
-                }
-                int airplaneModeOn = Settings.Global.getInt(mContentResolver,
-                        Settings.Global.AIRPLANE_MODE_ON, 0);
-                int bluetoothOn = Settings.Global.getInt(mContentResolver,
-                            Settings.Global.BLUETOOTH_ON, 0);
-                if (airplaneModeOn == 0 && bluetoothOn != 0) {
-                    bluetooth.enable();
-                }
+                Slog.i(TAG, "Bluetooth Manager Service");
+                bluetooth = new BluetoothManagerService(context);
+                ServiceManager.addService(BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE, bluetooth);
             }
 
         } catch (RuntimeException e) {

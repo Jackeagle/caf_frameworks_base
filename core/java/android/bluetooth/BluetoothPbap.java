@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +71,7 @@ public class BluetoothPbap {
     private IBluetoothPbap mService;
     private final Context mContext;
     private ServiceListener mServiceListener;
+    private BluetoothAdapter mAdapter;
 
     /** There was an error trying to obtain the state */
     public static final int STATE_ERROR        = -1;
@@ -98,7 +98,7 @@ public class BluetoothPbap {
          * this callback before making IPC calls on the BluetoothPbap
          * service.
          */
-        public void onServiceConnected();
+        public void onServiceConnected(BluetoothPbap proxy);
 
         /**
          * Called to notify the client that this proxy object has been
@@ -110,12 +110,54 @@ public class BluetoothPbap {
         public void onServiceDisconnected();
     }
 
+    final private IBluetoothStateChangeCallback mBluetoothStateChangeCallback =
+            new IBluetoothStateChangeCallback.Stub() {
+                public void onBluetoothStateChange(boolean up) {
+                    if (DBG) Log.d(TAG, "onBluetoothStateChange: up=" + up);
+                    if (!up) {
+                        if (VDBG) Log.d(TAG,"Unbinding service...");
+                        synchronized (mConnection) {
+                            try {
+                                mService = null;
+                                mContext.unbindService(mConnection);
+                            } catch (Exception re) {
+                                Log.e(TAG,"",re);
+                            }
+                        }
+                    } else {
+                        synchronized (mConnection) {
+                            try {
+                                if (mService == null) {
+                                    if (VDBG) Log.d(TAG,"Binding service...");
+                                    if (!mContext.bindService(
+                                                        new Intent(IBluetoothPbap.class.getName()),
+                                                        mConnection, 0)) {
+                                        Log.e(TAG, "Could not bind to Bluetooth PBAP Service");
+                                    }
+                                }
+                            } catch (Exception re) {
+                                Log.e(TAG,"",re);
+                            }
+                        }
+                    }
+                }
+        };
+
     /**
      * Create a BluetoothPbap proxy object.
      */
     public BluetoothPbap(Context context, ServiceListener l) {
         mContext = context;
         mServiceListener = l;
+        mAdapter = BluetoothAdapter.getDefaultAdapter();
+        IBluetoothManager mgr = mAdapter.getBluetoothManager();
+        if (mgr != null) {
+            try {
+                mgr.registerStateChangeCallback(mBluetoothStateChangeCallback);
+            } catch (RemoteException e) {
+                Log.e(TAG,"",e);
+            }
+        }
         if (!context.bindService(new Intent(IBluetoothPbap.class.getName()), mConnection, 0)) {
             Log.e(TAG, "Could not bind to Bluetooth Pbap Service");
         }
@@ -136,6 +178,15 @@ public class BluetoothPbap {
      * are ok.
      */
     public synchronized void close() {
+        IBluetoothManager mgr = mAdapter.getBluetoothManager();
+        if (mgr != null) {
+            try {
+                mgr.unregisterStateChangeCallback(mBluetoothStateChangeCallback);
+            } catch (Exception e) {
+                Log.e(TAG,"",e);
+            }
+        }
+
         synchronized (mConnection) {
             if (mService != null) {
                 try {
@@ -216,11 +267,7 @@ public class BluetoothPbap {
             try {
                 mService.disconnect();
                 return true;
-            } catch (RemoteException e) {Log.e(TAG, e.toString());
-            } catch (NullPointerException e) {
-                Log.w(TAG, "Pbap Service is already disconnected");
-            }
-
+            } catch (RemoteException e) {Log.e(TAG, e.toString());}
         } else {
             Log.w(TAG, "Proxy not attached to service");
             if (DBG) log(Log.getStackTraceString(new Throwable()));
@@ -253,7 +300,7 @@ public class BluetoothPbap {
             if (DBG) log("Proxy object connected");
             mService = IBluetoothPbap.Stub.asInterface(service);
             if (mServiceListener != null) {
-                mServiceListener.onServiceConnected();
+                mServiceListener.onServiceConnected(BluetoothPbap.this);
             }
         }
         public void onServiceDisconnected(ComponentName className) {
