@@ -2819,7 +2819,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                                 Iterator i = set.iterator();
                                 while (i.hasNext()) {
                                     Map.Entry entry = (Map.Entry)i.next();
-                                    int device = ((Integer)entry.getKey()).intValue();
+                                    int streamTypeAlias = mStreamVolumeAlias[mStreamType];
+                                    int device = getDeviceForStream(streamTypeAlias);
                                     setIndex(0, device, false /* lastAudible */);
                                 }
                                 sendMsg(mAudioHandler,
