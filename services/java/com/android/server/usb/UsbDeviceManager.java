@@ -188,15 +188,9 @@ public class UsbDeviceManager {
         StorageManager storageManager = (StorageManager)
                 mContext.getSystemService(Context.STORAGE_SERVICE);
         StorageVolume[] volumes = storageManager.getVolumeList();
-
         if (volumes.length > 0) {
-            if (Settings.Secure.getInt(mContentResolver, Settings.Secure.USB_MASS_STORAGE_ENABLED, 0) == 1 ) {
-                massStorageSupported = volumes[0].allowMassStorage();
-            } else {
-                massStorageSupported = false;
-            }
+            massStorageSupported = volumes[0].allowMassStorage();
         }
-
         mUseUsbNotification = !massStorageSupported;
 
         // make sure the ADB_ENABLED setting value matches the current state
@@ -632,6 +626,9 @@ public class UsbDeviceManager {
                     id = com.android.internal.R.string.usb_mtp_notification_title;
                 } else if (containsFunction(mCurrentFunctions, UsbManager.USB_FUNCTION_PTP)) {
                     id = com.android.internal.R.string.usb_ptp_notification_title;
+                } else if (containsFunction(mCurrentFunctions,
+                        UsbManager.USB_FUNCTION_MASS_STORAGE)) {
+                    id = com.android.internal.R.string.usb_cd_installer_notification_title;
                 } else if (containsFunction(mCurrentFunctions, UsbManager.USB_FUNCTION_ACCESSORY)) {
                     id = com.android.internal.R.string.usb_accessory_notification_title;
                 } else {
