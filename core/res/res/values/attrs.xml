@@ -275,6 +275,11 @@
         <!-- The preferred item height for dropdown lists. -->
         <attr name="dropdownListPreferredItemHeight" format="dimension" />
 
+        <!-- The preferred padding along the start edge of list items. -->
+        <attr name="listPreferredItemPaddingStart" format="dimension" />
+        <!-- The preferred padding along the end edge of list items. -->
+        <attr name="listPreferredItemPaddingEnd" format="dimension" />
+
         <!-- ============= -->
         <!-- Window styles -->
         <!-- ============= -->
@@ -478,6 +483,8 @@
         <attr name="autoCompleteTextViewStyle" format="reference" />
         <!-- Default Checkbox style. -->
         <attr name="checkboxStyle" format="reference" />
+        <!-- Default CheckedTextView style. -->
+        <attr name="checkedTextViewStyle" format="reference" />
         <!-- Default ListView style for drop downs. -->
         <attr name="dropDownListViewStyle" format="reference" />
         <!-- Default EditText style. -->
@@ -763,10 +770,14 @@
         <attr name="dialogCustomTitleDecorLayout" format="reference" />
         <!-- Window decor layout to use in dialog mode with title only -->
         <attr name="dialogTitleDecorLayout" format="reference" />
+
         <!-- Theme to use for alert dialogs spawned from this theme. -->
         <attr name="alertDialogTheme" format="reference" />
         <!-- Icon drawable to use for alerts -->
         <attr name="alertDialogIcon" format="reference" />
+
+        <!-- Theme to use for presentations spawned from this theme. -->
+        <attr name="presentationTheme" format="reference" />
 
         <!-- Drawable to use for generic vertical dividers. -->
         <attr name="dividerVertical" format="reference" />
@@ -1186,8 +1197,8 @@
     <!-- A coordinate in the Y dimension. -->
     <attr name="y" format="dimension" />
 
-    <!-- Specifies how to place the content of an object, both
-         on the x- and y-axis, within the object itself. -->
+    <!-- Specifies how an object should position its content, on both the X and Y axes,
+         within its own bounds.  -->
     <attr name="gravity">
         <!-- Push object to the top of its container, not changing its size. -->
         <flag name="top" value="0x30" />
@@ -1246,8 +1257,8 @@
     <!-- Reference to an array resource that will populate a list/adapter. -->
     <attr name="entries" format="reference" />
 
-    <!-- Standard gravity constant that a child can supply to its parent.
-         Defines how to place the view, both its x- and y-axis, within its parent view group. -->
+    <!-- Standard gravity constant that a child supplies to its parent.
+         Defines how the child view should be positioned, on both the X and Y axes, within its enclosing layout. -->
     <attr name="layout_gravity">
         <!-- Push object to the top of its container, not changing its size. -->
         <flag name="top" value="0x30" />
@@ -2154,39 +2165,11 @@
             <enum name="no" value="2" />
         </attr>
 
-        <!-- @hide Controls whether this view can take accessibility focus. -->
-        <attr name="accessibilityFocusable" format="integer">
-            <!-- The system determines whether the view can take accessibility focus - default
-                 (recommended).
-                 <p>
-                 Such a view is consideted by the focus search if it is:
-                 <ul>
-                 <li>
-                 Important for accessibility and actionable (clickable, long clickable, focusable)
-                 </li>
-                 <li>
-                 Important for accessibility, not actionable (clickable, long clickable, focusable),
-                 and does not have an actionable predecessor.
-                 </li>
-                 </ul>
-                 An accessibility srvice can request putting accessibility focus on such a view.
-                 </p> -->
-            <enum name="auto" value="0" />
-            <!-- The view can take accessibility focus.
-                 <p>
-                 A view that can take accessibility focus is always considered during focus
-                 search and an accessibility service can request putting accessibility focus
-                 on it.
-                 </p> -->
-            <enum name="yes" value="1" />
-            <!-- The view can not take accessibility focus.
-                 <p>
-                 A view that can not take accessibility focus is never considered during focus
-                 search and an accessibility service can not request putting accessibility focus
-                 on it.
-                 </p> -->
-            <enum name="no" value="2" />
-        </attr>
+        <!-- Specifies the id of a view for which this view serves as a label for
+             accessibility purposes. For example, a TextView before an EditText in
+             the UI usually specifies what infomation is contained in the EditText.
+             Hence, the TextView is a label for the EditText. -->
+        <attr name="labelFor" format="integer" />
 
     </declare-styleable>
 
@@ -2399,6 +2382,12 @@
         <!-- The extra value of the subtype. This string can be any string and will be passed to
              the IME when the framework calls the IME with the subtype.  -->
         <attr name="imeSubtypeExtraValue" format="string" />
+        <!-- The unique id for the subtype. The input method framework keeps track of enabled
+             subtypes by ID. When the IME package gets upgraded, enabled IDs will stay enabled even
+             if other attributes are different. If the ID is unspecified (by calling the other
+             constructor or 0. Arrays.hashCode(new Object[] {locale, mode, extraValue,
+             isAuxiliary, overridesImplicitlyEnabledSubtype}) will be used instead. -->
+        <attr name="subtypeId" format="integer"/>
     </declare-styleable>
 
     <!-- Use <code>spell-checker</code> as the root tag of the XML resource that
@@ -2498,7 +2487,7 @@
         <!-- The minimal period in milliseconds between two accessibility events of the same type
              are sent to this serivce. This setting can be changed at runtime by calling
              {@link android.accessibilityservice.AccessibilityService#setServiceInfo(android.accessibilityservice.AccessibilityServiceInfo)
-             android.accessibilityservice.AccessibilityService.setServiceInfo(android.accessibilityservice.AccessibilityServiceInfo)}. -->>
+             android.accessibilityservice.AccessibilityService.setServiceInfo(android.accessibilityservice.AccessibilityServiceInfo)}. -->
         <attr name="notificationTimeout" format="integer" />
         <!-- Additional flags as specified in
              {@link android.accessibilityservice.AccessibilityServiceInfo}.
@@ -3056,6 +3045,24 @@
         <attr name="textColorLink" />
         <!-- Present the text in ALL CAPS. This may use a small-caps form when available. -->
         <attr name="textAllCaps" format="boolean" />
+    </declare-styleable>
+    <declare-styleable name="TextClock">
+        <!-- Specifies the formatting pattern used to show the time and/or date
+             in 12-hour mode. Please refer to {@link android.text.format.DateFormat}
+             for a complete description of accepted formatting patterns.
+             The default pattern is "h:mm aa". -->
+        <attr name="format12Hour" format="string"/>
+        <!-- Specifies the formatting pattern used to show the time and/or date
+             in 24-hour mode. Please refer to {@link android.text.format.DateFormat}
+             for a complete description of accepted formatting patterns.
+             The default pattern is "k:mm". -->
+        <attr name="format24Hour" format="string"/>
+        <!-- Specifies the time zone to use. When this attribute is specified, the
+             TextClock will ignore the time zone of the system. To use the user's
+             time zone, do not specify this attribute. The default value is the
+             user's time zone. Please refer to {@link java.util.TimeZone} for more
+             information about time zone ids. -->
+        <attr name="timeZone" format="string"/>
     </declare-styleable>
     <declare-styleable name="TextSwitcher">
     </declare-styleable>
@@ -3668,6 +3675,24 @@
         <!-- If set to true, the parent will be used as the anchor when the anchor cannot be
              be found for layout_toLeftOf, layout_toRightOf, etc. -->
         <attr name="layout_alignWithParentIfMissing" format="boolean" />
+        <!-- Positions the end edge of this view to the start of the given anchor view ID.
+             Accommodates end margin of this view and start margin of anchor view. -->
+        <attr name="layout_toStartOf" format="reference" />
+        <!-- Positions the start edge of this view to the end of the given anchor view ID.
+             Accommodates start margin of this view and end margin of anchor view. -->
+        <attr name="layout_toEndOf" format="reference" />
+        <!-- Makes the start edge of this view match the start edge of the given anchor view ID.
+            Accommodates start margin. -->
+        <attr name="layout_alignStart" format="reference" />
+        <!-- Makes the end edge of this view match the end edge of the given anchor view ID.
+            Accommodates end margin. -->
+        <attr name="layout_alignEnd" format="reference" />
+        <!-- If true, makes the start edge of this view match the start edge of the parent.
+            Accommodates start margin. -->
+        <attr name="layout_alignParentStart" format="boolean" />
+        <!-- If true, makes the end edge of this view match the end edge of the parent.
+            Accommodates end margin. -->
+        <attr name="layout_alignParentEnd" format="boolean" />
     </declare-styleable>
     <declare-styleable name="VerticalSlider_Layout">
         <attr name="layout_scale" format="float" />
@@ -4080,6 +4105,10 @@
                  The clip will be based on the horizontal gravity: a left gravity will clip the right
                  edge, a right gravity will clip the left edge, and neither will clip both edges. -->
             <flag name="clip_horizontal" value="0x08" />
+            <!-- Push object to the beginning of its container, not changing its size. -->
+            <flag name="start" value="0x00800003" />
+            <!-- Push object to the end of its container, not changing its size. -->
+            <flag name="end" value="0x00800005" />
         </attr>
         <!-- Reference to a drawable resource to draw with the specified scale. -->
         <attr name="drawable" />
@@ -5177,6 +5206,8 @@
         <attr name="updatePeriodMillis" format="integer" />
         <!-- A resource id of a layout. -->
         <attr name="initialLayout" format="reference" />
+        <!-- A resource id of a layout. -->
+        <attr name="initialKeyguardLayout" format="reference" />
         <!-- A class name in the AppWidget's package to be launched to configure.
              If not supplied, then no activity will be launched. -->
         <attr name="configure" format="string" />
@@ -5187,11 +5218,18 @@
              by the widget's host. -->
         <attr name="autoAdvanceViewId" format="reference" />
         <!-- Optional parameter which indicates if and how this widget can be
-             resized. -->
+             resized. Supports combined values using | operator. -->
         <attr name="resizeMode" format="integer">
             <flag name="none" value="0x0" />
             <flag name="horizontal" value="0x1" />
             <flag name="vertical" value="0x2" />
+        </attr>
+        <!-- Optional parameter which indicates where this widget can be shown,
+             ie. home screen, keyguard or both.
+             resized. Supports combined values using | operator. -->
+        <attr name="widgetCategory" format="integer">
+            <flag name="home_screen" value="0x1" />
+            <flag name="keyguard" value="0x2" />
         </attr>
     </declare-styleable>
 
@@ -5278,6 +5316,19 @@
 
         <!-- Short description of the component's purpose or behavior. -->
         <attr name="description" />
+    </declare-styleable>
+
+    <!-- Use <code>dream</code> as the root tag of the XML resource that
+         describes an
+         {@link android.service.dreams.DreamService}, which is
+         referenced from its
+         {@link android.service.dreams.DreamService#DREAM_META_DATA}
+         meta-data entry.  Described here are the attributes that can be
+         included in that tag. -->
+    <declare-styleable name="Dream">
+        <!-- Component name of an activity that allows the user to modify
+             the settings for this dream. -->
+        <attr name="settingsActivity" />
     </declare-styleable>
 
     <!-- =============================== -->
@@ -5425,6 +5476,19 @@
 
         <!-- Used when the handle shouldn't wait to be hit before following the finger -->
         <attr name="alwaysTrackFinger"/>
+
+        <!-- Location along the circle of the first item, in degrees.-->
+        <attr name="firstItemOffset" format="float" />
+
+        <!-- Causes targets to snap to the finger location on activation. -->
+        <attr name="magneticTargets" format="boolean" />
+
+        <attr name="gravity" />
+
+        <!-- Determine whether the glow pad is allowed to scale to fit the bounds indicated
+            by its parent. If this is set to false, no scaling will occur. If this is set to true
+            scaling will occur to fit for any axis in which gravity is set to center. -->
+        <attr name="allowScaling" format="boolean" />
     </declare-styleable>
 
     <!-- =============================== -->
@@ -5513,6 +5577,7 @@
         </attr>
         <!-- Options affecting how the action bar is displayed. -->
         <attr name="displayOptions">
+            <flag name="none" value="0" />
             <flag name="useLogo" value="0x1" />
             <flag name="showHome" value="0x2" />
             <flag name="homeAsUp" value="0x4" />
@@ -5716,4 +5781,83 @@
         <attr name="minHeight" />
     </declare-styleable>
 
+    <!-- PagedView specific attributes. These attributes are used to customize
+         a PagedView view in XML files. -->
+    <declare-styleable name="PagedView">
+        <!-- The space between adjacent pages of the PagedView. -->
+        <attr name="pageSpacing" format="dimension" />
+        <!-- The padding for the scroll indicator area -->
+        <attr name="scrollIndicatorPaddingLeft" format="dimension" />
+        <attr name="scrollIndicatorPaddingRight" format="dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="KeyguardGlowStripView">
+        <attr name="dotSize" format="dimension" />
+        <attr name="numDots" format="integer" />
+        <attr name="glowDot" format="reference" />
+        <attr name="leftToRight" format="boolean" />
+    </declare-styleable>
+
+    <!-- Some child types have special behavior. -->
+    <attr name="layout_childType">
+        <!-- No special behavior. Layout will proceed as normal. -->
+        <enum name="none" value="0" />
+        <!-- Widget container.
+             This will be resized in response to certain events. -->
+        <enum name="widget" value="1" />
+        <!-- Security challenge container.
+             This will be dismissed/shown in response to certain events,
+             possibly obscuring widget elements. -->
+        <enum name="challenge" value="2" />
+        <!-- User switcher.
+             This will consume space from the total layout area. -->
+        <enum name="userSwitcher" value="3" />
+        <!-- Scrim. This will block access to child views that
+             come before it in the child list in bouncer mode. -->
+        <enum name="scrim" value="4" />
+        <!-- The home for widgets. All widgets will be descendents of this. -->
+        <enum name="widgets" value="5" />
+        <!-- This is a handle that is used for expanding the
+             security challenge container when it is collapsed. -->
+        <enum name="expandChallengeHandle" value="6" />
+        <!-- Delete drop target.  This will be the drop target to delete pages. -->
+        <enum name="pageDeleteDropTarget" value="7" />
+    </attr>
+
+    <declare-styleable name="SlidingChallengeLayout_Layout">
+        <attr name="layout_childType" />
+        <attr name="layout_maxHeight" />
+    </declare-styleable>
+
+    <!-- Attributes that can be used with <code>&lt;FragmentBreadCrumbs&gt;</code>
+    tags. -->
+    <declare-styleable name="FragmentBreadCrumbs">
+        <attr name="gravity" />
+    </declare-styleable>
+
+    <declare-styleable name="MultiPaneChallengeLayout">
+        <!-- Influences how layout_centerWithinArea behaves -->
+        <attr name="orientation" />
+    </declare-styleable>
+
+    <declare-styleable name="MultiPaneChallengeLayout_Layout">
+        <!-- Percentage of the screen this child should consume or center within.
+             If 0/default, the view will be measured by standard rules
+             as if this were a FrameLayout. -->
+        <attr name="layout_centerWithinArea" format="float" />
+        <attr name="layout_childType" />
+        <attr name="layout_gravity" />
+        <attr name="layout_maxWidth" format="dimension" />
+        <attr name="layout_maxHeight" />
+    </declare-styleable>
+
+    <declare-styleable name="KeyguardSecurityViewFlipper_Layout">
+        <attr name="layout_maxWidth" />
+        <attr name="layout_maxHeight" />
+    </declare-styleable>
+
+    <declare-styleable name="NumPadKey">
+        <attr name="digit" format="integer" />
+        <attr name="textView" format="reference" />
+    </declare-styleable>
 </resources>

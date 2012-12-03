@@ -38,6 +38,8 @@
 #include "TextDropShadowCache.h"
 #include "FboCache.h"
 #include "ResourceCache.h"
+#include "Stencil.h"
+#include "Dither.h"
 
 namespace android {
 namespace uirenderer {
@@ -66,6 +68,7 @@ static const GLsizei gVertexStride = sizeof(Vertex);
 static const GLsizei gAlphaVertexStride = sizeof(AlphaVertex);
 static const GLsizei gAAVertexStride = sizeof(AAVertex);
 static const GLsizei gMeshTextureOffset = 2 * sizeof(float);
+static const GLsizei gVertexAlphaOffset = 2 * sizeof(float);
 static const GLsizei gVertexAAWidthOffset = 2 * sizeof(float);
 static const GLsizei gVertexAALengthOffset = 3 * sizeof(float);
 static const GLsizei gMeshCount = 4;
@@ -170,14 +173,13 @@ public:
      * Binds an attrib to the specified float vertex pointer.
      * Assumes a stride of gMeshStride and a size of 2.
      */
-    void bindPositionVertexPointer(bool force, GLuint slot, GLvoid* vertices,
-            GLsizei stride = gMeshStride);
+    void bindPositionVertexPointer(bool force, GLvoid* vertices, GLsizei stride = gMeshStride);
 
     /**
      * Binds an attrib to the specified float vertex pointer.
      * Assumes a stride of gMeshStride and a size of 2.
      */
-    void bindTexCoordsVertexPointer(bool force, GLuint slot, GLvoid* vertices);
+    void bindTexCoordsVertexPointer(bool force, GLvoid* vertices);
 
     /**
      * Resets the vertex pointers.
@@ -197,12 +199,19 @@ public:
     /**
      * Sets the scissor for the current surface.
      */
-    void setScissor(GLint x, GLint y, GLint width, GLint height);
+    bool setScissor(GLint x, GLint y, GLint width, GLint height);
 
     /**
      * Resets the scissor state.
      */
     void resetScissor();
+
+    bool enableScissor();
+    bool disableScissor();
+    void setScissorEnabled(bool enabled);
+
+    void startTiling(GLuint x, GLuint y, GLuint width, GLuint height, bool opaque);
+    void endTiling();
 
     /**
      * Returns the mesh used to draw regions. Calling this method will
@@ -217,10 +226,15 @@ public:
     void dumpMemoryUsage();
     void dumpMemoryUsage(String8& log);
 
+    bool hasRegisteredFunctors();
+    void registerFunctors(uint32_t functorCount);
+    void unregisterFunctors(uint32_t functorCount);
+
     bool blend;
     GLenum lastSrcMode;
     GLenum lastDstMode;
     Program* currentProgram;
+    bool scissorEnabled;
 
     // VBO to draw with
     GLuint meshBuffer;
@@ -230,6 +244,8 @@ public:
 
     // Misc
     GLint maxTextureSize;
+    bool debugLayersUpdates;
+    bool debugOverdraw;
 
     TextureCache textureCache;
     LayerCache layerCache;
@@ -244,8 +260,14 @@ public:
     PatchCache patchCache;
     TextDropShadowCache dropShadowCache;
     FboCache fboCache;
-    GammaFontRenderer fontRenderer;
     ResourceCache resourceCache;
+
+    GammaFontRenderer* fontRenderer;
+
+    Dither dither;
+#if STENCIL_BUFFER_SIZE
+    Stencil stencil;
+#endif
 
     // Debug methods
     PFNGLINSERTEVENTMARKEREXTPROC eventMark;
@@ -256,8 +278,10 @@ public:
     PFNGLGETOBJECTLABELEXTPROC getLabel;
 
 private:
+    void initFont();
     void initExtensions();
     void initConstraints();
+    void initProperties();
 
     static void eventMarkNull(GLsizei length, const GLchar* marker) { }
     static void startMarkNull(GLsizei length, const GLchar* marker) { }
@@ -274,6 +298,7 @@ private:
     GLuint mCurrentBuffer;
     GLuint mCurrentIndicesBuffer;
     void* mCurrentPositionPointer;
+    GLsizei mCurrentPositionStride;
     void* mCurrentTexCoordsPointer;
 
     bool mTexCoordsArrayEnabled;
@@ -295,6 +320,8 @@ private:
 
     DebugLevel mDebugLevel;
     bool mInitialized;
+
+    uint32_t mFunctorsCount;
 }; // class Caches
 
 }; // namespace uirenderer

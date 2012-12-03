@@ -32,6 +32,7 @@
 #include <SkTemplates.h>
 #include <SkUtils.h>
 #include <SkAutoKern.h>
+#include <SkLanguage.h>
 
 #include <unicode/ubidi.h>
 #include <unicode/ushape.h>
@@ -56,7 +57,7 @@
 #define MB(s) s * 1024 * 1024
 
 // Define the default cache size in Mb
-#define DEFAULT_TEXT_LAYOUT_CACHE_SIZE_IN_MB 0.250f
+#define DEFAULT_TEXT_LAYOUT_CACHE_SIZE_IN_MB 0.500f
 
 // Define the interval in number of cache hits between two statistics dump
 #define DEFAULT_DUMP_STATS_CACHE_HIT_INTERVAL 100
@@ -76,20 +77,15 @@ public:
     TextLayoutCacheKey(const TextLayoutCacheKey& other);
 
     /**
-     * We need to copy the text when we insert the key into the cache itself.
-     * We don't need to copy the text when we are only comparing keys.
-     */
-    void internalTextCopy();
-
-    /**
      * Get the size of the Cache key.
      */
     size_t getSize() const;
 
     static int compare(const TextLayoutCacheKey& lhs, const TextLayoutCacheKey& rhs);
 
+    inline const UChar* getText() const { return textCopy.string(); }
+
 private:
-    const UChar* text; // if text is NULL, use textCopy
     String16 textCopy;
     size_t start;
     size_t count;
@@ -101,8 +97,8 @@ private:
     SkScalar textScaleX;
     uint32_t flags;
     SkPaint::Hinting hinting;
-
-    inline const UChar* getText() const { return text ? text : textCopy.string(); }
+    SkPaint::FontVariant variant;
+    SkLanguage language;
 
 }; // TextLayoutCacheKey
 
@@ -129,6 +125,8 @@ public:
     inline jfloat getTotalAdvance() const { return mTotalAdvance; }
     inline const jchar* getGlyphs() const { return mGlyphs.array(); }
     inline size_t getGlyphsCount() const { return mGlyphs.size(); }
+    inline const jfloat* getPos() const { return mPos.array(); }
+    inline size_t getPosCount() const { return mPos.size(); }
 
     /**
      * Advances vector
@@ -144,6 +142,11 @@ public:
      * Glyphs vector
      */
     Vector<jchar> mGlyphs;
+
+    /**
+     * Pos vector (2 * i is x pos, 2 * i + 1 is y pos, same as drawPosText)
+     */
+    Vector<jfloat> mPos;
 
     /**
      * Get the size of the Cache entry
@@ -188,17 +191,9 @@ private:
     SkPaint mShapingPaint;
 
     /**
-     * Skia typefaces cached for shaping
+     * Skia default typeface to be returned if we cannot resolve script
      */
     SkTypeface* mDefaultTypeface;
-    SkTypeface* mArabicTypeface;
-    SkTypeface* mHebrewRegularTypeface;
-    SkTypeface* mHebrewBoldTypeface;
-    SkTypeface* mBengaliTypeface;
-    SkTypeface* mThaiTypeface;
-    SkTypeface* mDevanagariRegularTypeface;
-    SkTypeface* mTamilRegularTypeface;
-    SkTypeface* mTamilBoldTypeface;
 
     /**
      * Cache of Harfbuzz faces
@@ -223,27 +218,28 @@ private:
     void init();
     void unrefTypefaces();
 
-    SkTypeface* typefaceForUnichar(const SkPaint* paint, SkTypeface* typeface,
-        SkUnichar unichar, HB_Script script);
+    SkTypeface* typefaceForScript(const SkPaint* paint, SkTypeface* typeface,
+        HB_Script script);
 
     size_t shapeFontRun(const SkPaint* paint, bool isRTL);
 
     void computeValues(const SkPaint* paint, const UChar* chars,
             size_t start, size_t count, size_t contextCount, int dirFlags,
             Vector<jfloat>* const outAdvances, jfloat* outTotalAdvance,
-            Vector<jchar>* const outGlyphs);
+            Vector<jchar>* const outGlyphs, Vector<jfloat>* const outPos);
 
     void computeRunValues(const SkPaint* paint, const UChar* chars,
             size_t count, bool isRTL,
             Vector<jfloat>* const outAdvances, jfloat* outTotalAdvance,
-            Vector<jchar>* const outGlyphs);
+            Vector<jchar>* const outGlyphs, Vector<jfloat>* const outPos);
 
-    SkTypeface* getCachedTypeface(SkTypeface** typeface, const char path[]);
+    SkTypeface* getCachedTypeface(SkTypeface** typeface, HB_Script script, SkTypeface::Style style);
     HB_Face getCachedHBFace(SkTypeface* typeface);
 
-    void ensureShaperItemGlyphArrays(size_t size);
+    bool doShaping(size_t size);
     void createShaperItemGlyphArrays(size_t size);
     void deleteShaperItemGlyphArrays();
+    bool isComplexScript(HB_Script script);
 
 }; // TextLayoutShaper
 
@@ -273,7 +269,7 @@ public:
     /**
      * Clear the cache
      */
-    void clear();
+    void purgeCaches();
 
 private:
     TextLayoutShaper* mShaper;
@@ -313,6 +309,12 @@ public:
     TextLayoutEngine();
     virtual ~TextLayoutEngine();
 
+    /**
+     * Note: this method currently does a defensive copy of the text argument, in case
+     * there is concurrent mutation of it. The contract may change, and may in the
+     * future require the caller to guarantee that the contents will not change during
+     * the call. Be careful of this when doing optimization.
+     **/
     sp<TextLayoutValue> getValue(const SkPaint* paint, const jchar* text, jint start,
             jint count, jint contextCount, jint dirFlags);
 

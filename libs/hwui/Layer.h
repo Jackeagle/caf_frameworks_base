@@ -45,25 +45,10 @@ class DisplayList;
  * A layer has dimensions and is backed by an OpenGL texture or FBO.
  */
 struct Layer {
-    Layer(const uint32_t layerWidth, const uint32_t layerHeight) {
-        mesh = NULL;
-        meshIndices = NULL;
-        meshElementCount = 0;
-        cacheable = true;
-        textureLayer = false;
-        renderTarget = GL_TEXTURE_2D;
-        texture.width = layerWidth;
-        texture.height = layerHeight;
-        colorFilter = NULL;
-        deferredUpdateScheduled = false;
-        renderer = NULL;
-        displayList = NULL;
-    }
+    Layer(const uint32_t layerWidth, const uint32_t layerHeight);
+    ~Layer();
 
-    ~Layer() {
-        if (mesh) delete mesh;
-        if (meshIndices) delete meshIndices;
-    }
+    void removeFbo();
 
     /**
      * Sets this layer's region to a rectangle. Computes the appropriate
@@ -106,6 +91,8 @@ struct Layer {
         texture.height = height;
     }
 
+    ANDROID_API void setPaint(SkPaint* paint);
+
     inline void setBlend(bool blend) {
         texture.blend = blend;
     }
@@ -147,10 +134,6 @@ struct Layer {
         return fbo;
     }
 
-    inline GLuint* getTexturePointer() {
-        return &texture.id;
-    }
-
     inline GLuint getTexture() {
         return texture.id;
     }
@@ -179,6 +162,14 @@ struct Layer {
         this->cacheable = cacheable;
     }
 
+    inline bool isDirty() {
+        return dirty;
+    }
+
+    inline void setDirty(bool dirty) {
+        this->dirty = dirty;
+    }
+
     inline bool isTextureLayer() {
         return textureLayer;
     }
@@ -191,20 +182,34 @@ struct Layer {
         return colorFilter;
     }
 
-    inline void setColorFilter(SkiaColorFilter* filter) {
-        colorFilter = filter;
-    }
+    ANDROID_API void setColorFilter(SkiaColorFilter* filter);
 
     inline void bindTexture() {
-        glBindTexture(renderTarget, texture.id);
+        if (texture.id) {
+            glBindTexture(renderTarget, texture.id);
+        }
     }
 
     inline void generateTexture() {
-        glGenTextures(1, &texture.id);
+        if (!texture.id) {
+            glGenTextures(1, &texture.id);
+        }
     }
 
     inline void deleteTexture() {
-        if (texture.id) glDeleteTextures(1, &texture.id);
+        if (texture.id) {
+            glDeleteTextures(1, &texture.id);
+            texture.id = 0;
+        }
+    }
+
+    /**
+     * When the caller frees the texture itself, the caller
+     * must call this method to tell this layer that it lost
+     * the texture.
+     */
+    void clearTexture() {
+        texture.id = 0;
     }
 
     inline void deleteFbo() {
@@ -212,6 +217,9 @@ struct Layer {
     }
 
     inline void allocateTexture(GLenum format, GLenum storage) {
+#if DEBUG_LAYERS
+        ALOGD("  Allocate layer: %dx%d", getWidth(), getHeight());
+#endif
         glTexImage2D(renderTarget, 0, format, getWidth(), getHeight(), 0, format, storage, NULL);
     }
 
@@ -285,6 +293,12 @@ private:
      * layer.
      */
     bool textureLayer;
+
+    /**
+     * When set to true, this layer is dirty and should be cleared
+     * before any rendering occurs.
+     */
+    bool dirty;
 
     /**
      * Indicates the render target.

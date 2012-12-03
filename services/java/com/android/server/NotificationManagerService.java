@@ -20,7 +20,9 @@ import static org.xmlpull.v1.XmlPullParser.END_DOCUMENT;
 import static org.xmlpull.v1.XmlPullParser.END_TAG;
 import static org.xmlpull.v1.XmlPullParser.START_TAG;
 
+import android.app.ActivityManager;
 import android.app.ActivityManagerNative;
+import android.app.AppGlobals;
 import android.app.IActivityManager;
 import android.app.INotificationManager;
 import android.app.ITransientNotification;
@@ -48,20 +50,21 @@ import android.os.Message;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.os.UserId;
+import android.os.UserHandle;
 import android.os.Vibrator;
 import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+import android.util.AtomicFile;
 import android.util.EventLog;
 import android.util.Log;
 import android.util.Slog;
 import android.util.Xml;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
+import android.widget.RemoteViews;
 import android.widget.Toast;
 
-import com.android.internal.os.AtomicFile;
 import com.android.internal.statusbar.StatusBarNotification;
 import com.android.internal.util.FastXmlSerializer;
 
@@ -98,6 +101,7 @@ public class NotificationManagerService extends INotificationManager.Stub
     private static final int SHORT_DELAY = 2000; // 2 seconds
 
     private static final long[] DEFAULT_VIBRATE_PATTERN = {0, 250, 250, 250};
+    private static final int VIBRATE_PATTERN_MAXLEN = 8 * 2 + 1; // up to eight bumps
 
     private static final int DEFAULT_STREAM_TYPE = AudioManager.STREAM_NOTIFICATION;
     private static final boolean SCORE_ONGOING_HIGHER = false;
@@ -121,6 +125,9 @@ public class NotificationManagerService extends INotificationManager.Stub
     private int mDefaultNotificationColor;
     private int mDefaultNotificationLedOn;
     private int mDefaultNotificationLedOff;
+
+    private long[] mDefaultVibrationPattern;
+    private long[] mFallbackVibrationPattern;
 
     private boolean mSystemReady;
     private int mDisabledNotifications;
@@ -314,17 +321,20 @@ public class NotificationManagerService extends INotificationManager.Stub
         final int id;
         final int uid;
         final int initialPid;
+        final int userId;
         final Notification notification;
         final int score;
         IBinder statusBarKey;
 
-        NotificationRecord(String pkg, String tag, int id, int uid, int initialPid, int score, Notification notification)
+        NotificationRecord(String pkg, String tag, int id, int uid, int initialPid,
+                int userId, int score, Notification notification)
         {
             this.pkg = pkg;
             this.tag = tag;
             this.id = id;
             this.uid = uid;
             this.initialPid = initialPid;
+            this.userId = userId;
             this.score = score;
             this.notification = notification;
         }
@@ -339,7 +349,7 @@ public class NotificationManagerService extends INotificationManager.Stub
             pw.println(prefix + "  deleteIntent=" + notification.deleteIntent);
             pw.println(prefix + "  tickerText=" + notification.tickerText);
             pw.println(prefix + "  contentView=" + notification.contentView);
-            pw.println(prefix + "  uid=" + uid);
+            pw.println(prefix + "  uid=" + uid + " userId=" + userId);
             pw.println(prefix + "  defaults=0x" + Integer.toHexString(notification.defaults));
             pw.println(prefix + "  flags=0x" + Integer.toHexString(notification.flags));
             pw.println(prefix + "  sound=" + notification.sound);
@@ -426,18 +436,25 @@ public class NotificationManagerService extends INotificationManager.Stub
         }
 
         public void onClearAll() {
-            cancelAll();
+            // XXX to be totally correct, the caller should tell us which user
+            // this is for.
+            cancelAll(ActivityManager.getCurrentUser());
         }
 
         public void onNotificationClick(String pkg, String tag, int id) {
+            // XXX to be totally correct, the caller should tell us which user
+            // this is for.
             cancelNotification(pkg, tag, id, Notification.FLAG_AUTO_CANCEL,
-                    Notification.FLAG_FOREGROUND_SERVICE, false);
+                    Notification.FLAG_FOREGROUND_SERVICE, false,
+                    ActivityManager.getCurrentUser());
         }
 
         public void onNotificationClear(String pkg, String tag, int id) {
+            // XXX to be totally correct, the caller should tell us which user
+            // this is for.
             cancelNotification(pkg, tag, id, 0,
                 Notification.FLAG_ONGOING_EVENT | Notification.FLAG_FOREGROUND_SERVICE,
-                true);
+                true, ActivityManager.getCurrentUser());
         }
 
         public void onPanelRevealed() {
@@ -476,7 +493,9 @@ public class NotificationManagerService extends INotificationManager.Stub
                 int uid, int initialPid, String message) {
             Slog.d(TAG, "onNotification error pkg=" + pkg + " tag=" + tag + " id=" + id
                     + "; will crashApplication(uid=" + uid + ", pid=" + initialPid + ")");
-            cancelNotification(pkg, tag, id, 0, 0, false);
+            // XXX to be totally correct, the caller should tell us which user
+            // this is for.
+            cancelNotification(pkg, tag, id, 0, 0, false, UserHandle.getUserId(uid));
             long ident = Binder.clearCallingIdentity();
             try {
                 ActivityManagerNative.getDefault().crashApplication(uid, initialPid, pkg,
@@ -528,7 +547,8 @@ public class NotificationManagerService extends INotificationManager.Stub
                 }
                 if (pkgList != null && (pkgList.length > 0)) {
                     for (String pkgName : pkgList) {
-                        cancelAllNotificationsInt(pkgName, 0, 0, !queryRestart);
+                        cancelAllNotificationsInt(pkgName, 0, 0, !queryRestart,
+                                UserHandle.USER_ALL);
                     }
                 }
             } else if (action.equals(Intent.ACTION_SCREEN_ON)) {
@@ -541,6 +561,11 @@ public class NotificationManagerService extends INotificationManager.Stub
                 mInCall = (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
                         TelephonyManager.EXTRA_STATE_OFFHOOK));
                 updateNotificationPulse();
+            } else if (action.equals(Intent.ACTION_USER_STOPPED)) {
+                int userHandle = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, -1);
+                if (userHandle >= 0) {
+                    cancelAllNotificationsInt(null, 0, 0, true, userHandle);
+                }
             } else if (action.equals(Intent.ACTION_USER_PRESENT)) {
                 // turn off LED when user passes through lock screen
                 mNotificationLight.turnOff();
@@ -575,6 +600,19 @@ public class NotificationManagerService extends INotificationManager.Stub
         }
     }
 
+    static long[] getLongArray(Resources r, int resid, int maxlen, long[] def) {
+        int[] ar = r.getIntArray(resid);
+        if (ar == null) {
+            return def;
+        }
+        final int len = ar.length > maxlen ? maxlen : ar.length;
+        long[] out = new long[len];
+        for (int i=0; i<len; i++) {
+            out[i] = ar[i];
+        }
+        return out;
+    }
+
     NotificationManagerService(Context context, StatusBarManagerService statusBar,
             LightsService lights)
     {
@@ -601,12 +639,22 @@ public class NotificationManagerService extends INotificationManager.Stub
         mDefaultNotificationLedOff = resources.getInteger(
                 com.android.internal.R.integer.config_defaultNotificationLedOff);
 
+        mDefaultVibrationPattern = getLongArray(resources,
+                com.android.internal.R.array.config_defaultNotificationVibePattern,
+                VIBRATE_PATTERN_MAXLEN,
+                DEFAULT_VIBRATE_PATTERN);
+
+        mFallbackVibrationPattern = getLongArray(resources,
+                com.android.internal.R.array.config_notificationFallbackVibePattern,
+                VIBRATE_PATTERN_MAXLEN,
+                DEFAULT_VIBRATE_PATTERN);
+
         // Don't start allowing notifications until the setup wizard has run once.
         // After that, including subsequent boots, init with notifications turned on.
         // This works on the first boot because the setup wizard will toggle this
         // flag at least once and we'll go back to 0 after that.
-        if (0 == Settings.Secure.getInt(mContext.getContentResolver(),
-                    Settings.Secure.DEVICE_PROVISIONED, 0)) {
+        if (0 == Settings.Global.getInt(mContext.getContentResolver(),
+                    Settings.Global.DEVICE_PROVISIONED, 0)) {
             mDisabledNotifications = StatusBarManager.DISABLE_NOTIFICATION_ALERTS;
         }
 
@@ -616,6 +664,7 @@ public class NotificationManagerService extends INotificationManager.Stub
         filter.addAction(Intent.ACTION_SCREEN_OFF);
         filter.addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED);
         filter.addAction(Intent.ACTION_USER_PRESENT);
+        filter.addAction(Intent.ACTION_USER_STOPPED);
         mContext.registerReceiver(mIntentReceiver, filter);
         IntentFilter pkgFilter = new IntentFilter();
         pkgFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
@@ -844,34 +893,31 @@ public class NotificationManagerService extends INotificationManager.Stub
 
     // Notifications
     // ============================================================================
-    @Deprecated
-    public void enqueueNotification(String pkg, int id, Notification notification, int[] idOut)
-    {
-        enqueueNotificationWithTag(pkg, null /* tag */, id, notification, idOut);
-    }
-
     public void enqueueNotificationWithTag(String pkg, String tag, int id, Notification notification,
-            int[] idOut)
+            int[] idOut, int userId)
     {
         enqueueNotificationInternal(pkg, Binder.getCallingUid(), Binder.getCallingPid(),
-                tag, id, notification, idOut);
+                tag, id, notification, idOut, userId);
     }
     
     private final static int clamp(int x, int low, int high) {
         return (x < low) ? low : ((x > high) ? high : x);
     }
 
-    
     // Not exposed via Binder; for system use only (otherwise malicious apps could spoof the
     // uid/pid of another application)
     public void enqueueNotificationInternal(String pkg, int callingUid, int callingPid,
-            String tag, int id, Notification notification, int[] idOut)
+            String tag, int id, Notification notification, int[] idOut, int userId)
     {
         if (DBG) {
             Slog.v(TAG, "enqueueNotificationInternal: pkg=" + pkg + " id=" + id + " notification=" + notification);
         }
         checkCallerIsSystemOrSameApp(pkg);
         final boolean isSystemNotification = ("android".equals(pkg));
+
+        userId = ActivityManager.handleIncomingUser(callingPid,
+                callingUid, userId, true, false, "enqueueNotification", pkg);
+        final UserHandle user = new UserHandle(userId);
 
         // Limit the number of notifications that any given package except the android
         // package can enqueue.  Prevents DOS attacks and deals with leaks.
@@ -881,7 +927,7 @@ public class NotificationManagerService extends INotificationManager.Stub
                 final int N = mNotificationList.size();
                 for (int i=0; i<N; i++) {
                     final NotificationRecord r = mNotificationList.get(i);
-                    if (r.pkg.equals(pkg)) {
+                    if (r.pkg.equals(pkg) && r.userId == userId) {
                         count++;
                         if (count >= MAX_PACKAGE_NOTIFICATIONS) {
                             Slog.e(TAG, "Package has already posted " + count
@@ -897,7 +943,7 @@ public class NotificationManagerService extends INotificationManager.Stub
         //     behalf of the download manager without affecting other apps.
         if (!pkg.equals("com.android.providers.downloads")
                 || Log.isLoggable("DownloadManager", Log.VERBOSE)) {
-            EventLog.writeEvent(EventLogTags.NOTIFICATION_ENQUEUE, pkg, id, tag,
+            EventLog.writeEvent(EventLogTags.NOTIFICATION_ENQUEUE, pkg, id, tag, userId,
                     notification.toString());
         }
 
@@ -947,12 +993,12 @@ public class NotificationManagerService extends INotificationManager.Stub
 
         synchronized (mNotificationList) {
             NotificationRecord r = new NotificationRecord(pkg, tag, id, 
-                    callingUid, callingPid, 
+                    callingUid, callingPid, userId,
                     score,
                     notification);
             NotificationRecord old = null;
 
-            int index = indexOfNotificationLocked(pkg, tag, id);
+            int index = indexOfNotificationLocked(pkg, tag, id, userId);
             if (index < 0) {
                 mNotificationList.add(r);
             } else {
@@ -972,9 +1018,17 @@ public class NotificationManagerService extends INotificationManager.Stub
                         | Notification.FLAG_NO_CLEAR;
             }
 
+            final int currentUser;
+            final long token = Binder.clearCallingIdentity();
+            try {
+                currentUser = ActivityManager.getCurrentUser();
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+
             if (notification.icon != 0) {
-                StatusBarNotification n = new StatusBarNotification(pkg, id, tag,
-                        r.uid, r.initialPid, score, notification);
+                final StatusBarNotification n = new StatusBarNotification(
+                        pkg, id, tag, r.uid, r.initialPid, score, notification, user);
                 if (old != null && old.statusBarKey != null) {
                     r.statusBarKey = old.statusBarKey;
                     long identity = Binder.clearCallingIdentity();
@@ -996,7 +1050,10 @@ public class NotificationManagerService extends INotificationManager.Stub
                         Binder.restoreCallingIdentity(identity);
                     }
                 }
-                sendAccessibilityEvent(notification, pkg);
+                // Send accessibility events only for the current user.
+                if (currentUser == userId) {
+                    sendAccessibilityEvent(notification, pkg);
+                }
             } else {
                 Slog.e(TAG, "Ignoring notification with icon==0: " + notification);
                 if (old != null && old.statusBarKey != null) {
@@ -1014,6 +1071,8 @@ public class NotificationManagerService extends INotificationManager.Stub
             if (((mDisabledNotifications & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) == 0)
                     && (!(old != null
                         && (notification.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0 ))
+                    && (r.userId == UserHandle.USER_ALL ||
+                        (r.userId == userId && r.userId == currentUser))
                     && mSystemReady) {
 
                 final AudioManager audioManager = (AudioManager) mContext
@@ -1037,13 +1096,14 @@ public class NotificationManagerService extends INotificationManager.Stub
                     }
                     mSoundNotification = r;
                     // do not play notifications if stream volume is 0
-                    // (typically because ringer mode is silent).
-                    if (audioManager.getStreamVolume(audioStreamType) != 0) {
+                    // (typically because ringer mode is silent) or if speech recognition is active.
+                    if ((audioManager.getStreamVolume(audioStreamType) != 0)
+                            && !audioManager.isSpeechRecognitionActive()) {
                         final long identity = Binder.clearCallingIdentity();
                         try {
                             final IRingtonePlayer player = mAudioService.getRingtonePlayer();
                             if (player != null) {
-                                player.playAsync(uri, looping, audioStreamType);
+                                player.playAsync(uri, user, looping, audioStreamType);
                             }
                         } catch (RemoteException e) {
                         } finally {
@@ -1053,15 +1113,40 @@ public class NotificationManagerService extends INotificationManager.Stub
                 }
 
                 // vibrate
+                // Does the notification want to specify its own vibration?
+                final boolean hasCustomVibrate = notification.vibrate != null;
+
+                // new in 4.2: if there was supposed to be a sound and we're in vibrate mode,
+                // and no other vibration is specified, we apply the default vibration anyway
+                final boolean convertSoundToVibration =
+                           !hasCustomVibrate
+                        && (useDefaultSound || notification.sound != null)
+                        && (audioManager.getRingerMode() == AudioManager.RINGER_MODE_VIBRATE);
+
+                // The DEFAULT_VIBRATE flag trumps any custom vibration.
                 final boolean useDefaultVibrate =
-                    (notification.defaults & Notification.DEFAULT_VIBRATE) != 0;
-                if ((useDefaultVibrate || notification.vibrate != null)
+                        (notification.defaults & Notification.DEFAULT_VIBRATE) != 0;
+
+                if ((useDefaultVibrate || convertSoundToVibration || hasCustomVibrate)
                         && !(audioManager.getRingerMode() == AudioManager.RINGER_MODE_SILENT)) {
                     mVibrateNotification = r;
 
-                    mVibrator.vibrate(useDefaultVibrate ? DEFAULT_VIBRATE_PATTERN
-                                                        : notification.vibrate,
-                              ((notification.flags & Notification.FLAG_INSISTENT) != 0) ? 0: -1);
+                    if (useDefaultVibrate || convertSoundToVibration) {
+                        // Escalate privileges so we can use the vibrator even if the notifying app
+                        // does not have the VIBRATE permission.
+                        long identity = Binder.clearCallingIdentity();
+                        try {
+                            mVibrator.vibrate(convertSoundToVibration ? mFallbackVibrationPattern
+                                                                      : mDefaultVibrationPattern,
+                                ((notification.flags & Notification.FLAG_INSISTENT) != 0) ? 0: -1);
+                        } finally {
+                            Binder.restoreCallingIdentity(identity);
+                        }
+                    } else if (notification.vibrate.length > 1) {
+                        // If you want your own vibration pattern, you need the VIBRATE permission
+                        mVibrator.vibrate(notification.vibrate,
+                            ((notification.flags & Notification.FLAG_INSISTENT) != 0) ? 0: -1);
+                    }
                 }
             }
 
@@ -1173,12 +1258,12 @@ public class NotificationManagerService extends INotificationManager.Stub
      * and none of the {@code mustNotHaveFlags}.
      */
     private void cancelNotification(String pkg, String tag, int id, int mustHaveFlags,
-            int mustNotHaveFlags, boolean sendDelete) {
-        EventLog.writeEvent(EventLogTags.NOTIFICATION_CANCEL, pkg, id, tag,
+            int mustNotHaveFlags, boolean sendDelete, int userId) {
+        EventLog.writeEvent(EventLogTags.NOTIFICATION_CANCEL, pkg, id, tag, userId,
                 mustHaveFlags, mustNotHaveFlags);
 
         synchronized (mNotificationList) {
-            int index = indexOfNotificationLocked(pkg, tag, id);
+            int index = indexOfNotificationLocked(pkg, tag, id, userId);
             if (index >= 0) {
                 NotificationRecord r = mNotificationList.get(index);
 
@@ -1198,26 +1283,47 @@ public class NotificationManagerService extends INotificationManager.Stub
     }
 
     /**
+     * Determine whether the userId applies to the notification in question, either because
+     * they match exactly, or one of them is USER_ALL (which is treated as a wildcard).
+     */
+    private boolean notificationMatchesUserId(NotificationRecord r, int userId) {
+        return
+                // looking for USER_ALL notifications? match everything
+                   userId == UserHandle.USER_ALL
+                // a notification sent to USER_ALL matches any query
+                || r.userId == UserHandle.USER_ALL
+                // an exact user match
+                || r.userId == userId;
+    }
+
+    /**
      * Cancels all notifications from a given package that have all of the
      * {@code mustHaveFlags}.
      */
     boolean cancelAllNotificationsInt(String pkg, int mustHaveFlags,
-            int mustNotHaveFlags, boolean doit) {
-        EventLog.writeEvent(EventLogTags.NOTIFICATION_CANCEL_ALL, pkg, mustHaveFlags,
-                mustNotHaveFlags);
+            int mustNotHaveFlags, boolean doit, int userId) {
+        EventLog.writeEvent(EventLogTags.NOTIFICATION_CANCEL_ALL, pkg, userId,
+                mustHaveFlags, mustNotHaveFlags);
 
         synchronized (mNotificationList) {
             final int N = mNotificationList.size();
             boolean canceledSomething = false;
             for (int i = N-1; i >= 0; --i) {
                 NotificationRecord r = mNotificationList.get(i);
+                if (!notificationMatchesUserId(r, userId)) {
+                    continue;
+                }
+                // Don't remove notifications to all, if there's no package name specified
+                if (r.userId == UserHandle.USER_ALL && pkg == null) {
+                    continue;
+                }
                 if ((r.notification.flags & mustHaveFlags) != mustHaveFlags) {
                     continue;
                 }
                 if ((r.notification.flags & mustNotHaveFlags) != 0) {
                     continue;
                 }
-                if (!r.pkg.equals(pkg)) {
+                if (pkg != null && !r.pkg.equals(pkg)) {
                     continue;
                 }
                 canceledSomething = true;
@@ -1234,30 +1340,30 @@ public class NotificationManagerService extends INotificationManager.Stub
         }
     }
 
-    @Deprecated
-    public void cancelNotification(String pkg, int id) {
-        cancelNotificationWithTag(pkg, null /* tag */, id);
-    }
-
-    public void cancelNotificationWithTag(String pkg, String tag, int id) {
+    public void cancelNotificationWithTag(String pkg, String tag, int id, int userId) {
         checkCallerIsSystemOrSameApp(pkg);
+        userId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
+                Binder.getCallingUid(), userId, true, false, "cancelNotificationWithTag", pkg);
         // Don't allow client applications to cancel foreground service notis.
         cancelNotification(pkg, tag, id, 0,
                 Binder.getCallingUid() == Process.SYSTEM_UID
-                ? 0 : Notification.FLAG_FOREGROUND_SERVICE, false);
+                ? 0 : Notification.FLAG_FOREGROUND_SERVICE, false, userId);
     }
 
-    public void cancelAllNotifications(String pkg) {
+    public void cancelAllNotifications(String pkg, int userId) {
         checkCallerIsSystemOrSameApp(pkg);
+
+        userId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
+                Binder.getCallingUid(), userId, true, false, "cancelAllNotifications", pkg);
 
         // Calling from user space, don't allow the canceling of actively
         // running foreground services.
-        cancelAllNotificationsInt(pkg, 0, Notification.FLAG_FOREGROUND_SERVICE, true);
+        cancelAllNotificationsInt(pkg, 0, Notification.FLAG_FOREGROUND_SERVICE, true, userId);
     }
 
     void checkCallerIsSystem() {
         int uid = Binder.getCallingUid();
-        if (uid == Process.SYSTEM_UID || uid == 0) {
+        if (UserHandle.getAppId(uid) == Process.SYSTEM_UID || uid == 0) {
             return;
         }
         throw new SecurityException("Disallowed call for uid " + uid);
@@ -1265,26 +1371,30 @@ public class NotificationManagerService extends INotificationManager.Stub
 
     void checkCallerIsSystemOrSameApp(String pkg) {
         int uid = Binder.getCallingUid();
-        if (uid == Process.SYSTEM_UID || uid == 0) {
+        if (UserHandle.getAppId(uid) == Process.SYSTEM_UID || uid == 0) {
             return;
         }
         try {
-            ApplicationInfo ai = mContext.getPackageManager().getApplicationInfo(
-                    pkg, 0);
-            if (!UserId.isSameApp(ai.uid, uid)) {
+            ApplicationInfo ai = AppGlobals.getPackageManager().getApplicationInfo(
+                    pkg, 0, UserHandle.getCallingUserId());
+            if (!UserHandle.isSameApp(ai.uid, uid)) {
                 throw new SecurityException("Calling uid " + uid + " gave package"
                         + pkg + " which is owned by uid " + ai.uid);
             }
-        } catch (PackageManager.NameNotFoundException e) {
-            throw new SecurityException("Unknown package " + pkg);
+        } catch (RemoteException re) {
+            throw new SecurityException("Unknown package " + pkg + "\n" + re);
         }
     }
 
-    void cancelAll() {
+    void cancelAll(int userId) {
         synchronized (mNotificationList) {
             final int N = mNotificationList.size();
             for (int i=N-1; i>=0; i--) {
                 NotificationRecord r = mNotificationList.get(i);
+
+                if (!notificationMatchesUserId(r, userId)) {
+                    continue;
+                }
 
                 if ((r.notification.flags & (Notification.FLAG_ONGOING_EVENT
                                 | Notification.FLAG_NO_CLEAR)) == 0) {
@@ -1330,12 +1440,15 @@ public class NotificationManagerService extends INotificationManager.Stub
     }
 
     // lock on mNotificationList
-    private int indexOfNotificationLocked(String pkg, String tag, int id)
+    private int indexOfNotificationLocked(String pkg, String tag, int id, int userId)
     {
         ArrayList<NotificationRecord> list = mNotificationList;
         final int len = list.size();
         for (int i=0; i<len; i++) {
             NotificationRecord r = list.get(i);
+            if (!notificationMatchesUserId(r, userId) || r.id != id) {
+                continue;
+            }
             if (tag == null) {
                 if (r.tag != null) {
                     continue;
@@ -1345,7 +1458,7 @@ public class NotificationManagerService extends INotificationManager.Stub
                     continue;
                 }
             }
-            if (r.id == id && r.pkg.equals(pkg)) {
+            if (r.pkg.equals(pkg)) {
                 return i;
             }
         }

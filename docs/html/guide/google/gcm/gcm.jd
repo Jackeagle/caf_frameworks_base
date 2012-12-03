@@ -57,9 +57,15 @@ page.title=GCM Architectural Overview
 </div>
 
 <p>Google Cloud Messaging for Android (GCM) is a free service that helps
-developers  send data from servers to their Android applications on  Android devices. This could be a lightweight message telling the Android application that there is new data to be fetched from the server (for instance, a movie uploaded by a friend), or it could be a message containing up to 4kb of payload data (so apps like instant messaging can consume the message directly). The GCM service handles all aspects  of queueing of
-  messages and delivery to the target Android application running  on the target
-  device.</p>
+developers  send data from servers to their Android applications on  Android
+devices. This could be a lightweight message telling the Android application
+that there is new data to be fetched from the server (for instance, a movie
+uploaded by a friend), or it could be a message containing up to 4kb of payload
+data (so apps like instant messaging can consume the message directly). The GCM
+service handles all aspects  of queueing of messages and delivery to the target
+Android application running  on the target device.</p>
+  
+  
 <p class="note"> To jump right into using GCM with your Android
   applications, see the instructions in <a href="gs.html">Getting Started</a>.</p>
 
@@ -647,13 +653,15 @@ when the device is offline, so that only the last message gets sent to the
 client. This is intended to avoid sending too many messages to the phone when it
 comes back online. Note that since there is no guarantee of the order in which
 messages get sent, the &quot;last&quot; message may not actually be the last
-message sent by the application server. See <a href="adv.html#collapsible">Advanced Topics</a> for more discussion of this topic. Optional, unless you are using the <code>time_to_live</code> parameter&mdash;in that case, you must also specify a <code>collapse_key</code>.</td>
+message sent by the application server. See <a href="adv.html#collapsible">Advanced Topics</a> for more discussion of this topic. Optional.</td>
   </tr>
   <tr>
     <td><code>data</code></td>
     <td>A JSON object whose fields represents the key-value pairs of the message's payload data. If present, the payload data it will be
 included in the Intent as application data, with the key being the extra's name. For instance, <code>"data":{"score":"3x1"}</code> would result in an intent extra named <code>score</code> whose value is the string <code>3x1</code>. 
+
 There is no limit on the number of key/value pairs, though there is a limit on the total size of the message (4kb). The values could be any JSON object, but we recommend using strings, since the values will be converted to strings in the GCM server anyway. If you want to include objects or other non-string data types (such as integers or booleans), you have to do the conversion to string yourself. Also note that the key cannot be a reserved word (<code>from</code> or any word starting with <code>google.</code>). To complicate things slightly, there are some reserved words (such as <code>collapse_key</code>) that are technically allowed in payload data. However, if the request also contains the word, the value in the request will overwrite the value in the payload data. Hence using words that are defined as field names in this table is not recommended, even in cases where they are technically allowed. Optional.</td>
+
 
   </tr>
   <tr>
@@ -665,7 +673,7 @@ sent. Optional. The default value is <code>false</code>, and must be a JSON bool
   </tr>
   <tr>
     <td><code>time_to_live</code></td>
-    <td>How long (in seconds) the message should be kept on GCM storage if the device is offline. Optional (default time-to-live is 4 weeks, and must be set as a JSON number). If you use this parameter, you must also specify a <code>collapse_key</code>.</td>
+    <td>How long (in seconds) the message should be kept on GCM storage if the device is offline. Optional (default time-to-live is 4 weeks, and must be set as a JSON number).</td>
   </tr>
 </table>
 
@@ -685,8 +693,10 @@ sent. Optional. The default value is <code>false</code>, and must be a JSON bool
   </tr>
   <tr>
     <td><code>data.&lt;key&gt;</code></td>
+
     <td>Payload data, expressed as parameters prefixed with <code>data.</code> and suffixed as the key. For instance, a parameter of <code>data.score=3x1</code> would result in an intent extra named <code>score</code> whose value is the string <code>3x1</code>. There is no limit on the number of key/value parameters, though there is a limit on the total size of the  message. Also note that the key cannot be a reserved word (<code>from</code> or any word starting with 
 <code>google.</code>). To complicate things slightly, there are some reserved words (such as <code>collapse_key</code>) that are technically allowed in payload data. However, if the request also contains the word, the value in the request will overwrite the value in the payload data. Hence using words that are defined as field names in this table is not recommended, even in cases where they are technically allowed. Optional.</td>
+
   </tr>
   <tr>
     <td><code>delay_while_idle</code></td>
@@ -698,7 +708,7 @@ sent. Optional. The default value is <code>false</code>, and must be a JSON bool
   </tr>
 </table>
 
-<p>If you want to test your request (either JSON or plain text) without delivering the message to the devices, you can set an optional HTTP parameter called <code>dry_run</code> with the value <code>true</code>. The result will be almost identical to running the request without this parameter, except that the message will not be delivered to the devices. Consequently, the response will contain fake IDs for the message and multicast fields (see <a href="#response">Response format</a>).</p>
+
 
   <h4 id="example-requests">Example requests</h4>
   <p>Here is the smallest possible request (a message without any parameters and just one recipient) using JSON:</p>
@@ -763,13 +773,8 @@ the HTTP response contains a non-200 status code (such as 400, 401, or 503).</p>
     <td>There was an error authenticating the sender account. <a href="#auth_error">Troubleshoot</a></td>
   </tr>
   <tr>
-    <td>500</td>
-    <td>There was an internal error in the GCM server while trying to process the request. <a href="#internal_error">Troubleshoot</a></td>
-  </tr>
-  <tr>
-    <td>503</td>
-    <td>Indicates that the server is temporarily unavailable (i.e., because of timeouts, etc ). Sender must retry later, honoring any <code>Retry-After</code> header
-      included in the response. Application servers must implement exponential back-off. The GCM server took too long to process the request. <a href="#internal_error">Troubleshoot</a></td>
+    <td>5xx</td>
+    <td>Errors in the 500-599 range (such as 500 or 503) indicate that there was an internal error in the GCM server while trying to process the request, or that the server is temporarily unavailable (for example, because of timeouts). Sender must retry later, honoring any <code>Retry-After</code> header included in the response. Application servers must implement exponential back-off. <a href="#internal_error">Troubleshoot</a></td>
   </tr>
 </table>
 
@@ -891,11 +896,9 @@ Happens when the error code is <code>InvalidDataKey</code>.</dd>
 </ul>
 Check that the token you're sending inside the <code>Authorization</code> header is the correct API key associated with your project. You can check the validity of your API key by running the following command:<br/>
 
-
 <pre># api_key=YOUR_API_KEY
 
 # curl --header "Authorization: key=$api_key" --header Content-Type:"application/json" https://android.googleapis.com/gcm/send  -d "{\"registration_ids\":[\"ABC\"]}"</pre>
-
 
 
 If you receive a 401 HTTP status code, your API key is not valid. Otherwise you should see something like this:<br/>
@@ -927,17 +930,15 @@ all messages at the same time.</li>
 
 Senders that cause problems risk being blacklisted. 
 <br />
-Happens when the HTTP status code is 503, or when the <code>error</code> field of a JSON object in the results array is <code>Unavailable</code>.
+Happens when the HTTP status code is between 501 and 599, or when the <code>error</code> field of a JSON object in the results array is <code>Unavailable</code>.
 </dd>
 
 <dt id="internal_error"><strong>Internal Server Error</strong></dt>
 
 <dd>
 The server encountered an error while trying to process the request. You
-could retry the same request (obeying the requirements listed in the <strong>Timeout</strong>
+could retry the same request (obeying the requirements listed in the <a href="#timeout">Timeout</a>
 section), but if the error persists, please report the problem in the <a href="https://groups.google.com/forum/?fromgroups#!forum/android-gcm">android-gcm group</a>.
-<br /> 
-Senders that cause problems risk being blacklisted. 
 <br />
 Happens when the HTTP status code is 500, or when the <code>error</code> field of a JSON
 object in the results array is <code>InternalServerError</code>.

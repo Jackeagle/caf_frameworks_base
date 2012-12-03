@@ -32,6 +32,7 @@ import android.content.pm.IPackageStatsObserver;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.ManifestDigest;
+import android.content.pm.PackageCleanItem;
 import android.content.pm.ParceledListSlice;
 import android.content.pm.ProviderInfo;
 import android.content.pm.PermissionGroupInfo;
@@ -39,8 +40,10 @@ import android.content.pm.PermissionInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.UserInfo;
+import android.content.pm.VerificationParams;
 import android.content.pm.VerifierDeviceIdentity;
 import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.content.IntentSender;
 
 /**
@@ -124,7 +127,7 @@ interface IPackageManager {
      * limit that kicks in when flags are included that bloat up the data
      * returned.
      */
-    ParceledListSlice getInstalledPackages(int flags, in String lastRead);
+    ParceledListSlice getInstalledPackages(int flags, in String lastRead, in int userId);
 
     /**
      * This implements getInstalledApplications via a "last returned row"
@@ -199,7 +202,7 @@ interface IPackageManager {
     List<PackageInfo> getPreferredPackages(int flags);
 
     void addPreferredActivity(in IntentFilter filter, int match,
-            in ComponentName[] set, in ComponentName activity);
+            in ComponentName[] set, in ComponentName activity, int userId);
 
     void replacePreferredActivity(in IntentFilter filter, int match,
             in ComponentName[] set, in ComponentName activity);
@@ -303,10 +306,11 @@ interface IPackageManager {
      * Get package statistics including the code, data and cache size for
      * an already installed package
      * @param packageName The package name of the application
+     * @param userHandle Which user the size should be retrieved for
      * @param observer a callback to use to notify when the asynchronous
      * retrieval of information is complete.
      */
-    void getPackageSizeInfo(in String packageName, IPackageStatsObserver observer);
+    void getPackageSizeInfo(in String packageName, int userHandle, IPackageStatsObserver observer);
     
     /**
      * Get a list of shared libraries that are available on the
@@ -348,7 +352,7 @@ interface IPackageManager {
      */
     void updateExternalMediaStatus(boolean mounted, boolean reportStatus);
 
-    String nextPackageToClean(String lastPackage);
+    PackageCleanItem nextPackageToClean(in PackageCleanItem lastPackage);
 
     void movePackage(String packageName, IPackageMoveObserver observer, int flags);
     
@@ -357,22 +361,23 @@ interface IPackageManager {
     boolean setInstallLocation(int loc);
     int getInstallLocation();
 
-    UserInfo createUser(in String name, int flags);
-    boolean removeUser(int userId);
-    void updateUserName(int userId, String name);
-
     void installPackageWithVerification(in Uri packageURI, in IPackageInstallObserver observer,
             int flags, in String installerPackageName, in Uri verificationURI,
             in ManifestDigest manifestDigest, in ContainerEncryptionParams encryptionParams);
 
+    void installPackageWithVerificationAndEncryption(in Uri packageURI,
+            in IPackageInstallObserver observer, int flags, in String installerPackageName,
+            in VerificationParams verificationParams,
+            in ContainerEncryptionParams encryptionParams);
+
+    int installExistingPackage(String packageName);
+
     void verifyPendingInstall(int id, int verificationCode);
+    void extendVerificationTimeout(int id, int verificationCodeAtTimeout, long millisecondsToDelay);
 
     VerifierDeviceIdentity getVerifierDeviceIdentity();
 
     boolean isFirstBoot();
-
-    List<UserInfo> getUsers();
-    UserInfo getUser(int userId);
 
     void setPermissionEnforced(String permission, boolean enforced);
     boolean isPermissionEnforced(String permission);

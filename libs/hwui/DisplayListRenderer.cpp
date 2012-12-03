@@ -61,9 +61,9 @@ const char* DisplayList::OP_NAMES[] = {
     "DrawPath",
     "DrawLines",
     "DrawPoints",
-    "DrawText",
     "DrawTextOnPath",
     "DrawPosText",
+    "DrawText",
     "ResetShader",
     "SetupShader",
     "ResetColorFilter",
@@ -105,7 +105,179 @@ DisplayList::~DisplayList() {
     clearResources();
 }
 
-void DisplayList::initProperties() {
+void DisplayList::destroyDisplayListDeferred(DisplayList* displayList) {
+    if (displayList) {
+        DISPLAY_LIST_LOGD("Deferring display list destruction");
+        Caches::getInstance().deleteDisplayListDeferred(displayList);
+    }
+}
+
+void DisplayList::clearResources() {
+    sk_free((void*) mReader.base());
+    mReader.setMemory(NULL, 0);
+
+    delete mTransformMatrix;
+    delete mTransformCamera;
+    delete mTransformMatrix3D;
+    delete mStaticMatrix;
+    delete mAnimationMatrix;
+
+    mTransformMatrix = NULL;
+    mTransformCamera = NULL;
+    mTransformMatrix3D = NULL;
+    mStaticMatrix = NULL;
+    mAnimationMatrix = NULL;
+
+    Caches& caches = Caches::getInstance();
+    caches.unregisterFunctors(mFunctorCount);
+    caches.resourceCache.lock();
+
+    for (size_t i = 0; i < mBitmapResources.size(); i++) {
+        caches.resourceCache.decrementRefcountLocked(mBitmapResources.itemAt(i));
+    }
+
+    for (size_t i = 0; i < mOwnedBitmapResources.size(); i++) {
+        SkBitmap* bitmap = mOwnedBitmapResources.itemAt(i);
+        caches.resourceCache.decrementRefcountLocked(bitmap);
+        caches.resourceCache.destructorLocked(bitmap);
+    }
+
+    for (size_t i = 0; i < mFilterResources.size(); i++) {
+        caches.resourceCache.decrementRefcountLocked(mFilterResources.itemAt(i));
+    }
+
+    for (size_t i = 0; i < mShaders.size(); i++) {
+        caches.resourceCache.decrementRefcountLocked(mShaders.itemAt(i));
+        caches.resourceCache.destructorLocked(mShaders.itemAt(i));
+    }
+
+    for (size_t i = 0; i < mSourcePaths.size(); i++) {
+        caches.resourceCache.decrementRefcountLocked(mSourcePaths.itemAt(i));
+    }
+
+    for (size_t i = 0; i < mLayers.size(); i++) {
+        caches.resourceCache.decrementRefcountLocked(mLayers.itemAt(i));
+    }
+
+    caches.resourceCache.unlock();
+
+    for (size_t i = 0; i < mPaints.size(); i++) {
+        delete mPaints.itemAt(i);
+    }
+
+    for (size_t i = 0; i < mPaths.size(); i++) {
+        SkPath* path = mPaths.itemAt(i);
+        caches.pathCache.remove(path);
+        delete path;
+    }
+
+    for (size_t i = 0; i < mMatrices.size(); i++) {
+        delete mMatrices.itemAt(i);
+    }
+
+    mBitmapResources.clear();
+    mOwnedBitmapResources.clear();
+    mFilterResources.clear();
+    mShaders.clear();
+    mSourcePaths.clear();
+    mPaints.clear();
+    mPaths.clear();
+    mMatrices.clear();
+    mLayers.clear();
+}
+
+void DisplayList::reset() {
+    clearResources();
+    init();
+}
+
+void DisplayList::initFromDisplayListRenderer(const DisplayListRenderer& recorder, bool reusing) {
+
+    if (reusing) {
+        // re-using display list - clear out previous allocations
+        clearResources();
+    }
+
+    init();
+
+    const SkWriter32& writer = recorder.writeStream();
+    if (writer.size() == 0) {
+        return;
+    }
+
+    mSize = writer.size();
+    void* buffer = sk_malloc_throw(mSize);
+    writer.flatten(buffer);
+    mReader.setMemory(buffer, mSize);
+
+    mFunctorCount = recorder.getFunctorCount();
+
+    Caches& caches = Caches::getInstance();
+    caches.registerFunctors(mFunctorCount);
+    caches.resourceCache.lock();
+
+    const Vector<SkBitmap*>& bitmapResources = recorder.getBitmapResources();
+    for (size_t i = 0; i < bitmapResources.size(); i++) {
+        SkBitmap* resource = bitmapResources.itemAt(i);
+        mBitmapResources.add(resource);
+        caches.resourceCache.incrementRefcountLocked(resource);
+    }
+
+    const Vector<SkBitmap*> &ownedBitmapResources = recorder.getOwnedBitmapResources();
+    for (size_t i = 0; i < ownedBitmapResources.size(); i++) {
+        SkBitmap* resource = ownedBitmapResources.itemAt(i);
+        mOwnedBitmapResources.add(resource);
+        caches.resourceCache.incrementRefcountLocked(resource);
+    }
+
+    const Vector<SkiaColorFilter*>& filterResources = recorder.getFilterResources();
+    for (size_t i = 0; i < filterResources.size(); i++) {
+        SkiaColorFilter* resource = filterResources.itemAt(i);
+        mFilterResources.add(resource);
+        caches.resourceCache.incrementRefcountLocked(resource);
+    }
+
+    const Vector<SkiaShader*>& shaders = recorder.getShaders();
+    for (size_t i = 0; i < shaders.size(); i++) {
+        SkiaShader* resource = shaders.itemAt(i);
+        mShaders.add(resource);
+        caches.resourceCache.incrementRefcountLocked(resource);
+    }
+
+    const SortedVector<SkPath*>& sourcePaths = recorder.getSourcePaths();
+    for (size_t i = 0; i < sourcePaths.size(); i++) {
+        mSourcePaths.add(sourcePaths.itemAt(i));
+        caches.resourceCache.incrementRefcountLocked(sourcePaths.itemAt(i));
+    }
+
+    const Vector<Layer*>& layers = recorder.getLayers();
+    for (size_t i = 0; i < layers.size(); i++) {
+        mLayers.add(layers.itemAt(i));
+        caches.resourceCache.incrementRefcountLocked(layers.itemAt(i));
+    }
+
+    caches.resourceCache.unlock();
+
+    const Vector<SkPaint*>& paints = recorder.getPaints();
+    for (size_t i = 0; i < paints.size(); i++) {
+        mPaints.add(paints.itemAt(i));
+    }
+
+    const Vector<SkPath*>& paths = recorder.getPaths();
+    for (size_t i = 0; i < paths.size(); i++) {
+        mPaths.add(paths.itemAt(i));
+    }
+
+    const Vector<SkMatrix*>& matrices = recorder.getMatrices();
+    for (size_t i = 0; i < matrices.size(); i++) {
+        mMatrices.add(matrices.itemAt(i));
+    }
+}
+
+void DisplayList::init() {
+    mSize = 0;
+    mIsRenderable = true;
+    mFunctorCount = 0;
     mLeft = 0;
     mTop = 0;
     mRight = 0;
@@ -132,151 +304,6 @@ void DisplayList::initProperties() {
     mHeight = 0;
     mPivotExplicitlySet = false;
     mCaching = false;
-}
-
-void DisplayList::destroyDisplayListDeferred(DisplayList* displayList) {
-    if (displayList) {
-        DISPLAY_LIST_LOGD("Deferring display list destruction");
-        Caches::getInstance().deleteDisplayListDeferred(displayList);
-    }
-}
-
-void DisplayList::clearResources() {
-    sk_free((void*) mReader.base());
-
-    delete mTransformMatrix;
-    delete mTransformCamera;
-    delete mTransformMatrix3D;
-    delete mStaticMatrix;
-    delete mAnimationMatrix;
-    mTransformMatrix = NULL;
-    mTransformCamera = NULL;
-    mTransformMatrix3D = NULL;
-    mStaticMatrix = NULL;
-    mAnimationMatrix = NULL;
-
-    Caches& caches = Caches::getInstance();
-
-    for (size_t i = 0; i < mBitmapResources.size(); i++) {
-        caches.resourceCache.decrementRefcount(mBitmapResources.itemAt(i));
-    }
-    mBitmapResources.clear();
-
-    for (size_t i = 0; i < mOwnedBitmapResources.size(); i++) {
-        SkBitmap* bitmap = mOwnedBitmapResources.itemAt(i);
-        caches.resourceCache.decrementRefcount(bitmap);
-        caches.resourceCache.destructor(bitmap);
-    }
-    mOwnedBitmapResources.clear();
-
-    for (size_t i = 0; i < mFilterResources.size(); i++) {
-        caches.resourceCache.decrementRefcount(mFilterResources.itemAt(i));
-    }
-    mFilterResources.clear();
-
-    for (size_t i = 0; i < mShaders.size(); i++) {
-        caches.resourceCache.decrementRefcount(mShaders.itemAt(i));
-        caches.resourceCache.destructor(mShaders.itemAt(i));
-    }
-    mShaders.clear();
-
-    for (size_t i = 0; i < mPaints.size(); i++) {
-        delete mPaints.itemAt(i);
-    }
-    mPaints.clear();
-
-    for (size_t i = 0; i < mPaths.size(); i++) {
-        SkPath* path = mPaths.itemAt(i);
-        caches.pathCache.remove(path);
-        delete path;
-    }
-    mPaths.clear();
-
-    for (size_t i = 0; i < mSourcePaths.size(); i++) {
-        caches.resourceCache.decrementRefcount(mSourcePaths.itemAt(i));
-    }
-    mSourcePaths.clear();
-
-    for (size_t i = 0; i < mMatrices.size(); i++) {
-        delete mMatrices.itemAt(i);
-    }
-    mMatrices.clear();
-}
-
-void DisplayList::initFromDisplayListRenderer(const DisplayListRenderer& recorder, bool reusing) {
-    const SkWriter32& writer = recorder.writeStream();
-    init();
-
-    if (writer.size() == 0) {
-        return;
-    }
-
-    if (reusing) {
-        // re-using display list - clear out previous allocations
-        clearResources();
-    }
-    initProperties();
-
-    mSize = writer.size();
-    void* buffer = sk_malloc_throw(mSize);
-    writer.flatten(buffer);
-    mReader.setMemory(buffer, mSize);
-
-    Caches& caches = Caches::getInstance();
-
-    const Vector<SkBitmap*>& bitmapResources = recorder.getBitmapResources();
-    for (size_t i = 0; i < bitmapResources.size(); i++) {
-        SkBitmap* resource = bitmapResources.itemAt(i);
-        mBitmapResources.add(resource);
-        caches.resourceCache.incrementRefcount(resource);
-    }
-
-    const Vector<SkBitmap*> &ownedBitmapResources = recorder.getOwnedBitmapResources();
-    for (size_t i = 0; i < ownedBitmapResources.size(); i++) {
-        SkBitmap* resource = ownedBitmapResources.itemAt(i);
-        mOwnedBitmapResources.add(resource);
-        caches.resourceCache.incrementRefcount(resource);
-    }
-
-    const Vector<SkiaColorFilter*>& filterResources = recorder.getFilterResources();
-    for (size_t i = 0; i < filterResources.size(); i++) {
-        SkiaColorFilter* resource = filterResources.itemAt(i);
-        mFilterResources.add(resource);
-        caches.resourceCache.incrementRefcount(resource);
-    }
-
-    const Vector<SkiaShader*>& shaders = recorder.getShaders();
-    for (size_t i = 0; i < shaders.size(); i++) {
-        SkiaShader* resource = shaders.itemAt(i);
-        mShaders.add(resource);
-        caches.resourceCache.incrementRefcount(resource);
-    }
-
-    const Vector<SkPaint*>& paints = recorder.getPaints();
-    for (size_t i = 0; i < paints.size(); i++) {
-        mPaints.add(paints.itemAt(i));
-    }
-
-    const Vector<SkPath*>& paths = recorder.getPaths();
-    for (size_t i = 0; i < paths.size(); i++) {
-        mPaths.add(paths.itemAt(i));
-    }
-
-    const SortedVector<SkPath*>& sourcePaths = recorder.getSourcePaths();
-    for (size_t i = 0; i < sourcePaths.size(); i++) {
-        mSourcePaths.add(sourcePaths.itemAt(i));
-        caches.resourceCache.incrementRefcount(sourcePaths.itemAt(i));
-    }
-
-    const Vector<SkMatrix*>& matrices = recorder.getMatrices();
-    for (size_t i = 0; i < matrices.size(); i++) {
-        mMatrices.add(matrices.itemAt(i));
-    }
-}
-
-void DisplayList::init() {
-    mSize = 0;
-    mIsRenderable = true;
 }
 
 size_t DisplayList::getSize() {
@@ -486,7 +513,8 @@ void DisplayList::output(OpenGLRenderer& renderer, uint32_t level) {
                 float top = getFloat();
                 float right = getFloat();
                 float bottom = getFloat();
-                SkPaint* paint = getPaint(renderer);
+                int alpha = getInt();
+                SkXfermode::Mode mode = (SkXfermode::Mode) getInt();
                 ALOGD("%s%s %.2f, %.2f, %.2f, %.2f", (char*) indent, OP_NAMES[op],
                         left, top, right, bottom);
             }
@@ -571,17 +599,6 @@ void DisplayList::output(OpenGLRenderer& renderer, uint32_t level) {
                 ALOGD("%s%s", (char*) indent, OP_NAMES[op]);
             }
             break;
-            case DrawText: {
-                getText(&text);
-                int32_t count = getInt();
-                float x = getFloat();
-                float y = getFloat();
-                SkPaint* paint = getPaint(renderer);
-                float length = getFloat();
-                ALOGD("%s%s %s, %d, %d, %.2f, %.2f, %p, %.2f", (char*) indent, OP_NAMES[op],
-                        text.text(), text.length(), count, x, y, paint, length);
-            }
-            break;
             case DrawTextOnPath: {
                 getText(&text);
                 int32_t count = getInt();
@@ -602,6 +619,20 @@ void DisplayList::output(OpenGLRenderer& renderer, uint32_t level) {
                 ALOGD("%s%s %s, %d, %d, %p", (char*) indent, OP_NAMES[op],
                         text.text(), text.length(), count, paint);
             }
+            break;
+            case DrawText: {
+                getText(&text);
+                int32_t count = getInt();
+                float x = getFloat();
+                float y = getFloat();
+                int32_t positionsCount = 0;
+                float* positions = getFloats(positionsCount);
+                SkPaint* paint = getPaint(renderer);
+                float length = getFloat();
+                ALOGD("%s%s %s, %d, %d, %p", (char*) indent, OP_NAMES[op],
+                        text.text(), text.length(), count, paint);
+            }
+            break;
             case ResetShader: {
                 ALOGD("%s%s", (char*) indent, OP_NAMES[op]);
             }
@@ -732,16 +763,17 @@ void DisplayList::outputViewProperties(OpenGLRenderer& renderer, char* indent) {
         }
     }
     if (mAlpha < 1 && !mCaching) {
-        // TODO: should be able to store the size of a DL at record time and not
-        // have to pass it into this call. In fact, this information might be in the
-        // location/size info that we store with the new native transform data.
-        int flags = SkCanvas::kHasAlphaLayer_SaveFlag;
-        if (mClipChildren) {
-            flags |= SkCanvas::kClipToLayer_SaveFlag;
+        if (!mHasOverlappingRendering) {
+            ALOGD("%s%s %.2f", indent, "SetAlpha", mAlpha);
+        } else {
+            int flags = SkCanvas::kHasAlphaLayer_SaveFlag;
+            if (mClipChildren) {
+                flags |= SkCanvas::kClipToLayer_SaveFlag;
+            }
+            ALOGD("%s%s %.2f, %.2f, %.2f, %.2f, %d, 0x%x", indent, "SaveLayerAlpha",
+                    (float) 0, (float) 0, (float) mRight - mLeft, (float) mBottom - mTop,
+                    mMultipliedAlpha, flags);
         }
-        ALOGD("%s%s %.2f, %.2f, %.2f, %.2f, %d, 0x%x", indent, "SaveLayerAlpha",
-                (float) 0, (float) 0, (float) mRight - mLeft, (float) mBottom - mTop,
-                mMultipliedAlpha, flags);
     }
     if (mClipChildren) {
         ALOGD("%s%s %.2f, %.2f, %.2f, %.2f", indent, "ClipRect", 0.0f, 0.0f,
@@ -851,11 +883,13 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
 #endif
 
     renderer.startMark(mName.string());
+
     int restoreTo = renderer.save(SkCanvas::kMatrix_SaveFlag | SkCanvas::kClip_SaveFlag);
     DISPLAY_LIST_LOGD("%s%s %d %d", indent, "Save",
             SkCanvas::kMatrix_SaveFlag | SkCanvas::kClip_SaveFlag, restoreTo);
     setViewProperties(renderer, level);
-    if (renderer.quickReject(0, 0, mWidth, mHeight)) {
+
+    if (renderer.quickRejectNoScissor(0, 0, mWidth, mHeight)) {
         DISPLAY_LIST_LOGD("%s%s %d", (char*) indent, "RestoreToCount", restoreTo);
         renderer.restoreToCount(restoreTo);
         renderer.endMark();
@@ -864,6 +898,7 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
 
     DisplayListLogBuffer& logBuffer = DisplayListLogBuffer::getInstance();
     int saveCount = renderer.getSaveCount() - 1;
+
     while (!mReader.eof()) {
         int op = mReader.readInt();
         if (op & OP_MAY_BE_SKIPPED_MASK) {
@@ -878,6 +913,10 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
             }
         }
         logBuffer.writeCommand(level, op);
+
+#if DEBUG_DISPLAY_LIST_OPS_AS_EVENTS
+        Caches::getInstance().eventMark(strlen(OP_NAMES[op]), OP_NAMES[op]);
+#endif
 
         switch (op) {
             case DrawGLFunction: {
@@ -993,29 +1032,39 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
             }
             break;
             case DrawLayer: {
+                int oldAlpha = -1;
                 Layer* layer = (Layer*) getInt();
                 float x = getFloat();
                 float y = getFloat();
                 SkPaint* paint = getPaint(renderer);
-                if (mCaching) {
-                    paint->setAlpha(mMultipliedAlpha);
+                if (mCaching && mMultipliedAlpha < 255) {
+                    oldAlpha = layer->getAlpha();
+                    layer->setAlpha(mMultipliedAlpha);
                 }
                 DISPLAY_LIST_LOGD("%s%s %p, %.2f, %.2f, %p", (char*) indent, OP_NAMES[op],
                         layer, x, y, paint);
                 drawGlStatus |= renderer.drawLayer(layer, x, y, paint);
+                if (oldAlpha >= 0) {
+                    layer->setAlpha(oldAlpha);
+                }
             }
             break;
             case DrawBitmap: {
+                int oldAlpha = -1;
                 SkBitmap* bitmap = getBitmap();
                 float x = getFloat();
                 float y = getFloat();
                 SkPaint* paint = getPaint(renderer);
-                if (mCaching) {
+                if (mCaching && mMultipliedAlpha < 255) {
+                    oldAlpha = paint->getAlpha();
                     paint->setAlpha(mMultipliedAlpha);
                 }
                 DISPLAY_LIST_LOGD("%s%s %p, %.2f, %.2f, %p", (char*) indent, OP_NAMES[op],
                         bitmap, x, y, paint);
                 drawGlStatus |= renderer.drawBitmap(bitmap, x, y, paint);
+                if (oldAlpha >= 0) {
+                    paint->setAlpha(oldAlpha);
+                }
             }
             break;
             case DrawBitmapMatrix: {
@@ -1089,11 +1138,14 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
                 float top = getFloat();
                 float right = getFloat();
                 float bottom = getFloat();
-                SkPaint* paint = getPaint(renderer);
+
+                int alpha = getInt();
+                SkXfermode::Mode mode = (SkXfermode::Mode) getInt();
 
                 DISPLAY_LIST_LOGD("%s%s", (char*) indent, OP_NAMES[op]);
                 drawGlStatus |= renderer.drawPatch(bitmap, xDivs, yDivs, colors,
-                        xDivsCount, yDivsCount, numColors, left, top, right, bottom, paint);
+                        xDivsCount, yDivsCount, numColors, left, top, right, bottom,
+                        alpha, mode);
             }
             break;
             case DrawColor: {
@@ -1185,19 +1237,6 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
                 drawGlStatus |= renderer.drawPoints(points, count, paint);
             }
             break;
-            case DrawText: {
-                getText(&text);
-                int32_t count = getInt();
-                float x = getFloat();
-                float y = getFloat();
-                SkPaint* paint = getPaint(renderer);
-                float length = getFloat();
-                DISPLAY_LIST_LOGD("%s%s %s, %d, %d, %.2f, %.2f, %p, %.2f", (char*) indent,
-                        OP_NAMES[op], text.text(), text.length(), count, x, y, paint, length);
-                drawGlStatus |= renderer.drawText(text.text(), text.length(), count, x, y,
-                        paint, length);
-            }
-            break;
             case DrawTextOnPath: {
                 getText(&text);
                 int32_t count = getInt();
@@ -1221,6 +1260,21 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
                         OP_NAMES[op], text.text(), text.length(), count, paint);
                 drawGlStatus |= renderer.drawPosText(text.text(), text.length(), count,
                         positions, paint);
+            }
+            break;
+            case DrawText: {
+                getText(&text);
+                int32_t count = getInt();
+                float x = getFloat();
+                float y = getFloat();
+                int32_t positionsCount = 0;
+                float* positions = getFloats(positionsCount);
+                SkPaint* paint = getPaint(renderer);
+                float length = getFloat();
+                DISPLAY_LIST_LOGD("%s%s %s, %d, %d, %.2f, %.2f, %p, %.2f", (char*) indent,
+                        OP_NAMES[op], text.text(), text.length(), count, x, y, paint, length);
+                drawGlStatus |= renderer.drawText(text.text(), text.length(), count,
+                        x, y, positions, paint, length);
             }
             break;
             case ResetShader: {
@@ -1293,8 +1347,10 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
 // Base structure
 ///////////////////////////////////////////////////////////////////////////////
 
-DisplayListRenderer::DisplayListRenderer() : mWriter(MIN_WRITER_SIZE),
-        mTranslateX(0.0f), mTranslateY(0.0f), mHasTranslate(false), mHasDrawOps(false) {
+DisplayListRenderer::DisplayListRenderer():
+        mCaches(Caches::getInstance()), mWriter(MIN_WRITER_SIZE),
+        mTranslateX(0.0f), mTranslateY(0.0f), mHasTranslate(false),
+        mHasDrawOps(false), mFunctorCount(0) {
 }
 
 DisplayListRenderer::~DisplayListRenderer() {
@@ -1304,33 +1360,41 @@ DisplayListRenderer::~DisplayListRenderer() {
 void DisplayListRenderer::reset() {
     mWriter.reset();
 
-    Caches& caches = Caches::getInstance();
+    mCaches.resourceCache.lock();
+
     for (size_t i = 0; i < mBitmapResources.size(); i++) {
-        caches.resourceCache.decrementRefcount(mBitmapResources.itemAt(i));
+        mCaches.resourceCache.decrementRefcountLocked(mBitmapResources.itemAt(i));
     }
-    mBitmapResources.clear();
 
     for (size_t i = 0; i < mOwnedBitmapResources.size(); i++) {
-        SkBitmap* bitmap = mOwnedBitmapResources.itemAt(i);
-        caches.resourceCache.decrementRefcount(bitmap);
+        mCaches.resourceCache.decrementRefcountLocked(mOwnedBitmapResources.itemAt(i));
     }
-    mOwnedBitmapResources.clear();
 
     for (size_t i = 0; i < mFilterResources.size(); i++) {
-        caches.resourceCache.decrementRefcount(mFilterResources.itemAt(i));
+        mCaches.resourceCache.decrementRefcountLocked(mFilterResources.itemAt(i));
     }
-    mFilterResources.clear();
 
     for (size_t i = 0; i < mShaders.size(); i++) {
-        caches.resourceCache.decrementRefcount(mShaders.itemAt(i));
+        mCaches.resourceCache.decrementRefcountLocked(mShaders.itemAt(i));
     }
-    mShaders.clear();
-    mShaderMap.clear();
 
     for (size_t i = 0; i < mSourcePaths.size(); i++) {
-        caches.resourceCache.decrementRefcount(mSourcePaths.itemAt(i));
+        mCaches.resourceCache.decrementRefcountLocked(mSourcePaths.itemAt(i));
     }
+
+    for (size_t i = 0; i < mLayers.size(); i++) {
+        mCaches.resourceCache.decrementRefcountLocked(mLayers.itemAt(i));
+    }
+
+    mCaches.resourceCache.unlock();
+
+    mBitmapResources.clear();
+    mOwnedBitmapResources.clear();
+    mFilterResources.clear();
     mSourcePaths.clear();
+
+    mShaders.clear();
+    mShaderMap.clear();
 
     mPaints.clear();
     mPaintMap.clear();
@@ -1340,7 +1404,10 @@ void DisplayListRenderer::reset() {
 
     mMatrices.clear();
 
+    mLayers.clear();
+
     mHasDrawOps = false;
+    mFunctorCount = 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1368,13 +1435,17 @@ void DisplayListRenderer::setViewport(int width, int height) {
     mHeight = height;
 }
 
-int DisplayListRenderer::prepareDirty(float left, float top,
+status_t DisplayListRenderer::prepareDirty(float left, float top,
         float right, float bottom, bool opaque) {
     mSnapshot = new Snapshot(mFirstSnapshot,
             SkCanvas::kMatrix_SaveFlag | SkCanvas::kClip_SaveFlag);
     mSaveCount = 1;
+
     mSnapshot->setClip(0.0f, 0.0f, mWidth, mHeight);
+    mDirtyClip = opaque;
+
     mRestoreSaveCount = -1;
+
     return DrawGlInfo::kStatusDone; // No invalidate needed at record-time
 }
 
@@ -1393,6 +1464,7 @@ status_t DisplayListRenderer::callDrawGLFunction(Functor *functor, Rect& dirty) 
     // Ignore dirty during recording, it matters only when we replay
     addOp(DisplayList::DrawGLFunction);
     addInt((int) functor);
+    mFunctorCount++;
     return DrawGlInfo::kStatusDone; // No invalidate needed at record-time
 }
 
@@ -1496,14 +1568,15 @@ status_t DisplayListRenderer::drawDisplayList(DisplayList* displayList,
 
 status_t DisplayListRenderer::drawLayer(Layer* layer, float x, float y, SkPaint* paint) {
     addOp(DisplayList::DrawLayer);
-    addInt((int) layer);
+    addLayer(layer);
     addPoint(x, y);
     addPaint(paint);
     return DrawGlInfo::kStatusDone;
 }
 
 status_t DisplayListRenderer::drawBitmap(SkBitmap* bitmap, float left, float top, SkPaint* paint) {
-    const bool reject = quickReject(left, top, left + bitmap->width(), top + bitmap->height());
+    const bool reject = quickRejectNoScissor(left, top,
+            left + bitmap->width(), top + bitmap->height());
     uint32_t* location = addOp(DisplayList::DrawBitmap, reject);
     addBitmap(bitmap);
     addPoint(left, top);
@@ -1517,7 +1590,7 @@ status_t DisplayListRenderer::drawBitmap(SkBitmap* bitmap, SkMatrix* matrix, SkP
     const mat4 transform(*matrix);
     transform.mapRect(r);
 
-    const bool reject = quickReject(r.left, r.top, r.right, r.bottom);
+    const bool reject = quickRejectNoScissor(r.left, r.top, r.right, r.bottom);
     uint32_t* location = addOp(DisplayList::DrawBitmapMatrix, reject);
     addBitmap(bitmap);
     addMatrix(matrix);
@@ -1529,7 +1602,7 @@ status_t DisplayListRenderer::drawBitmap(SkBitmap* bitmap, SkMatrix* matrix, SkP
 status_t DisplayListRenderer::drawBitmap(SkBitmap* bitmap, float srcLeft, float srcTop,
         float srcRight, float srcBottom, float dstLeft, float dstTop,
         float dstRight, float dstBottom, SkPaint* paint) {
-    const bool reject = quickReject(dstLeft, dstTop, dstRight, dstBottom);
+    const bool reject = quickRejectNoScissor(dstLeft, dstTop, dstRight, dstBottom);
     uint32_t* location = addOp(DisplayList::DrawBitmapRect, reject);
     addBitmap(bitmap);
     addBounds(srcLeft, srcTop, srcRight, srcBottom);
@@ -1541,7 +1614,8 @@ status_t DisplayListRenderer::drawBitmap(SkBitmap* bitmap, float srcLeft, float 
 
 status_t DisplayListRenderer::drawBitmapData(SkBitmap* bitmap, float left, float top,
         SkPaint* paint) {
-    const bool reject = quickReject(left, top, left + bitmap->width(), top + bitmap->height());
+    const bool reject = quickRejectNoScissor(left, top,
+            left + bitmap->width(), top + bitmap->height());
     uint32_t* location = addOp(DisplayList::DrawBitmapData, reject);
     addBitmapData(bitmap);
     addPoint(left, top);
@@ -1570,14 +1644,19 @@ status_t DisplayListRenderer::drawBitmapMesh(SkBitmap* bitmap, int meshWidth, in
 status_t DisplayListRenderer::drawPatch(SkBitmap* bitmap, const int32_t* xDivs,
         const int32_t* yDivs, const uint32_t* colors, uint32_t width, uint32_t height,
         int8_t numColors, float left, float top, float right, float bottom, SkPaint* paint) {
-    const bool reject = quickReject(left, top, right, bottom);
+    int alpha;
+    SkXfermode::Mode mode;
+    OpenGLRenderer::getAlphaAndModeDirect(paint, &alpha, &mode);
+
+    const bool reject = quickRejectNoScissor(left, top, right, bottom);
     uint32_t* location = addOp(DisplayList::DrawPatch, reject);
     addBitmap(bitmap);
     addInts(xDivs, width);
     addInts(yDivs, height);
     addUInts(colors, numColors);
     addBounds(left, top, right, bottom);
-    addPaint(paint);
+    addInt(alpha);
+    addInt(mode);
     addSkip(location);
     return DrawGlInfo::kStatusDone;
 }
@@ -1592,7 +1671,7 @@ status_t DisplayListRenderer::drawColor(int color, SkXfermode::Mode mode) {
 status_t DisplayListRenderer::drawRect(float left, float top, float right, float bottom,
         SkPaint* paint) {
     const bool reject = paint->getStyle() == SkPaint::kFill_Style &&
-            quickReject(left, top, right, bottom);
+            quickRejectNoScissor(left, top, right, bottom);
     uint32_t* location = addOp(DisplayList::DrawRect, reject);
     addBounds(left, top, right, bottom);
     addPaint(paint);
@@ -1603,7 +1682,7 @@ status_t DisplayListRenderer::drawRect(float left, float top, float right, float
 status_t DisplayListRenderer::drawRoundRect(float left, float top, float right, float bottom,
         float rx, float ry, SkPaint* paint) {
     const bool reject = paint->getStyle() == SkPaint::kFill_Style &&
-            quickReject(left, top, right, bottom);
+            quickRejectNoScissor(left, top, right, bottom);
     uint32_t* location = addOp(DisplayList::DrawRoundRect, reject);
     addBounds(left, top, right, bottom);
     addPoint(rx, ry);
@@ -1646,7 +1725,7 @@ status_t DisplayListRenderer::drawPath(SkPath* path, SkPaint* paint) {
     left -= offset;
     top -= offset;
 
-    const bool reject = quickReject(left, top, left + width, top + height);
+    const bool reject = quickRejectNoScissor(left, top, left + width, top + height);
     uint32_t* location = addOp(DisplayList::DrawPath, reject);
     addPath(path);
     addPaint(paint);
@@ -1668,8 +1747,38 @@ status_t DisplayListRenderer::drawPoints(float* points, int count, SkPaint* pain
     return DrawGlInfo::kStatusDone;
 }
 
+status_t DisplayListRenderer::drawTextOnPath(const char* text, int bytesCount, int count,
+        SkPath* path, float hOffset, float vOffset, SkPaint* paint) {
+    if (!text || count <= 0) return DrawGlInfo::kStatusDone;
+    addOp(DisplayList::DrawTextOnPath);
+    addText(text, bytesCount);
+    addInt(count);
+    addPath(path);
+    addFloat(hOffset);
+    addFloat(vOffset);
+    paint->setAntiAlias(true);
+    SkPaint* addedPaint = addPaint(paint);
+    FontRenderer& fontRenderer = mCaches.fontRenderer->getFontRenderer(addedPaint);
+    fontRenderer.precache(addedPaint, text, count);
+    return DrawGlInfo::kStatusDone;
+}
+
+status_t DisplayListRenderer::drawPosText(const char* text, int bytesCount, int count,
+        const float* positions, SkPaint* paint) {
+    if (!text || count <= 0) return DrawGlInfo::kStatusDone;
+    addOp(DisplayList::DrawPosText);
+    addText(text, bytesCount);
+    addInt(count);
+    addFloats(positions, count * 2);
+    paint->setAntiAlias(true);
+    SkPaint* addedPaint = addPaint(paint);
+    FontRenderer& fontRenderer = mCaches.fontRenderer->getFontRenderer(addedPaint);
+    fontRenderer.precache(addedPaint, text, count);
+    return DrawGlInfo::kStatusDone;
+}
+
 status_t DisplayListRenderer::drawText(const char* text, int bytesCount, int count,
-        float x, float y, SkPaint* paint, float length) {
+        float x, float y, const float* positions, SkPaint* paint, float length) {
     if (!text || count <= 0) return DrawGlInfo::kStatusDone;
 
     // TODO: We should probably make a copy of the paint instead of modifying
@@ -1686,42 +1795,22 @@ status_t DisplayListRenderer::drawText(const char* text, int bytesCount, int cou
     if (CC_LIKELY(paint->getTextAlign() == SkPaint::kLeft_Align)) {
         SkPaint::FontMetrics metrics;
         paint->getFontMetrics(&metrics, 0.0f);
-        reject = quickReject(x, y + metrics.fTop, x + length, y + metrics.fBottom);
+        reject = quickRejectNoScissor(x, y + metrics.fTop, x + length, y + metrics.fBottom);
     }
 
     uint32_t* location = addOp(DisplayList::DrawText, reject);
     addText(text, bytesCount);
     addInt(count);
-    addPoint(x, y);
-    addPaint(paint);
+    addFloat(x);
+    addFloat(y);
+    addFloats(positions, count * 2);
+    SkPaint* addedPaint = addPaint(paint);
+    if (!reject) {
+        FontRenderer& fontRenderer = mCaches.fontRenderer->getFontRenderer(addedPaint);
+        fontRenderer.precache(addedPaint, text, count);
+    }
     addFloat(length);
     addSkip(location);
-    return DrawGlInfo::kStatusDone;
-}
-
-status_t DisplayListRenderer::drawTextOnPath(const char* text, int bytesCount, int count,
-        SkPath* path, float hOffset, float vOffset, SkPaint* paint) {
-    if (!text || count <= 0) return DrawGlInfo::kStatusDone;
-    addOp(DisplayList::DrawTextOnPath);
-    addText(text, bytesCount);
-    addInt(count);
-    addPath(path);
-    addFloat(hOffset);
-    addFloat(vOffset);
-    paint->setAntiAlias(true);
-    addPaint(paint);
-    return DrawGlInfo::kStatusDone;
-}
-
-status_t DisplayListRenderer::drawPosText(const char* text, int bytesCount, int count,
-        const float* positions, SkPaint* paint) {
-    if (!text || count <= 0) return DrawGlInfo::kStatusDone;
-    addOp(DisplayList::DrawPosText);
-    addText(text, bytesCount);
-    addInt(count);
-    addFloats(positions, count * 2);
-    paint->setAntiAlias(true);
-    addPaint(paint);
     return DrawGlInfo::kStatusDone;
 }
 

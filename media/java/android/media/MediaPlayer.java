@@ -2265,6 +2265,16 @@ public class MediaPlayer
      */
     public static final int MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK = 200;
 
+    /** File or network related operation errors. */
+    public static final int MEDIA_ERROR_IO = -1004;
+    /** Bitstream is not conforming to the related coding standard or file spec. */
+    public static final int MEDIA_ERROR_MALFORMED = -1007;
+    /** Bitstream is conforming to the related coding standard or file spec, but
+     * the media framework does not support the feature. */
+    public static final int MEDIA_ERROR_UNSUPPORTED = -1010;
+    /** Some operation takes too long to complete, usually more than 3-5 seconds. */
+    public static final int MEDIA_ERROR_TIMED_OUT = -110;
+
     /**
      * Interface definition of a callback to be invoked when there
      * has been an error during an asynchronous operation (other errors
@@ -2282,7 +2292,13 @@ public class MediaPlayer
          * <li>{@link #MEDIA_ERROR_SERVER_DIED}
          * </ul>
          * @param extra an extra code, specific to the error. Typically
-         * implementation dependant.
+         * implementation dependent.
+         * <ul>
+         * <li>{@link #MEDIA_ERROR_IO}
+         * <li>{@link #MEDIA_ERROR_MALFORMED}
+         * <li>{@link #MEDIA_ERROR_UNSUPPORTED}
+         * <li>{@link #MEDIA_ERROR_TIMED_OUT}
+         * </ul>
          * @return True if the method handled the error, false if it didn't.
          * Returning false, or not having an OnErrorListener at all, will
          * cause the OnCompletionListener to be called.
@@ -2318,6 +2334,11 @@ public class MediaPlayer
      * @hide
      */
     public static final int MEDIA_INFO_STARTED_AS_NEXT = 2;
+
+    /** The player just pushed the very first video frame for rendering.
+     * @see android.media.MediaPlayer.OnInfoListener
+     */
+    public static final int MEDIA_INFO_VIDEO_RENDERING_START = 3;
 
     /** The video is too complex for the decoder: it can't decode frames fast
      *  enough. Possibly only the audio plays fine at this stage.
@@ -2374,6 +2395,7 @@ public class MediaPlayer
          * <ul>
          * <li>{@link #MEDIA_INFO_UNKNOWN}
          * <li>{@link #MEDIA_INFO_VIDEO_TRACK_LAGGING}
+         * <li>{@link #MEDIA_INFO_VIDEO_RENDERING_START}
          * <li>{@link #MEDIA_INFO_BUFFERING_START}
          * <li>{@link #MEDIA_INFO_BUFFERING_END}
          * <li>{@link #MEDIA_INFO_BAD_INTERLEAVING}
@@ -2381,7 +2403,7 @@ public class MediaPlayer
          * <li>{@link #MEDIA_INFO_METADATA_UPDATE}
          * </ul>
          * @param extra an extra code, specific to the info. Typically
-         * implementation dependant.
+         * implementation dependent.
          * @return True if the method handled the info, false if it didn't.
          * Returning false, or not having an OnErrorListener at all, will
          * cause the info to be discarded.

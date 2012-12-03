@@ -293,7 +293,8 @@ files for further customization.
 </p>
 <p>
 
-<a href="{@docRoot}downloads/design/Android_Design_Icons_20120229.zip">Download the Action Bar Icon Pack</a>
+<a onClick="_gaq.push(['_trackEvent', 'Design', 'Download', 'Action Bar Icons (@actionbar page)']);"
+   href="{@docRoot}downloads/design/Android_Design_Icons_20120814.zip">Download the Action Bar Icon Pack</a>
 
 </p>
 
@@ -347,6 +348,17 @@ sharing options.</p>
 <div class="figure-caption">
   The Gallery app's share action provider with extended spinner for additional sharing options.
 </div>
+
+
+<div class="note develop">
+<p><strong>Developer Guide</strong></p>
+  <p>For information about how to build an action bar
+  see the <a href="{@docRoot}guide/topics/ui/actionbar.html">Action Bar</a> API guide.
+  For information about contextual action bars, read
+  <a href="{@docRoot}guide/topics/ui/menus.html#context-menu">Creating Contextual Menus</a>.
+  </p>
+</div>
+
 
 <h2 id="checklist">Action Bar Checklist</h2>
 

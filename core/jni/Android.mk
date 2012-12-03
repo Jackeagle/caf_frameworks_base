@@ -32,6 +32,7 @@ LOCAL_SRC_FILES:= \
 	com_google_android_gles_jni_EGLImpl.cpp \
 	com_google_android_gles_jni_GLImpl.cpp.arm \
 	android_app_NativeActivity.cpp \
+	android_opengl_EGL14.cpp \
 	android_opengl_GLES10.cpp \
 	android_opengl_GLES10Ext.cpp \
 	android_opengl_GLES11.cpp \
@@ -43,9 +44,9 @@ LOCAL_SRC_FILES:= \
 	android_database_SQLiteGlobal.cpp \
 	android_database_SQLiteDebug.cpp \
 	android_emoji_EmojiFactory.cpp \
-	android_view_Display.cpp \
 	android_view_DisplayEventReceiver.cpp \
 	android_view_Surface.cpp \
+	android_view_SurfaceSession.cpp \
 	android_view_TextureView.cpp \
 	android_view_InputChannel.cpp \
 	android_view_InputDevice.cpp \
@@ -66,7 +67,7 @@ LOCAL_SRC_FILES:= \
 	android_os_MessageQueue.cpp \
 	android_os_ParcelFileDescriptor.cpp \
 	android_os_Parcel.cpp \
-	android_os_StatFs.cpp \
+	android_os_SELinux.cpp \
 	android_os_SystemClock.cpp \
 	android_os_SystemProperties.cpp \
 	android_os_Trace.cpp \
@@ -125,6 +126,7 @@ LOCAL_SRC_FILES:= \
 	android_media_AudioSystem.cpp \
 	android_media_AudioTrack.cpp \
 	android_media_JetPlayer.cpp \
+	android_media_RemoteDisplay.cpp \
 	android_media_ToneGenerator.cpp \
 	android_hardware_Camera.cpp \
 	android_hardware_SensorManager.cpp \
@@ -136,14 +138,6 @@ LOCAL_SRC_FILES:= \
 	android_util_FileObserver.cpp \
 	android/opengl/poly_clip.cpp.arm \
 	android/opengl/util.cpp.arm \
-	android_bluetooth_HeadsetBase.cpp \
-	android_bluetooth_common.cpp \
-	android_bluetooth_BluetoothAudioGateway.cpp \
-	android_bluetooth_BluetoothSocket.cpp \
-	android_bluetooth_c.c \
-	android_server_BluetoothService.cpp \
-	android_server_BluetoothEventLoop.cpp \
-	android_server_BluetoothA2dpService.cpp \
 	android_server_NetworkManagementSocketTagger.cpp \
 	android_server_Watchdog.cpp \
 	android_ddm_DdmHandleNativeHeap.cpp \
@@ -169,6 +163,7 @@ LOCAL_C_INCLUDES += \
 	external/skia/include/core \
 	external/skia/include/effects \
 	external/skia/include/images \
+	external/skia/include/ports \
 	external/skia/src/ports \
 	external/skia/include/utils \
 	external/sqlite/dist \
@@ -218,16 +213,14 @@ LOCAL_SHARED_LIBRARIES := \
 	libharfbuzz \
 	libz
 
+ifeq ($(HAVE_SELINUX),true)
+LOCAL_C_INCLUDES += external/libselinux/include
+LOCAL_SHARED_LIBRARIES += libselinux
+LOCAL_CFLAGS += -DHAVE_SELINUX
+endif # HAVE_SELINUX
+
 ifeq ($(USE_OPENGL_RENDERER),true)
 	LOCAL_SHARED_LIBRARIES += libhwui
-endif
-
-ifeq ($(BOARD_HAVE_BLUETOOTH),true)
-LOCAL_C_INCLUDES += \
-	external/dbus \
-	system/bluetooth/bluez-clean-headers
-LOCAL_CFLAGS += -DHAVE_BLUETOOTH
-LOCAL_SHARED_LIBRARIES += libbluedroid libdbus
 endif
 
 LOCAL_SHARED_LIBRARIES += \

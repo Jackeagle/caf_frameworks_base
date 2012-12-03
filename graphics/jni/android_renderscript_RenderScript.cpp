@@ -230,7 +230,7 @@ nContextSetSurface(JNIEnv *_env, jobject _this, RsContext con, jint width, jint 
     if (wnd == NULL) {
 
     } else {
-        window = android_Surface_getNativeWindow(_env, wnd).get();
+        window = android_view_Surface_getNativeWindow(_env, wnd).get();
     }
 
     rsContextSetSurface(con, width, height, window);
@@ -489,12 +489,12 @@ nAllocationGetSurfaceTextureID2(JNIEnv *_env, jobject _this, RsContext con, jint
 static void
 nAllocationSetSurface(JNIEnv *_env, jobject _this, RsContext con, RsAllocation alloc, jobject sur)
 {
-    LOG_API("nAllocationSetSurfaceTexture, con(%p), alloc(%p), surface(%p)",
+    LOG_API("nAllocationSetSurface, con(%p), alloc(%p), surface(%p)",
             con, alloc, (Surface *)sur);
 
     sp<Surface> s;
     if (sur != 0) {
-        s = Surface_getSurface(_env, sur);
+        s = android_view_Surface_getSurface(_env, sur);
     }
 
     rsAllocationSetSurface(con, alloc, static_cast<ANativeWindow *>(s.get()));
@@ -718,7 +718,7 @@ nAllocationRead_i(JNIEnv *_env, jobject _this, RsContext con, jint alloc, jintAr
     LOG_API("nAllocationRead_i, con(%p), alloc(%p), len(%i)", con, (RsAllocation)alloc, len);
     jint *ptr = _env->GetIntArrayElements(data, NULL);
     jsize length = _env->GetArrayLength(data);
-    rsAllocationRead(con, (RsAllocation)alloc, ptr, length);
+    rsAllocationRead(con, (RsAllocation)alloc, ptr, length * sizeof(int));
     _env->ReleaseIntArrayElements(data, ptr, 0);
 }
 
@@ -729,7 +729,7 @@ nAllocationRead_s(JNIEnv *_env, jobject _this, RsContext con, jint alloc, jshort
     LOG_API("nAllocationRead_i, con(%p), alloc(%p), len(%i)", con, (RsAllocation)alloc, len);
     jshort *ptr = _env->GetShortArrayElements(data, NULL);
     jsize length = _env->GetArrayLength(data);
-    rsAllocationRead(con, (RsAllocation)alloc, ptr, length);
+    rsAllocationRead(con, (RsAllocation)alloc, ptr, length * sizeof(short));
     _env->ReleaseShortArrayElements(data, ptr, 0);
 }
 
@@ -740,7 +740,7 @@ nAllocationRead_b(JNIEnv *_env, jobject _this, RsContext con, jint alloc, jbyteA
     LOG_API("nAllocationRead_i, con(%p), alloc(%p), len(%i)", con, (RsAllocation)alloc, len);
     jbyte *ptr = _env->GetByteArrayElements(data, NULL);
     jsize length = _env->GetArrayLength(data);
-    rsAllocationRead(con, (RsAllocation)alloc, ptr, length);
+    rsAllocationRead(con, (RsAllocation)alloc, ptr, length * sizeof(char));
     _env->ReleaseByteArrayElements(data, ptr, 0);
 }
 
@@ -751,7 +751,7 @@ nAllocationRead_f(JNIEnv *_env, jobject _this, RsContext con, jint alloc, jfloat
     LOG_API("nAllocationRead_f, con(%p), alloc(%p), len(%i)", con, (RsAllocation)alloc, len);
     jfloat *ptr = _env->GetFloatArrayElements(data, NULL);
     jsize length = _env->GetArrayLength(data);
-    rsAllocationRead(con, (RsAllocation)alloc, ptr, length);
+    rsAllocationRead(con, (RsAllocation)alloc, ptr, length * sizeof(float));
     _env->ReleaseFloatArrayElements(data, ptr, 0);
 }
 
@@ -1069,6 +1069,82 @@ exit:
     }
 
     return ret;
+}
+
+static jint
+nScriptIntrinsicCreate(JNIEnv *_env, jobject _this, RsContext con, jint id, jint eid)
+{
+    LOG_API("nScriptIntrinsicCreate, con(%p) id(%i) element(%p)", con, id, (void *)eid);
+    return (jint)rsScriptIntrinsicCreate(con, id, (RsElement)eid);
+}
+
+static jint
+nScriptKernelIDCreate(JNIEnv *_env, jobject _this, RsContext con, jint sid, jint slot, jint sig)
+{
+    LOG_API("nScriptKernelIDCreate, con(%p) script(%p), slot(%i), sig(%i)", con, (void *)sid, slot, sig);
+    return (jint)rsScriptKernelIDCreate(con, (RsScript)sid, slot, sig);
+}
+
+static jint
+nScriptFieldIDCreate(JNIEnv *_env, jobject _this, RsContext con, jint sid, jint slot)
+{
+    LOG_API("nScriptFieldIDCreate, con(%p) script(%p), slot(%i)", con, (void *)sid, slot);
+    return (jint)rsScriptFieldIDCreate(con, (RsScript)sid, slot);
+}
+
+static jint
+nScriptGroupCreate(JNIEnv *_env, jobject _this, RsContext con, jintArray _kernels, jintArray _src,
+    jintArray _dstk, jintArray _dstf, jintArray _types)
+{
+    LOG_API("nScriptGroupCreate, con(%p)", con);
+
+    jint kernelsLen = _env->GetArrayLength(_kernels) * sizeof(int);
+    jint *kernelsPtr = _env->GetIntArrayElements(_kernels, NULL);
+    jint srcLen = _env->GetArrayLength(_src) * sizeof(int);
+    jint *srcPtr = _env->GetIntArrayElements(_src, NULL);
+    jint dstkLen = _env->GetArrayLength(_dstk) * sizeof(int);
+    jint *dstkPtr = _env->GetIntArrayElements(_dstk, NULL);
+    jint dstfLen = _env->GetArrayLength(_dstf) * sizeof(int);
+    jint *dstfPtr = _env->GetIntArrayElements(_dstf, NULL);
+    jint typesLen = _env->GetArrayLength(_types) * sizeof(int);
+    jint *typesPtr = _env->GetIntArrayElements(_types, NULL);
+
+    int id = (int)rsScriptGroupCreate(con,
+                               (RsScriptKernelID *)kernelsPtr, kernelsLen,
+                               (RsScriptKernelID *)srcPtr, srcLen,
+                               (RsScriptKernelID *)dstkPtr, dstkLen,
+                               (RsScriptFieldID *)dstfPtr, dstfLen,
+                               (RsType *)typesPtr, typesLen);
+
+    _env->ReleaseIntArrayElements(_kernels, kernelsPtr, 0);
+    _env->ReleaseIntArrayElements(_src, srcPtr, 0);
+    _env->ReleaseIntArrayElements(_dstk, dstkPtr, 0);
+    _env->ReleaseIntArrayElements(_dstf, dstfPtr, 0);
+    _env->ReleaseIntArrayElements(_types, typesPtr, 0);
+    return id;
+}
+
+static void
+nScriptGroupSetInput(JNIEnv *_env, jobject _this, RsContext con, jint gid, jint kid, jint alloc)
+{
+    LOG_API("nScriptGroupSetInput, con(%p) group(%p), kernelId(%p), alloc(%p)", con,
+        (void *)gid, (void *)kid, (void *)alloc);
+    rsScriptGroupSetInput(con, (RsScriptGroup)gid, (RsScriptKernelID)kid, (RsAllocation)alloc);
+}
+
+static void
+nScriptGroupSetOutput(JNIEnv *_env, jobject _this, RsContext con, jint gid, jint kid, jint alloc)
+{
+    LOG_API("nScriptGroupSetOutput, con(%p) group(%p), kernelId(%p), alloc(%p)", con,
+        (void *)gid, (void *)kid, (void *)alloc);
+    rsScriptGroupSetOutput(con, (RsScriptGroup)gid, (RsScriptKernelID)kid, (RsAllocation)alloc);
+}
+
+static void
+nScriptGroupExecute(JNIEnv *_env, jobject _this, RsContext con, jint gid)
+{
+    LOG_API("nScriptGroupSetOutput, con(%p) group(%p)", con, (void *)gid);
+    rsScriptGroupExecute(con, (RsScriptGroup)gid);
 }
 
 // ---------------------------------------------------------------------------
@@ -1412,6 +1488,13 @@ static JNINativeMethod methods[] = {
 {"rsnScriptSetVarObj",               "(IIII)V",                               (void*)nScriptSetVarObj },
 
 {"rsnScriptCCreate",                 "(ILjava/lang/String;Ljava/lang/String;[BI)I",  (void*)nScriptCCreate },
+{"rsnScriptIntrinsicCreate",         "(III)I",                                (void*)nScriptIntrinsicCreate },
+{"rsnScriptKernelIDCreate",          "(IIII)I",                               (void*)nScriptKernelIDCreate },
+{"rsnScriptFieldIDCreate",           "(III)I",                                (void*)nScriptFieldIDCreate },
+{"rsnScriptGroupCreate",             "(I[I[I[I[I[I)I",                        (void*)nScriptGroupCreate },
+{"rsnScriptGroupSetInput",           "(IIII)V",                               (void*)nScriptGroupSetInput },
+{"rsnScriptGroupSetOutput",          "(IIII)V",                               (void*)nScriptGroupSetOutput },
+{"rsnScriptGroupExecute",            "(II)V",                                 (void*)nScriptGroupExecute },
 
 {"rsnProgramStoreCreate",            "(IZZZZZZIII)I",                         (void*)nProgramStoreCreate },
 

@@ -42,6 +42,14 @@
         <group gid="net_bt" />
     </permission>
 
+    <permission name="android.permission.BLUETOOTH_STACK" >
+        <group gid="net_bt_stack" />
+    </permission>
+
+    <permission name="android.permission.NET_TUNNELING" >
+        <group gid="vpn" />
+    </permission>
+
     <permission name="android.permission.INTERNET" >
         <group gid="inet" />
     </permission>
@@ -170,7 +178,11 @@
     <assign-permission name="android.permission.SET_SCREEN_COMPATIBILITY" uid="shell" />
     <assign-permission name="android.permission.READ_EXTERNAL_STORAGE" uid="shell" />
     <assign-permission name="android.permission.WRITE_EXTERNAL_STORAGE" uid="shell" />
-
+    <assign-permission name="android.permission.INTERACT_ACROSS_USERS" uid="shell" />
+    <assign-permission name="android.permission.INTERACT_ACROSS_USERS_FULL" uid="shell" />
+    <assign-permission name="android.permission.MANAGE_USERS" uid="shell" />
+    <assign-permission name="android.permission.BLUETOOTH_STACK" uid="shell" />
+    
     <assign-permission name="android.permission.MODIFY_AUDIO_SETTINGS" uid="media" />
     <assign-permission name="android.permission.ACCESS_DRM" uid="media" />
     <assign-permission name="android.permission.ACCESS_SURFACE_FLINGER" uid="media" />

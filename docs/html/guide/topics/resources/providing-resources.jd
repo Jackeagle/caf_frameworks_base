@@ -329,6 +329,39 @@ your application for other languages.</p>
 indicates the current locale.</p>
       </td>
     </tr>
+    <tr id="LayoutDirectionQualifier">
+      <td>Layout Direction</td>
+      <td><code>ldrtl</code><br/>
+        <code>ldltr</code><br/>
+      </td>
+      <td><p>The layout direction of your application. {@code ldrtl} means "layout-direction-right-to-left".
+      {@code ldltr} means "layout-direction-left-to-right" and is the default implicit value.
+      </p>
+      <p>This can apply to any resource such as layouts, drawables, or values.
+      </p>
+      <p>For example, if you want to provide some specific layout for the Arabic language and some
+      generic layout for any other "right-to-left" language (like Persian or Hebrew) then you would have:
+      </p>
+<pre class="classic no-pretty-print">
+res/
+    layout/   <span style="color:black">
+        main.xml  </span>(Default layout)
+    layout-ar/  <span style="color:black">
+        main.xml  </span>(Specific layout for Arabic)
+    layout-ldrtl/  <span style="color:black">
+        main.xml  </span>(Any "right-to-left" language, except
+                  for Arabic, because the "ar" language qualifier
+                  has a higher precedence.)
+</pre>
+        <p class="note"><strong>Note:</strong> To enable right-to-left layout features
+        for your app, you must set <a
+        href="{@docRoot}guide/topics/manifest/application-element.html#supportsrtl">{@code
+        supportsRtl}</a> to {@code "true"} and set <a
+        href="{@docRoot}guide/topics/manifest/uses-sdk-element.html#target"
+        >{@code targetSdkVersion}</a> to 17 or higher.</p>
+        <p><em>Added in API level 17.</em></p>
+      </td>
+    </tr>
     <tr id="SmallestScreenWidthQualifier">
       <td>smallestWidth</td>
       <td><code>sw&lt;N&gt;dp</code><br/><br/>
@@ -548,6 +581,10 @@ which indicates the current device orientation.</p>
           no display</li>
         </ul>
         <p><em>Added in API level 8, television added in API 13.</em></p>
+        <p>For information about how your app can respond when the device is inserted into or
+        removed from a dock, read <a 
+        href="{@docRoot}training/monitoring-device-state/docking-monitoring.html">Determining
+and Monitoring the Docking State and Type</a>.</p>
         <p>This can change during the life of your application if the user places the device in a
 dock. You can enable or disable some of these modes using {@link
 android.app.UiModeManager}. See <a href="runtime-changes.html">Handling Runtime Changes</a> for

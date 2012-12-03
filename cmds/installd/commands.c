@@ -14,20 +14,29 @@
 ** limitations under the License.
 */
 
+#include <linux/capability.h>
 #include "installd.h"
 #include <diskusage/dirsize.h>
+
+#ifdef HAVE_SELINUX
+#include <selinux/android.h>
+#endif
 
 /* Directory records that are used in execution of commands. */
 dir_rec_t android_data_dir;
 dir_rec_t android_asec_dir;
 dir_rec_t android_app_dir;
 dir_rec_t android_app_private_dir;
+dir_rec_t android_app_lib_dir;
+dir_rec_t android_media_dir;
 dir_rec_array_t android_system_dirs;
 
 int install(const char *pkgname, uid_t uid, gid_t gid)
 {
     char pkgdir[PKG_PATH_MAX];
-    char libdir[PKG_PATH_MAX];
+    char libsymlink[PKG_PATH_MAX];
+    char applibdir[PKG_PATH_MAX];
+    struct stat libStat;
 
     if ((uid < AID_SYSTEM) || (gid < AID_SYSTEM)) {
         ALOGE("invalid uid/gid: %d %d\n", uid, gid);
@@ -39,45 +48,68 @@ int install(const char *pkgname, uid_t uid, gid_t gid)
         return -1;
     }
 
-    if (create_pkg_path(libdir, pkgname, PKG_LIB_POSTFIX, 0)) {
-        ALOGE("cannot create package lib path\n");
+    if (create_pkg_path(libsymlink, pkgname, PKG_LIB_POSTFIX, 0)) {
+        ALOGE("cannot create package lib symlink origin path\n");
+        return -1;
+    }
+
+    if (create_pkg_path_in_dir(applibdir, &android_app_lib_dir, pkgname, PKG_DIR_POSTFIX)) {
+        ALOGE("cannot create package lib symlink dest path\n");
         return -1;
     }
 
     if (mkdir(pkgdir, 0751) < 0) {
         ALOGE("cannot create dir '%s': %s\n", pkgdir, strerror(errno));
-        return -errno;
+        return -1;
     }
     if (chmod(pkgdir, 0751) < 0) {
         ALOGE("cannot chmod dir '%s': %s\n", pkgdir, strerror(errno));
         unlink(pkgdir);
-        return -errno;
+        return -1;
     }
 
-    if (mkdir(libdir, 0755) < 0) {
-        ALOGE("cannot create dir '%s': %s\n", libdir, strerror(errno));
-        unlink(pkgdir);
-        return -errno;
+    if (lstat(libsymlink, &libStat) < 0) {
+        if (errno != ENOENT) {
+            ALOGE("couldn't stat lib dir: %s\n", strerror(errno));
+            return -1;
+        }
+    } else {
+        if (S_ISDIR(libStat.st_mode)) {
+            if (delete_dir_contents(libsymlink, 1, 0) < 0) {
+                ALOGE("couldn't delete lib directory during install for: %s", libsymlink);
+                return -1;
+            }
+        } else if (S_ISLNK(libStat.st_mode)) {
+            if (unlink(libsymlink) < 0) {
+                ALOGE("couldn't unlink lib directory during install for: %s", libsymlink);
+                return -1;
+            }
+        }
     }
-    if (chmod(libdir, 0755) < 0) {
-        ALOGE("cannot chmod dir '%s': %s\n", libdir, strerror(errno));
-        unlink(libdir);
+
+    if (symlink(applibdir, libsymlink) < 0) {
+        ALOGE("couldn't symlink directory '%s' -> '%s': %s\n", libsymlink, applibdir,
+                strerror(errno));
         unlink(pkgdir);
-        return -errno;
+        return -1;
     }
-    if (chown(libdir, AID_SYSTEM, AID_SYSTEM) < 0) {
-        ALOGE("cannot chown dir '%s': %s\n", libdir, strerror(errno));
-        unlink(libdir);
+
+#ifdef HAVE_SELINUX
+    if (selinux_android_setfilecon(pkgdir, pkgname, uid) < 0) {
+        ALOGE("cannot setfilecon dir '%s': %s\n", pkgdir, strerror(errno));
+        unlink(libsymlink);
         unlink(pkgdir);
-        return -errno;
+        return -1;
     }
+#endif
 
     if (chown(pkgdir, uid, gid) < 0) {
         ALOGE("cannot chown dir '%s': %s\n", pkgdir, strerror(errno));
-        unlink(libdir);
+        unlink(libsymlink);
         unlink(pkgdir);
-        return -errno;
+        return -1;
     }
+
     return 0;
 }
 
@@ -128,7 +160,7 @@ int fix_uid(const char *pkgname, uid_t uid, gid_t gid)
     if (stat(pkgdir, &s) < 0) return -1;
 
     if (s.st_uid != 0 || s.st_gid != 0) {
-        ALOGE("fixing uid of non-root pkg: %s %d %d\n", pkgdir, s.st_uid, s.st_gid);
+        ALOGE("fixing uid of non-root pkg: %s %lu %lu\n", pkgdir, s.st_uid, s.st_gid);
         return -1;
     }
 
@@ -160,32 +192,102 @@ int delete_user_data(const char *pkgname, uid_t persona)
 int make_user_data(const char *pkgname, uid_t uid, uid_t persona)
 {
     char pkgdir[PKG_PATH_MAX];
-    char real_libdir[PKG_PATH_MAX];
+    char applibdir[PKG_PATH_MAX];
+    char libsymlink[PKG_PATH_MAX];
+    struct stat libStat;
 
     // Create the data dir for the package
     if (create_pkg_path(pkgdir, pkgname, PKG_DIR_POSTFIX, persona)) {
         return -1;
     }
+    if (create_pkg_path(libsymlink, pkgname, PKG_LIB_POSTFIX, persona)) {
+        ALOGE("cannot create package lib symlink origin path\n");
+        return -1;
+    }
+    if (create_pkg_path_in_dir(applibdir, &android_app_lib_dir, pkgname, PKG_DIR_POSTFIX)) {
+        ALOGE("cannot create package lib symlink dest path\n");
+        return -1;
+    }
+
     if (mkdir(pkgdir, 0751) < 0) {
         ALOGE("cannot create dir '%s': %s\n", pkgdir, strerror(errno));
         return -errno;
     }
-    if (chown(pkgdir, uid, uid) < 0) {
-        ALOGE("cannot chown dir '%s': %s\n", pkgdir, strerror(errno));
+    if (chmod(pkgdir, 0751) < 0) {
+        ALOGE("cannot chmod dir '%s': %s\n", pkgdir, strerror(errno));
         unlink(pkgdir);
         return -errno;
     }
+
+    if (lstat(libsymlink, &libStat) < 0) {
+        if (errno != ENOENT) {
+            ALOGE("couldn't stat lib dir for non-primary: %s\n", strerror(errno));
+            unlink(pkgdir);
+            return -1;
+        }
+    } else {
+        if (S_ISDIR(libStat.st_mode)) {
+            if (delete_dir_contents(libsymlink, 1, 0) < 0) {
+                ALOGE("couldn't delete lib directory during install for non-primary: %s",
+                        libsymlink);
+                unlink(pkgdir);
+                return -1;
+            }
+        } else if (S_ISLNK(libStat.st_mode)) {
+            if (unlink(libsymlink) < 0) {
+                ALOGE("couldn't unlink lib directory during install for non-primary: %s",
+                        libsymlink);
+                unlink(pkgdir);
+                return -1;
+            }
+        }
+    }
+
+    if (symlink(applibdir, libsymlink) < 0) {
+        ALOGE("couldn't symlink directory for non-primary '%s' -> '%s': %s\n", libsymlink,
+                applibdir, strerror(errno));
+        unlink(pkgdir);
+        return -1;
+    }
+
+    if (chown(pkgdir, uid, uid) < 0) {
+        ALOGE("cannot chown dir '%s': %s\n", pkgdir, strerror(errno));
+        unlink(libsymlink);
+        unlink(pkgdir);
+        return -errno;
+    }
+
+#ifdef HAVE_SELINUX
+    if (selinux_android_setfilecon(pkgdir, pkgname, uid) < 0) {
+        ALOGE("cannot setfilecon dir '%s': %s\n", pkgdir, strerror(errno));
+        unlink(libsymlink);
+        unlink(pkgdir);
+        return -errno;
+    }
+#endif
+
     return 0;
 }
 
 int delete_persona(uid_t persona)
 {
-    char pkgdir[PKG_PATH_MAX];
-
-    if (create_persona_path(pkgdir, persona))
+    char data_path[PKG_PATH_MAX];
+    if (create_persona_path(data_path, persona)) {
         return -1;
+    }
+    if (delete_dir_contents(data_path, 1, NULL)) {
+        return -1;
+    }
 
-    return delete_dir_contents(pkgdir, 1, NULL);
+    char media_path[PATH_MAX];
+    if (create_persona_media_path(media_path, (userid_t) persona) == -1) {
+        return -1;
+    }
+    if (delete_dir_contents(media_path, 1, NULL) == -1) {
+        return -1;
+    }
+
+    return 0;
 }
 
 int clone_persona_data(uid_t src_persona, uid_t target_persona, int copy)
@@ -218,7 +320,7 @@ int clone_persona_data(uid_t src_persona, uid_t target_persona, int copy)
                 /* Get the file stat */
                 if (stat(pkg_path, &s) < 0) continue;
                 /* Get the uid of the package */
-                ALOGI("Adding datadir for uid = %d\n", s.st_uid);
+                ALOGI("Adding datadir for uid = %lu\n", s.st_uid);
                 uid = (uid_t) s.st_uid % PER_USER_RANGE;
                 /* Create the directory for the target */
                 make_user_data(name, uid + target_persona * PER_USER_RANGE,
@@ -227,29 +329,23 @@ int clone_persona_data(uid_t src_persona, uid_t target_persona, int copy)
         }
         closedir(d);
     }
+
+    if (ensure_media_user_dirs((userid_t) target_persona) == -1) {
+        return -1;
+    }
+
     return 0;
 }
 
-int delete_cache(const char *pkgname)
+int delete_cache(const char *pkgname, uid_t persona)
 {
     char cachedir[PKG_PATH_MAX];
 
-    if (create_pkg_path(cachedir, pkgname, CACHE_DIR_POSTFIX, 0))
+    if (create_pkg_path(cachedir, pkgname, CACHE_DIR_POSTFIX, persona))
         return -1;
 
         /* delete contents, not the directory, no exceptions */
     return delete_dir_contents(cachedir, 0, 0);
-}
-
-static int64_t disk_free()
-{
-    struct statfs sfs;
-    if (statfs(android_data_dir.path, &sfs) == 0) {
-        return sfs.f_bavail * sfs.f_bsize;
-    } else {
-        ALOGE("Couldn't statfs %s: %s\n", android_data_dir.path, strerror(errno));
-        return -1;
-    }
 }
 
 /* Try to ensure free_size bytes of storage are available.
@@ -261,57 +357,85 @@ static int64_t disk_free()
  */
 int free_cache(int64_t free_size)
 {
-    const char *name;
-    int dfd, subfd;
+    cache_t* cache;
+    int64_t avail;
     DIR *d;
     struct dirent *de;
-    int64_t avail;
-    char datadir[PKG_PATH_MAX];
+    char tmpdir[PATH_MAX];
+    char *dirpos;
 
-    avail = disk_free();
+    avail = data_disk_free();
     if (avail < 0) return -1;
 
     ALOGI("free_cache(%" PRId64 ") avail %" PRId64 "\n", free_size, avail);
     if (avail >= free_size) return 0;
 
-    if (create_persona_path(datadir, 0)) {
-        ALOGE("couldn't get directory for persona 0");
-        return -1;
+    cache = start_cache_collection();
+
+    // Collect cache files for primary user.
+    if (create_persona_path(tmpdir, 0) == 0) {
+        //ALOGI("adding cache files from %s\n", tmpdir);
+        add_cache_files(cache, tmpdir, "cache");
     }
 
-    d = opendir(datadir);
-    if (d == NULL) {
-        ALOGE("cannot open %s: %s\n", datadir, strerror(errno));
-        return -1;
-    }
-    dfd = dirfd(d);
-
-    while ((de = readdir(d))) {
-        if (de->d_type != DT_DIR) continue;
-        name = de->d_name;
-
-        /* always skip "." and ".." */
-        if (name[0] == '.') {
-            if (name[1] == 0) continue;
-            if ((name[1] == '.') && (name[2] == 0)) continue;
+    // Search for other users and add any cache files from them.
+    snprintf(tmpdir, sizeof(tmpdir), "%s%s", android_data_dir.path,
+            SECONDARY_USER_PREFIX);
+    dirpos = tmpdir + strlen(tmpdir);
+    d = opendir(tmpdir);
+    if (d != NULL) {
+        while ((de = readdir(d))) {
+            if (de->d_type == DT_DIR) {
+                const char *name = de->d_name;
+                    /* always skip "." and ".." */
+                if (name[0] == '.') {
+                    if (name[1] == 0) continue;
+                    if ((name[1] == '.') && (name[2] == 0)) continue;
+                }
+                if ((strlen(name)+(dirpos-tmpdir)) < (sizeof(tmpdir)-1)) {
+                    strcpy(dirpos, name);
+                    //ALOGI("adding cache files from %s\n", tmpdir);
+                    add_cache_files(cache, tmpdir, "cache");
+                } else {
+                    ALOGW("Path exceeds limit: %s%s", tmpdir, name);
+                }
+            }
         }
-
-        subfd = openat(dfd, name, O_RDONLY | O_DIRECTORY);
-        if (subfd < 0) continue;
-
-        delete_dir_contents_fd(subfd, "cache");
-        close(subfd);
-
-        avail = disk_free();
-        if (avail >= free_size) {
-            closedir(d);
-            return 0;
-        }
+        closedir(d);
     }
-    closedir(d);
 
-    /* Fail case - not possible to free space */
-    return -1;
+    // Collect cache files on external storage for all users (if it is mounted as part
+    // of the internal storage).
+    strcpy(tmpdir, android_media_dir.path);
+    dirpos = tmpdir + strlen(tmpdir);
+    d = opendir(tmpdir);
+    if (d != NULL) {
+        while ((de = readdir(d))) {
+            if (de->d_type == DT_DIR) {
+                const char *name = de->d_name;
+                    /* skip any dir that doesn't start with a number, so not a user */
+                if (name[0] < '0' || name[0] > '9') {
+                    continue;
+                }
+                if ((strlen(name)+(dirpos-tmpdir)) < (sizeof(tmpdir)-1)) {
+                    strcpy(dirpos, name);
+                    if (lookup_media_dir(tmpdir, "Android") == 0
+                            && lookup_media_dir(tmpdir, "data") == 0) {
+                        //ALOGI("adding cache files from %s\n", tmpdir);
+                        add_cache_files(cache, tmpdir, "cache");
+                    }
+                } else {
+                    ALOGW("Path exceeds limit: %s%s", tmpdir, name);
+                }
+            }
+        }
+        closedir(d);
+    }
+
+    clear_cache_files(cache, free_size);
+    finish_cache_collection(cache);
+
+    return data_disk_free() >= free_size ? 0 : -1;
 }
 
 int move_dex(const char *src, const char *dst)
@@ -350,32 +474,7 @@ int rm_dex(const char *path)
     }
 }
 
-int protect(char *pkgname, gid_t gid)
-{
-    struct stat s;
-    char pkgpath[PKG_PATH_MAX];
-
-    if (gid < AID_SYSTEM) return -1;
-
-    if (create_pkg_path_in_dir(pkgpath, &android_app_private_dir, pkgname, ".apk"))
-        return -1;
-
-    if (stat(pkgpath, &s) < 0) return -1;
-
-    if (chown(pkgpath, s.st_uid, gid) < 0) {
-        ALOGE("failed to chgrp '%s': %s\n", pkgpath, strerror(errno));
-        return -1;
-    }
-
-    if (chmod(pkgpath, S_IRUSR|S_IWUSR|S_IRGRP) < 0) {
-        ALOGE("failed to chmod '%s': %s\n", pkgpath, strerror(errno));
-        return -1;
-    }
-
-    return 0;
-}
-
-int get_size(const char *pkgname, const char *apkpath,
+int get_size(const char *pkgname, int persona, const char *apkpath,
              const char *fwdlock_apkpath, const char *asecpath,
              int64_t *_codesize, int64_t *_datasize, int64_t *_cachesize,
              int64_t* _asecsize)
@@ -414,6 +513,16 @@ int get_size(const char *pkgname, const char *apkpath,
         }
     }
 
+        /* add in size of any libraries */
+    if (!create_pkg_path_in_dir(path, &android_app_lib_dir, pkgname, PKG_DIR_POSTFIX)) {
+        d = opendir(path);
+        if (d != NULL) {
+            dfd = dirfd(d);
+            codesize += calculate_dir_size(dfd);
+            closedir(d);
+        }
+    }
+
         /* compute asec size if it is given
          */
     if (asecpath != NULL && asecpath[0] != '!') {
@@ -422,7 +531,7 @@ int get_size(const char *pkgname, const char *apkpath,
         }
     }
 
-    if (create_pkg_path(path, pkgname, PKG_DIR_POSTFIX, 0)) {
+    if (create_pkg_path(path, pkgname, PKG_DIR_POSTFIX, persona)) {
         goto done;
     }
 
@@ -441,21 +550,33 @@ int get_size(const char *pkgname, const char *apkpath,
 
         if (de->d_type == DT_DIR) {
             int subfd;
+            int64_t statsize = 0;
+            int64_t dirsize = 0;
                 /* always skip "." and ".." */
             if (name[0] == '.') {
                 if (name[1] == 0) continue;
                 if ((name[1] == '.') && (name[2] == 0)) continue;
             }
+            if (fstatat(dfd, name, &s, AT_SYMLINK_NOFOLLOW) == 0) {
+                statsize = stat_size(&s);
+            }
             subfd = openat(dfd, name, O_RDONLY | O_DIRECTORY);
             if (subfd >= 0) {
-                int64_t size = calculate_dir_size(subfd);
-                if (!strcmp(name,"lib")) {
-                    codesize += size;
-                } else if(!strcmp(name,"cache")) {
-                    cachesize += size;
-                } else {
-                    datasize += size;
-                }
+                dirsize = calculate_dir_size(subfd);
+            }
+            if(!strcmp(name,"lib")) {
+                codesize += dirsize + statsize;
+            } else if(!strcmp(name,"cache")) {
+                cachesize += dirsize + statsize;
+            } else {
+                datasize += dirsize + statsize;
+            }
+        } else if (de->d_type == DT_LNK && !strcmp(name,"lib")) {
+            // This is the symbolic link to the application's library
+            // code.  We'll count this as code instead of data, since
+            // it is not something that the app creates.
+            if (fstatat(dfd, name, &s, AT_SYMLINK_NOFOLLOW) == 0) {
+                codesize += stat_size(&s);
             }
         } else {
             if (fstatat(dfd, name, &s, AT_SYMLINK_NOFOLLOW) == 0) {
@@ -607,14 +728,14 @@ int dexopt(const char *apk_path, uid_t uid, int is_public)
         ALOGE("dexopt cannot open '%s' for output\n", dex_path);
         goto fail;
     }
-    if (fchown(odex_fd, AID_SYSTEM, uid) < 0) {
-        ALOGE("dexopt cannot chown '%s'\n", dex_path);
-        goto fail;
-    }
     if (fchmod(odex_fd,
                S_IRUSR|S_IWUSR|S_IRGRP |
                (is_public ? S_IROTH : 0)) < 0) {
         ALOGE("dexopt cannot chmod '%s'\n", dex_path);
+        goto fail;
+    }
+    if (fchown(odex_fd, AID_SYSTEM, uid) < 0) {
+        ALOGE("dexopt cannot chown '%s'\n", dex_path);
         goto fail;
     }
 
@@ -632,13 +753,23 @@ int dexopt(const char *apk_path, uid_t uid, int is_public)
             ALOGE("setuid(%d) during dexopt\n", uid);
             exit(65);
         }
+        // drop capabilities
+        struct __user_cap_header_struct capheader;
+        struct __user_cap_data_struct capdata[2];
+        memset(&capheader, 0, sizeof(capheader));
+        memset(&capdata, 0, sizeof(capdata));
+        capheader.version = _LINUX_CAPABILITY_VERSION_3;
+        if (capset(&capheader, &capdata[0]) < 0) {
+            ALOGE("capset failed: %s\n", strerror(errno));
+            exit(66);
+        }
         if (flock(odex_fd, LOCK_EX | LOCK_NB) != 0) {
             ALOGE("flock(%s) failed: %s\n", dex_path, strerror(errno));
-            exit(66);
+            exit(67);
         }
 
         run_dexopt(zip_fd, odex_fd, apk_path, dexopt_flags);
-        exit(67);   /* only get here on exec failure */
+        exit(68);   /* only get here on exec failure */
     } else {
         res = wait_dexopt(pid, apk_path);
         if (res != 0) {
@@ -926,158 +1057,72 @@ done:
     return 0;
 }
 
-int linklib(const char* dataDir, const char* asecLibDir)
+int linklib(const char* pkgname, const char* asecLibDir, int userId)
 {
-    char libdir[PKG_PATH_MAX];
+    char pkgdir[PKG_PATH_MAX];
+    char libsymlink[PKG_PATH_MAX];
     struct stat s, libStat;
     int rc = 0;
 
-    const size_t libdirLen = strlen(dataDir) + strlen(PKG_LIB_POSTFIX);
-    if (libdirLen >= PKG_PATH_MAX) {
-        ALOGE("library dir len too large");
+    if (create_pkg_path(pkgdir, pkgname, PKG_DIR_POSTFIX, userId)) {
+        ALOGE("cannot create package path\n");
+        return -1;
+    }
+    if (create_pkg_path(libsymlink, pkgname, PKG_LIB_POSTFIX, userId)) {
+        ALOGE("cannot create package lib symlink origin path\n");
         return -1;
     }
 
-    if (snprintf(libdir, sizeof(libdir), "%s%s", dataDir, PKG_LIB_POSTFIX) != (ssize_t)libdirLen) {
-        ALOGE("library dir not written successfully: %s\n", strerror(errno));
+    if (stat(pkgdir, &s) < 0) return -1;
+
+    if (chown(pkgdir, AID_INSTALL, AID_INSTALL) < 0) {
+        ALOGE("failed to chown '%s': %s\n", pkgdir, strerror(errno));
         return -1;
     }
 
-    if (stat(dataDir, &s) < 0) return -1;
-
-    if (chown(dataDir, 0, 0) < 0) {
-        ALOGE("failed to chown '%s': %s\n", dataDir, strerror(errno));
-        return -1;
-    }
-
-    if (chmod(dataDir, 0700) < 0) {
-        ALOGE("failed to chmod '%s': %s\n", dataDir, strerror(errno));
+    if (chmod(pkgdir, 0700) < 0) {
+        ALOGE("linklib() 1: failed to chmod '%s': %s\n", pkgdir, strerror(errno));
         rc = -1;
         goto out;
     }
 
-    if (lstat(libdir, &libStat) < 0) {
-        ALOGE("couldn't stat lib dir: %s\n", strerror(errno));
-        rc = -1;
-        goto out;
-    }
-
-    if (S_ISDIR(libStat.st_mode)) {
-        if (delete_dir_contents(libdir, 1, 0) < 0) {
+    if (lstat(libsymlink, &libStat) < 0) {
+        if (errno != ENOENT) {
+            ALOGE("couldn't stat lib dir: %s\n", strerror(errno));
             rc = -1;
             goto out;
         }
-    } else if (S_ISLNK(libStat.st_mode)) {
-        if (unlink(libdir) < 0) {
-            rc = -1;
-            goto out;
+    } else {
+        if (S_ISDIR(libStat.st_mode)) {
+            if (delete_dir_contents(libsymlink, 1, 0) < 0) {
+                rc = -1;
+                goto out;
+            }
+        } else if (S_ISLNK(libStat.st_mode)) {
+            if (unlink(libsymlink) < 0) {
+                ALOGE("couldn't unlink lib dir: %s\n", strerror(errno));
+                rc = -1;
+                goto out;
+            }
         }
     }
 
-    if (symlink(asecLibDir, libdir) < 0) {
-        ALOGE("couldn't symlink directory '%s' -> '%s': %s\n", libdir, asecLibDir, strerror(errno));
-        rc = -errno;
-        goto out;
-    }
-
-    if (lchown(libdir, AID_SYSTEM, AID_SYSTEM) < 0) {
-        ALOGE("cannot chown dir '%s': %s\n", libdir, strerror(errno));
-        unlink(libdir);
+    if (symlink(asecLibDir, libsymlink) < 0) {
+        ALOGE("couldn't symlink directory '%s' -> '%s': %s\n", libsymlink, asecLibDir,
+                strerror(errno));
         rc = -errno;
         goto out;
     }
 
 out:
-    if (chmod(dataDir, s.st_mode) < 0) {
-        ALOGE("failed to chmod '%s': %s\n", dataDir, strerror(errno));
+    if (chmod(pkgdir, s.st_mode) < 0) {
+        ALOGE("linklib() 2: failed to chmod '%s': %s\n", pkgdir, strerror(errno));
         rc = -errno;
     }
 
-    if (chown(dataDir, s.st_uid, s.st_gid) < 0) {
-        ALOGE("failed to chown '%s' : %s\n", dataDir, strerror(errno));
+    if (chown(pkgdir, s.st_uid, s.st_gid) < 0) {
+        ALOGE("failed to chown '%s' : %s\n", pkgdir, strerror(errno));
         return -errno;
-    }
-
-    return rc;
-}
-
-int unlinklib(const char* dataDir)
-{
-    char libdir[PKG_PATH_MAX];
-    struct stat s, libStat;
-    int rc = 0;
-
-    const size_t libdirLen = strlen(dataDir) + strlen(PKG_LIB_POSTFIX);
-    if (libdirLen >= PKG_PATH_MAX) {
-        return -1;
-    }
-
-    if (snprintf(libdir, sizeof(libdir), "%s%s", dataDir, PKG_LIB_POSTFIX) != (ssize_t)libdirLen) {
-        ALOGE("library dir not written successfully: %s\n", strerror(errno));
-        return -1;
-    }
-
-    if (stat(dataDir, &s) < 0) {
-        ALOGE("couldn't state data dir");
-        return -1;
-    }
-
-    if (chown(dataDir, 0, 0) < 0) {
-        ALOGE("failed to chown '%s': %s\n", dataDir, strerror(errno));
-        return -1;
-    }
-
-    if (chmod(dataDir, 0700) < 0) {
-        ALOGE("failed to chmod '%s': %s\n", dataDir, strerror(errno));
-        rc = -1;
-        goto out;
-    }
-
-    if (lstat(libdir, &libStat) < 0) {
-        ALOGE("couldn't stat lib dir: %s\n", strerror(errno));
-        rc = -1;
-        goto out;
-    }
-
-    if (S_ISDIR(libStat.st_mode)) {
-        if (delete_dir_contents(libdir, 1, 0) < 0) {
-            rc = -1;
-            goto out;
-        }
-    } else if (S_ISLNK(libStat.st_mode)) {
-        if (unlink(libdir) < 0) {
-            rc = -1;
-            goto out;
-        }
-    }
-
-    if (mkdir(libdir, 0755) < 0) {
-        ALOGE("cannot create dir '%s': %s\n", libdir, strerror(errno));
-        rc = -errno;
-        goto out;
-    }
-    if (chmod(libdir, 0755) < 0) {
-        ALOGE("cannot chmod dir '%s': %s\n", libdir, strerror(errno));
-        unlink(libdir);
-        rc = -errno;
-        goto out;
-    }
-    if (chown(libdir, AID_SYSTEM, AID_SYSTEM) < 0) {
-        ALOGE("cannot chown dir '%s': %s\n", libdir, strerror(errno));
-        unlink(libdir);
-        rc = -errno;
-        goto out;
-    }
-
-out:
-    if (chmod(dataDir, s.st_mode) < 0) {
-        ALOGE("failed to chmod '%s': %s\n", dataDir, strerror(errno));
-        rc = -1;
-    }
-
-    if (chown(dataDir, s.st_uid, s.st_gid) < 0) {
-        ALOGE("failed to chown '%s' : %s\n", dataDir, strerror(errno));
-        return -1;
     }
 
     return rc;

@@ -32,9 +32,11 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <cutils/fs.h>
 #include <cutils/sockets.h>
 #include <cutils/log.h>
 #include <cutils/properties.h>
+#include <cutils/multiuser.h>
 
 #include <private/android_filesystem_config.h>
 
@@ -59,6 +61,10 @@
 #define CACHE_DIR_POSTFIX      "/cache"
 
 #define APP_SUBDIR             "app/" // sub-directory under ANDROID_DATA
+
+#define APP_LIB_SUBDIR         "app-lib/" // sub-directory under ANDROID_DATA
+
+#define MEDIA_SUBDIR           "media/" // sub-directory under ANDROID_DATA
 
 /* other handy constants */
 
@@ -89,9 +95,38 @@ typedef struct {
 
 extern dir_rec_t android_app_dir;
 extern dir_rec_t android_app_private_dir;
+extern dir_rec_t android_app_lib_dir;
 extern dir_rec_t android_data_dir;
 extern dir_rec_t android_asec_dir;
+extern dir_rec_t android_media_dir;
 extern dir_rec_array_t android_system_dirs;
+
+typedef struct cache_dir_struct {
+    struct cache_dir_struct* parent;
+    int32_t childCount;
+    int32_t hiddenCount;
+    int32_t deleted;
+    char name[];
+} cache_dir_t;
+
+typedef struct {
+    cache_dir_t* dir;
+    time_t modTime;
+    char name[];
+} cache_file_t;
+
+typedef struct {
+    size_t numDirs;
+    size_t availDirs;
+    cache_dir_t** dirs;
+    size_t numFiles;
+    size_t availFiles;
+    cache_file_t** files;
+    size_t numCollected;
+    void* memBlocks;
+    int8_t* curMemBlockAvail;
+    int8_t* curMemBlockEnd;
+} cache_t;
 
 /* util.c */
 
@@ -108,6 +143,8 @@ int create_pkg_path(char path[PKG_PATH_MAX],
 int create_persona_path(char path[PKG_PATH_MAX],
                     uid_t persona);
 
+int create_persona_media_path(char path[PKG_PATH_MAX], userid_t userid);
+
 int create_move_path(char path[PKG_PATH_MAX],
                      const char* pkgname,
                      const char* leaf,
@@ -122,6 +159,18 @@ int delete_dir_contents(const char *pathname,
                         const char *ignore);
 
 int delete_dir_contents_fd(int dfd, const char *name);
+
+int lookup_media_dir(char basepath[PATH_MAX], const char *dir);
+
+int64_t data_disk_free();
+
+cache_t* start_cache_collection();
+
+void add_cache_files(cache_t* cache, const char *basepath, const char *cachedir);
+
+void clear_cache_files(cache_t* cache, int64_t free_size);
+
+void finish_cache_collection(cache_t* cache);
 
 int validate_system_app_path(const char* path);
 
@@ -138,6 +187,9 @@ int append_and_increment(char** dst, const char* src, size_t* dst_size);
 char *build_string2(char *s1, char *s2);
 char *build_string3(char *s1, char *s2, char *s3);
 
+int ensure_dir(const char* path, mode_t mode, uid_t uid, gid_t gid);
+int ensure_media_user_dirs(userid_t userid);
+
 /* commands.c */
 
 int install(const char *pkgname, uid_t uid, gid_t gid);
@@ -148,15 +200,14 @@ int delete_user_data(const char *pkgname, uid_t persona);
 int make_user_data(const char *pkgname, uid_t uid, uid_t persona);
 int delete_persona(uid_t persona);
 int clone_persona_data(uid_t src_persona, uid_t target_persona, int copy);
-int delete_cache(const char *pkgname);
+int delete_cache(const char *pkgname, uid_t persona);
 int move_dex(const char *src, const char *dst);
 int rm_dex(const char *path);
 int protect(char *pkgname, gid_t gid);
-int get_size(const char *pkgname, const char *apkpath, const char *fwdlock_apkpath,
+int get_size(const char *pkgname, int persona, const char *apkpath, const char *fwdlock_apkpath,
              const char *asecpath, int64_t *codesize, int64_t *datasize, int64_t *cachesize,
              int64_t *asecsize);
 int free_cache(int64_t free_size);
 int dexopt(const char *apk_path, uid_t uid, int is_public);
 int movefiles();
-int linklib(const char* target, const char* source);
-int unlinklib(const char* libPath);
+int linklib(const char* target, const char* source, int userId);

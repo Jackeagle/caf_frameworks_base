@@ -14,6 +14,9 @@
 ** limitations under the License.
 */
 
+#include <linux/capability.h>
+#include <linux/prctl.h>
+
 #include "installd.h"
 
 
@@ -69,12 +72,7 @@ static int do_free_cache(char **arg, char reply[REPLY_MAX]) /* TODO int:free_siz
 
 static int do_rm_cache(char **arg, char reply[REPLY_MAX])
 {
-    return delete_cache(arg[0]); /* pkgname */
-}
-
-static int do_protect(char **arg, char reply[REPLY_MAX])
-{
-    return protect(arg[0], atoi(arg[1])); /* pkgname, gid */
+    return delete_cache(arg[0], atoi(arg[1])); /* pkgname, userid */
 }
 
 static int do_get_size(char **arg, char reply[REPLY_MAX])
@@ -85,8 +83,9 @@ static int do_get_size(char **arg, char reply[REPLY_MAX])
     int64_t asecsize = 0;
     int res = 0;
 
-        /* pkgdir, apkpath */
-    res = get_size(arg[0], arg[1], arg[2], arg[3], &codesize, &datasize, &cachesize, &asecsize);
+        /* pkgdir, persona, apkpath */
+    res = get_size(arg[0], atoi(arg[1]), arg[2], arg[3], arg[4],
+            &codesize, &datasize, &cachesize, &asecsize);
 
     /*
      * Each int64_t can take up 22 characters printed out. Make sure it
@@ -124,12 +123,7 @@ static int do_movefiles(char **arg, char reply[REPLY_MAX])
 
 static int do_linklib(char **arg, char reply[REPLY_MAX])
 {
-    return linklib(arg[0], arg[1]);
-}
-
-static int do_unlinklib(char **arg, char reply[REPLY_MAX])
-{
-    return unlinklib(arg[0]);
+    return linklib(arg[0], arg[1], atoi(arg[2]));
 }
 
 struct cmdinfo {
@@ -148,13 +142,11 @@ struct cmdinfo cmds[] = {
     { "rename",               2, do_rename },
     { "fixuid",               3, do_fixuid },
     { "freecache",            1, do_free_cache },
-    { "rmcache",              1, do_rm_cache },
-    { "protect",              2, do_protect },
-    { "getsize",              4, do_get_size },
+    { "rmcache",              2, do_rm_cache },
+    { "getsize",              5, do_get_size },
     { "rmuserdata",           2, do_rm_user_data },
     { "movefiles",            0, do_movefiles },
-    { "linklib",              2, do_linklib },
-    { "unlinklib",            1, do_unlinklib },
+    { "linklib",              3, do_linklib },
     { "mkuserdata",           3, do_mk_user_data },
     { "rmuser",               1, do_rm_user },
     { "cloneuserdata",        3, do_clone_user_data },
@@ -292,8 +284,18 @@ int initialize_globals() {
         return -1;
     }
 
+    // Get the android app native library directory.
+    if (copy_and_append(&android_app_lib_dir, &android_data_dir, APP_LIB_SUBDIR) < 0) {
+        return -1;
+    }
+
     // Get the sd-card ASEC mount point.
     if (get_path_from_env(&android_asec_dir, "ASEC_MOUNTPOINT") < 0) {
+        return -1;
+    }
+
+    // Get the android media directory.
+    if (copy_and_append(&android_media_dir, &android_data_dir, MEDIA_SUBDIR) < 0) {
         return -1;
     }
 
@@ -326,37 +328,202 @@ int initialize_globals() {
 }
 
 int initialize_directories() {
+    int res = -1;
+
+    // Read current filesystem layout version to handle upgrade paths
+    char version_path[PATH_MAX];
+    snprintf(version_path, PATH_MAX, "%s.layout_version", android_data_dir.path);
+
+    int oldVersion;
+    if (fs_read_atomic_int(version_path, &oldVersion) == -1) {
+        oldVersion = 0;
+    }
+    int version = oldVersion;
+
     // /data/user
     char *user_data_dir = build_string2(android_data_dir.path, SECONDARY_USER_PREFIX);
     // /data/data
     char *legacy_data_dir = build_string2(android_data_dir.path, PRIMARY_USER_PREFIX);
     // /data/user/0
-    char *primary_data_dir = build_string3(android_data_dir.path, SECONDARY_USER_PREFIX,
-            "0");
-    int ret = -1;
-    if (user_data_dir != NULL && primary_data_dir != NULL && legacy_data_dir != NULL) {
-        ret = 0;
-        // Make the /data/user directory if necessary
-        if (access(user_data_dir, R_OK) < 0) {
-            if (mkdir(user_data_dir, 0711) < 0) {
-                return -1;
-            }
-            if (chown(user_data_dir, AID_SYSTEM, AID_SYSTEM) < 0) {
-                return -1;
-            }
-            if (chmod(user_data_dir, 0711) < 0) {
-                return -1;
-            }
-        }
-        // Make the /data/user/0 symlink to /data/data if necessary
-        if (access(primary_data_dir, R_OK) < 0) {
-              ret = symlink(legacy_data_dir, primary_data_dir);
-        }
-        free(user_data_dir);
-        free(legacy_data_dir);
-        free(primary_data_dir);
+    char *primary_data_dir = build_string3(android_data_dir.path, SECONDARY_USER_PREFIX, "0");
+    if (!user_data_dir || !legacy_data_dir || !primary_data_dir) {
+        goto fail;
     }
-    return ret;
+
+    // Make the /data/user directory if necessary
+    if (access(user_data_dir, R_OK) < 0) {
+        if (mkdir(user_data_dir, 0711) < 0) {
+            goto fail;
+        }
+        if (chown(user_data_dir, AID_SYSTEM, AID_SYSTEM) < 0) {
+            goto fail;
+        }
+        if (chmod(user_data_dir, 0711) < 0) {
+            goto fail;
+        }
+    }
+    // Make the /data/user/0 symlink to /data/data if necessary
+    if (access(primary_data_dir, R_OK) < 0) {
+        if (symlink(legacy_data_dir, primary_data_dir)) {
+            goto fail;
+        }
+    }
+
+    if (version == 0) {
+        // Introducing multi-user, so migrate /data/media contents into /data/media/0
+        ALOGD("Upgrading /data/media for multi-user");
+
+        // Ensure /data/media
+        if (fs_prepare_dir(android_media_dir.path, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
+            goto fail;
+        }
+
+        // /data/media.tmp
+        char media_tmp_dir[PATH_MAX];
+        snprintf(media_tmp_dir, PATH_MAX, "%smedia.tmp", android_data_dir.path);
+
+        // Only copy when upgrade not already in progress
+        if (access(media_tmp_dir, F_OK) == -1) {
+            if (rename(android_media_dir.path, media_tmp_dir) == -1) {
+                ALOGE("Failed to move legacy media path: %s", strerror(errno));
+                goto fail;
+            }
+        }
+
+        // Create /data/media again
+        if (fs_prepare_dir(android_media_dir.path, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
+            goto fail;
+        }
+
+        // /data/media/0
+        char owner_media_dir[PATH_MAX];
+        snprintf(owner_media_dir, PATH_MAX, "%s0", android_media_dir.path);
+
+        // Move any owner data into place
+        if (access(media_tmp_dir, F_OK) == 0) {
+            if (rename(media_tmp_dir, owner_media_dir) == -1) {
+                ALOGE("Failed to move owner media path: %s", strerror(errno));
+                goto fail;
+            }
+        }
+
+        // Ensure media directories for any existing users
+        DIR *dir;
+        struct dirent *dirent;
+        char user_media_dir[PATH_MAX];
+
+        dir = opendir(user_data_dir);
+        if (dir != NULL) {
+            while ((dirent = readdir(dir))) {
+                if (dirent->d_type == DT_DIR) {
+                    const char *name = dirent->d_name;
+
+                    // skip "." and ".."
+                    if (name[0] == '.') {
+                        if (name[1] == 0) continue;
+                        if ((name[1] == '.') && (name[2] == 0)) continue;
+                    }
+
+                    // /data/media/<user_id>
+                    snprintf(user_media_dir, PATH_MAX, "%s%s", android_media_dir.path, name);
+                    if (fs_prepare_dir(user_media_dir, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
+                        goto fail;
+                    }
+                }
+            }
+            closedir(dir);
+        }
+
+        version = 1;
+    }
+
+    // /data/media/obb
+    char media_obb_dir[PATH_MAX];
+    snprintf(media_obb_dir, PATH_MAX, "%sobb", android_media_dir.path);
+
+    if (version == 1) {
+        // Introducing /data/media/obb for sharing OBB across users; migrate
+        // any existing OBB files from owner.
+        ALOGD("Upgrading to shared /data/media/obb");
+
+        // /data/media/0/Android/obb
+        char owner_obb_path[PATH_MAX];
+        snprintf(owner_obb_path, PATH_MAX, "%s0/Android/obb", android_media_dir.path);
+
+        // Only move if target doesn't already exist
+        if (access(media_obb_dir, F_OK) != 0 && access(owner_obb_path, F_OK) == 0) {
+            if (rename(owner_obb_path, media_obb_dir) == -1) {
+                ALOGE("Failed to move OBB from owner: %s", strerror(errno));
+                goto fail;
+            }
+        }
+
+        version = 2;
+    }
+
+    if (ensure_media_user_dirs(0) == -1) {
+        ALOGE("Failed to setup media for user 0");
+        goto fail;
+    }
+    if (fs_prepare_dir(media_obb_dir, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
+        goto fail;
+    }
+
+    // Persist layout version if changed
+    if (version != oldVersion) {
+        if (fs_write_atomic_int(version_path, version) == -1) {
+            ALOGE("Failed to save version to %s: %s", version_path, strerror(errno));
+            goto fail;
+        }
+    }
+
+    // Success!
+    res = 0;
+
+fail:
+    free(user_data_dir);
+    free(legacy_data_dir);
+    free(primary_data_dir);
+    return res;
+}
+
+static void drop_privileges() {
+    if (prctl(PR_SET_KEEPCAPS, 1) < 0) {
+        ALOGE("prctl(PR_SET_KEEPCAPS) failed: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    if (setgid(AID_INSTALL) < 0) {
+        ALOGE("setgid() can't drop privileges; exiting.\n");
+        exit(1);
+    }
+
+    if (setuid(AID_INSTALL) < 0) {
+        ALOGE("setuid() can't drop privileges; exiting.\n");
+        exit(1);
+    }
+
+    struct __user_cap_header_struct capheader;
+    struct __user_cap_data_struct capdata[2];
+    memset(&capheader, 0, sizeof(capheader));
+    memset(&capdata, 0, sizeof(capdata));
+    capheader.version = _LINUX_CAPABILITY_VERSION_3;
+    capheader.pid = 0;
+
+    capdata[CAP_TO_INDEX(CAP_DAC_OVERRIDE)].permitted |= CAP_TO_MASK(CAP_DAC_OVERRIDE);
+    capdata[CAP_TO_INDEX(CAP_CHOWN)].permitted        |= CAP_TO_MASK(CAP_CHOWN);
+    capdata[CAP_TO_INDEX(CAP_SETUID)].permitted       |= CAP_TO_MASK(CAP_SETUID);
+    capdata[CAP_TO_INDEX(CAP_SETGID)].permitted       |= CAP_TO_MASK(CAP_SETGID);
+
+    capdata[0].effective = capdata[0].permitted;
+    capdata[1].effective = capdata[1].permitted;
+    capdata[0].inheritable = 0;
+    capdata[1].inheritable = 0;
+
+    if (capset(&capheader, &capdata[0]) < 0) {
+        ALOGE("capset failed: %s\n", strerror(errno));
+        exit(1);
+    }
 }
 
 int main(const int argc, const char *argv[]) {
@@ -364,6 +531,8 @@ int main(const int argc, const char *argv[]) {
     struct sockaddr addr;
     socklen_t alen;
     int lsocket, s, count;
+
+    ALOGI("installd firing up\n");
 
     if (initialize_globals() < 0) {
         ALOGE("Could not initialize globals; exiting.\n");
@@ -374,6 +543,8 @@ int main(const int argc, const char *argv[]) {
         ALOGE("Could not create directories; exiting.\n");
         exit(1);
     }
+
+    drop_privileges();
 
     lsocket = android_get_control_socket(SOCKET_PATH);
     if (lsocket < 0) {

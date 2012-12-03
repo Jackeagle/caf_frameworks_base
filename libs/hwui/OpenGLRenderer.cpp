@@ -33,6 +33,8 @@
 
 #include "OpenGLRenderer.h"
 #include "DisplayListRenderer.h"
+#include "PathRenderer.h"
+#include "Properties.h"
 #include "Vector.h"
 
 namespace android {
@@ -45,10 +47,9 @@ namespace uirenderer {
 #define RAD_TO_DEG (180.0f / 3.14159265f)
 #define MIN_ANGLE 0.001f
 
-// TODO: This should be set in properties
-#define ALPHA_THRESHOLD (0x7f / PANEL_BIT_DEPTH)
+#define ALPHA_THRESHOLD 0
 
-#define FILTER(paint) (paint && paint->isFilterBitmap() ? GL_LINEAR : GL_NEAREST)
+#define FILTER(paint) (!paint || paint->isFilterBitmap() ? GL_LINEAR : GL_NEAREST)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Globals
@@ -117,6 +118,8 @@ OpenGLRenderer::OpenGLRenderer(): mCaches(Caches::getInstance()) {
     memcpy(mMeshVertices, gMeshVertices, sizeof(gMeshVertices));
 
     mFirstSnapshot = new Snapshot;
+
+    mScissorOptimizationDisabled = false;
 }
 
 OpenGLRenderer::~OpenGLRenderer() {
@@ -124,31 +127,35 @@ OpenGLRenderer::~OpenGLRenderer() {
     // GL APIs. All GL state should be kept in Caches.h
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Debug
-///////////////////////////////////////////////////////////////////////////////
-
-void OpenGLRenderer::startMark(const char* name) const {
-    mCaches.startMark(0, name);
-}
-
-void OpenGLRenderer::endMark() const {
-    mCaches.endMark();
+void OpenGLRenderer::initProperties() {
+    char property[PROPERTY_VALUE_MAX];
+    if (property_get(PROPERTY_DISABLE_SCISSOR_OPTIMIZATION, property, "false")) {
+        mScissorOptimizationDisabled = !strcasecmp(property, "true");
+        INIT_LOGD("  Scissor optimization %s",
+                mScissorOptimizationDisabled ? "disabled" : "enabled");
+    } else {
+        INIT_LOGD("  Scissor optimization enabled");
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Setup
 ///////////////////////////////////////////////////////////////////////////////
 
-uint32_t OpenGLRenderer::getStencilSize() {
-    return STENCIL_BUFFER_SIZE;
-}
-
 bool OpenGLRenderer::isDeferred() {
     return false;
 }
 
 void OpenGLRenderer::setViewport(int width, int height) {
+    initViewport(width, height);
+
+    glDisable(GL_DITHER);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+    glEnableVertexAttribArray(Program::kBindingPosition);
+}
+
+void OpenGLRenderer::initViewport(int width, int height) {
     mOrthoMatrix.loadOrtho(0, width, height, 0, -1, 1);
 
     mWidth = width;
@@ -156,19 +163,14 @@ void OpenGLRenderer::setViewport(int width, int height) {
 
     mFirstSnapshot->height = height;
     mFirstSnapshot->viewport.set(0, 0, width, height);
-
-    glDisable(GL_DITHER);
-    glEnable(GL_SCISSOR_TEST);
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-    glEnableVertexAttribArray(Program::kBindingPosition);
 }
 
-int OpenGLRenderer::prepare(bool opaque) {
+status_t OpenGLRenderer::prepare(bool opaque) {
     return prepareDirty(0.0f, 0.0f, mWidth, mHeight, opaque);
 }
 
-int OpenGLRenderer::prepareDirty(float left, float top, float right, float bottom, bool opaque) {
+status_t OpenGLRenderer::prepareDirty(float left, float top, float right, float bottom,
+        bool opaque) {
     mCaches.clearGarbage();
 
     mSnapshot = new Snapshot(mFirstSnapshot,
@@ -177,18 +179,43 @@ int OpenGLRenderer::prepareDirty(float left, float top, float right, float botto
     mSaveCount = 1;
 
     mSnapshot->setClip(left, top, right, bottom);
-    mDirtyClip = opaque;
+    mDirtyClip = true;
+
+    updateLayers();
+
+    // If we know that we are going to redraw the entire framebuffer,
+    // perform a discard to let the driver know we don't need to preserve
+    // the back buffer for this frame.
+    if (mCaches.extensions.hasDiscardFramebuffer() &&
+            left <= 0.0f && top <= 0.0f && right >= mWidth && bottom >= mHeight) {
+        const GLenum attachments[] = { getTargetFbo() == 0 ? GL_COLOR_EXT : GL_COLOR_ATTACHMENT0 };
+        glDiscardFramebufferEXT(GL_FRAMEBUFFER, 1, attachments);
+    }
 
     syncState();
 
+    // Functors break the tiling extension in pretty spectacular ways
+    // This ensures we don't use tiling when a functor is going to be
+    // invoked during the frame
+    mSuppressTiling = mCaches.hasRegisteredFunctors();
+
+    mTilingSnapshot = mSnapshot;
+    startTiling(mTilingSnapshot, true);
+
+    debugOverdraw(true, true);
+
+    return clear(left, top, right, bottom, opaque);
+}
+
+status_t OpenGLRenderer::clear(float left, float top, float right, float bottom, bool opaque) {
     if (!opaque) {
+        mCaches.enableScissor();
         mCaches.setScissor(left, mSnapshot->height - bottom, right - left, bottom - top);
         glClear(GL_COLOR_BUFFER_BIT);
         return DrawGlInfo::kStatusDrew;
-    } else {
-        mCaches.resetScissor();
     }
 
+    mCaches.resetScissor();
     return DrawGlInfo::kStatusDone;
 }
 
@@ -202,34 +229,56 @@ void OpenGLRenderer::syncState() {
     }
 }
 
-void OpenGLRenderer::finish() {
-#if DEBUG_OPENGL
-    GLenum status = GL_NO_ERROR;
-    while ((status = glGetError()) != GL_NO_ERROR) {
-        ALOGD("GL error from OpenGLRenderer: 0x%x", status);
-        switch (status) {
-            case GL_INVALID_ENUM:
-                ALOGE("  GL_INVALID_ENUM");
-                break;
-            case GL_INVALID_VALUE:
-                ALOGE("  GL_INVALID_VALUE");
-                break;
-            case GL_INVALID_OPERATION:
-                ALOGE("  GL_INVALID_OPERATION");
-                break;
-            case GL_OUT_OF_MEMORY:
-                ALOGE("  Out of memory!");
-                break;
+void OpenGLRenderer::startTiling(const sp<Snapshot>& s, bool opaque) {
+    if (!mSuppressTiling) {
+        Rect* clip = mTilingSnapshot->clipRect;
+        if (s->flags & Snapshot::kFlagIsFboLayer) {
+            clip = s->clipRect;
         }
+
+        mCaches.startTiling(clip->left, s->height - clip->bottom,
+                clip->right - clip->left, clip->bottom - clip->top, opaque);
     }
+}
+
+void OpenGLRenderer::endTiling() {
+    if (!mSuppressTiling) mCaches.endTiling();
+}
+
+void OpenGLRenderer::finish() {
+    renderOverdraw();
+    endTiling();
+
+    if (!suppressErrorChecks()) {
+#if DEBUG_OPENGL
+        GLenum status = GL_NO_ERROR;
+        while ((status = glGetError()) != GL_NO_ERROR) {
+            ALOGD("GL error from OpenGLRenderer: 0x%x", status);
+            switch (status) {
+                case GL_INVALID_ENUM:
+                    ALOGE("  GL_INVALID_ENUM");
+                    break;
+                case GL_INVALID_VALUE:
+                    ALOGE("  GL_INVALID_VALUE");
+                    break;
+                case GL_INVALID_OPERATION:
+                    ALOGE("  GL_INVALID_OPERATION");
+                    break;
+                case GL_OUT_OF_MEMORY:
+                    ALOGE("  Out of memory!");
+                    break;
+            }
+        }
 #endif
+
 #if DEBUG_MEMORY_USAGE
-    mCaches.dumpMemoryUsage();
-#else
-    if (mCaches.getDebugLevel() & kDebugMemory) {
         mCaches.dumpMemoryUsage();
-    }
+#else
+        if (mCaches.getDebugLevel() & kDebugMemory) {
+            mCaches.dumpMemoryUsage();
+        }
 #endif
+    }
 }
 
 void OpenGLRenderer::interrupt() {
@@ -243,25 +292,38 @@ void OpenGLRenderer::interrupt() {
     mCaches.unbindIndicesBuffer();
     mCaches.resetVertexPointers();
     mCaches.disbaleTexCoordsVertexArray();
+    debugOverdraw(false, false);
 }
 
 void OpenGLRenderer::resume() {
     sp<Snapshot> snapshot = (mSnapshot != NULL) ? mSnapshot : mFirstSnapshot;
-
     glViewport(0, 0, snapshot->viewport.getWidth(), snapshot->viewport.getHeight());
+    glBindFramebuffer(GL_FRAMEBUFFER, snapshot->fbo);
+    debugOverdraw(true, false);
+
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-    glEnable(GL_SCISSOR_TEST);
+    mCaches.scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
+    mCaches.enableScissor();
     mCaches.resetScissor();
     dirtyClip();
 
     mCaches.activeTexture(0);
-    glBindFramebuffer(GL_FRAMEBUFFER, snapshot->fbo);
 
     mCaches.blend = true;
     glEnable(GL_BLEND);
     glBlendFunc(mCaches.lastSrcMode, mCaches.lastDstMode);
     glBlendEquation(GL_FUNC_ADD);
+}
+
+void OpenGLRenderer::resumeAfterLayer() {
+    sp<Snapshot> snapshot = (mSnapshot != NULL) ? mSnapshot : mFirstSnapshot;
+    glViewport(0, 0, snapshot->viewport.getWidth(), snapshot->viewport.getHeight());
+    glBindFramebuffer(GL_FRAMEBUFFER, snapshot->fbo);
+    debugOverdraw(true, false);
+
+    mCaches.resetScissor();
+    dirtyClip();
 }
 
 void OpenGLRenderer::detachFunctor(Functor* functor) {
@@ -303,9 +365,11 @@ status_t OpenGLRenderer::invokeFunctors(Rect& dirty) {
                 mFunctors.add(f);
             }
         }
+        // protect against functors binding to other buffers
+        mCaches.unbindMeshBuffer();
+        mCaches.unbindIndicesBuffer();
+        mCaches.activeTexture(0);
     }
-
-    mCaches.activeTexture(0);
 
     return result;
 }
@@ -314,6 +378,7 @@ status_t OpenGLRenderer::callDrawGLFunction(Functor* functor, Rect& dirty) {
     interrupt();
     detachFunctor(functor);
 
+    mCaches.enableScissor();
     if (mDirtyClip) {
         setScissorFromClip();
     }
@@ -321,13 +386,11 @@ status_t OpenGLRenderer::callDrawGLFunction(Functor* functor, Rect& dirty) {
     Rect clip(*mSnapshot->clipRect);
     clip.snapToPixelBoundaries();
 
-#if RENDER_LAYERS_AS_REGIONS
     // Since we don't know what the functor will draw, let's dirty
     // tne entire clip region
     if (hasLayer()) {
         dirtyLayerUnchecked(clip, getRegion());
     }
-#endif
 
     DrawGlInfo info;
     info.clipLeft = clip.left;
@@ -352,6 +415,124 @@ status_t OpenGLRenderer::callDrawGLFunction(Functor* functor, Rect& dirty) {
 
     resume();
     return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Debug
+///////////////////////////////////////////////////////////////////////////////
+
+void OpenGLRenderer::startMark(const char* name) const {
+    mCaches.startMark(0, name);
+}
+
+void OpenGLRenderer::endMark() const {
+    mCaches.endMark();
+}
+
+void OpenGLRenderer::debugOverdraw(bool enable, bool clear) {
+    if (mCaches.debugOverdraw && getTargetFbo() == 0) {
+        if (clear) {
+            mCaches.disableScissor();
+            mCaches.stencil.clear();
+        }
+        if (enable) {
+            mCaches.stencil.enableDebugWrite();
+        } else {
+            mCaches.stencil.disable();
+        }
+    }
+}
+
+void OpenGLRenderer::renderOverdraw() {
+    if (mCaches.debugOverdraw && getTargetFbo() == 0) {
+        const Rect* clip = mTilingSnapshot->clipRect;
+
+        mCaches.enableScissor();
+        mCaches.setScissor(clip->left, mTilingSnapshot->height - clip->bottom,
+                clip->right - clip->left, clip->bottom - clip->top);
+
+        mCaches.stencil.enableDebugTest(2);
+        drawColor(0x2f0000ff, SkXfermode::kSrcOver_Mode);
+        mCaches.stencil.enableDebugTest(3);
+        drawColor(0x2f00ff00, SkXfermode::kSrcOver_Mode);
+        mCaches.stencil.enableDebugTest(4);
+        drawColor(0x3fff0000, SkXfermode::kSrcOver_Mode);
+        mCaches.stencil.enableDebugTest(4, true);
+        drawColor(0x7fff0000, SkXfermode::kSrcOver_Mode);
+        mCaches.stencil.disable();
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Layers
+///////////////////////////////////////////////////////////////////////////////
+
+bool OpenGLRenderer::updateLayer(Layer* layer, bool inFrame) {
+    if (layer->deferredUpdateScheduled && layer->renderer && layer->displayList) {
+        OpenGLRenderer* renderer = layer->renderer;
+        Rect& dirty = layer->dirtyRect;
+
+        if (inFrame) {
+            endTiling();
+            debugOverdraw(false, false);
+        }
+
+        renderer->setViewport(layer->layer.getWidth(), layer->layer.getHeight());
+        renderer->prepareDirty(dirty.left, dirty.top, dirty.right, dirty.bottom, !layer->isBlend());
+        renderer->drawDisplayList(layer->displayList, dirty, DisplayList::kReplayFlag_ClipChildren);
+        renderer->finish();
+
+        if (inFrame) {
+            resumeAfterLayer();
+            startTiling(mSnapshot);
+        }
+
+        dirty.setEmpty();
+        layer->deferredUpdateScheduled = false;
+        layer->renderer = NULL;
+        layer->displayList = NULL;
+
+        return true;
+    }
+
+    return false;
+}
+
+void OpenGLRenderer::updateLayers() {
+    int count = mLayerUpdates.size();
+    if (count > 0) {
+        startMark("Layer Updates");
+
+        // Note: it is very important to update the layers in reverse order
+        for (int i = count - 1; i >= 0; i--) {
+            Layer* layer = mLayerUpdates.itemAt(i);
+            updateLayer(layer, false);
+            mCaches.resourceCache.decrementRefcount(layer);
+        }
+        mLayerUpdates.clear();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, getTargetFbo());
+        endMark();
+    }
+}
+
+void OpenGLRenderer::pushLayerUpdate(Layer* layer) {
+    if (layer) {
+        mLayerUpdates.push_back(layer);
+        mCaches.resourceCache.incrementRefcount(layer);
+    }
+}
+
+void OpenGLRenderer::clearLayerUpdates() {
+    size_t count = mLayerUpdates.size();
+    if (count > 0) {
+        mCaches.resourceCache.lock();
+        for (size_t i = 0; i < count; i++) {
+            mCaches.resourceCache.decrementRefcountLocked(mLayerUpdates.itemAt(i));
+        }
+        mCaches.resourceCache.unlock();
+        mLayerUpdates.clear();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -428,20 +609,12 @@ int OpenGLRenderer::saveLayer(float left, float top, float right, float bottom,
 
         if (p) {
             alpha = p->getAlpha();
-            if (!mCaches.extensions.hasFramebufferFetch()) {
-                const bool isMode = SkXfermode::IsMode(p->getXfermode(), &mode);
-                if (!isMode) {
-                    // Assume SRC_OVER
-                    mode = SkXfermode::kSrcOver_Mode;
-                }
-            } else {
-                mode = getXfermode(p->getXfermode());
-            }
+            mode = getXfermode(p->getXfermode());
         } else {
             mode = SkXfermode::kSrcOver_Mode;
         }
 
-        createLayer(mSnapshot, left, top, right, bottom, alpha, mode, flags, previousFbo);
+        createLayer(left, top, right, bottom, alpha, mode, flags, previousFbo);
     }
 
     return count;
@@ -449,7 +622,7 @@ int OpenGLRenderer::saveLayer(float left, float top, float right, float bottom,
 
 int OpenGLRenderer::saveLayerAlpha(float left, float top, float right, float bottom,
         int alpha, int flags) {
-    if (alpha >= 255 - ALPHA_THRESHOLD) {
+    if (alpha >= 255) {
         return saveLayer(left, top, right, bottom, NULL, flags);
     } else {
         SkPaint paint;
@@ -509,44 +682,56 @@ int OpenGLRenderer::saveLayerAlpha(float left, float top, float right, float bot
  *     buffer is left untouched until the first drawing operation. Only when
  *     something actually gets drawn are the layers regions cleared.
  */
-bool OpenGLRenderer::createLayer(sp<Snapshot> snapshot, float left, float top,
-        float right, float bottom, int alpha, SkXfermode::Mode mode,
-        int flags, GLuint previousFbo) {
+bool OpenGLRenderer::createLayer(float left, float top, float right, float bottom,
+        int alpha, SkXfermode::Mode mode, int flags, GLuint previousFbo) {
     LAYER_LOGD("Requesting layer %.2fx%.2f", right - left, bottom - top);
     LAYER_LOGD("Layer cache size = %d", mCaches.layerCache.getSize());
 
     const bool fboLayer = flags & SkCanvas::kClipToLayer_SaveFlag;
 
     // Window coordinates of the layer
+    Rect clip;
     Rect bounds(left, top, right, bottom);
-    if (!fboLayer) {
-        mSnapshot->transform->mapRect(bounds);
+    Rect untransformedBounds(bounds);
+    mSnapshot->transform->mapRect(bounds);
 
-        // Layers only make sense if they are in the framebuffer's bounds
-        if (bounds.intersect(*snapshot->clipRect)) {
-            // We cannot work with sub-pixels in this case
-            bounds.snapToPixelBoundaries();
+    // Layers only make sense if they are in the framebuffer's bounds
+    if (bounds.intersect(*mSnapshot->clipRect)) {
+        // We cannot work with sub-pixels in this case
+        bounds.snapToPixelBoundaries();
 
-            // When the layer is not an FBO, we may use glCopyTexImage so we
-            // need to make sure the layer does not extend outside the bounds
-            // of the framebuffer
-            if (!bounds.intersect(snapshot->previous->viewport)) {
-                bounds.setEmpty();
-            }
-        } else {
+        // When the layer is not an FBO, we may use glCopyTexImage so we
+        // need to make sure the layer does not extend outside the bounds
+        // of the framebuffer
+        if (!bounds.intersect(mSnapshot->previous->viewport)) {
             bounds.setEmpty();
+        } else if (fboLayer) {
+            clip.set(bounds);
+            mat4 inverse;
+            inverse.loadInverse(*mSnapshot->transform);
+            inverse.mapRect(clip);
+            clip.snapToPixelBoundaries();
+            if (clip.intersect(untransformedBounds)) {
+                clip.translate(-left, -top);
+                bounds.set(untransformedBounds);
+            } else {
+                clip.setEmpty();
+            }
         }
+    } else {
+        bounds.setEmpty();
     }
 
     if (bounds.isEmpty() || bounds.getWidth() > mCaches.maxTextureSize ||
-            bounds.getHeight() > mCaches.maxTextureSize) {
-        snapshot->empty = fboLayer;
+            bounds.getHeight() > mCaches.maxTextureSize ||
+            (fboLayer && clip.isEmpty())) {
+        mSnapshot->empty = fboLayer;
     } else {
-        snapshot->invisible = snapshot->invisible || (alpha <= ALPHA_THRESHOLD && fboLayer);
+        mSnapshot->invisible = mSnapshot->invisible || (alpha <= ALPHA_THRESHOLD && fboLayer);
     }
 
     // Bail out if we won't draw in this snapshot
-    if (snapshot->invisible || snapshot->empty) {
+    if (mSnapshot->invisible || mSnapshot->empty) {
         return false;
     }
 
@@ -562,25 +747,26 @@ bool OpenGLRenderer::createLayer(sp<Snapshot> snapshot, float left, float top,
             bounds.getWidth() / float(layer->getWidth()), 0.0f);
     layer->setColorFilter(mColorFilter);
     layer->setBlend(true);
+    layer->setDirty(false);
 
     // Save the layer in the snapshot
-    snapshot->flags |= Snapshot::kFlagIsLayer;
-    snapshot->layer = layer;
+    mSnapshot->flags |= Snapshot::kFlagIsLayer;
+    mSnapshot->layer = layer;
 
     if (fboLayer) {
-        return createFboLayer(layer, bounds, snapshot, previousFbo);
+        return createFboLayer(layer, bounds, clip, previousFbo);
     } else {
         // Copy the framebuffer into the layer
         layer->bindTexture();
         if (!bounds.isEmpty()) {
             if (layer->isEmpty()) {
                 glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                        bounds.left, snapshot->height - bounds.bottom,
+                        bounds.left, mSnapshot->height - bounds.bottom,
                         layer->getWidth(), layer->getHeight(), 0);
                 layer->setEmpty(false);
             } else {
                 glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, bounds.left,
-                        snapshot->height - bounds.bottom, bounds.getWidth(), bounds.getHeight());
+                        mSnapshot->height - bounds.bottom, bounds.getWidth(), bounds.getHeight());
             }
 
             // Enqueue the buffer coordinates to clear the corresponding region later
@@ -591,38 +777,23 @@ bool OpenGLRenderer::createLayer(sp<Snapshot> snapshot, float left, float top,
     return true;
 }
 
-bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> snapshot,
-        GLuint previousFbo) {
+bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, Rect& clip, GLuint previousFbo) {
     layer->setFbo(mCaches.fboCache.get());
 
-#if RENDER_LAYERS_AS_REGIONS
-    snapshot->region = &snapshot->layer->region;
-    snapshot->flags |= Snapshot::kFlagFboTarget;
-#endif
+    mSnapshot->region = &mSnapshot->layer->region;
+    mSnapshot->flags |= Snapshot::kFlagFboTarget;
 
-    Rect clip(bounds);
-    snapshot->transform->mapRect(clip);
-    clip.intersect(*snapshot->clipRect);
-    clip.snapToPixelBoundaries();
-    clip.intersect(snapshot->previous->viewport);
+    mSnapshot->flags |= Snapshot::kFlagIsFboLayer;
+    mSnapshot->fbo = layer->getFbo();
+    mSnapshot->resetTransform(-bounds.left, -bounds.top, 0.0f);
+    mSnapshot->resetClip(clip.left, clip.top, clip.right, clip.bottom);
+    mSnapshot->viewport.set(0.0f, 0.0f, bounds.getWidth(), bounds.getHeight());
+    mSnapshot->height = bounds.getHeight();
+    mSnapshot->flags |= Snapshot::kFlagDirtyOrtho;
+    mSnapshot->orthoMatrix.load(mOrthoMatrix);
 
-    mat4 inverse;
-    inverse.loadInverse(*mSnapshot->transform);
-
-    inverse.mapRect(clip);
-    clip.snapToPixelBoundaries();
-    clip.intersect(bounds);
-    clip.translate(-bounds.left, -bounds.top);
-
-    snapshot->flags |= Snapshot::kFlagIsFboLayer;
-    snapshot->fbo = layer->getFbo();
-    snapshot->resetTransform(-bounds.left, -bounds.top, 0.0f);
-    snapshot->resetClip(clip.left, clip.top, clip.right, clip.bottom);
-    snapshot->viewport.set(0.0f, 0.0f, bounds.getWidth(), bounds.getHeight());
-    snapshot->height = bounds.getHeight();
-    snapshot->flags |= Snapshot::kFlagDirtyOrtho;
-    snapshot->orthoMatrix.load(mOrthoMatrix);
-
+    endTiling();
+    debugOverdraw(false, false);
     // Bind texture to FBO
     glBindFramebuffer(GL_FRAMEBUFFER, layer->getFbo());
     layer->bindTexture();
@@ -636,22 +807,10 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, sp<Snapshot> sna
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
             layer->getTexture(), 0);
 
-#if DEBUG_LAYERS_AS_REGIONS
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) {
-        ALOGE("Framebuffer incomplete (GL error code 0x%x)", status);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, previousFbo);
-        layer->deleteTexture();
-        mCaches.fboCache.put(layer->getFbo());
-
-        delete layer;
-
-        return false;
-    }
-#endif
+    startTiling(mSnapshot);
 
     // Clear the FBO, expand the clear region by 1 to get nice bilinear filtering
+    mCaches.enableScissor();
     mCaches.setScissor(clip.left - 1.0f, bounds.getHeight() - clip.bottom - 1.0f,
             clip.getWidth() + 2.0f, clip.getHeight() + 2.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -677,11 +836,15 @@ void OpenGLRenderer::composeLayer(sp<Snapshot> current, sp<Snapshot> previous) {
     const bool fboLayer = current->flags & Snapshot::kFlagIsFboLayer;
 
     if (fboLayer) {
+        endTiling();
+
         // Detach the texture from the FBO
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-
         // Unbind current FBO and restore previous one
         glBindFramebuffer(GL_FRAMEBUFFER, previous->fbo);
+        debugOverdraw(true, false);
+
+        startTiling(previous);
     }
 
     Layer* layer = current->layer;
@@ -730,19 +893,12 @@ void OpenGLRenderer::composeLayer(sp<Snapshot> current, sp<Snapshot> previous) {
     // Failing to add the layer to the cache should happen only if the layer is too large
     if (!mCaches.layerCache.put(layer)) {
         LAYER_LOGD("Deleting layer");
-        layer->deleteTexture();
-        delete layer;
+        Caches::getInstance().resourceCache.decrementRefcount(layer);
     }
 }
 
 void OpenGLRenderer::drawTextureLayer(Layer* layer, const Rect& rect) {
     float alpha = layer->getAlpha() / 255.0f;
-
-    mat4& transform = layer->getTransform();
-    if (!transform.isIdentity()) {
-        save(0);
-        mSnapshot->transform->multiply(transform);
-    }
 
     setupDraw();
     if (layer->getRenderTarget() == GL_TEXTURE_2D) {
@@ -780,10 +936,6 @@ void OpenGLRenderer::drawTextureLayer(Layer* layer, const Rect& rect) {
     glDrawArrays(GL_TRIANGLE_STRIP, 0, gMeshCount);
 
     finishDrawTexture();
-
-    if (!transform.isIdentity()) {
-        restore();
-    }
 }
 
 void OpenGLRenderer::composeLayerRect(Layer* layer, const Rect& rect, bool swap) {
@@ -825,7 +977,6 @@ void OpenGLRenderer::composeLayerRect(Layer* layer, const Rect& rect, bool swap)
 }
 
 void OpenGLRenderer::composeLayerRegion(Layer* layer, const Rect& rect) {
-#if RENDER_LAYERS_AS_REGIONS
     if (layer->region.isRect()) {
         layer->setRegionAsRect();
 
@@ -906,9 +1057,6 @@ void OpenGLRenderer::composeLayerRegion(Layer* layer, const Rect& rect) {
 
         layer->region.clear();
     }
-#else
-    composeLayerRect(layer, rect);
-#endif
 }
 
 void OpenGLRenderer::drawRegionRects(const Region& region) {
@@ -939,27 +1087,22 @@ void OpenGLRenderer::drawRegionRects(const Region& region) {
 
 void OpenGLRenderer::dirtyLayer(const float left, const float top,
         const float right, const float bottom, const mat4 transform) {
-#if RENDER_LAYERS_AS_REGIONS
     if (hasLayer()) {
         Rect bounds(left, top, right, bottom);
         transform.mapRect(bounds);
         dirtyLayerUnchecked(bounds, getRegion());
     }
-#endif
 }
 
 void OpenGLRenderer::dirtyLayer(const float left, const float top,
         const float right, const float bottom) {
-#if RENDER_LAYERS_AS_REGIONS
     if (hasLayer()) {
         Rect bounds(left, top, right, bottom);
         dirtyLayerUnchecked(bounds, getRegion());
     }
-#endif
 }
 
 void OpenGLRenderer::dirtyLayerUnchecked(Rect& bounds, Region* region) {
-#if RENDER_LAYERS_AS_REGIONS
     if (bounds.intersect(*mSnapshot->clipRect)) {
         bounds.snapToPixelBoundaries();
         android::Rect dirty(bounds.left, bounds.top, bounds.right, bounds.bottom);
@@ -967,7 +1110,6 @@ void OpenGLRenderer::dirtyLayerUnchecked(Rect& bounds, Region* region) {
             region->orSelf(dirty);
         }
     }
-#endif
 }
 
 void OpenGLRenderer::clearLayerRegions() {
@@ -982,7 +1124,7 @@ void OpenGLRenderer::clearLayerRegions() {
         // The list contains bounds that have already been clipped
         // against their initial clip rect, and the current clip
         // is likely different so we need to disable clipping here
-        glDisable(GL_SCISSOR_TEST);
+        bool scissorChanged = mCaches.disableScissor();
 
         Vertex mesh[count * 6];
         Vertex* vertex = mesh;
@@ -1010,7 +1152,7 @@ void OpenGLRenderer::clearLayerRegions() {
 
         glDrawArrays(GL_TRIANGLES, 0, count * 6);
 
-        glEnable(GL_SCISSOR_TEST);
+        if (scissorChanged) mCaches.enableScissor();
     } else {
         for (uint32_t i = 0; i < count; i++) {
             delete mLayers.itemAt(i);
@@ -1067,17 +1209,17 @@ void OpenGLRenderer::setScissorFromClip() {
     Rect clip(*mSnapshot->clipRect);
     clip.snapToPixelBoundaries();
 
-    mCaches.setScissor(clip.left, mSnapshot->height - clip.bottom,
-            clip.getWidth(), clip.getHeight());
-
-    mDirtyClip = false;
+    if (mCaches.setScissor(clip.left, mSnapshot->height - clip.bottom,
+            clip.getWidth(), clip.getHeight())) {
+        mDirtyClip = false;
+    }
 }
 
 const Rect& OpenGLRenderer::getClipBounds() {
     return mSnapshot->getLocalClip();
 }
 
-bool OpenGLRenderer::quickReject(float left, float top, float right, float bottom) {
+bool OpenGLRenderer::quickRejectNoScissor(float left, float top, float right, float bottom) {
     if (mSnapshot->isIgnored()) {
         return true;
     }
@@ -1090,6 +1232,51 @@ bool OpenGLRenderer::quickReject(float left, float top, float right, float botto
     clipRect.snapToPixelBoundaries();
 
     return !clipRect.intersects(r);
+}
+
+bool OpenGLRenderer::quickRejectNoScissor(float left, float top, float right, float bottom,
+        Rect& transformed, Rect& clip) {
+    if (mSnapshot->isIgnored()) {
+        return true;
+    }
+
+    transformed.set(left, top, right, bottom);
+    mSnapshot->transform->mapRect(transformed);
+    transformed.snapToPixelBoundaries();
+
+    clip.set(*mSnapshot->clipRect);
+    clip.snapToPixelBoundaries();
+
+    return !clip.intersects(transformed);
+}
+
+bool OpenGLRenderer::quickRejectPreStroke(float left, float top, float right, float bottom, SkPaint* paint) {
+    if (paint->getStyle() != SkPaint::kFill_Style) {
+        float outset = paint->getStrokeWidth() * 0.5f;
+        return quickReject(left - outset, top - outset, right + outset, bottom + outset);
+    } else {
+        return quickReject(left, top, right, bottom);
+    }
+}
+
+bool OpenGLRenderer::quickReject(float left, float top, float right, float bottom) {
+    if (mSnapshot->isIgnored() || bottom <= top || right <= left) {
+        return true;
+    }
+
+    Rect r(left, top, right, bottom);
+    mSnapshot->transform->mapRect(r);
+    r.snapToPixelBoundaries();
+
+    Rect clipRect(*mSnapshot->clipRect);
+    clipRect.snapToPixelBoundaries();
+
+    bool rejected = !clipRect.intersects(r);
+    if (!isDeferred() && !rejected) {
+        mCaches.setScissorEnabled(mScissorOptimizationDisabled || !clipRect.contains(r));
+    }
+
+    return rejected;
 }
 
 bool OpenGLRenderer::clipRect(float left, float top, float right, float bottom, SkRegion::Op op) {
@@ -1109,6 +1296,8 @@ Rect* OpenGLRenderer::getClipRect() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void OpenGLRenderer::setupDraw(bool clear) {
+    // TODO: It would be best if we could do this before quickReject()
+    //       changes the scissor test state
     if (clear) clearLayerRegions();
     if (mDirtyClip) {
         setScissorFromClip();
@@ -1134,8 +1323,12 @@ void OpenGLRenderer::setupDrawNoTexture() {
     mCaches.disbaleTexCoordsVertexArray();
 }
 
-void OpenGLRenderer::setupDrawAALine() {
+void OpenGLRenderer::setupDrawAA() {
     mDescription.isAA = true;
+}
+
+void OpenGLRenderer::setupDrawVertexShape() {
+    mDescription.isVertexShape = true;
 }
 
 void OpenGLRenderer::setupDrawPoint(float pointSize) {
@@ -1169,6 +1362,10 @@ void OpenGLRenderer::setupDrawAlpha8Color(int color, int alpha) {
     mColorB = a * ((color      ) & 0xFF);
     mColorSet = true;
     mSetShaderColor = mDescription.setAlpha8Color(mColorR, mColorG, mColorB, mColorA);
+}
+
+void OpenGLRenderer::setupDrawTextGamma(const SkPaint* paint) {
+    mCaches.fontRenderer->describe(mDescription, paint);
 }
 
 void OpenGLRenderer::setupDrawColor(float r, float g, float b, float a) {
@@ -1212,8 +1409,8 @@ void OpenGLRenderer::setupDrawBlending(bool blend, SkXfermode::Mode mode, bool s
     // When the blending mode is kClear_Mode, we need to use a modulate color
     // argb=1,0,0,0
     accountForClear(mode);
-    chooseBlending(blend || (mColorSet && mColorA < 1.0f) || (mShader && mShader->blend()), mode,
-            mDescription, swapSrcDst);
+    chooseBlending(blend || (mColorSet && mColorA < 1.0f) || (mShader && mShader->blend()) ||
+            (mColorFilter && mColorFilter->blend()), mode, mDescription, swapSrcDst);
 }
 
 void OpenGLRenderer::setupDrawProgram() {
@@ -1298,9 +1495,13 @@ void OpenGLRenderer::setupDrawColorFilterUniforms() {
     }
 }
 
+void OpenGLRenderer::setupDrawTextGammaUniforms() {
+    mCaches.fontRenderer->setupProgram(mDescription, mCaches.currentProgram);
+}
+
 void OpenGLRenderer::setupDrawSimpleMesh() {
     bool force = mCaches.bindMeshBuffer();
-    mCaches.bindPositionVertexPointer(force, mCaches.currentProgram->position, 0);
+    mCaches.bindPositionVertexPointer(force, 0);
     mCaches.unbindIndicesBuffer();
 }
 
@@ -1333,9 +1534,9 @@ void OpenGLRenderer::setupDrawMesh(GLvoid* vertices, GLvoid* texCoords, GLuint v
         force = mCaches.unbindMeshBuffer();
     }
 
-    mCaches.bindPositionVertexPointer(force, mCaches.currentProgram->position, vertices);
+    mCaches.bindPositionVertexPointer(force, vertices);
     if (mCaches.currentProgram->texCoords >= 0) {
-        mCaches.bindTexCoordsVertexPointer(force, mCaches.currentProgram->texCoords, texCoords);
+        mCaches.bindTexCoordsVertexPointer(force, texCoords);
     }
 
     mCaches.unbindIndicesBuffer();
@@ -1343,16 +1544,15 @@ void OpenGLRenderer::setupDrawMesh(GLvoid* vertices, GLvoid* texCoords, GLuint v
 
 void OpenGLRenderer::setupDrawMeshIndices(GLvoid* vertices, GLvoid* texCoords) {
     bool force = mCaches.unbindMeshBuffer();
-    mCaches.bindPositionVertexPointer(force, mCaches.currentProgram->position, vertices);
+    mCaches.bindPositionVertexPointer(force, vertices);
     if (mCaches.currentProgram->texCoords >= 0) {
-        mCaches.bindTexCoordsVertexPointer(force, mCaches.currentProgram->texCoords, texCoords);
+        mCaches.bindTexCoordsVertexPointer(force, texCoords);
     }
 }
 
 void OpenGLRenderer::setupDrawVertices(GLvoid* vertices) {
     bool force = mCaches.unbindMeshBuffer();
-    mCaches.bindPositionVertexPointer(force, mCaches.currentProgram->position,
-            vertices, gVertexStride);
+    mCaches.bindPositionVertexPointer(force, vertices, gVertexStride);
     mCaches.unbindIndicesBuffer();
 }
 
@@ -1370,8 +1570,7 @@ void OpenGLRenderer::setupDrawVertices(GLvoid* vertices) {
 void OpenGLRenderer::setupDrawAALine(GLvoid* vertices, GLvoid* widthCoords,
         GLvoid* lengthCoords, float boundaryWidthProportion, int& widthSlot, int& lengthSlot) {
     bool force = mCaches.unbindMeshBuffer();
-    mCaches.bindPositionVertexPointer(force, mCaches.currentProgram->position,
-            vertices, gAAVertexStride);
+    mCaches.bindPositionVertexPointer(force, vertices, gAAVertexStride);
     mCaches.resetTexCoordsVertexPointer();
     mCaches.unbindIndicesBuffer();
 
@@ -1385,10 +1584,6 @@ void OpenGLRenderer::setupDrawAALine(GLvoid* vertices, GLvoid* widthCoords,
 
     int boundaryWidthSlot = mCaches.currentProgram->getUniform("boundaryWidth");
     glUniform1f(boundaryWidthSlot, boundaryWidthProportion);
-
-    // Setting the inverse value saves computations per-fragment in the shader
-    int inverseBoundaryWidthSlot = mCaches.currentProgram->getUniform("inverseBoundaryWidth");
-    glUniform1f(inverseBoundaryWidthSlot, 1.0f / boundaryWidthProportion);
 }
 
 void OpenGLRenderer::finishDrawAALine(const int widthSlot, const int lengthSlot) {
@@ -1530,39 +1725,22 @@ status_t OpenGLRenderer::drawBitmapData(SkBitmap* bitmap, float left, float top,
 
 status_t OpenGLRenderer::drawBitmapMesh(SkBitmap* bitmap, int meshWidth, int meshHeight,
         float* vertices, int* colors, SkPaint* paint) {
-    // TODO: Do a quickReject
     if (!vertices || mSnapshot->isIgnored()) {
         return DrawGlInfo::kStatusDone;
     }
 
-    mCaches.activeTexture(0);
-    Texture* texture = mCaches.textureCache.get(bitmap);
-    if (!texture) return DrawGlInfo::kStatusDone;
-    const AutoTexture autoCleanup(texture);
-
-    texture->setWrap(GL_CLAMP_TO_EDGE, true);
-    texture->setFilter(FILTER(paint), true);
-
-    int alpha;
-    SkXfermode::Mode mode;
-    getAlphaAndMode(paint, &alpha, &mode);
-
-    const uint32_t count = meshWidth * meshHeight * 6;
-
+    // TODO: We should compute the bounding box when recording the display list
     float left = FLT_MAX;
     float top = FLT_MAX;
     float right = FLT_MIN;
     float bottom = FLT_MIN;
 
-#if RENDER_LAYERS_AS_REGIONS
-    const bool hasActiveLayer = hasLayer();
-#else
-    const bool hasActiveLayer = false;
-#endif
+    const uint32_t count = meshWidth * meshHeight * 6;
 
     // TODO: Support the colors array
     TextureVertex mesh[count];
     TextureVertex* vertex = mesh;
+
     for (int32_t y = 0; y < meshHeight; y++) {
         for (int32_t x = 0; x < meshWidth; x++) {
             uint32_t i = (y * (meshWidth + 1) + x) * 2;
@@ -1589,23 +1767,33 @@ status_t OpenGLRenderer::drawBitmapMesh(SkBitmap* bitmap, int meshWidth, int mes
             TextureVertex::set(vertex++, vertices[cx], vertices[cy], u2, v1);
             TextureVertex::set(vertex++, vertices[dx], vertices[dy], u2, v2);
 
-#if RENDER_LAYERS_AS_REGIONS
-            if (hasActiveLayer) {
-                // TODO: This could be optimized to avoid unnecessary ops
-                left = fminf(left, fminf(vertices[ax], fminf(vertices[bx], vertices[cx])));
-                top = fminf(top, fminf(vertices[ay], fminf(vertices[by], vertices[cy])));
-                right = fmaxf(right, fmaxf(vertices[ax], fmaxf(vertices[bx], vertices[cx])));
-                bottom = fmaxf(bottom, fmaxf(vertices[ay], fmaxf(vertices[by], vertices[cy])));
-            }
-#endif
+            // TODO: This could be optimized to avoid unnecessary ops
+            left = fminf(left, fminf(vertices[ax], fminf(vertices[bx], vertices[cx])));
+            top = fminf(top, fminf(vertices[ay], fminf(vertices[by], vertices[cy])));
+            right = fmaxf(right, fmaxf(vertices[ax], fmaxf(vertices[bx], vertices[cx])));
+            bottom = fmaxf(bottom, fmaxf(vertices[ay], fmaxf(vertices[by], vertices[cy])));
         }
     }
 
-#if RENDER_LAYERS_AS_REGIONS
-    if (hasActiveLayer) {
+    if (quickReject(left, top, right, bottom)) {
+        return DrawGlInfo::kStatusDone;
+    }
+
+    mCaches.activeTexture(0);
+    Texture* texture = mCaches.textureCache.get(bitmap);
+    if (!texture) return DrawGlInfo::kStatusDone;
+    const AutoTexture autoCleanup(texture);
+
+    texture->setWrap(GL_CLAMP_TO_EDGE, true);
+    texture->setFilter(FILTER(paint), true);
+
+    int alpha;
+    SkXfermode::Mode mode;
+    getAlphaAndMode(paint, &alpha, &mode);
+
+    if (hasLayer()) {
         dirtyLayer(left, top, right, bottom, *mSnapshot->transform);
     }
-#endif
 
     drawTextureMesh(0.0f, 0.0f, 1.0f, 1.0f, texture->id, alpha / 255.0f,
             mode, texture->blend, &mesh[0].position[0], &mesh[0].texture[0],
@@ -1674,9 +1862,22 @@ status_t OpenGLRenderer::drawBitmap(SkBitmap* bitmap,
 status_t OpenGLRenderer::drawPatch(SkBitmap* bitmap, const int32_t* xDivs, const int32_t* yDivs,
         const uint32_t* colors, uint32_t width, uint32_t height, int8_t numColors,
         float left, float top, float right, float bottom, SkPaint* paint) {
+    int alpha;
+    SkXfermode::Mode mode;
+    getAlphaAndModeDirect(paint, &alpha, &mode);
+
+    return drawPatch(bitmap, xDivs, yDivs, colors, width, height, numColors,
+            left, top, right, bottom, alpha, mode);
+}
+
+status_t OpenGLRenderer::drawPatch(SkBitmap* bitmap, const int32_t* xDivs, const int32_t* yDivs,
+        const uint32_t* colors, uint32_t width, uint32_t height, int8_t numColors,
+        float left, float top, float right, float bottom, int alpha, SkXfermode::Mode mode) {
     if (quickReject(left, top, right, bottom)) {
         return DrawGlInfo::kStatusDone;
     }
+
+    alpha *= mSnapshot->alpha;
 
     mCaches.activeTexture(0);
     Texture* texture = mCaches.textureCache.get(bitmap);
@@ -1685,16 +1886,11 @@ status_t OpenGLRenderer::drawPatch(SkBitmap* bitmap, const int32_t* xDivs, const
     texture->setWrap(GL_CLAMP_TO_EDGE, true);
     texture->setFilter(GL_LINEAR, true);
 
-    int alpha;
-    SkXfermode::Mode mode;
-    getAlphaAndMode(paint, &alpha, &mode);
-
     const Patch* mesh = mCaches.patchCache.get(bitmap->width(), bitmap->height(),
             right - left, bottom - top, xDivs, yDivs, colors, width, height, numColors);
 
     if (CC_LIKELY(mesh && mesh->verticesCount > 0)) {
         const bool pureTranslate = mSnapshot->transform->isPureTranslate();
-#if RENDER_LAYERS_AS_REGIONS
         // Mark the current layer dirty where we are going to draw the patch
         if (hasLayer() && mesh->hasEmptyQuads) {
             const float offsetX = left + mSnapshot->transform->getTranslateX();
@@ -1712,7 +1908,6 @@ status_t OpenGLRenderer::drawPatch(SkBitmap* bitmap, const int32_t* xDivs, const
                 }
             }
         }
-#endif
 
         if (CC_LIKELY(pureTranslate)) {
             const float x = (int) floorf(left + mSnapshot->transform->getTranslateX() + 0.5f);
@@ -1734,83 +1929,67 @@ status_t OpenGLRenderer::drawPatch(SkBitmap* bitmap, const int32_t* xDivs, const
 }
 
 /**
- * This function uses a similar approach to that of AA lines in the drawLines() function.
- * We expand the rectangle by a half pixel in screen space on all sides, and use a fragment
- * shader to compute the translucency of the color, determined by whether a given pixel is
- * within that boundary region and how far into the region it is.
+ * Renders a convex path via tessellation. For AA paths, this function uses a similar approach to
+ * that of AA lines in the drawLines() function.  We expand the convex path by a half pixel in
+ * screen space in all directions. However, instead of using a fragment shader to compute the
+ * translucency of the color from its position, we simply use a varying parameter to define how far
+ * a given pixel is from the edge. For non-AA paths, the expansion and alpha varying are not used.
+ *
+ * Doesn't yet support joins, caps, or path effects.
  */
-void OpenGLRenderer::drawAARect(float left, float top, float right, float bottom,
-        int color, SkXfermode::Mode mode) {
-    float inverseScaleX = 1.0f;
-    float inverseScaleY = 1.0f;
-    // The quad that we use needs to account for scaling.
-    if (CC_UNLIKELY(!mSnapshot->transform->isPureTranslate())) {
-        Matrix4 *mat = mSnapshot->transform;
-        float m00 = mat->data[Matrix4::kScaleX];
-        float m01 = mat->data[Matrix4::kSkewY];
-        float m02 = mat->data[2];
-        float m10 = mat->data[Matrix4::kSkewX];
-        float m11 = mat->data[Matrix4::kScaleX];
-        float m12 = mat->data[6];
-        float scaleX = sqrt(m00 * m00 + m01 * m01);
-        float scaleY = sqrt(m10 * m10 + m11 * m11);
-        inverseScaleX = (scaleX != 0) ? (inverseScaleX / scaleX) : 0;
-        inverseScaleY = (scaleY != 0) ? (inverseScaleY / scaleY) : 0;
+void OpenGLRenderer::drawConvexPath(const SkPath& path, SkPaint* paint) {
+    int color = paint->getColor();
+    SkPaint::Style style = paint->getStyle();
+    SkXfermode::Mode mode = getXfermode(paint->getXfermode());
+    bool isAA = paint->isAntiAlias();
+
+    VertexBuffer vertexBuffer;
+    // TODO: try clipping large paths to viewport
+    PathRenderer::convexPathVertices(path, paint, mSnapshot->transform, vertexBuffer);
+
+    if (!vertexBuffer.getSize()) {
+        // no vertices to draw
+        return;
     }
 
     setupDraw();
     setupDrawNoTexture();
-    setupDrawAALine();
+    if (isAA) setupDrawAA();
+    setupDrawVertexShape();
     setupDrawColor(color, ((color >> 24) & 0xFF) * mSnapshot->alpha);
     setupDrawColorFilter();
     setupDrawShader();
-    setupDrawBlending(true, mode);
+    setupDrawBlending(isAA, mode);
     setupDrawProgram();
-    setupDrawModelViewIdentity(true);
+    setupDrawModelViewIdentity();
     setupDrawColorUniforms();
     setupDrawColorFilterUniforms();
     setupDrawShaderIdentityUniforms();
 
-    AAVertex rects[4];
-    AAVertex* aaVertices = &rects[0];
-    void* widthCoords = ((GLbyte*) aaVertices) + gVertexAAWidthOffset;
-    void* lengthCoords = ((GLbyte*) aaVertices) + gVertexAALengthOffset;
+    void* vertices = vertexBuffer.getBuffer();
+    bool force = mCaches.unbindMeshBuffer();
+    mCaches.bindPositionVertexPointer(true, vertices, isAA ? gAlphaVertexStride : gVertexStride);
+    mCaches.resetTexCoordsVertexPointer();
+    mCaches.unbindIndicesBuffer();
 
-    float boundarySizeX = .5 * inverseScaleX;
-    float boundarySizeY = .5 * inverseScaleY;
+    int alphaSlot = -1;
+    if (isAA) {
+        void* alphaCoords = ((GLbyte*) vertices) + gVertexAlphaOffset;
+        alphaSlot = mCaches.currentProgram->getAttrib("vtxAlpha");
 
-    // Adjust the rect by the AA boundary padding
-    left -= boundarySizeX;
-    right += boundarySizeX;
-    top -= boundarySizeY;
-    bottom += boundarySizeY;
-
-    float width = right - left;
-    float height = bottom - top;
-
-    int widthSlot;
-    int lengthSlot;
-
-    float boundaryWidthProportion = (width != 0) ? (2 * boundarySizeX) / width : 0;
-    float boundaryHeightProportion = (height != 0) ? (2 * boundarySizeY) / height : 0;
-    setupDrawAALine((void*) aaVertices, widthCoords, lengthCoords,
-            boundaryWidthProportion, widthSlot, lengthSlot);
-
-    int boundaryLengthSlot = mCaches.currentProgram->getUniform("boundaryLength");
-    int inverseBoundaryLengthSlot = mCaches.currentProgram->getUniform("inverseBoundaryLength");
-    glUniform1f(boundaryLengthSlot, boundaryHeightProportion);
-    glUniform1f(inverseBoundaryLengthSlot, (1.0f / boundaryHeightProportion));
-
-    if (!quickReject(left, top, right, bottom)) {
-        AAVertex::set(aaVertices++, left, bottom, 1, 1);
-        AAVertex::set(aaVertices++, left, top, 1, 0);
-        AAVertex::set(aaVertices++, right, bottom, 0, 1);
-        AAVertex::set(aaVertices++, right, top, 0, 0);
-        dirtyLayer(left, top, right, bottom, *mSnapshot->transform);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        // TODO: avoid enable/disable in back to back uses of the alpha attribute
+        glEnableVertexAttribArray(alphaSlot);
+        glVertexAttribPointer(alphaSlot, 1, GL_FLOAT, GL_FALSE, gAlphaVertexStride, alphaCoords);
     }
 
-    finishDrawAALine(widthSlot, lengthSlot);
+    SkRect bounds = PathRenderer::computePathBounds(path, paint);
+    dirtyLayer(bounds.fLeft, bounds.fTop, bounds.fRight, bounds.fBottom, *mSnapshot->transform);
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, vertexBuffer.getSize());
+
+    if (isAA) {
+        glDisableVertexAttribArray(alphaSlot);
+    }
 }
 
 /**
@@ -1864,10 +2043,8 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
             Matrix4 *mat = mSnapshot->transform;
             float m00 = mat->data[Matrix4::kScaleX];
             float m01 = mat->data[Matrix4::kSkewY];
-            float m02 = mat->data[2];
             float m10 = mat->data[Matrix4::kSkewX];
-            float m11 = mat->data[Matrix4::kScaleX];
-            float m12 = mat->data[6];
+            float m11 = mat->data[Matrix4::kScaleY];
 
             float scaleX = sqrtf(m00 * m00 + m01 * m01);
             float scaleY = sqrtf(m10 * m10 + m11 * m11);
@@ -1882,10 +2059,13 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
     }
 
     getAlphaAndMode(paint, &alpha, &mode);
+
+    mCaches.enableScissor();
+
     setupDraw();
     setupDrawNoTexture();
     if (isAA) {
-        setupDrawAALine();
+        setupDrawAA();
     }
     setupDrawColor(paint->getColor(), alpha);
     setupDrawColorFilter();
@@ -1924,7 +2104,7 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
         // This value is used in the fragment shader to determine how to fill fragments.
         // We will need to calculate the actual width proportion on each segment for
         // scaled non-hairlines, since the boundary proportion may differ per-axis when scaled.
-        float boundaryWidthProportion = 1 / (2 * halfStrokeWidth);
+        float boundaryWidthProportion = .5 - 1 / (2 * halfStrokeWidth);
         setupDrawAALine((void*) aaVertices, widthCoords, lengthCoords,
                 boundaryWidthProportion, widthSlot, lengthSlot);
     }
@@ -1933,9 +2113,7 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
     Vertex* prevVertex = NULL;
 
     int boundaryLengthSlot = -1;
-    int inverseBoundaryLengthSlot = -1;
     int boundaryWidthSlot = -1;
-    int inverseBoundaryWidthSlot = -1;
 
     for (int i = 0; i < count; i += 4) {
         // a = start point, b = end point
@@ -1948,6 +2126,10 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
 
         // Find the normal to the line
         vec2 n = (b - a).copyNormalized() * halfStrokeWidth;
+        float x = n.x;
+        n.x = -n.y;
+        n.y = x;
+
         if (isHairLine) {
             if (isAA) {
                 float wideningFactor;
@@ -1972,13 +2154,9 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
 
             float extendedNLength = extendedN.length();
             // We need to set this value on the shader prior to drawing
-            boundaryWidthProportion = extendedNLength / (halfStrokeWidth + extendedNLength);
+            boundaryWidthProportion = .5 - extendedNLength / (halfStrokeWidth + extendedNLength);
             n += extendedN;
         }
-
-        float x = n.x;
-        n.x = -n.y;
-        n.y = x;
 
         // aa lines expand the endpoint vertices to encompass the AA boundary
         if (isAA) {
@@ -1990,9 +2168,9 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
                 abVector.x *= inverseScaleX;
                 abVector.y *= inverseScaleY;
                 float abLength = abVector.length();
-                boundaryLengthProportion = abLength / (length + abLength);
+                boundaryLengthProportion = .5 - abLength / (length + abLength);
             } else {
-                boundaryLengthProportion = .5 / (length + 1);
+                boundaryLengthProportion = .5 - .5 / (length + 1);
             }
 
             abVector /= 2;
@@ -2012,7 +2190,7 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
         const float top = fmin(p1.y, fmin(p2.y, fmin(p3.y, p4.y)));
         const float bottom = fmax(p1.y, fmax(p2.y, fmax(p3.y, p4.y)));
 
-        if (!quickReject(left, top, right, bottom)) {
+        if (!quickRejectNoScissor(left, top, right, bottom)) {
             if (!isAA) {
                 if (prevVertex != NULL) {
                     // Issue two repeat vertices to create degenerate triangles to bridge
@@ -2038,22 +2216,16 @@ status_t OpenGLRenderer::drawLines(float* points, int count, SkPaint* paint) {
                     if (boundaryWidthSlot < 0) {
                         boundaryWidthSlot =
                                 mCaches.currentProgram->getUniform("boundaryWidth");
-                        inverseBoundaryWidthSlot =
-                                mCaches.currentProgram->getUniform("inverseBoundaryWidth");
                     }
 
                     glUniform1f(boundaryWidthSlot, boundaryWidthProportion);
-                    glUniform1f(inverseBoundaryWidthSlot, (1 / boundaryWidthProportion));
                 }
 
                 if (boundaryLengthSlot < 0) {
                     boundaryLengthSlot = mCaches.currentProgram->getUniform("boundaryLength");
-                    inverseBoundaryLengthSlot =
-                            mCaches.currentProgram->getUniform("inverseBoundaryLength");
                 }
 
                 glUniform1f(boundaryLengthSlot, boundaryLengthProportion);
-                glUniform1f(inverseBoundaryLengthSlot, (1 / boundaryLengthProportion));
 
                 if (prevAAVertex != NULL) {
                     // Issue two repeat vertices to create degenerate triangles to bridge
@@ -2117,6 +2289,10 @@ status_t OpenGLRenderer::drawPoints(float* points, int count, SkPaint* paint) {
     TextureVertex pointsData[verticesCount];
     TextureVertex* vertex = &pointsData[0];
 
+    // TODO: We should optimize this method to not generate vertices for points
+    // that lie outside of the clip.
+    mCaches.enableScissor();
+
     setupDraw();
     setupDrawNoTexture();
     setupDrawPoint(strokeWidth);
@@ -2175,83 +2351,189 @@ status_t OpenGLRenderer::drawShape(float left, float top, const PathTexture* tex
 }
 
 status_t OpenGLRenderer::drawRoundRect(float left, float top, float right, float bottom,
-        float rx, float ry, SkPaint* paint) {
-    if (mSnapshot->isIgnored()) return DrawGlInfo::kStatusDone;
-
-    mCaches.activeTexture(0);
-    const PathTexture* texture = mCaches.roundRectShapeCache.getRoundRect(
-            right - left, bottom - top, rx, ry, paint);
-    return drawShape(left, top, texture, paint);
-}
-
-status_t OpenGLRenderer::drawCircle(float x, float y, float radius, SkPaint* paint) {
-    if (mSnapshot->isIgnored()) return DrawGlInfo::kStatusDone;
-
-    mCaches.activeTexture(0);
-    const PathTexture* texture = mCaches.circleShapeCache.getCircle(radius, paint);
-    return drawShape(x - radius, y - radius, texture, paint);
-}
-
-status_t OpenGLRenderer::drawOval(float left, float top, float right, float bottom,
-        SkPaint* paint) {
-    if (mSnapshot->isIgnored()) return DrawGlInfo::kStatusDone;
-
-    mCaches.activeTexture(0);
-    const PathTexture* texture = mCaches.ovalShapeCache.getOval(right - left, bottom - top, paint);
-    return drawShape(left, top, texture, paint);
-}
-
-status_t OpenGLRenderer::drawArc(float left, float top, float right, float bottom,
-        float startAngle, float sweepAngle, bool useCenter, SkPaint* paint) {
-    if (mSnapshot->isIgnored()) return DrawGlInfo::kStatusDone;
-
-    if (fabs(sweepAngle) >= 360.0f) {
-        return drawOval(left, top, right, bottom, paint);
-    }
-
-    mCaches.activeTexture(0);
-    const PathTexture* texture = mCaches.arcShapeCache.getArc(right - left, bottom - top,
-            startAngle, sweepAngle, useCenter, paint);
-    return drawShape(left, top, texture, paint);
-}
-
-status_t OpenGLRenderer::drawRectAsShape(float left, float top, float right, float bottom,
-        SkPaint* paint) {
-    if (mSnapshot->isIgnored()) return DrawGlInfo::kStatusDone;
-
-    mCaches.activeTexture(0);
-    const PathTexture* texture = mCaches.rectShapeCache.getRect(right - left, bottom - top, paint);
-    return drawShape(left, top, texture, paint);
-}
-
-status_t OpenGLRenderer::drawRect(float left, float top, float right, float bottom, SkPaint* p) {
-    if (p->getStyle() != SkPaint::kFill_Style) {
-        return drawRectAsShape(left, top, right, bottom, p);
-    }
-
-    if (quickReject(left, top, right, bottom)) {
+        float rx, float ry, SkPaint* p) {
+    if (mSnapshot->isIgnored() || quickRejectPreStroke(left, top, right, bottom, p)) {
         return DrawGlInfo::kStatusDone;
     }
 
-    SkXfermode::Mode mode;
-    if (!mCaches.extensions.hasFramebufferFetch()) {
-        const bool isMode = SkXfermode::IsMode(p->getXfermode(), &mode);
-        if (!isMode) {
-            // Assume SRC_OVER
-            mode = SkXfermode::kSrcOver_Mode;
-        }
-    } else {
-        mode = getXfermode(p->getXfermode());
+    if (p->getPathEffect() != 0) {
+        mCaches.activeTexture(0);
+        const PathTexture* texture = mCaches.roundRectShapeCache.getRoundRect(
+                right - left, bottom - top, rx, ry, p);
+        return drawShape(left, top, texture, p);
     }
 
-    int color = p->getColor();
-    if (p->isAntiAlias() && !mSnapshot->transform->isSimple()) {
-        drawAARect(left, top, right, bottom, color, mode);
+    SkPath path;
+    SkRect rect = SkRect::MakeLTRB(left, top, right, bottom);
+    if (p->getStyle() == SkPaint::kStrokeAndFill_Style) {
+        float outset = p->getStrokeWidth() / 2;
+        rect.outset(outset, outset);
+        rx += outset;
+        ry += outset;
+    }
+    path.addRoundRect(rect, rx, ry);
+    drawConvexPath(path, p);
+
+    return DrawGlInfo::kStatusDrew;
+}
+
+status_t OpenGLRenderer::drawCircle(float x, float y, float radius, SkPaint* p) {
+    if (mSnapshot->isIgnored() || quickRejectPreStroke(x - radius, y - radius,
+            x + radius, y + radius, p)) {
+        return DrawGlInfo::kStatusDone;
+    }
+    if (p->getPathEffect() != 0) {
+        mCaches.activeTexture(0);
+        const PathTexture* texture = mCaches.circleShapeCache.getCircle(radius, p);
+        return drawShape(x - radius, y - radius, texture, p);
+    }
+
+    SkPath path;
+    if (p->getStyle() == SkPaint::kStrokeAndFill_Style) {
+        path.addCircle(x, y, radius + p->getStrokeWidth() / 2);
     } else {
-        drawColorRect(left, top, right, bottom, color, mode);
+        path.addCircle(x, y, radius);
+    }
+    drawConvexPath(path, p);
+
+    return DrawGlInfo::kStatusDrew;
+}
+
+status_t OpenGLRenderer::drawOval(float left, float top, float right, float bottom,
+        SkPaint* p) {
+    if (mSnapshot->isIgnored() || quickRejectPreStroke(left, top, right, bottom, p)) {
+        return DrawGlInfo::kStatusDone;
+    }
+
+    if (p->getPathEffect() != 0) {
+        mCaches.activeTexture(0);
+        const PathTexture* texture = mCaches.ovalShapeCache.getOval(right - left, bottom - top, p);
+        return drawShape(left, top, texture, p);
+    }
+
+    SkPath path;
+    SkRect rect = SkRect::MakeLTRB(left, top, right, bottom);
+    if (p->getStyle() == SkPaint::kStrokeAndFill_Style) {
+        rect.outset(p->getStrokeWidth() / 2, p->getStrokeWidth() / 2);
+    }
+    path.addOval(rect);
+    drawConvexPath(path, p);
+
+    return DrawGlInfo::kStatusDrew;
+}
+
+status_t OpenGLRenderer::drawArc(float left, float top, float right, float bottom,
+        float startAngle, float sweepAngle, bool useCenter, SkPaint* p) {
+    if (mSnapshot->isIgnored() || quickRejectPreStroke(left, top, right, bottom, p)) {
+        return DrawGlInfo::kStatusDone;
+    }
+
+    if (fabs(sweepAngle) >= 360.0f) {
+        return drawOval(left, top, right, bottom, p);
+    }
+
+    // TODO: support fills (accounting for concavity if useCenter && sweepAngle > 180)
+    if (p->getStyle() != SkPaint::kStroke_Style || p->getPathEffect() != 0 || p->getStrokeCap() != SkPaint::kButt_Cap || useCenter) {
+        mCaches.activeTexture(0);
+        const PathTexture* texture = mCaches.arcShapeCache.getArc(right - left, bottom - top,
+                startAngle, sweepAngle, useCenter, p);
+        return drawShape(left, top, texture, p);
+    }
+
+    SkRect rect = SkRect::MakeLTRB(left, top, right, bottom);
+    if (p->getStyle() == SkPaint::kStrokeAndFill_Style) {
+        rect.outset(p->getStrokeWidth() / 2, p->getStrokeWidth() / 2);
+    }
+
+    SkPath path;
+    if (useCenter) {
+        path.moveTo(rect.centerX(), rect.centerY());
+    }
+    path.arcTo(rect, startAngle, sweepAngle, !useCenter);
+    if (useCenter) {
+        path.close();
+    }
+    drawConvexPath(path, p);
+
+    return DrawGlInfo::kStatusDrew;
+}
+
+// See SkPaintDefaults.h
+#define SkPaintDefaults_MiterLimit SkIntToScalar(4)
+
+status_t OpenGLRenderer::drawRect(float left, float top, float right, float bottom, SkPaint* p) {
+    if (mSnapshot->isIgnored() || quickRejectPreStroke(left, top, right, bottom, p)) {
+        return DrawGlInfo::kStatusDone;
+    }
+
+    if (p->getStyle() != SkPaint::kFill_Style) {
+        // only fill style is supported by drawConvexPath, since others have to handle joins
+        if (p->getPathEffect() != 0 || p->getStrokeJoin() != SkPaint::kMiter_Join ||
+                p->getStrokeMiter() != SkPaintDefaults_MiterLimit) {
+            mCaches.activeTexture(0);
+            const PathTexture* texture =
+                    mCaches.rectShapeCache.getRect(right - left, bottom - top, p);
+            return drawShape(left, top, texture, p);
+        }
+
+        SkPath path;
+        SkRect rect = SkRect::MakeLTRB(left, top, right, bottom);
+        if (p->getStyle() == SkPaint::kStrokeAndFill_Style) {
+            rect.outset(p->getStrokeWidth() / 2, p->getStrokeWidth() / 2);
+        }
+        path.addRect(rect);
+        drawConvexPath(path, p);
+
+        return DrawGlInfo::kStatusDrew;
+    }
+
+    if (p->isAntiAlias() && !mSnapshot->transform->isSimple()) {
+        SkPath path;
+        path.addRect(left, top, right, bottom);
+        drawConvexPath(path, p);
+    } else {
+        drawColorRect(left, top, right, bottom, p->getColor(), getXfermode(p->getXfermode()));
     }
 
     return DrawGlInfo::kStatusDrew;
+}
+
+void OpenGLRenderer::drawTextShadow(SkPaint* paint, const char* text, int bytesCount, int count,
+        const float* positions, FontRenderer& fontRenderer, int alpha, SkXfermode::Mode mode,
+        float x, float y) {
+    mCaches.activeTexture(0);
+
+    // NOTE: The drop shadow will not perform gamma correction
+    //       if shader-based correction is enabled
+    mCaches.dropShadowCache.setFontRenderer(fontRenderer);
+    const ShadowTexture* shadow = mCaches.dropShadowCache.get(
+            paint, text, bytesCount, count, mShadowRadius, positions);
+    const AutoTexture autoCleanup(shadow);
+
+    const float sx = x - shadow->left + mShadowDx;
+    const float sy = y - shadow->top + mShadowDy;
+
+    const int shadowAlpha = ((mShadowColor >> 24) & 0xFF) * mSnapshot->alpha;
+    int shadowColor = mShadowColor;
+    if (mShader) {
+        shadowColor = 0xffffffff;
+    }
+
+    setupDraw();
+    setupDrawWithTexture(true);
+    setupDrawAlpha8Color(shadowColor, shadowAlpha < 255 ? shadowAlpha : alpha);
+    setupDrawColorFilter();
+    setupDrawShader();
+    setupDrawBlending(true, mode);
+    setupDrawProgram();
+    setupDrawModelView(sx, sy, sx + shadow->width, sy + shadow->height);
+    setupDrawTexture(shadow->id);
+    setupDrawPureColorUniforms();
+    setupDrawColorFilterUniforms();
+    setupDrawShaderUniforms();
+    setupDrawMesh(NULL, (GLvoid*) gMeshTextureOffset);
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, gMeshCount);
 }
 
 status_t OpenGLRenderer::drawPosText(const char* text, int bytesCount, int count,
@@ -2274,13 +2556,18 @@ status_t OpenGLRenderer::drawPosText(const char* text, int bytesCount, int count
         y = (int) floorf(y + mSnapshot->transform->getTranslateY() + 0.5f);
     }
 
-    FontRenderer& fontRenderer = mCaches.fontRenderer.getFontRenderer(paint);
+    FontRenderer& fontRenderer = mCaches.fontRenderer->getFontRenderer(paint);
     fontRenderer.setFont(paint, SkTypeface::UniqueID(paint->getTypeface()),
             paint->getTextSize());
 
     int alpha;
     SkXfermode::Mode mode;
     getAlphaAndMode(paint, &alpha, &mode);
+
+    if (CC_UNLIKELY(mHasShadow)) {
+        drawTextShadow(paint, text, bytesCount, count, positions, fontRenderer, alpha, mode,
+                0.0f, 0.0f);
+    }
 
     // Pick the appropriate texture filtering
     bool linearFilter = mSnapshot->transform->changesBounds();
@@ -2290,6 +2577,7 @@ status_t OpenGLRenderer::drawPosText(const char* text, int bytesCount, int count
 
     mCaches.activeTexture(0);
     setupDraw();
+    setupDrawTextGamma(paint);
     setupDrawDirtyRegionsDisabled();
     setupDrawWithTexture(true);
     setupDrawAlpha8Color(paint->getColor(), alpha);
@@ -2302,33 +2590,28 @@ status_t OpenGLRenderer::drawPosText(const char* text, int bytesCount, int count
     setupDrawPureColorUniforms();
     setupDrawColorFilterUniforms();
     setupDrawShaderUniforms(pureTranslate);
+    setupDrawTextGammaUniforms();
 
     const Rect* clip = pureTranslate ? mSnapshot->clipRect : &mSnapshot->getLocalClip();
     Rect bounds(FLT_MAX / 2.0f, FLT_MAX / 2.0f, FLT_MIN / 2.0f, FLT_MIN / 2.0f);
 
-#if RENDER_LAYERS_AS_REGIONS
     const bool hasActiveLayer = hasLayer();
-#else
-    const bool hasActiveLayer = false;
-#endif
 
     if (fontRenderer.renderPosText(paint, clip, text, 0, bytesCount, count, x, y,
             positions, hasActiveLayer ? &bounds : NULL)) {
-#if RENDER_LAYERS_AS_REGIONS
         if (hasActiveLayer) {
             if (!pureTranslate) {
                 mSnapshot->transform->mapRect(bounds);
             }
             dirtyLayerUnchecked(bounds, getRegion());
         }
-#endif
     }
 
     return DrawGlInfo::kStatusDrew;
 }
 
 status_t OpenGLRenderer::drawText(const char* text, int bytesCount, int count,
-        float x, float y, SkPaint* paint, float length) {
+        float x, float y, const float* positions, SkPaint* paint, float length) {
     if (text == NULL || count == 0 || mSnapshot->isIgnored() ||
             (paint->getAlpha() * mSnapshot->alpha == 0 && paint->getXfermode() == NULL)) {
         return DrawGlInfo::kStatusDone;
@@ -2361,10 +2644,11 @@ status_t OpenGLRenderer::drawText(const char* text, int bytesCount, int count,
     }
 
 #if DEBUG_GLYPHS
-    ALOGD("OpenGLRenderer drawText() with FontID=%d", SkTypeface::UniqueID(paint->getTypeface()));
+    ALOGD("OpenGLRenderer drawText() with FontID=%d",
+            SkTypeface::UniqueID(paint->getTypeface()));
 #endif
 
-    FontRenderer& fontRenderer = mCaches.fontRenderer.getFontRenderer(paint);
+    FontRenderer& fontRenderer = mCaches.fontRenderer->getFontRenderer(paint);
     fontRenderer.setFont(paint, SkTypeface::UniqueID(paint->getTypeface()),
             paint->getTextSize());
 
@@ -2373,37 +2657,8 @@ status_t OpenGLRenderer::drawText(const char* text, int bytesCount, int count,
     getAlphaAndMode(paint, &alpha, &mode);
 
     if (CC_UNLIKELY(mHasShadow)) {
-        mCaches.activeTexture(0);
-
-        mCaches.dropShadowCache.setFontRenderer(fontRenderer);
-        const ShadowTexture* shadow = mCaches.dropShadowCache.get(
-                paint, text, bytesCount, count, mShadowRadius);
-        const AutoTexture autoCleanup(shadow);
-
-        const float sx = oldX - shadow->left + mShadowDx;
-        const float sy = oldY - shadow->top + mShadowDy;
-
-        const int shadowAlpha = ((mShadowColor >> 24) & 0xFF) * mSnapshot->alpha;
-        int shadowColor = mShadowColor;
-        if (mShader) {
-            shadowColor = 0xffffffff;
-        }
-
-        setupDraw();
-        setupDrawWithTexture(true);
-        setupDrawAlpha8Color(shadowColor, shadowAlpha < 255 ? shadowAlpha : alpha);
-        setupDrawColorFilter();
-        setupDrawShader();
-        setupDrawBlending(true, mode);
-        setupDrawProgram();
-        setupDrawModelView(sx, sy, sx + shadow->width, sy + shadow->height);
-        setupDrawTexture(shadow->id);
-        setupDrawPureColorUniforms();
-        setupDrawColorFilterUniforms();
-        setupDrawShaderUniforms();
-        setupDrawMesh(NULL, (GLvoid*) gMeshTextureOffset);
-
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, gMeshCount);
+        drawTextShadow(paint, text, bytesCount, count, positions, fontRenderer, alpha, mode,
+                oldX, oldY);
     }
 
     // Pick the appropriate texture filtering
@@ -2415,6 +2670,7 @@ status_t OpenGLRenderer::drawText(const char* text, int bytesCount, int count,
     // The font renderer will always use texture unit 0
     mCaches.activeTexture(0);
     setupDraw();
+    setupDrawTextGamma(paint);
     setupDrawDirtyRegionsDisabled();
     setupDrawWithTexture(true);
     setupDrawAlpha8Color(paint->getColor(), alpha);
@@ -2429,26 +2685,30 @@ status_t OpenGLRenderer::drawText(const char* text, int bytesCount, int count,
     setupDrawPureColorUniforms();
     setupDrawColorFilterUniforms();
     setupDrawShaderUniforms(pureTranslate);
+    setupDrawTextGammaUniforms();
 
-    const Rect* clip = pureTranslate ? mSnapshot->clipRect : &mSnapshot->getLocalClip();
+    const Rect* clip = pureTranslate ? mSnapshot->clipRect :
+            (mSnapshot->hasPerspectiveTransform() ? NULL : &mSnapshot->getLocalClip());
     Rect bounds(FLT_MAX / 2.0f, FLT_MAX / 2.0f, FLT_MIN / 2.0f, FLT_MIN / 2.0f);
 
-#if RENDER_LAYERS_AS_REGIONS
     const bool hasActiveLayer = hasLayer();
-#else
-    const bool hasActiveLayer = false;
-#endif
 
-    if (fontRenderer.renderText(paint, clip, text, 0, bytesCount, count, x, y,
-            hasActiveLayer ? &bounds : NULL)) {
-#if RENDER_LAYERS_AS_REGIONS
-        if (hasActiveLayer) {
-            if (!pureTranslate) {
-                mSnapshot->transform->mapRect(bounds);
-            }
-            dirtyLayerUnchecked(bounds, getRegion());
+    bool status;
+    if (CC_UNLIKELY(paint->getTextAlign() != SkPaint::kLeft_Align)) {
+        SkPaint paintCopy(*paint);
+        paintCopy.setTextAlign(SkPaint::kLeft_Align);
+        status = fontRenderer.renderPosText(&paintCopy, clip, text, 0, bytesCount, count, x, y,
+                positions, hasActiveLayer ? &bounds : NULL);
+    } else {
+        status = fontRenderer.renderPosText(paint, clip, text, 0, bytesCount, count, x, y,
+                positions, hasActiveLayer ? &bounds : NULL);
+    }
+
+    if (status && hasActiveLayer) {
+        if (!pureTranslate) {
+            mSnapshot->transform->mapRect(bounds);
         }
-#endif
+        dirtyLayerUnchecked(bounds, getRegion());
     }
 
     drawTextDecorations(text, bytesCount, length, oldX, oldY, paint);
@@ -2463,7 +2723,7 @@ status_t OpenGLRenderer::drawTextOnPath(const char* text, int bytesCount, int co
         return DrawGlInfo::kStatusDone;
     }
 
-    FontRenderer& fontRenderer = mCaches.fontRenderer.getFontRenderer(paint);
+    FontRenderer& fontRenderer = mCaches.fontRenderer->getFontRenderer(paint);
     fontRenderer.setFont(paint, SkTypeface::UniqueID(paint->getTypeface()),
             paint->getTextSize());
 
@@ -2473,6 +2733,7 @@ status_t OpenGLRenderer::drawTextOnPath(const char* text, int bytesCount, int co
 
     mCaches.activeTexture(0);
     setupDraw();
+    setupDrawTextGamma(paint);
     setupDrawDirtyRegionsDisabled();
     setupDrawWithTexture(true);
     setupDrawAlpha8Color(paint->getColor(), alpha);
@@ -2485,24 +2746,19 @@ status_t OpenGLRenderer::drawTextOnPath(const char* text, int bytesCount, int co
     setupDrawPureColorUniforms();
     setupDrawColorFilterUniforms();
     setupDrawShaderUniforms(false);
+    setupDrawTextGammaUniforms();
 
     const Rect* clip = &mSnapshot->getLocalClip();
     Rect bounds(FLT_MAX / 2.0f, FLT_MAX / 2.0f, FLT_MIN / 2.0f, FLT_MIN / 2.0f);
 
-#if RENDER_LAYERS_AS_REGIONS
     const bool hasActiveLayer = hasLayer();
-#else
-    const bool hasActiveLayer = false;
-#endif
 
     if (fontRenderer.renderTextOnPath(paint, clip, text, 0, bytesCount, count, path,
             hOffset, vOffset, hasActiveLayer ? &bounds : NULL)) {
-#if RENDER_LAYERS_AS_REGIONS
         if (hasActiveLayer) {
             mSnapshot->transform->mapRect(bounds);
             dirtyLayerUnchecked(bounds, getRegion());
         }
-#endif
     }
 
     return DrawGlInfo::kStatusDrew;
@@ -2527,43 +2783,47 @@ status_t OpenGLRenderer::drawPath(SkPath* path, SkPaint* paint) {
 }
 
 status_t OpenGLRenderer::drawLayer(Layer* layer, float x, float y, SkPaint* paint) {
-    if (!layer || quickReject(x, y, x + layer->layer.getWidth(), y + layer->layer.getHeight())) {
+    if (!layer) {
         return DrawGlInfo::kStatusDone;
     }
 
-    if (layer->deferredUpdateScheduled && layer->renderer && layer->displayList) {
-        OpenGLRenderer* renderer = layer->renderer;
-        Rect& dirty = layer->dirtyRect;
-
-        interrupt();
-        renderer->setViewport(layer->layer.getWidth(), layer->layer.getHeight());
-        renderer->prepareDirty(dirty.left, dirty.top, dirty.right, dirty.bottom, !layer->isBlend());
-        renderer->drawDisplayList(layer->displayList, dirty, DisplayList::kReplayFlag_ClipChildren);
-        renderer->finish();
-        resume();
-
-        dirty.setEmpty();
-        layer->deferredUpdateScheduled = false;
-        layer->renderer = NULL;
-        layer->displayList = NULL;
+    mat4* transform = NULL;
+    if (layer->isTextureLayer()) {
+        transform = &layer->getTransform();
+        if (!transform->isIdentity()) {
+            save(0);
+            mSnapshot->transform->multiply(*transform);
+        }
     }
 
+    Rect transformed;
+    Rect clip;
+    const bool rejected = quickRejectNoScissor(x, y,
+            x + layer->layer.getWidth(), y + layer->layer.getHeight(), transformed, clip);
+
+    if (rejected) {
+        if (transform && !transform->isIdentity()) {
+            restore();
+        }
+        return DrawGlInfo::kStatusDone;
+    }
+
+    bool debugLayerUpdate = false;
+    if (updateLayer(layer, true)) {
+        debugLayerUpdate = mCaches.debugLayersUpdates;
+    }
+
+    mCaches.setScissorEnabled(mScissorOptimizationDisabled || !clip.contains(transformed));
     mCaches.activeTexture(0);
 
-    int alpha;
-    SkXfermode::Mode mode;
-    getAlphaAndMode(paint, &alpha, &mode);
-
-    layer->setAlpha(alpha, mode);
-
-#if RENDER_LAYERS_AS_REGIONS
     if (CC_LIKELY(!layer->region.isEmpty())) {
+        SkiaColorFilter* oldFilter = mColorFilter;
+        mColorFilter = layer->getColorFilter();
+
         if (layer->region.isRect()) {
             composeLayerRect(layer, layer->regionRect);
         } else if (layer->mesh) {
-            const float a = alpha / 255.0f;
-            const Rect& rect = layer->layer;
-
+            const float a = layer->getAlpha() / 255.0f;
             setupDraw();
             setupDrawWithTexture();
             setupDrawColor(a, a, a, a);
@@ -2574,12 +2834,12 @@ status_t OpenGLRenderer::drawLayer(Layer* layer, float x, float y, SkPaint* pain
             setupDrawColorFilterUniforms();
             setupDrawTexture(layer->getTexture());
             if (CC_LIKELY(mSnapshot->transform->isPureTranslate())) {
-                x = (int) floorf(x + mSnapshot->transform->getTranslateX() + 0.5f);
-                y = (int) floorf(y + mSnapshot->transform->getTranslateY() + 0.5f);
+                int tx = (int) floorf(x + mSnapshot->transform->getTranslateX() + 0.5f);
+                int ty = (int) floorf(y + mSnapshot->transform->getTranslateY() + 0.5f);
 
                 layer->setFilter(GL_NEAREST);
-                setupDrawModelViewTranslate(x, y,
-                        x + layer->layer.getWidth(), y + layer->layer.getHeight(), true);
+                setupDrawModelViewTranslate(tx, ty,
+                        tx + layer->layer.getWidth(), ty + layer->layer.getHeight(), true);
             } else {
                 layer->setFilter(GL_LINEAR);
                 setupDrawModelViewTranslate(x, y,
@@ -2596,11 +2856,18 @@ status_t OpenGLRenderer::drawLayer(Layer* layer, float x, float y, SkPaint* pain
             drawRegionRects(layer->region);
 #endif
         }
+
+        mColorFilter = oldFilter;
+
+        if (debugLayerUpdate) {
+            drawColorRect(x, y, x + layer->layer.getWidth(), y + layer->layer.getHeight(),
+                    0x7f00ff00, SkXfermode::kSrcOver_Mode);
+        }
     }
-#else
-    const Rect r(x, y, x + layer->layer.getWidth(), y + layer->layer.getHeight());
-    composeLayerRect(layer, r);
-#endif
+
+    if (transform && !transform->isIdentity()) {
+        restore();
+    }
 
     return DrawGlInfo::kStatusDrew;
 }
@@ -2723,23 +2990,11 @@ void OpenGLRenderer::drawTextDecorations(const char* text, int bytesCount, float
             underlineWidth = paintCopy.measureText(text, bytesCount);
         }
 
-        float offsetX = 0;
-        switch (paintCopy.getTextAlign()) {
-            case SkPaint::kCenter_Align:
-                offsetX = underlineWidth * 0.5f;
-                break;
-            case SkPaint::kRight_Align:
-                offsetX = underlineWidth;
-                break;
-            default:
-                break;
-        }
-
         if (CC_LIKELY(underlineWidth > 0.0f)) {
             const float textSize = paintCopy.getTextSize();
             const float strokeWidth = fmax(textSize * kStdUnderline_Thickness, 1.0f);
 
-            const float left = x - offsetX;
+            const float left = x;
             float top = 0.0f;
 
             int linesCount = 0;
@@ -2865,7 +3120,7 @@ void OpenGLRenderer::chooseBlending(bool blend, SkXfermode::Mode mode,
         // the blending, turn blending off here
         // If the blend mode cannot be implemented using shaders, fall
         // back to the default SrcOver blend mode instead
-        if CC_UNLIKELY((mode > SkXfermode::kScreen_Mode)) {
+        if (CC_UNLIKELY(mode > SkXfermode::kScreen_Mode)) {
             if (CC_UNLIKELY(mCaches.extensions.hasFramebufferFetch())) {
                 description.framebufferMode = mode;
                 description.swapSrcDst = swapSrcDst;
@@ -2918,29 +3173,8 @@ void OpenGLRenderer::resetDrawTextureTexCoords(float u1, float v1, float u2, flo
 }
 
 void OpenGLRenderer::getAlphaAndMode(SkPaint* paint, int* alpha, SkXfermode::Mode* mode) {
-    if (paint) {
-        *mode = getXfermode(paint->getXfermode());
-
-        // Skia draws using the color's alpha channel if < 255
-        // Otherwise, it uses the paint's alpha
-        int color = paint->getColor();
-        *alpha = (color >> 24) & 0xFF;
-        if (*alpha == 255) {
-            *alpha = paint->getAlpha();
-        }
-    } else {
-        *mode = SkXfermode::kSrcOver_Mode;
-        *alpha = 255;
-    }
+    getAlphaAndModeDirect(paint, alpha,  mode);
     *alpha *= mSnapshot->alpha;
-}
-
-SkXfermode::Mode OpenGLRenderer::getXfermode(SkXfermode* mode) {
-    SkXfermode::Mode resultMode;
-    if (!SkXfermode::AsMode(mode, &resultMode)) {
-        resultMode = SkXfermode::kSrcOver_Mode;
-    }
-    return resultMode;
 }
 
 }; // namespace uirenderer

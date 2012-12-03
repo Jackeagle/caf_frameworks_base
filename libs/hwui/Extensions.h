@@ -39,9 +39,6 @@ namespace uirenderer {
     #define EXT_LOGD(...)
 #endif
 
-// Vendor strings
-#define VENDOR_IMG "Imagination Technologies"
-
 ///////////////////////////////////////////////////////////////////////////////
 // Classes
 ///////////////////////////////////////////////////////////////////////////////
@@ -68,23 +65,21 @@ public:
         mHasDiscardFramebuffer = hasExtension("GL_EXT_discard_framebuffer");
         mHasDebugMarker = hasExtension("GL_EXT_debug_marker");
         mHasDebugLabel = hasExtension("GL_EXT_debug_label");
+        mHasTiledRendering = hasExtension("GL_QCOM_tiled_rendering");
 
-        const char* vendor = (const char*) glGetString(GL_VENDOR);
-        EXT_LOGD("Vendor: %s", vendor);
-        mNeedsHighpTexCoords = strcmp(vendor, VENDOR_IMG) == 0;
+        mExtensions = strdup(buffer);
+    }
 
-        // We don't need to copy the string, the OpenGL ES spec
-        // guarantees the result of glGetString to point to a
-        // static string as long as our OpenGL context is valid
-        mExtensions = buffer;
+    ~Extensions() {
+        free(mExtensions);
     }
 
     inline bool hasNPot() const { return mHasNPot; }
     inline bool hasFramebufferFetch() const { return mHasFramebufferFetch; }
-    inline bool needsHighpTexCoords() const { return mNeedsHighpTexCoords; }
     inline bool hasDiscardFramebuffer() const { return mHasDiscardFramebuffer; }
     inline bool hasDebugMarker() const { return mHasDebugMarker; }
     inline bool hasDebugLabel() const { return mHasDebugLabel; }
+    inline bool hasTiledRendering() const { return mHasTiledRendering; }
 
     bool hasExtension(const char* extension) const {
         const String8 s(extension);
@@ -98,14 +93,14 @@ public:
 private:
     SortedVector<String8> mExtensionList;
 
-    const char* mExtensions;
+    char* mExtensions;
 
     bool mHasNPot;
-    bool mNeedsHighpTexCoords;
     bool mHasFramebufferFetch;
     bool mHasDiscardFramebuffer;
     bool mHasDebugMarker;
     bool mHasDebugLabel;
+    bool mHasTiledRendering;
 }; // class Extensions
 
 }; // namespace uirenderer

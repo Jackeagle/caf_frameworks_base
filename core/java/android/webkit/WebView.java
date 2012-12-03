@@ -35,8 +35,8 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewDebug;
 import android.view.ViewGroup;
-import android.view.ViewGroup.LayoutParams;
 import android.view.ViewTreeObserver;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -44,6 +44,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.widget.AbsoluteLayout;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.util.Map;
 
@@ -163,10 +164,7 @@ import java.util.Map;
  *
  * <p>For obvious security reasons, your application has its own
  * cache, cookie store etc.&mdash;it does not share the Browser
- * application's data. Cookies are managed on a separate thread, so
- * operations like index building don't block the UI
- * thread. Follow the instructions in {@link android.webkit.CookieSyncManager}
- * if you want to use cookies in your application.
+ * application's data.
  * </p>
  *
  * <p>By default, requests by the HTML to open new windows are
@@ -263,7 +261,7 @@ import java.util.Map;
 @Widget
 public class WebView extends AbsoluteLayout
         implements ViewTreeObserver.OnGlobalFocusChangeListener,
-        ViewGroup.OnHierarchyChangeListener {
+        ViewGroup.OnHierarchyChangeListener, ViewDebug.HierarchyHandler {
 
     private static final String LOGTAG = "webview_proxy";
 
@@ -312,15 +310,15 @@ public class WebView extends AbsoluteLayout
         /**
          * Notifies the listener about progress made by a find operation.
          *
-         * @param numberOfMatches how many matches have been found
          * @param activeMatchOrdinal the zero-based ordinal of the currently selected match
+         * @param numberOfMatches how many matches have been found
          * @param isDoneCounting whether the find operation has actually completed. The listener
          *                       may be notified multiple times while the
          *                       operation is underway, and the numberOfMatches
          *                       value should not be considered final unless
          *                       isDoneCounting is true.
          */
-        public void onFindResultReceived(int numberOfMatches, int activeMatchOrdinal,
+        public void onFindResultReceived(int activeMatchOrdinal, int numberOfMatches,
             boolean isDoneCounting);
     }
 
@@ -332,16 +330,12 @@ public class WebView extends AbsoluteLayout
     @Deprecated
     public interface PictureListener {
         /**
-         * Notifies the listener that the picture has changed.
+         * Used to provide notification that the WebView's picture has changed.
+         * See {@link WebView#capturePicture} for details of the picture.
          *
          * @param view the WebView that owns the picture
          * @param picture the new picture
-         * @deprecated Due to internal changes, the picture does not include
-         *             composited layers such as fixed position elements or
-         *             scrollable divs. While the PictureListener API can still
-         *             be used to detect changes in the WebView content, you
-         *             are advised against its usage until a replacement is
-         *             provided in a future Android release.
+         * @deprecated Deprecated due to internal changes.
          */
         @Deprecated
         public void onNewPicture(WebView view, Picture picture);
@@ -475,7 +469,13 @@ public class WebView extends AbsoluteLayout
      * @param defStyle the default style resource ID
      * @param privateBrowsing whether this WebView will be initialized in
      *                        private mode
+     *
+     * @deprecated Private browsing is no longer supported directly via 
+     * WebView and will be removed in a future release. Prefer using
+     * {@link WebSettings}, {@link WebViewDatabase}, {@link CookieManager}
+     * and {@link WebStorage} for fine-grained control of privacy data.
      */
+    @Deprecated
     public WebView(Context context, AttributeSet attrs, int defStyle,
             boolean privateBrowsing) {
         this(context, attrs, defStyle, null, privateBrowsing);
@@ -555,6 +555,7 @@ public class WebView extends AbsoluteLayout
      * Gets the visible height (in pixels) of the embedded title bar (if any).
      *
      * @deprecated This method is now obsolete.
+     * @hide Since API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
      */
     public int getVisibleTitleHeight() {
         checkThread();
@@ -574,7 +575,11 @@ public class WebView extends AbsoluteLayout
 
     /**
      * Sets the SSL certificate for the main top-level page.
+     *
+     * @deprecated Calling this function has no useful effect, and will be
+     * ignored in future releases.
      */
+    @Deprecated
     public void setCertificate(SslCertificate certificate) {
         checkThread();
         mProvider.setCertificate(certificate);
@@ -585,12 +590,16 @@ public class WebView extends AbsoluteLayout
     //-------------------------------------------------------------------------
 
     /**
-     * Saves the username and password for a particular host in this WebView's
-     * internal database.
+     * Sets a username and password pair for the specified host. This data is
+     * used by the Webview to autocomplete username and password fields in web
+     * forms. Note that this is unrelated to the credentials used for HTTP
+     * authentication.
      *
      * @param host the host that required the credentials
      * @param username the username for the given host
      * @param password the password for the given host
+     * @see WebViewDatabase#clearUsernamePassword
+     * @see WebViewDatabase#hasUsernamePassword
      */
     public void savePassword(String host, String username, String password) {
         checkThread();
@@ -598,13 +607,17 @@ public class WebView extends AbsoluteLayout
     }
 
     /**
-     * Sets the HTTP authentication credentials for a given host and realm.
+     * Stores HTTP authentication credentials for a given host and realm. This
+     * method is intended to be used with
+     * {@link WebViewClient#onReceivedHttpAuthRequest}.
      *
-     * @param host the host for the credentials
-     * @param realm the realm for the credentials
-     * @param username the username for the password. If it is null, it means
-     *                 password can't be saved.
+     * @param host the host to which the credentials apply
+     * @param realm the realm to which the credentials apply
+     * @param username the username
      * @param password the password
+     * @see getHttpAuthUsernamePassword
+     * @see WebViewDatabase#hasHttpAuthUsernamePassword
+     * @see WebViewDatabase#clearHttpAuthUsernamePassword
      */
     public void setHttpAuthUsernamePassword(String host, String realm,
             String username, String password) {
@@ -613,13 +626,18 @@ public class WebView extends AbsoluteLayout
     }
 
     /**
-     * Retrieves the HTTP authentication username and password for a given
-     * host and realm pair
+     * Retrieves HTTP authentication credentials for a given host and realm.
+     * This method is intended to be used with
+     * {@link WebViewClient#onReceivedHttpAuthRequest}.
      *
-     * @param host the host for which the credentials apply
-     * @param realm the realm for which the credentials apply
-     * @return String[] if found. String[0] is username, which can be null and
-     *         String[1] is password. Return null if it can't find anything.
+     * @param host the host to which the credentials apply
+     * @param realm the realm to which the credentials apply
+     * @return the credentials as a String array, if found. The first element
+     *         is the username and the second element is the password. Null if
+     *         no credentials are found.
+     * @see setHttpAuthUsernamePassword
+     * @see WebViewDatabase#hasHttpAuthUsernamePassword
+     * @see WebViewDatabase#clearHttpAuthUsernamePassword
      */
     public String[] getHttpAuthUsernamePassword(String host, String realm) {
         checkThread();
@@ -641,6 +659,7 @@ public class WebView extends AbsoluteLayout
      * Notifications are enabled by default.
      *
      * @deprecated This method is now obsolete.
+     * @hide Since API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
      */
     @Deprecated
     public static void enablePlatformNotifications() {
@@ -653,6 +672,7 @@ public class WebView extends AbsoluteLayout
      * Notifications are enabled by default.
      *
      * @deprecated This method is now obsolete.
+     * @hide Since API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
      */
     @Deprecated
     public static void disablePlatformNotifications() {
@@ -677,14 +697,11 @@ public class WebView extends AbsoluteLayout
      * {@link android.app.Activity#onSaveInstanceState}. Please note that this
      * method no longer stores the display data for this WebView. The previous
      * behavior could potentially leak files if {@link #restoreState} was never
-     * called. See {@link #savePicture} and {@link #restorePicture} for saving
-     * and restoring the display data.
+     * called.
      *
      * @param outState the Bundle to store this WebView's state
      * @return the same copy of the back/forward list used to save the state. If
      *         saveState fails, the returned list will be null.
-     * @see #savePicture
-     * @see #restorePicture
      */
     public WebBackForwardList saveState(Bundle outState) {
         checkThread();
@@ -699,6 +716,7 @@ public class WebView extends AbsoluteLayout
      *             overwritten with this WebView's picture data.
      * @return true if the picture was successfully saved
      * @deprecated This method is now obsolete.
+     * @hide Since API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
      */
     @Deprecated
     public boolean savePicture(Bundle b, final File dest) {
@@ -715,6 +733,7 @@ public class WebView extends AbsoluteLayout
      * @param src the file where the picture data was stored
      * @return true if the picture was successfully restored
      * @deprecated This method is now obsolete.
+     * @hide Since API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
      */
     @Deprecated
     public boolean restorePicture(Bundle b, File src) {
@@ -723,19 +742,16 @@ public class WebView extends AbsoluteLayout
     }
 
     /**
-     * Restores the state of this WebView from the given map used in
-     * {@link android.app.Activity#onRestoreInstanceState}. This method should
-     * be called to restore the state of this WebView before using the object. If
+     * Restores the state of this WebView from the given Bundle. This method is
+     * intended for use in {@link android.app.Activity#onRestoreInstanceState}
+     * and should be called to restore the state of this WebView. If
      * it is called after this WebView has had a chance to build state (load
      * pages, create a back/forward list, etc.) there may be undesirable
      * side-effects. Please note that this method no longer restores the
-     * display data for this WebView. See {@link #savePicture} and {@link
-     * #restorePicture} for saving and restoring the display data.
+     * display data for this WebView.
      *
      * @param inState the incoming Bundle of state
      * @return the restored back/forward list or null if restoreState failed
-     * @see #savePicture
-     * @see #restorePicture
      */
     public WebBackForwardList restoreState(Bundle inState) {
         checkThread();
@@ -791,11 +807,13 @@ public class WebView extends AbsoluteLayout
      * #loadDataWithBaseURL(String,String,String,String,String)
      * loadDataWithBaseURL()} with an appropriate base URL.
      * <p>
-     * If the value of the encoding parameter is 'base64', then the data must
-     * be encoded as base64. Otherwise, the data must use ASCII encoding for
+     * The encoding parameter specifies whether the data is base64 or URL
+     * encoded. If the data is base64 encoded, the value of the encoding
+     * parameter must be 'base64'. For all other values of the parameter,
+     * including null, it is assumed that the data uses ASCII encoding for
      * octets inside the range of safe URL characters and use the standard %xx
-     * hex encoding of URLs for octets outside that range. For example,
-     * '#', '%', '\', '?' should be replaced by %23, %25, %27, %3f respectively.
+     * hex encoding of URLs for octets outside that range. For example, '#',
+     * '%', '\', '?' should be replaced by %23, %25, %27, %3f respectively.
      * <p>
      * The 'data' scheme URL formed by this method uses the default US-ASCII
      * charset. If you need need to set a different charset, you should form a
@@ -986,13 +1004,18 @@ public class WebView extends AbsoluteLayout
     }
 
     /**
-     * Gets a new picture that captures the current display of this WebView.
-     * This is a copy of the display, and will be unaffected if this WebView
-     * later loads a different URL.
+     * Gets a new picture that captures the current contents of this WebView.
+     * The picture is of the entire document being displayed, and is not
+     * limited to the area currently displayed by this WebView. Also, the
+     * picture is a static copy and is unaffected by later changes to the
+     * content being displayed.
+     * <p>
+     * Note that due to internal changes, for API levels between
+     * {@link android.os.Build.VERSION_CODES#HONEYCOMB} and
+     * {@link android.os.Build.VERSION_CODES#ICE_CREAM_SANDWICH} inclusive, the
+     * picture does not include fixed position elements or scrollable divs.
      *
-     * @return a picture containing the current contents of this WebView. Note
-     *         this picture is of the entire document, and is not restricted to
-     *         the bounds of the view.
+     * @return a picture that captures the current contents of this WebView
      */
     public Picture capturePicture() {
         checkThread();
@@ -1003,7 +1026,13 @@ public class WebView extends AbsoluteLayout
      * Gets the current scale of this WebView.
      *
      * @return the current scale
+     *
+     * @deprecated This method is prone to inaccuracy due to race conditions
+     * between the web rendering and UI threads; prefer
+     * {@link WebViewClient#onScaleChanged}.
      */
+    @Deprecated
+    @ViewDebug.ExportedProperty(category = "webview")
     public float getScale() {
         checkThread();
         return mProvider.getScale();
@@ -1094,6 +1123,7 @@ public class WebView extends AbsoluteLayout
      *
      * @return the URL for the current page
      */
+    @ViewDebug.ExportedProperty(category = "webview")
     public String getUrl() {
         checkThread();
         return mProvider.getUrl();
@@ -1108,6 +1138,7 @@ public class WebView extends AbsoluteLayout
      *
      * @return the URL that was originally requested for the current page
      */
+    @ViewDebug.ExportedProperty(category = "webview")
     public String getOriginalUrl() {
         checkThread();
         return mProvider.getOriginalUrl();
@@ -1119,6 +1150,7 @@ public class WebView extends AbsoluteLayout
      *
      * @return the title for the current page
      */
+    @ViewDebug.ExportedProperty(category = "webview")
     public String getTitle() {
         checkThread();
         return mProvider.getTitle();
@@ -1161,6 +1193,7 @@ public class WebView extends AbsoluteLayout
      *
      * @return the height of the HTML content
      */
+    @ViewDebug.ExportedProperty(category = "webview")
     public int getContentHeight() {
         checkThread();
         return mProvider.getContentHeight();
@@ -1172,6 +1205,7 @@ public class WebView extends AbsoluteLayout
      * @return the width of the HTML content
      * @hide
      */
+    @ViewDebug.ExportedProperty(category = "webview")
     public int getContentWidth() {
         return mProvider.getContentWidth();
     }
@@ -1246,8 +1280,10 @@ public class WebView extends AbsoluteLayout
     }
 
     /**
-     * Makes sure that clearing the form data removes the adapter from the
-     * currently focused textfield if there is one.
+     * Removes the autocomplete popup from the currently focused form field, if
+     * present. Note this only affects the display of the autocomplete popup,
+     * it does not remove any saved form data from this WebView's store. To do
+     * that, use {@link WebViewDatabase#clearFormData}.
      */
     public void clearFormData() {
         checkThread();
@@ -1297,12 +1333,11 @@ public class WebView extends AbsoluteLayout
     }
 
     /**
-     * Highlights and scrolls to the next match found by {@link #findAll} or
+     * Highlights and scrolls to the next match found by
      * {@link #findAllAsync}, wrapping around page boundaries as necessary.
-     * Notifies any registered {@link FindListener}. If neither
-     * {@link #findAll} nor {@link #findAllAsync(String)} has been called yet,
-     * or if {@link #clearMatches} has been called since the last find
-     * operation, this function does nothing.
+     * Notifies any registered {@link FindListener}. If {@link #findAllAsync(String)}
+     * has not been called yet, or if {@link #clearMatches} has been called since the
+     * last find operation, this function does nothing.
      *
      * @param forward the direction to search
      * @see #setFindListener
@@ -1331,8 +1366,7 @@ public class WebView extends AbsoluteLayout
     /**
      * Finds all instances of find on the page and highlights them,
      * asynchronously. Notifies any registered {@link FindListener}.
-     * Successive calls to this or {@link #findAll} will cancel any
-     * pending searches.
+     * Successive calls to this will cancel any pending searches.
      *
      * @param find the string to find.
      * @see #setFindListener
@@ -1381,13 +1415,12 @@ public class WebView extends AbsoluteLayout
      * @return the address, or if no address is found, null
      */
     public static String findAddress(String addr) {
-        checkThread();
         return getFactory().getStatics().findAddress(addr);
     }
 
     /**
      * Clears the highlighting surrounding text matches created by
-     * {@link #findAll} or {@link #findAllAsync}.
+     * {@link #findAllAsync}.
      */
     public void clearMatches() {
         checkThread();
@@ -1457,10 +1490,22 @@ public class WebView extends AbsoluteLayout
     /**
      * Injects the supplied Java object into this WebView. The object is
      * injected into the JavaScript context of the main frame, using the
-     * supplied name. This allows the Java object's public methods to be
-     * accessed from JavaScript. Note that that injected objects will not
+     * supplied name. This allows the Java object's methods to be
+     * accessed from JavaScript. For applications targeted to API
+     * level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
+     * and above, only public methods that are annotated with
+     * {@link android.webkit.JavascriptInterface} can be accessed from JavaScript.
+     * For applications targeted to API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN} or below,
+     * all public methods (including the inherited ones) can be accessed, see the
+     * important security note below for implications.
+     * <p> Note that injected objects will not
      * appear in JavaScript until the page is next (re)loaded. For example:
-     * <pre> webView.addJavascriptInterface(new Object(), "injectedObject");
+     * <pre>
+     * class JsObject {
+     *    {@literal @}JavascriptInterface
+     *    public String toString() { return "injectedObject"; }
+     * }
+     * webView.addJavascriptInterface(new JsObject(), "injectedObject");
      * webView.loadData("<!DOCTYPE html><title></title>", "text/html", null);
      * webView.loadUrl("javascript:alert(injectedObject.toString())");</pre>
      * <p>
@@ -1468,7 +1513,9 @@ public class WebView extends AbsoluteLayout
      * <ul>
      * <li> This method can be used to allow JavaScript to control the host
      * application. This is a powerful feature, but also presents a security
-     * risk, particularly as JavaScript could use reflection to access an
+     * risk for applications targeted to API level
+     * {@link android.os.Build.VERSION_CODES#JELLY_BEAN} or below, because
+     * JavaScript could use reflection to access an
      * injected object's public fields. Use of this method in a WebView
      * containing untrusted content could allow an attacker to manipulate the
      * host application in unintended ways, executing Java code with the
@@ -1477,6 +1524,7 @@ public class WebView extends AbsoluteLayout
      * <li> JavaScript interacts with Java object on a private, background
      * thread of this WebView. Care is therefore required to maintain thread
      * safety.</li>
+     * <li> The Java object's fields are not accessible.</li>
      * </ul>
      *
      * @param object the Java object to inject into this WebView's JavaScript
@@ -1539,11 +1587,11 @@ public class WebView extends AbsoluteLayout
      * functionality; it will be deprecated in the future.
      *
      * @deprecated This method is now obsolete.
+     * @hide Since API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
      */
     @Deprecated
     public void emulateShiftHeld() {
         checkThread();
-        mProvider.emulateShiftHeld();
     }
 
     /**
@@ -1574,6 +1622,10 @@ public class WebView extends AbsoluteLayout
     public void onGlobalFocusChanged(View oldFocus, View newFocus) {
     }
 
+    /**
+     * @deprecated Only the default case, true, will be supported in a future version.
+     */
+    @Deprecated
     public void setMapTrackballToArrowKeys(boolean setMap) {
         checkThread();
         mProvider.setMapTrackballToArrowKeys(setMap);
@@ -1607,7 +1659,12 @@ public class WebView extends AbsoluteLayout
      * Gets whether this WebView can be zoomed in.
      *
      * @return true if this WebView can be zoomed in
+     *
+     * @deprecated This method is prone to inaccuracy due to race conditions
+     * between the web rendering and UI threads; prefer
+     * {@link WebViewClient#onScaleChanged}.
      */
+    @Deprecated
     public boolean canZoomIn() {
         checkThread();
         return mProvider.canZoomIn();
@@ -1617,7 +1674,12 @@ public class WebView extends AbsoluteLayout
      * Gets whether this WebView can be zoomed out.
      *
      * @return true if this WebView can be zoomed out
+     *
+     * @deprecated This method is prone to inaccuracy due to race conditions
+     * between the web rendering and UI threads; prefer
+     * {@link WebViewClient#onScaleChanged}.
      */
+    @Deprecated
     public boolean canZoomOut() {
         checkThread();
         return mProvider.canZoomOut();
@@ -1645,11 +1707,29 @@ public class WebView extends AbsoluteLayout
 
     /**
      * @deprecated This method is now obsolete.
+     * @hide Since API level {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR1}
      */
     @Deprecated
     public void debugDump() {
         checkThread();
-        mProvider.debugDump();
+    }
+
+    /**
+     * See {@link ViewDebug.HierarchyHandler#dumpViewHierarchyWithProperties(BufferedWriter, int)}
+     * @hide
+     */
+    @Override
+    public void dumpViewHierarchyWithProperties(BufferedWriter out, int level) {
+        mProvider.dumpViewHierarchyWithProperties(out, level);
+    }
+
+    /**
+     * See {@link ViewDebug.HierarchyHandler#findHierarchyView(String, int)}
+     * @hide
+     */
+    @Override
+    public View findHierarchyView(String className, int hashCode) {
+        return mProvider.findHierarchyView(className, hashCode);
     }
 
     //-------------------------------------------------------------------------

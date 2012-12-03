@@ -112,11 +112,12 @@ public:
         multiply(u);
     }
 
-    bool isPureTranslate();
-    bool isSimple();
-    bool isIdentity();
+    bool isPureTranslate() const;
+    bool isSimple() const;
+    bool isIdentity() const;
+    bool isPerspective() const;
 
-    bool changesBounds();
+    bool changesBounds() const;
 
     void copyTo(float* v) const;
     void copyTo(SkMatrix& v) const;

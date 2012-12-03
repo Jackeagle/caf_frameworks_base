@@ -271,9 +271,14 @@ setVideoSurface(JNIEnv *env, jobject thiz, jobject jsurface, jboolean mediaPlaye
 
     sp<ISurfaceTexture> new_st;
     if (jsurface) {
-        sp<Surface> surface(Surface_getSurface(env, jsurface));
+        sp<Surface> surface(android_view_Surface_getSurface(env, jsurface));
         if (surface != NULL) {
             new_st = surface->getSurfaceTexture();
+            if (new_st == NULL) {
+                jniThrowException(env, "java/lang/IllegalArgumentException",
+                    "The surface does not have a binding SurfaceTexture!");
+                return;
+            }
             new_st->incStrong(thiz);
         } else {
             jniThrowException(env, "java/lang/IllegalArgumentException",

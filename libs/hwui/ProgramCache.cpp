@@ -40,50 +40,61 @@ const char* gVS_Header_Attributes =
         "attribute vec4 position;\n";
 const char* gVS_Header_Attributes_TexCoords =
         "attribute vec2 texCoords;\n";
-const char* gVS_Header_Attributes_AAParameters =
+const char* gVS_Header_Attributes_AALineParameters =
         "attribute float vtxWidth;\n"
         "attribute float vtxLength;\n";
+const char* gVS_Header_Attributes_AAVertexShapeParameters =
+        "attribute float vtxAlpha;\n";
 const char* gVS_Header_Uniforms_TextureTransform =
         "uniform mat4 mainTextureTransform;\n";
 const char* gVS_Header_Uniforms =
+        "uniform mat4 projection;\n" \
         "uniform mat4 transform;\n";
 const char* gVS_Header_Uniforms_IsPoint =
         "uniform mediump float pointSize;\n";
 const char* gVS_Header_Uniforms_HasGradient[3] = {
         // Linear
-        "uniform mat4 screenSpace;\n",
+        "uniform mat4 screenSpace;\n"
+        "uniform float ditherSize;\n",
         // Circular
-        "uniform mat4 screenSpace;\n",
+        "uniform mat4 screenSpace;\n"
+        "uniform float ditherSize;\n",
         // Sweep
         "uniform mat4 screenSpace;\n"
+        "uniform float ditherSize;\n"
 };
 const char* gVS_Header_Uniforms_HasBitmap =
         "uniform mat4 textureTransform;\n"
         "uniform mediump vec2 textureDimension;\n";
 const char* gVS_Header_Varyings_HasTexture =
         "varying vec2 outTexCoords;\n";
-const char* gVS_Header_Varyings_IsAA =
+const char* gVS_Header_Varyings_IsAALine =
         "varying float widthProportion;\n"
         "varying float lengthProportion;\n";
-const char* gVS_Header_Varyings_HasBitmap[2] = {
-        // Default precision
-        "varying vec2 outBitmapTexCoords;\n",
-        // High precision
-        "varying highp vec2 outBitmapTexCoords;\n"
-};
-const char* gVS_Header_Varyings_PointHasBitmap[2] = {
-        // Default precision
-        "varying vec2 outPointBitmapTexCoords;\n",
-        // High precision
-        "varying highp vec2 outPointBitmapTexCoords;\n"
-};
-const char* gVS_Header_Varyings_HasGradient[3] = {
+const char* gVS_Header_Varyings_IsAAVertexShape =
+        "varying float alpha;\n";
+const char* gVS_Header_Varyings_HasBitmap =
+        "varying highp vec2 outBitmapTexCoords;\n";
+const char* gVS_Header_Varyings_PointHasBitmap =
+        "varying highp vec2 outPointBitmapTexCoords;\n";
+const char* gVS_Header_Varyings_HasGradient[6] = {
         // Linear
-        "varying vec2 linear;\n",
+        "varying highp vec2 linear;\n"
+        "varying vec2 ditherTexCoords;\n",
+        "varying float linear;\n"
+        "varying vec2 ditherTexCoords;\n",
+
         // Circular
-        "varying vec2 circular;\n",
+        "varying highp vec2 circular;\n"
+        "varying vec2 ditherTexCoords;\n",
+        "varying highp vec2 circular;\n"
+        "varying vec2 ditherTexCoords;\n",
+
         // Sweep
-        "varying vec2 sweep;\n"
+        "varying highp vec2 sweep;\n"
+        "varying vec2 ditherTexCoords;\n",
+        "varying highp vec2 sweep;\n"
+        "varying vec2 ditherTexCoords;\n",
 };
 const char* gVS_Main =
         "\nvoid main(void) {\n";
@@ -91,25 +102,38 @@ const char* gVS_Main_OutTexCoords =
         "    outTexCoords = texCoords;\n";
 const char* gVS_Main_OutTransformedTexCoords =
         "    outTexCoords = (mainTextureTransform * vec4(texCoords, 0.0, 1.0)).xy;\n";
-const char* gVS_Main_OutGradient[3] = {
+const char* gVS_Main_OutGradient[6] = {
         // Linear
-        "    linear = vec2((screenSpace * position).x, 0.5);\n",
+        "    linear = vec2((screenSpace * position).x, 0.5);\n"
+        "    ditherTexCoords = (transform * position).xy * ditherSize;\n",
+        "    linear = (screenSpace * position).x;\n"
+        "    ditherTexCoords = (transform * position).xy * ditherSize;\n",
+
         // Circular
-        "    circular = (screenSpace * position).xy;\n",
+        "    circular = (screenSpace * position).xy;\n"
+        "    ditherTexCoords = (transform * position).xy * ditherSize;\n",
+        "    circular = (screenSpace * position).xy;\n"
+        "    ditherTexCoords = (transform * position).xy * ditherSize;\n",
+
         // Sweep
         "    sweep = (screenSpace * position).xy;\n"
+        "    ditherTexCoords = (transform * position).xy * ditherSize;\n",
+        "    sweep = (screenSpace * position).xy;\n"
+        "    ditherTexCoords = (transform * position).xy * ditherSize;\n",
 };
 const char* gVS_Main_OutBitmapTexCoords =
         "    outBitmapTexCoords = (textureTransform * position).xy * textureDimension;\n";
 const char* gVS_Main_OutPointBitmapTexCoords =
         "    outPointBitmapTexCoords = (textureTransform * position).xy * textureDimension;\n";
 const char* gVS_Main_Position =
-        "    gl_Position = transform * position;\n";
+        "    gl_Position = projection * transform * position;\n";
 const char* gVS_Main_PointSize =
         "    gl_PointSize = pointSize;\n";
-const char* gVS_Main_AA =
+const char* gVS_Main_AALine =
         "    widthProportion = vtxWidth;\n"
         "    lengthProportion = vtxLength;\n";
+const char* gVS_Main_AAVertexShape =
+        "    alpha = vtxAlpha;\n";
 const char* gVS_Footer =
         "}\n\n";
 
@@ -125,25 +149,34 @@ const char* gFS_Header =
         "precision mediump float;\n\n";
 const char* gFS_Uniforms_Color =
         "uniform vec4 color;\n";
-const char* gFS_Uniforms_AA =
+const char* gFS_Uniforms_AALine =
         "uniform float boundaryWidth;\n"
-        "uniform float inverseBoundaryWidth;\n"
-        "uniform float boundaryLength;\n"
-        "uniform float inverseBoundaryLength;\n";
+        "uniform float boundaryLength;\n";
 const char* gFS_Header_Uniforms_PointHasBitmap =
         "uniform vec2 textureDimension;\n"
         "uniform float pointSize;\n";
 const char* gFS_Uniforms_TextureSampler =
-        "uniform sampler2D sampler;\n";
+        "uniform sampler2D baseSampler;\n";
 const char* gFS_Uniforms_ExternalTextureSampler =
-        "uniform samplerExternalOES sampler;\n";
-const char* gFS_Uniforms_GradientSampler[3] = {
+        "uniform samplerExternalOES baseSampler;\n";
+#define FS_UNIFORMS_DITHER \
+        "uniform float ditherSizeSquared;\n" \
+        "uniform sampler2D ditherSampler;\n"
+#define FS_UNIFORMS_GRADIENT \
+        "uniform vec4 startColor;\n" \
+        "uniform vec4 endColor;\n"
+const char* gFS_Uniforms_GradientSampler[6] = {
         // Linear
-        "uniform sampler2D gradientSampler;\n",
+        FS_UNIFORMS_DITHER "uniform sampler2D gradientSampler;\n",
+        FS_UNIFORMS_DITHER FS_UNIFORMS_GRADIENT,
+
         // Circular
-        "uniform sampler2D gradientSampler;\n",
+        FS_UNIFORMS_DITHER "uniform sampler2D gradientSampler;\n",
+        FS_UNIFORMS_DITHER FS_UNIFORMS_GRADIENT,
+
         // Sweep
-        "uniform sampler2D gradientSampler;\n"
+        FS_UNIFORMS_DITHER "uniform sampler2D gradientSampler;\n",
+        FS_UNIFORMS_DITHER FS_UNIFORMS_GRADIENT
 };
 const char* gFS_Uniforms_BitmapSampler =
         "uniform sampler2D bitmapSampler;\n";
@@ -159,13 +192,21 @@ const char* gFS_Uniforms_ColorOp[4] = {
         // PorterDuff
         "uniform vec4 colorBlend;\n"
 };
+const char* gFS_Uniforms_Gamma =
+        "uniform float gamma;\n";
+
 const char* gFS_Main =
         "\nvoid main(void) {\n"
         "    lowp vec4 fragColor;\n";
 
 const char* gFS_Main_PointBitmapTexCoords =
-        "    vec2 outBitmapTexCoords = outPointBitmapTexCoords + "
+        "    highp vec2 outBitmapTexCoords = outPointBitmapTexCoords + "
         "((gl_PointCoord - vec2(0.5, 0.5)) * textureDimension * vec2(pointSize, pointSize));\n";
+
+#define FS_MAIN_DITHER \
+        "texture2D(ditherSampler, ditherTexCoords).a * ditherSizeSquared"
+const char* gFS_Main_AddDitherToGradient =
+        "    gradientColor += " FS_MAIN_DITHER ";\n";
 
 // Fast cases
 const char* gFS_Fast_SingleColor =
@@ -174,66 +215,87 @@ const char* gFS_Fast_SingleColor =
         "}\n\n";
 const char* gFS_Fast_SingleTexture =
         "\nvoid main(void) {\n"
-        "    gl_FragColor = texture2D(sampler, outTexCoords);\n"
+        "    gl_FragColor = texture2D(baseSampler, outTexCoords);\n"
         "}\n\n";
 const char* gFS_Fast_SingleModulateTexture =
         "\nvoid main(void) {\n"
-        "    gl_FragColor = color.a * texture2D(sampler, outTexCoords);\n"
+        "    gl_FragColor = color.a * texture2D(baseSampler, outTexCoords);\n"
         "}\n\n";
 const char* gFS_Fast_SingleA8Texture =
         "\nvoid main(void) {\n"
-        "    gl_FragColor = texture2D(sampler, outTexCoords);\n"
+        "    gl_FragColor = texture2D(baseSampler, outTexCoords);\n"
+        "}\n\n";
+const char* gFS_Fast_SingleA8Texture_ApplyGamma =
+        "\nvoid main(void) {\n"
+        "    gl_FragColor = vec4(0.0, 0.0, 0.0, pow(texture2D(baseSampler, outTexCoords).a, gamma));\n"
         "}\n\n";
 const char* gFS_Fast_SingleModulateA8Texture =
         "\nvoid main(void) {\n"
-        "    gl_FragColor = color * texture2D(sampler, outTexCoords).a;\n"
+        "    gl_FragColor = color * texture2D(baseSampler, outTexCoords).a;\n"
         "}\n\n";
-const char* gFS_Fast_SingleGradient =
+const char* gFS_Fast_SingleModulateA8Texture_ApplyGamma =
         "\nvoid main(void) {\n"
-        "    gl_FragColor = texture2D(gradientSampler, linear);\n"
+        "    gl_FragColor = color * pow(texture2D(baseSampler, outTexCoords).a, gamma);\n"
         "}\n\n";
-const char* gFS_Fast_SingleModulateGradient =
+const char* gFS_Fast_SingleGradient[2] = {
         "\nvoid main(void) {\n"
-        "    gl_FragColor = color.a * texture2D(gradientSampler, linear);\n"
-        "}\n\n";
+        "    gl_FragColor = " FS_MAIN_DITHER " + texture2D(gradientSampler, linear);\n"
+        "}\n\n",
+        "\nvoid main(void) {\n"
+        "    gl_FragColor = " FS_MAIN_DITHER " + mix(startColor, endColor, clamp(linear, 0.0, 1.0));\n"
+        "}\n\n"
+};
+const char* gFS_Fast_SingleModulateGradient[2] = {
+        "\nvoid main(void) {\n"
+        "    gl_FragColor = " FS_MAIN_DITHER " + color.a * texture2D(gradientSampler, linear);\n"
+        "}\n\n",
+        "\nvoid main(void) {\n"
+        "    gl_FragColor = " FS_MAIN_DITHER " + color.a * mix(startColor, endColor, clamp(linear, 0.0, 1.0));\n"
+        "}\n\n"
+};
 
 // General case
 const char* gFS_Main_FetchColor =
         "    fragColor = color;\n";
 const char* gFS_Main_ModulateColor =
         "    fragColor *= color.a;\n";
-const char* gFS_Main_AccountForAA =
-        "    if (widthProportion < boundaryWidth) {\n"
-        "        fragColor *= (widthProportion * inverseBoundaryWidth);\n"
-        "    } else if (widthProportion > (1.0 - boundaryWidth)) {\n"
-        "        fragColor *= ((1.0 - widthProportion) * inverseBoundaryWidth);\n"
-        "    }\n"
-        "    if (lengthProportion < boundaryLength) {\n"
-        "        fragColor *= (lengthProportion * inverseBoundaryLength);\n"
-        "    } else if (lengthProportion > (1.0 - boundaryLength)) {\n"
-        "        fragColor *= ((1.0 - lengthProportion) * inverseBoundaryLength);\n"
-        "    }\n";
+const char* gFS_Main_AccountForAALine =
+        "    fragColor *= (1.0 - smoothstep(boundaryWidth, 0.5, abs(0.5 - widthProportion)))\n"
+        "               * (1.0 - smoothstep(boundaryLength, 0.5, abs(0.5 - lengthProportion)));\n";
+const char* gFS_Main_AccountForAAVertexShape =
+        "    fragColor *= alpha;\n";
+
 const char* gFS_Main_FetchTexture[2] = {
         // Don't modulate
-        "    fragColor = texture2D(sampler, outTexCoords);\n",
+        "    fragColor = texture2D(baseSampler, outTexCoords);\n",
         // Modulate
-        "    fragColor = color * texture2D(sampler, outTexCoords);\n"
+        "    fragColor = color * texture2D(baseSampler, outTexCoords);\n"
 };
-const char* gFS_Main_FetchA8Texture[2] = {
+const char* gFS_Main_FetchA8Texture[4] = {
         // Don't modulate
-        "    fragColor = texture2D(sampler, outTexCoords);\n",
+        "    fragColor = texture2D(baseSampler, outTexCoords);\n",
+        "    fragColor = texture2D(baseSampler, outTexCoords);\n",
         // Modulate
-        "    fragColor = color * texture2D(sampler, outTexCoords).a;\n"
+        "    fragColor = color * texture2D(baseSampler, outTexCoords).a;\n",
+        "    fragColor = color * pow(texture2D(baseSampler, outTexCoords).a, gamma);\n"
 };
-const char* gFS_Main_FetchGradient[3] = {
+const char* gFS_Main_FetchGradient[6] = {
         // Linear
         "    vec4 gradientColor = texture2D(gradientSampler, linear);\n",
+
+        "    vec4 gradientColor = mix(startColor, endColor, clamp(linear, 0.0, 1.0));\n",
+
         // Circular
-        "    float index = length(circular);\n"
-        "    vec4 gradientColor = texture2D(gradientSampler, vec2(index, 0.5));\n",
+        "    vec4 gradientColor = texture2D(gradientSampler, vec2(length(circular), 0.5));\n",
+
+        "    vec4 gradientColor = mix(startColor, endColor, clamp(length(circular), 0.0, 1.0));\n",
+
         // Sweep
-        "    float index = atan(sweep.y, sweep.x) * 0.15915494309; // inv(2 * PI)\n"
-        "    vec4 gradientColor = texture2D(gradientSampler, vec2(index - floor(index), 0.5));\n"
+        "    highp float index = atan(sweep.y, sweep.x) * 0.15915494309; // inv(2 * PI)\n"
+        "    vec4 gradientColor = texture2D(gradientSampler, vec2(index - floor(index), 0.5));\n",
+
+        "    highp float index = atan(sweep.y, sweep.x) * 0.15915494309; // inv(2 * PI)\n"
+        "    vec4 gradientColor = mix(startColor, endColor, clamp(index - floor(index), 0.0, 1.0));\n"
 };
 const char* gFS_Main_FetchBitmap =
         "    vec4 bitmapColor = texture2D(bitmapSampler, outBitmapTexCoords);\n";
@@ -243,29 +305,38 @@ const char* gFS_Main_BlendShadersBG =
         "    fragColor = blendShaders(gradientColor, bitmapColor)";
 const char* gFS_Main_BlendShadersGB =
         "    fragColor = blendShaders(bitmapColor, gradientColor)";
-const char* gFS_Main_BlendShaders_Modulate[3] = {
+const char* gFS_Main_BlendShaders_Modulate[6] = {
         // Don't modulate
         ";\n",
+        ";\n",
         // Modulate
-        " * fragColor.a;\n",
+        " * color.a;\n",
+        " * color.a;\n",
         // Modulate with alpha 8 texture
-        " * texture2D(sampler, outTexCoords).a;\n"
+        " * texture2D(baseSampler, outTexCoords).a;\n",
+        " * pow(texture2D(baseSampler, outTexCoords).a, gamma);\n"
 };
-const char* gFS_Main_GradientShader_Modulate[3] = {
+const char* gFS_Main_GradientShader_Modulate[6] = {
         // Don't modulate
         "    fragColor = gradientColor;\n",
+        "    fragColor = gradientColor;\n",
         // Modulate
-        "    fragColor = gradientColor * fragColor.a;\n",
+        "    fragColor = gradientColor * color.a;\n",
+        "    fragColor = gradientColor * color.a;\n",
         // Modulate with alpha 8 texture
-        "    fragColor = gradientColor * texture2D(sampler, outTexCoords).a;\n"
+        "    fragColor = gradientColor * texture2D(baseSampler, outTexCoords).a;\n",
+        "    fragColor = gradientColor * pow(texture2D(baseSampler, outTexCoords).a, gamma);\n"
     };
-const char* gFS_Main_BitmapShader_Modulate[3] = {
+const char* gFS_Main_BitmapShader_Modulate[6] = {
         // Don't modulate
         "    fragColor = bitmapColor;\n",
+        "    fragColor = bitmapColor;\n",
         // Modulate
-        "    fragColor = bitmapColor * fragColor.a;\n",
+        "    fragColor = bitmapColor * color.a;\n",
+        "    fragColor = bitmapColor * color.a;\n",
         // Modulate with alpha 8 texture
-        "    fragColor = bitmapColor * texture2D(sampler, outTexCoords).a;\n"
+        "    fragColor = bitmapColor * texture2D(baseSampler, outTexCoords).a;\n",
+        "    fragColor = bitmapColor * pow(texture2D(baseSampler, outTexCoords).a, gamma);\n"
     };
 const char* gFS_Main_FragColor =
         "    gl_FragColor = fragColor;\n";
@@ -277,7 +348,6 @@ const char* gFS_Main_ApplyColorOp[4] = {
         // None
         "",
         // Matrix
-        // TODO: Fix premultiplied alpha computations for color matrix
         "    fragColor *= colorMatrix;\n"
         "    fragColor += colorMatrixVector;\n"
         "    fragColor.rgb *= fragColor.a;\n",
@@ -388,8 +458,11 @@ Program* ProgramCache::generateProgram(const ProgramDescription& description, pr
     String8 vertexShader = generateVertexShader(description);
     String8 fragmentShader = generateFragmentShader(description);
 
-    Program* program = new Program(description, vertexShader.string(), fragmentShader.string());
-    return program;
+    return new Program(description, vertexShader.string(), fragmentShader.string());
+}
+
+static inline size_t gradientIndex(const ProgramDescription& description) {
+    return description.gradientType * 2 + description.isSimpleGradient;
 }
 
 String8 ProgramCache::generateVertexShader(const ProgramDescription& description) {
@@ -399,7 +472,11 @@ String8 ProgramCache::generateVertexShader(const ProgramDescription& description
         shader.append(gVS_Header_Attributes_TexCoords);
     }
     if (description.isAA) {
-        shader.append(gVS_Header_Attributes_AAParameters);
+        if (description.isVertexShape) {
+            shader.append(gVS_Header_Attributes_AAVertexShapeParameters);
+        } else {
+            shader.append(gVS_Header_Attributes_AALineParameters);
+        }
     }
     // Uniforms
     shader.append(gVS_Header_Uniforms);
@@ -420,16 +497,19 @@ String8 ProgramCache::generateVertexShader(const ProgramDescription& description
         shader.append(gVS_Header_Varyings_HasTexture);
     }
     if (description.isAA) {
-        shader.append(gVS_Header_Varyings_IsAA);
+        if (description.isVertexShape) {
+            shader.append(gVS_Header_Varyings_IsAAVertexShape);
+        } else {
+            shader.append(gVS_Header_Varyings_IsAALine);
+        }
     }
     if (description.hasGradient) {
-        shader.append(gVS_Header_Varyings_HasGradient[description.gradientType]);
+        shader.append(gVS_Header_Varyings_HasGradient[gradientIndex(description)]);
     }
     if (description.hasBitmap) {
-        int index = Caches::getInstance().extensions.needsHighpTexCoords() ? 1 : 0;
         shader.append(description.isPoint ?
-                gVS_Header_Varyings_PointHasBitmap[index] :
-                gVS_Header_Varyings_HasBitmap[index]);
+                gVS_Header_Varyings_PointHasBitmap :
+                gVS_Header_Varyings_HasBitmap);
     }
 
     // Begin the shader
@@ -440,10 +520,11 @@ String8 ProgramCache::generateVertexShader(const ProgramDescription& description
             shader.append(gVS_Main_OutTexCoords);
         }
         if (description.isAA) {
-            shader.append(gVS_Main_AA);
-        }
-        if (description.hasGradient) {
-            shader.append(gVS_Main_OutGradient[description.gradientType]);
+            if (description.isVertexShape) {
+                shader.append(gVS_Main_AAVertexShape);
+            } else {
+                shader.append(gVS_Main_AALine);
+            }
         }
         if (description.hasBitmap) {
             shader.append(description.isPoint ?
@@ -455,6 +536,9 @@ String8 ProgramCache::generateVertexShader(const ProgramDescription& description
         }
         // Output transformed position
         shader.append(gVS_Main_Position);
+        if (description.hasGradient) {
+            shader.append(gVS_Main_OutGradient[gradientIndex(description)]);
+        }
     }
     // End the shader
     shader.append(gVS_Footer);
@@ -462,6 +546,14 @@ String8 ProgramCache::generateVertexShader(const ProgramDescription& description
     PROGRAM_LOGD("*** Generated vertex shader:\n\n%s", shader.string());
 
     return shader;
+}
+
+static bool shaderOp(const ProgramDescription& description, String8& shader,
+        const int modulateOp, const char** snippets) {
+    int op = description.hasAlpha8Texture ? MODULATE_OP_MODULATE_A8 : modulateOp;
+    op = op * 2 + description.hasGammaCorrection;
+    shader.append(snippets[op]);
+    return description.hasAlpha8Texture;
 }
 
 String8 ProgramCache::generateFragmentShader(const ProgramDescription& description) {
@@ -482,16 +574,19 @@ String8 ProgramCache::generateFragmentShader(const ProgramDescription& descripti
         shader.append(gVS_Header_Varyings_HasTexture);
     }
     if (description.isAA) {
-        shader.append(gVS_Header_Varyings_IsAA);
+        if (description.isVertexShape) {
+            shader.append(gVS_Header_Varyings_IsAAVertexShape);
+        } else {
+            shader.append(gVS_Header_Varyings_IsAALine);
+        }
     }
     if (description.hasGradient) {
-        shader.append(gVS_Header_Varyings_HasGradient[description.gradientType]);
+        shader.append(gVS_Header_Varyings_HasGradient[gradientIndex(description)]);
     }
     if (description.hasBitmap) {
-        int index = Caches::getInstance().extensions.needsHighpTexCoords() ? 1 : 0;
         shader.append(description.isPoint ?
-                gVS_Header_Varyings_PointHasBitmap[index] :
-                gVS_Header_Varyings_HasBitmap[index]);
+                gVS_Header_Varyings_PointHasBitmap :
+                gVS_Header_Varyings_HasBitmap);
     }
 
     // Uniforms
@@ -508,19 +603,23 @@ String8 ProgramCache::generateFragmentShader(const ProgramDescription& descripti
     } else if (description.hasExternalTexture) {
         shader.append(gFS_Uniforms_ExternalTextureSampler);
     }
-    if (description.isAA) {
-        shader.append(gFS_Uniforms_AA);
+    if (description.isAA && !description.isVertexShape) {
+        shader.append(gFS_Uniforms_AALine);
     }
     if (description.hasGradient) {
-        shader.append(gFS_Uniforms_GradientSampler[description.gradientType]);
+        shader.append(gFS_Uniforms_GradientSampler[gradientIndex(description)]);
     }
     if (description.hasBitmap && description.isPoint) {
         shader.append(gFS_Header_Uniforms_PointHasBitmap);
     }
+    if (description.hasGammaCorrection) {
+        shader.append(gFS_Uniforms_Gamma);
+    }
 
     // Optimization for common cases
     if (!description.isAA && !blendFramebuffer &&
-            description.colorOp == ProgramDescription::kColorNone && !description.isPoint) {
+            description.colorOp == ProgramDescription::kColorNone &&
+            !description.isPoint && !description.isVertexShape) {
         bool fast = false;
 
         const bool noShader = !description.hasGradient && !description.hasBitmap;
@@ -544,16 +643,24 @@ String8 ProgramCache::generateFragmentShader(const ProgramDescription& descripti
             fast = true;
         } else if (singleA8Texture) {
             if (!description.modulate) {
-                shader.append(gFS_Fast_SingleA8Texture);
+                if (description.hasGammaCorrection) {
+                    shader.append(gFS_Fast_SingleA8Texture_ApplyGamma);
+                } else {
+                    shader.append(gFS_Fast_SingleA8Texture);
+                }
             } else {
-                shader.append(gFS_Fast_SingleModulateA8Texture);
+                if (description.hasGammaCorrection) {
+                    shader.append(gFS_Fast_SingleModulateA8Texture_ApplyGamma);
+                } else {
+                    shader.append(gFS_Fast_SingleModulateA8Texture);
+                }
             }
             fast = true;
         } else if (singleGradient) {
             if (!description.modulate) {
-                shader.append(gFS_Fast_SingleGradient);
+                shader.append(gFS_Fast_SingleGradient[description.isSimpleGradient]);
             } else {
-                shader.append(gFS_Fast_SingleModulateGradient);
+                shader.append(gFS_Fast_SingleModulateGradient[description.isSimpleGradient]);
             }
             fast = true;
         }
@@ -594,21 +701,20 @@ String8 ProgramCache::generateFragmentShader(const ProgramDescription& descripti
         if (description.hasTexture || description.hasExternalTexture) {
             if (description.hasAlpha8Texture) {
                 if (!description.hasGradient && !description.hasBitmap) {
-                    shader.append(gFS_Main_FetchA8Texture[modulateOp]);
+                    shader.append(gFS_Main_FetchA8Texture[modulateOp * 2 +
+                                                          description.hasGammaCorrection]);
                 }
             } else {
                 shader.append(gFS_Main_FetchTexture[modulateOp]);
             }
         } else {
-            if ((!description.hasGradient && !description.hasBitmap) || description.modulate) {
+            if (!description.hasGradient && !description.hasBitmap) {
                 shader.append(gFS_Main_FetchColor);
             }
         }
-        if (description.isAA) {
-            shader.append(gFS_Main_AccountForAA);
-        }
         if (description.hasGradient) {
-            shader.append(gFS_Main_FetchGradient[description.gradientType]);
+            shader.append(gFS_Main_FetchGradient[gradientIndex(description)]);
+            shader.append(gFS_Main_AddDitherToGradient);
         }
         if (description.hasBitmap) {
             if (description.isPoint) {
@@ -623,30 +729,38 @@ String8 ProgramCache::generateFragmentShader(const ProgramDescription& descripti
         bool applyModulate = false;
         // Case when we have two shaders set
         if (description.hasGradient && description.hasBitmap) {
-            int op = description.hasAlpha8Texture ? MODULATE_OP_MODULATE_A8 : modulateOp;
             if (description.isBitmapFirst) {
                 shader.append(gFS_Main_BlendShadersBG);
             } else {
                 shader.append(gFS_Main_BlendShadersGB);
             }
-            shader.append(gFS_Main_BlendShaders_Modulate[op]);
-            applyModulate = true;
+            applyModulate = shaderOp(description, shader, modulateOp,
+                    gFS_Main_BlendShaders_Modulate);
         } else {
             if (description.hasGradient) {
-                int op = description.hasAlpha8Texture ? MODULATE_OP_MODULATE_A8 : modulateOp;
-                shader.append(gFS_Main_GradientShader_Modulate[op]);
-                applyModulate = true;
+                applyModulate = shaderOp(description, shader, modulateOp,
+                        gFS_Main_GradientShader_Modulate);
             } else if (description.hasBitmap) {
-                int op = description.hasAlpha8Texture ? MODULATE_OP_MODULATE_A8 : modulateOp;
-                shader.append(gFS_Main_BitmapShader_Modulate[op]);
-                applyModulate = true;
+                applyModulate = shaderOp(description, shader, modulateOp,
+                        gFS_Main_BitmapShader_Modulate);
             }
         }
+
         if (description.modulate && applyModulate) {
             shader.append(gFS_Main_ModulateColor);
         }
+
         // Apply the color op if needed
         shader.append(gFS_Main_ApplyColorOp[description.colorOp]);
+
+        if (description.isAA) {
+            if (description.isVertexShape) {
+                shader.append(gFS_Main_AccountForAAVertexShape);
+            } else {
+                shader.append(gFS_Main_AccountForAALine);
+            }
+        }
+
         // Output the fragment
         if (!blendFramebuffer) {
             shader.append(gFS_Main_FragColor);
@@ -676,13 +790,13 @@ void ProgramCache::generateBlend(String8& shader, const char* name, SkXfermode::
 }
 
 void ProgramCache::generateTextureWrap(String8& shader, GLenum wrapS, GLenum wrapT) {
-    shader.append("\nvec2 wrap(vec2 texCoords) {\n");
+    shader.append("\nhighp vec2 wrap(highp vec2 texCoords) {\n");
     if (wrapS == GL_MIRRORED_REPEAT) {
-        shader.append("    float xMod2 = mod(texCoords.x, 2.0);\n");
+        shader.append("    highp float xMod2 = mod(texCoords.x, 2.0);\n");
         shader.append("    if (xMod2 > 1.0) xMod2 = 2.0 - xMod2;\n");
     }
     if (wrapT == GL_MIRRORED_REPEAT) {
-        shader.append("    float yMod2 = mod(texCoords.y, 2.0);\n");
+        shader.append("    highp float yMod2 = mod(texCoords.y, 2.0);\n");
         shader.append("    if (yMod2 > 1.0) yMod2 = 2.0 - yMod2;\n");
     }
     shader.append("    return vec2(");

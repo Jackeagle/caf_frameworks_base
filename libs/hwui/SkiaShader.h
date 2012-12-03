@@ -82,10 +82,6 @@ struct SkiaShader {
         mGradientCache = gradientCache;
     }
 
-    virtual void updateTransforms(Program* program, const mat4& modelView,
-            const Snapshot& snapshot) {
-    }
-
     uint32_t getGenerationId() {
         return mGenerationId;
     }
@@ -148,17 +144,9 @@ struct SkiaBitmapShader: public SkiaShader {
     void describe(ProgramDescription& description, const Extensions& extensions);
     void setupProgram(Program* program, const mat4& modelView, const Snapshot& snapshot,
             GLuint* textureUnit);
-    void updateTransforms(Program* program, const mat4& modelView, const Snapshot& snapshot);
 
 private:
     SkiaBitmapShader() {
-    }
-
-    /**
-     * This method does not work for n == 0.
-     */
-    inline bool isPowerOfTwo(unsigned int n) {
-        return !(n & (n - 1));
     }
 
     SkBitmap* mBitmap;
@@ -179,12 +167,12 @@ struct SkiaLinearGradientShader: public SkiaShader {
     void describe(ProgramDescription& description, const Extensions& extensions);
     void setupProgram(Program* program, const mat4& modelView, const Snapshot& snapshot,
             GLuint* textureUnit);
-    void updateTransforms(Program* program, const mat4& modelView, const Snapshot& snapshot);
 
 private:
     SkiaLinearGradientShader() {
     }
 
+    bool mIsSimple;
     float* mBounds;
     uint32_t* mColors;
     float* mPositions;
@@ -203,7 +191,6 @@ struct SkiaSweepGradientShader: public SkiaShader {
     virtual void describe(ProgramDescription& description, const Extensions& extensions);
     void setupProgram(Program* program, const mat4& modelView, const Snapshot& snapshot,
             GLuint* textureUnit);
-    void updateTransforms(Program* program, const mat4& modelView, const Snapshot& snapshot);
 
 protected:
     SkiaSweepGradientShader(Type type, float x, float y, uint32_t* colors, float* positions,
@@ -211,6 +198,7 @@ protected:
     SkiaSweepGradientShader() {
     }
 
+    bool mIsSimple;
     uint32_t* mColors;
     float* mPositions;
     int mCount;

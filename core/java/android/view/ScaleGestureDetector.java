@@ -17,6 +17,8 @@
 package android.view;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.os.SystemClock;
 import android.util.FloatMath;
 
 /**
@@ -137,6 +139,18 @@ public class ScaleGestureDetector {
     private long mPrevTime;
     private boolean mInProgress;
     private int mSpanSlop;
+    private int mMinSpan;
+
+    // Bounds for recently seen values
+    private float mTouchUpper;
+    private float mTouchLower;
+    private float mTouchHistoryLastAccepted;
+    private int mTouchHistoryDirection;
+    private long mTouchHistoryLastAcceptedTime;
+    private int mTouchMinMajor;
+
+    private static final long TOUCH_STABILIZE_TIME = 128; // ms
+    private static final int TOUCH_MIN_MAJOR = 48; // dp
 
     /**
      * Consistency verifier for debugging purposes.
@@ -149,6 +163,83 @@ public class ScaleGestureDetector {
         mContext = context;
         mListener = listener;
         mSpanSlop = ViewConfiguration.get(context).getScaledTouchSlop() * 2;
+
+        final Resources res = context.getResources();
+        mTouchMinMajor = res.getDimensionPixelSize(
+                com.android.internal.R.dimen.config_minScalingTouchMajor);
+        mMinSpan = res.getDimensionPixelSize(
+                com.android.internal.R.dimen.config_minScalingSpan);
+    }
+
+    /**
+     * The touchMajor/touchMinor elements of a MotionEvent can flutter/jitter on
+     * some hardware/driver combos. Smooth it out to get kinder, gentler behavior.
+     * @param ev MotionEvent to add to the ongoing history
+     */
+    private void addTouchHistory(MotionEvent ev) {
+        final long currentTime = SystemClock.uptimeMillis();
+        final int count = ev.getPointerCount();
+        boolean accept = currentTime - mTouchHistoryLastAcceptedTime >= TOUCH_STABILIZE_TIME;
+        float total = 0;
+        int sampleCount = 0;
+        for (int i = 0; i < count; i++) {
+            final boolean hasLastAccepted = !Float.isNaN(mTouchHistoryLastAccepted);
+            final int historySize = ev.getHistorySize();
+            final int pointerSampleCount = historySize + 1;
+            for (int h = 0; h < pointerSampleCount; h++) {
+                float major;
+                if (h < historySize) {
+                    major = ev.getHistoricalTouchMajor(i, h);
+                } else {
+                    major = ev.getTouchMajor(i);
+                }
+                if (major < mTouchMinMajor) major = mTouchMinMajor;
+                total += major;
+
+                if (Float.isNaN(mTouchUpper) || major > mTouchUpper) {
+                    mTouchUpper = major;
+                }
+                if (Float.isNaN(mTouchLower) || major < mTouchLower) {
+                    mTouchLower = major;
+                }
+
+                if (hasLastAccepted) {
+                    final int directionSig = (int) Math.signum(major - mTouchHistoryLastAccepted);
+                    if (directionSig != mTouchHistoryDirection ||
+                            (directionSig == 0 && mTouchHistoryDirection == 0)) {
+                        mTouchHistoryDirection = directionSig;
+                        final long time = h < historySize ? ev.getHistoricalEventTime(h)
+                                : ev.getEventTime();
+                        mTouchHistoryLastAcceptedTime = time;
+                        accept = false;
+                    }
+                }
+            }
+            sampleCount += pointerSampleCount;
+        }
+
+        final float avg = total / sampleCount;
+
+        if (accept) {
+            float newAccepted = (mTouchUpper + mTouchLower + avg) / 3;
+            mTouchUpper = (mTouchUpper + newAccepted) / 2;
+            mTouchLower = (mTouchLower + newAccepted) / 2;
+            mTouchHistoryLastAccepted = newAccepted;
+            mTouchHistoryDirection = 0;
+            mTouchHistoryLastAcceptedTime = ev.getEventTime();
+        }
+    }
+
+    /**
+     * Clear all touch history tracking. Useful in ACTION_CANCEL or ACTION_UP.
+     * @see #addTouchHistory(MotionEvent)
+     */
+    private void clearTouchHistory() {
+        mTouchUpper = Float.NaN;
+        mTouchLower = Float.NaN;
+        mTouchHistoryLastAccepted = Float.NaN;
+        mTouchHistoryDirection = 0;
+        mTouchHistoryLastAcceptedTime = 0;
     }
 
     /**
@@ -183,11 +274,12 @@ public class ScaleGestureDetector {
             }
 
             if (streamComplete) {
+                clearTouchHistory();
                 return true;
             }
         }
 
-        final boolean configChanged =
+        final boolean configChanged = action == MotionEvent.ACTION_DOWN ||
                 action == MotionEvent.ACTION_POINTER_UP ||
                 action == MotionEvent.ACTION_POINTER_DOWN;
         final boolean pointerUp = action == MotionEvent.ACTION_POINTER_UP;
@@ -205,12 +297,18 @@ public class ScaleGestureDetector {
         final float focusX = sumX / div;
         final float focusY = sumY / div;
 
+
+        addTouchHistory(event);
+
         // Determine average deviation from focal point
         float devSumX = 0, devSumY = 0;
         for (int i = 0; i < count; i++) {
             if (skipIndex == i) continue;
-            devSumX += Math.abs(event.getX(i) - focusX);
-            devSumY += Math.abs(event.getY(i) - focusY);
+
+            // Convert the resulting diameter into a radius.
+            final float touchSize = mTouchHistoryLastAccepted / 2;
+            devSumX += Math.abs(event.getX(i) - focusX) + touchSize;
+            devSumY += Math.abs(event.getY(i) - focusY) + touchSize;
         }
         final float devX = devSumX / div;
         final float devY = devSumY / div;
@@ -228,7 +326,7 @@ public class ScaleGestureDetector {
         final boolean wasInProgress = mInProgress;
         mFocusX = focusX;
         mFocusY = focusY;
-        if (mInProgress && (span == 0 || configChanged)) {
+        if (mInProgress && (span < mMinSpan || configChanged)) {
             mListener.onScaleEnd(this);
             mInProgress = false;
             mInitialSpan = span;
@@ -238,7 +336,7 @@ public class ScaleGestureDetector {
             mPrevSpanY = mCurrSpanY = spanY;
             mInitialSpan = mPrevSpan = mCurrSpan = span;
         }
-        if (!mInProgress && span != 0 &&
+        if (!mInProgress && span >= mMinSpan &&
                 (wasInProgress || Math.abs(span - mInitialSpan) > mSpanSlop)) {
             mPrevSpanX = mCurrSpanX = spanX;
             mPrevSpanY = mCurrSpanY = spanY;

@@ -27,12 +27,11 @@ import android.util.Slog;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
+import android.view.ScaleGestureDetector.OnScaleGestureListener;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.View.OnClickListener;
-
-import java.util.Stack;
 
 public class ExpandHelper implements Gefingerpoken, OnClickListener {
     public interface Callback {
@@ -86,6 +85,8 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
     private float mInitialTouchFocusY;
     private float mInitialTouchY;
     private float mInitialTouchSpan;
+    private float mLastFocusY;
+    private float mLastSpanY;
     private int mTouchSlop;
     private int mLastMotionY;
     private float mPopLimit;
@@ -107,6 +108,32 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
     private int mGravity;
 
     private View mScrollView;
+
+    private OnScaleGestureListener mScaleGestureListener 
+            = new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        @Override
+        public boolean onScaleBegin(ScaleGestureDetector detector) {
+            if (DEBUG_SCALE) Slog.v(TAG, "onscalebegin()");
+            float focusX = detector.getFocusX();
+            float focusY = detector.getFocusY();
+
+            final View underFocus = findView(focusX, focusY);
+            if (underFocus != null) {
+                startExpanding(underFocus, STRETCH);
+            }
+            return mExpanding;
+        }
+
+        @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+            if (DEBUG_SCALE) Slog.v(TAG, "onscale() on " + mCurrView);
+            return true;
+        }
+
+        @Override
+        public void onScaleEnd(ScaleGestureDetector detector) {
+        }
+    };
 
     private class ViewScaler {
         View mView;
@@ -199,47 +226,13 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
         final ViewConfiguration configuration = ViewConfiguration.get(mContext);
         mTouchSlop = configuration.getScaledTouchSlop();
 
-        mSGD = new ScaleGestureDetector(context,
-                                         new ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            @Override
-            public boolean onScaleBegin(ScaleGestureDetector detector) {
-                if (DEBUG_SCALE) Slog.v(TAG, "onscalebegin()");
-                float focusX = detector.getFocusX();
-                float focusY = detector.getFocusY();
-
-                // your fingers have to be somewhat close to the bounds of the view in question
-                mInitialTouchFocusY = focusY;
-                mInitialTouchSpan = Math.abs(detector.getCurrentSpan());
-                if (DEBUG_SCALE) Slog.d(TAG, "got mInitialTouchSpan: (" + mInitialTouchSpan + ")");
-
-                final View underFocus = findView(focusX, focusY);
-                if (underFocus != null) {
-                    startExpanding(underFocus, STRETCH);
-                }
-                return mExpanding;
-            }
-
-            @Override
-            public boolean onScale(ScaleGestureDetector detector) {
-                if (DEBUG_SCALE) Slog.v(TAG, "onscale() on " + mCurrView);
-                updateExpansion();
-                return true;
-            }
-
-            @Override
-            public void onScaleEnd(ScaleGestureDetector detector) {
-                if (DEBUG_SCALE) Slog.v(TAG, "onscaleend()");
-                // I guess we're alone now
-                if (DEBUG_SCALE) Slog.d(TAG, "scale end");
-                finishExpanding(false);
-                clearView();
-            }
-        });
+        mSGD = new ScaleGestureDetector(context, mScaleGestureListener);
     }
 
     private void updateExpansion() {
+        if (DEBUG_SCALE) Slog.v(TAG, "updateExpansion()");
         // are we scaling or dragging?
-        float span = Math.abs(mSGD.getCurrentSpan()) - mInitialTouchSpan;
+        float span = mSGD.getCurrentSpan() - mInitialTouchSpan;
         span *= USE_SPAN ? 1f : 0f;
         float drag = mSGD.getFocusY() - mInitialTouchFocusY;
         drag *= USE_DRAG ? 1f : 0f;
@@ -251,6 +244,8 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
         mScaler.setHeight(newHeight);
 
         setGlow(calculateGlow(target, newHeight));
+        mLastFocusY = mSGD.getFocusY();
+        mLastSpanY = mSGD.getCurrentSpan();
     }
 
     private float clamp(float target) {
@@ -362,6 +357,13 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
         mSGD.onTouchEvent(ev);
         final int x = (int) mSGD.getFocusX();
         final int y = (int) mSGD.getFocusY();
+
+        mInitialTouchFocusY = y;
+        mInitialTouchSpan = mSGD.getCurrentSpan();
+        mLastFocusY = mInitialTouchFocusY;
+        mLastSpanY = mInitialTouchSpan;
+        if (DEBUG_SCALE) Slog.d(TAG, "set initial span: " + mInitialTouchSpan);
+
         if (mExpanding) {
             return true;
         } else {
@@ -375,8 +377,6 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
                     xspan > mSGD.getCurrentSpanY())) {
                 // detect a vertical pulling gesture with fingers somewhat separated
                 if (DEBUG_SCALE) Slog.v(TAG, "got pull gesture (xspan=" + xspan + "px)");
-
-                mInitialTouchFocusY = y;
 
                 final View underFocus = findView(x, y);
                 if (underFocus != null) {
@@ -424,7 +424,7 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
-        final int action = ev.getAction();
+        final int action = ev.getActionMasked();
         if (DEBUG_SCALE) Slog.d(TAG, "touch: act=" + MotionEvent.actionToString(action) +
                 " expanding=" + mExpanding +
                 (0 != (mExpansionStyle & BLINDS) ? " (blinds)" : "") +
@@ -481,6 +481,14 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
 
                 break;
             }
+
+            case MotionEvent.ACTION_POINTER_UP:
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if (DEBUG) Slog.d(TAG, "pointer change");
+                mInitialTouchY += mSGD.getFocusY() - mLastFocusY;
+                mInitialTouchSpan += mSGD.getCurrentSpan() - mLastSpanY;
+                break;
+
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 if (DEBUG) Slog.d(TAG, "up/cancel");
@@ -492,8 +500,11 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
     }
 
     private void startExpanding(View v, int expandType) {
+        mExpansionStyle = expandType;
+        if (mExpanding &&  v == mCurrView) {
+            return;
+        }
         mExpanding = true;
-        mExpansionStyle = expandType; 
         if (DEBUG) Slog.d(TAG, "scale type " + expandType + " beginning on view: " + v);
         mCallback.setUserLockedChild(v, true);
         setView(v);
@@ -514,6 +525,8 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
 
     private void finishExpanding(boolean force) {
         if (!mExpanding) return;
+
+        if (DEBUG) Slog.d(TAG, "scale in finishing on view: " + mCurrView);
 
         float currentHeight = mScaler.getHeight();
         float targetHeight = mSmallSize;
@@ -539,6 +552,10 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
         mExpanding = false;
         mExpansionStyle = NONE;
 
+        if (DEBUG) Slog.d(TAG, "wasClosed is: " + wasClosed);
+        if (DEBUG) Slog.d(TAG, "currentHeight is: " + currentHeight);
+        if (DEBUG) Slog.d(TAG, "mSmallSize is: " + mSmallSize);
+        if (DEBUG) Slog.d(TAG, "targetHeight is: " + targetHeight);
         if (DEBUG) Slog.d(TAG, "scale was finished on view: " + mCurrView);
     }
 
@@ -568,6 +585,17 @@ public class ExpandHelper implements Gefingerpoken, OnClickListener {
         startExpanding(v, STRETCH);
         finishExpanding(true);
         clearView();
+    }
+
+    /**
+     * Use this to abort any pending expansions in progress.
+     */
+    public void cancel() {
+        finishExpanding(true);
+        clearView();
+
+        // reset the gesture detector
+        mSGD = new ScaleGestureDetector(mContext, mScaleGestureListener);
     }
 
     /**

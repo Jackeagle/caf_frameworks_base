@@ -41,8 +41,8 @@ namespace uirenderer {
     #define PROGRAM_LOGD(...)
 #endif
 
-#define COLOR_COMPONENT_THRESHOLD (1.0f - (0.5f / PANEL_BIT_DEPTH))
-#define COLOR_COMPONENT_INV_THRESHOLD (0.5f / PANEL_BIT_DEPTH)
+#define COLOR_COMPONENT_THRESHOLD 1.0f
+#define COLOR_COMPONENT_INV_THRESHOLD 0.0f
 
 #define PROGRAM_KEY_TEXTURE 0x1
 #define PROGRAM_KEY_A8_TEXTURE 0x2
@@ -77,6 +77,12 @@ namespace uirenderer {
 #define PROGRAM_HAS_EXTERNAL_TEXTURE_SHIFT 38
 #define PROGRAM_HAS_TEXTURE_TRANSFORM_SHIFT 39
 
+#define PROGRAM_HAS_GAMMA_CORRECTION 40
+
+#define PROGRAM_IS_SIMPLE_GRADIENT 41
+
+#define PROGRAM_IS_VERTEX_SHAPE_SHIFT 42
+
 ///////////////////////////////////////////////////////////////////////////////
 // Types
 ///////////////////////////////////////////////////////////////////////////////
@@ -94,14 +100,14 @@ typedef uint64_t programid;
  */
 struct ProgramDescription {
     enum ColorModifier {
-        kColorNone,
+        kColorNone = 0,
         kColorMatrix,
         kColorLighting,
         kColorBlend
     };
 
     enum Gradient {
-        kGradientLinear,
+        kGradientLinear = 0,
         kGradientCircular,
         kGradientSweep
     };
@@ -124,9 +130,11 @@ struct ProgramDescription {
     bool isBitmapNpot;
 
     bool isAA;
+    bool isVertexShape;
 
     bool hasGradient;
     Gradient gradientType;
+    bool isSimpleGradient;
 
     SkXfermode::Mode shadersMode;
 
@@ -146,6 +154,9 @@ struct ProgramDescription {
     bool isPoint;
     float pointSize;
 
+    bool hasGammaCorrection;
+    float gamma;
+
     /**
      * Resets this description. All fields are reset back to the default
      * values they hold after building a new instance.
@@ -157,6 +168,7 @@ struct ProgramDescription {
         hasTextureTransform = false;
 
         isAA = false;
+        isVertexShape = false;
 
         modulate = false;
 
@@ -165,6 +177,7 @@ struct ProgramDescription {
 
         hasGradient = false;
         gradientType = kGradientLinear;
+        isSimpleGradient = false;
 
         shadersMode = SkXfermode::kClear_Mode;
 
@@ -180,6 +193,9 @@ struct ProgramDescription {
 
         isPoint = false;
         pointSize = 0.0f;
+
+        hasGammaCorrection = false;
+        gamma = 2.2f;
     }
 
     /**
@@ -188,8 +204,7 @@ struct ProgramDescription {
      * be provided with a modulation color.
      */
     bool setColor(const float r, const float g, const float b, const float a) {
-        modulate = a < COLOR_COMPONENT_THRESHOLD || r < COLOR_COMPONENT_THRESHOLD ||
-                g < COLOR_COMPONENT_THRESHOLD || b < COLOR_COMPONENT_THRESHOLD;
+        modulate = a < COLOR_COMPONENT_THRESHOLD;
         return modulate;
     }
 
@@ -246,6 +261,9 @@ struct ProgramDescription {
         if (isAA) key |= programid(0x1) << PROGRAM_HAS_AA_SHIFT;
         if (hasExternalTexture) key |= programid(0x1) << PROGRAM_HAS_EXTERNAL_TEXTURE_SHIFT;
         if (hasTextureTransform) key |= programid(0x1) << PROGRAM_HAS_TEXTURE_TRANSFORM_SHIFT;
+        if (hasGammaCorrection) key |= programid(0x1) << PROGRAM_HAS_GAMMA_CORRECTION;
+        if (isSimpleGradient) key |= programid(0x1) << PROGRAM_IS_SIMPLE_GRADIENT;
+        if (isVertexShape) key |= programid(0x1) << PROGRAM_IS_VERTEX_SHAPE_SHIFT;
         return key;
     }
 
@@ -261,7 +279,7 @@ struct ProgramDescription {
     }
 
 private:
-    inline uint32_t getEnumForWrap(GLenum wrap) const {
+    static inline uint32_t getEnumForWrap(GLenum wrap) {
         switch (wrap) {
             case GL_CLAMP_TO_EDGE:
                 return 0;
@@ -355,6 +373,11 @@ public:
      * Name of the transform uniform.
      */
     int transform;
+
+    /**
+     * Name of the projection uniform.
+     */
+    int projection;
 
 protected:
     /**

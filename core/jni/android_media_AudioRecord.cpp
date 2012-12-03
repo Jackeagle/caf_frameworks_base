@@ -242,7 +242,6 @@ android_media_AudioRecord_setup(JNIEnv *env, jobject thiz, jobject weak_this,
         format,        // word length, PCM
         channels,
         frameCount,
-        (AudioRecord::record_flags) 0,  // flags
         recorderCallback,// callback_t
         lpCallbackData,// void* user
         0,             // notificationFrames,
@@ -517,7 +516,7 @@ static jint android_media_AudioRecord_get_min_buff_size(JNIEnv *env,  jobject th
             sampleRateInHertz,
             (audioFormat == javaAudioRecordFields.PCM16 ?
                 AUDIO_FORMAT_PCM_16_BIT : AUDIO_FORMAT_PCM_8_BIT),
-            nbChannels);
+            audio_channel_in_mask_from_count(nbChannels));
 
     if (result == BAD_VALUE) {
         return 0;

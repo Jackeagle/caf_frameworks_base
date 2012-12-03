@@ -1,10 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:androidprv="http://schemas.android.com/apk/prv/res/android"
         package="com.android.systemui"
         coreApp="true">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.ACCESS_ALL_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <uses-permission android:name="android.permission.INJECT_EVENTS" />
@@ -14,6 +16,12 @@
     <uses-permission android:name="android.permission.STATUS_BAR" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <uses-permission android:name="android.permission.REMOTE_AUDIO_PLAYBACK" />
+
+    <uses-permission android:name="android.permission.MANAGE_USERS" />
+    <uses-permission android:name="android.permission.READ_PROFILE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.CONFIGURE_WIFI_DISPLAY" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 
     <!-- Networking and telephony -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -40,6 +48,7 @@
     <uses-permission android:name="android.permission.STOP_APP_SWITCHES" />
     <uses-permission android:name="android.permission.SET_SCREEN_COMPATIBILITY" />
     <uses-permission android:name="android.permission.START_ANY_ACTIVITY" />
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
     <!-- WindowManager -->
     <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW" />
@@ -48,6 +57,10 @@
     <uses-permission android:name="android.permission.MANAGE_APP_TOKENS" />
     <uses-permission android:name="android.permission.SET_ORIENTATION" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+
+    <!-- DreamManager -->
+    <uses-permission android:name="android.permission.READ_DREAM_STATE" />
+    <uses-permission android:name="android.permission.WRITE_DREAM_STATE" />
 
     <application
         android:persistent="true"
@@ -78,7 +91,7 @@
                 android:permission="android.permission.BIND_WALLPAPER"
                 android:exported="true" />
 
-        <receiver android:name=".BootReceiver" >
+        <receiver android:name=".BootReceiver" androidprv:primaryUserOnly="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
@@ -92,6 +105,26 @@
                 android:theme="@*android:style/Theme.Dialog.Alert"
                 android:excludeFromRecents="true">
         </activity>
+
+        <activity android:name=".recent.RecentsActivity"
+                android:label="@string/accessibility_desc_recent_apps"
+                android:theme="@style/RecentsStyle"
+                android:excludeFromRecents="true"
+                android:launchMode="singleInstance"
+                android:exported="true">
+          <intent-filter>
+            <action android:name="com.android.systemui.TOGGLE_RECENTS" />
+          </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".recent.RecentsPreloadReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.android.systemui.recent.action.PRELOAD" />
+                <action android:name="com.android.systemui.recent.action.CANCEL_PRELOAD" />
+            </intent-filter>
+        </receiver>
 
         <!-- started from UsbDeviceSettingsManager -->
         <activity android:name=".usb.UsbConfirmActivity"
@@ -129,6 +162,14 @@
             android:excludeFromRecents="true">
         </activity>
 
+        <!-- started from UsbDebuggingManager -->
+        <activity android:name=".usb.UsbDebuggingActivity"
+            android:permission="android.permission.MANAGE_USB"
+            android:theme="@*android:style/Theme.Holo.Dialog.Alert"
+            android:finishOnCloseSystemDialogs="true"
+            android:excludeFromRecents="true">
+        </activity>
+
         <!-- started from NetworkPolicyManagerService -->
         <activity
             android:name=".net.NetworkOverLimitActivity"
@@ -145,7 +186,7 @@
             android:name=".BeanBag"
             android:exported="true"
             android:label="BeanBag"
-            android:icon="@drawable/redbeandroid"
+            android:icon="@drawable/redbean2"
             android:theme="@android:style/Theme.Wallpaper.NoTitleBar.Fullscreen"
             android:hardwareAccelerated="true"
             android:launchMode="singleInstance"
@@ -155,6 +196,39 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="com.android.internal.category.PLATLOGO" />
 <!--            <category android:name="android.intent.category.LAUNCHER" />-->
+            </intent-filter>
+        </activity>
+
+        <!-- Beans in space -->
+        <service
+            android:name=".BeanBagDream"
+            android:exported="true"
+            android:label="@string/jelly_bean_dream_name"
+            android:enabled="false"
+            >
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <activity android:name=".Somnambulator"
+            android:label="@string/start_dreams"
+            android:icon="@mipmap/ic_launcher_dreams"
+            android:theme="@android:style/Theme.Wallpaper.NoTitleBar"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            >
+            <!--
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.DESK_DOCK" />
             </intent-filter>
         </activity>
     </application>
