@@ -370,4 +370,14 @@ class LinkManager implements ILinkManager {
         return false;
     }
 
+    /**
+     * notification of wifi routes added
+     */
+    public boolean notifyWlanConnectivityUp() {
+        if (DBG) Log.v(TAG, "notifyWlanConnectivityUp()" +
+                       " not supported in LinkManager");
+        return false;
+    }
+
+
 }
