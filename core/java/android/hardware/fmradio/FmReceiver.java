@@ -2100,9 +2100,13 @@ public class FmReceiver extends FmTransceiver
    *
    *    <p>
    */
-   public void setOnChannelThreshold(int data)
+   public boolean setOnChannelThreshold(int data)
    {
       int re =  mControl.setOnChannelThreshold(sFd, data);
+      if (re < 0)
+          return false;
+      else
+          return true;
    }
 
 /*==============================================================
@@ -2132,9 +2136,13 @@ public class FmReceiver extends FmTransceiver
    *
    *    <p>
    */
-   public void setOffChannelThreshold(int data)
+   public boolean setOffChannelThreshold(int data)
    {
       int re =  mControl.setOffChannelThreshold(sFd, data);
+      if (re < 0)
+          return false;
+      else
+          return true;
    }
 /*==============================================================
    FUNCTION:  getOffChannelThreshold
@@ -2180,9 +2188,13 @@ public class FmReceiver extends FmTransceiver
    *
    *    <p>
    */
-   public void setSINRThreshold(int data)
+   public boolean setSINRThreshold(int data)
    {
       int re =  mControl.setSINRThreshold(sFd, data);
+      if (re < 0)
+          return false;
+      else
+          return true;
    }
 
 /*==============================================================
@@ -2212,9 +2224,13 @@ public class FmReceiver extends FmTransceiver
    *
    *    <p>
    */
-   public void setSINRsamples(int data)
+   public boolean setSINRsamples(int data)
    {
       int re =  mControl.setSINRsamples(sFd, data);
+      if (re < 0)
+          return false;
+      else
+          return true;
    }
 
 /*==============================================================
