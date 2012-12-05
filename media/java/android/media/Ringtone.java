@@ -200,6 +200,26 @@ public class Ringtone {
             }
         }
 
+        if(mLocalPlayer == null) {
+           Log.e(TAG,"failed to play current ringtone, fallback to any valid ringtone");
+           mLocalPlayer = new MediaPlayer();
+           try {
+               mLocalPlayer.setDataSource(mContext, RingtoneManager.getValidRingtoneUri(mContext));
+               mLocalPlayer.setAudioStreamType(mStreamType);
+               mLocalPlayer.prepare();
+           } catch (SecurityException e) {
+               destroyLocalPlayer();
+               if (!mAllowRemote) {
+                   Log.w(TAG, "fallback remote playback not allowed: " + e);
+               }
+           } catch (IOException e) {
+               destroyLocalPlayer();
+               if (!mAllowRemote) {
+                   Log.w(TAG, "fallback remote playback not allowed: " + e);
+               }
+           }
+        }
+
         if (LOGD) {
             if (mLocalPlayer != null) {
                 Log.d(TAG, "Successfully created local player");
