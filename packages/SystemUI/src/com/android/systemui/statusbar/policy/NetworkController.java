@@ -1011,6 +1011,8 @@ public class NetworkController extends BroadcastReceiver {
 
         if (info != null && info.getType() == ConnectivityManager.TYPE_ETHERNET) {
             mEthernetConnected = info.isConnected();
+        } else {
+            mEthernetConnected = false;
         }
 
         // We want to update all the icons, all at once, for any condition change

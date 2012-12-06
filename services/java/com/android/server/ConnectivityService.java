@@ -2084,11 +2084,13 @@ private NetworkStateTracker makeWimaxStateTracker() {
             }
             if (mNetConfigs[netType].isDefault()) {
                 if(netType == ConnectivityManager.TYPE_ETHERNET) {
-					log("net Type is ConnectivityManager.TYPE_ETHERNET "+ netType + " Setting mGlobalProxy" );
-                    handleApplyDefaultProxy(mGlobalProxy);
+                   if(DBG) {
+                      log("net Type is ConnectivityManager.TYPE_ETHERNET "+ netType + " Setting mGlobalProxy" );
+                   }
+                   handleApplyDefaultProxy(mGlobalProxy);
                 }
                 else {
-                    handleApplyDefaultProxy(newLp.getHttpProxy());
+                   handleApplyDefaultProxy(newLp.getHttpProxy());
                 }
             }
         } else {
@@ -2959,8 +2961,10 @@ private NetworkStateTracker makeWimaxStateTracker() {
             proxyProperties = mDefaultProxy;
          }
         if(mActiveDefaultNetwork == ConnectivityManager.TYPE_ETHERNET) {
-					    log("net Type is ConnectivityManager.TYPE_ETHERNET "+ mActiveDefaultNetwork + "Setting mGlobalProxy" );
-                        handleApplyDefaultProxy(mGlobalProxy);
+           if(DBG) {
+              log("net Type is ConnectivityManager.TYPE_ETHERNET "+ mActiveDefaultNetwork + "Setting mGlobalProxy" );
+           }
+           handleApplyDefaultProxy(mGlobalProxy);
         }
         //sendProxyBroadcast(proxyProperties);
     }
