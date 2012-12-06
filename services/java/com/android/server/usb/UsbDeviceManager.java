@@ -431,7 +431,7 @@ public class UsbDeviceManager {
         }
 
         private void setEnabledFunctions(String functions, boolean makeDefault) {
-           String mExtraFunctions = SystemProperties.get("sys.usb.config.extra");
+           String mExtraFunctions = SystemProperties.get("persist.sys.usb.config.extra");
            if (!mExtraFunctions.equals("") && (functions != null)) {
                functions = addFunction(functions, mExtraFunctions);
            }
