@@ -584,56 +584,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             } catch (IllegalArgumentException e) {
                 Slog.e(TAG, "Problem creating " + getNetworkTypeName(targetNetworkType)
                         + " tracker: " + e);
-        /*
-         * Create the network state trackers for Wi-Fi and mobile
-         * data. Maybe this could be done with a factory class,
-         * but it's not clear that it's worth it, given that
-         * the number of different network types is not going
-         * to change very often.
-         */
-        for (int netType : mPriorityList) {
-            switch (mNetConfigs[netType].radio) {
-            case ConnectivityManager.TYPE_WIFI:
-                mNetTrackers[netType] = new WifiStateTracker(netType,
-                        mNetConfigs[netType].name);
-                mNetTrackers[netType].startMonitoring(context, mHandler);
-               break;
-            case ConnectivityManager.TYPE_MOBILE:
-                mNetTrackers[netType] = new MobileDataStateTracker(netType,
-                        mNetConfigs[netType].name);
-                mNetTrackers[netType].startMonitoring(context, mHandler);
-                break;
-            case ConnectivityManager.TYPE_DUMMY:
-                mNetTrackers[netType] = new DummyDataStateTracker(netType,
-                        mNetConfigs[netType].name);
-                mNetTrackers[netType].startMonitoring(context, mHandler);
-                break;
-            case ConnectivityManager.TYPE_BLUETOOTH:
-                mNetTrackers[netType] = BluetoothTetheringDataTracker.getInstance();
-                mNetTrackers[netType].startMonitoring(context, mHandler);
-                break;
-            case ConnectivityManager.TYPE_WIMAX:
-                mNetTrackers[netType] = makeWimaxStateTracker();
-                if (mNetTrackers[netType]!= null) {
-                    mNetTrackers[netType].startMonitoring(context, mHandler);
-                }
-                break;
-            case ConnectivityManager.TYPE_ETHERNET:
-                //mNetTrackers[netType] = EthernetDataTracker.getInstance();
-                //mNetTrackers[netType].startMonitoring(context, mHandler);
-                if (DBG) log("Starting Ethernet Service.");
-                EthernetStateTracker est = new EthernetStateTracker(context, mHandler);
-                EthernetService ethService = new EthernetService(context, est);
-                ServiceManager.addService(Context.ETHERNET_SERVICE, ethService);
-                mNetTrackers[ConnectivityManager.TYPE_ETHERNET] = est;
-                est.startMonitoring(context, mHandler);
-                break;
-            default:
-                loge("Trying to create a DataStateTracker for an unknown radio type " +
-                        mNetConfigs[netType].radio);
                 continue;
             }
-
             tracker.startMonitoring(context, mTrackerHandler);
             if (config.isDefault()) {
                 tracker.reconnect();
@@ -2362,11 +2314,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
             if (mNetConfigs[netType].isDefault()) {
                 if(netType == ConnectivityManager.TYPE_ETHERNET) {
-					log("net Type is ConnectivityManager.TYPE_ETHERNET "+ netType + " Setting mGlobalProxy" );
-                    handleApplyDefaultProxy(mGlobalProxy);
+                   if(DBG) {
+                      log("net Type is ConnectivityManager.TYPE_ETHERNET "+ netType + " Setting mGlobalProxy" );
+                   }
+                   handleApplyDefaultProxy(mGlobalProxy);
                 }
                 else {
-                    handleApplyDefaultProxy(newLp.getHttpProxy());
+                   handleApplyDefaultProxy(newLp.getHttpProxy());
                 }
             }
         } else {
@@ -3234,8 +3188,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             proxyProperties = mDefaultProxy;
          }
         if(mActiveDefaultNetwork == ConnectivityManager.TYPE_ETHERNET) {
-					    log("net Type is ConnectivityManager.TYPE_ETHERNET "+ mActiveDefaultNetwork + "Setting mGlobalProxy" );
-                        handleApplyDefaultProxy(mGlobalProxy);
+           if(DBG) {
+              log("net Type is ConnectivityManager.TYPE_ETHERNET "+ mActiveDefaultNetwork + "Setting mGlobalProxy" );
+           }
+           handleApplyDefaultProxy(mGlobalProxy);
         }
         sendProxyBroadcast(proxyProperties);
     }
