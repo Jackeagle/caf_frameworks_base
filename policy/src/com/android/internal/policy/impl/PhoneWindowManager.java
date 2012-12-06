@@ -242,30 +242,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     //private static final int SW_LID = 0x00;
     private static final int SW_HEADPHONE_INSERT = 0x02;
     private static final int SW_MICROPHONE_INSERT = 0x04;
-    //ToDo: This needs to be revisted once the kernel has support to report ANC event
-    private static final int SW_ANC_INSERT = 0x08;
+    private static final int SW_LINEOUT_INSERT = 0x06;
     private static final int SW_HEADSET_INSERT = (SW_HEADPHONE_INSERT|SW_MICROPHONE_INSERT);
-    private static final int SW_ANC_HEADPHONE_INSERT = 0x10;
-    private static final int SW_ANC_MICROPHONE_INSERT = 0x20;
-    private static final int SW_ANC_HEADSET_INSERT = (SW_ANC_HEADPHONE_INSERT|SW_ANC_MICROPHONE_INSERT);
-    private static final int BTN_MOUSE = 0x110;
 
     // Useful HeadSet codes... Same definition as WireAccessoryObserver.java
     private static int mHeadsetJackState = 0;
-    private static boolean mIsAncOn = false;
     private static final int BIT_HEADSET = (1 << 0);
-    private static final int BIT_HEADSET_SPEAKER_ONLY = (1 << 1);
+    private static final int BIT_HEADSET_NO_MIC = (1 << 1);
     //Useful Headset codes... QC added definitions
     private static final int BIT_HEADSET_MIC_ONLY = (1 << 2);
-    private static final int BIT_ANC_HEADSET = (1 << 3);
-    private static final int BIT_ANC_HEADSET_SPEAKER_ONLY = (1 << 4);
-    private static final int BIT_ANC_HEADSET_MIC_ONLY = (1 << 5);
-    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_SPEAKER_ONLY|BIT_HEADSET_MIC_ONLY |
-                                                   BIT_ANC_HEADSET|BIT_ANC_HEADSET_SPEAKER_ONLY|BIT_ANC_HEADSET_MIC_ONLY);
+    private static final int SUPPORTED_HEADSETS = (BIT_HEADSET|BIT_HEADSET_NO_MIC|BIT_HEADSET_MIC_ONLY);
 
-    private static final int BIT_HEADSET_NO_MIC = BIT_HEADSET_SPEAKER_ONLY;
-    private static final int BIT_ANC_HEADSET_NO_MIC = BIT_ANC_HEADSET_SPEAKER_ONLY;
-    private static final int ANC_HEADSETS_WITH_MIC = BIT_ANC_HEADSET;
     private static final int HEADSETS_WITH_MIC = BIT_HEADSET;
 
     private String mHeadsetName = "Headset";
@@ -3140,75 +3127,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     public void notifyJackSwitchChanged(long whenNanos, int switchCode, boolean switchState) {
         Slog.d(TAG,"notifyJackSwitchChanged(): switchCode "+switchCode+" switchState "+switchState);
         synchronized(mHeadsetLock) {
-            if(switchCode == SW_ANC_INSERT) {
-                if(switchState) {
-                    mIsAncOn = true;
-                    if((mHeadsetJackState & BIT_HEADSET) != 0) {
-                        mHeadsetJackState &= ~BIT_HEADSET;
-                        mHeadsetJackState |= BIT_ANC_HEADSET;
-                    }
-                    if((mHeadsetJackState & BIT_HEADSET_SPEAKER_ONLY) != 0) {
-                        mHeadsetJackState &= ~BIT_HEADSET_SPEAKER_ONLY;
-                        mHeadsetJackState |= BIT_ANC_HEADSET_SPEAKER_ONLY;
-                    }
-                    if((mHeadsetJackState & BIT_HEADSET_MIC_ONLY) != 0) {
-                        mHeadsetJackState &= ~BIT_HEADSET_MIC_ONLY;
-                        mHeadsetJackState |= BIT_ANC_HEADSET_MIC_ONLY;
-                    }
-                } else {
-                    mIsAncOn = false;
-                    if((mHeadsetJackState & BIT_ANC_HEADSET) != 0) {
-                        mHeadsetJackState &= ~BIT_ANC_HEADSET;
-                        mHeadsetJackState |= BIT_HEADSET;
-                    }
-                    if((mHeadsetJackState & BIT_ANC_HEADSET_SPEAKER_ONLY) != 0) {
-                        mHeadsetJackState &= ~BIT_ANC_HEADSET_SPEAKER_ONLY;
-                        mHeadsetJackState |= BIT_HEADSET_SPEAKER_ONLY;
-                    }
-                    if((mHeadsetJackState & BIT_ANC_HEADSET_MIC_ONLY) != 0) {
-                        mHeadsetJackState &= ~BIT_ANC_HEADSET_MIC_ONLY;
-                        mHeadsetJackState |= BIT_HEADSET_MIC_ONLY;
-                    }
-                }
-            } else if ( switchCode == SW_HEADPHONE_INSERT) {
+            if ( switchCode == SW_HEADPHONE_INSERT ||
+                        switchCode == SW_LINEOUT_INSERT) {
                 if (switchState) {
-                    if(mIsAncOn) {
-                        mHeadsetJackState |= BIT_ANC_HEADSET_SPEAKER_ONLY;
-                    } else {
-                        mHeadsetJackState |= BIT_HEADSET_SPEAKER_ONLY;
-                    }
+                    mHeadsetJackState |= BIT_HEADSET_NO_MIC;
                 } else if( (mHeadsetJackState & BIT_HEADSET) != 0 ) {
                     mHeadsetJackState &= ~BIT_HEADSET;
                     mHeadsetJackState |= BIT_HEADSET_MIC_ONLY;
-                } else if( (mHeadsetJackState & BIT_ANC_HEADSET) != 0 ) {
-                    mHeadsetJackState &= ~BIT_ANC_HEADSET;
-                    mHeadsetJackState |= BIT_ANC_HEADSET_MIC_ONLY;
                 } else {
-                    if(mIsAncOn) {
-                        mHeadsetJackState &= ~BIT_ANC_HEADSET_SPEAKER_ONLY;
-                    } else {
-                        mHeadsetJackState &= ~BIT_HEADSET_SPEAKER_ONLY;
-                    }
+                    mHeadsetJackState &= ~BIT_HEADSET_NO_MIC;
                 }
             } else if ( switchCode == SW_MICROPHONE_INSERT) {
                 if (switchState) {
-                    if(mIsAncOn) {
-                        mHeadsetJackState |= BIT_ANC_HEADSET_MIC_ONLY;
-                    } else {
-                        mHeadsetJackState |= BIT_HEADSET_MIC_ONLY;
-                    }
+                    mHeadsetJackState |= BIT_HEADSET_MIC_ONLY;
                 } else if( (mHeadsetJackState & BIT_HEADSET) != 0 ) {
                     mHeadsetJackState &= ~BIT_HEADSET;
-                    mHeadsetJackState |= BIT_HEADSET_SPEAKER_ONLY;
-                } else if( (mHeadsetJackState & BIT_ANC_HEADSET) != 0 ) {
-                    mHeadsetJackState &= ~BIT_ANC_HEADSET;
-                    mHeadsetJackState |= BIT_ANC_HEADSET_SPEAKER_ONLY;
+                    mHeadsetJackState |= BIT_HEADSET_NO_MIC;
                 } else {
-                    if(mIsAncOn) {
-                        mHeadsetJackState &= ~BIT_ANC_HEADSET_MIC_ONLY;
-                    } else {
-                        mHeadsetJackState &= ~BIT_HEADSET_MIC_ONLY;
-                    }
+                    mHeadsetJackState &= ~BIT_HEADSET_MIC_ONLY;
                 }
             }
 
@@ -3218,9 +3154,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mHeadsetJackState = BIT_HEADSET;
             }
 
-            if( mHeadsetJackState == SW_ANC_HEADSET_INSERT ) {
-                mHeadsetJackState = BIT_ANC_HEADSET;
-            }
             update();
         } // synchronized(mHeadsetLock)
     }
@@ -3305,15 +3238,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
             if ((headset & BIT_HEADSET) != 0) {
                 device = AudioManager.DEVICE_OUT_WIRED_HEADSET;
-            } else if ((headset & BIT_HEADSET_SPEAKER_ONLY) != 0) {
+            } else if ((headset & BIT_HEADSET_NO_MIC) != 0) {
                 device = AudioManager.DEVICE_OUT_WIRED_HEADPHONE;
             } else if ((headset & BIT_HEADSET_MIC_ONLY ) != 0) {
-                device = 0;
-            } else if ((headset & BIT_ANC_HEADSET) != 0) {
-                device = 0;//AudioManager.DEVICE_OUT_ANC_HEADSET;
-            } else if ((headset & BIT_ANC_HEADSET_SPEAKER_ONLY) != 0) {
-                device = 0;//AudioManager.DEVICE_OUT_ANC_HEADPHONE;
-            } else if ((headset & BIT_ANC_HEADSET_MIC_ONLY) != 0) {
                 device = 0;
             } else {
                 Slog.e(TAG, "setDeviceState() invalid headset type: "+headset);
