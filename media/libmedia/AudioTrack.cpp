@@ -899,6 +899,9 @@ status_t AudioTrack::createTrack_l(
         if (minBufCount < 2) minBufCount = 2;
 
         int minFrameCount = (afFrameCount*sampleRate*minBufCount)/afSampleRate;
+        LOGV("minFrameCount: %d, afFrameCount=%d, minBufCount=%d, sampleRate=%d,
+              afSampleRate=%d, afLatency=%d", minFrameCount, afFrameCount,
+              minBufCount, sampleRate, afSampleRate, afLatency);
 
         if (sharedBuffer == 0) {
             if (frameCount == 0) {
@@ -1057,13 +1060,6 @@ create_new_track:
             framesAvail = cblk->framesAvailable_l();
         }
         cblk->lock.unlock();
-    }
-
-    // restart track if it was disabled by audioflinger due to previous underrun
-    if (mActive && (cblk->flags & CBLK_DISABLED_MSK)) {
-        android_atomic_and(~CBLK_DISABLED_ON, &cblk->flags);
-        LOGW("obtainBuffer() track %p disabled, restarting", this);
-        mAudioTrack->start();
     }
 
     cblk->waitTimeMs = 0;
