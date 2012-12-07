@@ -43,6 +43,7 @@ import android.widget.FrameLayout;
 import android.widget.MediaController;
 import android.widget.MediaController.MediaPlayerControl;
 import android.util.Log;
+import java.lang.NullPointerException;
 
 /**
  * @hide This is only used by the browser
@@ -247,8 +248,8 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
             if (mFullscreenProxy.getWebView().getViewManager() != null)
                 mFullscreenProxy.getWebView().getViewManager().hideAll();
             // Add progress view
-            if (mProgressView == null) {
-                mProgressView = client.getVideoLoadingProgressView();
+            mProgressView = client.getVideoLoadingProgressView();
+            if (mProgressView != null) {
                 mLayout.addView(mProgressView, WRAP_CONTENT_PARAMS);
             }
         }
@@ -287,7 +288,11 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         }
         assert (mFullscreenProxy != null);
         // Re enable plugin views.
-        mFullscreenProxy.getWebView().getViewManager().showAll();
+        try {
+            mFullscreenProxy.getWebView().getViewManager().showAll();
+        } catch (NullPointerException e) {
+            Log.e(LOGTAG, "Error while Exiting Full Screen" + e);
+        }
         mFullscreenProxy = null;
         mLayout = null;
     }
@@ -394,6 +399,8 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
     }
 
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+        if (mFullscreenProxy != null)
+            mFullscreenProxy.onAvailableVideoFrame();
     }
 
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
@@ -410,7 +417,7 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
      * @param surface The surface about to be destroyed
      */
     public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        assert (mFullscreenProxy != null);
+        assert(mFullscreenProxy != null);
         mFullscreenProxy.onStopFullscreen();
         return false;
     }
@@ -453,11 +460,12 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         if (!proxy.isFullscreen())
             return;
 
-        assert(mProgressView != null);
-        if (playerBuffering)
-            mProgressView.setVisibility(View.VISIBLE);
-        else
-            mProgressView.setVisibility(View.GONE);
+        if (mProgressView != null) {
+            if (playerBuffering)
+                mProgressView.setVisibility(View.VISIBLE);
+            else
+                mProgressView.setVisibility(View.GONE);
+        }
     }
 
     static class FullScreenMediaController extends MediaController {
