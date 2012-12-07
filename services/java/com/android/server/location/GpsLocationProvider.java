@@ -37,6 +37,8 @@ import android.net.NetworkInfo;
 import android.net.NetworkUtils;
 import android.net.SntpClient;
 import android.net.Uri;
+import android.net.LinkProperties;
+import android.net.LinkAddress;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Bundle;
@@ -75,8 +77,10 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Collection;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.net.Inet6Address;
 
 /**
  * A GPS implementation of LocationProvider used by LocationManager.
@@ -556,7 +560,24 @@ public class GpsLocationProvider implements LocationProviderInterface {
                         apnName = defaultApn;
                     }
                     agpsConnInfo.mAPN = apnName;
-                    agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
+
+                    LinkProperties lp = mConnMgr.getLinkProperties(agpsConnInfo.mCMConnType);
+                    Collection<LinkAddress> las = lp.getLinkAddresses();
+                    boolean isV4 = false;
+                    boolean isV6 = false;
+                    for (LinkAddress la : las) {
+                        if (la.getAddress() instanceof Inet6Address) {
+                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
+                            isV6 = true;
+                        } else {
+                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
+                            isV4 = true;
+                        }
+                        if (isV4 && isV6) {
+                            agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
+                            break;
+                        }
+                    }
 
                     if (agpsConnInfo.mIpAddr != null) {
                         boolean route_result;
