@@ -515,7 +515,7 @@ public class WifiNative {
             return p2pFind();
         }
         if (WifiP2pService.mIsGroupOwner)
-            return doBooleanCommand("P2P_FIND" + timeout + " delay=" + P2P_SEARCH_DELAY_MSECS);
+            return doBooleanCommand("P2P_FIND " + timeout + " delay=" + P2P_SEARCH_DELAY_MSECS);
         else
             return doBooleanCommand("P2P_FIND " + timeout);
     }
