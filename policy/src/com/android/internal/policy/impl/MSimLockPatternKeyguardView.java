@@ -51,9 +51,10 @@ import android.view.View;
 public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
     private static final boolean DEBUG = false;
     private static final String TAG = "MSimLockPatternKeyguardView";
+    private int mNumPhones =  MSimTelephonyManager.getDefault().getPhoneCount();
 
-    private boolean[] mIsPinUnlockCancelled = {false, false};
-    private boolean[] mIsPukUnlockCancelled = {false, false};
+    private boolean[] mIsPinUnlockCancelled = {false, false, false};
+    private boolean[] mIsPukUnlockCancelled = {false, false, false};
 
     /**
      * @return Whether we are stuck on the lock screen because the sim is
@@ -62,7 +63,7 @@ public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
     @Override
     protected boolean stuckOnLockScreenBecauseSimMissing() {
         boolean result = mRequiresSim && (!mUpdateMonitor.isDeviceProvisioned());
-        for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+        for (int i = 0; i < mNumPhones; i++) {
             //In case of dual subscription, stuck on lock screen
             //only when SIM is absent on both subscriptions
             result = result && (getSimState(i) == IccCard.State.ABSENT ||
@@ -107,7 +108,7 @@ public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
 
             public void goToUnlockScreen() {
                 boolean isPukRequired = true;
-                for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+                for (int i = 0; i < mNumPhones; i++) {
                     isPukRequired = isPukRequired && isSimPukLocked(i);
                     if (!isPukRequired) break;
                 }
@@ -131,50 +132,97 @@ public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
              * PIN dialog for any of the subscription.PIN Dialog will not be
              * prompted again for that subscription if the other subscription
              * is in ready state.
-             * In case, the other subscription is PUK-Locked, user is not
+             * In case, the other subscriptions is PUK-Locked, user is not
              * allowed to dismiss the PIN dialog.
             */
             public void updatePinUnlockCancel(int subscription) {
-                Log.d(TAG, "updatePinUnlockCancel sub :" + subscription);
-                int otherSub = (subscription == MSimConstants.SUB1) ?
-                    MSimConstants.SUB2 : MSimConstants.SUB1;
-                if ((isSimPukLocked(otherSub) && mIsPukUnlockCancelled[otherSub])
-                        || (getSimState(otherSub) == IccCard.State.ABSENT)) {
-                    Log.d(TAG, "Cannot cancel PIN dialog");
-                    mIsPinUnlockCancelled[subscription] = false;
-                } else {
-                    mIsPinUnlockCancelled[subscription] = true;
-                    // In case both subscriptions are PIN-Locked, let the
-                    // SIM dialog be prompted for the other subscription.
-                    // So, irrespective of the subscription state set the
-                    // flag to false.
-                    mIsPinUnlockCancelled[otherSub] = false;
+                int otherSub;
+                for (int i = 0; i < mNumPhones-1; i++) {
+                    otherSub = getNextSubscription(subscription+i);
+                    if (!isPukCancelDialog(otherSub)) {
+                        mIsPinUnlockCancelled[subscription] = true;
+                    } else {
+                         Log.i(TAG, "Cannot cancel PIN dialog");
+                        mIsPinUnlockCancelled[subscription] = false;
+                    }
+                }
+
+                if (isAllPinUnlockCancel() &&
+                        !MSimLockPatternKeyguardView.this.isAnySubUnlocked()) {
+                    for (int i = 0; i < mNumPhones; i++) {
+                        mIsPinUnlockCancelled[i] = false;
+                    }
                 }
             }
+
+           /**
+            *Gives status of dimisses PIN Dialog for PIN Locke Subscriptions
+            * return true if all PIN dialgos dismissed by user for
+            * SIM PIN Locked Subscriptions.
+            * otherwise retun false
+           */
+            private boolean isAllPinUnlockCancel() {
+                boolean pinUnlockCancel = true;
+                for (int i = 0; i < mNumPhones; i++) {
+                    if (isSimPinLocked (i)) {
+                        pinUnlockCancel = pinUnlockCancel  && mIsPinUnlockCancelled[i];
+                    }
+                }
+                return pinUnlockCancel;
+            }
+
+           /**
+            *Gives status of dimisses PUK Dialog for PUK Locke Subscriptions
+            * return true if all PUK dialgos dismissed by user for
+            * SIM PUK Locked Subscriptions.
+            * otherwise retun false
+           */
+            private boolean isPukCancelDialog(int sub) {
+                return ((isSimPukLocked(sub) &&
+                        mIsPukUnlockCancelled[sub]) ||
+                        (getSimState(sub) == IccCard.State.ABSENT));
+            }
+
             /**
              * SimPukUnlockScreen invokes this method when user dismisses the
              * PUK dialog for any of the subscription.PUK Dialog will not be
              * prompted again for that subscription if the other subscription
              * also is not in PUK-Locked state.
-             * In case the the sim state of other subscription is ABSENT
+             * In case the the sim state of other subscriptions is ABSENT
              * user is not allowed to dismiss the PUK dialog.
              */
             public void updatePukUnlockCancel(int subscription) {
-                Log.d(TAG, "updatePukUnlockCancel sub :" + subscription);
-                int otherSub = (subscription == MSimConstants.SUB1) ?
-                    MSimConstants.SUB2 : MSimConstants.SUB1;
-                if (getSimState(otherSub) == IccCard.State.ABSENT) {
-                    Log.e(TAG, "Cannot cancel PUK dialog");
-                    mIsPukUnlockCancelled[subscription] = false;
-                } else {
-                    mIsPukUnlockCancelled[subscription] = true;
-                    // In case both subscriptions are PUK-Locked, let the
-                    // PUK dialog be prompted for the other subscription.
-                    // So, irrespective of the subscription state set the
-                    // flag to false.
-                    mIsPukUnlockCancelled[otherSub] = false;
-                 }
-             }
+                int otherSub;
+                for (int i = 0; i < mNumPhones-1; i++) {
+                    otherSub = getNextSubscription(subscription+i);
+                    if (!isCardAbsent(otherSub)) {
+                        mIsPukUnlockCancelled[subscription] = true;
+                    } else {
+                        mIsPukUnlockCancelled[subscription] = false;
+                    }
+                }
+
+                if (isAllPukUnlockCancel() &&
+                        !MSimLockPatternKeyguardView.this.isAnySubUnlocked()) {
+                    for (int i = 0; i < mNumPhones; i++) {
+                    mIsPukUnlockCancelled[i] = false;
+                    }
+                }
+            }
+
+            private boolean isAllPukUnlockCancel() {
+                boolean pukUnlockCancel = true;
+                for (int i = 0; i < mNumPhones; i++) {
+                    if (isSimPukLocked (i)) {
+                        pukUnlockCancel = pukUnlockCancel && mIsPukUnlockCancelled[i];
+                    }
+                }
+                return pukUnlockCancel;
+            }
+
+            private boolean isCardAbsent(int sub) {
+                return (getSimState(sub) == IccCard.State.ABSENT);
+            }
 
             public void forgotPattern(boolean isForgotten) {
                 if (mEnableFallback) {
@@ -301,31 +349,64 @@ public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
         };
     }
 
+   /**
+   *returns true if any subscription is not PIN and PUK locked
+   */
+    public boolean isAnySubUnlocked() {
+        boolean isSubUnlocked = false;
+        for (int i = 0; i < mNumPhones; i++) {
+            isSubUnlocked = isSubUnlocked ||
+                    (!isSimPinLocked(i) && !isSimPukLocked(i));
+        }
+        return isSubUnlocked;
+    }
+
+
     /**
      * Get the subscription that is PIN-Locked.
      * Return '0' if SUB1 is PIN-Locked and,
      * PIN dialog for SUB1 was not dismissed by user.
      * Return '1' if SUB2 is PIN-Locked and,
      * PIN dialog for SUB2 was not dismissed by user.
+     * Return '2' if SUB3 is PIN-Locked and,
+     * PIN dialog for SUB3 was not dismissed by user.
      */
     private int getPinLockedSubscription() {
         int subscription = MSimConstants.SUB2;
-
-        for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+        for (int i = 0; i < mNumPhones; i++) {
             if (isSimPinLocked(i) && !mIsPinUnlockCancelled[i]) {
                 subscription = i;
                 break;
             }
         }
-        //If SUB1 is pin locked & SUB2 is puk locked,
-        //keep prmpting for SUB1 pin entry only
-        if (isSimPukLocked(MSimConstants.SUB2) && isSimPinLocked(MSimConstants.SUB1)) {
-            return MSimConstants.SUB1;
-        } else if (isSimPukLocked(MSimConstants.SUB1) && isSimPinLocked(MSimConstants.SUB2)) {
-            return MSimConstants.SUB2;
-        } else {
-            return subscription;
+        for (int i = 0; i < mNumPhones; i++) {
+            if (isPukLockedOtherSub(i) && isSimPinLocked(i)) {
+                return i;
+            }
         }
+        return subscription;
+    }
+
+    /**
+    * retun true if all other subscriptions are PUK locked
+    */
+    private boolean isPukLockedOtherSub(int subscription) {
+        boolean isSimPukLocked = true;
+        for (int i = 0; i < mNumPhones-1; i++) {
+             isSimPukLocked = isSimPukLocked && isSimPukLocked(getNextSubscription(subscription+i));
+        }
+        return isSimPukLocked;
+    }
+
+   /**
+   *return Subscription next to current subscription
+   * if maximum subscription index reached reset to 0
+   */
+    private int getNextSubscription(int subscription) {
+        subscription = subscription % mNumPhones;
+        subscription = subscription + 1;
+        if (subscription == mNumPhones) subscription = 0;
+        return subscription;
     }
 
     /**
@@ -334,11 +415,13 @@ public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
      * PUK dialog for SUB1 was not dismissed by user.
      * Return '1' if SUB2 is PUK-Locked and,
      * PUK dialog for SUB2 was not dismissed by user.
+     * Return '2' if SUB3 is PUK-Locked and,
+     * PUK dialog for SUB3 was not dismissed by user.
      */
     private int getPukLockedSubscription() {
         int subscription = MSimConstants.SUB1;
 
-        for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+        for (int i = 0; i < mNumPhones; i++) {
             if (isSimPukLocked(i) && !mIsPukUnlockCancelled[i]) {
                 subscription = i;
                 break;
@@ -518,7 +601,7 @@ public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
         // In case of multi SIM mode,
         // Set the unlock mode to "SimPin" if any of the sub is PIN-Locked.
         // Set the unlock mode to "SimPuk" if any of the sub is PUK-Locked.
-        for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+        for (int i = 0; i < mNumPhones; i++) {
             isPinLocked = isPinLocked || (isSimPinLocked(i) && (!mIsPinUnlockCancelled[i]));
             isPukLocked = isPukLocked || (isSimPukLocked(i) && (!mIsPukUnlockCancelled[i]));
             isPinRequired = isPinRequired || (isSimPinLocked(i));
@@ -529,7 +612,7 @@ public class MSimLockPatternKeyguardView extends LockPatternKeyguardView {
              currentMode = UnlockMode.SimPin;
         } else if (isPukLocked) {
             currentMode = UnlockMode.SimPuk;
-        } else if (isPinRequired && isPukRequired) {
+        } else if (isPinRequired && isPukRequired && !isAnySubUnlocked()) {
             currentMode = UnlockMode.SimPin;
         } else {
             final int mode = mLockPatternUtils.getKeyguardStoredPasswordQuality();
