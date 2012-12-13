@@ -61,8 +61,6 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
 
     private RegistrantList mAllDataDisconnectedRegistrants = new RegistrantList();
 
-    protected int mDisconnectPendingCount = 0;
-
     MSimGsmDataConnectionTracker(PhoneBase p) {
         super(p);
         mSubscription = mPhone.getSubscription();
@@ -143,92 +141,9 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
     protected void cleanUpAllConnections(boolean tearDown, String reason) {
         super.cleanUpAllConnections(tearDown, reason);
 
-        log("cleanUpConnection: mDisconnectPendingCount = " + mDisconnectPendingCount);
-        if (tearDown && mDisconnectPendingCount == 0) {
+        if (tearDown && isDisconnected()) {
             notifyDataDisconnectComplete();
             notifyAllDataDisconnected();
-        }
-    }
-
-    @Override
-    protected void cleanUpConnection(boolean tearDown, ApnContext apnContext, boolean doAll) {
-
-        if (apnContext == null) {
-            if (DBG) log("cleanUpConnection: apn context is null");
-            return;
-        }
-
-        DataConnectionAc dcac = apnContext.getDataConnectionAc();
-        if (DBG) {
-            log("cleanUpConnection: E tearDown=" + tearDown + " reason=" + apnContext.getReason() +
-                    " apnContext=" + apnContext);
-        }
-        if (tearDown) {
-            if (apnContext.isDisconnected()) {
-                // The request is tearDown and but ApnContext is not connected.
-                // If apnContext is not enabled anymore, break the linkage to the DCAC/DC.
-                apnContext.setState(State.IDLE);
-                if (!apnContext.isReady()) {
-                    apnContext.setDataConnection(null);
-                    apnContext.setDataConnectionAc(null);
-                }
-            } else {
-                // Connection is still there. Try to clean up.
-                if (dcac != null) {
-                    if (apnContext.getState() != State.DISCONNECTING) {
-                        boolean disconnectAll = doAll;
-                        if (Phone.APN_TYPE_DUN.equals(apnContext.getApnType())) {
-                            DataProfile dunSetting = fetchDunApn();
-                            if (dunSetting != null &&
-                                    dunSetting.equals(apnContext.getApnSetting())) {
-                                if (DBG) log("tearing down dedicated DUN connection");
-                                // we need to tear it down - we brought it up just for dun and
-                                // other people are camped on it and now dun is done.  We need
-                                // to stop using it and let the normal apn list get used to find
-                                // connections for the remaining desired connections
-                                disconnectAll = true;
-                            }
-                        }
-                        if (DBG) {
-                            log("cleanUpConnection: tearing down" + (disconnectAll ? " all" :""));
-                        }
-                        Message msg = obtainMessage(EVENT_DISCONNECT_DONE, apnContext);
-                        if (disconnectAll) {
-                            apnContext.getDataConnection().tearDownAll(apnContext.getReason(), msg);
-                        } else {
-                            apnContext.getDataConnection().tearDown(apnContext.getReason(), msg);
-                        }
-                        apnContext.setState(State.DISCONNECTING);
-                        mDisconnectPendingCount++;
-                    }
-                } else {
-                    // apn is connected but no reference to dcac.
-                    // Should not be happen, but reset the state in case.
-                    apnContext.setState(State.IDLE);
-                    mPhone.notifyDataConnection(apnContext.getReason(),
-                                                apnContext.getApnType());
-                }
-            }
-        } else {
-            // force clean up the data connection.
-            if (dcac != null) dcac.resetSync();
-            apnContext.setState(State.IDLE);
-            mPhone.notifyDataConnection(apnContext.getReason(), apnContext.getApnType());
-            apnContext.setDataConnection(null);
-            apnContext.setDataConnectionAc(null);
-        }
-
-        // make sure reconnection alarm is cleaned up if there is no ApnContext
-        // associated to the connection.
-        if (dcac != null) {
-            Collection<ApnContext> apnList = dcac.getApnListSync();
-            if (apnList.isEmpty()) {
-                cancelReconnectAlarm(dcac);
-            }
-        }
-        if (DBG) {
-            log("cleanUpConnection: X tearDown=" + tearDown + " reason=" + apnContext.getReason() +
-                    " apnContext=" + apnContext + " dc=" + apnContext.getDataConnection());
         }
     }
 
@@ -238,10 +153,8 @@ public final class MSimGsmDataConnectionTracker extends GsmDataConnectionTracker
     @Override
     protected void onDisconnectDone(int connId, AsyncResult ar) {
         super.onDisconnectDone(connId, ar);
-        if (mDisconnectPendingCount > 0)
-            mDisconnectPendingCount--;
 
-        if (mDisconnectPendingCount == 0) {
+        if (isDisconnected()) {
             notifyDataDisconnectComplete();
             notifyAllDataDisconnected();
         }
