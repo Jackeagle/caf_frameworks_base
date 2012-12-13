@@ -59,8 +59,6 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
 
     private RegistrantList mAllDataDisconnectedRegistrants = new RegistrantList();
 
-    protected int mDisconnectPendingCount = 0;
-
     MSimCdmaDataConnectionTracker(MSimCDMALTEPhone p) {
         super(p);
         mPhone = p;
@@ -133,52 +131,9 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
     protected void cleanUpConnection(boolean tearDown, String reason, boolean doAll) {
         if (DBG) log("cleanUpConnection: reason: " + reason);
 
-        // Clear the reconnect alarm, if set.
-        if (mReconnectIntent != null) {
-            AlarmManager am =
-                (AlarmManager) mPhone.getContext().getSystemService(Context.ALARM_SERVICE);
-            am.cancel(mReconnectIntent);
-            mReconnectIntent = null;
-        }
+        super.cleanUpConnection(tearDown, reason, doAll);
 
-        setState(State.DISCONNECTING);
-        notifyOffApnsOfAvailability(reason);
-
-        boolean notificationDeferred = false;
-        for (DataConnection conn : mDataConnections.values()) {
-            if(conn != null) {
-                DataConnectionAc dcac =
-                    mDataConnectionAsyncChannels.get(conn.getDataConnectionId());
-                if (tearDown) {
-                    if (doAll) {
-                        if (DBG) log("cleanUpConnection: teardown, conn.tearDownAll");
-                        conn.tearDownAll(reason, obtainMessage(EVENT_DISCONNECT_DONE,
-                                conn.getDataConnectionId(), 0, reason));
-                    } else {
-                        if (DBG) log("cleanUpConnection: teardown, conn.tearDown");
-                        conn.tearDown(reason, obtainMessage(EVENT_DISCONNECT_DONE,
-                                conn.getDataConnectionId(), 0, reason));
-                    }
-                    notificationDeferred = true;
-                    mDisconnectPendingCount++;
-                } else {
-                    if (DBG) log("cleanUpConnection: !tearDown, call conn.resetSynchronously");
-                    if (dcac != null) {
-                        dcac.resetSync();
-                    }
-                    notificationDeferred = false;
-                }
-            }
-        }
-
-        stopNetStatPoll();
-
-        if (!notificationDeferred) {
-            if (DBG) log("cleanupConnection: !notificationDeferred");
-            gotoIdleAndNotifyDataConnection(reason);
-        }
-
-        if (tearDown && mDisconnectPendingCount == 0) {
+        if (tearDown && isDisconnected()) {
             notifyDataDisconnectComplete();
             notifyAllDataDisconnected();
         }
@@ -190,10 +145,8 @@ public final class MSimCdmaDataConnectionTracker extends CdmaDataConnectionTrack
     @Override
     protected void onDisconnectDone(int connId, AsyncResult ar) {
         super.onDisconnectDone(connId, ar);
-        if (mDisconnectPendingCount > 0)
-            mDisconnectPendingCount--;
 
-        if (mDisconnectPendingCount == 0) {
+        if (isDisconnected()) {
             notifyDataDisconnectComplete();
             notifyAllDataDisconnected();
         }
