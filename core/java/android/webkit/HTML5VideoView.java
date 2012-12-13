@@ -315,7 +315,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
             if (mProxy.isMediaVisible())
                 mProxy.getWebView().invalidate();
 
-            mProxy.onAvailableVideoFrame();
+            mProxy.dispatchOnAvailableVideoFrame();
         }
     }
 

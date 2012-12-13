@@ -399,11 +399,11 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
     }
 
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        if (mFullscreenProxy != null)
-            mFullscreenProxy.onAvailableVideoFrame();
     }
 
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+        if (mFullscreenProxy != null)
+            mFullscreenProxy.dispatchOnAvailableVideoFrame();
     }
 
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
