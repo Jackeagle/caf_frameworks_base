@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -293,6 +294,10 @@ public class AudioRecord
             mChannelCount = 2;
             mChannels = AudioFormat.CHANNEL_IN_STEREO;
             break;
+        case AudioFormat.CHANNEL_IN_5POINT1:
+            mChannelCount = 6;
+            mChannels = AudioFormat.CHANNEL_IN_5POINT1;
+            break;
         default:
             mChannelCount = 0;
             mChannels = AudioFormat.CHANNEL_INVALID;
@@ -480,6 +485,9 @@ public class AudioRecord
         case AudioFormat.CHANNEL_IN_STEREO:
         case AudioFormat.CHANNEL_CONFIGURATION_STEREO:
             channelCount = 2;
+            break;
+        case AudioFormat.CHANNEL_IN_5POINT1:
+            channelCount = 6;
             break;
         case AudioFormat.CHANNEL_INVALID:
         default:
