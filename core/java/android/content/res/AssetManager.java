@@ -77,9 +77,6 @@ public final class AssetManager {
     private boolean mOpen = true;
     private HashMap<Integer, RuntimeException> mRefStacks; 
  
-    private static final int GC_LOOP_COUNT = 10; // -1 disable gc
-    private static int loopCount = 0;
-
     /**
      * Create a new AssetManager containing only the basic system assets.
      * Applications will not generally use this method, instead retrieving the
@@ -88,16 +85,6 @@ public final class AssetManager {
      * {@hide}
      */
     public AssetManager() {
-
-        if (GC_LOOP_COUNT >= 0) {
-            if (loopCount >= GC_LOOP_COUNT) {
-                System.gc();
-                loopCount = 0;
-            } else {
-                loopCount++;
-            }
-        }
-
         synchronized (this) {
             if (DEBUG_REFS) {
                 mNumRefs = 0;
