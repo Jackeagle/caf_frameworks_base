@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011,2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +37,10 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.NetworkUtils;
 import android.net.SntpClient;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.net.Uri;
 import android.net.LinkProperties;
 import android.net.LinkAddress;
@@ -49,6 +54,7 @@ import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.WorkSource;
 import android.provider.Settings;
@@ -57,6 +63,7 @@ import android.provider.Telephony.Sms.Intents;
 import android.telephony.SmsMessage;
 import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.NtpTrustedTime;
 import com.android.internal.app.IBatteryStats;
@@ -66,6 +73,7 @@ import com.android.internal.location.ProviderRequest;
 import com.android.internal.location.GpsNetInitiatedHandler.GpsNiNotification;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.TelephonyProperties;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -75,6 +83,7 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Collection;
@@ -173,6 +182,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int REMOVE_LISTENER = 9;
     private static final int INJECT_NTP_TIME_FINISHED = 10;
     private static final int DOWNLOAD_XTRA_DATA_FINISHED = 11;
+    private static final int REPORT_AGPS_STATUS = 12;
 
     // Request setid
     private static final int AGPS_RIL_REQUEST_SETID_IMSI = 1;
@@ -313,6 +323,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     // only modified on handler thread
     private int[] mClientUids = new int[0];
+    private WifiState mWifiState = null;
 
     private final IGpsStatusProvider mGpsStatusProvider = new IGpsStatusProvider.Stub() {
         @Override
@@ -431,6 +442,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
         mWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_KEY);
         mWakeLock.setReferenceCounted(true);
 
+        mWifiState = new WifiState();
+
         mAlarmManager = (AlarmManager)mContext.getSystemService(Context.ALARM_SERVICE);
         mWakeupIntent = PendingIntent.getBroadcast(mContext, 0, new Intent(ALARM_WAKEUP), 0);
         mTimeoutIntent = PendingIntent.getBroadcast(mContext, 0, new Intent(ALARM_TIMEOUT), 0);
@@ -486,6 +499,40 @@ public class GpsLocationProvider implements LocationProviderInterface {
         });
     }
 
+    /**
+    * When a client wants to connect to a specific SSID, we don't want
+    * them to block forever in the case that this SSID disappears.
+    * If we notice that's gone, we will return failure right away to
+    * the client.
+    */
+    private final BroadcastReceiver mWifiScanReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String ssid = null;
+            String action = intent.getAction();
+
+            if (mWifiState.state == mWifiState.WIFI_STATE_OPENING) {
+              ssid = mWifiState.currentSSID;
+            } else if (mWifiState.state == mWifiState.WIFI_STATE_CLOSING) {
+              ssid = mWifiState.originalSSID;
+            } else {
+              //do nothing
+              return;
+            }
+
+            if (WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(action)) {
+              List<ScanResult> results = mWifiState.mWifiManager.getScanResults();
+              for (ScanResult result : results) {
+                  if (result.SSID.equals(ssid)) {
+                    return;
+                  }
+              }
+              //What we were waiting on is no longer here. Fail.
+              mWifiState.handleFailure();
+            }
+        }
+    };
+
     private void listenForBroadcasts() {
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(Intents.DATA_SMS_RECEIVED_ACTION);
@@ -507,6 +554,10 @@ public class GpsLocationProvider implements LocationProviderInterface {
         intentFilter.addAction(ALARM_TIMEOUT);
         intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         mContext.registerReceiver(mBroadcastReciever, intentFilter, null, mHandler);
+
+        IntentFilter intentFilter1 = new IntentFilter();
+        intentFilter1.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+        mContext.registerReceiver(mWifiScanReceiver, intentFilter1);
     }
 
     /**
@@ -538,57 +589,80 @@ public class GpsLocationProvider implements LocationProviderInterface {
             boolean dataEnabled = Settings.Global.getInt(mContext.getContentResolver(),
                                                          Settings.Global.MOBILE_DATA, 1) == 1;
             boolean networkAvailable = info.isAvailable() && dataEnabled;
-            String defaultApn = getSelectedApn();
-            if (defaultApn == null) {
-                defaultApn = "dummy-apn";
-            }
+            String defaultApn = getDefaultApn();
 
             native_update_network_state(info.isConnected(), info.getType(),
                                         info.isRoaming(), networkAvailable,
                                         info.getExtraInfo(), defaultApn);
 
-            int connType = (ConnectivityManager.TYPE_MOBILE_SUPL == info.getType()) ?
-                AGpsConnectionInfo.CONNECTION_TYPE_SUPL : AGpsConnectionInfo.CONNECTION_TYPE_WWAN_ANY;
+            int connType;
+            switch (info.getType()) {
+              case ConnectivityManager.TYPE_MOBILE_SUPL: {
+                  connType = AGpsConnectionInfo.CONNECTION_TYPE_SUPL;
+                  break;
+              }
+              case ConnectivityManager.TYPE_WIFI: {
+                  connType = AGpsConnectionInfo.CONNECTION_TYPE_WIFI;
+                  break;
+              }
+              default: {
+                  connType = AGpsConnectionInfo.CONNECTION_TYPE_WWAN_ANY;
+                  break;
+              }
+            }
             AGpsConnectionInfo agpsConnInfo = getAGpsConnectionInfo(connType);
+
             if (null != agpsConnInfo &&
-                agpsConnInfo.mState == AGpsConnectionInfo.STATE_OPENING) {
+                agpsConnInfo.mState == AGpsConnectionInfo.STATE_OPENING &&
+                connType != AGpsConnectionInfo.CONNECTION_TYPE_WIFI) {
                 if (mNetworkAvailable) {
-                    String apnName = info.getExtraInfo();
-                    if (apnName == null) {
-                        /* We use the value we read out from the database. That value itself
-                           is default to "dummy-apn" if no value from database. */
-                        apnName = defaultApn;
-                    }
-                    agpsConnInfo.mAPN = apnName;
-
-                    String ipProtocol = getIpProtocol(agpsConnInfo.mAPN);
-                    if (null == ipProtocol) {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
-                    } else if (ipProtocol.equals("IPV6")) {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
-                    } else if (ipProtocol.equals("IPV4V6")) {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
-                    } else {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
-                    }
-
-                    if (agpsConnInfo.mIpAddr != null) {
-                        boolean route_result;
-                        if (DEBUG) Log.d(TAG, "agpsConnInfo.mIpAddr " + agpsConnInfo.mIpAddr.toString());
-                        route_result = mConnMgr.requestRouteToHostAddress(agpsConnInfo.mCMConnType,
-                                                                          agpsConnInfo.mIpAddr);
-                        if (route_result == false)
+                    if (agpsConnInfo.getIpAddr() != null) {
+                        Log.d(TAG, "agpsConnInfo.mIpAddr " + agpsConnInfo.getIpAddr().toString());
+                        if (false == mConnMgr.requestRouteToHostAddress(agpsConnInfo.getCMConnType(), agpsConnInfo.getIpAddr())) {
                             Log.d(TAG, "call requestRouteToHostAddress failed");
+                        }
                     }
                     if (DEBUG) Log.d(TAG, "call native_agps_data_conn_open");
-                    native_agps_data_conn_open(agpsConnInfo.mAgpsType, apnName, agpsConnInfo.mBearerType);
+                    native_agps_data_conn_open(agpsConnInfo.getAgpsType(),
+                                               agpsConnInfo.getApn(info, defaultApn),
+                                               agpsConnInfo.getBearerType(info));
                     agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPEN;
-                } else {
-                    if (DEBUG) Log.d(TAG, "call native_agps_data_conn_failed");
-                    agpsConnInfo.mAPN = null;
-                    agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
-                    native_agps_data_conn_failed(agpsConnInfo.mAgpsType);
                 }
+            } else if (null != agpsConnInfo &&
+                       connType == AGpsConnectionInfo.CONNECTION_TYPE_WIFI) {
+                if (mWifiState.state == mWifiState.WIFI_STATE_OPENING ||
+                          mWifiState.state == mWifiState.WIFI_STATE_CLOSING) {
+                  NetworkInfo.State networkState = info.getState();
+                  NetworkInfo.DetailedState detailedState = info.getDetailedState();
+                  if (DEBUG) Log.d(TAG, "handleUpdateNetworkState for TYPE_WIFI");
+                  if (DEBUG) Log.d(TAG, "handleUpdateNetworkState detailedstate = " + detailedState+", and state = "+networkState);
+                  if (!info.isAvailable()) {
+                    if (DEBUG) Log.e(TAG, "ERROR: handleUpdateNetworkState connect to wifi failed!!");
+                    mWifiState.handleFailure();
+                    return;
+                  }
+                  if (detailedState != NetworkInfo.DetailedState.CONNECTED) {
+                    //note: disconnected means: IP traffic not available.
+                    //kind of misleading. idle means disconnected but possible available
+                    if (DEBUG) Log.d(TAG, "handleUpdateNetworkState neither connected nor disconnected... return until it is ready");
+                    return;
+                  }
+                  String ssid = (mWifiState.state == mWifiState.WIFI_STATE_OPENING) ? mWifiState.currentSSID : mWifiState.originalSSID;
+                  if (isWifiConnectedToSSID(info, ssid)) {
+                      if (DEBUG) Log.d(TAG, "handleUpdateNetworkState succeeded! wifi connected, and ssid matches expected!");
+                      mWifiState.handleSuccess();
+                  } else {
+                      Log.e(TAG, "isWifiConnectedToSSID returned false!");
+                      mWifiState.handleFailure();
+                  }
+                } else {
+                    if (DEBUG) Log.d(TAG, "ignore wifi update if we are not in OPENING or CLOSING");
+                }
+            } else {
+                if (DEBUG) Log.d(TAG, "call native_agps_data_conn_failed");
+                agpsConnInfo.mAPN = null;
+                agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
+                native_agps_data_conn_failed(agpsConnInfo.mAgpsType);
             }
         }
 
@@ -1237,10 +1311,246 @@ public class GpsLocationProvider implements LocationProviderInterface {
         }
     }
 
+
+    private void associateToNetwork(String ssid, String password) {
+        boolean b;
+        Log.d(TAG, "associateToNetwork begin ssid ="+ssid+", password="+password);
+
+        mWifiState.currentSSID = ssid;
+
+        //0) save current state info so we can restore it on if release
+        WifiInfo originalNetworkInfo = mWifiState.mWifiManager.getConnectionInfo();
+        mWifiState.originalNetId = originalNetworkInfo.getNetworkId();
+        mWifiState.originalSSID = originalNetworkInfo.getSSID();
+        mWifiState.originalNetworkPreference = mConnMgr.getNetworkPreference();
+
+        if (DEBUG) Log.d(TAG, "saved original wifi info. originalNetId  = " + mWifiState.originalNetId + ", originalNetworkPreference = "+ mWifiState.originalNetworkPreference );
+
+        //2) set network pref to wifi
+        mConnMgr.setNetworkPreference(ConnectivityManager.TYPE_WIFI);
+        if (DEBUG) Log.d(TAG, "network prefence changed to wifi");
+        if (DEBUG) Log.d(TAG, "get WPA wifi config for ssid="+ssid+", password="+password);
+        WifiConfiguration wc;
+        if (password == null) {
+          wc = getWifiConfigurationForOpen(ssid);
+        } else {
+          wc = getWifiConfigurationForWPA(ssid, password);
+        }
+        if (DEBUG) Log.d(TAG, "wifi configuration is : "+wc);
+        mWifiState.currentNetId = mWifiState.mWifiManager.addNetwork(wc);
+
+        if (mWifiState.currentNetId < 0) {
+          if (DEBUG) Log.e(TAG, "ERROR: "+ssid+" add Network returned " + mWifiState.currentNetId);
+          mWifiState.handleFailure();
+        } else {
+          if (DEBUG) Log.d(TAG, ssid+" add Network returned " + mWifiState.currentNetId);
+
+          //4) assoc to network
+          b = mWifiState.mWifiManager.enableNetwork(mWifiState.currentNetId, true);
+          //mWifiState.mWifiManager.reassociate();
+          if (b) {
+            if (DEBUG) Log.d(TAG, "enableNetwork returned " + b);
+          } else {
+            if (DEBUG) Log.e(TAG, "ERROR: enableNetwork returned " + b);
+            mWifiState.handleFailure();
+          }
+        }
+    }
+
+    private void restoreOriginalNetworkPreference() {
+      mConnMgr.setNetworkPreference(mWifiState.originalNetworkPreference);
+      mWifiState.originalNetworkPreference = -1;
+    }
+
+    private int getCurrentNetId() {
+        WifiInfo info = mWifiState.mWifiManager.getConnectionInfo();
+        return info.getNetworkId();
+    }
+
+    /**
+     * If the string does not have "", convert it to quoted string. For an
+     * example, if the string is <abcdef>, the return string will be <"abcdef">.
+     * If the string has "", return it.
+     *
+     * @param string
+     *            To be converted to quoted string
+     * @return string with quote
+     */
+    private String convertToQuotedString(String string) {
+        if (TextUtils.isEmpty(string)) {
+            return "";
+        }
+
+        final int lastPos = string.length() - 1;
+        if (lastPos < 0 || (string.charAt(0) == '"' && string.charAt(lastPos) == '"')) {
+            return string;
+        }
+
+        return "\"" + string + "\"";
+    }
+
+    private WifiConfiguration getWifiConfigurationForNoAuth(String SSID) {
+        WifiConfiguration conf = new WifiConfiguration();
+        conf.allowedAuthAlgorithms.clear();
+        conf.allowedGroupCiphers.clear();
+        conf.allowedKeyManagement.clear();
+        conf.allowedPairwiseCiphers.clear();
+        conf.allowedProtocols.clear();
+        conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+        conf.hiddenSSID = false;
+        conf.SSID = convertToQuotedString(SSID);
+
+        conf.status = WifiConfiguration.Status.ENABLED;
+
+        return conf;
+    }
+
+    private WifiConfiguration getWifiConfigurationForOpen(String SSID)
+    {
+        WifiConfiguration conf = new WifiConfiguration();
+        conf.allowedAuthAlgorithms.clear();
+        conf.allowedGroupCiphers.clear();
+        conf.allowedKeyManagement.clear();
+        conf.allowedPairwiseCiphers.clear();
+        conf.allowedProtocols.clear();
+        conf.hiddenSSID = false;
+        conf.SSID = convertToQuotedString(SSID);
+        conf.priority = 1;
+
+        conf.status = WifiConfiguration.Status.DISABLED;
+        conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+        conf.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
+        conf.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+        conf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+        conf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP40);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP104);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
+
+        return conf;
+    }
+
+    private WifiConfiguration getWifiConfigurationForWPA(String SSID, String password) {
+        WifiConfiguration conf = new WifiConfiguration();
+        conf.allowedAuthAlgorithms.clear();
+        conf.allowedGroupCiphers.clear();
+        conf.allowedKeyManagement.clear();
+        conf.allowedPairwiseCiphers.clear();
+        conf.allowedProtocols.clear();
+        conf.hiddenSSID = false;
+        conf.SSID = convertToQuotedString(SSID);
+        conf.priority = 1;
+
+      if (password.matches("[0-9A-Fa-f]{64}")) {
+        Log.d(TAG, "A 64 bit hex password entered.");
+        conf.preSharedKey = password;
+      } else {
+        Log.d(TAG, "A normal password entered: I am quoting it.");
+        conf.preSharedKey = convertToQuotedString(password);
+      }
+
+      conf.status = WifiConfiguration.Status.DISABLED;
+      //this mighth not be necessary:
+        //conf.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+        conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
+        conf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP);
+        conf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP40);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP104);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+        conf.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+        conf.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
+
+        return conf;
+    }
+
+    private WifiConfiguration getWifiConfigurationForWEP(String SSID, String password) {
+        WifiConfiguration conf = new WifiConfiguration();
+        conf.allowedAuthAlgorithms.clear();
+        conf.allowedGroupCiphers.clear();
+        conf.allowedKeyManagement.clear();
+        conf.allowedPairwiseCiphers.clear();
+        conf.allowedProtocols.clear();
+        conf.hiddenSSID = false;
+        conf.SSID = convertToQuotedString(SSID);
+        conf.priority = 40;
+
+      conf.status = WifiConfiguration.Status.DISABLED;
+        conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+        conf.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
+        conf.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+        conf.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+        conf.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.SHARED);
+        conf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+        conf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP40);
+        conf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP104);
+
+        conf.wepKeys[0] = convertToQuotedString(password);
+        conf.wepTxKeyIndex = 0;
+
+        return conf;
+    }
+
+    public boolean isWifiConnectedToSSID(NetworkInfo info, String ssid) {
+        NetworkInfo.DetailedState networkState = info.getDetailedState();
+        if (networkState == NetworkInfo.DetailedState.CONNECTED) {
+              WifiInfo wifiInfo = mWifiState.mWifiManager.getConnectionInfo();
+              if (DEBUG) Log.d(TAG, "wifiInfo  = " + wifiInfo);
+              if ((ssid != null) && ssid.equals(wifiInfo.getSSID())) {
+                if (DEBUG) Log.d(TAG, "wifi connected, and ssid matches expected!");
+                return true;
+              } else {
+                if (DEBUG) Log.e(TAG, "ssid="+ssid+" doesn't match wifiInfo.getSSID()="+wifiInfo.getSSID());
+                return false;
+              }
+          } else {
+            if (DEBUG) Log.e(TAG, "not connected");
+            return false;
+          }
+    }
+
     /**
      * called from native code to update AGPS status
      */
-    private void reportAGpsStatus(int type, int status, byte[] ipAddr) {
+    private void reportAGpsStatus(int type,
+                                  int status,
+                                  byte[] ipAddr,
+                                  String ssid,
+                                  String password) {
+        if (DEBUG) Log.d(TAG, "reportAGpsStatus with type = " + type +
+                              "status = " + status +
+                              "ipAddr = " + ipAddr +
+                              "ssid = " + ssid +
+                              "password = " + password);
+        ReportAgpsStatusMessage rasm = new ReportAgpsStatusMessage(type,
+                                                                   status,
+                                                                   ipAddr,
+                                                                   ssid,
+                                                                   password);
+
+        Message msg = new Message();
+        msg.what = REPORT_AGPS_STATUS;
+        msg.obj = rasm;
+
+        mHandler.sendMessage(msg);
+    }
+
+    private void handleReportAgpsStatus(ReportAgpsStatusMessage rasm) {
+        int type = rasm.type;
+        int status = rasm.status;
+        byte[] ipAddr = rasm.ipAddr;
+        String ssid = rasm.ssid;
+        String password = rasm.password;
+
+        if (DEBUG) Log.d(TAG, "handleReportAgpsStatus with type = " + type +
+                              "status = " + status +
+                              "ipAddr = " + ipAddr +
+                              "ssid = " + ssid +
+                              "password = " + password);
+
         AGpsConnectionInfo agpsConnInfo = getAGpsConnectionInfo(type);
         if (agpsConnInfo == null) {
             if (DEBUG) Log.d(TAG, "reportAGpsStatus agpsConnInfo is null for type "+type);
@@ -1251,80 +1561,104 @@ public class GpsLocationProvider implements LocationProviderInterface {
         switch (status) {
             case GPS_REQUEST_AGPS_DATA_CONN:
                 if (DEBUG) Log.d(TAG, "GPS_REQUEST_AGPS_DATA_CONN");
-                // Set agpsConnInfo.mState before calling startUsingNetworkFeature
-                //  to avoid a race condition with handleUpdateNetworkState()
-                agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPENING;
-                int result = mConnMgr.startUsingNetworkFeature(
-                        ConnectivityManager.TYPE_MOBILE, agpsConnInfo.mPHConnFeatureStr);
 
-                agpsConnInfo.mIpAddr = null;
-                if (ipAddr != null) {
-                    try {
-                        agpsConnInfo.mIpAddr = InetAddress.getByAddress(ipAddr);
-                    } catch(UnknownHostException uhe) {
-                        if (DEBUG) Log.d(TAG, "bad ipaddress");
+                switch (type) {
+                case AGpsConnectionInfo.CONNECTION_TYPE_SUPL:
+                case AGpsConnectionInfo.CONNECTION_TYPE_WWAN_ANY: {
+                    NetworkInfo info = mConnMgr.getNetworkInfo(agpsConnInfo.getCMConnType());
+                    agpsConnInfo.connect(info, ipAddr);
+                    if (agpsConnInfo.mState == AGpsConnectionInfo.STATE_OPEN ||
+                        agpsConnInfo.mState == AGpsConnectionInfo.STATE_KEEP_OPEN) {
+                        if (agpsConnInfo.getIpAddr() != null) {
+                            Log.d(TAG, "agpsConnInfo.mIpAddr " + agpsConnInfo.getIpAddr().toString());
+                            if (false == mConnMgr.requestRouteToHostAddress(agpsConnInfo.getCMConnType(), agpsConnInfo.getIpAddr())) {
+                                Log.d(TAG, "call requestRouteToHostAddress failed");
+                            }
+                        }
+                        native_agps_data_conn_open(agpsConnInfo.getAgpsType(),
+                                                   agpsConnInfo.getApn(info),
+                                                   agpsConnInfo.getBearerType(info));
+                    } else if (agpsConnInfo.mState == AGpsConnectionInfo.STATE_OPENING) {
+                        // wait for handleUpdateNetworkState before calling native_agps_data_conn_*
+                    } else  {
+                        native_agps_data_conn_failed(agpsConnInfo.getAgpsType());
                     }
+                    break;
                 }
 
-                if (result == PhoneConstants.APN_ALREADY_ACTIVE) {
-                    if (DEBUG) Log.d(TAG, "Phone.APN_ALREADY_ACTIVE");
+                case AGpsConnectionInfo.CONNECTION_TYPE_WIFI: {
+                    if (DEBUG) Log.d(TAG, "type == AGpsConnectionInfo.CONNECTION_TYPE_WIFI");
+                    if (mWifiState.state != WifiState.WIFI_STATE_CLOSED) {
+                        if (DEBUG) Log.e(TAG, "Error: request Wifi but WifiState is not WIFI_STATE_CLOSED");
+                        native_agps_data_conn_failed(agpsConnInfo.getAgpsType());
+                    }
+                    if (mWifiState.mWifiManager.isWifiEnabled()) {
+                        if (DEBUG) Log.d(TAG, "wifi enabled");
+                        NetworkInfo info = mConnMgr.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+                        if (isWifiConnectedToSSID(info, ssid)) {
+                            if (DEBUG) Log.d(TAG, "already connected to this SSID. not associating to it...");
+                            mWifiState.originalNetworkPreference = mConnMgr.getNetworkPreference();
+                            if (mWifiState.originalNetworkPreference == ConnectivityManager.TYPE_WIFI) {
+                                if (DEBUG) Log.d(TAG, "network Preference already TYPE_mWifiState.mWifiManager. do nothing");
+                            } else {
+                                if (DEBUG) Log.d(TAG, "network Preference not already TYPE_mWifiState.mWifiManager. change it.");
+                                mConnMgr.setNetworkPreference(ConnectivityManager.TYPE_WIFI);
+                            }
+                            if (DEBUG) Log.d(TAG, "wifi connected, and ssid matches expected!");
+                            mWifiState.originalNetId = getCurrentNetId();
+                            mWifiState.currentNetId = mWifiState.originalNetId;
+                            mWifiState.originalSSID = mWifiState.mWifiManager.getConnectionInfo().getSSID();
 
-                    if (agpsConnInfo.mAPN == null) {
-                        NetworkInfo info;
-                        if (type == AGpsConnectionInfo.CONNECTION_TYPE_SUPL) {
-                            info = mConnMgr.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_SUPL);
+                            mWifiState.state = WifiState.WIFI_STATE_OPEN;
+                            agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPEN;
+
+                            native_agps_data_conn_open(AGpsConnectionInfo.CONNECTION_TYPE_WIFI, "dummy-apn", AGpsConnectionInfo.BEARER_IPV4);
                         } else {
-                            info = mConnMgr.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+                            if (DEBUG) Log.d(TAG, "not already connected to this SSID. associating to it...");
+                            mWifiState.state = WifiState.WIFI_STATE_OPENING;
+                            agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPENING;
+                            associateToNetwork(ssid, password);
                         }
-                        if (info != null) {
-                            agpsConnInfo.mAPN = info.getExtraInfo();
-                        }
-                        if (agpsConnInfo.mAPN == null) {
-                            agpsConnInfo.mAPN = "dummy-apn";
-                        }
-                    }
-
-                    String ipProtocol = getIpProtocol(agpsConnInfo.mAPN);
-                    if (null == ipProtocol) {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
-                    } else if (ipProtocol.equals("IPV6")) {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV6;
-                    } else if (ipProtocol.equals("IPV4V6")) {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4V6;
                     } else {
-                        agpsConnInfo.mBearerType = agpsConnInfo.BEARER_IPV4;
+                        if (DEBUG) Log.e(TAG, "ERROR: wifi not enabled.. (we assume it is enabled)");
+                        native_agps_data_conn_failed(agpsConnInfo.getAgpsType());
                     }
+                    break;
+                }
 
-                    if (agpsConnInfo.mIpAddr != null) {
-                        boolean route_result;
-                        if (DEBUG)
-                                Log.d(TAG, "agpsConnInfo.mIpAddr " + agpsConnInfo.mIpAddr.toString());
-                        route_result = mConnMgr.requestRouteToHostAddress(
-                            agpsConnInfo.mCMConnType,
-                                agpsConnInfo.mIpAddr);
-                        if (route_result == false) Log.d(TAG, "call requestRouteToHostAddress failed");
-                    }
-                    native_agps_data_conn_open(agpsConnInfo.mAgpsType, agpsConnInfo.mAPN, agpsConnInfo.mBearerType);
-                    agpsConnInfo.mState = AGpsConnectionInfo.STATE_OPEN;
-                } else if (result == PhoneConstants.APN_REQUEST_STARTED) {
-                    if (DEBUG) Log.d(TAG, "Phone.APN_REQUEST_STARTED");
-                    // Nothing to do here
-                } else {
-                    if (DEBUG) Log.d(TAG, "startUsingNetworkFeature failed with "+result);
-                    agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
-                    native_agps_data_conn_failed(agpsConnInfo.mAgpsType);
+                default:
+                    if (DEBUG) Log.e(TAG, "type == unknown");
+                    break;
                 }
                 break;
-            case GPS_RELEASE_AGPS_DATA_CONN:
+            case GPS_RELEASE_AGPS_DATA_CONN: {
                 if (DEBUG) Log.d(TAG, "GPS_RELEASE_AGPS_DATA_CONN");
-                if (agpsConnInfo.mState != AGpsConnectionInfo.STATE_CLOSED) {
-                    mConnMgr.stopUsingNetworkFeature(
-                            ConnectivityManager.TYPE_MOBILE, agpsConnInfo.mPHConnFeatureStr);
-                    native_agps_data_conn_closed(agpsConnInfo.mAgpsType);
-                    agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
-                    agpsConnInfo.mIpAddr = null;
+
+                switch (type) {
+                case AGpsConnectionInfo.CONNECTION_TYPE_SUPL:
+                case AGpsConnectionInfo.CONNECTION_TYPE_WWAN_ANY:
+                {
+                    if (agpsConnInfo.mState != AGpsConnectionInfo.STATE_CLOSED) {
+                        if (agpsConnInfo.mState != AGpsConnectionInfo.STATE_KEEP_OPEN) {
+                            mConnMgr.stopUsingNetworkFeature(
+                                ConnectivityManager.TYPE_MOBILE, agpsConnInfo.mPHConnFeatureStr);
+                        }
+                        native_agps_data_conn_closed(agpsConnInfo.getAgpsType());
+                        agpsConnInfo.mState = AGpsConnectionInfo.STATE_CLOSED;
+                    }
+                    break;
+                }
+                case AGpsConnectionInfo.CONNECTION_TYPE_WIFI: {
+                    if (DEBUG) Log.v(TAG, "case AGpsConnectionInfo.CONNECTION_TYPE_WIFI");
+                    mWifiState.restoreOriginalWifiSettings(false);
+                    return;
+                }
+                default:
+                    if (DEBUG) Log.e(TAG, "GPS_RELEASE_AGPS_DATA_CONN but current network state is unknown!");
+                    return;
                 }
                 break;
+            }
             case GPS_AGPS_DATA_CONNECTED:
                 if (DEBUG) Log.d(TAG, "GPS_AGPS_DATA_CONNECTED");
                 break;
@@ -1595,6 +1929,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 case UPDATE_LOCATION:
                     handleUpdateLocation((Location)msg.obj);
                     break;
+                case REPORT_AGPS_STATUS:
+                    handleReportAgpsStatus((ReportAgpsStatusMessage)msg.obj);
+                    break;
             }
             if (msg.arg2 == 1) {
                 // wakelock was taken for this message, release it
@@ -1619,25 +1956,6 @@ public class GpsLocationProvider implements LocationProviderInterface {
         public void onProviderDisabled(String provider) { }
     }
 
-    private String getSelectedApn() {
-        Uri uri = Uri.parse("content://telephony/carriers/preferapn");
-        String apn = null;
-
-        Cursor cursor = mContext.getContentResolver().query(uri, new String[] {"apn"},
-                null, null, Carriers.DEFAULT_SORT_ORDER);
-
-        if (null != cursor) {
-            try {
-                if (cursor.moveToFirst()) {
-                    apn = cursor.getString(0);
-                }
-            } finally {
-                cursor.close();
-            }
-        }
-        return apn;
-    }
-
     @Override
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         StringBuilder s = new StringBuilder();
@@ -1654,29 +1972,23 @@ public class GpsLocationProvider implements LocationProviderInterface {
         pw.append(s);
     }
 
-    private String getIpProtocol(String apn) {
-        TelephonyManager phone = (TelephonyManager)
-                mContext.getSystemService(Context.TELEPHONY_SERVICE);
-        String operator =  phone.getNetworkOperator();
-        String ipProtocol = null;
-        String selection = "numeric = '" + operator + "'";
-        selection += " and apn = '" + apn + "'";
-        selection += " and carrier_enabled = 1";
+    private String getDefaultApn() {
+        Uri uri = Uri.parse("content://telephony/carriers/preferapn");
+        String apn = null;
 
-        Cursor cursor = mContext.getContentResolver().query(Carriers.CONTENT_URI,
-                new String[] {Carriers.PROTOCOL}, selection, null, Carriers.DEFAULT_SORT_ORDER);
+        Cursor cursor = mContext.getContentResolver().query(uri, new String[] {"apn"},
+                null, null, Carriers.DEFAULT_SORT_ORDER);
 
         if (null != cursor) {
             try {
                 if (cursor.moveToFirst()) {
-                    ipProtocol = cursor.getString(0);
+                    apn = cursor.getString(0);
                 }
             } finally {
                 cursor.close();
             }
         }
-
-        return ipProtocol;
+        return apn;
     }
 
     // for GPS SV statistics
@@ -1739,7 +2051,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private native void native_update_network_state(boolean connected, int type,
             boolean roaming, boolean available, String extraInfo, String defaultAPN);
 
-    private static AGpsConnectionInfo[] mAGpsConnections = new AGpsConnectionInfo[2];
+    private static AGpsConnectionInfo[] mAGpsConnections = new AGpsConnectionInfo[3];
     private AGpsConnectionInfo getAGpsConnectionInfo(int connType) {
         if (DEBUG) Log.d(TAG, "getAGpsConnectionInfo connType - "+connType);
         switch (connType)
@@ -1753,6 +2065,10 @@ public class GpsLocationProvider implements LocationProviderInterface {
             if (null == mAGpsConnections[1])
                 mAGpsConnections[1] = new AGpsConnectionInfo(ConnectivityManager.TYPE_MOBILE_SUPL, connType);
             return mAGpsConnections[1];
+        case AGpsConnectionInfo.CONNECTION_TYPE_WIFI:
+            if (null == mAGpsConnections[2])
+                mAGpsConnections[2] = new AGpsConnectionInfo(ConnectivityManager.TYPE_WIFI, connType);
+            return mAGpsConnections[2];
         default:
             return null;
         }
@@ -1764,6 +2080,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
         private static final int CONNECTION_TYPE_SUPL = 1;
         private static final int CONNECTION_TYPE_C2K = 2;
         private static final int CONNECTION_TYPE_WWAN_ANY = 3;
+        private static final int CONNECTION_TYPE_WIFI = 4;
 
         // this must match the definition of gps.h
         private static final int BEARER_INVALID = -1;
@@ -1775,6 +2092,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
         private static final int STATE_CLOSED = 0;
         private static final int STATE_OPENING = 1;
         private static final int STATE_OPEN = 2;
+        private static final int STATE_KEEP_OPEN = 3;
 
         // SUPL vs ANY (which really is non-SUPL)
         private final int mCMConnType;
@@ -1799,5 +2117,295 @@ public class GpsLocationProvider implements LocationProviderInterface {
             mIpAddr = null;
             mBearerType = BEARER_INVALID;
         }
+        private int getAgpsType() {
+            return mAgpsType;
+        }
+        private int getCMConnType() {
+            return mCMConnType;
+        }
+        private InetAddress getIpAddr() {
+            return mIpAddr;
+        }
+        private String getApn(NetworkInfo info) {
+            return getApn(info, getDefaultApn());
+        }
+        private String getApn(NetworkInfo info, String defaultApn) {
+
+            if (info != null) {
+                mAPN = info.getExtraInfo();
+            }
+            if (mAPN == null) {
+                /* We use the value we read out from the database. That value itself
+                   is default to "dummy-apn" if no value from database. */
+                mAPN = defaultApn;
+            }
+
+            return mAPN;
+        }
+        private int getBearerType(NetworkInfo info) {
+            if (mAPN == null) {
+                mAPN = getApn(info);
+            }
+            String ipProtocol = null;
+            TelephonyManager phone = (TelephonyManager)
+                    mContext.getSystemService(Context.TELEPHONY_SERVICE);
+
+            // if using the existing default data connection
+            if (mState == AGpsConnectionInfo.STATE_KEEP_OPEN) {
+                int networkType = phone.getNetworkType();
+                if (TelephonyManager.NETWORK_TYPE_CDMA == networkType ||
+                    TelephonyManager.NETWORK_TYPE_EVDO_0 == networkType ||
+                    TelephonyManager.NETWORK_TYPE_EVDO_A == networkType ||
+                    TelephonyManager.NETWORK_TYPE_1xRTT == networkType ||
+                    TelephonyManager.NETWORK_TYPE_EVDO_B == networkType) {
+                        ipProtocol = SystemProperties.get("persist.telephony.cdma.protocol", "IP");
+                }
+            }
+
+            if (ipProtocol == null) {
+                String selection = "current = 1";
+                selection += " and apn = '" + mAPN + "'";
+                selection += " and carrier_enabled = 1";
+
+                Cursor cursor = mContext.getContentResolver().query(Carriers.CONTENT_URI,
+                        new String[] {Carriers.PROTOCOL}, selection, null, Carriers.DEFAULT_SORT_ORDER);
+
+                if (null != cursor) {
+                    try {
+                        if (cursor.moveToFirst()) {
+                            ipProtocol = cursor.getString(0);
+                        }
+                    } finally {
+                        cursor.close();
+                    }
+                }
+            }
+            Log.d(TAG, "ipProtocol: " + ipProtocol + " apn: " + mAPN +
+                       " networkType: " + phone.getNetworkTypeName() + " state: " + mState);
+
+            if (null == ipProtocol) {
+                mBearerType = BEARER_IPV4;
+            } else if (ipProtocol.equals("IPV6")) {
+                mBearerType = BEARER_IPV6;
+            } else if (ipProtocol.equals("IPV4V6")) {
+                mBearerType = BEARER_IPV4V6;
+            } else {
+                mBearerType = BEARER_IPV4;
+            }
+
+            return mBearerType;
+        }
+
+        private void connect(NetworkInfo info, byte[] ipAddr) {
+            int result = -1;
+            if (mCMConnType == ConnectivityManager.TYPE_MOBILE &&
+                info != null && info.isConnected() && !info.isRoaming()) {
+                mState = AGpsConnectionInfo.STATE_KEEP_OPEN;
+                result = PhoneConstants.APN_ALREADY_ACTIVE;
+            } else {
+                // Set agpsConnInfo.mState before calling startUsingNetworkFeature
+                //  to avoid a race condition with handleUpdateNetworkState()
+                mState = AGpsConnectionInfo.STATE_OPENING;
+                result = mConnMgr.startUsingNetworkFeature(
+                      ConnectivityManager.TYPE_MOBILE, mPHConnFeatureStr);
+                if ( ipAddr != null) {
+                    try {
+                        mIpAddr = InetAddress.getByAddress(ipAddr);
+                    } catch(UnknownHostException uhe) {
+                        if (DEBUG) Log.d(TAG, "bad ipaddress");
+                    }
+                }
+            }
+            if (result == PhoneConstants.APN_ALREADY_ACTIVE) {
+                if (DEBUG) Log.d(TAG, "Phone.APN_ALREADY_ACTIVE");
+                if (mState != AGpsConnectionInfo.STATE_KEEP_OPEN) {
+                    mState = AGpsConnectionInfo.STATE_OPEN;
+                }
+            } else if (result == PhoneConstants.APN_REQUEST_STARTED) {
+                if (DEBUG) Log.d(TAG, "Phone.APN_REQUEST_STARTED");
+                // Nothing to do here
+            } else {
+                if (DEBUG) Log.d(TAG, "startUsingNetworkFeature failed with "+result);
+                mState = AGpsConnectionInfo.STATE_CLOSED;
+            }
+        }
+    }
+
+
+    private class WifiState {
+        private static final int WIFI_STATE_CLOSED = 0;
+        private static final int WIFI_STATE_OPENING = 1;
+        private static final int WIFI_STATE_OPEN = 2;
+        private static final int WIFI_STATE_CLOSING = 3;
+
+        private int state = WIFI_STATE_CLOSED;
+        private String currentSSID = null;
+        private int currentNetId = -1;
+        private int originalNetId = -1;
+        private String originalSSID = null;
+        private int originalNetworkPreference = -1;
+
+        private boolean reportFailOnClosed = false;
+
+        private WifiManager mWifiManager = null;
+
+        public WifiState() {
+            mWifiManager = (WifiManager) GpsLocationProvider.this.mContext.getSystemService(Context.WIFI_SERVICE);
+        }
+
+        private void restoreOriginalNetworkPreference() {
+          mConnMgr.setNetworkPreference(originalNetworkPreference);
+          originalNetworkPreference = -1;
+        }
+
+        /*
+         * Restore Wifi and network settings to original
+         * The restore is started here, and could completed here,
+         * or by an asynchronous broadcast event saying network restore complete.
+         */
+        private void restoreOriginalWifiSettings(boolean ReportFailOnClosed) {
+          if (DEBUG) Log.v(TAG, "restoreOriginalWifiSettings");
+
+          if (DEBUG) Log.v(TAG, "originalNetId = "+ originalNetId );
+          if (DEBUG) Log.v(TAG, "currentNetId = "+ currentNetId );
+          if (DEBUG) Log.v(TAG, "reportFailOnClosed = "+ reportFailOnClosed);
+
+
+          this.reportFailOnClosed = ReportFailOnClosed;
+          boolean b;
+          if (mConnMgr.getNetworkPreference() == originalNetworkPreference) {
+              if (DEBUG) Log.v(TAG, "current network preference same as original. do nothing.");
+          } else {
+              if (DEBUG) Log.v(TAG, "restoring original Network Preference...");
+              restoreOriginalNetworkPreference();
+          }
+
+          /*
+          * Do not restore original network settings if original network connection was "none"
+          * Side effect: you will be connected to something after it's oven even though originally
+          * you were not connected to anything.
+          */
+          if ((currentNetId == originalNetId) ||
+              (originalNetId == -1)) {
+              if (DEBUG) Log.v(TAG, "currentNetId == originalNetId or original was not connected. don't touch netId.");
+
+              state = WIFI_STATE_CLOSED;
+              if (reportFailOnClosed) {
+                  /*
+                  * We added a network but it failed, let's remove it
+                  */
+                  if (currentNetId >= 0) {
+                    if (DEBUG) Log.v(TAG, "removing currentNetId = " + currentNetId);
+                    b = mWifiManager.removeNetwork(currentNetId);
+                    if (b) {
+                      if (DEBUG) Log.e(TAG, "successfully removed current AP");
+                    } else {
+                      if (DEBUG) Log.e(TAG, "ERROR: removeNetwork returned " + b);
+                    }
+                  }
+                  native_agps_data_conn_failed(AGpsConnectionInfo.CONNECTION_TYPE_WIFI);
+              } else {
+                  native_agps_data_conn_closed(AGpsConnectionInfo.CONNECTION_TYPE_WIFI);
+              }
+          } else {
+              state = WIFI_STATE_CLOSING;
+              if (currentNetId >= 0) {
+                /*
+                if (DEBUG) Log.v(TAG, "There is a current NetId. disconnecting...");
+                b = mWifiManager.disconnect();
+                if (b) {
+                  if (DEBUG) Log.e(TAG, "successfully disconnected from current AP");
+                } else {
+                  if (DEBUG) Log.e(TAG, "ERROR: disconnect returned " + b);
+                }
+                */
+
+                b = mWifiManager.removeNetwork(currentNetId);
+                if (b) {
+                  if (DEBUG) Log.e(TAG, "successfully removed current AP");
+                } else {
+                  if (DEBUG) Log.e(TAG, "ERROR: removeNetwork returned " + b);
+                }
+              }
+
+              if (DEBUG) Log.v(TAG, "restoring original network...");
+              b = mWifiManager.enableNetwork(originalNetId, true);
+              if (b) {
+                if (DEBUG) Log.d(TAG, "enableNetwork returned " + b);
+              } else {
+                if (DEBUG) Log.e(TAG, "ERROR: enableNetwork returned " + b);
+              }
+          }
+          if (DEBUG) Log.v(TAG, "restoreOriginalWifiSettings end");
+        }
+
+
+        /*
+        * Waiting is now done, state has finished changing
+        * to be what we were waiting for
+        */
+        private void handleSuccess() {
+          if (state == WIFI_STATE_OPENING) {
+            if (DEBUG) Log.v(TAG, "handleSuccess for WIFI_STATE_OPENING");
+            native_agps_data_conn_open(AGpsConnectionInfo.CONNECTION_TYPE_WIFI, "dummy-apn", AGpsConnectionInfo.BEARER_IPV4);
+
+            state = WIFI_STATE_OPEN;
+            getAGpsConnectionInfo(AGpsConnectionInfo.CONNECTION_TYPE_WIFI).mState = AGpsConnectionInfo.STATE_OPEN;
+          } else if (state == WIFI_STATE_CLOSING) {
+            if (DEBUG) Log.v(TAG, "handleSuccess for WIFI_STATE_CLOSING");
+            if (reportFailOnClosed) {
+              reportFailOnClosed = false;
+              native_agps_data_conn_failed(AGpsConnectionInfo.CONNECTION_TYPE_WIFI);
+            } else {
+              native_agps_data_conn_closed(AGpsConnectionInfo.CONNECTION_TYPE_WIFI);
+            }
+            state = WIFI_STATE_CLOSED;
+            getAGpsConnectionInfo(AGpsConnectionInfo.CONNECTION_TYPE_WIFI).mState = AGpsConnectionInfo.STATE_CLOSED;
+            currentNetId = -1;
+            currentSSID = null;
+            originalNetId = -1;
+            originalSSID = null;
+            originalNetworkPreference = -1;
+          } else {
+            if (DEBUG) Log.e(TAG, "handleSuccess invalid case");
+          }
+        }
+
+        /*
+        * We have noticed at this point that we can no longer succeed
+        * in whatever we were waiting to do.
+        */
+        private void handleFailure() {
+          if (state == WIFI_STATE_OPENING) {
+            if (DEBUG) Log.v(TAG, "handleFailure for WIFI_STATE_OPENING");
+            restoreOriginalWifiSettings(true);
+          } else if (state == WIFI_STATE_CLOSING) {
+            if (DEBUG) Log.v(TAG, "handleFailure for WIFI_STATE_CLOSING");
+            state = WIFI_STATE_CLOSED;
+            native_agps_data_conn_failed(AGpsConnectionInfo.CONNECTION_TYPE_WIFI);
+          } else {
+            if (DEBUG) Log.e(TAG, "handleFailure invalid case");
+          }
+        }
+    }
+
+    private class ReportAgpsStatusMessage {
+      int type;
+      int status;
+      byte[] ipAddr;
+      String ssid;
+      String password;
+
+      public ReportAgpsStatusMessage(int type,
+                                     int status,
+                                     byte[] ipAddr,
+                                     String ssid,
+                                     String password) {
+        this.type = type;
+        this.status = status;
+        this.ipAddr = ipAddr;
+        this.ssid = ssid;
+        this.password = password;
+      }
     }
 }
