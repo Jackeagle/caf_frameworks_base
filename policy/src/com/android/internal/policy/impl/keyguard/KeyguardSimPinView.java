@@ -41,8 +41,8 @@ import com.android.internal.R;
 public class KeyguardSimPinView extends KeyguardAbsKeyInputView
         implements KeyguardSecurityView, OnEditorActionListener, TextWatcher {
 
-    private ProgressDialog mSimUnlockProgressDialog = null;
-    private volatile boolean mSimCheckInProgress;
+    protected ProgressDialog mSimUnlockProgressDialog = null;
+    protected volatile boolean mSimCheckInProgress;
 
     public KeyguardSimPinView(Context context) {
         this(context, null);
@@ -153,7 +153,7 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
         }
     }
 
-    private Dialog getSimUnlockProgressDialog() {
+    protected Dialog getSimUnlockProgressDialog() {
         if (mSimUnlockProgressDialog == null) {
             mSimUnlockProgressDialog = new ProgressDialog(mContext);
             mSimUnlockProgressDialog.setMessage(

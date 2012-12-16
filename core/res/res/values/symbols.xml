@@ -1815,4 +1815,16 @@
   <!-- From PinyinIME(!!!) -->
   <java-symbol type="string" name="inputMethod" />
 
+  <!-- Multi SIM related -->
+  <java-symbol type="string" name="msim_kg_sim_pin_msg_format" />
+  <java-symbol type="string" name="msim_carrier_text_format" />
+
+  <java-symbol type="id" name="msim_keyguard_sim_pin_view" />
+  <java-symbol type="id" name="msim_keyguard_sim_puk_view" />
+  <java-symbol type="id" name="msim_keyguard_carrier_area" />
+  <java-symbol type="id" name="stub_msim_carrier_text" />
+
+  <java-symbol type="layout" name="msim_keyguard_sim_pin_view" />
+  <java-symbol type="layout" name="msim_keyguard_sim_puk_view" />
+  <java-symbol type="layout" name="msim_keyguard_carrier_area" />
 </resources>

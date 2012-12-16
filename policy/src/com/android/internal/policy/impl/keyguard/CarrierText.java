@@ -91,6 +91,9 @@ public class CarrierText extends TextView {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        if (KeyguardUpdateMonitor.isMultiSimEnabled) {
+            return;
+        }
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(mCallback);
     }
 
@@ -109,7 +112,7 @@ public class CarrierText extends TextView {
      * @param spn
      * @return
      */
-    private CharSequence getCarrierTextForSimState(IccCardConstants.State simState,
+    protected CharSequence getCarrierTextForSimState(IccCardConstants.State simState,
             CharSequence plmn, CharSequence spn) {
         CharSequence carrierText = null;
         StatusMode status = getStatusForIccState(simState);
