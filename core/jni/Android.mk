@@ -149,10 +149,8 @@ LOCAL_SRC_FILES:= \
 	android_app_backup_FullBackup.cpp \
 	android_content_res_ObbScanner.cpp \
 	android_content_res_Configuration.cpp \
-    android_animation_PropertyValuesHolder.cpp
-ifeq ($(call is-vendor-board-platform,QCOM),true)
-LOCAL_SRC_FILES += com_android_internal_app_ActivityTrigger.cpp
-endif
+	android_animation_PropertyValuesHolder.cpp \
+	com_android_internal_app_ActivityTrigger.cpp
 
 LOCAL_C_INCLUDES += \
 	$(JNI_H_INCLUDE) \
