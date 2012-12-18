@@ -149,8 +149,6 @@ public class MSimGSMPhone extends GSMPhone {
     }
 
     public void resetSubSpecifics() {
-        mImei = null;
-        mImeiSv = null;
         setVoiceMessageCount(0);
         if (getCallForwardingIndicator()) {
             int notificationId = (mSubscription == 0) ? CALL_FORWARD_NOTIFICATION :
