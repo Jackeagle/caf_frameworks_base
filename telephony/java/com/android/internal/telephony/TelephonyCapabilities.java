@@ -128,6 +128,14 @@ public class TelephonyCapabilities {
     }
 
     /**
+     * Return true if the current phone supports the ability to upgrade
+     * or downgrade to a VT call
+     */
+    public static boolean supportsCallModify(Phone phone) {
+        return (phone.getPhoneType() == Phone.PHONE_TYPE_IMS);
+    }
+
+    /**
      * Return true if the current phone supports explicit "Hold" and
      * "Unhold" actions for an active call.  (If so, the in-call UI will
      * provide onscreen "Hold" / "Unhold" buttons.)
