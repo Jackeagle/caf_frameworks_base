@@ -198,6 +198,9 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     /**@hide*/
     public static boolean doConcurrentScan = true;
 
+    /**@hide*/
+    public static boolean mIsGroupOwner = false;
+
     /* Is chosen as a unique range to avoid conflict with
        the range defined in Tethering.java */
     private static final String[] DHCP_RANGE = {"192.168.49.2", "192.168.49.254"};
@@ -1185,6 +1188,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (DBG) logd(getName() + " group started");
                     if (mGroup.isGroupOwner()) {
                         startDhcpServer(mGroup.getInterface());
+                        mIsGroupOwner = true;
                     } else {
                         // Set group idle only for a client on the group interface to speed up
                         // disconnect when GO is gone. Setting group idle time for a group owner
@@ -1312,6 +1316,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         }
                     }
                     if (mGroup.isGroupOwner()) {
+                        mIsGroupOwner = false;
                         stopDhcpServer();
                     } else {
                         if (DBG) logd("stop DHCP client");
