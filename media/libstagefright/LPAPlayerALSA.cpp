@@ -1013,7 +1013,6 @@ void LPAPlayer::eventThreadEntry() {
 
         if (timeout != -1 && mReachedEOS) {
             LOGV("Timeout %d: Posting EOS event to AwesomePlayer",timeout);
-            isPaused = true;
             mPauseTime = mSeekTimeUs + getTimeStamp(A2DP_DISABLED);
             mReachedOutputEOS = true;
             mObserver->postAudioEOS();
