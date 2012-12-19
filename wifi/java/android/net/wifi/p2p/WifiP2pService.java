@@ -969,6 +969,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                    Slog.d(TAG, "startChannel while creating P2P Group=" + startChannel);
                    if (startChannel!=0){
                         if (mWifiNative.p2pGroupAddOnSpecifiedFreq(channelToFrequency(startChannel))) {
+                            mWifiNative.setP2pGroupIdle(mGroup.getInterface(), 0);
                             replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
                         } else {
                              replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
@@ -976,6 +977,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         }
                    } else {
                          if (mWifiNative.p2pGroupAdd()) {
+                             mWifiNative.setP2pGroupIdle(mGroup.getInterface(), 0);
                              replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
                          } else {
                               replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
@@ -1111,6 +1113,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
                     if (mSavedPeerConfig.wps.setup == WpsInfo.PBC) {
                         if (DBG) logd("Found a match " + mSavedPeerConfig);
+                        if (DBG) logd("SetP2pGroupIdle(10) before group formation");
+                        mWifiNative.setP2pGroupIdle("p2p0", 10);
                         mWifiNative.p2pConnect(mSavedPeerConfig, FORM_GROUP);
                         transitionTo(mGroupNegotiationState);
                     }
@@ -1307,7 +1311,6 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                             changed = true;
                         }
                     }
-                    mWifiNative.setP2pGroupIdle(mGroup.getInterface(), 0);
                     if (mGroup.isGroupOwner()) {
                         stopDhcpServer();
                     } else {
@@ -1714,6 +1717,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     }
 
     private void p2pConnectWithPinDisplay(WifiP2pConfig config, boolean join) {
+       if(!join) {
+             if (DBG) logd("Set p2p_group_idle_timeout of 10 sec before staring group formation");
+             mWifiNative.setP2pGroupIdle("p2p0", 10);
+        }
         String pin = mWifiNative.p2pConnect(config, join);
         try {
             Integer.parseInt(pin);
