@@ -2748,8 +2748,18 @@ final class ActivityStack {
                                 // intent.
                                 top.task.setIntent(r.intent, r.info);
                             }
-                            logStartActivity(EventLogTags.AM_NEW_INTENT, r, top.task);
-                            top.deliverNewIntentLocked(callingUid, r.intent);
+
+                            // for MPQ
+                            // If currently resumed app is 'HOME', no need to deliver
+                            // new intent. Since unnecessarily onPause() & onResume()
+                            // of the TV activity are called successively, with surface
+                            // getting destroyed and re-created
+                            if ((mResumedActivity != null)
+                                && (mResumedActivity.isHomeActivity)
+                                && (mResumedActivity.nowVisible == false)) {
+                                logStartActivity(EventLogTags.AM_NEW_INTENT, r, top.task);
+                                top.deliverNewIntentLocked(callingUid, r.intent);
+                            }
                         } else {
                             // A special case: we need to
                             // start the activity because it is not currently
