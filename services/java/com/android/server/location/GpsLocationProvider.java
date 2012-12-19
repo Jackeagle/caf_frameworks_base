@@ -1988,6 +1988,11 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 cursor.close();
             }
         }
+
+        if (apn == null) {
+            apn = "dummy-apn";
+        }
+
         return apn;
     }
 
