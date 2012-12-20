@@ -1440,6 +1440,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     //Ignore more client requests
                     break;
                 case PEER_CONNECTION_USER_ACCEPT:
+                     //Stop discovery before issuing wps pbc
+                     mWifiNative.p2pStopFind();
                     if (mSavedPeerConfig.wps.setup == WpsInfo.PBC) {
                         mWifiNative.startWpsPbc(mGroup.getInterface(), null);
                     } else {
