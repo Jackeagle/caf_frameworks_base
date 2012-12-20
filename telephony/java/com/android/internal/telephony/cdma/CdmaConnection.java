@@ -68,7 +68,6 @@ public class CdmaConnection extends Connection {
      * i.e., time since boot.  They are appropriate for comparison and
      * calculating deltas.
      */
-    long connectTimeReal;
     long duration;
     long holdingStartTime;  // The time when the Connection last transitioned
                             // into HOLDING
