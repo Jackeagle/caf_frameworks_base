@@ -23,7 +23,7 @@
 #include "DisplayListLogBuffer.h"
 #include "DisplayListRenderer.h"
 #include "Caches.h"
-
+#include <testframework/testframework.h>
 namespace android {
 namespace uirenderer {
 
@@ -869,6 +869,14 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
     TextContainer text;
     mReader.rewind();
 
+#ifdef GFX_TESTFRAMEWORK
+    nsecs_t startTime = systemTime();
+    if (level == 0) {
+        TF_PRINT(TF_EVENT_START, "DispList", "replay", "Replay start");
+    }
+#endif
+
+
 #if DEBUG_DISPLAY_LIST
     uint32_t count = (level + 1) * 2;
     char indent[count + 1];
@@ -1337,6 +1345,16 @@ status_t DisplayList::replay(OpenGLRenderer& renderer, Rect& dirty, int32_t flag
     DISPLAY_LIST_LOGD("%s%s %d", (char*) indent, "RestoreToCount", restoreTo);
     renderer.restoreToCount(restoreTo);
     renderer.endMark();
+
+
+#ifdef GFX_TESTFRAMEWORK
+        if (level == 0) {
+            nsecs_t endTime = systemTime();
+            int replayTime = ns2ms(endTime - startTime);
+            TF_PRINT(TF_EVENT_STOP, "DispList", "replay", "Replay stop");
+            TF_PRINT(TF_EVENT, "DispList", "replaytime", "ReplayTime: %d", replayTime);
+        }
+#endif
 
     DISPLAY_LIST_LOGD("%sDone (%p, %s), returning %d", (char*) indent + 2, this, mName.string(),
             drawGlStatus);

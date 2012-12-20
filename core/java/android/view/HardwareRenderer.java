@@ -31,6 +31,7 @@ import android.os.SystemProperties;
 import android.os.Trace;
 import android.util.Log;
 import com.google.android.gles_jni.EGLImpl;
+import android.util.jTestFramework;
 
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGL11;
@@ -1189,7 +1190,8 @@ public abstract class HardwareRenderer {
 
                             getDisplayListStartTime = System.nanoTime();
                         }
-
+                        jTestFramework.print(jTestFramework.TF_EVENT_JAVA_START,
+                                             "hwrend", "update", "update DL");
                         canvas.clearLayerUpdates();
 
                         DisplayList displayList;
@@ -1201,6 +1203,8 @@ public abstract class HardwareRenderer {
                         }
 
                         Trace.traceBegin(Trace.TRACE_TAG_VIEW, "prepareFrame");
+                        jTestFramework.print(jTestFramework.TF_EVENT_JAVA_START,
+                                             "hwrend", "predraw", "predraw start");
                         try {
                             status = onPreDraw(dirty);
                         } finally {
@@ -1209,6 +1213,9 @@ public abstract class HardwareRenderer {
                         saveCount = canvas.save();
                         callbacks.onHardwarePreDraw(canvas);
 
+                        jTestFramework.print(jTestFramework.TF_EVENT_JAVA_STOP,
+                                             "hwrend", "predraw", "predraw end");
+
                         if (mProfileEnabled) {
                             long now = System.nanoTime();
                             float total = (now - getDisplayListStartTime) * 0.000001f;
@@ -1216,8 +1223,14 @@ public abstract class HardwareRenderer {
                             mProfileData[mProfileCurrentFrame] = total;
                         }
 
+                        jTestFramework.print(jTestFramework.TF_EVENT_JAVA_STOP,
+                                             "hwrend", "update", "update DL");
+
                         if (displayList != null) {
                             long drawDisplayListStartTime = 0;
+                            jTestFramework.print(jTestFramework.TF_EVENT_JAVA_START,
+                                                 "hwrend", "process", "process DL");
+
                             if (mProfileEnabled) {
                                 drawDisplayListStartTime = System.nanoTime();
                             }
@@ -1237,6 +1250,9 @@ public abstract class HardwareRenderer {
                             }
 
                             handleFunctorStatus(attachInfo, status);
+                            jTestFramework.print(jTestFramework.TF_EVENT_JAVA_STOP,
+                                             "hwrend", "process", "process DL");
+
                         } else {
                             // Shouldn't reach here
                             view.draw(canvas);
@@ -1260,8 +1276,13 @@ public abstract class HardwareRenderer {
                         }
                     }
 
+
+                    jTestFramework.print(jTestFramework.TF_EVENT_JAVA_START,
+                                         "hwrend", "postdraw", "postdraw start");
                     onPostDraw();
 
+                    jTestFramework.print(jTestFramework.TF_EVENT_JAVA_STOP,
+                                         "hwrend", "postdraw", "postdraw end");
                     attachInfo.mIgnoreDirtyState = false;
                     
                     if ((status & DisplayList.STATUS_DREW) == DisplayList.STATUS_DREW) {
@@ -1269,6 +1290,8 @@ public abstract class HardwareRenderer {
                         if (mProfileEnabled) {
                             eglSwapBuffersStartTime = System.nanoTime();
                         }
+                        jTestFramework.print(jTestFramework.TF_EVENT_JAVA_START,
+                                             "hwrend", "swapbuffers", "swapbuffers DL");
     
                         sEgl.eglSwapBuffers(sEglDisplay, mEglSurface);
     
@@ -1277,6 +1300,8 @@ public abstract class HardwareRenderer {
                             float total = (now - eglSwapBuffersStartTime) * 0.000001f;
                             mProfileData[mProfileCurrentFrame + 2] = total;
                         }
+                        jTestFramework.print(jTestFramework.TF_EVENT_JAVA_STOP,
+                                             "hwrend", "swapbuffers", "swapbuffers DL");
     
                         checkEglErrors();
                     }
