@@ -168,6 +168,7 @@ public class MSimIccProvider extends IccProvider {
 
         resultUri = Uri.parse(buf.toString());
 
+        getContext().getContentResolver().notifyChange(url, null);
         /*
         // notify interested parties that an insertion happened
         getContext().getContentResolver().notifyInsert(
@@ -259,6 +260,7 @@ public class MSimIccProvider extends IccProvider {
             return 0;
         }
 
+        getContext().getContentResolver().notifyChange(url, null);
         return 1;
     }
 
@@ -307,6 +309,7 @@ public class MSimIccProvider extends IccProvider {
             return 0;
         }
 
+        getContext().getContentResolver().notifyChange(url, null);
         return 1;
     }
 

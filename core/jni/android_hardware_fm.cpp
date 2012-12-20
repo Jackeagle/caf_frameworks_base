@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *        * Redistributions in binary form must reproduce the above copyright
  *            notice, this list of conditions and the following disclaimer in the
  *            documentation and/or other materials provided with the distribution.
- *        * Neither the name of Code Aurora nor
+ *        * Neither the name of The Linux Foundation nor
  *            the names of its contributors may be used to endorse or promote
  *            products derived from this software without specific prior written
  *            permission.
@@ -57,6 +57,8 @@
 #define WAIT_TIMEOUT 200000 /* 200*1000us */
 #define TX_RT_DELIMITER    0x0d
 #define PS_LEN    9
+#define STD_BUF_SIZE 256
+
 enum search_dir_t {
     SEEK_UP,
     SEEK_DN,
@@ -386,9 +388,9 @@ static jint android_hardware_fmradio_FmReceiverJNI_getBufferNative
     memset(&v4l2_buf, 0, sizeof (v4l2_buf));
     v4l2_buf.index = index;
     v4l2_buf.type = type;
-    v4l2_buf.length = 128;
+    v4l2_buf.length = STD_BUF_SIZE;
     v4l2_buf.m.userptr = (unsigned long)bool_buffer;
-    err = ioctl(fd,VIDIOC_DQBUF,&v4l2_buf) ;
+    err = ioctl(fd,VIDIOC_DQBUF,&v4l2_buf);
     if(err < 0){
         /* free up the memory in failure case*/
         env->ReleaseBooleanArrayElements(buff, bool_buffer, 0);

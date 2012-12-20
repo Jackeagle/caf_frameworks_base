@@ -999,9 +999,17 @@ public class PhoneStatusBar extends BaseStatusBar {
         }
 
         final boolean emergencyCallsShownElsewhere = mEmergencyCallLabel != null;
-        final boolean makeVisible =
-            !(emergencyCallsShownElsewhere && mNetworkController.isEmergencyOnly())
-            && mPile.getHeight() < (mScrollView.getHeight() - mCarrierLabelHeight);
+        final boolean makeVisible;
+
+        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+            makeVisible =
+                !(emergencyCallsShownElsewhere && mMSimNetworkController.isEmergencyOnly())
+                && mPile.getHeight() < (mScrollView.getHeight() - mCarrierLabelHeight);
+        } else {
+            makeVisible =
+                !(emergencyCallsShownElsewhere && mNetworkController.isEmergencyOnly())
+                && mPile.getHeight() < (mScrollView.getHeight() - mCarrierLabelHeight);
+        }
         
         if (force || mCarrierLabelVisible != makeVisible) {
             mCarrierLabelVisible = makeVisible;
