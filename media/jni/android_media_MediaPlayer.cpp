@@ -167,10 +167,10 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
             }
             else
             {
-                Parcel* nativeParcel = parcelForJavaObject(env, mParcel);
+                Parcel* nativeParcel = parcelForJavaObject(env, jParcel);
                 nativeParcel->setData(obj->data(), obj->dataSize());
                 env->CallStaticVoidMethod(mClass, fields.post_event, mObject,
-                      msg, ext1, ext2, mParcel);
+                      msg, ext1, ext2, jParcel);
             }
         }
     } else {
