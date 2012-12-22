@@ -1298,6 +1298,10 @@ public abstract class PhoneBase extends Handler implements Phone {
         pw.println(" needsOtaServiceProvisioning=" + needsOtaServiceProvisioning());
     }
 
+    public void setTransmitPower(int powerLevel, Message onCompleted) {
+        return;
+    }
+
     /**
      * Returns the subscription id.
      * Always returns default subscription(ie., 0).

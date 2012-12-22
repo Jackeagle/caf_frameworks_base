@@ -1584,6 +1584,10 @@ public final class SimulatedCommands extends BaseCommands
             int retry, int messageRef, Message response){
     }
 
+    public void setTransmitPower(int powerLevel, Message result) {
+        unimplemented(result);
+    }
+
     public void setUiccSubscription(int slotId, int appIndex, int subId, int subStatus,
             Message response) {
         unimplemented(response);
