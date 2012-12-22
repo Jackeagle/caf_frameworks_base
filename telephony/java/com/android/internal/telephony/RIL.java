@@ -2604,6 +2604,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_VOICE_RADIO_TECH: ret = responseInts(p); break;
             case RIL_REQUEST_IMS_REGISTRATION_STATE: ret = responseInts(p); break;
             case RIL_REQUEST_IMS_SEND_SMS: ret =  responseSMS(p); break;
+            case RIL_REQUEST_SET_TRANSMIT_POWER: ret = responseVoid(p); break;
             case RIL_REQUEST_SET_UICC_SUBSCRIPTION: ret = responseVoid(p); break;
             case RIL_REQUEST_SET_DATA_SUBSCRIPTION: ret = responseVoid(p); break;
             case RIL_REQUEST_GET_UICC_SUBSCRIPTION: ret = responseUiccSubscription(p); break;
@@ -4083,6 +4084,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_VOICE_RADIO_TECH: return "RIL_REQUEST_VOICE_RADIO_TECH";
             case RIL_REQUEST_IMS_REGISTRATION_STATE: return "RIL_REQUEST_IMS_REGISTRATION_STATE";
             case RIL_REQUEST_IMS_SEND_SMS: return "RIL_REQUEST_IMS_SEND_SMS";
+            case RIL_REQUEST_SET_TRANSMIT_POWER: return "RIL_REQUEST_SET_TRANSMIT_POWER";
             case RIL_REQUEST_SET_UICC_SUBSCRIPTION: return "RIL_REQUEST_SET_UICC_SUBSCRIPTION";
             case RIL_REQUEST_SET_DATA_SUBSCRIPTION: return "RIL_REQUEST_SET_DATA_SUBSCRIPTION";
             case RIL_REQUEST_GET_UICC_SUBSCRIPTION: return "RIL_REQUEST_GET_UICC_SUBSCRIPTION";
@@ -4454,5 +4456,17 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         }
         pw.println(" mLastNITZTimeInfo=" + mLastNITZTimeInfo);
         pw.println(" mTestingEmergencyCall=" + mTestingEmergencyCall.get());
+    }
+
+    public void setTransmitPower(int powerLevel, Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_TRANSMIT_POWER, result);
+
+        rr.mp.writeInt(1);
+        rr.mp.writeInt(powerLevel);
+
+        if (RILJ_LOGD)
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
     }
 }
