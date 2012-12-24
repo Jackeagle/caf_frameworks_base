@@ -1273,6 +1273,11 @@
     <string name="ime_action_done" msgid="8971516117910934605">"完成"</string>
     <string name="ime_action_previous" msgid="1443550039250105948">"上一页"</string>
     <string name="ime_action_default" msgid="2840921885558045721">"执行"</string>
+    <!-- Shown in "Managed Roaming" dialog when registration is denied with rejCode 10. -->
+    <string name="managed_roaming_title">"管理漫游"</string>
+    <string name="managed_roaming_dialog_content">"发现服务受限的网络，您确定要启用网络搜索吗？"</string>
+    <string name="managed_roaming_dialog_ok_button">"确定"</string>
+    <string name="managed_roaming_dialog_cancel_button">"取消"</string>
     <string name="dial_number_using" msgid="5789176425167573586">"拨打电话"\n"<xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="create_contact_using" msgid="4947405226788104538">"创建电话号码为"\n"<xliff:g id="NUMBER">%s</xliff:g> 的联系人"</string>
     <string name="grant_credentials_permission_message_header" msgid="2106103817937859662">"以下一个或多个应用请求获得相应权限，以便在当前和以后访问您的帐户。"</string>
