@@ -185,4 +185,18 @@ public class EditableInputConnection extends BaseInputConnection {
 
         return success;
     }
+
+    @Override
+    public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+        if (mTextView == null) {
+            return super.deleteSurroundingText(beforeLength, afterLength);
+        }
+
+        mTextView.resetErrorChangedFlag();
+        boolean success = super
+                .deleteSurroundingText(beforeLength, afterLength);
+        mTextView.hideErrorIfUnchanged();
+
+        return success;
+    }
 }
