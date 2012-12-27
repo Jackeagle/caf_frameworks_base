@@ -3296,6 +3296,7 @@ package android.app {
     method public deprecated android.app.DownloadManager.Request setShowRunningNotification(boolean);
     method public android.app.DownloadManager.Request setTitle(java.lang.CharSequence);
     method public android.app.DownloadManager.Request setVisibleInDownloadsUi(boolean);
+    field public static final int NETWORK_ETHERNET = 4; // 0x4
     field public static final int NETWORK_MOBILE = 1; // 0x1
     field public static final int NETWORK_WIFI = 2; // 0x2
     field public static final int VISIBILITY_HIDDEN = 2; // 0x2
@@ -5338,6 +5339,7 @@ package android.content {
     field public static final java.lang.String DEVICE_POLICY_SERVICE = "device_policy";
     field public static final java.lang.String DOWNLOAD_SERVICE = "download";
     field public static final java.lang.String DROPBOX_SERVICE = "dropbox";
+    field public static final java.lang.String ETHERNET_SERVICE = "ethernet";
     field public static final java.lang.String INPUT_METHOD_SERVICE = "input_method";
     field public static final java.lang.String INPUT_SERVICE = "input";
     field public static final java.lang.String KEYGUARD_SERVICE = "keyguard";
@@ -12731,6 +12733,68 @@ package android.net {
 
 }
 
+package android.net.ethernet {
+
+  public class EthernetDevInfo implements android.os.Parcelable {
+    ctor public EthernetDevInfo();
+    method public int describeContents();
+    method public java.lang.String getConnectMode();
+    method public java.lang.String getDnsAddr();
+    method public java.lang.String getIfName();
+    method public java.lang.String getIpAddress();
+    method public java.lang.String getNetMask();
+    method public java.lang.String getRouteAddr();
+    method public boolean setConnectMode(java.lang.String);
+    method public void setDnsAddr(java.lang.String);
+    method public void setIfName(java.lang.String);
+    method public void setIpAddress(java.lang.String);
+    method public void setNetMask(java.lang.String);
+    method public void setRouteAddr(java.lang.String);
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final java.lang.String ETHERNET_CONN_MODE_DHCP = "dhcp";
+    field public static final java.lang.String ETHERNET_CONN_MODE_MANUAL = "manual";
+  }
+
+  public class EthernetManager {
+    ctor public EthernetManager(android.net.ethernet.IEthernetManager, android.os.Handler);
+    method public java.lang.String[] getDeviceNameList();
+    method public android.net.ethernet.EthernetDevInfo getSavedConfig();
+    method public int getState();
+    method public int getTotalInterface();
+    method public boolean isConfigured();
+    method public void updateDevInfo(android.net.ethernet.EthernetDevInfo);
+    field public static final int ETHERNET_DEVICE_SCAN_RESULT_READY = 0; // 0x0
+    field public static final java.lang.String ETHERNET_STATE_CHANGED_ACTION = "android.net.ethernet.ETHERNET_STATE_CHANGED";
+    field public static final int ETHERNET_STATE_DISABLED = 1; // 0x1
+    field public static final int ETHERNET_STATE_ENABLED = 2; // 0x2
+    field public static final int ETHERNET_STATE_UNKNOWN = 0; // 0x0
+    field public static final java.lang.String EXTRA_ETHERNET_STATE = "ETHERNET_state";
+    field public static final java.lang.String EXTRA_NETWORK_INFO = "networkInfo";
+    field public static final java.lang.String EXTRA_PREVIOUS_ETHERNET_STATE = "previous_ETHERNET_state";
+    field public static final java.lang.String NETWORK_STATE_CHANGED_ACTION = "android.net.ethernet.STATE_CHANGE";
+    field public static final java.lang.String TAG = "EthernetManager";
+  }
+
+  public abstract interface IEthernetManager implements android.os.IInterface {
+    method public abstract java.lang.String[] getDeviceNameList() throws android.os.RemoteException;
+    method public abstract android.net.ethernet.EthernetDevInfo getSavedConfig() throws android.os.RemoteException;
+    method public abstract int getState() throws android.os.RemoteException;
+    method public abstract int getTotalInterface() throws android.os.RemoteException;
+    method public abstract boolean isConfigured() throws android.os.RemoteException;
+    method public abstract void setMode(java.lang.String) throws android.os.RemoteException;
+    method public abstract void setState(int) throws android.os.RemoteException;
+    method public abstract void updateDevInfo(android.net.ethernet.EthernetDevInfo) throws android.os.RemoteException;
+  }
+
+  public static abstract class IEthernetManager.Stub extends android.os.Binder implements android.net.ethernet.IEthernetManager {
+    ctor public IEthernetManager.Stub();
+    method public android.os.IBinder asBinder();
+    method public static android.net.ethernet.IEthernetManager asInterface(android.os.IBinder);
+    method public boolean onTransact(int, android.os.Parcel, android.os.Parcel, int) throws android.os.RemoteException;
+  }
+
+}
+
 package android.net.http {
 
   public final class AndroidHttpClient implements org.apache.http.client.HttpClient {
@@ -18389,6 +18453,14 @@ package android.provider {
     field public static final java.lang.String DEVICE_PROVISIONED = "device_provisioned";
     field public static final java.lang.String ENABLED_ACCESSIBILITY_SERVICES = "enabled_accessibility_services";
     field public static final java.lang.String ENABLED_INPUT_METHODS = "enabled_input_methods";
+    field public static final java.lang.String ETHERNET_CONF = "ethernet_conf";
+    field public static final java.lang.String ETHERNET_DNS = "ethernet_dns";
+    field public static final java.lang.String ETHERNET_IFNAME = "ethernet_ifname";
+    field public static final java.lang.String ETHERNET_IP = "ethernet_ip";
+    field public static final java.lang.String ETHERNET_MASK = "ethernet_netmask";
+    field public static final java.lang.String ETHERNET_MODE = "ethernet_mode";
+    field public static final java.lang.String ETHERNET_ON = "ethernet_on";
+    field public static final java.lang.String ETHERNET_ROUTE = "ethernet_iproute";
     field public static final java.lang.String HTTP_PROXY = "http_proxy";
     field public static final java.lang.String INPUT_METHOD_SELECTOR_VISIBILITY = "input_method_selector_visibility";
     field public static final java.lang.String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
