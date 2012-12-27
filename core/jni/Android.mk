@@ -207,6 +207,7 @@ LOCAL_CFLAGS += -include bionic/libc/kernel/arch-arm/asm/byteorder.h
 LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/types.h
 LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/posix_types.h
 LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/socket.h
+LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/netlink.h
 LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/in.h
 LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/un.h
 
