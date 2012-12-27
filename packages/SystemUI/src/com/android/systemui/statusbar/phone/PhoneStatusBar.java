@@ -547,6 +547,12 @@ public class PhoneStatusBar extends BaseStatusBar {
                     }
                 });
             }
+           // Ethernet Status
+           final ImageView ethernetStatus =
+                    (ImageView)mStatusBarView.findViewById(R.id.ethernet_status);
+           if (ethernetStatus != null) {
+                mNetworkController.addEthernetIconView(ethernetStatus);
+           }
         }
 //        final ImageView wimaxRSSI =
 //                (ImageView)sb.findViewById(R.id.wimax_signal);
