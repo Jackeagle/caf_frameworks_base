@@ -39,4 +39,6 @@ interface IBluetoothPreferredDeviceListCallback
     void onClearPreferredDeviceList(in int result);
     void onGattConnectToPreferredDeviceList(in int result);
     void onGattCancelConnectToPreferredDeviceList(in int result);
+    void onGattAutoConnect(in int result);
+    void onGattAutoConnectCancel(in int result);
 }

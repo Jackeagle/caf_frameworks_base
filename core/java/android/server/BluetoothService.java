@@ -249,7 +249,14 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final String ACTION_BT_DISCOVERABLE_TIMEOUT =
              "android.bluetooth.service.action.DISCOVERABLE_TIMEOUT";
 
-    public IBluetoothPreferredDeviceListCallback sPListCallBack;
+    public IBluetoothPreferredDeviceListCallback sPListCallBack = null;
+    public String callerPreferredDevApi = null;
+    public String callerIntent = null;
+    public HashMap<BluetoothDevice, Integer> preferredDevicesList;
+    public BluetoothDevice btDeviceInPreferredDevList;
+    public boolean isScanInProgress = false;
+    public final int DEVICE_IS_CONNECTED = 1;
+    public final int DEVICE_IN_PREFERRED_DEVICES_LIST = 2;
 
     private static class RemoteService {
         public String address;
@@ -436,6 +443,8 @@ public class BluetoothService extends IBluetooth.Stub {
         filter.addAction(Intent.ACTION_DOCK_EVENT);
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
         mContext.registerReceiver(mReceiver, filter);
         mBluetoothInputProfileHandler = BluetoothInputProfileHandler.getInstance(mContext, this);
         mBluetoothPanProfileHandler = BluetoothPanProfileHandler.getInstance(mContext, this);
@@ -1331,7 +1340,45 @@ public class BluetoothService extends IBluetooth.Stub {
 
     synchronized void onAddToPreferredDeviceListResult(int result) {
         try {
-            sPListCallBack.onAddDeviceToPreferredList(result);
+            if(callerPreferredDevApi != null && callerPreferredDevApi.equalsIgnoreCase("AutoConnect")
+                    || (callerIntent != null && callerIntent.equalsIgnoreCase("ACTION_ACL_DISCONNECTED"))) {
+                try {
+                    Log.d(TAG, "onAddDeviceAutoConnect in BT service");
+                    if(sPListCallBack != null) {
+                        if(result == 0) { //result 0 is success
+                            //add device to devices in preferred devices list
+                            if(preferredDevicesList == null) {
+                                preferredDevicesList = new HashMap<BluetoothDevice, Integer>();
+                                preferredDevicesList.put(btDeviceInPreferredDevList, DEVICE_IN_PREFERRED_DEVICES_LIST);
+                            }
+                            else {
+                                boolean isDevPresent = false;
+                                if(preferredDevicesList != null) {
+                                    for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                                        if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(
+                                                entry.getKey().getAddress())) {
+                                            preferredDevicesList.put(entry.getKey(), DEVICE_IN_PREFERRED_DEVICES_LIST);
+                                            isDevPresent = true;
+                                        }
+                                    }
+                                    if(isDevPresent == false) {
+                                        preferredDevicesList.put(btDeviceInPreferredDevList, DEVICE_IN_PREFERRED_DEVICES_LIST);
+                                    }
+                                }
+                            }
+                        }
+                        //call create connection to preferred devices list
+                        callerIntent = null;
+                        callerPreferredDevApi = "AutoConnect";
+                        gattConnectToPreferredDeviceList(sPListCallBack);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "onAddDeviceAutoConnect", e);
+                }
+            }
+            else {//for older white list API
+                sPListCallBack.onAddDeviceToPreferredList(result);
+            }
         }
         catch(Exception e) {
             {Log.e(TAG, "onAddToPreferredDeviceListResult", e);}
@@ -1339,7 +1386,70 @@ public class BluetoothService extends IBluetooth.Stub {
     }
     synchronized void onRemoveFromPreferredDeviceListResult(int result) {
         try {
-            sPListCallBack.onRemoveDeviceFromPreferredList(result);
+            Log.d(TAG, "onRemoveFromPreferredDeviceListResult");
+            if((callerPreferredDevApi != null && callerPreferredDevApi.equalsIgnoreCase("AutoConnectCancel")) ||
+                    (callerIntent != null && callerIntent.equalsIgnoreCase("ACTION_ACL_CONNECTED"))) {
+                try {
+                    if(sPListCallBack != null) {
+                        if(callerPreferredDevApi != null &&
+                                callerPreferredDevApi.equalsIgnoreCase("AutoConnectCancel")){
+                            sPListCallBack.onGattAutoConnectCancel(result); //callback to app
+                            if(result == 0) {
+                                //remove device from device in preferred devices list
+                                if(preferredDevicesList != null) {
+                                    for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                                        if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
+                                            preferredDevicesList.remove(entry.getKey());
+                                        }
+                                    }
+                                }
+                                //call create connection to preferred devices list if there are
+                                //any devices in preferred devices list
+                                if(preferredDevicesList != null &&
+                                        preferredDevicesList.containsValue(DEVICE_IN_PREFERRED_DEVICES_LIST)){
+                                    callerPreferredDevApi = "AutoConnect";
+                                    gattConnectToPreferredDeviceList(sPListCallBack);
+                                }
+                                else {
+                                    callerPreferredDevApi = null;
+                                }
+                            }
+                        }
+                        else if(callerIntent != null &&
+                                callerIntent.equalsIgnoreCase("ACTION_ACL_CONNECTED")) {
+                            if(result == 0) {
+                                //change the status to connected for the device in the list
+                                if(preferredDevicesList != null) {
+                                    //find the device in the list
+                                    if(preferredDevicesList != null) {
+                                        for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                                            if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(
+                                                    entry.getKey().getAddress())) {
+                                                preferredDevicesList.put(entry.getKey(), DEVICE_IS_CONNECTED);
+                                                callerPreferredDevApi = null;
+                                                callerIntent = null;
+                                            }
+                                        }
+                                    }
+                                }
+                                Log.d(TAG, "onRemoveDeviceAutoConnect isScanInProgress ::"+isScanInProgress);
+                                //Start the scan again
+                                if(preferredDevicesList != null &&
+                                        preferredDevicesList.containsValue(DEVICE_IN_PREFERRED_DEVICES_LIST)){
+                                    callerPreferredDevApi = "AutoConnect";
+                                    callerIntent = null;
+                                    gattConnectToPreferredDeviceList(sPListCallBack);
+                                }
+                            }
+                        }
+                    }
+                } catch (RemoteException e) {
+                    Log.e(TAG, "onRemoveDeviceAutoConnect", e);
+                }
+            }
+            else {
+                sPListCallBack.onRemoveDeviceFromPreferredList(result);
+            }
         }
         catch(Exception e) {
             {Log.e(TAG, "onRemoveFromPreferredDeviceListResult", e);}
@@ -1347,7 +1457,9 @@ public class BluetoothService extends IBluetooth.Stub {
     }
     synchronized void onClearPreferredDeviceListResult(int result) {
         try {
-            sPListCallBack.onClearPreferredDeviceList(result);
+            if(sPListCallBack != null) {
+                sPListCallBack.onClearPreferredDeviceList(result);
+            }
         }
         catch(Exception e) {
             {Log.e(TAG, "onClearPreferredDeviceListResult", e);}
@@ -1355,7 +1467,17 @@ public class BluetoothService extends IBluetooth.Stub {
     }
     synchronized void onGattConnectToPreferredDeviceListResult(int result) {
         try {
-            sPListCallBack.onGattConnectToPreferredDeviceList(result);
+            if(callerPreferredDevApi != null && callerPreferredDevApi.equalsIgnoreCase("AutoConnect")
+                    || (callerIntent != null && callerIntent.equalsIgnoreCase("ACTION_ACL_DISCONNECTED"))) {
+                sPListCallBack.onGattAutoConnect(result); //callback to app
+                callerPreferredDevApi = null;
+                callerIntent = null;
+                isScanInProgress = true;
+                Log.d(TAG, "onGattConnectToPreferredDeviceListResult isScanInProgress ::"+isScanInProgress);
+            }
+            else {
+                sPListCallBack.onGattConnectToPreferredDeviceList(result);
+            }
         }
         catch(Exception e) {
             {Log.e(TAG, "onGattConnectToPreferredDeviceListResult", e);}
@@ -1363,7 +1485,38 @@ public class BluetoothService extends IBluetooth.Stub {
     }
     synchronized void onGattCancelConnectToPreferredDeviceListResult(int result) {
         try {
-            sPListCallBack.onGattCancelConnectToPreferredDeviceList(result);
+            Log.d(TAG, "onGattCancelConnectToPreferredDeviceListResult");
+            if((callerPreferredDevApi != null && callerPreferredDevApi.equalsIgnoreCase("AutoConnectCancel")) ||
+                    (callerIntent != null && callerIntent.equalsIgnoreCase("ACTION_ACL_DISCONNECTED"))) {
+                try {
+                    if(sPListCallBack != null) {
+                        if(result == 0) { //result 0 is success
+                            if(callerPreferredDevApi != null &&
+                                    callerPreferredDevApi.equalsIgnoreCase("AutoConnectCancel")){
+                                Log.d(TAG,"AutoConnectCancel....");
+                                //call remove device from preffered devices list
+                                removeFromPreferredDeviceList(btDeviceInPreferredDevList.getAddress(),
+                                        sPListCallBack);
+                            }
+                            else if(callerIntent != null &&
+                                    callerIntent.equalsIgnoreCase("ACTION_ACL_DISCONNECTED")) {
+                                //change the status for the device in preferred devices list
+                                //ie remove device from connect list and add the device to preferred devices list
+                                //call add device to preferred devices list API
+                                addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "onGattAutoConnectCancel", e);
+                }
+            }
+            else if(callerPreferredDevApi != null && callerPreferredDevApi.equalsIgnoreCase("AutoConnect")) {
+                addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
+            }
+            else {//callback for old white list API
+                sPListCallBack.onGattCancelConnectToPreferredDeviceList(result);
+            }
         }
         catch(Exception e) {
             {Log.e(TAG, "onGattCancelConnectToPreferredDeviceListResult", e);}
@@ -2814,9 +2967,27 @@ public class BluetoothService extends IBluetooth.Stub {
                     mBluetoothState.sendMessage(
                         BluetoothAdapterStateMachine.ALL_DEVICES_DISCONNECTED);
                 }
+                gattAclDisconnected("ACTION_ACL_DISCONNECTED", device);
             } else if (ACTION_BT_DISCOVERABLE_TIMEOUT.equals(action)) {
                 Log.i(TAG, "ACTION_BT_DISCOVERABLE_TIMEOUT");
                 setScanMode(BluetoothAdapter.SCAN_MODE_CONNECTABLE, 0);
+            } else if (BluetoothAdapter.ACTION_STATE_CHANGED.equalsIgnoreCase(action)) {
+                  if(intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1) ==
+                          BluetoothAdapter.STATE_OFF) {
+                      Log.d(TAG, "Bluetooth is off");
+                      preferredDevicesList = null;
+                      btDeviceInPreferredDevList = null;
+                      isScanInProgress = false;
+                      callerPreferredDevApi = null;
+                      callerIntent = null;
+                      sPListCallBack = null;
+                  }
+            } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (device == null) {
+                    return;
+                }
+                gattAclConnected(device);
             }
         }
     };
@@ -5056,6 +5227,22 @@ public class BluetoothService extends IBluetooth.Stub {
             return mBluetoothGattProfileHandler.writeResponse(config, uuidStr, status, reqHandle);
             }
     }
+    public boolean addToPreferredDeviceListWrapper(BluetoothDevice btDevObj, IBluetoothPreferredDeviceListCallback pListCallBack,
+            String caller) {
+        boolean status = false;
+        Log.d(TAG, "addToPreferredDeviceListWrapper");
+        sPListCallBack = pListCallBack;
+        callerPreferredDevApi = caller;
+        btDeviceInPreferredDevList = btDevObj;
+        //Stop the scan if it is running
+        if(isScanInProgress == true) {
+            gattCancelConnectToPreferredDeviceList(sPListCallBack);
+        }
+        else {
+            status = addToPreferredDeviceList(btDevObj.getAddress(), sPListCallBack);
+        }
+        return status;
+    }
     public boolean addToPreferredDeviceList(String address, IBluetoothPreferredDeviceListCallback pListCallBack) {
         Log.d(TAG, "addToPreferredDeviceList");
         sPListCallBack = pListCallBack;
@@ -5102,6 +5289,103 @@ public class BluetoothService extends IBluetooth.Stub {
 
         synchronized (mBluetoothGattProfileHandler) {
             return mBluetoothGattProfileHandler.gattCancelConnectToPreferredDeviceList();
+        }
+    }
+    public boolean gattCancelConnectToPreferredDeviceListWrapper(IBluetoothPreferredDeviceListCallback pListCallBack,
+            BluetoothDevice btDevice, String caller) {
+        Log.d(TAG, "gattCancelConnectToPreferredDeviceListWrapper");
+        sPListCallBack = pListCallBack;
+        btDeviceInPreferredDevList = btDevice;
+        callerPreferredDevApi = caller;
+        boolean isDevInPreferredDevList = false;
+        Log.d(TAG, "gattCancelConnectToPreferredDeviceListWrapper isScanInProgress ::"+isScanInProgress);
+        //If scan is in progress, stop the scan
+        if(isScanInProgress == true){
+            mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+
+            synchronized (mBluetoothGattProfileHandler) {
+                return mBluetoothGattProfileHandler.gattCancelConnectToPreferredDeviceList();
+            }
+        }
+        //else remove device from preferred devices list
+        else {
+            if(preferredDevicesList != null) {
+                for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                    if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
+                        isDevInPreferredDevList = true;
+                        break;
+                    }
+                }
+            }
+            if(isDevInPreferredDevList == true) {
+                //call remove device from preferred devices list
+                removeFromPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
+            }
+        }
+        return true;
+    }
+    public void gattAclDisconnected(String caller, BluetoothDevice btDevice) {
+        Log.d(TAG, "gattAclDisconnected");
+        try {
+            callerIntent = caller;
+            btDeviceInPreferredDevList = btDevice;
+            String btAddress = btDevice.getAddress();
+            boolean isDevInPreferredDevList = false;
+            Log.d(TAG, "gattAclDisconnected  isScanInProgress ::"+isScanInProgress);
+            if(preferredDevicesList != null) {
+                for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                    Log.d(TAG, "key ::"+entry.getKey().getAddress());
+                    Log.d(TAG, "value ::"+entry.getValue());
+                    if(btAddress.equalsIgnoreCase(entry.getKey().getAddress())) {
+                        isDevInPreferredDevList = true;
+                        break;
+                    }
+                }
+            }
+            //Stop the scan if the scan is in progress
+            if(isScanInProgress == true) {
+                gattCancelConnectToPreferredDeviceList(sPListCallBack);
+            }
+            //If the ACL_DISCONNECTED intent is received after a preferred devices list device disconnects,
+            //add device to preferred devices list again for auto connection
+            else if(isDevInPreferredDevList == true){
+                addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
+            }
+            else {
+                callerIntent = null;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "gattAclDisconnected", e);
+        }
+    }
+    public void gattAclConnected(BluetoothDevice btDevice) {
+        Log.d(TAG, "gattAclConnected");
+        try {
+            btDeviceInPreferredDevList = btDevice;
+            callerIntent = "ACTION_ACL_CONNECTED";
+            isScanInProgress = false;
+            Log.d(TAG, "gattAclConnected isScanInProgress ::"+isScanInProgress);
+            //false means device connected is not in preferred devices list
+            boolean isDevInPreferredDevList = false;
+            Log.d(TAG, "ACL connected bluetooth device address::"+btDevice.getAddress());
+            if(preferredDevicesList != null) {
+                for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                    if(btDevice.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
+                        if(entry.getValue() == DEVICE_IN_PREFERRED_DEVICES_LIST) {
+                            isDevInPreferredDevList = true;
+                        }
+                        break;
+                    }
+                }
+            }
+            //check whether this device is in preferred devices list
+            if(isDevInPreferredDevList == true) {
+                //call remove_device_from_preferred_devices_list
+                removeFromPreferredDeviceList(btDeviceInPreferredDevList.getAddress(),
+                        sPListCallBack);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "gattAclConnected", e);
         }
     }
     private native static void classInitNative();
