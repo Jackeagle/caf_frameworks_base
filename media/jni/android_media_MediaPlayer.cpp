@@ -79,6 +79,7 @@ private:
     jobject     mParcelArray[MAX_NUM_PARCELS];
     int         mParcelIndex;
     jobject     mParcelCodecConf;
+    bool        mQcMediaPlayer;
 };
 
 JNIMediaPlayerListener::JNIMediaPlayerListener(JNIEnv* env, jobject thiz, jobject weak_thiz)
@@ -104,6 +105,13 @@ JNIMediaPlayerListener::JNIMediaPlayerListener(JNIEnv* env, jobject thiz, jobjec
     for (int i = 0; i < MAX_NUM_PARCELS; i++) {
         mParcelArray[i] = env->NewGlobalRef(createJavaParcelObject(env));
     }
+    mQcMediaPlayer = false;
+    jclass qcclazz = env->FindClass("com/qualcomm/qcmedia/QCMediaPlayer");
+    if (qcclazz != NULL){
+       if(env->IsInstanceOf(thiz,qcclazz)){
+          mQcMediaPlayer = true;
+       }
+    }
 }
 
 JNIMediaPlayerListener::~JNIMediaPlayerListener()
@@ -123,6 +131,7 @@ JNIMediaPlayerListener::~JNIMediaPlayerListener()
         recycleJavaParcelObject(env, mParcelArray[i]);
         env->DeleteGlobalRef(mParcelArray[i]);
     }
+    mQcMediaPlayer = false;
 }
 
 void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *obj)
@@ -131,7 +140,7 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
     if (obj && obj->dataSize() > 0) {
         jobject jParcel = createJavaParcelObject(env);
         if (jParcel != NULL) {
-            if( (fields.qc_post_event != NULL) &&
+            if( (mQcMediaPlayer) &&
                 ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT) ) )
             {
               ALOGD("JNIMediaPlayerListener::notify calling qc_post_event");
@@ -165,7 +174,7 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
             }
         }
     } else {
-        if( (fields.qc_post_event != NULL) &&
+        if( (mQcMediaPlayer) && (fields.qc_post_event != NULL) &&
           ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT) ) )
       {
         ALOGD("JNIMediaPlayerListener::notify calling qc_post_event");
@@ -713,8 +722,7 @@ android_media_MediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_t
           ALOGE("Using QCMediaPlayer....");
         }
         else{
-          fields.qc_post_event = NULL;
-          ALOGE("Not Using QCMediaPlayer,setting qc_post_event to NULL...");
+          ALOGE("Not Using QCMediaPlayer .....");
         }
       }else{
         //clear exception in case FindClass fails above...
