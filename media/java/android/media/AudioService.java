@@ -3625,7 +3625,6 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                    devices |= dev;
                 }
             }
-            if (devices == device) {
                 sendMsg(mAudioHandler,
                         MSG_BROADCAST_AUDIO_BECOMING_NOISY,
                         SENDMSG_REPLACE,
@@ -3634,7 +3633,6 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                         null,
                         0);
                 delay = 1000;
-            }
         }
 
         if (mAudioHandler.hasMessages(MSG_SET_A2DP_CONNECTION_STATE) ||
@@ -3822,7 +3820,11 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                         + (action.equals(Intent.ACTION_USB_AUDIO_ACCESSORY_PLUG) ?
                               "ACTION_USB_AUDIO_ACCESSORY_PLUG" : "ACTION_USB_AUDIO_DEVICE_PLUG")
                         + ", state = " + state + ", card: " + alsaCard + ", device: " + alsaDevice);
-                setWiredDeviceConnectionState(device, state, params);
+                if(state==1) {
+                        handleDeviceConnection((state ==1 ), device, params);
+                } else {
+                        setWiredDeviceConnectionState(device, state, params);
+                }
             } else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
                 boolean broadcast = false;
                 int scoAudioState = AudioManager.SCO_AUDIO_STATE_ERROR;
