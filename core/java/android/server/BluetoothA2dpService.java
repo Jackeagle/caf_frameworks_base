@@ -456,14 +456,16 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
 
                 if (uri == null)
                     return;
-                /*Ignore posting track change intent for uri location content://media/internal/ */
+                /* Ignore posting of track change intent for uri location
+                   content://media/internal/ content://settings/system/alarm_alertmUri */
                 String uriPath = uri.toString();
                 String[] value = uriPath.split("//");
 
                 if (value != null && value.length > 1) {
                     String[] value1 = value[1].split("/");
                     if(value1 != null && value1.length > 1) {
-                       if ((value1[0].equals("media")) && (!value1[1].equals("external"))) {
+                       if (((value1[0].equals("media")) && (!value1[1].equals("external"))) ||
+                           (value1[0].equals("settings"))) {
                            log("Internal audio file data, ignoring");
                            return;
                        }
