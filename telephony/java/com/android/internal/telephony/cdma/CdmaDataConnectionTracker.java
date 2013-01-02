@@ -172,7 +172,10 @@ public class CdmaDataConnectionTracker extends DataConnectionTracker {
 
     @Override
     public synchronized State getState(String apnType) {
-        return mState;
+        if (isApnTypeActive(apnType)) {
+            return mState;
+        }
+        return State.IDLE;
     }
 
     @Override
