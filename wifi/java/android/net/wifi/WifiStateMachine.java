@@ -3308,8 +3308,6 @@ public class WifiStateMachine extends StateMachine {
                     }
                     break;
                 case WifiMonitor.SCAN_RESULTS_EVENT:
-                    /* Set the scan setting back to "connect" mode */
-                    mWifiNative.setScanResultHandling(CONNECT_MODE);
                     /* Handle scan results */
                     return NOT_HANDLED;
                 case WifiMonitor.NETWORK_CONNECTION_EVENT:
@@ -3378,12 +3376,6 @@ public class WifiStateMachine extends StateMachine {
                     }
                     break;
                 case CMD_START_SCAN:
-                    /* When the network is connected, re-scanning can trigger
-                     * a reconnection. Put it in scan-only mode during scan.
-                     * When scan results are received, the mode is switched
-                     * back to CONNECT_MODE.
-                     */
-                    mWifiNative.setScanResultHandling(SCAN_ONLY_MODE);
                     /* Have the parent state handle the rest */
                     return NOT_HANDLED;
                     /* Ignore connection to same network */
