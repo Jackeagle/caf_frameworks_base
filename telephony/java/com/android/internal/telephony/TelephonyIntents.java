@@ -309,4 +309,16 @@ public class TelephonyIntents {
      */
     public static final String ACTION_DEFAULT_SUBSCRIPTION_CHANGED
             = "qualcomm.intent.action.ACTION_DEFAULT_SUBSCRIPTION_CHANGED";
+
+     /**
+     * Managed Roaming Intent. Used by Phone App to show popup to the end user that location update
+     * request rejected with status as "Persistent location update reject", so user can try to do
+     * location update on other Network:</p>
+     *
+     * <p class="note">This is a protected intent that can only be sent
+     * by the system.
+     * @hide
+     */
+    public static final String ACTION_MANAGED_ROAMING_IND
+            = "qualcomm.intent.action.ACTION_MANAGED_ROAMING_IND";
 }
