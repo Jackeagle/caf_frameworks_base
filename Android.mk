@@ -132,6 +132,19 @@ LOCAL_SRC_FILES += \
 	core/java/android/hardware/ISerialManager.aidl \
 	core/java/android/hardware/display/IDisplayManager.aidl \
 	core/java/android/hardware/display/IDisplayManagerCallback.aidl \
+	core/java/android/hardware/fmradio/FmConfig.java \
+	core/java/android/hardware/fmradio/FmReceiver.java \
+	core/java/android/hardware/fmradio/FmReceiverJNI.java \
+	core/java/android/hardware/fmradio/FmRxControls.java \
+	core/java/android/hardware/fmradio/FmRxEvCallbacksAdaptor.java \
+	core/java/android/hardware/fmradio/FmRxEvCallbacks.java \
+	core/java/android/hardware/fmradio/FmRxEventListner.java \
+	core/java/android/hardware/fmradio/FmRxRdsData.java \
+	core/java/android/hardware/fmradio/FmTransceiver.java \
+	core/java/android/hardware/fmradio/FmTransmitterCallbacksAdaptor.java \
+	core/java/android/hardware/fmradio/FmTransmitterCallbacks.java \
+	core/java/android/hardware/fmradio/FmTransmitter.java \
+	core/java/android/hardware/fmradio/FmTxEventListner.java \
 	core/java/android/hardware/input/IInputManager.aidl \
 	core/java/android/hardware/input/IInputDevicesChangedListener.aidl \
 	core/java/android/hardware/usb/IUsbManager.aidl \
