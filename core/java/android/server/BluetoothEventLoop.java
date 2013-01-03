@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2012 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2013 Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -448,7 +448,7 @@ class BluetoothEventLoop {
             String adapterObjectPath = adapterProperties.getObjectPath();
             if ((value != null)  && name.equals("UUIDs")) {
                 adapterProperties.setProperty(name, value);
-                mBluetoothService.updateBluetoothState(value);
+                updateBTState(value);
             } else if ((value != null) && (value.startsWith(adapterObjectPath))) {
                 // Devices Prop expect value starts with obj path
                 adapterProperties.setProperty(name, value);
@@ -461,6 +461,20 @@ class BluetoothEventLoop {
         } else if (name.equals("Class")) {
             adapterProperties.setProperty(name, propValues[1]);
         }
+    }
+
+    /** This is the test function for on off lockup.
+     * This function is called from Bluetooth Event Loop when onPropertyChanged
+     * for adapter comes in with UUID property.
+     * @param uuidsThe uuids of adapter as reported by Bluez.
+     */
+    private void updateBTState(String uuids) {
+        ParcelUuid[] adapterUuids =  mBluetoothService.convertStringToParcelUuid(uuids);
+        if (mBluetoothService.mAdapterUuids != null &&
+            BluetoothUuid.containsAllUuids(adapterUuids, mBluetoothService.mAdapterUuids) ) {
+            mBluetoothState.sendMessage(BluetoothAdapterStateMachine.SERVICE_RECORD_LOADED);
+        }
+
     }
 
     /**
