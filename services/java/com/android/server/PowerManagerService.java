@@ -19,6 +19,7 @@ package com.android.server;
 import com.android.internal.app.IBatteryStats;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.pm.ShutdownThread;
+import com.qualcomm.util.MpqUtils;
 
 import android.app.ActivityManagerNative;
 import android.app.IActivityManager;
@@ -772,7 +773,11 @@ public class PowerManagerService extends IPowerManager.Stub
 
     private void updateWakeLockLocked() {
         final int stayOnConditions = getStayOnConditionsLocked();
-        if (stayOnConditions != 0 && mBatteryService.isPowered(stayOnConditions)) {
+
+        // If its an MPQ specific target, stay always ON
+        // as that is very relevant for TV / Set top box
+        if ( (MpqUtils.isTargetMpq() == true) ||
+                (stayOnConditions != 0 && mBatteryService.isPowered(stayOnConditions)) ) {
             // keep the device on if we're plugged in and mStayOnWhilePluggedIn is set.
             mStayOnWhilePluggedInScreenDimLock.acquire();
             mStayOnWhilePluggedInPartialLock.acquire();
