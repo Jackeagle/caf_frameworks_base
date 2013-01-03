@@ -122,7 +122,7 @@ public final class BluetoothDevice implements Parcelable {
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_RSSI_UPDATE =
-            "android.bluetooth.device.action.RSSI_UPDATE";
+            "qualcomm.bluetooth.device.action.RSSI_UPDATE";
     /**
      * Broadcast Action: Negotiated connection parameters update
      * for the connection between the Gatt server and the remote GATT
@@ -133,7 +133,7 @@ public final class BluetoothDevice implements Parcelable {
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_LE_CONN_PARAMS =
-            "android.bluetooth.device.action.LE_CONN_PARAMS";
+            "qualcomm.bluetooth.device.action.LE_CONN_PARAMS";
 
     /**
      * Broadcast Action: Indicates a low level (ACL) connection has been
@@ -225,7 +225,7 @@ public final class BluetoothDevice implements Parcelable {
      * Used as an UINT 16 extra field in {ACTION_LE_CONN_PARAMS} intent.
      * It contains the negotiated connection interval value after establishing LE connection.
      * @hide */
-    public static final String EXTRA_CONN_INTERVAL = "android.bluetooth.device.extra.CONN_INTERVAL";
+    public static final String EXTRA_CONN_INTERVAL = "qualcomm.bluetooth.device.extra.CONN_INTERVAL";
 
     /**
      * Used as an Parcelable {@link BluetoothClass} extra field in {@link
@@ -254,7 +254,7 @@ public final class BluetoothDevice implements Parcelable {
             "android.bluetooth.device.extra.PREVIOUS_BOND_STATE";
 
     /** @hide */
-    public static final String EXTRA_SECURE_PAIRING = "android.bluetooth.device.extra.SECURE";
+    public static final String EXTRA_SECURE_PAIRING = "qualcomm.bluetooth.device.extra.SECURE";
 
     /**
      * Indicates the remote device is not bonded (paired).
@@ -407,7 +407,7 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public static final String ACTION_GATT =
-            "android.bluetooth.device.action.GATT";
+            "qualcomm.bluetooth.device.action.GATT";
 
     /** A bond attempt succeeded
      * @hide */
@@ -525,13 +525,13 @@ public final class BluetoothDevice implements Parcelable {
      * Contains the object paths of the GATT based services on remote device.
      * @hide
      */
-    public static final String EXTRA_GATT = "android.bluetooth.device.extra.GATT";
+    public static final String EXTRA_GATT = "qualcomm.bluetooth.device.extra.GATT";
     /**
      * Used as an extra field in ACTION_GATT intent.
      * Contains the result code for GATT service discovery.
      * @hide
      */
-    public static final String EXTRA_GATT_RESULT = "android.bluetooth.device.extra.GATT_RESULT";
+    public static final String EXTRA_GATT_RESULT = "qualcomm.bluetooth.device.extra.GATT_RESULT";
 
     /** A GATT request was successful.
      * @hide */
@@ -559,13 +559,13 @@ public final class BluetoothDevice implements Parcelable {
      * Used as an extra field for SAP state change events.
      * @hide
      */
-    public static final String SAP_STATE_CHANGED = "com.android.bluetooth.sap.statechanged";
+    public static final String SAP_STATE_CHANGED = "com.qualcomm.bluetooth.sap.statechanged";
 
     /**
      * Used as an extra field for DUN state change events.
      * @hide
      */
-    public static final String DUN_STATE_CHANGED = "com.android.bluetooth.dun.statechanged";
+    public static final String DUN_STATE_CHANGED = "com.qualcomm.bluetooth.dun.statechanged";
     /**
      * Lazy initialization. Guaranteed final after first object constructed, or
      * getService() called.
@@ -1363,7 +1363,7 @@ public final class BluetoothDevice implements Parcelable {
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_GATT_SERVICE =
-            "android.bleutooth.device.action.GATT_SERVICE";
+            "qualcomm.bleutooth.device.action.GATT_SERVICE";
 
   /**
      * Broadcast Action
@@ -1372,7 +1372,7 @@ public final class BluetoothDevice implements Parcelable {
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_GATT_SERVICE_CHANGED =
-            "android.bleutooth.device.action.GATT_SERVICES_CHANGED";
+            "qualcomm.bleutooth.device.action.GATT_SERVICES_CHANGED";
 
    /**
      * Get GATT-based service for a given UUID.

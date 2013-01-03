@@ -162,10 +162,10 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int GATT_INTENT_DELAY = 30000;
 
     public static final String SAP_STATECHANGE_INTENT =
-            "com.android.bluetooth.sap.statechanged";
+            "com.qualcomm.bluetooth.sap.statechanged";
 
     public static final String DUN_STATECHANGE_INTENT =
-            "com.android.bluetooth.dun.statechanged";
+            "com.qualcomm.bluetooth.dun.statechanged";
 
     private static final String SAP_UUID = "0000112D-0000-1000-8000-00805F9B34FB";
     private static final String DUN_UUID = "00001103-0000-1000-8000-00805F9B34FB";
@@ -243,7 +243,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private Intent mDiscoverableTimeoutIntent;
     private PendingIntent mPendingDiscoverableTimeout;
     private static final String ACTION_BT_DISCOVERABLE_TIMEOUT =
-             "android.bluetooth.service.action.DISCOVERABLE_TIMEOUT";
+             "qualcomm.bluetooth.service.action.DISCOVERABLE_TIMEOUT";
 
     public IBluetoothPreferredDeviceListCallback sPListCallBack;
 
