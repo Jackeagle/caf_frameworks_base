@@ -1737,6 +1737,17 @@ public interface CommandsInterface {
     */
     public void getQosStatus (int qosId, Message result);
 
+    /**
+     * Sets the transmit power
+     *
+     * @param powerLevel Transmit power level to set. One of:
+     *            TRANSMIT_POWER_DEFAULT
+     *            TRANSMIT_POWER_WIFI_HOTSPOT
+     * @param result Callback message contains the information of
+     *            SUCCESS/FAILURE.
+     */
+    void setTransmitPower(int powerLevel, Message result);
+
    /**
      * Sets user selected subscription at Modem.
      *
