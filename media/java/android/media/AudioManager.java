@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1416,6 +1419,47 @@ public class AudioManager {
         }
     }
 
+    /**
+     * Sets the audio in call mode.
+     * <p>
+     * This function is used by the telephony layer to notify Audio Manager that there is
+     * an active voice call. This function will give the state for VoLTE and CS call.
+     *
+     * @hide
+     * @param state  This parameter is provided by the telephony to differentiate which
+     *               type of voice call is active
+     */
+    public void setInCallMode(int state) {
+        IAudioService service = getService();
+        if (((state & CS_ACTIVE) != 0) && ((state & CS_ACTIVE_SESSION2) != 0) &&
+            ((state & IMS_ACTIVE) != 0)) {
+              Log.e(TAG, "Invalid call state for CS & VoLTE");
+              return;
+        }
+        try {
+                service.setInCallMode(state, mICallBack);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Dead object in setInCallMode", e);
+        }
+    }
+
+    /**
+     * Returns the current state of all calls.
+     *
+     * @hide
+     * @return      Returns the current current audio state from the HAL.
+     */
+    public int getInCallMode() {
+        IAudioService service = getService();
+        try {
+            return service.getInCallMode();
+        } catch (RemoteException e) {
+            Log.e(TAG, "Dead object in getInCallMode", e);
+            return MODE_INVALID;
+        }
+    }
+
+
     /* modes for setMode/getMode/setRoute/getRoute */
     /**
      * Audio harware modes.
@@ -1444,6 +1488,44 @@ public class AudioManager {
      * In communication audio mode. An audio/video chat or VoIP call is established.
      */
     public static final int MODE_IN_COMMUNICATION   = AudioSystem.MODE_IN_COMMUNICATION;
+
+    /* Modes for IMS and CS call */
+    /**
+     * @hide Mode for CS inactive.
+     */
+    public static final int CS_INACTIVE           = AudioSystem.CS_INACTIVE;
+    /**
+     * @hide Mode for CS active.
+     */
+    public static final int CS_ACTIVE             = AudioSystem.CS_ACTIVE;
+    /**
+     * @hide Mode for CS hold.
+     */
+    public static final int CS_HOLD               = AudioSystem.CS_HOLD;
+    /**
+     * @hide Mode for IMS inactive.
+     */
+    public static final int IMS_INACTIVE          = AudioSystem.IMS_INACTIVE;
+    /**
+     * @hide Mode for IMS active.
+     */
+    public static final int IMS_ACTIVE            = AudioSystem.IMS_ACTIVE;
+    /**
+     * @hide Mode for IMS hold.
+     */
+    public static final int IMS_HOLD              = AudioSystem.IMS_HOLD;
+    /**
+     * @hide Mode for CS Session2 inactive.
+     */
+    public static final int CS_INACTIVE_SESSION2  = AudioSystem.CS_INACTIVE_SESSION2;
+    /**
+     * @hide Mode for CS Session2 active.
+     */
+    public static final int CS_ACTIVE_SESSION2    = AudioSystem.CS_ACTIVE_SESSION2;
+    /**
+     * @hide Mode for CS Session2 hold.
+     */
+    public static final int CS_HOLD_SESSION2      = AudioSystem.CS_HOLD_SESSION2;
 
     /* Routing bits for setRouting/getRouting API */
     /**
