@@ -675,4 +675,8 @@ class UsimDataDownloadCommands extends BaseCommands {
     @Override
     public void setDataSubscription (Message result) {
     }
+
+    @Override
+    public void setTransmitPower(int powerLevel, Message result) {
+    }
 }
