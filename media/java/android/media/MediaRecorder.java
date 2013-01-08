@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -183,6 +184,12 @@ public class MediaRecorder
          * Audio source for remote submix.
          */
         public static final int REMOTE_SUBMIX_SOURCE = 8;
+
+        /** @hide */
+        public static final int FM_RX = 9;
+
+        /** @hide */
+        public static final int FM_RX_A2DP = 10;
     }
 
     /**
@@ -313,7 +320,7 @@ public class MediaRecorder
     public static final int getAudioSourceMax() {
         // FIXME disable selection of the remote submxi source selection once test code
         //       doesn't rely on it
-        return AudioSource.REMOTE_SUBMIX_SOURCE;
+        return AudioSource.FM_RX_A2DP;
         //return AudioSource.VOICE_COMMUNICATION;
     }
 

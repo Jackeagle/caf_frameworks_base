@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1764,6 +1765,18 @@ public final class Settings {
         public static final String VOLUME_MUSIC = "volume_music";
 
         /**
+         * FM volume (float in the range 0.0f to 1.0f).
+         * @hide
+         */
+        public static final String VOLUME_FM = "volume_fm";
+
+        /**
+         * Dummy string. Dummy string for padding
+         * @hide
+         */
+        public static final String DUMMY_STRING_FOR_PADDING = "";
+
+        /**
          * Alarm volume. This is used internally, changing this
          * value will not change the volume. See AudioManager.
          */
@@ -1831,7 +1844,9 @@ public final class Settings {
          */
         public static final String[] VOLUME_SETTINGS = {
             VOLUME_VOICE, VOLUME_SYSTEM, VOLUME_RING, VOLUME_MUSIC,
-            VOLUME_ALARM, VOLUME_NOTIFICATION, VOLUME_BLUETOOTH_SCO
+            VOLUME_ALARM, VOLUME_NOTIFICATION, VOLUME_BLUETOOTH_SCO,
+            DUMMY_STRING_FOR_PADDING,DUMMY_STRING_FOR_PADDING,
+            DUMMY_STRING_FOR_PADDING,VOLUME_FM
         };
 
         /**
@@ -2292,6 +2307,7 @@ public final class Settings {
             VOLUME_SYSTEM,
             VOLUME_RING,
             VOLUME_MUSIC,
+            VOLUME_FM,
             VOLUME_ALARM,
             VOLUME_NOTIFICATION,
             VOLUME_BLUETOOTH_SCO,
