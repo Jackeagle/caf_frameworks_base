@@ -48,6 +48,9 @@ public class WifiP2pGroup implements Parcelable {
     /** The passphrase used for WPA2-PSK */
     private String mPassphrase;
 
+    /** GO operating Frequency*/
+    private int mGoOperFreq;
+
     private String mInterface;
 
     /** P2P group started string pattern */
@@ -96,7 +99,7 @@ public class WifiP2pGroup implements Parcelable {
 
             mNetworkName = match.group(1);
             //freq and psk are unused right now
-            //int freq = Integer.parseInt(match.group(2));
+            mGoOperFreq = Integer.parseInt(match.group(2));
             //String psk = match.group(3);
             mPassphrase = match.group(4);
             mOwner = new WifiP2pDevice(match.group(5));
@@ -188,6 +191,18 @@ public class WifiP2pGroup implements Parcelable {
         return Collections.unmodifiableCollection(mClients);
     }
 
+     /** @hide */
+    public int setGoOperatingFrequency(int GoOperFreq) {
+        return mGoOperFreq = GoOperFreq;
+    }
+
+    /** @hide
+    * This is used to fetch the GO operating frequency
+    */
+    public int getGoOperatingFrequency() {
+        return mGoOperFreq;
+    }
+
     /** @hide */
     public void setPassphrase(String passphrase) {
         mPassphrase = passphrase;
@@ -238,6 +253,7 @@ public class WifiP2pGroup implements Parcelable {
             for (WifiP2pDevice d : source.getClientList()) mClients.add(d);
             mPassphrase = source.getPassphrase();
             mInterface = source.getInterface();
+            mGoOperFreq = source.getGoOperatingFrequency();
         }
     }
 
@@ -252,6 +268,7 @@ public class WifiP2pGroup implements Parcelable {
         }
         dest.writeString(mPassphrase);
         dest.writeString(mInterface);
+        dest.writeInt(mGoOperFreq);
     }
 
     /** Implement the Parcelable interface */
@@ -268,6 +285,7 @@ public class WifiP2pGroup implements Parcelable {
                 }
                 group.setPassphrase(in.readString());
                 group.setInterface(in.readString());
+                group.setGoOperatingFrequency(in.readInt());
                 return group;
             }
 
