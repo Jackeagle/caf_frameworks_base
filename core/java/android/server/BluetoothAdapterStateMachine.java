@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2011 The Android Open Source Project
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2013, Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -324,23 +324,23 @@ final class BluetoothAdapterStateMachine extends StateMachine {
 
             boolean retValue = HANDLED;
             switch(message.what) {
-                case SERVICE_RECORD_LOADED:
-                    transitionTo(mWarmUp);
-                    break;
                 case PREPARE_BLUETOOTH_TIMEOUT:
                     Log.e(TAG, "Bluetooth adapter SDP failed to load");
                     shutoffBluetooth();
                     transitionTo(mPowerOff);
                     broadcastState(BluetoothAdapter.STATE_OFF);
                     break;
+                case POWER_STATE_CHANGED: // handle this at WarmUp state
+                    transitionTo(mWarmUp);
+                    mBluetoothService.updateSdpRecords();
+                    break;
                 case USER_TURN_ON: // handle this at HotOff state
                 case TURN_ON_CONTINUE: // Once in HotOff state, continue turn bluetooth
-                                       // on to the BluetoothOn state
+                                      // on to the BluetoothOn state
                 case AIRPLANE_MODE_ON:
                 case AIRPLANE_MODE_OFF:
                 case PER_PROCESS_TURN_ON:
                 case PER_PROCESS_TURN_OFF:
-                case POWER_STATE_CHANGED: // handle this at WarmUp state
                     deferMessage(message);
                     break;
                 case USER_TURN_OFF:
@@ -370,6 +370,11 @@ final class BluetoothAdapterStateMachine extends StateMachine {
 
             boolean retValue = HANDLED;
             switch(message.what) {
+                case SERVICE_RECORD_LOADED:
+                    removeMessages(PREPARE_BLUETOOTH_TIMEOUT);
+                    transitionTo(mHotOff);
+                    deferMessage(obtainMessage(TURN_ON_CONTINUE));
+                    break;
                 case POWER_STATE_CHANGED:
                     if (!((Boolean) message.obj)) {
                         removeMessages(PREPARE_BLUETOOTH_TIMEOUT);
@@ -378,7 +383,6 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
-                        transitionTo(mHotOff);
                     }
                     break;
                 case PREPARE_BLUETOOTH_TIMEOUT:
