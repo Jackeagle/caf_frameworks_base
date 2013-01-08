@@ -5762,6 +5762,10 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         mSendScroll.send(false);
 
         if (!mInOverScrollMode) {
+            if (mWebView.getGlobalVisibleRect(mGlobalVisibleRect) &&
+                !mGlobalVisibleRect.equals(mLastGlobalRect)) {
+                 invalidate();
+            }
             // update WebKit if visible title bar height changed. The logic is same
             // as getVisibleTitleHeightImpl.
             int titleHeight = getTitleHeight();
