@@ -273,6 +273,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
 
     static final String SOCKET_NAME_RIL = "rild";
     static final String SOCKET_NAME_RIL1 = "rild1";
+    static final String SOCKET_NAME_RIL2 = "rild2";
 
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
 
@@ -540,8 +541,10 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 // Use 'rild1' socket for second instance in DSDS and Multi rild enabled
                 if (mInstanceId == null || mInstanceId == 0 || multiRild == false) {
                     rilSocket = SOCKET_NAME_RIL;
-                } else {
+                } else if (mInstanceId == 1) {
                     rilSocket = SOCKET_NAME_RIL1;
+                } else if (mInstanceId == 2) {
+                    rilSocket = SOCKET_NAME_RIL2;
                 }
 
                 try {
@@ -586,7 +589,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
                 mSocket = s;
                 Log.i(LOG_TAG, "Connected to '" + rilSocket + "' socket");
 
-                String str = (mInstanceId == null || mInstanceId == 0 || multiRild == true) ? "SUB1" : "SUB2";
+                String str = (mInstanceId == null || mInstanceId == 0 || multiRild == true)
+                             ? "SUB1" : (mInstanceId == 1) ? "SUB2" : "SUB3";
 
                 // It's possible that RIL(2) connects before RIL(1).
                 // In such cases, rild should be able to identify

@@ -48,6 +48,7 @@ import android.os.Message;
 import android.os.Registrant;
 import android.os.RegistrantList;
 import android.provider.Settings;
+import android.telephony.MSimTelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -95,8 +96,9 @@ public class SubscriptionManager extends Handler {
 
     //***** Class Variables
     private static SubscriptionManager sSubscriptionManager;
+    private int mNumPhones = MSimTelephonyManager.getDefault().getPhoneCount();
 
-    public static int NUM_SUBSCRIPTIONS = 2;
+    public static int NUM_SUBSCRIPTIONS = MSimTelephonyManager.getDefault().getPhoneCount();
 
     // Number of fields in the user preferred subscription property
     private static int USER_PREF_SUB_FIELDS = 6;
@@ -141,7 +143,9 @@ public class SubscriptionManager extends Handler {
 
     private boolean mSetSubsModeRequired = true;
 
-    private boolean[] mCardInfoAvailable = {false, false};
+    private boolean[] mCardInfoAvailable = new boolean[mNumPhones];
+    private boolean[] mIsNewCard = new boolean[mNumPhones];
+    private boolean[] mRadioOn = new boolean[mNumPhones];
 
     private HashMap<SubscriptionId, Subscription> mActivatePending;
     private HashMap<SubscriptionId, Subscription> mDeactivatePending;
@@ -162,23 +166,19 @@ public class SubscriptionManager extends Handler {
 
     private boolean mDataActive = false;
 
-    private boolean[] mIsNewCard = {false, false};
-
     private Message mSetDdsCompleteMsg;
 
     private RegistrantList mSetSubscriptionRegistrants = new RegistrantList();
 
     private String[] mSubResult = new String [NUM_SUBSCRIPTIONS];
 
-    private boolean[] mRadioOn = {false, false};
-
-
     /**
      * Subscription Id
      */
     private enum SubscriptionId {
         SUB0,
-        SUB1
+        SUB1,
+        SUB2
     }
 
     /**
@@ -222,7 +222,7 @@ public class SubscriptionManager extends Handler {
         getUserPreferredSubs();
 
         mCardSubMgr = CardSubscriptionManager.getInstance(context, uiccController, ci);
-        for (int i=0; i < MSimConstants.RIL_MAX_CARDS; i++) {
+        for (int i=0; i < mNumPhones; i++) {
             mCardSubMgr.registerForCardInfoAvailable(i, this,
                     EVENT_CARD_INFO_AVAILABLE, new Integer(i));
             mCardSubMgr.registerForCardInfoUnavailable(i, this,
@@ -237,19 +237,24 @@ public class SubscriptionManager extends Handler {
             mCi[i].registerForOffOrNotAvailable(this, EVENT_RADIO_OFF_OR_NOT_AVAILABLE,
                     new Integer(i));
             mCi[i].registerForOn(this, EVENT_RADIO_ON, new Integer(i));
+
+            mCardInfoAvailable[i] = false;
+            mIsNewCard[i] = false;
+            mRadioOn[i] = false;
         }
 
-        mSubDeactivatedRegistrants = new RegistrantList[MSimConstants.RIL_MAX_CARDS];
-        mSubActivatedRegistrants = new RegistrantList[MSimConstants.RIL_MAX_CARDS];
-        for (int i = 0; i < MSimConstants.RIL_MAX_CARDS; i++) {
+        mSubDeactivatedRegistrants = new RegistrantList[mNumPhones];
+        mSubActivatedRegistrants = new RegistrantList[mNumPhones];
+        for (int i = 0; i < mNumPhones; i++) {
             mSubDeactivatedRegistrants[i] = new RegistrantList();
             mSubActivatedRegistrants[i] = new RegistrantList();
         }
         mActivatePending = new HashMap<SubscriptionId, Subscription>();
         mDeactivatePending = new HashMap<SubscriptionId, Subscription>();
-        for (SubscriptionId t : SubscriptionId.values()) {
-            mActivatePending.put(t, null);
-            mDeactivatePending.put(t, null);
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
+            mActivatePending.put(sub, null);
+            mDeactivatePending.put(sub, null);
         }
 
         //mMSimProxyManager = MSimProxyManager.getInstance();
@@ -258,8 +263,9 @@ public class SubscriptionManager extends Handler {
         logd("In MSimProxyManager constructor current active dds is:" + mCurrentDds);
 
         mCurrentSubscriptions = new HashMap<SubscriptionId, PhoneSubscriptionInfo>();
-        for (SubscriptionId t : SubscriptionId.values()) {
-            mCurrentSubscriptions.put(t, new PhoneSubscriptionInfo());
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
+            mCurrentSubscriptions.put(sub, new PhoneSubscriptionInfo());
         }
         logd("Constructor - Exit");
     }
@@ -663,55 +669,88 @@ public class SubscriptionManager extends Handler {
     }
 
     /**
+     * Get the next available subscription
+     */
+    private int getNextActiveSubscription(int sub) {
+        int subscription = sub;
+        SubscriptionId subId;
+        do {
+            subscription = (subscription + 1) < mNumPhones
+                           ? (subscription + 1)
+                           : MSimConstants.SUB1;
+            subId = SubscriptionId.values()[subscription];
+            if (getCurrentSubscriptionStatus(subId) == SubscriptionStatus.SUB_ACTIVATED) {
+                return subscription;
+            }
+        } while (sub != subscription);
+        Log.e(LOG_TAG, "getNextActiveSubscription should not come here !!!!!");
+        return -1; // This should not come
+    }
+
+    /**
      * Updates the subscriptions preferences based on the number of active subscriptions.
      */
     private void updateSubPreferences() {
         int activeSubCount = 0;
-        Subscription activeSub = null;
 
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             if (getCurrentSubscriptionStatus(sub) == SubscriptionStatus.SUB_ACTIVATED) {
                 activeSubCount++;
-                activeSub = getCurrentSubscription(sub);
             }
         }
 
-        // If there is only one active subscription, set user preferred settings
-        // for voice/sms/data subscription to this subscription.
-        if (activeSubCount == 1) {
-            logd("updateSubPreferences: only SUB:" + activeSub.subId
-                    + " is Active.  Update the default/voice/sms and data subscriptions");
-            MSimPhoneFactory.setVoiceSubscription(activeSub.subId);
-            MSimPhoneFactory.setSMSSubscription(activeSub.subId);
-            MSimPhoneFactory.setPromptEnabled(false);
-
+        // If preferred subscription is deactivated then check next available subscription and
+        // set that subscription as preferred for voice/sms/data.
+        if (activeSubCount > 0 && activeSubCount < mNumPhones) {
+            int subscription = MSimPhoneFactory.getVoiceSubscription();
+            SubscriptionId subId = SubscriptionId.values()[subscription];
+            if (getCurrentSubscriptionStatus(subId) != SubscriptionStatus.SUB_ACTIVATED) {
+                subscription = getNextActiveSubscription(subscription);
+                MSimPhoneFactory.setVoiceSubscription(subscription);
+                if (activeSubCount == 1) {
+                    MSimPhoneFactory.setPromptEnabled(false);
+                }
+            }
+            subscription = MSimPhoneFactory.getSMSSubscription();
+            subId = SubscriptionId.values()[subscription];
+            if (getCurrentSubscriptionStatus(subId) != SubscriptionStatus.SUB_ACTIVATED) {
+                subscription = getNextActiveSubscription(subscription);
+                MSimPhoneFactory.setSMSSubscription(subscription);
+            }
             logd("updateSubPreferences: current defaultSub = "
                     + MSimPhoneFactory.getDefaultSubscription());
             logd("updateSubPreferences: current mCurrentDds = " + mCurrentDds);
-            if (MSimPhoneFactory.getDefaultSubscription() != activeSub.subId) {
-                MSimPhoneFactory.setDefaultSubscription(activeSub.subId);
+            subscription = MSimPhoneFactory.getDefaultSubscription();
+            subId = SubscriptionId.values()[subscription];
+            if (getCurrentSubscriptionStatus(subId) != SubscriptionStatus.SUB_ACTIVATED) {
+                subscription = getNextActiveSubscription(subscription);
+                MSimPhoneFactory.setDefaultSubscription(subscription);
             }
 
-            if (mCurrentDds != activeSub.subId) {
+            subId = SubscriptionId.values()[mCurrentDds];
+            if (getCurrentSubscriptionStatus(subId) != SubscriptionStatus.SUB_ACTIVATED) {
+                subscription = getNextActiveSubscription(mCurrentDds);
+
                 // Currently selected DDS subscription is not in activated state.
-                // So set the DDS to the only active subscription available now.
+                // So set the DDS to the next subscription available now.
                 // Directly set the Data Subscription Source to the only activeSub if it
                 // is READY. If the SUBSCRIPTION_READY event is not yet received on this
                 // subscription, wait for the event to set the Data Subscription Source.
-                SubscriptionId subId = SubscriptionId.values()[activeSub.subId];
+                subId = SubscriptionId.values()[subscription];
                 if (getCurrentSubscriptionReadiness(subId)) {
-                    mQueuedDds = activeSub.subId;
+                    mQueuedDds = subscription;
                     Message callback = Message.obtain(this, EVENT_SET_DATA_SUBSCRIPTION_DONE,
-                            Integer.toString(activeSub.subId));
+                            Integer.toString(subscription));
                     mDisableDdsInProgress = true;
-                    logd("update setDataSubscription to " + activeSub.subId);
-                    mCi[activeSub.subId].setDataSubscription(callback);
+                    logd("update setDataSubscription to " + subscription);
+                    mCi[subscription].setDataSubscription(callback);
                     mSetDdsRequired = false;
                 } else {
                     // Set the flag and update the mCurrentDds, so that when subscription
                     // ready event receives, it will set the dds properly.
                     mSetDdsRequired = true;
-                    mCurrentDds = activeSub.subId;
+                    mCurrentDds = subscription;
                     //MSimPhoneFactory.setDataSubscription(mCurrentDds);
                 }
             }
@@ -742,13 +781,13 @@ public class SubscriptionManager extends Handler {
         int availableCards = 0;
         mAllCardsStatusAvailable = true;
 
-        for (int i = 0; i < MSimConstants.RIL_MAX_CARDS; i++) {
+        for (int i = 0; i < mNumPhones; i++) {
             if (mCardInfoAvailable[i] || mCardSubMgr.isCardAbsentOrError(i)) {
                 availableCards++;
             }
         }
         // Process any pending activate requests if there is any.
-        if (availableCards == MSimConstants.RIL_MAX_CARDS
+        if (availableCards == mNumPhones
             && !mSetSubscriptionInProgress) {
             processActivateRequests();
         }
@@ -776,7 +815,7 @@ public class SubscriptionManager extends Handler {
            return;
         }
 
-        for (int cardIndex = 0; cardIndex < MSimConstants.RIL_MAX_CARDS; cardIndex++) {
+        for (int cardIndex = 0; cardIndex < mNumPhones; cardIndex++) {
             updateActivatePendingList(cardIndex);
         }
 
@@ -880,7 +919,8 @@ public class SubscriptionManager extends Handler {
     }
 
     private boolean isPresentInActivatePendingList(Subscription userSub) {
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             Subscription actPendingSub = mActivatePending.get(sub);
             if (userSub != null && userSub.isSame(actPendingSub)) {
                 return true;
@@ -949,7 +989,12 @@ public class SubscriptionManager extends Handler {
         // Set subscription is required if both the cards are unavailable
         // and when those are available next time!
 
-        mSetSubsModeRequired = !mCardInfoAvailable[0] && !mCardInfoAvailable[1];
+        boolean subscriptionRequired = true;
+        for (int i = 0; i < mNumPhones; i++) {
+            subscriptionRequired = subscriptionRequired && !mCardInfoAvailable[i];
+        }
+        mSetSubsModeRequired = subscriptionRequired;
+
         logd("processCardInfoNotAvailable mSetSubsModeRequired = " + mSetSubsModeRequired);
 
         // Reset the current subscription and notify the subscriptions deactivated.
@@ -958,7 +1003,8 @@ public class SubscriptionManager extends Handler {
                 || reason == CardUnavailableReason.REASON_SIM_REFRESH_RESET) {
             // Card has been removed from slot - cardIndex.
             // Mark the active subscription from this card as de-activated!!
-            for (SubscriptionId sub: SubscriptionId.values()) {
+            for (int i = 0; i < mNumPhones; i++) {
+                SubscriptionId sub = SubscriptionId.values()[i];
                 if (getCurrentSubscription(sub).slotId == cardIndex) {
                     resetCurrentSubscription(sub);
                     notifySubscriptionDeactivated(sub.ordinal());
@@ -977,7 +1023,8 @@ public class SubscriptionManager extends Handler {
      */
     private void printPendingActivateRequests() {
         logd("ActivatePending Queue : ");
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             Subscription newSub = mActivatePending.get(sub);
             logd(sub + ":" + newSub);
         }
@@ -988,7 +1035,8 @@ public class SubscriptionManager extends Handler {
      */
     private void printPendingDeactivateRequests() {
         logd("DeactivatePending Queue : ");
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             Subscription newSub = mDeactivatePending.get(sub);
             logd(sub + ":" + newSub);
         }
@@ -1003,7 +1051,8 @@ public class SubscriptionManager extends Handler {
     private boolean startNextPendingDeactivateRequests() {
         printPendingDeactivateRequests();
 
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             Subscription newSub = mDeactivatePending.get(sub);
             if (newSub != null && newSub.subStatus == SubscriptionStatus.SUB_DEACTIVATE) {
                 if (!validateDeactivationRequest(newSub)) {
@@ -1101,7 +1150,8 @@ public class SubscriptionManager extends Handler {
     private boolean startNextPendingActivateRequests() {
         printPendingActivateRequests();
 
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             Subscription newSub = mActivatePending.get(sub);
             if (newSub != null && newSub.subStatus == SubscriptionStatus.SUB_ACTIVATE) {
                 if (!validateActivationRequest(newSub)) {
@@ -1217,7 +1267,8 @@ public class SubscriptionManager extends Handler {
     private boolean setSubscriptionMode() {
         // If subscription mode is not set
         int numSubsciptions = 0;
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             Subscription pendingSub = mActivatePending.get(sub);
             if (pendingSub != null
                     && pendingSub.subStatus == SubscriptionStatus.SUB_ACTIVATE) {
@@ -1290,11 +1341,13 @@ public class SubscriptionManager extends Handler {
             return false;
         }
 
-        mSubResult[0] = SUB_NOT_CHANGED;
-        mSubResult[1] = SUB_NOT_CHANGED;
+        for (int i =0; i < mNumPhones; i++) {
+            mSubResult[i] = SUB_NOT_CHANGED;
+        }
 
         // Check what are the user preferred subscriptions.
-        for (SubscriptionId subId: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId subId = SubscriptionId.values()[i];
             // If previous subscription is not same as the requested subscription
             //    (ie., the user must have marked this subscription as deactivate or
             //    selected a new sim app for this subscription), then deactivate the
@@ -1595,7 +1648,8 @@ public class SubscriptionManager extends Handler {
 
     public int getActiveSubscriptionsCount() {
         int activeSubCount = 0;
-        for (SubscriptionId sub: SubscriptionId.values()) {
+        for (int i = 0; i < mNumPhones; i++) {
+            SubscriptionId sub = SubscriptionId.values()[i];
             if (getCurrentSubscriptionStatus(sub) == SubscriptionStatus.SUB_ACTIVATED) {
                 activeSubCount++;
             }
