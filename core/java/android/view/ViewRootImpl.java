@@ -223,6 +223,7 @@ public final class ViewRootImpl implements ViewParent,
     boolean mFirst;
     boolean mReportNextDraw;
     boolean mFullRedrawNeeded;
+    boolean mConfigurationChanged = false;
     boolean mNewSurfaceNeeded;
     boolean mHasHadWindowFocus;
     boolean mLastWasImTarget;
@@ -1206,12 +1207,14 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             desiredWindowWidth = frame.width();
             desiredWindowHeight = frame.height();
-            if (desiredWindowWidth != mWidth || desiredWindowHeight != mHeight) {
+            if (desiredWindowWidth != mWidth || desiredWindowHeight != mHeight ||
+		mConfigurationChanged) {
                 if (DEBUG_ORIENTATION) Log.v(TAG,
                         "View " + host + " resized to: " + frame);
                 mFullRedrawNeeded = true;
                 mLayoutRequested = true;
                 windowSizeMayChange = true;
+		mConfigurationChanged = false;
             }
         }
 
@@ -2674,6 +2677,7 @@ public final class ViewRootImpl implements ViewParent,
             // the on in them which may be newer.
             config = mView.getResources().getConfiguration();
             if (force || mLastConfiguration.diff(config) != 0) {
+		mConfigurationChanged = true;
                 mLastConfiguration.setTo(config);
                 mView.dispatchConfigurationChanged(config);
             }
