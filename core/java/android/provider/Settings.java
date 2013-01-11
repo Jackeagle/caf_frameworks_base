@@ -1406,6 +1406,12 @@ public final class Settings {
         public static final String DIM_SCREEN = "dim_screen";
 
         /**
+        * Whether or not to show System bar. 1 = show, 0 = hide
+        * @hide
+        */
+        public static final String SHOW_SYSTEM_BAR = "show_system_bar";
+
+        /**
          * The timeout before the screen turns off.
          */
         public static final String SCREEN_OFF_TIMEOUT = "screen_off_timeout";

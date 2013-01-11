@@ -16,6 +16,8 @@
 
 package com.android.internal.policy.impl;
 
+import com.qualcomm.util.MpqUtils;
+
 import android.app.ActivityManager;
 import android.app.ActivityManagerNative;
 import android.app.IUiModeManager;
@@ -522,6 +524,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mScreenSaverMayRun = true; // false if a wakelock is held
     boolean mPluggedIn;
 
+    // System bar visibility
+    int mShowSystemBar = 1;
+
     // Behavior of ENDCALL Button.  (See Settings.System.END_BUTTON_BEHAVIOR.)
     int mEndcallBehavior;
 
@@ -597,6 +602,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         void observe() {
             ContentResolver resolver = mContext.getContentResolver();
+
+            // Listen to system bar visibility change, for MPQ
+            if (MpqUtils.isTargetMpq()) {
+                resolver.registerContentObserver(Settings.System.getUriFor(
+                        Settings.System.SHOW_SYSTEM_BAR), false, this);
+            }
+
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.END_BUTTON_BEHAVIOR), false, this);
             resolver.registerContentObserver(Settings.Secure.getUriFor(
@@ -1137,6 +1149,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         ContentResolver resolver = mContext.getContentResolver();
         boolean updateRotation = false;
         synchronized (mLock) {
+
+            if (MpqUtils.isTargetMpq()) {
+                try {
+                    // system bar visibility check
+                    mShowSystemBar = Settings.System.getInt(resolver,
+                            Settings.System.SHOW_SYSTEM_BAR, 1);
+
+                    if (mShowSystemBar == 1)
+                        mRestrictedScreenHeight = mDockBottom - mDockTop;
+                    else
+                        mRestrictedScreenHeight = mUnrestrictedScreenHeight;
+
+                }
+                catch (Exception e) {
+                    Slog.e(TAG, "Error in reading system bar visibility : " + e.toString());
+                }
+            }
+
             mEndcallBehavior = Settings.System.getInt(resolver,
                     Settings.System.END_BUTTON_BEHAVIOR,
                     Settings.System.END_BUTTON_BEHAVIOR_DEFAULT);
@@ -1803,6 +1833,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
         }
 
+        // show/hide Launchpad for a designated key on IR remote, fo MPQ
+        if (MpqUtils.isTargetMpq()) {
+            if (keyCode == KeyEvent.KEYCODE_PROG_BLUE && down) {
+                Log.d(TAG, "== Show / Hide Launchpad ==");
+                Intent showLaunchpad = new Intent("ACTION_SHOW_LAUNCHPAD");
+                mContext.sendBroadcast(showLaunchpad);
+
+                return -1;
+            }
+        }
+
         // First we always handle the home key here, so applications
         // can never break it, although if keyguard is on, we do let
         // it handle it, because that gives us the correct 5 second
@@ -2424,7 +2465,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (navVisible) {
                     mNavigationBar.showLw(true);
                     mDockBottom = mTmpNavigationFrame.top;
-                    mRestrictedScreenHeight = mDockBottom - mDockTop;
+
+                    // decide the boundary based on system bar's visibility, for MPQ
+                    if (MpqUtils.isTargetMpq()) {
+                        if (mShowSystemBar == 1)
+                            mRestrictedScreenHeight = mDockBottom - mDockTop;
+                        else
+                            mRestrictedScreenHeight = mUnrestrictedScreenHeight;
+                    }
+                    else
+                        mRestrictedScreenHeight = mDockBottom - mDockTop;
+
                 } else {
                     // We currently want to hide the navigation UI.
                     mNavigationBar.hideLw(true);
