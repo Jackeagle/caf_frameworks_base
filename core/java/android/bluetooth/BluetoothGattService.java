@@ -16,12 +16,14 @@
 
 package android.bluetooth;
 
+import android.os.Handler;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.util.Log;
 
 import java.io.IOException;
 
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,6 +46,7 @@ public class BluetoothGattService {
     private IBluetoothGattProfile profileCallback = null;
 
     private final HashMap<String, Map<String, String>> mCharacteristicProperties;
+    private final ArrayList<String> mUpdateCharacteristicsTracker;
     private String[] characteristicPaths = null;
 
     private static final int DISCOVERY_NONE = 0;
@@ -59,6 +62,8 @@ public class BluetoothGattService {
 
     private final ServiceHelper mHelper;
 
+    private final Handler mRemoteGattServiceHandler;
+
     public BluetoothGattService(BluetoothDevice device, ParcelUuid uuid, String path,
                                 IBluetoothGattProfile callback) {
         mDevice = device;
@@ -69,10 +74,20 @@ public class BluetoothGattService {
         mLock = new ReentrantReadWriteLock();
 
         mCharacteristicProperties = new HashMap<String, Map<String, String>>();
+        mUpdateCharacteristicsTracker = new ArrayList<String>();
 
         mHelper = new ServiceHelper();
         mService = BluetoothDevice.getService();
-        mHelper.startRemoteGattService();
+
+        mRemoteGattServiceHandler = new Handler();
+        boolean hasGattServiceStarted = mRemoteGattServiceHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "Inside run for disc char");
+                mHelper.startRemoteGattService();
+            }
+        }, 1000);
+        Log.d(TAG, "Remote Gatt service started : " + hasGattServiceStarted);
     }
 
     public boolean gattConnect(byte prohibitRemoteChg,
@@ -451,14 +466,13 @@ public class BluetoothGattService {
                 if(state == BluetoothDevice.BOND_BONDED) {
                     characteristicPaths =  getCharacteristicPaths();
                     if(characteristicPaths != null) {
-                       Log.d(TAG, "retrieved characteristic Paths from the cache");
-                       onCharacteristicsDiscovered(characteristicPaths, true);
 
                        for(int i = 0; i< characteristicPaths.length; i++) {
                            Log.d(TAG, "Update value for characteristics path : " +
                                  characteristicPaths[i]);
                            try {
-                               updateCharacteristicValue(characteristicPaths[i]);
+                               mHelper.fetchCharValue(characteristicPaths[i]);
+                               mUpdateCharacteristicsTracker.add(characteristicPaths[i]);
                            } catch (Exception e) {Log.e(TAG, "", e);}
                        }
 
@@ -612,6 +626,17 @@ public class BluetoothGattService {
 
             if (result) {
                 updateCharacteristicPropertyCache(path);
+            }
+
+            if(mUpdateCharacteristicsTracker.contains(path)) {
+                Log.d(TAG, "Char path present in update tracker: " + path);
+                mUpdateCharacteristicsTracker.remove(path);
+                if(mUpdateCharacteristicsTracker.isEmpty() &&
+                   discoveryState == DISCOVERY_NONE) {
+                    Log.d(TAG, "retrieved char Paths from the cache and updated value");
+                    onCharacteristicsDiscovered(getCharacteristicPaths(), true);
+                }
+                return;
             }
 
             if (profileCallback != null) {
