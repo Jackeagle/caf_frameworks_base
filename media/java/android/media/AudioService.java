@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1851,8 +1853,10 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         if (!checkAudioSettingsPermission("setSpeakerphoneOn()")) {
             return;
         }
-        mForcedUseForComm = on ? AudioSystem.FORCE_SPEAKER : AudioSystem.FORCE_NONE;
-
+        if(on == true)
+            mForcedUseForComm = AudioSystem.FORCE_SPEAKER;
+        if(on == false && mForcedUseForComm == AudioSystem.FORCE_SPEAKER)
+            mForcedUseForComm = AudioSystem.FORCE_NONE;
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
                 AudioSystem.FOR_COMMUNICATION, mForcedUseForComm, null, 0);
     }
@@ -1867,8 +1871,10 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         if (!checkAudioSettingsPermission("setBluetoothScoOn()")) {
             return;
         }
-        mForcedUseForComm = on ? AudioSystem.FORCE_BT_SCO : AudioSystem.FORCE_NONE;
-
+        if(on == true)
+            mForcedUseForComm = AudioSystem.FORCE_BT_SCO;
+        if(on == false && mForcedUseForComm == AudioSystem.FORCE_BT_SCO)
+            mForcedUseForComm = AudioSystem.FORCE_NONE;
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
                 AudioSystem.FOR_COMMUNICATION, mForcedUseForComm, null, 0);
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
