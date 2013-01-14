@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009,2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009,2012,2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,6 +29,7 @@
 package android.hardware.fmradio;
 
 import android.util.Log;
+import java.util.Arrays;
 
 /**
  * This class contains all interfaces and types needed to
@@ -1417,11 +1418,15 @@ public class FmReceiver extends FmTransceiver
    public FmRxRdsData getRTInfo () {
 
       byte [] buff = new byte[STD_BUF_SIZE];
+      int ret;
       int piLower = 0;
       int piHigher = 0;
+      String rdsStr;
 
-      FmReceiverJNI.getBufferNative(sFd, buff, 2);
-      String rdsStr = new String(buff);
+      ret = FmReceiverJNI.getBufferNative(sFd, buff, 2);
+      if(ret <= 0) {
+         return mRdsData;
+      }
       /* byte is signed ;(
       *  knock down signed bit
       */
@@ -1430,14 +1435,17 @@ public class FmReceiver extends FmTransceiver
       int pi = ((piHigher << 8) | piLower);
       mRdsData.setPrgmId (pi);
       mRdsData.setPrgmType ( (int)( buff[1] & 0x1F));
-      try
-      {
-         rdsStr = rdsStr.substring(5, (int) buff[0]+ 5);
-         mRdsData.setRadioText (rdsStr);
-
-      } catch (StringIndexOutOfBoundsException x)
-      {
-         Log.d (TAG, "StringIndexOutOfBoundsException ...");
+      for(int i = 0; i < buff[0]; i++) {
+         Log.d(TAG, "raw RT at [" + i + "]: " + buff[5 + i]);
+      }
+      if(buff[0] > 0) {
+         byte [] raw_rt = Arrays.copyOfRange(buff, 5, buff[0] + 5);
+         try {
+              rdsStr = new String(raw_rt, "UTF-8");
+              mRdsData.setRadioText(rdsStr);
+         }catch (Exception e) {
+              e.printStackTrace();
+         }
       }
       return mRdsData;
    }
