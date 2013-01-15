@@ -208,4 +208,10 @@ public interface TelephonyProperties
      * Property that can be used to set the IP version for CDMA when roaming
      */
     static final String PROPERTY_CDMA_ROAMING_IPPROTOCOL = "persist.telephony.cdma.rproto";
+
+    /**
+     * Property to control EONS.
+     * Type: boolean ( true = EONS enabled, false = EONS disabled)
+     */
+    static final String PROPERTY_EONS_ENABLED = "persist.radio.eons.enabled";
 }
