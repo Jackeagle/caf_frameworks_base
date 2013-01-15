@@ -2,6 +2,9 @@
  * Copyright (C) 2007 The Android Open Source Project
  * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -39,6 +42,7 @@ import android.provider.Settings.Global;
 import android.provider.Settings.Secure;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+import android.telephony.MSimTelephonyManager;
 import android.util.Log;
 
 import com.android.internal.content.PackageHelper;
@@ -2198,7 +2202,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int type;
                 type = SystemProperties.getInt("ro.telephony.default_network",
                         RILConstants.PREFERRED_NETWORK_MODE);
-            loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, type);
+
+            String val = Integer.toString(type);
+            if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                val = type + "," + type;
+            }
+            loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, val);
 
             // --- New global settings start here
         } finally {

@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2012 The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +28,8 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemProperties;
 import android.util.Log;
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
 
 import com.android.internal.telephony.IPhoneSubInfo;
 import com.android.internal.telephony.ITelephony;
@@ -522,7 +528,35 @@ public class TelephonyManager {
      * on a CDMA network).
      */
     public String getNetworkCountryIso() {
-        return SystemProperties.get(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY);
+        return getTelephonyProperty(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY,
+                getDefaultSubscription(), "");
+    }
+
+    /**
+     * Gets the telephony Default Subscription.
+     *
+     * @hide
+     */
+    public static int getDefaultSubscription() {
+        return  SystemProperties.getInt(TelephonyProperties.PROPERTY_DEFAULT_SUBSCRIPTION, 0);
+    }
+
+
+    /**
+     * Gets the telephony property.
+     *
+     * @hide
+     */
+    public static String getTelephonyProperty(String property, int index, String defaultVal) {
+        String propVal = null;
+        String prop = SystemProperties.get(property);
+         if ((prop != null) && (prop.length() > 0)) {
+            String values[] = prop.split(",");
+            if ((index >= 0) && (index < values.length) && (values[index] != null)) {
+                propVal = values[index];
+            }
+        }
+        return propVal == null ? defaultVal : propVal;
     }
 
     /** Network type is unknown */
@@ -772,7 +806,8 @@ public class TelephonyManager {
      * @see #getSimState
      */
     public String getSimOperator() {
-        return SystemProperties.get(TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC);
+        return getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC,
+                getDefaultSubscription(), "");
     }
 
     /**
@@ -790,7 +825,8 @@ public class TelephonyManager {
      * Returns the ISO country code equivalent for the SIM provider's country code.
      */
     public String getSimCountryIso() {
-        return SystemProperties.get(TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY);
+        return getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
+                getDefaultSubscription(), "");
     }
 
     /**
