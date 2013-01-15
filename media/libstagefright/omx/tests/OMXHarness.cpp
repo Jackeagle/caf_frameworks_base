@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /*--------------------------------------------------------------------------
-Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+Copyright (c) 2011, The Linux Foundation. All rights reserved.
 --------------------------------------------------------------------------*/
 
 //#define LOG_NDEBUG 0
