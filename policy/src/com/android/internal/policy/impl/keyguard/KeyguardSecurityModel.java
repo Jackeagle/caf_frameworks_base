@@ -17,6 +17,7 @@ package com.android.internal.policy.impl.keyguard;
 
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
+import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
 
 import com.android.internal.telephony.IccCardConstants;
@@ -75,7 +76,26 @@ public class KeyguardSecurityModel {
 
     SecurityMode getSecurityMode() {
         KeyguardUpdateMonitor updateMonitor = KeyguardUpdateMonitor.getInstance(mContext);
-        final IccCardConstants.State simState = updateMonitor.getSimState();
+        IccCardConstants.State simState = updateMonitor.getSimState();
+
+        // Multi sim check is not required here.
+        // getPhoneCount() will return
+        //     1 if Multi Sim Disabled.
+        //     2 if Multi Sim Enabled.
+        // if (MSimTelephonyManager.getInstance().isMultiSimEnabled()) {
+        int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
+        for (int i = 0; i < numPhones; i++) {
+            simState = updateMonitor.getSimState(i);
+            // We are intereseted only in PIN_REQUIRED or PUK_REQUIRED
+            // So continue to the next sub if the sim state is other
+            // then these two. Refer to the below if condition to find
+            // out the 'mode'.
+            if (simState == IccCardConstants.State.PIN_REQUIRED
+                    || simState == IccCardConstants.State.PUK_REQUIRED) {
+                break;
+            }
+        }
+
         SecurityMode mode = SecurityMode.None;
         if (simState == IccCardConstants.State.PIN_REQUIRED) {
             mode = SecurityMode.SimPin;
