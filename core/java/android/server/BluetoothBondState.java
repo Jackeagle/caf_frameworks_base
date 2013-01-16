@@ -111,6 +111,27 @@ class BluetoothBondState {
         closeProfileProxy();
     }
 
+    public void deviceUpdateCache() {
+        String val = mService.getAdapterProperties().getProperty("Devices");
+        if (val == null) {
+            return;
+        }
+        String[] bonds = val.split(",");
+        if (bonds == null) {
+            return;
+        }
+        String address = null;
+        if (DBG) Log.d(TAG, "found " + bonds.length + " bonded devices");
+        for (String device : bonds) {
+            address = mService.getAddressFromObjectPath(device);
+            if (address == null) {
+                Log.e(TAG, "error! address is null");
+                continue;
+            }
+            mService.updateDeviceServiceChannelCache(address);
+        }
+    }
+
     private void loadBondState() {
         if (mService.getBluetoothStateInternal() !=
                 BluetoothAdapter.STATE_TURNING_ON) {
