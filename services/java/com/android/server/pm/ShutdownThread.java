@@ -510,13 +510,15 @@ public final class ShutdownThread extends Thread {
                     }
                     if (!radioOff) {
                         try {
+                            boolean subRadioOff = true;
                             if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
                                 final ITelephonyMSim mphone = ITelephonyMSim.Stub.asInterface(
                                         ServiceManager.checkService("phone_msim"));
                                 for (int i = 0; i < MSimTelephonyManager.getDefault().
                                         getPhoneCount(); i++) {
-                                    radioOff = radioOff && !mphone.isRadioOn(i);
+                                    subRadioOff = subRadioOff && !mphone.isRadioOn(i);
                                 }
+                                radioOff = subRadioOff;
                             } else {
                                 radioOff = !phone.isRadioOn();
                             }
