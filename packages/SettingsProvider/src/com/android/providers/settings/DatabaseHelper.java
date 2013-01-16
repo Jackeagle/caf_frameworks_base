@@ -17,6 +17,8 @@
 
 package com.android.providers.settings;
 
+import com.qualcomm.util.MpqUtils;
+
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
@@ -1480,6 +1482,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         try {
             stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                     + " VALUES(?,?);");
+
+            // For MPQ, load the default setting for system bar's visibility
+            if (MpqUtils.isTargetMpq()) {
+                loadBooleanSetting(stmt, Settings.System.SHOW_SYSTEM_BAR,
+                           R.bool.def_show_system_bar);
+            }
 
             loadBooleanSetting(stmt, Settings.System.DIM_SCREEN,
                     R.bool.def_dim_screen);

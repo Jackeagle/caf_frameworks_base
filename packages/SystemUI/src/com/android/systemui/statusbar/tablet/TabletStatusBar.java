@@ -20,6 +20,11 @@
 
 package com.android.systemui.statusbar.tablet;
 
+import com.qualcomm.util.MpqUtils;
+import android.provider.Settings;
+import android.os.Handler;
+import android.database.ContentObserver;
+
 import android.animation.LayoutTransition;
 import android.animation.ObjectAnimator;
 import android.app.ActivityManager;
@@ -135,6 +140,10 @@ public class TabletStatusBar extends BaseStatusBar implements
 
     IWindowManager mWindowManager;
 
+    // For MPQ, Launchpad
+    private LaunchpadPanel mLaunchpadPanel;
+    WindowManager.LayoutParams myLayoutParams = null;
+
     TabletStatusBarView mStatusBarView;
     View mNotificationArea;
     View mNotificationTrigger;
@@ -227,6 +236,11 @@ public class TabletStatusBar extends BaseStatusBar implements
 
     @Override
     protected void createAndAddWindows() {
+        // For MPQ, create the launchpad panel
+        if (MpqUtils.isTargetMpq()) {
+            mLaunchpadPanel = new LaunchpadPanel(mContext);
+        }
+
         addStatusBarWindow();
         addPanelWindows();
     }
@@ -234,7 +248,7 @@ public class TabletStatusBar extends BaseStatusBar implements
     private void addStatusBarWindow() {
         final View sb = makeStatusBarView();
 
-        final WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+        final WindowManager.LayoutParams lp = myLayoutParams = new WindowManager.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_NAVIGATION_BAR,
@@ -254,8 +268,53 @@ public class TabletStatusBar extends BaseStatusBar implements
         lp.gravity = getStatusBarGravity();
         lp.setTitle("SystemBar");
         lp.packageName = mContext.getPackageName();
-        WindowManagerImpl.getDefault().addView(sb, lp);
+
+        // value that indicates whether or not to show system bar. By defaule it should be shown
+        int showSystemBar = 1;
+
+        if (MpqUtils.isTargetMpq()) {
+            // listen to changes happening on system bar's visibility
+            mContext.getContentResolver().registerContentObserver(
+                                Settings.System.getUriFor(Settings.System.SHOW_SYSTEM_BAR), true,
+                                mSystembarVisibilityChangeObserver);
+
+            try {
+                showSystemBar = Settings.System.getInt(mContext.getContentResolver(),
+                                        Settings.System.SHOW_SYSTEM_BAR, 1);
+            }
+            catch (Exception e) {
+                Slog.e(TAG, "Error while reading System bar's visibility : " + e.toString());
+            }
+        }
+
+        // add the system bar vide only if applicable
+        if (showSystemBar == 1)
+            WindowManagerImpl.getDefault().addView(sb, lp);
     }
+
+    private ContentObserver mSystembarVisibilityChangeObserver = new ContentObserver(new Handler()) {
+        @Override
+        public void onChange(boolean selfChange) {
+            Slog.d(TAG, "system bar visibility has been changed by user!");
+
+            int showSystemBar = 1;
+
+            try {
+                showSystemBar = Settings.System.getInt(mContext.getContentResolver(),
+                                        Settings.System.SHOW_SYSTEM_BAR, 1);
+            }
+            catch (Exception e) {
+                Slog.e(TAG, "Error while reading System bar's visibility : " + e.toString());
+            }
+
+            // either hide / show system bar
+            if (showSystemBar == 1)
+                WindowManagerImpl.getDefault().addView(mStatusBarView, myLayoutParams);
+            else
+                WindowManagerImpl.getDefault().removeView(mStatusBarView);
+
+        }
+    };
 
     protected void addPanelWindows() {
         final Context context = mContext;
