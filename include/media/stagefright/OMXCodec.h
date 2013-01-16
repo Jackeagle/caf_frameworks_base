@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /*--------------------------------------------------------------------------
-Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
 --------------------------------------------------------------------------*/
 
 #ifndef OMX_CODEC_H_
