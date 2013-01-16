@@ -248,6 +248,16 @@ public class MSimPhoneFactory extends PhoneFactory {
             Log.e(LOG_TAG, "Settings Exception Reading Dual Sim Voice Call Values");
         }
 
+        // Set subscription to 0 if current subscription is invalid.
+        // Ex: multisim.config property is TSTS and subscription is 2.
+        // If user is trying to set multisim.config to DSDS and reboots
+        // in this case index 2 is invalid so need to set to 0.
+        if (subscription < 0 || subscription >= MSimTelephonyManager.getDefault().getPhoneCount()) {
+            Log.i(LOG_TAG, "Subscription is invalid..." + subscription + " Set to 0");
+            subscription = 0;
+            setVoiceSubscription(subscription);
+        }
+
         return subscription;
     }
 
@@ -286,6 +296,12 @@ public class MSimPhoneFactory extends PhoneFactory {
             Log.e(LOG_TAG, "Settings Exception Reading Dual Sim Data Call Values");
         }
 
+        if (subscription < 0 || subscription >= MSimTelephonyManager.getDefault().getPhoneCount()) {
+            Log.i(LOG_TAG, "Subscription is invalid..." + subscription + " Set to 0");
+            subscription = 0;
+            setDataSubscription(subscription);
+        }
+
         return subscription;
     }
 
@@ -297,6 +313,12 @@ public class MSimPhoneFactory extends PhoneFactory {
                     Settings.System.MULTI_SIM_SMS_SUBSCRIPTION);
         } catch (SettingNotFoundException snfe) {
             Log.e(LOG_TAG, "Settings Exception Reading Dual Sim SMS Values");
+        }
+
+        if (subscription < 0 || subscription >= MSimTelephonyManager.getDefault().getPhoneCount()) {
+            Log.i(LOG_TAG, "Subscription is invalid..." + subscription + " Set to 0");
+            subscription = 0;
+            setSMSSubscription(subscription);
         }
 
         return subscription;
