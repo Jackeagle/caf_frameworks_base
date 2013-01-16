@@ -1049,9 +1049,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (!mHasSystemNavBar) {
             mHasNavigationBar = mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_showNavigationBar);
-            // Allow a system property to override this. Used by the emulator.
+            // Allow a system property to override this. Used by the emulator,
+            // and also devices with no hardware navigation keys (e.g. tablets).
             // See also hasNavigationBar().
             String navBarOverride = SystemProperties.get("qemu.hw.mainkeys");
+            if ("".equals(navBarOverride)) {
+                navBarOverride = SystemProperties.get("ro.hw.nav_keys");
+            }
             if (! "".equals(navBarOverride)) {
                 if      (navBarOverride.equals("1")) mHasNavigationBar = false;
                 else if (navBarOverride.equals("0")) mHasNavigationBar = true;
