@@ -6250,6 +6250,7 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
     private boolean doDrag(int deltaX, int deltaY) {
         boolean allDrag = true;
+        pauseTimers();
         if ((deltaX | deltaY) != 0) {
             int oldX = getScrollX();
             int oldY = getScrollY();
@@ -6313,6 +6314,7 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
     }
 
     private void stopTouch() {
+        resumeTimers();
         if (mScroller.isFinished() && !mSelectingText
                 && (mTouchMode == TOUCH_DRAG_MODE
                 || mTouchMode == TOUCH_DRAG_LAYER_MODE)) {
