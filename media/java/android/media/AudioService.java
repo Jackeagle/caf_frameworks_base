@@ -283,7 +283,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             "STREAM_BLUETOOTH_SCO",
             "STREAM_SYSTEM_ENFORCED",
             "STREAM_DTMF",
-            "STREAM_TTS"
+            "STREAM_TTS",
+            "STREAM_FM"
     };
 
     private final AudioSystem.ErrorCallback mAudioSystemCallback = new AudioSystem.ErrorCallback() {
@@ -737,9 +738,10 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 System.MUTE_STREAMS_AFFECTED,
                 ((1 << AudioSystem.STREAM_MUSIC)|
                  (1 << AudioSystem.STREAM_RING)|
-                 (1 << AudioSystem.STREAM_SYSTEM)|
-                 (1 << AudioSystem.STREAM_FM)),
+                 (1 << AudioSystem.STREAM_SYSTEM)),
                  UserHandle.USER_CURRENT);
+        //Add STREAM_FM in mMuteAffectedStreams
+        mMuteAffectedStreams |= (1 << AudioSystem.STREAM_FM);
 
         boolean masterMute = System.getIntForUser(cr, System.VOLUME_MASTER_MUTE,
                                                   0, UserHandle.USER_CURRENT) == 1;
