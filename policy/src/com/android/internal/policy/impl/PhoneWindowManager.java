@@ -101,6 +101,8 @@ import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.widget.PointerLocationView;
 
+import org.codeaurora.util.MpqUtils;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -1953,6 +1955,33 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (!down) {
                     mVolumeDownKeyConsumedByScreenshotChord = false;
                 }
+                return -1;
+            }
+        }
+
+        if (MpqUtils.isTargetMpq()) {
+            if (keyCode == KeyEvent.KEYCODE_PROG_RED && down) {
+                if (down) {
+                    // Complete shutdown
+                    Intent shutdown = new Intent(Intent.ACTION_REQUEST_SHUTDOWN);
+                    shutdown.putExtra(Intent.EXTRA_KEY_CONFIRM, false);
+                    shutdown.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    mContext.startActivity(shutdown);
+                }
+
+                // nobody else should receive this event
+                return -1;
+            }
+            else if (keyCode == KeyEvent.KEYCODE_PROG_YELLOW && down) {
+                if (down) {
+                    // Inform MPQPlayerApp about XO Shutdown (Network standby)
+                    // MPQPlayerApp must deinitialize the service layer & then initiate
+                    // a PowerManager.goToSleep();
+                    Intent xoShutDown = new Intent("media.tvservice.HANDLE_NETWORK_STANDBY");
+                    mContext.sendBroadcast(xoShutDown);
+                }
+
+                // nobody else should receive this event
                 return -1;
             }
         }
