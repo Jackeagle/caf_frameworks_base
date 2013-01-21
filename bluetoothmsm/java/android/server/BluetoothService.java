@@ -289,6 +289,7 @@ public class BluetoothService extends IBluetooth.Stub {
         private ArrayList <String> mDontRemoveServiceBlackList;
         private ArrayList <String> mAvoidConnectOnPairBlackList;
         private ArrayList <String> mAvoidAutoConnectBlackList;
+        private ArrayList <String> mEnablePhotoOnPbap;
 
         public HostPatchForIOP() {
              // Read the IOP device list into patch table
@@ -317,6 +318,10 @@ public class BluetoothService extends IBluetooth.Stub {
                             mAvoidAutoConnectBlackList =
                                 new ArrayList<String>(Arrays.asList(val));
                             if(DBG) Log.d(TAG, " HostPatchForIOT: Loaded NoAutoConnectList");
+                        } else if (value[0].equalsIgnoreCase("enable_photosharing")) {
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Loaded  Photo Sharing");
+                            mEnablePhotoOnPbap =
+                                    new ArrayList<String>(Arrays.asList(val));
                         }
                     }
                 }
@@ -369,6 +374,16 @@ public class BluetoothService extends IBluetooth.Stub {
                             blacklistAddress, 0, blacklistAddress.length())) {
                             if(DBG) Log.d(TAG, " HostPatchForIOT: Apply DontAutoConnect");
                             return true;
+                        }
+                    }
+                }
+                break;
+            case BluetoothAdapter.HOST_PATCH_ENABLE_PHOTO_ON_PBAP:
+                if (mEnablePhotoOnPbap != null) {
+                    for (String PhotoVcardFeature : mEnablePhotoOnPbap) {
+                        if( PhotoVcardFeature.equals("true")) {
+                           if(DBG) Log.d(TAG, " HostPatchForIOT: Apply Avoid photo on pbap");
+                           return true;
                         }
                     }
                 }
