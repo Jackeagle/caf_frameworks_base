@@ -75,6 +75,13 @@ public abstract class Connection {
 
     Object userData;
 
+    /*
+     * This time/timespan values are based on SystemClock.elapsedRealTime(),
+     * i.e., time since boot.  They are appropriate for comparison and
+     * calculating deltas.
+     */
+    public long connectTimeReal;
+
     /* Instance Methods */
 
     /**
