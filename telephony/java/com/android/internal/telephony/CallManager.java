@@ -123,6 +123,8 @@ public final class CallManager {
     // default phone as the first phone registered, which is PhoneBase obj
     private Phone mDefaultPhone;
 
+    private boolean mSpeedUpAudioForMtCall = false;
+
     // This variable tells us the type of baseband
     private String mBaseband = SystemProperties.get(TelephonyProperties.PROPERTY_BASEBAND, "msm");
 
@@ -587,14 +589,21 @@ public final class CallManager {
         // but only on audio mode transitions
         switch (getState()) {
             case RINGING:
-                if (audioManager.getMode() != AudioManager.MODE_RINGTONE) {
+                int curAudioMode = audioManager.getMode();
+                if (curAudioMode != AudioManager.MODE_RINGTONE) {
                     // only request audio focus if the ringtone is going to be heard
                     if (audioManager.getStreamVolume(AudioManager.STREAM_RING) > 0) {
                         if (VDBG) Log.d(LOG_TAG, "requestAudioFocus on STREAM_RING");
                         audioManager.requestAudioFocusForCall(AudioManager.STREAM_RING,
                                 AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
                     }
-                    audioManager.setMode(AudioManager.MODE_RINGTONE);
+                    if(!mSpeedUpAudioForMtCall) {
+                        audioManager.setMode(AudioManager.MODE_RINGTONE);
+                    }
+                }
+
+                if (mSpeedUpAudioForMtCall && (curAudioMode != AudioManager.MODE_IN_CALL)) {
+                    audioManager.setMode(AudioManager.MODE_IN_CALL);
                 }
                 break;
             case OFFHOOK:
@@ -612,7 +621,7 @@ public final class CallManager {
                     newAudioMode = AudioManager.MODE_IN_COMMUNICATION;
                 }
                 int currMode = audioManager.getMode();
-                if (currMode != newAudioMode) {
+                if (currMode != newAudioMode || mSpeedUpAudioForMtCall) {
                     // request audio focus before setting the new mode
                     Log.d(LOG_TAG, "requestAudioFocus on STREAM_VOICE_CALL");
                     audioManager.requestAudioFocusForCall(AudioManager.STREAM_VOICE_CALL,
@@ -621,6 +630,7 @@ public final class CallManager {
                             + currMode + " to " + newAudioMode);
                     audioManager.setMode(newAudioMode);
                 }
+                mSpeedUpAudioForMtCall = false;
                 break;
             case IDLE:
                 if (audioManager.getMode() != AudioManager.MODE_NORMAL) {
@@ -629,6 +639,7 @@ public final class CallManager {
                     // abandon audio focus after the mode has been set back to normal
                     audioManager.abandonAudioFocusForCall();
                 }
+                mSpeedUpAudioForMtCall = false;
                 break;
         }
     }
@@ -744,6 +755,22 @@ public final class CallManager {
                 activePhone.switchHoldingAndActive();
             } else if (!sameChannel && hasBgCall) {
                 getActiveFgCall().hangup();
+            }
+        }
+
+        Context context = getContext();
+        if (context == null) {
+            Log.d(LOG_TAG, "Speedup Audio Path fix: Context is null");
+        } else {
+            Log.d(LOG_TAG, "Speedup Audio Path fix");
+            AudioManager audioManager = (AudioManager)
+                    context.getSystemService(Context.AUDIO_SERVICE);
+            int currMode = audioManager.getMode();
+            if ((currMode != AudioManager.MODE_IN_CALL) && !(ringingPhone instanceof SipPhone)) {
+                Log.d(LOG_TAG, "Speedup Audio Path fix: setAudioMode Setting audio mode from "
+                        + currMode + " to " + AudioManager.MODE_IN_CALL);
+                audioManager.setMode(AudioManager.MODE_IN_CALL);
+                mSpeedUpAudioForMtCall = true;
             }
         }
 
