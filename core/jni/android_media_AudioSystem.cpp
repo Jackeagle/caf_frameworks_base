@@ -1,6 +1,10 @@
 /*
 **
 ** Copyright 2006, The Android Open Source Project
+** Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+**
+** Not a Contribution, Apache license notifications and license are retained
+** for attribution purposes only.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -163,6 +167,12 @@ android_media_AudioSystem_setPhoneState(JNIEnv *env, jobject thiz, jint state)
 }
 
 static int
+android_media_AudioSystem_setInCallPhoneState(JNIEnv *env, jobject thiz, jint state)
+{
+    return check_AudioSystem_Command(AudioSystem::setInCallPhoneState((audio_mode_t) state));
+}
+
+static int
 android_media_AudioSystem_setForceUse(JNIEnv *env, jobject thiz, jint usage, jint config)
 {
     return check_AudioSystem_Command(AudioSystem::setForceUse(static_cast <audio_policy_force_use_t>(usage),
@@ -274,6 +284,7 @@ static JNINativeMethod gMethods[] = {
     {"setDeviceConnectionState", "(IILjava/lang/String;)I", (void *)android_media_AudioSystem_setDeviceConnectionState},
     {"getDeviceConnectionState", "(ILjava/lang/String;)I",  (void *)android_media_AudioSystem_getDeviceConnectionState},
     {"setPhoneState",       "(I)I",     (void *)android_media_AudioSystem_setPhoneState},
+    {"setInCallPhoneState",       "(I)I",     (void *)android_media_AudioSystem_setInCallPhoneState},
     {"setForceUse",         "(II)I",    (void *)android_media_AudioSystem_setForceUse},
     {"getForceUse",         "(I)I",     (void *)android_media_AudioSystem_getForceUse},
     {"initStreamVolume",    "(III)I",   (void *)android_media_AudioSystem_initStreamVolume},

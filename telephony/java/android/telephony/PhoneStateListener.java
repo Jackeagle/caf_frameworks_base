@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +27,7 @@ import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.CellLocation;
 import android.telephony.CellInfo;
+import android.telephony.MSimTelephonyManager;
 import android.util.Log;
 
 import com.android.internal.telephony.IPhoneStateListener;
@@ -165,7 +170,22 @@ public class PhoneStateListener {
      */
     public static final int LISTEN_CELL_INFO = 0x00000400;
 
+    /**
+     * Subscription used to listen to the phone state changes
+     * @hide
+     */
+    protected int mSubscription = 0;
+
     public PhoneStateListener() {
+        // If subscription is not passed set the default subscription.
+        mSubscription = MSimTelephonyManager.getDefault().getDefaultSubscription();
+    }
+
+    /**
+     * @hide
+     */
+    public PhoneStateListener(int subscription) {
+        mSubscription = subscription;
     }
 
     /**

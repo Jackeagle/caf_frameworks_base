@@ -63,7 +63,7 @@ public abstract class CellInfo implements Parcelable {
     }
 
     /** @hide */
-    protected CellInfo(CellInfo ci) {
+    public CellInfo(CellInfo ci) {
         this.mRegistered = ci.mRegistered;
         this.mTimeStampType = ci.mTimeStampType;
         this.mTimeStamp = ci.mTimeStamp;

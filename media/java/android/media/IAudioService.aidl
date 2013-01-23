@@ -1,5 +1,9 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,7 +88,11 @@ interface IAudioService {
 
     void setMode(int mode, IBinder cb);
 
+    void setInCallMode(int state, IBinder cb);
+
     int getMode();
+
+    int getInCallMode();
 
     oneway void playSoundEffect(int effectType);
   

@@ -2,6 +2,9 @@
  * Copyright (C) 2006 The Android Open Source Project
  * Copyright (c) 2012, 2013. The Linux Foundation. All rights reserved.
  *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -149,6 +152,7 @@ class ServerThread extends Thread {
         WindowManagerService wm = null;
         BluetoothManagerService bluetooth = null;
         DockObserver dock = null;
+	RegulatoryObserver regulatory = null;
         UsbService usb = null;
         SerialService serial = null;
         TwilightService twilight = null;
@@ -159,6 +163,7 @@ class ServerThread extends Thread {
         CommonTimeManagementService commonTimeMgmtService = null;
         InputManagerService inputManager = null;
         TelephonyRegistry telephonyRegistry = null;
+        MSimTelephonyRegistry msimTelephonyRegistry = null;
 
         // Create a shared handler thread for UI within the system server.
         // This thread is used by at least the following components:
@@ -231,6 +236,12 @@ class ServerThread extends Thread {
             Slog.i(TAG, "Telephony Registry");
             telephonyRegistry = new TelephonyRegistry(context);
             ServiceManager.addService("telephony.registry", telephonyRegistry);
+
+            if (android.telephony.MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                Slog.i(TAG, "MSimTelephony Registry");
+                msimTelephonyRegistry = new MSimTelephonyRegistry(context);
+                ServiceManager.addService("telephony.msim.registry", msimTelephonyRegistry);
+            }
 
             Slog.i(TAG, "Scheduling Policy");
             ServiceManager.addService(Context.SCHEDULING_POLICY_SERVICE,
@@ -479,6 +490,14 @@ class ServerThread extends Thread {
                 ServiceManager.addService(Context.NETWORK_POLICY_SERVICE, networkPolicy);
             } catch (Throwable e) {
                 reportWtf("starting NetworkPolicy Service", e);
+            }
+
+            try {
+                Slog.i(TAG, "Regulatory Observer");
+                // Listen for country code changes
+                regulatory = new RegulatoryObserver(context);
+            } catch (Throwable e) {
+                reportWtf("starting RegulatoryObserver", e);
             }
 
            try {
@@ -895,6 +914,7 @@ class ServerThread extends Thread {
         final DreamManagerService dreamyF = dreamy;
         final InputManagerService inputManagerF = inputManager;
         final TelephonyRegistry telephonyRegistryF = telephonyRegistry;
+        final MSimTelephonyRegistry msimTelephonyRegistryF = msimTelephonyRegistry;
 
         // We now tell the activity manager it is okay to run third party
         // code.  It will call back into us once it has gotten to the state
@@ -1024,6 +1044,11 @@ class ServerThread extends Thread {
                 }
                 try {
                     if (telephonyRegistryF != null) telephonyRegistryF.systemReady();
+                } catch (Throwable e) {
+                    reportWtf("making TelephonyRegistry ready", e);
+                }
+                try {
+                    if (msimTelephonyRegistryF != null) msimTelephonyRegistryF.systemReady();
                 } catch (Throwable e) {
                     reportWtf("making TelephonyRegistry ready", e);
                 }
