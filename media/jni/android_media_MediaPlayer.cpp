@@ -143,8 +143,8 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
     if (obj && obj->dataSize() > 0) {
         if (mParcel != NULL) {
             if( (mQcMediaPlayer) &&
-                    ((msg == MEDIA_PREPARED) || (msg == MEDIA_TIMED_TEXT))) {
-
+                ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT)||(msg == MEDIA_QOE) ) )
+            {
                 ALOGD("JNIMediaPlayerListener::notify calling qc_post_event");
                 if (ext2 == 1) { // only in case of codec config frame
                     if (mParcelCodecConf != NULL) {
@@ -175,8 +175,8 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
         }
     } else {
         if((mQcMediaPlayer) && (fields.qc_post_event != NULL) &&
-                ((msg == MEDIA_PREPARED) || (msg == MEDIA_TIMED_TEXT))) {
-
+          ((msg == MEDIA_PREPARED)||(msg == MEDIA_TIMED_TEXT)||(msg == MEDIA_QOE) ) )
+      {
             ALOGD("JNIMediaPlayerListener::notify calling qc_post_event");
             env->CallStaticVoidMethod(mClass, fields.qc_post_event, mObject,
                     msg, ext1, ext2, NULL);
