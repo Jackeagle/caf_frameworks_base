@@ -982,6 +982,17 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
     // cached value used to determine if we need to switch drawing models
     private boolean mHardwareAccelSkia = false;
 
+    // BrowserMgmt Plugin Handlers
+    static private Class mBrowserMgmtClassType=null;
+    static private Object mBrowserMgmtInst=null;
+    static private Class[] args_types = null;
+    static private Context[] args_val = null;
+    private boolean mFirstPaint = true;
+    private final String BrowserMgmtPluginName=
+        "/system/framework/browsermanagement.jar";
+    private final String BrowserMgmtClassName=
+        "com.android.qualcomm.browsermanagement.BrowserManagement";
+
     /*
      * Private message ids
      */
@@ -1226,6 +1237,48 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
                                         "browser.multitab.management",true);
         if (DebugFlags.WEB_VIEW) {
             Log.d(LOGTAG,"MultitabManagement is "+ mIsMultitabManagementOn);
+        }
+
+        boolean mIsBrowserManagementOn =
+            android.os.SystemProperties.getBoolean("browser.management", true);
+        if (DebugFlags.WEB_VIEW) {
+            Log.d(LOGTAG,"BrowserManagement sys prop is "+ mIsBrowserManagementOn);
+        }
+        if (mIsBrowserManagementOn) {
+            setupBrowserMgmtPlugin(mContext);
+        }
+    }
+
+    private void setupBrowserMgmtPlugin(Context context) {
+
+        if (mBrowserMgmtInst == null) {
+            //allocate mem only first time - since they are declared static
+            try {
+                dalvik.system.PathClassLoader pluginClassLoader =
+                new dalvik.system.PathClassLoader(
+                BrowserMgmtPluginName,ClassLoader.getSystemClassLoader());
+                mBrowserMgmtClassType =
+                        pluginClassLoader.loadClass(BrowserMgmtClassName);
+                mBrowserMgmtInst = mBrowserMgmtClassType.newInstance();
+                args_types = new Class[1];
+                args_val = new Context[1];
+                args_types[0] = Context.class;
+                Log.d(LOGTAG, "BrowserMgmt First Instance  ");
+            } catch (Throwable e) {
+                Log.e(LOGTAG, "BrowserMgmt Instance failed " + e);
+            }
+        } else {
+                Log.d(LOGTAG, "BrowserMgmt Instance already available ");
+        }
+
+        if (mBrowserMgmtClassType != null) {
+             args_val[0] = context;
+             try {
+                  mBrowserMgmtClassType.getMethod("Init",args_types).
+                  invoke(mBrowserMgmtInst,(Object)args_val[0]);
+             } catch (Throwable e) {
+                Log.e(LOGTAG, "method not found: Init " + e);
+             }
         }
     }
 
@@ -2127,6 +2180,14 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         if (Thread.currentThread() == mPrivateHandler.getLooper().getThread()) {
             // We are on the main thread and can safely delete
             nativeDestroy(nptr);
+            if (mBrowserMgmtClassType != null) {
+                try {
+                    mBrowserMgmtClassType.getMethod("Destroy",args_types).
+                    invoke(mBrowserMgmtInst,(Object)args_val[0]);
+                } catch (Throwable e) {
+                    Log.e(LOGTAG, "BrowserMgmt method not found: Destroy " + e);
+                }
+            }
         } else {
             mPrivateHandler.post(new DestroyNativeRunnable(nptr));
         }
@@ -3501,6 +3562,15 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             WebViewCore.resumeUpdatePicture(mWebViewCore);
         }
 
+        if(mBrowserMgmtClassType != null) {
+            try {
+                mBrowserMgmtClassType.getMethod("ViewResumed",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                Log.e(LOGTAG, "method not found: ViewResumed " + e);
+            }
+        }
+
         // We get a call to onResume for new WebViews (i.e. mIsPaused will be false). We need
         // to ensure that the Watchdog thread is running for the new WebView, so call
         // it outside the if block above.
@@ -3967,6 +4037,16 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         if (mIsMultitabManagementOn) {
             mInPageLoadWindow = true;
         }
+
+        if(mBrowserMgmtClassType != null) {
+            try {
+                mBrowserMgmtClassType.getMethod("PageLoadStarted",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                Log.e(LOGTAG, "method not found: PageLoadStarted " + e);
+            }
+            mFirstPaint = true;
+        }
     }
 
     /**
@@ -3981,6 +4061,14 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         }
         if (mIsMultitabManagementOn) {
             mInPageLoadWindow = false;
+        }
+        if(mBrowserMgmtClassType != null) {
+            try {
+                mBrowserMgmtClassType.getMethod("PageLoadFinished",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                Log.e(LOGTAG, "method not found: PageLoadFinished " + e);
+            }
         }
     }
 
@@ -4482,6 +4570,15 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
         if (mHTML5VideoViewManager != null) {
             mHTML5VideoViewManager.setBaseLayer(layer);
+        }
+        if((mBrowserMgmtClassType != null) && (mFirstPaint)) {
+            try {
+                mBrowserMgmtClassType.getMethod("WebviewLoaded",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                    Log.e(LOGTAG, "method not found: WebviewLoaded " + e);
+            }
+            mFirstPaint = false;
         }
     }
 
@@ -5476,6 +5573,14 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         if (!mTouchHighlightRegion.isEmpty()) {
             mWebView.invalidate(mTouchHighlightRegion.getBounds());
         }
+        if(mBrowserMgmtClassType != null) {
+            try {
+                mBrowserMgmtClassType.getMethod("FocusChanged",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                Log.e(LOGTAG, "method not found: FocusChanged " + e);
+            }
+        }
     }
 
     // updateRectsForGL() happens almost every draw call, in order to avoid creating
@@ -5836,6 +5941,15 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         int deltaY = mLastTouchY - y;
         int contentX = viewToContentX(x + getScrollX());
         int contentY = viewToContentY(y + getScrollY());
+
+        if(mBrowserMgmtClassType != null) {
+            try {
+                mBrowserMgmtClassType.getMethod("PageTouched",args_types).
+                invoke(mBrowserMgmtInst,(Object)args_val[0]);
+            } catch (Throwable e) {
+                Log.d(LOGTAG, "method not found: PageTouched " + e);
+            }
+        }
 
         switch (action) {
             case MotionEvent.ACTION_DOWN: {
