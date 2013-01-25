@@ -49,7 +49,7 @@ namespace android
 static void (*startActivity)(const char *)  = NULL;
 static void (*resumeActivity)(const char *) = NULL;
 static void *dlhandle                       = NULL;
-
+static int  (*browserActivity)(const char *) = NULL;
 // ----------------------------------------------------------------------------
 
 static void
@@ -80,6 +80,10 @@ com_android_internal_app_ActivityTrigger_native_at_init()
 
     dlerror();
 
+    *(void **) (&browserActivity) = dlsym(dlhandle, "activity_trigger_browser");
+    if ((rc = dlerror()) != NULL) {
+        goto cleanup;
+    }
     *(void **) (&startActivity) = dlsym(dlhandle, "activity_trigger_start");
     if ((rc = dlerror()) != NULL) {
         goto cleanup;
@@ -147,12 +151,27 @@ com_android_internal_app_ActivityTrigger_native_at_resumeActivity(JNIEnv *env, j
     }
 }
 
+static int
+com_android_internal_app_ActivityTrigger_native_at_browserActivity(JNIEnv *env, jobject clazz, jstring url)
+{
+    int i = 0;
+    if (browserActivity && url) {
+        const char *urlStr = env->GetStringUTFChars(url, NULL);
+        if (urlStr) {
+            i = (*browserActivity)(urlStr);
+        }
+    }
+    return i;
+}
+
+
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod gMethods[] = {
     {"native_at_startActivity",  "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_startActivity},
     {"native_at_resumeActivity", "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_resumeActivity},
     {"native_at_deinit",         "()V",                   (void *)com_android_internal_app_ActivityTrigger_native_at_deinit},
+    {"native_at_browserActivity", "(Ljava/lang/String;)I", (int *)com_android_internal_app_ActivityTrigger_native_at_browserActivity}
 };
 
 

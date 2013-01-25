@@ -84,6 +84,10 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+import java.util.Timer;
+import java.util.TimerTask;
+import org.codeaurora.Performance;
+
 /**
  * The top of a view hierarchy, implementing the needed protocol between View
  * and the WindowManager.  This is for the most part an internal implementation
@@ -115,6 +119,13 @@ public final class ViewRootImpl implements ViewParent,
      * at 60 Hz. This can be used to measure the potential framerate.
      */
     private static final String PROPERTY_PROFILE_RENDERING = "viewancestor.profile_rendering";    
+
+    private Timer  mActiveTimer;
+    private boolean mIsScheduled = false;
+    private boolean mIsActive = false;
+    private int DURATION_OF_TIMER = 1800;
+    private static final String CHROME_VIEW_NAME = "chromium.content.browser.ChromeView";
+    private Performance mPerfObject = new Performance();
     
     private static final boolean MEASURE_LATENCY = false;
     private static LatencyTimer lt;
@@ -1101,6 +1112,20 @@ public final class ViewRootImpl implements ViewParent,
         return windowSizeMayChange;
     }
 
+    public void timerMethod() {
+        if (mIsActive) {
+            if ( mPerfObject != null) {
+               mPerfObject.setCpuBoost();
+            }
+            mIsActive = false;
+        }
+        else {
+            mActiveTimer.cancel();
+            mIsScheduled = false;
+        }
+    }
+
+
     private void performTraversals() {
         // cache mView since it is used so much below...
         final View host = mView;
@@ -1113,6 +1138,23 @@ public final class ViewRootImpl implements ViewParent,
 
         if (host == null || !mAdded)
             return;
+
+        if ((mFocusedView != null) && (mFocusedView.toString().contains(CHROME_VIEW_NAME)) && (host instanceof ViewGroup)) {
+            ViewGroup parent = (ViewGroup)host;
+            if (parent.isChromeBrowserRunningJavaScripts()) {
+                mIsActive = true;
+            }
+            if (!mIsScheduled && mIsActive) {
+                mActiveTimer = new Timer();
+                mActiveTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        timerMethod();
+                    }
+                }, 0, DURATION_OF_TIMER);
+                mIsScheduled = true;
+            }
+        }
 
         mIsInTraversal = true;
         mWillDrawSoon = true;
