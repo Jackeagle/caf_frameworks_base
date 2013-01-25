@@ -48,6 +48,7 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.SystemService;
 import android.os.UserHandle;
 import android.os.WorkSource;
@@ -356,6 +357,9 @@ public final class PowerManagerService extends IPowerManager.Stub
     // Time when we last logged a warning about calling userActivity() without permission.
     private long mLastWarningAboutUserActivityPermission = Long.MIN_VALUE;
 
+    //track the blocked uids.
+    private final ArrayList<Integer> mBlockedUids = new ArrayList<Integer>();
+
     private native void nativeInit();
     private static native void nativeShutdown();
     private static native void nativeReboot(String reason) throws IOException;
@@ -585,6 +589,15 @@ public final class PowerManagerService extends IPowerManager.Stub
     private void acquireWakeLockInternal(IBinder lock, int flags, String tag, WorkSource ws,
             int uid, int pid) {
         synchronized (mLock) {
+            if(mBlockedUids.contains(new Integer(uid)) && uid != Process.myUid()) {
+                //wakelock acquisition for blocked uid, do not acquire.
+                if (DEBUG_SPEW) {
+                    Slog.d(TAG, "uid is blocked not acquiring wakeLock flags=0x" +
+                        Integer.toHexString(flags) + " tag=" + tag + " uid=" + uid +
+                        " pid =" + pid);
+                }
+                return;
+            }
             if (DEBUG_SPEW) {
                 Slog.d(TAG, "acquireWakeLockInternal: lock=" + Objects.hashCode(lock)
                         + ", flags=0x" + Integer.toHexString(flags)
@@ -721,7 +734,9 @@ public final class PowerManagerService extends IPowerManager.Stub
     private void updateWakeLockWorkSourceInternal(IBinder lock, WorkSource ws) {
         synchronized (mLock) {
             int index = findWakeLockIndexLocked(lock);
-            if (index < 0) {
+            int value = SystemProperties.getInt("persist.cne.feature", 0);
+            boolean isNsrmEnabled = (value == 4 || value == 5 || value == 6);
+            if (index < 0 && !isNsrmEnabled) {
                 throw new IllegalArgumentException("Wake lock not active");
             }
 
@@ -730,6 +745,33 @@ public final class PowerManagerService extends IPowerManager.Stub
                 notifyWakeLockReleasedLocked(wakeLock);
                 wakeLock.updateWorkSource(ws);
                 notifyWakeLockAcquiredLocked(wakeLock);
+            }
+        }
+    }
+
+    /* updates the blocked uids, so if a wake lock is acquired for it
+     * can be released.
+     */
+    public void updateBlockedUids(int uid, boolean isBlocked) {
+        synchronized(mLock) {
+            if (DEBUG_SPEW) Slog.v(TAG, "updateBlockedUids: uid = "+uid +"isBlocked = "+isBlocked);
+            if(isBlocked) {
+                mBlockedUids.add(new Integer(uid));
+                for (int index=0; index < mWakeLocks.size(); index++) {
+                    WakeLock wl = mWakeLocks.get(index);
+                    if(wl != null) {
+                        if (wl.mOwnerUid == uid || wl.mOwnerUid == 1000) {
+                            /* release the wakelock for the blocked uid and uid 1000(package
+                             * android)optimisation needs to be done to handle uid 1000 better.
+                             */
+                            releaseWakeLockInternal(wl.mLock,wl.mFlags);
+                            if (DEBUG_SPEW) Slog.v(TAG, "Internally releasing it");
+                        }
+                    }
+                }
+            }
+            else {
+                mBlockedUids.remove(new Integer(uid));
             }
         }
     }
