@@ -239,4 +239,9 @@ public interface TelephonyProperties
      * Type: string ( default = silent, enable to = prompt )
      */
     static final String PROPERTY_MMS_TRANSACTION = "mms.transaction";
+
+    /**
+     * Indicates whether Out Of Service is considered as data call disconnect.
+     */
+    static final String PROPERTY_OOS_IS_DISCONNECT = "persist.telephony.oosisdc";
 }
