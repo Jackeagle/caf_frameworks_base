@@ -198,6 +198,9 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     /**@hide*/
     public static boolean doConcurrentScan = true;
 
+    /**@hide*/
+    public static boolean mIsGroupOwner = false;
+
     /* Is chosen as a unique range to avoid conflict with
        the range defined in Tethering.java */
     private static final String[] DHCP_RANGE = {"192.168.49.2", "192.168.49.254"};
@@ -969,6 +972,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                    Slog.d(TAG, "startChannel while creating P2P Group=" + startChannel);
                    if (startChannel!=0){
                         if (mWifiNative.p2pGroupAddOnSpecifiedFreq(channelToFrequency(startChannel))) {
+                            mWifiNative.setP2pGroupIdle(mGroup.getInterface(), 0);
                             replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
                         } else {
                              replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
@@ -976,6 +980,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                         }
                    } else {
                          if (mWifiNative.p2pGroupAdd()) {
+                             mWifiNative.setP2pGroupIdle(mGroup.getInterface(), 0);
                              replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
                          } else {
                               replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
@@ -1111,6 +1116,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
                     if (mSavedPeerConfig.wps.setup == WpsInfo.PBC) {
                         if (DBG) logd("Found a match " + mSavedPeerConfig);
+                        if (DBG) logd("SetP2pGroupIdle(10) before group formation");
+                        mWifiNative.setP2pGroupIdle("p2p0", 10);
                         mWifiNative.p2pConnect(mSavedPeerConfig, FORM_GROUP);
                         transitionTo(mGroupNegotiationState);
                     }
@@ -1181,6 +1188,9 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (DBG) logd(getName() + " group started");
                     if (mGroup.isGroupOwner()) {
                         startDhcpServer(mGroup.getInterface());
+                        mIsGroupOwner = true;
+                        mWifiNative.setP2pDiscInterval(2, 3, 40);
+
                     } else {
                         // Set group idle only for a client on the group interface to speed up
                         // disconnect when GO is gone. Setting group idle time for a group owner
@@ -1307,9 +1317,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                             changed = true;
                         }
                     }
-                    mWifiNative.setP2pGroupIdle(mGroup.getInterface(), 0);
                     if (mGroup.isGroupOwner()) {
+                        mIsGroupOwner = false;
                         stopDhcpServer();
+                        mWifiNative.setP2pDiscInterval(2, 3, -1);
                     } else {
                         if (DBG) logd("stop DHCP client");
                         mDhcpStateMachine.sendMessage(DhcpStateMachine.CMD_STOP_DHCP);
@@ -1716,6 +1727,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     }
 
     private void p2pConnectWithPinDisplay(WifiP2pConfig config, boolean join) {
+       if(!join) {
+             if (DBG) logd("Set p2p_group_idle_timeout of 10 sec before staring group formation");
+             mWifiNative.setP2pGroupIdle("p2p0", 10);
+        }
         String pin = mWifiNative.p2pConnect(config, join);
         try {
             Integer.parseInt(pin);

@@ -30,10 +30,13 @@ package android.webkit;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.content.Context;
+import android.graphics.Rect;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
+import android.os.Handler;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
@@ -51,10 +54,13 @@ import java.lang.NullPointerException;
  *
  */
 public class HTML5VideoFullscreen implements View.OnTouchListener,
-       TextureView.SurfaceTextureListener
+       TextureView.SurfaceTextureListener, View.OnSystemUiVisibilityChangeListener
 {
     private static final String LOGTAG = "HTML5VideoFullscreen";
 
+    // Hide navigation timeout is defined to be the same as
+    // MediaController's sDefaultTimeout
+    private static final int HIDE_NAVIGATION_TIMEOUT = 3000;
     private static final long ANIMATION_DURATION = 750L; // in ms
     private static final int ANIMATION_STATE_NONE     = 0;
     private static final int ANIMATION_STATE_STARTED  = 1;
@@ -78,7 +84,7 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
 
     private HTML5VideoViewProxy mFullscreenProxy = null;
     private VideoTextureView mTextureView;
-    // End Fullscreen member variables
+    private int mLastSystemUiVisibility;
 
     // The video size will be ready when prepared. Used to make sure the aspect
     // ratio is correct.
@@ -241,8 +247,14 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         mAnimationState = ANIMATION_STATE_NONE;
         WebChromeClient client = mFullscreenProxy.getWebView().getWebChromeClient();
         if (client != null) {
+            // Set nav visibility here so that the layout will be fullscreen layout
+            setNavVisibility(true);
             // Only call show custom view if it's not already shown
             client.onShowCustomView(mLayout, mCallback);
+            if (mLayout != null) {
+                mLayout.setOnSystemUiVisibilityChangeListener(this);
+                mLastSystemUiVisibility = mLayout.getSystemUiVisibility();
+            }
             // Plugins like Flash will draw over the video so hide
             // them while we're playing.
             if (mFullscreenProxy.getWebView().getViewManager() != null)
@@ -316,10 +328,14 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
     private void updateDisplaySize() {
         WindowManager wm = (WindowManager)mFullscreenProxy.getContext().getSystemService(Context.WINDOW_SERVICE);
         Display display = wm.getDefaultDisplay();
-        display.getSize(mDisplaySize);
+        display.getRealSize(mDisplaySize);
 
-        mFullscreenProxy.getWebView().getWebView().getLocationOnScreen(mWebViewLocation);
-        mWebViewLocation[1] += mFullscreenProxy.getWebView().getVisibleTitleHeight();
+        // Only get WebView location when entering fullscreen since this is when WebView
+        // is actually visible.
+        if (mIsFullscreen) {
+            mFullscreenProxy.getWebView().getWebView().getLocationOnScreen(mWebViewLocation);
+            mWebViewLocation[1] += mFullscreenProxy.getWebView().getVisibleTitleHeight();
+        }
     }
 
     private float getInlineXOffset() {
@@ -366,8 +382,7 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         // This should only be called when MediaPlayer is in prepared state
         // Otherwise data will return invalid values
         if (mMediaController == null) {
-            MediaController mc = new FullScreenMediaController(proxy.getContext(), mLayout);
-            mc.setSystemUiVisibility(mLayout.getSystemUiVisibility());
+            MediaController mc = new FullScreenMediaController(proxy.getContext(), mFullscreenProxy);
             mMediaController = mc;
         }
         mMediaController.setEnabled(false);
@@ -379,31 +394,21 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         mMediaController.setEnabled(true);
     }
 
-    public void showMediaControls(HTML5VideoViewProxy proxy, boolean showForever) {
+    public void showMediaControls(HTML5VideoViewProxy proxy) {
         if (mFullscreenProxy != proxy)
             return;
 
         if (mMediaController != null && mAnimationState == ANIMATION_STATE_FINISHED) {
-            if (showForever)
-                mMediaController.show(0);
-            else
-                mMediaController.show();
+            setNavVisibility(true);
         }
     }
 
-    private void toggleMediaControlsVisiblity() {
-        if (mMediaController.isShowing())
-            mMediaController.hide();
-        else
-            mMediaController.show();
-    }
-
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        if (mFullscreenProxy != null)
-            mFullscreenProxy.onAvailableVideoFrame();
     }
 
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+        if (mFullscreenProxy != null)
+            mFullscreenProxy.dispatchOnAvailableVideoFrame();
     }
 
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
@@ -449,8 +454,16 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
             FullscreenAnimatedCustomViewCallback();
 
     public boolean onTouch(View v, MotionEvent event) {
-        if (mIsFullscreen && mMediaController != null)
-            toggleMediaControlsVisiblity();
+        boolean navBarIsVisible = (mLastSystemUiVisibility == View.SYSTEM_UI_FLAG_VISIBLE) ||
+                (mLastSystemUiVisibility == sBaseUISettings);
+        if (navBarIsVisible && mMediaController != null && !mMediaController.isShowing()) {
+            // Media controls may be auto-hidden by the MediaController
+            // Show media controls if user touches the screen when nav bar is already visible
+            setNavVisibility(true);
+        } else {
+            // Toggle navigation visibility
+            setNavVisibility(!navBarIsVisible);
+        }
         return false;
     }
 
@@ -468,30 +481,93 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         }
     }
 
+    @Override
+    public void onSystemUiVisibilityChange(int visibility) {
+        // Detect when we go out from SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        int diff = mLastSystemUiVisibility ^ visibility;
+        mLastSystemUiVisibility = visibility;
+        if ((diff & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) != 0
+                && (visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
+            setNavVisibility(true);
+        }
+    }
+
+    Runnable mNavHider = new Runnable() {
+        @Override public void run() {
+            setNavVisibility(false);
+        }
+    };
+
+    private static int sBaseUISettings = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+
+    void setNavVisibility(boolean visible) {
+        if (mLayout == null)
+            return;
+
+        int newVis = sBaseUISettings;
+        if (!visible) {
+            newVis  |= View.SYSTEM_UI_FLAG_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LOW_PROFILE
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+        }
+
+        // If we are now visible, schedule a timer for us to go invisible.
+        if (visible) {
+            Handler h = mLayout.getHandler();
+            if (h != null) {
+                h.removeCallbacks(mNavHider);
+                h.postDelayed(mNavHider, HIDE_NAVIGATION_TIMEOUT);
+            }
+        }
+
+        // Set the new desired visibility.
+        mLayout.setSystemUiVisibility(newVis);
+
+        if (mMediaController != null) {
+            mMediaController.setSystemUiVisibility(newVis);
+            if (visible) {
+                mMediaController.show(0);
+
+            } else {
+                mMediaController.hide();
+            }
+        }
+        mLayout.invalidate();
+    }
+
     static class FullScreenMediaController extends MediaController {
+        HTML5VideoViewProxy mProxy;
 
-        View mVideoView;
-
-        public FullScreenMediaController(Context context, View video) {
+        public FullScreenMediaController(Context context, HTML5VideoViewProxy proxy) {
             super(context);
-            mVideoView = video;
+            mProxy = proxy;
+            mPadding.set(getPaddingLeft(), getPaddingTop(), getPaddingRight(), getPaddingBottom());
         }
 
         @Override
-        public void show() {
-            super.show();
-            if (mVideoView != null) {
-                mVideoView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+        public boolean dispatchKeyEvent(KeyEvent event) {
+            if ((event.getKeyCode() == KeyEvent.KEYCODE_BACK)
+                    && (event.getRepeatCount() == 0)
+                    && (event.getAction() == KeyEvent.ACTION_DOWN)) {
+                mProxy.webkitExitFullscreen();
+                return true;
             }
+            return super.dispatchKeyEvent(event);
         }
 
+        private final Rect mWindowInsets = new Rect();
+        private final Rect mPadding = new Rect();
+
         @Override
-        public void hide() {
-            if (mVideoView != null) {
-                mVideoView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+        protected boolean fitSystemWindows(Rect insets) {
+            if (!mWindowInsets.equals(insets)) {
+                mWindowInsets.set(insets);
+                setPadding(mPadding.left + insets.left, mPadding.top + insets.top,
+                        mPadding.right + insets.right, mPadding.bottom + insets.bottom);
             }
-            super.hide();
+            return true;
         }
     }
 }
