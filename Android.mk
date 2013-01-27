@@ -293,6 +293,10 @@ LOCAL_SRC_FILES += \
 	core/java/android/bluetooth/IBluetoothStateChangeCallback.aidl
 endif
 
+LOCAL_SRC_FILES += \
+        security-bridge/src/com/android/services/SecurityBridge/api/PackageManagerMonitor.java \
+        security-bridge/src/com/android/services/SecurityBridge/api/ClipboardManagerMonitor.java
+
 # FRAMEWORKS_BASE_JAVA_SRC_DIRS comes from build/core/pathmap.mk
 LOCAL_AIDL_INCLUDES += $(FRAMEWORKS_BASE_JAVA_SRC_DIRS)
 
