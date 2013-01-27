@@ -107,6 +107,9 @@ JNIMediaPlayerListener::JNIMediaPlayerListener(JNIEnv* env, jobject thiz, jobjec
     }
     mQcMediaPlayer = false;
     jclass qcclazz = env->FindClass("com/qualcomm/qcmedia/QCMediaPlayer");
+    if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+    }
     if (qcclazz != NULL){
         if(env->IsInstanceOf(thiz,qcclazz)){
             mQcMediaPlayer = true;
