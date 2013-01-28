@@ -942,6 +942,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mHomeIntent.addCategory(Intent.CATEGORY_HOME);
         mHomeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        // For MPQ (To know from where 'HOME' activity is started from
+        mHomeIntent.putExtra("TriggeredFrom", "PhoneWindowManager");
+
         mCarDockIntent =  new Intent(Intent.ACTION_MAIN, null);
         mCarDockIntent.addCategory(Intent.CATEGORY_CAR_DOCK);
         mCarDockIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK

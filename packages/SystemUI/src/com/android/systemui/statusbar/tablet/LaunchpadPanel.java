@@ -193,8 +193,8 @@ public class LaunchpadPanel {
          mLaunchpadApplications.add("com.google.android.gallery3d");
          mLaunchpadApplications.add("com.android.music");
          mLaunchpadApplications.add("com.android.settings");
-         mLaunchpadApplications.add("com.android.chrome");
-         mLaunchpadApplications.add("com.google.android.gm");
+         mLaunchpadApplications.add("com.qualcomm.wfd.client");
+         mLaunchpadApplications.add("com.android.qualcomm");
       }
 
       mLaunchpadAdapter = new LaunchpadAdapter(this);
