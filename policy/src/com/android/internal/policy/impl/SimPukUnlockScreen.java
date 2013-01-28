@@ -286,7 +286,11 @@ public class SimPukUnlockScreen extends LinearLayout implements KeyguardScreen,
                         if (result == Phone.PIN_RESULT_SUCCESS) {
                             // before closing the keyguard, report back that
                             // the sim is unlocked so it knows right away
-                            mUpdateMonitor.reportSimUnlocked();
+                            if (!MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                                mUpdateMonitor.reportSimUnlocked();
+                             } else {
+                                mUpdateMonitor.reportSimUnlocked(mSubscription);
+                            }
                             mCallback.goToUnlockScreen();
                         } else {
                             if (result == Phone.PIN_PASSWORD_INCORRECT) {
