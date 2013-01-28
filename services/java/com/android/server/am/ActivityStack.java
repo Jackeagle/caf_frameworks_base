@@ -2753,13 +2753,24 @@ final class ActivityStack {
                             // If currently resumed app is 'HOME', no need to deliver
                             // new intent. Since unnecessarily onPause() & onResume()
                             // of the TV activity are called successively, with surface
-                            // getting destroyed and re-created
+                            // getting destroyed and re-created. Moreover, changing this
+                            // point of code shall affect apps like skype/browser/youtube etc.
+                            // So check if the HOME app is triggered from 'PhoneWindowManager'
+                            String triggeredFrom = intent.getStringExtra("TriggeredFrom");
+                            Slog.i(TAG, "For MPQ, TriggeredFrom : " + triggeredFrom);
+
                             if ((mResumedActivity != null)
                                 && (mResumedActivity.isHomeActivity)
-                                && (mResumedActivity.nowVisible == false)) {
-                                logStartActivity(EventLogTags.AM_NEW_INTENT, r, top.task);
-                                top.deliverNewIntentLocked(callingUid, r.intent);
+                                && (mResumedActivity.nowVisible)
+                                && ((triggeredFrom != null) && triggeredFrom.equalsIgnoreCase("PhoneWindowManager"))
+                                ) {
+                                Slog.i(TAG, "--- Do nothing! Probably Home Activity is in focus & Home button was pressed. ---");
                             }
+                            else {
+                                 logStartActivity(EventLogTags.AM_NEW_INTENT, r, top.task);
+                                 top.deliverNewIntentLocked(callingUid, r.intent);
+                             }
+
                         } else {
                             // A special case: we need to
                             // start the activity because it is not currently
