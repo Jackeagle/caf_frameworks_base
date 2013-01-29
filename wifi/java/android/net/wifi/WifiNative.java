@@ -40,9 +40,9 @@ import java.util.List;
  */
 public class WifiNative {
 
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
     private final String mTAG;
-    private static final int DEFAULT_GROUP_OWNER_INTENT = 7;
+    private static final int DEFAULT_GROUP_OWNER_INTENT = 5;
 
     static final int BLUETOOTH_COEXISTENCE_MODE_ENABLED = 0;
     static final int BLUETOOTH_COEXISTENCE_MODE_DISABLED = 1;
@@ -590,8 +590,12 @@ public class WifiNative {
             //TODO: This can be adapted based on device plugged in state and
             //device battery state
             int groupOwnerIntent = config.groupOwnerIntent;
+            if (DBG) Log.d(mTAG, "config.groupOwnerIntent=: " + config.groupOwnerIntent);
             if (groupOwnerIntent < 0 || groupOwnerIntent > 15) {
                 groupOwnerIntent = DEFAULT_GROUP_OWNER_INTENT;
+            }
+            if(groupOwnerIntent > DEFAULT_GROUP_OWNER_INTENT) {
+                 groupOwnerIntent = DEFAULT_GROUP_OWNER_INTENT;
             }
             args.add("go_intent=" + groupOwnerIntent);
         }
