@@ -212,7 +212,7 @@ public class TelephonyIntents {
      * @hide
      */
     public static final String ACTION_SAFE_WIFI_CHANNELS_CHANGED
-            = "android.intent.action.SAFE_WIFI_CHANNELS_CHANGED";
+            = "qualcomm.intent.action.SAFE_WIFI_CHANNELS_CHANGED";
 
     /**
      * Broadcast Action: The time was set by the carrier (typically by the NITZ string).
