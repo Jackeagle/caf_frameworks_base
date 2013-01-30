@@ -220,6 +220,8 @@ public class AudioManager {
     public static final int STREAM_TTS = AudioSystem.STREAM_TTS;
     /** @hide The audio stream for FM Radio (FM) */
     public static final int STREAM_FM = AudioSystem.STREAM_FM;
+    /** @hide The audio stream for incall music delivery */
+    public static final int STREAM_INCALL_MUSIC = AudioSystem.STREAM_INCALL_MUSIC;
     /** Number of audio streams */
     /**
      * @deprecated Use AudioSystem.getNumStreamTypes() instead
@@ -239,7 +241,8 @@ public class AudioManager {
         7,  // STREAM_SYSTEM_ENFORCED
         11, // STREAM_DTMF
         11, // STREAM_TTS
-        11  // STREAM_FM
+        11, // STREAM_FM
+        4   // STREAM_INCALL_MUSIC
     };
 
     /**
