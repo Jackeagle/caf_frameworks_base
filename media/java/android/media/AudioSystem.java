@@ -58,6 +58,8 @@ public class AudioSystem
     public static final int STREAM_TTS = 9;
     /* @hide The audio stream for FM */
     public static final int STREAM_FM = 10;
+    /* @hide The audio stream for incall music delivery */
+    public static final int STREAM_INCALL_MUSIC = 11;
     /**
      * @deprecated Use {@link #numStreamTypes() instead}
      */
