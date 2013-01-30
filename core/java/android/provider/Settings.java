@@ -1676,6 +1676,20 @@ public final class Settings {
         public static final String DIM_SCREEN = "dim_screen";
 
         /**
+        * Int value to specify if CABL is enabled.
+        * 0 = Disable  1 = Enable
+        * @hide
+        */
+        public static final String CABL_ENABLED = "cabl_enabled";
+
+        /**
+        * Int value to specify CABL levels.
+        * @hide
+        */
+        public static final String CABL_LEVELS = "cabl_levels";
+
+
+        /**
          * The timeout before the screen turns off.
          */
         public static final String SCREEN_OFF_TIMEOUT = "screen_off_timeout";
