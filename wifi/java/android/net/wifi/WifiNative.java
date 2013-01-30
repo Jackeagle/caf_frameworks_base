@@ -44,10 +44,13 @@ public class WifiNative {
     private static final boolean DBG = false;
     private final String mTAG;
     private static final int DEFAULT_GROUP_OWNER_INTENT = 7;
+    private static final int WPS_PIN_TIMEOUT = 120;
 
     static final int BLUETOOTH_COEXISTENCE_MODE_ENABLED = 0;
     static final int BLUETOOTH_COEXISTENCE_MODE_DISABLED = 1;
     static final int BLUETOOTH_COEXISTENCE_MODE_SENSE = 2;
+
+    static final int P2P_SEARCH_DELAY_MSECS = 100;
 
     String mInterface = "";
 
@@ -394,12 +397,18 @@ public class WifiNative {
 
     public boolean startWpsPinKeypad(String pin) {
         if (TextUtils.isEmpty(pin)) return false;
-        return doBooleanCommand("WPS_PIN any " + pin);
+        if (WifiP2pService.mIsGroupOwner)
+             return doBooleanCommand("WPS_PIN any " + pin + " " + WPS_PIN_TIMEOUT);
+        else
+             return doBooleanCommand("WPS_PIN any " + pin);
     }
 
     public boolean startWpsPinKeypad(String iface, String pin) {
         if (TextUtils.isEmpty(pin)) return false;
-        return doBooleanCommand("WPS_PIN interface=" + iface + " any " + pin);
+        if (WifiP2pService.mIsGroupOwner)
+             return doBooleanCommand("WPS_PIN interface=" + iface + " any " + pin + " " + WPS_PIN_TIMEOUT);
+        else
+             return doBooleanCommand("WPS_PIN interface=" + iface + " any " + pin);
     }
 
 
@@ -495,14 +504,20 @@ public class WifiNative {
     }
 
     public boolean p2pFind() {
-        return doBooleanCommand("P2P_FIND");
+        if (WifiP2pService.mIsGroupOwner)
+            return doBooleanCommand("P2P_FIND" + " delay=" + P2P_SEARCH_DELAY_MSECS);
+        else
+            return doBooleanCommand("P2P_FIND");
     }
 
     public boolean p2pFind(int timeout) {
         if (timeout <= 0) {
             return p2pFind();
         }
-        return doBooleanCommand("P2P_FIND " + timeout);
+        if (WifiP2pService.mIsGroupOwner)
+            return doBooleanCommand("P2P_FIND" + timeout + " delay=" + P2P_SEARCH_DELAY_MSECS);
+        else
+            return doBooleanCommand("P2P_FIND " + timeout);
     }
 
     public boolean p2pStopFind() {
@@ -780,6 +795,10 @@ public class WifiNative {
   /** Set Operating Channel*/
   public boolean setP2pOperChannel(int channel) {
       return doBooleanCommand("SET p2p_oper_channel " + channel);
+  }
+
+  public boolean setP2pDiscInterval(int minDisc, int maxDisc, int maxTus) {
+      return doBooleanCommand("P2P_SET disc_int=" + minDisc + " " + maxDisc + " " + maxTus);
   }
 
 }

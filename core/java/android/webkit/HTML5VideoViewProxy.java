@@ -214,6 +214,8 @@ class HTML5VideoViewProxy extends Handler
                 // This second condition allows an HTML5VideoView with preload
                 // metadata to continue into playing state
                 || mHTML5VideoView.getCurrentState() == HTML5VideoView.STATE_INITIALIZED) {
+                // setStartWhenPrepared is called for the preload metadata case
+                mHTML5VideoView.setStartWhenPrepared(true);
                 mHTML5VideoView.prepareDataAndDisplayMode();
                 mHTML5VideoView.seekTo(time);
             } else {
@@ -269,7 +271,7 @@ class HTML5VideoViewProxy extends Handler
 
         public void end() {
             if (mHTML5VideoView != null)
-                HTML5VideoFullscreen.instance().showMediaControls(mProxy, true);
+                HTML5VideoFullscreen.instance().showMediaControls(mProxy);
             if (mProxy != null) {
                 if (isVideoSelfEnded)
                     mProxy.dispatchOnEnded();
@@ -297,7 +299,6 @@ class HTML5VideoViewProxy extends Handler
                 mHTML5VideoView.setVideoURI(url);
                 return true;
             }
-            mHTML5VideoView.setStartWhenPrepared(willPlay);
             return false;
         }
 
@@ -372,7 +373,7 @@ class HTML5VideoViewProxy extends Handler
         mWebCoreHandler.sendMessage(msg);
     }
 
-    public void onAvailableVideoFrame() {
+    public void dispatchOnAvailableVideoFrame() {
         if (!mVideoFrameAvailable) {
             Message msg = Message.obtain(mWebCoreHandler, AVAILABLE_VIDEO_FRAME);
             mWebCoreHandler.sendMessage(msg);
