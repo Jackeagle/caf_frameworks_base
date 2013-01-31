@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -193,6 +194,10 @@ public class PackageManagerService extends IPackageManager.Stub {
     static final int FIRST_APPLICATION_UID =
                    Process.FIRST_APPLICATION_UID;
     static final int MAX_APPLICATION_UIDS = 1000;
+
+    private static final int UID_NET_RAW = Process.UID_NET_RAW;
+    private static final int UID_NET_ADMIN = Process.UID_NET_ADMIN;
+    private static final int UID_QCOM_DIAG = 3009;
 
     private static final boolean GET_CERTIFICATES = true;
 
@@ -978,7 +983,8 @@ public class PackageManagerService extends IPackageManager.Stub {
         mSettings = new Settings(context);
         mSettings.addSharedUserLPw("android.uid.system",
                 Process.SYSTEM_UID, ApplicationInfo.FLAG_SYSTEM);
-        mSettings.addSharedUserLPw("android.uid.phone", RADIO_UID, ApplicationInfo.FLAG_SYSTEM);
+        mSettings.addSharedUserLPw("android.uid.phone", RADIO_UID, ApplicationInfo.FLAG_SYSTEM,
+                new int[] {UID_NET_RAW, UID_QCOM_DIAG, UID_NET_ADMIN});
         mSettings.addSharedUserLPw("android.uid.log", LOG_UID, ApplicationInfo.FLAG_SYSTEM);
         mSettings.addSharedUserLPw("android.uid.nfc", NFC_UID, ApplicationInfo.FLAG_SYSTEM);
         mSettings.addSharedUserLPw("android.uid.bluetooth", BLUETOOTH_UID, ApplicationInfo.FLAG_SYSTEM);
