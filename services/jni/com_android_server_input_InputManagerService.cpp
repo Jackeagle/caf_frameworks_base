@@ -589,10 +589,9 @@ void NativeInputManager::notifySwitch(nsecs_t when, int32_t switchCode,
 #ifdef ALSA_HEADSET_DETECTION
     case SW_HEADPHONE_INSERT:
     case SW_MICROPHONE_INSERT:
-    //todo, add support for ANC HEADSET as well
+    case SW_LINEOUT_INSERT:
     //case SW_ANC_INSERT:
         // ToDo: Handle ANC switch event as well
-        ALOGD("JACK-DETECT: In NativeInputManager-Before calling windowmanager service for HEADPHONE_INSERT");
         env->CallVoidMethod(mServiceObj, gServiceClassInfo.notifyJackSwitchChanged,
                when, switchCode, switchValue);
         checkAndClearExceptionFromCallback(env, "notifyJackSwitchChanged");
