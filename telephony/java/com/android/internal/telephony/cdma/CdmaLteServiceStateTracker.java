@@ -81,7 +81,13 @@ public class CdmaLteServiceStateTracker extends CdmaServiceStateTracker {
                 mMdn = ruim.getMdn();
                 mMin = ruim.getMin();
                 parseSidNid(ruim.getSid(), ruim.getNid());
-                mPrlVersion = ruim.getPrlVersion();;
+
+                String prlVersion = ruim.getPrlVersion();
+                if (!TextUtils.isEmpty(prlVersion)) {
+                    log("Updating Prl info Old=" +mPrlVersion +
+                            " new= " + prlVersion);
+                    mPrlVersion = prlVersion;
+                }
                 mIsMinInfoReady = true;
                 updateOtaspState();
             }
