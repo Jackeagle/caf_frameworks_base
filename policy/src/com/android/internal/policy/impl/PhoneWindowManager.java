@@ -3324,10 +3324,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mPrevHeadsetState = mCurHeadsetState;
             mCurHeadsetState  = headsetState;
         }
-        if(headsetState == 0) {
-            Intent intent = new Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
-            mContext.sendBroadcast(intent);
-        }
         int allHeadsets = SUPPORTED_HEADSETS;
         //Handle plug-in events first
         for (int curHeadset = 1; curHeadset < SUPPORTED_HEADSETS; curHeadset <<= 1) {
