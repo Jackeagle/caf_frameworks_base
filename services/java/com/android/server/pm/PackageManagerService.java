@@ -158,6 +158,8 @@ import libcore.io.Libcore;
 import libcore.io.OsConstants;
 import libcore.io.StructStat;
 
+import com.android.services.SecurityBridge.api.PackageManagerMonitor;
+
 /**
  * Keep track of all those .apks everywhere.
  * 
@@ -222,6 +224,9 @@ public class PackageManagerService extends IPackageManager.Stub {
     static final int SCAN_BOOTING = 1<<8;
 
     static final int REMOVE_CHATTY = 1<<16;
+
+    private static final String SECURITY_BRIDGE_NAME = "com.android.services.SecurityBridge.core.PackageManagerSB";
+    private PackageManagerMonitor mSecurityBridge;
 
     /**
      * Whether verification is enabled by default.
@@ -973,6 +978,22 @@ public class PackageManagerService extends IPackageManager.Stub {
 
         if (mSdkVersion <= 0) {
             Slog.w(TAG, "**** ro.build.version.sdk not set!");
+        }
+
+        Object bridgeObject;
+
+        try {
+
+            /*
+             * load and create the security bridge
+             */
+             bridgeObject = getClass().getClassLoader().loadClass(SECURITY_BRIDGE_NAME).newInstance();
+             mSecurityBridge = (PackageManagerMonitor)bridgeObject;
+
+        } catch (Exception e){
+
+            Slog.w(TAG, "No security bridge jar found, using default");
+            mSecurityBridge = new PackageManagerMonitor();
         }
 
         mContext = context;
@@ -7832,6 +7853,11 @@ public class PackageManagerService extends IPackageManager.Stub {
                 | (newInstall ? SCAN_NEW_INSTALL : 0);
         // Result object to be returned
         res.returnCode = PackageManager.INSTALL_SUCCEEDED;
+
+        if (true != mSecurityBridge.approveAppInstallRequest(args.getResourcePath(), args.packageURI.toSafeString())) {
+            res.returnCode = PackageManager.INSTALL_FAILED_VERIFICATION_FAILURE;
+            return;
+        }
 
         // Retrieve PackageSettings and parse package
         int parseFlags = mDefParseFlags | PackageParser.PARSE_CHATTY
