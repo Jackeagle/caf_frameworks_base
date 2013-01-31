@@ -3162,8 +3162,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // Retain only relevant bits
         int headsetState = mHeadsetJackState & SUPPORTED_HEADSETS;
-        // Set default delay to 10msec to allow all the events to reach before sending intent
-        int delay = 10;
+        // Default delay to allow all the events to reach before sending intent
+        int delay = 100;
         // reject all suspect transitions: only accept state changes from:
         // - a: 0 heaset to 1 headset
         // - b: 1 headset to 0 headset
@@ -3171,22 +3171,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return;
         }
 
-        if (headsetState == 0) {
-            Intent intent = new Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
-            mContext.sendBroadcast(intent);
-            // It can take hundreds of ms flush the audio pipeline after
-            // apps pause audio playback, but audio route changes are
-            // immediate, so delay the route change by 1000ms.
-            // This could be improved once the audio sub-system provides an
-            // interface to clear the audio pipeline.
-            delay = 1000;
-        } else {
-            // Insert the same delay for headset connection so that the connection event is not
-            // broadcast before the disconnection event in case of fast removal/insertion
-            if ( mIntentHandler.hasMessages(0)) {
-                delay = 1000;
-            }
-        }
         mBroadcastWakeLock.acquire();
         Slog.d(TAG,"update(): sending Message to IntentHander with delay of "+delay);
         mIntentHandler.sendMessageDelayed( mIntentHandler.obtainMessage(0, mHeadsetName),
@@ -3206,20 +3190,29 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mPrevHeadsetState = mCurHeadsetState;
             mCurHeadsetState  = headsetState;
         }
-
+        if(headsetState == 0) {
+            Intent intent = new Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+            mContext.sendBroadcast(intent);
+        }
         int allHeadsets = SUPPORTED_HEADSETS;
-        //Handle unplug events first and then handle plug-in events
+        //Handle plug-in events first
         for (int curHeadset = 1; curHeadset < SUPPORTED_HEADSETS; curHeadset <<= 1) {
-            if (((headsetState & curHeadset) == 0) && ((mPrevHeadsetState & curHeadset) == curHeadset)) {
+            if (((headsetState & curHeadset) == curHeadset) && ((mPrevHeadsetState & curHeadset) == 0)) {
                 if ((curHeadset & allHeadsets) != 0) {
                     sendIntent(curHeadset, headsetState, mPrevHeadsetState, headsetName);
                     allHeadsets &= ~curHeadset;
                 }
             }
         }
-
+        // Allow AudioService to handle plug in events
+        try {
+            Thread.sleep(20);
+        } catch (Exception e) {
+             e.printStackTrace();
+        }
+        //Handle unplug events
         for (int curHeadset = 1; curHeadset < SUPPORTED_HEADSETS; curHeadset <<= 1) {
-            if (((headsetState & curHeadset) == curHeadset) && ((mPrevHeadsetState & curHeadset) == 0)) {
+            if (((headsetState & curHeadset) == 0) && ((mPrevHeadsetState & curHeadset) == curHeadset)) {
                 if ((curHeadset & allHeadsets) != 0) {
                     sendIntent(curHeadset, headsetState, mPrevHeadsetState, headsetName);
                     allHeadsets &= ~curHeadset;
