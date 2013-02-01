@@ -93,7 +93,7 @@ static jstring doStringCommand(JNIEnv* env, const char *ifname, const char* fmt,
     if (byteCount < 0 || byteCount >= BUF_SIZE) {
         return NULL;
     }
-    char reply[4096];
+    char reply[8192];
     if (doCommand(ifname, buf, reply, sizeof(reply)) != 0) {
         return NULL;
     }
