@@ -50,6 +50,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 
+import android.widget.TextView;
+import com.android.internal.app.ActivityTrigger;
+
 /**
  * <p>
  * A <code>ViewGroup</code> is a special view that can contain other views
@@ -416,6 +419,8 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     @ViewDebug.ExportedProperty(category = "layout")
     private int mChildCountWithTransientState = 0;
 
+    static final ActivityTrigger mActivityTrigger = new ActivityTrigger();
+
     public ViewGroup(Context context) {
         super(context);
         initViewGroup();
@@ -509,6 +514,32 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
 
         a.recycle();
     }
+
+    /**
+    * Determines if Chrome Browser is running specific workloads.
+    *
+    * @hide
+    */
+    public boolean isChromeBrowserRunningJavaScripts() {
+        int count = mChildrenCount;
+        for (int i = 0; i < count; i++) {
+            View child = mChildren[i];
+            if (child instanceof TextView) {
+               TextView t = (TextView)child;
+               if (mActivityTrigger.activityBrowserTrigger(t.getText().toString()) == 1) {
+                   return true;
+               }
+            }
+            if (child instanceof ViewGroup) {
+                ViewGroup c = (ViewGroup)child;
+                if (c.isChromeBrowserRunningJavaScripts() == true) {
+                   return true;
+                }
+            }
+        }
+        return false;
+    }
+
 
     /**
      * Gets the descendant focusability of this view group.  The descendant
