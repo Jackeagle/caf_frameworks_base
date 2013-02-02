@@ -22,6 +22,7 @@
 
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <utils/KeyedVector.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
 
@@ -94,8 +95,8 @@ struct ATSParser : public RefBase {
 
     status_t parseTSToGetPID(const void *data, size_t size,
                              unsigned& streamPID);
-    bool checkPMT(const void *data, size_t size, unsigned PID);
-    bool checkPAT(const void *data, size_t size);
+    bool checkPMT(ABitReader *br, unsigned PID, unsigned payload_unit_start_indicator);
+    bool checkPAT(ABitReader *br, unsigned payload_unit_start_indicator);
 
 
 protected:
@@ -104,9 +105,14 @@ protected:
 private:
     struct Program;
     struct Stream;
+    struct PSISection;
 
     uint32_t mFlags;
     Vector<sp<Program> > mPrograms;
+
+    // Keyed by PID
+    KeyedVector<unsigned, sp<PSISection> > mPSISections;
+    KeyedVector<unsigned, sp<PSISection> > mPSISectionsCheck;
 
     void parseProgramAssociationTable(ABitReader *br);
     void parseProgramMap(ABitReader *br);

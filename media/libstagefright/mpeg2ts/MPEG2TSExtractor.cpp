@@ -22,6 +22,7 @@
 #include "include/LiveSession.h"
 #include "include/NuCachedSource2.h"
 
+#include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaDebug.h>
 #include <media/stagefright/MediaDefs.h>
@@ -300,19 +301,38 @@ status_t MPEG2TSSource::feedMoreForStream() {
         }
         //TODO handle program/stream PID change
         if (PID == 0 || PID == mStream->mProgramPID) {
-            //PID = 0 indicate PAT Packet.Check new PAT with previous.
-            if(PID == 0 && !mExtractor->mParser->checkPAT(packet, kTSPacketSize))
-            {
-               LOGE("PAT Changed ... at these clips are not supported");
-               return DEAD_OBJECT;
-            }
+            ABitReader br((const uint8_t *)packet, kTSPacketSize);
 
-            //compare streamPID
-            if(PID == mStream->mProgramPID && !mExtractor->mParser->checkPMT(packet, kTSPacketSize,PID))
-            {
-                LOGE("StreamPID Changed ... at these clips are not supported");
-                return DEAD_OBJECT;
-            }
+            unsigned sync_byte = br.getBits(8);
+            CHECK_EQ(sync_byte, 0x47u);
+
+            br.skipBits(1);
+            unsigned payload_unit_start_indicator = br.getBits(1);
+            br.skipBits(16);
+
+            unsigned adaptation_field_control = br.getBits(2);
+            br.getBits(4);
+
+           if (adaptation_field_control == 2 || adaptation_field_control == 3) {
+               unsigned adaptation_field_length = br.getBits(8);
+               if (adaptation_field_length > 0) {
+                   br.skipBits(adaptation_field_length * 8);  // XXX
+               }
+           }
+
+           if (adaptation_field_control == 1 || adaptation_field_control == 3) {
+               //PID = 0 indicate PAT Packet.Check new PAT with previous.
+               if(PID == 0 && !mExtractor->mParser->checkPAT(&br, payload_unit_start_indicator)) {
+                    LOGE("PAT Changed ... at these clips are not supported");
+                    return DEAD_OBJECT;
+                }
+
+                //compare streamPID
+                if(PID == mStream->mProgramPID && !mExtractor->mParser->checkPMT(&br, PID, payload_unit_start_indicator)) {
+                    LOGE("StreamPID Changed ... at these clips are not supported");
+                    return DEAD_OBJECT;
+                }
+           }
         }
 
         offset += kTSPacketSize;
