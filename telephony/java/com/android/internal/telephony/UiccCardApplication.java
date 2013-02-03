@@ -655,8 +655,7 @@ public class UiccCardApplication {
              Message onComplete) {
          log("Change Pin1 old: " + oldPassword + " new: " + newPassword);
          mCi.changeIccPinForApp(oldPassword, newPassword, mAid,
-                 onComplete);
-
+                 mHandler.obtainMessage(EVENT_CHANGE_PIN1_DONE, onComplete));
      }
 
     /**
@@ -674,7 +673,7 @@ public class UiccCardApplication {
             Message onComplete) {
         log("Change Pin2 old: " + oldPassword + " new: " + newPassword);
         mCi.changeIccPin2ForApp(oldPassword, newPassword, mAid,
-                onComplete);
+                mHandler.obtainMessage(EVENT_CHANGE_PIN2_DONE, onComplete));
     }
 
     /**
