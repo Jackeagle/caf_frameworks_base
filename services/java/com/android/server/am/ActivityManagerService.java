@@ -7869,7 +7869,7 @@ public final class ActivityManagerService extends ActivityManagerNative
                 // stopped, to avoid a situation where one will get
                 // re-start our crashing activity once it gets resumed again.
                 index--;
-                if (index >= 0) {
+                if (index >= 0 && index < mMainStack.mHistory.size()) {
                     r = (ActivityRecord)mMainStack.mHistory.get(index);
                     if (r.state == ActivityState.RESUMED
                             || r.state == ActivityState.PAUSING
