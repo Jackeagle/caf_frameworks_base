@@ -184,13 +184,17 @@ public final class MSimGsmServiceStateTracker extends GsmServiceStateTracker {
             case EVENT_NITZ_TIME:
                 if(!(SystemProperties.getBoolean("persist.timed.enable", false))) {
                     SubscriptionManager subMgr = SubscriptionManager.getInstance();
-                    log("EVENT_NITZ_TIME received phone type ::" + MSimTelephonyManager.
+                    log("EVENT_NITZ_TIME received phone type :: " + MSimTelephonyManager.
                             getDefault().getCurrentPhoneType(DEFAULT_SUBSCRIPTION) +
-                            "is cdma sub active ::" + subMgr.isSubActive(DEFAULT_SUBSCRIPTION));
+                            " subscription activation status ::" + subMgr.
+                            isSubActive(DEFAULT_SUBSCRIPTION));
                     if (TelephonyManager.PHONE_TYPE_CDMA == MSimTelephonyManager.
                             getDefault().getCurrentPhoneType(DEFAULT_SUBSCRIPTION) &&
                             subMgr.isSubActive(DEFAULT_SUBSCRIPTION)) {
                         log("EVENT_NITZ_TIME received in c + g ignore updating time");
+                    } else if (TelephonyManager.PHONE_TYPE_GSM == MSimTelephonyManager.
+                            getDefault().getCurrentPhoneType(DEFAULT_SUBSCRIPTION)) {
+                        super.handleMessage(msg);
                     }
                 } else {
                     super.handleMessage(msg);
