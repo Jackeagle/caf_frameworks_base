@@ -32,6 +32,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/Utils.h>
 #include <media/IStreamSource.h>
 #include <utils/KeyedVector.h>
 #include <cutils/properties.h>
@@ -50,6 +51,9 @@ struct ATSParser::Program : public RefBase {
     bool parsePID(
             unsigned pid, unsigned payload_unit_start_indicator,
             ABitReader *br, status_t *err);
+
+    bool parsePSISection(
+            unsigned pid, ABitReader *br, status_t *err);
 
     void signalDiscontinuity(
             DiscontinuityType type, const sp<AMessage> &extra);
@@ -71,6 +75,10 @@ struct ATSParser::Program : public RefBase {
 
     void updateProgramMapPID(unsigned programMapPID) {
         mProgramMapPID = programMapPID;
+    }
+
+    unsigned programMapPID() const {
+        return mProgramMapPID;
     }
 
 private:
@@ -139,6 +147,28 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(Stream);
 };
 
+struct ATSParser::PSISection : public RefBase {
+    PSISection();
+
+    status_t append(const void *data, size_t size);
+    void clear();
+
+    bool isComplete() const;
+    bool isEmpty() const;
+
+    const uint8_t *data() const;
+    size_t size() const;
+
+protected:
+    virtual ~PSISection();
+
+private:
+    sp<ABuffer> mBuffer;
+
+    DISALLOW_EVIL_CONSTRUCTORS(PSISection);
+};
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
 ATSParser::Program::Program(
@@ -151,21 +181,24 @@ ATSParser::Program::Program(
     LOGV("new program number %u", programNumber);
 }
 
+bool ATSParser::Program::parsePSISection(
+        unsigned pid, ABitReader *br, status_t *err) {
+
+    *err = OK;
+
+    if (pid != mProgramMapPID) {
+        return false;
+    }
+
+    *err = parseProgramMap(br);
+
+    return true;
+}
+
 bool ATSParser::Program::parsePID(
         unsigned pid, unsigned payload_unit_start_indicator,
         ABitReader *br, status_t *err) {
     *err = OK;
-
-    if (pid == mProgramMapPID) {
-        if (payload_unit_start_indicator) {
-            unsigned skip = br->getBits(8);
-            br->skipBits(skip * 8);
-        }
-
-        *err = parseProgramMap(br);
-
-        return true;
-    }
 
     ssize_t index = mStreams.indexOfKey(pid);
     if (index < 0) {
@@ -896,6 +929,8 @@ sp<MediaSource> ATSParser::Stream::getSource(SourceType type) {
 
 ATSParser::ATSParser(uint32_t flags)
     : mFlags(flags) {
+    mPSISections.add(0 /* PID */, new PSISection);
+    mPSISectionsCheck.add(0 /* PID */, new PSISection);
 }
 
 ATSParser::~ATSParser() {
@@ -976,6 +1011,11 @@ void ATSParser::parseProgramAssociationTable(ABitReader *br) {
             if (!found) {
                 mPrograms.push(
                         new Program(this, program_number, programMapPID));
+
+                if (mPSISections.indexOfKey(programMapPID) < 0) {
+                    mPSISections.add(programMapPID, new PSISection);
+                    mPSISectionsCheck.add(programMapPID, new PSISection);
+                }
             }
         }
     }
@@ -986,12 +1026,57 @@ void ATSParser::parseProgramAssociationTable(ABitReader *br) {
 status_t ATSParser::parsePID(
         ABitReader *br, unsigned PID,
         unsigned payload_unit_start_indicator) {
-    if (PID == 0) {
+    ssize_t sectionIndex = mPSISections.indexOfKey(PID);
+
+    if (sectionIndex >= 0) {
+        const sp<PSISection> section = mPSISections.valueAt(sectionIndex);
+
         if (payload_unit_start_indicator) {
+            CHECK(section->isEmpty());
+
             unsigned skip = br->getBits(8);
             br->skipBits(skip * 8);
         }
-        parseProgramAssociationTable(br);
+
+        CHECK((br->numBitsLeft() % 8) == 0);
+        status_t err = section->append(br->data(), br->numBitsLeft() / 8);
+
+        if (err != OK) {
+            return err;
+        }
+
+        if (!section->isComplete()) {
+            return OK;
+        }
+
+        ABitReader sectionBits(section->data(), section->size());
+
+        if (PID == 0) {
+            parseProgramAssociationTable(&sectionBits);
+        } else {
+            bool handled = false;
+            for (size_t i = 0; i < mPrograms.size(); ++i) {
+                status_t err;
+                if (!mPrograms.editItemAt(i)->parsePSISection(
+                            PID, &sectionBits, &err)) {
+                    continue;
+                }
+
+                if (err != OK) {
+                    return err;
+                }
+
+                handled = true;
+                break;
+            }
+
+            if (!handled) {
+                mPSISections.removeItem(PID);
+            }
+        }
+
+        section->clear();
+
         return OK;
     }
 
@@ -1252,29 +1337,40 @@ status_t ATSParser::parseTSToGetPID(const void *data, size_t size,
 
 }
 
-bool ATSParser::checkPMT(const void *data, size_t size, unsigned PID)
+bool ATSParser::checkPMT(ABitReader *br, unsigned PID, unsigned payload_unit_start_indicator)
 {
-    ABitReader br2((const uint8_t *)data, size);
-    ABitReader *br = &br2;
+    ssize_t sectionIndex = mPSISectionsCheck.indexOfKey(PID);
 
-    br->skipBits(9);
-    unsigned payload_unit_start_indicator = br->getBits(1);
-    br->skipBits(16);
+    if (sectionIndex >= 0) {
+        const sp<PSISection> section = mPSISectionsCheck.valueAt(sectionIndex);
 
-    unsigned adaptation_field_control = br->getBits(2);
-    unsigned continuity_counter = br->getBits(4);
-
-    if (adaptation_field_control == 2 || adaptation_field_control == 3) {
-        parseAdaptationField(br);
-    }
-
-    if (adaptation_field_control == 1 || adaptation_field_control == 3) {
         if (payload_unit_start_indicator) {
-            unsigned skip = br->getBits(8);
-            br->skipBits(skip * 8);
+           if(!section->isEmpty()) {
+               section->clear();
+           }
+           unsigned skip = br->getBits(8);
+           br->skipBits(skip * 8);
+        } else {
+            if(section->isEmpty())
+            return true;
         }
-        for (size_t index = 0; index < mPrograms.size(); ++index)
-        {
+
+
+        CHECK((br->numBitsLeft() % 8) == 0);
+        status_t err = section->append(br->data(), br->numBitsLeft() / 8);
+
+        if (err != OK) {
+            return false;
+        }
+
+        if (!section->isComplete()) {
+            return true;
+        }
+        ABitReader sectionBits(section->data(), section->size());
+        br = &sectionBits; //Override br with the accumulated PMT
+        section->clear();
+
+        for (size_t index = 0; index < mPrograms.size(); ++index) {
             const sp<Program> &program = mPrograms.itemAt(index);
             if( PID == program->programPID())
                 return program->checkPMT(br);
@@ -1349,7 +1445,7 @@ bool ATSParser::Program::checkPMT(ABitReader *br)
 
         for (size_t j = 0; j < mStreams.size(); j++){
             sp<Stream> stream = mStreams.editValueAt(j);
-            if (infos.itemAt(i).mType == stream->type() && infos.itemAt(i).mPID != stream->pid()) {
+            if (infos.itemAt(i).mPID == stream->pid() && infos.itemAt(i).mType != stream->type() ) {
                 LOGE("stream PIDs have changed.");
                 PIDsChanged = true;
                 break;
@@ -1363,28 +1459,35 @@ bool ATSParser::Program::checkPMT(ABitReader *br)
     return true;
 }
 
-bool ATSParser::checkPAT(const void *data, size_t size)
+bool ATSParser::checkPAT(ABitReader *br, unsigned payload_unit_start_indicator)
 {
-    ABitReader br2((const uint8_t *)data, size);
-    ABitReader *br = &br2;
+    ssize_t sectionIndex = mPSISectionsCheck.indexOfKey(0);
 
-    br->skipBits(9);
-    unsigned payload_unit_start_indicator = br->getBits(1);
-    br->skipBits(16);
+    if (sectionIndex >= 0) {
+        const sp<PSISection> section = mPSISectionsCheck.valueAt(sectionIndex);
 
-    unsigned adaptation_field_control = br->getBits(2);
-    unsigned continuity_counter = br->getBits(4);
+        if (payload_unit_start_indicator) {
+            CHECK(section->isEmpty());
 
-    if (adaptation_field_control == 2 || adaptation_field_control == 3) {
-        parseAdaptationField(br);
-    }
-
-    if (adaptation_field_control == 1 || adaptation_field_control == 3) {
-
-        if (payload_unit_start_indicator){
             unsigned skip = br->getBits(8);
             br->skipBits(skip * 8);
         }
+
+        CHECK((br->numBitsLeft() % 8) == 0);
+        status_t err = section->append(br->data(), br->numBitsLeft() / 8);
+
+        if (err != OK) {
+            return false;
+        }
+
+        if (!section->isComplete()) {
+            return true;
+        }
+
+        ABitReader sectionBits(section->data(), section->size());
+        br = &sectionBits; //Override br with the accumulated PAT
+        section->clear();
+
         br->skipBits(12);
         unsigned section_length = br->getBits(12);
         CHECK_EQ(section_length & 0xc00, 0u);
@@ -1421,5 +1524,66 @@ bool ATSParser::checkPAT(const void *data, size_t size)
     }
     return false;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+ATSParser::PSISection::PSISection() {
+}
+
+ATSParser::PSISection::~PSISection() {
+}
+
+status_t ATSParser::PSISection::append(const void *data, size_t size) {
+    if (mBuffer == NULL || mBuffer->size() + size > mBuffer->capacity()) {
+        size_t newCapacity =
+            (mBuffer == NULL) ? size : mBuffer->capacity() + size;
+
+        newCapacity = (newCapacity + 1023) & ~1023;
+
+        sp<ABuffer> newBuffer = new ABuffer(newCapacity);
+
+        if (mBuffer != NULL) {
+            memcpy(newBuffer->data(), mBuffer->data(), mBuffer->size());
+            newBuffer->setRange(0, mBuffer->size());
+        } else {
+            newBuffer->setRange(0, 0);
+        }
+
+        mBuffer = newBuffer;
+    }
+
+    memcpy(mBuffer->data() + mBuffer->size(), data, size);
+    mBuffer->setRange(0, mBuffer->size() + size);
+
+    return OK;
+}
+
+void ATSParser::PSISection::clear() {
+    if (mBuffer != NULL) {
+        mBuffer->setRange(0, 0);
+    }
+}
+
+bool ATSParser::PSISection::isComplete() const {
+    if (mBuffer == NULL || mBuffer->size() < 3) {
+        return false;
+    }
+
+    unsigned sectionLength = U16_AT(mBuffer->data() + 1) & 0xfff;
+    return mBuffer->size() >= sectionLength + 3;
+}
+
+bool ATSParser::PSISection::isEmpty() const {
+    return mBuffer == NULL || mBuffer->size() == 0;
+}
+
+const uint8_t *ATSParser::PSISection::data() const {
+    return mBuffer == NULL ? NULL : mBuffer->data();
+}
+
+size_t ATSParser::PSISection::size() const {
+    return mBuffer == NULL ? 0 : mBuffer->size();
+}
+
 }
   // namespace android
