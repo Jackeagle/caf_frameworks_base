@@ -3266,7 +3266,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mPrevHeadsetState = mCurHeadsetState;
             mCurHeadsetState  = headsetState;
         }
-
         int allHeadsets = SUPPORTED_HEADSETS;
         //Handle unplug events first and then handle plug-in events
         for (int curHeadset = 1; curHeadset < SUPPORTED_HEADSETS; curHeadset <<= 1) {
