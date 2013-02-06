@@ -376,7 +376,7 @@ public class KeyguardViewMediator {
 
         @Override
         public void onSimStateChanged(IccCardConstants.State simState) {
-            if (DEBUG) Log.d(TAG, "onSimStateChanged: " + simState);
+            Log.d(TAG, "onSimStateChanged: " + simState);
 
             switch (simState) {
                 case NOT_READY:
