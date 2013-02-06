@@ -549,7 +549,7 @@ public class MediaPlayer
     /* {@hide}
      */
     private static final String ACTION_METADATA_CHANGED  =
-        "android.media.MediaPlayer.action.METADATA_CHANGED";
+        "qualcomm.MediaPlayer.action.METADATA_CHANGED";
 
     /* {@hide}
      */

@@ -200,9 +200,9 @@ public class AtParser {
                 return null;
            }
            if ((at_bia == true) && (i == j) && (input.charAt(i) == ',')) {
-               //Adding a default value value of 1 for all indicators which are
+               //Adding a default value value of -1 for all indicators which are
                //not sent for updates
-               out.add(new Integer(1));
+               out.add(new Integer(-1));
                i = j + 1;
                if (i >= input.length())
                    break;
