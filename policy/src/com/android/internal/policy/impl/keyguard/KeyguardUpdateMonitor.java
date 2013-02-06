@@ -700,8 +700,8 @@ public class KeyguardUpdateMonitor {
      * Handle {@link #MSG_CARRIER_INFO_UPDATE}
      */
     private void handleCarrierInfoUpdate() {
-        if (DEBUG) Log.d(TAG, "handleCarrierInfoUpdate: plmn = " + mTelephonyPlmn
-            + ", spn = " + mTelephonySpn);
+        Log.d(TAG, "handleCarrierInfoUpdate: plmn = " + mTelephonyPlmn
+                + ", spn = " + mTelephonySpn);
 
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
@@ -717,10 +717,8 @@ public class KeyguardUpdateMonitor {
     private void handleSimStateChange(SimArgs simArgs) {
         final IccCardConstants.State state = simArgs.simState;
 
-        if (DEBUG) {
-            Log.d(TAG, "handleSimStateChange: intentValue = " + simArgs + " "
-                    + "state resolved to " + state.toString());
-        }
+        Log.d(TAG, "handleSimStateChange: intentValue = " + simArgs + " "
+                + "state resolved to " + state.toString());
 
         if (state != IccCardConstants.State.UNKNOWN && state != mSimState) {
             mSimState = state;
