@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -351,6 +351,7 @@ public final class BluetoothAdapter {
     /** @hide */ public static final int HOST_PATCH_DONT_REMOVE_SERVICE = 1;
     /** @hide */ public static final int HOST_PATCH_AVOID_CONNECT_ON_PAIR = 2;
     /** @hide */ public static final int HOST_PATCH_AVOID_AUTO_CONNECT = 3;
+    /** @hide */ public static final int HOST_PATCH_ENABLE_PHOTO_ON_PBAP = 4;
 
     /**
      * Lazily initialized singleton. Guaranteed final after first object

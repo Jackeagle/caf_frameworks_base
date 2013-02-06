@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2012, Code Aurora Forum. All rights reserved
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -75,7 +75,6 @@ public class LockPatternKeyguardViewProperties implements KeyguardViewProperties
             simState[i] = mUpdateMonitor.getSimState(i);
             // isPinLocked returns true if SIM is PIN/PUK Locked.
             isSimPinSecure = isSimPinSecure || (simState[i].isPinLocked()
-                    || simState[i] == IccCard.State.ABSENT
                     || simState[i] == IccCard.State.PERM_DISABLED);
             if (isSimPinSecure) break;
         }

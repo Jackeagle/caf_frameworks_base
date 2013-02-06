@@ -1,6 +1,6 @@
 /*
  * Copyright 2009, The Android Open Source Project
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -149,6 +149,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
     case TYPE_RFCOMM:
         lm |= auth ? RFCOMM_LM_AUTH : 0;
         lm |= encrypt ? RFCOMM_LM_ENCRYPT : 0;
+        lm |= (auth && encrypt) ? RFCOMM_LM_SECURE : 0;
         if (!strcmp("true", value)) {
             ALOGI("Setting Master socket option");
             lm |= RFCOMM_LM_MASTER;
@@ -158,6 +159,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
     case TYPE_EL2CAP:
         lm |= auth ? L2CAP_LM_AUTH : 0;
         lm |= encrypt ? L2CAP_LM_ENCRYPT : 0;
+        lm |= (auth && encrypt) ? L2CAP_LM_SECURE : 0;
         if (!strcmp("true", value)) {
             ALOGI("Setting Master socket option");
             lm |= L2CAP_LM_MASTER;

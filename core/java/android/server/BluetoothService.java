@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -282,6 +282,7 @@ public class BluetoothService extends IBluetooth.Stub {
         private ArrayList <String> mDontRemoveServiceBlackList;
         private ArrayList <String> mAvoidConnectOnPairBlackList;
         private ArrayList <String> mAvoidAutoConnectBlackList;
+        private ArrayList <String> mEnablePhotoOnPbap;
 
         public HostPatchForIOP() {
              // Read the IOP device list into patch table
@@ -310,6 +311,10 @@ public class BluetoothService extends IBluetooth.Stub {
                             mAvoidAutoConnectBlackList =
                                 new ArrayList<String>(Arrays.asList(val));
                             if(DBG) Log.d(TAG, " HostPatchForIOT: Loaded NoAutoConnectList");
+                        } else if(value[0].equalsIgnoreCase("enable_photosharing")) {
+                            if(DBG) Log.d(TAG, " HostPatchForIOT: Loaded  Photo Sharing");
+                            mEnablePhotoOnPbap =
+                                    new ArrayList<String>(Arrays.asList(val));
                         }
                     }
                 }
@@ -362,6 +367,16 @@ public class BluetoothService extends IBluetooth.Stub {
                             blacklistAddress, 0, blacklistAddress.length())) {
                             if(DBG) Log.d(TAG, " HostPatchForIOT: Apply DontAutoConnect");
                             return true;
+                        }
+                    }
+                }
+                break;
+            case BluetoothAdapter.HOST_PATCH_ENABLE_PHOTO_ON_PBAP:
+                if (mEnablePhotoOnPbap != null) {
+                   for (String PhotoVcardFeature : mEnablePhotoOnPbap) {
+                       if( PhotoVcardFeature.equals("true")) {
+                           if(DBG) Log.d(TAG, " HostPatchForIOT: Apply Avoid photo on pbap");
+                           return true;
                         }
                     }
                 }
@@ -1844,16 +1859,6 @@ public class BluetoothService extends IBluetooth.Stub {
         if (!isBondingFeasible(address)) return false;
         BluetoothClass btClass = new BluetoothClass(getRemoteClass(address));
         int btDeviceClass = btClass.getDeviceClass();
-
-        if (btDeviceClass == BluetoothClass.Device.PERIPHERAL_POINTING) {
-            Log.i(TAG, "The device is HID pointing device, skipping pairing");
-            if (!createDeviceNative(address)) {
-                Log.e(TAG, "CreateDeviceNative failed for " + address);
-                return false;
-            }
-            mBondState.setBondState(address, BluetoothDevice.BOND_BONDING);
-            return true;
-        }
 
         if (!createPairedDeviceNative(address, 60000  /*1 minute*/ )) {
             return false;
