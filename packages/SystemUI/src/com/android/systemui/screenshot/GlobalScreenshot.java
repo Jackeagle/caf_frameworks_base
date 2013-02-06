@@ -43,6 +43,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.os.Process;
+import android.os.SystemProperties;
 import android.provider.MediaStore;
 import android.util.DisplayMetrics;
 import android.view.Display;
@@ -382,6 +383,7 @@ class GlobalScreenshot {
         mDisplay.getRealMetrics(mDisplayMetrics);
         float[] dims = {mDisplayMetrics.widthPixels, mDisplayMetrics.heightPixels};
         float degrees = getDegreesForRotation(mDisplay.getRotation());
+        String secureLayer = "false";
         boolean requiresRotation = (degrees > 0);
         if (requiresRotation) {
             // Get the dimensions of the device in its native orientation
@@ -394,7 +396,10 @@ class GlobalScreenshot {
 
         // Take the screenshot
         mScreenBitmap = Surface.screenshot((int) dims[0], (int) dims[1]);
-        if (mScreenBitmap == null) {
+        /* Check screen capture is secure  or not */
+        secureLayer = SystemProperties.get("hw.sf.SecureLayer","false");
+        /* Don't display secure screen */
+        if (mScreenBitmap == null || secureLayer.equals("true")) {
             notifyScreenshotError(mContext, mNotificationManager);
             finisher.run();
             return;
