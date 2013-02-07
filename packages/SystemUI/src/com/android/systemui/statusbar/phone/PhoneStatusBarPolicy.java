@@ -227,6 +227,9 @@ public class PhoneStatusBarPolicy {
         if (IccCardConstants.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
             simState = IccCardConstants.State.ABSENT;
         }
+        else if (IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
+            simState = IccCardConstants.State.CARD_IO_ERROR;
+        }
         else if (IccCardConstants.INTENT_VALUE_ICC_READY.equals(stateExtra)) {
             simState = IccCardConstants.State.READY;
         }
