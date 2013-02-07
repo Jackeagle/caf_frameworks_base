@@ -1,5 +1,8 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +19,24 @@
 
 package com.android.server;
 
+import java.io.File;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import com.android.internal.atfwd.AtCmdFwdService;
+import com.android.internal.os.BinderInternal;
+import com.android.internal.os.SamplingProfilerIntegration;
+import com.android.internal.widget.LockSettingsService;
+import com.android.server.accessibility.AccessibilityManagerService;
+import com.android.server.am.ActivityManagerService;
+import com.android.server.input.InputManagerService;
+import com.android.server.net.NetworkPolicyManagerService;
+import com.android.server.net.NetworkStatsService;
+import com.android.server.pm.PackageManagerService;
+import com.android.server.pm.ShutdownThread;
+import com.android.server.usb.UsbService;
+import com.android.server.wm.WindowManagerService;
+
 import android.accounts.AccountManagerService;
 import android.app.ActivityManagerNative;
 import android.bluetooth.BluetoothAdapter;
@@ -27,7 +48,10 @@ import android.content.Intent;
 import android.content.pm.IPackageManager;
 import android.content.res.Configuration;
 import android.media.AudioService;
+//import android.net.CNEManager;
+import android.net.FeatureConfig;
 import android.net.wifi.p2p.WifiP2pService;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.os.SchedulingPolicyService;
@@ -46,26 +70,12 @@ import android.util.Log;
 import android.util.Slog;
 import android.view.WindowManager;
 
-import com.android.internal.os.BinderInternal;
-import com.android.internal.os.SamplingProfilerIntegration;
-import com.android.internal.widget.LockSettingsService;
-import com.android.server.accessibility.AccessibilityManagerService;
-import com.android.server.am.ActivityManagerService;
-import com.android.server.input.InputManagerService;
-import com.android.server.net.NetworkPolicyManagerService;
-import com.android.server.net.NetworkStatsService;
-import com.android.server.pm.PackageManagerService;
-import com.android.server.pm.ShutdownThread;
-import com.android.server.usb.UsbService;
-import com.android.server.wm.WindowManagerService;
-import com.android.internal.atfwd.AtCmdFwdService;
-
 import dalvik.system.VMRuntime;
 import dalvik.system.Zygote;
 
-import java.io.File;
-import java.util.Timer;
-import java.util.TimerTask;
+import dalvik.system.PathClassLoader;
+import java.lang.reflect.Constructor;
+
 
 class ServerThread extends Thread {
     private static final String TAG = "SystemServer";
@@ -126,6 +136,7 @@ class ServerThread extends Thread {
         NetworkStatsService networkStats = null;
         NetworkPolicyManagerService networkPolicy = null;
         ConnectivityService connectivity = null;
+        Object cneObj = null;
         WifiP2pService wifiP2p = null;
         WifiService wifi = null;
         NsdService serviceDiscovery= null;
@@ -435,9 +446,41 @@ class ServerThread extends Thread {
                 networkPolicy.bindConnectivityManager(connectivity);
                 wifi.checkAndStartWifi();
                 wifiP2p.connectivityServiceReady();
-                connectivity.startCne();
             } catch (Throwable e) {
                 reportWtf("starting Connectivity Service", e);
+            }
+
+            try {
+                Slog.i(TAG, "Connectivity Engine Service");
+                QosManager qmgr = new QosManager(context, connectivity);
+                ILinkManager linkMng = null;
+                boolean cneEnabled = false;
+                if(FeatureConfig.isEnabled(FeatureConfig.CNE)) {
+                    try {
+                        PathClassLoader cneClassLoader =
+                            new PathClassLoader("/system/framework/com.quicinc.cne.jar",
+                                                ClassLoader.getSystemClassLoader());
+                        Class cneClass = cneClassLoader.loadClass("com.quicinc.cne.CNE");
+                        Constructor cneConstructor = cneClass.getConstructor
+                            (new Class[] {Context.class, ConnectivityService.class,
+                                          QosManager.class});
+                        cneObj = cneConstructor.newInstance(context, connectivity, qmgr);
+                    } catch (Exception e) {
+                        cneObj = null;
+                    }
+                    if (cneObj != null && (cneObj instanceof IBinder)) {
+                        ServiceManager.addService("cneservice", (IBinder)cneObj);
+                        linkMng = (ILinkManager) cneObj;
+                        cneEnabled = true;
+                    } else {
+                        linkMng = new LinkManager(context, connectivity, qmgr);
+                    }
+                } else {
+                    linkMng = new LinkManager(context, connectivity, qmgr);
+                }
+                connectivity.bindLinkManager(linkMng, cneEnabled);
+            } catch (Throwable e) {
+                reportWtf("starting Connectivity Engine Service", e);
             }
 
             try {

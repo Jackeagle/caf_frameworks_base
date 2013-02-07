@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2012 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -302,9 +304,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private ConnectivityServiceHSM mHSM;
 
     private ILinkManager mLinkManager = null;
-    private Object mCneObj = null;
     private boolean mCneStarted = false;
-    private QosManager qosManager = null;
 
     // list of DeathRecipients used to make sure features are turned off when
     // a process dies
@@ -3244,40 +3244,14 @@ private NetworkStateTracker makeWimaxStateTracker() {
     }
 
     /* CNE related methods. */
-    public void startCne() {
-        if (!isCneStarted()) {
-            qosManager = new QosManager(mContext, this);
-            mCneStarted = true;
-            if (isCneAware()) {
-                mCneObj = makeVendorCne(qosManager);
-                if (mCneObj != null) {
-                    logv("Vendor CNE is starting up");
-                    mLinkManager = (ILinkManager) mCneObj;
-                    return;
-                }
-            } else {
-                logv("CNE is disabled.");
-            }
-            mLinkManager = new LinkManager(mContext, this, qosManager);
+    public void bindLinkManager(ILinkManager linkMng, boolean cneEnabled) {
+        if (linkMng != null) {
+            mCneStarted = cneEnabled;
+            mLinkManager = linkMng;
         } else {
-            loge("CNE already Started");
+            mCneStarted = false;
+            mLinkManager = new LinkManager(mContext, this, new QosManager(mContext, this));
         }
-    }
-
-    private Object makeVendorCne(QosManager qosMgr) {
-        try {
-            PathClassLoader cneClassLoader =
-                new PathClassLoader("/system/framework/com.quicinc.cne.jar",
-                                    ClassLoader.getSystemClassLoader());
-            Class cneClass = cneClassLoader.loadClass("com.quicinc.cne.CNE");
-            Constructor cneConstructor = cneClass.getConstructor
-                        (new Class[] {Context.class,ConnectivityService.class,QosManager.class});
-                return cneConstructor.newInstance(mContext,this,qosMgr);
-            } catch (Exception e) { // ignored; lives in system server
-                loge("Caught exception in makeVendorCne " + e);
-            }
-        loge("Could not make vendor Cne obj. Disabling CNE");
-        return null;
     }
 
     /** @hide
@@ -3601,7 +3575,16 @@ private NetworkStateTracker makeWimaxStateTracker() {
     public void setTrackedCapabilities(int id, int[] capabilities) {
         if (VDBG) log("setTrackedCapabilities(id=" + id + ", capabilities)");
     }
-
+    /**
+     * Used by cne to enable/disable smart connectivity feature at runtime
+     * @hide
+     */
+    public void avoidUnsuitableWifi (boolean doEnable) {
+        mHandler.sendMessage(mHandler.obtainMessage(
+                    ConnectivityServiceHSM.HSM_EVENT_AVOID_UNSUITABLE_WIFI,
+                    doEnable ? 1:0,
+                    INVALID_MSG_ARG));
+    }
 
     private final class ConnectivityServiceHSM extends StateMachine {
 
@@ -3630,6 +3613,8 @@ private NetworkStateTracker makeWimaxStateTracker() {
         static final int HSM_EVENT_REPRIORITIZE_DNS = HSM_MSG_MIN + 10;
         // handleConnectivitySwitch (int toNetType)
         static final int HSM_EVENT_CONNECTIVITY_SWITCH = HSM_MSG_MIN + 11;
+        // avoidUnsuitableWifi
+        static final int HSM_EVENT_AVOID_UNSUITABLE_WIFI = HSM_MSG_MIN + 12;
 
         private int myDefaultDnsNet;
         // List to track multiple active default networks
@@ -4135,7 +4120,10 @@ private NetworkStateTracker makeWimaxStateTracker() {
          */
         private final class SmartConnectivityState extends State {
 
+            private boolean avoidUnsuitableWifi;
+
             public SmartConnectivityState () {
+                avoidUnsuitableWifi = true;
             }
 
             @Override
@@ -4160,9 +4148,8 @@ private NetworkStateTracker makeWimaxStateTracker() {
                 final int type = info.getType();
                 boolean ret = false;
                 if (mNetConfigs[type].isDefault()) {
-                    mConnectedDefaultNetworks.add(type);
-                    if (mConnectedDefaultNetworks.size() > 1) {
-                        ret = true;
+                    if (avoidUnsuitableWifi && (mConnectedDefaultNetworks.size() > 1)) {
+                            ret = true;
                     }
                 }
                 return ret;
@@ -4177,6 +4164,7 @@ private NetworkStateTracker makeWimaxStateTracker() {
                     case HSM_HANDLE_CONNECT :
                     {
                         info = (NetworkInfo) msg.obj;
+                        mConnectedDefaultNetworks.add(info.getType());
                         if (isNetworkSimultaneitySupported(info)) {
                             log("Dual Connectivity Mode detected");
                             deferMessage(msg);
@@ -4193,6 +4181,16 @@ private NetworkStateTracker makeWimaxStateTracker() {
                     {
                         info = (NetworkInfo) msg.obj;
                         mConnectedDefaultNetworks.remove(info.getType());
+                        break;
+                    }
+                    case HSM_EVENT_AVOID_UNSUITABLE_WIFI:
+                    {
+                        avoidUnsuitableWifi = (msg.arg1 == 1);
+                        log("dual network support " + (avoidUnsuitableWifi ? "enabled":"disabled"));
+                        if (avoidUnsuitableWifi && (mActiveDefaultNetwork == TYPE_WIFI)) {
+                           bringUpRat(TYPE_MOBILE);
+                        }
+                        ret = HANDLED;
                         break;
                     }
                     default: ret = NOT_HANDLED;
@@ -4376,6 +4374,12 @@ private NetworkStateTracker makeWimaxStateTracker() {
                         } else {
                             logw("Dns is already prioritized for network " + type);
                         }
+                        ret = HANDLED;
+                        break;
+                    }
+                    case HSM_EVENT_AVOID_UNSUITABLE_WIFI:
+                    {
+                        deferMessage(msg);
                         ret = HANDLED;
                         break;
                     }
