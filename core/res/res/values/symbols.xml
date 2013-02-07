@@ -607,6 +607,7 @@
   <java-symbol type="string" name="mismatchPin" />
   <java-symbol type="string" name="mmiComplete" />
   <java-symbol type="string" name="mmiError" />
+  <java-symbol type="string" name="unsupportedMmiCode" />
   <java-symbol type="string" name="mmiFdnError" />
   <java-symbol type="string" name="month" />
   <java-symbol type="string" name="month_day" />
