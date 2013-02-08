@@ -917,10 +917,12 @@ public class CatService extends Handler implements AppInterface {
             }
             break;
         case BACKWARD_MOVE_BY_USER:
+        case USER_NOT_ACCEPT:
             // if the user dismissed the alert dialog for a
-            // setup call, consider that as the user
-            // rejecting the call. Again, no need for a terminal response, as explained above.
-            if (type == CommandType.SET_UP_CALL) {
+            // setup call/open channel, consider that as the user
+            // rejecting the call. Use dedicated API for this, rather than
+            // sending a terminal response.
+            if (type == CommandType.SET_UP_CALL || type == CommandType.OPEN_CHANNEL) {
                 mCmdIf.handleCallSetupRequestFromSim(false, null);
                 mCurrntCmd = null;
                 return;
@@ -935,7 +937,6 @@ public class CatService extends Handler implements AppInterface {
             resMsg.additionalInfo = 0x01;
         case NO_RESPONSE_FROM_USER:
         case UICC_SESSION_TERM_BY_USER:
-        case USER_NOT_ACCEPT:
             resp = null;
             break;
         default:
