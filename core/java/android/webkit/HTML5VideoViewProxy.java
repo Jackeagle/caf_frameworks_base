@@ -81,6 +81,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int STOPFULLSCREEN    = 204;
     private static final int SIZE_CHANGED      = 205;
     private static final int PLAYING           = 206;
+    private static final int AVAILABLE_VIDEO_FRAME = 207;
 
     // Timer thread -> UI thread
     private static final int TIMEUPDATE = 300;
@@ -102,6 +103,8 @@ class HTML5VideoViewProxy extends Handler
     private int mVideoLayerId;
     // Indicates if this video is to be shown in fullscreen
     private boolean mIsFullscreen;
+    // Indicates whether video frame has updated after MediaPlayer initialization
+    private boolean mVideoFrameAvailable;
 
     // A helper class to control the playback. This executes on the UI thread!
     private final class VideoPlayer {
@@ -208,7 +211,10 @@ class HTML5VideoViewProxy extends Handler
         }
 
         public void play(String url, int time) {
-            if (ensureHTML5VideoView(url, time, true)) {
+            if (ensureHTML5VideoView(url, time, true)
+                // This second condition allows an HTML5VideoView with preload
+                // metadata to continue into playing state
+                || mHTML5VideoView.getCurrentState() == HTML5VideoView.STATE_INITIALIZED) {
                 mHTML5VideoView.prepareDataAndDisplayMode();
                 mHTML5VideoView.seekTo(time);
             } else {
@@ -292,6 +298,7 @@ class HTML5VideoViewProxy extends Handler
                 mHTML5VideoView.setVideoURI(url);
                 return true;
             }
+            mHTML5VideoView.setStartWhenPrepared(willPlay);
             return false;
         }
 
@@ -364,6 +371,14 @@ class HTML5VideoViewProxy extends Handler
     public void dispatchOnPlaying() {
         Message msg = Message.obtain(mWebCoreHandler, PLAYING);
         mWebCoreHandler.sendMessage(msg);
+    }
+
+    public void onAvailableVideoFrame() {
+        if (!mVideoFrameAvailable) {
+            Message msg = Message.obtain(mWebCoreHandler, AVAILABLE_VIDEO_FRAME);
+            mWebCoreHandler.sendMessage(msg);
+            mVideoFrameAvailable = true;
+        }
     }
 
     public void dispatchOnStopFullscreen() {
@@ -696,6 +711,9 @@ class HTML5VideoViewProxy extends Handler
                     case PLAYING:
                         nativeOnPlaying(mNativePointer);
                         break;
+                    case AVAILABLE_VIDEO_FRAME:
+                        nativeOnAvailableVideoFrame(mNativePointer);
+                        break;
                     case POSTER_FETCHED:
                         Bitmap poster = (Bitmap) msg.obj;
                         nativeOnPosterFetched(poster, mNativePointer);
@@ -967,6 +985,7 @@ class HTML5VideoViewProxy extends Handler
     private native void nativeOnPlaying(int nativePointer);
     private native void nativeOnPosterFetched(Bitmap poster, int nativePointer);
     private native void nativeOnTimeupdate(int position, int nativePointer);
+    private native void nativeOnAvailableVideoFrame(int nativePointer);
     private native void nativeOnStopFullscreen(int nativePointer);
     private native static boolean nativeSendSurfaceTexture(SurfaceTexture texture,
             int baseLayer, int videoLayerId, int textureName,
