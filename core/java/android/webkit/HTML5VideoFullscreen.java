@@ -43,6 +43,7 @@ import android.widget.FrameLayout;
 import android.widget.MediaController;
 import android.widget.MediaController.MediaPlayerControl;
 import android.util.Log;
+import java.lang.NullPointerException;
 
 /**
  * @hide This is only used by the browser
@@ -287,7 +288,11 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         }
         assert (mFullscreenProxy != null);
         // Re enable plugin views.
-        mFullscreenProxy.getWebView().getViewManager().showAll();
+        try {
+            mFullscreenProxy.getWebView().getViewManager().showAll();
+        } catch (NullPointerException e) {
+            Log.e(LOGTAG, "Error while Exiting Full Screen" + e);
+        }
         mFullscreenProxy = null;
         mLayout = null;
     }
