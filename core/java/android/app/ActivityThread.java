@@ -4005,13 +4005,17 @@ public final class ActivityThread {
 
         final ContextImpl appContext = new ContextImpl();
         appContext.init(data.info, null, this);
-        final File cacheDir = appContext.getCacheDir();
+        if (!Process.isIsolated()) {
+            final File cacheDir = appContext.getCacheDir();
 
-        // Provide a usable directory for temporary files
-        System.setProperty("java.io.tmpdir", cacheDir.getAbsolutePath());
-
-        setupGraphicsSupport(data.info, cacheDir);
-
+            if (cacheDir != null) {
+                // Provide a usable directory for temporary files
+                System.setProperty("java.io.tmpdir", cacheDir.getAbsolutePath());
+                setupGraphicsSupport(data.info, cacheDir);
+            } else {
+                Log.e(TAG, "Unable to setupGraphicsSupport due to missing cache directory");
+            }
+        }
         /**
          * For system applications on userdebug/eng builds, log stack
          * traces of disk and network access to dropbox for analysis.
