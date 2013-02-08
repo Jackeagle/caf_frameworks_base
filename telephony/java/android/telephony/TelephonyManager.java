@@ -651,7 +651,8 @@ public class TelephonyManager {
      * @see #SIM_STATE_CARD_IO_ERROR
      */
     public int getSimState() {
-        String prop = SystemProperties.get(TelephonyProperties.PROPERTY_SIM_STATE);
+        String prop = getTelephonyProperty(TelephonyProperties.PROPERTY_SIM_STATE,
+                              getDefaultSubscription(), "");
         if ("ABSENT".equals(prop)) {
             return SIM_STATE_ABSENT;
         }
