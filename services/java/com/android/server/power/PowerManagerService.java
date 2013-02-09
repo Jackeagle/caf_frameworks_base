@@ -736,8 +736,13 @@ public final class PowerManagerService extends IPowerManager.Stub
             int index = findWakeLockIndexLocked(lock);
             int value = SystemProperties.getInt("persist.cne.feature", 0);
             boolean isNsrmEnabled = (value == 4 || value == 5 || value == 6);
-            if (index < 0 && !isNsrmEnabled) {
-                throw new IllegalArgumentException("Wake lock not active");
+            if (index < 0) {
+                if (!isNsrmEnabled) {
+                    throw new IllegalArgumentException("Wake lock not active");
+                } else {
+                    Slog.v(TAG, "Wake lock not active");
+                    return;
+                }
             }
 
             WakeLock wakeLock = mWakeLocks.get(index);
@@ -760,10 +765,8 @@ public final class PowerManagerService extends IPowerManager.Stub
                 for (int index=0; index < mWakeLocks.size(); index++) {
                     WakeLock wl = mWakeLocks.get(index);
                     if(wl != null) {
-                        if (wl.mOwnerUid == uid || wl.mOwnerUid == 1000) {
-                            /* release the wakelock for the blocked uid and uid 1000(package
-                             * android)optimisation needs to be done to handle uid 1000 better.
-                             */
+                        // release the wakelock for the blocked uid
+                        if (wl.mOwnerUid == uid) {
                             releaseWakeLockInternal(wl.mLock,wl.mFlags);
                             if (DEBUG_SPEW) Slog.v(TAG, "Internally releasing it");
                         }
