@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Code Aurora Forum
+ * Copyright (C) 2012 The Linux Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /*--------------------------------------------------------------------------
-Copyright (c) 2012 Code Aurora Forum. All rights reserved.
+Copyright (c) 2012 The Linux Foundation. All rights reserved.
 --------------------------------------------------------------------------*/
 #include <PostProcFactory.h>
 #include <PostProcNativeWindow.h>
