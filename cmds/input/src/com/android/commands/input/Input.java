@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2012 The Linux Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +24,7 @@ import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.os.SystemProperties;
 
 /**
  * Command that sends key events to the device, either by their keycode, or by
@@ -31,6 +33,9 @@ import android.view.MotionEvent;
 
 public class Input {
     private static final String TAG = "Input";
+
+    // Set to true to enable browser automation
+    static boolean WTA_PERF_LOG = SystemProperties.getBoolean("wta.perf.logging", false);
 
     /**
      * Command-line entry point.
@@ -73,6 +78,29 @@ public class Input {
                 if (args.length == 5) {
                     sendSwipe(Float.parseFloat(args[1]), Float.parseFloat(args[2]),
                             Float.parseFloat(args[3]), Float.parseFloat(args[4]));
+                    return;
+                }
+            } else if ((command.equals("ctrl")) && (true == WTA_PERF_LOG)) {
+                if (args.length == 2) {
+                    int keyCode = KeyEvent.keyCodeFromString(args[1]);
+                    if (keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                        keyCode = KeyEvent.keyCodeFromString("KEYCODE_" + args[1].toUpperCase());
+                    }
+                    sendKeyEventWithCtrl(keyCode);
+                    return;
+                }
+            } else if ((command.equals("multiple")) && (true == WTA_PERF_LOG)) {
+                if (args.length == 3) {
+                    int keyCode = KeyEvent.keyCodeFromString(args[1]);
+                    if (keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                        keyCode = KeyEvent.keyCodeFromString("KEYCODE_" + args[1]);
+                    }
+                    int count = Integer.parseInt(args[2]);
+                    if (count == 1){
+                        sendKeyEvent(keyCode);
+                    } else {
+                        sendKeyEventMultiple(keyCode, count);
+                    }
                     return;
                 }
             } else {
@@ -126,6 +154,27 @@ public class Input {
         injectKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, 0,
                 KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD));
     }
+
+    private void sendKeyEventWithCtrl(int keyCode) {
+        long now = SystemClock.uptimeMillis();
+        injectKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, KeyEvent.META_CTRL_ON,
+                KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD));
+        injectKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, KeyEvent.META_CTRL_ON,
+                KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD));
+    }
+
+    private void sendKeyEventMultiple(int keyCode, int count) {
+        long now = SystemClock.uptimeMillis();
+        injectKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, 0,
+                KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD));
+        for (int i = 0; i < count-1 ; i++) {
+            injectKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, count - i - 1, 0,
+                    KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD));
+        }
+        injectKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, 0,
+                KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD));
+    }
+
 
     private void sendTap(float x, float y) {
         long now = SystemClock.uptimeMillis();
