@@ -707,6 +707,9 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
     boolean mIsBatchingTextChanges = false;
     private long mLastEditScroll = 0;
 
+    private boolean mInPageLoadWindow = false;
+    private boolean mIsMultitabManagementOn = false;
+
     private static class OnTrimMemoryListener implements ComponentCallbacks2 {
         private static OnTrimMemoryListener sInstance = null;
 
@@ -1218,6 +1221,12 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         mWebView = webView;
         mWebViewPrivate = privateAccess;
         mContext = webView.getContext();
+
+        mIsMultitabManagementOn = android.os.SystemProperties.getBoolean(
+                                        "browser.multitab.management",true);
+        if (DebugFlags.WEB_VIEW) {
+            Log.d(LOGTAG,"MultitabManagement is "+ mIsMultitabManagementOn);
+        }
     }
 
     /**
@@ -3438,6 +3447,9 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             }
 
             cancelSelectDialog();
+            if ((mIsMultitabManagementOn) && !(mInPageLoadWindow)) {
+                WebViewCore.pauseUpdatePicture(mWebViewCore);
+            }
             WebCoreThreadWatchdog.pause();
         }
     }
@@ -3470,6 +3482,10 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
                 nativeSetPauseDrawing(mNativeClass, false);
             }
         }
+        if (mIsMultitabManagementOn) {
+            WebViewCore.resumeUpdatePicture(mWebViewCore);
+        }
+
         // We get a call to onResume for new WebViews (i.e. mIsPaused will be false). We need
         // to ensure that the Watchdog thread is running for the new WebView, so call
         // it outside the if block above.
@@ -3930,6 +3946,10 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
         // Don't start out editing.
         mIsEditingText = false;
+
+        if (mIsMultitabManagementOn) {
+            mInPageLoadWindow = true;
+        }
     }
 
     /**
@@ -3941,6 +3961,9 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
         if (isAccessibilityEnabled()) {
             getAccessibilityInjector().onPageFinished(url);
+        }
+        if (mIsMultitabManagementOn) {
+            mInPageLoadWindow = false;
         }
     }
 
