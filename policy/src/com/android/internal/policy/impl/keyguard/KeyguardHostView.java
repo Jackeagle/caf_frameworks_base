@@ -720,6 +720,7 @@ public class KeyguardHostView extends KeyguardViewBase {
     }
 
     private KeyguardSecurityView getSecurityView(SecurityMode securityMode) {
+        Log.d(TAG, "showSecurityScreen(" + securityMode + ")");
         final int securityViewIdForMode = getSecurityViewIdForMode(securityMode);
         KeyguardSecurityView view = null;
         final int children = mSecurityViewContainer.getChildCount();
@@ -758,7 +759,7 @@ public class KeyguardHostView extends KeyguardViewBase {
      * @param securityMode
      */
     private void showSecurityScreen(SecurityMode securityMode) {
-        if (DEBUG) Log.d(TAG, "showSecurityScreen(" + securityMode + ")");
+        Log.d(TAG, "showSecurityScreen(" + securityMode + ")");
 
         if (securityMode == mCurrentSecuritySelection) return;
 
