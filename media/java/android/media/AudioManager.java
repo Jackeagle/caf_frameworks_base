@@ -1431,11 +1431,6 @@ public class AudioManager {
      */
     public void setInCallMode(int state) {
         IAudioService service = getService();
-        if (((state & CS_ACTIVE) != 0) && ((state & CS_ACTIVE_SESSION2) != 0) &&
-            ((state & IMS_ACTIVE) != 0)) {
-              Log.e(TAG, "Invalid call state for CS & VoLTE");
-              return;
-        }
         try {
                 service.setInCallMode(state, mICallBack);
         } catch (RemoteException e) {
