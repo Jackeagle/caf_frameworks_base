@@ -736,7 +736,10 @@ public class KeyguardHostView extends KeyguardViewBase {
             if (DEBUG) Log.v(TAG, "inflating id = " + layoutId);
             View v = inflater.inflate(layoutId, mSecurityViewContainer, false);
             if (KeyguardUpdateMonitor.isMultiSimEnabled) {
-                ((ViewStub) (v.findViewById(R.id.stub_msim_carrier_text))).inflate();
+                ViewStub vStub = (ViewStub) (v.findViewById(R.id.stub_msim_carrier_text));
+                if (vStub != null) {
+                    vStub.inflate();
+                }
             }
             mSecurityViewContainer.addView(v);
             updateSecurityView(v);
