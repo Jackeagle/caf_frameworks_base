@@ -348,6 +348,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     // the set of network types that can only be enabled by system/sig apps
     List mProtectedNetworks;
 
+    protected ConnectivityService() { }
+
     public ConnectivityService(Context context, INetworkManagementService netd,
             INetworkStatsService statsService, INetworkPolicyManager policyManager) {
         // Currently, omitting a NetworkFactory will create one internally
@@ -1960,7 +1962,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    void systemReady() {
+    public void systemReady() {
         synchronized(this) {
             mSystemReady = true;
             if (mInitialBroadcast != null) {
@@ -3186,7 +3188,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         Slog.e(TAG, s);
     }
 
-    int convertFeatureToNetworkType(int networkType, String feature) {
+    private int convertFeatureToNetworkType(int networkType, String feature) {
         int usedNetworkType = networkType;
 
         if(networkType == ConnectivityManager.TYPE_MOBILE) {
@@ -3316,7 +3318,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      * be done whenever a better abstraction is developed.
      */
     public class VpnCallback {
-        private VpnCallback() {
+        protected VpnCallback() {
         }
 
         public void onStateChanged(NetworkInfo info) {
@@ -3451,7 +3453,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    public void updateBlockedUids(int uid, boolean isBlocked) {
+    protected void updateBlockedUids(int uid, boolean isBlocked) {
         try {
             AlarmManagerService mAlarmMgrSvc =
                 (AlarmManagerService)ServiceManager.getService(Context.ALARM_SERVICE);
