@@ -47,6 +47,7 @@ public class WifiNative {
     static final int BLUETOOTH_COEXISTENCE_MODE_ENABLED = 0;
     static final int BLUETOOTH_COEXISTENCE_MODE_DISABLED = 1;
     static final int BLUETOOTH_COEXISTENCE_MODE_SENSE = 2;
+    static final int NUM_SCAN_RESULTS_PER_ITERATION = 20;
 
     String mInterface = "";
     private boolean mSuspendOptEnabled = false;
@@ -213,7 +214,70 @@ public class WifiNative {
      * MASK=<N> see wpa_supplicant/src/common/wpa_ctrl.h for details
      */
     public String scanResults() {
-        return doStringCommand("BSS RANGE=ALL MASK=0x1986");
+
+        /* read the scan results iteratively in clusters
+           stop when no more scan results are being returned */
+
+        String temp_result;
+        String ID_STR = "id=";
+        String first_result, last_result;
+        String result = new String();
+        int first_id, last_id;
+        int lower_range, upper_range;
+
+        String suppl_com = "BSS FIRST MASK=0x1";
+
+        first_result = doStringCommand(suppl_com);
+
+        if (first_result.length() == 0)
+            return result;
+
+        try {
+            first_id = Integer.parseInt(first_result.substring(ID_STR.length(),
+                                                           first_result.indexOf('\n')));
+        } catch(NumberFormatException e) {
+
+            if (DBG) Log.d(mTAG, "The first scan result does not have valid ID");
+
+            return result;
+        }
+
+        suppl_com = "BSS LAST MASK=0x1";
+
+        last_result = doStringCommand(suppl_com);
+
+        try {
+            last_id = Integer.parseInt(last_result.substring(ID_STR.length(),
+                                                             last_result.indexOf('\n')));
+        } catch(NumberFormatException e) {
+
+            if (DBG) Log.d(mTAG, "The last scan result does not have valid ID");
+
+            return result;
+        }
+
+        lower_range = first_id;
+
+        while (lower_range <= last_id) {
+
+            upper_range = lower_range + NUM_SCAN_RESULTS_PER_ITERATION - 1;
+
+            if (upper_range > last_id)
+                upper_range = last_id;
+
+            suppl_com = "BSS RANGE=" + Integer.toString(lower_range) +
+                "-" + Integer.toString(upper_range) +
+                " MASK=0x1986";
+
+            temp_result = doStringCommand(suppl_com);
+
+            result = result + "\n" + temp_result;
+
+            lower_range = lower_range + NUM_SCAN_RESULTS_PER_ITERATION;
+
+        }
+
+        return result;
     }
 
     public boolean startDriver() {
