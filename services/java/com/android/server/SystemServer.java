@@ -28,9 +28,13 @@ import android.content.res.Configuration;
 import android.media.AudioService;
 import android.net.wifi.p2p.WifiP2pService;
 import android.os.Environment;
+import android.net.INetworkPolicyManager;
+import android.net.INetworkStatsService;
+import android.os.IBinder;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.INetworkManagementService;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.StrictMode;
@@ -73,6 +77,9 @@ import dalvik.system.Zygote;
 import java.io.File;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import dalvik.system.PathClassLoader;
+import java.lang.reflect.Constructor;
 
 class ServerThread extends Thread {
     private static final String TAG = "SystemServer";
@@ -136,6 +143,7 @@ class ServerThread extends Thread {
         NetworkStatsService networkStats = null;
         NetworkPolicyManagerService networkPolicy = null;
         ConnectivityService connectivity = null;
+        Object qcCon = null;
         WifiP2pService wifiP2p = null;
         WifiService wifi = null;
         NsdService serviceDiscovery= null;
@@ -494,14 +502,32 @@ class ServerThread extends Thread {
             }
 
             try {
-                Slog.i(TAG, "Connectivity Service");
-                connectivity = new ConnectivityService(
-                        context, networkManagement, networkStats, networkPolicy);
-                ServiceManager.addService(Context.CONNECTIVITY_SERVICE, connectivity);
-                networkStats.bindConnectivityManager(connectivity);
-                networkPolicy.bindConnectivityManager(connectivity);
-                wifi.checkAndStartWifi();
-                wifiP2p.connectivityServiceReady();
+                int value = SystemProperties.getInt("persist.cne.feature", 0);
+                if ( value > 0 && value < 7 ) {
+                    Slog.i(TAG, "QcConnectivity Service");
+                    PathClassLoader qcsClassLoader =
+                        new PathClassLoader("/system/framework/services-ext.jar",
+                                ClassLoader.getSystemClassLoader());
+                    Class qcsClass =
+                        qcsClassLoader.loadClass("com.android.server.QcConnectivityService");
+                    Constructor qcsConstructor = qcsClass.getConstructor
+                        (new Class[] {Context.class, INetworkManagementService.class,
+                            INetworkStatsService.class, INetworkPolicyManager.class});
+                    qcCon = qcsConstructor.newInstance(
+                            context, networkManagement, networkStats, networkPolicy);
+                    connectivity = (ConnectivityService) qcCon;
+                } else {
+                    Slog.i(TAG, "Connectivity Service");
+                    connectivity = new ConnectivityService( context, networkManagement,
+                            networkStats, networkPolicy);
+                }
+                if (connectivity != null) {
+                    ServiceManager.addService(Context.CONNECTIVITY_SERVICE, connectivity);
+                    networkStats.bindConnectivityManager(connectivity);
+                    networkPolicy.bindConnectivityManager(connectivity);
+                    wifi.checkAndStartWifi();
+                    wifiP2p.connectivityServiceReady();
+                }
             } catch (Throwable e) {
                 reportWtf("starting Connectivity Service", e);
             }
@@ -730,7 +756,7 @@ class ServerThread extends Thread {
             } catch (Throwable e) {
                 reportWtf("starting CertBlacklister", e);
             }
-            
+
             if (context.getResources().getBoolean(
                     com.android.internal.R.bool.config_dreamsSupported)) {
                 try {
