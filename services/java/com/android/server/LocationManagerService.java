@@ -521,7 +521,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 }
             } else {
                 Intent statusChanged = new Intent();
-                statusChanged.putExtras(extras);
+                statusChanged.putExtras(new Bundle(extras));
                 statusChanged.putExtra(LocationManager.KEY_STATUS_CHANGED, status);
                 try {
                     synchronized (this) {
@@ -546,7 +546,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                     synchronized (this) {
                         // synchronize to ensure incrementPendingBroadcastsLocked()
                         // is called before decrementPendingBroadcasts()
-                        mListener.onLocationChanged(location);
+                        mListener.onLocationChanged(new Location(location));
                         // call this after broadcasting so we do not increment
                         // if we throw an exeption.
                         incrementPendingBroadcastsLocked();
@@ -556,7 +556,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 }
             } else {
                 Intent locationChanged = new Intent();
-                locationChanged.putExtra(LocationManager.KEY_LOCATION_CHANGED, location);
+                locationChanged.putExtra(LocationManager.KEY_LOCATION_CHANGED, new Location(location));
                 try {
                     synchronized (this) {
                         // synchronize to ensure incrementPendingBroadcastsLocked()
@@ -1343,10 +1343,10 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
                 if (allowedResolutionLevel < RESOLUTION_LEVEL_FINE) {
                     Location noGPSLocation = location.getExtraLocation(Location.EXTRA_NO_GPS_LOCATION);
                     if (noGPSLocation != null) {
-                        return mLocationFudger.getOrCreate(noGPSLocation);
+                        return new Location(mLocationFudger.getOrCreate(noGPSLocation));
                     }
                 } else {
-                    return location;
+                    return new Location(location);
                 }
             }
             return null;
@@ -1745,6 +1745,7 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             for (UpdateRecord r : deadUpdateRecords) {
                 r.disposeLocked(true);
             }
+            applyRequirementsLocked(provider);
         }
     }
 
