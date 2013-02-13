@@ -346,6 +346,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     // the set of network types that can only be enabled by system/sig apps
     List mProtectedNetworks;
 
+    protected ConnectivityService() { }
+
     public ConnectivityService(Context context, INetworkManagementService netd,
             INetworkStatsService statsService, INetworkPolicyManager policyManager) {
         // Currently, omitting a NetworkFactory will create one internally
@@ -1996,7 +1998,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    void systemReady() {
+    public void systemReady() {
         synchronized(this) {
             mSystemReady = true;
             if (mInitialBroadcast != null) {
@@ -3322,7 +3324,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      * be done whenever a better abstraction is developed.
      */
     public class VpnCallback {
-        private VpnCallback() {
+        protected VpnCallback() {
         }
 
         public void onStateChanged(NetworkInfo info) {
@@ -3471,5 +3473,24 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         }
         return ConnectivityManager.TYPE_NONE;
+    }
+
+    protected void updateBlockedUids(int uid, boolean isBlocked) {
+        /* TODO: NSRM
+        try {
+            AlarmManagerService mAlarmMgrSvc =
+                (AlarmManagerService)ServiceManager.getService(Context.ALARM_SERVICE);
+            mAlarmMgrSvc.updateBlockedUids(uid,isBlocked);
+        } catch (NullPointerException e) {
+            Slog.w(TAG, "Could Not Update blocked Uids with alarmManager" + e);
+        }
+        try {
+            PowerManagerService mPowerMgrSvc =
+                (PowerManagerService)ServiceManager.getService(Context.POWER_SERVICE);
+            mPowerMgrSvc.updateBlockedUids(uid,isBlocked);
+        } catch (NullPointerException e) {
+            Slog.w(TAG, "Could Not Update blocked Uids with powerManager" + e);
+        }
+        */
     }
 }
