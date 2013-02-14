@@ -164,6 +164,7 @@ class MemoryUsage implements Serializable {
             + ":/system/framework/framework-tests.jar"
             + ":/system/framework/services.jar"
             + ":/system/framework/telephony-msim.jar"
+            + ":/system/framework/qcmediaplayer.jar"
             + ":/system/framework/loadclass.jar";
 
     private static final String[] GET_DIRTY_PAGES = {
