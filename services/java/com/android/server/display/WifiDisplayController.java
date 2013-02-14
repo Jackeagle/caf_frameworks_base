@@ -16,6 +16,9 @@
 
 package com.android.server.display;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import com.android.internal.util.DumpUtils;
 
 import android.content.BroadcastReceiver;
@@ -128,6 +131,45 @@ final class WifiDisplayController implements DumpUtils.Dump {
 
     // Number of connection retries remaining.
     private int mConnectionRetriesLeft;
+
+    // Open QCRemoteDisplay class
+    private static Class sQCRemoteDisplayClass;
+
+    private static Method sQCRemoteDisplayListen;
+
+    private static Method sQCRemoteDisplayDispose;
+
+    private Object mQCRemoteDisplay;
+
+    static {
+        //Check availability of QCRemoteDisplay runtime
+        try {
+            sQCRemoteDisplayClass = Class.forName("com.qualcomm.wfd.service.QCRemoteDisplay");
+        } catch (Throwable t) {
+            Slog.i(TAG, "QCRemoteDisplay Not available");
+        }
+
+        if(sQCRemoteDisplayClass != null) {
+            // If QCRemoteDisplay is available find the methods
+            try {
+                Class args[] = {
+                                   String.class,
+                                   RemoteDisplay.Listener.class,
+                                   Handler.class, Context.class
+                               };
+                sQCRemoteDisplayListen = sQCRemoteDisplayClass.getDeclaredMethod("listen", args);
+            } catch (Throwable t) {
+                Slog.i(TAG, "QCRemoteDisplay.listen Not available");
+            }
+
+            try {
+                Class args[] = {};
+                sQCRemoteDisplayDispose = sQCRemoteDisplayClass.getDeclaredMethod("dispose", args);
+            } catch (Throwable t) {
+                Slog.i(TAG, "QCRemoteDisplay.dispose Not available");
+            }
+        }
+    }
 
     // The remote display that is listening on the connection.
     // Created after the Wifi P2P network is connected.
@@ -442,11 +484,23 @@ final class WifiDisplayController implements DumpUtils.Dump {
     private void updateConnection() {
         // Step 1. Before we try to connect to a new device, tell the system we
         // have disconnected from the old one.
-        if (mRemoteDisplay != null && mConnectedDevice != mDesiredDevice) {
+        if ((mRemoteDisplay != null || mQCRemoteDisplay != null) && mConnectedDevice != mDesiredDevice) {
             Slog.i(TAG, "Stopped listening for RTSP connection on " + mRemoteDisplayInterface
                     + " from Wifi display: " + mConnectedDevice.deviceName);
 
-            mRemoteDisplay.dispose();
+            if(mRemoteDisplay != null) {
+                mRemoteDisplay.dispose();
+            } else {
+                if(sQCRemoteDisplayDispose != null) {
+                    try{
+                        sQCRemoteDisplayDispose.invoke(mQCRemoteDisplay);
+                    }catch (Throwable t){
+                        Slog.i(TAG, "Failed to invoke QCRemoteDisplay.dispose");
+                    }
+                }
+            }
+
+            mQCRemoteDisplay = null;
             mRemoteDisplay = null;
             mRemoteDisplayInterface = null;
             mRemoteDisplayConnected = false;
@@ -567,7 +621,7 @@ final class WifiDisplayController implements DumpUtils.Dump {
         }
 
         // Step 6. Listen for incoming connections.
-        if (mConnectedDevice != null && mRemoteDisplay == null) {
+        if (mConnectedDevice != null && (mRemoteDisplay == null && mQCRemoteDisplay == null)) {
             Inet4Address addr = getInterfaceAddress(mConnectedDeviceGroupInfo);
             if (addr == null) {
                 Slog.i(TAG, "Failed to get local interface address for communicating "
@@ -576,7 +630,7 @@ final class WifiDisplayController implements DumpUtils.Dump {
                 return; // done
             }
 
-            setRemoteSubmixOn(true);
+
 
             final WifiP2pDevice oldDevice = mConnectedDevice;
             final int port = getPortNumber(mConnectedDevice);
@@ -586,41 +640,85 @@ final class WifiDisplayController implements DumpUtils.Dump {
             Slog.i(TAG, "Listening for RTSP connection on " + iface
                     + " from Wifi display: " + mConnectedDevice.deviceName);
 
-            mRemoteDisplay = RemoteDisplay.listen(iface, new RemoteDisplay.Listener() {
-                @Override
-                public void onDisplayConnected(Surface surface,
-                        int width, int height, int flags) {
-                    if (mConnectedDevice == oldDevice && !mRemoteDisplayConnected) {
-                        Slog.i(TAG, "Opened RTSP connection with Wifi display: "
-                                + mConnectedDevice.deviceName);
-                        mRemoteDisplayConnected = true;
-                        mHandler.removeCallbacks(mRtspTimeout);
+            if(sQCRemoteDisplayListen != null && sQCRemoteDisplayDispose != null){
+                try{
+                    mQCRemoteDisplay = sQCRemoteDisplayListen.invoke(null,
+                         iface, new RemoteDisplay.Listener() {
+                        @Override
+                        public void onDisplayConnected(Surface surface,
+                                int width, int height, int flags) {
+                            if (mConnectedDevice == oldDevice && !mRemoteDisplayConnected) {
+                                Slog.i(TAG, "Opened RTSP connection with Wifi display: "
+                                        + mConnectedDevice.deviceName);
+                                mRemoteDisplayConnected = true;
+                                mHandler.removeCallbacks(mRtspTimeout);
 
-                        final WifiDisplay display = createWifiDisplay(mConnectedDevice);
-                        advertiseDisplay(display, surface, width, height, flags);
-                    }
-                }
+                                final WifiDisplay display = createWifiDisplay(mConnectedDevice);
+                                advertiseDisplay(display, surface, width, height, flags);
+                            }
+                        }
 
-                @Override
-                public void onDisplayDisconnected() {
-                    if (mConnectedDevice == oldDevice) {
-                        Slog.i(TAG, "Closed RTSP connection with Wifi display: "
-                                + mConnectedDevice.deviceName);
-                        mHandler.removeCallbacks(mRtspTimeout);
-                        disconnect();
-                    }
-                }
+                        @Override
+                        public void onDisplayDisconnected() {
+                            if (mConnectedDevice == oldDevice) {
+                                Slog.i(TAG, "Closed RTSP connection with Wifi display: "
+                                        + mConnectedDevice.deviceName);
+                                mHandler.removeCallbacks(mRtspTimeout);
+                                disconnect();
+                            }
+                        }
 
-                @Override
-                public void onDisplayError(int error) {
-                    if (mConnectedDevice == oldDevice) {
-                        Slog.i(TAG, "Lost RTSP connection with Wifi display due to error "
-                                + error + ": " + mConnectedDevice.deviceName);
-                        mHandler.removeCallbacks(mRtspTimeout);
-                        handleConnectionFailure(false);
-                    }
+                        @Override
+                        public void onDisplayError(int error) {
+                            if (mConnectedDevice == oldDevice) {
+                                Slog.i(TAG, "Lost RTSP connection with Wifi display due to error "
+                                        + error + ": " + mConnectedDevice.deviceName);
+                                mHandler.removeCallbacks(mRtspTimeout);
+                                handleConnectionFailure(false);
+                            }
+                        }
+                    }, mHandler, mContext);
+                }catch (Throwable t){
+                    Slog.i(TAG, " Failed to invoke QCRemoteDisplay.listen");
                 }
-            }, mHandler);
+            } else {
+                setRemoteSubmixOn(true);
+                mRemoteDisplay = RemoteDisplay.listen(iface, new RemoteDisplay.Listener() {
+                    @Override
+                    public void onDisplayConnected(Surface surface,
+                            int width, int height, int flags) {
+                        if (mConnectedDevice == oldDevice && !mRemoteDisplayConnected) {
+                            Slog.i(TAG, "Opened RTSP connection with Wifi display: "
+                                    + mConnectedDevice.deviceName);
+                            mRemoteDisplayConnected = true;
+                            mHandler.removeCallbacks(mRtspTimeout);
+
+                            final WifiDisplay display = createWifiDisplay(mConnectedDevice);
+                            advertiseDisplay(display, surface, width, height, flags);
+                        }
+                    }
+
+                    @Override
+                    public void onDisplayDisconnected() {
+                        if (mConnectedDevice == oldDevice) {
+                            Slog.i(TAG, "Closed RTSP connection with Wifi display: "
+                                    + mConnectedDevice.deviceName);
+                            mHandler.removeCallbacks(mRtspTimeout);
+                            disconnect();
+                        }
+                    }
+
+                    @Override
+                    public void onDisplayError(int error) {
+                        if (mConnectedDevice == oldDevice) {
+                            Slog.i(TAG, "Lost RTSP connection with Wifi display due to error "
+                                    + error + ": " + mConnectedDevice.deviceName);
+                            mHandler.removeCallbacks(mRtspTimeout);
+                            handleConnectionFailure(false);
+                        }
+                    }
+                }, mHandler);
+            }
 
             mHandler.postDelayed(mRtspTimeout, RTSP_TIMEOUT_SECONDS * 1000);
         }
