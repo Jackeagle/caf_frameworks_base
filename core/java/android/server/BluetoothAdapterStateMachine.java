@@ -535,9 +535,13 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                     }
                     break;
                 case ALL_DEVICES_DISCONNECTED:
-                    removeMessages(DEVICES_DISCONNECT_TIMEOUT);
-                    mBluetoothService.switchConnectable(false);
-                    sendMessageDelayed(POWER_DOWN_TIMEOUT, POWER_DOWN_TIMEOUT_TIME);
+                    if (mPublicState == BluetoothAdapter.STATE_TURNING_OFF) {
+                        removeMessages(DEVICES_DISCONNECT_TIMEOUT);
+                        mBluetoothService.switchConnectable(false);
+                        sendMessageDelayed(POWER_DOWN_TIMEOUT, POWER_DOWN_TIMEOUT_TIME);
+                    } else {
+                        log("Ignore unexpected devices disconnected message");
+                    }
                     break;
                 case DEVICES_DISCONNECT_TIMEOUT:
                     sendMessage(ALL_DEVICES_DISCONNECTED);
