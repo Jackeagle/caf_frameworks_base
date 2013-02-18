@@ -1279,11 +1279,6 @@ public class InputManagerService extends IInputManager.Stub
             mWindowManagerCallbacks.notifyLidSwitchChanged(whenNanos, lidOpen);
         }
 
-        if ((switchMask & SW_HEADPHONE_INSERT) != 0 ||
-            (switchMask & SW_MICROPHONE_INSERT) != 0) {
-            mWindowManagerCallbacks.notifyJackSwitchChanged(whenNanos, switchValues, switchMask);
-        }
-
         if (mUseDevInputEventForAudioJack && (switchMask & SW_JACK_BITS) != 0) {
             mWiredAccessoryCallbacks.notifyWiredAccessoryChanged(whenNanos, switchValues,
                     switchMask);
@@ -1478,8 +1473,6 @@ public class InputManagerService extends IInputManager.Stub
         public void notifyConfigurationChanged();
 
         public void notifyLidSwitchChanged(long whenNanos, boolean lidOpen);
-
-        public void notifyJackSwitchChanged(long whenNanos, int switchValues, int switchMask);
 
         public void notifyInputChannelBroken(InputWindowHandle inputWindowHandle);
 
