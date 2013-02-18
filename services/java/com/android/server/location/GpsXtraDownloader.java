@@ -32,8 +32,10 @@ import org.apache.http.conn.params.ConnRouteParams;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.File;
 import java.util.Properties;
 import java.util.Random;
+import java.util.ArrayList;
 
 /**
  * A class for downloading GPS XTRA data.
@@ -42,6 +44,11 @@ import java.util.Random;
  */
 public class GpsXtraDownloader {
 
+    private static final String STATUS_FILE = "/data/misc/location/atlas/exist";
+    private static final String [] DEFAULT_XTRA_SERVERS =
+    { "XTRA_SERVER_1", "XTRA_SERVER_2", "XTRA_SERVER_3" };
+    private static final String [] EXTRA_XTRA_SERVERS =
+    { "XTRA2_SERVER_1", "XTRA2_SERVER_2", "XTRA2_SERVER_3"};
     private static final String TAG = "GpsXtraDownloader";
     static final boolean DEBUG = false;
     
@@ -54,28 +61,46 @@ public class GpsXtraDownloader {
         mContext = context;
 
         // read XTRA servers from the Properties object
-        int count = 0;
-        String server1 = properties.getProperty("XTRA_SERVER_1");
-        String server2 = properties.getProperty("XTRA_SERVER_2");
-        String server3 = properties.getProperty("XTRA_SERVER_3");
-        if (server1 != null) count++;
-        if (server2 != null) count++;
-        if (server3 != null) count++;
-        
-        if (count == 0) {
+
+        // If status file is present on file system, then
+        // additional (XTRA2) configuration properties are used
+        // if defined. Otherise default configuration is used.
+        boolean useXtra2Servers = new File(STATUS_FILE).exists();
+
+        String[] props = DEFAULT_XTRA_SERVERS;
+
+        if (useXtra2Servers)
+        {
+            for (String prop: EXTRA_XTRA_SERVERS)
+            {
+                if (properties.getProperty(prop) != null)
+                {
+                    props = EXTRA_XTRA_SERVERS;
+                    break;
+                }
+            }
+        }
+
+        ArrayList<String> urls = new ArrayList<String>(3);
+        for (String prop: props)
+        {
+            String url = properties.getProperty(prop);
+            if (url != null)
+            {
+                urls.add(url);
+            }
+        }
+
+        if (urls.isEmpty()) {
             Log.e(TAG, "No XTRA servers were specified in the GPS configuration");
             return;
         } else {
-            mXtraServers = new String[count];
-            count = 0;
-            if (server1 != null) mXtraServers[count++] = server1;
-            if (server2 != null) mXtraServers[count++] = server2;
-            if (server3 != null) mXtraServers[count++] = server3;
+            mXtraServers = urls.toArray(new String[urls.size()]);
 
             // randomize first server
             Random random = new Random();
-            mNextServerIndex = random.nextInt(count);
-        }       
+            mNextServerIndex = random.nextInt(urls.size());
+        }
     }
 
     byte[] downloadXtraData() {
