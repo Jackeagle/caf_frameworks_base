@@ -1420,6 +1420,11 @@ public class SubscriptionManager extends Handler {
         Registrant r = new Registrant (h, what, obj);
         synchronized (mSubActivatedRegistrants[subId]) {
             mSubActivatedRegistrants[subId].add(r);
+            if (isSubActive(subId)) {
+                mSubActivatedRegistrants[subId].notifyRegistrants();
+            } else {
+                Log.d(LOG_TAG, "registerForSubscriptionActivated: Subscription is not activated");
+            }
         }
     }
 
