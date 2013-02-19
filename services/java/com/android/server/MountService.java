@@ -754,7 +754,14 @@ class MountService extends IMountService.Stub
         } else if(code == VoldResponseCode.ExternalDeviceRemoved) {
             //External Device Removal is detected
             final String path = cooked[2];
-            updatePublicVolumeState(path.trim(), Environment.MEDIA_REMOVED);
+            /*
+             * MediaScanner will scan for the content updates, only when the device is mounted.
+             * So, while removing the external USB disk, we need to update the content of the
+             * MediaProvider. To do so, we have to send the sendStorageIntent with
+             * Action=Intent.ACTION_MEDIA_MOUNTED on Unomunt event.
+             */
+            sendStorageIntent(Intent.ACTION_MEDIA_MOUNTED, path);
+
             for(int i = 0; i < mVolumes.size(); i++) {
                 if(mVolumes.get(i).getPath().equals(path)) {
                     mVolumes.remove(i);
