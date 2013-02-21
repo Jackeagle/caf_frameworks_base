@@ -85,10 +85,11 @@ class WiredAccessoryObserver extends UEventObserver {
         }
 
         public int computeNewHeadsetState(int headsetState, int switchState) {
+            int preserveMask = ~(mState1Bits | mState2Bits);
             int setBits = ((switchState == 1) ? mState1Bits :
                           ((switchState == 2) ? mState2Bits : ((switchState == 8) ? 8 : 0)));
             Slog.e(TAG, "computeNewHeadsetState:setBits"+setBits);
-            return setBits;
+            return ((headsetState & preserveMask) | setBits);
         }
     }
 
