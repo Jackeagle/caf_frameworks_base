@@ -2462,6 +2462,15 @@ public final class ActivityManagerService extends ActivityManagerNative
             Intent intent, String resolvedType, IBinder resultTo,
             String resultWho, int requestCode, int startFlags,
             String profileFile, ParcelFileDescriptor profileFd, Bundle options) {
+        if (intent.getCategories() != null
+            && intent.getCategories().contains(Intent.CATEGORY_HOME)) {
+            // Requesting home, set the identity to the current user
+            if (mScreenStatusRequest) {
+                Intent StkIntent = new Intent(AppInterface.CAT_IDLE_SCREEN_ACTION);
+                StkIntent.putExtra("SCREEN_IDLE", true);
+                mContext.sendBroadcast(StkIntent);
+            }
+        }
         return startActivityAsUser(caller, intent, resolvedType, resultTo, resultWho, requestCode,
                 startFlags, profileFile, profileFd, options, UserHandle.getCallingUserId());
     }
