@@ -103,7 +103,7 @@
         android:persistent="true"
         android:allowClearUserData="false"
         android:allowBackup="false"
-        android:hardwareAccelerated="true"
+        android:hardwareAccelerated="false"
         android:label="@string/app_label"
         android:icon="@*android:drawable/platlogo"
         android:supportsRtl="true">
@@ -231,7 +231,7 @@
             android:label="BeanBag"
             android:icon="@drawable/redbean2"
             android:theme="@android:style/Theme.Wallpaper.NoTitleBar.Fullscreen"
-            android:hardwareAccelerated="true"
+            android:hardwareAccelerated="false"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true">
             <intent-filter>
