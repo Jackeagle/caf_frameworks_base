@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -63,6 +67,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int BUFFERING_START     = 105;
     private static final int BUFFERING_END       = 106;
     private static final int ENTER_FULLSCREEN    = 107;
+    private static final int SET_VISIBILITY      = 108;
 
     // Message Ids to be handled on the WebCore thread
     private static final int PREPARED          = 200;
@@ -71,6 +76,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int PAUSED            = 203;
     private static final int STOPFULLSCREEN    = 204;
     private static final int RESTORESTATE      = 205;
+    private static final int AVAILABLE_VIDEO_FRAME = 206;
 
     // Timer thread -> UI thread
     private static final int TIMEUPDATE = 300;
@@ -88,6 +94,9 @@ class HTML5VideoViewProxy extends Handler
     private PosterDownloader mPosterDownloader;
     // The seek position.
     private int mSeekPosition;
+    // Indicates whether video frame has updated after MediaPlayer initialization
+    private boolean mVideoFrameAvailable;
+
     // A helper class to control the playback. This executes on the UI thread!
     private static final class VideoPlayer {
         // The proxy that is currently playing (if any).
@@ -95,6 +104,8 @@ class HTML5VideoViewProxy extends Handler
         // The VideoView instance. This is a singleton for now, at least until
         // http://b/issue?id=1973663 is fixed.
         private static HTML5VideoView mHTML5VideoView;
+        // True if the inline video is visible on the web page.
+        private static boolean mMediaIsVisible;
 
         private static boolean isVideoSelfEnded = false;
 
@@ -127,6 +138,15 @@ class HTML5VideoViewProxy extends Handler
                         mHTML5VideoView.pauseAndDispatch(mCurrentProxy);
                     }
                 }
+            }
+        }
+
+        // This function updates the native layer's player state
+        private static void updateVideoLayerPlayerState() {
+            if (mHTML5VideoView != null) {
+                nativeSetVideoLayerPlayerState(mHTML5VideoView.getVideoLayerId(),
+                        mHTML5VideoView.getTextureName(),
+                        mHTML5VideoView.getCurrentState());
             }
         }
 
@@ -249,6 +269,7 @@ class HTML5VideoViewProxy extends Handler
                 if (!mHTML5VideoView.isPlaying()) {
                     mHTML5VideoView.seekTo(time);
                     mHTML5VideoView.start();
+                    updateVideoLayerPlayerState();
                 }
             } else if (mCurrentProxy != null) {
                 // Some other video is already playing. Notify the caller that
@@ -286,6 +307,7 @@ class HTML5VideoViewProxy extends Handler
             if (!mHTML5VideoView.isFullScreenMode()) {
                 mHTML5VideoView.start();
             }
+            updateVideoLayerPlayerState();
         }
 
         public static void end() {
@@ -297,6 +319,14 @@ class HTML5VideoViewProxy extends Handler
                     mCurrentProxy.dispatchOnPaused();
             }
             isVideoSelfEnded = false;
+        }
+
+        public static void setMediaIsVisible(boolean visible) {
+            mMediaIsVisible = visible;
+        }
+
+        public static boolean isMediaVisible() {
+            return mMediaIsVisible;
         }
     }
 
@@ -336,6 +366,14 @@ class HTML5VideoViewProxy extends Handler
         mWebCoreHandler.sendMessage(msg);
     }
 
+    public void dispatchOnAvailableVideoFrame() {
+        if (!mVideoFrameAvailable) {
+            mVideoFrameAvailable = true;
+            Message msg = Message.obtain(mWebCoreHandler, AVAILABLE_VIDEO_FRAME);
+            mWebCoreHandler.sendMessage(msg);
+        }
+    }
+
     public void dispatchOnPaused() {
         Message msg = Message.obtain(mWebCoreHandler, PAUSED);
         mWebCoreHandler.sendMessage(msg);
@@ -360,8 +398,11 @@ class HTML5VideoViewProxy extends Handler
     // to refresh.
     @Override
     public void onFrameAvailable(SurfaceTexture surfaceTexture) {
-        // TODO: This should support partial invalidation too.
-        mWebView.invalidate();
+        if (VideoPlayer.isMediaVisible()) {
+            // TODO: This should support partial invalidation too.
+            mWebView.invalidate();
+        }
+        dispatchOnAvailableVideoFrame();
     }
 
     // Handler for the messages from WebCore or Timer thread to the UI thread.
@@ -428,6 +469,11 @@ class HTML5VideoViewProxy extends Handler
             }
             case BUFFERING_END: {
                 VideoPlayer.setPlayerBuffering(false);
+                break;
+            }
+            case SET_VISIBILITY: {
+                boolean visible = ((Boolean)msg.obj).booleanValue();
+                VideoPlayer.setMediaIsVisible(visible);
                 break;
             }
         }
@@ -631,6 +677,9 @@ class HTML5VideoViewProxy extends Handler
                     case PAUSED:
                         nativeOnPaused(mNativePointer);
                         break;
+                    case AVAILABLE_VIDEO_FRAME:
+                        nativeOnAvailableVideoFrame(mNativePointer);
+                        break;
                     case POSTER_FETCHED:
                         Bitmap poster = (Bitmap) msg.obj;
                         nativeOnPosterFetched(poster, mNativePointer);
@@ -753,6 +802,12 @@ class HTML5VideoViewProxy extends Handler
         mPosterDownloader.start();
     }
 
+    public void setVisibility(boolean visible) {
+        Message message = obtainMessage(SET_VISIBILITY);
+        message.obj = Boolean.valueOf(visible);
+        sendMessage(message);
+    }
+
     // These three function are called from UI thread only by WebView.
     public void setBaseLayer(int layer) {
         VideoPlayer.setBaseLayer(layer);
@@ -791,9 +846,12 @@ class HTML5VideoViewProxy extends Handler
     private native void nativeOnTimeupdate(int position, int nativePointer);
     private native void nativeOnStopFullscreen(int stillPlaying, int nativePointer);
     private native void nativeOnRestoreState(int nativePointer);
+    private native void nativeOnAvailableVideoFrame(int nativePointer);
     private native static boolean nativeSendSurfaceTexture(SurfaceTexture texture,
             int baseLayer, int videoLayerId, int textureName,
             int playerState);
+    private native static void nativeSetVideoLayerPlayerState(int videoLayerId,
+            int textureName, int playerState);
 
     @Override
     public boolean onInfo(MediaPlayer mp, int what, int extra) {

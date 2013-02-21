@@ -105,6 +105,8 @@ public class HTML5VideoFullScreen extends HTML5VideoView
                 }
                 mMediaController.show();
             }
+            if (mProxy != null)
+                mProxy.dispatchOnAvailableVideoFrame();
         }
 
         @Override
