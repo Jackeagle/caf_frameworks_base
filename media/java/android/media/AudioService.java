@@ -3625,6 +3625,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                    devices |= dev;
                 }
             }
+            if(devices == device)
+            {
                 sendMsg(mAudioHandler,
                         MSG_BROADCAST_AUDIO_BECOMING_NOISY,
                         SENDMSG_REPLACE,
@@ -3633,6 +3635,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                         null,
                         0);
                 delay = 1000;
+            }
         }
 
         if (mAudioHandler.hasMessages(MSG_SET_A2DP_CONNECTION_STATE) ||
