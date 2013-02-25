@@ -1036,7 +1036,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
     }
 
-    private synchronized void updateSdpRecords() {
+    private void updateSdpRecords() {
         ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>();
 
         Resources R = mContext.getResources();
