@@ -2362,6 +2362,11 @@ public final class ActivityManagerService extends ActivityManagerNative
             // Requesting home, set the identity to the current user
             // HACK!
             userId = mCurrentUserId;
+	    if (mScreenStatusRequest) {
+                Intent StkIntent = new Intent(AppInterface.CAT_IDLE_SCREEN_ACTION);
+                StkIntent.putExtra("SCREEN_IDLE", true);
+                mContext.sendBroadcast(StkIntent);
+            }
         } else {
             // TODO: Fix this in a better way - calls coming from SystemUI should probably carry
             // the current user's userId
