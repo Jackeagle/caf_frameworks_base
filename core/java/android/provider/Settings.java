@@ -2094,6 +2094,12 @@ public final class Settings {
         public static final String VIBRATE_WHEN_RINGING = "vibrate_when_ringing";
 
         /**
+         * Whether the slot1 phone vibrates when it is ringing due to an incoming call
+         * @hide
+         */
+        public static final String VIBRATE_WHEN_RINGING2 = "vibrate_when_ringing2";
+
+        /**
          * Whether the audible DTMF tones are played by the dialer when dialing. The value is
          * boolean (1 or 0).
          */
@@ -2378,7 +2384,8 @@ public final class Settings {
             SIP_CALL_OPTIONS,
             SIP_RECEIVE_CALLS,
             POINTER_SPEED,
-            VIBRATE_WHEN_RINGING
+            VIBRATE_WHEN_RINGING,
+            VIBRATE_WHEN_RINGING2
         };
 
         // Settings moved to Settings.Secure
