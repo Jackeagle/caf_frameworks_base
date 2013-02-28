@@ -3457,10 +3457,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                    devices |= dev;
                 }
             }
-            if (devices == device) {
-                delay = 1000;
-                sendBecomingNoisyIntent();
-            }
+            delay = 1000;
+            sendBecomingNoisyIntent();
         }
 
         if (mAudioHandler.hasMessages(MSG_SET_A2DP_CONNECTION_STATE) ||
