@@ -39,6 +39,8 @@ import android.util.Log;
 import android.util.Slog;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 
@@ -458,6 +460,16 @@ public class Watchdog extends Thread {
             }
 
             final File newFd = new File(tracesPath);
+
+            // Trigger the kernel to dump all blocked threads to the kernel log
+            try {
+                FileWriter sysrq_trigger = new FileWriter("/proc/sysrq-trigger");
+                sysrq_trigger.write("w");
+                sysrq_trigger.close();
+            } catch (IOException e) {
+                Slog.e(TAG, "Failed to write to /proc/sysrq-trigger");
+                Slog.e(TAG, e.getMessage());
+            }
 
             // Try to add the error to the dropbox, but assuming that the ActivityManager
             // itself may be deadlocked.  (which has happened, causing this statement to
