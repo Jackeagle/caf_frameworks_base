@@ -4043,6 +4043,14 @@ public final class Settings {
          */
         public static final String UI_NIGHT_MODE = "ui_night_mode";
 
+
+        /**
+         * URL to open browser on to allow user to manage a prepay account
+         * @hide
+         */
+        public static final String SETUP_PREPAID_DATA_SERVICE_URL =
+                "setup_prepaid_data_service_url";
+
         /**
          * Whether screensavers are enabled.
          * @hide
