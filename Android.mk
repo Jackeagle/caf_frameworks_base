@@ -343,6 +343,7 @@ aidl_files := \
 	frameworks/base/core/java/android/app/Notification.aidl \
 	frameworks/base/core/java/android/app/PendingIntent.aidl \
 	frameworks/base/core/java/android/content/ComponentName.aidl \
+	frameworks/base/core/java/android/content/ContentValues.aidl \
 	frameworks/base/core/java/android/content/Intent.aidl \
 	frameworks/base/core/java/android/content/IntentSender.aidl \
 	frameworks/base/core/java/android/content/PeriodicSync.aidl \
