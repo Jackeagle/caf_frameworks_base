@@ -43,6 +43,15 @@
     -->
     <string name="def_location_providers_allowed" translatable="false">gps</string>
     <bool name="assisted_gps_enabled">true</bool>
+    <integer name="def_pref_assisted_gps_type">0</integer>
+<!--add for AGPS parameters settings. Begin-->
+    <string name="supl_host">221.176.0.55</string>
+    <string name="supl_port">7275</string>
+    <string name="agps_provid">MSB</string>
+    <string name="agps_reset_type">HOT</string>
+    <string name="agps_network">HOME</string>
+<!--add for AGPS parameters settings. End-->
+
     <!--  0 == mobile, 1 == wifi. -->
     <integer name="def_network_preference">1</integer>
     <bool name="def_netstats_enabled">true</bool>

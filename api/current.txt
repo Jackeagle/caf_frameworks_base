@@ -18789,6 +18789,9 @@ package android.provider {
     method public static boolean putLong(android.content.ContentResolver, java.lang.String, long);
     method public static boolean putString(android.content.ContentResolver, java.lang.String, java.lang.String);
     field public static final java.lang.String ADB_ENABLED = "adb_enabled";
+    field public static final java.lang.String AGPS_NETWORK = "agps_network";
+    field public static final java.lang.String AGPS_PROVID = "agps_provid";
+    field public static final java.lang.String AGPS_RESET_TYPE = "agps_reset_type";
     field public static final java.lang.String AIRPLANE_MODE_ON = "airplane_mode_on";
     field public static final java.lang.String AIRPLANE_MODE_RADIOS = "airplane_mode_radios";
     field public static final java.lang.String ALWAYS_FINISH_ACTIVITIES = "always_finish_activities";
@@ -18805,12 +18808,15 @@ package android.provider {
     field public static final java.lang.String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
     field public static final java.lang.String MODE_RINGER = "mode_ringer";
     field public static final java.lang.String NETWORK_PREFERENCE = "network_preference";
+    field public static final java.lang.String PREF_ASSISTED_GPS_TYPE = "pref_assisted_gps_type";
     field public static final java.lang.String RADIO_BLUETOOTH = "bluetooth";
     field public static final java.lang.String RADIO_CELL = "cell";
     field public static final java.lang.String RADIO_NFC = "nfc";
     field public static final java.lang.String RADIO_WIFI = "wifi";
     field public static final java.lang.String SHOW_PROCESSES = "show_processes";
     field public static final java.lang.String STAY_ON_WHILE_PLUGGED_IN = "stay_on_while_plugged_in";
+    field public static final java.lang.String SUPL_HOST = "supl_host";
+    field public static final java.lang.String SUPL_PORT = "supl_port";
     field public static final java.lang.String SYS_PROP_SETTING_VERSION = "sys.settings_global_version";
     field public static final java.lang.String TRANSITION_ANIMATION_SCALE = "transition_animation_scale";
     field public static final java.lang.String USB_MASS_STORAGE_ENABLED = "usb_mass_storage_enabled";
@@ -21031,6 +21037,7 @@ package android.telephony {
     field public static final int SIM_STATE_PUK_REQUIRED = 3; // 0x3
     field public static final int SIM_STATE_READY = 5; // 0x5
     field public static final int SIM_STATE_UNKNOWN = 0; // 0x0
+    field protected static java.lang.String multiSimConfig;
   }
 
 }
