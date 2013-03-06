@@ -1372,4 +1372,20 @@ public class TelephonyManager {
         return (multiSimConfig.equals("dsds") || multiSimConfig.equals("dsda"));
     }
    //merge from 8x25q end    
+
+    /**
+     * return the current network name by MCC and MNC.
+     *
+     * @hide
+     */
+   public String getNetworkName() {
+        try {
+            return getITelephony().getNetworkName();
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            return null;
+        }
+   }
+
 }
