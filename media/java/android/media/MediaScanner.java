@@ -26,6 +26,7 @@ import android.content.Context;
 import android.content.IContentProvider;
 import android.database.Cursor;
 import android.database.SQLException;
+import android.database.sqlite.SQLiteDiskIOException;
 import android.drm.DrmManagerClient;
 import android.graphics.BitmapFactory;
 import android.mtp.MtpConstants;
@@ -1506,7 +1507,9 @@ public class MediaScanner
                 return new FileEntry(rowId, path, lastModified, format);
             }
         } catch (RemoteException e) {
-        } finally {
+        } catch (SQLiteDiskIOException ex){
+            Log.e(TAG, "makeEntryFor: SQLiteDiskIOException # path=" + path, ex);//HMCT:
+        }finally {
             if (c != null) {
                 c.close();
             }
