@@ -16,6 +16,7 @@
 
 package android.os;
 
+import android.content.res.Resources;
 import android.os.storage.IMountService;
 import android.os.storage.StorageManager;
 import android.os.storage.StorageVolume;
@@ -218,8 +219,7 @@ public class Environment {
      * @hide
      */
     public static File getMediaStorageDirectory() {
-        throwIfSystem();
-        return sCurrentUser.getMediaStorageDirectory();
+        return MEDIA_STORAGE_DIRECTORY;
     }
 
     /**
@@ -252,7 +252,27 @@ public class Environment {
     private static final File SECURE_DATA_DIRECTORY
             = getDirectory("ANDROID_SECURE_DATA", "/data/secure");
 
-    private static final File DOWNLOAD_CACHE_DIRECTORY = getDirectory("DOWNLOAD_CACHE", "/cache");
+    /** @hide */
+    private static final File MEDIA_STORAGE_DIRECTORY
+            = getDirectory("MEDIA_STORAGE", "/data/media");
+
+    private static final File EXTERNAL_STORAGE_DIRECTORY
+            = getDirectory("EXTERNAL_STORAGE", "/storage/sdcard0");
+    /*support internel storage*/
+    private static final File INTERNAL_STORAGE_DIRECTORY
+            = getDirectory("INTERNAL_STORAGE", "/storage/sdcard1");
+
+    private static final File EXTERNAL_STORAGE_ANDROID_DATA_DIRECTORY = new File(new File(
+            getDirectory("EXTERNAL_STORAGE", "/storage/sdcard0"), "Android"), "data");
+
+    private static final File EXTERNAL_STORAGE_ANDROID_MEDIA_DIRECTORY = new File(new File(
+            getDirectory("EXTERNAL_STORAGE", "/storage/sdcard0"), "Android"), "media");
+
+    private static final File EXTERNAL_STORAGE_ANDROID_OBB_DIRECTORY = new File(new File(
+            getDirectory("EXTERNAL_STORAGE", "/storage/sdcard0"), "Android"), "obb");
+
+    private static final File DOWNLOAD_CACHE_DIRECTORY
+            = getDirectory("DOWNLOAD_CACHE", "/cache");
 
     /**
      * Gets the Android data directory.
@@ -313,8 +333,10 @@ public class Environment {
      * @see #isExternalStorageRemovable()
      */
     public static File getExternalStorageDirectory() {
-        throwIfSystem();
-        return sCurrentUser.getExternalStorageDirectory();
+        return EXTERNAL_STORAGE_DIRECTORY;
+    }
+    public static File getInternalStorageDirectory() {
+        return INTERNAL_STORAGE_DIRECTORY;
     }
 
     /** {@hide} */
@@ -460,8 +482,7 @@ public class Environment {
      * using it such as with {@link File#mkdirs File.mkdirs()}.
      */
     public static File getExternalStoragePublicDirectory(String type) {
-        throwIfSystem();
-        return sCurrentUser.getExternalStoragePublicDirectory(type);
+        return new File(getExternalStorageDirectory(), type);
     }
 
     /**
@@ -469,8 +490,7 @@ public class Environment {
      * @hide
      */
     public static File getExternalStorageAndroidDataDir() {
-        throwIfSystem();
-        return sCurrentUser.getExternalStorageAndroidDataDir();
+        return EXTERNAL_STORAGE_ANDROID_DATA_DIRECTORY;
     }
     
     /**
@@ -478,8 +498,7 @@ public class Environment {
      * @hide
      */
     public static File getExternalStorageAppDataDirectory(String packageName) {
-        throwIfSystem();
-        return sCurrentUser.getExternalStorageAppDataDirectory(packageName);
+        return new File(EXTERNAL_STORAGE_ANDROID_DATA_DIRECTORY, packageName);
     }
     
     /**
@@ -487,8 +506,7 @@ public class Environment {
      * @hide
      */
     public static File getExternalStorageAppMediaDirectory(String packageName) {
-        throwIfSystem();
-        return sCurrentUser.getExternalStorageAppMediaDirectory(packageName);
+        return new File(EXTERNAL_STORAGE_ANDROID_MEDIA_DIRECTORY, packageName);
     }
     
     /**
@@ -496,8 +514,7 @@ public class Environment {
      * @hide
      */
     public static File getExternalStorageAppObbDirectory(String packageName) {
-        throwIfSystem();
-        return sCurrentUser.getExternalStorageAppObbDirectory(packageName);
+        return new File(EXTERNAL_STORAGE_ANDROID_OBB_DIRECTORY, packageName);
     }
     
     /**
@@ -505,8 +522,8 @@ public class Environment {
      * @hide
      */
     public static File getExternalStorageAppFilesDirectory(String packageName) {
-        throwIfSystem();
-        return sCurrentUser.getExternalStorageAppFilesDirectory(packageName);
+        return new File(new File(EXTERNAL_STORAGE_ANDROID_DATA_DIRECTORY,
+                packageName), "files");
     }
 
     /**
@@ -514,8 +531,8 @@ public class Environment {
      * @hide
      */
     public static File getExternalStorageAppCacheDirectory(String packageName) {
-        throwIfSystem();
-        return sCurrentUser.getExternalStorageAppCacheDirectory(packageName);
+        return new File(new File(EXTERNAL_STORAGE_ANDROID_DATA_DIRECTORY,
+                packageName), "cache");
     }
     
     /**
@@ -571,6 +588,11 @@ public class Environment {
      * removed before it was unmounted. 
      */
     public static final String MEDIA_BAD_REMOVAL = "bad_removal";
+    /**
+     *sometimes ,the primary is too full to be mounted
+     *Let user know to rlease some space
+     */
+    public static final String MEDIA_NO_SPACE = "no_space";
 
     /**
      * {@link #getExternalStorageState()} returns MEDIA_UNMOUNTABLE if the media is present
@@ -588,10 +610,21 @@ public class Environment {
         try {
             IMountService mountService = IMountService.Stub.asInterface(ServiceManager
                     .getService("mount"));
-            final StorageVolume primary = getPrimaryVolume();
-            return mountService.getVolumeState(primary.getPath());
-        } catch (RemoteException rex) {
-            Log.w(TAG, "Failed to read external storage state; assuming REMOVED: " + rex);
+            return mountService.getVolumeState(getExternalStorageDirectory()
+                    .toString());
+        } catch (Exception rex) {
+            return Environment.MEDIA_REMOVED;
+        }
+    }
+    /**
+     *Get the current state of the "internal" storage device
+     */
+    public static String getInternalStorageState() {
+        try {
+            IMountService mountService = IMountService.Stub.asInterface(ServiceManager
+                    .getService("mount"));
+            return mountService.getVolumeState(getInternalStorageDirectory().toString());
+        } catch (Exception rex) {
             return Environment.MEDIA_REMOVED;
         }
     }
