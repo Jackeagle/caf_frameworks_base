@@ -117,6 +117,14 @@ public class PassiveProvider implements LocationProviderInterface {
         return false;
     }
 
+    public boolean syncDeviceManagementInfo(Bundle dminfo) {
+        return false;
+    }
+    
+    public Bundle readAgpsSettingInfo(){
+        return null;
+    }
+
     @Override
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println("mReportLocation=" + mReportLocation);

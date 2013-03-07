@@ -293,6 +293,11 @@ interface ITelephony {
      */
     boolean hasIccCard();
 
+    //xiaohong add 2013/2/21
+    long getCallsDuration(String key);
+    
+    void setCallsDuration(String key, long value);
+    //xiaohong add end 
     /**
      * Return if the current radio is LTE on CDMA. This
      * is a tri-state return value as for a period of time
