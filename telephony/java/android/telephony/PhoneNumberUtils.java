@@ -25,6 +25,8 @@ import com.android.i18n.phonenumbers.PhoneNumberUtil;
 import com.android.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
 import com.android.i18n.phonenumbers.Phonenumber.PhoneNumber;
 import com.android.i18n.phonenumbers.ShortNumberUtil;
+import com.android.internal.telephony.MSimConstants;
+
 
 import android.content.Context;
 import android.content.Intent;
@@ -34,6 +36,7 @@ import android.net.Uri;
 import android.os.SystemProperties;
 import android.provider.Contacts;
 import android.provider.ContactsContract;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -158,17 +161,19 @@ public class PhoneNumberUtils
 
         Uri uri = intent.getData();
         String scheme = uri.getScheme();
+        int subscription = intent.getIntExtra(SUBSCRIPTION_KEY,
+                MSimTelephonyManager.getDefault().getDefaultSubscription());
 
         if (scheme.equals("tel") || scheme.equals("sip")) {
-            return uri.getSchemeSpecificPart();
+            return checkAndAppendPrefix(intent, subscription, uri.getSchemeSpecificPart(), context);
         }
 
         // TODO: We don't check for SecurityException here (requires
         // CALL_PRIVILEGED permission).
         if (scheme.equals("voicemail")) {
             if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                int subscription = intent.getIntExtra(SUBSCRIPTION_KEY,
-                        MSimTelephonyManager.getDefault().getDefaultSubscription());
+                // int subscription = intent.getIntExtra(SUBSCRIPTION_KEY,
+                //         MSimTelephonyManager.getDefault().getDefaultSubscription());
                 return MSimTelephonyManager.getDefault()
                         .getCompleteVoiceMailNumber(subscription);
             }
@@ -203,7 +208,7 @@ public class PhoneNumberUtils
             }
         }
 
-        return number;
+        return checkAndAppendPrefix(intent, subscription, number, context);
     }
 
     /** Extracts the network address portion and canonicalizes
@@ -1856,6 +1861,34 @@ public class PhoneNumberUtils
         // don't return true when both are null.
         return !TextUtils.isEmpty(number) && compare(number, vmNumber);
     }
+	
+	/**
+     * isVoiceMailNumber: checks a given number against the voicemail number
+     * provided by the RIL and SIM card. The caller must have the
+     * READ_PHONE_STATE credential.
+     * 
+     * @param number the number to look up.
+     * @return true if the number is in the list of voicemail. False otherwise,
+     *         including if the caller does not have the permission to read the
+     *         VM number.
+     * @hide TODO: pending API Council approval
+     */
+    public static boolean isVoiceMailNumber(String number, int subscription) {
+        String vmNumber;
+        try {
+            vmNumber = MSimTelephonyManager.getDefault().getVoiceMailNumber(subscription);
+        } catch (SecurityException ex) {
+            return false;
+        }
+
+        // Strip the separators from the number before comparing it
+        // to the list.
+        number = extractNetworkPortionAlt(number);
+
+        // compare tolerates null so we need to make sure that we
+        // don't return true when both are null.
+        return !TextUtils.isEmpty(number) && compare(number, vmNumber);
+    }
 
     /**
      * Translates any alphabetic letters (i.e. [A-Za-z]) in the
@@ -2552,6 +2585,19 @@ public class PhoneNumberUtils
         }
 
         return true;
+    }
+
+    private static String checkAndAppendPrefix(Intent intent, int subscription, String number,
+            Context context) {
+        boolean isIPPrefix = intent.getBooleanExtra(MSimConstants.IS_IP_CALL, false);
+        if (isIPPrefix && number != null) {
+            String IPPrefix = Settings.System.getString(context.getContentResolver(),
+                    Settings.System.IPCALL_PREFIX[subscription]);
+            if (!TextUtils.isEmpty(IPPrefix)) {
+                return IPPrefix + number;
+            }
+        }
+        return number;
     }
 
     //==== End of utility methods used only in compareStrictly() =====

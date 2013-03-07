@@ -51,6 +51,7 @@ import android.util.Log;
 import com.android.internal.content.PackageHelper;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.util.XmlUtils;
 import com.android.internal.widget.LockPatternUtils;
@@ -301,6 +302,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     Settings.Secure.ANDROID_ID,
                     Settings.Secure.BLUETOOTH_ON,
                     Settings.Secure.DATA_ROAMING,
+                    Settings.Secure.DATA_ROAMING_2,
                     Settings.Secure.DEVICE_PROVISIONED,
                     Settings.Secure.HTTP_PROXY,
                     Settings.Secure.INSTALL_NON_MARKET_APPS,
@@ -1285,6 +1287,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                             Settings.Secure.ADB_ENABLED,
                             Settings.Secure.BLUETOOTH_ON,
                             Settings.Secure.DATA_ROAMING,
+                            Settings.Secure.DATA_ROAMING_2,
                             Settings.Secure.DEVICE_PROVISIONED,
                             Settings.Secure.INSTALL_NON_MARKET_APPS,
                             Settings.Secure.USB_MASS_STORAGE_ENABLED
@@ -1943,6 +1946,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                     + " VALUES(?,?);");
 
+            loadSetting(stmt, Settings.System.MULTI_SIM_COUNTDOWN, 5);
+            loadSetting(stmt, Settings.System.CALLBACK_PRIORITY_ENABLED, FeatureQuery.FEATURE_UX_SETTINGS_PREFERREDCALLBACK ? 1: 0);
+
             loadBooleanSetting(stmt, Settings.System.DIM_SCREEN,
                     R.bool.def_dim_screen);
             loadIntegerSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT,
@@ -1977,6 +1983,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadIntegerSetting(stmt, Settings.System.POINTER_SPEED,
                     R.integer.def_pointer_speed);
+
+            loadSetting(stmt, Settings.System.SHOW_DURATION,
+                    FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
+
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
+
+            loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
+                    R.bool.def_proximity_sensor);
+        
+            loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
+                    R.bool.def_vibrate_after_connected);
+
         } finally {
             if (stmt != null) stmt.close();
         }
@@ -2180,6 +2199,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                             SystemProperties.get("ro.com.android.dataroaming",
                                     "false")) ? 1 : 0);
 
+            loadSetting(stmt, Settings.Global.DATA_ROAMING_2,
+                    "true".equalsIgnoreCase(
+                            SystemProperties.get("ro.com.android.dataroaming",
+                                    "false")) ? 1 : 0);
+
             loadBooleanSetting(stmt, Settings.Global.DEVICE_PROVISIONED,
                     R.bool.def_device_provisioned);
 
@@ -2264,6 +2288,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, val);
 
             // --- New global settings start here
+            loadSetting(stmt, Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION,
+                    MSimConstants.DEFAULT_SUBSCRIPTION);
         } finally {
             if (stmt != null) stmt.close();
         }

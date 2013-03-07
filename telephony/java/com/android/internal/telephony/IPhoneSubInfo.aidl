@@ -91,4 +91,10 @@ interface IPhoneSubInfo {
      *      not present or not loaded
      */
     String[] getIsimImpu();
+    //merge from 8x25q start     
+    /**
+     * Retrieves the sim card type of a given subscription, e.g., IMSI for GSM phones.
+     */
+    String getCardType();
+    //merge from 8x25q end    
 }

@@ -178,6 +178,11 @@
     <string name="jelly_bean_dream_name" msgid="5992026543636816792">"果冻豆大乱舞"</string>
     <string name="start_dreams" msgid="7219575858348719790">"互动屏保"</string>
     <string name="ethernet_label" msgid="7967563676324087464">"以太网"</string>
+    <string name="internal_storage_turn_on">"内部存储器已打开"</string>
+    <string name="internal_storage_turn_off">"内部存储器已关闭"</string>
+    <string name="external_storage_turn_on">"外部存储器已打开"</string>
+    <string name="external_storage_turn_off">"外部存储器已关闭"</string>
+
     <string name="quick_settings_airplane_mode_label" msgid="5510520633448831350">"飞行模式"</string>
     <string name="quick_settings_battery_charging_label" msgid="490074774465309209">"正在充电：<xliff:g id="NUMBER">%d</xliff:g><xliff:g id="PERCENT">%%</xliff:g>"</string>
     <string name="quick_settings_battery_charged_label" msgid="8865413079414246081">"充电完成"</string>
