@@ -1622,6 +1622,17 @@ public final class Settings {
 		 */
 		public static final int GSM_WIFI_CONNECT_TYPE_ASK = 2;
 
+		public static final String WIFI_BROWSER_INTERACTION_REMIND_TYPE = "wifi_browser_interaction_remind";
+		/**
+		 * user will be notified when wifi is unavailable
+		 * @hide
+		 */
+		public static final int WIFI_BROWSER_INTERACTION_REMIND_TYPE_OK = 1;
+		/**
+		 * user will not be notified when wifi is unavailable
+		 * @hide
+		 */
+		public static final int WIFI_BROWSER_INTERACTION_REMIND_TYPE_CANCEL = 0;
 //QUALCOMM_CMCC_END
 
         /**
