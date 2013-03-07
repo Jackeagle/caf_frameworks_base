@@ -2083,6 +2083,11 @@ public final class Settings {
          * boolean (1 or 0).
          */
         public static final String DTMF_TONE_WHEN_DIALING = "dtmf_tone";
+	 /**
+          * Key backlight value. The backlight values are 0,1,2.
+          * @hide
+          */
+        public static final String KEY_BACKLIGHT = "key_backlight_enable";
 
         /**
          * CDMA only settings
