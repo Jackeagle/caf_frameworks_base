@@ -1946,6 +1946,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                     + " VALUES(?,?);");
 
+            loadSetting(stmt, Settings.System.MULTI_SIM_COUNTDOWN, 5);
+            loadSetting(stmt, Settings.System.CALLBACK_PRIORITY_ENABLED, FeatureQuery.FEATURE_UX_SETTINGS_PREFERREDCALLBACK ? 1: 0);
+
             loadBooleanSetting(stmt, Settings.System.DIM_SCREEN,
                     R.bool.def_dim_screen);
             loadIntegerSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT,
@@ -1980,6 +1983,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadIntegerSetting(stmt, Settings.System.POINTER_SPEED,
                     R.integer.def_pointer_speed);
+
+            loadSetting(stmt, Settings.System.SHOW_DURATION,
+                    FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
+
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
+
+            loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
+                    R.bool.def_proximity_sensor);
+        
+            loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
+                    R.bool.def_vibrate_after_connected);
+
         } finally {
             if (stmt != null) stmt.close();
         }
