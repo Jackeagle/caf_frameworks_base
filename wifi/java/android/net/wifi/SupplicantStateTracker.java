@@ -85,6 +85,12 @@ class SupplicantStateTracker extends StateMachine {
         start();
     }
 
+//QUALCOMM_CMCC_START
+    public boolean isNetworksDisabledDuringConnect() {
+        return mNetworksDisabledDuringConnect;
+    }
+//QUALCOMM_CMCC_END
+    
     private void handleNetworkConnectionFailure(int netId) {
         /* If other networks disabled during connection, enable them */
         if (mNetworksDisabledDuringConnect) {

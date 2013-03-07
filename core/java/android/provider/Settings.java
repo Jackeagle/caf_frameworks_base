@@ -1534,8 +1534,51 @@ public final class Settings {
          * @deprecated Use {@link android.provider.Settings.Global#MODE_RINGER} instead
          */
         @Deprecated
-//QUALCOMM_CMCC_START 
+
         public static final String MODE_RINGER = Global.MODE_RINGER;
+
+//QUALCOMM_CMCC_START 
+        /**
+         * Whether select an access point to connect among SSID automatically
+         * @hide 
+         */
+        public static final String WIFI_SELECT_IN_SSIDS_TYPE = "wifi_select_in_ssids_type";
+        
+        /**
+         * select an access point to connect automatically
+         * @hide 
+         */
+        public static final int WIFI_SELECT_IN_SSIDS_AUTO = 0;
+        
+        /**
+         * select an access point to connect manually
+         * @hide 
+         */
+        public static final int WIFI_SELECT_IN_SSIDS_MANUL = 1;
+        /**
+         * user will be notified when other access point's signal is better
+         * @hide 
+         */
+        public static final int WIFI_SELECT_IN_SSIDS_ASK = 2;        
+
+
+        /**
+         * Whether wifi settings will connect to access point automatically
+         * @hide
+         */
+        public static final String WIFI_AUTO_CONNECT_TYPE = "wifi_auto_connect_type";
+        
+        /**
+         * wifi settings will connect to access point automatically
+         * @hide
+         */
+        public static final int WIFI_AUTO_CONNECT_TYPE_AUTO = 0;
+        
+        /**
+         * user need to connect to access point manually
+         * @hide
+         */
+        public static final int WIFI_AUTO_CONNECT_TYPE_MANUAL = 1;
 
         /**
          * The type of how each AP accessing its priority values

@@ -24,6 +24,7 @@ import android.app.PendingIntent;
 import android.app.TaskStackBuilder;
 import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -79,6 +80,8 @@ import com.android.internal.util.AsyncChannel;
 import com.android.server.am.BatteryStatsService;
 import com.android.internal.R;
 
+import com.qrd.plugin.feature_query.FeatureQuery;
+
 /**
  * WifiService handles remote WiFi operation requests by implementing
  * the IWifiManager interface.
@@ -91,7 +94,7 @@ import com.android.internal.R;
 
 public class WifiService extends IWifiManager.Stub {
     private static final String TAG = "WifiService";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
 
     private final WifiStateMachine mWifiStateMachine;
 
@@ -365,6 +368,18 @@ public class WifiService extends IWifiManager.Stub {
      */
     private final WorkSource mTmpWorkSource = new WorkSource();
     private WifiWatchdogStateMachine mWifiWatchdogStateMachine;
+//QUALCOMM_CMCC_START
+    static final int SECURITY_NONE = 0;
+    static final int SECURITY_WEP = 1;
+    static final int SECURITY_PSK = 2;
+    static final int SECURITY_EAP = 3;
+    static final int SECURITY_WAPI_PSK = 4;
+    static final int SECURITY_WAPI_CERT = 5;
+    static final int SECURITY_WPA2_PSK = 6;
+    private int mAutoConnectPolicy = Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO;
+    private AutoConnectTypeObserver mAutoConnectTypeObserver;
+    private boolean mAutoConnect = false;
+//QUALCOMM_CMCC_END
 
     WifiService(Context context) {
         mContext = context;
@@ -438,6 +453,10 @@ public class WifiService extends IWifiManager.Stub {
                 Settings.Global.WIFI_NETWORKS_AVAILABLE_REPEAT_DELAY, 900) * 1000l;
         mNotificationEnabledSettingObserver = new NotificationEnabledSettingObserver(new Handler());
         mNotificationEnabledSettingObserver.register();
+//QUALCOMM_CMCC_START
+        mAutoConnectTypeObserver = new AutoConnectTypeObserver(new Handler());		
+        mAutoConnectPolicy = Settings.System.getInt(context.getContentResolver(), Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO);
+//QUALCOMM_CMCC_END
     }
 
     /** Tell battery stats about a new WIFI scan */
@@ -1697,6 +1716,79 @@ public class WifiService extends IWifiManager.Stub {
                     }
                 }
 
+//QUALCOMM_CMCC_START
+                Slog.d(TAG, "mAutoConnectPolicy=" + mAutoConnectPolicy);
+                boolean isConnecting = false;
+                int networkId = mWifiStateMachine.syncGetConnectingNetworkId(mWifiStateMachineChannel);
+                if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                    List<WifiConfiguration> networks = getConfiguredNetworks();
+                    mAutoConnect = false;
+                    ConnectivityManager cm = (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+                    NetworkInfo info = cm.getActiveNetworkInfo();
+                    if (null == info) {
+                        Slog.d(TAG, "No active network");
+                    } else {
+                        Slog.d(TAG, "Active network type:" + info.getTypeName());
+                    }
+                  
+                    String highestPriorityNetworkSSID = null;
+                    int highestPriority = -1;
+                    int highestPriorityNetworkId = -1;
+                    
+                    if (null != networks) {
+                        for (WifiConfiguration network : networks) {
+                            for (ScanResult scanresult : scanResults) {
+                                //Slog.d(TAG, "network.SSID=" + network.SSID + ", scanresult.SSID=" + scanresult.SSID);
+                                //Slog.d(TAG, "network.security=" + getSecurity(network) + ", scanresult.security=" + getSecurity(scanresult));
+                                if ((network.SSID != null) && (scanresult.SSID != null) 
+                                    && network.SSID.equals("\"" + scanresult.SSID + "\"") 
+                                    && (getSecurity(network) == getSecurity(scanresult))) {
+                                    
+                                    if (network.priority > highestPriority) {
+                                        highestPriority = network.priority;
+                                        highestPriorityNetworkId = network.networkId;
+                                        highestPriorityNetworkSSID = network.SSID;
+                                    }
+                                    if (network.networkId == networkId) {
+                                        isConnecting = true;
+                                    }
+                                }
+                            }
+                        }
+                    }			
+                    if (!isConnecting) {
+                        if (null != info && info.getType() == ConnectivityManager.TYPE_MOBILE) {
+                            Slog.d(TAG, "highestPriorityNetworkId=" + highestPriorityNetworkId + ", highestPriorityNetworkSSID=" + highestPriorityNetworkSSID);
+                            Slog.d(TAG, "currentTimeMillis=" + System.currentTimeMillis());
+                            if (mAutoConnectPolicy == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO) {
+
+                            } else {
+                                ActivityManager am = (ActivityManager)mContext.getSystemService(Context.ACTIVITY_SERVICE);   
+                                ComponentName cn = null;
+                                String classname = null;
+                                if (am.getRunningTasks(1) != null && am.getRunningTasks(1).get(0) != null) {
+                                    cn = am.getRunningTasks(1).get(0).topActivity;
+                                }
+                                if (cn != null) {
+                                    classname = cn.getClassName();
+                                    Slog.d(TAG, "Class Name:" + classname); 
+                                } else {
+                                    Slog.e(TAG, "ComponentName is null");
+                                }
+
+                            }
+                        } else {
+                            if (mAutoConnectPolicy == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO) {
+                                if (highestPriorityNetworkId != -1 && !TextUtils.isEmpty(highestPriorityNetworkSSID)) {
+                                    enableAllNetworks();
+                                }
+                            }
+                        }
+                    }
+                    Slog.d(TAG, "mAutoConnect:" + mAutoConnect + ", isConnecting:" + isConnecting);
+                }
+//QUALCOMM_CMCC_END
+
                 if (numOpenNetworks > 0) {
                     if (++mNumScansSinceNetworkStateChange >= NUM_SCANS_BEFORE_ACTUALLY_SCANNING) {
                         /*
@@ -1818,9 +1910,96 @@ public class WifiService extends IWifiManager.Stub {
         }
     }
 	
-//QUALCOMM_CMCC_START 	
+    private class AutoConnectTypeObserver extends ContentObserver {
+
+        public AutoConnectTypeObserver(Handler handler) {
+            super(handler);
+            ContentResolver cr = mContext.getContentResolver();
+            cr.registerContentObserver(Settings.System.getUriFor(
+                Settings.System.WIFI_AUTO_CONNECT_TYPE), false, this);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            int connectType = Settings.System.getInt(mContext.getContentResolver(), 
+                Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO);
+			int mCellToWiFiPolicy = 0;
+            mAutoConnectPolicy = connectType;
+            if (mWifiStateMachineChannel != null) {
+                mWifiStateMachine.syncSetConnectPolicy(mWifiStateMachineChannel, mAutoConnectPolicy, mCellToWiFiPolicy);
+            } else {
+                Slog.e(TAG, "mWifiStateMachineChannel is not initialized");
+            }
+        }
+    }
 
 
+	
+    private int getSecurity(WifiConfiguration config) {
+        if (config.allowedKeyManagement.get(KeyMgmt.WPA_PSK)) {
+            return SECURITY_PSK;
+        }
+        if (config.allowedKeyManagement.get(KeyMgmt.WPA_EAP) ||
+            config.allowedKeyManagement.get(KeyMgmt.IEEE8021X)) {
+            return SECURITY_EAP;
+        }
+//        if (config.allowedKeyManagement.get(KeyMgmt.WAPI_PSK)) {
+//            return SECURITY_WAPI_PSK;
+//        }
+//        if (config.allowedKeyManagement.get(KeyMgmt.WAPI_CERT)) {
+//            return SECURITY_WAPI_CERT;
+//        }       
+        if (config.wepTxKeyIndex>=0 && config.wepTxKeyIndex<config.wepKeys.length && config.wepKeys[config.wepTxKeyIndex]!=null) {
+            return SECURITY_WEP;
+        }
+        if (config.allowedKeyManagement.get(KeyMgmt.WPA2_PSK)) {
+            return SECURITY_WPA2_PSK;
+        } 
+        return SECURITY_NONE;
+    }
+
+    private int getSecurity(ScanResult result) {
+        if (result.capabilities.contains("WAPI-PSK")) {
+            return SECURITY_WAPI_PSK;
+        } else if (result.capabilities.contains("WAPI-CERT")) {
+            return SECURITY_WAPI_CERT;
+        } else if (result.capabilities.contains("WEP")) {
+            return SECURITY_WEP;
+        } else if (result.capabilities.contains("PSK")) {
+            return SECURITY_PSK;
+        } else if (result.capabilities.contains("EAP")) {
+            return SECURITY_EAP;
+        } else if (result.capabilities.contains("WPA2-PSK")) {
+            return SECURITY_WPA2_PSK;
+        }
+        return SECURITY_NONE;
+    }	
+	
+    private void enableAllNetworks() {
+        if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+            boolean isConnecting = mWifiStateMachine.isNetworksDisabledDuringConnect();
+            Slog.d(TAG, "enableAllNetworks, isConnecting=" + isConnecting);
+            if (!isConnecting) {
+                List<WifiConfiguration> networks = getConfiguredNetworks();
+                WifiInfo wifiInfo = mWifiStateMachine.syncRequestConnectionInfo();
+                if (null != networks) {
+                    for (WifiConfiguration network : networks) {
+                        if (wifiInfo != null && network.networkId != wifiInfo.getNetworkId() 
+                            && network.disableReason == WifiConfiguration.DISABLED_UNKNOWN_REASON) {
+                            enableNetwork(network.networkId, false);
+                            mAutoConnect = true;
+                        }
+                    }
+                    if (mAutoConnect) {
+                        reconnect();
+                        saveConfiguration();
+                    }
+                }
+            }
+        }
+    }
+		
     public boolean saveAPPriority() {
         enforceChangePermission();
         boolean result = false;        
