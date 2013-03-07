@@ -108,5 +108,12 @@ interface IWifiManager
     String getConfigFile();
 
     void captivePortalCheckComplete();
+    
+//QUALCOMM_CMCC_START 
+    /**
+     * @hide
+     */
+    boolean saveAPPriority();
+//QUALCOMM_CMCC_END
 }
 

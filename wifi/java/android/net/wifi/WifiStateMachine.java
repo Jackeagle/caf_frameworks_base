@@ -366,6 +366,10 @@ public class WifiStateMachine extends StateMachine {
     public static final int CMD_DISABLE_P2P_REQ           = BASE + 132;
     public static final int CMD_DISABLE_P2P_RSP           = BASE + 133;
 
+//QUALCOMM_CMCC_START 
+    public static final int CMD_SAVE_AP_PRIORITY          = BASE + 140;
+//QUALCOMM_CMCC_END
+
     private static final int CONNECT_MODE   = 1;
     private static final int SCAN_ONLY_MODE = 2;
 
@@ -1916,6 +1920,9 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_ADD_OR_UPDATE_NETWORK:
                 case CMD_REMOVE_NETWORK:
                 case CMD_SAVE_CONFIG:
+//QUALCOMM_CMCC_START 
+                case CMD_SAVE_AP_PRIORITY:
+//QUALCOMM_CMCC_END
                     replyToMessage(message, message.what, FAILURE);
                     break;
                 case CMD_GET_CONFIGURED_NETWORKS:
@@ -2554,6 +2561,23 @@ public class WifiStateMachine extends StateMachine {
                                 WifiManager.ERROR);
                     }
                     break;
+//QUALCOMM_CMCC_START 
+                case CMD_SAVE_AP_PRIORITY:
+                    ok = mWifiConfigStore.saveAPPriority();
+                    mReplyChannel.replyToMessage(message, message.what, ok ? SUCCESS : FAILURE);
+
+                    // Inform the backup manager about a data change
+                    ibm = IBackupManager.Stub.asInterface(
+                            ServiceManager.getService(Context.BACKUP_SERVICE));
+                    if (ibm != null) {
+                        try {
+                            ibm.dataChanged("com.android.providers.settings");
+                        } catch (Exception e) {
+                            // Try again later
+                        }
+                    }
+                    break;
+//QUALCOMM_CMCC_END
                 case WifiManager.FORGET_NETWORK:
                     if (mWifiConfigStore.forgetNetwork(message.arg1)) {
                         replyToMessage(message, WifiManager.FORGET_NETWORK_SUCCEEDED);
@@ -4092,4 +4116,13 @@ public class WifiStateMachine extends StateMachine {
     private void loge(String s) {
         Log.e(TAG, s);
     }
+
+//QUALCOMM_CMCC_START 
+    public boolean syncSaveAPPriority(AsyncChannel channel) {
+        Message resultMsg = channel.sendMessageSynchronously(CMD_SAVE_AP_PRIORITY);
+        boolean result = (resultMsg.arg1 != FAILURE);
+        resultMsg.recycle();
+        return result;
+    }
+//QUALCOMM_CMCC_END
 }

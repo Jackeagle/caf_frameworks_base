@@ -1983,6 +1983,23 @@ public class WifiManager {
         }
     }
 
+//QUALCOMM_CMCC_START 
+    /**
+     * Save the priority of access point, added for CMCC customization
+     * @hide no intent to publish
+     */
+    public boolean saveAPPriority() {
+        if (mService == null) {
+            return false;
+        }
+        try {
+            return mService.saveAPPriority();
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+//QUALCOMM_CMCC_END
+
     /** @hide */
     public void captivePortalCheckComplete() {
         try {

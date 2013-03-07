@@ -1817,6 +1817,19 @@ public class WifiService extends IWifiManager.Stub {
                     Settings.Global.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON, 1) == 1;
         }
     }
+	
+//QUALCOMM_CMCC_START 	
 
 
+    public boolean saveAPPriority() {
+        enforceChangePermission();
+        boolean result = false;        
+        if (mWifiStateMachineChannel != null) {
+            result = mWifiStateMachine.syncSaveAPPriority(mWifiStateMachineChannel);
+        } else {
+            Slog.e(TAG, "mWifiStateMachineChannel is not initialized");
+        }
+        return result;
+    }
+//QUALCOMM_CMCC_END 
 }

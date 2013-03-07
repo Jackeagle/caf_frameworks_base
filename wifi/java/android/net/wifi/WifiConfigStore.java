@@ -1600,4 +1600,10 @@ class WifiConfigStore {
     private void log(String s) {
         Log.d(TAG, s);
     }
+	
+//QUALCOMM_CMCC_START 
+    boolean saveAPPriority() {
+        return mWifiNative.saveAPPriorityCommand();
+    }
+//QUALCOMM_CMCC_END
 }
