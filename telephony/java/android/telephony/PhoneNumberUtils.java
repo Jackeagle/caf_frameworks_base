@@ -2591,11 +2591,8 @@ public class PhoneNumberUtils
             Context context) {
         boolean isIPPrefix = intent.getBooleanExtra(MSimConstants.IS_IP_CALL, false);
         if (isIPPrefix && number != null) {
-            // String IPPrefix = Settings.System.getString(context.getContentResolver(),
-            //         Settings.System.IPCALL_PREFIX[subscription]);
-
-            // add for test
-            String IPPrefix = "";
+            String IPPrefix = Settings.System.getString(context.getContentResolver(),
+                    Settings.System.IPCALL_PREFIX[subscription]);
             if (!TextUtils.isEmpty(IPPrefix)) {
                 return IPPrefix + number;
             }
