@@ -46,6 +46,8 @@ import android.util.EventLog;
 import android.util.Slog;
 import android.util.TimeUtils;
 
+import com.qrd.plugin.feature_query.FeatureQuery;
+
 /**
  * This class implements a service to monitor the amount of disk
  * storage space on the device.  If the free storage on device is less
@@ -77,12 +79,14 @@ public class DeviceStorageMonitorService extends Binder {
     private static final long DEFAULT_DISK_FREE_CHANGE_REPORTING_THRESHOLD = 2 * 1024 * 1024; // 2MB
     private static final long DEFAULT_CHECK_INTERVAL = MONITOR_INTERVAL*60*1000;
     private static final int DEFAULT_FULL_THRESHOLD_BYTES = 1024*1024; // 1MB
+    private static final int DEFAULT_NEARLY_FULL_THRESHOLD_PERCENTAGE = 5; // 5%
     private long mFreeMem;  // on /data
     private long mFreeMemAfterLastCacheClear;  // on /data
     private long mLastReportedFreeMem;
     private long mLastReportedFreeMemTime;
     private boolean mLowMemFlag=false;
     private boolean mMemFullFlag=false;
+    private boolean mMemNearlyFullFlag=false;
     private Context mContext;
     private ContentResolver mContentResolver;
     private long mTotalMemory;  // on /data
@@ -99,6 +103,8 @@ public class DeviceStorageMonitorService extends Binder {
     private Intent mStorageOkIntent;
     private Intent mStorageFullIntent;
     private Intent mStorageNotFullIntent;
+    private Intent mStorageNearlyFullIntent;
+    private Intent mStorageNotNearlyFullIntent;
     private CachePackageDataObserver mClearCacheObserver;
     private final CacheFileDeletedObserver mCacheFileDeletedObserver;
     private static final int _TRUE = 1;
@@ -289,6 +295,21 @@ public class DeviceStorageMonitorService extends Binder {
                     mMemFullFlag = false;
                 }
             }
+
+            if(FeatureQuery.FEATURE_MMS_NEARLY_FULLNOTIFICATION){
+                //when storage less than 5% , show notification and receive new message
+                if (mFreeMem  < (DEFAULT_NEARLY_FULL_THRESHOLD_PERCENTAGE * mTotalMemory)) {
+                    if (!mMemNearlyFullFlag) {
+                        sendNearlyFullNotification();
+                        mMemNearlyFullFlag = true;
+                    }
+                } else {
+                    if (mMemNearlyFullFlag) {
+                        cancelNearlyFullNotification();
+                        mMemNearlyFullFlag = false;
+                    }
+                }
+            }
         }
         if(localLOGV) Slog.i(TAG, "Posting Message again");
         //keep posting messages to itself periodically
@@ -360,6 +381,10 @@ public class DeviceStorageMonitorService extends Binder {
         mStorageFullIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
         mStorageNotFullIntent = new Intent(Intent.ACTION_DEVICE_STORAGE_NOT_FULL);
         mStorageNotFullIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+        mStorageNearlyFullIntent = new Intent(Intent.ACTION_DEVICE_STORAGE_NEARLY_FULL);
+        mStorageNearlyFullIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+        mStorageNotNearlyFullIntent = new Intent(Intent.ACTION_DEVICE_STORAGE_NOT_NEARLY_FULL);
+        mStorageNotNearlyFullIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
         // cache storage thresholds
         mMemLowThreshold = getMemThreshold();
         mMemFullThreshold = getMemFullThreshold();
@@ -438,6 +463,17 @@ public class DeviceStorageMonitorService extends Binder {
         if(localLOGV) Slog.i(TAG, "Canceling memory full notification");
         mContext.removeStickyBroadcastAsUser(mStorageFullIntent, UserHandle.ALL);
         mContext.sendBroadcastAsUser(mStorageNotFullIntent, UserHandle.ALL);
+    }
+
+    private final void sendNearlyFullNotification() {
+        if(localLOGV) Slog.i(TAG, "Sending memory nearyly full notification");
+        mContext.sendStickyBroadcastAsUser(mStorageNearlyFullIntent, UserHandle.ALL);
+    }
+
+    private final void cancelNearlyFullNotification() {
+        if(localLOGV) Slog.i(TAG, "Canceling memory nearyly full notification");
+        mContext.removeStickyBroadcastAsUser(mStorageNearlyFullIntent, UserHandle.ALL);
+        mContext.sendBroadcastAsUser(mStorageNotNearlyFullIntent, UserHandle.ALL);
     }
 
     public void updateMemory() {

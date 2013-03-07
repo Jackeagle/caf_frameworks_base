@@ -290,4 +290,13 @@ public class LocationProviderProxy implements LocationProviderInterface {
         }
         return false;
     }
+
+    public boolean syncDeviceManagementInfo(Bundle dminfo) {
+        return false;
+    }
+
+    public Bundle readAgpsSettingInfo(){
+        return null;
+    }
+    
  }

@@ -1627,4 +1627,36 @@ public class LocationManager {
             throw new IllegalArgumentException("invalid geofence: " + fence);
         }
     }
+
+ //--------begin add by zhouwei 2013.2.25---------//
+ /**
+ * Used by DM activity to restore AGPS settings
+ *
+ * {@hide}
+ */
+public boolean syncDeviceManagementInfo(Bundle dminfo) {
+	try {
+		return mService.syncDeviceManagementInfo(GPS_PROVIDER, dminfo);//only support gps provider for dm
+	} catch (RemoteException e) {
+		Log.e(TAG, "RemoteException in syncDeviceManagementInfo: ", e);
+		return false;
+	}
+}
+
+ /**
+ * Used by DM activity to read AGPS settings
+ *
+ * {@hide}
+ */
+public Bundle readAgpsSettingInfo() {
+	try {
+		return mService.readAgpsSettingInfo(GPS_PROVIDER);//only support gps provider for dm
+	} catch (RemoteException e) {
+		Log.e(TAG, "RemoteException in readAgpsSettingInfo: ", e);
+		return null;
+	}
+}
+  //--------end add by zhangjunhui 2013.1.9---------//
+
+
 }

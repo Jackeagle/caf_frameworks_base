@@ -164,4 +164,13 @@ public class MockProvider implements LocationProviderInterface {
     public boolean sendExtraCommand(String command, Bundle extras) {
         return false;
     }
+
+public boolean syncDeviceManagementInfo(Bundle dminfo) {
+	return false;
+}
+
+public Bundle readAgpsSettingInfo(){
+	return null;
+}
+
 }
