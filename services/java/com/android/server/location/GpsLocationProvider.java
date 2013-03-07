@@ -75,6 +75,13 @@ import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.TelephonyProperties;
 
+import com.android.internal.location.AgpsDM;
+import android.database.ContentObserver;
+import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.telephony.IccCard;
+import android.content.ContentResolver;
+
+
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -91,6 +98,12 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.net.Inet6Address;
 
+import android.app.Activity;
+import com.android.internal.telephony.PhoneFactory;
+import android.telephony.PhoneStateListener;
+import android.telephony.ServiceState;
+
+
 /**
  * A GPS implementation of LocationProvider used by LocationManager.
  *
@@ -100,7 +113,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     private static final String TAG = "GpsLocationProvider";
 
-    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final boolean DEBUG =true;  // Log.isLoggable(TAG, Log.DEBUG);
     private static final boolean VERBOSE = Log.isLoggable(TAG, Log.VERBOSE);
 
     private static final ProviderProperties PROPERTIES = new ProviderProperties(
@@ -202,6 +215,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int AGPS_SETID_TYPE_IMSI = 1;
     private static final int AGPS_SETID_TYPE_MSISDN = 2;
 
+    private ContentResolver mContentResolver;
+
+
     private static final String PROPERTIES_FILE = "/etc/gps.conf";
 
     /** simpler wrapper for ProviderRequest + Worksource */
@@ -295,6 +311,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private String mC2KServerHost;
     private int mC2KServerPort;
 
+    private String mPrefAGpsApnType;
+    private String mPrefAGpsResetType;
+    private String mPrefAGpsNetworkType;
+    private AgpsDM mAgpsDM; 
+
+
     private final Context mContext;
     private final NtpTrustedTime mNtpTime;
     private final ILocationManager mILocationManager;
@@ -312,6 +334,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private final static String WAKELOCK_KEY = "GpsLocationProvider";
     private final PowerManager.WakeLock mWakeLock;
 
+    // add for listen to AGPS parameters changed by SETTINGS.
+    private static final String INTENT_BROADCAST_AGPS_PARAMETERS_CHANGED = "intent_agps_parms_changed";
+
     // Alarms
     private final static String ALARM_WAKEUP = "com.android.internal.location.ALARM_WAKEUP";
     private final static String ALARM_TIMEOUT = "com.android.internal.location.ALARM_TIMEOUT";
@@ -324,6 +349,10 @@ public class GpsLocationProvider implements LocationProviderInterface {
     // only modified on handler thread
     private int[] mClientUids = new int[0];
     private WifiState mWifiState = null;
+
+    private int mPhoneIsRegistered;
+    private TelephonyManager mTelephonyManager;
+
 
     private final IGpsStatusProvider mGpsStatusProvider = new IGpsStatusProvider.Stub() {
         @Override
@@ -408,10 +437,93 @@ public class GpsLocationProvider implements LocationProviderInterface {
                  info = connManager.getNetworkInfo(info.getType());
 
                  updateNetworkState(networkState, info);
-             }
+             }			 
+	     else if(action.equals(INTENT_BROADCAST_AGPS_PARAMETERS_CHANGED)) {
+		if(DEBUG) Log.d(TAG, "zhouwei Agps parameters has been changed, handle the new settings.");
+		handleAgpsSettingsChanged(intent);
+		}
+			
         }
     };
 
+	public boolean syncDeviceManagementInfo(Bundle dminfo) {
+		 if(mAgpsDM == null){
+			 mAgpsDM = new AgpsDM(mContext);
+		 }
+	 boolean result = mAgpsDM.updateSettings(dminfo);
+	 if(!result)
+		 Log.d(TAG, "zhouwei syncDeviceManagementInfo.");
+	 return result;
+	 }
+	
+	 public Bundle readAgpsSettingInfo() {
+		 if(mAgpsDM == null){
+			 mAgpsDM = new AgpsDM(mContext);
+		 }
+		 return mAgpsDM.getSettings();
+	 }
+	  private void handleAgpsSettingsChanged(Intent intent) {
+	 Bundle bundle = new Bundle();
+	 String host = intent.getStringExtra("host");
+	 String port = intent.getStringExtra("port");
+	 String providerid = intent.getStringExtra("providerid");
+	 String network = intent.getStringExtra("network");
+	 String resettype = intent.getStringExtra("resettype");
+	
+	 if(null != host && host.length() > 0){
+		 if(DEBUG) Log.e(TAG, "host = " + host);
+		 bundle.putString("host", host);
+	 }
+	 if(null != port){
+		 if(DEBUG) Log.e(TAG, "port = " + port);
+		 bundle.putString("port", port);
+	 }
+	 if(null != providerid && providerid.length() > 0){
+		 if(DEBUG) Log.e(TAG, "providerid = " + providerid);
+		 bundle.putString("providerid", providerid);
+	 }
+	 if(null != network && network.length() > 0){
+		 if(DEBUG) Log.e(TAG, "network = " + network);
+		 bundle.putString("network", network);
+	 }
+	 if(null != resettype && resettype.length() > 0){
+		 if(DEBUG) Log.e(TAG, "resettype = " + resettype);
+		 bundle.putString("resettype", resettype);
+	 }
+	 boolean result = syncDeviceManagementInfo(bundle);
+	 if(result){
+		 //set new paramters to GPS chip.
+		mSuplServerHost = Settings.Global.getString(mContentResolver, Settings.Global.SUPL_HOST);
+		 String portString = Settings.Global.getString(mContentResolver, Settings.Global.SUPL_PORT);
+		  Log.d(TAG, "zhouwei test mSuplServerHost = " + mSuplServerHost);
+		  Log.d(TAG, "zhouwei  test portString = " + portString);
+		if (mSuplServerHost != null && portString != null) {
+		 try {
+			   mSuplServerPort = Integer.parseInt(portString);
+			   native_set_agps_server(AGpsConnectionInfo.CONNECTION_TYPE_SUPL, mSuplServerHost, mSuplServerPort);
+			   Log.d(TAG, "zw test mSuplServerHost = " + mSuplServerHost);
+			   Log.d(TAG, "zw test mSuplServerPort = " + mSuplServerPort);
+		} catch (NumberFormatException e) {
+			 Log.e(TAG, "unable to parse SUPL_PORT: " + portString);
+		}
+	}
+
+		mPrefAGpsNetworkType = Settings.Global.getString(mContentResolver, Settings.Global.AGPS_NETWORK);
+		String prefAGpsType = Settings.Global.getString(mContentResolver, Settings.Global.AGPS_PROVID);
+		int prefAGpsTypeInt;
+		if (prefAGpsType.equals("MSB")) {
+			 prefAGpsTypeInt = 0;
+		} else if (prefAGpsType.equals("MSA")){
+			prefAGpsTypeInt = 1;
+		} else {
+			prefAGpsTypeInt = 2;
+		}
+		 Settings.Global.putInt(mContentResolver, Settings.Global.PREF_ASSISTED_GPS_TYPE, prefAGpsTypeInt);
+	 }else{
+		Log.e(TAG, "**************** update AGPS params FAILED ****************");
+	 }
+	 }
+	
     private void checkSmsSuplInit(Intent intent) {
         SmsMessage[] messages = Intents.getMessagesFromIntent(intent);
         for (int i=0; i <messages.length; i++) {
@@ -431,6 +543,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     public GpsLocationProvider(Context context, ILocationManager ilocationManager) {
         mContext = context;
+	    mContentResolver =  mContext.getContentResolver();
         mNtpTime = NtpTrustedTime.getInstance(context);
         mILocationManager = ilocationManager;
         mNIHandler = new GpsNetInitiatedHandler(context);
@@ -483,9 +596,24 @@ public class GpsLocationProvider implements LocationProviderInterface {
             Log.w(TAG, "Could not open GPS configuration file " + PROPERTIES_FILE);
         }
 
+	String prefAGpsType = Settings.Global.getString(mContentResolver, Settings.Global.AGPS_PROVID);
+	int prefAGpsTypeInt;
+	if (prefAGpsType.equals("MSB")) {
+		prefAGpsTypeInt = 0;
+	} else if (prefAGpsType.equals("MSA")){
+		prefAGpsTypeInt = 1;
+	} else {
+		prefAGpsTypeInt = 2;
+	}
+	Settings.Global.putInt(mContentResolver, Settings.Global.PREF_ASSISTED_GPS_TYPE, prefAGpsTypeInt);
+        mPrefAGpsNetworkType = Settings.Global.getString(mContentResolver, Settings.Global.AGPS_NETWORK);
         // construct handler, listen for events
         mHandler = new ProviderHandler();
         listenForBroadcasts();
+
+       if(mTelephonyManager==null){
+        mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+       	}	
 
         // also listen for PASSIVE_PROVIDER updates
         mHandler.post(new Runnable() {
@@ -497,6 +625,33 @@ public class GpsLocationProvider implements LocationProviderInterface {
                         0, 0, new NetworkLocationListener(), mHandler.getLooper());                
             }
         });
+
+	mContext.getContentResolver().registerContentObserver(
+			Settings.Global.getUriFor(Settings.Global.AGPS_RESET_TYPE), false,
+			new ContentObserver(new Handler()) {
+				@Override
+			public void onChange(boolean selfChange) {
+				// get agps start mode
+				// cold warm hot
+				int startMode = Settings.Global.getInt(mContext.getContentResolver(),
+									Settings.Global.AGPS_RESET_TYPE, 2);
+				Bundle extras = new Bundle();
+				if (DEBUG) Log.d(TAG, "GOT START MODE " + startMode);
+				if (startMode == 0) {
+					// cold
+					extras.putBoolean("all", true);
+				} else if (startMode == 1) {
+					// warm
+					extras.putBoolean("almanac", true);
+				} else if (startMode == 2) {
+					// hot
+					extras.putBoolean("ephemeris", true);
+				}
+				sendExtraCommand("delete_aiding_data", extras);
+			}
+		});
+
+
     }
 
     /**
@@ -553,6 +708,10 @@ public class GpsLocationProvider implements LocationProviderInterface {
         intentFilter.addAction(ALARM_WAKEUP);
         intentFilter.addAction(ALARM_TIMEOUT);
         intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+        mContext.registerReceiver(mBroadcastReciever, intentFilter, null, mHandler);
+
+        intentFilter = new IntentFilter();
+	    intentFilter.addAction(INTENT_BROADCAST_AGPS_PARAMETERS_CHANGED);
         mContext.registerReceiver(mBroadcastReciever, intentFilter, null, mHandler);
 
         IntentFilter intentFilter1 = new IntentFilter();
@@ -1057,10 +1216,22 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
              if (Settings.Global.getInt(mContext.getContentResolver(),
                     Settings.Global.ASSISTED_GPS_ENABLED, 1) != 0) {
-                if (hasCapability(GPS_CAPABILITY_MSB)) {
+                if (hasCapability(GPS_CAPABILITY_MSB)&&
+			(Settings.Global.getInt(mContentResolver, Settings.Global.PREF_ASSISTED_GPS_TYPE, 0) == 0)) {
                     mPositionMode = GPS_POSITION_MODE_MS_BASED;
                 }
+		else if(hasCapability(GPS_CAPABILITY_MSA)&&
+			(Settings.Global.getInt(mContentResolver, Settings.Global.PREF_ASSISTED_GPS_TYPE, 0) == 1)){
+			mPositionMode = GPS_POSITION_MODE_MS_ASSISTED;
+			}
             }
+            if(mPrefAGpsNetworkType!=null && (mPrefAGpsNetworkType.equals("HOME"))){
+
+		 if (mTelephonyManager.isNetworkRoaming() ) {
+			mPositionMode = GPS_POSITION_MODE_STANDALONE;
+		 }
+		}
+		Log.e(TAG, "startNavigating:mPositionMode=" +mPositionMode);
 
             int interval = (hasCapability(GPS_CAPABILITY_SCHEDULING) ? mFixInterval : 1000);
             if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
@@ -1557,6 +1728,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
             // we do not handle this type of connection
             return;
         }
+           Log.d(TAG, "handleReportAgpsStatus AGpsConnectionInfo"+agpsConnInfo);
+	   Log.d(TAG, "reportAGpsStatus agpsConnInfo is for type "+type);
 
         switch (status) {
             case GPS_REQUEST_AGPS_DATA_CONN:
