@@ -1597,6 +1597,31 @@ public final class Settings {
          * @hide
          */
         public static final int WIFI_PRIORITY_TYPE_MANUAL = 1;
+
+		/**
+		 * Whether wpa_supplicant will connect to access point automatically
+		 * @hide
+		 */
+		public static final String GSM_WIFI_CONNECT_TYPE = "gsm_wifi_connect_type";
+
+		/**
+		 * wpa_supplicant will connect to access point automatically
+		 * @hide
+		 */
+		public static final int GSM_WIFI_CONNECT_TYPE_AUTO = 0;
+
+		/**
+		 * user need to connect to access point manually
+		 * @hide
+		 */
+		public static final int GSM_WIFI_CONNECT_TYPE_MANUL = 1;
+
+		/**
+		 * user will be notified when wifi is available
+		 * @hide
+		 */
+		public static final int GSM_WIFI_CONNECT_TYPE_ASK = 2;
+
 //QUALCOMM_CMCC_END
 
         /**

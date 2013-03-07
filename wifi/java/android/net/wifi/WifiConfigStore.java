@@ -182,9 +182,10 @@ class WifiConfigStore {
     void enableAllNetworks() {
 //QUALCOMM_CMCC_START
         int autoConnectPolicy = Settings.System.getInt(mContext.getContentResolver(), Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO);
-        log("enableAllNetworks, autoConnectPolicy =" + autoConnectPolicy);
+        int gsmToWiFiPolicy = Settings.System.getInt(mContext.getContentResolver(), Settings.System.GSM_WIFI_CONNECT_TYPE, Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO);
+        log("enableAllNetworks, autoConnectPolicy =" + autoConnectPolicy  + ", gsmToWiFiPolicy =" + gsmToWiFiPolicy);
         if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT 
-            && !(autoConnectPolicy == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO)) {
+            && !(autoConnectPolicy == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO && gsmToWiFiPolicy == Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO)) {
             return;
         }
 //QUALCOMM_CMCC_END

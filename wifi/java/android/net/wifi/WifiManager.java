@@ -522,6 +522,15 @@ public class WifiManager {
     private static int sThreadRefCount;
     private static HandlerThread sHandlerThread;
 
+//QUALCOMM_CMCC_START 
+    /** @hide */
+    public static final String WIFI_NOTIFICATION_ACTION = "android.net.wifi.WIFI_NOTIFICATION";
+    /** @hide */
+    public static final String EXTRA_NOTIFICATION_SSID = "ssid";
+    /** @hide */
+    public static final String EXTRA_NOTIFICATION_NETWORKID = "network_id";
+//QUALCOMM_CMCC_END
+	
     /**
      * Create a new WifiManager instance.
      * Applications will almost always want to use
@@ -1994,6 +2003,22 @@ public class WifiManager {
     }
 
 //QUALCOMM_CMCC_START 
+    /**
+     * Suspend the WiFi available notification, added for CMCC customization
+     * @hide no intent to publish
+     */
+    public boolean suspendNotification() {
+        if (mService == null) {
+            return false;
+        }
+        try {
+            mService.suspendNotification();
+            return true;
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+	
     /**
      * Save the priority of access point, added for CMCC customization
      * @hide no intent to publish

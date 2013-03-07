@@ -576,6 +576,7 @@ public class WifiStateMachine extends StateMachine {
 
 //QUALCOMM_CMCC_START
     private int mAutoConnectPolicy = Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO;
+    private int mGsmToWiFiPolicy = Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO;
 //QUALCOMM_CMCC_END
 
     public WifiStateMachine(Context context, String wlanInterface) {
@@ -734,6 +735,7 @@ public class WifiStateMachine extends StateMachine {
         setLogRecSize(100);
 //QUALCOMM_CMCC_START
         mAutoConnectPolicy = Settings.System.getInt(context.getContentResolver(), Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO);
+        mGsmToWiFiPolicy = Settings.System.getInt(context.getContentResolver(), Settings.System.GSM_WIFI_CONNECT_TYPE, Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO);
 //QUALCOMM_CMCC_END
         if (DBG) setDbg(true);
 
@@ -2063,6 +2065,7 @@ public class WifiStateMachine extends StateMachine {
 //QUALCOMM_CMCC_START
                 case CMD_SET_CONNECT_POLICY:
                     mAutoConnectPolicy = message.arg1;
+                    mGsmToWiFiPolicy = message.arg2;
                     mReplyChannel.replyToMessage(message, message.what, SUCCESS);
                     break;
 //QUALCOMM_CMCC_END
@@ -4188,10 +4191,11 @@ public class WifiStateMachine extends StateMachine {
     public void setConnectPolicy(int connectType, int gsmToWlan) {
         if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) { 
             Log.d(TAG, "setConnectPolicy, connectType=" + connectType);
-            if (mAutoConnectPolicy == connectType) {
+            if (mAutoConnectPolicy == connectType && mGsmToWiFiPolicy == gsmToWlan) {
                 return;
             }
             mAutoConnectPolicy = connectType;
+            mGsmToWiFiPolicy = gsmToWlan;
             updateAutoConnectSettings();
         }
     }
@@ -4206,7 +4210,7 @@ public class WifiStateMachine extends StateMachine {
         }
         if (mAutoConnectPolicy == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO 
             && (info == null /*|| (info != null && info.getType() == ConnectivityManager.TYPE_WIFI)*/
-                || (info != null && info.getType() == ConnectivityManager.TYPE_MOBILE))) {
+                || (info != null && info.getType() == ConnectivityManager.TYPE_MOBILE && mGsmToWiFiPolicy == Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO))) {
             Log.d(TAG, "Should auto connect");
             return true;
         } else {
@@ -4226,7 +4230,7 @@ public class WifiStateMachine extends StateMachine {
 
     private void disableAllNetworks(boolean except) {
         if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) { 
-            Log.d(TAG, "disableAllNetworks, except=" + except + ", mAutoConnectPolicy=" + mAutoConnectPolicy);
+            Log.d(TAG, "disableAllNetworks, except=" + except + ", mAutoConnectPolicy=" + mAutoConnectPolicy  + ", mGsmToWiFiPolicy=" + mGsmToWiFiPolicy);
             List<WifiConfiguration> networks = mWifiConfigStore.getConfiguredNetworks();
             if (except) {
                 if (null != networks) {

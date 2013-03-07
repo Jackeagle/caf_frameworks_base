@@ -110,6 +110,12 @@ interface IWifiManager
     void captivePortalCheckComplete();
     
 //QUALCOMM_CMCC_START 
+
+    /**
+     * @hide
+     */
+    void suspendNotification();
+    
     /**
      * @hide
      */
