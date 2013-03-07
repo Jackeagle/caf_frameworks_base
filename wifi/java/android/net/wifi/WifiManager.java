@@ -400,6 +400,16 @@ public class WifiManager {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_PICK_WIFI_NETWORK = "android.net.wifi.PICK_WIFI_NETWORK";
 
+//QUALCOMM_CMCC_START
+    /**
+     * @hide
+     */
+    public static final String PRESER_NETWORK_CMCC= "CMCC";
+    /**
+     * @hide
+     */
+    public static final String PRESER_NETWORK_CMCC_EDU= "CMCC-EDU";
+//QUALCOMM_CMCC_END
     /**
      * In this Wi-Fi lock mode, Wi-Fi will be kept active,
      * and will behave normally, i.e., it will attempt to automatically
