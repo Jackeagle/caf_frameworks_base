@@ -90,9 +90,6 @@ extern int register_android_media_JetPlayer(JNIEnv *env);
 extern int register_android_media_ToneGenerator(JNIEnv *env);
 
 extern int register_android_util_FloatMath(JNIEnv* env);
-#ifndef NON_QCOM_TARGET
-extern int register_android_hardware_fm_fmradio(JNIEnv* env);
-#endif
 
 namespace android {
 
@@ -1240,7 +1237,6 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_server_BluetoothA2dpService),
 #endif //HAVE_BLUEZ_JNI
 #ifndef NON_QCOM_TARGET
-    REG_JNI(register_android_hardware_fm_fmradio),
     REG_JNI(register_org_codeaurora_Performance),
 #endif
 };
