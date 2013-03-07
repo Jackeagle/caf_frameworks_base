@@ -177,7 +177,8 @@ final class DisplayPowerController {
 
     // The lights service.
     private final LightsService mLights;
-
+    // Add button back lights control . --xst
+    private LightsService.Light mButtonLight;
     // The twilight service.
     private final TwilightService mTwilight;
 
@@ -355,6 +356,8 @@ final class DisplayPowerController {
         mCallbackHandler = callbackHandler;
 
         mLights = lights;
+        //add button back light control function . --xst
+        mButtonLight = mLights.getLight(LightsService.LIGHT_ID_BUTTONS);
         mTwilight = twilight;
         mSensorManager = sensorManager;
         mDisplayManager = displayManager;
@@ -674,7 +677,12 @@ final class DisplayPowerController {
                     // be visible if the electron beam has not been dismissed because
                     // its last frame of animation is solid black.
                     setScreenOn(true);
-
+                    if(mButtonLight.getButtonBackLightsMode()==1){
+                       mButtonLight.setButtonBackLightsOn(true);
+                    }else if(mButtonLight.getButtonBackLightsMode()==0){
+                       mButtonLight.setButtonBackLightsOn(false);
+                    }
+                    Slog.v("xst", "DisplayPowerController--Want screen on...");
                     if (mPowerRequest.blockScreenOn
                             && mPowerState.getElectronBeamLevel() == 0.0f) {
                         blockScreenOn();
@@ -706,6 +714,7 @@ final class DisplayPowerController {
                     if (!mElectronBeamOffAnimator.isStarted()) {
                         if (mPowerState.getElectronBeamLevel() == 0.0f) {
                             setScreenOn(false);
+                            mButtonLight.setButtonBackLightsOn(false);
                         } else if (mPowerState.prepareElectronBeam(
                                 mElectronBeamFadesConfig ?
                                         ElectronBeam.MODE_FADE :
