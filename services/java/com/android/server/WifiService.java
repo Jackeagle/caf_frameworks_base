@@ -650,6 +650,12 @@ public class WifiService extends IWifiManager.Stub {
         enforceChangePermission();
         Slog.d(TAG, "setWifiEnabled: " + enable + " pid=" + Binder.getCallingPid()
                     + ", uid=" + Binder.getCallingUid());
+
+		if (enable && mAirplaneModeOn.get() && !isAirplaneToggleable()){
+			Slog.d(TAG, "setWifiEnabled: false in airplaneMode");
+            enable = false;
+		}
+
         if (DBG) {
             Slog.e(TAG, "Invoking mWifiStateMachine.setWifiEnabled\n");
         }
@@ -1938,6 +1944,7 @@ public class WifiService extends IWifiManager.Stub {
         }
     }
 	
+//QUALCOMM_CMCC_START 	
     private class AutoConnectTypeObserver extends ContentObserver {
 
         public AutoConnectTypeObserver(Handler handler) {
