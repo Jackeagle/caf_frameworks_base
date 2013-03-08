@@ -47,6 +47,7 @@ public class WifiNative {
     static final int BLUETOOTH_COEXISTENCE_MODE_ENABLED = 0;
     static final int BLUETOOTH_COEXISTENCE_MODE_DISABLED = 1;
     static final int BLUETOOTH_COEXISTENCE_MODE_SENSE = 2;
+    static final int NUM_SCAN_RESULTS_PER_ITERATION = 20;
 
     String mInterface = "";
     private boolean mSuspendOptEnabled = false;
@@ -213,7 +214,70 @@ public class WifiNative {
      * MASK=<N> see wpa_supplicant/src/common/wpa_ctrl.h for details
      */
     public String scanResults() {
-        return doStringCommand("BSS RANGE=ALL MASK=0x1986");
+
+        /* read the scan results iteratively in clusters
+           stop when no more scan results are being returned */
+
+        String temp_result;
+        String ID_STR = "id=";
+        String first_result, last_result;
+        String result = new String();
+        int first_id, last_id;
+        int lower_range, upper_range;
+
+        String suppl_com = "BSS FIRST MASK=0x1";
+
+        first_result = doStringCommand(suppl_com);
+
+        if (first_result.length() == 0)
+            return result;
+
+        try {
+            first_id = Integer.parseInt(first_result.substring(ID_STR.length(),
+                                                           first_result.indexOf('\n')));
+        } catch(NumberFormatException e) {
+
+            if (DBG) Log.d(mTAG, "The first scan result does not have valid ID");
+
+            return result;
+        }
+
+        suppl_com = "BSS LAST MASK=0x1";
+
+        last_result = doStringCommand(suppl_com);
+
+        try {
+            last_id = Integer.parseInt(last_result.substring(ID_STR.length(),
+                                                             last_result.indexOf('\n')));
+        } catch(NumberFormatException e) {
+
+            if (DBG) Log.d(mTAG, "The last scan result does not have valid ID");
+
+            return result;
+        }
+
+        lower_range = first_id;
+
+        while (lower_range <= last_id) {
+
+            upper_range = lower_range + NUM_SCAN_RESULTS_PER_ITERATION - 1;
+
+            if (upper_range > last_id)
+                upper_range = last_id;
+
+            suppl_com = "BSS RANGE=" + Integer.toString(lower_range) +
+                "-" + Integer.toString(upper_range) +
+                " MASK=0x1986";
+
+            temp_result = doStringCommand(suppl_com);
+
+            result = result + "\n" + temp_result;
+
+            lower_range = lower_range + NUM_SCAN_RESULTS_PER_ITERATION;
+
+        }
+
+        return result;
     }
 
     public boolean startDriver() {
@@ -802,4 +866,26 @@ public class WifiNative {
     public boolean p2pServDiscCancelReq(String id) {
         return doBooleanCommand("P2P_SERV_DISC_CANCEL_REQ " + id);
     }
+
+      /**Create P2P GO on the operating frequency*/
+    public boolean p2pGroupAddOnSpecifiedFreq(int freq) {
+       return doBooleanCommand("P2P_GROUP_ADD" + " freq=" + freq);
+    }
+
+    /**Set Channel preferrence eg., p2p_pref_chan=81:1,81:2,81:3,81:4,81:5,81:6*/
+    public boolean setPreferredChannel(int startChannel, int endChannel) {
+      int i = 0;
+      if ((startChannel == 0) || (endChannel == 0)) return false;
+          StringBuffer strBuf = new StringBuffer();
+          String command = "SET p2p_pref_chan ";
+          for (i = startChannel; i<=endChannel; i++) {
+              strBuf.append("81:" + i);
+              strBuf.append(",");
+          }
+       strBuf.deleteCharAt(strBuf.length() - 1);
+       command += strBuf;
+       Log.d(mTAG, "setPreferredChannel Command that goes to Supplicant is=" + command);
+       return doBooleanCommand(command) && doBooleanCommand("SAVE_CONFIG");
+    }
+
 }
