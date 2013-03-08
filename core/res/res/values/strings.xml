@@ -4065,4 +4065,6 @@
     <!-- CMCC WLAN customization begin-->
     <string name="reconnect_net_for_wifi_disconnected">WLAN is unavailable, try to connect mobile data?</string>
     <!-- CMCC WLAN customization end-->
+    <string name="auto_power_off_title">Auto power off</string>  
+    <string name="auto_power_off_msg">Shut down in <xliff:g id="seconds">%d</xliff:g> seconds.</string>
 </resources>
