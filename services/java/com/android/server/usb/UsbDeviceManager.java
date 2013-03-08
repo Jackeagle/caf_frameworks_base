@@ -687,7 +687,7 @@ public class UsbDeviceManager {
         }
 
         private void updateUsbNotification() {
-            if (mNotificationManager == null || !mUseUsbNotification) return;
+            if (mNotificationManager == null ) return;
             int id = 0;
             Resources r = mContext.getResources();
             if (mConnected) {
