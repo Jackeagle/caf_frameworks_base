@@ -58,6 +58,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import android.provider.Settings;
+import com.qrd.plugin.feature_query.FeatureQuery;
+
 /**
  * This class provides the API to manage configured
  * wifi networks. The API is not thread safe is being
@@ -177,6 +180,15 @@ class WifiConfigStore {
      * of configured networks indicates all networks as being enabled
      */
     void enableAllNetworks() {
+//QUALCOMM_CMCC_START
+        int autoConnectPolicy = Settings.System.getInt(mContext.getContentResolver(), Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO);
+        int gsmToWiFiPolicy = Settings.System.getInt(mContext.getContentResolver(), Settings.System.GSM_WIFI_CONNECT_TYPE, Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO);
+        log("enableAllNetworks, autoConnectPolicy =" + autoConnectPolicy  + ", gsmToWiFiPolicy =" + gsmToWiFiPolicy);
+        if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT 
+            && !(autoConnectPolicy == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO && gsmToWiFiPolicy == Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO)) {
+            return;
+        }
+//QUALCOMM_CMCC_END
         boolean networkEnabledStateChanged = false;
         for(WifiConfiguration config : mConfiguredNetworks.values()) {
             if(config != null && config.status == Status.DISABLED) {
@@ -1600,4 +1612,10 @@ class WifiConfigStore {
     private void log(String s) {
         Log.d(TAG, s);
     }
+	
+//QUALCOMM_CMCC_START 
+    boolean saveAPPriority() {
+        return mWifiNative.saveAPPriorityCommand();
+    }
+//QUALCOMM_CMCC_END
 }
