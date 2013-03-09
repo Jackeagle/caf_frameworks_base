@@ -45,6 +45,7 @@ class RegulatoryObserver extends UEventObserver {
     private static final String TAG = RegulatoryObserver.class.getSimpleName();
 
     private static final String REGULATORY_UEVENT_MATCH = "MODALIAS=platform:regulatory";
+    private static final String UEVENT_FILE = "/sys/devices/platform/regulatory.0/uevent";
 
     private String mCountryKeyword = "COUNTRY=";
     private String mCountryCode;
@@ -75,8 +76,25 @@ class RegulatoryObserver extends UEventObserver {
     private final void init() {
         try {
             Slog.v(TAG, "RegulatoryObserver init.");
+            // Read the regulatory uevent file to check if any pending
+            // uevent before we start observing
+            BufferedReader uevent_buf = new BufferedReader(new FileReader(UEVENT_FILE));
+            String line;
+            while (((line = uevent_buf.readLine()) != null)
+                 && (line.length() != 0)) {
+                String[] event_string = line.split("=");
+                String key = event_string[0];
+                String value = event_string[1];
+                if (key.equals("COUNTRY")) {
+                    // If it has COUNTRY code, it's a pending request before
+                    // RegulatoryObserver started. Very likely it's from
+                    // CFG80211 which is built in to kernel.
+                    mCountryCode = value;
+                    run_crda();
+                }
+            }
         } catch (Exception e) {
-            Slog.e(TAG, "" , e);
+            Slog.e(TAG, "This kernel may not have CRDA support." , e);
         }
     }
 
@@ -95,7 +113,7 @@ class RegulatoryObserver extends UEventObserver {
                 }
             }
         } catch (Exception e) {
-            Slog.e(TAG, "" , e);
+            Slog.e(TAG, "Failed to start wifi-crda service to run crda." , e);
 	}
     }
 
