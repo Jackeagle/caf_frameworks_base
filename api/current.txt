@@ -16003,6 +16003,7 @@ package android.os {
     method public static java.io.File getExternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getExternalStorageState();
     method public static java.io.File getInternalStorageDirectory();
+    method public static java.io.File getInternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getInternalStorageState();
     method public static java.io.File getRootDirectory();
     method public static boolean isExternalStorageEmulated();
@@ -23080,6 +23081,7 @@ package android.text.util {
     ctor public Linkify();
     method public static final boolean addLinks(android.text.Spannable, int);
     method public static final boolean addLinks(android.widget.TextView, int);
+    method public static final boolean addLinks(android.text.Spannable, int, java.lang.String, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String, android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter);
     method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String);
@@ -29722,6 +29724,7 @@ package android.widget {
     method public void setSingleLine();
     method public void setSingleLine(boolean);
     method public final void setSpannableFactory(android.text.Spannable.Factory);
+    method public void setTelUrl(java.lang.String);
     method public final void setText(java.lang.CharSequence);
     method public void setText(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public final void setText(char[], int, int);
@@ -29740,6 +29743,7 @@ package android.widget {
     method public final void setTransformationMethod(android.text.method.TransformationMethod);
     method public void setTypeface(android.graphics.Typeface, int);
     method public void setTypeface(android.graphics.Typeface);
+    method public void setWebUrl(java.lang.String);
     method public void setWidth(int);
   }
 
