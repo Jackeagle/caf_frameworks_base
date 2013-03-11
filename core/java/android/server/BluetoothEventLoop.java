@@ -452,13 +452,15 @@ class BluetoothEventLoop {
                 }
                 value = str.toString();
             }
-            String adapterObjectPath = adapterProperties.getObjectPath();
-            if ((value != null)  && name.equals("UUIDs")) {
-                adapterProperties.setProperty(name, value);
-                mBluetoothService.updateBluetoothState(value);
-            } else if ((value != null) && (value.startsWith(adapterObjectPath))) {
+            if (value != null) {
+                String adapterObjectPath = adapterProperties.getObjectPath();
+                if (name.equals("UUIDs")) {
+                    adapterProperties.setProperty(name, value);
+                    mBluetoothService.updateBluetoothState(value);
+                } else if ((adapterObjectPath != null) && (value.startsWith(adapterObjectPath))) {
                 // Devices Prop expect value starts with obj path
-                adapterProperties.setProperty(name, value);
+                    adapterProperties.setProperty(name, value);
+                }
             }
         } else if (name.equals("Powered")) {
             mBluetoothState.sendMessage(BluetoothAdapterStateMachine.POWER_STATE_CHANGED,
