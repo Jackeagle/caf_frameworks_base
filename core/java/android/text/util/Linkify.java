@@ -281,14 +281,21 @@ public class Linkify {
     private static final String CN_IRI_CHAR =
         "([\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]{0,10}\\.[a-zA-Z0-9]{3}){0,10}";
 
-	private static final Pattern WEB_URL_PATTERN_CUSTOM
-			= Pattern.compile(	  
-			"(((([hH][tT][tT][pP][sS]?)|([mM][mM][sS])|([rR][tT][sS][pP][uU]?)):\\/\\/)"
-			+ "|([wW]{3}\\.)|(([wW][aA][pP])\\.)|(([wW][aA][pP])2\\.)|(3[gG]\\.))"
-			+ "[a-zA-Z0-9\\!\\#\\$\\%\\&\\'\\(\\)\\*\\+\\,\\-\\.\\/\\:\\;"	
-			+ "\\\\"
-			+ "\\=\\?\\@\\[\\]\\^_\\'\\{\\|\\}\\~]{0,512}[a-zA-Z0-9\\+\\&\\@\\#\\/\\%\\=\\~\\_\\|\\$]");
+    private static final Pattern WEB_URL_PATTERN_CUSTOM
+        = Pattern.compile(
+        "(((([hH][tT][tT][pP][sS]?)|([mM][mM][sS])|([rR][tT][sS][pP][uU]?)):\\/\\/)"
+        + "|([wW]{3}\\.)|(([wW][aA][pP])\\.)|(([wW][aA][pP])2\\.)|(3[gG]\\.))"
+        + "[a-zA-Z0-9\\!\\#\\$\\%\\&\\'\\(\\)\\*\\+\\,\\-\\.\\/\\:\\;"	
+        + "\\\\"
+        + "\\=\\?\\@\\[\\]\\^_\\'\\{\\|\\}\\~]{0,512}[a-zA-Z0-9\\+\\&\\@\\#\\/\\%\\=\\~\\_\\|\\$]");
 
+    /**
+     *  Scans the text of the provided Spannable and turns all occurrences
+     *  of the link types indicated in the mask into clickable links.
+     *  If the mask is nonzero, it also removes any existing URLSpans
+     *  attached to the Spannable, to avoid problems if you call it
+     *  repeatedly on the same text.
+     */
     public static final boolean addLinks(Spannable text, int mask, 
         String telUrl, String webUrl) {
         if (mask == 0) {
@@ -312,15 +319,15 @@ public class Linkify {
             }
             else
             {  
-				if (!webUrl.equals("http://")) {
-		            gatherLinks(links, text, WEB_URL_PATTERN_CUSTOM,
-		                new String[] { webUrl,"rtsp://" },
-			                sUrlMatchFilter, null);
-			  	} else {
-					gatherLinks(links, text, WEB_URL_PATTERN_CUSTOM,
-	                new String[] { "http://", "https://", "ftp://", "rtsp://" },
-	                sUrlMatchFilter, null);
-			  	}
+                if (!webUrl.equals("http://")) {
+                    gatherLinks(links, text, WEB_URL_PATTERN_CUSTOM,
+                        new String[] { webUrl,"rtsp://" },
+                        sUrlMatchFilter, null);
+                } else {
+                    gatherLinks(links, text, WEB_URL_PATTERN_CUSTOM,
+                        new String[] { "http://", "https://", "ftp://", "rtsp://" },
+                        sUrlMatchFilter, null);
+                }
             }
         }
 
@@ -352,7 +359,7 @@ public class Linkify {
 
         return true;
     }
-	
+
     private static final void addLinkMovementMethod(TextView t) {
         MovementMethod m = t.getMovementMethod();
 

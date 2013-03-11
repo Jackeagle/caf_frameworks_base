@@ -274,7 +274,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private boolean mTemporaryDetach;
     private boolean mDispatchTemporaryDetach;
     // add for linkable response in mms message content 
-	private String mTelUrl = "tel:";
+    private String mTelUrl = "tel:";
     private String mWebUrl = "http://";  
 
     private Editable.Factory mEditableFactory = Editable.Factory.getInstance();
@@ -3632,23 +3632,23 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 s2 = mSpannableFactory.newSpannable(text);
             }
 
-			if (Linkify.addLinks(s2, mAutoLinkMask, mTelUrl, mWebUrl)) {
-				text = s2;
-				type = (type == BufferType.EDITABLE) ? BufferType.EDITABLE : BufferType.SPANNABLE;
-			
-				/*
-				 * We must go ahead and set the text before changing the
-				 * movement method, because setMovementMethod() may call
-				 * setText() again to try to upgrade the buffer type.
-				 */
-				mText = text;
-			
-				// Do not change the movement method for text that support text selection as it
-				// would prevent an arbitrary cursor displacement.
-				if (mLinksClickable && !textCanBeSelected()) {
-					setMovementMethod(LinkMovementMethod.getInstance());
-				}
-			}
+            if (Linkify.addLinks(s2, mAutoLinkMask, mTelUrl, mWebUrl)) {
+                text = s2;
+                type = (type == BufferType.EDITABLE) ? BufferType.EDITABLE : BufferType.SPANNABLE;
+
+                /*
+                           * We must go ahead and set the text before changing the
+                           * movement method, because setMovementMethod() may call
+                           * setText() again to try to upgrade the buffer type.
+                           */
+                mText = text;
+
+                // Do not change the movement method for text that support text selection as it
+                // would prevent an arbitrary cursor displacement.
+                if (mLinksClickable && !textCanBeSelected()) {
+                    setMovementMethod(LinkMovementMethod.getInstance());
+                }
+            }
 
         }
 
@@ -3834,7 +3834,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     // add for linkable response in mms message content
-	public void setTelUrl(String urlStr)
+    public void setTelUrl(String urlStr)
     {
         if (TextUtils.isEmpty(urlStr))
         {
@@ -3844,7 +3844,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         {
             mTelUrl = urlStr;
         }
-		Log.d(LOG_TAG, "setTelUrl: mTelUrl = " + mTelUrl);
+        Log.d(LOG_TAG, "setTelUrl: mTelUrl = " + mTelUrl);
     }
     
     public void setWebUrl(String urlStr)
@@ -3857,7 +3857,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         {
             mWebUrl = urlStr;
         }
-		Log.d(LOG_TAG, "setWebUrl: mWebUrl = " + mWebUrl);
+        Log.d(LOG_TAG, "setWebUrl: mWebUrl = " + mWebUrl);
     }
     
 
