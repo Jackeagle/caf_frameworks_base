@@ -1384,6 +1384,7 @@ package android {
     field public static final deprecated int stat_sys_phone_call = 17301636; // 0x1080084
     field public static final deprecated int stat_sys_phone_call_forward = 17301637; // 0x1080085
     field public static final deprecated int stat_sys_phone_call_on_hold = 17301638; // 0x1080086
+    field public static final int stat_sys_plug_headset = 17301684; // 0x10800b4
     field public static final int stat_sys_speakerphone = 17301639; // 0x1080087
     field public static final int stat_sys_upload = 17301640; // 0x1080088
     field public static final int stat_sys_upload_done = 17301641; // 0x1080089
@@ -1544,6 +1545,8 @@ package android {
     field public static final int defaultVoiceMailAlphaTag = 17039364; // 0x1040004
     field public static final int dialog_alert_title = 17039380; // 0x1040014
     field public static final int emptyPhoneNumber = 17039366; // 0x1040006
+    field public static final int headset_plugin_view_text = 17039384; // 0x1040018
+    field public static final int headset_plugin_view_title = 17039385; // 0x1040019
     field public static final int httpErrorBadUrl = 17039367; // 0x1040007
     field public static final int httpErrorUnsupportedScheme = 17039368; // 0x1040008
     field public static final int no = 17039369; // 0x1040009
@@ -2977,6 +2980,7 @@ package android.app {
 
   public class AlarmManager {
     method public void cancel(android.app.PendingIntent);
+    method public int getPowerOnReason();
     method public void set(int, long, android.app.PendingIntent);
     method public void setInexactRepeating(int, long, long, android.app.PendingIntent);
     method public void setRepeating(int, long, long, android.app.PendingIntent);
@@ -2990,6 +2994,7 @@ package android.app {
     field public static final long INTERVAL_HALF_HOUR = 1800000L; // 0x1b7740L
     field public static final long INTERVAL_HOUR = 3600000L; // 0x36ee80L
     field public static final int RTC = 1; // 0x1
+    field public static final int RTC_POWEROFF_WAKEUP = 4; // 0x4
     field public static final int RTC_WAKEUP = 0; // 0x0
   }
 
@@ -12548,6 +12553,7 @@ package android.net {
     method public int stopUsingNetworkFeature(int, java.lang.String);
     field public static final deprecated java.lang.String ACTION_BACKGROUND_DATA_SETTING_CHANGED = "android.net.conn.BACKGROUND_DATA_SETTING_CHANGED";
     field public static final java.lang.String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
+    field public static final java.lang.String CONNECTIVITY_ACTION_IMMEDIATE = "android.net.conn.CONNECTIVITY_CHANGE_IMMEDIATE";
     field public static final int DEFAULT_NETWORK_PREFERENCE = 1; // 0x1
     field public static final java.lang.String EXTRA_EXTRA_INFO = "extraInfo";
     field public static final java.lang.String EXTRA_IS_FAILOVER = "isFailover";
@@ -15682,6 +15688,7 @@ package android.os {
     field public static final java.lang.String DISPLAY;
     field public static final java.lang.String FINGERPRINT;
     field public static final java.lang.String HARDWARE;
+    field public static final java.lang.String HARDWARE_VERSION;
     field public static final java.lang.String HOST;
     field public static final java.lang.String ID;
     field public static final java.lang.String MANUFACTURER;
@@ -15689,6 +15696,7 @@ package android.os {
     field public static final java.lang.String PRODUCT;
     field public static final deprecated java.lang.String RADIO;
     field public static final java.lang.String SERIAL;
+    field public static final java.lang.String SOFTWARE_VERSION;
     field public static final java.lang.String TAGS;
     field public static final long TIME;
     field public static final java.lang.String TYPE;
@@ -15994,6 +16002,8 @@ package android.os {
     method public static java.io.File getExternalStorageDirectory();
     method public static java.io.File getExternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getExternalStorageState();
+    method public static java.io.File getInternalStorageDirectory();
+    method public static java.lang.String getInternalStorageState();
     method public static java.io.File getRootDirectory();
     method public static boolean isExternalStorageEmulated();
     method public static boolean isExternalStorageRemovable();
@@ -16011,6 +16021,7 @@ package android.os {
     field public static final java.lang.String MEDIA_MOUNTED = "mounted";
     field public static final java.lang.String MEDIA_MOUNTED_READ_ONLY = "mounted_ro";
     field public static final java.lang.String MEDIA_NOFS = "nofs";
+    field public static final java.lang.String MEDIA_NO_SPACE = "no_space";
     field public static final java.lang.String MEDIA_REMOVED = "removed";
     field public static final java.lang.String MEDIA_SHARED = "shared";
     field public static final java.lang.String MEDIA_UNMOUNTABLE = "unmountable";
@@ -17366,6 +17377,7 @@ package android.provider {
     field public static final java.lang.String CACHED_NAME = "name";
     field public static final java.lang.String CACHED_NUMBER_LABEL = "numberlabel";
     field public static final java.lang.String CACHED_NUMBER_TYPE = "numbertype";
+    field public static final java.lang.String CALLTYPE = "call_type";
     field public static final android.net.Uri CONTENT_FILTER_URI;
     field public static final java.lang.String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/calls";
     field public static final java.lang.String CONTENT_TYPE = "vnd.android.cursor.dir/calls";
@@ -17373,13 +17385,17 @@ package android.provider {
     field public static final java.lang.String DATE = "date";
     field public static final java.lang.String DEFAULT_SORT_ORDER = "date DESC";
     field public static final java.lang.String DURATION = "duration";
+    field public static final int INCOMING_CSVT_TYPE = 5; // 0x5
     field public static final int INCOMING_TYPE = 1; // 0x1
     field public static final java.lang.String IS_READ = "is_read";
     field public static final java.lang.String LIMIT_PARAM_KEY = "limit";
+    field public static final int MISSED_CSVT_TYPE = 7; // 0x7
     field public static final int MISSED_TYPE = 3; // 0x3
     field public static final java.lang.String NEW = "new";
     field public static final java.lang.String NUMBER = "number";
     field public static final java.lang.String OFFSET_PARAM_KEY = "offset";
+    field public static final int OUTGOING_CSVT_TYPE = 6; // 0x6
+    field public static final int OUTGOING_FAILED_TYPE = 4; // 0x4
     field public static final int OUTGOING_TYPE = 2; // 0x2
     field public static final java.lang.String TYPE = "type";
   }
@@ -18720,6 +18736,25 @@ package android.provider {
     field public static final java.lang.String SIZE = "_size";
   }
 
+  public class RecentCallsPreferences {
+    ctor public RecentCallsPreferences(android.content.Context);
+    method public long getLong(java.lang.String);
+    method public static synchronized android.provider.RecentCallsPreferences getPreferences(android.content.Context);
+    method public void setLong(java.lang.String, long);
+    field public static final java.lang.String ALL_INCOMING_CALLS = "all_incoming_calls";
+    field public static final java.lang.String ALL_LAST_CALLS = "all_last_calls";
+    field public static final java.lang.String ALL_OUTGOING_CALLS = "all_outgoing_calls";
+    field public static final java.lang.String ALL_TOTAL_CALLS = "all_total_calls";
+    field public static final java.lang.String SUB1_INCOMING_CALLS = "sub1_incoming_calls";
+    field public static final java.lang.String SUB1_LAST_CALLS = "sub1_last_calls";
+    field public static final java.lang.String SUB1_OUTGOING_CALLS = "sub1_outgoing_calls";
+    field public static final java.lang.String SUB1_TOTAL_CALLS = "sub1_total_calls";
+    field public static final java.lang.String SUB2_INCOMING_CALLS = "sub2_incoming_calls";
+    field public static final java.lang.String SUB2_LAST_CALLS = "sub2_last_calls";
+    field public static final java.lang.String SUB2_OUTGOING_CALLS = "sub2_outgoing_calls";
+    field public static final java.lang.String SUB2_TOTAL_CALLS = "sub2_total_calls";
+  }
+
   public class SearchRecentSuggestions {
     ctor public SearchRecentSuggestions(android.content.Context, java.lang.String, int);
     method public void clearHistory();
@@ -18801,6 +18836,7 @@ package android.provider {
     field public static final java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEBUG_APP = "debug_app";
     field public static final java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18870,6 +18906,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEFAULT_INPUT_METHOD = "default_input_method";
     field public static final deprecated java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final deprecated java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18959,6 +18996,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DATE_FORMAT = "date_format";
     field public static final deprecated java.lang.String DEBUG_APP = "debug_app";
     field public static final android.net.Uri DEFAULT_ALARM_ALERT_URI;
@@ -19024,6 +19062,7 @@ package android.provider {
     field public static final java.lang.String VOLUME_VOICE = "volume_voice";
     field public static final deprecated java.lang.String WAIT_FOR_DEBUGGER = "wait_for_debugger";
     field public static final deprecated java.lang.String WALLPAPER_ACTIVITY = "wallpaper_activity";
+    field public static final java.lang.String WIFI_BROWSER_INTERACTION_REMIND_TYPE = "wifi_browser_interaction_remind";
     field public static final deprecated java.lang.String WIFI_MAX_DHCP_RETRY_COUNT = "wifi_max_dhcp_retry_count";
     field public static final deprecated java.lang.String WIFI_MOBILE_DATA_TRANSITION_WAKELOCK_TIMEOUT_MS = "wifi_mobile_data_transition_wakelock_timeout_ms";
     field public static final deprecated java.lang.String WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON = "wifi_networks_available_notification_on";
@@ -20896,6 +20935,7 @@ package android.telephony {
     method public java.util.ArrayList<java.lang.String> divideMessage(java.lang.String);
     method public static android.telephony.SmsManager getDefault();
     method public void sendDataMessage(java.lang.String, java.lang.String, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
+    method public void sendDataMessage(java.lang.String, java.lang.String, short, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
     method public void sendMultipartTextMessage(java.lang.String, java.lang.String, java.util.ArrayList<java.lang.String>, java.util.ArrayList<android.app.PendingIntent>, java.util.ArrayList<android.app.PendingIntent>);
     method public void sendTextMessage(java.lang.String, java.lang.String, java.lang.String, android.app.PendingIntent, android.app.PendingIntent);
     field public static final int RESULT_ERROR_GENERIC_FAILURE = 1; // 0x1
@@ -20931,6 +20971,7 @@ package android.telephony {
     method public deprecated int getStatusOnSim();
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, java.lang.String, boolean);
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, byte[], boolean);
+    method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, short, byte[], boolean);
     method public static int getTPLayerLengthForPDU(java.lang.String);
     method public long getTimestampMillis();
     method public byte[] getUserData();
@@ -20970,6 +21011,7 @@ package android.telephony {
   public class TelephonyManager {
     method public java.util.List<android.telephony.CellInfo> getAllCellInfo();
     method public int getCallState();
+    method public long getCallsDuration(java.lang.String);
     method public android.telephony.CellLocation getCellLocation();
     method public int getDataActivity();
     method public int getDataState();
@@ -20993,6 +21035,7 @@ package android.telephony {
     method public boolean hasIccCard();
     method public boolean isNetworkRoaming();
     method public void listen(android.telephony.PhoneStateListener, int);
+    method public void setCallsDuration(java.lang.String, long);
     field public static final java.lang.String ACTION_PHONE_STATE_CHANGED = "android.intent.action.PHONE_STATE";
     field public static final int CALL_STATE_IDLE = 0; // 0x0
     field public static final int CALL_STATE_OFFHOOK = 2; // 0x2

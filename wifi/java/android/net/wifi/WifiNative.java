@@ -802,4 +802,9 @@ public class WifiNative {
     public boolean p2pServDiscCancelReq(String id) {
         return doBooleanCommand("P2P_SERV_DISC_CANCEL_REQ " + id);
     }
+//QUALCOMM_CMCC_START 
+  public boolean saveAPPriorityCommand() {
+      return doBooleanCommand("SAVE_CONFIG");
+  }
+//QUALCOMM_CMCC_END
 }

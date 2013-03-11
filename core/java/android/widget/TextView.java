@@ -273,6 +273,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private boolean mFreezesText;
     private boolean mTemporaryDetach;
     private boolean mDispatchTemporaryDetach;
+    // add for linkable response in mms message content 
+	private String mTelUrl = "tel:";
+    private String mWebUrl = "http://";  
 
     private Editable.Factory mEditableFactory = Editable.Factory.getInstance();
     private Spannable.Factory mSpannableFactory = Spannable.Factory.getInstance();
@@ -3629,23 +3632,24 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 s2 = mSpannableFactory.newSpannable(text);
             }
 
-            if (Linkify.addLinks(s2, mAutoLinkMask)) {
-                text = s2;
-                type = (type == BufferType.EDITABLE) ? BufferType.EDITABLE : BufferType.SPANNABLE;
+			if (Linkify.addLinks(s2, mAutoLinkMask, mTelUrl, mWebUrl)) {
+				text = s2;
+				type = (type == BufferType.EDITABLE) ? BufferType.EDITABLE : BufferType.SPANNABLE;
+			
+				/*
+				 * We must go ahead and set the text before changing the
+				 * movement method, because setMovementMethod() may call
+				 * setText() again to try to upgrade the buffer type.
+				 */
+				mText = text;
+			
+				// Do not change the movement method for text that support text selection as it
+				// would prevent an arbitrary cursor displacement.
+				if (mLinksClickable && !textCanBeSelected()) {
+					setMovementMethod(LinkMovementMethod.getInstance());
+				}
+			}
 
-                /*
-                 * We must go ahead and set the text before changing the
-                 * movement method, because setMovementMethod() may call
-                 * setText() again to try to upgrade the buffer type.
-                 */
-                mText = text;
-
-                // Do not change the movement method for text that support text selection as it
-                // would prevent an arbitrary cursor displacement.
-                if (mLinksClickable && !textCanBeSelected()) {
-                    setMovementMethod(LinkMovementMethod.getInstance());
-                }
-            }
         }
 
         mBufferType = type;
@@ -3828,6 +3832,34 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         return (type & (EditorInfo.TYPE_MASK_CLASS | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE)) ==
             (EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE);
     }
+
+    // add for linkable response in mms message content
+	public void setTelUrl(String urlStr)
+    {
+        if (TextUtils.isEmpty(urlStr))
+        {
+            mTelUrl = "tel:";
+        }
+        else
+        {
+            mTelUrl = urlStr;
+        }
+		Log.d(LOG_TAG, "setTelUrl: mTelUrl = " + mTelUrl);
+    }
+    
+    public void setWebUrl(String urlStr)
+    {
+        if (TextUtils.isEmpty(urlStr))
+        {
+            mWebUrl = "http://";
+        }
+        else
+        {
+            mWebUrl = urlStr;
+        }
+		Log.d(LOG_TAG, "setWebUrl: mWebUrl = " + mWebUrl);
+    }
+    
 
     /**
      * Removes the suggestion spans.
