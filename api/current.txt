@@ -16003,6 +16003,7 @@ package android.os {
     method public static java.io.File getExternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getExternalStorageState();
     method public static java.io.File getInternalStorageDirectory();
+    method public static java.io.File getInternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getInternalStorageState();
     method public static java.io.File getRootDirectory();
     method public static boolean isExternalStorageEmulated();
