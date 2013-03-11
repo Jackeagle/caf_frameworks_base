@@ -4468,6 +4468,10 @@ private NetworkStateTracker makeWimaxStateTracker() {
                     //post switch handling in new state
                     mActiveDefaultNetwork = myDefaultNet;
                     updateDefaultRouteMetric(otherDefaultNet);
+                    //Tell VPN of default net change
+                    mVpn.interfaceStatusChanged(
+                            mNetTrackers[otherDefaultNet].getLinkProperties().getInterfaceName(),
+                            false);
                     sendConnectivitySwitchBroadcast(reason);
                 } else {
                     //pre switch handling in old state
