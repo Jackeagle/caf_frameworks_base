@@ -486,6 +486,38 @@ public class Environment {
     }
 
     /**
+     * Get a top-level public external storage directory for placing files of
+     * a particular type.  This is where the user will typically place and
+     * manage their own files, so you should be careful about what you put here
+     * to ensure you don't erase their files or get in the way of their own
+     * organization.
+     * 
+     * <p>On devices with multiple users (as described by {@link UserManager}),
+     * each user has their own isolated external storage. Applications only
+     * have access to the external storage for the user they're running as.</p>
+     *
+     * <p>Here is an example of typical code to manipulate a picture on
+     * the public external storage:</p>
+     * 
+     * {@sample development/samples/ApiDemos/src/com/example/android/apis/content/ExternalStorage.java
+     * public_picture}
+     * 
+     * @param type The type of storage directory to return.  Should be one of
+     * {@link #DIRECTORY_MUSIC}, {@link #DIRECTORY_PODCASTS},
+     * {@link #DIRECTORY_RINGTONES}, {@link #DIRECTORY_ALARMS},
+     * {@link #DIRECTORY_NOTIFICATIONS}, {@link #DIRECTORY_PICTURES},
+     * {@link #DIRECTORY_MOVIES}, {@link #DIRECTORY_DOWNLOADS}, or
+     * {@link #DIRECTORY_DCIM}.  May not be null.
+     * 
+     * @return Returns the File path for the directory.  Note that this
+     * directory may not yet exist, so you must make sure it exists before
+     * using it such as with {@link File#mkdirs File.mkdirs()}.
+     */
+    public static File getInternalStoragePublicDirectory(String type) {
+        return new File(getInternalStorageDirectory(), type);
+    }
+
+    /**
      * Returns the path for android-specific data on the SD card.
      * @hide
      */
