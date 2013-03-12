@@ -32,6 +32,7 @@ import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.ActionMode;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
@@ -537,5 +538,12 @@ public class ActionBarContextView extends AbsActionBarView implements AnimatorLi
 
     public boolean isTitleOptional() {
         return mTitleOptional;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        super.onTouchEvent(ev);
+        // An action bar always eats touch events.
+        return true;
     }
 }
