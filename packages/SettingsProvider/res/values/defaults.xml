@@ -175,6 +175,7 @@
     <!-- Development settings -->
     <bool name="def_stay_on_while_plugged_in">false</bool>
 
+<string name="def_default_input_method">com.android.inputmethod.latin/.LatinIME</string>
     <!-- Number of retries for connecting to DHCP.
          Value here is the same as WifiStateMachine.DEFAULT_MAX_DHCP_RETRIES -->
     <integer name="def_max_dhcp_retries">9</integer>
