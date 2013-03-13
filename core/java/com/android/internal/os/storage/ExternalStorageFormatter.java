@@ -227,7 +227,12 @@ public class ExternalStorageFormatter extends Service
             // Popup message base on storage path
             if (!PHONE_STORAGE_PATH.equals(extStoragePath)) {
                 fail(R.string.media_checking);
-            } 
+            }else{
+                if (mAlwaysReset) {
+                    sendBroadcast(new Intent("android.intent.action.MASTER_CLEAR"));
+                }
+                stopSelf();
+            }
         } else if (Environment.MEDIA_REMOVED.equals(status)) {
             fail(R.string.media_removed);
         } else if (Environment.MEDIA_SHARED.equals(status)) {

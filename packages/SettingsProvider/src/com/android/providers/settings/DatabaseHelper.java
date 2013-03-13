@@ -2161,16 +2161,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
                 loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
                         R.string.cmcc_airplane_mode_toggleable_radios);
-			} else {
+            } else {
                 loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
                         R.string.airplane_mode_toggleable_radios);
-			}
-			
+            }
+
             loadBooleanSetting(stmt, Settings.Global.ASSISTED_GPS_ENABLED,
                     R.bool.assisted_gps_enabled);
     
-	     loadIntegerSetting(stmt, Settings.Global.PREF_ASSISTED_GPS_TYPE,
-				  R.integer.def_pref_assisted_gps_type);
+            loadIntegerSetting(stmt, Settings.Global.PREF_ASSISTED_GPS_TYPE,
+                    R.integer.def_pref_assisted_gps_type);
 
             /* add for AGPS parameters settings. Begin*/
             loadStringSetting(stmt, Settings.Global.SUPL_HOST,
