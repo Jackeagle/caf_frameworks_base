@@ -2016,8 +2016,10 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         if (!checkAudioSettingsPermission("setSpeakerphoneOn()")) {
             return;
         }
-        mForcedUseForComm = on ? AudioSystem.FORCE_SPEAKER : AudioSystem.FORCE_NONE;
-
+        if(on == true)
+            mForcedUseForComm = AudioSystem.FORCE_SPEAKER;
+        if(on == false && mForcedUseForComm == AudioSystem.FORCE_SPEAKER)
+            mForcedUseForComm = AudioSystem.FORCE_NONE;
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
                 AudioSystem.FOR_COMMUNICATION, mForcedUseForComm, null, 0);
     }
@@ -2032,8 +2034,10 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         if (!checkAudioSettingsPermission("setBluetoothScoOn()")) {
             return;
         }
-        mForcedUseForComm = on ? AudioSystem.FORCE_BT_SCO : AudioSystem.FORCE_NONE;
-
+        if(on == true)
+            mForcedUseForComm = AudioSystem.FORCE_BT_SCO;
+        if(on == false && mForcedUseForComm == AudioSystem.FORCE_BT_SCO)
+            mForcedUseForComm = AudioSystem.FORCE_NONE;
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
                 AudioSystem.FOR_COMMUNICATION, mForcedUseForComm, null, 0);
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
