@@ -47,6 +47,7 @@ import java.util.Locale;
 public class CallerInfo {
     private static final String TAG = "CallerInfo";
     private static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
+    private static final boolean DBG = true;
 
     public static final String UNKNOWN_NUMBER = "-1";
     public static final String PRIVATE_NUMBER = "-2";
@@ -533,7 +534,7 @@ public class CallerInfo {
 
         Uri NATIVE_AREA_URI =Uri.parse("content://externalareasearch");
         Cursor cursor = null;
-        	 
+
         try{
             cursor = context.getContentResolver().query(NATIVE_AREA_URI,null, 
             number, null, null);
@@ -543,6 +544,7 @@ public class CallerInfo {
         }
         String area="";
         if(cursor == null){
+            if(DBG) Log.d(TAG,"cursor = null");
             return "";
         }
 
@@ -550,6 +552,7 @@ public class CallerInfo {
             if (cursor.moveToFirst()) {
                 do{
                    area = cursor.getString(0);
+                   if(DBG) Log.d(TAG,"area = " + area);
                 }while(cursor.moveToNext());
             }
         } finally {
@@ -557,7 +560,7 @@ public class CallerInfo {
                 cursor.close();
             }
         }
-        			
+        
         return area;
     }
 
