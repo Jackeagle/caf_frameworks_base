@@ -20955,6 +20955,7 @@ package android.telephony {
     method public static int[] calculateLength(java.lang.CharSequence, boolean);
     method public static int[] calculateLength(java.lang.String, boolean);
     method public static android.telephony.SmsMessage createFromPdu(byte[]);
+    method public static android.telephony.SmsMessage.DeliveryPdu getDeliveryPdu(java.lang.String, java.lang.String, java.lang.String, boolean, byte[]);
     method public java.lang.String getDisplayMessageBody();
     method public java.lang.String getDisplayOriginatingAddress();
     method public java.lang.String getEmailBody();
@@ -20993,6 +20994,11 @@ package android.telephony {
     field public static final int MAX_USER_DATA_BYTES_WITH_HEADER = 134; // 0x86
     field public static final int MAX_USER_DATA_SEPTETS = 160; // 0xa0
     field public static final int MAX_USER_DATA_SEPTETS_WITH_HEADER = 153; // 0x99
+  }
+
+  public static class SmsMessage.DeliveryPdu {
+    field public byte[] encodedMessage;
+    field public byte[] encodedScAddress;
   }
 
   public static final class SmsMessage.MessageClass extends java.lang.Enum {
