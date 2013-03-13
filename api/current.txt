@@ -20832,6 +20832,7 @@ package android.telephony {
     method public static boolean compare(java.lang.String, java.lang.String);
     method public static boolean compare(android.content.Context, java.lang.String, java.lang.String);
     method public static java.lang.String convertKeypadLettersToDigits(java.lang.String);
+    method public static java.lang.String convertKeypadLettersToDigitsExt(java.lang.String);
     method public static java.lang.String extractNetworkPortion(java.lang.String);
     method public static java.lang.String extractPostDialPortion(java.lang.String);
     method public static void formatJapaneseNumber(android.text.Editable);
