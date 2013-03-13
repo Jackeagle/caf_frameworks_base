@@ -2826,7 +2826,7 @@ private View.OnClickListener mSwitchApnListener = new View.OnClickListener() {
 	*/
    private class ApnSwitch {
 	   private final String DEFAULT = "default";
-	   private final String WAP = "wap";
+        private final String CTWAP = "ctwap";
 
 	   private final Uri PREFERAPN_URI = Uri.parse("content://telephony/carriers/preferapn");
 	   private final String APN_ID = "apn_id";
@@ -2921,7 +2921,7 @@ private View.OnClickListener mSwitchApnListener = new View.OnClickListener() {
 				   apn.apn = cursor.getString(INDEX_APN);
 				   apn.type = cursor.getString(INDEX_TYPE);
 
-				   boolean selectable = ((apn.type == null) || !apn.type.equals("mms"));
+                    boolean selectable = ((apn.type == null) || !(apn.type.equals("mms")||apn.type.equals("dm")));
 				   if (!selectable) {
 					   // if the type is mms, we needn't to handle it.
 					   continue;
@@ -2962,7 +2962,7 @@ private View.OnClickListener mSwitchApnListener = new View.OnClickListener() {
 					   for (int i = 0; i < apnList.size(); i++) {
 						   Apn apn = apnList.get(i);
 						   if (apn.type != null && apn.type.contains(DEFAULT)
-								   && apn.apn != null && apn.apn.contains(WAP)) {
+                               && apn.apn != null && apn.apn.contains(CTWAP)) {
 							   switchToNextApn(apn);
 						   }
 					   }
