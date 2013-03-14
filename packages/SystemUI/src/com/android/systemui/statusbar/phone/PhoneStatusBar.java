@@ -131,8 +131,8 @@ import java.util.ArrayList;
 
 public class PhoneStatusBar extends BaseStatusBar {
     static final String TAG = "PhoneStatusBar";
-    public static final boolean DEBUG = BaseStatusBar.DEBUG;
-    public static final boolean SPEW = DEBUG;
+    public static final boolean DEBUG = true;//BaseStatusBar.DEBUG;
+    public static final boolean SPEW = true;//DEBUG;
     public static final boolean DUMPTRUCK = true; // extra dumpsys info
     public static final boolean DEBUG_GESTURES = false;
 
@@ -349,7 +349,7 @@ public class PhoneStatusBar extends BaseStatusBar {
                     Settings.Secure.USER_SETUP_COMPLETE,
                     0 /*default */,
                     mCurrentUserId);
-            if (MULTIUSER_DEBUG) Slog.d(TAG, String.format("User setup changed: " +
+            if (true) Slog.d(TAG, String.format("User setup changed: " +
                     "selfChange=%s userSetup=%s mUserSetup=%s",
                     selfChange, userSetup, mUserSetup));
             if (mSettingsButton != null && mHasFlipSettings) {
@@ -1676,6 +1676,7 @@ public class PhoneStatusBar extends BaseStatusBar {
         if ((mDisabled & StatusBarManager.DISABLE_EXPAND) != 0) {
             return;
         }
+    if (SPEW) Slog.d(TAG, "animateExpand: mUserSetup=" + mUserSetup);
 
         // Settings are not available in setup
         if (!mUserSetup) return;
@@ -1694,6 +1695,7 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public void switchToSettings() {
         // Settings are not available in setup
+         if (SPEW) Slog.d(TAG, "switchToSettings: mUserSetup=" + mUserSetup);
         if (!mUserSetup) return;
 
         mFlipSettingsView.setScaleX(1f);
@@ -1708,8 +1710,10 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public void flipToSettings() {
         // Settings are not available in setup
+        
+	 if (SPEW) Slog.d(TAG, "flipToSettings: mUserSetup=" + mUserSetup);
         if (!mUserSetup) return;
-
+	 
         if (mFlipSettingsViewAnim != null) mFlipSettingsViewAnim.cancel();
         if (mScrollViewAnim != null) mScrollViewAnim.cancel();
         if (mSettingsButtonAnim != null) mSettingsButtonAnim.cancel();
