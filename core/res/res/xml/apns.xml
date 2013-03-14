@@ -21,18 +21,18 @@
 <!-- If you edit this version, also edit the version in the partner-supplied
     apns-conf.xml configuration file -->
 <apns version="7">
-  <apn carrier="China Mobile" apn="cmnet" mcc="460" mnc="00" user="" server="" password="" proxy="" port="" mmsproxy="" mmsport="" mmsc="" type="default,supl"/>
+  <apn carrier="China Mobile" apn="cmnet" mcc="460" mnc="00" user="" server="" password="" proxy="" port="" mmsproxy="" mmsport="" mmsc="" type="default,net,supl"/>
   <apn carrier="China Mobile MMS" apn="cmwap" mcc="460" mnc="00" user="" server="" password="" proxy="10.0.0.172" port="80" mmsproxy="10.0.0.172" mmsport="80" mmsc="http://mmsc.monternet.com" type="mms"/>
   <apn carrier="China Mobile WAP" apn="cmwap" mcc="460" mnc="00" proxy="10.0.0.172" port="80" type="default,supl,wap"/>
   <apn carrier="ro.China Unicom 3G" apn="3gnet" mcc="460" mnc="01" user="" server="" password="" proxy="" port="80" mmsproxy="" mmsport="" mmsc="" type="default"/>
   <apn carrier="ro.China Unicom 3G" apn="3gnet" mcc="460" mnc="01" user="" server="" password="" proxy="" port="80" mmsproxy="" mmsport="" mmsc="" type="supl"/>
   <apn carrier="ro.China Unicom" apn="3gwap" mcc="460" mnc="01" user="" server="" password="" proxy="" port="" mmsproxy="10.0.0.172" mmsport="80" mmsc="http://mmsc.myuni.com.cn" type="mms"/>
   <apn carrier="ro.China Unicom wap" apn="3gwap" mcc="460" mnc="01" user="" server="" password="" proxy="10.0.0.172" port="80" mmsproxy="" mmsport="" mmsc="" type="default"/>
-  <apn carrier="China Mobile" apn="cmnet" mcc="460" mnc="02" user="" server="" password="" proxy="" port="" mmsproxy="" mmsport="" mmsc="" type="default,supl"/>
+  <apn carrier="China Mobile" apn="cmnet" mcc="460" mnc="02" user="" server="" password="" proxy="" port="" mmsproxy="" mmsport="" mmsc="" type="default,net,supl"/>
   <apn carrier="China Mobile MMS" apn="cmwap" mcc="460" mnc="02" user="" server="" password="" proxy="10.0.0.172" port="80" mmsproxy="10.0.0.172" mmsport="80" mmsc="http://mmsc.monternet.com" type="mms"/>
   <apn carrier="China Mobile WAP" apn="cmwap" mcc="460" mnc="02" proxy="10.0.0.172" port="80" type="default,supl,wap"/>
-  <apn carrier="China Mobile GPRS" apn="cmnet" mcc="460" mnc="07" user="" server="" password="" proxy="" port="" mmsproxy="" mmsport="" mmsc="" type="default,supl"/>
-  <apn carrier="China Mobile" apn="cmwap" mcc="460" mnc="07" user="" server="" password="" proxy="10.0.0.172" port="80" mmsproxy="10.0.0.172" mmsport="80" mmsc="http://mmsc.monternet.com" type="mms"/>
+  <apn carrier="China Mobile" apn="cmnet" mcc="460" mnc="07" user="" server="" password="" proxy="" port="" mmsproxy="" mmsport="" mmsc="" type="default,net,supl"/>
+  <apn carrier="China Mobil MMS" apn="cmwap" mcc="460" mnc="07" user="" server="" password="" proxy="10.0.0.172" port="80" mmsproxy="10.0.0.172" mmsport="80" mmsc="http://mmsc.monternet.com" type="mms"/>
   <apn carrier="China Mobile WAP" apn="cmwap" mcc="460" mnc="07" proxy="10.0.0.172" port="80"  type="default,supl,wap"/>
   <apn carrier="China Telecom" apn="ctnet" mcc="460" mnc="03" user="ctnet@mycdma.cn" server="" password="vnet.mobi" proxy="" port="" mmsproxy="" mmsport="" mmsc="" type="default,hipri" authtype="3"/>
   <apn carrier="China Telecom" apn="ctwap" mcc="460" mnc="03" user="ctwap@mycdma.cn" server="" password="vnet.mobi" proxy="10.0.0.200" port="80" mmsproxy="10.0.0.200" mmsport="80" mmsc="http://mmsc.vnet.mobi" type="default,mms,supl" authtype="3"/>
