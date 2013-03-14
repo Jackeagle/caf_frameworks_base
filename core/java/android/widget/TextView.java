@@ -3844,7 +3844,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         {
             mTelUrl = urlStr;
         }
-        Log.d(LOG_TAG, "setTelUrl: mTelUrl = " + mTelUrl);
     }
     
     public void setWebUrl(String urlStr)
@@ -3857,7 +3856,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         {
             mWebUrl = urlStr;
         }
-        Log.d(LOG_TAG, "setWebUrl: mWebUrl = " + mWebUrl);
     }
     
 
