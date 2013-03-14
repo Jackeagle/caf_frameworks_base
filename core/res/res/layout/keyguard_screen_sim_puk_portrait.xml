@@ -34,6 +34,9 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:ellipsize="marquee"
+            android:singleLine="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:layout_marginRight="6dip"
             android:layout_marginLeft="6dip"
             android:textAppearance="?android:attr/textAppearanceLarge"/>
