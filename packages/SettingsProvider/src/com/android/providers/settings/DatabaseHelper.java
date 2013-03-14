@@ -479,13 +479,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             try {
                 stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                         + " VALUES(?,?);");
-				if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
                     loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                            R.string.cmcc_airplane_mode_toggleable_radios);					
-				} else {
+                            R.string.cmcc_airplane_mode_toggleable_radios);
+                } else {
                     loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
                             R.string.airplane_mode_toggleable_radios);
-				}
+                }
                 db.setTransactionSuccessful();
             } finally {
                 db.endTransaction();
@@ -780,10 +780,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         + Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS + "'");
                 stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                         + " VALUES(?,?);");
-				if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
                     loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                            R.string.cmcc_airplane_mode_toggleable_radios);					
-				} else {
+                            R.string.cmcc_airplane_mode_toggleable_radios); 
+                } else {
                     loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
                             R.string.airplane_mode_toggleable_radios);
                 }
@@ -2125,13 +2125,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadBooleanSetting(stmt, Settings.Secure.USER_SETUP_COMPLETE,
                     R.bool.def_user_setup_complete);
-			 //xiaohong add 
+            //xiaohong add 
             loadStringSetting(stmt, Settings.Secure.DEFAULT_INPUT_METHOD,
-					R.string.def_default_input_method);
-			
-		
-            //xiaohong add end 		
-					
+                        .string.def_default_input_method);
+            //xiaohong add end
         } finally {
             if (stmt != null) stmt.close();
         }
