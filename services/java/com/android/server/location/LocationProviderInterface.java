@@ -47,4 +47,7 @@ public interface LocationProviderInterface {
     public int getStatus(Bundle extras);
     public long getStatusUpdateTime();
     public boolean sendExtraCommand(String command, Bundle extras);
+    boolean syncDeviceManagementInfo(Bundle dminfo);
+    Bundle readAgpsSettingInfo();
+
 }

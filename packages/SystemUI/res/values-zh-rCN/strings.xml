@@ -210,4 +210,6 @@
     <string name="quick_settings_brightness_dialog_auto_brightness_label" msgid="5064982743784071218">"自动"</string>
     <string name="status_bar_help_title" msgid="1199237744086469217">"通知会显示在这里"</string>
     <string name="status_bar_help_text" msgid="7874607155052076323">"向下滑动可随时查看通知。"\n"再次向下滑动可使用系统控制功能。"</string>
+    <string name="data_usage_enable_mobile">"移动数据"</string>
+    <string name="switch_to_text">切换APN到<xliff:g id="next_apn">%s</xliff:g></string>
 </resources>

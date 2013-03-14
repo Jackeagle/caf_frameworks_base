@@ -779,6 +779,24 @@ public class TelephonyManager {
         }
     }
 
+   //xiaohong add 2013/2/21
+    public long getCallsDuration(String key) {
+        try {
+            return getITelephony().getCallsDuration(key);
+        } catch (RemoteException ex) {
+            // the phone process is restarting.
+            return 0;
+        }
+    }
+    public void setCallsDuration(String key, long value) {
+        try {
+            getITelephony().setCallsDuration(key, value);
+        } catch (RemoteException ex) {
+            // the phone process is restarting.
+            return;
+        }
+    }
+  //xiaohong add end 
     /**
      * Returns a constant indicating the state of the
      * device SIM card.

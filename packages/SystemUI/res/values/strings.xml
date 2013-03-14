@@ -521,4 +521,9 @@
     <string name="status_bar_help_title">Notifications appear here</string>
     <!-- Body of help text shown when the notification panel is pulled down for the very first time. [CHAR LIMIT=NONE] -->
     <string name="status_bar_help_text">Access them anytime by swiping down.\nSwipe down again for system controls.</string>
+    
+    <!-- Toggle switch title for enabling all mobile data network connections. [CHAR LIMIT=32] -->  
+    <string name="data_usage_enable_mobile">Mobile data</string>
+    <!-- Add for switch apn -->
+    <string name="switch_to_text">Switch the APN to <xliff:g id="next_apn">%s</xliff:g></string>
 </resources>

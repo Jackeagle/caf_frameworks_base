@@ -70,6 +70,8 @@ public class BatteryController extends BroadcastReceiver {
             final int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
             final int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS,
                     BatteryManager.BATTERY_STATUS_UNKNOWN);
+			final boolean charging = intent.getIntExtra(BatteryManager.EXTRA_STATUS, 1) ==                                                         
+					BatteryManager.BATTERY_STATUS_CHARGING;
 
             boolean plugged = false;
             switch (status) {
@@ -79,7 +81,7 @@ public class BatteryController extends BroadcastReceiver {
                     break;
             }
 
-            final int icon = plugged ? R.drawable.stat_sys_battery_charge
+            final int icon = (plugged && charging) ? R.drawable.stat_sys_battery_charge
                                      : R.drawable.stat_sys_battery;
 
             int N = mIconViews.size();

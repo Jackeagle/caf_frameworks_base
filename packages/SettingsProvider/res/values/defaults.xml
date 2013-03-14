@@ -23,6 +23,9 @@
     <!-- Comma-separated list of bluetooth, wifi, and cell. -->
     <string name="def_airplane_mode_radios" translatable="false">cell,bluetooth,wifi,nfc,wimax</string>
     <string name="airplane_mode_toggleable_radios" translatable="false">bluetooth,wifi,nfc</string>
+<!-- QUALCOMM_CMCC_START -->
+    <string name="cmcc_airplane_mode_toggleable_radios" translatable="false">nfc</string>
+<!-- QUALCOMM_CMCC_END -->
     <bool name="def_auto_time">true</bool>
     <bool name="def_auto_time_zone">true</bool>
     <bool name="def_accelerometer_rotation">true</bool>
@@ -172,10 +175,21 @@
     <!-- Development settings -->
     <bool name="def_stay_on_while_plugged_in">false</bool>
 
+<string name="def_default_input_method">com.android.inputmethod.latin/.LatinIME</string>
     <!-- Number of retries for connecting to DHCP.
          Value here is the same as WifiStateMachine.DEFAULT_MAX_DHCP_RETRIES -->
     <integer name="def_max_dhcp_retries">9</integer>
 
     <!-- Default for Settings.Secure.USER_SETUP_COMPLETE -->
     <bool name="def_user_setup_complete">false</bool>
+
+    <!-- Default for Settings.System.KEY_BACKLIGHT-->
+    <integer name="def_key_backlight_values">1</integer>
+
+    <!-- Default for Settings.Secure.PROXIMITY_SENSOR -->
+    <bool name="def_proximity_sensor">true</bool>
+
+    <!-- Default for Settings.Secure.VIBRATE_AFTER_CONNECTED -->
+    <bool name="def_vibrate_after_connected">true</bool>
+
 </resources>

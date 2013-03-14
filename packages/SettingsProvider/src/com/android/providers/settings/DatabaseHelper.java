@@ -479,8 +479,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             try {
                 stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                         + " VALUES(?,?);");
-                loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                        R.string.airplane_mode_toggleable_radios);
+				if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.cmcc_airplane_mode_toggleable_radios);					
+				} else {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.airplane_mode_toggleable_radios);
+				}
                 db.setTransactionSuccessful();
             } finally {
                 db.endTransaction();
@@ -775,8 +780,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         + Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS + "'");
                 stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                         + " VALUES(?,?);");
-                loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                        R.string.airplane_mode_toggleable_radios);
+				if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.cmcc_airplane_mode_toggleable_radios);					
+				} else {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.airplane_mode_toggleable_radios);
+                }
                 db.setTransactionSuccessful();
             } finally {
                 db.endTransaction();
@@ -993,8 +1003,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Add RADIO_NFC to AIRPLANE_MODE_RADIO and AIRPLANE_MODE_TOGGLEABLE_RADIOS
             String airplaneRadios = mContext.getResources().getString(
                     R.string.def_airplane_mode_radios);
-            String toggleableRadios = mContext.getResources().getString(
-                    R.string.airplane_mode_toggleable_radios);
+			String toggleableRadios;
+			if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                toggleableRadios = mContext.getResources().getString(
+                        R.string.cmcc_airplane_mode_toggleable_radios);
+			} else {
+                toggleableRadios = mContext.getResources().getString(
+                        R.string.airplane_mode_toggleable_radios);
+			}
             db.beginTransaction();
             try {
                 db.execSQL("UPDATE system SET value='" + airplaneRadios + "' " +
@@ -1946,6 +1962,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                     + " VALUES(?,?);");
 
+            loadSetting(stmt, Settings.System.MULTI_SIM_COUNTDOWN, 5);
+            loadSetting(stmt, Settings.System.CALLBACK_PRIORITY_ENABLED, FeatureQuery.FEATURE_UX_SETTINGS_PREFERREDCALLBACK ? 1: 0);
+
             loadBooleanSetting(stmt, Settings.System.DIM_SCREEN,
                     R.bool.def_dim_screen);
             loadIntegerSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT,
@@ -1980,6 +1999,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadIntegerSetting(stmt, Settings.System.POINTER_SPEED,
                     R.integer.def_pointer_speed);
+
+            loadSetting(stmt, Settings.System.SHOW_DURATION,
+                    FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
+
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
+
+            loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
+                    R.bool.def_proximity_sensor);
+        
+            loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
+                    R.bool.def_vibrate_after_connected);
+
         } finally {
             if (stmt != null) stmt.close();
         }
@@ -2119,14 +2151,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_RADIOS,
                     R.string.def_airplane_mode_radios);
 
-            loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                    R.string.airplane_mode_toggleable_radios);
+            if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                        R.string.cmcc_airplane_mode_toggleable_radios);
+            } else {
+                loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                        R.string.airplane_mode_toggleable_radios);
+            }
 
             loadBooleanSetting(stmt, Settings.Global.ASSISTED_GPS_ENABLED,
                     R.bool.assisted_gps_enabled);
     
-	     loadIntegerSetting(stmt, Settings.Global.PREF_ASSISTED_GPS_TYPE,
-				  R.integer.def_pref_assisted_gps_type);
+            loadIntegerSetting(stmt, Settings.Global.PREF_ASSISTED_GPS_TYPE,
+                    R.integer.def_pref_assisted_gps_type);
 
             /* add for AGPS parameters settings. Begin*/
             loadStringSetting(stmt, Settings.Global.SUPL_HOST,
