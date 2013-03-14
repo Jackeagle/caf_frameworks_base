@@ -1679,7 +1679,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     if (SPEW) Slog.d(TAG, "animateExpand: mUserSetup=" + mUserSetup);
 
         // Settings are not available in setup
-        if (!mUserSetup) return;
+       // if (!mUserSetup) return;
 
         if (mHasFlipSettings) {
             mNotificationPanel.expand();
@@ -1696,7 +1696,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     public void switchToSettings() {
         // Settings are not available in setup
          if (SPEW) Slog.d(TAG, "switchToSettings: mUserSetup=" + mUserSetup);
-        if (!mUserSetup) return;
+       // if (!mUserSetup) return;
 
         mFlipSettingsView.setScaleX(1f);
         mFlipSettingsView.setVisibility(View.VISIBLE);
@@ -1712,7 +1712,7 @@ public class PhoneStatusBar extends BaseStatusBar {
         // Settings are not available in setup
         
 	 if (SPEW) Slog.d(TAG, "flipToSettings: mUserSetup=" + mUserSetup);
-        if (!mUserSetup) return;
+       // if (!mUserSetup) return;
 	 
         if (mFlipSettingsViewAnim != null) mFlipSettingsViewAnim.cancel();
         if (mScrollViewAnim != null) mScrollViewAnim.cancel();
