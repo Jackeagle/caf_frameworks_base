@@ -40,7 +40,7 @@ import android.util.FloatMath;
 import android.util.Slog;
 import android.util.Spline;
 import android.util.TimeUtils;
-
+import android.provider.Settings;
 import java.io.PrintWriter;
 
 /**
@@ -341,6 +341,8 @@ final class DisplayPowerController {
     // Twilight changed.  We might recalculate auto-brightness values.
     private boolean mTwilightChanged;
 
+    //Add context for lcd brightness control by proximity when calling . -- a-xst
+    private Context mContext ;
     /**
      * Creates the display power controller.
      */
@@ -358,6 +360,8 @@ final class DisplayPowerController {
         mLights = lights;
         //add button back light control function . --xst
         mButtonLight = mLights.getLight(LightsService.LIGHT_ID_BUTTONS);
+        //Add context for lcd brightness control by proximity when calling . -- a-xst
+        mContext = context;
         mTwilight = twilight;
         mSensorManager = sensorManager;
         mDisplayManager = displayManager;
@@ -841,7 +845,11 @@ final class DisplayPowerController {
         if (mPendingProximity == PROXIMITY_POSITIVE && positive) {
             return; // no change
         }
-
+        //Add for switch the lcd brightness when calling . -- a-xst .
+        int proximityFlag = Settings.System.getInt(mContext.getContentResolver(),Settings.System.PROXIMITY_SENSOR, 1);
+        if (proximityFlag == 0) {
+            return;
+        }
         // Only accept a proximity sensor reading if it remains
         // stable for the entire debounce delay.
         mHandler.removeMessages(MSG_PROXIMITY_SENSOR_DEBOUNCED);

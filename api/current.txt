@@ -2980,6 +2980,7 @@ package android.app {
 
   public class AlarmManager {
     method public void cancel(android.app.PendingIntent);
+    method public int getPowerOnReason();
     method public void set(int, long, android.app.PendingIntent);
     method public void setInexactRepeating(int, long, long, android.app.PendingIntent);
     method public void setRepeating(int, long, long, android.app.PendingIntent);
@@ -2993,6 +2994,7 @@ package android.app {
     field public static final long INTERVAL_HALF_HOUR = 1800000L; // 0x1b7740L
     field public static final long INTERVAL_HOUR = 3600000L; // 0x36ee80L
     field public static final int RTC = 1; // 0x1
+    field public static final int RTC_POWEROFF_WAKEUP = 4; // 0x4
     field public static final int RTC_WAKEUP = 0; // 0x0
   }
 
@@ -16001,6 +16003,7 @@ package android.os {
     method public static java.io.File getExternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getExternalStorageState();
     method public static java.io.File getInternalStorageDirectory();
+    method public static java.io.File getInternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getInternalStorageState();
     method public static java.io.File getRootDirectory();
     method public static boolean isExternalStorageEmulated();
@@ -19060,6 +19063,7 @@ package android.provider {
     field public static final java.lang.String VOLUME_VOICE = "volume_voice";
     field public static final deprecated java.lang.String WAIT_FOR_DEBUGGER = "wait_for_debugger";
     field public static final deprecated java.lang.String WALLPAPER_ACTIVITY = "wallpaper_activity";
+    field public static final java.lang.String WIFI_BROWSER_INTERACTION_REMIND_TYPE = "wifi_browser_interaction_remind";
     field public static final deprecated java.lang.String WIFI_MAX_DHCP_RETRY_COUNT = "wifi_max_dhcp_retry_count";
     field public static final deprecated java.lang.String WIFI_MOBILE_DATA_TRANSITION_WAKELOCK_TIMEOUT_MS = "wifi_mobile_data_transition_wakelock_timeout_ms";
     field public static final deprecated java.lang.String WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON = "wifi_networks_available_notification_on";
@@ -20828,6 +20832,7 @@ package android.telephony {
     method public static boolean compare(java.lang.String, java.lang.String);
     method public static boolean compare(android.content.Context, java.lang.String, java.lang.String);
     method public static java.lang.String convertKeypadLettersToDigits(java.lang.String);
+    method public static java.lang.String convertKeypadLettersToDigitsExt(java.lang.String);
     method public static java.lang.String extractNetworkPortion(java.lang.String);
     method public static java.lang.String extractPostDialPortion(java.lang.String);
     method public static void formatJapaneseNumber(android.text.Editable);
@@ -20950,6 +20955,7 @@ package android.telephony {
     method public static int[] calculateLength(java.lang.CharSequence, boolean);
     method public static int[] calculateLength(java.lang.String, boolean);
     method public static android.telephony.SmsMessage createFromPdu(byte[]);
+    method public static android.telephony.SmsMessage.DeliveryPdu getDeliveryPdu(java.lang.String, java.lang.String, java.lang.String, boolean, byte[]);
     method public java.lang.String getDisplayMessageBody();
     method public java.lang.String getDisplayOriginatingAddress();
     method public java.lang.String getEmailBody();
@@ -20988,6 +20994,11 @@ package android.telephony {
     field public static final int MAX_USER_DATA_BYTES_WITH_HEADER = 134; // 0x86
     field public static final int MAX_USER_DATA_SEPTETS = 160; // 0xa0
     field public static final int MAX_USER_DATA_SEPTETS_WITH_HEADER = 153; // 0x99
+  }
+
+  public static class SmsMessage.DeliveryPdu {
+    field public byte[] encodedMessage;
+    field public byte[] encodedScAddress;
   }
 
   public static final class SmsMessage.MessageClass extends java.lang.Enum {
@@ -23077,6 +23088,7 @@ package android.text.util {
     ctor public Linkify();
     method public static final boolean addLinks(android.text.Spannable, int);
     method public static final boolean addLinks(android.widget.TextView, int);
+    method public static final boolean addLinks(android.text.Spannable, int, java.lang.String, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String, android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter);
     method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String);
@@ -29719,6 +29731,7 @@ package android.widget {
     method public void setSingleLine();
     method public void setSingleLine(boolean);
     method public final void setSpannableFactory(android.text.Spannable.Factory);
+    method public void setTelUrl(java.lang.String);
     method public final void setText(java.lang.CharSequence);
     method public void setText(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public final void setText(char[], int, int);
@@ -29737,6 +29750,7 @@ package android.widget {
     method public final void setTransformationMethod(android.text.method.TransformationMethod);
     method public void setTypeface(android.graphics.Typeface, int);
     method public void setTypeface(android.graphics.Typeface);
+    method public void setWebUrl(java.lang.String);
     method public void setWidth(int);
   }
 

@@ -320,7 +320,7 @@ public class CMCCSignalClusterView
         int radioTechnology = mServiceState.getRadioTechnology();
         Log.i(TAG,":radio technology is:"+mServiceState.getRadioTechnology());
         if(radioTechnology == 0)
-        radioTechnology = mServiceState.getRilRadioTechnology();//getVoiceRadioTechnology
+        radioTechnology = mServiceState.getVoiceRadioTechnology();// getRilRadioTechnology
         switch (radioTechnology) {
         case ServiceState.RIL_RADIO_TECHNOLOGY_IS95A:
         case ServiceState.RIL_RADIO_TECHNOLOGY_IS95B:

@@ -131,8 +131,8 @@ import java.util.ArrayList;
 
 public class PhoneStatusBar extends BaseStatusBar {
     static final String TAG = "PhoneStatusBar";
-    public static final boolean DEBUG = BaseStatusBar.DEBUG;
-    public static final boolean SPEW = DEBUG;
+    public static final boolean DEBUG = true;//BaseStatusBar.DEBUG;
+    public static final boolean SPEW = true;//DEBUG;
     public static final boolean DUMPTRUCK = true; // extra dumpsys info
     public static final boolean DEBUG_GESTURES = false;
 
@@ -349,7 +349,7 @@ public class PhoneStatusBar extends BaseStatusBar {
                     Settings.Secure.USER_SETUP_COMPLETE,
                     0 /*default */,
                     mCurrentUserId);
-            if (MULTIUSER_DEBUG) Slog.d(TAG, String.format("User setup changed: " +
+            if (true) Slog.d(TAG, String.format("User setup changed: " +
                     "selfChange=%s userSetup=%s mUserSetup=%s",
                     selfChange, userSetup, mUserSetup));
             if (mSettingsButton != null && mHasFlipSettings) {
@@ -1676,9 +1676,10 @@ public class PhoneStatusBar extends BaseStatusBar {
         if ((mDisabled & StatusBarManager.DISABLE_EXPAND) != 0) {
             return;
         }
+    if (SPEW) Slog.d(TAG, "animateExpand: mUserSetup=" + mUserSetup);
 
         // Settings are not available in setup
-        if (!mUserSetup) return;
+       // if (!mUserSetup) return;
 
         if (mHasFlipSettings) {
             mNotificationPanel.expand();
@@ -1694,7 +1695,8 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public void switchToSettings() {
         // Settings are not available in setup
-        if (!mUserSetup) return;
+         if (SPEW) Slog.d(TAG, "switchToSettings: mUserSetup=" + mUserSetup);
+       // if (!mUserSetup) return;
 
         mFlipSettingsView.setScaleX(1f);
         mFlipSettingsView.setVisibility(View.VISIBLE);
@@ -1708,8 +1710,10 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public void flipToSettings() {
         // Settings are not available in setup
-        if (!mUserSetup) return;
-
+        
+	 if (SPEW) Slog.d(TAG, "flipToSettings: mUserSetup=" + mUserSetup);
+       // if (!mUserSetup) return;
+	 
         if (mFlipSettingsViewAnim != null) mFlipSettingsViewAnim.cancel();
         if (mScrollViewAnim != null) mScrollViewAnim.cancel();
         if (mSettingsButtonAnim != null) mSettingsButtonAnim.cancel();
@@ -2826,7 +2830,7 @@ private View.OnClickListener mSwitchApnListener = new View.OnClickListener() {
 	*/
    private class ApnSwitch {
 	   private final String DEFAULT = "default";
-	   private final String WAP = "wap";
+        private final String CTWAP = "ctwap";
 
 	   private final Uri PREFERAPN_URI = Uri.parse("content://telephony/carriers/preferapn");
 	   private final String APN_ID = "apn_id";
@@ -2921,7 +2925,7 @@ private View.OnClickListener mSwitchApnListener = new View.OnClickListener() {
 				   apn.apn = cursor.getString(INDEX_APN);
 				   apn.type = cursor.getString(INDEX_TYPE);
 
-				   boolean selectable = ((apn.type == null) || !apn.type.equals("mms"));
+                    boolean selectable = ((apn.type == null) || !(apn.type.equals("mms")||apn.type.equals("dm")));
 				   if (!selectable) {
 					   // if the type is mms, we needn't to handle it.
 					   continue;
@@ -2962,7 +2966,7 @@ private View.OnClickListener mSwitchApnListener = new View.OnClickListener() {
 					   for (int i = 0; i < apnList.size(); i++) {
 						   Apn apn = apnList.get(i);
 						   if (apn.type != null && apn.type.contains(DEFAULT)
-								   && apn.apn != null && apn.apn.contains(WAP)) {
+                               && apn.apn != null && apn.apn.contains(CTWAP)) {
 							   switchToNextApn(apn);
 						   }
 					   }
