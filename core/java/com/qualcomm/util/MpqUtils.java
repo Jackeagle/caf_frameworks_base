@@ -46,9 +46,50 @@ public class MpqUtils {
 
    // file path to read the SOC ID
    private static final String SOC_ID_PATH = "/sys/devices/system/soc/soc0/id";
+   // file path to read the hardware platform
+   private static final String HW_PLATFORM_PATH = "/sys/devices/system/soc/soc0/hw_platform";
 
    // store the already read SOC ID
    private static int mSocIdValue;
+   private static String mHarwarePlatform;
+
+   public static String readHardwarePlatform() {
+      BufferedReader br = null;
+      String hwPlatform = null;
+
+      if (mHarwarePlatform != null) {
+         Log.d(TAG, "Already read hardware platform : " + mHarwarePlatform);
+         return mHarwarePlatform;
+      }
+
+      try {
+         br = new BufferedReader(new FileReader(HW_PLATFORM_PATH));
+         hwPlatform = br.readLine();
+
+         while (hwPlatform != null) {
+            mHarwarePlatform = new String(hwPlatform);
+            hwPlatform = br.readLine();
+         }
+
+         // Print the content on the console
+         Log.d(TAG, "Read hardware platform : " + mHarwarePlatform);
+
+      } catch (FileNotFoundException e) {
+         Log.e(TAG, e.toString());
+      } catch (Exception e) {
+         Log.e(TAG, e.toString());
+      }
+
+      finally {
+         try {
+            br.close();
+         } catch (Exception e) {
+            Log.e(TAG, e.toString());
+         }
+      }
+
+      return mHarwarePlatform;
+   }
 
    public static boolean isTargetMpq() {
       boolean retVal = false;
