@@ -117,6 +117,7 @@ public class UsbStorageActivity extends Activity
                     internalToastOff =false;
                     Toast.makeText(UsbStorageActivity.this, com.android.systemui.R.string.internal_storage_turn_on, Toast.LENGTH_SHORT).show();
                 }
+            switchDisplay(isAllStorageShared());
             }
             if (off) {
                 if (isExternalPath && !externalToastOff) {
@@ -129,8 +130,8 @@ public class UsbStorageActivity extends Activity
                     internalToastOff = true;
                     Toast.makeText(UsbStorageActivity.this, com.android.systemui.R.string.internal_storage_turn_off, Toast.LENGTH_SHORT).show();
                 }
-            }
             switchDisplay(isAllStorageShared());
+            }
         }
     };
     
@@ -188,7 +189,8 @@ public class UsbStorageActivity extends Activity
 
     private boolean isAllStorageShared() {
         return (Environment.getExternalStorageState().equals(Environment.MEDIA_SHARED) ||
-                Environment.getExternalStorageState().equals(Environment.MEDIA_REMOVED)) &&
+                Environment.getExternalStorageState().equals(Environment.MEDIA_REMOVED)||
+                Environment.getExternalStorageState().equals(Environment.MEDIA_BAD_REMOVAL)) &&
                 Environment.getInternalStorageState().equals(Environment.MEDIA_SHARED);
     }
 
@@ -204,7 +206,7 @@ public class UsbStorageActivity extends Activity
 
     private void switchDisplayAsync(boolean usbStorageInUse) {
         if (localLOGV)Log.d(TAG,"switchDisplayAsync mEnableUMS="+mEnableUMS);
-        if (usbStorageInUse) {
+        if (usbStorageInUse ||   (mStorageManager.isUsbMassStorageEnabled() == true) ) {
             mProgressBar.setVisibility(View.GONE);
             mUnmountButton.setVisibility(View.VISIBLE);
             mMountButton.setVisibility(View.GONE);
@@ -392,7 +394,7 @@ public class UsbStorageActivity extends Activity
     public void onClick(View v) {
         if (v == mMountButton) {
             // wait for umount operation was done, otherwise drop this click.
-            if (mStorageManager.isUsbMassStorageEnabled() == false) {
+            if (true || mStorageManager.isUsbMassStorageEnabled() == false) {
                 // Check for list of storage users and display dialog if needed.
                 checkStorageUsers();
             }
