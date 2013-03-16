@@ -73,7 +73,7 @@ public class UsbStorageActivity extends Activity
     private StorageManager mStorageManager = null;
     private static final int DLG_CONFIRM_KILL_STORAGE_USERS = 1;
     private static final int DLG_ERROR_SHARING = 2;
-    static final boolean localLOGV = false;
+    static final boolean localLOGV = true;
     static boolean mUsbIsConnected = false;
     private boolean mDestroyed;
     protected KeyguardManager mKeyguardManager;
@@ -137,7 +137,7 @@ public class UsbStorageActivity extends Activity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        if (localLOGV)Log.d(TAG,"onCreate");
         if (mStorageManager == null) {
             mStorageManager = (StorageManager) getSystemService(Context.STORAGE_SERVICE);
             if (mStorageManager == null) {
@@ -169,12 +169,14 @@ public class UsbStorageActivity extends Activity
         mUnmountButton.setOnClickListener(this);
         mProgressBar = (ProgressBar) findViewById(com.android.internal.R.id.progress);
         //Move registerReceiver to onCreate so that it can keep onsistency in onDestroy
+        mEnableUMS = false;
         registerReceiver(mUsbStateReceiver, new IntentFilter(UsbManager.ACTION_USB_STATE));
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (localLOGV)Log.d(TAG,"onDestroy");
         // unregisterReceiver here so that
         // 1. ACTION_USB_STATE can be received when this UI is overlayed by LockScreen
         // 2. resource can be released
@@ -191,6 +193,7 @@ public class UsbStorageActivity extends Activity
     }
 
     private void switchDisplay(final boolean usbStorageInUse) {
+        if (localLOGV)Log.d(TAG,"switchDisplay usbStorageInUse="+usbStorageInUse);
         mUIHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -200,6 +203,7 @@ public class UsbStorageActivity extends Activity
     }
 
     private void switchDisplayAsync(boolean usbStorageInUse) {
+        if (localLOGV)Log.d(TAG,"switchDisplayAsync mEnableUMS="+mEnableUMS);
         if (usbStorageInUse) {
             mProgressBar.setVisibility(View.GONE);
             mUnmountButton.setVisibility(View.VISIBLE);
@@ -237,6 +241,9 @@ public class UsbStorageActivity extends Activity
             mAsyncStorageHandler.post(new Runnable() {
                 @Override
                 public void run() {
+                    if(!isAllStorageShared()){
+                        mEnableUMS = false;
+                    }
                     switchDisplay(isAllStorageShared());
                 }
             });
@@ -310,6 +317,7 @@ public class UsbStorageActivity extends Activity
     }
 
     private void switchUsbMassStorage(final boolean on) {
+        if (localLOGV)Log.d(TAG,"switchUsbMassStorage on="+on);
         // things to do on the UI thread
         mUIHandler.post(new Runnable() {
             @Override
@@ -338,6 +346,7 @@ public class UsbStorageActivity extends Activity
     }
 
     private void checkStorageUsers() {
+        if (localLOGV)Log.d(TAG,"checkStorageUsers");
         mAsyncStorageHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -347,6 +356,7 @@ public class UsbStorageActivity extends Activity
     }
 
     private void checkStorageUsersAsync() {
+        if (localLOGV)Log.d(TAG,"checkStorageUsersAsync");
         IMountService ims = getMountService();
         if (ims == null) {
             // Display error dialog
