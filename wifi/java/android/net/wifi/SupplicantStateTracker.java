@@ -28,6 +28,7 @@ import android.os.Parcelable;
 import android.os.UserHandle;
 import android.util.Log;
 
+import com.qrd.plugin.feature_query.FeatureQuery;
 /**
  * Tracks the state changes in supplicant and provides functionality
  * that is based on these state changes:
@@ -225,6 +226,15 @@ class SupplicantStateTracker extends StateMachine {
              Message message = getCurrentMessage();
              StateChangeResult stateChangeResult = (StateChangeResult) message.obj;
 
+//QUALCOMM_CMCC_START
+            if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                 if (mNetworksDisabledDuringConnect) {
+                     mWifiConfigStore.enableAllNetworks();
+                     mNetworksDisabledDuringConnect = false;
+                 }
+            }
+//QUALCOMM_CMCC_END
+
              if (mAuthenticationFailuresCount >= MAX_RETRIES_ON_AUTHENTICATION_FAILURE) {
                  Log.d(TAG, "Failed to authenticate, disabling network " +
                          stateChangeResult.networkId);
@@ -331,6 +341,14 @@ class SupplicantStateTracker extends StateMachine {
         @Override
         public void enter() {
             if (DBG) Log.d(TAG, getName() + "\n");
+//QUALCOMM_CMCC_START
+			if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                if (mNetworksDisabledDuringConnect) {
+                    mWifiConfigStore.enableAllNetworks();
+                    mNetworksDisabledDuringConnect = false;
+                }
+			}
+//QUALCOMM_CMCC_END
         }
     }
 }
