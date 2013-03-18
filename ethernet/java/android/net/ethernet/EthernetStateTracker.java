@@ -34,6 +34,7 @@ import android.net.LinkCapabilities;
 import android.net.LinkProperties;
 import android.net.ConnectivityManager;
 import android.net.DhcpInfoInternal;
+import android.net.DhcpInfo;
 import android.net.NetworkStateTracker;
 import android.net.NetworkUtils;
 import android.net.LinkCapabilities;
@@ -144,6 +145,25 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         return true;
     }
 
+
+    private static int stringToIpAddr(String addrString) throws UnknownHostException {
+	    try {
+		    if (addrString == null)
+			    return 0;
+		    String[] parts = addrString.split("\\.");
+		    if (parts.length != 4) {
+			    throw new UnknownHostException(addrString);
+		    }
+		    int a = Integer.parseInt(parts[0])      ;
+		    int b = Integer.parseInt(parts[1]) <<  8;
+		    int c = Integer.parseInt(parts[2]) << 16;
+		    int d = Integer.parseInt(parts[3]) << 24;
+		    return a | b | c | d;
+	    } catch (NumberFormatException ex) {
+		    throw new UnknownHostException(addrString);
+	    }
+    }
+
     private boolean configureInterface(EthernetDevInfo info) throws UnknownHostException {
         mStackConnected = false;
         mHWConnected = false;
@@ -158,32 +178,24 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
 
             mDhcpTarget.sendEmptyMessage(EVENT_DHCP_START);
         } else {
-/* HFM
-            int event;
-            sDnsPropNames = new String[] {
-                "net." + mInterfaceName + ".dns1",
-                "net." + mInterfaceName + ".dns2"
-             };
-            mDhcpInfo.ipAddress = lookupHost(info.getIpAddress());
-            mDhcpInfo.gateway = lookupHost(info.getRouteAddr());
-            mDhcpInfo.netmask = lookupHost(info.getNetMask());
-            mDhcpInfo.dns1 = lookupHost(info.getDnsAddr());
-            mDhcpInfo.dns2 = 0;
 
-            if (localLOGV) Slog.i(TAG, "set ip manually " + mDhcpInfo.toString());
-            NetworkUtils.removeDefaultRoute(info.getIfName());
-            if (NetworkUtils.configureInterface(info.getIfName(), mDhcpInfo)) {
-                event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
-                SystemProperties.set("net.dns1", info.getDnsAddr());
-		SystemProperties.set("net." + info.getIfName() + ".dns1", info.getDnsAddr());
-		SystemProperties.set("net." + info.getIfName() + ".dns2", "0.0.0.0");
-                if (localLOGV) Slog.v(TAG, "Static IP configuration succeeded");
-            } else {
-                event = EVENT_INTERFACE_CONFIGURATION_FAILED;
-                if (localLOGV) Slog.w(TAG, "Static IP configuration failed");
-            }
-            this.sendEmptyMessage(event);
-*/
+		int event;
+		DhcpInfo tempDhcpInfo = new DhcpInfo();
+		tempDhcpInfo.ipAddress =  stringToIpAddr(info.getIpAddress());
+		tempDhcpInfo.gateway = stringToIpAddr(info.getRouteAddr());
+		tempDhcpInfo.netmask = stringToIpAddr(info.getNetMask());
+		tempDhcpInfo.dns1 = stringToIpAddr(info.getDnsAddr());
+		tempDhcpInfo.dns2 = 0;
+		Log.i(TAG, "set ip manually " + tempDhcpInfo.toString());
+		NetworkUtils.removeDefaultRoute(info.getIfName());
+		if (NetworkUtils.configureInterface(info.getIfName(), tempDhcpInfo)) {
+			event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
+				Log.v(TAG, "Static IP configuration succeeded");
+			} else {
+				event = EVENT_INTERFACE_CONFIGURATION_FAILED;
+				Log.v(TAG, "Static IP configuration failed");
+			}
+			this.sendEmptyMessage(event);
         }
         return true;
     }
@@ -212,6 +224,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                         if (localLOGV) Slog.w(TAG, "Could not stop DHCP");
                     }
                     mLinkProperties.clear();
+                    if (localLOGV) Slog.i(TAG, "Try to configure interface " + mInterfaceName);
                     configureInterface(info);
                 }
             }
