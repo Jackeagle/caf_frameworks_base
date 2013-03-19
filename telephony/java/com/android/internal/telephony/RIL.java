@@ -48,6 +48,7 @@ import android.os.PowerManager;
 import android.os.SystemProperties;
 import android.os.RegistrantList;
 import android.os.PowerManager.WakeLock;
+import android.provider.Settings.SettingNotFoundException;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.SignalStrength;
@@ -96,6 +97,7 @@ class RILRequest {
     private static RILRequest sPool = null;
     private static int sPoolSize = 0;
     private static final int MAX_POOL_SIZE = 4;
+    private Context mContext;
 
     //***** Instance Variables
     int mSerial;
@@ -677,6 +679,7 @@ public final class RIL extends BaseCommands implements CommandsInterface {
             riljLog("RIL(context, preferredNetworkType=" + preferredNetworkType +
                     " cdmaSubscription=" + cdmaSubscription + ")");
         }
+        mContext = context;
         mCdmaSubscription  = cdmaSubscription;
         mPreferredNetworkType = preferredNetworkType;
         mPhoneType = RILConstants.NO_PHONE;
@@ -2135,6 +2138,15 @@ public final class RIL extends BaseCommands implements CommandsInterface {
      */
     @Override
     public void setCurrentPreferredNetworkType() {
+        try {
+            mSetPreferredNetworkType = android.provider.Settings.Secure.getIntAtIndex(
+                    mContext.getContentResolver(),
+                    android.provider.Settings.Secure.PREFERRED_NETWORK_MODE,
+                    mInstanceId);
+        } catch (SettingNotFoundException snfe) {
+            if (RILJ_LOGD) riljLog("Could not find PREFERRED_NETWORK_MODE!!! in database");
+            mSetPreferredNetworkType = mPreferredNetworkType;
+        }
         if (RILJ_LOGD) riljLog("setCurrentPreferredNetworkType: " + mSetPreferredNetworkType);
         setPreferredNetworkType(mSetPreferredNetworkType, null);
     }
