@@ -654,7 +654,7 @@ public class WifiService extends IWifiManager.Stub {
 
 		if (enable && mAirplaneModeOn.get() && !isAirplaneToggleable()){
 			Slog.d(TAG, "setWifiEnabled: false in airplaneMode");
-            enable = false;
+			return true;
 		}
 
         if (DBG) {
