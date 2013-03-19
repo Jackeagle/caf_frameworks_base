@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -106,7 +109,7 @@ public class HTML5VideoFullScreen extends HTML5VideoView
                 mMediaController.show();
             }
             if (mProxy != null)
-                mProxy.dispatchOnAvailableVideoFrame();
+                mProxy.dispatchOnVideoFrameAvailable();
         }
 
         @Override

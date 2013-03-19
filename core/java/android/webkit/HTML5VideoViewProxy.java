@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
- * Not a Contribution, Apache license notifications and license are retained
- * for attribution purposes only.
+ * Not a Contribution.
  *
  * Copyright (C) 2009 The Android Open Source Project
  *
@@ -68,6 +67,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int BUFFERING_END       = 106;
     private static final int ENTER_FULLSCREEN    = 107;
     private static final int SET_VISIBILITY      = 108;
+    private static final int VIDEO_FRAME_AVAILABLE_ACK = 109;
 
     // Message Ids to be handled on the WebCore thread
     private static final int PREPARED          = 200;
@@ -76,7 +76,7 @@ class HTML5VideoViewProxy extends Handler
     private static final int PAUSED            = 203;
     private static final int STOPFULLSCREEN    = 204;
     private static final int RESTORESTATE      = 205;
-    private static final int AVAILABLE_VIDEO_FRAME = 206;
+    private static final int VIDEO_FRAME_AVAILABLE = 206;
 
     // Timer thread -> UI thread
     private static final int TIMEUPDATE = 300;
@@ -109,6 +109,17 @@ class HTML5VideoViewProxy extends Handler
 
         private static boolean isVideoSelfEnded = false;
 
+        // Define states for when browser has exited fullscreen.
+        // These are used to determine whether to resume video playback
+        // after exiting fullscreen.
+        static final int EXIT_FULLSCREEN_STATE_NONE = 0;
+        // Video exited fullscreen mode in playing state
+        static final int EXIT_FULLSCREEN_STATE_PLAYING = 1;
+        // Video exited fullscreen mode in playing state but was paused
+        // before it resumed in inline mode.
+        static final int EXIT_FULLSCREEN_STATE_PAUSED = 2;
+        private static int mExitFullscreenState = EXIT_FULLSCREEN_STATE_NONE;
+
         private static void setPlayerBuffering(boolean playerBuffering) {
             mHTML5VideoView.setPlayerBuffering(playerBuffering);
         }
@@ -134,7 +145,7 @@ class HTML5VideoViewProxy extends Handler
                             layer, currentVideoLayerId, textureName,
                             playerState);
                     if (playerState >= HTML5VideoView.STATE_PREPARED
-                            && !foundInTree) {
+                            && !foundInTree && mCurrentProxy.getVideoFrameAvailable()) {
                         mHTML5VideoView.pauseAndDispatch(mCurrentProxy);
                     }
                 }
@@ -153,6 +164,9 @@ class HTML5VideoViewProxy extends Handler
         // When a WebView is paused, we also want to pause the video in it.
         public static void pauseAndDispatch() {
             if (mHTML5VideoView != null) {
+                // Check if video was paused after it exited fullscreen in playing state
+                if (mExitFullscreenState == VideoPlayer.EXIT_FULLSCREEN_STATE_PLAYING)
+                    mExitFullscreenState = VideoPlayer.EXIT_FULLSCREEN_STATE_PAUSED;
                 mHTML5VideoView.pauseAndDispatch(mCurrentProxy);
             }
         }
@@ -216,6 +230,13 @@ class HTML5VideoViewProxy extends Handler
                 currentVideoLayerId = mHTML5VideoView.getVideoLayerId();
                 backFromFullScreenMode = mHTML5VideoView.fullScreenExited();
 
+                if (currentVideoLayerId != videoLayerId) {
+                    // Reset mVideoFrameAvailable on the new proxy whenever
+                    // there is a change in video layer ID to clear the previous
+                    // frame available status for the proxy.
+                    proxy.setVideoFrameAvailable(false);
+                }
+
                 // When playing video back to back in full screen mode,
                 // javascript will switch the src and call play.
                 // In this case, we can just reuse the same full screen view,
@@ -258,7 +279,6 @@ class HTML5VideoViewProxy extends Handler
             if (createInlineView) {
                 mCurrentProxy = proxy;
                 mHTML5VideoView = new HTML5VideoInline(videoLayerId, time, skipPrepare);
-
                 mHTML5VideoView.setVideoURI(url, mCurrentProxy);
                 mHTML5VideoView.prepareDataAndDisplayMode(proxy);
                 return;
@@ -304,9 +324,14 @@ class HTML5VideoViewProxy extends Handler
         }
 
         public static void onPrepared() {
-            if (!mHTML5VideoView.isFullScreenMode()) {
+            // Start the video playback only if the video was not paused
+            // while exiting fullscreen mode
+            if (!mHTML5VideoView.isFullScreenMode() &&
+                mExitFullscreenState != VideoPlayer.EXIT_FULLSCREEN_STATE_PAUSED) {
                 mHTML5VideoView.start();
             }
+            // Reset the exit fullscreen state after media is prepared
+            mExitFullscreenState = VideoPlayer.EXIT_FULLSCREEN_STATE_NONE;
             updateVideoLayerPlayerState();
         }
 
@@ -366,12 +391,19 @@ class HTML5VideoViewProxy extends Handler
         mWebCoreHandler.sendMessage(msg);
     }
 
-    public void dispatchOnAvailableVideoFrame() {
+    public void dispatchOnVideoFrameAvailable() {
         if (!mVideoFrameAvailable) {
-            mVideoFrameAvailable = true;
-            Message msg = Message.obtain(mWebCoreHandler, AVAILABLE_VIDEO_FRAME);
+            Message msg = Message.obtain(mWebCoreHandler, VIDEO_FRAME_AVAILABLE);
             mWebCoreHandler.sendMessage(msg);
         }
+    }
+
+    public boolean getVideoFrameAvailable() {
+        return mVideoFrameAvailable;
+    }
+
+    public void setVideoFrameAvailable(boolean available) {
+        mVideoFrameAvailable = available;
     }
 
     public void dispatchOnPaused() {
@@ -381,6 +413,9 @@ class HTML5VideoViewProxy extends Handler
 
     public void dispatchOnStopFullScreen(boolean stillPlaying) {
         Message msg = Message.obtain(mWebCoreHandler, STOPFULLSCREEN);
+        VideoPlayer.mExitFullscreenState = stillPlaying ?
+                VideoPlayer.EXIT_FULLSCREEN_STATE_PLAYING :
+                VideoPlayer.EXIT_FULLSCREEN_STATE_NONE;
         msg.arg1 = stillPlaying ? 1 : 0;
         mWebCoreHandler.sendMessage(msg);
     }
@@ -402,7 +437,7 @@ class HTML5VideoViewProxy extends Handler
             // TODO: This should support partial invalidation too.
             mWebView.invalidate();
         }
-        dispatchOnAvailableVideoFrame();
+        dispatchOnVideoFrameAvailable();
     }
 
     // Handler for the messages from WebCore or Timer thread to the UI thread.
@@ -476,6 +511,11 @@ class HTML5VideoViewProxy extends Handler
                 VideoPlayer.setMediaIsVisible(visible);
                 break;
             }
+            case VIDEO_FRAME_AVAILABLE_ACK:
+                // This needs to be set after nativeOnVideoFrameAvailable
+                // has been called on the WebCore thread.
+                setVideoFrameAvailable(true);
+                break;
         }
     }
 
@@ -677,8 +717,9 @@ class HTML5VideoViewProxy extends Handler
                     case PAUSED:
                         nativeOnPaused(mNativePointer);
                         break;
-                    case AVAILABLE_VIDEO_FRAME:
-                        nativeOnAvailableVideoFrame(mNativePointer);
+                    case VIDEO_FRAME_AVAILABLE:
+                        nativeOnVideoFrameAvailable(mNativePointer);
+                        ackOnVideoFrameAvailable();
                         break;
                     case POSTER_FETCHED:
                         Bitmap poster = (Bitmap) msg.obj;
@@ -735,6 +776,12 @@ class HTML5VideoViewProxy extends Handler
         Message message = obtainMessage(PLAY);
         message.arg1 = videoLayerID;
         message.obj = url;
+        sendMessage(message);
+    }
+
+    private void ackOnVideoFrameAvailable() {
+        // Send message back to UI thread acknowledging the message
+        Message message = obtainMessage(VIDEO_FRAME_AVAILABLE_ACK);
         sendMessage(message);
     }
 
@@ -846,7 +893,7 @@ class HTML5VideoViewProxy extends Handler
     private native void nativeOnTimeupdate(int position, int nativePointer);
     private native void nativeOnStopFullscreen(int stillPlaying, int nativePointer);
     private native void nativeOnRestoreState(int nativePointer);
-    private native void nativeOnAvailableVideoFrame(int nativePointer);
+    private native void nativeOnVideoFrameAvailable(int nativePointer);
     private native static boolean nativeSendSurfaceTexture(SurfaceTexture texture,
             int baseLayer, int videoLayerId, int textureName,
             int playerState);
