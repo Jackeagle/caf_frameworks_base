@@ -940,13 +940,15 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     }
 
     private void performPoll(int flags) {
+        // try refreshing time source when stale
+        // forceRefresh will call the method InetAddress.getByName(), and this
+        // method will block the thread, so we move this out of the synchronized
+        // method, otherwise mStatsLock will not be released
+        if (mTime.getCacheAge() > mSettings.getTimeCacheMaxAge()) {
+            mTime.forceRefresh();
+        }
         synchronized (mStatsLock) {
             mWakeLock.acquire();
-
-            // try refreshing time source when stale
-            if (mTime.getCacheAge() > mSettings.getTimeCacheMaxAge()) {
-                mTime.forceRefresh();
-            }
 
             try {
                 performPollLocked(flags);
