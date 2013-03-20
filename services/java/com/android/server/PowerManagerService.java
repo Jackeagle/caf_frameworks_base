@@ -302,6 +302,8 @@ public class PowerManagerService extends IPowerManager.Stub
     private long mLastTouchDown;
     private int mTouchCycles;
 
+    private final ArrayList<Integer> mBlockedUids = new ArrayList<Integer>();
+
     // could be either static or controllable at runtime
     private static final boolean mSpew = false;
     private static boolean mSpewWl = false;
@@ -856,6 +858,14 @@ public class PowerManagerService extends IPowerManager.Stub
 
     public void acquireWakeLockLocked(int flags, IBinder lock, int uid, int pid, String tag,
             WorkSource ws) {
+        if(mBlockedUids.contains(new Integer(uid)) && uid != Process.myUid()) {
+            //wakelock acquisition for blocked uid, do not acquire.
+            if (mSpew) {
+                Slog.d(TAG, "uid is blocked not acquiring wakeLock flags=0x" +
+                    Integer.toHexString(flags) + " tag=" + tag + " uid=" + uid + " pid =" + pid);
+            }
+            return;
+        }
         if (mSpew || mSpewWl) {
             Slog.d(TAG, "acquireWakeLock flags=0x" +
                 Integer.toHexString(flags) + " tag=" + tag);
@@ -1013,20 +1023,24 @@ public class PowerManagerService extends IPowerManager.Stub
     public void updateBlockedUids(int uid, boolean isBlocked) {
         synchronized(mLocks){
             if (mSpew) Slog.v(TAG, "updateBlockedUids: uid = "+uid +"isBlocked = "+isBlocked);
-            for (int index=0; index < mLocks.size(); index++){
-                WakeLock wl = mLocks.get(index);
-                if(wl != null){
-                    if (wl.uid == uid || wl.uid == 1000){
-                        /* release the wakelock for the blocked uid and uid 1000(package android)
-                         * optimisation needs to be done to handle uid 1000 better.
-                        */
-                        if(isBlocked){
+            if(isBlocked) {
+                mBlockedUids.add(new Integer(uid));
+                for (int index=0; index < mLocks.size(); index++) {
+                    WakeLock wl = mLocks.get(index);
+                    if(wl != null) {
+                        if (wl.uid == uid || wl.uid == 1000) {
+                            /* release the wakelock for the blocked uid and uid 1000(package android)
+                             * optimisation needs to be done to handle uid 1000 better.
+                             */
                             releaseWakeLockLocked(wl.binder,wl.flags,false);
                             wl.isReleasedInternal = true;
                             if (mSpew) Slog.v(TAG, "Internally releasing it");
                         }
                     }
                 }
+            }
+            else {
+                mBlockedUids.remove(new Integer(uid));
             }
         }
     }
