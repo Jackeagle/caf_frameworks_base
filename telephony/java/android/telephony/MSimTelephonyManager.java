@@ -154,6 +154,38 @@ public class MSimTelephonyManager {
     }
 
     /**
+     * Returns the location of the device of a subscription. Return
+     * null if current location is not available.
+     *
+     * <p>
+     * Requires Permission:
+     * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION
+     * ACCESS_COARSE_LOCATION} or
+     * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION
+     * ACCESS_FINE_LOCATION}.
+     *
+     * @param subscription
+     *            of which the device current location is returned
+     * @hide
+     */
+    public CellLocation getCellLocation(int subscription) {
+        ITelephonyMSim iTelephony = null;
+        try {
+            iTelephony = ITelephonyMSim.Stub.asInterface(ServiceManager
+                    .getService(Context.MSIM_TELEPHONY_SERVICE));
+            Bundle bundle = iTelephony.getCellLocation(subscription);
+            CellLocation cl = CellLocation.newFromBundle(bundle);
+            if (cl.isEmpty())
+                return null;
+            return cl;
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            return null;
+        }
+    }
+
+    /**
      * Returns a constant indicating the device phone type for a subscription.
      *
      * @see #PHONE_TYPE_NONE
@@ -308,6 +340,24 @@ public class MSimTelephonyManager {
      */
     public String getNetworkTypeName(int subscription) {
         return TelephonyManager.getNetworkTypeName(getNetworkType(subscription));
+    }
+
+
+    /**
+     * Return network name by MCC and MNC.
+     *
+     * @param subscription for which phone type is returned
+     * @hide
+     */
+    public String getNetworkName(int subscription) {
+
+        try{
+            return getITelephonyMSim().getNetworkName(subscription);
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            return null;
+        }
     }
 
     //
