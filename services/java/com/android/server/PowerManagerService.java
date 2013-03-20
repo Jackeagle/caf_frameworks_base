@@ -1013,6 +1013,7 @@ public class PowerManagerService extends IPowerManager.Stub
                     throw new IllegalArgumentException("Wake lock not active");
                 } else {
                     Slog.v(TAG, "Wake lock not active");
+                    return;
                 }
             }
             WakeLock wl = mLocks.get(index);
@@ -1034,10 +1035,8 @@ public class PowerManagerService extends IPowerManager.Stub
                 for (int index=0; index < mLocks.size(); index++) {
                     WakeLock wl = mLocks.get(index);
                     if(wl != null) {
-                        if (wl.uid == uid || wl.uid == 1000) {
-                            /* release the wakelock for the blocked uid and uid 1000(package android)
-                             * optimisation needs to be done to handle uid 1000 better.
-                             */
+                        // release the wakelock for the blocked uid
+                        if (wl.uid == uid) {
                             releaseWakeLockLocked(wl.binder,wl.flags,false);
                             wl.isReleasedInternal = true;
                             if (mSpew) Slog.v(TAG, "Internally releasing it");
