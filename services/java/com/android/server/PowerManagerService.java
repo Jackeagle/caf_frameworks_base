@@ -38,6 +38,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.SystemSensorManager;
+import android.net.FeatureConfig;
 import android.os.BatteryManager;
 import android.os.BatteryStats;
 import android.os.Binder;
@@ -1007,7 +1008,12 @@ public class PowerManagerService extends IPowerManager.Stub
         synchronized (mLocks) {
             int index = mLocks.getIndex(lock);
             if (index < 0) {
-                throw new IllegalArgumentException("Wake lock not active");
+                boolean isNsrmEnabled = FeatureConfig.isEnabled(FeatureConfig.NSRM);
+                if(!isNsrmEnabled){
+                    throw new IllegalArgumentException("Wake lock not active");
+                } else {
+                    Slog.v(TAG, "Wake lock not active");
+                }
             }
             WakeLock wl = mLocks.get(index);
             WorkSource oldsource = wl.ws;
