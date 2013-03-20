@@ -208,8 +208,7 @@ public abstract class HardwareRenderer {
      *         false otherwise
      */
     public static boolean isAvailable() {
-        /*return GLES20Canvas.isAvailable();*/
-        return false;
+        return GLES20Canvas.isAvailable();
     }
 
     /**
