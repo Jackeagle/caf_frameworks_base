@@ -15994,6 +15994,9 @@ package android.os {
     method public static java.io.File getExternalStorageDirectory();
     method public static java.io.File getExternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getExternalStorageState();
+    method public static java.io.File getInternalStorageDirectory();
+    method public static java.io.File getInternalStoragePublicDirectory(java.lang.String);
+    method public static java.lang.String getInternalStorageState();
     method public static java.io.File getRootDirectory();
     method public static boolean isExternalStorageEmulated();
     method public static boolean isExternalStorageRemovable();
@@ -16011,6 +16014,7 @@ package android.os {
     field public static final java.lang.String MEDIA_MOUNTED = "mounted";
     field public static final java.lang.String MEDIA_MOUNTED_READ_ONLY = "mounted_ro";
     field public static final java.lang.String MEDIA_NOFS = "nofs";
+    field public static final java.lang.String MEDIA_NO_SPACE = "no_space";
     field public static final java.lang.String MEDIA_REMOVED = "removed";
     field public static final java.lang.String MEDIA_SHARED = "shared";
     field public static final java.lang.String MEDIA_UNMOUNTABLE = "unmountable";
