@@ -19,6 +19,37 @@
      ***************************************************************
      *************************************************************** -->
 <resources>
+  <java-symbol type="string" name="phonemedia_format_button_format" />
+  <java-symbol type="string" name="phonemedia_format_message" />
+  <java-symbol type="string" name="phonemedia_format_title" />
+  <java-symbol type="string" name="primary_storage_no_space_title" />
+  <java-symbol type="string" name="primary_storage_no_space_message" />
+  <java-symbol type="string" name="primary_storage_no_space_confirm" />
+  <java-symbol type="string" name="ext_media_badremoval_notification_message" />
+  <java-symbol type="string" name="ext_media_badremoval_notification_title" />
+  <java-symbol type="string" name="ext_media_checking_notification_message" />
+  <java-symbol type="string" name="ext_media_checking_notification_title" />
+  <java-symbol type="string" name="ext_media_nofs_notification_message" />
+  <java-symbol type="string" name="ext_media_nofs_notification_title" />
+  <java-symbol type="string" name="phone_media_nofs_notification_message" />
+  <java-symbol type="string" name="phone_media_nofs_notification_title" />
+  <java-symbol type="string" name="ext_media_nomedia_notification_message" />
+  <java-symbol type="string" name="ext_media_nomedia_notification_title" />
+  <java-symbol type="string" name="ext_media_safe_unmount_notification_message" />
+  <java-symbol type="string" name="ext_media_safe_unmount_notification_title" />
+  <java-symbol type="string" name="ext_media_unmountable_notification_message" />
+  <java-symbol type="string" name="ext_media_unmountable_notification_title" />
+  <java-symbol type="string" name="phone_media_unmountable_notification_message" />
+  <java-symbol type="string" name="phone_media_unmountable_notification_title" />
+  <java-symbol type="string" name="usb_storage_error_message" />
+  <java-symbol type="string" name="usb_storage_message" />
+  <java-symbol type="string" name="usb_storage_notification_message" />
+  <java-symbol type="string" name="usb_storage_notification_title" />
+  <java-symbol type="string" name="usb_storage_stop_message" />
+  <java-symbol type="string" name="usb_storage_stop_notification_message" />
+  <java-symbol type="string" name="usb_storage_stop_notification_title" />
+  <java-symbol type="string" name="usb_storage_stop_title" />
+  <java-symbol type="string" name="usb_storage_title" />
 
 <!-- ===============================================================
      Resources for version 1 of the platform.
