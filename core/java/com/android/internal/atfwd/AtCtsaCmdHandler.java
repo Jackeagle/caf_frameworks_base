@@ -223,31 +223,54 @@ public class AtCtsaCmdHandler extends AtCmdBaseHandler {
     }
 
     public AtCmdResponse handleCommand(AtCmd cmd) {
-        AtCmdResponse ret = null;
         ParsedCtsaCmd valid = null;
         boolean dead = false;
-        Log.d(LOG_TAG, "handleCommand: " + cmd);
+        String result = null;
+        boolean isAtCmdRespOK = false;
 
-        dead = !mInjectThread.isAlive();
-        if (!dead) {
-            // According to TS 27.007 8.7:
-            // "This command should be accepted (OK returned) before
-            // "actually emulating the touch screen action
-            // Thus we validate first before queuing for execution
-            try {
-                valid = new ParsedCtsaCmd(cmd);
-                ret = new AtCmdResponse(AtCmdResponse.RESULT_OK, null);
-                Log.d(LOG_TAG, "Queuing command");
-                Message.obtain(mInjectHandler, EVT_CTSA_CMD, valid).sendToTarget();
-                Log.d(LOG_TAG, "Command queued");
-            } catch (AtCmdParseException e) {
-                Log.d(LOG_TAG, "Error parsing command " + cmd);
-                ret = new AtCmdResponse(AtCmdResponse.RESULT_ERROR, "+CME ERROR: 25");
-            }
-        } else {
-            ret = new AtCmdResponse(AtCmdResponse.RESULT_ERROR, "+CME ERROR: 1");
+        Log.d(LOG_TAG, "handleCommand: " + cmd);
+        Log.d(LOG_TAG, "OpCode: " + cmd.getOpcode());
+
+        switch (cmd.getOpcode()) {
+            case AtCmd.ATCMD_OPCODE_NA_EQ_QU:
+                // AT+CTSA=?
+                // We support all five actions.
+                isAtCmdRespOK = true;
+                result = getCommandName() + ": (0-4)";
+                break;
+
+            case AtCmd.ATCMD_OPCODE_NA_EQ_AR:
+                // AT+CTSA=<action>,<x>,<y>
+                dead = !mInjectThread.isAlive();
+                if (!dead) {
+                    // According to TS 27.007 8.7:
+                    // "This command should be accepted (OK returned) before
+                    // "actually emulating the touch screen action
+                    // Thus we validate first before queuing for execution
+                    try {
+                        valid = new ParsedCtsaCmd(cmd);
+                        isAtCmdRespOK = true;
+                        Log.d(LOG_TAG, "Queuing command");
+                        Message.obtain(mInjectHandler, EVT_CTSA_CMD, valid).sendToTarget();
+                        Log.d(LOG_TAG, "Command queued");
+                    } catch (AtCmdParseException e) {
+                        Log.d(LOG_TAG, "Error parsing command " + cmd);
+                        result = cmd.getAtCmdErrStr(AtCmd.AT_ERR_INVALID_CHARS);
+                    }
+                } else {
+                    result = cmd.getAtCmdErrStr(AtCmd.AT_ERR_NO_CONN_TO_PHONE);
+                }
+                break;
+
+            default:
+                // CTSA supports only control command and test command
+                Log.d(LOG_TAG, "CTSA OpCode Error");
+                result = cmd.getAtCmdErrStr(AtCmd.AT_ERR_OP_NOT_SUPP);
+                break;
         }
-        return ret;
+
+        return isAtCmdRespOK ? new AtCmdResponse(AtCmdResponse.RESULT_OK, result) :
+            new AtCmdResponse(AtCmdResponse.RESULT_ERROR, result);
     }
 
     public String getCommandName() {
