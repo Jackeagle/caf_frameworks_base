@@ -887,5 +887,10 @@ public class WifiNative {
        Log.d(mTAG, "setPreferredChannel Command that goes to Supplicant is=" + command);
        return doBooleanCommand(command) && doBooleanCommand("SAVE_CONFIG");
     }
-
+	
+//QUALCOMM_CMCC_START 
+  public boolean saveAPPriorityCommand() {
+      return doBooleanCommand("SAVE_CONFIG");
+  }
+//QUALCOMM_CMCC_END
 }
