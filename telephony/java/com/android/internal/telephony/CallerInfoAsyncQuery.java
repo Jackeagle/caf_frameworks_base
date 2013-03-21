@@ -16,10 +16,13 @@
 
 package com.android.internal.telephony;
 
+import java.util.Locale;
+
 import android.content.AsyncQueryHandler;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.SQLException;
+import android.location.Country;
 import android.location.CountryDetector;
 import android.net.Uri;
 import android.os.Handler;
@@ -274,9 +277,20 @@ public class CallerInfoAsyncQuery {
                     if (!TextUtils.isEmpty(cw.number)) {
                         CountryDetector detector = (CountryDetector) mQueryContext.getSystemService(
                                 Context.COUNTRY_DETECTOR);
+                        
+                        String countryIso = null;
+                        Country c = null;
+                        if (detector != null &&  (c = detector.detectCountry()) != null) {
+                            countryIso = c.getCountryIso();
+                        } else {
+                            Locale locale = mQueryContext.getResources().getConfiguration().locale;
+                            countryIso = locale.getCountry();
+                            Log.w(LOG_TAG, "No CountryDetector; falling back to countryIso based on locale: "
+                                    + countryIso);
+                        }
+                        
                         mCallerInfo.phoneNumber = PhoneNumberUtils.formatNumber(cw.number,
-                                mCallerInfo.normalizedNumber,
-                                detector.detectCountry().getCountryIso());
+                                mCallerInfo.normalizedNumber,countryIso);
                     }
                 }
 
