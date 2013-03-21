@@ -74,5 +74,10 @@ interface IPhoneSubInfoMSim {
      * of a subscription.
      */
     String getVoiceMailAlphaTag(int subscription);
-
+    //merge from 8x25q start     
+    /**
+     * Retrieves the sim card type of a given subscription, e.g., IMSI for GSM phones.
+     */
+    String getCardType(int subscription);
+    //merge from 8x25q end    
 }
