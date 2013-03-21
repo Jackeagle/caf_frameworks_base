@@ -49,6 +49,10 @@ public class IccCardConstants {
     /* PERM_DISABLED means ICC is permanently disabled due to puk fails */
     public static final String INTENT_VALUE_ABSENT_ON_PERM_DISABLED = "PERM_DISABLED";
 
+    //merge from 8x25q start     
+    /* DEACTIVATED means the sim card is deactivated */
+    static public final String INTENT_VALUE_ICC_DEACTIVATED = "CARD_DEACTIVATED";
+    //merge from 8x25q end    
     /**
      * This is combination of IccCardStatus.CardState and IccCardApplicationStatus.AppState
      * for external apps (like PhoneApp) to use
@@ -66,8 +70,10 @@ public class IccCardConstants {
         READY,
         NOT_READY,
         PERM_DISABLED,
-        CARD_IO_ERROR;
-
+        //merge from 8x25q start     
+        CARD_IO_ERROR,
+        CARD_DEACTIVATED;
+        //merge from 8x25q end    
         public boolean isPinLocked() {
             return ((this == PIN_REQUIRED) || (this == PUK_REQUIRED));
         }
