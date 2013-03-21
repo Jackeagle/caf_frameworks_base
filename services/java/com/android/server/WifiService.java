@@ -213,7 +213,7 @@ public class WifiService extends IWifiManager.Stub {
      * supplicant in a scanning state. This allows supplicant to associate with
      * remembered networks that are in the scan results.
      */
-    private static final int NUM_SCANS_BEFORE_ACTUALLY_SCANNING = 3;
+    private static final int NUM_SCANS_BEFORE_ACTUALLY_SCANNING = 0;
     /**
      * The number of scans since the last network state change. When this
      * exceeds {@link #NUM_SCANS_BEFORE_ACTUALLY_SCANNING}, we consider the
@@ -418,6 +418,7 @@ public class WifiService extends IWifiManager.Stub {
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
+					    Log.d(TAG, "intent.getAction():" + intent.getAction());
                         if (intent.getAction().equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) {
                             int wifiState = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
                                     WifiManager.WIFI_STATE_DISABLED);
@@ -653,7 +654,7 @@ public class WifiService extends IWifiManager.Stub {
 
 		if (enable && mAirplaneModeOn.get() && !isAirplaneToggleable()){
 			Slog.d(TAG, "setWifiEnabled: false in airplaneMode");
-            enable = false;
+			return true;
 		}
 
         if (DBG) {
@@ -1055,6 +1056,11 @@ public class WifiService extends IWifiManager.Stub {
                 mAlarmManager.cancel(mIdleIntent);
                 mScreenOff = false;
                 evaluateTrafficStatsPolling();
+//QUALCOMM_CMCC_START
+                if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                    mWifiStateMachine.enableAllNetworks();
+				}
+//QUALCOMM_CMCC_END
                 setDeviceIdleAndUpdateWifi(false);
             } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
                 if (DBG) {
@@ -1820,6 +1826,9 @@ public class WifiService extends IWifiManager.Stub {
                         }
                     }
                     Slog.d(TAG, "mAutoConnect:" + mAutoConnect + ", isConnecting:" + isConnecting);
+                    if (mAutoConnect || isConnecting) {
+                        return;
+                    }
                 }
 //QUALCOMM_CMCC_END
 
@@ -1832,7 +1841,14 @@ public class WifiService extends IWifiManager.Stub {
                          * since otherwise supplicant would have tried to
                          * associate and thus resetting this counter.
                          */
-                        setNotificationVisible(true, numOpenNetworks, false, 0);
+                        
+                        SupplicantState supplicantState = mWifiStateMachine.syncRequestConnectionInfo().getSupplicantState();
+                        Slog.d(TAG, "Supplicant state is " + supplicantState + " when interpret scan results, isConnecting=" + isConnecting);
+                        if (!(SupplicantState.AUTHENTICATING.ordinal() <= supplicantState.ordinal() && supplicantState.ordinal() <= SupplicantState.COMPLETED.ordinal())) {
+                            if (!isConnecting) {
+                                setNotificationVisible(true, numOpenNetworks, false, 0);
+                            }
+                        }
                     }
                     return;
                 }
@@ -1963,7 +1979,8 @@ public class WifiService extends IWifiManager.Stub {
                 Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO);
             int gsmToWlan = Settings.System.getInt(mContext.getContentResolver(),
                 Settings.System.GSM_WIFI_CONNECT_TYPE, Settings.System.GSM_WIFI_CONNECT_TYPE_AUTO);
-            if (mGsmToWiFiPolicy != gsmToWlan || (mGsmToWiFiPolicy == Settings.System.GSM_WIFI_CONNECT_TYPE_ASK && mAutoConnectPolicy != connectType)) {
+			Slog.d(TAG, "onChange, connectType:" + connectType + ", gsmToWlan:" + gsmToWlan);
+			if (mGsmToWiFiPolicy != gsmToWlan || (mGsmToWiFiPolicy == Settings.System.GSM_WIFI_CONNECT_TYPE_ASK && mAutoConnectPolicy != connectType)) {
                 mSuspendNotificationTime = 0;
             }
             mAutoConnectPolicy = connectType;

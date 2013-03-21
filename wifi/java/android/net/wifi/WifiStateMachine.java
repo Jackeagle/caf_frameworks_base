@@ -105,7 +105,7 @@ public class WifiStateMachine extends StateMachine {
 
     private static final String TAG = "WifiStateMachine";
     private static final String NETWORKTYPE = "WIFI";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
 
     private WifiMonitor mWifiMonitor;
     private WifiNative mWifiNative;
@@ -371,6 +371,17 @@ public class WifiStateMachine extends StateMachine {
     public static final int CMD_SAVE_AP_PRIORITY          = BASE + 140;
     public static final int CMD_SET_CONNECT_POLICY        = BASE + 141;
     public static final int CMD_GET_CONNECTING_NETWORK_ID = BASE + 142;
+
+    private static final int BEST_SIGNAL_RSSI = -79;
+    private static final int WEAK_SIGNAL_RSSI = -85;
+    private static final int MIN_NETWORKS_NUM = 2;
+
+    static final int SECURITY_NONE = 0;
+    static final int SECURITY_WEP = 1;
+    static final int SECURITY_PSK = 2;
+    static final int SECURITY_EAP = 3;
+    static final int SECURITY_WAPI_PSK = 4;
+    static final int SECURITY_WAPI_CERT = 5;
 //QUALCOMM_CMCC_END
 
     private static final int CONNECT_MODE   = 1;
@@ -4190,7 +4201,7 @@ public class WifiStateMachine extends StateMachine {
  
     public void setConnectPolicy(int connectType, int gsmToWlan) {
         if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) { 
-            Log.d(TAG, "setConnectPolicy, connectType=" + connectType);
+            Log.d(TAG, "setConnectPolicy, connectType=" + connectType + ", gsmToWlan=" + gsmToWlan);
             if (mAutoConnectPolicy == connectType && mGsmToWiFiPolicy == gsmToWlan) {
                 return;
             }
@@ -4270,6 +4281,9 @@ public class WifiStateMachine extends StateMachine {
                                 mWifiConfigStore.enableNetwork(network.networkId, false);
                             }
                         }
+						Log.d(TAG, "updateAutoConnectSettings, getBestSignalNetworkId=" + getHighPriorityNetworkId());
+                        mWifiConfigStore.selectNetwork(getHighPriorityNetworkId());
+                        mWifiNative.reconnect();
                     }
                 } else {
                     if (!isConnecting) {
@@ -4304,5 +4318,106 @@ public class WifiStateMachine extends StateMachine {
         resultMsg.recycle();
         return result;
     }
+
+	public int getBestSignalNetworkId() {
+		int networkId = WifiConfiguration.INVALID_NETWORK_ID;
+		int rssi = MIN_RSSI;
+		String ssid = null;
+		List<WifiConfiguration> networks = mWifiConfigStore.getConfiguredNetworks();
+		if (mScanResults == null || networks == null || networks.size() < MIN_NETWORKS_NUM) {
+			Log.d(TAG,"No scan result or configured networks less than " + MIN_NETWORKS_NUM);
+			return networkId;
+		}
+		for (WifiConfiguration network : networks) {
+			for (ScanResult scanresult : mScanResults) {
+				if ((network.SSID != null) && (scanresult.SSID != null)
+					&& network.SSID.equals("\"" + scanresult.SSID + "\"")
+					&& getSecurity(network) == getSecurity(scanresult)) {
+					if (scanresult.level > rssi) {
+						networkId = network.networkId;
+						rssi = scanresult.level;
+						ssid = network.SSID;
+					}
+				}
+			}
+		}
+		if (rssi > BEST_SIGNAL_RSSI) {
+			Log.d(TAG, "Found the best AP, networkId:" + networkId
+				+ ", rssi:" + rssi + ", ssid:" + ssid);
+			return networkId;
+		} else {
+			Log.d(TAG, "No suitable AP found.");
+			return WifiConfiguration.INVALID_NETWORK_ID;
+		}
+	}
+
+	public int getHighPriorityNetworkId() {
+		int networkId = WifiConfiguration.INVALID_NETWORK_ID;
+		int priority = -1;
+		int rssi = MIN_RSSI;
+		String ssid = null;
+		List<WifiConfiguration> networks = mWifiConfigStore.getConfiguredNetworks();
+		if (networks == null || networks.size() < 2) {
+			Log.d(TAG,"Configured networks number less than two, ignore!");
+			return networkId;
+		}
+		if (mScanResults != null) {
+			for (WifiConfiguration network : networks) {
+				for (ScanResult scanresult : mScanResults) {
+					if ((network.SSID != null) && (scanresult.SSID != null)
+						&& network.SSID.equals("\"" + scanresult.SSID + "\"")
+						&& getSecurity(network) == getSecurity(scanresult)) {
+						if (network.priority > priority) {
+							networkId = network.networkId;
+							priority = network.priority;
+							rssi = scanresult.level;
+							ssid = network.SSID;
+						}
+					}
+				}
+			}
+		}
+		Log.d(TAG, "Found the highest priority AP, networkId:" + networkId
+			+ ", priority:" + priority + ", rssi:" + rssi + ", ssid:" + ssid);
+		return networkId;
+	}
+
+    public int getSecurity(WifiConfiguration config) {
+        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WPA_PSK)) {
+            return SECURITY_PSK;
+        }
+        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WPA_EAP) ||
+                config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.IEEE8021X)) {
+            return SECURITY_EAP;
+        }
+// WAPI+++
+//        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WAPI_PSK)) {
+//            return SECURITY_WAPI_PSK;
+//        }
+//        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WAPI_CERT)) {
+//            return SECURITY_WAPI_CERT;
+//        }
+// WAPI--
+        return (config.wepKeys[0] != null) ? SECURITY_WEP : SECURITY_NONE;
+    }
+
+    public int getSecurity(ScanResult result) {
+		if (result.capabilities.contains("WAPI-PSK")) {
+	           return SECURITY_WAPI_PSK;
+	        } else if (result.capabilities.contains("WEP")) { 
+	            return SECURITY_WEP;
+	        } else if (result.capabilities.contains("PSK")) {
+	            return SECURITY_PSK;
+	        } else if (result.capabilities.contains("EAP")) {
+	            return SECURITY_EAP;
+	// WAPI++ // WAPI-PSK .. here PSK contain matches with PSK security causing prob
+	        } else if (result.capabilities.contains("WAPI-CERT")) {
+	            return SECURITY_WAPI_CERT;
+	         }
+	// WAPI-
+	             Log.w(TAG, "private getSecurity: " + result.capabilities);
+	        return SECURITY_NONE;
+    }
+
 //QUALCOMM_CMCC_END
 }
