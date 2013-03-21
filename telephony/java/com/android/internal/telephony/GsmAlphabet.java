@@ -1001,7 +1001,22 @@ public class GsmAlphabet {
             sHighestEnabledSingleShiftCode = 0;
         }
     }
-
+    //merge from 8x25q start    
+    public static Boolean
+    isStringToGsm8Bit(String s) {
+        for (int i = 0, sz = s.length(); i < sz; i++) {
+            char c = s.charAt(i);
+            int v = GsmAlphabet.charToGsm(c);
+            if (v == GSM_EXTENDED_ESCAPE) {
+               v = GsmAlphabet.charToGsmExtended(c);
+            }
+            if (v == sCharsToGsmTables[0].get(' ', ' ') && c != ' ' ) {
+                return false;
+            }
+        }
+        return true;
+    }
+    //merge from 8x25q end
     /**
      * Modify the array of enabled national language locking shift tables for SMS
      * encoding. This is used for unit testing, but could also be used to

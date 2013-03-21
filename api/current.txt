@@ -12548,6 +12548,7 @@ package android.net {
     method public int stopUsingNetworkFeature(int, java.lang.String);
     field public static final deprecated java.lang.String ACTION_BACKGROUND_DATA_SETTING_CHANGED = "android.net.conn.BACKGROUND_DATA_SETTING_CHANGED";
     field public static final java.lang.String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
+    field public static final java.lang.String CONNECTIVITY_ACTION_IMMEDIATE = "android.net.conn.CONNECTIVITY_CHANGE_IMMEDIATE";
     field public static final int DEFAULT_NETWORK_PREFERENCE = 1; // 0x1
     field public static final java.lang.String EXTRA_EXTRA_INFO = "extraInfo";
     field public static final java.lang.String EXTRA_IS_FAILOVER = "isFailover";
@@ -15994,6 +15995,9 @@ package android.os {
     method public static java.io.File getExternalStorageDirectory();
     method public static java.io.File getExternalStoragePublicDirectory(java.lang.String);
     method public static java.lang.String getExternalStorageState();
+    method public static java.io.File getInternalStorageDirectory();
+    method public static java.io.File getInternalStoragePublicDirectory(java.lang.String);
+    method public static java.lang.String getInternalStorageState();
     method public static java.io.File getRootDirectory();
     method public static boolean isExternalStorageEmulated();
     method public static boolean isExternalStorageRemovable();
@@ -16011,6 +16015,7 @@ package android.os {
     field public static final java.lang.String MEDIA_MOUNTED = "mounted";
     field public static final java.lang.String MEDIA_MOUNTED_READ_ONLY = "mounted_ro";
     field public static final java.lang.String MEDIA_NOFS = "nofs";
+    field public static final java.lang.String MEDIA_NO_SPACE = "no_space";
     field public static final java.lang.String MEDIA_REMOVED = "removed";
     field public static final java.lang.String MEDIA_SHARED = "shared";
     field public static final java.lang.String MEDIA_UNMOUNTABLE = "unmountable";
@@ -18798,6 +18803,7 @@ package android.provider {
     field public static final java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEBUG_APP = "debug_app";
     field public static final java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18864,6 +18870,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEFAULT_INPUT_METHOD = "default_input_method";
     field public static final deprecated java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final deprecated java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18953,6 +18960,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DATE_FORMAT = "date_format";
     field public static final deprecated java.lang.String DEBUG_APP = "debug_app";
     field public static final android.net.Uri DEFAULT_ALARM_ALERT_URI;
@@ -21033,6 +21041,7 @@ package android.telephony {
     field public static final int SIM_STATE_PUK_REQUIRED = 3; // 0x3
     field public static final int SIM_STATE_READY = 5; // 0x5
     field public static final int SIM_STATE_UNKNOWN = 0; // 0x0
+    field protected static java.lang.String multiSimConfig;
   }
 
 }
