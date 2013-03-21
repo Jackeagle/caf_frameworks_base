@@ -20976,6 +20976,7 @@ package android.telephony {
     method public java.lang.String getLine1Number();
     method public java.util.List<android.telephony.NeighboringCellInfo> getNeighboringCellInfo();
     method public java.lang.String getNetworkCountryIso();
+    method public java.lang.String getNetworkName();
     method public java.lang.String getNetworkOperator();
     method public java.lang.String getNetworkOperatorName();
     method public int getNetworkType();
