@@ -1032,7 +1032,7 @@
     <string name="low_internal_storage_view_title" msgid="5576272496365684834">"存储空间不足"</string>
     <string name="low_internal_storage_view_text" msgid="6640505817617414371">"某些系统功能可能无法正常使用"</string>
     
-    <!--zouyanfei add for headset insert-->
+    <!-- add for headset insert-->
     <string name="headset_plugin_view_text">"耳机已插入到手机。"</string>
     <string name="headset_plugin_view_title">"耳机插入"</string>
     
