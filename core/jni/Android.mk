@@ -150,7 +150,8 @@ LOCAL_SRC_FILES:= \
 	android_content_res_ObbScanner.cpp \
 	android_content_res_Configuration.cpp \
 	android_animation_PropertyValuesHolder.cpp \
-	com_android_internal_app_ActivityTrigger.cpp
+	com_android_internal_app_ActivityTrigger.cpp \
+        android_hardware_GestureDevice.cpp
 ifeq ($(call is-vendor-board-platform,QCOM),true)
 LOCAL_SRC_FILES += android_hardware_fm.cpp \
 LOCAL_SRC_FILES += org_codeaurora_Performance.cpp
@@ -240,7 +241,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libjpeg \
 	libusbhost \
 	libharfbuzz \
-	libz
+	libz \
+	libgesture_client
 
 ifeq ($(BOARD_HAVE_BLUETOOTH_BLUEZ),true)
     LOCAL_C_INCLUDES += \
