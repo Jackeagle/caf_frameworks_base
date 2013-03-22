@@ -219,6 +219,8 @@ status_t OpenGLRenderer::clear(float left, float top, float right, float bottom,
         mCaches.resetScissor();
     }
 
+    mCaches.setScissor(left, mSnapshot->height - bottom, right - left, bottom - top);
+    glClear(GL_COLOR_BUFFER_BIT);
     mCaches.resetScissor();
     return DrawGlInfo::kStatusDone;
 }
