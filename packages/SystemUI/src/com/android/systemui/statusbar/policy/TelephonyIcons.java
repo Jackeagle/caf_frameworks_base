@@ -18,7 +18,7 @@ package com.android.systemui.statusbar.policy;
 
 import com.android.systemui.R;
 
-class TelephonyIcons {
+public class TelephonyIcons {
     //***** Signal strength icons
 
     //GSM/UMTS
@@ -27,12 +27,14 @@ class TelephonyIcons {
           R.drawable.stat_sys_signal_1,
           R.drawable.stat_sys_signal_2,
           R.drawable.stat_sys_signal_3,
-          R.drawable.stat_sys_signal_4 },
+          R.drawable.stat_sys_signal_4,
+          R.drawable.stat_sys_signal_5 },
         { R.drawable.stat_sys_signal_0_fully,
           R.drawable.stat_sys_signal_1_fully,
           R.drawable.stat_sys_signal_2_fully,
           R.drawable.stat_sys_signal_3_fully,
-          R.drawable.stat_sys_signal_4_fully }
+          R.drawable.stat_sys_signal_4_fully,
+          R.drawable.stat_sys_signal_5_fully}
     };
 
     static final int[][] QS_TELEPHONY_SIGNAL_STRENGTH = {
@@ -40,12 +42,14 @@ class TelephonyIcons {
           R.drawable.ic_qs_signal_1,
           R.drawable.ic_qs_signal_2,
           R.drawable.ic_qs_signal_3,
-          R.drawable.ic_qs_signal_4 },
+          R.drawable.ic_qs_signal_4 ,
+           R.drawable.ic_qs_signal_4},
         { R.drawable.ic_qs_signal_full_0,
           R.drawable.ic_qs_signal_full_1,
           R.drawable.ic_qs_signal_full_2,
           R.drawable.ic_qs_signal_full_3,
-          R.drawable.ic_qs_signal_full_4 }
+          R.drawable.ic_qs_signal_full_4,
+          R.drawable.ic_qs_signal_full_4}
     };
 
     static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING = {
@@ -53,15 +57,594 @@ class TelephonyIcons {
           R.drawable.stat_sys_signal_1,
           R.drawable.stat_sys_signal_2,
           R.drawable.stat_sys_signal_3,
-          R.drawable.stat_sys_signal_4 },
+          R.drawable.stat_sys_signal_4,
+          R.drawable.stat_sys_signal_5},
         { R.drawable.stat_sys_signal_0_fully,
           R.drawable.stat_sys_signal_1_fully,
           R.drawable.stat_sys_signal_2_fully,
           R.drawable.stat_sys_signal_3_fully,
-          R.drawable.stat_sys_signal_4_fully }
+          R.drawable.stat_sys_signal_4_fully, 
+          R.drawable.stat_sys_signal_5_fully}
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_3G_DEFAULT = {
+        { R.drawable.stat_sys_signal_0_3g_default,
+          R.drawable.stat_sys_signal_1_3g_default,
+          R.drawable.stat_sys_signal_2_3g_default,
+          R.drawable.stat_sys_signal_3_3g_default,
+          R.drawable.stat_sys_signal_4_3g_default ,
+          R.drawable.stat_sys_signal_5_3g_default },
+        { R.drawable.stat_sys_signal_0_3g_default_fully,
+          R.drawable.stat_sys_signal_1_3g_default_fully,
+          R.drawable.stat_sys_signal_2_3g_default_fully,
+          R.drawable.stat_sys_signal_3_3g_default_fully,
+          R.drawable.stat_sys_signal_4_3g_default_fully, 
+          R.drawable.stat_sys_signal_5_3g_default_fully }
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_3G_R_DEFAULT = {
+        { R.drawable.stat_sys_signal_0_3g_default_roam,
+          R.drawable.stat_sys_signal_1_3g_default_roam,
+          R.drawable.stat_sys_signal_2_3g_default_roam,
+          R.drawable.stat_sys_signal_3_3g_default_roam,
+          R.drawable.stat_sys_signal_4_3g_default_roam,
+          R.drawable.stat_sys_signal_5_3g_default_roam},
+        { R.drawable.stat_sys_signal_0_3g_default_fully_roam,
+          R.drawable.stat_sys_signal_1_3g_default_fully_roam,
+          R.drawable.stat_sys_signal_2_3g_default_fully_roam,
+          R.drawable.stat_sys_signal_3_3g_default_fully_roam,
+          R.drawable.stat_sys_signal_4_3g_default_fully_roam,
+           R.drawable.stat_sys_signal_5_3g_default_fully_roam}
+    };
+
+    // for cmcc
+    //GSM/UMTS
+    static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_G = {
+        { R.drawable.stat_sys_signal_0_g,
+	   R.drawable.stat_sys_signal_1_g,
+	   R.drawable.stat_sys_signal_2_g,
+	   R.drawable.stat_sys_signal_3_g,
+	   R.drawable.stat_sys_signal_4_g ,
+	   R.drawable.stat_sys_signal_5_g},
+        {R.drawable.stat_sys_signal_0_g,
+	   R.drawable.stat_sys_signal_1_g,
+	   R.drawable.stat_sys_signal_2_g,
+	   R.drawable.stat_sys_signal_3_g,
+	   R.drawable.stat_sys_signal_4_g ,
+	   R.drawable.stat_sys_signal_5_g}
+	/*{ R.drawable.stat_sys_signal_0_g_fully,
+	  R.drawable.stat_sys_signal_1_g_fully,
+	  R.drawable.stat_sys_signal_2_g_fully,
+	  R.drawable.stat_sys_signal_3_g_fully,
+	  R.drawable.stat_sys_signal_4_g_fully,
+	  R.drawable.stat_sys_signal_5_g_fully}*/
+    };
+
+    static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_G = {
+	{ R.drawable.stat_sys_signal_0_g_roam,
+	  R.drawable.stat_sys_signal_1_g_roam,
+	  R.drawable.stat_sys_signal_2_g_roam,
+	  R.drawable.stat_sys_signal_3_g_roam,
+	  R.drawable.stat_sys_signal_4_g_roam ,
+	  R.drawable.stat_sys_signal_5_g_roam},
+	{ R.drawable.stat_sys_signal_0_g_roam,
+	  R.drawable.stat_sys_signal_1_g_roam,
+	  R.drawable.stat_sys_signal_2_g_roam,
+	  R.drawable.stat_sys_signal_3_g_roam,
+	  R.drawable.stat_sys_signal_4_g_roam ,
+	  R.drawable.stat_sys_signal_5_g_roam}
+      /*{ R.drawable.stat_sys_signal_0_g_fully_roam,
+         R.drawable.stat_sys_signal_1_g_fully_roam,
+	  R.drawable.stat_sys_signal_2_g_fully_roam,
+	  R.drawable.stat_sys_signal_3_g_fully_roam,
+	  R.drawable.stat_sys_signal_4_g_fully_roam,
+	  R.drawable.stat_sys_signal_5_g_fully_roam}*/
+    };
+
+    static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_3G = {
+	{ R.drawable.stat_sys_signal_0_3g,
+	  R.drawable.stat_sys_signal_1_3g,
+	  R.drawable.stat_sys_signal_2_3g,
+	  R.drawable.stat_sys_signal_3_3g,
+	  R.drawable.stat_sys_signal_4_3g,
+	  R.drawable.stat_sys_signal_5_3g},
+	{R.drawable.stat_sys_signal_0_3g,
+	  R.drawable.stat_sys_signal_1_3g,
+	  R.drawable.stat_sys_signal_2_3g,
+	  R.drawable.stat_sys_signal_3_3g,
+	  R.drawable.stat_sys_signal_4_3g,
+	  R.drawable.stat_sys_signal_5_3g}
+	/*{ R.drawable.stat_sys_signal_0_3g_default_fully,
+	  R.drawable.stat_sys_signal_1_3g_default_fully,
+	  R.drawable.stat_sys_signal_2_3g_default_fully,
+	  R.drawable.stat_sys_signal_3_3g_default_fully,
+	  R.drawable.stat_sys_signal_4_3g_default_fully,
+	  R.drawable.stat_sys_signal_5_3g_default_fully}*/
+    };
+
+    static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_3G = {
+	{ R.drawable.stat_sys_signal_0_3g_roam,
+          R.drawable.stat_sys_signal_1_3g_roam,
+          R.drawable.stat_sys_signal_2_3g_roam,
+          R.drawable.stat_sys_signal_3_3g_roam,
+          R.drawable.stat_sys_signal_4_3g_roam,
+          R.drawable.stat_sys_signal_5_3g_roam },
+        { R.drawable.stat_sys_signal_0_3g_roam,
+          R.drawable.stat_sys_signal_1_3g_roam,
+          R.drawable.stat_sys_signal_2_3g_roam,
+          R.drawable.stat_sys_signal_3_3g_roam,
+          R.drawable.stat_sys_signal_4_3g_roam,
+          R.drawable.stat_sys_signal_5_3g_roam }
+	/*{ R.drawable.stat_sys_signal_0_3g_default_roam,
+	  R.drawable.stat_sys_signal_1_3g_default_roam,
+	  R.drawable.stat_sys_signal_2_3g_default_roam,
+	  R.drawable.stat_sys_signal_3_3g_default_roam,
+	  R.drawable.stat_sys_signal_4_3g_default_roam },
+	{ R.drawable.stat_sys_signal_0_3g_default_fully_roam,
+	  R.drawable.stat_sys_signal_1_3g_default_fully_roam,
+	  R.drawable.stat_sys_signal_2_3g_default_fully_roam,
+	  R.drawable.stat_sys_signal_3_3g_default_fully_roam,
+	  R.drawable.stat_sys_signal_4_3g_default_fully_roam }*/
+    };
+
+    static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_E = {
+        { R.drawable.stat_sys_signal_0_e,
+          R.drawable.stat_sys_signal_1_e,
+          R.drawable.stat_sys_signal_2_e,
+          R.drawable.stat_sys_signal_3_e,
+          R.drawable.stat_sys_signal_4_e,
+          R.drawable.stat_sys_signal_5_e  },
+        { R.drawable.stat_sys_signal_0_e,
+          R.drawable.stat_sys_signal_1_e,
+          R.drawable.stat_sys_signal_2_e,
+          R.drawable.stat_sys_signal_3_e,
+          R.drawable.stat_sys_signal_4_e,
+          R.drawable.stat_sys_signal_5_e  }
+
+	/*{ R.drawable.stat_sys_signal_0_e,
+	  R.drawable.stat_sys_signal_1_e,
+	  R.drawable.stat_sys_signal_2_e,
+	  R.drawable.stat_sys_signal_3_e,
+	  R.drawable.stat_sys_signal_4_e },
+	{ R.drawable.stat_sys_signal_0_e_fully,
+	  R.drawable.stat_sys_signal_1_e_fully,
+	  R.drawable.stat_sys_signal_2_e_fully,
+	  R.drawable.stat_sys_signal_3_e_fully,
+	  R.drawable.stat_sys_signal_4_e_fully }*/
+    };
+
+    static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_E = {
+        { R.drawable.stat_sys_signal_0_e_roam,
+          R.drawable.stat_sys_signal_1_e_roam,
+          R.drawable.stat_sys_signal_2_e_roam,
+          R.drawable.stat_sys_signal_3_e_roam,
+          R.drawable.stat_sys_signal_4_e_roam,
+          R.drawable.stat_sys_signal_5_e_roam },
+        { R.drawable.stat_sys_signal_0_e_roam,
+          R.drawable.stat_sys_signal_1_e_roam,
+          R.drawable.stat_sys_signal_2_e_roam,
+          R.drawable.stat_sys_signal_3_e_roam,
+          R.drawable.stat_sys_signal_4_e_roam,
+          R.drawable.stat_sys_signal_5_e_roam }
+
+	/*{ R.drawable.stat_sys_signal_0_e_roam,
+	  R.drawable.stat_sys_signal_1_e_roam,
+	  R.drawable.stat_sys_signal_2_e_roam,
+	  R.drawable.stat_sys_signal_3_e_roam,
+	  R.drawable.stat_sys_signal_4_e_roam },
+	{ R.drawable.stat_sys_signal_0_e_fully_roam,
+	  R.drawable.stat_sys_signal_1_e_fully_roam,
+	  R.drawable.stat_sys_signal_2_e_fully_roam,
+	  R.drawable.stat_sys_signal_3_e_fully_roam,
+	  R.drawable.stat_sys_signal_4_e_fully_roam }*/
+    };
+
+    public  static final int[][] CMCC_DATA_SIGNAL_STRENGTH_G = TELEPHONY_CMCC_SIGNAL_STRENGTH_G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_R_G = TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_3G = TELEPHONY_CMCC_SIGNAL_STRENGTH_3G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_R_3G = TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_3G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_E = TELEPHONY_CMCC_SIGNAL_STRENGTH_E;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_R_E = TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_E;
+
+	
+  // CMCC dualsim statusbar style icons.
+   public static final int[] MULTI_SIGNAL_NULL_CMCC = {
+	 R.drawable.c_stat_sys_signal_null,
+	 R.drawable.c_stat_sys_signal_null
+    };
+  public static final int[] MULTI_NO_SIM_CMCC = {
+	  R.drawable.stat_sys_no_sim,
+	  R.drawable.stat_sys_no_sim
+  };
+
+
+    // CU dualsim statusbar style icons.
+    public static final int[] MULTI_NO_SIM_CU = {
+        R.drawable.stat_sys_no_sim1_new,
+        R.drawable.stat_sys_no_sim2_new
+    };
+
+    public static final int[] MULTI_SIGNAL_NULL_CU = {
+        R.drawable.stat_sys_signal_null_sim1,
+        R.drawable.stat_sys_signal_null_sim2
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM1_G_CU = {
+        { R.drawable.stat_sys_signal_0_sim1_g,
+          R.drawable.stat_sys_signal_1_sim1_g,
+          R.drawable.stat_sys_signal_2_sim1_g,
+          R.drawable.stat_sys_signal_3_sim1_g,
+          R.drawable.stat_sys_signal_4_sim1_g,
+          R.drawable.stat_sys_signal_5_sim1_g },
+         { R.drawable.stat_sys_signal_0_sim1_g,
+          R.drawable.stat_sys_signal_1_sim1_g,
+          R.drawable.stat_sys_signal_2_sim1_g,
+          R.drawable.stat_sys_signal_3_sim1_g,
+          R.drawable.stat_sys_signal_4_sim1_g,
+          R.drawable.stat_sys_signal_5_sim1_g }
+       /* { R.drawable.stat_sys_signal_0_fully_sim1_g,
+          R.drawable.stat_sys_signal_1_fully_sim1_g,
+          R.drawable.stat_sys_signal_2_fully_sim1_g,
+          R.drawable.stat_sys_signal_3_fully_sim1_g,
+          R.drawable.stat_sys_signal_4_fully_sim1_g,
+          R.drawable.stat_sys_signal_5_fully_sim1_g }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM2_G_CU = {
+        { R.drawable.stat_sys_signal_0_sim2_g,
+          R.drawable.stat_sys_signal_1_sim2_g,
+          R.drawable.stat_sys_signal_2_sim2_g,
+          R.drawable.stat_sys_signal_3_sim2_g,
+          R.drawable.stat_sys_signal_4_sim2_g,
+          R.drawable.stat_sys_signal_5_sim2_g },
+        { R.drawable.stat_sys_signal_0_sim2_g,
+          R.drawable.stat_sys_signal_1_sim2_g,
+          R.drawable.stat_sys_signal_2_sim2_g,
+          R.drawable.stat_sys_signal_3_sim2_g,
+          R.drawable.stat_sys_signal_4_sim2_g,
+          R.drawable.stat_sys_signal_5_sim2_g }
+        /*{ R.drawable.stat_sys_signal_0_fully_sim2_g,
+          R.drawable.stat_sys_signal_1_fully_sim2_g,
+          R.drawable.stat_sys_signal_2_fully_sim2_g,
+          R.drawable.stat_sys_signal_3_fully_sim2_g,
+          R.drawable.stat_sys_signal_4_fully_sim2_g,
+          R.drawable.stat_sys_signal_5_fully_sim2_g }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_G_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim1_g,
+          R.drawable.stat_sys_r_signal_1_sim1_g,
+          R.drawable.stat_sys_r_signal_2_sim1_g,
+          R.drawable.stat_sys_r_signal_3_sim1_g,
+          R.drawable.stat_sys_r_signal_4_sim1_g,
+          R.drawable.stat_sys_r_signal_5_sim1_g },
+        { R.drawable.stat_sys_r_signal_0_sim1_g,
+          R.drawable.stat_sys_r_signal_1_sim1_g,
+          R.drawable.stat_sys_r_signal_2_sim1_g,
+          R.drawable.stat_sys_r_signal_3_sim1_g,
+          R.drawable.stat_sys_r_signal_4_sim1_g,
+          R.drawable.stat_sys_r_signal_5_sim1_g }
+       /* { R.drawable.stat_sys_r_signal_0_fully_sim1_g,
+          R.drawable.stat_sys_r_signal_1_fully_sim1_g,
+          R.drawable.stat_sys_r_signal_2_fully_sim1_g,
+          R.drawable.stat_sys_r_signal_3_fully_sim1_g,
+          R.drawable.stat_sys_r_signal_4_fully_sim1_g,
+          R.drawable.stat_sys_r_signal_5_fully_sim1_g  }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_G_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim2_g,
+          R.drawable.stat_sys_r_signal_1_sim2_g,
+          R.drawable.stat_sys_r_signal_2_sim2_g,
+          R.drawable.stat_sys_r_signal_3_sim2_g,
+          R.drawable.stat_sys_r_signal_4_sim2_g,
+          R.drawable.stat_sys_r_signal_5_sim2_g },
+        { R.drawable.stat_sys_r_signal_0_sim2_g,
+          R.drawable.stat_sys_r_signal_1_sim2_g,
+          R.drawable.stat_sys_r_signal_2_sim2_g,
+          R.drawable.stat_sys_r_signal_3_sim2_g,
+          R.drawable.stat_sys_r_signal_4_sim2_g,
+          R.drawable.stat_sys_r_signal_5_sim2_g }
+       /* { R.drawable.stat_sys_r_signal_0_fully_sim2_g,
+          R.drawable.stat_sys_r_signal_1_fully_sim2_g,
+          R.drawable.stat_sys_r_signal_2_fully_sim2_g,
+          R.drawable.stat_sys_r_signal_3_fully_sim2_g,
+          R.drawable.stat_sys_r_signal_4_fully_sim2_g,
+          R.drawable.stat_sys_r_signal_5_fully_sim2_g }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM1_3G_CU = {
+        { R.drawable.stat_sys_signal_0_sim1_3g,
+          R.drawable.stat_sys_signal_1_sim1_3g,
+          R.drawable.stat_sys_signal_2_sim1_3g,
+          R.drawable.stat_sys_signal_3_sim1_3g,
+          R.drawable.stat_sys_signal_4_sim1_3g,
+          R.drawable.stat_sys_signal_5_sim1_3g },
+        { R.drawable.stat_sys_signal_0_sim1_3g,
+          R.drawable.stat_sys_signal_1_sim1_3g,
+          R.drawable.stat_sys_signal_2_sim1_3g,
+          R.drawable.stat_sys_signal_3_sim1_3g,
+          R.drawable.stat_sys_signal_4_sim1_3g,
+          R.drawable.stat_sys_signal_5_sim1_3g }
+       /* { R.drawable.stat_sys_signal_0_fully_sim1_3g,
+          R.drawable.stat_sys_signal_1_fully_sim1_3g,
+          R.drawable.stat_sys_signal_2_fully_sim1_3g,
+          R.drawable.stat_sys_signal_3_fully_sim1_3g,
+          R.drawable.stat_sys_signal_4_fully_sim1_3g,
+          R.drawable.stat_sys_signal_4_fully_sim1_3g  }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM2_3G_CU = {
+        { R.drawable.stat_sys_signal_0_sim2_3g,
+          R.drawable.stat_sys_signal_1_sim2_3g,
+          R.drawable.stat_sys_signal_2_sim2_3g,
+          R.drawable.stat_sys_signal_3_sim2_3g,
+          R.drawable.stat_sys_signal_4_sim2_3g,
+          R.drawable.stat_sys_signal_5_sim2_3g },
+        { R.drawable.stat_sys_signal_0_sim2_3g,
+          R.drawable.stat_sys_signal_1_sim2_3g,
+          R.drawable.stat_sys_signal_2_sim2_3g,
+          R.drawable.stat_sys_signal_3_sim2_3g,
+          R.drawable.stat_sys_signal_4_sim2_3g,
+          R.drawable.stat_sys_signal_5_sim2_3g }
+       /* { R.drawable.stat_sys_signal_0_fully_sim2_3g,
+          R.drawable.stat_sys_signal_1_fully_sim2_3g,
+          R.drawable.stat_sys_signal_2_fully_sim2_3g,
+          R.drawable.stat_sys_signal_3_fully_sim2_3g,
+          R.drawable.stat_sys_signal_4_fully_sim2_3g,
+          R.drawable.stat_sys_signal_4_fully_sim2_3g }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_3G_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim1_3g,
+          R.drawable.stat_sys_r_signal_1_sim1_3g,
+          R.drawable.stat_sys_r_signal_2_sim1_3g,
+          R.drawable.stat_sys_r_signal_3_sim1_3g,
+          R.drawable.stat_sys_r_signal_4_sim1_3g,
+          R.drawable.stat_sys_r_signal_5_sim1_3g },
+        { R.drawable.stat_sys_r_signal_0_sim1_3g,
+          R.drawable.stat_sys_r_signal_1_sim1_3g,
+          R.drawable.stat_sys_r_signal_2_sim1_3g,
+          R.drawable.stat_sys_r_signal_3_sim1_3g,
+          R.drawable.stat_sys_r_signal_4_sim1_3g,
+          R.drawable.stat_sys_r_signal_5_sim1_3g }
+       /* { R.drawable.stat_sys_r_signal_0_fully_sim1_3g,
+          R.drawable.stat_sys_r_signal_1_fully_sim1_3g,
+          R.drawable.stat_sys_r_signal_2_fully_sim1_3g,
+          R.drawable.stat_sys_r_signal_3_fully_sim1_3g,
+          R.drawable.stat_sys_r_signal_4_fully_sim1_3g,
+          R.drawable.stat_sys_r_signal_4_fully_sim1_3g }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_3G_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim2_3g,
+          R.drawable.stat_sys_r_signal_1_sim2_3g,
+          R.drawable.stat_sys_r_signal_2_sim2_3g,
+          R.drawable.stat_sys_r_signal_3_sim2_3g,
+          R.drawable.stat_sys_r_signal_4_sim2_3g ,
+          R.drawable.stat_sys_r_signal_5_sim2_3g},
+        { R.drawable.stat_sys_r_signal_0_sim2_3g,
+          R.drawable.stat_sys_r_signal_1_sim2_3g,
+          R.drawable.stat_sys_r_signal_2_sim2_3g,
+          R.drawable.stat_sys_r_signal_3_sim2_3g,
+          R.drawable.stat_sys_r_signal_4_sim2_3g ,
+          R.drawable.stat_sys_r_signal_5_sim2_3g}
+        /*{ R.drawable.stat_sys_r_signal_0_fully_sim2_3g,
+          R.drawable.stat_sys_r_signal_1_fully_sim2_3g,
+          R.drawable.stat_sys_r_signal_2_fully_sim2_3g,
+          R.drawable.stat_sys_r_signal_3_fully_sim2_3g,
+          R.drawable.stat_sys_r_signal_4_fully_sim2_3g,
+          R.drawable.stat_sys_r_signal_4_fully_sim2_3g }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM1_H_CU = {
+        { R.drawable.stat_sys_signal_0_sim1_h,
+          R.drawable.stat_sys_signal_1_sim1_h,
+          R.drawable.stat_sys_signal_2_sim1_h,
+          R.drawable.stat_sys_signal_3_sim1_h,
+          R.drawable.stat_sys_signal_4_sim1_h,
+          R.drawable.stat_sys_signal_5_sim1_h  },
+        { R.drawable.stat_sys_signal_0_sim1_h,
+          R.drawable.stat_sys_signal_1_sim1_h,
+          R.drawable.stat_sys_signal_2_sim1_h,
+          R.drawable.stat_sys_signal_3_sim1_h,
+          R.drawable.stat_sys_signal_4_sim1_h,
+          R.drawable.stat_sys_signal_5_sim1_h  }
+        /*{ R.drawable.stat_sys_signal_0_fully_sim1_h,
+          R.drawable.stat_sys_signal_1_fully_sim1_h,
+          R.drawable.stat_sys_signal_2_fully_sim1_h,
+          R.drawable.stat_sys_signal_3_fully_sim1_h,
+          R.drawable.stat_sys_signal_4_fully_sim1_h,
+          R.drawable.stat_sys_signal_4_fully_sim1_h }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM2_H_CU = {
+        { R.drawable.stat_sys_signal_0_sim2_h,
+          R.drawable.stat_sys_signal_1_sim2_h,
+          R.drawable.stat_sys_signal_2_sim2_h,
+          R.drawable.stat_sys_signal_3_sim2_h,
+          R.drawable.stat_sys_signal_4_sim2_h,
+          R.drawable.stat_sys_signal_5_sim2_h  },
+        { R.drawable.stat_sys_signal_0_sim2_h,
+          R.drawable.stat_sys_signal_1_sim2_h,
+          R.drawable.stat_sys_signal_2_sim2_h,
+          R.drawable.stat_sys_signal_3_sim2_h,
+          R.drawable.stat_sys_signal_4_sim2_h,
+          R.drawable.stat_sys_signal_5_sim2_h  }
+       /* { R.drawable.stat_sys_signal_0_fully_sim2_h,
+          R.drawable.stat_sys_signal_1_fully_sim2_h,
+          R.drawable.stat_sys_signal_2_fully_sim2_h,
+          R.drawable.stat_sys_signal_3_fully_sim2_h,
+          R.drawable.stat_sys_signal_4_fully_sim2_h,
+          R.drawable.stat_sys_signal_4_fully_sim2_h }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_H_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim1_h,
+          R.drawable.stat_sys_r_signal_1_sim1_h,
+          R.drawable.stat_sys_r_signal_2_sim1_h,
+          R.drawable.stat_sys_r_signal_3_sim1_h,
+          R.drawable.stat_sys_r_signal_4_sim1_h,
+          R.drawable.stat_sys_r_signal_5_sim1_h },
+        { R.drawable.stat_sys_r_signal_0_sim1_h,
+          R.drawable.stat_sys_r_signal_1_sim1_h,
+          R.drawable.stat_sys_r_signal_2_sim1_h,
+          R.drawable.stat_sys_r_signal_3_sim1_h,
+          R.drawable.stat_sys_r_signal_4_sim1_h,
+          R.drawable.stat_sys_r_signal_5_sim1_h }
+       /* { R.drawable.stat_sys_r_signal_0_fully_sim1_h,
+          R.drawable.stat_sys_r_signal_1_fully_sim1_h,
+          R.drawable.stat_sys_r_signal_2_fully_sim1_h,
+          R.drawable.stat_sys_r_signal_3_fully_sim1_h,
+          R.drawable.stat_sys_r_signal_4_fully_sim1_h ,
+          R.drawable.stat_sys_r_signal_4_fully_sim1_h }*/
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_H_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim2_h,
+          R.drawable.stat_sys_r_signal_1_sim2_h,
+          R.drawable.stat_sys_r_signal_2_sim2_h,
+          R.drawable.stat_sys_r_signal_3_sim2_h,
+          R.drawable.stat_sys_r_signal_4_sim2_h ,
+          R.drawable.stat_sys_r_signal_5_sim2_h},
+        { R.drawable.stat_sys_r_signal_0_sim2_h,
+          R.drawable.stat_sys_r_signal_1_sim2_h,
+          R.drawable.stat_sys_r_signal_2_sim2_h,
+          R.drawable.stat_sys_r_signal_3_sim2_h,
+          R.drawable.stat_sys_r_signal_4_sim2_h ,
+          R.drawable.stat_sys_r_signal_5_sim2_h}
+        /*{ R.drawable.stat_sys_r_signal_0_fully_sim2_h,
+          R.drawable.stat_sys_r_signal_1_fully_sim2_h,
+          R.drawable.stat_sys_r_signal_2_fully_sim2_h,
+          R.drawable.stat_sys_r_signal_3_fully_sim2_h,
+          R.drawable.stat_sys_r_signal_4_fully_sim2_h,
+          R.drawable.stat_sys_r_signal_4_fully_sim2_h  }*/
     };
 
     static final int[][] DATA_SIGNAL_STRENGTH = TELEPHONY_SIGNAL_STRENGTH;
+
+  
+    public static final int[][][] MULTI_SIGNAL_IMAGES_G = {TELEPHONY_SIGNAL_STRENGTH_SIM1_G_CU,TELEPHONY_SIGNAL_STRENGTH_SIM2_G_CU};
+    public static final int[][][] MULTI_SIGNAL_IMAGES_R_G = {TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_G_CU,TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_G_CU};
+    public static final int[][][] MULTI_SIGNAL_IMAGES_3G = {TELEPHONY_SIGNAL_STRENGTH_SIM1_3G_CU,TELEPHONY_SIGNAL_STRENGTH_SIM2_3G_CU};
+    public static final int[][][] MULTI_SIGNAL_IMAGES_R_3G = {TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_3G_CU,TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_3G_CU};
+    public static final int[][][] MULTI_SIGNAL_IMAGES_H = {TELEPHONY_SIGNAL_STRENGTH_SIM1_H_CU,TELEPHONY_SIGNAL_STRENGTH_SIM2_H_CU};
+    public static final int[][][] MULTI_SIGNAL_IMAGES_R_H = {TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_H_CU,TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_H_CU};
+
+    // CT status bar icons
+    public static final int[][] TELEPHONY_SIGNAL_STRENGTH_3G_CT = {
+        { R.drawable.stat_sys_signal_0_3g,
+          R.drawable.stat_sys_signal_1_3g,
+          R.drawable.stat_sys_signal_2_3g,
+          R.drawable.stat_sys_signal_3_3g,
+          R.drawable.stat_sys_signal_4_3g },
+        { R.drawable.stat_sys_signal_0_3g_fully,
+          R.drawable.stat_sys_signal_1_3g_fully,
+          R.drawable.stat_sys_signal_2_3g_fully,
+          R.drawable.stat_sys_signal_3_3g_fully,
+          R.drawable.stat_sys_signal_4_3g_fully }
+    };
+
+    public static final int[][] TELEPHONY_SIGNAL_STRENGTH_1X_CT = {
+          { R.drawable.stat_sys_signal_0_1x,
+            R.drawable.stat_sys_signal_1_1x,
+            R.drawable.stat_sys_signal_2_1x,
+            R.drawable.stat_sys_signal_3_1x,
+            R.drawable.stat_sys_signal_4_1x },
+          { R.drawable.stat_sys_signal_0_1x_fully,
+            R.drawable.stat_sys_signal_1_1x_fully,
+            R.drawable.stat_sys_signal_2_1x_fully,
+            R.drawable.stat_sys_signal_3_1x_fully,
+            R.drawable.stat_sys_signal_4_1x_fully }
+    };
+
+    public static final int[][] TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_CT = {
+          { R.drawable.stat_sys_signal_0_1x_only,
+            R.drawable.stat_sys_signal_1_1x_only,
+            R.drawable.stat_sys_signal_2_1x_only,
+            R.drawable.stat_sys_signal_3_1x_only,
+            R.drawable.stat_sys_signal_4_1x_only },
+          { R.drawable.stat_sys_signal_0_1x_only_fully,
+            R.drawable.stat_sys_signal_1_1x_only_fully,
+            R.drawable.stat_sys_signal_2_1x_only_fully,
+            R.drawable.stat_sys_signal_3_1x_only_fully,
+            R.drawable.stat_sys_signal_4_1x_only_fully }
+    };
+
+    public static final int[][] TELEPHONY_SIGNAL_STRENGTH_G_CT = {
+          { R.drawable.stat_sys_signal_0_g,
+            R.drawable.stat_sys_signal_1_g,
+            R.drawable.stat_sys_signal_2_g,
+            R.drawable.stat_sys_signal_3_g,
+            R.drawable.stat_sys_signal_4_g },
+          { R.drawable.stat_sys_signal_0_g_fully,
+            R.drawable.stat_sys_signal_1_g_fully,
+            R.drawable.stat_sys_signal_2_g_fully,
+            R.drawable.stat_sys_signal_3_g_fully,
+            R.drawable.stat_sys_signal_4_g_fully }
+    };
+
+    public static final int[][] TELEPHONY_SIGNAL_STRENGTH_3G_R_CT = {
+        { R.drawable.stat_sys_signal_0_3g_roam,
+          R.drawable.stat_sys_signal_1_3g_roam,
+          R.drawable.stat_sys_signal_2_3g_roam,
+          R.drawable.stat_sys_signal_3_3g_roam,
+          R.drawable.stat_sys_signal_4_3g_roam },
+        { R.drawable.stat_sys_signal_0_3g_fully_roam,
+          R.drawable.stat_sys_signal_1_3g_fully_roam,
+          R.drawable.stat_sys_signal_2_3g_fully_roam,
+          R.drawable.stat_sys_signal_3_3g_fully_roam,
+          R.drawable.stat_sys_signal_4_3g_fully_roam }
+    };
+
+    public static final int[][] TELEPHONY_SIGNAL_STRENGTH_1X_R_CT = {
+          { R.drawable.stat_sys_signal_0_1x_roam,
+            R.drawable.stat_sys_signal_1_1x_roam,
+            R.drawable.stat_sys_signal_2_1x_roam,
+            R.drawable.stat_sys_signal_3_1x_roam,
+            R.drawable.stat_sys_signal_4_1x_roam },
+          { R.drawable.stat_sys_signal_0_1x_fully_roam,
+            R.drawable.stat_sys_signal_1_1x_fully_roam,
+            R.drawable.stat_sys_signal_2_1x_fully_roam,
+            R.drawable.stat_sys_signal_3_1x_fully_roam,
+            R.drawable.stat_sys_signal_4_1x_fully }
+    };
+
+     public static final int[][] TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT = {
+          { R.drawable.stat_sys_signal_0_1x_only_roam,
+            R.drawable.stat_sys_signal_1_1x_only_roam,
+            R.drawable.stat_sys_signal_2_1x_only_roam,
+            R.drawable.stat_sys_signal_3_1x_only_roam,
+            R.drawable.stat_sys_signal_4_1x_only_roam },
+          { R.drawable.stat_sys_signal_0_1x_only_fully_roam,
+            R.drawable.stat_sys_signal_1_1x_only_fully_roam,
+            R.drawable.stat_sys_signal_2_1x_only_fully_roam,
+            R.drawable.stat_sys_signal_3_1x_only_fully_roam,
+            R.drawable.stat_sys_signal_4_1x_only_fully_roam }
+    };
+
+      public static final int[][] TELEPHONY_SIGNAL_STRENGTH_G_R_CT = {
+          { R.drawable.stat_sys_signal_0_g_roam,
+            R.drawable.stat_sys_signal_1_g_roam,
+            R.drawable.stat_sys_signal_2_g_roam,
+            R.drawable.stat_sys_signal_3_g_roam,
+            R.drawable.stat_sys_signal_4_g_roam },
+          { R.drawable.stat_sys_signal_0_g_fully_roam,
+            R.drawable.stat_sys_signal_1_g_fully_roam,
+            R.drawable.stat_sys_signal_2_g_fully_roam,
+            R.drawable.stat_sys_signal_3_g_fully_roam,
+            R.drawable.stat_sys_signal_4_g_fully_roam }
+    };
+
+  public static final int[] MULTI_NO_SIM_CT = {
+	  R.drawable.stat_sys_signal_cdma_null,
+	  R.drawable.stat_sys_signal_g_null
+  };
+  
+  public static final int[] MULTI_SIGNAL_NULL_CT = {
+	  R.drawable.stat_sys_signal_null_sim1,
+	  R.drawable.stat_sys_signal_null_sim2
+  };
 
     //***** Data connection icons
 
@@ -136,6 +719,72 @@ class TelephonyIcons {
               R.drawable.stat_sys_data_fully_connected_4g }
         };
 
+    public static final int SIGNAL_LEVEL_0 = 0;
+    public static final int SIGNAL_LEVEL_1 = 1;
+    public static final int SIGNAL_LEVEL_2 = 2;
+    public static final int SIGNAL_LEVEL_3 = 3;
+    public static final int SIGNAL_LEVEL_4 = 4;
+    public static final int SIGNAL_LEVEL_5 = 5;
 
+
+    public static final int DATA_CONNECTIVITY_NOT_CONNECTED = 0;
+    public static final int DATA_CONNECTIVITY_CONNECTED     = 1;
+    
+    public static final int DATA_TYPE_E = 0;
+    public static final int DATA_TYPE_G = 1;
+    public static final int DATA_TYPE_1X = 2;
+    public static final int DATA_TYPE_3G = 3;
+    public static final int DATA_TYPE_H = 4;
+    public static final int DATA_TYPE_R = 5;
+    
+    public static final int DATA_NONE = 0;
+    public static final int DATA_IN = 1;
+    public static final int DATA_OUT = 2;
+    public static final int DATA_INOUT = 3;
+    
+    public static final int[][] DATA_TYPE_ACTIVITY = {
+        {   R.drawable.stat_sys_data_idle_e,
+            R.drawable.stat_sys_data_in_e,
+            R.drawable.stat_sys_data_out_e,
+            R.drawable.stat_sys_data_inandout_e},
+        {   R.drawable.stat_sys_data_idle_g,
+            R.drawable.stat_sys_data_in_g,
+            R.drawable.stat_sys_data_out_g,
+            R.drawable.stat_sys_data_inout_g},
+        {   R.drawable.stat_sys_data_idle_1x,
+            R.drawable.stat_sys_data_in_1x,
+            R.drawable.stat_sys_data_out_1x,
+            R.drawable.stat_sys_data_inout_1x},
+        {   R.drawable.stat_sys_data_idle_3g,
+            R.drawable.stat_sys_data_in_3g,
+            R.drawable.stat_sys_data_out_3g,
+            R.drawable.stat_sys_data_inout_3g},
+        {   R.drawable.stat_sys_data_idle_h,
+            R.drawable.stat_sys_data_in_h,
+            R.drawable.stat_sys_data_out_h,
+            R.drawable.stat_sys_data_inandout_h}
+		/*
+        {   R.drawable.stat_sys_signal_e_no,
+            R.drawable.stat_sys_signal_e_in,
+            R.drawable.stat_sys_signal_e_out,
+            R.drawable.stat_sys_signal_e_inout},
+        {   R.drawable.stat_sys_signal_g_no,
+            R.drawable.stat_sys_signal_g_in,
+            R.drawable.stat_sys_signal_g_out,
+            R.drawable.stat_sys_signal_g_inout},
+        {   R.drawable.stat_sys_signal_1x_no,
+            R.drawable.stat_sys_signal_1x_in,
+            R.drawable.stat_sys_signal_1x_out,
+            R.drawable.stat_sys_signal_1x_inout},
+        {   R.drawable.stat_sys_signal_3g_no,
+            R.drawable.stat_sys_signal_3g_in,
+            R.drawable.stat_sys_signal_3g_out,
+            R.drawable.stat_sys_signal_3g_inout},
+        {   R.drawable.stat_sys_signal_h_no,
+            R.drawable.stat_sys_signal_h_in,
+            R.drawable.stat_sys_signal_h_out,
+            R.drawable.stat_sys_signal_h_inout}
+		*/
+    };
 }
 

@@ -38,10 +38,12 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.provider.Settings;
+import android.provider.Telephony;
 import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.util.Slog;
 import android.view.View;
 import android.widget.ImageView;
@@ -60,6 +62,10 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.android.systemui.statusbar.phone.PhoneStatusBar;
+import com.qrd.plugin.feature_query.DefaultQuery;
+import com.qrd.plugin.feature_query.FeatureQuery;
+
 public class NetworkController extends BroadcastReceiver {
     // debug
     static final String TAG = "StatusBar.NetworkController";
@@ -70,6 +76,8 @@ public class NetworkController extends BroadcastReceiver {
     boolean mHspaDataDistinguishable;
     private TelephonyManager mPhone;
     boolean mDataConnected;
+    boolean isRoam = false;
+
     IccCardConstants.State mSimState = IccCardConstants.State.READY;
     int mPhoneState = TelephonyManager.CALL_STATE_IDLE;
     int mDataNetType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
@@ -177,8 +185,16 @@ public class NetworkController extends BroadcastReceiver {
         void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
                 String contentDescription);
         void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
-                int typeIcon, String contentDescription, String typeContentDescription,
-                int noSimIcon);
+            int typeIcon, String contentDescription, String typeContentDescription,
+            int noSimIcon, ServiceState simServiceState,boolean isRoam,boolean dataConnect);
+        void setIsAirplaneMode(boolean is, int airplaneIcon);
+    }
+    public interface CMCCSignalCluster {
+        void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
+                String contentDescription);
+        void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
+            int typeIcon, String contentDescription, String typeContentDescription,
+            int noSimIcon, ServiceState simServiceState,boolean isRoam,boolean dataConnect);
         void setIsAirplaneMode(boolean is, int airplaneIcon);
     }
 
@@ -204,8 +220,13 @@ public class NetworkController extends BroadcastReceiver {
 
         mShowPhoneRSSIForData = res.getBoolean(R.bool.config_showPhoneRSSIForData);
         mShowAtLeastThreeGees = res.getBoolean(R.bool.config_showMin3G);
-        mAlwaysShowCdmaRssi = res.getBoolean(
-                com.android.internal.R.bool.config_alwaysUseCdmaRssi);
+        if (DefaultQuery.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+            mAlwaysShowCdmaRssi = false;
+        } else {
+            mAlwaysShowCdmaRssi = res.getBoolean(
+                    com.android.internal.R.bool.config_alwaysUseCdmaRssi);
+        }
+
 
         // set up the default wifi icon, used when no radios have ever appeared
         updateWifiIcons();
@@ -349,7 +370,10 @@ public class NetworkController extends BroadcastReceiver {
                     mDataTypeIconId,
                     mContentDescriptionWimax,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mServiceState,
+                    isRoam,
+                    mDataConnected);
         } else {
             // normal mobile data
             cluster.setMobileDataIndicators(
@@ -359,7 +383,10 @@ public class NetworkController extends BroadcastReceiver {
                     mDataTypeIconId,
                     mContentDescriptionPhoneSignal,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mServiceState,
+                    isRoam,
+                    mDataConnected);
         }
         cluster.setIsAirplaneMode(mAirplaneMode, mAirplaneIconId);
     }
@@ -1244,6 +1271,8 @@ public class NetworkController extends BroadcastReceiver {
                     + " mBluetoothTetherIconId=0x" + Integer.toHexString(mBluetoothTetherIconId));
         }
 
+	if(DEBUG)Slog.d(TAG, "twfx refreshViews mPhoneSignalIconId 0="+mPhoneSignalIconId);
+
         if (mLastPhoneSignalIconId          != mPhoneSignalIconId
          || mLastDataDirectionOverlayIconId != combinedActivityIconId
          || mLastWifiIconId                 != mWifiIconId
@@ -1251,7 +1280,8 @@ public class NetworkController extends BroadcastReceiver {
          || mLastDataTypeIconId             != mDataTypeIconId
          || mLastAirplaneMode               != mAirplaneMode
          || mLastSimIconId                  != mNoSimIconId)
-        {
+        {        
+		Slog.d(TAG, "twfx refreshViews refreshSignalCluster 0="+mPhoneSignalIconId);
             // NB: the mLast*s will be updated later
             for (SignalCluster cluster : mSignalClusters) {
                 refreshSignalCluster(cluster);

@@ -521,4 +521,17 @@
     <string name="status_bar_help_title">Notifications appear here</string>
     <!-- Body of help text shown when the notification panel is pulled down for the very first time. [CHAR LIMIT=NONE] -->
     <string name="status_bar_help_text">Access them anytime by swiping down.\nSwipe down again for system controls.</string>
+    
+    <!-- Toggle switch title for enabling all mobile data network connections. [CHAR LIMIT=32] -->  
+    <string name="data_usage_enable_mobile">Mobile data</string>
+    <!-- Add for switch apn -->
+    <string name="switch_to_text">Switch the APN to <xliff:g id="next_apn">%s</xliff:g></string>
+    
+    <!--TaskManager-->
+    <string name="tasklistview_title">Task manager</string>
+    <string name="message_switch_fail">Can not switch to this task, because it has no interface.</string>
+    <string name="tasklist_killall">Kill All</string>
+    <string name="tasklist_memory_usage">"Free/Total Memory:[<xliff:g id="number">%s</xliff:g>] / [<xliff:g id="name">%s</xliff:g>]"</string>
+    <string name="message_keep_one_launcher">Should keep at lease one home activity!</string>
+    <!--end TaskManager-->    
 </resources>

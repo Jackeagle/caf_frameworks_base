@@ -22,6 +22,7 @@ package com.android.systemui.statusbar;
 
 import android.content.Context;
 import android.telephony.MSimTelephonyManager;
+import android.telephony.ServiceState;
 import android.telephony.TelephonyManager;
 import android.util.AttributeSet;
 import android.util.Slog;
@@ -32,10 +33,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import com.android.internal.telephony.MSimConstants;
+import com.android.systemui.statusbar.phone.PhoneStatusBar;
 import com.android.systemui.statusbar.policy.NetworkController;
 import com.android.systemui.statusbar.policy.MSimNetworkController;
 
 import com.android.systemui.R;
+import com.qrd.plugin.feature_query.DefaultQuery;
 
 // Intimately tied to the design of res/layout/msim_signal_cluster_view.xml
 public class MSimSignalClusterView
@@ -58,6 +61,8 @@ public class MSimSignalClusterView
     private int mAirplaneIconId = 0;
     private String mWifiDescription, mMobileTypeDescription;
     private String[] mMobileDescription;
+    private boolean[] mMNoSimIconVisiable;
+    private boolean[] mSignalIconVisiable;
 
     ViewGroup mWifiGroup, mMobileGroup, mMobileGroupSub2;
     ImageView mWifi, mWifiActivity, mMobile, mMobileActivity, mMobileType, mAirplane;
@@ -81,11 +86,15 @@ public class MSimSignalClusterView
         mMobileTypeId = new int[numPhones];
         mMobileActivityId = new int[numPhones];
         mNoSimIconId = new int[numPhones];
+        mMNoSimIconVisiable = new boolean[numPhones];
+        mSignalIconVisiable = new boolean[numPhones];
         for(int i=0; i < numPhones; i++) {
             mMobileStrengthId[i] = 0;
             mMobileTypeId[i] = 0;
             mMobileActivityId[i] = 0;
             mNoSimIconId[i] = 0;
+            mMNoSimIconVisiable[i] = false;
+            mSignalIconVisiable[i] = false;
         }
     }
 
@@ -150,17 +159,30 @@ public class MSimSignalClusterView
     }
 
     @Override
-    public void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
+    public void setMobileDataIndicators(boolean visible, int[] strengthIcon, int activityIcon,
             int typeIcon, String contentDescription, String typeContentDescription,
-            int noSimIcon, int subscription) {
+            int noSimIcon, int subscription, ServiceState simServiceState,boolean isRoam,boolean isDataEnabled) {
         mMobileVisible = visible;
-        mMobileStrengthId[subscription] = strengthIcon;
+        mMobileStrengthId[subscription] = strengthIcon[0];
         mMobileActivityId[subscription] = activityIcon;
         mMobileTypeId[subscription] = typeIcon;
         mMobileDescription[subscription] = contentDescription;
         mMobileTypeDescription = typeContentDescription;
         mNoSimIconId[subscription] = noSimIcon;
 
+        if (DefaultQuery.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_DEFAULT) {
+            mMNoSimIconVisiable[subscription] = true;
+            mSignalIconVisiable[subscription] = true;
+        } else if (noSimIcon != 0) {
+            mMNoSimIconVisiable[subscription] = true;
+            mSignalIconVisiable[subscription] = false;
+        } else {
+            mMNoSimIconVisiable[subscription] = false;
+            mSignalIconVisiable[subscription] = true;
+        }
+        if (DEBUG)
+        Slog.d(TAG,"SetMobileDataIndicators MNoSimIconVisiable "+subscription+"="+mMNoSimIconVisiable[subscription]);
+        apply();
         applySubscription(subscription);
     }
 
@@ -204,23 +226,29 @@ public class MSimSignalClusterView
             if (subscription == MSimConstants.SUB1) {
                 mMobileGroup.setVisibility(View.VISIBLE);
                 mMobile.setImageResource(mMobileStrengthId[subscription]);
+                mMobile.setVisibility(mSignalIconVisiable[subscription] ? View.VISIBLE : View.GONE);
                 mMobileGroup.setContentDescription(mMobileTypeDescription + " "
                     + mMobileDescription[subscription]);
                 mMobileActivity.setImageResource(mMobileActivityId[subscription]);
                 mMobileType.setImageResource(mMobileTypeId[subscription]);
                 mMobileType.setVisibility(
-                    !mWifiVisible ? View.VISIBLE : View.GONE);
+                    (!mWifiVisible && DefaultQuery.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_DEFAULT)
+                    ? View.VISIBLE : View.GONE);
                 mNoSimSlot.setImageResource(mNoSimIconId[subscription]);
+                mNoSimSlot.setVisibility(mMNoSimIconVisiable[subscription] ? View.VISIBLE : View.GONE);
             } else {
                 mMobileGroupSub2.setVisibility(View.VISIBLE);
                 mMobileSub2.setImageResource(mMobileStrengthId[subscription]);
+                mMobileSub2.setVisibility(mSignalIconVisiable[subscription] ? View.VISIBLE : View.GONE);
                 mMobileGroupSub2.setContentDescription(mMobileTypeDescription + " "
                     + mMobileDescription[subscription]);
                 mMobileActivitySub2.setImageResource(mMobileActivityId[subscription]);
                 mMobileTypeSub2.setImageResource(mMobileTypeId[subscription]);
                 mMobileTypeSub2.setVisibility(
-                    !mWifiVisible ? View.VISIBLE : View.GONE);
+                    (!mWifiVisible && DefaultQuery.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_DEFAULT)
+                    ? View.VISIBLE : View.GONE);
                 mNoSimSlotSub2.setImageResource(mNoSimIconId[subscription]);
+                mNoSimSlotSub2.setVisibility(mMNoSimIconVisiable[subscription] ? View.VISIBLE : View.GONE);
             }
         } else {
             if (subscription == 0) {
@@ -246,6 +274,25 @@ public class MSimSignalClusterView
             }
         }
 
+    }
+
+    // Run after each indicator change.
+    private void apply() {
+        if (mWifiGroup == null) return;
+
+        if (mWifiVisible) {
+            mWifiGroup.setVisibility(View.VISIBLE);
+            mWifi.setImageResource(mWifiStrengthId);
+            mWifiActivity.setImageResource(mWifiActivityId);
+            mWifiGroup.setContentDescription(mWifiDescription);
+        } else {
+            mWifiGroup.setVisibility(View.GONE);
+        }
+
+        if (DEBUG) Slog.d(TAG,
+                String.format("wifi: %s sig=%d act=%d",
+                    (mWifiVisible ? "VISIBLE" : "GONE"),
+                    mWifiStrengthId, mWifiActivityId));
     }
 }
 
