@@ -2139,10 +2139,17 @@ public final class RIL extends BaseCommands implements CommandsInterface {
     @Override
     public void setCurrentPreferredNetworkType() {
         try {
-            mSetPreferredNetworkType = android.provider.Settings.Secure.getIntAtIndex(
-                    mContext.getContentResolver(),
-                    android.provider.Settings.Secure.PREFERRED_NETWORK_MODE,
-                    mInstanceId);
+            if (mInstanceId == null) {
+                mSetPreferredNetworkType = android.provider.Settings.Secure.getInt(
+                        mContext.getContentResolver(),
+                        android.provider.Settings.Secure.PREFERRED_NETWORK_MODE,
+                        Phone.PREFERRED_NT_MODE);
+            } else {
+                mSetPreferredNetworkType = android.provider.Settings.Secure.getIntAtIndex(
+                        mContext.getContentResolver(),
+                        android.provider.Settings.Secure.PREFERRED_NETWORK_MODE,
+                        mInstanceId);
+            }
         } catch (SettingNotFoundException snfe) {
             if (RILJ_LOGD) riljLog("Could not find PREFERRED_NETWORK_MODE!!! in database");
             mSetPreferredNetworkType = mPreferredNetworkType;
