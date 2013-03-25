@@ -2120,4 +2120,47 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
             }
         }
     }
+	//-----begin add by zhouwei 2013.2.20----------------//
+	  public boolean syncDeviceManagementInfo(String provider, Bundle dminfo)
+	  {
+		  // first check for permission to the provider
+		 
+	   checkResolutionLevelIsSufficientForProviderUse(getCallerAllowedResolutionLevel(),provider);
+		  // and check for ACCESS_LOCATION_EXTRA_COMMANDS
+		  if ((mContext.checkCallingOrSelfPermission(ACCESS_LOCATION_EXTRA_COMMANDS)
+				  != PackageManager.PERMISSION_GRANTED)) {
+			  throw new SecurityException("Requires ACCESS_LOCATION_EXTRA_COMMANDS permission");
+		  }
+		  synchronized (mLock) {
+			  LocationProviderInterface p = mProvidersByName.get(provider);
+			  if (p == null) {
+				  throw new IllegalArgumentException("provider=" + provider);
+			  }
+			  //1.first should stop any of the current navigating activity
+			  //2.sync settings specify provider
+			  return p.syncDeviceManagementInfo(dminfo);
+		  }
+	
+	  }
+	  public Bundle readAgpsSettingInfo(String provider)
+	  {
+		  // first check for permission to the provider
+		   checkResolutionLevelIsSufficientForProviderUse(getCallerAllowedResolutionLevel(),provider);
+		  // and check for ACCESS_LOCATION_EXTRA_COMMANDS
+		  if ((mContext.checkCallingOrSelfPermission(ACCESS_LOCATION_EXTRA_COMMANDS)
+				  != PackageManager.PERMISSION_GRANTED)) {
+			  throw new SecurityException("Requires ACCESS_LOCATION_EXTRA_COMMANDS permission");
+		  }
+		  synchronized (mLock) {
+			  LocationProviderInterface p = mProvidersByName.get(provider);
+			  if (p == null) {
+				  throw new IllegalArgumentException("provider=" + provider);
+			  }
+			  //1.first should stop any of the current navigating activity
+			  //2.sync settings specify provider
+			  return p.readAgpsSettingInfo();
+		  }
+	
+	  }
+
 }

@@ -4540,6 +4540,33 @@ public final class Settings {
          */
         public static final String ASSISTED_GPS_ENABLED = "assisted_gps_enabled";
 
+	public static final String PREF_ASSISTED_GPS_TYPE = "pref_assisted_gps_type";
+
+	/**
+	   * CMCC  agps SUPL server address
+	 */
+	public static final String SUPL_HOST = "supl_host";
+	
+	/**
+	   * CMCC  agps SUPL port address
+	 */
+	public static final String SUPL_PORT = "supl_port";
+	
+	/**
+	   * location agps start mode,MSB or MSA
+	 */
+	public static final String AGPS_PROVID = "agps_provid";
+	
+	/**
+	   * location agps start mode,cold start or hot start.
+	 */
+	public static final String AGPS_RESET_TYPE = "agps_reset_type";
+	
+	/**
+	   * location agps start network,home or all
+	 */	
+	public static final String AGPS_NETWORK = "agps_network";
+
         /**
          * Whether bluetooth is enabled/disabled
          * 0=disabled. 1=enabled.

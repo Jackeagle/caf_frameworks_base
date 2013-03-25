@@ -2161,6 +2161,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadBooleanSetting(stmt, Settings.Global.ASSISTED_GPS_ENABLED,
                     R.bool.assisted_gps_enabled);
+    
+            loadIntegerSetting(stmt, Settings.Global.PREF_ASSISTED_GPS_TYPE,
+                    R.integer.def_pref_assisted_gps_type);
+
+            /* add for AGPS parameters settings. Begin*/
+            loadStringSetting(stmt, Settings.Global.SUPL_HOST,
+                    R.string.supl_host);
+            loadStringSetting(stmt, Settings.Global.SUPL_PORT,
+                    R.string.supl_port);
+
+            loadStringSetting(stmt, Settings.Global.AGPS_PROVID,
+                    R.string.agps_provid);
+
+            loadStringSetting(stmt, Settings.Global.AGPS_RESET_TYPE,
+                    R.string.agps_reset_type);
+            loadStringSetting(stmt, Settings.Global.AGPS_NETWORK,
+                    R.string.agps_network);
+
 
             loadBooleanSetting(stmt, Settings.Global.AUTO_TIME,
                     R.bool.def_auto_time); // Sync time to NITZ
