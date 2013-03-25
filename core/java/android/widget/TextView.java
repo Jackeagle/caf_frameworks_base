@@ -7567,19 +7567,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
 
             final boolean textIsSelectable = isTextSelectable();
-            if (touchIsFinished && mLinksClickable && mAutoLinkMask != 0 && textIsSelectable) {
-                // The LinkMovementMethod which should handle taps on links has not been installed
-                // on non editable text that support text selection.
-                // We reproduce its behavior here to open links for these.
-                ClickableSpan[] links = ((Spannable) mText).getSpans(getSelectionStart(),
-                        getSelectionEnd(), ClickableSpan.class);
-
-                if (links.length > 0) {
-                    links[0].onClick(this);
-                    handled = true;
-                }
-            }
-
             if (touchIsFinished && (isTextEditable() || textIsSelectable)) {
                 // Show the IME, except when selecting in read-only text.
                 final InputMethodManager imm = InputMethodManager.peekInstance();
@@ -7592,6 +7579,19 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 mEditor.onTouchUpEvent(event);
 
                 handled = true;
+            }
+            
+            if (touchIsFinished && mLinksClickable && mAutoLinkMask != 0 && textIsSelectable) {
+                // The LinkMovementMethod which should handle taps on links has not been installed
+                // on non editable text that support text selection.
+                // We reproduce its behavior here to open links for these.
+                ClickableSpan[] links = ((Spannable) mText).getSpans(getSelectionStart(),
+                        getSelectionEnd(), ClickableSpan.class);
+
+                if (links.length > 0) {
+                    links[0].onClick(this);
+                    handled = true;
+                }
             }
 
             if (handled) {
