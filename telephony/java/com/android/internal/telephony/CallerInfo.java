@@ -521,7 +521,46 @@ public class CallerInfo {
      */
     public void updateGeoDescription(Context context, String fallbackNumber) {
         String number = TextUtils.isEmpty(phoneNumber) ? fallbackNumber : phoneNumber;
-        geoDescription = getGeoDescription(context, number);
+        //geoDescription = getGeoDescription(context, number);
+        geoDescription = getGeoDescriptionExt(context, number);
+    }
+    
+    /**
+     * To get geographic information from local AreaSearch app.
+     * @return a geographical description string for the specified number.
+     */
+    private static String getGeoDescriptionExt(Context context,String number) {
+
+        Uri NATIVE_AREA_URI =Uri.parse("content://externalareasearch");
+        Cursor cursor = null;
+
+        try{
+            cursor = context.getContentResolver().query(NATIVE_AREA_URI,null, 
+            number, null, null);
+        }catch(Exception ex){
+            Log.e(TAG,"Query AreaInfo E:"+ex);
+            return "";
+        }
+        String area="";
+        if(cursor == null){
+            if(DBG) Log.d(TAG,"cursor = null");
+            return "";
+        }
+
+        try {
+            if (cursor.moveToFirst()) {
+                do{
+                   area = cursor.getString(0);
+                   if(DBG) Log.d(TAG,"area = " + area);
+                }while(cursor.moveToNext());
+            }
+        } finally {
+            if(cursor != null){
+                cursor.close();
+            }
+        }
+        
+        return area;
     }
 
     /**
