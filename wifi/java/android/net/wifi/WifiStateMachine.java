@@ -3485,6 +3485,12 @@ public class WifiStateMachine extends StateMachine {
               case CMD_SET_HIGH_PERF_MODE:
                   deferMessage(message);
                   break;
+               /* Defer scan request since we should not switch to other channels at DHCP */
+              case CMD_START_SCAN:
+                  loge("Received SCAN while in ObtainingIpState");
+                  deferMessage(message);
+                 break;
+
               default:
                   return NOT_HANDLED;
           }
