@@ -2056,56 +2056,64 @@ public class MediaPlayer
                }
              break;
              case PLAYER_PLAY:
-               if (mContext != null) {
-                   Intent intent = new Intent(ACTION_METADATA_CHANGED);
-                   intent.putExtra("duration", getDuration());
-                   intent.putExtra("time", System.currentTimeMillis());
-                   intent.putExtra("position", getCurrentPosition());
-                   Log.d(TAG, "start() mUri is " + mUri);
-                   intent.putExtra("uripath", mUri);
-                   intent.putExtra("playstate", PLAYSTATUS_PLAYING);
-                   mContext.sendBroadcast(intent);
-               }
+               synchronized(mContextLock) {
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", getCurrentPosition());
+                       Log.d(TAG, "start() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       intent.putExtra("playstate", PLAYSTATUS_PLAYING);
+                       mContext.sendBroadcast(intent);
+                   }
+              }
              break;
              case PLAYER_PAUSE:
-               if (mContext != null) {
-                   Intent intent = new Intent(ACTION_METADATA_CHANGED);
-                   intent.putExtra("duration", getDuration());
-                   intent.putExtra("time", System.currentTimeMillis());
-                   intent.putExtra("position", getCurrentPosition());
-                   Log.d(TAG, "pause() mUri is " + mUri);
-                   intent.putExtra("uripath", mUri);
-                   intent.putExtra("playstate", PLAYSTATUS_PAUSED);
-                   mContext.sendBroadcast(intent);
+               synchronized(mContextLock) {
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", getCurrentPosition());
+                       Log.d(TAG, "pause() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       intent.putExtra("playstate", PLAYSTATUS_PAUSED);
+                       mContext.sendBroadcast(intent);
+                  }
                }
              break;
              case PLAYER_STOP:
-               if (mContext != null) {
-                   Intent intent = new Intent(ACTION_METADATA_CHANGED);
-                   intent.putExtra("duration", getDuration());
-                   intent.putExtra("time", System.currentTimeMillis());
-                   intent.putExtra("position", getCurrentPosition());
-                   Log.d(TAG, "stop() mUri is " + mUri);
-                   intent.putExtra("uripath", mUri);
-                   intent.putExtra("playstate", PLAYSTATUS_STOPPED);
-                   mContext.sendBroadcast(intent);
+               synchronized(mContextLock) {
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", getCurrentPosition());
+                       Log.d(TAG, "stop() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       intent.putExtra("playstate", PLAYSTATUS_STOPPED);
+                       mContext.sendBroadcast(intent);
+                   }
                }
              break;
              case PLAYER_SEEK_TO:
-               if (mContext != null) {
-                   Intent intent = new Intent(ACTION_METADATA_CHANGED);
-                   intent.putExtra("duration", getDuration());
-                   intent.putExtra("time", System.currentTimeMillis());
-                   intent.putExtra("position", msg.arg1);
-                   Log.d(TAG, "seekTo() mUri is " + mUri);
-                   intent.putExtra("uripath", mUri);
-                   if (msg.arg1 > msg.arg2) {
-                       intent.putExtra("playstate", PLAYSTATUS_SEEKFWD);
-                   } else {
-                       intent.putExtra("playstate", PLAYSTATUS_REWIND);
+                synchronized(mContextLock) {
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", msg.arg1);
+                       Log.d(TAG, "seekTo() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       if (msg.arg1 > msg.arg2) {
+                           intent.putExtra("playstate", PLAYSTATUS_SEEKFWD);
+                       } else {
+                           intent.putExtra("playstate", PLAYSTATUS_REWIND);
+                       }
+                       mContext.sendBroadcast(intent);
                    }
-                   mContext.sendBroadcast(intent);
-               }
+              }
              break;
              default:
                Log.e(TAG, "Unknown message type " + msg.what);
