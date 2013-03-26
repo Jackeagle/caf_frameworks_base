@@ -194,10 +194,15 @@ interface IBluetooth
     void disconnectDUN();
     boolean disableDUN();
     boolean enableDUN();
+
     // WhiteList APIs
     boolean addToPreferredDeviceList(in String address, in IBluetoothPreferredDeviceListCallback pListCallBack);
     boolean removeFromPreferredDeviceList(in String address, in IBluetoothPreferredDeviceListCallback pListCallBack);
     boolean clearPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
     boolean gattConnectToPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
     boolean gattCancelConnectToPreferredDeviceList(in IBluetoothPreferredDeviceListCallback pListCallBack);
+    boolean addToPreferredDeviceListWrapper(in BluetoothDevice btDevObj, in IBluetoothPreferredDeviceListCallback pListCallBack,
+            in String caller);
+    boolean gattCancelConnectToPreferredDeviceListWrapper(in IBluetoothPreferredDeviceListCallback pListCallBack,
+            in BluetoothDevice btDevice, in String caller);
 }
