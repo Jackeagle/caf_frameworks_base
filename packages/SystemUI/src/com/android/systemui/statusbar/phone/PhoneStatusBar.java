@@ -1660,6 +1660,12 @@ public class PhoneStatusBar extends BaseStatusBar {
 
         mNotificationPanel.expand();
         if (mHasFlipSettings && mScrollView.getVisibility() != View.VISIBLE) {
+	      if(mIsShowTasklist){
+   			mOriginLayout.setVisibility(View.VISIBLE);
+			mTaskListView.setVisibility(View.GONE);
+			mIsShowTasklist = false;
+   		}	
+		  
             flipToNotifications();
         }
 
@@ -1721,8 +1727,9 @@ public class PhoneStatusBar extends BaseStatusBar {
             mNotificationPanel.expand();
             if (mFlipSettingsView.getVisibility() != View.VISIBLE) {
    		  if(mIsShowTasklist){
-   			mOriginLayout.setVisibility(View.GONE);
-   			mTaskListView.setVisibility(View.VISIBLE);
+   			mOriginLayout.setVisibility(View.VISIBLE);
+			mTaskListView.setVisibility(View.GONE);
+			mIsShowTasklist = false;
    		}		
                 flipToSettings();
             }
@@ -3134,7 +3141,7 @@ private View.OnClickListener mTaskSwitchButtonListener = new View.OnClickListene
 
 	public void onClick(View v) {
 
-		if(mIsShowTasklist){
+		if(!mIsShowTasklist){
 			mOriginLayout.setVisibility(View.GONE);
 			mTaskListView.setVisibility(View.VISIBLE);
 		}else{
