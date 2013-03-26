@@ -998,6 +998,7 @@ public class MediaScanner
                     mDefaultNotificationSet = true;
                 } else if (ringtones) {
                     setSettingIfNotSet(Settings.System.RINGTONE, tableUri, rowId);
+                    setSettingIfNotSet(Settings.System.RINGTONE_2, tableUri, rowId);
                     mDefaultRingtoneSet = true;
                 } else if (alarms) {
                     setSettingIfNotSet(Settings.System.ALARM_ALERT, tableUri, rowId);
