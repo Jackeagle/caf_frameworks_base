@@ -88,8 +88,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.Stack;
-
-//add by zouyanfei for headset insert
+//add for headset insert
 import android.app.NotificationManager;
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -455,7 +454,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
 
     private int mDockState = Intent.EXTRA_DOCK_STATE_UNDOCKED;
 
-	//add by zouyanfei for headset insert
+	//add for headset insert
     private final static String NO_ACTION="android.intent.action.NO_ACTION";
     private final static int HEADSET_NOTIFICATION_ID=com.android.internal.R.drawable.stat_sys_plug_headset;
 
@@ -3956,7 +3955,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 setBluetoothA2dpOnInt(true);
             }
 
-			//add by zouyanfei for headset insert begin
+			//add for headset insert begin
             if (FeatureQuery.FEATURE_HEADSET_INSERT) {
                 if(state == 0) {
                     cancelNotification();
@@ -3965,7 +3964,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     sendNotification();
                 }
             }
-            //add by zouyanfei for headset insert end
+            //addfor headset insert end
             
             boolean isUsb = ((device & AudioSystem.DEVICE_OUT_ALL_USB) != 0);
             handleDeviceConnection((state == 1), device, (isUsb ? name : ""));
@@ -3990,7 +3989,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         }
     }
 
-	//add by zouyanfei for headset insert begin
+	//add for headset insert begin
     private final void sendNotification() {
         Log.i(TAG, "Sending headset pulg in notification");
         Intent lowMemIntent = new Intent(NO_ACTION);
@@ -4018,7 +4017,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         //cancel notification since headset has been plug out
         mNotificationMgr.cancel(HEADSET_NOTIFICATION_ID);
     }
-    //add by zouyanfei for headset insert end
+    //addfor headset insert end
 
     /* cache of the address of the last dock the device was connected to */
     private String mDockAddress;

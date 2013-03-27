@@ -1384,6 +1384,7 @@ package android {
     field public static final deprecated int stat_sys_phone_call = 17301636; // 0x1080084
     field public static final deprecated int stat_sys_phone_call_forward = 17301637; // 0x1080085
     field public static final deprecated int stat_sys_phone_call_on_hold = 17301638; // 0x1080086
+    field public static final int stat_sys_plug_headset = 17301684; // 0x10800b4
     field public static final int stat_sys_speakerphone = 17301639; // 0x1080087
     field public static final int stat_sys_upload = 17301640; // 0x1080088
     field public static final int stat_sys_upload_done = 17301641; // 0x1080089
@@ -1544,6 +1545,8 @@ package android {
     field public static final int defaultVoiceMailAlphaTag = 17039364; // 0x1040004
     field public static final int dialog_alert_title = 17039380; // 0x1040014
     field public static final int emptyPhoneNumber = 17039366; // 0x1040006
+    field public static final int headset_plugin_view_text = 17039384; // 0x1040018
+    field public static final int headset_plugin_view_title = 17039385; // 0x1040019
     field public static final int httpErrorBadUrl = 17039367; // 0x1040007
     field public static final int httpErrorUnsupportedScheme = 17039368; // 0x1040008
     field public static final int no = 17039369; // 0x1040009
@@ -15683,6 +15686,7 @@ package android.os {
     field public static final java.lang.String DISPLAY;
     field public static final java.lang.String FINGERPRINT;
     field public static final java.lang.String HARDWARE;
+    field public static final java.lang.String HARDWARE_VERSION;
     field public static final java.lang.String HOST;
     field public static final java.lang.String ID;
     field public static final java.lang.String MANUFACTURER;
@@ -15690,6 +15694,7 @@ package android.os {
     field public static final java.lang.String PRODUCT;
     field public static final deprecated java.lang.String RADIO;
     field public static final java.lang.String SERIAL;
+    field public static final java.lang.String SOFTWARE_VERSION;
     field public static final java.lang.String TAGS;
     field public static final long TIME;
     field public static final java.lang.String TYPE;
@@ -17371,6 +17376,7 @@ package android.provider {
     field public static final java.lang.String CACHED_NAME = "name";
     field public static final java.lang.String CACHED_NUMBER_LABEL = "numberlabel";
     field public static final java.lang.String CACHED_NUMBER_TYPE = "numbertype";
+    field public static final java.lang.String CALLTYPE = "call_type";
     field public static final android.net.Uri CONTENT_FILTER_URI;
     field public static final java.lang.String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/calls";
     field public static final java.lang.String CONTENT_TYPE = "vnd.android.cursor.dir/calls";
@@ -17378,13 +17384,17 @@ package android.provider {
     field public static final java.lang.String DATE = "date";
     field public static final java.lang.String DEFAULT_SORT_ORDER = "date DESC";
     field public static final java.lang.String DURATION = "duration";
+    field public static final int INCOMING_CSVT_TYPE = 5; // 0x5
     field public static final int INCOMING_TYPE = 1; // 0x1
     field public static final java.lang.String IS_READ = "is_read";
     field public static final java.lang.String LIMIT_PARAM_KEY = "limit";
+    field public static final int MISSED_CSVT_TYPE = 7; // 0x7
     field public static final int MISSED_TYPE = 3; // 0x3
     field public static final java.lang.String NEW = "new";
     field public static final java.lang.String NUMBER = "number";
     field public static final java.lang.String OFFSET_PARAM_KEY = "offset";
+    field public static final int OUTGOING_CSVT_TYPE = 6; // 0x6
+    field public static final int OUTGOING_FAILED_TYPE = 4; // 0x4
     field public static final int OUTGOING_TYPE = 2; // 0x2
     field public static final java.lang.String TYPE = "type";
   }
@@ -18725,6 +18735,25 @@ package android.provider {
     field public static final java.lang.String SIZE = "_size";
   }
 
+  public class RecentCallsPreferences {
+    ctor public RecentCallsPreferences(android.content.Context);
+    method public long getLong(java.lang.String);
+    method public static synchronized android.provider.RecentCallsPreferences getPreferences(android.content.Context);
+    method public void setLong(java.lang.String, long);
+    field public static final java.lang.String ALL_INCOMING_CALLS = "all_incoming_calls";
+    field public static final java.lang.String ALL_LAST_CALLS = "all_last_calls";
+    field public static final java.lang.String ALL_OUTGOING_CALLS = "all_outgoing_calls";
+    field public static final java.lang.String ALL_TOTAL_CALLS = "all_total_calls";
+    field public static final java.lang.String SUB1_INCOMING_CALLS = "sub1_incoming_calls";
+    field public static final java.lang.String SUB1_LAST_CALLS = "sub1_last_calls";
+    field public static final java.lang.String SUB1_OUTGOING_CALLS = "sub1_outgoing_calls";
+    field public static final java.lang.String SUB1_TOTAL_CALLS = "sub1_total_calls";
+    field public static final java.lang.String SUB2_INCOMING_CALLS = "sub2_incoming_calls";
+    field public static final java.lang.String SUB2_LAST_CALLS = "sub2_last_calls";
+    field public static final java.lang.String SUB2_OUTGOING_CALLS = "sub2_outgoing_calls";
+    field public static final java.lang.String SUB2_TOTAL_CALLS = "sub2_total_calls";
+  }
+
   public class SearchRecentSuggestions {
     ctor public SearchRecentSuggestions(android.content.Context, java.lang.String, int);
     method public void clearHistory();
@@ -18794,6 +18823,9 @@ package android.provider {
     method public static boolean putLong(android.content.ContentResolver, java.lang.String, long);
     method public static boolean putString(android.content.ContentResolver, java.lang.String, java.lang.String);
     field public static final java.lang.String ADB_ENABLED = "adb_enabled";
+    field public static final java.lang.String AGPS_NETWORK = "agps_network";
+    field public static final java.lang.String AGPS_PROVID = "agps_provid";
+    field public static final java.lang.String AGPS_RESET_TYPE = "agps_reset_type";
     field public static final java.lang.String AIRPLANE_MODE_ON = "airplane_mode_on";
     field public static final java.lang.String AIRPLANE_MODE_RADIOS = "airplane_mode_radios";
     field public static final java.lang.String ALWAYS_FINISH_ACTIVITIES = "always_finish_activities";
@@ -18811,12 +18843,15 @@ package android.provider {
     field public static final java.lang.String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
     field public static final java.lang.String MODE_RINGER = "mode_ringer";
     field public static final java.lang.String NETWORK_PREFERENCE = "network_preference";
+    field public static final java.lang.String PREF_ASSISTED_GPS_TYPE = "pref_assisted_gps_type";
     field public static final java.lang.String RADIO_BLUETOOTH = "bluetooth";
     field public static final java.lang.String RADIO_CELL = "cell";
     field public static final java.lang.String RADIO_NFC = "nfc";
     field public static final java.lang.String RADIO_WIFI = "wifi";
     field public static final java.lang.String SHOW_PROCESSES = "show_processes";
     field public static final java.lang.String STAY_ON_WHILE_PLUGGED_IN = "stay_on_while_plugged_in";
+    field public static final java.lang.String SUPL_HOST = "supl_host";
+    field public static final java.lang.String SUPL_PORT = "supl_port";
     field public static final java.lang.String SYS_PROP_SETTING_VERSION = "sys.settings_global_version";
     field public static final java.lang.String TRANSITION_ANIMATION_SCALE = "transition_animation_scale";
     field public static final java.lang.String USB_MASS_STORAGE_ENABLED = "usb_mass_storage_enabled";
@@ -20795,6 +20830,7 @@ package android.telephony {
     method public static boolean compare(java.lang.String, java.lang.String);
     method public static boolean compare(android.content.Context, java.lang.String, java.lang.String);
     method public static java.lang.String convertKeypadLettersToDigits(java.lang.String);
+    method public static java.lang.String convertKeypadLettersToDigitsExt(java.lang.String);
     method public static java.lang.String extractNetworkPortion(java.lang.String);
     method public static java.lang.String extractPostDialPortion(java.lang.String);
     method public static void formatJapaneseNumber(android.text.Editable);
@@ -20899,6 +20935,7 @@ package android.telephony {
     method public java.util.ArrayList<java.lang.String> divideMessage(java.lang.String);
     method public static android.telephony.SmsManager getDefault();
     method public void sendDataMessage(java.lang.String, java.lang.String, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
+    method public void sendDataMessage(java.lang.String, java.lang.String, short, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
     method public void sendMultipartTextMessage(java.lang.String, java.lang.String, java.util.ArrayList<java.lang.String>, java.util.ArrayList<android.app.PendingIntent>, java.util.ArrayList<android.app.PendingIntent>);
     method public void sendTextMessage(java.lang.String, java.lang.String, java.lang.String, android.app.PendingIntent, android.app.PendingIntent);
     field public static final int RESULT_ERROR_GENERIC_FAILURE = 1; // 0x1
@@ -20916,6 +20953,7 @@ package android.telephony {
     method public static int[] calculateLength(java.lang.CharSequence, boolean);
     method public static int[] calculateLength(java.lang.String, boolean);
     method public static android.telephony.SmsMessage createFromPdu(byte[]);
+    method public static android.telephony.SmsMessage.DeliveryPdu getDeliveryPdu(java.lang.String, java.lang.String, java.lang.String, boolean, byte[]);
     method public java.lang.String getDisplayMessageBody();
     method public java.lang.String getDisplayOriginatingAddress();
     method public java.lang.String getEmailBody();
@@ -20934,6 +20972,7 @@ package android.telephony {
     method public deprecated int getStatusOnSim();
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, java.lang.String, boolean);
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, byte[], boolean);
+    method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, short, byte[], boolean);
     method public static int getTPLayerLengthForPDU(java.lang.String);
     method public long getTimestampMillis();
     method public byte[] getUserData();
@@ -20955,6 +20994,11 @@ package android.telephony {
     field public static final int MAX_USER_DATA_SEPTETS_WITH_HEADER = 153; // 0x99
   }
 
+  public static class SmsMessage.DeliveryPdu {
+    field public byte[] encodedMessage;
+    field public byte[] encodedScAddress;
+  }
+
   public static final class SmsMessage.MessageClass extends java.lang.Enum {
     method public static android.telephony.SmsMessage.MessageClass valueOf(java.lang.String);
     method public static final android.telephony.SmsMessage.MessageClass[] values();
@@ -20973,6 +21017,7 @@ package android.telephony {
   public class TelephonyManager {
     method public java.util.List<android.telephony.CellInfo> getAllCellInfo();
     method public int getCallState();
+    method public long getCallsDuration(java.lang.String);
     method public android.telephony.CellLocation getCellLocation();
     method public int getDataActivity();
     method public int getDataState();
@@ -20997,6 +21042,7 @@ package android.telephony {
     method public boolean hasIccCard();
     method public boolean isNetworkRoaming();
     method public void listen(android.telephony.PhoneStateListener, int);
+    method public void setCallsDuration(java.lang.String, long);
     field public static final java.lang.String ACTION_PHONE_STATE_CHANGED = "android.intent.action.PHONE_STATE";
     field public static final int CALL_STATE_IDLE = 0; // 0x0
     field public static final int CALL_STATE_OFFHOOK = 2; // 0x2

@@ -251,11 +251,11 @@ public final class ShutdownThread extends Thread {
             sIsStarted = true;
         }
 
-		//add by zouyanfei
-				mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-				mAudioManager.setWiredDeviceConnectionState(AudioManager.DEVICE_OUT_WIRED_HEADSET,
-													  0,
-													  "Headset");
+		//add for close headset
+		mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+		mAudioManager.setWiredDeviceConnectionState(AudioManager.DEVICE_OUT_WIRED_HEADSET,
+											  0,
+											  "Headset");
         // throw up an indeterminate system dialog to indicate radio is
         // shutting down.
         ProgressDialog pd = new ProgressDialog(context);

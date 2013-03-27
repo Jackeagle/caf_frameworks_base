@@ -54,6 +54,11 @@ import com.android.internal.R;
 import com.google.android.collect.Lists;
 
 import java.lang.ref.WeakReference;
+import android.app.AlertDialog;
+import android.view.WindowManager;
+import android.content.DialogInterface;
+import android.os.PowerManager;
+
 import java.util.ArrayList;
 
 /**
@@ -88,6 +93,13 @@ public class KeyguardUpdateMonitor {
     private static final int MSG_USER_REMOVED = 311;
     private static final int MSG_KEYGUARD_VISIBILITY_CHANGED = 312;
     protected static final int MSG_BOOT_COMPLETED = 313;
+    private static final int MSG_POWER_OFF_AT_ONCE = 320;
+    private static final int MSG_POWER_OFF = 321;
+    private static final int MSG_POWER_OFF_DELAY = 322;
+    private static final int DELAY_TIME = 15; // 8 seconds
+    private AlertDialog mPowerOffDialog = null;
+    PowerManager.WakeLock sWakeLock = null;
+    private boolean mButtonClicked;
 
 
     private static KeyguardUpdateMonitor sInstance;
@@ -167,6 +179,18 @@ public class KeyguardUpdateMonitor {
                 case MSG_BOOT_COMPLETED:
                     handleBootCompleted();
                     break;
+                    case MSG_POWER_OFF_AT_ONCE:
+                        //ShutdownThread.shutdown(mContext, false);
+                        handleAutoPowerOffAtOnce();
+                        break;
+                    case MSG_POWER_OFF:
+                        handleAutoPowerOff();
+                        break;
+                    case MSG_POWER_OFF_DELAY:
+                        if (!mButtonClicked) {
+                            handleAutoPowerOffDelay(msg.arg1);
+                        }
+                        break;
 
             }
         }
@@ -221,6 +245,10 @@ public class KeyguardUpdateMonitor {
                        intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0), 0));
             } else if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
                 mHandler.sendMessage(mHandler.obtainMessage(MSG_BOOT_COMPLETED));
+            }else if ("android.intent.action.POWER_OFF_AT_ONCE".equals(action)) {
+                mHandler.sendMessage(mHandler.obtainMessage(MSG_POWER_OFF_AT_ONCE));
+            }else if ("android.intent.action.POWER_OFF".equals(action)) {
+                mHandler.sendMessage(mHandler.obtainMessage(MSG_POWER_OFF));
             }
         }
     };
@@ -379,6 +407,9 @@ public class KeyguardUpdateMonitor {
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         filter.addAction(DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED);
         filter.addAction(Intent.ACTION_USER_REMOVED);
+		filter.addAction("android.intent.action.POWER_OFF");
+	    filter.addAction("android.intent.action.POWER_OFF_AT_ONCE");
+		
         context.registerReceiver(mBroadcastReceiver, filter);
 
         final IntentFilter bootCompleteFilter = new IntentFilter();
@@ -657,6 +688,104 @@ public class KeyguardUpdateMonitor {
             }
         }
     }
+    private void handleAutoPowerOffAtOnce() 
+    {
+        // acquire wake lock
+        PowerManager pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+        sWakeLock = pm.newWakeLock(
+                PowerManager.FULL_WAKE_LOCK |
+                PowerManager.ACQUIRE_CAUSES_WAKEUP |
+                PowerManager.ON_AFTER_RELEASE, TAG);
+        sWakeLock.acquire();
+
+        // implement shut down
+        shutdownalarm();
+        //ShutdownThread.shutdown(mContext, false);
+    }
+
+    /**
+     * Handle auto power off
+     */
+    private void handleAutoPowerOff() {
+        // reset mButtonClicked
+        mButtonClicked = false;
+        Log.v("AlarmClock","**********handleAutoPowerOff()******" );
+        // acquire wake lock.
+        PowerManager pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+        sWakeLock = pm.newWakeLock(
+                PowerManager.FULL_WAKE_LOCK |
+                PowerManager.ACQUIRE_CAUSES_WAKEUP |
+                PowerManager.ON_AFTER_RELEASE, TAG);
+        sWakeLock.acquire();
+        
+        // show dialog
+        final AlertDialog powerOffDialog = new AlertDialog.Builder(mContext)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .setTitle(R.string.auto_power_off_title)
+            .setMessage(mContext.getString(R.string.auto_power_off_msg, DELAY_TIME))
+            //.setMessage("shutdown in 8 seconds.")
+            .setCancelable(false)
+            .setPositiveButton(com.android.internal.R.string.power_off, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) 
+                {
+                    mHandler.removeMessages(MSG_POWER_OFF_DELAY);
+                    mButtonClicked = true;
+                    mPowerOffDialog = null;
+                    
+                    shutdownalarm();
+                    //ShutdownThread.shutdown(mContext, false);
+                }
+            })
+            .setNegativeButton(com.android.internal.R.string.cancel, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) 
+                {
+                    mHandler.removeMessages(MSG_POWER_OFF_DELAY);
+                    mButtonClicked = true;
+                    mPowerOffDialog = null;
+                    
+                    // release wake lock.
+                    sWakeLock.release();
+                    sWakeLock = null;
+                }
+            })
+            .create();
+            powerOffDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
+            powerOffDialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+            powerOffDialog.show();
+            mPowerOffDialog = powerOffDialog;
+
+        // send delay message
+        final Message msg = mHandler.obtainMessage(MSG_POWER_OFF_DELAY, (DELAY_TIME-1), 0);
+        mHandler.sendMessageDelayed(msg, 1000);
+        
+    }
+
+    
+    /**
+     * Handle auto power off delay
+     */
+    private void handleAutoPowerOffDelay(int delay) {
+    	 Log.v("AlarmClock","**********handleAutoPowerOff()******delay=" + delay );
+        if (delay == 0) {
+            // close dialog
+            if (mPowerOffDialog != null) {
+                mPowerOffDialog.dismiss();
+                mPowerOffDialog = null;
+            }
+            // implement shut down
+            shutdownalarm();
+            //ShutdownThread.shutdown(mContext, false);
+            return;
+        }
+
+        // update dialog message
+        String msgStr = mContext.getString(com.android.internal.R.string.auto_power_off_msg, delay);
+        mPowerOffDialog.setMessage(msgStr);
+
+        // send delay message
+        final Message msg = mHandler.obtainMessage(MSG_POWER_OFF_DELAY, (delay-1), 0);
+        mHandler.sendMessageDelayed(msg, 1000);
+    }
 
     public boolean isKeyguardVisible() {
         return mKeyguardIsVisible;
@@ -932,5 +1061,11 @@ public class KeyguardUpdateMonitor {
         return (simState == IccCardConstants.State.PIN_REQUIRED
                 || simState == IccCardConstants.State.PUK_REQUIRED
                 || simState == IccCardConstants.State.PERM_DISABLED);
+    }
+	private void shutdownalarm() {
+        Intent intent = new Intent(Intent.ACTION_REQUEST_SHUTDOWN);
+        intent.putExtra(Intent.EXTRA_KEY_CONFIRM, false);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        mContext.startActivity(intent);
     }
 }

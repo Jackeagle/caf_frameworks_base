@@ -46,6 +46,15 @@
     -->
     <string name="def_location_providers_allowed" translatable="false">gps</string>
     <bool name="assisted_gps_enabled">true</bool>
+    <integer name="def_pref_assisted_gps_type">0</integer>
+<!--add for AGPS parameters settings. Begin-->
+    <string name="supl_host">221.176.0.55</string>
+    <string name="supl_port">7275</string>
+    <string name="agps_provid">MSB</string>
+    <string name="agps_reset_type">HOT</string>
+    <string name="agps_network">HOME</string>
+<!--add for AGPS parameters settings. End-->
+
     <!--  0 == mobile, 1 == wifi. -->
     <integer name="def_network_preference">1</integer>
     <bool name="def_netstats_enabled">true</bool>
@@ -173,4 +182,16 @@
 
     <!-- Default for Settings.Secure.USER_SETUP_COMPLETE -->
     <bool name="def_user_setup_complete">false</bool>
+
+    <!-- Default for Settings.System.KEY_BACKLIGHT-->
+    <integer name="def_key_backlight_values">1</integer>
+
+    <!-- Default for Settings.Secure.PROXIMITY_SENSOR -->
+    <bool name="def_proximity_sensor">true</bool>
+
+    <!-- Default for Settings.Secure.VIBRATE_AFTER_CONNECTED -->
+    <bool name="def_vibrate_after_connected">true</bool>
+
+    <string name="def_default_input_method">com.android.inputmethod.pinyin/.PinyinIME</string>
+    <string name="def_enabled_input_methods">com.android.inputmethod.pinyin/.PinyinIME</string>    
 </resources>

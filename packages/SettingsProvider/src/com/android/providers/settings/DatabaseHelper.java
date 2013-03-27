@@ -57,6 +57,8 @@ import com.android.internal.util.XmlUtils;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.LockPatternView;
 
+import com.qrd.plugin.feature_query.FeatureQuery;
+
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -1960,6 +1962,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                     + " VALUES(?,?);");
 
+            loadSetting(stmt, Settings.System.MULTI_SIM_COUNTDOWN, 5);
+            loadSetting(stmt, Settings.System.CALLBACK_PRIORITY_ENABLED, FeatureQuery.FEATURE_UX_SETTINGS_PREFERREDCALLBACK ? 1: 0);
+
             loadBooleanSetting(stmt, Settings.System.DIM_SCREEN,
                     R.bool.def_dim_screen);
             loadIntegerSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT,
@@ -1994,6 +1999,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadIntegerSetting(stmt, Settings.System.POINTER_SPEED,
                     R.integer.def_pointer_speed);
+
+            loadSetting(stmt, Settings.System.SHOW_DURATION,
+                    FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
+
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
+
+            loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
+                    R.bool.def_proximity_sensor);
+        
+            loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
+                    R.bool.def_vibrate_after_connected);
+
         } finally {
             if (stmt != null) stmt.close();
         }
@@ -2107,6 +2125,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadBooleanSetting(stmt, Settings.Secure.USER_SETUP_COMPLETE,
                     R.bool.def_user_setup_complete);
+			 //add for inputmethod
+            loadStringSetting(stmt, Settings.Secure.DEFAULT_INPUT_METHOD,
+					R.string.def_default_input_method);
+			
+			loadStringSetting(stmt, Settings.Secure.ENABLED_INPUT_METHODS,
+									R.string.def_enabled_input_methods);
+            // add end 		
         } finally {
             if (stmt != null) stmt.close();
         }
@@ -2143,6 +2168,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadBooleanSetting(stmt, Settings.Global.ASSISTED_GPS_ENABLED,
                     R.bool.assisted_gps_enabled);
+    
+            loadIntegerSetting(stmt, Settings.Global.PREF_ASSISTED_GPS_TYPE,
+                    R.integer.def_pref_assisted_gps_type);
+
+            /* add for AGPS parameters settings. Begin*/
+            loadStringSetting(stmt, Settings.Global.SUPL_HOST,
+                    R.string.supl_host);
+            loadStringSetting(stmt, Settings.Global.SUPL_PORT,
+                    R.string.supl_port);
+
+            loadStringSetting(stmt, Settings.Global.AGPS_PROVID,
+                    R.string.agps_provid);
+
+            loadStringSetting(stmt, Settings.Global.AGPS_RESET_TYPE,
+                    R.string.agps_reset_type);
+            loadStringSetting(stmt, Settings.Global.AGPS_NETWORK,
+                    R.string.agps_network);
+
 
             loadBooleanSetting(stmt, Settings.Global.AUTO_TIME,
                     R.bool.def_auto_time); // Sync time to NITZ

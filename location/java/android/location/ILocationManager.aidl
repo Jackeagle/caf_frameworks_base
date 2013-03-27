@@ -88,6 +88,7 @@ interface ILocationManager
 
     // for reporting callback completion
     void locationCallbackFinished(ILocationListener listener);
-
+    boolean syncDeviceManagementInfo(String provider, in Bundle dminfo);
+    Bundle readAgpsSettingInfo(String provider);
 
 }

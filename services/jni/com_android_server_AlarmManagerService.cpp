@@ -96,6 +96,22 @@ static jint android_server_AlarmManagerService_waitForAlarm(JNIEnv* env, jobject
     return result;
 }
 
+#define ANDROID_ALARM_GET_RTC_WAKEUP  _IO('a', 6)
+static jint android_server_AlarmManagerService_getPowerOnReason(JNIEnv* env, jobject obj, jint fd)
+{
+#if HAVE_ANDROID_OS
+    int result = 0;
+    result = ioctl(fd, ANDROID_ALARM_GET_RTC_WAKEUP);
+    if (result < 0)
+    {
+        ALOGE("Unable to get_power_on_reason!!!\n");
+        return -1;
+    }
+    return result;
+#else
+    return -1;
+#endif
+}
 static JNINativeMethod sMethods[] = {
      /* name, signature, funcPtr */
 	{"init", "()I", (void*)android_server_AlarmManagerService_init},
@@ -103,6 +119,7 @@ static JNINativeMethod sMethods[] = {
 	{"set", "(IIJJ)V", (void*)android_server_AlarmManagerService_set},
     {"waitForAlarm", "(I)I", (void*)android_server_AlarmManagerService_waitForAlarm},
     {"setKernelTimezone", "(II)I", (void*)android_server_AlarmManagerService_setKernelTimezone},
+    {"getPowerOnReason", "(I)I", (void*)android_server_AlarmManagerService_getPowerOnReason},
 };
 
 int register_android_server_AlarmManagerService(JNIEnv* env)
