@@ -20935,6 +20935,7 @@ package android.telephony {
     method public java.util.ArrayList<java.lang.String> divideMessage(java.lang.String);
     method public static android.telephony.SmsManager getDefault();
     method public void sendDataMessage(java.lang.String, java.lang.String, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
+    method public void sendDataMessage(java.lang.String, java.lang.String, short, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
     method public void sendMultipartTextMessage(java.lang.String, java.lang.String, java.util.ArrayList<java.lang.String>, java.util.ArrayList<android.app.PendingIntent>, java.util.ArrayList<android.app.PendingIntent>);
     method public void sendTextMessage(java.lang.String, java.lang.String, java.lang.String, android.app.PendingIntent, android.app.PendingIntent);
     field public static final int RESULT_ERROR_GENERIC_FAILURE = 1; // 0x1
@@ -20952,6 +20953,7 @@ package android.telephony {
     method public static int[] calculateLength(java.lang.CharSequence, boolean);
     method public static int[] calculateLength(java.lang.String, boolean);
     method public static android.telephony.SmsMessage createFromPdu(byte[]);
+    method public static android.telephony.SmsMessage.DeliveryPdu getDeliveryPdu(java.lang.String, java.lang.String, java.lang.String, boolean, byte[]);
     method public java.lang.String getDisplayMessageBody();
     method public java.lang.String getDisplayOriginatingAddress();
     method public java.lang.String getEmailBody();
@@ -20970,6 +20972,7 @@ package android.telephony {
     method public deprecated int getStatusOnSim();
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, java.lang.String, boolean);
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, byte[], boolean);
+    method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, short, byte[], boolean);
     method public static int getTPLayerLengthForPDU(java.lang.String);
     method public long getTimestampMillis();
     method public byte[] getUserData();
@@ -20989,6 +20992,11 @@ package android.telephony {
     field public static final int MAX_USER_DATA_BYTES_WITH_HEADER = 134; // 0x86
     field public static final int MAX_USER_DATA_SEPTETS = 160; // 0xa0
     field public static final int MAX_USER_DATA_SEPTETS_WITH_HEADER = 153; // 0x99
+  }
+
+  public static class SmsMessage.DeliveryPdu {
+    field public byte[] encodedMessage;
+    field public byte[] encodedScAddress;
   }
 
   public static final class SmsMessage.MessageClass extends java.lang.Enum {
