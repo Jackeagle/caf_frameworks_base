@@ -3797,15 +3797,15 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 s2 = mSpannableFactory.newSpannable(text);
             }
 
-            if (Linkify.addLinks(s2, mAutoLinkMask)) {
+            if (Linkify.addLinks(s2, mAutoLinkMask)) { 
                 text = s2;
                 type = (type == BufferType.EDITABLE) ? BufferType.EDITABLE : BufferType.SPANNABLE;
 
                 /*
-                 * We must go ahead and set the text before changing the
-                 * movement method, because setMovementMethod() may call
-                 * setText() again to try to upgrade the buffer type.
-                 */
+                           * We must go ahead and set the text before changing the
+                           * movement method, because setMovementMethod() may call
+                           * setText() again to try to upgrade the buffer type.
+                           */
                 mText = text;
 
                 // Do not change the movement method for text that support text selection as it
@@ -3814,6 +3814,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     setMovementMethod(LinkMovementMethod.getInstance());
                 }
             }
+
         }
 
         mBufferType = type;
