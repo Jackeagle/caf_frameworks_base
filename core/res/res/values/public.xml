@@ -51,8 +51,13 @@
   <java-symbol type="string" name="usb_storage_stop_notification_title" />
   <java-symbol type="string" name="usb_storage_stop_title" />
   <java-symbol type="string" name="usb_storage_title" />
+<<<<<<< HEAD
   <java-symbol type="string" name="global_action_power_off_fast" />
   <java-symbol type="string" name="global_action_power_off_fast_sumrary" />
+=======
+  <java-symbol type="string" name="auto_power_off_title" />
+  <java-symbol type="string" name="auto_power_off_msg" />
+>>>>>>> 92cbdd79473f10ddf92f042e83fe9038c8ad42dd
   <!-- We don't want to publish private symbols in android.R as part of the
        SDK.  Instead, put them here. -->
   <private-symbols package="com.android.internal" />
