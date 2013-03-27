@@ -63,7 +63,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.OutputStreamWriter;
-
+import android.content.pm.ActivityInfo;
 import android.media.AudioManager;
 import java.lang.reflect.Method;
 
@@ -265,6 +265,9 @@ public final class ShutdownThread extends Thread {
         pd.setCancelable(false);
         pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
 
+        WindowManager.LayoutParams lp = pd.getWindow().getAttributes();    
+        lp.screenOrientation = ActivityInfo.SCREEN_ORIENTATION_NOSENSOR;    
+        pd.getWindow().setAttributes(lp);          
         pd.show();
 
         sInstance.mContext = context;
