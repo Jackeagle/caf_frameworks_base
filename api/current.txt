@@ -2980,6 +2980,7 @@ package android.app {
 
   public class AlarmManager {
     method public void cancel(android.app.PendingIntent);
+    method public int getPowerOnReason();
     method public void set(int, long, android.app.PendingIntent);
     method public void setInexactRepeating(int, long, long, android.app.PendingIntent);
     method public void setRepeating(int, long, long, android.app.PendingIntent);
@@ -2993,6 +2994,7 @@ package android.app {
     field public static final long INTERVAL_HALF_HOUR = 1800000L; // 0x1b7740L
     field public static final long INTERVAL_HOUR = 3600000L; // 0x36ee80L
     field public static final int RTC = 1; // 0x1
+    field public static final int RTC_POWEROFF_WAKEUP = 4; // 0x4
     field public static final int RTC_WAKEUP = 0; // 0x0
   }
 
@@ -5783,6 +5785,7 @@ package android.content {
     field public static final java.lang.String ACTION_DEFAULT = "android.intent.action.VIEW";
     field public static final java.lang.String ACTION_DELETE = "android.intent.action.DELETE";
     field public static final java.lang.String ACTION_DEVICE_STORAGE_LOW = "android.intent.action.DEVICE_STORAGE_LOW";
+    field public static final java.lang.String ACTION_DEVICE_STORAGE_NEARLY_FULL = "android.intent.action.DEVICE_STORAGE_NEARLY_FULL";
     field public static final java.lang.String ACTION_DEVICE_STORAGE_OK = "android.intent.action.DEVICE_STORAGE_OK";
     field public static final java.lang.String ACTION_DIAL = "android.intent.action.DIAL";
     field public static final java.lang.String ACTION_DOCK_EVENT = "android.intent.action.DOCK_EVENT";
@@ -23087,6 +23090,7 @@ package android.text.util {
     ctor public Linkify();
     method public static final boolean addLinks(android.text.Spannable, int);
     method public static final boolean addLinks(android.widget.TextView, int);
+    method public static final boolean addLinks(android.text.Spannable, int, java.lang.String, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String, android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter);
     method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String);
@@ -29729,6 +29733,7 @@ package android.widget {
     method public void setSingleLine();
     method public void setSingleLine(boolean);
     method public final void setSpannableFactory(android.text.Spannable.Factory);
+    method public void setTelUrl(java.lang.String);
     method public final void setText(java.lang.CharSequence);
     method public void setText(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public final void setText(char[], int, int);
@@ -29737,6 +29742,8 @@ package android.widget {
     method public void setTextAppearance(android.content.Context, int);
     method public void setTextColor(int);
     method public void setTextColor(android.content.res.ColorStateList);
+    method public final void setTextExt(java.lang.CharSequence);
+    method public void setTextExt(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public void setTextIsSelectable(boolean);
     method public final void setTextKeepState(java.lang.CharSequence);
     method public final void setTextKeepState(java.lang.CharSequence, android.widget.TextView.BufferType);
@@ -29747,6 +29754,7 @@ package android.widget {
     method public final void setTransformationMethod(android.text.method.TransformationMethod);
     method public void setTypeface(android.graphics.Typeface, int);
     method public void setTypeface(android.graphics.Typeface);
+    method public void setWebUrl(java.lang.String);
     method public void setWidth(int);
   }
 
