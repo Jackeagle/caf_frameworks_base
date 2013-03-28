@@ -154,6 +154,8 @@
     <string name="global_actions" product="default" msgid="2406416831541615258">"手机选项"</string>
     <string name="global_action_lock" msgid="2844945191792119712">"屏幕锁定"</string>
     <string name="global_action_power_off" msgid="4471879440839879722">"关机"</string>
+	<string name="global_action_power_off_fast">"快速开关机"</string>
+    <string name="global_action_power_off_fast_sumrary">系统深度休眠关机模式</string>
     <string name="global_action_bug_report" msgid="7934010578922304799">"错误报告"</string>
     <string name="bugreport_title" msgid="2667494803742548533">"提交错误报告"</string>
     <string name="bugreport_message" msgid="398447048750350456">"这会收集有关当前设备状态的信息，并以电子邮件的形式进行发送。从开始生成错误报告到准备好发送需要一点时间，请耐心等待。"</string>
@@ -1378,7 +1380,7 @@
     <string name="action_menu_overflow_description" msgid="2295659037509008453">"更多选项"</string>
     <string name="storage_internal" msgid="4891916833657929263">"内存设备"</string>
     <string name="storage_sd_card" msgid="3282948861378286745">"SD 卡"</string>
-    <string name="storage_usb" msgid="3017954059538517278">"USB 存储器"</string>
+    <string name="storage_usb" msgid="3017954059538517278">"话机U盘"</string>
     <string name="extract_edit_menu_button" msgid="8940478730496610137">"修改"</string>
     <string name="data_usage_warning_title" msgid="1955638862122232342">"流量使用警告"</string>
     <string name="data_usage_warning_body" msgid="2814673551471969954">"触摸可查看使用情况和设置。"</string>
@@ -1486,4 +1488,7 @@
     <!-- CMCC WLAN customization begin-->
     <string name="reconnect_net_for_wifi_disconnected">"WLAN网络已断开，是否切换到移动网络继续上网？"</string>
     <!-- CMCC WLAN customization end-->
+    <string name="auto_power_off_title">自动关机</string>  
+    <string name="auto_power_off_msg">系统将在<xliff:g id="seconds">%d</xliff:g> 秒后关机.</string>
+
 </resources>

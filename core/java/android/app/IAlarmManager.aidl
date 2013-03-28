@@ -30,6 +30,8 @@ interface IAlarmManager {
     void setTime(long millis);
     void setTimeZone(String zone);
     void remove(in PendingIntent operation);
+    //added for autopower on
+    int getPowerOnReason();
 }
 
 
