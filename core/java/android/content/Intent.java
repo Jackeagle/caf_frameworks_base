@@ -1921,6 +1921,25 @@ public class Intent implements Parcelable, Cloneable {
      * notification.
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_DEVICE_STORAGE_NEARLY_FULL = "android.intent.action.DEVICE_STORAGE_NEARLY_FULL";
+    /**
+     * Broadcast Action:  Indicates memory nearly full condition on the device
+     * no longer exists.
+     *
+     * <p class="note">This is a protected intent that can only be sent
+     * by the system.
+     *
+     * {@hide}
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_DEVICE_STORAGE_NOT_NEARLY_FULL = "android.intent.action.DEVICE_STORAGE_NOT_NEARLY_FULL";
+    /**
+     * Broadcast Action:  Indicates low memory condition notification acknowledged by user
+     * and package management should be started.
+     * This is triggered by the user from the ACTION_DEVICE_STORAGE_LOW
+     * notification.
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_MANAGE_PACKAGE_STORAGE = "android.intent.action.MANAGE_PACKAGE_STORAGE";
     /**
      * Broadcast Action:  The device has entered USB Mass Storage mode.
