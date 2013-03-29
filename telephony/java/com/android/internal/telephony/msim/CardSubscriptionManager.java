@@ -158,6 +158,7 @@ public class CardSubscriptionManager extends Handler {
     private RegistrantList[] mCardInfoUnavailableRegistrants;
     private RegistrantList[] mCardInfoAvailableRegistrants;
     private RegistrantList mAllCardsInfoAvailableRegistrants = new RegistrantList();
+    private RegistrantList mSimStateRegistrants = new RegistrantList();
 
     // The subscription information of all the cards
     private SubscriptionData[] mCardSubData = null;
@@ -595,12 +596,25 @@ public class CardSubscriptionManager extends Handler {
             notifyCardInfoNotAvailable(cardIndex, CardUnavailableReason.REASON_CARD_REMOVED);
         }
 
+        if (cardRemoved || cardInserted) {
+            mSimStateRegistrants.notifyRegistrants();
+        }
+
         // Required to notify only once!!!
         // Notify if all card info is available.
         if (isValidCards() && !mAllCardsInfoAvailable && mRadioOn[cardIndex]) {
             mAllCardsInfoAvailable = true;
             notifyAllCardsInfoAvailable();
         }
+    }
+
+    public synchronized void registerForSimStateChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+        mSimStateRegistrants.add(r);
+    }
+
+    public synchronized void unRegisterForSimStateChanged(Handler h) {
+        mSimStateRegistrants.remove(h);
     }
 
     private void fillAppIndex(Subscription cardSub, int appIndex) {
