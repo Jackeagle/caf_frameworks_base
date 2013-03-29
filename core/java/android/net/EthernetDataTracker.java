@@ -84,6 +84,12 @@ public class EthernetDataTracker implements NetworkStateTracker {
                     mTracker.reconnect();
                 } else {
                     mTracker.disconnect();
+                    NetworkUtils.stopDhcp(mIface);
+                    mTracker.mNetworkInfo.setIsAvailable(false);
+                    mTracker.mNetworkInfo.setDetailedState(DetailedState.DISCONNECTED,
+                                                           null, null);
+                    Message msg = mTracker.mCsHandler.obtainMessage(EVENT_STATE_CHANGED, mTracker.mNetworkInfo);
+                    msg.sendToTarget();
                 }
             }
         }
