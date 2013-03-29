@@ -225,6 +225,14 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         return getNameServerList(sDnsPropNames);
     }
 */
+    /**
+     * Captive check is complete, switch to network
+     */
+    @Override
+    public void captivePortalCheckComplete() {
+        // not implemented
+    }
+
     @Override
     public String getTcpBufferSizesPropName() {
         return "net.tcp.buffersize.default";
