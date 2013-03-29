@@ -273,6 +273,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private boolean mFreezesText;
     private boolean mTemporaryDetach;
     private boolean mDispatchTemporaryDetach;
+    // add for linkable response in mms message content 
+    private String mTelUrl = "tel:";
+    private String mWebUrl = "http://";  
 
     private Editable.Factory mEditableFactory = Editable.Factory.getInstance();
     private Spannable.Factory mSpannableFactory = Spannable.Factory.getInstance();
@@ -3529,6 +3532,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         setText(text, mBufferType);
     }
 
+    /*used in Mms message content screen */
+    public final void setTextExt(CharSequence text) {
+        setTextExt(text, mBufferType);
+    }
+    
     /**
      * Like {@link #setText(CharSequence)},
      * except that the cursor position (if any) is retained in the new text.
@@ -3558,6 +3566,166 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
     }
 
+    /*used in Mms message content screen */
+    public void setTextExt(CharSequence text, BufferType type) {
+        setTextExt(text, type, true, 0);
+
+        if (mCharWrapper != null) {
+            mCharWrapper.mChars = null;
+        }
+    }
+
+    private void setTextExt(CharSequence text, BufferType type,
+                         boolean notifyBefore, int oldlen) {
+        if (text == null) {
+            text = "";
+        }
+
+        // If suggestions are not enabled, remove the suggestion spans from the text
+        if (!isSuggestionsEnabled()) {
+            text = removeSuggestionSpans(text);
+        }
+
+        if (!mUserSetTextScaleX) mTextPaint.setTextScaleX(1.0f);
+
+        if (text instanceof Spanned &&
+            ((Spanned) text).getSpanStart(TextUtils.TruncateAt.MARQUEE) >= 0) {
+            if (ViewConfiguration.get(mContext).isFadingMarqueeEnabled()) {
+                setHorizontalFadingEdgeEnabled(true);
+                mMarqueeFadeMode = MARQUEE_FADE_NORMAL;
+            } else {
+                setHorizontalFadingEdgeEnabled(false);
+                mMarqueeFadeMode = MARQUEE_FADE_SWITCH_SHOW_ELLIPSIS;
+            }
+            setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        }
+
+        int n = mFilters.length;
+        for (int i = 0; i < n; i++) {
+            CharSequence out = mFilters[i].filter(text, 0, text.length(), EMPTY_SPANNED, 0, 0);
+            if (out != null) {
+                text = out;
+            }
+        }
+
+        if (notifyBefore) {
+            if (mText != null) {
+                oldlen = mText.length();
+                sendBeforeTextChanged(mText, 0, oldlen, text.length());
+            } else {
+                sendBeforeTextChanged("", 0, 0, text.length());
+            }
+        }
+
+        boolean needEditableForNotification = false;
+
+        if (mListeners != null && mListeners.size() != 0) {
+            needEditableForNotification = true;
+        }
+
+        if (type == BufferType.EDITABLE || getKeyListener() != null ||
+                needEditableForNotification) {
+            createEditorIfNeeded();
+            Editable t = mEditableFactory.newEditable(text);
+            text = t;
+            setFilters(t, mFilters);
+            InputMethodManager imm = InputMethodManager.peekInstance();
+            if (imm != null) imm.restartInput(this);
+        } else if (type == BufferType.SPANNABLE || mMovement != null) {
+            text = mSpannableFactory.newSpannable(text);
+        } else if (!(text instanceof CharWrapper)) {
+            text = TextUtils.stringOrSpannedString(text);
+        }
+
+        if (mAutoLinkMask != 0) {
+            Spannable s2;
+
+            if (type == BufferType.EDITABLE || text instanceof Spannable) {
+                s2 = (Spannable) text;
+            } else {
+                s2 = mSpannableFactory.newSpannable(text);
+            }
+
+/*Start of  zhuzhongwei 2010.11.24*/
+	         if (Linkify.addLinks(s2, mAutoLinkMask, mTelUrl, mWebUrl)) {            
+	/*End   of  zhuzhongwei 2010.11.24*/
+                text = s2;
+                type = (type == BufferType.EDITABLE) ? BufferType.EDITABLE : BufferType.SPANNABLE;
+
+               /*
+                         * We must go ahead and set the text before changing the
+                         * movement method, because setMovementMethod() may call
+                         * setText() again to try to upgrade the buffer type.
+                         */
+                mText = text;
+
+                // Do not change the movement method for text that support text selection as it
+                // would prevent an arbitrary cursor displacement.
+                if (mLinksClickable && !textCanBeSelected()) {
+                    setMovementMethod(LinkMovementMethod.getInstance());
+                }
+             }           
+        }
+
+        mBufferType = type;
+        mText = text;
+
+        if (mTransformation == null) {
+            mTransformed = text;
+        } else {
+            mTransformed = mTransformation.getTransformation(text, this);
+        }
+
+        final int textLength = text.length();
+
+        if (text instanceof Spannable && !mAllowTransformationLengthChange) {
+            Spannable sp = (Spannable) text;
+
+            // Remove any ChangeWatchers that might have come from other TextViews.
+            final ChangeWatcher[] watchers = sp.getSpans(0, sp.length(), ChangeWatcher.class);
+            final int count = watchers.length;
+            for (int i = 0; i < count; i++) {
+                sp.removeSpan(watchers[i]);
+            }
+
+            if (mChangeWatcher == null) mChangeWatcher = new ChangeWatcher();
+
+            sp.setSpan(mChangeWatcher, 0, textLength, Spanned.SPAN_INCLUSIVE_INCLUSIVE |
+                       (CHANGE_WATCHER_PRIORITY << Spanned.SPAN_PRIORITY_SHIFT));
+
+            if (mEditor != null) mEditor.addSpanWatchers(sp);
+
+            if (mTransformation != null) {
+                sp.setSpan(mTransformation, 0, textLength, Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+            }
+
+            if (mMovement != null) {
+                mMovement.initialize(this, (Spannable) text);
+
+                /*
+                 * Initializing the movement method will have set the
+                 * selection, so reset mSelectionMoved to keep that from
+                 * interfering with the normal on-focus selection-setting.
+                 */
+                if (mEditor != null) mEditor.mSelectionMoved = false;
+            }
+        }
+
+        if (mLayout != null) {
+            checkForRelayout();
+        }
+
+        sendOnTextChanged(text, 0, oldlen, textLength);
+        onTextChanged(text, 0, oldlen, textLength);
+
+        if (needEditableForNotification) {
+            sendAfterTextChanged((Editable) text);
+        }
+
+        // SelectionModifierCursorController depends on textCanBeSelected, which depends on text
+        if (mEditor != null) mEditor.prepareCursorControllers();
+    }
+    
     private void setText(CharSequence text, BufferType type,
                          boolean notifyBefore, int oldlen) {
         if (text == null) {
@@ -3828,6 +3996,32 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         return (type & (EditorInfo.TYPE_MASK_CLASS | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE)) ==
             (EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE);
     }
+
+    // add for linkable response in mms message content
+    public void setTelUrl(String urlStr)
+    {
+        if (TextUtils.isEmpty(urlStr))
+        {
+            mTelUrl = "tel:";
+        }
+        else
+        {
+            mTelUrl = urlStr;
+        }
+    }
+    
+    public void setWebUrl(String urlStr)
+    {
+        if (TextUtils.isEmpty(urlStr))
+        {
+            mWebUrl = "http://";
+        }
+        else
+        {
+            mWebUrl = urlStr;
+        }
+    }
+    
 
     /**
      * Removes the suggestion spans.
@@ -7537,19 +7731,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
 
             final boolean textIsSelectable = isTextSelectable();
-            if (touchIsFinished && mLinksClickable && mAutoLinkMask != 0 && textIsSelectable) {
-                // The LinkMovementMethod which should handle taps on links has not been installed
-                // on non editable text that support text selection.
-                // We reproduce its behavior here to open links for these.
-                ClickableSpan[] links = ((Spannable) mText).getSpans(getSelectionStart(),
-                        getSelectionEnd(), ClickableSpan.class);
-
-                if (links.length > 0) {
-                    links[0].onClick(this);
-                    handled = true;
-                }
-            }
-
             if (touchIsFinished && (isTextEditable() || textIsSelectable)) {
                 // Show the IME, except when selecting in read-only text.
                 final InputMethodManager imm = InputMethodManager.peekInstance();
@@ -7562,6 +7743,19 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 mEditor.onTouchUpEvent(event);
 
                 handled = true;
+            }
+            
+            if (touchIsFinished && mLinksClickable && mAutoLinkMask != 0 && textIsSelectable) {
+                // The LinkMovementMethod which should handle taps on links has not been installed
+                // on non editable text that support text selection.
+                // We reproduce its behavior here to open links for these.
+                ClickableSpan[] links = ((Spannable) mText).getSpans(getSelectionStart(),
+                        getSelectionEnd(), ClickableSpan.class);
+
+                if (links.length > 0) {
+                    links[0].onClick(this);
+                    handled = true;
+                }
             }
 
             if (handled) {

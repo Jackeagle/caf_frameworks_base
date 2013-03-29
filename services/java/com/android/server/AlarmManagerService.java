@@ -55,10 +55,15 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.TimeZone;
 
 import com.android.internal.util.LocalLog;
+import android.util.Log;
+import java.io.IOException;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 
 class AlarmManagerService extends IAlarmManager.Stub {
     // The threshold for how long an alarm can be late before we print a
@@ -214,9 +219,46 @@ class AlarmManagerService extends IAlarmManager.Stub {
     public void set(int type, long triggerAtTime, PendingIntent operation) {
         setRepeating(type, triggerAtTime, 0, operation);
     }
+    private void saveRtcAlarm(long time) {
+	 FileOutputStream outputStream=null;
+        try {
+                outputStream = new FileOutputStream("/data/misc/lastalarm", false);
+            try {
+                outputStream.write(Long.toString(time).getBytes());
+            } catch (IOException e) {
+                Log.e(TAG, "saveRtcAlarm exception: "+e.toString());
+            }
+        } catch (FileNotFoundException ee) {
+            Log.e(TAG, "saveRtcAlarm exception: "+ee.toString());
+        }
+		finally {
+			if(outputStream != null)
+			{
+				try{
+                    outputStream.flush();
+                    outputStream.close();
+                } catch (IOException ex) {
+                    Log.e(TAG, "Cannot close output stream for: " + ex.toString());
+	            }
+			}
+		}
+    }
     
     public void setRepeating(int type, long triggerAtTime, long interval, 
             PendingIntent operation) {
+        if (type == AlarmManager.RTC_POWEROFF_WAKEUP)
+        {         
+            if (mDescriptor != -1) 
+            {
+               set(mDescriptor, type,  triggerAtTime/1000, (triggerAtTime% 1000)*1000*1000);
+                Time time = new Time();
+                time.set(triggerAtTime);
+                String powerOffTime = time.format("%Y-%m-%d %H:%M:%S");
+                Log.w(TAG, "______Power-off alarm time: " + powerOffTime);
+                saveRtcAlarm(triggerAtTime);
+            }
+            return;
+        }
         if (operation == null) {
             Slog.w(TAG, "set/setRepeating ignored because there is no intent");
             return;
@@ -1184,5 +1226,14 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 }
             }
         }
+    }
+    private native int getPowerOnReason(int fd);
+        public int getPowerOnReason()
+        {
+            if (mDescriptor != -1)
+            {
+                return getPowerOnReason(mDescriptor);
+            }
+            return -1;
     }
 }

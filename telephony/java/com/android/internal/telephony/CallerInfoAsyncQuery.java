@@ -16,10 +16,13 @@
 
 package com.android.internal.telephony;
 
+import java.util.Locale;
+
 import android.content.AsyncQueryHandler;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.SQLException;
+import android.location.Country;
 import android.location.CountryDetector;
 import android.net.Uri;
 import android.os.Handler;
@@ -260,22 +263,34 @@ public class CallerInfoAsyncQuery {
                         // new parameter to CallerInfoAsyncQuery.startQuery() to force
                         // the geoDescription field to be populated.)
 
-                        if (TextUtils.isEmpty(mCallerInfo.name)) {
+                        // update Geo Info all time
+                        //if (TextUtils.isEmpty(mCallerInfo.name)) {
                             // Actually when no contacts match the incoming phone number,
                             // the CallerInfo object is totally blank here (i.e. no name
                             // *or* phoneNumber).  So we need to pass in cw.number as
                             // a fallback number.
                             mCallerInfo.updateGeoDescription(mQueryContext, cw.number);
-                        }
+                        //}
                     }
 
                     // Use the number entered by the user for display.
                     if (!TextUtils.isEmpty(cw.number)) {
                         CountryDetector detector = (CountryDetector) mQueryContext.getSystemService(
                                 Context.COUNTRY_DETECTOR);
+                        
+                        String countryIso = null;
+                        Country c = null;
+                        if (detector != null &&  (c = detector.detectCountry()) != null) {
+                            countryIso = c.getCountryIso();
+                        } else {
+                            Locale locale = mQueryContext.getResources().getConfiguration().locale;
+                            countryIso = locale.getCountry();
+                            Log.w(LOG_TAG, "No CountryDetector; falling back to countryIso based on locale: "
+                                    + countryIso);
+                        }
+                        
                         mCallerInfo.phoneNumber = PhoneNumberUtils.formatNumber(cw.number,
-                                mCallerInfo.normalizedNumber,
-                                detector.detectCountry().getCountryIso());
+                                mCallerInfo.normalizedNumber,countryIso);
                     }
                 }
 

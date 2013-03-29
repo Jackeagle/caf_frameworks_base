@@ -41,10 +41,13 @@ public class SignalStrength implements Parcelable {
     /** @hide */
     public static final int SIGNAL_STRENGTH_GREAT = 4;
     /** @hide */
-    public static final int NUM_SIGNAL_STRENGTH_BINS = 5;
+    public static final int SIGNAL_STRENGTH_EXCELLENT = 5;
+    /** @hide */
+    public static final int NUM_SIGNAL_STRENGTH_BINS = 6;
+
     /** @hide */
     public static final String[] SIGNAL_STRENGTH_NAMES = {
-        "none", "poor", "moderate", "good", "great"
+        "none", "poor", "moderate", "good", "great" , "excellent"
     };
 
     /** @hide */
@@ -593,10 +596,11 @@ public class SignalStrength implements Parcelable {
         // signal, its better to show 0 bars to the user in such cases.
         // asu = 99 is a special case, where the signal strength is unknown.
         int asu = getGsmSignalStrength();
-        if (asu <= 2 || asu == 99) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
-        else if (asu >= 12) level = SIGNAL_STRENGTH_GREAT;
-        else if (asu >= 8)  level = SIGNAL_STRENGTH_GOOD;
-        else if (asu >= 5)  level = SIGNAL_STRENGTH_MODERATE;
+        if (asu <= 0 || asu == 99) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        else if (asu >= 12) level = SIGNAL_STRENGTH_EXCELLENT;
+        else if (asu >= 9)  level = SIGNAL_STRENGTH_GREAT;
+        else if (asu >= 7)  level = SIGNAL_STRENGTH_GOOD;
+        else if (asu >= 4)  level = SIGNAL_STRENGTH_MODERATE;
         else level = SIGNAL_STRENGTH_POOR;
         if (DBG) log("getGsmLevel=" + level);
         return level;

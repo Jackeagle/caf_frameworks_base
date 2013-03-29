@@ -57,6 +57,122 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/notification_panel_header_height"
             />
+        <!-- tasklist -->    
+        <ExpandableListView android:id="@+id/taskList"	       
+            android:layout_width="match_parent"	       
+            android:layout_height="wrap_content"	       
+            android:layout_gravity="center_vertical"	        	        
+            />    
+        <!-- originLayout --> 
+        <LinearLayout android:id="@+id/originLayout"	 
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            >
+        <!-- CT statusbar feature -->
+        <View
+            android:id="@+id/div_top"
+            android:layout_width="match_parent"
+            android:layout_height="0.5dip"
+            android:background="?android:attr/listDivider" />
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:id="@+id/data_switch_container"
+            android:layout_width="match_parent"
+            android:layout_height="50dip"
+            android:layout_margin="5dip"
+            android:gravity="center_vertical"
+            android:background="@drawable/notification_header_bg" >
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="15dip"
+                android:paddingRight="15dip"
+                android:src="@drawable/stat_notify_mobile_data" />
+
+            <TextView
+                android:layout_width="0dip"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="marquee"
+                android:gravity="left"
+                android:paddingLeft="10dip"
+                android:singleLine="true"
+                android:text="@string/data_usage_enable_mobile"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <Switch
+                android:id="@+id/data_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="5dip" />
+
+        </LinearLayout>
+
+        <View
+            android:id="@+id/div_center"
+            android:layout_width="match_parent"
+            android:layout_height="0.5dip"
+            android:background="?android:attr/listDivider" />
+
+        <LinearLayout
+            android:id="@+id/apn_switch_container"
+            android:layout_width="match_parent"
+            android:layout_height="50dip"
+            android:background="@drawable/notification_header_bg"
+            android:orientation="horizontal"
+            android:layout_margin="5dip" >
+
+            <ImageView
+                android:id="@+id/apn_switch_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_vertical"
+                android:scaleType="center"
+                android:paddingLeft="15dip"
+                android:paddingRight="15dip"
+                android:src="@drawable/stat_notify_network" />
+
+            <LinearLayout
+                android:id="@+id/apn_settings_view"
+                android:layout_width="0dip"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_gravity="center_vertical"
+                android:paddingLeft="10dip"
+                android:gravity="center_vertical"
+                android:orientation="vertical" >
+
+                <TextView
+                    android:id="@+id/current_apn_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:gravity="left"
+                    android:singleLine="true"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <TextView
+                    android:id="@+id/next_apn_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:gravity="left"
+                    android:singleLine="true"
+                    android:textAppearance="?android:attr/textAppearanceSmall" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <View
+            android:id="@+id/div_bottom"
+            android:layout_width="match_parent"
+            android:layout_height="0.5dip"
+            android:background="?android:attr/listDivider" />
+        <!-- end CT statusbar feature -->
 
         <TextView
             android:id="@+id/emergency_calls_only"
@@ -93,5 +209,6 @@
                     />
             </ScrollView>
         </FrameLayout>
+         </LinearLayout>
     </LinearLayout>
 </com.android.systemui.statusbar.phone.NotificationPanelView><!-- end of sliding panel -->

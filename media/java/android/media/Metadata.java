@@ -197,6 +197,9 @@ public class Metadata
      */
     public static final int DRM_CRIPPLED            = 31; // Boolean
 
+
+    public static final int SERVER_TIMEOUT        = 8801; //Integer ,for rtstp timeout
+
     private static final int LAST_SYSTEM = 31;
     private static final int FIRST_CUSTOM = 8192;
 
