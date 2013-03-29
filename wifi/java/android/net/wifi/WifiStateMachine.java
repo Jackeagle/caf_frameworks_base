@@ -2142,22 +2142,6 @@ public class WifiStateMachine extends StateMachine {
             //Connect to WifiP2pService
             mWifiP2pManager = (WifiP2pManager) mContext.getSystemService(Context.WIFI_P2P_SERVICE);
             mWifiP2pChannel.connect(mContext, getHandler(), mWifiP2pManager.getMessenger());
-
-            /* IPv6 is disabled at boot time and is controlled by framework
-             * to be enabled only as long as we are connected to an access point
-             *
-             * This fixes issues, a few being:
-             * - IPv6 addresses and routes stick around after disconnection
-             * - When connected, the kernel is unaware and can fail to start IPv6 negotiation
-             * - The kernel sometimes starts autoconfiguration when 802.1x is not complete
-             */
-            try {
-                mNwService.disableIpv6(mInterfaceName);
-            } catch (RemoteException re) {
-                loge("Failed to disable IPv6: " + re);
-            } catch (IllegalStateException e) {
-                loge("Failed to disable IPv6: " + e);
-            }
         }
     }
 
@@ -2243,6 +2227,22 @@ public class WifiStateMachine extends StateMachine {
         public void enter() {
             if (DBG) log(getName() + "\n");
             EventLog.writeEvent(EVENTLOG_WIFI_STATE_CHANGED, getName());
+
+            /* IPv6 is disabled at boot time and is controlled by framework
+             * to be enabled only as long as we are connected to an access point
+             *
+             * This fixes issues, a few being:
+             * - IPv6 addresses and routes stick around after disconnection
+             * - When connected, the kernel is unaware and can fail to start IPv6 negotiation
+             * - The kernel sometimes starts autoconfiguration when 802.1x is not complete
+             */
+            try {
+                mNwService.disableIpv6(mInterfaceName);
+            } catch (RemoteException re) {
+                loge("Failed to disable IPv6: " + re);
+            } catch (IllegalStateException e) {
+                loge("Failed to disable IPv6: " + e);
+            }
         }
         @Override
         public boolean processMessage(Message message) {
