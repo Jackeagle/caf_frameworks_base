@@ -38,6 +38,9 @@ import com.android.internal.util.AsyncChannel;
 import com.android.internal.util.Protocol;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import com.qrd.plugin.feature_query.FeatureQuery;
 
 /**
  * This class provides the primary API for managing all aspects of Wi-Fi
@@ -2034,6 +2037,43 @@ public class WifiManager {
         }
     }
 //QUALCOMM_CMCC_END
+
+    /**
+     * replace all the wifi string to WLAN in china
+     * 
+     * @param res
+     *            The string need to be replaced.
+     * 
+     * @return CharSequence The replaced string.
+     */
+    public static String replaceAllWiFi(String res) {
+        if (!FeatureQuery.FEATURE_DISPLAY_USE_WLAN_INSTEAD)
+            return res;
+        if (null == res)
+            return null;
+        // ignore some special string contain "wifi" string
+        String regEx = "[a-zA-Z]wi-?fi";
+        Pattern p = Pattern.compile(regEx, Pattern.CASE_INSENSITIVE);
+        Matcher m = p.matcher(res);
+        if (m.find())
+            return res;
+
+        regEx = "wi-?fi[a-zA-Z]";
+        p = Pattern.compile(regEx, Pattern.CASE_INSENSITIVE);
+        m = p.matcher(res);
+        if (m.find())
+            return res;
+
+        Log.i(TAG, "before replace string is " + res);
+        regEx = "wi-?fi";
+        p = Pattern.compile(regEx, Pattern.CASE_INSENSITIVE);
+        m = p.matcher(res);
+        res = m.replaceAll("WLAN");
+
+        Log.i(TAG, "after replace string is " + res);
+        return res;
+    }
+
 
     /** @hide */
     public void captivePortalCheckComplete() {

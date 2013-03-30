@@ -1914,11 +1914,18 @@ public class WifiService extends IWifiManager.Stub {
                                 new Intent(WifiManager.ACTION_PICK_WIFI_NETWORK))
                         .getPendingIntent(0, 0, null, UserHandle.CURRENT);
             }
+			
+			int wifiAvailableId = com.android.internal.R.plurals.wifi_available;
+			int wifiAvailableDetailedId = com.android.internal.R.plurals.wifi_available_detailed;
+			if (FeatureQuery.FEATURE_DISPLAY_USE_WLAN_INSTEAD) {
+			    wifiAvailableId = com.android.internal.R.plurals.wifi_available_wlan;
+				wifiAvailableDetailedId = com.android.internal.R.plurals.wifi_available_detailed_wlan;
+			}
 
             CharSequence title = mContext.getResources().getQuantityText(
-                    com.android.internal.R.plurals.wifi_available, numNetworks);
+                    wifiAvailableId, numNetworks);
             CharSequence details = mContext.getResources().getQuantityText(
-                    com.android.internal.R.plurals.wifi_available_detailed, numNetworks);
+                    wifiAvailableDetailedId, numNetworks);
             mNotification.tickerText = title;
             mNotification.setLatestEventInfo(mContext, title, details, mNotification.contentIntent);
 
