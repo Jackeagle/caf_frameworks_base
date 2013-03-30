@@ -13457,6 +13457,7 @@ package android.net.wifi {
     method public boolean reassociate();
     method public boolean reconnect();
     method public boolean removeNetwork(int);
+    method public static java.lang.String replaceAllWiFi(java.lang.String);
     method public boolean saveConfiguration();
     method public boolean setWifiEnabled(boolean);
     method public boolean startScan();
