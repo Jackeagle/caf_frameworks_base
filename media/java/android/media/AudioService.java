@@ -3967,6 +3967,9 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             //addfor headset insert end
             
             boolean isUsb = ((device & AudioSystem.DEVICE_OUT_ALL_USB) != 0);
+			if (!isUsb) {
+                sendDeviceConnectionIntent(device, state, name);
+            }
             handleDeviceConnection((state == 1), device, (isUsb ? name : ""));
             if (state != 0) {
                 if ((device == AudioSystem.DEVICE_OUT_WIRED_HEADSET) ||
@@ -3982,10 +3985,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                             null,
                             MUSIC_ACTIVE_POLL_PERIOD_MS);
                 }
-            }
-            if (!isUsb) {
-                sendDeviceConnectionIntent(device, state, name);
-            }
+            }            
         }
     }
 
