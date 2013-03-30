@@ -49,7 +49,7 @@ import com.android.systemui.statusbar.policy.LocationController.LocationGpsState
 import com.android.systemui.statusbar.policy.NetworkController.NetworkSignalChangedCallback;
 
 import java.util.List;
-
+import android.net.wifi.WifiManager;
 
 class QuickSettingsModel implements BluetoothStateChangeCallback,
         NetworkSignalChangedCallback,
@@ -408,12 +408,12 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
             mWifiState.signalContentDescription = wifiSignalContentDescription;
         } else if (wifiNotConnected) {
             mWifiState.iconId = R.drawable.ic_qs_wifi_0;
-            mWifiState.label = r.getString(R.string.quick_settings_wifi_label);
-            mWifiState.signalContentDescription = r.getString(R.string.accessibility_no_wifi);
+            mWifiState.label = WifiManager.replaceAllWiFi(r.getString(R.string.quick_settings_wifi_label));
+            mWifiState.signalContentDescription = WifiManager.replaceAllWiFi(r.getString(R.string.accessibility_no_wifi));
         } else {
             mWifiState.iconId = R.drawable.ic_qs_wifi_no_network;
-            mWifiState.label = r.getString(R.string.quick_settings_wifi_off_label);
-            mWifiState.signalContentDescription = r.getString(R.string.accessibility_wifi_off);
+            mWifiState.label = WifiManager.replaceAllWiFi(r.getString(R.string.quick_settings_wifi_off_label));
+            mWifiState.signalContentDescription = WifiManager.replaceAllWiFi(r.getString(R.string.accessibility_wifi_off));
         }
         mWifiCallback.refreshView(mWifiTile, mWifiState);
     }

@@ -1939,8 +1939,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     private void notifyP2pEnableFailure() {
         Resources r = Resources.getSystem();
         AlertDialog dialog = new AlertDialog.Builder(mContext)
-            .setTitle(r.getString(R.string.wifi_p2p_dialog_title))
-            .setMessage(r.getString(R.string.wifi_p2p_failed_message))
+            .setTitle(WifiManager.replaceAllWiFi(r.getString(R.string.wifi_p2p_dialog_title)))
+            .setMessage(WifiManager.replaceAllWiFi(r.getString(R.string.wifi_p2p_failed_message)))
             .setPositiveButton(r.getString(R.string.ok), null)
             .create();
         dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);

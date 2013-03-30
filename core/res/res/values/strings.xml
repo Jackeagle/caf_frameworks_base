@@ -3147,7 +3147,17 @@
         <item quantity="one">Open Wi-Fi network available</item>
         <item quantity="other">Open Wi-Fi networks available</item>
     </plurals>
-
+    
+    <plurals name="wifi_available_wlan">
+        <item quantity="one">WLAN network available</item>
+        <item quantity="other">WLAN networks available</item>
+    </plurals>
+    <!-- A notification is shown when there are open wireless networks nearby.  This is the notification's message. -->
+    <plurals name="wifi_available_detailed_wlan">
+        <item quantity="one">Open WLAN network available</item>
+        <item quantity="other">Open WLAN networks available</item>
+    </plurals>
+    
     <!-- A notification is shown when a wifi captive portal network is detected.  This is the notification's title. -->
     <string name="wifi_available_sign_in">Sign into Wi-Fi network</string>
 
