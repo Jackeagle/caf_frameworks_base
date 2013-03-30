@@ -254,7 +254,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
      *  STREAM_VOLUME_ALIAS_NON_VOICE for a non voice capable device (tablet).*/
     private final int[] STREAM_VOLUME_ALIAS = new int[] {
         AudioSystem.STREAM_VOICE_CALL,      // STREAM_VOICE_CALL
-        AudioSystem.STREAM_RING,            // STREAM_SYSTEM
+        AudioSystem.STREAM_SYSTEM,          // STREAM_SYSTEM
         AudioSystem.STREAM_RING,            // STREAM_RING
         AudioSystem.STREAM_MUSIC,           // STREAM_MUSIC
         AudioSystem.STREAM_ALARM,           // STREAM_ALARM
@@ -267,7 +267,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     };
     private final int[] STREAM_VOLUME_ALIAS_NON_VOICE = new int[] {
         AudioSystem.STREAM_VOICE_CALL,      // STREAM_VOICE_CALL
-        AudioSystem.STREAM_MUSIC,           // STREAM_SYSTEM
+        AudioSystem.STREAM_SYSTEM,          // STREAM_SYSTEM
         AudioSystem.STREAM_RING,            // STREAM_RING
         AudioSystem.STREAM_MUSIC,           // STREAM_MUSIC
         AudioSystem.STREAM_ALARM,           // STREAM_ALARM
@@ -3967,6 +3967,9 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             //addfor headset insert end
             
             boolean isUsb = ((device & AudioSystem.DEVICE_OUT_ALL_USB) != 0);
+			if (!isUsb) {
+                sendDeviceConnectionIntent(device, state, name);
+            }
             handleDeviceConnection((state == 1), device, (isUsb ? name : ""));
             if (state != 0) {
                 if ((device == AudioSystem.DEVICE_OUT_WIRED_HEADSET) ||
@@ -3982,10 +3985,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                             null,
                             MUSIC_ACTIVE_POLL_PERIOD_MS);
                 }
-            }
-            if (!isUsb) {
-                sendDeviceConnectionIntent(device, state, name);
-            }
+            }            
         }
     }
 
