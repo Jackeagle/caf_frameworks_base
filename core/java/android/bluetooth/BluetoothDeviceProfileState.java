@@ -99,7 +99,7 @@ public final class BluetoothDeviceProfileState extends StateMachine {
 
     private static final String ACCESS_AUTHORITY_PACKAGE = "com.android.settings";
     private static final String ACCESS_AUTHORITY_CLASS =
-        "com.android.settings.bluetooth.BluetoothPermissionRequest";
+        "com.qualcomm.settings.bluetooth.BluetoothPermissionRequest";
     private static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
 
     private BondedDevice mBondedDevice = new BondedDevice();
