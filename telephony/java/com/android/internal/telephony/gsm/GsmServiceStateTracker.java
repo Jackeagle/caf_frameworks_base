@@ -1832,7 +1832,7 @@ public class GsmServiceStateTracker extends ServiceStateTracker {
     /*
      * Show Managed Roaming dialog if user preferred Network Selection mode is 'Manual'
      */
-    private void createManagedRoamingDialog() {
+    protected void createManagedRoamingDialog() {
         Resources r = Resources.getSystem();
         String networkSelection = PreferenceManager.getDefaultSharedPreferences(phone.getContext())
             .getString(NETWORK_SELECTION_KEY, "");

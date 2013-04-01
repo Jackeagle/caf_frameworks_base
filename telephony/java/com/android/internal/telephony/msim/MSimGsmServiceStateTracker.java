@@ -208,6 +208,11 @@ public final class MSimGsmServiceStateTracker extends GsmServiceStateTracker {
     }
 
     @Override
+    protected void createManagedRoamingDialog() {
+        log(" Managed Roaming is not supported.. ");
+    }
+
+    @Override
     protected void log(String s) {
         Log.d(LOG_TAG, "[MSimGsmSST] [SUB : " + phone.getSubscription() + "] " + s);
     }
