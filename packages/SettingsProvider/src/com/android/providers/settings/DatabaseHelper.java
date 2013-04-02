@@ -2306,16 +2306,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Set default cdma call auto retry
             loadSetting(stmt, Settings.Global.CALL_AUTO_RETRY, 0);
 
-            // Set the preferred network mode to 0 = Global, CDMA default
-            int type;
-                type = SystemProperties.getInt("ro.telephony.default_network",
-                        RILConstants.PREFERRED_NETWORK_MODE);
 
-            String val = Integer.toString(type);
-            if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                val = type + "," + type;
-            }
+            /**del
+			// Set the preferred network mode to 0 = Global, CDMA default
+			int type;
+				type = SystemProperties.getInt("ro.telephony.default_network",
+						RILConstants.PREFERRED_NETWORK_MODE);
+
+			String val = Integer.toString(type);
+			if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+				val = type + "," + type;
+			}
+			*/
+			
+			//added default network type for dsds project.
+			// Set the preferred network mode to 0 = Global, CDMA default
+            String val = SystemProperties.get("ro.telephony.default_network",
+            RILConstants.PREFERRED_NETWORK_MODE+","+RILConstants.PREFERRED_NETWORK_MODE); 
             loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, val);
+			//added end.
 
             // --- New global settings start here
             loadSetting(stmt, Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION,
