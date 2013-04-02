@@ -1823,6 +1823,21 @@ public class PhoneNumberUtils
     }
 
     /**
+     * Check if the number is an exact or a potential emergency number
+     *
+     * @hide
+     */
+    public static boolean isExactOrPotentialLocalEmergencyNumber(String number, Context context) {
+        if (number == null) {
+            return false;
+        }
+        boolean isExactEmergencyNumber = isLocalEmergencyNumber(number, context);
+        boolean isPotentialEmergencyNumber = isPotentialLocalEmergencyNumber(number, context);
+
+        return (isExactEmergencyNumber || isPotentialEmergencyNumber);
+    }
+
+    /**
      * isVoiceMailNumber: checks a given number against the voicemail
      *   number provided by the RIL and SIM card. The caller must have
      *   the READ_PHONE_STATE credential.
