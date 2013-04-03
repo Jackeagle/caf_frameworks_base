@@ -931,9 +931,9 @@ public final class StrictMode {
         // Eng builds have flashes on all the time.  The suppression property
         // overrides this, so we force the behavior only after the short-circuit
         // check above.
-        if (IS_ENG_BUILD) {
-            doFlashes = true;
-        }
+        //if (IS_ENG_BUILD) {
+        //    doFlashes = true;
+        //}
 
         // Thread policy controls BlockGuard.
         int threadPolicyMask = StrictMode.DETECT_DISK_WRITE |
