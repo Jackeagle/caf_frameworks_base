@@ -456,7 +456,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
 
 	//add for headset insert
     private final static String NO_ACTION="android.intent.action.NO_ACTION";
-    private final static int HEADSET_NOTIFICATION_ID=com.android.internal.R.drawable.stat_sys_plug_headset;
+    private final static int HEADSET_NOTIFICATION_ID=com.android.internal.R.drawable.stat_sys_headset;
 
     ///////////////////////////////////////////////////////////////////////////
     // Construction
