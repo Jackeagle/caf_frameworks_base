@@ -4001,7 +4001,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         CharSequence details = mContext.getText(com.android.internal.R.string.headset_plugin_view_text);
         PendingIntent intent = PendingIntent.getActivity(mContext, 0,  lowMemIntent, 0);
         Notification notification = new Notification();
-        notification.icon = com.android.internal.R.drawable.stat_sys_plug_headset;
+        notification.icon = com.android.internal.R.drawable.stat_sys_headset;		
         notification.tickerText = title;
         notification.flags |= Notification.FLAG_NO_CLEAR;
         notification.setLatestEventInfo(mContext, title, details, intent);
