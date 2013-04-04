@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -179,15 +180,6 @@ public class Ringtone {
         if (mUri == null) {
             return;
         }
-        /* return if ringtone is set to Silent to avoid fall back to valid ringtone */
-        if (mUri.toString().startsWith(Settings.System.DEFAULT_RINGTONE_URI.toString())) {
-            String ringUri = Settings.System.getString(mContext.getContentResolver(),
-                                                       mUri.getLastPathSegment());
-        if (TextUtils.isEmpty(ringUri)) {
-                Log.w(TAG, "ringUri " + ringUri);
-                return;
-            }
-        }
         // TODO: detect READ_EXTERNAL and specific content provider case, instead of relying on throwing
 
         // try opening uri locally before delegating to remote player
@@ -210,6 +202,15 @@ public class Ringtone {
         }
 
         if(mLocalPlayer == null && !mAllowRemote) {
+           /* return if ringtone is set to Silent to avoid fall back to valid ringtone */
+           if (mUri.toString().startsWith(Settings.System.DEFAULT_RINGTONE_URI.toString())) {
+              String ringUri = Settings.System.getString(mContext.getContentResolver(),
+                                                       mUri.getLastPathSegment());
+              if (TextUtils.isEmpty(ringUri)) {
+                 Log.w(TAG, "ringUri " + ringUri);
+                 return;
+              }
+           }
            Log.e(TAG,"failed to play current ringtone, fallback to any valid ringtone");
            mLocalPlayer = new MediaPlayer();
            try {
