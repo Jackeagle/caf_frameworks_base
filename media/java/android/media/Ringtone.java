@@ -26,6 +26,7 @@ import android.provider.DrmStore;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.util.Log;
+import android.text.TextUtils;
 
 import java.io.IOException;
 
@@ -178,7 +179,15 @@ public class Ringtone {
         if (mUri == null) {
             return;
         }
-
+        /* return if ringtone is set to Silent to avoid fall back to valid ringtone */
+        if (mUri.toString().startsWith(Settings.System.DEFAULT_RINGTONE_URI.toString())) {
+            String ringUri = Settings.System.getString(mContext.getContentResolver(),
+                                                       mUri.getLastPathSegment());
+        if (TextUtils.isEmpty(ringUri)) {
+                Log.w(TAG, "ringUri " + ringUri);
+                return;
+            }
+        }
         // TODO: detect READ_EXTERNAL and specific content provider case, instead of relying on throwing
 
         // try opening uri locally before delegating to remote player
@@ -200,7 +209,7 @@ public class Ringtone {
             }
         }
 
-        if(mLocalPlayer == null) {
+        if(mLocalPlayer == null && !mAllowRemote) {
            Log.e(TAG,"failed to play current ringtone, fallback to any valid ringtone");
            mLocalPlayer = new MediaPlayer();
            try {
@@ -209,14 +218,10 @@ public class Ringtone {
                mLocalPlayer.prepare();
            } catch (SecurityException e) {
                destroyLocalPlayer();
-               if (!mAllowRemote) {
-                   Log.w(TAG, "fallback remote playback not allowed: " + e);
-               }
+               Log.w(TAG, "fallback remote playback not allowed: " + e);
            } catch (IOException e) {
                destroyLocalPlayer();
-               if (!mAllowRemote) {
-                   Log.w(TAG, "fallback remote playback not allowed: " + e);
-               }
+               Log.w(TAG, "fallback remote playback not allowed: " + e);
            }
         }
 
