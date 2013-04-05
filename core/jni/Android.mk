@@ -152,7 +152,6 @@ LOCAL_SRC_FILES:= \
 	android_animation_PropertyValuesHolder.cpp \
 	com_android_internal_app_ActivityTrigger.cpp
 ifeq ($(call is-vendor-board-platform,QCOM),true)
-LOCAL_SRC_FILES += android_hardware_fm.cpp \
 LOCAL_SRC_FILES += org_codeaurora_Performance.cpp
 endif
 
