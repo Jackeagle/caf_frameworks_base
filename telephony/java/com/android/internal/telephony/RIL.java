@@ -697,6 +697,8 @@ public final class RIL extends BaseCommands implements CommandsInterface {
         if (cm.isNetworkSupported(ConnectivityManager.TYPE_MOBILE) == false) {
             riljLog("Not starting RILReceiver: wifi-only");
         } if (SystemProperties.getBoolean("ro.radio.noril", false)) {
+            mState = RadioState.RADIO_OFF;
+            Log.d(LOG_TAG, "mState value " + mState);
             riljLog("Not starting RILReceiver: basebandless target");
         } else {
             riljLog("Starting RILReceiver");
