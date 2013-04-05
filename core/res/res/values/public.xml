@@ -1545,7 +1545,6 @@
 
   <public type="drawable" name="dialog_holo_dark_frame" id="0x010800b2" />
   <public type="drawable" name="dialog_holo_light_frame" id="0x010800b3" />
-  <public type="drawable" name="stat_sys_plug_headset" id="0x010800b4" />
 
   <public type="style" name="Theme.WithActionBar" id="0x01030069" />
   <public type="style" name="Theme.NoTitleBar.OverlayActionModes" id="0x0103006a" />
