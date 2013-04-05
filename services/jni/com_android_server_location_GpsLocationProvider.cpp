@@ -170,7 +170,7 @@ static void agps_status_callback(AGpsStatus* agps_status)
 
     // there is neither ipv4 now ipv6 addresses unless this is true
     if (agps_status->size >
-        ((char*)(agps_status->ipv4_addr) - (char*)agps_status)) {
+        ((char*)(&(agps_status->ipv4_addr)) - (char*)agps_status)) {
         // if we have a valid ipv4 address
         if (agps_status->ipv4_addr != 0xFFFFFFFF) {
             byteArray = env->NewByteArray(4);
@@ -183,11 +183,13 @@ static void agps_status_callback(AGpsStatus* agps_status)
             byteArray = env->NewByteArray(16);
             ALOG_ASSERT(byteArray, "Native could not create new byte[]");
             env->SetByteArrayRegion(byteArray, 0, 16, (const jbyte *)agps_status->ipv6_addr );
+        }
 
+        if (agps_status->size >= sizeof(AGpsStatus)) {
             if (agps_status->ssid[0] != '\0') {
                 ssid_string = env->NewStringUTF(agps_status->ssid);
                 if (agps_status->password[0] != '\0') {
-                    password_string = env->NewStringUTF(agps_status->password);
+                  password_string = env->NewStringUTF(agps_status->password);
                 }
             }
         }
@@ -196,7 +198,6 @@ static void agps_status_callback(AGpsStatus* agps_status)
                         method_reportAGpsStatus,
                         agps_status->type,
                         agps_status->status,
-                        byteArray,
                         byteArray,
                         ssid_string,
                         password_string);
