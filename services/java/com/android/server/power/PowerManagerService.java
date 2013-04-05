@@ -780,7 +780,7 @@ public final class PowerManagerService extends IPowerManager.Stub
                     WakeLock wl = mWakeLocks.get(index);
                     if(wl != null) {
                         // release the wakelock for the blocked uid
-                        if (wl.mOwnerUid == uid) {
+                        if (wl.mOwnerUid == uid || releaseQueuedUidWakeLock(uid, wl)) {
                             releaseWakeLockInternal(wl.mLock,wl.mFlags);
                             if (DEBUG_SPEW) Slog.v(TAG, "Internally releasing it");
                         }
@@ -791,6 +791,22 @@ public final class PowerManagerService extends IPowerManager.Stub
                 mBlockedUids.remove(new Integer(uid));
             }
         }
+    }
+
+    private boolean releaseQueuedUidWakeLock(int uid, WakeLock wl) {
+        try {
+            for (int index = 0; index < wl.mWorkSource.size(); index++) {
+                if (uid == wl.mWorkSource.get(index)) {
+                    if (DEBUG_SPEW) Slog.v(TAG, "WS uid matched");
+                    return true;
+                }
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return false;
     }
 
     private int findWakeLockIndexLocked(IBinder lock) {
