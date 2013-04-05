@@ -1384,7 +1384,6 @@ package android {
     field public static final deprecated int stat_sys_phone_call = 17301636; // 0x1080084
     field public static final deprecated int stat_sys_phone_call_forward = 17301637; // 0x1080085
     field public static final deprecated int stat_sys_phone_call_on_hold = 17301638; // 0x1080086
-    field public static final int stat_sys_plug_headset = 17301684; // 0x10800b4
     field public static final int stat_sys_speakerphone = 17301639; // 0x1080087
     field public static final int stat_sys_upload = 17301640; // 0x1080088
     field public static final int stat_sys_upload_done = 17301641; // 0x1080089
