@@ -17399,6 +17399,7 @@ package android.provider {
     field public static final int OUTGOING_CSVT_TYPE = 6; // 0x6
     field public static final int OUTGOING_FAILED_TYPE = 4; // 0x4
     field public static final int OUTGOING_TYPE = 2; // 0x2
+    field public static final int REJECTED_TYPE = 8; // 0x8
     field public static final java.lang.String TYPE = "type";
   }
 

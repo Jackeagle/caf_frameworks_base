@@ -132,6 +132,7 @@ public class CallLog {
         public static final int OUTGOING_CSVT_TYPE = 6;
         /** Call log type for missed CSVT calls. */
         public static final int MISSED_CSVT_TYPE = 7;
+        public static final int REJECTED_TYPE = 8;
         /**
          * Call log type for voicemails.
          * @hide
