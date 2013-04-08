@@ -476,8 +476,10 @@ public class SignalStrength implements Parcelable {
 
         if (isGsm) {
             level = getLteLevel();
+	    log("getLteLevel=" + level);
             if (level == SIGNAL_STRENGTH_NONE_OR_UNKNOWN) {
                 level = getTdScdmaLevel();
+				log("getTdScdmaLevel=" + level);
                 if (level == SIGNAL_STRENGTH_NONE_OR_UNKNOWN) {
                     level = getGsmLevel();
                 }
@@ -866,14 +868,15 @@ public class SignalStrength implements Parcelable {
     public int getTdScdmaLevel() {
         final int tdScdmaDbm = getTdScdmaDbm();
         int level;
+       if (DBG) log("getTdScdmatdScdmaDbm = " + tdScdmaDbm);
 
         if ((tdScdmaDbm > -25) || (tdScdmaDbm == SignalStrength.INVALID))
                 level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
-        else if (tdScdmaDbm >= -49) level = SIGNAL_STRENGTH_GREAT;
-        else if (tdScdmaDbm >= -73) level = SIGNAL_STRENGTH_GOOD;
-        else if (tdScdmaDbm >= -97) level = SIGNAL_STRENGTH_MODERATE;
-        else if (tdScdmaDbm >= -120) level = SIGNAL_STRENGTH_POOR;
-        else level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        else if (tdScdmaDbm >= -82) level = SIGNAL_STRENGTH_EXCELLENT;
+        else if (tdScdmaDbm >= -88) level = SIGNAL_STRENGTH_GREAT;
+        else if (tdScdmaDbm >= -94) level = SIGNAL_STRENGTH_GOOD;
+        else if (tdScdmaDbm >= -105) level = SIGNAL_STRENGTH_MODERATE;
+        else level = SIGNAL_STRENGTH_POOR;
 
         if (DBG) log("getTdScdmaLevel = " + level);
         return level;

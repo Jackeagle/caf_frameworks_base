@@ -95,6 +95,8 @@ public class CMCCSignalClusterView
 
     public CMCCSignalClusterView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle); 
+	mContext = context;
+	mServiceState = new ServiceState();
     }
 
     public void setNetworkController(MSimNetworkController nc) {
@@ -146,6 +148,11 @@ public class CMCCSignalClusterView
     public void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
             int typeIcon, String contentDescription, String typeContentDescription,
             int noSimIcon,  ServiceState simServiceState,boolean isRoam,boolean dataConnect) {
+        
+       Log.i(TAG, "setMobileDataIndicators=simServiceState111=" +simServiceState );
+       Log.i(TAG, "setMobileDataIndicators=mServiceState111=" +mServiceState );
+	 mServiceState = simServiceState;
+	 Log.i(TAG, "setMobileDataIndicators=mServiceState222=" +mServiceState );
         mMobileVisible = visible;
         mMobileStrengthId = convertStrengthIconIdToCMCC(strengthIcon, 0);
         mMobileActivityId = convertMobileActivityIconIdToCMCC(typeIcon,activityIcon);
@@ -153,7 +160,7 @@ public class CMCCSignalClusterView
         mMobileDescription = contentDescription;
         mMobileTypeDescription = typeContentDescription;
         mNoSimIconId= convertNoSimIconIdToCMCC(0);
-        mServiceState = simServiceState;
+
 
         if (noSimIcon != 0) {
             mMNoSimIconVisiable = true;
@@ -326,6 +333,7 @@ public class CMCCSignalClusterView
         if (mServiceState == null) {
             return 0;
         }
+	Log.i(TAG,":radio technology ismServiceState:"+mServiceState);
         int radioTechnology = mServiceState.getRadioTechnology();
         Log.i(TAG,":radio technology is:"+mServiceState.getRadioTechnology());
         if(radioTechnology == 0)
