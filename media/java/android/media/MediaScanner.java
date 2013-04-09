@@ -1287,10 +1287,23 @@ public class MediaScanner
         }
     }
 
+    //delete some uri in databases ,whese _data are null
+    //these uri are produced in eject and process.media died
+    private void checkProvider(String volumeName) throws RemoteException {
+        if (!volumeName.equals("internal")) {
+            String where = FileColumns.DATA + "=?";
+            String[] whereArgs = new String[] {""};
+            mMediaProvider.delete(mFilesUri, where, whereArgs);
+        }
+    }
+    
     public void scanDirectories(String[] directories, String volumeName) {
         try {
             long start = System.currentTimeMillis();
             initialize(volumeName);
+            
+            checkProvider(volumeName);
+            
             prescan(null, true);
             long prescan = System.currentTimeMillis();
 
