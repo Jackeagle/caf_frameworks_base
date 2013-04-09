@@ -140,7 +140,7 @@ public class ServiceWatcher implements ServiceConnection {
                 version = rInfo.serviceInfo.metaData.getInt(EXTRA_SERVICE_VERSION, 0);
             }
 
-            if (version > mVersion) {
+            if (version > mVersion && version > bestVersion) {
                 bestVersion = version;
                 bestPackage = packageName;
             }
