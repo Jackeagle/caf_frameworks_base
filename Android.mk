@@ -132,19 +132,6 @@ LOCAL_SRC_FILES += \
 	core/java/android/hardware/ISerialManager.aidl \
 	core/java/android/hardware/display/IDisplayManager.aidl \
 	core/java/android/hardware/display/IDisplayManagerCallback.aidl \
-	core/java/android/hardware/fmradio/FmConfig.java \
-	core/java/android/hardware/fmradio/FmReceiver.java \
-	core/java/android/hardware/fmradio/FmReceiverJNI.java \
-	core/java/android/hardware/fmradio/FmRxControls.java \
-	core/java/android/hardware/fmradio/FmRxEvCallbacksAdaptor.java \
-	core/java/android/hardware/fmradio/FmRxEvCallbacks.java \
-	core/java/android/hardware/fmradio/FmRxEventListner.java \
-	core/java/android/hardware/fmradio/FmRxRdsData.java \
-	core/java/android/hardware/fmradio/FmTransceiver.java \
-	core/java/android/hardware/fmradio/FmTransmitterCallbacksAdaptor.java \
-	core/java/android/hardware/fmradio/FmTransmitterCallbacks.java \
-	core/java/android/hardware/fmradio/FmTransmitter.java \
-	core/java/android/hardware/fmradio/FmTxEventListner.java \
 	core/java/android/hardware/input/IInputManager.aidl \
 	core/java/android/hardware/input/IInputDevicesChangedListener.aidl \
 	core/java/android/hardware/usb/IUsbManager.aidl \
@@ -829,33 +816,6 @@ include $(BUILD_DROIDDOC)
 
 # explicitly specify that ds depends on framework-res and any generated docs
 $(full_target): framework-res-package-target
-
-
-#==== reference docs for GCM =======================
-
-include $(CLEAR_VARS)
-#
-gcm_docs_src_files += \
-        $(call all-java-files-under, ../../vendor/unbundled_google/libs/gcm/gcm-client/src) \
-        $(call all-java-files-under, ../../vendor/unbundled_google/libs/gcm/gcm-server/src) \
-        $(call all-html-files-under, ../../vendor/unbundled_google/libs/gcm/gcm-client/src) \
-        $(call all-html-files-under, ../../vendor/unbundled_google/libs/gcm/gcm-server/src) \
-
-LOCAL_SRC_FILES := $(gcm_docs_src_files)
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE:= online-gcm-ref
-LOCAL_MODULE_CLASS := JAVA_LIBRARIES
-LOCAL_IS_HOST_MODULE := false
-
-LOCAL_DROIDDOC_CUSTOM_TEMPLATE_DIR := build/tools/droiddoc/templates-sdk
-
-LOCAL_DROIDDOC_OPTIONS := \
-        -toroot / \
-        -gcmref \
-        -hdf android.whichdoc online \
-        -hdf template.showLanguageMenu true
-
-include $(BUILD_DROIDDOC)
 
 # ==== docs that have all of the stuff that's @hidden =======================
 include $(CLEAR_VARS)
