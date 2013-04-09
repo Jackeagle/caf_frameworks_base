@@ -5,6 +5,7 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
+LOCAL_JAVA_LIBRARIES := com.qrd.plugin.feature_query
             
 LOCAL_MODULE := android.policy
 
