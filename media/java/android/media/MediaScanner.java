@@ -1326,7 +1326,7 @@ public class MediaScanner
             postscan(directories);
             long end = System.currentTimeMillis();
 
-            if (false) {
+            if (true) {
                 Log.d(TAG, " prescan time: " + (prescan - start) + "ms\n");
                 Log.d(TAG, "    scan time: " + (scan - prescan) + "ms\n");
                 Log.d(TAG, "postscan time: " + (end - scan) + "ms\n");
@@ -1340,6 +1340,10 @@ public class MediaScanner
             Log.e(TAG, "UnsupportedOperationException in MediaScanner.scan()", e);
         } catch (RemoteException e) {
             Log.e(TAG, "RemoteException in MediaScanner.scan()", e);
+        }finally {
+            if(mMediaProvider != null){
+                mMediaProvider = null;
+            }
         }
     }
 
