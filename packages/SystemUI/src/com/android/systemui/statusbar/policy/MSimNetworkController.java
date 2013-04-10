@@ -393,6 +393,10 @@ public class MSimNetworkController extends NetworkController {
                 mMSimServiceState[mSubscription] = state;
                 updateTelephonySignalStrength(mSubscription);
                 updateDataNetType(mSubscription);
+                if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+                    updateNetworkName(false, null, false, null, mSubscription);
+                }
+
                 updateDataIcon(mSubscription);
                 refreshViews(mSubscription);
             }
@@ -824,6 +828,11 @@ public class MSimNetworkController extends NetworkController {
             Slog.d("CarrierLabel", "updateNetworkName showSpn=" + showSpn + " spn=" + spn
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
+	 if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+            String networkName = mPhone.getNetworkName(subscription);
+            mMSimNetworkName[subscription] = networkName == null ? mNetworkNameDefault : networkName;
+        }
+	else{
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
@@ -842,6 +851,7 @@ public class MSimNetworkController extends NetworkController {
         } else {
             mMSimNetworkName[subscription] = mNetworkNameDefault;
         }
+			}
     }
 
     // ===== Full or limited Internet connectivity ==================================

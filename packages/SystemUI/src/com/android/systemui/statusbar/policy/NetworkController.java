@@ -498,6 +498,9 @@ public class NetworkController extends BroadcastReceiver {
             updateTelephonySignalStrength();
             updateDataNetType();
             updateDataIcon();
+            if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+                updateNetworkName(false, null, false, null);
+            }
             refreshViews();
         }
 
@@ -870,10 +873,15 @@ public class NetworkController extends BroadcastReceiver {
     }
 
     void updateNetworkName(boolean showSpn, String spn, boolean showPlmn, String plmn) {
-        if (false) {
+        if (true) {
             Log.i("CarrierLabel", "updateNetworkName showSpn=" + showSpn + " spn=" + spn
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
+	if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+            String networkName = mPhone.getNetworkName();
+            mNetworkName = networkName == null ? mNetworkNameDefault : networkName;
+        }
+	else{	
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
@@ -892,6 +900,7 @@ public class NetworkController extends BroadcastReceiver {
         } else {
             mNetworkName = mNetworkNameDefault;
         }
+    	}
     }
 
     // ===== Wifi ===================================================================

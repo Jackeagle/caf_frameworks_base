@@ -1287,10 +1287,23 @@ public class MediaScanner
         }
     }
 
+    //delete some uri in databases ,whese _data are null
+    //these uri are produced in eject and process.media died
+    private void checkProvider(String volumeName) throws RemoteException {
+        if (!volumeName.equals("internal")) {
+            String where = FileColumns.DATA + "=?";
+            String[] whereArgs = new String[] {""};
+            mMediaProvider.delete(mFilesUri, where, whereArgs);
+        }
+    }
+    
     public void scanDirectories(String[] directories, String volumeName) {
         try {
             long start = System.currentTimeMillis();
             initialize(volumeName);
+            
+            checkProvider(volumeName);
+            
             prescan(null, true);
             long prescan = System.currentTimeMillis();
 
@@ -1313,7 +1326,7 @@ public class MediaScanner
             postscan(directories);
             long end = System.currentTimeMillis();
 
-            if (false) {
+            if (true) {
                 Log.d(TAG, " prescan time: " + (prescan - start) + "ms\n");
                 Log.d(TAG, "    scan time: " + (scan - prescan) + "ms\n");
                 Log.d(TAG, "postscan time: " + (end - scan) + "ms\n");
@@ -1327,6 +1340,10 @@ public class MediaScanner
             Log.e(TAG, "UnsupportedOperationException in MediaScanner.scan()", e);
         } catch (RemoteException e) {
             Log.e(TAG, "RemoteException in MediaScanner.scan()", e);
+        }finally {
+            if(mMediaProvider != null){
+                mMediaProvider = null;
+            }
         }
     }
 

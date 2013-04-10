@@ -181,6 +181,7 @@ public class CUMSimSignalClusterView
             int typeIcon, String contentDescription, String typeContentDescription,
             int noSimIcon, int subscription, ServiceState simServiceState,boolean isRoam,boolean dataConnect) {
         if(DEBUG)Log.i("twfx","data activity sub= "+subscription +" setMobileDataIndicators");
+	        mServiceState[subscription] = simServiceState;
         mMobileVisible = visible;
         mMobileStrengthId[subscription] = convertStrengthIconIdToCU(strengthIcon[0], subscription);
         mMobileTypeId[subscription] = convertMobileTypeIconIdToCU(typeIcon);
@@ -188,7 +189,7 @@ public class CUMSimSignalClusterView
         mMobileDescription[subscription] = contentDescription;
         mMobileTypeDescription = typeContentDescription;
         mNoSimIconId[subscription] = convertNoSimIconIdToCU(subscription);
-        mServiceState[subscription] = simServiceState;
+
 
         if (noSimIcon != 0) {
             mMNoSimIconVisiable[subscription] = true;
