@@ -3336,6 +3336,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 usedNetworkType = ConnectivityManager.TYPE_MOBILE_CBS;
             } else if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_DM)) {
                 usedNetworkType = ConnectivityManager.TYPE_MOBILE_DM;
+            } else if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_WAP)) {
+                usedNetworkType = ConnectivityManager.TYPE_MOBILE_WAP;
             } else {
                 Slog.e(TAG, "Can't match any mobile netTracker!");
             }

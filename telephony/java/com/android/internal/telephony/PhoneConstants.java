@@ -130,4 +130,6 @@ public class PhoneConstants {
     public static final String APN_TYPE_CBS = "cbs";
     /** APN type for DM */
     public static final String APN_TYPE_DM = "dm";
+    /** APN type for CMWAP */
+    public static final String APN_TYPE_WAP = "wap";
 }
