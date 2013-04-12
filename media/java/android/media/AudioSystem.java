@@ -102,6 +102,30 @@ public class AudioSystem
     public static final int CS_INACTIVE_SESSION2    = 0x0;
     public static final int CS_ACTIVE_SESSION2      = 0x100;
     public static final int CS_HOLD_SESSION2        = 0x200;
+
+    /* Call states for Voice calls */
+    /* @hide Call state for inactive call state. */
+    public static final int CALL_INACTIVE           = 0x1;
+    /* @hide Call state for active call state. */
+	public static final int CALL_ACTIVE             = 0x2;
+    /* @hide Call state for hold call state. */
+	public static final int CALL_HOLD               = 0x3;
+    /* @hide Call state for local hold call state. */
+	public static final int CALL_LOCAL_HOLD         = 0x4;
+
+    /* @hide VSID for CS voice, Multimode */
+    public static final long VOICE_VSID             = 0x10C01000;
+    /* @hide VSID for CS Voice GSM-Only */
+    public static final long VOICE2_VSID            = 0x10DC1000;
+    /* @hide VSID for IMS Multimode */
+    public static final long IMS_VSID               = 0x10C02000;
+
+    /* @hide Key for vsid used in setParameters */
+    public static final String VSID_KEY             = "vsid";
+
+    /* @hide Key for call_state used in setParameters */
+    public static final String CALL_STATE_KEY       = "call_state";
+
     /* Routing bits for the former setRouting/getRouting API */
     /** @deprecated */
     @Deprecated public static final int ROUTE_EARPIECE          = (1 << 0);
