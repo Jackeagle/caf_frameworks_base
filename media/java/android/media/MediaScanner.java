@@ -1307,7 +1307,7 @@ public class MediaScanner
             prescan(null, true);
             long prescan = System.currentTimeMillis();
 
-            if (ENABLE_BULK_INSERTS) {
+            if (ENABLE_BULK_INSERTS  && !volumeName.equals("internal")) {
                 // create MediaInserter for bulk inserts
                 mMediaInserter = new MediaInserter(mMediaProvider, 500);
             }
@@ -1316,7 +1316,7 @@ public class MediaScanner
                 processDirectory(directories[i], mClient);
             }
 
-            if (ENABLE_BULK_INSERTS) {
+            if (ENABLE_BULK_INSERTS && !volumeName.equals("internal")) {
                 // flush remaining inserts
                 mMediaInserter.flushAll();
                 mMediaInserter = null;
@@ -1524,6 +1524,7 @@ public class MediaScanner
                 return new FileEntry(rowId, path, lastModified, format);
             }
         } catch (RemoteException e) {
+        } catch (SQLException e){
         } finally {
             if (c != null) {
                 c.close();
