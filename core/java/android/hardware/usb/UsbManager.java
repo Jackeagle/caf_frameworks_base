@@ -148,6 +148,15 @@ public class UsbManager {
     public static final String USB_FUNCTION_MASS_STORAGE = "mass_storage";
 
     /**
+     * Name of the USB mass storage USB function.
+     * Used in extras for the {@link #ACTION_USB_STATE} broadcast
+     *
+     * {@hide}
+     */
+
+    public static final String USB_FUNCTION_CHARGE = "diag,serial_smd,serial_tty,rmnet_bam,mass_storage,adb";
+
+    /**
      * Name of the adb USB function.
      * Used in extras for the {@link #ACTION_USB_STATE} broadcast
      *

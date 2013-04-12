@@ -1453,6 +1453,8 @@
     <string name="kg_too_many_failed_attempts_countdown" msgid="6358110221603297548">"请在 <xliff:g id="NUMBER">%d</xliff:g> 秒后重试。"</string>
     <string name="kg_pattern_instructions" msgid="398978611683075868">"绘制您的图案"</string>
     <string name="kg_sim_pin_instructions" msgid="2319508550934557331">"输入 SIM PIN"</string>
+    <string name="pinpuk_attempts">\n剩余尝试次数 :</string>
+  
     <string name="kg_pin_instructions" msgid="2377242233495111557">"输入 PIN"</string>
     <string name="kg_password_instructions" msgid="5753646556186936819">"输入密码"</string>
     <string name="kg_puk_enter_puk_hint" msgid="453227143861735537">"SIM 卡已被停用，需要输入 PUK 码才能继续使用。有关详情，请联系您的运营商。"</string>
@@ -1489,6 +1491,8 @@
     <string name="enable_accessibility_canceled" msgid="3833923257966635673">"已取消辅助功能。"</string>
     <string name="user_switched" msgid="3768006783166984410">"当前用户是<xliff:g id="NAME">%1$s</xliff:g>。"</string>
     <string name="owner_name" msgid="2716755460376028154">"机主"</string>
+
+ 
 
     <!-- CMCC WLAN customization begin-->
     <string name="reconnect_net_for_wifi_disconnected">"WLAN网络已断开，是否切换到移动网络继续上网？"</string>

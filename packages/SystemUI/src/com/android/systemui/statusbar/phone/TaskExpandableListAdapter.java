@@ -885,11 +885,17 @@ public class TaskExpandableListAdapter extends BaseExpandableListAdapter {
 			){
 				return true;
 			}else{
-				Log.d(TAG,"appNeedshow psPackageName= " + psPackageName);
+				for(DetailProcess dp:getList()){
+					String packageName = dp.getPackageName();
+					if(packageName.equals(psPackageName)){
+					//Log.d(TAG,"already have the app named := " + psPackageName);
+						return true;
+					}
+				}
+				//Log.d(TAG,"appNeedshow psPackageName= " + psPackageName);
 				return false;
 			}
 		}        
-
     }
 
     private class H extends Handler {

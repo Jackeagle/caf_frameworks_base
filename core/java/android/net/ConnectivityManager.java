@@ -334,12 +334,18 @@ public class ConnectivityManager {
      * DM data connection
      */
     public static final int TYPE_MOBILE_DM  = 13;
+
+    /**
+     * wap
+     */
+    public static final int TYPE_MOBILE_WAP = 14;
+
     /**
      * A Wi-Fi p2p connection. Only requesting processes will have access to
      * the peers connected.
      * {@hide}
      */
-    public static final int TYPE_WIFI_P2P    = 14;
+    public static final int TYPE_WIFI_P2P    = 15;
 
     /** {@hide} */
     public static final int MAX_RADIO_TYPE   = TYPE_WIFI_P2P;
@@ -394,6 +400,8 @@ public class ConnectivityManager {
                 return "MOBILE_CBS";
             case TYPE_MOBILE_DM:
                 return "MOBILE_DM";
+            case TYPE_MOBILE_WAP:
+                return "MOBILE_WAP";
             case TYPE_WIFI_P2P:
                 return "WIFI_P2P";
             default:
@@ -413,6 +421,7 @@ public class ConnectivityManager {
             case TYPE_MOBILE_IMS:
             case TYPE_MOBILE_CBS:
             case TYPE_MOBILE_DM:
+            case TYPE_MOBILE_WAP:
                 return true;
             default:
                 return false;
