@@ -456,18 +456,21 @@ public class CMCCSignalClusterView
 	};
 
 	private boolean isSubDataConnect() {
-		
+	
 		boolean Data_connect_on = false;
+		
 		ConnectivityManager cm = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
 		Data_connect_on = cm.getMobileDataEnabled();
 		
 		boolean data_on=(cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE).getState()==NetworkInfo.State.CONNECTED);
-		Slog.d(TAG, "activedSub=="  + " Data_connect_on=" + Data_connect_on+" data_on="+data_on);
-		if (data_on && (Data_connect_on == true)) {
+		boolean mms_data_on = (cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_MMS).getState()==NetworkInfo.State.CONNECTED);
+		Slog.d(TAG,  " Data_connect_on=" + Data_connect_on+" data_on="+data_on+" mms_data_on="+mms_data_on+" NetworkInfo.State.CONNECTED="+NetworkInfo.State.CONNECTED);
+		if ((data_on && (Data_connect_on == true))||mms_data_on) {
 			return true;
 		} else {
 			return false;
 		}
+
 	}
 }
 

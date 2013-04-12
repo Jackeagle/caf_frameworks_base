@@ -60,12 +60,13 @@
         android:scaleType="center"
         android:src="@drawable/ic_tasklist_switch"
         />
+ <!--     
     <Space
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_weight="1"
         />
-
+-->
     <TextView
         android:id="@+id/header_debug_info"
         android:visibility="invisible"

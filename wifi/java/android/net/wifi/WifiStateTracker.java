@@ -20,6 +20,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.ConnectivityManager;
 import android.net.LinkCapabilities;
 import android.net.LinkProperties;
 import android.net.NetworkInfo;
@@ -39,7 +40,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class WifiStateTracker implements NetworkStateTracker {
 
     private static final String NETWORKTYPE = "WIFI";
-    private static final String TAG = "WifiStateTracker";
+    //private static final String TAG = "WifiStateTracker";
+    private String TAG = "";
 
     private static final boolean LOGV = true;
 
@@ -58,7 +60,15 @@ public class WifiStateTracker implements NetworkStateTracker {
     private BroadcastReceiver mWifiStateReceiver;
     private WifiManager mWifiManager;
 
+    private int mNetType;
+
     public WifiStateTracker(int netType, String networkName) {
+        mNetType = netType;
+        if (netType == ConnectivityManager.TYPE_WIFI) {
+            TAG = "WifiStateTracker";
+        } else if (netType == ConnectivityManager.TYPE_WIFI_P2P) {
+            TAG = "WifiP2pStateTracker";
+        }
         mNetworkInfo = new NetworkInfo(netType, 0, networkName, "");
         mLinkProperties = new LinkProperties();
         mLinkCapabilities = new LinkCapabilities();
@@ -85,8 +95,10 @@ public class WifiStateTracker implements NetworkStateTracker {
 
         mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
         IntentFilter filter = new IntentFilter();
-        filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
-        filter.addAction(WifiManager.LINK_CONFIGURATION_CHANGED_ACTION);
+        if (mNetType == ConnectivityManager.TYPE_WIFI) {
+            filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+            filter.addAction(WifiManager.LINK_CONFIGURATION_CHANGED_ACTION);
+        }
 
         mWifiStateReceiver = new WifiStateReceiver();
         mContext.registerReceiver(mWifiStateReceiver, filter);

@@ -12570,6 +12570,7 @@ package android.net {
     field public static final int TYPE_MOBILE_HIPRI = 5; // 0x5
     field public static final int TYPE_MOBILE_MMS = 2; // 0x2
     field public static final int TYPE_MOBILE_SUPL = 3; // 0x3
+    field public static final int TYPE_MOBILE_WAP = 14; // 0xe
     field public static final int TYPE_WIFI = 1; // 0x1
     field public static final int TYPE_WIMAX = 6; // 0x6
   }
@@ -13368,6 +13369,10 @@ package android.net.wifi {
     field public java.lang.String preSharedKey;
     field public int priority;
     field public int status;
+    field public java.lang.String wapiASCert;
+    field public java.lang.String wapiPsk;
+    field public int wapiPskType;
+    field public java.lang.String wapiUserCert;
     field public java.lang.String[] wepKeys;
     field public int wepTxKeyIndex;
   }
