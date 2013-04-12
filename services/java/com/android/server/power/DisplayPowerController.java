@@ -610,6 +610,8 @@ final class DisplayPowerController {
                     mScreenOffBecauseOfProximity = true;
                     sendOnProximityPositive();
                     setScreenOn(false);
+                    mButtonLight.setButtonBackLightsOn(false);
+                    Slog.v("xst","DPC--updatePowerState--set lcd and button back lights -> on");
                 }
             } else if (mWaitingForNegativeProximity
                     && mScreenOffBecauseOfProximity
@@ -681,12 +683,6 @@ final class DisplayPowerController {
                     // be visible if the electron beam has not been dismissed because
                     // its last frame of animation is solid black.
                     setScreenOn(true);
-                    if(mButtonLight.getButtonBackLightsMode()==1){
-                       mButtonLight.setButtonBackLightsOn(true);
-                    }else if(mButtonLight.getButtonBackLightsMode()==0){
-                       mButtonLight.setButtonBackLightsOn(false);
-                    }
-                    Slog.v("xst", "DisplayPowerController--Want screen on...");
                     if (mPowerRequest.blockScreenOn
                             && mPowerState.getElectronBeamLevel() == 0.0f) {
                         blockScreenOn();
@@ -710,6 +706,13 @@ final class DisplayPowerController {
                             mPowerState.dismissElectronBeam();
                         }
                     }
+                    //turn on the button back lights if the screen is turn on when the setting is open state. --a-xst
+                    if(mButtonLight.getButtonBackLightsMode()==1){
+                        mButtonLight.setButtonBackLightsOn(true);
+                    }else if(mButtonLight.getButtonBackLightsMode()==0){
+                        mButtonLight.setButtonBackLightsOn(false);
+                    }
+                    Slog.v("xst","DPC--updatePowerState--set lcd and button back lights -> on");
                 }
             } else {
                 // Want screen off.
@@ -719,6 +722,7 @@ final class DisplayPowerController {
                         if (mPowerState.getElectronBeamLevel() == 0.0f) {
                             setScreenOn(false);
                             mButtonLight.setButtonBackLightsOn(false);
+                            Slog.v("xst","DPC--updatePowerState--set lcd and button back lights -> off");
                         } else if (mPowerState.prepareElectronBeam(
                                 mElectronBeamFadesConfig ?
                                         ElectronBeam.MODE_FADE :
