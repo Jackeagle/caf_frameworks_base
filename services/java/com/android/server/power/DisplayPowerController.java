@@ -143,15 +143,15 @@ final class DisplayPowerController {
     // The short term average gives us a filtered but relatively low latency measurement.
     // The long term average informs us about the overall trend.
     private static final long SHORT_TERM_AVERAGE_LIGHT_TIME_CONSTANT = 1000;
-    private static final long LONG_TERM_AVERAGE_LIGHT_TIME_CONSTANT = 5000;
+    private static final long LONG_TERM_AVERAGE_LIGHT_TIME_CONSTANT = 2000;//5000 -> 2000 --m-xst
 
     // Stability requirements in milliseconds for accepting a new brightness
     // level.  This is used for debouncing the light sensor.  Different constants
     // are used to debounce the light sensor when adapting to brighter or darker environments.
     // This parameter controls how quickly brightness changes occur in response to
     // an observed change in light level that exceeds the hysteresis threshold.
-    private static final long BRIGHTENING_LIGHT_DEBOUNCE = 4000;
-    private static final long DARKENING_LIGHT_DEBOUNCE = 8000;
+    private static final long BRIGHTENING_LIGHT_DEBOUNCE = 2000;//4000 -> 2000 --m-xst
+    private static final long DARKENING_LIGHT_DEBOUNCE = 4000;//8000 -> 4000 --m-xst
 
     // Hysteresis constraints for brightening or darkening.
     // The recent lux must have changed by at least this fraction relative to the
@@ -611,7 +611,6 @@ final class DisplayPowerController {
                     sendOnProximityPositive();
                     setScreenOn(false);
                     mButtonLight.setButtonBackLightsOn(false);
-                    Slog.v("xst","DPC--updatePowerState--set lcd and button back lights -> on");
                 }
             } else if (mWaitingForNegativeProximity
                     && mScreenOffBecauseOfProximity
@@ -712,7 +711,6 @@ final class DisplayPowerController {
                     }else if(mButtonLight.getButtonBackLightsMode()==0){
                         mButtonLight.setButtonBackLightsOn(false);
                     }
-                    Slog.v("xst","DPC--updatePowerState--set lcd and button back lights -> on");
                 }
             } else {
                 // Want screen off.
@@ -722,7 +720,6 @@ final class DisplayPowerController {
                         if (mPowerState.getElectronBeamLevel() == 0.0f) {
                             setScreenOn(false);
                             mButtonLight.setButtonBackLightsOn(false);
-                            Slog.v("xst","DPC--updatePowerState--set lcd and button back lights -> off");
                         } else if (mPowerState.prepareElectronBeam(
                                 mElectronBeamFadesConfig ?
                                         ElectronBeam.MODE_FADE :
@@ -906,7 +903,6 @@ final class DisplayPowerController {
 
     private void handleLightSensorEvent(long time, float lux) {
         mHandler.removeMessages(MSG_LIGHT_SENSOR_DEBOUNCED);
-
         applyLightSensorMeasurement(time, lux);
         updateAmbientLux(time);
     }
