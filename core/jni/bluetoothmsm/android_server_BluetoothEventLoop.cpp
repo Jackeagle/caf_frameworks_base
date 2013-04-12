@@ -265,8 +265,9 @@ static void initializeNativeDataNative(JNIEnv* env, jobject object) {
         if (dbus_error_is_set(&err)) {
             ALOGE("%s: Could not get onto the system bus!", __FUNCTION__);
             dbus_error_free(&err);
+            return;
         }
-    dbus_bus_request_name(nat->conn, FRAMEWORKS_BASE_IFC,
+        dbus_bus_request_name(nat->conn, FRAMEWORKS_BASE_IFC,
                     DBUS_NAME_FLAG_DO_NOT_QUEUE, &err);
         if (dbus_error_is_set(&err)) {
             ALOGE("%s: Could not get requested name", __FUNCTION__);
