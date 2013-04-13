@@ -30,6 +30,7 @@ import com.android.internal.telephony.MSimConstants;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.location.Country;
 import android.location.CountryDetector;
 import android.net.Uri;
 import android.os.SystemProperties;
@@ -1815,8 +1816,9 @@ public class PhoneNumberUtils
         String countryIso;
         CountryDetector detector = (CountryDetector) context.getSystemService(
                 Context.COUNTRY_DETECTOR);
-        if (detector != null) {
-            countryIso = detector.detectCountry().getCountryIso();
+        Country mCountry = null;
+        if ((detector != null) && ((mCountry = detector.detectCountry()) != null)) {
+            countryIso = mCountry.getCountryIso();
         } else {
             Locale locale = context.getResources().getConfiguration().locale;
             countryIso = locale.getCountry();
@@ -2570,5 +2572,60 @@ public class PhoneNumberUtils
         }
         return number;
     }
+
+    /**
+    * This function is added  for support P T/W
+    * Conver number with P T/W to standard strings
+    */
+    public static String convertKeypadLettersToDigitsExt(String input) {
+        if (input == null) {
+            return input;
+        }
+        int len = input.length();
+        if (len == 0) {
+            return input;
+        }
+
+        char[] out = input.toCharArray();
+
+        for (int i = 0; i < len; i++) {
+            char c = out[i];
+            // If this char isn't in KEYPAD_MAP at all, just leave it alone.
+            out[i] = (char) KEYPAD_MAP_EXT.get(c, c);
+        }
+
+        return new String(out);
+    }
+
+    /**
+     * The phone keypad letter mapping (see ITU E.161 or ISO/IEC 9995-8.)
+     */
+    private static final SparseIntArray KEYPAD_MAP_EXT = new SparseIntArray();
+    static {
+        KEYPAD_MAP_EXT.put('a', '2'); KEYPAD_MAP_EXT.put('b', '2'); KEYPAD_MAP_EXT.put('c', '2');
+        KEYPAD_MAP_EXT.put('A', '2'); KEYPAD_MAP_EXT.put('B', '2'); KEYPAD_MAP_EXT.put('C', '2');
+
+        KEYPAD_MAP_EXT.put('d', '3'); KEYPAD_MAP_EXT.put('e', '3'); KEYPAD_MAP_EXT.put('f', '3');
+        KEYPAD_MAP_EXT.put('D', '3'); KEYPAD_MAP_EXT.put('E', '3'); KEYPAD_MAP_EXT.put('F', '3');
+
+        KEYPAD_MAP_EXT.put('g', '4'); KEYPAD_MAP_EXT.put('h', '4'); KEYPAD_MAP_EXT.put('i', '4');
+        KEYPAD_MAP_EXT.put('G', '4'); KEYPAD_MAP_EXT.put('H', '4'); KEYPAD_MAP_EXT.put('I', '4');
+
+        KEYPAD_MAP_EXT.put('j', '5'); KEYPAD_MAP_EXT.put('k', '5'); KEYPAD_MAP_EXT.put('l', '5');
+        KEYPAD_MAP_EXT.put('J', '5'); KEYPAD_MAP_EXT.put('K', '5'); KEYPAD_MAP_EXT.put('L', '5');
+
+        KEYPAD_MAP_EXT.put('m', '6'); KEYPAD_MAP_EXT.put('n', '6'); KEYPAD_MAP_EXT.put('o', '6');
+        KEYPAD_MAP_EXT.put('M', '6'); KEYPAD_MAP_EXT.put('N', '6'); KEYPAD_MAP_EXT.put('O', '6');
+
+        KEYPAD_MAP_EXT.put('t', ';'); KEYPAD_MAP_EXT.put('q', '7'); KEYPAD_MAP_EXT.put('r', '7'); KEYPAD_MAP_EXT.put('s', '7');
+        KEYPAD_MAP_EXT.put('T', ';'); KEYPAD_MAP_EXT.put('Q', '7'); KEYPAD_MAP_EXT.put('R', '7'); KEYPAD_MAP_EXT.put('S', '7');
+
+        KEYPAD_MAP_EXT.put('w', ';'); KEYPAD_MAP_EXT.put('u', '8'); KEYPAD_MAP_EXT.put('v', '8');
+        KEYPAD_MAP_EXT.put('W', ';'); KEYPAD_MAP_EXT.put('U', '8'); KEYPAD_MAP_EXT.put('V', '8');
+
+        KEYPAD_MAP_EXT.put('p', ','); KEYPAD_MAP_EXT.put('x', '9'); KEYPAD_MAP_EXT.put('y', '9'); KEYPAD_MAP_EXT.put('z', '9');
+        KEYPAD_MAP_EXT.put('P', ','); KEYPAD_MAP_EXT.put('X', '9'); KEYPAD_MAP_EXT.put('Y', '9'); KEYPAD_MAP_EXT.put('Z', '9');
+    }
+
     //==== End of utility methods used only in compareStrictly() =====
 }
