@@ -47,6 +47,7 @@ import java.util.Locale;
 public class CallerInfo {
     private static final String TAG = "CallerInfo";
     private static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
+    private static final boolean DBG = true;
 
     public static final String UNKNOWN_NUMBER = "-1";
     public static final String PRIVATE_NUMBER = "-2";
