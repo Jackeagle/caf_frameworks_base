@@ -415,6 +415,12 @@ public class MSimTelephonyManager {
         else if ("READY".equals(prop)) {
             return TelephonyManager.SIM_STATE_READY;
         }
+        else if ("CARD_IO_ERROR".equals(prop)) {
+            return TelephonyManager.SIM_STATE_CARD_IO_ERROR;
+        } 
+        else if ("CARD_DEACTIVATED".equals(prop)) {
+            return TelephonyManager.SIM_STATE_DEACTIVATED;
+        }
         else {
             return TelephonyManager.SIM_STATE_UNKNOWN;
         }
@@ -979,4 +985,63 @@ public class MSimTelephonyManager {
         }
         return android.provider.Settings.Global.putString(cr, name, data);
     }
+    
+    //merge from 8x25q start     
+    
+        /**
+     * Returns the sim card type for a subscription, for example, USIM or RUIM.
+     * Return null if it is unavailable.
+     * <p>
+     * Requires Permission:
+     *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
+     */
+    /** @hide */
+    public String getCardType(int subscription) {
+        try {
+            return getMSimSubscriberInfo().getCardType(subscription);
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            // This could happen before phone restarts due to crashing
+            return null;
+        }
+    }
+    public String getCardType() {
+        if(!isMultiSimEnabled()){
+            return TelephonyManager.getDefault().getCardType();
+        }else{
+            return getCardType(getDefaultSubscription());
+        }
+    }
+    
+    /**
+     * Returns true if the sim state is valid.
+     *
+     * @param slotId
+     * @return
+     */
+    public boolean isValidSimState(int slotId) {
+       int simState = getSimState(slotId);
+       if (TelephonyManager.SIM_STATE_ABSENT == simState
+             || TelephonyManager.SIM_STATE_UNKNOWN == simState || TelephonyManager.SIM_STATE_DEACTIVATED == simState) {
+           return false;
+       } else {
+           return true;
+       }
+    }
+
+    public String getSimOperatorName() {
+        return getSimOperatorName(getDefaultSubscription());
+    }
+    /**
+     * Returns the Service Provider Name (SPN).
+     * <p>
+     * Availability: SIM state must be {@link #SIM_STATE_READY}
+     *
+     * @see #getSimState
+     */
+    public String getSimOperatorName(int slotId) {
+        return getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, slotId, "");
+    }
+    //merge from 8x25q end    
 }
