@@ -196,6 +196,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int INJECT_NTP_TIME_FINISHED = 10;
     private static final int DOWNLOAD_XTRA_DATA_FINISHED = 11;
     private static final int REPORT_AGPS_STATUS = 12;
+    private static final int CANCEL_NI_LOCATION_ANIMATION = 13;
+    private static final int DISPLAY_NI_LOCATION_ANIMATION = 14;
+
 
     // Request setid
     private static final int AGPS_RIL_REQUEST_SETID_IMSI = 1;
@@ -530,12 +533,14 @@ public class GpsLocationProvider implements LocationProviderInterface {
         SmsMessage[] messages = Intents.getMessagesFromIntent(intent);
         for (int i=0; i <messages.length; i++) {
             byte[] supl_init = messages[i].getUserData();
+	     notifyNiLocation();
             native_agps_ni_message(supl_init,supl_init.length);
         }
     }
 
     private void checkWapSuplInit(Intent intent) {
         byte[] supl_init = (byte[]) intent.getExtra("data");
+	 notifyNiLocation();
         native_agps_ni_message(supl_init,supl_init.length);
     }
 
@@ -2114,6 +2119,17 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 case REPORT_AGPS_STATUS:
                     handleReportAgpsStatus((ReportAgpsStatusMessage)msg.obj);
                     break;
+	        case DISPLAY_NI_LOCATION_ANIMATION:
+		      if(DEBUG) Log.d(TAG, "DISPLAY_NI_LOCATION_ANIMATION");
+		      displayNiLocationAnimation(true);
+			//after 15s cancel ni icon
+		      mHandler.sendEmptyMessageDelayed(CANCEL_NI_LOCATION_ANIMATION, 15 * 1000);  
+		      break;
+		case CANCEL_NI_LOCATION_ANIMATION:
+		     if(DEBUG) Log.d(TAG, "CANCEL_NI_LOCATION_ANIMATION");
+		    //cancel ni icon
+		    displayNiLocationAnimation(false);
+		    break;
             }
             if (msg.arg2 == 1) {
                 // wakelock was taken for this message, release it
@@ -2176,6 +2192,34 @@ public class GpsLocationProvider implements LocationProviderInterface {
         }
 
         return apn;
+    }
+
+    private void wakeScreen() {
+	try {
+	   if (DEBUG) Log.e(TAG," wakeScreen()");
+	   PowerManager pm = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
+	   PowerManager.WakeLock wl =pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK|PowerManager.ACQUIRE_CAUSES_WAKEUP,"GpslocationProvider");
+		try{
+		   long timewake = Settings.System.getInt(mContext.getContentResolver(),Settings.System.SCREEN_OFF_TIMEOUT);
+                      if (DEBUG) Log.e(TAG,"timewake"+timewake);
+			    wl.acquire(timewake);
+                   }catch(Exception e){
+			Log.e(TAG," 	 Exception " + e);
+				}
+		   } catch (Exception ex) {
+			   if (DEBUG) Log.e(TAG,"	 Exception	  " + ex);
+		   }
+    }
+    private void notifyNiLocation(){
+	if (DEBUG) Log.e(TAG,"notifyNiLocation()");
+	wakeScreen();
+	mHandler.sendEmptyMessage(DISPLAY_NI_LOCATION_ANIMATION);
+    }
+     private void displayNiLocationAnimation(boolean flag){
+	if (DEBUG) Log.e(TAG,"displayNiLocationAnimation()=" + flag);
+	Intent intent = new Intent(LocationManager.GPS_ENABLED_CHANGE_ACTION);
+	intent.putExtra(LocationManager.EXTRA_GPS_ENABLED, flag);
+	mContext.sendBroadcast(intent);
     }
 
     // for GPS SV statistics
