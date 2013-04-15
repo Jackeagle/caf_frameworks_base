@@ -1335,4 +1335,14 @@ public class TelephonyManager {
             return null;
         }
     }
+
+   public String getNetworkName() {
+        try {
+            return getITelephony().getNetworkName();
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            return null;
+        }
+   }
 }

@@ -286,6 +286,13 @@ interface ITelephonyMSim {
     int getNetworkType(int subscription);
 
     /**
+     * Returns the cell location Bundle of a subscription.
+     * @param subscription user preferred subscription.
+     * Returns cell location Bundle
+     */
+    Bundle getCellLocation(int subscription);
+
+    /**
      * Return true if an ICC card is present for a subscription.
      * @param subscription user preferred subscription.
      * Return true if an ICC card is present
@@ -330,5 +337,6 @@ interface ITelephonyMSim {
      * @return true if success
      */
     boolean setPreferredDataSubscription(int subscription);
+    String getNetworkName(int subscription);
 }
 
