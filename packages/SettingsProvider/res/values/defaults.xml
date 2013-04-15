@@ -170,4 +170,13 @@
 
     <!-- Default for Settings.Secure.USER_SETUP_COMPLETE -->
     <bool name="def_user_setup_complete">false</bool>
+
+    <!-- Default for Settings.System.KEY_BACKLIGHT-->
+    <integer name="def_key_backlight_values">1</integer>
+
+    <!-- Default for Settings.Secure.PROXIMITY_SENSOR -->
+    <bool name="def_proximity_sensor">true</bool>
+
+    <!-- Default for Settings.Secure.VIBRATE_AFTER_CONNECTED -->
+    <bool name="def_vibrate_after_connected">true</bool>
 </resources>

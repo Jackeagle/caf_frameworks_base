@@ -3557,10 +3557,14 @@
     <string name="progress_unmounting" product="nosdcard">Unmounting USB storage\u2026</string>
     <!-- Text for progress dialog while unmounting SD card [CHAR LIMIT=NONE] -->
     <string name="progress_unmounting" product="default">Unmounting SD card\u2026</string>
+    <!-- Text for progress dialog while unmounting Phone storage [CHAR LIMIT=NONE] -->
+    <string name="progress_unmounting_phone">Unmounting Phone storage\u2026</string>
     <!-- Text for progress dialog while erasing USB storage volume [CHAR LIMIT=NONE] -->
     <string name="progress_erasing" product="nosdcard">Erasing USB storage\u2026</string>
     <!-- Text for progress dialog while erasing SD card [CHAR LIMIT=NONE] -->
     <string name="progress_erasing" product="default">Erasing SD card\u2026</string>
+    <!-- Text for progress dialog while erasing Phone storage [CHAR LIMIT=NONE] -->
+    <string name="progress_erasing_phone">Erasing Phone storage\u2026</string>
     <!-- Text for message to user that an error happened when formatting USB storage [CHAR LIMIT=NONE] -->
     <string name="format_error" product="nosdcard">Couldn\'t erase USB storage.</string>
     <!-- Text for message to user that an error happened when formatting SD card [CHAR LIMIT=NONE] -->
@@ -3738,7 +3742,7 @@
     <string name="storage_sd_card">SD card</string>
 
     <!-- Storage description for USB storage. [CHAR LIMIT=NONE] -->
-    <string name="storage_usb">USB storage</string>
+    <string name="storage_usb">Phone storage</string>
 
     <!-- Button text for the edit menu in input method extract mode. [CHAR LIMIT=16] -->
     <string name="extract_edit_menu_button">Edit</string>

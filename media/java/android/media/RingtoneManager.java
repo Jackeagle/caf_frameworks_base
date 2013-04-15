@@ -70,7 +70,13 @@ public class RingtoneManager {
      * Type that refers to sounds that are used for the alarm.
      */
     public static final int TYPE_ALARM = 4;
-    
+
+    /**
+     * Type that refers to sounds that are used for the phone ringer.
+     * @hide
+     */
+    public static final int TYPE_RINGTONE_2 = 8;
+
     /**
      * All types of sounds.
      */
@@ -526,6 +532,10 @@ public class RingtoneManager {
         if ((type & TYPE_ALARM) != 0) {
             columns.add(MediaStore.Audio.AudioColumns.IS_ALARM);
         }
+
+        if ((type & TYPE_RINGTONE_2) != 0) {
+            columns.add(MediaStore.Audio.AudioColumns.IS_RINGTONE);
+        }
     }
     
     /**
@@ -663,6 +673,8 @@ public class RingtoneManager {
             return Settings.System.NOTIFICATION_SOUND;
         } else if ((type & TYPE_ALARM) != 0) {
             return Settings.System.ALARM_ALERT;
+        } else if ((type & TYPE_RINGTONE_2) != 0) {
+            return Settings.System.RINGTONE_2;
         } else {
             return null;
         }
@@ -696,6 +708,8 @@ public class RingtoneManager {
             return TYPE_NOTIFICATION;
         } else if (defaultRingtoneUri.equals(Settings.System.DEFAULT_ALARM_ALERT_URI)) {
             return TYPE_ALARM;
+        } else if (defaultRingtoneUri.equals(Settings.System.DEFAULT_RINGTONE_URI_2)) {
+            return TYPE_RINGTONE_2;
         } else {
             return -1;
         }
@@ -717,6 +731,8 @@ public class RingtoneManager {
             return Settings.System.DEFAULT_NOTIFICATION_URI;
         } else if ((type & TYPE_ALARM) != 0) {
             return Settings.System.DEFAULT_ALARM_ALERT_URI;
+        } else if ((type & TYPE_RINGTONE_2) != 0) {
+            return Settings.System.DEFAULT_RINGTONE_URI_2;
         } else {
             return null;
         }
