@@ -3892,6 +3892,10 @@
 
     <!-- "Done" button for MediaRouter chooser dialog when grouping routes. [CHAR LIMIT=NONE] -->
     <string name="media_route_chooser_grouping_done">Done</string>
+    <string name="China_Mobile">China Mobile</string>
+    <string name="China_Unicom">China Unicom</string>
+    <string name="China_Telecom">China Telecom</string>
+    
 
     <!-- Content description of a MediaRouteButton for accessibility support -->
     <string name="media_route_button_content_description">Media output</string>
