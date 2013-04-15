@@ -99,9 +99,15 @@
 
         <activity android:name=".usb.UsbStorageActivity"
                   android:label="@*android:string/usb_storage_activity_title"
+                  android:screenOrientation="nosensor"
                   android:excludeFromRecents="true">
         </activity>
         <activity android:name="com.android.internal.app.ExternalMediaFormatActivity"
+                android:theme="@*android:style/Theme.Dialog.Alert"
+                android:excludeFromRecents="true">
+        </activity>
+	
+        <activity android:name="com.android.internal.app.PhoneMediaFormatActivity"
                 android:theme="@*android:style/Theme.Dialog.Alert"
                 android:excludeFromRecents="true">
         </activity>

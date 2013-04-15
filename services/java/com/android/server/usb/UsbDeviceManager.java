@@ -89,6 +89,7 @@ public class UsbDeviceManager {
     private static final int MSG_SYSTEM_READY = 3;
     private static final int MSG_BOOT_COMPLETED = 4;
     private static final int MSG_USER_SWITCHED = 5;
+    private static final int MSG_UPDATE_NOTIFICATION = 6;
 
     private static final int AUDIO_MODE_NONE = 0;
     private static final int AUDIO_MODE_SOURCE = 1;
@@ -151,6 +152,19 @@ public class UsbDeviceManager {
         }
     };
 
+    /*
+     * Listens for system language changed from settings
+     */
+    private BroadcastReceiver mLocaleReceiver = new BroadcastReceiver(){
+        static final String INTENAL_LOCAL_ACTION = Intent.ACTION_LOCALE_CHANGED;
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(INTENAL_LOCAL_ACTION)) {
+                mHandler.sendEmptyMessage(MSG_UPDATE_NOTIFICATION);
+            }
+        }
+    };
     public UsbDeviceManager(Context context) {
         mContext = context;
         mContentResolver = context.getContentResolver();
@@ -375,6 +389,7 @@ public class UsbDeviceManager {
                         mBootCompletedReceiver, new IntentFilter(Intent.ACTION_BOOT_COMPLETED));
                 mContext.registerReceiver(
                         mUserSwitchedReceiver, new IntentFilter(Intent.ACTION_USER_SWITCHED));
+                mContext.registerReceiver(mLocaleReceiver, new IntentFilter(Intent.ACTION_LOCALE_CHANGED));
             } catch (Exception e) {
                 Slog.e(TAG, "Error initializing UsbHandler", e);
             }
@@ -656,6 +671,14 @@ public class UsbDeviceManager {
                     mCurrentUser = msg.arg1;
                     break;
                 }
+
+                case MSG_UPDATE_NOTIFICATION:
+                    //reload adb&Usb notification when system language changed
+                    mAdbNotificationShown = false;
+                    mUsbNotificationId = 0;
+                    updateUsbNotification();
+                    updateAdbNotification();
+                    break;
             }
         }
 
@@ -664,7 +687,7 @@ public class UsbDeviceManager {
         }
 
         private void updateUsbNotification() {
-            if (mNotificationManager == null || !mUseUsbNotification) return;
+            if (mNotificationManager == null ) return;
             int id = 0;
             Resources r = mContext.getResources();
             if (mConnected) {
