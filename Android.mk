@@ -307,7 +307,7 @@ LOCAL_INTERMEDIATE_SOURCES := \
 			$(framework_res_source_path)/com/android/internal/R.java
 
 LOCAL_NO_STANDARD_LIBRARIES := true
-LOCAL_JAVA_LIBRARIES := bouncycastle core core-junit ext
+LOCAL_JAVA_LIBRARIES := bouncycastle core core-junit ext com.qrd.plugin.feature_query
 
 LOCAL_MODULE := framework
 LOCAL_MODULE_CLASS := JAVA_LIBRARIES
@@ -488,6 +488,7 @@ framework_docs_LOCAL_JAVA_LIBRARIES := \
 			framework \
 			mms-common \
 			telephony-common \
+                        com.qrd.plugin.feature_query
 
 framework_docs_LOCAL_MODULE_CLASS := JAVA_LIBRARIES
 framework_docs_LOCAL_DROIDDOC_HTML_DIR := docs/html
@@ -914,6 +915,8 @@ LOCAL_SRC_FILES := $(ext_src_files)
 
 LOCAL_NO_STANDARD_LIBRARIES := true
 LOCAL_JAVA_LIBRARIES := core
+LOCAL_JAVA_LIBRARIES += com.qrd.plugin.feature_query
+
 LOCAL_JAVA_RESOURCE_DIRS := $(ext_res_dirs)
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := ext
