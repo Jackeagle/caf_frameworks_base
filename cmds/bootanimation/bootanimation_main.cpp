@@ -25,12 +25,16 @@
 #include <utils/Log.h>
 #include <utils/threads.h>
 
+
+#include <fcntl.h> 
+
 #if defined(HAVE_PTHREADS)
 # include <pthread.h>
 # include <sys/resource.h>
 #endif
 
 #include "BootAnimation.h"
+#include "BootSound.h" 
 
 using namespace android;
 
@@ -45,6 +49,11 @@ int main(int argc, char** argv)
     char value[PROPERTY_VALUE_MAX];
     property_get("debug.sf.nobootanimation", value, "0");
     int noBootAnimation = atoi(value);
+	
+    char bootAudioFile[] = "/system/media/boot.wav";
+    char *fileName;
+	fileName = bootAudioFile;
+	
     ALOGI_IF(noBootAnimation,  "boot animation disabled");
     if (!noBootAnimation) {
 
@@ -54,6 +63,13 @@ int main(int argc, char** argv)
         // create the boot animation object
         sp<BootAnimation> boot = new BootAnimation();
 
+ 
+        sp<BootSound> sound = new BootSound();
+		
+        sound->setFile(fileName);
+      
+        sound->run("BootSound", PRIORITY_AUDIO);
+		boot->run("BootAnimation", PRIORITY_DISPLAY);
         IPCThreadState::self()->joinThreadPool();
 
     }

@@ -35,7 +35,10 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.MediaPlayer;
+import android.media.MediaPlayer.OnCompletionListener;
 import android.os.Handler;
+import android.os.Message;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -52,7 +55,16 @@ import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.msim.ITelephonyMSim;
 
 import android.util.Log;
+import android.view.IWindowManager;
 import android.view.WindowManager;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
+import android.content.pm.ActivityInfo;
+import android.media.AudioManager;
 import java.lang.reflect.Method;
 
 public final class ShutdownThread extends Thread {
@@ -83,6 +95,7 @@ public final class ShutdownThread extends Thread {
 
     // static instance of this thread
     private static final ShutdownThread sInstance = new ShutdownThread();
+	private static AudioManager mAudioManager;
     
     private final Object mActionDoneSync = new Object();
     private boolean mActionDone;
@@ -92,7 +105,14 @@ public final class ShutdownThread extends Thread {
     private PowerManager.WakeLock mScreenWakeLock;
     private Handler mHandler;
 
-    private static AlertDialog sConfirmDialog;
+    private static final String USER_BOOTANIMATION_FILE = "/data/local/shutdownanimation.zip";
+    private static final String SYSTEM_BOOTANIMATION_FILE = "/system/media/shutdownanimation.zip";
+    private static final String SYSTEM_ENCRYPTED_BOOTANIMATION_FILE = "/system/media/shutdownanimation-encrypted.zip";
+
+    private static final String MUSIC_SHUTDOWN_FILE = "/system/media/shutdown.wav";
+    private static final String MUSIC_QRD_SHUTDOWN_FILE = "/data/qrd_theme/boot/shutdown.wav";
+ 	private boolean isShutdownMusicPlaying = false;   
+	private static AlertDialog sConfirmDialog;
     
     private ShutdownThread() {
     }
@@ -194,6 +214,20 @@ public final class ShutdownThread extends Thread {
         shutdownInner(context, confirm);
     }
 
+    private static String getShutdownMusicFilePath() {    
+        final String[] fileName = {MUSIC_QRD_SHUTDOWN_FILE,
+                MUSIC_SHUTDOWN_FILE};
+        File checkFile = null;
+        int i = 0;
+        for( ; i < fileName.length; i ++) {
+            checkFile = new File(fileName[i]);
+            if (checkFile.exists())
+                break;
+        }
+        if (i >= fileName.length)
+            return null;
+        return fileName[i];
+    }
     /**
      * Request a reboot into safe mode.  Must be called from a Looper thread in which its UI
      * is shown.
@@ -217,6 +251,11 @@ public final class ShutdownThread extends Thread {
             sIsStarted = true;
         }
 
+		//add for close headset
+		mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+		mAudioManager.setWiredDeviceConnectionState(AudioManager.DEVICE_OUT_WIRED_HEADSET,
+											  0,
+											  "Headset");
         // throw up an indeterminate system dialog to indicate radio is
         // shutting down.
         ProgressDialog pd = new ProgressDialog(context);
@@ -226,6 +265,9 @@ public final class ShutdownThread extends Thread {
         pd.setCancelable(false);
         pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
 
+        WindowManager.LayoutParams lp = pd.getWindow().getAttributes();    
+        lp.screenOrientation = ActivityInfo.SCREEN_ORIENTATION_NOSENSOR;    
+        pd.getWindow().setAttributes(lp);          
         pd.show();
 
         sInstance.mContext = context;
@@ -282,6 +324,13 @@ public final class ShutdownThread extends Thread {
             }
         };
 
+		//add for close headset
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException ie) {
+						/* ignore */
+		}
+
         /*
          * Write a system property in case the system_server reboots before we
          * get to the actual hardware restart. If that happens, we'll retry at
@@ -322,6 +371,31 @@ public final class ShutdownThread extends Thread {
             }
         }
         
+		showShutdownAnimation();
+        String shutDownFile = null;
+        if (!isSilentMode()
+                && (shutDownFile = getShutdownMusicFilePath()) != null) {
+            isShutdownMusicPlaying = true;
+        Log.i(TAG, "obtainMessage for shutdown music");
+            shutdownMusicHandler.obtainMessage(0, shutDownFile).sendToTarget();
+        }
+        final long endTimeForMusic = SystemClock.elapsedRealtime() + MAX_BROADCAST_TIME;
+        synchronized (mActionDoneSync) {
+            while (isShutdownMusicPlaying) {
+                long delay = endTimeForMusic - SystemClock.elapsedRealtime();
+                if (delay <= 0) {
+                    Log.w(TAG, "play shutdown music timeout!");
+                    break;
+                }
+                try {
+                    mActionDoneSync.wait(delay);
+                } catch (InterruptedException e) {
+                }
+            }
+            if (!isShutdownMusicPlaying) {
+                Log.i(TAG, "play shutdown music complete.");
+            }
+        }
         Log.i(TAG, "Shutting down activity manager...");
         
         final IActivityManager am =
@@ -553,28 +627,70 @@ public final class ShutdownThread extends Thread {
         Log.i(TAG, "Performing low-level shutdown...");
         PowerManagerService.lowLevelShutdown();
     }
-
-    private static void deviceRebootOrShutdown(boolean reboot, String reason) {
-
-        Class<?> cl;
-        String deviceShutdownClassName = "com.android.server.power.ShutdownOem";
-
-        try{
-            cl = Class.forName(deviceShutdownClassName);
-            Method m;
-            try {
-                m = cl.getMethod("rebootOrShutdown", new Class[]{boolean.class, String.class});
-                m.invoke(cl.newInstance(), reboot, reason);
-
-            } catch (NoSuchMethodException ex) {
-                //Method not found.
-            } catch (Exception ex) {
-                //Unknown exception
+    private static boolean checkAnimationFileExist() {
+        if (new File(USER_BOOTANIMATION_FILE).exists()
+                || new File(SYSTEM_BOOTANIMATION_FILE).exists()
+                || new File(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE).exists())
+            return true;
+        else
+            return false;
+    }
+    private static boolean isSilentMode() {
+        String mode = SystemProperties.get("persist.sys.silent");
+        return mode != null && mode.equals("1");
+    }
+    private static void showShutdownAnimation() {
+        SystemProperties.set("ctl.start", "bootanim");
+    }
+    private Handler shutdownMusicHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            String path = (String) msg.obj;
+            MediaPlayer mediaPlayer = new MediaPlayer();
+            try
+            {
+                mediaPlayer.reset();
+                mediaPlayer.setDataSource(path);
+                mediaPlayer.prepare();
+                mediaPlayer.start();
+                mediaPlayer.setOnCompletionListener(new OnCompletionListener() {
+                    @Override
+                    public void onCompletion(MediaPlayer mp) {
+                        synchronized (mActionDoneSync) {
+                            isShutdownMusicPlaying = false;
+                            mActionDoneSync.notifyAll();
+                        }
+                    }
+                });
+            } catch (IOException e) {
+                Log.d(TAG, "play shutdown music error:" + e);
             }
-        }catch(ClassNotFoundException e){
-        //Classnotfound!
-        }catch(Exception e){
-        //Unknown exception
+			
         }
-     }
+    };
+	
+	private static void deviceRebootOrShutdown(boolean reboot, String reason) {
+	
+		Class<?> cl;
+		String deviceShutdownClassName = "com.android.server.power.ShutdownOem";
+
+		try{
+			cl = Class.forName(deviceShutdownClassName);
+			Method m;
+			try {
+				m = cl.getMethod("rebootOrShutdown", new Class[]{boolean.class, String.class});
+				m.invoke(cl.newInstance(), reboot, reason);
+
+			} catch (NoSuchMethodException ex) {
+				//Method not found.
+			} catch (Exception ex) {
+				//Unknown exception
+			}
+		}catch(ClassNotFoundException e){
+		//Classnotfound!
+		}catch(Exception e){
+		//Unknown exception
+		}
+	 }
 }
+    

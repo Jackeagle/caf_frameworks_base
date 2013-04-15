@@ -2241,6 +2241,7 @@
 
         <activity android:name="com.android.server.ShutdownActivity"
             android:permission="android.permission.SHUTDOWN"
+            android:screenOrientation="nosensor"
             android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.ACTION_REQUEST_SHUTDOWN" />

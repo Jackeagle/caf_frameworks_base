@@ -2965,6 +2965,11 @@
     <string name="low_internal_storage_view_title">Storage space running out</string>
     <!-- If the device is getting low on internal storage, a notification is shown to the user.  This is the message of that notification. -->
     <string name="low_internal_storage_view_text">Some system functions may not work</string>
+    
+    <!--add for headset insert-->
+    <string name="headset_plugin_view_text">Headset was plugged in.</string>
+    <string name="headset_plugin_view_title">Headset</string>
+
 
     <!-- Preference framework strings. -->
     <string name="ok">OK</string>
@@ -3868,6 +3873,10 @@
 
     <!-- "Done" button for MediaRouter chooser dialog when grouping routes. [CHAR LIMIT=NONE] -->
     <string name="media_route_chooser_grouping_done">Done</string>
+    <string name="China_Mobile">China Mobile</string>
+    <string name="China_Unicom">China Unicom</string>
+    <string name="China_Telecom">China Telecom</string>
+    
 
     <!-- Content description of a MediaRouteButton for accessibility support -->
     <string name="media_route_button_content_description">Media output</string>

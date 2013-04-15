@@ -61,12 +61,17 @@ extern "C" int clock_nanosleep(clockid_t clock_id, int flags,
                            const struct timespec *request,
                            struct timespec *remain);
 
+#define USER_SHUTDOWNANIMATION_FILE "/data/local/shutdownanimation.zip"
+#define SYSTEM_SHUTDOWNANIMATION_FILE "/system/media/shutdownanimation.zip"
+
+
 namespace android {
 
 // ---------------------------------------------------------------------------
 
 BootAnimation::BootAnimation() : Thread(false)
 {
+    mShutdown = false;  
     mSession = new SurfaceComposerClient();
 }
 
@@ -277,16 +282,29 @@ status_t BootAnimation::readyToRun() {
 
     bool encryptedAnimation = atoi(decrypt) != 0 || !strcmp("trigger_restart_min_framework", decrypt);
 
-    if ((encryptedAnimation &&
-            (access(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE, R_OK) == 0) &&
-            (mZip.open(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE) == NO_ERROR)) ||
-
-            ((access(USER_BOOTANIMATION_FILE, R_OK) == 0) &&
-            (mZip.open(USER_BOOTANIMATION_FILE) == NO_ERROR)) ||
-
-            ((access(SYSTEM_BOOTANIMATION_FILE, R_OK) == 0) &&
-            (mZip.open(SYSTEM_BOOTANIMATION_FILE) == NO_ERROR))) {
-        mAndroidAnimation = false;
+  
+    char value[PROPERTY_VALUE_MAX];
+    property_get("sys.shutdown.requested", value, "null");
+    if (strcmp(value, "null") != 0 || mShutdown){
+        if (((access(USER_SHUTDOWNANIMATION_FILE, R_OK) == 0) &&
+                (mZip.open(USER_SHUTDOWNANIMATION_FILE) == NO_ERROR)) ||
+    
+                ((access(SYSTEM_SHUTDOWNANIMATION_FILE, R_OK) == 0) &&
+                (mZip.open(SYSTEM_SHUTDOWNANIMATION_FILE) == NO_ERROR))) {
+            mAndroidAnimation = false;
+        }
+    } else {
+        if ((encryptedAnimation &&
+                (access(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE, R_OK) == 0) &&
+                (mZip.open(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE) == NO_ERROR)) ||
+    
+                ((access(USER_BOOTANIMATION_FILE, R_OK) == 0) &&
+                (mZip.open(USER_BOOTANIMATION_FILE) == NO_ERROR)) ||
+    
+                ((access(SYSTEM_BOOTANIMATION_FILE, R_OK) == 0) &&
+                (mZip.open(SYSTEM_BOOTANIMATION_FILE) == NO_ERROR))) {
+            mAndroidAnimation = false;
+        }
     }
 
     return NO_ERROR;
@@ -574,6 +592,93 @@ bool BootAnimation::movie()
     return false;
 }
 
+char *BootAnimation::getAnimationFileName(ImageID image)
+{
+    char *fileName[2][3] = { { "/data/qrd_theme/boot/bootanimation.zip",
+            "/system/media/bootanimation.zip",
+            "/system/media/bootanimation-encrypted.zip" }, {
+            "/data/qrd_theme/boot/shutdownanimation.zip",
+            "/system/media/shutdownanimation.zip",
+            "/system/media/shutdownanimation-encrypted.zip" } };
+    int state;
+
+    state = checkBootState() ? 0 : 1;
+
+    return fileName[state][image];
+}
+char *BootAnimation::getBootRingtoneFileName(ImageID image)
+{
+    char *fileName[2][2] = { { "/data/qrd_theme/boot/boot.wav",
+            "/system/media/boot.wav" }, {
+            "/data/qrd_theme/boot/shutdown.wav",
+            "/system/media/shutdown.wav" } };
+    int state;
+
+    state = checkBootState() ? 0 : 1;
+
+    return fileName[state][image];
+}
+
+void BootAnimation::playBackgroundMusic(void)
+{
+
+ 
+    SLOGD("playBackgroundMusic");
+    char bootAudioFile[] = "/system/media/boot.wav";
+    char shutdownAudioFile[] = "/system/media/shutdown.wav";
+    char *fileName;
+	
+    if (checkBootState()) {
+        // boot
+        fileName = bootAudioFile;
+    }
+    else {
+        // shutdown music played in shutdownThread,so don't care
+        //return;
+        fileName = shutdownAudioFile;
+    }
+
+    if (access(fileName, F_OK) != 0)
+        return;
+
+	pid_t pid = 0;
+	int status;
+    if (pid = fork() == 0) {
+	
+		
+     
+		execlp("aplay", "aplay", fileName, (char *)0);
+		
+        exit(0);
+    } 
+	
+	/*
+    char *fileName;
+    if (((fileName = getBootRingtoneFileName(IMG_DATA)) != NULL && access(fileName, R_OK) == 0) ||
+            ((fileName = getBootRingtoneFileName(IMG_SYS)) != NULL && access(fileName, R_OK) == 0)) {
+        if (fork() == 0) {
+            execlp("sound", "sound", fileName, (char *)0);
+            exit(0);
+        }
+    }*/
+} 
+ 
+bool BootAnimation::checkBootState(void)
+{
+    char value[PROPERTY_VALUE_MAX];
+    bool ret = true;
+
+    property_get("sys.shutdown.requested", value, "null");
+	SLOGD("checkBootState =%s",value);
+    if (strcmp(value, "null") != 0 || mShutdown) {
+        ret = false;
+    }
+
+    return ret;
+}
+void BootAnimation::setShutdown() {
+    mShutdown = true;
+}
 // ---------------------------------------------------------------------------
 
 }

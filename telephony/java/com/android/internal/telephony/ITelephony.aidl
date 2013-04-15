@@ -307,5 +307,6 @@ interface ITelephony {
      * Returns the all observed cell information of the device.
      */
     List<CellInfo> getAllCellInfo();
+    String getNetworkName();
 }
 
