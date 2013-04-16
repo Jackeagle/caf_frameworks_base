@@ -293,6 +293,16 @@ interface ITelephony {
      */
     boolean hasIccCard();
 
+     /**
+     *  get call duration for call log 
+     */
+    long getCallsDuration(String key);
+    
+     /**
+     *  set call duration for call log 
+     */
+    void setCallsDuration(String key, long value);
+   
     /**
      * Return if the current radio is LTE on CDMA. This
      * is a tri-state return value as for a period of time
