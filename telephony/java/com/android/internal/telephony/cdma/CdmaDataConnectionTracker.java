@@ -165,11 +165,6 @@ public class CdmaDataConnectionTracker extends DataConnectionTracker {
         }
     }
 
-    /* API provided for CdmaDataProfileTracker */
-    public int apnTypeToId(String apnType) {
-        return super.apnTypeToId(apnType);
-    }
-
     @Override
     public synchronized State getState(String apnType) {
         return mState;

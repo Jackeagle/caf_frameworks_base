@@ -43,6 +43,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import com.android.internal.telephony.DataConnectionTracker;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.DataProfile;
 import com.android.internal.telephony.cdma.DataProfileCdma;
@@ -163,12 +164,11 @@ public final class CdmaDataProfileTracker extends Handler {
                 TelephonyProperties.PROPERTY_CDMA_IPPROTOCOL, "IP");
         String roamingIpProto = SystemProperties.get(
                 TelephonyProperties.PROPERTY_CDMA_ROAMING_IPPROTOCOL, "IP");
-        CdmaDataConnectionTracker cdmaDct =
-            (CdmaDataConnectionTracker)(mPhone.mDataConnectionTracker);
+        DataConnectionTracker dct = mPhone.mDataConnectionTracker;
 
         DataProfileCdma dp;
         dp = new DataProfileCdma(
-                cdmaDct.apnTypeToId(Phone.APN_TYPE_DEFAULT),
+                dct.apnTypeToId(Phone.APN_TYPE_DEFAULT),
                 null, null, null, null,
                 RILConstants.SETUP_DATA_AUTH_PAP_CHAP, mDefaultApnTypes, ipProto, roamingIpProto,
                 mPhone.getServiceState().getRadioTechnology());
@@ -178,7 +178,7 @@ public final class CdmaDataProfileTracker extends Handler {
         String[] types = {Phone.APN_TYPE_DUN};
 
         dp = new DataProfileCdma(
-                cdmaDct.apnTypeToId(Phone.APN_TYPE_DUN),
+                dct.apnTypeToId(Phone.APN_TYPE_DUN),
                 null, null, null, null,
                 RILConstants.SETUP_DATA_AUTH_PAP_CHAP, types, ipProto, roamingIpProto,
                 mPhone.getServiceState().getRadioTechnology());
@@ -192,14 +192,13 @@ public final class CdmaDataProfileTracker extends Handler {
 
     private String getOperatorNumeric() {
         String result = null;
-        CdmaDataConnectionTracker cdmaDct =
-            (CdmaDataConnectionTracker)(mPhone.mDataConnectionTracker);
+        DataConnectionTracker dct = mPhone.mDataConnectionTracker;
         if (mCdmaSsm.getCdmaSubscriptionSource() ==
                         CdmaSubscriptionSourceManager.SUBSCRIPTION_FROM_NV) {
             result = SystemProperties.get(CDMAPhone.PROPERTY_CDMA_HOME_OPERATOR_NUMERIC);
             log("operatorNumeric for NV " + result);
-        } else if (cdmaDct.getIccRecords() != null) {
-            result = cdmaDct.getIccRecords().getOperatorNumeric();
+        } else if (dct.getIccRecords() != null) {
+            result = dct.getIccRecords().getOperatorNumeric();
             log("operatorNumeric for icc " + result);
         } else {
             log("IccRecords == null -> operatorNumeric = null");
