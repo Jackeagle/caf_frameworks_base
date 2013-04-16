@@ -19,6 +19,7 @@
      ***************************************************************
      *************************************************************** -->
 <resources>
+  <java-symbol type="string" name="reconnect_net_for_wifi_disconnected" />
   <java-symbol type="string" name="phonemedia_format_button_format" />
   <java-symbol type="string" name="phonemedia_format_message" />
   <java-symbol type="string" name="phonemedia_format_title" />
@@ -50,6 +51,8 @@
   <java-symbol type="string" name="usb_storage_stop_notification_title" />
   <java-symbol type="string" name="usb_storage_stop_title" />
   <java-symbol type="string" name="usb_storage_title" />
+  <java-symbol type="string" name="auto_power_off_title" />
+  <java-symbol type="string" name="auto_power_off_msg" />
   <!-- We don't want to publish private symbols in android.R as part of the
        SDK.  Instead, put them here. -->
   <private-symbols package="com.android.internal" />

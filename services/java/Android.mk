@@ -18,6 +18,7 @@ endif
 LOCAL_MODULE:= services
 
 LOCAL_JAVA_LIBRARIES := android.policy telephony-common
+LOCAL_JAVA_LIBRARIES += com.qrd.plugin.feature_query
 
 include $(BUILD_JAVA_LIBRARY)
 

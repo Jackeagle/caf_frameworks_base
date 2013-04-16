@@ -51,10 +51,13 @@ import android.util.Log;
 import com.android.internal.content.PackageHelper;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
+import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.util.XmlUtils;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.LockPatternView;
+
+import com.qrd.plugin.feature_query.FeatureQuery;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -63,6 +66,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+
+import com.qrd.plugin.feature_query.FeatureQuery;
 
 /**
  * Database helper class for {@link SettingsProvider}.
@@ -297,6 +302,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     Settings.Secure.ANDROID_ID,
                     Settings.Secure.BLUETOOTH_ON,
                     Settings.Secure.DATA_ROAMING,
+                    Settings.Secure.DATA_ROAMING_2,
                     Settings.Secure.DEVICE_PROVISIONED,
                     Settings.Secure.HTTP_PROXY,
                     Settings.Secure.INSTALL_NON_MARKET_APPS,
@@ -473,8 +479,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             try {
                 stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                         + " VALUES(?,?);");
-                loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                        R.string.airplane_mode_toggleable_radios);
+				if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.cmcc_airplane_mode_toggleable_radios);					
+				} else {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.airplane_mode_toggleable_radios);
+				}
                 db.setTransactionSuccessful();
             } finally {
                 db.endTransaction();
@@ -769,8 +780,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         + Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS + "'");
                 stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                         + " VALUES(?,?);");
-                loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                        R.string.airplane_mode_toggleable_radios);
+				if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.cmcc_airplane_mode_toggleable_radios);					
+				} else {
+                    loadStringSetting(stmt, Settings.System.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                            R.string.airplane_mode_toggleable_radios);
+                }
                 db.setTransactionSuccessful();
             } finally {
                 db.endTransaction();
@@ -987,8 +1003,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Add RADIO_NFC to AIRPLANE_MODE_RADIO and AIRPLANE_MODE_TOGGLEABLE_RADIOS
             String airplaneRadios = mContext.getResources().getString(
                     R.string.def_airplane_mode_radios);
-            String toggleableRadios = mContext.getResources().getString(
-                    R.string.airplane_mode_toggleable_radios);
+			String toggleableRadios;
+			if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                toggleableRadios = mContext.getResources().getString(
+                        R.string.cmcc_airplane_mode_toggleable_radios);
+			} else {
+                toggleableRadios = mContext.getResources().getString(
+                        R.string.airplane_mode_toggleable_radios);
+			}
             db.beginTransaction();
             try {
                 db.execSQL("UPDATE system SET value='" + airplaneRadios + "' " +
@@ -1281,6 +1303,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                             Settings.Secure.ADB_ENABLED,
                             Settings.Secure.BLUETOOTH_ON,
                             Settings.Secure.DATA_ROAMING,
+                            Settings.Secure.DATA_ROAMING_2,
                             Settings.Secure.DEVICE_PROVISIONED,
                             Settings.Secure.INSTALL_NON_MARKET_APPS,
                             Settings.Secure.USB_MASS_STORAGE_ENABLED
@@ -1939,6 +1962,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
                     + " VALUES(?,?);");
 
+            loadSetting(stmt, Settings.System.MULTI_SIM_COUNTDOWN, 5);
+            loadSetting(stmt, Settings.System.CALLBACK_PRIORITY_ENABLED, FeatureQuery.FEATURE_UX_SETTINGS_PREFERREDCALLBACK ? 1: 0);
+
             loadBooleanSetting(stmt, Settings.System.DIM_SCREEN,
                     R.bool.def_dim_screen);
             loadIntegerSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT,
@@ -1973,6 +1999,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadIntegerSetting(stmt, Settings.System.POINTER_SPEED,
                     R.integer.def_pointer_speed);
+
+            loadSetting(stmt, Settings.System.SHOW_DURATION,
+                    FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
+
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
+
+            loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
+                    R.bool.def_proximity_sensor);
+        
+            loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
+                    R.bool.def_vibrate_after_connected);
+
         } finally {
             if (stmt != null) stmt.close();
         }
@@ -2112,8 +2151,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_RADIOS,
                     R.string.def_airplane_mode_radios);
 
-            loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
-                    R.string.airplane_mode_toggleable_radios);
+            if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                        R.string.cmcc_airplane_mode_toggleable_radios);
+            } else {
+                loadStringSetting(stmt, Settings.Global.AIRPLANE_MODE_TOGGLEABLE_RADIOS,
+                        R.string.airplane_mode_toggleable_radios);
+            }
 
             loadBooleanSetting(stmt, Settings.Global.ASSISTED_GPS_ENABLED,
                     R.bool.assisted_gps_enabled);
@@ -2154,6 +2198,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             // Data roaming default, based on build
             loadSetting(stmt, Settings.Global.DATA_ROAMING,
+                    "true".equalsIgnoreCase(
+                            SystemProperties.get("ro.com.android.dataroaming",
+                                    "false")) ? 1 : 0);
+
+            loadSetting(stmt, Settings.Global.DATA_ROAMING_2,
                     "true".equalsIgnoreCase(
                             SystemProperties.get("ro.com.android.dataroaming",
                                     "false")) ? 1 : 0);
@@ -2232,18 +2281,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Set default cdma call auto retry
             loadSetting(stmt, Settings.Global.CALL_AUTO_RETRY, 0);
 
-            // Set the preferred network mode to 0 = Global, CDMA default
-            int type;
-                type = SystemProperties.getInt("ro.telephony.default_network",
-                        RILConstants.PREFERRED_NETWORK_MODE);
 
-            String val = Integer.toString(type);
-            if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                val = type + "," + type;
-            }
+            /**del
+			// Set the preferred network mode to 0 = Global, CDMA default
+			int type;
+				type = SystemProperties.getInt("ro.telephony.default_network",
+						RILConstants.PREFERRED_NETWORK_MODE);
+
+			String val = Integer.toString(type);
+			if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+				val = type + "," + type;
+			}
+			*/
+			
+			//added default network type for dsds project.
+			// Set the preferred network mode to 0 = Global, CDMA default
+            String val = SystemProperties.get("ro.telephony.default_network",
+            RILConstants.PREFERRED_NETWORK_MODE+","+RILConstants.PREFERRED_NETWORK_MODE); 
             loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, val);
+			//added end.
 
             // --- New global settings start here
+            loadSetting(stmt, Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION,
+                    MSimConstants.DEFAULT_SUBSCRIPTION);
         } finally {
             if (stmt != null) stmt.close();
         }

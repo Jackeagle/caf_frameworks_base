@@ -3141,7 +3141,17 @@
         <item quantity="one">Open Wi-Fi network available</item>
         <item quantity="other">Open Wi-Fi networks available</item>
     </plurals>
-
+    
+    <plurals name="wifi_available_wlan">
+        <item quantity="one">WLAN network available</item>
+        <item quantity="other">WLAN networks available</item>
+    </plurals>
+    <!-- A notification is shown when there are open wireless networks nearby.  This is the notification's message. -->
+    <plurals name="wifi_available_detailed_wlan">
+        <item quantity="one">Open WLAN network available</item>
+        <item quantity="other">Open WLAN networks available</item>
+    </plurals>
+    
     <!-- A notification is shown when a wifi captive portal network is detected.  This is the notification's title. -->
     <string name="wifi_available_sign_in">Sign into Wi-Fi network</string>
 
@@ -4070,6 +4080,10 @@
     <!-- Carrier text used in Multi SIM enabled view -->
     <string name="msim_carrier_text_format"><xliff:g id="text_1">%s</xliff:g>, <xliff:g id="text_2">%s</xliff:g></string>
 
+    <!-- CMCC WLAN customization begin-->
+    <string name="reconnect_net_for_wifi_disconnected">WLAN is unavailable, try to connect mobile data?</string>
+    <!-- CMCC WLAN customization end-->
+    
     <!-- Displayed when the USSD/SS request is modified by STK CC to a
     different request. This will be displayed in a toast. -->
     <string name="stkCcUssdToDial">USSD request is modified to DIAL request.</string>
@@ -4078,5 +4092,9 @@
     <string name="stkCcSsToDial">SS request is modified to DIAL request.</string>
     <string name="stkCcSsToUssd">SS request is modified to USSD request.</string>
     <string name="stkCcSsToSs">SS request is modified to new SS request.</string>
+
+
+    <string name="auto_power_off_title">Auto power off</string>  
+    <string name="auto_power_off_msg">Shut down in <xliff:g id="seconds">%d</xliff:g> seconds.</string>
 
 </resources>

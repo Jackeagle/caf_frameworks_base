@@ -2979,6 +2979,7 @@ package android.app {
 
   public class AlarmManager {
     method public void cancel(android.app.PendingIntent);
+    method public int getPowerOnReason();
     method public void set(int, long, android.app.PendingIntent);
     method public void setInexactRepeating(int, long, long, android.app.PendingIntent);
     method public void setRepeating(int, long, long, android.app.PendingIntent);
@@ -2992,6 +2993,7 @@ package android.app {
     field public static final long INTERVAL_HALF_HOUR = 1800000L; // 0x1b7740L
     field public static final long INTERVAL_HOUR = 3600000L; // 0x36ee80L
     field public static final int RTC = 1; // 0x1
+    field public static final int RTC_POWEROFF_WAKEUP = 4; // 0x4
     field public static final int RTC_WAKEUP = 0; // 0x0
   }
 
@@ -13452,6 +13454,7 @@ package android.net.wifi {
     method public boolean reassociate();
     method public boolean reconnect();
     method public boolean removeNetwork(int);
+    method public static java.lang.String replaceAllWiFi(java.lang.String);
     method public boolean saveConfiguration();
     method public boolean setWifiEnabled(boolean);
     method public boolean startScan();
@@ -19024,6 +19027,7 @@ package android.provider {
     field public static final java.lang.String VOLUME_VOICE = "volume_voice";
     field public static final deprecated java.lang.String WAIT_FOR_DEBUGGER = "wait_for_debugger";
     field public static final deprecated java.lang.String WALLPAPER_ACTIVITY = "wallpaper_activity";
+    field public static final java.lang.String WIFI_BROWSER_INTERACTION_REMIND_TYPE = "wifi_browser_interaction_remind";
     field public static final deprecated java.lang.String WIFI_MAX_DHCP_RETRY_COUNT = "wifi_max_dhcp_retry_count";
     field public static final deprecated java.lang.String WIFI_MOBILE_DATA_TRANSITION_WAKELOCK_TIMEOUT_MS = "wifi_mobile_data_transition_wakelock_timeout_ms";
     field public static final deprecated java.lang.String WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON = "wifi_networks_available_notification_on";
