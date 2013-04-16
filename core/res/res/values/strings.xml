@@ -4093,4 +4093,8 @@
     <string name="stkCcSsToUssd">SS request is modified to USSD request.</string>
     <string name="stkCcSsToSs">SS request is modified to new SS request.</string>
 
+
+    <string name="auto_power_off_title">Auto power off</string>  
+    <string name="auto_power_off_msg">Shut down in <xliff:g id="seconds">%d</xliff:g> seconds.</string>
+
 </resources>

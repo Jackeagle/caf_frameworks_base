@@ -25,6 +25,11 @@ public class Build {
     /** Value used for when a build property is unknown. */
     public static final String UNKNOWN = "unknown";
 
+	/*hardware version*/
+    public static final String HARDWARE_VERSION = getString("ro.hardware.version");
+    /*software version*/
+    public static final String SOFTWARE_VERSION = getString("ro.software.version");
+
     /** Either a changelist number, or a label like "M4-rc20". */
     public static final String ID = getString("ro.build.id");
 

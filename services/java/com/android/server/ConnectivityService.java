@@ -1619,6 +1619,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         mHandler.sendMessage(mHandler.obtainMessage(EVENT_SET_MOBILE_DATA,
                 (enabled ? ENABLED : DISABLED), 0));
+        Intent intent = new Intent(ConnectivityManager.MOBILE_CONNECTIVITY_ACTION);
+        intent.putExtra(ConnectivityManager.EXTRA_ENABLED, enabled);
+        mContext.sendBroadcast(intent);
     }
 
     private void handleSetMobileData(boolean enabled) {
@@ -3331,6 +3334,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 usedNetworkType = ConnectivityManager.TYPE_MOBILE_IMS;
             } else if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_CBS)) {
                 usedNetworkType = ConnectivityManager.TYPE_MOBILE_CBS;
+            } else if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_DM)) {
+                usedNetworkType = ConnectivityManager.TYPE_MOBILE_DM;
+            } else if (TextUtils.equals(feature, Phone.FEATURE_ENABLE_WAP)) {
+                usedNetworkType = ConnectivityManager.TYPE_MOBILE_WAP;
             } else {
                 Slog.e(TAG, "Can't match any mobile netTracker!");
             }
