@@ -177,6 +177,9 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     public static final int DISCONNECT_WIFI_REQUEST         =   BASE + 12;
     public static final int DISCONNECT_WIFI_RESPONSE        =   BASE + 13;
 
+    /** @hide */
+    public static final int P2P_SAFE_CHANNELS_CHANGED       =   BASE + 14;
+
     private final boolean mP2pSupported;
 
     private WifiP2pDevice mThisDevice = new WifiP2pDevice();
@@ -341,26 +344,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     startChannel = startSafeChannel;
                     endChannel = endSafeChannel;
 
-                    if (mIsWifiP2pEnabled) {
-                        Slog.d(TAG, "Set Preferred channel list for Non Auto GO");
-                        mP2pStateMachine.mWifiNative.setPreferredChannel(startSafeChannel, endSafeChannel);
-                        if (mP2pStateMachine.mWifiP2pInfo.groupFormed) {
-                            int currentChannel = 0;
-                            currentChannel = frequencyToChannel(mP2pStateMachine.mGroup.getGoOperatingFrequency());
-                            Slog.d(TAG, "GO operating frequency=" + mP2pStateMachine.mGroup.getGoOperatingFrequency());
-                            Slog.d(TAG, "current channel of P2P GO=" + currentChannel);
-
-                            if (currentChannel >= 0 &&
-                               (currentChannel < startSafeChannel ||
-                                currentChannel > endSafeChannel)) {
-                                Slog.d(TAG, "P2P GO is operating on restricted channel.Terminate P2P Group");
-                                mP2pStateMachine.mWifiNative.p2pGroupRemove(mP2pStateMachine.mGroup.getInterface());
-                                if (mAutonomousGroup)
-                                    mP2pStateMachine.mWifiNative.p2pGroupAddOnSpecifiedFreq(channelToFrequency(startSafeChannel));
-                             }
-
-                       }
-                   }
+                    mP2pStateMachine.sendMessage(P2P_SAFE_CHANNELS_CHANGED);
              }
         }
     }
@@ -1020,6 +1004,26 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                    mGroups.remove(message.arg1);
                    replyToMessage(message, WifiP2pManager.DELETE_PERSISTENT_GROUP_SUCCEEDED);
                    break;
+               case WifiP2pService.P2P_SAFE_CHANNELS_CHANGED:
+                    Slog.d(TAG, "Set Preferred channel list for Non Auto GO In P2pEnabledState");
+                    mWifiNative.setPreferredChannel(startChannel, endChannel);
+                    if (mWifiP2pInfo.groupFormed) {
+                        int currentChannel = 0;
+                        currentChannel = frequencyToChannel(mGroup.getGoOperatingFrequency());
+                        Slog.d(TAG, "GO operating frequency=" + mGroup.getGoOperatingFrequency());
+                        Slog.d(TAG, "current channel of P2P GO=" + currentChannel);
+
+                        if (currentChannel >= 0 &&
+                            (currentChannel < startChannel || currentChannel > endChannel)) {
+                            Slog.d(TAG, "P2P GO is operating on restricted channel." +
+                                "Terminate P2P Group");
+                            mWifiNative.p2pGroupRemove(mGroup.getInterface());
+                            if (mAutonomousGroup)
+                                mWifiNative.p2pGroupAddOnSpecifiedFreq(
+                                    channelToFrequency(startChannel));
+                        }
+                    }
+                    break;
                 default:
                     return NOT_HANDLED;
             }
