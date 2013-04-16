@@ -3392,6 +3392,7 @@
     <string name="usb_accessory_notification_title">Connected to a USB accessory</string>
     <!-- See USB_PREFERENCES. This is the message. -->
     <string name="usb_notification_message">Touch for other USB options.</string>
+    <string name="usb_charging_notification_title">Connected in charging mode</string>
 
     <!-- External media format dialog strings -->
     <!-- This is the label for the activity, and should never be visible to the user. -->
