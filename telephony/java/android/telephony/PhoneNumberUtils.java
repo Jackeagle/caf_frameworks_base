@@ -1862,6 +1862,34 @@ public class PhoneNumberUtils
         // don't return true when both are null.
         return !TextUtils.isEmpty(number) && compare(number, vmNumber);
     }
+	
+	/**
+     * isVoiceMailNumber: checks a given number against the voicemail number
+     * provided by the RIL and SIM card. The caller must have the
+     * READ_PHONE_STATE credential.
+     * 
+     * @param number the number to look up.
+     * @return true if the number is in the list of voicemail. False otherwise,
+     *         including if the caller does not have the permission to read the
+     *         VM number.
+     * @hide TODO: pending API Council approval
+     */
+    public static boolean isVoiceMailNumber(String number, int subscription) {
+        String vmNumber;
+        try {
+            vmNumber = MSimTelephonyManager.getDefault().getVoiceMailNumber(subscription);
+        } catch (SecurityException ex) {
+            return false;
+        }
+
+        // Strip the separators from the number before comparing it
+        // to the list.
+        number = extractNetworkPortionAlt(number);
+
+        // compare tolerates null so we need to make sure that we
+        // don't return true when both are null.
+        return !TextUtils.isEmpty(number) && compare(number, vmNumber);
+    }
 
     /**
      * Translates any alphabetic letters (i.e. [A-Za-z]) in the

@@ -124,6 +124,14 @@ public class CallLog {
         public static final int OUTGOING_TYPE = 2;
         /** Call log type for missed calls. */
         public static final int MISSED_TYPE = 3;
+        public static final int OUTGOING_FAILED_TYPE = 4;
+        /** Call log type for incoming CSVT calls. */
+        public static final int INCOMING_CSVT_TYPE = 5;
+        /** Call log type for outgoing CSVT calls. */
+        public static final int OUTGOING_CSVT_TYPE = 6;
+        /** Call log type for missed CSVT calls. */
+        public static final int MISSED_CSVT_TYPE = 7;
+        public static final int REJECTED_TYPE = 8;
         /**
          * Call log type for voicemails.
          * @hide
@@ -261,6 +269,13 @@ public class CallLog {
         public static final String CACHED_FORMATTED_NUMBER = "formatted_number";
 
         /**
+         * The subscription id.
+         * <P>Type: Integer</P>
+         * @hide
+         */
+        public static final String SUBSCRIPTION = "sub_id";   
+  
+          /**
          * Adds a call to the call log.
          *
          * @param ci the CallerInfo object to get the target contact from.  Can be null
