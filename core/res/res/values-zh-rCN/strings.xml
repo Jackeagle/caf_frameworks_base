@@ -1487,4 +1487,6 @@
     <string name="enable_accessibility_canceled" msgid="3833923257966635673">"已取消辅助功能。"</string>
     <string name="user_switched" msgid="3768006783166984410">"当前用户是<xliff:g id="NAME">%1$s</xliff:g>。"</string>
     <string name="owner_name" msgid="2716755460376028154">"机主"</string>
+    <string name="auto_power_off_title">自动关机</string>  
+    <string name="auto_power_off_msg">系统将在<xliff:g id="seconds">%d</xliff:g> 秒后关机.</string>
 </resources>
