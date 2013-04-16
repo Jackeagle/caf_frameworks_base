@@ -427,6 +427,23 @@ public class UsbDeviceManager {
             sendMessageDelayed(msg, ((connected == 0) && mSoftSwitch) ? UPDATE_DELAY : 0);
         }
 
+        private void updateUsbMassStorage(boolean connected) {
+            UsbManager usbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
+            StorageManager storageManager = (StorageManager) mContext
+                    .getSystemService(Context.STORAGE_SERVICE);
+            if (storageManager == null) {
+                Slog.w(TAG, "can not get storage manager");
+                return;
+            }
+            if (connected && UsbManager.USB_FUNCTION_MASS_STORAGE
+                    .equals(usbManager.getDefaultFunction())
+                && !storageManager.isUsbMassStorageEnabled()) {
+                storageManager.enableUsbMassStorage();
+            } else if (!connected && storageManager.isUsbMassStorageEnabled()) {
+                storageManager.disableUsbMassStorage();
+            }
+        }
+
         private boolean waitForState(String state) {
             // wait for the transition to complete.
             // give up after 1 second.
@@ -605,6 +622,7 @@ public class UsbDeviceManager {
                 case MSG_UPDATE_STATE:
                     mConnected = (msg.arg1 == 1);
                     mConfigured = (msg.arg2 == 1);
+                    updateUsbMassStorage(mConnected);
                     updateUsbNotification();
                     updateAdbNotification();
                     if (containsFunction(mCurrentFunctions,
