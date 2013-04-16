@@ -378,7 +378,7 @@ public class WifiMonitor {
                 String eventStr = mWifiNative.waitForEvent();
 
                 // Skip logging the common but mostly uninteresting scan-results event
-                if (false && eventStr.indexOf(SCAN_RESULTS_STR) == -1) {
+                if (true && eventStr.indexOf(SCAN_RESULTS_STR) == -1) {
                     Log.d(TAG, "Event [" + eventStr + "]");
                 }
                 if (!eventStr.startsWith(EVENT_PREFIX_STR)) {
