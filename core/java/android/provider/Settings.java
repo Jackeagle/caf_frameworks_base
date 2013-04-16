@@ -939,6 +939,7 @@ public final class Settings {
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.ADB_ENABLED);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.BLUETOOTH_ON);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.DATA_ROAMING);
+            MOVED_TO_SECURE_THEN_GLOBAL.add(Global.DATA_ROAMING_2);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.DEVICE_PROVISIONED);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.INSTALL_NON_MARKET_APPS);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.USB_MASS_STORAGE_ENABLED);
@@ -1675,6 +1676,20 @@ public final class Settings {
         public static final String DIM_SCREEN = "dim_screen";
 
         /**
+        * Int value to specify if CABL is enabled.
+        * 0 = Disable  1 = Enable
+        * @hide
+        */
+        public static final String CABL_ENABLED = "cabl_enabled";
+
+        /**
+        * Int value to specify CABL levels.
+        * @hide
+        */
+        public static final String CABL_LEVELS = "cabl_levels";
+
+
+        /**
          * The timeout before the screen turns off.
          */
         public static final String SCREEN_OFF_TIMEOUT = "screen_off_timeout";
@@ -1884,6 +1899,10 @@ public final class Settings {
          * @see #DEFAULT_RINGTONE_URI
          */
         public static final String RINGTONE = "ringtone";
+        /**
+         * @hide
+         */
+        public static final String RINGTONE_2 = "ringtone_2";
 
         /**
          * A {@link Uri} that will point to the current default ringtone at any
@@ -1894,6 +1913,10 @@ public final class Settings {
          * FileNotFoundException.
          */
         public static final Uri DEFAULT_RINGTONE_URI = getUriFor(RINGTONE);
+        /**
+         * @hide
+         */
+        public static final Uri DEFAULT_RINGTONE_URI_2 = getUriFor(RINGTONE_2);
 
         /**
          * Persistent store for the system-wide default notification sound.
@@ -2079,10 +2102,70 @@ public final class Settings {
         public static final String VIBRATE_WHEN_RINGING = "vibrate_when_ringing";
 
         /**
+         * Whether the slot1 phone vibrates when it is ringing due to an incoming call
+         * @hide
+         */
+        public static final String VIBRATE_WHEN_RINGING2 = "vibrate_when_ringing2";
+
+        /**
          * Whether the audible DTMF tones are played by the dialer when dialing. The value is
          * boolean (1 or 0).
          */
         public static final String DTMF_TONE_WHEN_DIALING = "dtmf_tone";
+
+        /**
+         * display duration info after end call.
+         *                 0 = Off
+         *                 1 = On
+         * @hide
+         */
+        public static final String SHOW_DURATION = "show_duration";
+
+        /**
+          * Subscription to be used for multi Sim IP Call Prefix Setting. The supported values
+          * are  0 = SUB1, 1 = SUB2.
+          * @hide
+          */
+        public static final String [] IPCALL_PREFIX = { "ipcall_prefix_sub1", "ipcall_prefix_sub2" };
+
+	 /**
+          * Key backlight value. The backlight values are 0,1,2.
+          * @hide
+          */
+        public static final String KEY_BACKLIGHT = "key_backlight_enable";
+
+        /**
+          * Channel name for subcription one and two i.e. channele name 1, channel name 2
+          * @hide
+          */
+        public static final String [] MULTI_SIM_NAME = {"perferred_name_sub1", "preferred_name_sub2"};
+
+        /**
+          * User preferred countdown waiting time when select subscription to dial or sms
+          * @hide
+          */
+        public static final String MULTI_SIM_COUNTDOWN = "mutli_sim_countdown";
+
+        /** Callback enable option
+         * @hide
+         */
+        public static final String CALLBACK_PRIORITY_ENABLED = "callback_priority_enabled";
+
+        /**
+         * Set the proximity sensor on or off.
+         *                 0 = Off
+         *                 1 = On
+         * @hide
+         */
+        public static final String PROXIMITY_SENSOR = "proximity_sensor";
+
+        /**
+         * Vibrate after connected.
+         *                 0 = Off
+         *                 1 = On
+         * @hide
+         */
+        public static final String VIBRATE_AFTER_CONNECTED = "vibrate_after_connected";
 
         /**
          * CDMA only settings
@@ -2358,7 +2441,8 @@ public final class Settings {
             SIP_CALL_OPTIONS,
             SIP_RECEIVE_CALLS,
             POINTER_SPEED,
-            VIBRATE_WHEN_RINGING
+            VIBRATE_WHEN_RINGING,
+            VIBRATE_WHEN_RINGING2
         };
 
         // Settings moved to Settings.Secure
@@ -2388,6 +2472,8 @@ public final class Settings {
         @Deprecated
         public static final String DATA_ROAMING = Global.DATA_ROAMING;
 
+        @Deprecated
+        public static final String DATA_ROAMING_2 = Global.DATA_ROAMING_2;
         /**
          * @deprecated Use {@link android.provider.Settings.Global#DEVICE_PROVISIONED} instead
          */
@@ -2635,6 +2721,7 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.DATA_ACTIVITY_TIMEOUT_MOBILE);
             MOVED_TO_GLOBAL.add(Settings.Global.DATA_ACTIVITY_TIMEOUT_WIFI);
             MOVED_TO_GLOBAL.add(Settings.Global.DATA_ROAMING);
+            MOVED_TO_GLOBAL.add(Settings.Global.DATA_ROAMING_2);
             MOVED_TO_GLOBAL.add(Settings.Global.DEVELOPMENT_SETTINGS_ENABLED);
             MOVED_TO_GLOBAL.add(Settings.Global.DEVICE_PROVISIONED);
             MOVED_TO_GLOBAL.add(Settings.Global.DISPLAY_DENSITY_FORCED);
@@ -3138,6 +3225,8 @@ public final class Settings {
         @Deprecated
         public static final String DATA_ROAMING = Global.DATA_ROAMING;
 
+        @Deprecated
+        public static final String DATA_ROAMING_2 = Global.DATA_ROAMING_2;
         /**
          * Setting to record the input method used by default, holding the ID
          * of the desired method.
@@ -4011,6 +4100,14 @@ public final class Settings {
          */
         public static final String UI_NIGHT_MODE = "ui_night_mode";
 
+
+        /**
+         * URL to open browser on to allow user to manage a prepay account
+         * @hide
+         */
+        public static final String SETUP_PREPAID_DATA_SERVICE_URL =
+                "setup_prepaid_data_service_url";
+
         /**
          * Whether screensavers are enabled.
          * @hide
@@ -4402,6 +4499,8 @@ public final class Settings {
         * Whether or not data roaming is enabled. (0 = false, 1 = true)
         */
        public static final String DATA_ROAMING = "data_roaming";
+
+       public static final String DATA_ROAMING_2 = "data_roaming_2";
 
        /**
         * Whether user has enabled development settings.
