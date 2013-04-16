@@ -5784,6 +5784,7 @@ package android.content {
     field public static final java.lang.String ACTION_DEFAULT = "android.intent.action.VIEW";
     field public static final java.lang.String ACTION_DELETE = "android.intent.action.DELETE";
     field public static final java.lang.String ACTION_DEVICE_STORAGE_LOW = "android.intent.action.DEVICE_STORAGE_LOW";
+    field public static final java.lang.String ACTION_DEVICE_STORAGE_NEARLY_FULL = "android.intent.action.DEVICE_STORAGE_NEARLY_FULL";
     field public static final java.lang.String ACTION_DEVICE_STORAGE_OK = "android.intent.action.DEVICE_STORAGE_OK";
     field public static final java.lang.String ACTION_DIAL = "android.intent.action.DIAL";
     field public static final java.lang.String ACTION_DOCK_EVENT = "android.intent.action.DOCK_EVENT";
@@ -12552,6 +12553,7 @@ package android.net {
     method public int stopUsingNetworkFeature(int, java.lang.String);
     field public static final deprecated java.lang.String ACTION_BACKGROUND_DATA_SETTING_CHANGED = "android.net.conn.BACKGROUND_DATA_SETTING_CHANGED";
     field public static final java.lang.String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
+    field public static final java.lang.String CONNECTIVITY_ACTION_IMMEDIATE = "android.net.conn.CONNECTIVITY_CHANGE_IMMEDIATE";
     field public static final int DEFAULT_NETWORK_PREFERENCE = 1; // 0x1
     field public static final java.lang.String EXTRA_EXTRA_INFO = "extraInfo";
     field public static final java.lang.String EXTRA_IS_FAILOVER = "isFailover";
@@ -12568,6 +12570,7 @@ package android.net {
     field public static final int TYPE_MOBILE_HIPRI = 5; // 0x5
     field public static final int TYPE_MOBILE_MMS = 2; // 0x2
     field public static final int TYPE_MOBILE_SUPL = 3; // 0x3
+    field public static final int TYPE_MOBILE_WAP = 14; // 0xe
     field public static final int TYPE_WIFI = 1; // 0x1
     field public static final int TYPE_WIMAX = 6; // 0x6
   }
@@ -15687,6 +15690,7 @@ package android.os {
     field public static final java.lang.String DISPLAY;
     field public static final java.lang.String FINGERPRINT;
     field public static final java.lang.String HARDWARE;
+    field public static final java.lang.String HARDWARE_VERSION;
     field public static final java.lang.String HOST;
     field public static final java.lang.String ID;
     field public static final java.lang.String MANUFACTURER;
@@ -15694,6 +15698,7 @@ package android.os {
     field public static final java.lang.String PRODUCT;
     field public static final deprecated java.lang.String RADIO;
     field public static final java.lang.String SERIAL;
+    field public static final java.lang.String SOFTWARE_VERSION;
     field public static final java.lang.String TAGS;
     field public static final long TIME;
     field public static final java.lang.String TYPE;
@@ -17382,14 +17387,19 @@ package android.provider {
     field public static final java.lang.String DATE = "date";
     field public static final java.lang.String DEFAULT_SORT_ORDER = "date DESC";
     field public static final java.lang.String DURATION = "duration";
+    field public static final int INCOMING_CSVT_TYPE = 5; // 0x5
     field public static final int INCOMING_TYPE = 1; // 0x1
     field public static final java.lang.String IS_READ = "is_read";
     field public static final java.lang.String LIMIT_PARAM_KEY = "limit";
+    field public static final int MISSED_CSVT_TYPE = 7; // 0x7
     field public static final int MISSED_TYPE = 3; // 0x3
     field public static final java.lang.String NEW = "new";
     field public static final java.lang.String NUMBER = "number";
     field public static final java.lang.String OFFSET_PARAM_KEY = "offset";
+    field public static final int OUTGOING_CSVT_TYPE = 6; // 0x6
+    field public static final int OUTGOING_FAILED_TYPE = 4; // 0x4
     field public static final int OUTGOING_TYPE = 2; // 0x2
+    field public static final int REJECTED_TYPE = 8; // 0x8
     field public static final java.lang.String TYPE = "type";
   }
 
@@ -18807,6 +18817,7 @@ package android.provider {
     field public static final java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEBUG_APP = "debug_app";
     field public static final java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18873,6 +18884,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEFAULT_INPUT_METHOD = "default_input_method";
     field public static final deprecated java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final deprecated java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18962,6 +18974,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DATE_FORMAT = "date_format";
     field public static final deprecated java.lang.String DEBUG_APP = "debug_app";
     field public static final android.net.Uri DEFAULT_ALARM_ALERT_URI;
@@ -20796,6 +20809,7 @@ package android.telephony {
     method public static boolean compare(java.lang.String, java.lang.String);
     method public static boolean compare(android.content.Context, java.lang.String, java.lang.String);
     method public static java.lang.String convertKeypadLettersToDigits(java.lang.String);
+    method public static java.lang.String convertKeypadLettersToDigitsExt(java.lang.String);
     method public static java.lang.String extractNetworkPortion(java.lang.String);
     method public static java.lang.String extractPostDialPortion(java.lang.String);
     method public static void formatJapaneseNumber(android.text.Editable);
@@ -20900,6 +20914,7 @@ package android.telephony {
     method public java.util.ArrayList<java.lang.String> divideMessage(java.lang.String);
     method public static android.telephony.SmsManager getDefault();
     method public void sendDataMessage(java.lang.String, java.lang.String, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
+    method public void sendDataMessage(java.lang.String, java.lang.String, short, short, byte[], android.app.PendingIntent, android.app.PendingIntent);
     method public void sendMultipartTextMessage(java.lang.String, java.lang.String, java.util.ArrayList<java.lang.String>, java.util.ArrayList<android.app.PendingIntent>, java.util.ArrayList<android.app.PendingIntent>);
     method public void sendTextMessage(java.lang.String, java.lang.String, java.lang.String, android.app.PendingIntent, android.app.PendingIntent);
     field public static final int RESULT_ERROR_GENERIC_FAILURE = 1; // 0x1
@@ -20917,6 +20932,7 @@ package android.telephony {
     method public static int[] calculateLength(java.lang.CharSequence, boolean);
     method public static int[] calculateLength(java.lang.String, boolean);
     method public static android.telephony.SmsMessage createFromPdu(byte[]);
+    method public static android.telephony.SmsMessage.DeliveryPdu getDeliveryPdu(java.lang.String, java.lang.String, java.lang.String, boolean, byte[]);
     method public java.lang.String getDisplayMessageBody();
     method public java.lang.String getDisplayOriginatingAddress();
     method public java.lang.String getEmailBody();
@@ -20935,6 +20951,7 @@ package android.telephony {
     method public deprecated int getStatusOnSim();
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, java.lang.String, boolean);
     method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, byte[], boolean);
+    method public static android.telephony.SmsMessage.SubmitPdu getSubmitPdu(java.lang.String, java.lang.String, short, short, byte[], boolean);
     method public static int getTPLayerLengthForPDU(java.lang.String);
     method public long getTimestampMillis();
     method public byte[] getUserData();
@@ -20954,6 +20971,11 @@ package android.telephony {
     field public static final int MAX_USER_DATA_BYTES_WITH_HEADER = 134; // 0x86
     field public static final int MAX_USER_DATA_SEPTETS = 160; // 0xa0
     field public static final int MAX_USER_DATA_SEPTETS_WITH_HEADER = 153; // 0x99
+  }
+
+  public static class SmsMessage.DeliveryPdu {
+    field public byte[] encodedMessage;
+    field public byte[] encodedScAddress;
   }
 
   public static final class SmsMessage.MessageClass extends java.lang.Enum {
@@ -23042,6 +23064,7 @@ package android.text.util {
     ctor public Linkify();
     method public static final boolean addLinks(android.text.Spannable, int);
     method public static final boolean addLinks(android.widget.TextView, int);
+    method public static final boolean addLinks(android.text.Spannable, int, java.lang.String, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String, android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter);
     method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String);
