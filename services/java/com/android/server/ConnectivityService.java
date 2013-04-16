@@ -125,6 +125,14 @@ import java.util.GregorianCalendar;
 import java.util.HashSet;
 import java.util.List;
 
+//QUALCOMM_CMCC_START
+import android.provider.Settings;
+import android.app.AlertDialog;
+import android.telephony.TelephonyManager;
+import android.net.wifi.WifiManager;
+import com.qrd.plugin.feature_query.FeatureQuery;
+//QUALCOMM_CMCC_END
+
 /**
  * @hide
  */
@@ -330,6 +338,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private final Object mGlobalProxyLock = new Object();
 
     private SettingsObserver mSettingsObserver;
+
+//QUALCOMM_CMCC_START
+    private TelephonyManager mTelephonyManager = null;
+    private AlertDialog mWifiDisconnectDlg = null;
+    private boolean mWifiConnected = false;
+//QUALCOMM_CMCC_END
 
     NetworkConfig[] mNetConfigs;
     int mNetworksDefined;
@@ -555,6 +569,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         mCaptivePortalTracker = CaptivePortalTracker.makeCaptivePortalTracker(mContext, this);
         loadGlobalProxy();
+
+//QUALCOMM_CMCC_START
+	    mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+//QUALCOMM_CMCC_END	
+
     }
 
     /**
@@ -1768,6 +1787,48 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     private void tryFailover(int prevNetType) {
+//QUALCOMM_CMCC_START
+		if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+		    //boolean mAutoConnect = Settings.System.getInt(mContext.getContentResolver(), 
+            //            Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO) == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO;
+            //show confirm dialog when wifi disconnected
+	        if (prevNetType == ConnectivityManager.TYPE_WIFI/* && !mAutoConnect*/) {
+			    log("---------tryFailover-----------------");
+	            //modify two card nodify for wlan->TD/GSM
+//	            int num_simcard = TelephonyManager.getDefaultDataPhoneId(mContext);
+//	            if(num_simcard != 0 && num_simcard != 1) {
+//	                log("tryFailover for wifi, num_simcard = " + num_simcard);
+//	                return;
+//	            }
+	            
+	            if (mActiveDefaultNetwork == prevNetType) {
+	                mActiveDefaultNetwork = -1;
+	            }
+	            int num_simstate = 0;
+//	            if(num_simcard == 0) {
+	                num_simstate = mTelephonyManager.getSimState();
+//	            } 
+//				else {
+//	                num_simstate = mTelephonyManager1.getSimState();
+//	            }
+	            log("tryFailover for wifi, num_simstate = "+ num_simstate + " , mWifiConnected = " + mWifiConnected);// + num_simcard +" , num_simcard = " 
+	            if (num_simstate == TelephonyManager.SIM_STATE_READY && mWifiConnected) {
+	                mWifiConnected = false;
+//                    WifiManager wifiManager = (WifiManager) 
+//                                     mContext.getSystemService(Context.WIFI_SERVICE);
+
+//                    boolean isAvailConfiguredAp = wifiManager.isWlanAvailConfiguredAp();
+                    
+//                    if (!isAvailConfiguredAp) {
+                        log("[CMCC]***tryFailover()***WLAN->TD/GSM ");
+                        showWifiDisconnectedDlg();
+                        return; 
+//                    }
+	            }
+	        } 
+		}
+//QUALCOMM_CMCC_END
+
         /*
          * If this is a default network, check if other defaults are available.
          * Try to reconnect on all available and let them hash it out when
@@ -1813,6 +1874,62 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         }
     }
+
+//QUALCOMM_CMCC_START		
+	private Boolean mOKClicked = false; 
+	private void showWifiDisconnectedDlg() {
+		if (mWifiDisconnectDlg == null) {
+			log(" showWifiDisconnectedDlg  mWifiDisconnectDlg == null");
+			mOKClicked = false; 
+			AlertDialog.Builder b = new AlertDialog.Builder(mContext);
+			b.setNegativeButton(com.android.internal.R.string.cancel, new  android.content.DialogInterface.OnClickListener() {
+					public void onClick(android.content.DialogInterface dialog, int which) {
+						log(" showWifiDisconnectedDlg   mOKClicked = false");
+						mOKClicked = false; 
+					}
+					});
+			b.setPositiveButton(com.android.internal.R.string.ok, new  android.content.DialogInterface.OnClickListener() {
+					public void onClick(android.content.DialogInterface dialog, int which) {
+						log(" showWifiDisconnectedDlg   mOKClicked = true");
+						mOKClicked = true; 
+					}
+					});
+			b.setTitle("WLAN"); 
+			b.setMessage(mContext.getResources().getString(com.android.internal.R.string.reconnect_net_for_wifi_disconnected));
+			AlertDialog dlg = b.create();
+			dlg.getWindow().setType(android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+			dlg.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+		            public void onDismiss(android.content.DialogInterface dialog) {
+						log(" showWifiDisconnectedDlg   onDismiss mOKClicked="+mOKClicked);
+				        if (mOKClicked) {
+							NetworkStateTracker net = mNetTrackers[ConnectivityManager.TYPE_MOBILE];
+							if (net != null && net.isAvailable()) {
+								NetworkInfo switchTo = net.getNetworkInfo();
+								if (!switchTo.isConnectedOrConnecting() || net.isTeardownRequested()) {
+									log(" ok getMobileDataEnabled=" + getMobileDataEnabled());
+									if( getMobileDataEnabled() ) {
+										net.reconnect();	 //reconnect if ppp button has already on
+									} else {
+										setMobileDataEnabled(true); 
+										net.reconnect();
+									}
+
+								}
+							}
+				        } else {
+						    log(" cancel getMobileDataEnabled=" + getMobileDataEnabled());
+							setMobileDataEnabled(false);
+						}
+						mWifiDisconnectDlg = null;
+					}
+				});
+			dlg.show();
+			mWifiDisconnectDlg = dlg;
+ 		} else {
+			log(" showWifiDisconnectedDlg  mWifiDisconnectDlg ! null");
+		}
+	}
+//QUALCOMM_CMCC_END
 
     public void sendConnectedBroadcast(NetworkInfo info) {
         sendGeneralBroadcast(info, CONNECTIVITY_ACTION_IMMEDIATE);
@@ -2719,6 +2836,15 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         handleDisconnect(info);
                     } else if (state == NetworkInfo.State.CONNECTED) {
                         handleConnect(info);
+                        //QUALCOMM_CMCC_START
+                        if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+                            if (type == ConnectivityManager.TYPE_WIFI) {
+                                log("mWifiConnected = true ");
+                                mWifiConnected = true;
+                            }
+                            hideWifiDisconnectedDlg();
+                        }
+                        //QUALCOMM_CMCC_END
                     }
                     if (mLockdownTracker != null) {
                         mLockdownTracker.onNetworkInfoChanged(info);
@@ -2831,6 +2957,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         }
     }
+	
+	//QUALCOMM_CMCC_START
+		private void hideWifiDisconnectedDlg() { 
+			if (mWifiDisconnectDlg != null) {
+				mWifiDisconnectDlg.dismiss();
+			}
+		}
+	//QUALCOMM_CMCC_END
 
     // javadoc from interface
     public int tether(String iface) {

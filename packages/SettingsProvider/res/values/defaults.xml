@@ -23,6 +23,9 @@
     <!-- Comma-separated list of bluetooth, wifi, and cell. -->
     <string name="def_airplane_mode_radios" translatable="false">cell,bluetooth,wifi,nfc,wimax</string>
     <string name="airplane_mode_toggleable_radios" translatable="false">bluetooth,wifi,nfc</string>
+<!-- QUALCOMM_CMCC_START -->
+    <string name="cmcc_airplane_mode_toggleable_radios" translatable="false">nfc</string>
+<!-- QUALCOMM_CMCC_END -->
     <bool name="def_auto_time">true</bool>
     <bool name="def_auto_time_zone">true</bool>
     <bool name="def_accelerometer_rotation">true</bool>

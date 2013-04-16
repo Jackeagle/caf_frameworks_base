@@ -19,6 +19,7 @@
      ***************************************************************
      *************************************************************** -->
 <resources>
+  <java-symbol type="string" name="reconnect_net_for_wifi_disconnected" />
   <java-symbol type="string" name="phonemedia_format_button_format" />
   <java-symbol type="string" name="phonemedia_format_message" />
   <java-symbol type="string" name="phonemedia_format_title" />
