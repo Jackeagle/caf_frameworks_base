@@ -302,6 +302,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     Settings.Secure.ANDROID_ID,
                     Settings.Secure.BLUETOOTH_ON,
                     Settings.Secure.DATA_ROAMING,
+                    Settings.Secure.DATA_ROAMING_2,
                     Settings.Secure.DEVICE_PROVISIONED,
                     Settings.Secure.HTTP_PROXY,
                     Settings.Secure.INSTALL_NON_MARKET_APPS,
@@ -1286,6 +1287,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                             Settings.Secure.ADB_ENABLED,
                             Settings.Secure.BLUETOOTH_ON,
                             Settings.Secure.DATA_ROAMING,
+                            Settings.Secure.DATA_ROAMING_2,
                             Settings.Secure.DEVICE_PROVISIONED,
                             Settings.Secure.INSTALL_NON_MARKET_APPS,
                             Settings.Secure.USB_MASS_STORAGE_ENABLED
@@ -2175,6 +2177,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             // Data roaming default, based on build
             loadSetting(stmt, Settings.Global.DATA_ROAMING,
+                    "true".equalsIgnoreCase(
+                            SystemProperties.get("ro.com.android.dataroaming",
+                                    "false")) ? 1 : 0);
+
+            loadSetting(stmt, Settings.Global.DATA_ROAMING_2,
                     "true".equalsIgnoreCase(
                             SystemProperties.get("ro.com.android.dataroaming",
                                     "false")) ? 1 : 0);

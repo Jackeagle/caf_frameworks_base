@@ -939,6 +939,7 @@ public final class Settings {
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.ADB_ENABLED);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.BLUETOOTH_ON);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.DATA_ROAMING);
+            MOVED_TO_SECURE_THEN_GLOBAL.add(Global.DATA_ROAMING_2);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.DEVICE_PROVISIONED);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.INSTALL_NON_MARKET_APPS);
             MOVED_TO_SECURE_THEN_GLOBAL.add(Global.USB_MASS_STORAGE_ENABLED);
@@ -2471,6 +2472,8 @@ public final class Settings {
         @Deprecated
         public static final String DATA_ROAMING = Global.DATA_ROAMING;
 
+        @Deprecated
+        public static final String DATA_ROAMING_2 = Global.DATA_ROAMING_2;
         /**
          * @deprecated Use {@link android.provider.Settings.Global#DEVICE_PROVISIONED} instead
          */
@@ -2718,6 +2721,7 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.DATA_ACTIVITY_TIMEOUT_MOBILE);
             MOVED_TO_GLOBAL.add(Settings.Global.DATA_ACTIVITY_TIMEOUT_WIFI);
             MOVED_TO_GLOBAL.add(Settings.Global.DATA_ROAMING);
+            MOVED_TO_GLOBAL.add(Settings.Global.DATA_ROAMING_2);
             MOVED_TO_GLOBAL.add(Settings.Global.DEVELOPMENT_SETTINGS_ENABLED);
             MOVED_TO_GLOBAL.add(Settings.Global.DEVICE_PROVISIONED);
             MOVED_TO_GLOBAL.add(Settings.Global.DISPLAY_DENSITY_FORCED);
@@ -3221,6 +3225,8 @@ public final class Settings {
         @Deprecated
         public static final String DATA_ROAMING = Global.DATA_ROAMING;
 
+        @Deprecated
+        public static final String DATA_ROAMING_2 = Global.DATA_ROAMING_2;
         /**
          * Setting to record the input method used by default, holding the ID
          * of the desired method.
@@ -4493,6 +4499,8 @@ public final class Settings {
         * Whether or not data roaming is enabled. (0 = false, 1 = true)
         */
        public static final String DATA_ROAMING = "data_roaming";
+
+       public static final String DATA_ROAMING_2 = "data_roaming_2";
 
        /**
         * Whether user has enabled development settings.

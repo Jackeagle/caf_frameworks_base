@@ -633,6 +633,10 @@ public class MobileDataStateTracker implements NetworkStateTracker {
                 return PhoneConstants.APN_TYPE_IMS;
             case ConnectivityManager.TYPE_MOBILE_CBS:
                 return PhoneConstants.APN_TYPE_CBS;
+            case ConnectivityManager.TYPE_MOBILE_DM:
+                return PhoneConstants.APN_TYPE_DM;
+            case ConnectivityManager.TYPE_MOBILE_WAP:
+                return PhoneConstants.APN_TYPE_WAP;
             default:
                 sloge("Error mapping networkType " + netType + " to apnType.");
                 return null;
