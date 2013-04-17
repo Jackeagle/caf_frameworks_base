@@ -1908,17 +1908,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 								if (!switchTo.isConnectedOrConnecting() || net.isTeardownRequested()) {
 									log(" ok getMobileDataEnabled=" + getMobileDataEnabled());
 									if( getMobileDataEnabled() ) {
-										net.reconnect();	 //reconnect if ppp button has already on
+										//net.reconnect();	 //reconnect if ppp button has already on
 									} else {
 										setMobileDataEnabled(true); 
-										net.reconnect();
+										//net.reconnect();
 									}
 
 								}
 							}
 				        } else {
 						    log(" cancel getMobileDataEnabled=" + getMobileDataEnabled());
-							setMobileDataEnabled(false);
+							//setMobileDataEnabled(false);
 						}
 						mWifiDisconnectDlg = null;
 					}
@@ -2142,10 +2142,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         log("Policy requires " + otherNet.getNetworkInfo().getTypeName() +
                             " teardown");
                     }
-                    if (!teardown(otherNet)) {
-                        loge("Network declined teardown request");
-                        teardown(thisNet);
-                        return;
+                    if (!((FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) && (newNetType == ConnectivityManager.TYPE_WIFI))) {
+                        if (!teardown(otherNet)) {
+                            loge("Network declined teardown request");
+                            teardown(thisNet);
+                            return;
+                        }
                     }
                 } else {
                        // don't accept this one
@@ -2835,16 +2837,18 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         // differently, or not.
                         handleDisconnect(info);
                     } else if (state == NetworkInfo.State.CONNECTED) {
-                        handleConnect(info);
                         //QUALCOMM_CMCC_START
                         if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
                             if (type == ConnectivityManager.TYPE_WIFI) {
-                                log("mWifiConnected = true ");
+                                log("mWifiConnected = true " + ", getMobileDataEnabled:" + getMobileDataEnabled());
                                 mWifiConnected = true;
+                                if (getMobileDataEnabled())
+                                    setMobileDataEnabled(false);
                             }
                             hideWifiDisconnectedDlg();
                         }
                         //QUALCOMM_CMCC_END
+                        handleConnect(info);
                     }
                     if (mLockdownTracker != null) {
                         mLockdownTracker.onNetworkInfoChanged(info);

@@ -499,7 +499,6 @@ public final class PowerManagerService extends IPowerManager.Stub
                     Settings.System.SCREEN_BRIGHTNESS_MODE),
                     false, mSettingsObserver, UserHandle.USER_ALL);
             //add contentObserver for key back light . -- xst
-            Slog.v("xst", "PowerManagerService--systemReady--registerContentObserver for KEY_BACKLIGHT");
             resolver.registerContentObserver(Settings.System.getUriFor(
                      Settings.System.KEY_BACKLIGHT),
                      false, mSettingsObserver, UserHandle.USER_ALL);

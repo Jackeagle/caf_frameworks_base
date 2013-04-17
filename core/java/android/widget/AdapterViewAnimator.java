@@ -745,6 +745,7 @@ public abstract class AdapterViewAnimator extends AdapterView<Adapter>
                         showOnly(mWhichChild, false);
                     } else if (mOldItemCount != getCount()) {
                         showOnly(mWhichChild, false);
+                        mOldItemCount = mItemCount;//wss for refresh of app widget
                     }
                     refreshChildren();
                     requestLayout();
