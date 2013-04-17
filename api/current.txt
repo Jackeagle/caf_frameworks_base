@@ -12552,6 +12552,7 @@ package android.net {
     method public int stopUsingNetworkFeature(int, java.lang.String);
     field public static final deprecated java.lang.String ACTION_BACKGROUND_DATA_SETTING_CHANGED = "android.net.conn.BACKGROUND_DATA_SETTING_CHANGED";
     field public static final java.lang.String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
+    field public static final java.lang.String CONNECTIVITY_ACTION_IMMEDIATE = "android.net.conn.CONNECTIVITY_CHANGE_IMMEDIATE";
     field public static final int DEFAULT_NETWORK_PREFERENCE = 1; // 0x1
     field public static final java.lang.String EXTRA_EXTRA_INFO = "extraInfo";
     field public static final java.lang.String EXTRA_IS_FAILOVER = "isFailover";
@@ -12568,6 +12569,7 @@ package android.net {
     field public static final int TYPE_MOBILE_HIPRI = 5; // 0x5
     field public static final int TYPE_MOBILE_MMS = 2; // 0x2
     field public static final int TYPE_MOBILE_SUPL = 3; // 0x3
+    field public static final int TYPE_MOBILE_WAP = 14; // 0xe
     field public static final int TYPE_WIFI = 1; // 0x1
     field public static final int TYPE_WIMAX = 6; // 0x6
   }
@@ -15687,6 +15689,7 @@ package android.os {
     field public static final java.lang.String DISPLAY;
     field public static final java.lang.String FINGERPRINT;
     field public static final java.lang.String HARDWARE;
+    field public static final java.lang.String HARDWARE_VERSION;
     field public static final java.lang.String HOST;
     field public static final java.lang.String ID;
     field public static final java.lang.String MANUFACTURER;
@@ -15694,6 +15697,7 @@ package android.os {
     field public static final java.lang.String PRODUCT;
     field public static final deprecated java.lang.String RADIO;
     field public static final java.lang.String SERIAL;
+    field public static final java.lang.String SOFTWARE_VERSION;
     field public static final java.lang.String TAGS;
     field public static final long TIME;
     field public static final java.lang.String TYPE;
@@ -18807,6 +18811,7 @@ package android.provider {
     field public static final java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEBUG_APP = "debug_app";
     field public static final java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18873,6 +18878,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DEFAULT_INPUT_METHOD = "default_input_method";
     field public static final deprecated java.lang.String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
     field public static final deprecated java.lang.String DEVICE_PROVISIONED = "device_provisioned";
@@ -18962,6 +18968,7 @@ package android.provider {
     field public static final deprecated java.lang.String BLUETOOTH_ON = "bluetooth_on";
     field public static final android.net.Uri CONTENT_URI;
     field public static final deprecated java.lang.String DATA_ROAMING = "data_roaming";
+    field public static final deprecated java.lang.String DATA_ROAMING_2 = "data_roaming_2";
     field public static final java.lang.String DATE_FORMAT = "date_format";
     field public static final deprecated java.lang.String DEBUG_APP = "debug_app";
     field public static final android.net.Uri DEFAULT_ALARM_ALERT_URI;
