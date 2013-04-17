@@ -102,6 +102,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
     private boolean mIsWaitingForEcmExit = false;
     private boolean mHasTelephony;
     private boolean mHasVibrator;
+	//fast power on flag	
+	private boolean mEnableFastPowerOn = true;
 
     /**
      * @param context everything needs a context :(
@@ -255,6 +257,26 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                     return true;
                 }
             });
+				// add: fastpoweron
+		if (mEnableFastPowerOn) {
+			 mItems.add(
+				 new SinglePressHasSumraryAction(
+						 com.android.internal.R.drawable.ic_lock_power_off,
+						 R.string.global_action_power_off_fast,R.string.global_action_power_off_fast_sumrary) {
+		
+					 public void onPress() {
+						 startFastBoot();
+					 }
+		
+					 public boolean showDuringKeyguard() {
+						 return true;
+					 }
+		
+					 public boolean showBeforeProvisioning() {
+						 return true;
+					 }
+				 });
+		 }
 
         // next: airplane mode
         mItems.add(mAirplaneModeOn);
@@ -585,6 +607,70 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             return v;
         }
     }
+	
+	/**
+	  * A single press action maintains has state, just responds to a press
+	  * and takes an action.
+	  * for fastboot 
+	 */
+
+	private static abstract class SinglePressHasSumraryAction implements Action {
+	
+		 private final int mIconResId;
+		 private final int mMessageResId;
+         private final int mStatusResId; 
+
+		 
+		 private final CharSequence mMessage;
+	     private final CharSequence mStatus;
+		 protected SinglePressHasSumraryAction(int iconResId, int messageResId ,int statusResId) {
+			 mIconResId = iconResId;
+			 mMessageResId = messageResId;
+			 mStatusResId = statusResId;
+			 mMessage = null;
+			 mStatus = null;
+		 }
+	
+	
+		 public boolean isEnabled() {
+			 return true;
+		 }
+	
+		 abstract public void onPress();
+	
+		 public boolean onLongPress() {
+			 return false;
+		 }
+	
+		 public View create(
+			 Context context, View convertView, ViewGroup parent, LayoutInflater inflater) {
+			 View v = inflater.inflate(R.layout.global_actions_item, parent, false);
+	
+			 ImageView icon = (ImageView) v.findViewById(R.id.icon);
+			 TextView messageView = (TextView) v.findViewById(R.id.message);
+			 TextView statusView= (TextView)v.findViewById(R.id.status);
+	
+			 icon.setImageDrawable(context.getResources().getDrawable(mIconResId));
+			 if (mMessage != null) {
+				 messageView.setText(mMessage);
+			
+			 } else {
+				 messageView.setText(mMessageResId);
+				
+			 }
+			 if (mStatus != null) {
+				statusView.setText(mStatus);
+			
+			 } else {
+				statusView.setText(mStatusResId);
+			 }
+			 	 		 	  
+			// messageView.setTextColor(0xFF000000);
+			// statusView.setTextColor(0xFF808080);
+	
+			 return v;
+		 }
+	}
 
     /**
      * A toggle action knows whether it is on or off, and displays an icon
@@ -894,6 +980,20 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         mAirplaneState = airplaneModeOn ? ToggleAction.State.On : ToggleAction.State.Off;
         mAirplaneModeOn.updateState(mAirplaneState);
     }
+	
+	/**
+     * Start Fast Boot
+     */
+    private void startFastBoot() {
+        synchronized (this) {
+            mAudioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+            Intent intent = new Intent(Intent.ACTION_FAST_BOOT_START);
+            intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+            intent.putExtra("state", true);
+            mContext.sendBroadcast(intent);
+		}
+	}
+
 
     /**
      * Change the airplane mode system setting
