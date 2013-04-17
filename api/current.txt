@@ -29729,6 +29729,7 @@ package android.widget {
     method public void setSingleLine();
     method public void setSingleLine(boolean);
     method public final void setSpannableFactory(android.text.Spannable.Factory);
+    method public void setTelUrl(java.lang.String);
     method public final void setText(java.lang.CharSequence);
     method public void setText(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public final void setText(char[], int, int);
@@ -29737,6 +29738,8 @@ package android.widget {
     method public void setTextAppearance(android.content.Context, int);
     method public void setTextColor(int);
     method public void setTextColor(android.content.res.ColorStateList);
+    method public final void setTextExt(java.lang.CharSequence);
+    method public void setTextExt(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public void setTextIsSelectable(boolean);
     method public final void setTextKeepState(java.lang.CharSequence);
     method public final void setTextKeepState(java.lang.CharSequence, android.widget.TextView.BufferType);
@@ -29747,6 +29750,7 @@ package android.widget {
     method public final void setTransformationMethod(android.text.method.TransformationMethod);
     method public void setTypeface(android.graphics.Typeface, int);
     method public void setTypeface(android.graphics.Typeface);
+    method public void setWebUrl(java.lang.String);
     method public void setWidth(int);
   }
 
