@@ -277,6 +277,89 @@ public class Linkify {
         }
     }
 
+
+    private static final String CN_IRI_CHAR =
+        "([\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]{0,10}\\.[a-zA-Z0-9]{3}){0,10}";
+
+    private static final Pattern WEB_URL_PATTERN_CUSTOM
+        = Pattern.compile(
+        "(((([hH][tT][tT][pP][sS]?)|([mM][mM][sS])|([rR][tT][sS][pP][uU]?)):\\/\\/)"
+        + "|([wW]{3}\\.)|(([wW][aA][pP])\\.)|(([wW][aA][pP])2\\.)|(3[gG]\\.))"
+        + "[a-zA-Z0-9\\!\\#\\$\\%\\&\\'\\(\\)\\*\\+\\,\\-\\.\\/\\:\\;"	
+        + "\\\\"
+        + "\\=\\?\\@\\[\\]\\^_\\'\\{\\|\\}\\~]{0,512}[a-zA-Z0-9\\+\\&\\@\\#\\/\\%\\=\\~\\_\\|\\$]");
+
+    /**
+     *  Scans the text of the provided Spannable and turns all occurrences
+     *  of the link types indicated in the mask into clickable links.
+     *  If the mask is nonzero, it also removes any existing URLSpans
+     *  attached to the Spannable, to avoid problems if you call it
+     *  repeatedly on the same text.
+     */
+    public static final boolean addLinks(Spannable text, int mask, 
+        String telUrl, String webUrl) {
+        if (mask == 0) {
+            return false;
+        }
+
+        URLSpan[] old = text.getSpans(0, text.length(), URLSpan.class);
+
+        for (int i = old.length - 1; i >= 0; i--) {
+            text.removeSpan(old[i]);
+        }
+
+        ArrayList<LinkSpec> links = new ArrayList<LinkSpec>();
+
+        if ((mask & WEB_URLS) != 0) {
+            if (false) 
+            {
+                gatherLinks(links, text, Patterns.WEB_URL,
+                    new String[] { "http://", "https://", "rtsp://" },
+                    sUrlMatchFilter, null);                
+            }
+            else
+            {  
+                if (!webUrl.equals("http://")) {
+                    gatherLinks(links, text, WEB_URL_PATTERN_CUSTOM,
+                        new String[] { webUrl,"rtsp://" },
+                        sUrlMatchFilter, null);
+                } else {
+                    gatherLinks(links, text, WEB_URL_PATTERN_CUSTOM,
+                        new String[] { "http://", "https://", "ftp://", "rtsp://" },
+                        sUrlMatchFilter, null);
+                }
+            }
+        }
+
+        if ((mask & EMAIL_ADDRESSES) != 0) {
+            gatherLinks(links, text, Patterns.EMAIL_ADDRESS,
+                new String[] { "mailto:" },
+                null, null);
+        }
+
+        if ((mask & PHONE_NUMBERS) != 0) {
+            gatherLinks(links, text, Patterns.PHONE,
+                new String[] { telUrl },
+                sPhoneNumberMatchFilter, sPhoneNumberTransformFilter);
+        }
+
+        if ((mask & MAP_ADDRESSES) != 0) {
+            gatherMapLinks(links, text);
+        }
+
+        pruneOverlaps(links);
+
+        if (links.size() == 0) {
+            return false;
+        }
+
+        for (LinkSpec link: links) {
+            applyLink(link.url, link.start, link.end, text);
+        }
+
+        return true;
+    }
+
     private static final void addLinkMovementMethod(TextView t) {
         MovementMethod m = t.getMovementMethod();
 
