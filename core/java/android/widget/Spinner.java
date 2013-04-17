@@ -416,6 +416,15 @@ public class Spinner extends AbsSpinner implements OnClickListener {
     }
 
     /**
+     * @hide
+     */
+    public void dismissPop() {
+        if (mPopup != null && mPopup.isShowing()) {
+            mPopup.dismiss();
+        }
+    }
+
+    /**
      * <p>A spinner does not support item click events. Calling this method
      * will raise an exception.</p>
      * <p>Instead use {@link AdapterView#setOnItemSelectedListener}.

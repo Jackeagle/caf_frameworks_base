@@ -779,6 +779,25 @@ public class TelephonyManager {
         }
     }
 
+   // get  call duration for  call log
+    public long getCallsDuration(String key) {
+        try {
+            return getITelephony().getCallsDuration(key);
+        } catch (RemoteException ex) {
+            // the phone process is restarting.
+            return 0;
+        }
+    }
+   // set call duration for  call log 
+    public void setCallsDuration(String key, long value) {
+        try {
+            getITelephony().setCallsDuration(key, value);
+        } catch (RemoteException ex) {
+            // the phone process is restarting.
+            return;
+        }
+    }
+
     /**
      * Returns a constant indicating the state of the
      * device SIM card.
