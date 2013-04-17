@@ -1014,6 +1014,17 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
             Log.w(TAG, "Failed to enable location provider");
         }
+
+	  // do it when init gpslocationprovider
+	   int lockMode = Settings.Global.getInt(mContext.getContentResolver(),
+					  Settings.Global.ASSISTED_GPS_ENABLED, 1);
+	  if(lockMode==0)
+	 {
+		  lockMode=3;
+	  }
+	if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
+	 native_set_gps_lock(lockMode);
+
     }
 
     /**
