@@ -689,7 +689,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 	   {
 	        lockMode=3;
 	    }
-	if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
+	  if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
 	   native_set_gps_lock(lockMode);
 
     }
@@ -1272,6 +1272,23 @@ public class GpsLocationProvider implements LocationProviderInterface {
 		 }
 		}
 		Log.e(TAG, "startNavigating:mPositionMode=" +mPositionMode);
+
+	
+	int startMode = Settings.Global.getInt(mContext.getContentResolver(),
+						Settings.Global.AGPS_RESET_TYPE, 2);
+	Bundle extras = new Bundle();
+	if (DEBUG) Log.d(TAG, "GOT START MODE " + startMode);
+	if (startMode == 0) {
+		// cold
+		extras.putBoolean("all", true);
+	} else if (startMode == 1) {
+		// warm
+		extras.putBoolean("almanac", true);
+	} else if (startMode == 2) {
+		// hot
+		extras.putBoolean("ephemeris", true);
+	}
+	sendExtraCommand("delete_aiding_data", extras);
 
             int interval = (hasCapability(GPS_CAPABILITY_SCHEDULING) ? mFixInterval : 1000);
             if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
