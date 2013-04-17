@@ -1031,6 +1031,11 @@
     <string name="editTextMenuTitle" msgid="4909135564941815494">"文字操作"</string>
     <string name="low_internal_storage_view_title" msgid="5576272496365684834">"存储空间不足"</string>
     <string name="low_internal_storage_view_text" msgid="6640505817617414371">"某些系统功能可能无法正常使用"</string>
+    
+    <!-- add for headset insert-->
+    <string name="headset_plugin_view_text">"耳机已插入到手机。"</string>
+    <string name="headset_plugin_view_title">"耳机插入"</string>
+    
     <string name="ok" msgid="5970060430562524910">"确定"</string>
     <string name="cancel" msgid="6442560571259935130">"取消"</string>
     <string name="yes" msgid="5362982303337969312">"确定"</string>
@@ -1102,6 +1107,14 @@
     <item quantity="other" msgid="4192424489168397386">"有可用的 Wi-Fi 网络"</item>
   </plurals>
   <plurals name="wifi_available_detailed">
+    <item quantity="one" msgid="1634101450343277345">"打开可用的 Wi-Fi 网络"</item>
+    <item quantity="other" msgid="7915895323644292768">"打开可用的 Wi-Fi 网络"</item>
+  </plurals>
+  <plurals name="wifi_available_wlan">
+    <item quantity="one" msgid="6654123987418168693">"有可用的 Wi-Fi 网络"</item>
+    <item quantity="other" msgid="4192424489168397386">"有可用的 Wi-Fi 网络"</item>
+  </plurals>
+  <plurals name="wifi_available_detailed_wlan">
     <item quantity="one" msgid="1634101450343277345">"打开可用的 Wi-Fi 网络"</item>
     <item quantity="other" msgid="7915895323644292768">"打开可用的 Wi-Fi 网络"</item>
   </plurals>
@@ -1180,9 +1193,14 @@
     <string name="usb_notification_message" msgid="2290859399983720271">"触摸可显示其他 USB 选项。"</string>
     <string name="extmedia_format_title" product="nosdcard" msgid="9020092196061007262">"格式化 USB 存储设备吗？"</string>
     <string name="extmedia_format_title" product="default" msgid="3648415921526526069">"要格式化 SD 卡吗？"</string>
+    <string name="phonemedia_format_title" product="nosdcard">"格式化内置存储设备吗？"</string>
+    <string name="phonemedia_format_title" product="default">"要格式化内置 SD 卡吗？"</string>
     <string name="extmedia_format_message" product="nosdcard" msgid="3934016853425761078">"您的 USB 存储设备中存储的所有文件都将清除。该操作无法撤消！"</string>
     <string name="extmedia_format_message" product="default" msgid="14131895027543830">"您卡上的所有数据都会丢失。"</string>
     <string name="extmedia_format_button_format" msgid="4131064560127478695">"格式化"</string>
+    <string name="phonemedia_format_message" product="nosdcard">"您的内置存储设备中存储的所有文件都将清除。该操作无法撤消！"</string>
+    <string name="phonemedia_format_message" product="default">"您内置SD卡上的所有数据都会丢失。"</string>
+    <string name="phonemedia_format_button_format">"格式化"</string>
     <string name="adb_active_notification_title" msgid="6729044778949189918">"已连接 USB 调试"</string>
     <string name="adb_active_notification_message" msgid="1016654627626476142">"触摸可停用 USB 调试。"</string>
     <string name="select_input_method" msgid="4653387336791222978">"选择输入法"</string>
@@ -1199,14 +1217,22 @@
     <string name="ext_media_checking_notification_message" msgid="8287319882926737053">"正在检查是否有错误。"</string>
     <string name="ext_media_nofs_notification_title" product="nosdcard" msgid="7788040745686229307">"USB 存储设备中无文件"</string>
     <string name="ext_media_nofs_notification_title" product="default" msgid="780477838241212997">"空 SD 卡"</string>
+    <string name="phone_media_nofs_notification_title" product="nosdcard">"内置存储设备中无文件"</string>
+    <string name="phone_media_nofs_notification_title" product="default">"空白内置 SD 卡"</string>
     <string name="ext_media_nofs_notification_message" product="nosdcard" msgid="7840121067427269500">"USB 存储设备中没有任何文件或使用了不支持的文件系统。"</string>
     <string name="ext_media_nofs_notification_message" product="default" msgid="8641065641786923604">"SD 卡中没有任何文件或使用了不支持的文件系统。"</string>
+    <string name="phone_media_nofs_notification_message" product="nosdcard">"内置存储设备中没有任何文件或使用了不支持的文件系统。"</string>
+    <string name="phone_media_nofs_notification_message" product="default">"内置 SD 卡中没有任何文件或使用了不支持的文件系统。"</string>
     <string name="ext_media_unmountable_notification_title" product="nosdcard" msgid="2090046769532713563">"USB 存储设备已损坏"</string>
     <string name="ext_media_unmountable_notification_title" product="default" msgid="6410723906019100189">"SD 卡受损"</string>
     <string name="ext_media_unmountable_notification_message" product="nosdcard" msgid="1795917578395333280">"USB 存储设备已损坏，请尝试重新格式化。"</string>
     <string name="ext_media_unmountable_notification_message" product="default" msgid="1753898567525568253">"SD 卡已损坏，请尝试重新格式化。"</string>
     <string name="ext_media_badremoval_notification_title" product="nosdcard" msgid="1661683031330951073">"USB 存储设备已意外移除"</string>
     <string name="ext_media_badremoval_notification_title" product="default" msgid="6872152882604407837">"SD 卡未正常移除"</string>
+    <string name="phone_media_unmountable_notification_title" product="nosdcard">"内置存储设备已损坏"</string>
+    <string name="phone_media_unmountable_notification_title" product="default">"内置 SD 卡受损"</string>
+    <string name="phone_media_unmountable_notification_message" product="nosdcard">"内置存储设备已损坏，请尝试重新格式化。"</string>
+    <string name="phone_media_unmountable_notification_message" product="default">"内置 SD 卡已损坏，请尝试重新格式化。"</string>
     <string name="ext_media_badremoval_notification_message" product="nosdcard" msgid="4329848819865594241">"请先卸载 USB 存储设备，再将其移除，以防数据丢失。"</string>
     <string name="ext_media_badremoval_notification_message" product="default" msgid="7260183293747448241">"请先卸载 SD 卡，再将其移除，以防数据丢失。"</string>
     <string name="ext_media_safe_unmount_notification_title" product="nosdcard" msgid="3967973893270360230">"USB 存储设备已安全移除"</string>
@@ -1217,6 +1243,12 @@
     <string name="ext_media_nomedia_notification_title" product="default" msgid="8902518030404381318">"已移除 SD 卡"</string>
     <string name="ext_media_nomedia_notification_message" product="nosdcard" msgid="6921126162580574143">"USB 存储设备已移除。请插入新媒体。"</string>
     <string name="ext_media_nomedia_notification_message" product="default" msgid="3870120652983659641">"SD 卡已移除。请插入新的 SD 卡。"</string>
+    <string name="primary_storage_no_space_title" product="nosdcard">"无法挂载 USB 存储设备!"</string>
+    <string name="primary_storage_no_space_title" product="default">"无法挂载 SD 卡!"</string>
+    <string name="primary_storage_no_space_message" product="nosdcard">"USB 存储设备已满，无法挂载，请打开USB Mass Storage删除一些文件来释放空间。"</string>
+    <string name="primary_storage_no_space_message" product="default">"SD 卡已满，无法挂载，请打开USB Mass Storage删除一些文件来释放空间。"</string>
+    <string name="primary_storage_no_space_confirm" product="nosdcard">"我知道了"</string>
+    <string name="primary_storage_no_space_confirm" product="default">"我知道了"</string>
     <string name="activity_list_empty" msgid="1675388330786841066">"未找到匹配的活动。"</string>
     <string name="permlab_pkgUsageStats" msgid="8787352074326748892">"更新组件使用情况统计"</string>
     <string name="permdesc_pkgUsageStats" msgid="1106612424254277630">"允许应用修改收集到的组件使用情况统计信息。普通应用不能使用此权限。"</string>
@@ -1279,8 +1311,10 @@
     <string name="action_mode_done" msgid="7217581640461922289">"完成"</string>
     <string name="progress_unmounting" product="nosdcard" msgid="3923810448507612746">"正在卸载 USB 存储设备..."</string>
     <string name="progress_unmounting" product="default" msgid="1327894998409537190">"正在卸载 SD 卡..."</string>
+    <string name="progress_unmounting_phone">"正在卸载内部存储卡..."</string>
     <string name="progress_erasing" product="nosdcard" msgid="4521573321524340058">"正在清除 USB 存储设备的数据..."</string>
     <string name="progress_erasing" product="default" msgid="6596988875507043042">"正在清除 SD 卡的数据..."</string>
+    <string name="progress_erasing_phone">"正在清除内部存储卡的数据..."</string>
     <string name="format_error" product="nosdcard" msgid="6299769563624776948">"无法清除 USB 存储设备。"</string>
     <string name="format_error" product="default" msgid="7315248696644510935">"无法清除 SD 卡。"</string>
     <string name="media_bad_removal" msgid="7960864061016603281">"SD 卡尚未卸载就被移除。"</string>
@@ -1352,7 +1386,7 @@
     <string name="action_menu_overflow_description" msgid="2295659037509008453">"更多选项"</string>
     <string name="storage_internal" msgid="4891916833657929263">"内存设备"</string>
     <string name="storage_sd_card" msgid="3282948861378286745">"SD 卡"</string>
-    <string name="storage_usb" msgid="3017954059538517278">"USB 存储器"</string>
+    <string name="storage_usb" msgid="3017954059538517278">"话机U盘"</string>
     <string name="extract_edit_menu_button" msgid="8940478730496610137">"修改"</string>
     <string name="data_usage_warning_title" msgid="1955638862122232342">"流量使用警告"</string>
     <string name="data_usage_warning_body" msgid="2814673551471969954">"触摸可查看使用情况和设置。"</string>
@@ -1400,6 +1434,11 @@
     <string name="default_audio_route_category_name" msgid="3722811174003886946">"系统"</string>
     <string name="bluetooth_a2dp_audio_route_name" msgid="8575624030406771015">"蓝牙音频"</string>
     <string name="media_route_chooser_grouping_done" msgid="7966438307723317169">"完成"</string>
+            <!-- On carrier name display -->
+    <string name="China_Mobile">中国移动</string>
+    <string name="China_Unicom">中国联通</string>
+    <string name="China_Telecom">中国电信</string>
+    
     <string name="media_route_button_content_description" msgid="5758553567065145276">"媒体输出线路"</string>
     <string name="media_route_status_scanning" msgid="7279908761758293783">"正在扫描..."</string>
     <string name="media_route_status_connecting" msgid="6422571716007825440">"正在连接..."</string>
@@ -1456,4 +1495,9 @@
     <string name="enable_accessibility_canceled" msgid="3833923257966635673">"已取消辅助功能。"</string>
     <string name="user_switched" msgid="3768006783166984410">"当前用户是<xliff:g id="NAME">%1$s</xliff:g>。"</string>
     <string name="owner_name" msgid="2716755460376028154">"机主"</string>
+    <string name="auto_power_off_title">自动关机</string>  
+    <string name="auto_power_off_msg">系统将在<xliff:g id="seconds">%d</xliff:g> 秒后关机.</string>
+    <!-- CMCC WLAN customization begin-->
+    <string name="reconnect_net_for_wifi_disconnected">"WLAN网络已断开，是否切换到移动网络继续上网？"</string>
+    <!-- CMCC WLAN customization end-->
 </resources>

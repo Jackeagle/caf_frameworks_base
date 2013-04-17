@@ -33,6 +33,9 @@ public class ExternalStorageFormatter extends Service
 
     public static final String EXTRA_ALWAYS_RESET = "always_reset";
 
+    // Define phone storage path, use for pop process message when format phone storage
+    public static final String PHONE_STORAGE_PATH = "/storage/sdcard1";
+
     // If non-null, the volume to format. Otherwise, will use the default external storage directory
     private StorageVolume mStorageVolume;
 
@@ -146,11 +149,17 @@ public class ExternalStorageFormatter extends Service
                 mStorageManager.getVolumeState(mStorageVolume.getPath());
         if (Environment.MEDIA_MOUNTED.equals(status)
                 || Environment.MEDIA_MOUNTED_READ_ONLY.equals(status)) {
-            updateProgressDialog(R.string.progress_unmounting);
             IMountService mountService = getMountService();
             final String extStoragePath = mStorageVolume == null ?
                     Environment.getLegacyExternalStorageDirectory().toString() :
                     mStorageVolume.getPath();
+            // Popup message base on storage path
+            if (PHONE_STORAGE_PATH.equals(extStoragePath)) {
+                //when progress_unmounting ,give user the last chance to cancel
+                updateProgressDialog(R.string.progress_unmounting_phone);
+            } else {
+                updateProgressDialog(R.string.progress_unmounting);
+            }
             try {
                 // Remove encryption mapping if this is an unmount for a factory reset.
                 mountService.unmountVolume(extStoragePath, true, mFactoryReset);
@@ -160,11 +169,17 @@ public class ExternalStorageFormatter extends Service
         } else if (Environment.MEDIA_NOFS.equals(status)
                 || Environment.MEDIA_UNMOUNTED.equals(status)
                 || Environment.MEDIA_UNMOUNTABLE.equals(status)) {
-            updateProgressDialog(R.string.progress_erasing);
             final IMountService mountService = getMountService();
             final String extStoragePath = mStorageVolume == null ?
                     Environment.getLegacyExternalStorageDirectory().toString() :
                     mStorageVolume.getPath();
+            // Popup message base on storage path
+            if (PHONE_STORAGE_PATH.equals(extStoragePath)) {
+                //when progress_erasing , user have no chance to cancel erase.it was being executed.
+                updateProgressDialog(R.string.progress_erasing_phone);
+            } else {
+                updateProgressDialog(R.string.progress_erasing);
+            }
             if (mountService != null) {
                 new Thread() {
                     @Override
@@ -206,7 +221,18 @@ public class ExternalStorageFormatter extends Service
         } else if (Environment.MEDIA_BAD_REMOVAL.equals(status)) {
             fail(R.string.media_bad_removal);
         } else if (Environment.MEDIA_CHECKING.equals(status)) {
-            fail(R.string.media_checking);
+            final String extStoragePath = mStorageVolume == null ?
+                    Environment.getExternalStorageDirectory().toString() :
+                    mStorageVolume.getPath();
+            // Popup message base on storage path
+            if (!PHONE_STORAGE_PATH.equals(extStoragePath)) {
+                fail(R.string.media_checking);
+            }else{
+                if (mAlwaysReset) {
+                    sendBroadcast(new Intent("android.intent.action.MASTER_CLEAR"));
+                }
+                stopSelf();
+            }
         } else if (Environment.MEDIA_REMOVED.equals(status)) {
             fail(R.string.media_removed);
         } else if (Environment.MEDIA_SHARED.equals(status)) {

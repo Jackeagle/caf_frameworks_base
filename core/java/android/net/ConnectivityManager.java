@@ -78,6 +78,13 @@ public class ConnectivityManager {
      *
      * @hide
      */
+    /**
+        * Broadcast that will be sent when setMobileDataEnabled is called
+        *
+        * @hide
+       */
+    public static final String MOBILE_CONNECTIVITY_ACTION = "android.net.conn.MOBILE_CONNECTIVITY_CHANGE";
+
     public static final String CONNECTIVITY_ACTION_IMMEDIATE =
             "android.net.conn.CONNECTIVITY_CHANGE_IMMEDIATE";
 
@@ -129,6 +136,13 @@ public class ConnectivityManager {
      * it with {@link android.content.Intent#getStringExtra(String)}.
      */
     public static final String EXTRA_REASON = "reason";
+
+    /**
+     * The lookup key for a boolean that indicates whether mobile data is enabled
+     *
+     * @hide
+     */
+    public static final String EXTRA_ENABLED = "enable";
     /**
      * The lookup key for a string that provides optionally supplied
      * extra information about the network state. The information
@@ -315,12 +329,23 @@ public class ConnectivityManager {
      */
     public static final int TYPE_MOBILE_CBS  = 12;
 
+    /**{@hide}
+     *
+     * DM data connection
+     */
+    public static final int TYPE_MOBILE_DM  = 13;
+
+    /**
+     * wap
+     */
+    public static final int TYPE_MOBILE_WAP = 14;
+
     /**
      * A Wi-Fi p2p connection. Only requesting processes will have access to
      * the peers connected.
      * {@hide}
      */
-    public static final int TYPE_WIFI_P2P    = 13;
+    public static final int TYPE_WIFI_P2P    = 15;
 
     /** {@hide} */
     public static final int MAX_RADIO_TYPE   = TYPE_WIFI_P2P;
@@ -373,6 +398,10 @@ public class ConnectivityManager {
                 return "MOBILE_IMS";
             case TYPE_MOBILE_CBS:
                 return "MOBILE_CBS";
+            case TYPE_MOBILE_DM:
+                return "MOBILE_DM";
+            case TYPE_MOBILE_WAP:
+                return "MOBILE_WAP";
             case TYPE_WIFI_P2P:
                 return "WIFI_P2P";
             default:
@@ -391,6 +420,8 @@ public class ConnectivityManager {
             case TYPE_MOBILE_FOTA:
             case TYPE_MOBILE_IMS:
             case TYPE_MOBILE_CBS:
+            case TYPE_MOBILE_DM:
+            case TYPE_MOBILE_WAP:
                 return true;
             default:
                 return false;

@@ -67,7 +67,10 @@ public class TelephonyManager {
 
     private static Context sContext;
     private static ITelephonyRegistry sRegistry;
-
+    
+    protected static String multiSimConfig =
+            SystemProperties.get(TelephonyProperties.PROPERTY_MULTI_SIM_CONFIG);
+    
     /** @hide */
     public TelephonyManager(Context context) {
         if (sContext == null) {
@@ -752,7 +755,15 @@ public class TelephonyManager {
      *@hide
      */
     public static final int SIM_STATE_CARD_IO_ERROR = 6;
+    
+    //merge from 8x25q start     
 
+    /** SIM card state: SIM Card Deactivated, only the sim card is activated,
+    *   we can get the other sim card state(eg:ready, pin lock...)
+    *@hide
+    */
+    public static final int SIM_STATE_DEACTIVATED = 0x0A;
+    //merge from 8x25q end    
     /**
      * @return true if a ICC card is present
      */
@@ -765,6 +776,25 @@ public class TelephonyManager {
         } catch (NullPointerException ex) {
             // This could happen before phone restarts due to crashing
             return false;
+        }
+    }
+
+   // get  call duration for  call log
+    public long getCallsDuration(String key) {
+        try {
+            return getITelephony().getCallsDuration(key);
+        } catch (RemoteException ex) {
+            // the phone process is restarting.
+            return 0;
+        }
+    }
+   // set call duration for  call log 
+    public void setCallsDuration(String key, long value) {
+        try {
+            getITelephony().setCallsDuration(key, value);
+        } catch (RemoteException ex) {
+            // the phone process is restarting.
+            return;
         }
     }
 
@@ -1335,4 +1365,41 @@ public class TelephonyManager {
             return null;
         }
     }
+
+   public String getNetworkName() {
+        try {
+            return getITelephony().getNetworkName();
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            return null;
+        }
+   }
+
+    
+    //merge from 8x25q start     
+    /**
+     * Returns the sim card type, for example, USIM or RUIM.
+     * Return null if it is unavailable.
+     * <p>
+     * Requires Permission:
+     *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
+     */
+    
+    /** {@hide} */
+    public String getCardType() {
+        try {
+            return getSubscriberInfo().getCardType();
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            // This could happen before phone restarts due to crashing
+            return null;
+        }
+    }
+    /** @hide */
+    public static boolean isMultiSimEnabled() {
+        return (multiSimConfig.equals("dsds") || multiSimConfig.equals("dsda"));
+    }
+   //merge from 8x25q end    
 }

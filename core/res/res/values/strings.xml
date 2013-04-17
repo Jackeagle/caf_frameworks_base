@@ -2965,6 +2965,11 @@
     <string name="low_internal_storage_view_title">Storage space running out</string>
     <!-- If the device is getting low on internal storage, a notification is shown to the user.  This is the message of that notification. -->
     <string name="low_internal_storage_view_text">Some system functions may not work</string>
+    
+    <!--add for headset insert-->
+    <string name="headset_plugin_view_text">Headset was plugged in.</string>
+    <string name="headset_plugin_view_title">Headset</string>
+
 
     <!-- Preference framework strings. -->
     <string name="ok">OK</string>
@@ -3136,7 +3141,17 @@
         <item quantity="one">Open Wi-Fi network available</item>
         <item quantity="other">Open Wi-Fi networks available</item>
     </plurals>
-
+    
+    <plurals name="wifi_available_wlan">
+        <item quantity="one">WLAN network available</item>
+        <item quantity="other">WLAN networks available</item>
+    </plurals>
+    <!-- A notification is shown when there are open wireless networks nearby.  This is the notification's message. -->
+    <plurals name="wifi_available_detailed_wlan">
+        <item quantity="one">Open WLAN network available</item>
+        <item quantity="other">Open WLAN networks available</item>
+    </plurals>
+    
     <!-- A notification is shown when a wifi captive portal network is detected.  This is the notification's title. -->
     <string name="wifi_available_sign_in">Sign into Wi-Fi network</string>
 
@@ -3307,11 +3322,16 @@
     <!-- See EXTMEDIA_FORMAT.  EXTMEDIA_FORMAT_DIALOG:  After the user selects the notification, a dialog is shown asking if he wants to format the SD card.  This is the title. -->
     <string name="extmedia_format_title" product="default">Format SD card?</string>
     <!-- See EXTMEDIA_FORMAT.   This is the message. [CHAR LIMIT=NONE] -->
+    <string name="phonemedia_format_title" product="nosdcard">Format Phone storage?</string>
+    <string name="phonemedia_format_title" product="default">Format Phone storage?</string>
     <string name="extmedia_format_message" product="nosdcard">All files stored in your USB storage will be erased. This action can\'t be reversed!</string>
     <!-- See EXTMEDIA_FORMAT.   This is the message. -->
     <string name="extmedia_format_message" product="default">All data on your card will be lost.</string>
+    <string name="phonemedia_format_message" product="nosdcard">All files stored in your Phone storage will be erased. This action can\'t be reversed!</string>
+    <string name="phonemedia_format_message" product="default">All data on your Phone storage will be lost.</string>
     <!-- See EXTMEDIA_FORMAT.    This is the button text to format the sd card. -->
     <string name="extmedia_format_button_format">Format</string>
+    <string name="phonemedia_format_button_format">Format</string>
 
     <!-- Title of notification shown when ADB is actively connected to the phone. -->
     <string name="adb_active_notification_title">USB debugging connected</string>
@@ -3355,17 +3375,25 @@
     <string name="ext_media_nofs_notification_title" product="nosdcard">Blank USB storage</string>
     <!-- Shown when external media is blank (or unsupported filesystem) -->
     <string name="ext_media_nofs_notification_title" product="default">Blank SD card</string>
+    <string name="phone_media_nofs_notification_title" product="nosdcard">Blank Internal storage</string>
+    <string name="phone_media_nofs_notification_title" product="default">Blank Phone Storage</string>
     <!-- Shown when USB storage cannot be read.  [CHAR LIMIT=NONE] -->
     <string name="ext_media_nofs_notification_message" product="nosdcard">USB storage is blank or has unsupported filesystem.</string>
     <string name="ext_media_nofs_notification_message" product="default">SD card is blank or has unsupported filesystem.</string>
+    <string name="phone_media_nofs_notification_message" product="nosdcard">SD card is blank or has unsupported filesystem.</string>
+    <string name="phone_media_nofs_notification_message" product="default">Phone storage is blank or has unsupported filesystem.</string>
 
     <!-- Shown when external media is unmountable (corrupt)) [CHAR LIMIT=30] -->
     <string name="ext_media_unmountable_notification_title" product="nosdcard">Damaged USB storage</string>
     <!-- Shown when external media is unmountable (corrupt)) -->
     <string name="ext_media_unmountable_notification_title" product="default">Damaged SD card</string>
+    <string name="phone_media_unmountable_notification_title" product="nosdcard">Damaged Internal SD card</string>
+    <string name="phone_media_unmountable_notification_title" product="default">Damaged Phone Storage</string>
     <!-- Shown when USB storage cannot be read.  [CHAR LIMIT=NONE] -->
     <string name="ext_media_unmountable_notification_message" product="nosdcard">USB storage is damaged. Try reformatting it.</string>
     <string name="ext_media_unmountable_notification_message" product="default">SD card is damaged. Try reformatting it.</string>
+    <string name="phone_media_unmountable_notification_message" product="nosdcard">Internal SD card is damaged. Try reformatting it.</string>
+    <string name="phone_media_unmountable_notification_message" product="default">Phone Storage is damaged. Try reformatting it.</string>
 
     <!-- Shown when external media is unsafely removed [CHAR LIMIT=30] -->
     <string name="ext_media_badremoval_notification_title" product="nosdcard">USB storage unexpectedly removed</string>
@@ -3390,6 +3418,12 @@
     <!-- Shown when external media is missing.  [CHAR LIMIT=NONE] -->
     <string name="ext_media_nomedia_notification_message" product="nosdcard">USB storage removed. Insert new media.</string>
     <string name="ext_media_nomedia_notification_message" product="default">SD card removed. Insert a new one.</string>
+    <string name="primary_storage_no_space_title" product="nosdcard">Fail to mount USB Storage Device!</string>
+    <string name="primary_storage_no_space_title" product="default">Fail to mount SD card!</string>
+    <string name="primary_storage_no_space_message" product="nosdcard">USB Storage Device is too full to be mounted.You can open USB Mass Storage to delete some files to release some space.</string>
+    <string name="primary_storage_no_space_message" product="default">SD card is too full to be mounted.You can open USB Mass Storage to delete some files to release some space.</string>
+    <string name="primary_storage_no_space_confirm" product="nosdcard">I know.</string>
+    <string name="primary_storage_no_space_confirm" product="default">I know.</string>
 
     <!-- Shown in LauncherActivity when the requested target Intent didn't return any matching Activities, leaving the list empty. -->
     <string name="activity_list_empty">No matching activities found.</string>
@@ -3557,10 +3591,14 @@
     <string name="progress_unmounting" product="nosdcard">Unmounting USB storage\u2026</string>
     <!-- Text for progress dialog while unmounting SD card [CHAR LIMIT=NONE] -->
     <string name="progress_unmounting" product="default">Unmounting SD card\u2026</string>
+    <!-- Text for progress dialog while unmounting Phone storage [CHAR LIMIT=NONE] -->
+    <string name="progress_unmounting_phone">Unmounting Phone storage\u2026</string>
     <!-- Text for progress dialog while erasing USB storage volume [CHAR LIMIT=NONE] -->
     <string name="progress_erasing" product="nosdcard">Erasing USB storage\u2026</string>
     <!-- Text for progress dialog while erasing SD card [CHAR LIMIT=NONE] -->
     <string name="progress_erasing" product="default">Erasing SD card\u2026</string>
+    <!-- Text for progress dialog while erasing Phone storage [CHAR LIMIT=NONE] -->
+    <string name="progress_erasing_phone">Erasing Phone storage\u2026</string>
     <!-- Text for message to user that an error happened when formatting USB storage [CHAR LIMIT=NONE] -->
     <string name="format_error" product="nosdcard">Couldn\'t erase USB storage.</string>
     <!-- Text for message to user that an error happened when formatting SD card [CHAR LIMIT=NONE] -->
@@ -3738,7 +3776,7 @@
     <string name="storage_sd_card">SD card</string>
 
     <!-- Storage description for USB storage. [CHAR LIMIT=NONE] -->
-    <string name="storage_usb">USB storage</string>
+    <string name="storage_usb">Phone storage</string>
 
     <!-- Button text for the edit menu in input method extract mode. [CHAR LIMIT=16] -->
     <string name="extract_edit_menu_button">Edit</string>
@@ -3864,6 +3902,10 @@
 
     <!-- "Done" button for MediaRouter chooser dialog when grouping routes. [CHAR LIMIT=NONE] -->
     <string name="media_route_chooser_grouping_done">Done</string>
+    <string name="China_Mobile">China Mobile</string>
+    <string name="China_Unicom">China Unicom</string>
+    <string name="China_Telecom">China Telecom</string>
+    
 
     <!-- Content description of a MediaRouteButton for accessibility support -->
     <string name="media_route_button_content_description">Media output</string>
@@ -4038,6 +4080,10 @@
     <!-- Carrier text used in Multi SIM enabled view -->
     <string name="msim_carrier_text_format"><xliff:g id="text_1">%s</xliff:g>, <xliff:g id="text_2">%s</xliff:g></string>
 
+    <!-- CMCC WLAN customization begin-->
+    <string name="reconnect_net_for_wifi_disconnected">WLAN is unavailable, try to connect mobile data?</string>
+    <!-- CMCC WLAN customization end-->
+    
     <!-- Displayed when the USSD/SS request is modified by STK CC to a
     different request. This will be displayed in a toast. -->
     <string name="stkCcUssdToDial">USSD request is modified to DIAL request.</string>
@@ -4046,5 +4092,9 @@
     <string name="stkCcSsToDial">SS request is modified to DIAL request.</string>
     <string name="stkCcSsToUssd">SS request is modified to USSD request.</string>
     <string name="stkCcSsToSs">SS request is modified to new SS request.</string>
+
+
+    <string name="auto_power_off_title">Auto power off</string>  
+    <string name="auto_power_off_msg">Shut down in <xliff:g id="seconds">%d</xliff:g> seconds.</string>
 
 </resources>

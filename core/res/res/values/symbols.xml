@@ -695,7 +695,9 @@
   <java-symbol type="string" name="preposition_for_date" />
   <java-symbol type="string" name="preposition_for_time" />
   <java-symbol type="string" name="progress_erasing" />
+  <java-symbol type="string" name="progress_erasing_phone" />
   <java-symbol type="string" name="progress_unmounting" />
+  <java-symbol type="string" name="progress_unmounting_phone" />
   <java-symbol type="string" name="reboot_safemode_confirm" />
   <java-symbol type="string" name="reboot_safemode_title" />
   <java-symbol type="string" name="relationTypeAssistant" />
@@ -1615,6 +1617,8 @@
   <java-symbol type="layout" name="simple_list_item_2_single_choice" />
   <java-symbol type="plurals" name="wifi_available" />
   <java-symbol type="plurals" name="wifi_available_detailed" />
+  <java-symbol type="plurals" name="wifi_available_wlan" />
+  <java-symbol type="plurals" name="wifi_available_detailed_wlan" />
   <java-symbol type="string" name="accessibility_binding_label" />
   <java-symbol type="string" name="adb_active_notification_message" />
   <java-symbol type="string" name="adb_active_notification_title" />

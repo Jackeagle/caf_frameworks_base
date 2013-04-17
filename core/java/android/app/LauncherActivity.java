@@ -47,6 +47,7 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import android.net.wifi.WifiManager;
 
 
 /**
@@ -72,7 +73,7 @@ public abstract class LauncherActivity extends ListActivity {
         
         ListItem(PackageManager pm, ResolveInfo resolveInfo, IconResizer resizer) {
             this.resolveInfo = resolveInfo;
-            label = resolveInfo.loadLabel(pm);
+            label = WifiManager.replaceAllWiFi(resolveInfo.loadLabel(pm).toString());
             ComponentInfo ci = resolveInfo.activityInfo;
             if (ci == null) ci = resolveInfo.serviceInfo;
             if (label == null && ci != null) {

@@ -18,6 +18,8 @@ package android.app;
 
 import android.content.Intent;
 import android.os.RemoteException;
+import android.os.ServiceManager;
+import android.util.Log;
 
 /**
  * This class provides access to the system alarm services.  These allow you
@@ -79,6 +81,7 @@ public class AlarmManager
      * wakes up.
      */
     public static final int ELAPSED_REALTIME = 3;
+    public static final int RTC_POWEROFF_WAKEUP = 4;
 
     private final IAlarmManager mService;
 
@@ -301,5 +304,17 @@ public class AlarmManager
             mService.setTimeZone(timeZone);
         } catch (RemoteException ex) {
         }
+    }
+    public int getPowerOnReason()
+    {
+    Log.v("AlarmManager","****************enter into getPowerOnReason()");
+        try 
+        {
+            return mService.getPowerOnReason();
+        } 
+        catch (RemoteException ex) 
+        {
+            return -1;
+        }        
     }
 }

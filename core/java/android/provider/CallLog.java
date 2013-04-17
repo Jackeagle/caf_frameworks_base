@@ -25,6 +25,7 @@ import android.net.Uri;
 import android.provider.ContactsContract.CommonDataKinds.Callable;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.DataUsageFeedback;
+import android.provider.RecentCallsPreferences;
 import android.text.TextUtils;
 
 import com.android.internal.telephony.CallerInfo;
@@ -124,6 +125,14 @@ public class CallLog {
         public static final int OUTGOING_TYPE = 2;
         /** Call log type for missed calls. */
         public static final int MISSED_TYPE = 3;
+        public static final int OUTGOING_FAILED_TYPE = 4;
+        /** Call log type for incoming CSVT calls. */
+        public static final int INCOMING_CSVT_TYPE = 5;
+        /** Call log type for outgoing CSVT calls. */
+        public static final int OUTGOING_CSVT_TYPE = 6;
+        /** Call log type for missed CSVT calls. */
+        public static final int MISSED_CSVT_TYPE = 7;
+        public static final int REJECTED_TYPE = 8;
         /**
          * Call log type for voicemails.
          * @hide
@@ -154,16 +163,40 @@ public class CallLog {
         public static final String DATE = "date";
 
         /**
+         * duration type for active.
+         * @hide
+         */
+        public static final int DURATION_TYPE_ACTIVE = 0;
+
+        /**
+         * duration type for call out time.
+         * @hide
+         */
+        public static final int DURATION_TYPE_CALLOUT = 1;
+
+        /**
          * The duration of the call in seconds
          * <P>Type: INTEGER (long)</P>
          */
         public static final String DURATION = "duration";
 
         /**
+         * The type of the duration
+         * <P>Type: INTEGER (long)</P>
+         * @hide
+         */
+        public static final String DURATION_TYPE = "duration_type";
+
+        /**
          * Whether or not the call has been acknowledged
          * <P>Type: INTEGER (boolean)</P>
          */
         public static final String NEW = "new";
+        /**
+         * The type of the call,voice call or video call
+         * <P>Type: INTEGER (long)</P>
+         */
+        public static final String CALLTYPE = "call_type";
 
         /**
          * The cached name associated with the phone number, if it exists.
@@ -260,7 +293,15 @@ public class CallLog {
          */
         public static final String CACHED_FORMATTED_NUMBER = "formatted_number";
 
+        
         /**
+         * The subscription id.
+         * <P>Type: Integer</P>
+         * @hide
+         */
+        public static final String SUBSCRIPTION = "sub_id";   
+  
+          /**
          * Adds a call to the call log.
          *
          * @param ci the CallerInfo object to get the target contact from.  Can be null
@@ -277,6 +318,54 @@ public class CallLog {
          */
         public static Uri addCall(CallerInfo ci, Context context, String number,
                 int presentation, int callType, long start, int duration) {
+                // for single SIM, use 0 as the subscription value
+                return addCall(ci, context, number,
+                    presentation, callType, start, duration, 0, DURATION_TYPE_ACTIVE);
+        }
+
+        /**
+         * Adds a call to the call log for dual SIM.
+         *
+         * @param ci the CallerInfo object to get the target contact from.  Can be null
+         * if the contact is unknown.
+         * @param context the context used to get the ContentResolver
+         * @param number the phone number to be added to the calls db
+         * @param presentation the number presenting rules set by the network for
+         *        "allowed", "payphone", "restricted" or "unknown"
+         * @param callType enumerated values for "incoming", "outgoing", or "missed"
+         * @param start time stamp for the call in milliseconds
+         * @param duration call duration in seconds
+         * @param subscription valid value is 0 or 1
+         *
+         * {@hide}
+         */
+
+        public static Uri addCall(CallerInfo ci, Context context, String number,
+                int presentation, int callType, long start, int duration, int subscription) {
+            return addCall(ci, context, number,
+                    presentation, callType, start, duration, subscription, DURATION_TYPE_ACTIVE);
+        }
+        
+        /**
+         * Adds a call to the call log for dual SIM.
+         *
+         * @param ci the CallerInfo object to get the target contact from.  Can be null
+         * if the contact is unknown.
+         * @param context the context used to get the ContentResolver
+         * @param number the phone number to be added to the calls db
+         * @param presentation the number presenting rules set by the network for
+         *        "allowed", "payphone", "restricted" or "unknown"
+         * @param callType enumerated values for "incoming", "outgoing", or "missed"
+         * @param start time stamp for the call in milliseconds
+         * @param duration call duration in seconds
+         * @param subscription valid value is 0 or 1
+         * @param durationType valid value is 0 or 1
+         *
+         * {@hide}
+         */
+
+        public static Uri addCall(CallerInfo ci, Context context, String number,
+                int presentation, int callType, long start, int duration, int subscription, int durationType) {
             final ContentResolver resolver = context.getContentResolver();
 
             // If this is a private number then set the number to Private, otherwise check
@@ -300,6 +389,8 @@ public class CallLog {
             values.put(DATE, Long.valueOf(start));
             values.put(DURATION, Long.valueOf(duration));
             values.put(NEW, Integer.valueOf(1));
+            values.put(SUBSCRIPTION, Integer.valueOf(subscription));
+            values.put(DURATION_TYPE, Integer.valueOf(durationType));
             if (callType == MISSED_TYPE) {
                 values.put(IS_READ, Integer.valueOf(0));
             }
@@ -355,7 +446,97 @@ public class CallLog {
             Uri result = resolver.insert(CONTENT_URI, values);
 
             removeExpiredEntries(context);
+       
+            RecentCallsPreferences mprefs;
+            mprefs = RecentCallsPreferences.getPreferences(context);
+            
+            if (callType == Calls.INCOMING_TYPE) {
+                mprefs.setLong(RecentCallsPreferences.ALL_LAST_CALLS, duration);
 
+                long allIncomingCalls = mprefs.getLong(RecentCallsPreferences.ALL_INCOMING_CALLS);
+                allIncomingCalls += duration;
+                mprefs.setLong(RecentCallsPreferences.ALL_INCOMING_CALLS, allIncomingCalls);
+
+                long allTotalCalls = mprefs.getLong(RecentCallsPreferences.ALL_TOTAL_CALLS);
+                allTotalCalls += duration;
+                mprefs.setLong(RecentCallsPreferences.ALL_TOTAL_CALLS, allTotalCalls);
+
+                switch (subscription) {
+                    case 0: {
+                        mprefs.setLong(RecentCallsPreferences.SUB1_LAST_CALLS, duration);
+
+                        long SUB1IncomingCalls = mprefs
+                                .getLong(RecentCallsPreferences.SUB1_INCOMING_CALLS);
+                        SUB1IncomingCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB1_INCOMING_CALLS,
+                                SUB1IncomingCalls);
+
+                        long SUB1TotalCalls = mprefs
+                                .getLong(RecentCallsPreferences.SUB1_TOTAL_CALLS);
+                        SUB1TotalCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB1_TOTAL_CALLS, SUB1TotalCalls);
+                        break;
+                    }
+                    case 1: {
+                        mprefs.setLong(RecentCallsPreferences.SUB2_LAST_CALLS, duration);
+
+                        long SUB2IncomingCalls = mprefs
+                                .getLong(RecentCallsPreferences.SUB2_INCOMING_CALLS);
+                        SUB2IncomingCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB2_INCOMING_CALLS, SUB2IncomingCalls);
+
+                        long GSMTotalCalls = mprefs.getLong(RecentCallsPreferences.SUB2_TOTAL_CALLS);
+                        GSMTotalCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB2_TOTAL_CALLS, GSMTotalCalls);
+                        break;
+                    }
+                }
+            } else if (callType == Calls.OUTGOING_TYPE) {
+                mprefs.setLong(RecentCallsPreferences.ALL_LAST_CALLS, duration);
+
+                long allOutgoingCalls = mprefs.getLong(RecentCallsPreferences.ALL_OUTGOING_CALLS);
+                allOutgoingCalls += duration;
+                mprefs.setLong(RecentCallsPreferences.ALL_OUTGOING_CALLS, allOutgoingCalls);
+
+                long allTotalCalls = mprefs.getLong(RecentCallsPreferences.ALL_TOTAL_CALLS);
+                allTotalCalls += duration;
+                mprefs.setLong(RecentCallsPreferences.ALL_TOTAL_CALLS, allTotalCalls);
+
+                switch (subscription) {
+                    case 0: {
+                        mprefs.setLong(RecentCallsPreferences.SUB1_LAST_CALLS, duration);
+
+                        long SUB1OutgoingCalls = mprefs
+                                .getLong(RecentCallsPreferences.SUB1_OUTGOING_CALLS);
+                        SUB1OutgoingCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB1_OUTGOING_CALLS,
+                                SUB1OutgoingCalls);
+
+                        long SUB1TotalCalls = mprefs
+                                .getLong(RecentCallsPreferences.SUB1_TOTAL_CALLS);
+                        SUB1TotalCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB1_TOTAL_CALLS, SUB1TotalCalls);
+                        break;
+                    }
+                    case 1: {
+                        mprefs.setLong(RecentCallsPreferences.SUB2_LAST_CALLS, duration);
+
+                        long SUB2OutgoingCalls = mprefs
+                                .getLong(RecentCallsPreferences.SUB2_OUTGOING_CALLS);
+                        SUB2OutgoingCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB2_OUTGOING_CALLS, SUB2OutgoingCalls);
+
+                        long SUB2TotalCalls = mprefs
+                            .getLong(RecentCallsPreferences.SUB2_TOTAL_CALLS);
+                        SUB2TotalCalls += duration;
+                        mprefs.setLong(RecentCallsPreferences.SUB2_TOTAL_CALLS, SUB2TotalCalls);
+                        break;
+                    }
+                }
+            }
+
+            
+     
             return result;
         }
 
@@ -372,7 +553,8 @@ public class CallLog {
                 c = resolver.query(
                     CONTENT_URI,
                     new String[] {NUMBER},
-                    TYPE + " = " + OUTGOING_TYPE,
+                    TYPE + " = " + OUTGOING_TYPE + " OR " +
+                    TYPE + " = " + OUTGOING_CSVT_TYPE,
                     null,
                     DEFAULT_SORT_ORDER + " LIMIT 1");
                 if (c == null || !c.moveToFirst()) {
