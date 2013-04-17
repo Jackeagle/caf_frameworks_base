@@ -308,6 +308,8 @@ public class PhoneNumberUtils
                 ret.append(digit);
             } else if (isNonSeparator(c)) {
                 ret.append(c);
+            } else if(c == 'P' || c == 'p' || c == 'W' || c == 'w') {
+                ret.append(c);
             }
         }
 
