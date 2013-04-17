@@ -665,6 +665,32 @@ public class GpsLocationProvider implements LocationProviderInterface {
 			}
 		});
 
+		mContext.getContentResolver().registerContentObserver(
+			Settings.Secure.getUriFor(Settings.Global.ASSISTED_GPS_ENABLED), false,
+			new ContentObserver(new Handler()) {
+				@Override
+				public void onChange(boolean selfChange) {
+					// gps lock mode
+					// 1-lock none 3-lock ni
+					int lockMode1 = Settings.Global.getInt(mContext.getContentResolver(),
+										Settings.Global.ASSISTED_GPS_ENABLED, 1);
+					if(lockMode1==0)
+					{
+					   lockMode1=3;
+					}
+					if (DEBUG) Log.d(TAG, "GOT LOCK MODE " + lockMode1);
+					native_set_gps_lock(lockMode1);
+				}
+			});
+	    // do it when init gpslocationprovider
+	     int lockMode = Settings.Global.getInt(mContext.getContentResolver(),
+						Settings.Global.ASSISTED_GPS_ENABLED, 1);
+	    if(lockMode==0)
+	   {
+	        lockMode=3;
+	    }
+	if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
+	   native_set_gps_lock(lockMode);
 
     }
 
@@ -2246,6 +2272,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private native void native_cleanup();
     private native boolean native_set_position_mode(int mode, int recurrence, int min_interval,
             int preferred_accuracy, int preferred_time);
+    private native void native_set_gps_lock(int lock);
     private native boolean native_start();
     private native boolean native_stop();
     private native void native_delete_aiding_data(int flags);
