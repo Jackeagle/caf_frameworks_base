@@ -540,7 +540,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     private void checkWapSuplInit(Intent intent) {
         byte[] supl_init = (byte[]) intent.getExtra("data");
-	 notifyNiLocation();
+	 //notifyNiLocation();
         native_agps_ni_message(supl_init,supl_init.length);
     }
 
@@ -1285,7 +1285,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 		Log.e(TAG, "startNavigating:mPositionMode=" +mPositionMode);
 
 	
-	int startMode = Settings.Global.getInt(mContext.getContentResolver(),
+	/*int startMode = Settings.Global.getInt(mContext.getContentResolver(),
 						Settings.Global.AGPS_RESET_TYPE, 2);
 	Bundle extras = new Bundle();
 	if (DEBUG) Log.d(TAG, "GOT START MODE " + startMode);
@@ -1299,7 +1299,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 		// hot
 		extras.putBoolean("ephemeris", true);
 	}
-	sendExtraCommand("delete_aiding_data", extras);
+	sendExtraCommand("delete_aiding_data", extras);*/
 
             int interval = (hasCapability(GPS_CAPABILITY_SCHEDULING) ? mFixInterval : 1000);
             if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
