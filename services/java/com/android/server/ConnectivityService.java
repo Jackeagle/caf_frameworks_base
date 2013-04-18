@@ -2801,22 +2801,14 @@ private NetworkStateTracker makeWimaxStateTracker() {
     }
 
     // An API NetworkStateTrackers can call when they lose their network.
-    // This will automatically be cleared after X seconds or a network becomes CONNECTED,
-    // whichever happens first.  The timer is started by the first caller and not
-    // restarted by subsequent callers.
+    // This will request the HSM to acquire NetTransition wakelock
     public void requestNetworkTransitionWakelock(String forWhom) {
         enforceConnectivityInternalPermission();
         synchronized (this) {
-            if (mNetTransitionWakeLock.isHeld()) return;
-            mNetTransitionWakeLockSerialNumber++;
-            mNetTransitionWakeLock.acquire();
-            mNetTransitionWakeLockCausedBy = forWhom;
+            mHandler.sendMessage(mHandler.obtainMessage(
+                        ConnectivityServiceHSM.HSM_HANDLE_REQUEST_NET_TRANSITION_WAKELOCK,
+                        forWhom));
         }
-        mHandler.sendMessageDelayed(mHandler.obtainMessage(
-                EVENT_CLEAR_NET_TRANSITION_WAKELOCK,
-                mNetTransitionWakeLockSerialNumber,
-                INVALID_MSG_ARG),
-                mNetTransitionWakeLockTimeout);
         return;
     }
 
@@ -3615,6 +3607,8 @@ private NetworkStateTracker makeWimaxStateTracker() {
         static final int HSM_EVENT_CONNECTIVITY_SWITCH = HSM_MSG_MIN + 11;
         // avoidUnsuitableWifi
         static final int HSM_EVENT_AVOID_UNSUITABLE_WIFI = HSM_MSG_MIN + 12;
+        // handleRequestNetworkTransitionWakelock
+        static final int HSM_HANDLE_REQUEST_NET_TRANSITION_WAKELOCK = HSM_MSG_MIN + 13;
 
         private int myDefaultDnsNet;
         // List to track multiple active default networks
@@ -3922,6 +3916,26 @@ private NetworkStateTracker makeWimaxStateTracker() {
                         handleInetConditionHoldEnd(netType, sequence);
                         break;
                     }
+                    case HSM_HANDLE_REQUEST_NET_TRANSITION_WAKELOCK:
+                    {
+                        String forWhom = (String) msg.obj;
+                        // This will automatically be cleared after 60 seconds or
+                        // a network becomes CONNECTED, whichever happens first.
+                        // The timer is started by the first caller and not
+                        // restarted by subsequent callers.
+
+                        if (mNetTransitionWakeLock.isHeld()) break;
+
+                        mNetTransitionWakeLockSerialNumber++;
+                        mNetTransitionWakeLock.acquire();
+                        mNetTransitionWakeLockCausedBy = forWhom;
+
+                        sendMessageDelayed(obtainMessage(
+                                    EVENT_CLEAR_NET_TRANSITION_WAKELOCK,
+                                    mNetTransitionWakeLockSerialNumber,
+                                    INVALID_MSG_ARG), mNetTransitionWakeLockTimeout);
+                        break;
+                    }
                     case HSM_EVENT_ENFORCE_PREFERENCE:
                         enforcePreference();
                         break;
@@ -4193,6 +4207,14 @@ private NetworkStateTracker makeWimaxStateTracker() {
                         ret = HANDLED;
                         break;
                     }
+                    case HSM_HANDLE_REQUEST_NET_TRANSITION_WAKELOCK:
+                    {
+                        if (mActiveDefaultNetwork == TYPE_MOBILE) {
+                            if (VDBG) log("NetTransition wakelock is not needed");
+                            ret = HANDLED;
+                        }
+                        break;
+                    }
                     default: ret = NOT_HANDLED;
                 }
                 return ret;
@@ -4341,6 +4363,12 @@ private NetworkStateTracker makeWimaxStateTracker() {
                         if (handleInetConditionHoldEnd(netType, sequence)) {
                             ret = HANDLED;
                         }
+                        break;
+                    }
+                    case HSM_HANDLE_REQUEST_NET_TRANSITION_WAKELOCK:
+                    {
+                        if (VDBG) log("NetTransition wakelock is not needed");
+                        ret = HANDLED;
                         break;
                     }
                     case HSM_EVENT_ENFORCE_PREFERENCE:
