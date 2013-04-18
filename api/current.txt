@@ -22555,6 +22555,12 @@ package android.text.method {
     field public static final char[] CHARACTERS;
   }
 
+  public class DialerKeyListenerNoCTS extends android.text.method.DialerKeyListener {
+    ctor public DialerKeyListenerNoCTS();
+    method public static android.text.method.DialerKeyListenerNoCTS getInstance();
+    field public static final char[] CHARACTERS;
+  }
+
   public class DigitsKeyListener extends android.text.method.NumberKeyListener {
     ctor public DigitsKeyListener();
     ctor public DigitsKeyListener(boolean, boolean);

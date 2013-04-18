@@ -665,6 +665,32 @@ public class GpsLocationProvider implements LocationProviderInterface {
 			}
 		});
 
+		mContext.getContentResolver().registerContentObserver(
+			Settings.Secure.getUriFor(Settings.Global.ASSISTED_GPS_ENABLED), false,
+			new ContentObserver(new Handler()) {
+				@Override
+				public void onChange(boolean selfChange) {
+					// gps lock mode
+					// 1-lock none 3-lock ni
+					int lockMode1 = Settings.Global.getInt(mContext.getContentResolver(),
+										Settings.Global.ASSISTED_GPS_ENABLED, 1);
+					if(lockMode1==0)
+					{
+					   lockMode1=3;
+					}
+					if (DEBUG) Log.d(TAG, "GOT LOCK MODE " + lockMode1);
+					native_set_gps_lock(lockMode1);
+				}
+			});
+	    // do it when init gpslocationprovider
+	     int lockMode = Settings.Global.getInt(mContext.getContentResolver(),
+						Settings.Global.ASSISTED_GPS_ENABLED, 1);
+	    if(lockMode==0)
+	   {
+	        lockMode=3;
+	    }
+	  if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
+	   native_set_gps_lock(lockMode);
 
     }
 
@@ -988,6 +1014,17 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
             Log.w(TAG, "Failed to enable location provider");
         }
+
+	  // do it when init gpslocationprovider
+	   int lockMode = Settings.Global.getInt(mContext.getContentResolver(),
+					  Settings.Global.ASSISTED_GPS_ENABLED, 1);
+	  if(lockMode==0)
+	 {
+		  lockMode=3;
+	  }
+	if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
+	 native_set_gps_lock(lockMode);
+
     }
 
     /**
@@ -1246,6 +1283,23 @@ public class GpsLocationProvider implements LocationProviderInterface {
 		 }
 		}
 		Log.e(TAG, "startNavigating:mPositionMode=" +mPositionMode);
+
+	
+	int startMode = Settings.Global.getInt(mContext.getContentResolver(),
+						Settings.Global.AGPS_RESET_TYPE, 2);
+	Bundle extras = new Bundle();
+	if (DEBUG) Log.d(TAG, "GOT START MODE " + startMode);
+	if (startMode == 0) {
+		// cold
+		extras.putBoolean("all", true);
+	} else if (startMode == 1) {
+		// warm
+		extras.putBoolean("almanac", true);
+	} else if (startMode == 2) {
+		// hot
+		extras.putBoolean("ephemeris", true);
+	}
+	sendExtraCommand("delete_aiding_data", extras);
 
             int interval = (hasCapability(GPS_CAPABILITY_SCHEDULING) ? mFixInterval : 1000);
             if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
@@ -2246,6 +2300,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private native void native_cleanup();
     private native boolean native_set_position_mode(int mode, int recurrence, int min_interval,
             int preferred_accuracy, int preferred_time);
+    private native void native_set_gps_lock(int lock);
     private native boolean native_start();
     private native boolean native_stop();
     private native void native_delete_aiding_data(int flags);

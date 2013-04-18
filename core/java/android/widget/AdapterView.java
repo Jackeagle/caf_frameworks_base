@@ -797,7 +797,7 @@ public abstract class AdapterView<T extends Adapter> extends ViewGroup {
         @Override
         public void onChanged() {
             mDataChanged = true;
-            mOldItemCount = mItemCount;
+            //mOldItemCount = mItemCount;//wss for refresh of app widget
             mItemCount = getAdapter().getCount();
 
             // Detect the case where a cursor that was previously invalidated has
