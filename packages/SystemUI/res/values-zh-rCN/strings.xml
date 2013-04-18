@@ -210,4 +210,14 @@
     <string name="quick_settings_brightness_dialog_auto_brightness_label" msgid="5064982743784071218">"自动"</string>
     <string name="status_bar_help_title" msgid="1199237744086469217">"通知会显示在这里"</string>
     <string name="status_bar_help_text" msgid="7874607155052076323">"向下滑动可随时查看通知。"\n"再次向下滑动可使用系统控制功能。"</string>
+    <string name="data_usage_enable_mobile">"移动数据"</string>
+    <string name="switch_to_text">切换APN到<xliff:g id="next_apn">%s</xliff:g></string>
+    <!--start add TaskManager-->
+    <string name="tasklistview_title">任务管理器</string>
+    <string name="message_switch_fail">无法切换至此任务，接口不存在！</string>
+    <string name="tasklist_killall">全部关闭</string>
+    <string name="tasklist_memory_usage">"剩余/总内存: [<xliff:g id="NUMBER">%s</xliff:g>] / [<xliff:g id="NAME">%s</xliff:g>]"</string>
+    <string name="message_keep_one_launcher">至少保留一个桌面主屏！</string>
+    <!--end add TaskManager-->    
+    
 </resources>

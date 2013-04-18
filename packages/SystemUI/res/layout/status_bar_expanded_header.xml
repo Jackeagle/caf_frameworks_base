@@ -54,11 +54,11 @@
             android:layout_alignBaseline="@id/clock"
             />
     </RelativeLayout>
-
-    <Space
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+    <ImageView android:id="@+id/tasklistSwitch"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:scaleType="center"
+        android:src="@drawable/ic_tasklist_switch"
         />
 
     <TextView

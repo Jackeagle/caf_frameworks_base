@@ -31,12 +31,14 @@ import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.StatusBarManager;
 import android.content.BroadcastReceiver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.database.ContentObserver;
+import android.database.Cursor;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.PixelFormat;
@@ -45,6 +47,9 @@ import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.inputmethodservice.InputMethodService;
+import android.net.ConnectivityManager;
+import android.net.Uri;
+
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -60,11 +65,13 @@ import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Slog;
+import android.provider.Telephony;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.view.ViewPropertyAnimator;
@@ -75,18 +82,29 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
-
+import android.widget.CompoundButton.OnCheckedChangeListener;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.statusbar.StatusBarNotification;
+import com.android.internal.telephony.IccCard;
+import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.telephony.TelephonyProperties;
+import com.qualcomm.internal.telephony.SubscriptionManager;
+
 import com.android.systemui.R;
 import com.android.systemui.statusbar.BaseStatusBar;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.GestureRecorder;
 import com.android.systemui.statusbar.MSimSignalClusterView;
+import com.android.systemui.statusbar.CTMSimSignalClusterView;
+import com.android.systemui.statusbar.CUMSimSignalClusterView;
+import com.android.systemui.statusbar.CMCCSignalClusterView;
 import com.android.systemui.statusbar.NotificationData;
 import com.android.systemui.statusbar.NotificationData.Entry;
 import com.android.systemui.statusbar.SignalClusterView;
@@ -101,6 +119,17 @@ import com.android.systemui.statusbar.policy.NetworkController;
 import com.android.systemui.statusbar.policy.NotificationRowLayout;
 import com.android.systemui.statusbar.policy.OnSizeChangedListener;
 import com.android.systemui.statusbar.policy.Prefs;
+import com.qrd.plugin.feature_query.DefaultQuery;
+import com.qrd.plugin.feature_query.FeatureQuery;
+import com.android.internal.telephony.IccCardConstants;
+import android.os.SystemProperties;
+
+import android.widget.ExpandableListView;
+import android.widget.ExpandableListView.OnGroupCollapseListener;
+import android.widget.ExpandableListView.OnGroupExpandListener;
+import android.widget.ExpandableListView.OnChildClickListener;
+import android.widget.ExpandableListView.OnGroupClickListener;
+
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -108,8 +137,8 @@ import java.util.ArrayList;
 
 public class PhoneStatusBar extends BaseStatusBar {
     static final String TAG = "PhoneStatusBar";
-    public static final boolean DEBUG = BaseStatusBar.DEBUG;
-    public static final boolean SPEW = DEBUG;
+    public static final boolean DEBUG = true;//BaseStatusBar.DEBUG;
+    public static final boolean SPEW = true;//DEBUG;
     public static final boolean DUMPTRUCK = true; // extra dumpsys info
     public static final boolean DEBUG_GESTURES = false;
 
@@ -124,6 +153,9 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public static final String ACTION_STATUSBAR_START
             = "com.android.internal.policy.statusbar.START";
+
+    private static final boolean DIM_BEHIND_EXPANDED_PANEL = true;
+    private static final boolean SHOW_CARRIER_LABEL = true;
 
     private static final int MSG_OPEN_NOTIFICATION_PANEL = 1000;
     private static final int MSG_CLOSE_PANELS = 1001;
@@ -152,6 +184,11 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     private float mFlingGestureMaxOutputVelocityPx; // how fast can it really go? (should be a little 
                                                     // faster than mSelfCollapseVelocityPx)
+
+    public static final int STATUSBAR_STYLE_DEFAULT = 0;
+    public static final int STATUSBAR_STYLE_CU = 1;
+    public static final int STATUSBAR_STYLE_CT = 2;
+    public static final int STATUSBAR_STYLE_CMCC = 3;
 
     PhoneStatusBarPolicy mIconPolicy;
 
@@ -269,6 +306,28 @@ public class PhoneStatusBar extends BaseStatusBar {
     private Animator mLightsOutAnimation;
     private Animator mLightsOnAnimation;
 
+    private View mDataSwitchContainer;
+    private Switch mDataEnabled;
+    private ConnectivityManager mConnService;
+    private Boolean mMobileDataEnabled;
+
+    private View mApnSwitchContainer;
+    private View mApnSettingsView;
+    private ImageView mApnSwitchIcon;
+    private TextView mCurrentApnText;
+    private TextView mNextApnText;
+
+    private ApnSwitch mApnSwitch;
+
+	//TaskManager    
+    private ExpandableListView  mTaskListView;    
+    private TaskExpandableListAdapter mTaskListViewAdapter;
+	private ImageView mtasklistSwitch;
+	private boolean mIsShowTasklist=false;
+	//originLayout    
+    private LinearLayout mOriginLayout; 
+
+
     // for disabling the status bar
     int mDisabled = 0;
 
@@ -304,7 +363,7 @@ public class PhoneStatusBar extends BaseStatusBar {
                     Settings.Secure.USER_SETUP_COMPLETE,
                     0 /*default */,
                     mCurrentUserId);
-            if (MULTIUSER_DEBUG) Slog.d(TAG, String.format("User setup changed: " +
+            if (true) Slog.d(TAG, String.format("User setup changed: " +
                     "selfChange=%s userSetup=%s mUserSetup=%s",
                     selfChange, userSetup, mUserSetup));
             if (mSettingsButton != null && mHasFlipSettings) {
@@ -325,6 +384,28 @@ public class PhoneStatusBar extends BaseStatusBar {
     public void start() {
         mDisplay = ((WindowManager)mContext.getSystemService(Context.WINDOW_SERVICE))
                 .getDefaultDisplay();
+
+	if (FeatureQuery.FEATURE_NOTIFICATION_BAR_DATA_SWITCH) {
+		mConnService = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+		IntentFilter filter = new IntentFilter(ConnectivityManager.MOBILE_CONNECTIVITY_ACTION);
+		mContext.registerReceiver(new NetworkStatusChangeIntentReceiver(), filter);
+	}
+
+        if (FeatureQuery.FEATURE_NOTIFICATION_BAR_NETWORK_CHOOSE) {
+            // Init the ApnSwitch.
+            mApnSwitch = new ApnSwitch();
+
+            // Register the content observer to monitor the apn changed
+            mContext.getContentResolver().registerContentObserver(Telephony.Carriers.CONTENT_URI, true, mApnObserver);
+
+            // Register the receiver to handle the sim state changed event.
+            // And caused by if we open the airplane mode, we couldn't receive the sim state changed immediately,
+            // so we will also listen the airplane mode changed event.
+            // If the new state is on, we need set the views as gone.
+            IntentFilter filter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
+            filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+            mContext.registerReceiver(new SimStateChangedReceiver(), filter);
+        }
 
         mDreamManager = IDreamManager.Stub.asInterface(
                 ServiceManager.checkService(DreamService.DREAM_SERVICE));
@@ -514,64 +595,125 @@ public class PhoneStatusBar extends BaseStatusBar {
         // set the inital view visibility
         setAreThereNotifications();
 
+        //start add task list view and manager		  
+        mTaskListView = (ExpandableListView) mStatusBarWindow.findViewById(R.id.taskList);		
+        mTaskListViewAdapter = new TaskExpandableListAdapter(mContext);		
+        final TaskListManager taskListManager = new TaskListManager();		
+        mTaskListViewAdapter.setOnTaskActionListener(taskListManager);		
+        mTaskListView.setAdapter(mTaskListViewAdapter);  
+        mTaskListView.setChildDivider(mContext.getResources().getDrawable(R.drawable.list_divider_holo_light));//add for tasklist divider
+        mTaskListView.setOnGroupClickListener(mOnGroupClickListener);
+        mTaskListViewAdapter.expandGroup(null,0);//enable kill all 
+        mTaskListViewAdapter.onGroupExpanded(0);
+        mTaskListView.expandGroup(0);
+        mTaskListView.setGroupIndicator(null);
+        mTaskListView.setVisibility(View.GONE);
+        //origin layout
+        mOriginLayout = (LinearLayout) mStatusBarWindow.findViewById(R.id.originLayout);
+        mOriginLayout.setVisibility(View.VISIBLE);
+        mtasklistSwitch = (ImageView) mStatusBarWindow.findViewById(R.id.tasklistSwitch);
+        mtasklistSwitch.setOnClickListener(mTaskSwitchButtonListener);
+
+        //add end
+
+
+        // bind data switch
+        mDataSwitchContainer = (LinearLayout) mStatusBarWindow.findViewById(R.id.data_switch_container);
+		
+        if (FeatureQuery.FEATURE_NOTIFICATION_BAR_DATA_SWITCH) {
+            mDataEnabled = (Switch) mStatusBarWindow.findViewById(R.id.data_switch);
+            mDataEnabled.setOnCheckedChangeListener(mDataEnabledListener);
+            mMobileDataEnabled = mConnService.getMobileDataEnabled();
+            mDataEnabled.setChecked(mMobileDataEnabled);
+        } else {
+            mStatusBarWindow.findViewById(R.id.div_top).setVisibility(View.GONE);
+            mDataSwitchContainer.setVisibility(View.GONE);
+        }
+
+        // bind APN switch
+        mApnSwitchContainer = (LinearLayout) mStatusBarWindow.findViewById(R.id.apn_switch_container);
+	
+        if (FeatureQuery.FEATURE_NOTIFICATION_BAR_NETWORK_CHOOSE) {
+            mApnSettingsView = (LinearLayout) mStatusBarWindow.findViewById(R.id.apn_settings_view);
+            mApnSwitchIcon = (ImageView) mStatusBarWindow.findViewById(R.id.apn_switch_icon);
+            mCurrentApnText = (TextView) mStatusBarWindow.findViewById(R.id.current_apn_label);
+            mNextApnText = (TextView) mStatusBarWindow.findViewById(R.id.next_apn_label);
+
+            // If user press this container, will go to apn settings.
+            mApnSettingsView.setOnClickListener(mApnSettingsListener);
+            // If user press the switch icon, will switch the apn.
+            mApnSwitchIcon.setOnClickListener(mSwitchApnListener);
+        } else {
+            mStatusBarWindow.findViewById(R.id.div_center).setVisibility(View.GONE);
+            mApnSwitchContainer.setVisibility(View.GONE);
+            // Caused by we also add one div on bottom, if data switch also needn't to show,
+            // We need make it as GONE.
+            
+            if (!FeatureQuery.FEATURE_NOTIFICATION_BAR_DATA_SWITCH) {
+                mStatusBarWindow.findViewById(R.id.div_bottom).setVisibility(View.GONE);
+            }
+        }
+
         // Other icons
         mLocationController = new LocationController(mContext); // will post a notification
         mBatteryController = new BatteryController(mContext);
         mBatteryController.addIconView((ImageView)mStatusBarView.findViewById(R.id.battery));
         mBluetoothController = new BluetoothController(mContext);
 
+        LinearLayout signalView;
+        LinearLayout mSimSignalView;
+
         if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
             mMSimNetworkController = new MSimNetworkController(mContext);
-            MSimSignalClusterView mSimSignalCluster = (MSimSignalClusterView) mStatusBarView.findViewById(
-                    R.id.msim_signal_cluster);
-            for (int i=0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
-                mMSimNetworkController.addSignalCluster(mSimSignalCluster, i);
-            }
-            mSimSignalCluster.setNetworkController(mMSimNetworkController);
-
-            mEmergencyCallLabel = (TextView)mStatusBarWindow.findViewById(R.id.emergency_calls_only);
-            if (mEmergencyCallLabel != null) {
-                mMSimNetworkController.addEmergencyLabelView(mEmergencyCallLabel);
-                mEmergencyCallLabel.setOnClickListener(new View.OnClickListener() {
-                    public void onClick(View v) { }});
-                mEmergencyCallLabel.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
-                    @Override
-                    public void onLayoutChange(View v, int left, int top, int right, int bottom,
-                            int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                        updateCarrierLabelVisibility(false);
-                    }});
-            }
-
-            mCarrierLabel = (TextView)mStatusBarWindow.findViewById(R.id.carrier_label);
-            mShowCarrierInPanel = (mCarrierLabel != null);
-            if (DEBUG) Slog.v(TAG, "carrierlabel=" + mCarrierLabel + " show=" + mShowCarrierInPanel);
-            if (mShowCarrierInPanel) {
-                mCarrierLabel.setVisibility(mCarrierLabelVisible ? View.VISIBLE : View.INVISIBLE);
-
-                // for mobile devices, we always show mobile connection info here (SPN/PLMN)
-                // for other devices, we show whatever network is connected
-                if (mMSimNetworkController.hasMobileDataFeature()) {
-                    mMSimNetworkController.addMobileLabelView(mCarrierLabel);
-                } else {
-                    mMSimNetworkController.addCombinedLabelView(mCarrierLabel);
-                }
-
-                // set up the dynamic hide/show of the label
-                mPile.setOnSizeChangedListener(new OnSizeChangedListener() {
-                    @Override
-                    public void onSizeChanged(View view, int w, int h, int oldw, int oldh) {
-                        updateCarrierLabelVisibility(false);
+            mSimSignalView = (LinearLayout) mStatusBarView.findViewById(R.id.msim_signal_cluster);
+            switch (DefaultQuery.STATUSBAR_STYLE) {
+                case STATUSBAR_STYLE_CU :
+                    CUMSimSignalClusterView cuMSimSignalCluster = (CUMSimSignalClusterView)View.inflate(context, R.layout.msim_signal_cluster_view_cu, null);
+                    mSimSignalView.addView(cuMSimSignalCluster);
+                    for (int i=0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+                        mMSimNetworkController.addSignalCluster(cuMSimSignalCluster, i);
                     }
-                });
+                    cuMSimSignalCluster.setNetworkController(mMSimNetworkController);
+                    break;
+                case STATUSBAR_STYLE_CT :
+                    CTMSimSignalClusterView ctMSimSignalCluster = (CTMSimSignalClusterView)View.inflate(context, R.layout.msim_signal_cluster_view_ct, null);
+                    mSimSignalView.addView(ctMSimSignalCluster);
+                    for (int i=0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+                        mMSimNetworkController.addSignalCluster(ctMSimSignalCluster, i);
+                    }
+                    ctMSimSignalCluster.setNetworkController(mMSimNetworkController);
+                    break;
+                default:
+                    MSimSignalClusterView mSimSignalCluster = (MSimSignalClusterView)View.inflate(context, R.layout.msim_signal_cluster_view, null);
+                    mSimSignalView.addView(mSimSignalCluster);
+                    for (int i=0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+                        mMSimNetworkController.addSignalCluster(mSimSignalCluster, i);
+                    }
+                    mSimSignalCluster.setNetworkController(mMSimNetworkController);
+                    break;
             }
+
         } else {
-            mNetworkController = new NetworkController(mContext);
-            final SignalClusterView signalCluster =
-                (SignalClusterView)mStatusBarView.findViewById(R.id.signal_cluster);
-
-            mNetworkController.addSignalCluster(signalCluster);
-            signalCluster.setNetworkController(mNetworkController);
-
+	     mNetworkController = new NetworkController(mContext);
+	    signalView = (LinearLayout)mStatusBarView.findViewById(R.id.signal_cluster);
+		switch (DefaultQuery.STATUSBAR_STYLE){
+		  case STATUSBAR_STYLE_CMCC:
+		  	{
+		     CMCCSignalClusterView cmccSignalCluster = (CMCCSignalClusterView)View.inflate(context, R.layout.sim_signal_cluster_view_cmcc, null);
+                    signalView.addView(cmccSignalCluster);
+                    mNetworkController.addSignalCluster(cmccSignalCluster);
+                    cmccSignalCluster.setNetworkController(mNetworkController);
+			}
+		  break;
+	         case STATUSBAR_STYLE_CU :
+                default:                    
+                    SignalClusterView signalCluster = (SignalClusterView)View.inflate(context, R.layout.signal_cluster_view, null);
+                    signalView.addView(signalCluster);
+                    mNetworkController.addSignalCluster(signalCluster);
+                    signalCluster.setNetworkController(mNetworkController);
+                    break;
+		}
+		
             mEmergencyCallLabel = (TextView)mStatusBarWindow.findViewById(R.id.emergency_calls_only);
             if (mEmergencyCallLabel != null) {
                 mNetworkController.addEmergencyLabelView(mEmergencyCallLabel);
@@ -1518,6 +1660,12 @@ public class PhoneStatusBar extends BaseStatusBar {
 
         mNotificationPanel.expand();
         if (mHasFlipSettings && mScrollView.getVisibility() != View.VISIBLE) {
+	      if(mIsShowTasklist){
+   			mOriginLayout.setVisibility(View.VISIBLE);
+			mTaskListView.setVisibility(View.GONE);
+			mIsShowTasklist = false;
+   		}	
+		  
             flipToNotifications();
         }
 
@@ -1570,13 +1718,19 @@ public class PhoneStatusBar extends BaseStatusBar {
         if ((mDisabled & StatusBarManager.DISABLE_EXPAND) != 0) {
             return;
         }
+    if (SPEW) Slog.d(TAG, "animateExpand: mUserSetup=" + mUserSetup);
 
         // Settings are not available in setup
-        if (!mUserSetup) return;
+       // if (!mUserSetup) return;
 
         if (mHasFlipSettings) {
             mNotificationPanel.expand();
             if (mFlipSettingsView.getVisibility() != View.VISIBLE) {
+   		  if(mIsShowTasklist){
+   			mOriginLayout.setVisibility(View.VISIBLE);
+			mTaskListView.setVisibility(View.GONE);
+			mIsShowTasklist = false;
+   		}		
                 flipToSettings();
             }
         } else if (mSettingsPanel != null) {
@@ -1588,7 +1742,8 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public void switchToSettings() {
         // Settings are not available in setup
-        if (!mUserSetup) return;
+         if (SPEW) Slog.d(TAG, "switchToSettings: mUserSetup=" + mUserSetup);
+       // if (!mUserSetup) return;
 
         mFlipSettingsView.setScaleX(1f);
         mFlipSettingsView.setVisibility(View.VISIBLE);
@@ -1602,8 +1757,10 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public void flipToSettings() {
         // Settings are not available in setup
-        if (!mUserSetup) return;
-
+        
+	 if (SPEW) Slog.d(TAG, "flipToSettings: mUserSetup=" + mUserSetup);
+       // if (!mUserSetup) return;
+	 
         if (mFlipSettingsViewAnim != null) mFlipSettingsViewAnim.cancel();
         if (mScrollViewAnim != null) mScrollViewAnim.cancel();
         if (mSettingsButtonAnim != null) mSettingsButtonAnim.cancel();
@@ -2538,6 +2695,47 @@ public class PhoneStatusBar extends BaseStatusBar {
         }
     };
 
+    private void updateApnView() {
+        if (mApnSwitch == null || mApnSwitchContainer == null) return;
+        mApnSwitch.updateApnList();
+        mCurrentApnText.setText(mApnSwitch.getCurrentApnName());
+        mNextApnText.setText(mContext.getString(R.string.switch_to_text, mApnSwitch.getNextApnName()));
+    }
+
+    private void setApnSwitchViewShown(boolean show) {
+        if (mApnSwitchContainer == null) return;
+
+        boolean currentState = mApnSwitchContainer.getVisibility() == View.VISIBLE;
+        if (currentState == show) {
+            // If the new state is same as the current state, we will do nothing.
+            return;
+        }
+
+        if (show) {
+            mStatusBarWindow.findViewById(R.id.div_center).setVisibility(View.VISIBLE);
+            mApnSwitchContainer.setVisibility(View.VISIBLE);
+        } else {
+            mStatusBarWindow.findViewById(R.id.div_center).setVisibility(View.GONE);
+            mApnSwitchContainer.setVisibility(View.GONE);
+        }
+    }
+
+    private boolean hasIccCard() {
+        int phoneCount = MSimTelephonyManager.getDefault().getPhoneCount();
+        if (phoneCount > 1) {
+            MSimTelephonyManager msimTM = (MSimTelephonyManager) mContext.getSystemService(Context.MSIM_TELEPHONY_SERVICE);
+            int simState = msimTM.getSimState(0);
+            boolean active = simState != TelephonyManager.SIM_STATE_ABSENT
+                    && simState != TelephonyManager.SIM_STATE_DEACTIVATED
+                    && simState != TelephonyManager.SIM_STATE_UNKNOWN;
+            return active && msimTM.hasIccCard(0);
+        } else {
+            TelephonyManager tm = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+            return tm.hasIccCard();
+        }
+    }
+
+
     @Override
     protected void haltTicker() {
         mTicker.halt();
@@ -2583,4 +2781,378 @@ public class PhoneStatusBar extends BaseStatusBar {
         public void setBounds(Rect bounds) {
         }
     }
+
+private OnCheckedChangeListener mDataEnabledListener = new OnCheckedChangeListener() {
+	@Override
+	public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+		if (mMobileDataEnabled != mDataEnabled.isChecked()){
+			mConnService.setMobileDataEnabled(isChecked);
+		}
+	}
+};
+
+private View.OnClickListener mSwitchApnListener = new View.OnClickListener() {
+	public void onClick(View v) {
+		if (mApnSwitch != null) {
+			mApnSwitch.switchToNextApn(null);
+		}
+	}
+};
+
+/**
+	* Receives notifications when enable/disable mobile data.
+	*/
+   private class NetworkStatusChangeIntentReceiver extends BroadcastReceiver {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			String actionStr = intent.getAction();
+			if (ConnectivityManager.MOBILE_CONNECTIVITY_ACTION.equals(actionStr)) {
+				mMobileDataEnabled = intent.getBooleanExtra(ConnectivityManager.EXTRA_ENABLED, false);
+				mDataEnabled.setChecked(mMobileDataEnabled);
+			}
+		}
+   }
+
+   /**
+	* We need to handle the apn changed, if it is changed, we will try to update the apn list,
+	* and update the views on the status bar.
+	*/
+   private ContentObserver mApnObserver = new ContentObserver(mHandler) {
+	   @Override
+	   public void onChange(boolean selfChange, Uri uri) {
+		   super.onChange(selfChange, uri);
+		   if (DEBUG) Log.i(TAG, "ApnObserver, will try to update the apn views.");
+		   updateApnView();
+	   }
+   };
+
+   private OnClickListener mApnSettingsListener = new OnClickListener() {
+	   @Override
+	   public void onClick(View v) {
+		   if (!isDeviceProvisioned()) return;
+		   try {
+			   // Dismiss the lock screen when Settings starts.
+			   ActivityManagerNative.getDefault().dismissKeyguardOnNextActivity();
+		   } catch (RemoteException e) {
+		   }
+		   Intent intent = new Intent(Settings.ACTION_APN_SETTINGS);
+		   intent.putExtra("subscription", 0);
+		   intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		   v.getContext().startActivity(intent);
+		   animateCollapsePanels();
+	   }
+   };
+
+   private class SimStateChangedReceiver extends BroadcastReceiver {
+	   @Override
+	   public void onReceive(Context context, Intent intent) {
+		   String action = intent.getAction();
+		   if (DEBUG) Log.i(TAG, "SimStateChangedReceiver, receive the action: " + action);
+
+		   if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(action)) {
+			   boolean hasCard = hasIccCard();
+			   if (hasCard) {
+				   // we need make sure the icc state has been loaded complete and then
+				   // update the apn view. If not we will maybe got the error numeric.
+				   String iccState = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
+				   if (IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(iccState)) {
+					   updateApnView();
+					   setApnSwitchViewShown(true);
+				   }
+			   } else {
+				   setApnSwitchViewShown(false);
+			   }
+		   } else if (Intent.ACTION_AIRPLANE_MODE_CHANGED.equals(action)) {
+			   boolean enable = intent.getBooleanExtra("state", false);
+			   if (enable) {
+				   // The airplane mode is on, set the view as gone.
+				   setApnSwitchViewShown(false);
+			   }
+		   }
+	   }
+   }
+
+/**
+	* The class to track the apn switch.
+	*/
+   private class ApnSwitch {
+	   private final String DEFAULT = "default";
+        private final String CTWAP = "ctwap";
+
+	   private final Uri PREFERAPN_URI = Uri.parse("content://telephony/carriers/preferapn");
+	   private final String APN_ID = "apn_id";
+
+	   private final String[] PROJECTION = new String[] {
+			   "_id", "name", "apn", "type"
+	   };
+	   private final int INDEX_ID = 0;
+	   private final int INDEX_NAME = 1;
+	   private final int INDEX_APN = 2;
+	   private final int INDEX_TYPE = 3;
+
+	   private Apn mCurrentApn;
+	   private Apn mNextApn;
+
+	   public ApnSwitch() {
+	   }
+
+	   /**
+		* Switch the current apn to next apn.
+		*
+		* @param apn The next apn you want to switch.
+		*			 If the value is null, will use the saved next apn to switch.
+		*/
+	   public void switchToNextApn(Apn apn) {
+		   // if the given next apn is null, we will use the saved next apn to switch.
+		   if (apn == null) {
+			   apn = mNextApn;
+		   }
+
+		   // We will only set the prefer apn to the next apn, and then the data base will be
+		   // changed, so we will update the view when we receive the content changed message.
+		   if (apn != null) {
+			   if (DEBUG) Log.i(TAG, "switch to the next apn, and it's id: " + apn.id);
+			   ContentValues values = new ContentValues();
+			   values.put(APN_ID, apn.id);
+			   mContext.getContentResolver().update(PREFERAPN_URI, values, null, null);
+		   }
+	   }
+
+	   /**
+		* To get the current apn name
+		* @return the current apn name saved as apn's apn
+		*/
+	   public String getCurrentApnName() {
+		   if (mCurrentApn == null) {
+			   Log.w(TAG, "Try to get the current apn, but it is null.");
+			   return "";
+		   }
+		   return mCurrentApn.apn;
+	   }
+
+	   /**
+		* To get the next apn name
+		* @return the next apn name saved as apn's apn
+		*/
+	   public String getNextApnName() {
+		   if (mNextApn == null) {
+			   Log.w(TAG, "Try to get the next apn, but it is null.");
+			   return "";
+		   }
+		   return mNextApn.apn;
+	   }
+
+	   /**
+		* To update the apn list, and it will update the current apn and next apn.
+		*/
+	   public void updateApnList() {
+		   if (DEBUG) Log.i(TAG, "Try to update the apn list.");
+		   Apn currentApn = null;
+		   Apn nextApn = null;
+
+		   ArrayList<Apn> apnList = new ArrayList<Apn>();
+		   String selectedKey = getSelectedApnKey();
+
+		   Cursor cursor = null;
+		   try {
+			   String where = getOperatorNumericSelection();
+			   cursor = mContext.getContentResolver().query(Telephony.Carriers.CONTENT_URI,
+					   PROJECTION, where, null,
+					   Telephony.Carriers.DEFAULT_SORT_ORDER);
+			   if (cursor == null) {
+				   Log.e(TAG, "When update the apn list, the cursor is null.");
+				   return;
+			   }
+
+			   boolean getNextApn = false;
+			   while (cursor.moveToNext()) {
+				   Apn apn = new Apn();
+				   apn.id = cursor.getString(INDEX_ID);
+				   apn.name = cursor.getString(INDEX_NAME);
+				   apn.apn = cursor.getString(INDEX_APN);
+				   apn.type = cursor.getString(INDEX_TYPE);
+
+                    boolean selectable = ((apn.type == null) || !(apn.type.equals("mms")||apn.type.equals("dm")));
+				   if (!selectable) {
+					   // if the type is mms, we needn't to handle it.
+					   continue;
+				   }
+
+				   apnList.add(apn);
+				   if (getNextApn) {
+					   nextApn = apn;
+					   getNextApn = false;
+					   break;
+				   }
+
+				   // As android default, the DUT will not set the default selected apn, so it maybe null.
+				   // And we will deal with this case after.
+				   if (selectedKey != null && selectedKey.equals(apn.id)) {
+					   currentApn = apn;
+					   if (cursor.isLast()) {
+						   // If the current apn is the last cursor, we need set the next apn as the first in the apn list.
+						   nextApn = apnList.get(0);
+						   getNextApn = false;
+						   break;
+					   } else {
+						   // We need try to get the next apn if next cursor is not mms.
+						   getNextApn = true;
+					   }
+				   }
+			   }
+			   if (getNextApn) {
+				   // We have read all the cursor, but we also need get the next apn, it means the next apn is the first in the apn list.
+				   nextApn = apnList.get(0);
+			   }
+
+			   // Sometimes we didn't find the default apn for example, after we reset the DUT, the selectedkey will be null.
+			   // Note: As ct spec, we need set the ctwap as the default apn, so if the selectedkey is null,
+			   //		We'd like to set it as the default apn.
+			   if (currentApn == null) {
+				   if (selectedKey == null) {
+					   for (int i = 0; i < apnList.size(); i++) {
+						   Apn apn = apnList.get(i);
+						   if (apn.type != null && apn.type.contains(DEFAULT)
+                               && apn.apn != null && apn.apn.contains(CTWAP)) {
+							   switchToNextApn(apn);
+						   }
+					   }
+				   } else {
+					   // If the selectedkey is not null, but we didn't find the current apn. it maybe the data has been set to slot2.
+					   // TODO: if we need add some support for the use set the data to slot2? Now, we will leave it as last value.
+					   Log.w(TAG, "The selected key is: " + selectedKey + ", but we didn't matched the current apn.");
+				   }
+			   } else {
+				   mCurrentApn = currentApn;
+				   mNextApn = nextApn;
+			   }
+		   } finally {
+			   if (cursor != null) {
+				   cursor.close();
+				   cursor = null;
+			   }
+		   }
+	   }
+
+	   private String getOperatorNumericSelection() {
+		   String[] mccmncs = getOperatorNumeric();
+		   String where;
+		   where = (mccmncs[0] != null) ? "numeric=\"" + mccmncs[0] + "\"" : "";
+		   where = where + ((mccmncs[1] != null) ? " or numeric=\"" + mccmncs[1] + "\"" : "");
+		   if (DEBUG) Log.d(TAG, "getOperatorNumericSelection: " + where);
+		   return where;
+	   }
+
+	   private String[] getOperatorNumeric() {
+		   ArrayList<String> result = new ArrayList<String>();
+		   if (SystemProperties.getBoolean("persist.radio.use_nv_for_ehrpd", false)) {
+			   String mccMncForEhrpd = SystemProperties.get("ro.cdma.home.operator.numeric", null);
+			   if (mccMncForEhrpd != null && mccMncForEhrpd.length() > 0) {
+				   result.add(mccMncForEhrpd);
+			   }
+		   }
+
+		   String property = TelephonyProperties.PROPERTY_APN_SIM_OPERATOR_NUMERIC;
+		   String mccMncFromSim = MSimTelephonyManager.getTelephonyProperty(property, 0,null);
+
+		   if (mccMncFromSim != null && mccMncFromSim.length() > 0) {
+			   result.add(mccMncFromSim);
+		   }
+		   return result.toArray(new String[2]);
+	   }
+
+	   private String getSelectedApnKey() {
+		   String key = null;
+
+		   Cursor cursor = null;
+		   try {
+			   cursor = mContext.getContentResolver().query(PREFERAPN_URI, new String[] {"_id"},
+					   null, null, Telephony.Carriers.DEFAULT_SORT_ORDER);
+			   if (cursor != null && cursor.getCount() > 0) {
+				   cursor.moveToFirst();
+				   key = cursor.getString(0);
+			   }
+		   } finally {
+			   if (cursor != null) {
+				   cursor.close();
+				   cursor = null;
+			   }
+		   }
+		   return key;
+	   }
+
+	   private class Apn {
+		   String id;
+		   String name;
+		   String apn;
+		   String type;
+	   }
+   }
+
+
+//start add Taskmanager 
+private final OnChildClickListener mOnChildClickListener = new OnChildClickListener() {
+  public boolean onChildClick(ExpandableListView parent, View v, int groupPosition,
+		  int childPosition, long id) {
+	  Log.d("StatusBarService","onChildClick");
+	  if("kill".equals(v.getTag())){
+		  mTaskListViewAdapter.killChild(childPosition);
+	  }
+	  return true;
+  }
+};
+
+private final OnGroupClickListener mOnGroupClickListener = new OnGroupClickListener() {
+  public boolean onGroupClick(ExpandableListView parent, View v, int groupPosition,
+					  long id) {
+	  if(true)return true;
+
+	  if(mTaskListView.isGroupExpanded(groupPosition)){  
+		  mTaskListViewAdapter.collapseGroup(v, groupPosition);
+		  mTaskListView.collapseGroup(groupPosition);
+	  }else{
+		  mTaskListViewAdapter.expandGroup(v, groupPosition);
+		  mTaskListView.expandGroup(groupPosition);
+	  }
+	  return true;
+  }
+};
+
+private final OnGroupCollapseListener mOnGroupCollapseListener = new OnGroupCollapseListener() {
+  public void onGroupCollapse(int groupPosition) {
+  }
+};
+
+private final OnGroupExpandListener mOnGroupExpandListener = new OnGroupExpandListener() {
+  public void onGroupExpand(int groupPosition) {
+  }
+};
+
+private class TaskListManager implements TaskExpandableListAdapter.OnTaskActionListener {
+	public void onTaskKilled() {
+		
+	}
+	public void onTaskBroughtToFront() {
+		animateCollapsePanels();
+	}
+}
+
+private View.OnClickListener mTaskSwitchButtonListener = new View.OnClickListener() {
+
+	public void onClick(View v) {
+
+		if(!mIsShowTasklist){
+			mOriginLayout.setVisibility(View.GONE);
+			mTaskListView.setVisibility(View.VISIBLE);
+		}else{
+			mOriginLayout.setVisibility(View.VISIBLE);
+			mTaskListView.setVisibility(View.GONE);
+		}
+		mIsShowTasklist = !mIsShowTasklist;
+	}
+};
+//end add Taskmanager 
+
+
+	
 }
