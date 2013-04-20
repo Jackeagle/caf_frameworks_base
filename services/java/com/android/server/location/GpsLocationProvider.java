@@ -540,7 +540,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     private void checkWapSuplInit(Intent intent) {
         byte[] supl_init = (byte[]) intent.getExtra("data");
-	 //notifyNiLocation();
+	    notifyNiLocation();
         native_agps_ni_message(supl_init,supl_init.length);
     }
 
