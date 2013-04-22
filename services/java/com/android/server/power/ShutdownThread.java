@@ -651,6 +651,7 @@ public final class ShutdownThread extends Thread {
             {
                 mediaPlayer.reset();
                 mediaPlayer.setDataSource(path);
+				mediaPlayer.setAudioStreamType(android.media.AudioManager.STREAM_SYSTEM);
                 mediaPlayer.prepare();
                 mediaPlayer.start();
                 mediaPlayer.setOnCompletionListener(new OnCompletionListener() {

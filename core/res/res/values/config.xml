@@ -1058,4 +1058,10 @@
 
     <!-- Flag indicating if the speed up audio on mt call code should be executed -->
     <bool name="config_speed_up_audio_on_mt_calls">false</bool>
+
+    <integer name="config_mms_mtu_2g_size">1300</integer>
+    <integer name="config_mms_mtu_3g_size">1400</integer>
+    <integer name="config_mobile_mtu_2g_size">1410</integer>
+    <integer name="config_mobile_mtu_3g_size">1410</integer>
+    <integer name="config_mtu_default_size">1380</integer>
 </resources>

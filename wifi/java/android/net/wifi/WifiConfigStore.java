@@ -1087,7 +1087,6 @@ class WifiConfigStore {
                 loge("failed to set psk");
                 break setVariables;
             }
-
             boolean hasSetKey = false;
             if (config.wepKeys != null) {
                 for (int i = 0; i < config.wepKeys.length; i++) {
