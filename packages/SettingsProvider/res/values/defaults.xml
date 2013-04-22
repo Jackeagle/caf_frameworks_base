@@ -196,4 +196,5 @@
 
     <string name="def_default_input_method">com.android.inputmethod.pinyin/.PinyinIME</string>
     <string name="def_enabled_input_methods">com.android.inputmethod.pinyin/.PinyinIME</string>
+    <bool name="def_auto_time_gps">false</bool>
 </resources>

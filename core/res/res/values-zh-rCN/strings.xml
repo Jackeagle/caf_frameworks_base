@@ -1507,5 +1507,5 @@
     <!-- CMCC WLAN customization end-->
     <string name="auto_power_off_title">自动关机</string>  
     <string name="auto_power_off_msg">系统将在<xliff:g id="seconds">%d</xliff:g> 秒后关机.</string>
-
+    <string name="gps_time_sync_fail_str">使用 GPS 提供时间失败</string>
 </resources>
