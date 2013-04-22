@@ -880,7 +880,8 @@
   <java-symbol type="string" name="media_route_status_available" />
   <java-symbol type="string" name="media_route_status_not_available" />
   <java-symbol type="string" name="owner_name" />
-
+  <java-symbol type="string" name="gps_time_sync_fail_str" />
+  
   <java-symbol type="plurals" name="abbrev_in_num_days" />
   <java-symbol type="plurals" name="abbrev_in_num_hours" />
   <java-symbol type="plurals" name="abbrev_in_num_minutes" />
@@ -1854,4 +1855,10 @@
   <java-symbol type="layout" name="msim_keyguard_sim_pin_view" />
   <java-symbol type="layout" name="msim_keyguard_sim_puk_view" />
   <java-symbol type="layout" name="msim_keyguard_carrier_area" />
+
+  <java-symbol type="integer" name="config_mms_mtu_2g_size" />
+  <java-symbol type="integer" name="config_mms_mtu_3g_size" />
+  <java-symbol type="integer" name="config_mobile_mtu_2g_size" />
+  <java-symbol type="integer" name="config_mobile_mtu_3g_size" />
+  <java-symbol type="integer" name="config_mtu_default_size" />
 </resources>
