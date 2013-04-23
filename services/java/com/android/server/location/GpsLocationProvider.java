@@ -523,7 +523,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
             if (WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(action)) {
               List<ScanResult> results = mWifiState.mWifiManager.getScanResults();
               for (ScanResult result : results) {
-                  if (result.SSID.equals(ssid)) {
+                  String ssid_result = convertToQuotedString (result.SSID);
+                  if (ssid_result.equals(ssid)) {
                     return;
                   }
               }
@@ -1550,6 +1551,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
                               "ipAddr = " + ipAddr +
                               "ssid = " + ssid +
                               "password = " + password);
+
+        // Convert the ssid to quoted string if it is not already.
+        ssid = convertToQuotedString (ssid);
 
         AGpsConnectionInfo agpsConnInfo = getAGpsConnectionInfo(type);
         if (agpsConnInfo == null) {
