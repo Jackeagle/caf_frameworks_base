@@ -45,6 +45,8 @@ public class EthernetDevInfo implements Parcelable {
     private String route;
     private String dns;
     private String mode;
+    private int leaseDuration;
+    private long lastDhcpRequestTime;//time of the last successful dhcp request
 
     public EthernetDevInfo () {
         dev_name = null;
@@ -53,6 +55,7 @@ public class EthernetDevInfo implements Parcelable {
         route = null;
         netmask = null;
         mode = ETHERNET_CONN_MODE_DHCP;
+        leaseDuration = -1;
     }
 
     /**
@@ -121,6 +124,22 @@ public class EthernetDevInfo implements Parcelable {
 
     public int describeContents() {
         return 0;
+    }
+
+    public void setDhcpLeaseDuration(int leaseDuration) {
+        this.leaseDuration = leaseDuration;
+    }
+
+    public int getDhcpLeaseDuration( ) {
+        return this.leaseDuration;
+    }
+
+    public void setLastDhcpRequestTime(long lastDhcpRequestTime) {
+        this.lastDhcpRequestTime = lastDhcpRequestTime;
+    }
+
+    public long getLastDhcpRequestTime( ) {
+        return this.lastDhcpRequestTime;
     }
 
     public void writeToParcel(Parcel dest, int flags) {

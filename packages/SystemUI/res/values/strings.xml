@@ -416,7 +416,11 @@
     <string name="status_bar_settings_signal_meter_disconnected">
         No Internet connection
     </string>
-
+    <!-- Text to display underneath the graphical signal strength meter when
+         Ethernet connection is available -->
+    <string name="status_bar_settings_ethernet_connected">
+        Ethernet connected
+    </string>
     <!-- Text to display underneath the graphical signal strength meter when
          it is displaying Wi-Fi status and Wi-Fi is connected to a network
          whose SSID is not available.
