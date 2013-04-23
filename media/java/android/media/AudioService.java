@@ -1728,7 +1728,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         if (newMode == AudioSystem.MODE_RINGTONE) {
             // if not ringing silently
             int ringVolume = AudioService.this.getStreamVolume(AudioManager.STREAM_RING);
-            if (ringVolume > 0) {
+            //music need stop with slience or vibrate when incoming call
+            //if (ringVolume > 0) {
                 // request audio focus for the communication focus entry
                 requestAudioFocus(AudioManager.STREAM_RING,
                         AudioManager.AUDIOFOCUS_GAIN_TRANSIENT, cb,
@@ -1736,7 +1737,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                         IN_VOICE_COMM_FOCUS_ID /*clientId*/,
                         "system");
 
-            }
+            //}
         }
         // if entering call
         else if ((newMode == AudioSystem.MODE_IN_CALL)

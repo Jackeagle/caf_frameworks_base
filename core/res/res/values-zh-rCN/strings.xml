@@ -154,6 +154,8 @@
     <string name="global_actions" product="default" msgid="2406416831541615258">"手机选项"</string>
     <string name="global_action_lock" msgid="2844945191792119712">"屏幕锁定"</string>
     <string name="global_action_power_off" msgid="4471879440839879722">"关机"</string>
+    <string name="global_action_power_off_fast">"快速开关机"</string>
+    <string name="global_action_power_off_fast_sumrary">系统深度休眠关机模式</string>
     <string name="global_action_bug_report" msgid="7934010578922304799">"错误报告"</string>
     <string name="bugreport_title" msgid="2667494803742548533">"提交错误报告"</string>
     <string name="bugreport_message" msgid="398447048750350456">"这会收集有关当前设备状态的信息，并以电子邮件的形式进行发送。从开始生成错误报告到准备好发送需要一点时间，请耐心等待。"</string>
@@ -1111,12 +1113,12 @@
     <item quantity="other" msgid="7915895323644292768">"打开可用的 Wi-Fi 网络"</item>
   </plurals>
   <plurals name="wifi_available_wlan">
-    <item quantity="one" msgid="6654123987418168693">"有可用的 Wi-Fi 网络"</item>
-    <item quantity="other" msgid="4192424489168397386">"有可用的 Wi-Fi 网络"</item>
+    <item quantity="one" msgid="6654123987418168693">"有可用的 WLAN 网络"</item>
+    <item quantity="other" msgid="4192424489168397386">"有可用的 WLAN 网络"</item>
   </plurals>
   <plurals name="wifi_available_detailed_wlan">
-    <item quantity="one" msgid="1634101450343277345">"打开可用的 Wi-Fi 网络"</item>
-    <item quantity="other" msgid="7915895323644292768">"打开可用的 Wi-Fi 网络"</item>
+    <item quantity="one" msgid="1634101450343277345">"打开可用的 WLAN 网络"</item>
+    <item quantity="other" msgid="7915895323644292768">"打开可用的 WLAN 网络"</item>
   </plurals>
     <string name="wifi_available_sign_in" msgid="4029489716605255386">"登录到 Wi-Fi 网络"</string>
     <string name="network_available_sign_in" msgid="8495155593358054676">"登录网络"</string>

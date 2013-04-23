@@ -40,7 +40,7 @@ import android.util.FloatMath;
 import android.util.Slog;
 import android.util.Spline;
 import android.util.TimeUtils;
-
+import android.provider.Settings;
 import java.io.PrintWriter;
 
 /**
@@ -143,15 +143,15 @@ final class DisplayPowerController {
     // The short term average gives us a filtered but relatively low latency measurement.
     // The long term average informs us about the overall trend.
     private static final long SHORT_TERM_AVERAGE_LIGHT_TIME_CONSTANT = 1000;
-    private static final long LONG_TERM_AVERAGE_LIGHT_TIME_CONSTANT = 5000;
+    private static final long LONG_TERM_AVERAGE_LIGHT_TIME_CONSTANT = 2000;//5000 -> 2000 --m-xst
 
     // Stability requirements in milliseconds for accepting a new brightness
     // level.  This is used for debouncing the light sensor.  Different constants
     // are used to debounce the light sensor when adapting to brighter or darker environments.
     // This parameter controls how quickly brightness changes occur in response to
     // an observed change in light level that exceeds the hysteresis threshold.
-    private static final long BRIGHTENING_LIGHT_DEBOUNCE = 4000;
-    private static final long DARKENING_LIGHT_DEBOUNCE = 8000;
+    private static final long BRIGHTENING_LIGHT_DEBOUNCE = 2000;//4000 -> 2000 --m-xst
+    private static final long DARKENING_LIGHT_DEBOUNCE = 4000;//8000 -> 4000 --m-xst
 
     // Hysteresis constraints for brightening or darkening.
     // The recent lux must have changed by at least this fraction relative to the
@@ -177,7 +177,8 @@ final class DisplayPowerController {
 
     // The lights service.
     private final LightsService mLights;
-
+    // Add button back lights control . --xst
+    private LightsService.Light mButtonLight;
     // The twilight service.
     private final TwilightService mTwilight;
 
@@ -340,6 +341,8 @@ final class DisplayPowerController {
     // Twilight changed.  We might recalculate auto-brightness values.
     private boolean mTwilightChanged;
 
+    //Add context for lcd brightness control by proximity when calling . -- a-xst
+    private Context mContext ;
     /**
      * Creates the display power controller.
      */
@@ -355,6 +358,10 @@ final class DisplayPowerController {
         mCallbackHandler = callbackHandler;
 
         mLights = lights;
+        //add button back light control function . --xst
+        mButtonLight = mLights.getLight(LightsService.LIGHT_ID_BUTTONS);
+        //Add context for lcd brightness control by proximity when calling . -- a-xst
+        mContext = context;
         mTwilight = twilight;
         mSensorManager = sensorManager;
         mDisplayManager = displayManager;
@@ -603,6 +610,7 @@ final class DisplayPowerController {
                     mScreenOffBecauseOfProximity = true;
                     sendOnProximityPositive();
                     setScreenOn(false);
+                    mButtonLight.setButtonBackLightsOn(false);
                 }
             } else if (mWaitingForNegativeProximity
                     && mScreenOffBecauseOfProximity
@@ -674,7 +682,6 @@ final class DisplayPowerController {
                     // be visible if the electron beam has not been dismissed because
                     // its last frame of animation is solid black.
                     setScreenOn(true);
-
                     if (mPowerRequest.blockScreenOn
                             && mPowerState.getElectronBeamLevel() == 0.0f) {
                         blockScreenOn();
@@ -698,6 +705,12 @@ final class DisplayPowerController {
                             mPowerState.dismissElectronBeam();
                         }
                     }
+                    //turn on the button back lights if the screen is turn on when the setting is open state. --a-xst
+                    if(mButtonLight.getButtonBackLightsMode()==1){
+                        mButtonLight.setButtonBackLightsOn(true);
+                    }else if(mButtonLight.getButtonBackLightsMode()==0){
+                        mButtonLight.setButtonBackLightsOn(false);
+                    }
                 }
             } else {
                 // Want screen off.
@@ -706,6 +719,7 @@ final class DisplayPowerController {
                     if (!mElectronBeamOffAnimator.isStarted()) {
                         if (mPowerState.getElectronBeamLevel() == 0.0f) {
                             setScreenOn(false);
+                            mButtonLight.setButtonBackLightsOn(false);
                         } else if (mPowerState.prepareElectronBeam(
                                 mElectronBeamFadesConfig ?
                                         ElectronBeam.MODE_FADE :
@@ -832,7 +846,11 @@ final class DisplayPowerController {
         if (mPendingProximity == PROXIMITY_POSITIVE && positive) {
             return; // no change
         }
-
+        //Add for switch the lcd brightness when calling . -- a-xst .
+        int proximityFlag = Settings.System.getInt(mContext.getContentResolver(),Settings.System.PROXIMITY_SENSOR, 1);
+        if (proximityFlag == 0) {
+            return;
+        }
         // Only accept a proximity sensor reading if it remains
         // stable for the entire debounce delay.
         mHandler.removeMessages(MSG_PROXIMITY_SENSOR_DEBOUNCED);
@@ -885,7 +903,6 @@ final class DisplayPowerController {
 
     private void handleLightSensorEvent(long time, float lux) {
         mHandler.removeMessages(MSG_LIGHT_SENSOR_DEBOUNCED);
-
         applyLightSensorMeasurement(time, lux);
         updateAmbientLux(time);
     }

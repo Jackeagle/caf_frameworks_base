@@ -17380,6 +17380,7 @@ package android.provider {
     field public static final java.lang.String CACHED_NAME = "name";
     field public static final java.lang.String CACHED_NUMBER_LABEL = "numberlabel";
     field public static final java.lang.String CACHED_NUMBER_TYPE = "numbertype";
+    field public static final java.lang.String CALLTYPE = "call_type";
     field public static final android.net.Uri CONTENT_FILTER_URI;
     field public static final java.lang.String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/calls";
     field public static final java.lang.String CONTENT_TYPE = "vnd.android.cursor.dir/calls";
@@ -18737,6 +18738,25 @@ package android.provider {
   public abstract interface OpenableColumns {
     field public static final java.lang.String DISPLAY_NAME = "_display_name";
     field public static final java.lang.String SIZE = "_size";
+  }
+
+  public class RecentCallsPreferences {
+    ctor public RecentCallsPreferences(android.content.Context);
+    method public long getLong(java.lang.String);
+    method public static synchronized android.provider.RecentCallsPreferences getPreferences(android.content.Context);
+    method public void setLong(java.lang.String, long);
+    field public static final java.lang.String ALL_INCOMING_CALLS = "all_incoming_calls";
+    field public static final java.lang.String ALL_LAST_CALLS = "all_last_calls";
+    field public static final java.lang.String ALL_OUTGOING_CALLS = "all_outgoing_calls";
+    field public static final java.lang.String ALL_TOTAL_CALLS = "all_total_calls";
+    field public static final java.lang.String SUB1_INCOMING_CALLS = "sub1_incoming_calls";
+    field public static final java.lang.String SUB1_LAST_CALLS = "sub1_last_calls";
+    field public static final java.lang.String SUB1_OUTGOING_CALLS = "sub1_outgoing_calls";
+    field public static final java.lang.String SUB1_TOTAL_CALLS = "sub1_total_calls";
+    field public static final java.lang.String SUB2_INCOMING_CALLS = "sub2_incoming_calls";
+    field public static final java.lang.String SUB2_LAST_CALLS = "sub2_last_calls";
+    field public static final java.lang.String SUB2_OUTGOING_CALLS = "sub2_outgoing_calls";
+    field public static final java.lang.String SUB2_TOTAL_CALLS = "sub2_total_calls";
   }
 
   public class SearchRecentSuggestions {
@@ -20996,6 +21016,7 @@ package android.telephony {
   public class TelephonyManager {
     method public java.util.List<android.telephony.CellInfo> getAllCellInfo();
     method public int getCallState();
+    method public long getCallsDuration(java.lang.String);
     method public android.telephony.CellLocation getCellLocation();
     method public int getDataActivity();
     method public int getDataState();
@@ -21020,6 +21041,7 @@ package android.telephony {
     method public boolean hasIccCard();
     method public boolean isNetworkRoaming();
     method public void listen(android.telephony.PhoneStateListener, int);
+    method public void setCallsDuration(java.lang.String, long);
     field public static final java.lang.String ACTION_PHONE_STATE_CHANGED = "android.intent.action.PHONE_STATE";
     field public static final int CALL_STATE_IDLE = 0; // 0x0
     field public static final int CALL_STATE_OFFHOOK = 2; // 0x2
@@ -29707,6 +29729,7 @@ package android.widget {
     method public void setSingleLine();
     method public void setSingleLine(boolean);
     method public final void setSpannableFactory(android.text.Spannable.Factory);
+    method public void setTelUrl(java.lang.String);
     method public final void setText(java.lang.CharSequence);
     method public void setText(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public final void setText(char[], int, int);
@@ -29715,6 +29738,8 @@ package android.widget {
     method public void setTextAppearance(android.content.Context, int);
     method public void setTextColor(int);
     method public void setTextColor(android.content.res.ColorStateList);
+    method public final void setTextExt(java.lang.CharSequence);
+    method public void setTextExt(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public void setTextIsSelectable(boolean);
     method public final void setTextKeepState(java.lang.CharSequence);
     method public final void setTextKeepState(java.lang.CharSequence, android.widget.TextView.BufferType);
@@ -29725,6 +29750,7 @@ package android.widget {
     method public final void setTransformationMethod(android.text.method.TransformationMethod);
     method public void setTypeface(android.graphics.Typeface, int);
     method public void setTypeface(android.graphics.Typeface);
+    method public void setWebUrl(java.lang.String);
     method public void setWidth(int);
   }
 
