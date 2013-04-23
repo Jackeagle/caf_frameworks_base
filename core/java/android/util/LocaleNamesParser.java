@@ -96,7 +96,7 @@ public final class LocaleNamesParser {
                 Slog.e(LOG_TAG, "locale is null");
             }
         }
-        if (DBG)
+        //if (DBG)
             Slog.d(LOG_TAG, " actually name is " + name);
         return name;
     }
