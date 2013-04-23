@@ -92,6 +92,15 @@ public class EthernetService<syncronized> extends IEthernetManager.Stub {
     }
 
     /**
+     * Return the saved ethernet configuration
+     * @return ethernet interface configuration on success, {@code null} on failure
+     */
+    public EthernetDevInfo getEthernetDevInfo() {
+
+        return  mTracker.getEthernetDevInfo();
+    }
+
+    /**
      * Set the ethernet interface configuration mode
      * @param mode {@code ETHERNET_CONN_MODE_DHCP} for dhcp {@code ETHERNET_CONN_MODE_MANUAL} for manual configure
      */
