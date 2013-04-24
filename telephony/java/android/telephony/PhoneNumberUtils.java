@@ -25,6 +25,7 @@ import com.android.i18n.phonenumbers.PhoneNumberUtil;
 import com.android.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
 import com.android.i18n.phonenumbers.Phonenumber.PhoneNumber;
 import com.android.i18n.phonenumbers.ShortNumberUtil;
+import com.android.internal.telephony.PhoneConstants;
 
 import android.content.Context;
 import android.content.Intent;
@@ -34,12 +35,14 @@ import android.net.Uri;
 import android.os.SystemProperties;
 import android.provider.Contacts;
 import android.provider.ContactsContract;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseIntArray;
 
+import static com.android.internal.telephony.MSimConstants.MAX_PHONE_COUNT_DS;
 import static com.android.internal.telephony.MSimConstants.SUBSCRIPTION_KEY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY;
 import static com.android.internal.telephony.TelephonyProperties.PROPERTY_IDP_STRING;
@@ -145,6 +148,19 @@ public class PhoneNumberUtils
         return !isDialable(ch) && !(('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z'));
     }
 
+    private static String checkAndAppendPrefix(Intent intent, int subscription, String number,
+            Context context) {
+        boolean isIPPrefix = intent.getBooleanExtra(PhoneConstants.IP_CALL, false);
+        if (isIPPrefix && number != null && subscription < MAX_PHONE_COUNT_DS) {
+            String IPPrefix = Settings.System.getString(context.getContentResolver(),
+                    Settings.Global.IPCALL_PREFIX[subscription]);
+            if (!TextUtils.isEmpty(IPPrefix)) {
+                return IPPrefix + number;
+            }
+        }
+        return number;
+    }
+
     /** Extracts the phone number from an Intent.
      *
      * @param intent the intent to get the number of
@@ -158,17 +174,17 @@ public class PhoneNumberUtils
 
         Uri uri = intent.getData();
         String scheme = uri.getScheme();
+        int subscription = intent.getIntExtra(SUBSCRIPTION_KEY,
+                MSimTelephonyManager.getDefault().getDefaultSubscription());
 
         if (scheme.equals("tel") || scheme.equals("sip")) {
-            return uri.getSchemeSpecificPart();
+            return checkAndAppendPrefix(intent, subscription, uri.getSchemeSpecificPart(), context);
         }
 
         // TODO: We don't check for SecurityException here (requires
         // CALL_PRIVILEGED permission).
         if (scheme.equals("voicemail")) {
             if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                int subscription = intent.getIntExtra(SUBSCRIPTION_KEY,
-                        MSimTelephonyManager.getDefault().getDefaultSubscription());
                 return MSimTelephonyManager.getDefault()
                         .getCompleteVoiceMailNumber(subscription);
             }
@@ -203,7 +219,7 @@ public class PhoneNumberUtils
             }
         }
 
-        return number;
+        return checkAndAppendPrefix(intent, subscription, number, context);
     }
 
     /** Extracts the network address portion and canonicalizes
