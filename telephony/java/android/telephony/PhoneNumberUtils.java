@@ -308,6 +308,8 @@ public class PhoneNumberUtils
                 ret.append(digit);
             } else if (isNonSeparator(c)) {
                 ret.append(c);
+            } else if(c == 'P' || c == 'p' || c == 'W' || c == 'w') {
+                ret.append(c);
             }
         }
 
@@ -975,6 +977,7 @@ public class PhoneNumberUtils
             case 0xb: return '#';
             case 0xc: return PAUSE;
             case 0xd: return WILD;
+            case 0xe: return WAIT;
 
             default: return 0;
         }
@@ -992,6 +995,8 @@ public class PhoneNumberUtils
             return 0xc;
         } else if (c == WILD) {
             return 0xd;
+        } else if (c == WAIT){
+            return 0xe;
         } else {
             throw new RuntimeException ("invalid char for BCD " + c);
         }
