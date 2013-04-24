@@ -2331,6 +2331,12 @@ public final class Settings {
         public static final String POINTER_SPEED = "pointer_speed";
 
         /**
+         * @hide
+         * Whether FastPowerOn is enabled
+         */
+        public static final String ENABLE_FAST_POWERON = "enable_fast_poweron";
+
+        /**
          * Settings to backup. This is here so that it's in the same place as the settings
          * keys and easy to update.
          *
@@ -2398,7 +2404,8 @@ public final class Settings {
             SIP_RECEIVE_CALLS,
             POINTER_SPEED,
             VIBRATE_WHEN_RINGING,
-            VIBRATE_WHEN_RINGING2
+            VIBRATE_WHEN_RINGING2,
+            ENABLE_FAST_POWERON
         };
 
         // Settings moved to Settings.Secure
