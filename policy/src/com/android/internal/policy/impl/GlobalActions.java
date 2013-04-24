@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +38,7 @@ import android.media.AudioManager;
 import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IPowerManager;
 import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -103,6 +105,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
     private boolean mHasTelephony;
     private boolean mHasVibrator;
     private final boolean mShowSilentToggle;
+    private boolean mEnableFastPowerOn;
 
     /**
      * @param context everything needs a context :(
@@ -234,32 +237,55 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         onAirplaneModeChanged();
 
         mItems = new ArrayList<Action>();
+        mEnableFastPowerOn = Settings.System.getInt(
+                                mContext.getContentResolver(),
+                                Settings.System.ENABLE_FAST_POWERON, 0) == 1;
+        if (mEnableFastPowerOn) {
+            // add: fastboot
+            mItems.add(
+                new SinglePressAction(
+                        com.android.internal.R.drawable.ic_lock_power_off,
+                        R.string.global_action_power_off) {
 
-        // first: power off
-        mItems.add(
-            new SinglePressAction(
-                    com.android.internal.R.drawable.ic_lock_power_off,
-                    R.string.global_action_power_off) {
+                    public void onPress() {
+                        startFastBoot();
+                    }
 
-                public void onPress() {
-                    // shutdown by making sure radio and power are handled accordingly.
-                    mWindowManagerFuncs.shutdown(true);
-                }
+                    public boolean showDuringKeyguard() {
+                        return true;
+                    }
 
-                public boolean onLongPress() {
-                    mWindowManagerFuncs.rebootSafeMode(true);
-                    return true;
-                }
+                    public boolean showBeforeProvisioning() {
+                        return true;
+                    }
+                });
+        } else {
+            // first: power off
+            mItems.add(
+                new SinglePressAction(
+                        com.android.internal.R.drawable.ic_lock_power_off,
+                        R.string.global_action_power_off) {
 
-                public boolean showDuringKeyguard() {
-                    return true;
-                }
+                    public void onPress() {
+                        // shutdown by making sure radio and power are handled
+                        // accordingly.
+                        mWindowManagerFuncs.shutdown(true);
+                    }
 
-                public boolean showBeforeProvisioning() {
-                    return true;
-                }
-            });
+                    public boolean onLongPress() {
+                        mWindowManagerFuncs.rebootSafeMode(true);
+                        return true;
+                    }
 
+                    public boolean showDuringKeyguard() {
+                        return true;
+                    }
+
+                    public boolean showBeforeProvisioning() {
+                        return true;
+                    }
+                });
+        }
         // next: airplane mode
         mItems.add(mAirplaneModeOn);
 
@@ -918,6 +944,19 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
         if (!mHasTelephony) {
             mAirplaneState = on ? ToggleAction.State.On : ToggleAction.State.Off;
+        }
+    }
+
+    /**
+     * Start Fast Boot
+     */
+    private void startFastBoot() {
+        synchronized (this) {
+            mAudioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+            Intent intent = new Intent(Intent.ACTION_FAST_BOOT_START);
+            intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+            intent.putExtra("state", true);
+            mContext.sendBroadcast(intent);
         }
     }
 
