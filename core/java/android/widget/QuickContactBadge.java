@@ -308,8 +308,11 @@ public class QuickContactBadge extends ImageView implements OnClickListener {
                         QuickContact.MODE_LARGE, mExcludeMimes);
             } else if (createUri != null) {
                 // Prompt user to add this person to contacts
-                final Intent intent = new Intent(Intents.SHOW_OR_CREATE_CONTACT, createUri);
-                getContext().startActivity(intent);
+                // if message is browser information,don't add to contacts.
+                if (!createUri.toString().equals("tel:Browser%20Information")) {
+                    final Intent intent = new Intent(Intents.SHOW_OR_CREATE_CONTACT, createUri);
+                    getContext().startActivity(intent);
+                }
             }
         }
     }
