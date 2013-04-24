@@ -2090,6 +2090,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
                     R.bool.def_vibrate_after_connected);
 
+            loadBooleanSetting(stmt, Settings.System.AUTO_TIME_GPS,
+                    R.bool.def_auto_time_gps); // Sync time to GPS  
+
         } finally {
             if (stmt != null) stmt.close();
         }

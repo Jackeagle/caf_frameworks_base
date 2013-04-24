@@ -2117,6 +2117,13 @@ public final class Settings {
         public static final String DATE_FORMAT = "date_format";
 
         /**
+         * Value to specify if the user prefers the date, time and time zone
+         * to be automatically fetched from the GPS. 1=yes, 0=no
+           @hide
+         */
+        public static final String AUTO_TIME_GPS = "auto_time_gps";
+
+        /**
          * Whether the setup wizard has been run before (on first boot), or if
          * it still needs to be run.
          *
