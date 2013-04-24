@@ -51,8 +51,7 @@ class StrictModeFlash {
     }
 
     private void drawIfNeeded() {
-        //if (!mDrawNeeded) {
-        if (true) {
+        if (!mDrawNeeded) {
             return;
         }
         mDrawNeeded = false;
