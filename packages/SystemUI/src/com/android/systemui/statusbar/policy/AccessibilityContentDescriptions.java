@@ -15,6 +15,7 @@ public class AccessibilityContentDescriptions {
         R.string.accessibility_phone_one_bar,
         R.string.accessibility_phone_two_bars,
         R.string.accessibility_phone_three_bars,
+        R.string.accessibility_phone_signal_full,
         R.string.accessibility_phone_signal_full
     };
 
@@ -23,6 +24,7 @@ public class AccessibilityContentDescriptions {
         R.string.accessibility_data_one_bar,
         R.string.accessibility_data_two_bars,
         R.string.accessibility_data_three_bars,
+        R.string.accessibility_data_signal_full,
         R.string.accessibility_data_signal_full
     };
 

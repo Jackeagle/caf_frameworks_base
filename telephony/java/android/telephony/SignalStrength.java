@@ -41,10 +41,13 @@ public class SignalStrength implements Parcelable {
     /** @hide */
     public static final int SIGNAL_STRENGTH_GREAT = 4;
     /** @hide */
-    public static final int NUM_SIGNAL_STRENGTH_BINS = 5;
+    public static final int SIGNAL_STRENGTH_EXCELLENT = 5;
+    /** @hide */
+    public static final int NUM_SIGNAL_STRENGTH_BINS = 6;
+
     /** @hide */
     public static final String[] SIGNAL_STRENGTH_NAMES = {
-        "none", "poor", "moderate", "good", "great"
+        "none", "poor", "moderate", "good", "great" , "excellent"
     };
 
     /** @hide */
@@ -473,8 +476,10 @@ public class SignalStrength implements Parcelable {
 
         if (isGsm) {
             level = getLteLevel();
+	    log("getLteLevel=" + level);
             if (level == SIGNAL_STRENGTH_NONE_OR_UNKNOWN) {
                 level = getTdScdmaLevel();
+				log("getTdScdmaLevel=" + level);
                 if (level == SIGNAL_STRENGTH_NONE_OR_UNKNOWN) {
                     level = getGsmLevel();
                 }
@@ -593,10 +598,11 @@ public class SignalStrength implements Parcelable {
         // signal, its better to show 0 bars to the user in such cases.
         // asu = 99 is a special case, where the signal strength is unknown.
         int asu = getGsmSignalStrength();
-        if (asu <= 2 || asu == 99) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
-        else if (asu >= 12) level = SIGNAL_STRENGTH_GREAT;
-        else if (asu >= 8)  level = SIGNAL_STRENGTH_GOOD;
-        else if (asu >= 5)  level = SIGNAL_STRENGTH_MODERATE;
+        if (asu <= 0 || asu == 99) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        else if (asu >= 12) level = SIGNAL_STRENGTH_EXCELLENT;
+        else if (asu >= 9)  level = SIGNAL_STRENGTH_GREAT;
+        else if (asu >= 7)  level = SIGNAL_STRENGTH_GOOD;
+        else if (asu >= 4)  level = SIGNAL_STRENGTH_MODERATE;
         else level = SIGNAL_STRENGTH_POOR;
         if (DBG) log("getGsmLevel=" + level);
         return level;
@@ -862,14 +868,15 @@ public class SignalStrength implements Parcelable {
     public int getTdScdmaLevel() {
         final int tdScdmaDbm = getTdScdmaDbm();
         int level;
+       if (DBG) log("getTdScdmatdScdmaDbm = " + tdScdmaDbm);
 
         if ((tdScdmaDbm > -25) || (tdScdmaDbm == SignalStrength.INVALID))
                 level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
-        else if (tdScdmaDbm >= -49) level = SIGNAL_STRENGTH_GREAT;
-        else if (tdScdmaDbm >= -73) level = SIGNAL_STRENGTH_GOOD;
-        else if (tdScdmaDbm >= -97) level = SIGNAL_STRENGTH_MODERATE;
-        else if (tdScdmaDbm >= -120) level = SIGNAL_STRENGTH_POOR;
-        else level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        else if (tdScdmaDbm >= -82) level = SIGNAL_STRENGTH_EXCELLENT;
+        else if (tdScdmaDbm >= -88) level = SIGNAL_STRENGTH_GREAT;
+        else if (tdScdmaDbm >= -94) level = SIGNAL_STRENGTH_GOOD;
+        else if (tdScdmaDbm >= -105) level = SIGNAL_STRENGTH_MODERATE;
+        else level = SIGNAL_STRENGTH_POOR;
 
         if (DBG) log("getTdScdmaLevel = " + level);
         return level;

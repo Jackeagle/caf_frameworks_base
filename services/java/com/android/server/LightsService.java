@@ -26,6 +26,8 @@ import android.util.Slog;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+//add KEY_BACKLIGHT import. --xst
+import android.provider.Settings;
 
 public class LightsService {
     private static final String TAG = "LightsService";
@@ -62,19 +64,36 @@ public class LightsService {
         private Light(int id) {
             mId = id;
         }
-
+     
         public void setBrightness(int brightness) {
             setBrightness(brightness, BRIGHTNESS_MODE_USER);
         }
 
         public void setBrightness(int brightness, int brightnessMode) {
             synchronized (this) {
+			    //make sure the button back lights is dark when the lcd is dark. --xst
+                if(LIGHT_ID_BACKLIGHT == mId && brightness == 0){
+                   setLightLocked(0, LIGHT_FLASH_NONE, 0, 0, BRIGHTNESS_MODE_USER);
+                }
                 int color = brightness & 0x000000ff;
                 color = 0xff000000 | (color << 16) | (color << 8) | color;
                 setLightLocked(color, LIGHT_FLASH_NONE, 0, 0, brightnessMode);
             }
         }
-
+        //get the button back lights settings mode . --xst
+        public int getButtonBackLightsMode(){
+           return Settings.System.getInt(mContext.getContentResolver(),  Settings.System.KEY_BACKLIGHT, 1);
+        }
+		//set the button back lights switch . --xst
+        public void setButtonBackLightsOn(boolean on){
+           Slog.v("xst", "LightService--setButtonBackLightsOn="+on);
+           if(on == true){
+              setBrightness(127);
+           }
+           else{
+              setBrightness(0);
+           }
+        }
         public void setColor(int color) {
             synchronized (this) {
                 setLightLocked(color, LIGHT_FLASH_NONE, 0, 0, 0);

@@ -67,6 +67,8 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 
 import libcore.util.Objects;
+import android.util.Slog;
+
 
 /**
  * The power manager service is responsible for coordinating power management
@@ -181,6 +183,8 @@ public final class PowerManagerService extends IPowerManager.Stub
     private SettingsObserver mSettingsObserver;
     private DreamManagerService mDreamManager;
     private LightsService.Light mAttentionLight;
+    //add button light control in lightService. -- xst
+    private LightsService.Light mButtonLight;
 
     private final Object mLock = new Object();
 
@@ -355,6 +359,8 @@ public final class PowerManagerService extends IPowerManager.Stub
     // Time when we last logged a warning about calling userActivity() without permission.
     private long mLastWarningAboutUserActivityPermission = Long.MIN_VALUE;
 
+    //Add  variable for button back light . -- xst
+    private int mButtonLightMode = 1 ;
     //track the blocked uids.
     private final ArrayList<Integer> mBlockedUids = new ArrayList<Integer>();
 
@@ -444,6 +450,8 @@ public final class PowerManagerService extends IPowerManager.Stub
                     createSuspendBlockerLocked("PowerManagerService.WirelessChargerDetector"));
             mSettingsObserver = new SettingsObserver(mHandler);
             mAttentionLight = mLightsService.getLight(LightsService.LIGHT_ID_ATTENTION);
+            //add button back light control function . --xst
+            mButtonLight = mLightsService.getLight(LightsService.LIGHT_ID_BUTTONS);
 
             // Register for broadcasts from other components of the system.
             IntentFilter filter = new IntentFilter();
@@ -490,7 +498,10 @@ public final class PowerManagerService extends IPowerManager.Stub
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.SCREEN_BRIGHTNESS_MODE),
                     false, mSettingsObserver, UserHandle.USER_ALL);
-
+            //add contentObserver for key back light . -- xst
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                     Settings.System.KEY_BACKLIGHT),
+                     false, mSettingsObserver, UserHandle.USER_ALL);
             // Go.
             readConfigurationLocked();
             updateSettingsLocked();
@@ -556,6 +567,17 @@ public final class PowerManagerService extends IPowerManager.Stub
                 Settings.System.SCREEN_BRIGHTNESS_MODE,
                 Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL, UserHandle.USER_CURRENT);
 
+        //get the key back light values . -- xst
+        mButtonLightMode = Settings.System.getIntForUser(resolver,
+        Settings.System.KEY_BACKLIGHT, 1, UserHandle.USER_CURRENT);
+        if(isScreenOn()){
+           if(mButtonLightMode == 1){
+              mButtonLight.setButtonBackLightsOn(true);
+           }
+           else if(mButtonLightMode == 0){
+              mButtonLight.setButtonBackLightsOn(false);
+           }
+        }		
         mDirty |= DIRTY_SETTINGS;
     }
 
