@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,14 @@ public class AudioFormat {
     public static final int ENCODING_EVRCB = 103;   // accessed by native code
     /** @hide */
     public static final int ENCODING_EVRCWB = 104;  // accessed by native code
+
+    public static final int ENCODING_PCM_16BIT_DIRECT = 105;
+
+    public static final int ENCODING_PCM_24BIT_DIRECT = 106;
+
+    public static final int ENCODING_AC3 = 107;
+
+    public static final int ENCODING_EAC3 = 108;
 
     /** Invalid audio channel configuration */
     /** @deprecated use CHANNEL_INVALID instead  */
