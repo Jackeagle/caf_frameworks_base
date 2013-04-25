@@ -2925,20 +2925,6 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 int lastAudibleIndex = Settings.System.getIntForUser(
                         mContentResolver, name, defaultIndex, UserHandle.USER_CURRENT);
 
-                // a last audible index of 0 should never be stored for ring and notification
-                // streams on phones (voice capable devices).
-                if ((lastAudibleIndex == 0) && mVoiceCapable &&
-                                (mStreamVolumeAlias[mStreamType] == AudioSystem.STREAM_RING)) {
-                    lastAudibleIndex = AudioManager.DEFAULT_STREAM_VOLUME[mStreamType];
-                    // Correct the data base
-                    sendMsg(mAudioHandler,
-                            MSG_PERSIST_VOLUME,
-                            SENDMSG_QUEUE,
-                            PERSIST_LAST_AUDIBLE,
-                            device,
-                            this,
-                            PERSIST_DELAY);
-                }
                 mLastAudibleIndex.put(device, getValidIndex(10 * lastAudibleIndex));
                 // the initial index should never be 0 for ring and notification streams on phones
                 // (voice capable devices) if not in silent or vibrate mode.
