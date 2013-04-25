@@ -544,15 +544,18 @@ public final class CallManager {
         int mode = AudioManager.MODE_NORMAL;
         int inCallMode = 0; // inCallMode is a bitmap. Clearing all bits
 
-        Log.d(LOG_TAG, "setAudioAndInCall state: " + getState());
+        if (VDBG) Log.d(LOG_TAG, "setAudioAndInCall state: " + getState());
         switch (getState()) {
             case RINGING:
                 mode = AudioManager.MODE_RINGTONE;
+                if (audioManager.getMode() != mode) {
+                    Log.d(LOG_TAG, "Calling setMode( " + mode + ") RINGTONE");
+                    audioManager.setMode(mode);
+                }
                 break;
-            case OFFHOOK: {
+            case OFFHOOK:
                 // For off-hook we need to set in-call mode to notify of the state
                 // of ims and cs.
-
                 for (Phone phone: mPhones) {
                     if (phone instanceof SipPhone) {
                         // enable IN_COMMUNICATION audio mode for sipPhone
@@ -561,21 +564,28 @@ public final class CallManager {
                         inCallMode |= inCallAudioModeForPhone(phone);
                     }
                 }
-
+                if (isInCallModeActive(inCallMode)) {
+                    Log.d(LOG_TAG, "Calling setInCallMode(" + inCallModeToString(inCallMode) + ")");
+                    if (inCallMode != audioManager.getInCallMode()) {
+                        audioManager.setInCallMode(inCallMode);
+                    }
+                } else {
+                    if (mode == AudioManager.MODE_IN_COMMUNICATION) {
+                        if (audioManager.getMode() != mode) {
+                            Log.d(LOG_TAG, "Calling setMode( " + mode + ") OFFHOOK");
+                            audioManager.setMode(mode);
+                        }
+                    }
+                }
                 break;
-            }
+            case IDLE:
+                if (audioManager.getMode() != mode) {
+                    Log.d(LOG_TAG, "Calling setMode( " + mode + ") IDLE");
+                    audioManager.setMode(mode);
+                }
+                break;
         }
-
-        Log.d(LOG_TAG, "setAudioAndInCallMode inCallMode = " + inCallMode);
-        if (isInCallModeActive(inCallMode)) {
-            Log.d(LOG_TAG, "Calling setInCallMode(" + inCallModeToString(inCallMode) + ")");
-            if (inCallMode != audioManager.getInCallMode()) {
-                audioManager.setInCallMode(inCallMode);
-            }
-        } else {
-            Log.d(LOG_TAG, "Calling setMode( " + mode + ")");
-            if (audioManager.getMode() != mode) audioManager.setMode(mode);
-        }
+        Log.d(LOG_TAG, "setAudioAndInCall end state: " + getState());
     }
 
     public void setAudioMode() {
