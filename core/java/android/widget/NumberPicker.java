@@ -675,6 +675,14 @@ public class NumberPicker extends LinearLayout {
                 } else {
                     mInputText.setSelection(0, 0);
                     validateInputTextView(v);
+                    // When mInputText isn't focused, hide the soft input.
+                    InputMethodManager inputMethodManager = InputMethodManager
+                            .peekInstance();
+                    if (inputMethodManager != null
+                            && inputMethodManager.isActive(mInputText)) {
+                        inputMethodManager.hideSoftInputFromWindow(
+                                getWindowToken(), 0);
+                    }
                 }
             }
         });
