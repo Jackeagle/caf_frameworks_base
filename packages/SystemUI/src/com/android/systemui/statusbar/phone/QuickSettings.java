@@ -484,7 +484,7 @@ class QuickSettings {
                             state.label));
                 }
             });
-            ///if( !(MSimTelephonyManager.getDefault().isMultiSimEnabled()))//this icon doesn't fit MultiSim for now.
+            if( !(MSimTelephonyManager.getDefault().isMultiSimEnabled()))//this icon doesn't fit MultiSim for now.
                 parent.addView(rssiTile);
         }
 
