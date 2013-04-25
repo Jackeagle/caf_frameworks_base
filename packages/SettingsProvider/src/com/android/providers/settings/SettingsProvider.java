@@ -449,7 +449,7 @@ public class SettingsProvider extends ContentProvider {
                     String value = c.getString(1);
                     cache.populate(name, value);
                     //Setting properties to work around media streaming issue
-                    if(table.equals("secure") && name.indexOf("proxy") > -1)SystemProperties.set(name.replace("exclusion","excl").replace("global_","net.").replace("_","."),value);
+                    if(table.equals("global") && name.indexOf("proxy") > -1)SystemProperties.set(name.replace("exclusion","excl").replace("global_","net.").replace("_","."),value);
                 }
                 if (rows > MAX_CACHE_ENTRIES) {
                     // Somewhat redundant, as removeEldestEntry() will
