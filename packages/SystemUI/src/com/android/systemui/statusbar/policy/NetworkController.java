@@ -77,6 +77,7 @@ public class NetworkController extends BroadcastReceiver {
     private TelephonyManager mPhone;
     boolean mDataConnected;
     boolean isRoam = false;
+    boolean isLastRoam =false;
 
     IccCardConstants.State mSimState = IccCardConstants.State.READY;
     int mPhoneState = TelephonyManager.CALL_STATE_IDLE;
@@ -625,8 +626,10 @@ public class NetworkController extends BroadcastReceiver {
                 // Though mPhone is a Manager, this call is not an IPC
                 if ((isCdma() && isCdmaEri()) || mPhone.isNetworkRoaming()) {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_ROAMING[mInetCondition];
+                    isRoam=true;
                 } else {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH[mInetCondition];
+                    isRoam=false;
                 }
 
                 mPhoneSignalIconId = iconList[iconLevel];
@@ -1291,6 +1294,7 @@ public class NetworkController extends BroadcastReceiver {
 
         if (mLastPhoneSignalIconId          != mPhoneSignalIconId
          || mLastDataDirectionOverlayIconId != combinedActivityIconId
+         || isLastRoam != isRoam
          || mLastWifiIconId                 != mWifiIconId
          || mLastWimaxIconId                != mWimaxIconId
          || mLastDataTypeIconId             != mDataTypeIconId
@@ -1307,7 +1311,9 @@ public class NetworkController extends BroadcastReceiver {
                 notifySignalsChangedCallbacks(cb);
             }
         }
-	
+	    if (isLastRoam != isRoam) {
+            isLastRoam = isRoam;
+        }
 
         if (mLastAirplaneMode != mAirplaneMode) {
             mLastAirplaneMode = mAirplaneMode;

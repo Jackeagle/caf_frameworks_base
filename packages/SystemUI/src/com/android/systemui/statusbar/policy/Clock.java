@@ -59,7 +59,7 @@ public class Clock extends TextView {
     private static final int AM_PM_STYLE_SMALL   = 1;
     private static final int AM_PM_STYLE_GONE    = 2;
 
-    private static final int AM_PM_STYLE = AM_PM_STYLE_GONE;
+    private static final int AM_PM_STYLE = AM_PM_STYLE_NORMAL;
 
     public Clock(Context context) {
         this(context, null);
@@ -113,6 +113,7 @@ public class Clock extends TextView {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
+            Slog.d("clock","onReceive action="+action);
             if (action.equals(Intent.ACTION_TIMEZONE_CHANGED)) {
                 String tz = intent.getStringExtra("time-zone");
                 mCalendar = Calendar.getInstance(TimeZone.getTimeZone(tz));
@@ -132,6 +133,7 @@ public class Clock extends TextView {
 
     final void updateClock() {
         mCalendar.setTimeInMillis(System.currentTimeMillis());
+        Slog.d("clock","updateClock time="+getSmallTime());
         setText(getSmallTime());
     }
 

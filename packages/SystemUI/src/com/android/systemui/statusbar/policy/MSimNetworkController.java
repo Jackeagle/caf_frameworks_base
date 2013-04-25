@@ -831,6 +831,7 @@ public class MSimNetworkController extends NetworkController {
 	 if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
             String networkName = mPhone.getNetworkName(subscription);
             mMSimNetworkName[subscription] = networkName == null ? mNetworkNameDefault : networkName;
+            Slog.d("CarrierLabel", "updateNetworkName networkName["+subscription+"] =" + networkName);
         }
 	else{
         StringBuilder str = new StringBuilder();
@@ -931,7 +932,8 @@ public class MSimNetworkController extends NetworkController {
                     mobileLabel = mMSimNetworkName[subscription];
                 } else {
                     mobileLabel = "";
-                }
+                }                
+                if (DEBUG)Slog.d("CarrierLabel", "updateNetworkName mobileLabel["+subscription+"] =" + mobileLabel+"  mMSimServiceState[subscription]="+mMSimServiceState[subscription]);
             } else {
                 mobileLabel
                     = context.getString(R.string.status_bar_settings_signal_meter_disconnected);

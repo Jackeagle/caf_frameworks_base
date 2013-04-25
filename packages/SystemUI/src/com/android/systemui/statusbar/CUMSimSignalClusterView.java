@@ -77,6 +77,7 @@ public class CUMSimSignalClusterView
     private boolean[] mMNoSimIconVisiable;
     private boolean[] mSignalIconVisiable;
     private ServiceState[] mServiceState;
+    private boolean[] isSimRoam;
 
     ViewGroup mWifiGroup, mMobileGroup, mMobileGroupSub2;
     ImageView mWifi, mWifiActivity, mMobile, mMobileActivity, mMobileType, mAirplane;
@@ -105,6 +106,7 @@ public class CUMSimSignalClusterView
         mMobileActivityId = new int[numPhones];
         mServiceState = new ServiceState[numPhones];
         mNoSimIconId = new int[numPhones];
+        isSimRoam = new boolean[numPhones];
         mMNoSimIconVisiable = new boolean[numPhones];
         mSignalIconVisiable = new boolean[numPhones];
         for(int i=0; i < numPhones; i++) {
@@ -114,6 +116,7 @@ public class CUMSimSignalClusterView
             mNoSimIconId[i] = 0;
             mMNoSimIconVisiable[i] = false;
             mSignalIconVisiable[i] = false;
+            isSimRoam[i] = false;
             mServiceState[i] = new ServiceState();
         }
     }
@@ -182,7 +185,8 @@ public class CUMSimSignalClusterView
             int noSimIcon, int subscription, ServiceState simServiceState,boolean isRoam,boolean dataConnect) {
         if(DEBUG)Log.i("twfx","data activity sub= "+subscription +" setMobileDataIndicators");
 	        mServiceState[subscription] = simServiceState;
-        mMobileVisible = visible;
+        mMobileVisible = visible;		
+        isSimRoam[subscription] = isRoam;
         mMobileStrengthId[subscription] = convertStrengthIconIdToCU(strengthIcon[0], subscription);
         mMobileTypeId[subscription] = convertMobileTypeIconIdToCU(typeIcon);
         mMobileActivityId[subscription] = convertMobileActivityIconIdToCU(typeIcon,activityIcon,subscription);
@@ -392,22 +396,34 @@ public class CUMSimSignalClusterView
         case ServiceState.RIL_RADIO_TECHNOLOGY_IS95B:
         case ServiceState.RIL_RADIO_TECHNOLOGY_1xRTT:
         case ServiceState.RIL_RADIO_TECHNOLOGY_GPRS:
-        case ServiceState.RIL_RADIO_TECHNOLOGY_EDGE:
-            return TelephonyIcons.MULTI_SIGNAL_IMAGES_G[subscription][inetCondition][level];
+        case ServiceState.RIL_RADIO_TECHNOLOGY_EDGE:		
+            if(isSimRoam[subscription])
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_R_G[subscription][inetCondition][level];
+            else
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_G[subscription][inetCondition][level];
         case ServiceState.RIL_RADIO_TECHNOLOGY_LTE:
         case ServiceState.RIL_RADIO_TECHNOLOGY_UMTS:
         case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_0:
         case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_A:
         case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_B:
-        case ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD:
-            return TelephonyIcons.MULTI_SIGNAL_IMAGES_3G[subscription][inetCondition][level];
+        case ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD:		
+            if(isSimRoam[subscription])
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_R_3G[subscription][inetCondition][level];
+            else
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_3G[subscription][inetCondition][level];
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSDPA:
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSUPA:
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:
-        case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:
-            return TelephonyIcons.MULTI_SIGNAL_IMAGES_H[subscription][inetCondition][level];
-        default:
-            return TelephonyIcons.MULTI_SIGNAL_IMAGES_G[subscription][inetCondition][level];
+        case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:		
+            if(isSimRoam[subscription])
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_R_H[subscription][inetCondition][level];
+            else
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_H[subscription][inetCondition][level];
+        default:		
+            if(isSimRoam[subscription])
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_R_G[subscription][inetCondition][level];
+            else
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_G[subscription][inetCondition][level];
         }
     }
 	
