@@ -45,6 +45,7 @@ public class WifiSsid implements Parcelable {
 
     private static final int HEX_RADIX = 16;
     public static final String NONE = "<unknown ssid>";
+	private String SSID;
 
     private WifiSsid() {
     }
@@ -158,6 +159,7 @@ public class WifiSsid implements Parcelable {
                     break;
             }
         }
+		SSID = asciiEncoded;
     }
 
     @Override
@@ -179,7 +181,7 @@ public class WifiSsid implements Parcelable {
         if (result.isError()) {
             return NONE;
         }
-        return out.toString();
+        return SSID;
     }
 
     private boolean isArrayAllZeroes(byte[] ssidBytes) {
@@ -213,6 +215,7 @@ public class WifiSsid implements Parcelable {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeInt(octets.size());
         dest.writeByteArray(octets.toByteArray());
+		dest.writeString(SSID);
     }
 
     /** Implement the Parcelable interface {@hide} */
@@ -224,6 +227,7 @@ public class WifiSsid implements Parcelable {
                 byte b[] = new byte[length];
                 in.readByteArray(b);
                 ssid.octets.write(b, 0, length);
+				ssid.SSID = in.readString();
                 return ssid;
             }
 
