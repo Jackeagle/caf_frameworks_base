@@ -149,7 +149,7 @@ public class WifiNative {
 
     public boolean setNetworkVariable(int netId, String name, String value) {
         if (TextUtils.isEmpty(name) || TextUtils.isEmpty(value)) return false;
-        return doBooleanCommand("SET_NETWORK " + netId + " " + name + " " + value);
+        return setNetworkVariableCommand(mInterface, netId, name, value);
     }
 
     public String getNetworkVariable(int netId, String name) {
@@ -399,6 +399,8 @@ public class WifiNative {
         // Make sure we never write out a value for AP_SCAN other than 1
         return doBooleanCommand("AP_SCAN 1") && doBooleanCommand("SAVE_CONFIG");
     }
+
+	private native boolean setNetworkVariableCommand(String iface, int netId, String name, String value);
 
     public boolean setScanResultHandling(int mode) {
         return doBooleanCommand("AP_SCAN " + mode);
