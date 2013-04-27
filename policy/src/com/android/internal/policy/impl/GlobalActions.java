@@ -259,7 +259,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             });
 		
 		// add: fastpoweron
-		if (mEnableFastPowerOn) {
+		if (SystemProperties.getInt("ro.cmcc.test", 0) == 0) {
 			 mItems.add(
 				 new SinglePressHasSumraryAction(
 						 com.android.internal.R.drawable.ic_lock_power_off,
