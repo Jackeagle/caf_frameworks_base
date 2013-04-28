@@ -61,6 +61,11 @@ import android.os.PowerManager;
 
 import java.util.ArrayList;
 
+import com.qrd.plugin.feature_query.DefaultQuery;
+import com.qrd.plugin.feature_query.FeatureQuery;
+
+
+
 /**
  * Watches for updates that may be interesting to the keyguard, and provides
  * the up to date information as well as a registration for callbacks that care
@@ -404,6 +409,10 @@ public class KeyguardUpdateMonitor {
         filter.addAction(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
         filter.addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED);
         filter.addAction(TelephonyIntents.SPN_STRINGS_UPDATED_ACTION);
+        if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+            filter.addAction(TelephonyIntents.ACTION_SERVICE_STATE_CHANGED);
+        }
+
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         filter.addAction(DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED);
         filter.addAction(Intent.ACTION_USER_REMOVED);
@@ -615,6 +624,18 @@ public class KeyguardUpdateMonitor {
      * Handle {@link #MSG_CARRIER_INFO_UPDATE}
      */
     private void handleCarrierInfoUpdate(int subscription) {
+        if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+            //when plmn is not empty, lock screen will show plmn, so here we only
+            //need to update plmn and ensure it is not empty
+            String networkName = null;
+            if (TelephonyManager.isMultiSimEnabled()) {
+                networkName = MSimTelephonyManager.getDefault().getNetworkName(subscription);
+            } else {
+                networkName = TelephonyManager.getDefault().getNetworkName();
+            }
+            mTelephonyPlmn[subscription] = networkName == null ? getDefaultPlmn() : networkName;
+            mTelephonySpn[subscription] = "";//add by sunzhe ,carrierlabel only use getNetworkName();don't care if plmn or spn
+        }
         Log.d(TAG, "handleCarrierInfoUpdate: plmn = " + mTelephonyPlmn[subscription]
                 + ", spn = " + mTelephonySpn[subscription] + ", subscription = " + subscription);
 

@@ -1908,7 +1908,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 								if (!switchTo.isConnectedOrConnecting() || net.isTeardownRequested()) {
 									log(" ok getMobileDataEnabled=" + getMobileDataEnabled());
 									if( getMobileDataEnabled() ) {
-										//net.reconnect();	 //reconnect if ppp button has already on
+										net.reconnect();	 //reconnect if ppp button has already on
 									} else {
 										setMobileDataEnabled(true); 
 										//net.reconnect();
@@ -1918,7 +1918,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 							}
 				        } else {
 						    log(" cancel getMobileDataEnabled=" + getMobileDataEnabled());
-							//setMobileDataEnabled(false);
+							if( getMobileDataEnabled()) setMobileDataEnabled(false);
 						}
 						mWifiDisconnectDlg = null;
 					}

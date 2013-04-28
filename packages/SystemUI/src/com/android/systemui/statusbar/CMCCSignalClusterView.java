@@ -72,13 +72,13 @@ public class CMCCSignalClusterView
     private int mMobileTypeId;
     private int mNoSimIconId;
     private boolean mIsAirplaneMode = false;
-	private int mAirplaneIconId = 0;
+    private int mAirplaneIconId = 0;
     private String mWifiDescription, mMobileTypeDescription;
     private String mMobileDescription;
     private boolean mMNoSimIconVisiable=false;
     private boolean mSignalIconVisiable=false;
     private ServiceState mServiceState;
-
+    private boolean isSimRoam;
     ViewGroup mWifiGroup, mMobileGroup;
     ImageView mWifi, mWifiActivity, mMobile, mMobileActivity, mMobileType, mAirplane;
     ImageView mNoSimSlot;
@@ -95,8 +95,8 @@ public class CMCCSignalClusterView
 
     public CMCCSignalClusterView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle); 
-	mContext = context;
-	mServiceState = new ServiceState();
+        mContext = context;
+        mServiceState = new ServiceState();
     }
 
     public void setNetworkController(MSimNetworkController nc) {
@@ -149,9 +149,10 @@ public class CMCCSignalClusterView
             int typeIcon, String contentDescription, String typeContentDescription,
             int noSimIcon,  ServiceState simServiceState,boolean isRoam,boolean dataConnect) {
         
-       Log.i(TAG, "setMobileDataIndicators=simServiceState111=" +simServiceState );
-       Log.i(TAG, "setMobileDataIndicators=mServiceState111=" +mServiceState );
+        Log.i(TAG, "setMobileDataIndicators=simServiceState111=" +simServiceState );
+        Log.i(TAG, "setMobileDataIndicators=mServiceState111=" +mServiceState );
 	 mServiceState = simServiceState;
+        isSimRoam = isRoam;
 	 Log.i(TAG, "setMobileDataIndicators=mServiceState222=" +mServiceState );
         mMobileVisible = visible;
         mMobileStrengthId = convertStrengthIconIdToCMCC(strengthIcon, 0);
@@ -343,20 +344,32 @@ public class CMCCSignalClusterView
         case ServiceState.RIL_RADIO_TECHNOLOGY_IS95B:
         case ServiceState.RIL_RADIO_TECHNOLOGY_1xRTT:
         case ServiceState.RIL_RADIO_TECHNOLOGY_GPRS:
-	 case ServiceState.RIL_RADIO_TECHNOLOGY_UMTS:
-            return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_G[inetCondition][level];
+        case ServiceState.RIL_RADIO_TECHNOLOGY_UMTS:
+            if(isSimRoam){
+                return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_R_G[inetCondition][level];}
+			else{
+                return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_G[inetCondition][level];}
         case ServiceState.RIL_RADIO_TECHNOLOGY_LTE:
-	 case ServiceState.RIL_RADIO_TECHNOLOGY_HSDPA:
+        case ServiceState.RIL_RADIO_TECHNOLOGY_HSDPA:
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSUPA:
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:
-	 case ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA:
-            return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_3G[inetCondition][level];
-	 case ServiceState.RIL_RADIO_TECHNOLOGY_EDGE:
-	 case ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD:
-           return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_E[inetCondition][level];
+        case ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA:
+            if(isSimRoam){
+                return  TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_R_3G[inetCondition][level];}
+            else{
+                return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_3G[inetCondition][level];}
+        case ServiceState.RIL_RADIO_TECHNOLOGY_EDGE:
+        case ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD:
+            if(isSimRoam){
+                return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_R_E[inetCondition][level];}
+            else{
+                return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_E[inetCondition][level];}
         default:
-            return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_G[inetCondition][level];
+            if(isSimRoam){
+                return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_R_G[inetCondition][level];}
+            else{
+                return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_G[inetCondition][level];}
         }
     }
    private int convertMobileActivityIconIdToCMCC(int typeicon, int activityicon) {

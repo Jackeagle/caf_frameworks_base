@@ -78,6 +78,8 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 
+import android.telephony.MSimTelephonyManager;
+
 
 /**
  *
@@ -449,7 +451,7 @@ class QuickSettings {
         if (mModel.deviceHasMobileData()) {
             // RSSI
             QuickSettingsTileView rssiTile = (QuickSettingsTileView)
-                    inflater.inflate(R.layout.quick_settings_tile, parent, false);
+            inflater.inflate(R.layout.quick_settings_tile, parent, false);
             rssiTile.setContent(R.layout.quick_settings_tile_rssi, inflater);
             rssiTile.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -482,7 +484,8 @@ class QuickSettings {
                             state.label));
                 }
             });
-            parent.addView(rssiTile);
+            if( !(MSimTelephonyManager.getDefault().isMultiSimEnabled()))//this icon doesn't fit MultiSim for now.
+                parent.addView(rssiTile);
         }
 
         // Rotation Lock

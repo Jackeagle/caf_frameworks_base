@@ -831,6 +831,7 @@ public class MSimNetworkController extends NetworkController {
 	 if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
             String networkName = mPhone.getNetworkName(subscription);
             mMSimNetworkName[subscription] = networkName == null ? mNetworkNameDefault : networkName;
+            Slog.d("CarrierLabel", "updateNetworkName networkName["+subscription+"] =" + networkName);
         }
 	else{
         StringBuilder str = new StringBuilder();
@@ -931,7 +932,8 @@ public class MSimNetworkController extends NetworkController {
                     mobileLabel = mMSimNetworkName[subscription];
                 } else {
                     mobileLabel = "";
-                }
+                }                
+                if (DEBUG)Slog.d("CarrierLabel", "updateNetworkName mobileLabel["+subscription+"] =" + mobileLabel+"  mMSimServiceState[subscription]="+mMSimServiceState[subscription]);
             } else {
                 mobileLabel
                     = context.getString(R.string.status_bar_settings_signal_meter_disconnected);
@@ -1255,13 +1257,28 @@ public class MSimNetworkController extends NetworkController {
                 v.setVisibility(View.VISIBLE);
             }
         }
-
+        
         // mobile label
+        int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
+        String bannerString = "";
+
+        if(!mConnected){            
+            bannerString = context.getString(R.string.status_bar_settings_signal_meter_disconnected);
+        }else{
+            for(int sub=0;sub<numPhones;sub++){
+                if(!mMSimNetworkName[sub].equals(""))
+                    bannerString = bannerString + mMSimNetworkName[sub] + "   " ;
+            }
+        }
+        if (!FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+            bannerString = mobileLabel;
+        }
+        
         N = mMobileLabelViews.size();
         for (int i=0; i<N; i++) {
             TextView v = mMobileLabelViews.get(i);
-            v.setText(mobileLabel);
-            if ("".equals(mobileLabel)) {
+            v.setText(bannerString);
+            if ("".equals(bannerString)) {
                 v.setVisibility(View.GONE);
             } else {
                 v.setVisibility(View.VISIBLE);
