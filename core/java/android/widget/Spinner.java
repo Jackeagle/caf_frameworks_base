@@ -69,12 +69,12 @@ public class Spinner extends AbsSpinner implements OnClickListener {
      * Use a dropdown anchored to the Spinner for selecting spinner options.
      */
     public static final int MODE_DROPDOWN = 1;
-    
+
     /**
      * Use the theme-supplied value to select the dropdown mode.
      */
     private static final int MODE_THEME = -1;
-    
+
     private SpinnerPopup mPopup;
     private DropDownAdapter mTempAdapter;
     int mDropDownWidth;
@@ -194,7 +194,7 @@ public class Spinner extends AbsSpinner implements OnClickListener {
             break;
         }
         }
-        
+
         mGravity = a.getInt(com.android.internal.R.styleable.Spinner_gravity, Gravity.CENTER);
 
         mPopup.setPromptText(a.getString(com.android.internal.R.styleable.Spinner_prompt));
@@ -410,6 +410,15 @@ public class Spinner extends AbsSpinner implements OnClickListener {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         
+        if (mPopup != null && mPopup.isShowing()) {
+            mPopup.dismiss();
+        }
+    }
+
+     /**
+     * @hide
+     */
+    public void dismissPop() {
         if (mPopup != null && mPopup.isShowing()) {
             mPopup.dismiss();
         }
