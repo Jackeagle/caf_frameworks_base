@@ -12960,6 +12960,7 @@ package android.net.ethernet {
   public class EthernetManager {
     ctor public EthernetManager(android.net.ethernet.IEthernetManager, android.os.Handler);
     method public java.lang.String[] getDeviceNameList();
+    method public android.net.ethernet.EthernetDevInfo getEthernetDevInfo();
     method public android.net.ethernet.EthernetDevInfo getSavedConfig();
     method public int getState();
     method public int getTotalInterface();
@@ -12979,6 +12980,7 @@ package android.net.ethernet {
 
   public abstract interface IEthernetManager implements android.os.IInterface {
     method public abstract java.lang.String[] getDeviceNameList() throws android.os.RemoteException;
+    method public abstract android.net.ethernet.EthernetDevInfo getEthernetDevInfo() throws android.os.RemoteException;
     method public abstract android.net.ethernet.EthernetDevInfo getSavedConfig() throws android.os.RemoteException;
     method public abstract int getState() throws android.os.RemoteException;
     method public abstract int getTotalInterface() throws android.os.RemoteException;

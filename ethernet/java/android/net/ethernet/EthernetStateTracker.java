@@ -34,6 +34,7 @@ import android.net.LinkCapabilities;
 import android.net.LinkProperties;
 import android.net.ConnectivityManager;
 import android.net.DhcpInfoInternal;
+import android.net.RouteInfo;
 import android.net.NetworkStateTracker;
 import android.net.NetworkUtils;
 import android.net.LinkCapabilities;
@@ -91,6 +92,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
     private LinkProperties mLinkProperties;
 
     private BroadcastReceiver mEthernetStateReceiver;
+    private EthernetDevInfo mEthInfo;
 
     /* For sending events to connectivity service handler */
     private Handler mCsHandler;
@@ -113,6 +115,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         mDhcpTarget = new DhcpHandler(dhcpThread.getLooper(), this);
         mMonitor = new EthernetMonitor(this);
         mDhcpInfo = new DhcpInfoInternal();
+        mEthInfo = new EthernetDevInfo();
     }
 
     /**
@@ -401,6 +404,18 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                                  if (localLOGV) Slog.d(TAG, "DhcpHandler: DHCP request succeeded: " + mDhcpInfo.toString());
                                  mLinkProperties = mDhcpInfo.makeLinkProperties();
                                  mLinkProperties.setInterfaceName(mInterfaceName);
+
+                                 mEthInfo.setIpAddress(mDhcpInfo.ipAddress);
+                                 mEthInfo.setIfName("eth0");
+                                 mEthInfo.setDnsAddr(mDhcpInfo.dns1);
+                                 String routeString = "";
+                                 for (RouteInfo route : mDhcpInfo.getRoutes()) routeString += route.toString() + " | ";
+                                 mEthInfo.setRouteAddr(routeString);
+                                 StringBuffer str = new StringBuffer();
+                                 int addr = NetworkUtils.prefixLengthToNetmaskInt(mDhcpInfo.prefixLength);
+                                 str.append(NetworkUtils.intToInetAddress(addr).getHostAddress());
+                                 mEthInfo.setNetMask(str.toString());
+
                              } else {
                                  event = EVENT_INTERFACE_CONFIGURATION_FAILED;
                                  Slog.e(TAG, "DhcpHandler: DHCP request failed: " + NetworkUtils.getDhcpError());
@@ -496,6 +511,13 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
      */
     public LinkProperties getLinkProperties() {
         return new LinkProperties(mLinkProperties);
+    }
+
+    /**
+     * Fetch Ethernet Interface configuration
+     */
+    public EthernetDevInfo getEthernetDevInfo() {
+        return mEthInfo;
     }
 
     /**

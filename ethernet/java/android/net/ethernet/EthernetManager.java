@@ -109,6 +109,19 @@ public class EthernetManager {
         return null;
     }
 
+   /**
+     * Return ethernet interface information
+     * @return  ethernet interface configuration on success, {@code null} on failure
+    */
+    public EthernetDevInfo getEthernetDevInfo() {
+        try {
+            return mService.getEthernetDevInfo();
+        } catch (RemoteException e) {
+            Slog.i(TAG, "Can not get eth config");
+        }
+        return null;
+    }
+
     /**
      * update a ethernet interface information
      * @param info  the interface infomation
