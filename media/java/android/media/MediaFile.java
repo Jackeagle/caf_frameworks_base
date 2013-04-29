@@ -264,7 +264,7 @@ public class MediaFile {
         addFileType("MPG", FILE_TYPE_MP2PS, "video/mp2p");
         addFileType("MPEG", FILE_TYPE_MP2PS, "video/mp2p");
         addFileType("AC3", FILE_TYPE_EC3, "audio/ac3");
-        addFileType("EC3", FILE_TYPE_EC3, "audio/ec3");
+        addFileType("EC3", FILE_TYPE_EC3, "audio/eac3");
     }
 
     public static boolean isAudioFileType(int fileType) {
