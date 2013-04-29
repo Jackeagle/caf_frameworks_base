@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only
@@ -525,7 +525,7 @@ public class NetworkController extends BroadcastReceiver {
                 mSimState = IccCardConstants.State.PUK_REQUIRED;
             }
             else {
-                mSimState = IccCardConstants.State.NETWORK_LOCKED;
+                mSimState = IccCardConstants.State.PERSO_LOCKED;
             }
         } else {
             mSimState = IccCardConstants.State.UNKNOWN;
