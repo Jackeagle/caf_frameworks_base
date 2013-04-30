@@ -246,7 +246,7 @@ static void initSocketNative(JNIEnv *env, jobject obj) {
 
 static void setAmpPolicyNative(JNIEnv *env, jobject obj, jint amppol) {
 #ifdef HAVE_BLUETOOTH
-    ALOGV(__FUNCTION__);
+    ALOGV("%s", __FUNCTION__);
 
     struct asocket *s = get_socketData(env, obj);
 
@@ -268,7 +268,7 @@ static void setAmpPolicyNative(JNIEnv *env, jobject obj, jint amppol) {
 
 static int getMtuNative(JNIEnv *env, jobject obj) {
 #ifdef HAVE_BLUETOOTH
-    ALOGV(__FUNCTION__);
+    ALOGV("%s", __FUNCTION__);
 
     jint type = env->GetIntField(obj, field_mType);
     struct asocket *s = get_socketData(env, obj);

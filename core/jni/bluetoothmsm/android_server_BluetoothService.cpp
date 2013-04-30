@@ -1522,7 +1522,7 @@ static jboolean removeReservedServiceRecordsNative(JNIEnv *env, jobject object,
 
 static jstring findDeviceNative(JNIEnv *env, jobject object,
                                 jstring address) {
-    ALOGV(__FUNCTION__);
+    ALOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
     jobject eventLoop = env->GetObjectField(object, field_mEventLoop);
@@ -3517,7 +3517,7 @@ static jboolean registerCharacteristicsWatcherNative(JNIEnv *env, jobject object
 
 static jboolean disconnectGattNative(JNIEnv *env, jobject object,
                                               jstring path) {
-   ALOGV(__FUNCTION__);
+   ALOGV("%s", __FUNCTION__);
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
     if (nat) {
@@ -3581,7 +3581,7 @@ static jboolean disConnectSapNative(JNIEnv *env, jobject object) {
 }
 
 static jint listConnectionNative(JNIEnv *env, jobject object) {
-   ALOGV(__FUNCTION__);
+   ALOGV("%s", __FUNCTION__);
 
 #ifdef HAVE_BLUETOOTH
     DBusMessage *msg = NULL;
@@ -3628,7 +3628,7 @@ done:
 }
 
 static jboolean disconnectAllConnectionsNative(JNIEnv *env, jobject object) {
-   ALOGV(__FUNCTION__);
+   ALOGV("%s", __FUNCTION__);
 
 #ifdef HAVE_BLUETOOTH
     native_data_t *nat = get_native_data(env, object);
