@@ -98,7 +98,7 @@ public class EthernetService<syncronized> extends IEthernetManager.Stub {
     public synchronized void setMode(String mode) {
         final ContentResolver cr = mContext.getContentResolver();
         if (DevName != null) {
-            Settings.Secure.putString(cr, Settings.Secure.ETHERNET_IFNAME, DevName[0]);
+            Settings.Secure.putString(cr, Settings.Secure.ETHERNET_IFNAME, "eth0");
             Settings.Secure.putInt(cr, Settings.Secure.ETHERNET_CONF, 1);
             Settings.Secure.putString(cr, Settings.Secure.ETHERNET_MODE, mode);
         }
