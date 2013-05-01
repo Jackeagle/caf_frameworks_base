@@ -141,6 +141,12 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                         NetworkUtils.disableInterface(ifname);
 
                     mLinkProperties.clear();
+                    mEthInfo.setIpAddress("null");
+                    mEthInfo.setIfName("null");
+                    mEthInfo.setDnsAddr("null");
+                    mEthInfo.setRouteAddr("null");
+                    mEthInfo.setNetMask("null");
+
                 }
             }
         }
@@ -408,9 +414,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                                  mEthInfo.setIpAddress(mDhcpInfo.ipAddress);
                                  mEthInfo.setIfName("eth0");
                                  mEthInfo.setDnsAddr(mDhcpInfo.dns1);
-                                 String routeString = "";
-                                 for (RouteInfo route : mDhcpInfo.getRoutes()) routeString += route.toString() + " | ";
-                                 mEthInfo.setRouteAddr(routeString);
+                                 mEthInfo.setRouteAddr((mDhcpInfo.getRoutes().toArray()[(mDhcpInfo.getRoutes().size())-1]).toString());
                                  StringBuffer str = new StringBuffer();
                                  int addr = NetworkUtils.prefixLengthToNetmaskInt(mDhcpInfo.prefixLength);
                                  str.append(NetworkUtils.intToInetAddress(addr).getHostAddress());
