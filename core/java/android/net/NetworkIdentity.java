@@ -24,8 +24,11 @@ import android.content.Context;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
+import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
-
+import android.util.Log;
 import com.android.internal.util.Objects;
 
 /**
@@ -39,6 +42,7 @@ public class NetworkIdentity {
      * When enabled, combine all {@link #mSubType} together under
      * {@link #SUBTYPE_COMBINED}.
      */
+    private static final String TAG = "NetworkIdentity";
     public static final boolean COMBINE_SUBTYPE_ENABLED = true;
 
     public static final int SUBTYPE_COMBINED = -1;
@@ -154,7 +158,12 @@ public class NetworkIdentity {
             if (state.subscriberId != null) {
                 subscriberId = state.subscriberId;
             } else {
-                subscriberId = telephony.getSubscriberId();
+                //used for dual sim data traffic statistics
+                if(MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                    subscriberId = getActiveSubscriberId(context);
+                } else {
+                    subscriberId = telephony.getSubscriberId();
+                }
             }
 
         } else if (type == TYPE_WIFI) {
@@ -169,5 +178,16 @@ public class NetworkIdentity {
         }
 
         return new NetworkIdentity(type, subType, subscriberId, networkId, roaming);
+    }
+
+    private static String getActiveSubscriberId(Context context) {
+        int sub = -1;
+        try {
+            sub = Settings.System.getInt(context.getContentResolver(),
+                    Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION);
+        } catch (SettingNotFoundException snfe) {
+            Log.e(TAG, "Read current data port value exception.", snfe);
+        }
+        return MSimTelephonyManager.getDefault().getSubscriberId(sub);
     }
 }
