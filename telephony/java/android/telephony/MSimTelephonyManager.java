@@ -929,4 +929,64 @@ public class MSimTelephonyManager {
         }
         return android.provider.Settings.Global.putString(cr, name, data);
     }
+
+    /**
+     * Returns the MCC+MNC (mobile country code + mobile network code) of the
+     * provider of the SIM for a particular subscription. 5 or 6 decimal digits.
+     * <p>
+     * Availability: SIM state must be {@link #SIM_STATE_READY}
+     *
+     * @see #getSimState
+     *
+     * @param subscription for which provider's MCC+MNC is returned
+     * @hide
+     */
+    public String getSimOperator(int subscription) {
+        return getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC,
+                subscription, "");
+    }
+
+    /**
+     * Returns the Service Provider Name (SPN) of a subscription.
+     * <p>
+     * Availability: SIM state must be {@link #SIM_STATE_READY}
+     *
+     * @see #getSimState
+     *
+     * @param subscription for which provider's name is returned
+     * @hide
+     */
+    public String getSimOperatorName(int subscription) {
+        String alpha = getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA,
+                subscription, "");
+        return alpha;
+    }
+
+    /**
+     * Returns the location of the device of a subscription. Return
+     * null if current location is not available.
+     *
+     * <p>
+     * Requires Permission:
+     * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION
+     * ACCESS_COARSE_LOCATION} or
+     * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION
+     * ACCESS_FINE_LOCATION}.
+     *
+     * @param subscription of which the device current location is returned
+     * @hide
+     */
+    public CellLocation getCellLocation(int subscription) {
+        try {
+            Bundle bundle = getITelephonyMSim().getCellLocation(subscription);
+            CellLocation cl = CellLocation.newFromBundle(bundle);
+            if (cl.isEmpty())
+                return null;
+            return cl;
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            return null;
+        }
+    }
 }

@@ -330,5 +330,12 @@ interface ITelephonyMSim {
      * @return true if success
      */
     boolean setPreferredDataSubscription(int subscription);
+
+    /**
+     * Returns the cell location Bundle of a subscription.
+     * @param subscription user preferred subscription.
+     * Returns cell location Bundle
+     */
+    Bundle getCellLocation(int subscription);
 }
 
