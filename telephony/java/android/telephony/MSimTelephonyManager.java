@@ -35,6 +35,8 @@ import com.android.internal.telephony.msim.IPhoneSubInfoMSim;
 import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.TelephonyProperties;
+import android.provider.SpnProvider;
+import android.util.LocaleNamesParser;
 
 import java.util.List;
 
@@ -1030,6 +1032,21 @@ public class MSimTelephonyManager {
        }
     }
 
+    /**
+     * Returns the MCC+MNC (mobile country code + mobile network code) of the
+     * provider of the SIM for a particular subscription. 5 or 6 decimal digits.
+     * <p>
+     * Availability: SIM state must be {@link #SIM_STATE_READY}
+     *
+     * @see #getSimState
+     *
+     * @param subscription for which provider's MCC+MNC is returned
+     * @hide
+     */
+    public String getSimOperator(int subscription) {
+        return getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, subscription, "");
+    }
+
     public String getSimOperatorName() {
         return getSimOperatorName(getDefaultSubscription());
     }
@@ -1041,7 +1058,18 @@ public class MSimTelephonyManager {
      * @see #getSimState
      */
     public String getSimOperatorName(int slotId) {
-        return getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, slotId, "");
+        String alpha = getTelephonyProperty(TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, slotId, "");
+        if ("".equals(alpha)) {
+            String numeric = getSimOperator(slotId);
+            if (numeric != null && numeric.length() > 3)
+                alpha = (String) SpnProvider.getSPNByMCCMNC(sContext, numeric);
+        } else {
+            LocaleNamesParser localeNamesParser = new LocaleNamesParser(sContext,"MSimTelephonyManager",
+                           com.android.internal.R.array.origin_carrier_names,
+                           com.android.internal.R.array.locale_carrier_names);
+            alpha = localeNamesParser.getLocaleName(alpha).toString();
+        }
+        return alpha;
     }
     //merge from 8x25q end    
 }
