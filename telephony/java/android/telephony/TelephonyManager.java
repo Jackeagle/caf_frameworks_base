@@ -34,6 +34,7 @@ import android.provider.Settings.SettingNotFoundException;
 import com.android.internal.telephony.IPhoneSubInfo;
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.ITelephonyRegistry;
+import com.android.internal.telephony.MSimTelephonyProperties;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.TelephonyProperties;
@@ -1334,5 +1335,15 @@ public class TelephonyManager {
         } catch (NullPointerException ex) {
             return null;
         }
+    }
+
+    /**
+     * Returns the sim card type, for example, USIM or RUIM.
+     *
+     * @hide
+     */
+    public String getCardType() {
+        return getTelephonyProperty(MSimTelephonyProperties.PROPERTY_ICC_APP_TYPE,
+                getDefaultSubscription(), "");
     }
 }
