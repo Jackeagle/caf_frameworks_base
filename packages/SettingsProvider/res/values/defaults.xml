@@ -31,6 +31,7 @@
     <bool name="def_accelerometer_rotation">true</bool>
     <!-- Default screen brightness, from 0 to 255.  102 is 40%. -->
     <integer name="def_screen_brightness">102</integer>
+    <integer name="def_screen_brightness_cmcc">51</integer>
     <bool name="def_screen_brightness_automatic_mode">false</bool>
     <fraction name="def_window_animation_scale">100%</fraction>
     <fraction name="def_window_transition_scale">100%</fraction>
@@ -176,6 +177,7 @@
 
     <!-- Default for Settings.System.KEY_BACKLIGHT-->
     <integer name="def_key_backlight_values">1</integer>
+    <integer name="def_key_backlight_values_cmcc">0</integer>
 
     <!-- Default for Settings.Secure.PROXIMITY_SENSOR -->
     <bool name="def_proximity_sensor">true</bool>
@@ -185,4 +187,5 @@
 
     <string name="def_default_input_method">com.android.inputmethod.pinyin/.PinyinIME</string>
     <string name="def_enabled_input_methods">com.android.inputmethod.pinyin/.PinyinIME</string>
+    <bool name="def_auto_time_gps">false</bool>
 </resources>
