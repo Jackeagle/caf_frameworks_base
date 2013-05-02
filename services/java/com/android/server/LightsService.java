@@ -86,7 +86,6 @@ public class LightsService {
         }
 		//set the button back lights switch . --xst
         public void setButtonBackLightsOn(boolean on){
-           Slog.v("xst", "LightService--setButtonBackLightsOn="+on);
            if(on == true){
               setBrightness(127);
            }
