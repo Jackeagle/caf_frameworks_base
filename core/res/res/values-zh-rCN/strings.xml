@@ -1456,4 +1456,7 @@
     <string name="enable_accessibility_canceled" msgid="3833923257966635673">"已取消辅助功能。"</string>
     <string name="user_switched" msgid="3768006783166984410">"当前用户是<xliff:g id="NAME">%1$s</xliff:g>。"</string>
     <string name="owner_name" msgid="2716755460376028154">"机主"</string>
+    <string name="China_Mobile">中国移动</string>
+    <string name="China_Unicom">中国联通</string>
+    <string name="China_Telecom">中国电信</string>
 </resources>
