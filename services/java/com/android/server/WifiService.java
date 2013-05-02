@@ -2016,12 +2016,14 @@ public class WifiService extends IWifiManager.Stub {
             config.allowedKeyManagement.get(KeyMgmt.IEEE8021X)) {
             return SECURITY_EAP;
         }
-//        if (config.allowedKeyManagement.get(KeyMgmt.WAPI_PSK)) {
-//            return SECURITY_WAPI_PSK;
-//        }
-//        if (config.allowedKeyManagement.get(KeyMgmt.WAPI_CERT)) {
-//            return SECURITY_WAPI_CERT;
-//        }       
+// WAPI+++
+        if (config.allowedKeyManagement.get(KeyMgmt.WAPI_PSK)) {
+            return SECURITY_WAPI_PSK;
+        }
+        if (config.allowedKeyManagement.get(KeyMgmt.WAPI_CERT)) {
+            return SECURITY_WAPI_CERT;
+        }
+// WAPI---
         if (config.wepTxKeyIndex>=0 && config.wepTxKeyIndex<config.wepKeys.length && config.wepKeys[config.wepTxKeyIndex]!=null) {
             return SECURITY_WEP;
         }
