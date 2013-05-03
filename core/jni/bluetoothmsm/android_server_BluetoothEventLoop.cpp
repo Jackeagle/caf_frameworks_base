@@ -2324,7 +2324,7 @@ void onInputDeviceConnectionResult(DBusMessage *msg, void *user, void *n) {
 }
 
 void onDiscoverCharacteristicsResult(DBusMessage *msg, void *user, void *n) {
-    ALOGV(__FUNCTION__);
+    ALOGV("%s", __FUNCTION__);
 
     native_data_t *nat = (native_data_t *)n;
     const char *path = (const char *)user;
@@ -2481,7 +2481,7 @@ void onIndicateResponse(DBusMessage *msg, void *user, void *n) {
 }
 
 void onUpdateCharacteristicValueResult(DBusMessage *msg, void *user, void *n) {
-    ALOGV(__FUNCTION__);
+    ALOGV("%s", __FUNCTION__);
 
     native_data_t *nat = (native_data_t *)n;
     const char *path = (const char *)user;
