@@ -2359,7 +2359,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadIntegerSetting(stmt, Settings.Global.DOCK_AUDIO_MEDIA_ENABLED,
                     R.integer.def_dock_audio_media_enabled);
 
-            loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 0);
+            loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 1);
             loadSetting(stmt, Settings.Global.DEFAULT_INSTALL_LOCATION,
                     PackageHelper.APP_INSTALL_AUTO);
 
