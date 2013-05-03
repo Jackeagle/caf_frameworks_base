@@ -182,6 +182,7 @@ public class NetworkController extends BroadcastReceiver {
     // yuck -- stop doing this here and put it in the framework
     IBatteryStats mBatteryStats;
     ServiceState mLastServiceState;
+    Handler handlerData = null;
 
     public interface SignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
@@ -244,6 +245,8 @@ public class NetworkController extends BroadcastReceiver {
         mNetworkName = mNetworkNameDefault;
 
         createWifiHandler();
+
+       handlerData = new Handler();
 
         // broadcasts
         IntentFilter filter = new IntentFilter();
@@ -525,9 +528,16 @@ public class NetworkController extends BroadcastReceiver {
             }
             mDataState = state;
             mDataNetType = networkType;
-            updateDataNetType();
-            updateDataIcon();
-            refreshViews();
+
+
+	     handlerData.postDelayed(new Runnable() {
+                                public void run() {
+                                         updateDataNetType();
+                                         updateDataIcon();
+                                         refreshViews();
+                                        }
+                                    },1000);
+            
         }
 
         @Override

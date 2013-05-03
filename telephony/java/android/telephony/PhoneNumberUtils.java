@@ -977,6 +977,7 @@ public class PhoneNumberUtils
             case 0xb: return '#';
             case 0xc: return PAUSE;
             case 0xd: return WILD;
+            case 0xe: return WAIT;
 
             default: return 0;
         }
@@ -994,6 +995,8 @@ public class PhoneNumberUtils
             return 0xc;
         } else if (c == WILD) {
             return 0xd;
+        } else if (c == WAIT){
+            return 0xe;
         } else {
             throw new RuntimeException ("invalid char for BCD " + c);
         }
@@ -1558,7 +1561,7 @@ public class PhoneNumberUtils
     //
     // However, in order to loose match 650-555-1212 and 555-1212, we need to set the min match
     // to 7.
-    static final int MIN_MATCH = 7;
+    static final int MIN_MATCH = SystemProperties.getInt("ro.cta.test", 0) == 0?7:11;
 
     /**
      * Checks a given number against the list of
