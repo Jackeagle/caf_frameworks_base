@@ -2303,6 +2303,7 @@ public final class Settings {
          * @hide
          */
         public static final String[] SETTINGS_TO_BACKUP = {
+            Global.ENABLE_FAST_POWERON,
             STAY_ON_WHILE_PLUGGED_IN,   // moved to global
             WIFI_USE_STATIC_IP,
             WIFI_STATIC_IP,
@@ -5665,6 +5666,10 @@ public final class Settings {
             return putString(cr, name, Float.toString(value));
         }
 
+        /**
+         * @hide Whether FastPowerOn is enabled
+         */
+        public static final String ENABLE_FAST_POWERON = "enable_fast_poweron";
 
         /**
           * Subscription to be used for voice call on a multi sim device. The supported values
