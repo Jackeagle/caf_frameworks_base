@@ -5728,6 +5728,13 @@ public final class Settings {
         public static final String[] MULTI_SIM_NAME = {
                 "perferred_name_sub1", "preferred_name_sub2"
         };
+
+        /**
+         * display duration info after end call. 0 = Off 1 = On
+         *
+         * @hide
+         */
+        public static final String SHOW_CALL_DURATION = "show_call_duration";
     }
 
     /**
