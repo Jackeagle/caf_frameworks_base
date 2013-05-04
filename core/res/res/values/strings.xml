@@ -4048,5 +4048,7 @@
     <string name="stkCcSsToDial">SS request is modified to DIAL request.</string>
     <string name="stkCcSsToUssd">SS request is modified to USSD request.</string>
     <string name="stkCcSsToSs">SS request is modified to new SS request.</string>
-
+    <string name="China_Mobile">China Mobile</string>
+    <string name="China_Unicom">China Unicom</string>
+    <string name="China_Telecom">China Telecom</string>
 </resources>

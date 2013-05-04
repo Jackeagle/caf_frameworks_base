@@ -5701,6 +5701,26 @@ public final class Settings {
          */
         public static final String[] MULTI_SIM_USER_PREFERRED_SUBS = {"user_preferred_sub1",
                 "user_preferred_sub2"};
+
+        /**
+         * Subscription to be used for multi Sim IP Call Prefix Setting. The
+         * supported values are 0 = SUB1, 1 = SUB2.
+         *
+         * @hide
+         */
+        public static final String[] IPCALL_PREFIX = {
+                "ipcall_prefix_sub1", "ipcall_prefix_sub2"
+        };
+
+        /**
+         * Channel name for subcription one and two i.e. channele name 1,
+         * channel name 2
+         *
+         * @hide
+         */
+        public static final String[] MULTI_SIM_NAME = {
+                "perferred_name_sub1", "preferred_name_sub2"
+        };
     }
 
     /**
