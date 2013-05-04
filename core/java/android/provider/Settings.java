@@ -5779,6 +5779,54 @@ public final class Settings {
          * @hide
          */
         public static final String SHOW_CALL_DURATION = "show_call_duration";
+
+        /**
+         * If true, if the environment is dark, light the button back-light each
+         * time screen is touched after unlock. if the environment is bright,
+         * only light the button back-light once the phone is unlocked. If
+         * false, only light the button back-light once the
+         *
+         * @hide
+         */
+        public static final String LIGHT_SENSOR_FOR_BUTTON_LIGHT = "light_sensor_for_button_light";
+
+        /**
+         * The input of light sensor lower than this value means the environment
+         * is dark.
+         *
+         * @hide
+         */
+        public static final String LIGHT_DARK_THRESHOLD = "light_dark_threshold";
+
+        /**
+         * The input of light sensor higher than this value means the
+         * environment is bright.
+         *
+         * @hide
+         */
+        public static final String LIGHT_BRIGHT_THRESHOLD = "light_bright_threshold";
+
+        /**
+         * The brightness of button back-light.
+         *
+         * @hide
+         */
+        public static final String BUTTON_LIGHT_BRIGHTNESS = "button_light_brightness";
+
+        /**
+         * The button back light would off automatically after certain seconds
+         * for power consumption consideration.
+         *
+         * @hide
+         */
+        public static final String BUTTON_LIGHT_TIMEOUT = "button_light_timeout";
+
+        /**
+         * Whether to enable button light.
+         *
+         * @hide
+         */
+        public static final String BUTTON_LIGHT_ENABLE = "button_light_enable";
     }
 
     /**
