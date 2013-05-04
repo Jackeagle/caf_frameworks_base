@@ -604,8 +604,12 @@ public class NetworkController extends BroadcastReceiver {
     }
 
     private final void updateTelephonySignalStrength() {
+
+      //mPhoneState==TelephonyManager.CALL_STATE_IDLE
+
+		
         if (!hasService() &&
-                (mDataServiceState != ServiceState.STATE_IN_SERVICE)) {
+            (mDataServiceState != ServiceState.STATE_IN_SERVICE) && (mPhoneState==TelephonyManager.CALL_STATE_IDLE)) {
             if (DEBUG) Log.i(TAG, " No service");
             mPhoneSignalIconId = R.drawable.stat_sys_signal_null;
             mQSPhoneSignalIconId = R.drawable.ic_qs_signal_no_signal;
