@@ -4404,6 +4404,13 @@ public final class Settings {
        public static final String DATA_ROAMING = "data_roaming";
 
        /**
+        * Whether or not data roaming is enabled. (0 = false, 1 = true)
+        *
+        * @hide
+        */
+       public static final String DATA_ROAMING_2 = "data_roaming_2";
+
+       /**
         * Whether user has enabled development settings.
         */
        public static final String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
