@@ -139,6 +139,7 @@ public class ServiceState implements Parcelable {
 
     //***** CDMA
     private int mRadioTechnology;
+    private int mVoiceRadioTechnology;
     private boolean mCssIndicator;
     private int mNetworkId;
     private int mSystemId;
@@ -187,6 +188,7 @@ public class ServiceState implements Parcelable {
         mOperatorNumeric = s.mOperatorNumeric;
         mIsManualNetworkSelection = s.mIsManualNetworkSelection;
         mRadioTechnology = s.mRadioTechnology;
+        mVoiceRadioTechnology = s.mVoiceRadioTechnology;
         mCssIndicator = s.mCssIndicator;
         mNetworkId = s.mNetworkId;
         mSystemId = s.mSystemId;
@@ -209,6 +211,7 @@ public class ServiceState implements Parcelable {
         mOperatorNumeric = in.readString();
         mIsManualNetworkSelection = in.readInt() != 0;
         mRadioTechnology = in.readInt();
+        mVoiceRadioTechnology = in.readInt();
         mCssIndicator = (in.readInt() != 0);
         mNetworkId = in.readInt();
         mSystemId = in.readInt();
@@ -228,6 +231,7 @@ public class ServiceState implements Parcelable {
         out.writeString(mOperatorNumeric);
         out.writeInt(mIsManualNetworkSelection ? 1 : 0);
         out.writeInt(mRadioTechnology);
+        out.writeInt(mVoiceRadioTechnology);
         out.writeInt(mCssIndicator ? 1 : 0);
         out.writeInt(mNetworkId);
         out.writeInt(mSystemId);
@@ -408,6 +412,7 @@ public class ServiceState implements Parcelable {
                 && equalsHandlesNulls(mOperatorAlphaShort, s.mOperatorAlphaShort)
                 && equalsHandlesNulls(mOperatorNumeric, s.mOperatorNumeric)
                 && equalsHandlesNulls(mRadioTechnology, s.mRadioTechnology)
+                && equalsHandlesNulls(mVoiceRadioTechnology, s.mVoiceRadioTechnology)
                 && equalsHandlesNulls(mCssIndicator, s.mCssIndicator)
                 && equalsHandlesNulls(mNetworkId, s.mNetworkId)
                 && equalsHandlesNulls(mSystemId, s.mSystemId)
@@ -520,6 +525,7 @@ public class ServiceState implements Parcelable {
         mOperatorNumeric = null;
         mIsManualNetworkSelection = false;
         mRadioTechnology = 0;
+        mVoiceRadioTechnology = 0;
         mCssIndicator = false;
         mNetworkId = -1;
         mSystemId = -1;
@@ -632,6 +638,7 @@ public class ServiceState implements Parcelable {
         mOperatorNumeric = m.getString("operator-numeric");
         mIsManualNetworkSelection = m.getBoolean("manual");
         mRadioTechnology = m.getInt("radioTechnology");
+        mVoiceRadioTechnology = m.getInt("voiceRadioTechnology");
         mCssIndicator = m.getBoolean("cssIndicator");
         mNetworkId = m.getInt("networkId");
         mSystemId = m.getInt("systemId");
@@ -654,6 +661,7 @@ public class ServiceState implements Parcelable {
         m.putString("operator-numeric", mOperatorNumeric);
         m.putBoolean("manual", Boolean.valueOf(mIsManualNetworkSelection));
         m.putInt("radioTechnology", mRadioTechnology);
+        m.putInt("voiceRadioTechnology", mVoiceRadioTechnology);
         m.putBoolean("cssIndicator", mCssIndicator);
         m.putInt("networkId", mNetworkId);
         m.putInt("systemId", mSystemId);
@@ -666,6 +674,12 @@ public class ServiceState implements Parcelable {
     /** @hide */
     public void setRadioTechnology(int state) {
         this.mRadioTechnology = state;
+    }
+
+    /** @hide */
+    public void setVoiceRadioTechnology(int state) {
+        Log.d(LOG_TAG, "setVoiceRadioTechnology:" + state);
+        this.mVoiceRadioTechnology = state;
     }
 
     /** @hide */
@@ -683,6 +697,13 @@ public class ServiceState implements Parcelable {
     public int getRilRadioTechnology() {
         return this.mRadioTechnology;
     }
+
+    /** @hide */
+    public int getVoiceRadioTechnology() {
+        Log.d(LOG_TAG, "getVoiceRadioTechnology:" + this.mVoiceRadioTechnology);
+        return this.mVoiceRadioTechnology;
+    }
+
     /** @hide */
     public int getRadioTechnology() {
         return getRilRadioTechnology();

@@ -1,9 +1,8 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
- * Not a Contribution, Apache license notifications and license are retained
- * for attribution purposes only
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,6 +83,8 @@ import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.statusbar.StatusBarNotification;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.BaseStatusBar;
+import com.android.systemui.statusbar.CTMSimSignalClusterView;
+import com.android.systemui.statusbar.CUMSimSignalClusterView;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.GestureRecorder;
 import com.android.systemui.statusbar.MSimSignalClusterView;
@@ -124,6 +125,14 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     public static final String ACTION_STATUSBAR_START
             = "com.android.internal.policy.statusbar.START";
+
+    // To marked the CU/CT status bar style.
+    public static final int STATUSBAR_STYLE_DEFAULT = 0;
+    public static final int STATUSBAR_STYLE_CU = 1;
+    public static final int STATUSBAR_STYLE_CT = 2;
+
+    // To save the status bar style.
+    public static final int STATUSBAR_STYLE = STATUSBAR_STYLE_DEFAULT;
 
     private static final int MSG_OPEN_NOTIFICATION_PANEL = 1000;
     private static final int MSG_CLOSE_PANELS = 1001;
@@ -520,50 +529,38 @@ public class PhoneStatusBar extends BaseStatusBar {
         mBatteryController.addIconView((ImageView)mStatusBarView.findViewById(R.id.battery));
         mBluetoothController = new BluetoothController(mContext);
 
+        NetworkController networkController = null;
         if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
             mMSimNetworkController = new MSimNetworkController(mContext);
-            MSimSignalClusterView mSimSignalCluster = (MSimSignalClusterView) mStatusBarView.findViewById(
-                    R.id.msim_signal_cluster);
-            for (int i=0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
-                mMSimNetworkController.addSignalCluster(mSimSignalCluster, i);
+            LinearLayout simSignalView =
+                    (LinearLayout) mStatusBarView.findViewById(R.id.msim_signal_cluster);
+            MSimSignalClusterView signalClusterView = null;
+
+            // According to the different style to inflate the signal cluster views.
+            switch (STATUSBAR_STYLE) {
+                case STATUSBAR_STYLE_DEFAULT:
+                    signalClusterView = (MSimSignalClusterView) View
+                            .inflate(context, R.layout.msim_signal_cluster_view, null);
+                    break;
+                case STATUSBAR_STYLE_CT:
+                    signalClusterView = (CTMSimSignalClusterView) View
+                            .inflate(context, R.layout.msim_signal_cluster_view_ct, null);
+                    break;
+                case STATUSBAR_STYLE_CU:
+                    signalClusterView = (CUMSimSignalClusterView) View
+                            .inflate(context, R.layout.msim_signal_cluster_view_cu, null);
+                    break;
+                default:
+                    Log.e(TAG, "The status bar's style is: " + STATUSBAR_STYLE);
+                    break;
             }
-            mSimSignalCluster.setNetworkController(mMSimNetworkController);
 
-            mEmergencyCallLabel = (TextView)mStatusBarWindow.findViewById(R.id.emergency_calls_only);
-            if (mEmergencyCallLabel != null) {
-                mMSimNetworkController.addEmergencyLabelView(mEmergencyCallLabel);
-                mEmergencyCallLabel.setOnClickListener(new View.OnClickListener() {
-                    public void onClick(View v) { }});
-                mEmergencyCallLabel.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
-                    @Override
-                    public void onLayoutChange(View v, int left, int top, int right, int bottom,
-                            int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                        updateCarrierLabelVisibility(false);
-                    }});
+            simSignalView.addView(signalClusterView);
+            for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+                mMSimNetworkController.addSignalCluster(signalClusterView, i);
             }
-
-            mCarrierLabel = (TextView)mStatusBarWindow.findViewById(R.id.carrier_label);
-            mShowCarrierInPanel = (mCarrierLabel != null);
-            if (DEBUG) Slog.v(TAG, "carrierlabel=" + mCarrierLabel + " show=" + mShowCarrierInPanel);
-            if (mShowCarrierInPanel) {
-                mCarrierLabel.setVisibility(mCarrierLabelVisible ? View.VISIBLE : View.INVISIBLE);
-
-                // for mobile devices, we always show mobile connection info here (SPN/PLMN)
-                // for other devices, we show whatever network is connected
-                if (mMSimNetworkController.hasMobileDataFeature()) {
-                    mMSimNetworkController.addMobileLabelView(mCarrierLabel);
-                } else {
-                    mMSimNetworkController.addCombinedLabelView(mCarrierLabel);
-                }
-
-                // set up the dynamic hide/show of the label
-                mPile.setOnSizeChangedListener(new OnSizeChangedListener() {
-                    @Override
-                    public void onSizeChanged(View view, int w, int h, int oldw, int oldh) {
-                        updateCarrierLabelVisibility(false);
-                    }
-                });
-            }
+            signalClusterView.setNetworkController(mMSimNetworkController);
+            networkController = mMSimNetworkController;
         } else {
             mNetworkController = new NetworkController(mContext);
             final SignalClusterView signalCluster =
@@ -571,42 +568,43 @@ public class PhoneStatusBar extends BaseStatusBar {
 
             mNetworkController.addSignalCluster(signalCluster);
             signalCluster.setNetworkController(mNetworkController);
+            networkController = mNetworkController;
+        }
 
-            mEmergencyCallLabel = (TextView)mStatusBarWindow.findViewById(R.id.emergency_calls_only);
-            if (mEmergencyCallLabel != null) {
-                mNetworkController.addEmergencyLabelView(mEmergencyCallLabel);
-                mEmergencyCallLabel.setOnClickListener(new View.OnClickListener() {
-                    public void onClick(View v) { }});
-                mEmergencyCallLabel.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
-                    @Override
-                    public void onLayoutChange(View v, int left, int top, int right, int bottom,
+        mEmergencyCallLabel = (TextView)mStatusBarWindow.findViewById(R.id.emergency_calls_only);
+        if (mEmergencyCallLabel != null) {
+            networkController.addEmergencyLabelView(mEmergencyCallLabel);
+            mEmergencyCallLabel.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { }});
+            mEmergencyCallLabel.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+                @Override
+                public void onLayoutChange(View v, int left, int top, int right, int bottom,
                         int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                        updateCarrierLabelVisibility(false);
-                    }});
+                    updateCarrierLabelVisibility(false);
+                }});
+        }
+
+        mCarrierLabel = (TextView)mStatusBarWindow.findViewById(R.id.carrier_label);
+        mShowCarrierInPanel = (mCarrierLabel != null);
+        if (DEBUG) Slog.v(TAG, "carrierlabel=" + mCarrierLabel + " show=" + mShowCarrierInPanel);
+        if (mShowCarrierInPanel) {
+            mCarrierLabel.setVisibility(mCarrierLabelVisible ? View.VISIBLE : View.INVISIBLE);
+
+            // for mobile devices, we always show mobile connection info here (SPN/PLMN)
+            // for other devices, we show whatever network is connected
+            if (networkController.hasMobileDataFeature()) {
+                networkController.addMobileLabelView(mCarrierLabel);
+            } else {
+                networkController.addCombinedLabelView(mCarrierLabel);
             }
 
-            mCarrierLabel = (TextView)mStatusBarWindow.findViewById(R.id.carrier_label);
-            mShowCarrierInPanel = (mCarrierLabel != null);
-            if (DEBUG) Slog.v(TAG, "carrierlabel=" + mCarrierLabel + " show=" + mShowCarrierInPanel);
-            if (mShowCarrierInPanel) {
-                mCarrierLabel.setVisibility(mCarrierLabelVisible ? View.VISIBLE : View.INVISIBLE);
-
-                // for mobile devices, we always show mobile connection info here (SPN/PLMN)
-                // for other devices, we show whatever network is connected
-                if (mNetworkController.hasMobileDataFeature()) {
-                    mNetworkController.addMobileLabelView(mCarrierLabel);
-                } else {
-                    mNetworkController.addCombinedLabelView(mCarrierLabel);
+            // set up the dynamic hide/show of the label
+            mPile.setOnSizeChangedListener(new OnSizeChangedListener() {
+                @Override
+                public void onSizeChanged(View view, int w, int h, int oldw, int oldh) {
+                    updateCarrierLabelVisibility(false);
                 }
-
-                // set up the dynamic hide/show of the label
-                mPile.setOnSizeChangedListener(new OnSizeChangedListener() {
-                    @Override
-                    public void onSizeChanged(View view, int w, int h, int oldw, int oldh) {
-                        updateCarrierLabelVisibility(false);
-                    }
-                });
-            }
+            });
         }
 
         // Quick Settings (where available, some restrictions apply)
@@ -874,7 +872,8 @@ public class PhoneStatusBar extends BaseStatusBar {
                     | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                     | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                     | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-                    | WindowManager.LayoutParams.FLAG_SPLIT_TOUCH,
+                    | WindowManager.LayoutParams.FLAG_SPLIT_TOUCH
+                    | WindowManager.LayoutParams.FLAG_SLIPPERY,
                 PixelFormat.OPAQUE);
         // this will allow the navbar to run in an overlay on devices that support this
         if (ActivityManager.isHighEndGfx()) {
@@ -912,7 +911,13 @@ public class PhoneStatusBar extends BaseStatusBar {
                 + " icon=" + icon);
         StatusBarIconView view = new StatusBarIconView(mContext, slot, null);
         view.set(icon);
-        mStatusIcons.addView(view, viewIndex, new LinearLayout.LayoutParams(mIconSize, mIconSize));
+        if (STATUSBAR_STYLE != STATUSBAR_STYLE_DEFAULT) {
+            mStatusIcons.addView(view, viewIndex, new LinearLayout.LayoutParams(
+                    LayoutParams.WRAP_CONTENT, mIconSize));
+        } else {
+            mStatusIcons.addView(view, viewIndex,
+                    new LinearLayout.LayoutParams(mIconSize, mIconSize));
+        }
     }
 
     public void updateIcon(String slot, int index, int viewIndex,
