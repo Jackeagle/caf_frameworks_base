@@ -48,6 +48,8 @@ public class IccCardConstants {
     public static final String INTENT_VALUE_LOCKED_PERSO = "PERSO";
     /* PERM_DISABLED means ICC is permanently disabled due to puk fails */
     public static final String INTENT_VALUE_ABSENT_ON_PERM_DISABLED = "PERM_DISABLED";
+    /* DEACTIVATED means ICC is deactivated */
+    public static final String INTENT_VALUE_ICC_DEACTIVATED = "DEACTIVATED";
 
     /**
      * This is combination of IccCardStatus.CardState and IccCardApplicationStatus.AppState
@@ -66,7 +68,8 @@ public class IccCardConstants {
         READY,
         NOT_READY,
         PERM_DISABLED,
-        CARD_IO_ERROR;
+        CARD_IO_ERROR,
+        DEACTIVATED;
 
         public boolean isPinLocked() {
             return ((this == PIN_REQUIRED) || (this == PUK_REQUIRED));

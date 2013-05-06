@@ -763,6 +763,11 @@ public class TelephonyManager {
      *@hide
      */
     public static final int SIM_STATE_CARD_IO_ERROR = 6;
+    /**
+     * SIM card state: deactivated
+     * @hide
+     */
+    public static final int SIM_STATE_DEACTIVATED = 7;
 
     /**
      * @return true if a ICC card is present
