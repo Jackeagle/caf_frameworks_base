@@ -223,6 +223,6 @@
     <string name="screenshot_emmc_not_mount">无法保存截图,内部存储器未就绪</string>
         <!-- Notification text displayed when emmc is full.  -->
     <string name="screenshot_emmc_full">无法保存屏幕截图,内部存储器已满</string>
-
+    <string name="statusbar_expanded_notification_title">通知</string>
     
 </resources>
