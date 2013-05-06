@@ -33,6 +33,7 @@ import com.android.internal.telephony.msim.ITelephonyMSim;
 import com.android.internal.telephony.ITelephonyRegistryMSim;
 import com.android.internal.telephony.msim.IPhoneSubInfoMSim;
 import com.android.internal.telephony.MSimConstants;
+import com.android.internal.telephony.MSimTelephonyProperties;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.TelephonyProperties;
 
@@ -988,5 +989,15 @@ public class MSimTelephonyManager {
         } catch (NullPointerException ex) {
             return null;
         }
+    }
+
+    /**
+     * Returns the sim card type for the subscription, for example, USIM or RUIM.
+     *
+     * @hide
+     */
+    public String getCardType(int subscription) {
+        return getTelephonyProperty(MSimTelephonyProperties.PROPERTY_ICC_APP_TYPE,
+                subscription, "");
     }
 }
