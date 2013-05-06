@@ -603,9 +603,9 @@ public class NetworkController extends BroadcastReceiver {
             Settings.Global.AIRPLANE_MODE_ON, 0) == 1);
     }
 
-    private final void updateTelephonySignalStrength() {
+    private final void updateTelephonySignalStrength() {	
         if (!hasService() &&
-                (mDataServiceState != ServiceState.STATE_IN_SERVICE)) {
+            (mDataServiceState != ServiceState.STATE_IN_SERVICE) && (mPhoneState==TelephonyManager.CALL_STATE_IDLE)) {
             if (DEBUG) Log.i(TAG, " No service");
             mPhoneSignalIconId = R.drawable.stat_sys_signal_null;
             mQSPhoneSignalIconId = R.drawable.ic_qs_signal_no_signal;
