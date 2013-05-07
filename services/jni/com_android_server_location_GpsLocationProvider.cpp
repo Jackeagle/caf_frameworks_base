@@ -349,6 +349,13 @@ static jboolean android_location_GpsLocationProvider_set_position_mode(JNIEnv* e
         return false;
 }
 
+static void android_location_GpsLocationProvider_set_gps_lock(JNIEnv* env, jobject obj,jint lock)
+{
+    
+    if (sGpsInterface)
+        sGpsInterface->set_gps_lock( lock );
+}
+
 static jboolean android_location_GpsLocationProvider_start(JNIEnv* env, jobject obj)
 {
     if (sGpsInterface)
@@ -607,6 +614,7 @@ static JNINativeMethod sMethods[] = {
     {"native_init", "()Z", (void*)android_location_GpsLocationProvider_init},
     {"native_cleanup", "()V", (void*)android_location_GpsLocationProvider_cleanup},
     {"native_set_position_mode", "(IIIII)Z", (void*)android_location_GpsLocationProvider_set_position_mode},
+    {"native_set_gps_lock", "(I)V", (void*)android_location_GpsLocationProvider_set_gps_lock},
     {"native_start", "()Z", (void*)android_location_GpsLocationProvider_start},
     {"native_stop", "()Z", (void*)android_location_GpsLocationProvider_stop},
     {"native_delete_aiding_data", "(I)V", (void*)android_location_GpsLocationProvider_delete_aiding_data},

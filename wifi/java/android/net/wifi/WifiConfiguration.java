@@ -153,7 +153,7 @@ public class WifiConfiguration implements Parcelable {
         public static final String varName = "key_mgmt";
 
         public static final String[] strings = { "NONE", "WPA_PSK", "WPA_EAP", "IEEE8021X",
-                "WPA2_PSK" };
+               "WPA2_PSK" };
     }
 
     /**
@@ -204,8 +204,9 @@ public class WifiConfiguration implements Parcelable {
         public static final int CCMP = 2;
 
         public static final String varName = "pairwise";
+		
+		public static final String[] strings = { "NONE", "TKIP", "CCMP" };
 
-        public static final String[] strings = { "NONE", "TKIP", "CCMP" };
     }
 
     /**
@@ -231,7 +232,7 @@ public class WifiConfiguration implements Parcelable {
 
         public static final String varName = "group";
 
-        public static final String[] strings = { "WEP40", "WEP104", "TKIP", "CCMP" };
+		public static final String[] strings = { "WEP40", "WEP104", "TKIP", "CCMP" };
     }
 
     /** Possible status of a network configuration. */
@@ -301,6 +302,7 @@ public class WifiConfiguration implements Parcelable {
      * string otherwise.
      */
     public String preSharedKey;
+
     /**
      * Up to four WEP keys. Either an ASCII string enclosed in double
      * quotation marks (e.g., {@code "abcdef"} or a string

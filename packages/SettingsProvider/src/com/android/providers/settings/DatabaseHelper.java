@@ -195,7 +195,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
 
         // Load initial volume levels into DB
-        loadVolumeLevels(db);
+        if (SystemProperties.getInt("ro.cmcc.test", 0) == 1) {
+                loadVolumeLevels_cmcc(db);
+        }
+        else{
+                loadVolumeLevels(db);
+        }
 
         // Load inital settings values
         loadSettings(db);
@@ -1906,6 +1911,67 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         loadVibrateWhenRingingSetting(db);
     }
 
+    private void loadVolumeLevels_cmcc(SQLiteDatabase db) {
+        SQLiteStatement stmt = null;
+        try {
+            stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
+                    + " VALUES(?,?);");
+    
+            loadSetting(stmt, Settings.System.VOLUME_MUSIC,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_MUSIC]);
+            loadSetting(stmt, Settings.System.VOLUME_FM,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_FM]);
+            loadSetting(stmt, Settings.System.VOLUME_RING,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_RING]);
+            loadSetting(stmt, Settings.System.VOLUME_SYSTEM,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_SYSTEM]);
+            loadSetting(
+                    stmt,
+                    Settings.System.VOLUME_VOICE,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_VOICE_CALL]);
+            loadSetting(stmt, Settings.System.VOLUME_ALARM,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_ALARM]);
+            loadSetting(
+                    stmt,
+                    Settings.System.VOLUME_NOTIFICATION,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_NOTIFICATION]);
+            loadSetting(
+                    stmt,
+                    Settings.System.VOLUME_BLUETOOTH_SCO,
+                    AudioManager.DEFAULT_STREAM_VOLUME_CMCC[AudioManager.STREAM_BLUETOOTH_SCO]);
+    
+            loadSetting(stmt, Settings.System.MODE_RINGER,
+                    AudioManager.RINGER_MODE_NORMAL);
+    
+            loadVibrateSetting(db, false);
+    
+            // By default:
+            // - ringtones, notification, system and music streams are affected by ringer mode
+            // on non voice capable devices (tablets)
+            // - ringtones, notification and system streams are affected by ringer mode
+            // on voice capable devices (phones)
+            int ringerModeAffectedStreams = (1 << AudioManager.STREAM_RING) |
+                                            (1 << AudioManager.STREAM_NOTIFICATION) |
+                                            (1 << AudioManager.STREAM_SYSTEM) |
+                                            (1 << AudioManager.STREAM_SYSTEM_ENFORCED)|
+                                            (1 << AudioManager.STREAM_ALARM);
+            if (!mContext.getResources().getBoolean(
+                    com.android.internal.R.bool.config_voice_capable)) {
+                ringerModeAffectedStreams |= (1 << AudioManager.STREAM_MUSIC);
+            }
+            loadSetting(stmt, Settings.System.MODE_RINGER_STREAMS_AFFECTED,
+                    ringerModeAffectedStreams);
+
+            loadSetting(stmt, Settings.System.MUTE_STREAMS_AFFECTED,
+                    ((1 << AudioManager.STREAM_MUSIC) |
+                     (1 << AudioManager.STREAM_RING) |
+                     (1 << AudioManager.STREAM_NOTIFICATION) |
+                     (1 << AudioManager.STREAM_SYSTEM)));
+        } finally {
+            if (stmt != null) stmt.close();
+        }
+    }
+
     private void loadVibrateSetting(SQLiteDatabase db, boolean deleteOld) {
         if (deleteOld) {
             db.execSQL("DELETE FROM system WHERE name='" + Settings.System.VIBRATE_ON + "'");
@@ -1979,8 +2045,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Set default tty mode
             loadSetting(stmt, Settings.System.TTY_MODE, 0);
 
-            loadIntegerSetting(stmt, Settings.System.SCREEN_BRIGHTNESS,
-                    R.integer.def_screen_brightness);
+            if (SystemProperties.getInt("ro.cmcc.test", 0) == 1) {
+                loadIntegerSetting(stmt, Settings.System.SCREEN_BRIGHTNESS,
+                        R.integer.def_screen_brightness_cmcc);
+            }
+            else{
+                loadIntegerSetting(stmt, Settings.System.SCREEN_BRIGHTNESS,
+                        R.integer.def_screen_brightness);
+            }
 
             loadBooleanSetting(stmt, Settings.System.SCREEN_BRIGHTNESS_MODE,
                     R.bool.def_screen_brightness_automatic_mode);
@@ -2003,14 +2075,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadSetting(stmt, Settings.System.SHOW_DURATION,
                     FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
 
-            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
-                    R.integer.def_key_backlight_values);
+            if (SystemProperties.getInt("ro.cmcc.test", 0) == 1) {
+                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                        R.integer.def_key_backlight_values_cmcc);
+            }
+            else{
+                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                        R.integer.def_key_backlight_values);
+            }
 
             loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
                     R.bool.def_proximity_sensor);
         
             loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
                     R.bool.def_vibrate_after_connected);
+
+            loadBooleanSetting(stmt, Settings.System.AUTO_TIME_GPS,
+                    R.bool.def_auto_time_gps); // Sync time to GPS  
 
         } finally {
             if (stmt != null) stmt.close();
@@ -2296,7 +2377,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadIntegerSetting(stmt, Settings.Global.DOCK_AUDIO_MEDIA_ENABLED,
                     R.integer.def_dock_audio_media_enabled);
 
-            loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 0);
+            loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 1);
             loadSetting(stmt, Settings.Global.DEFAULT_INSTALL_LOCATION,
                     PackageHelper.APP_INSTALL_AUTO);
 

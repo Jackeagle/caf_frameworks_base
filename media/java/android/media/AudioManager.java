@@ -242,6 +242,22 @@ public class AudioManager {
         11  // STREAM_FM
     };
 
+    /**  @hide Default volume index values for audio streams */
+    public static final int[] DEFAULT_STREAM_VOLUME_CMCC = new int[] {
+        1,  // STREAM_VOICE_CALL
+        1,  // STREAM_SYSTEM
+        1,  // STREAM_RING
+        2, // STREAM_MUSIC
+        1,  // STREAM_ALARM
+        1,  // STREAM_NOTIFICATION
+        1,  // STREAM_BLUETOOTH_SCO
+        1,  // STREAM_SYSTEM_ENFORCED
+        11, // STREAM_DTMF
+        11, // STREAM_TTS
+        11  // STREAM_FM
+    };
+
+
     /**
      * Increase the ringer volume.
      *

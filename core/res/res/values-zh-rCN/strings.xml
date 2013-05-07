@@ -1112,6 +1112,14 @@
     <item quantity="one" msgid="1634101450343277345">"打开可用的 Wi-Fi 网络"</item>
     <item quantity="other" msgid="7915895323644292768">"打开可用的 Wi-Fi 网络"</item>
   </plurals>
+  <plurals name="wifi_available_wlan">
+    <item quantity="one" msgid="6654123987418168693">"有可用的 WLAN 网络"</item>
+    <item quantity="other" msgid="4192424489168397386">"有可用的 WLAN 网络"</item>
+  </plurals>
+  <plurals name="wifi_available_detailed_wlan">
+    <item quantity="one" msgid="1634101450343277345">"打开可用的 WLAN 网络"</item>
+    <item quantity="other" msgid="7915895323644292768">"打开可用的 WLAN 网络"</item>
+  </plurals>
     <string name="wifi_available_sign_in" msgid="4029489716605255386">"登录到 Wi-Fi 网络"</string>
     <string name="network_available_sign_in" msgid="8495155593358054676">"登录网络"</string>
     <!-- no translation found for network_available_sign_in_detailed (8000081941447976118) -->
@@ -1499,5 +1507,5 @@
     <!-- CMCC WLAN customization end-->
     <string name="auto_power_off_title">自动关机</string>  
     <string name="auto_power_off_msg">系统将在<xliff:g id="seconds">%d</xliff:g> 秒后关机.</string>
-
+    <string name="gps_time_sync_fail_str">使用 GPS 提供时间失败</string>
 </resources>

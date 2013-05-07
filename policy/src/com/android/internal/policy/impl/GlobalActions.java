@@ -259,6 +259,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             });
 		
 		// add: fastpoweron
+		//if (SystemProperties.getInt("ro.cmcc.test", 0) == 1) {
 		if (mEnableFastPowerOn) {
 			 mItems.add(
 				 new SinglePressHasSumraryAction(

@@ -1805,8 +1805,8 @@ public class WifiStateMachine extends StateMachine {
         } else {
             mWifiInfo.setNetworkId(WifiConfiguration.INVALID_NETWORK_ID);
         }
-
-        mWifiInfo.setBSSID(stateChangeResult.BSSID);
+		
+		mWifiInfo.setBSSID(stateChangeResult.BSSID);
         mWifiInfo.setSSID(stateChangeResult.wifiSsid);
 
         mSupplicantStateTracker.sendMessage(Message.obtain(message));

@@ -65,6 +65,7 @@ import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.TextUtils;
 import android.util.Log;
+import java.util.Date;
 import android.util.NtpTrustedTime;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.location.GpsNetInitiatedHandler;
@@ -114,7 +115,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final String TAG = "GpsLocationProvider";
 
     private static final boolean DEBUG =true;  // Log.isLoggable(TAG, Log.DEBUG);
-    private static final boolean VERBOSE = Log.isLoggable(TAG, Log.VERBOSE);
+    private static final boolean VERBOSE = true;//Log.isLoggable(TAG, Log.VERBOSE);
 
     private static final ProviderProperties PROPERTIES = new ProviderProperties(
             true, true, false, false, true, true, true,
@@ -219,7 +220,11 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int AGPS_SETID_TYPE_MSISDN = 2;
 
     private ContentResolver mContentResolver;
-
+    
+    // true if single shot request is in progress
+    private boolean mSingleShot =false;
+         // add support for auto time gps
+    private boolean sAutoTimeGPS = false;
 
     private static final String PROPERTIES_FILE = "/etc/gps.conf";
 
@@ -540,7 +545,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     private void checkWapSuplInit(Intent intent) {
         byte[] supl_init = (byte[]) intent.getExtra("data");
-	 notifyNiLocation();
+	  notifyNiLocation();
         native_agps_ni_message(supl_init,supl_init.length);
     }
 
@@ -590,6 +595,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 }
             }
 
+
+
+
             mC2KServerHost = mProperties.getProperty("C2K_HOST");
             portString = mProperties.getProperty("C2K_PORT");
             if (mC2KServerHost != null && portString != null) {
@@ -602,6 +610,25 @@ public class GpsLocationProvider implements LocationProviderInterface {
         } catch (IOException e) {
             Log.w(TAG, "Could not open GPS configuration file " + PROPERTIES_FILE);
         }
+
+        int autoGpsTimeInitValue = Settings.System.getInt(mContentResolver,Settings.System.AUTO_TIME_GPS, 0);
+        sAutoTimeGPS = (autoGpsTimeInitValue == 1);
+        if (DEBUG) Log.d(TAG, "Init sAutoTimeGPS= " + sAutoTimeGPS);
+
+        //listen to auto time gps flag 
+        mContext.getContentResolver().registerContentObserver(
+                Settings.System.getUriFor(Settings.System.AUTO_TIME_GPS), false,
+                new ContentObserver(new Handler()) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        int autotimegps = Settings.System.getInt(mContentResolver,
+                                                Settings.System.AUTO_TIME_GPS, 0);
+                        sAutoTimeGPS = (autotimegps == 1);
+                        if (DEBUG) Log.d(TAG, "sync GPS time has been changed: sAutoTimeGPS= " + sAutoTimeGPS);
+                    }
+                });
+
+
 
 	String prefAGpsType = Settings.Global.getString(mContentResolver, Settings.Global.AGPS_PROVID);
 	Log.e(TAG, "****************prefAGpsType ****************" +prefAGpsType);
@@ -665,6 +692,32 @@ public class GpsLocationProvider implements LocationProviderInterface {
 			}
 		});
 
+	mContext.getContentResolver().registerContentObserver(
+			Settings.Secure.getUriFor(Settings.Global.ASSISTED_GPS_ENABLED), false,
+			new ContentObserver(new Handler()) {
+				@Override
+				public void onChange(boolean selfChange) {
+					// gps lock mode
+					// 1-lock none 3-lock ni
+					int lockMode1 = Settings.Global.getInt(mContext.getContentResolver(),
+										Settings.Global.ASSISTED_GPS_ENABLED, 1);
+					if(lockMode1==0)
+					{
+					   lockMode1=3;
+					}
+					if (DEBUG) Log.d(TAG, "GOT LOCK MODE " + lockMode1);
+					native_set_gps_lock(lockMode1);
+				}
+			});
+	    // do it when init gpslocationprovider
+	     int lockMode = Settings.Global.getInt(mContext.getContentResolver(),
+						Settings.Global.ASSISTED_GPS_ENABLED, 1);
+	    if(lockMode==0)
+	   {
+	        lockMode=3;
+	    }
+	  if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
+	   native_set_gps_lock(lockMode);
 
     }
 
@@ -973,6 +1026,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
         }
 
         boolean enabled = native_init();
+	  mSuplServerHost = Settings.Global.getString(mContentResolver, Settings.Global.SUPL_HOST);
+         String portString = Settings.Global.getString(mContentResolver, Settings.Global.SUPL_PORT);
+	if (mSuplServerHost != null && portString != null) {
+		 
+         mSuplServerPort = Integer.parseInt(portString);
+	}
 
         if (enabled) {
             mSupportsXtra = native_supports_xtra();
@@ -988,6 +1047,17 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
             Log.w(TAG, "Failed to enable location provider");
         }
+
+	  // do it when init gpslocationprovider
+	  int lockMode = Settings.Global.getInt(mContext.getContentResolver(),
+					  Settings.Global.ASSISTED_GPS_ENABLED, 1);
+	  if(lockMode==0)
+	 {
+		  lockMode=3;
+	  }
+	if (DEBUG) Log.d(TAG, "GOT LOCK MODE11 " + lockMode);
+	 native_set_gps_lock(lockMode);
+
     }
 
     /**
@@ -1237,6 +1307,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
 		else if(hasCapability(GPS_CAPABILITY_MSA)&&
 			(Settings.Global.getInt(mContentResolver, Settings.Global.PREF_ASSISTED_GPS_TYPE, 0) == 1)){
 			mPositionMode = GPS_POSITION_MODE_MS_ASSISTED;
+                    mSingleShot = true;
 			}
             }
             if(mPrefAGpsNetworkType!=null && (mPrefAGpsNetworkType.equals("HOME"))){
@@ -1278,6 +1349,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (DEBUG) Log.d(TAG, "stopNavigating");
         if (mStarted) {
             mStarted = false;
+            mSingleShot = false;
             native_stop();
             mTimeToFirstFix = 0;
             mLastFixTime = 0;
@@ -1286,6 +1358,13 @@ public class GpsLocationProvider implements LocationProviderInterface {
             // reset SV count to zero
             updateStatus(LocationProvider.TEMPORARILY_UNAVAILABLE, 0);
         }
+    }
+
+     private void setAndBroadcastGPSTime(long time) {
+        SystemClock.setCurrentTimeMillis(time);
+        Intent intent = new Intent(TelephonyIntents.ACTION_NETWORK_SET_TIME);
+        intent.putExtra("time", time);
+        mContext.sendStickyBroadcast(intent);
     }
 
     private void hibernate() {
@@ -1353,6 +1432,10 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (mTimeToFirstFix == 0 && (flags & LOCATION_HAS_LAT_LONG) == LOCATION_HAS_LAT_LONG) {
             mTimeToFirstFix = (int)(mLastFixTime - mFixRequestTime);
             if (DEBUG) Log.d(TAG, "TTFF: " + mTimeToFirstFix);
+             if (sAutoTimeGPS){
+                if (DEBUG) Log.d(TAG, "reportLocation(): time= (" + new Date(timestamp) + ")");
+                setAndBroadcastGPSTime(timestamp);
+            }
 
             // notify status listeners
             synchronized (mListeners) {
@@ -1371,6 +1454,10 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
         }
 
+        if (mSingleShot) {
+         Log.v(TAG, "reportLocationmSingleShot: " + mSingleShot);
+         stopNavigating();
+        }
         if (mStarted && mStatus != LocationProvider.AVAILABLE) {
             // we want to time out if we do not receive a fix
             // within the time out and we are requesting infrequent fixes
@@ -1383,8 +1470,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
             intent.putExtra(LocationManager.EXTRA_GPS_ENABLED, true);
             mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
             updateStatus(LocationProvider.AVAILABLE, mSvCount);
+	    if (DEBUG) Log.d(TAG, "got fix, GPS_FIX_CHANGE_ACTION");
         }
-
+      
        if (!hasCapability(GPS_CAPABILITY_SCHEDULING) && mStarted &&
                mFixInterval > GPS_POLLING_THRESHOLD_INTERVAL) {
             if (DEBUG) Log.d(TAG, "got fix, hibernating");
@@ -1440,6 +1528,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 Intent intent = new Intent(LocationManager.GPS_ENABLED_CHANGE_ACTION);
                 intent.putExtra(LocationManager.EXTRA_GPS_ENABLED, mNavigating);
                 mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
+	      if (DEBUG) Log.v(TAG, "reportStatus GPS_ENABLED_CHANGE_ACTION");
             }
         }
     }
@@ -1744,12 +1833,13 @@ public class GpsLocationProvider implements LocationProviderInterface {
         }
            Log.d(TAG, "handleReportAgpsStatus AGpsConnectionInfo"+agpsConnInfo);
 	   Log.d(TAG, "reportAGpsStatus agpsConnInfo is for type "+type);
+	  
 
         switch (status) {
             case GPS_REQUEST_AGPS_DATA_CONN:
                 if (DEBUG) Log.d(TAG, "GPS_REQUEST_AGPS_DATA_CONN");
-
-                switch (type) {
+				    
+		switch (type) {
                 case AGpsConnectionInfo.CONNECTION_TYPE_SUPL:
                 case AGpsConnectionInfo.CONNECTION_TYPE_WWAN_ANY: {
                     NetworkInfo info = mConnMgr.getNetworkInfo(agpsConnInfo.getCMConnType());
@@ -2246,6 +2336,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private native void native_cleanup();
     private native boolean native_set_position_mode(int mode, int recurrence, int min_interval,
             int preferred_accuracy, int preferred_time);
+    private native void native_set_gps_lock(int lock);
     private native boolean native_start();
     private native boolean native_stop();
     private native void native_delete_aiding_data(int flags);

@@ -401,7 +401,7 @@ public class RingtoneManager {
     public Uri getRingtoneUri(int position) {
         // use cursor directly instead of requerying it, which could easily
         // cause position to shuffle.
-        if (mCursor == null || !mCursor.moveToPosition(position)) {
+        if (mCursor == null || mCursor.isClosed() || !mCursor.moveToPosition(position)) {
             return null;
         }
         
@@ -409,8 +409,13 @@ public class RingtoneManager {
     }
     
     private static Uri getUriFromCursor(Cursor cursor) {
-        return ContentUris.withAppendedId(Uri.parse(cursor.getString(URI_COLUMN_INDEX)), cursor
-                .getLong(ID_COLUMN_INDEX));
+        try {
+            return ContentUris.withAppendedId(Uri.parse(cursor.getString(URI_COLUMN_INDEX)),
+                    cursor.getLong(ID_COLUMN_INDEX));
+        } catch (Exception e) {
+            Log.w(TAG, "can not get uri from cursor:" + e);
+            return null;
+        }
     }
     
     /**
