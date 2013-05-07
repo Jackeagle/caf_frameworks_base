@@ -523,6 +523,9 @@ public final class ShutdownThread extends Thread {
      * @param reason reason for reboot
      */
     public static void rebootOrShutdown(boolean reboot, String reason) {
+        // Oem specific shutdown
+        deviceRebootOrShutdown(reboot, reason);
+
         if (reboot) {
             Log.i(TAG, "Rebooting, reason: " + reason);
             try {
@@ -546,9 +549,6 @@ public final class ShutdownThread extends Thread {
             } catch (InterruptedException unused) {
             }
         }
-
-        // Oem specific shutdown
-        deviceRebootOrShutdown(reboot, reason);
 
         // Shutdown power
         Log.i(TAG, "Performing low-level shutdown...");
