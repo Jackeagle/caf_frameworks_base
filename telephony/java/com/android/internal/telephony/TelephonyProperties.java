@@ -199,6 +199,15 @@ public interface TelephonyProperties
     static final String CALLS_ON_IMS_ENABLED_PROPERTY = "persist.radio.calls.on.ims";
 
     /**
+     * Controls audio route for VT calls.
+     * 0 - Use the default audio routing strategy.
+     * 1 - Disable the speaker. Route the audio to Headset or Bloutooth
+     *     or Earpiece, based on the default audio routing strategy.
+     * This property is for testing purpose only.
+     */
+    static final String PROPERTY_IMS_AUDIO_OUTPUT = "persist.radio.ims.audio.output";
+
+    /**
      * Ignore RIL_UNSOL_NITZ_TIME_RECEIVED completely, used for debugging/testing.
      */
     static final String PROPERTY_IGNORE_NITZ = "telephony.test.ignore.nitz";
