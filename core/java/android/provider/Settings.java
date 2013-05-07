@@ -1597,6 +1597,25 @@ public final class Settings {
          */
         public static final int WIFI_PRIORITY_TYPE_MANUAL = 1;
 
+        /**
+             * Whether connect to data network automatically
+             * @hide
+             */
+        public static final String WIFI_GSM_CONNECT_TYPE = "wifi_gsm_connect_type";
+
+        /**
+             * data network will connect automatically
+             * @hide
+             */
+        public static final int WIFI_GSM_CONNECT_TYPE_AUTO = 0;
+
+        /**
+              * user will be notified when wifi is unavailable
+              * @hide
+              */
+        public static final int WIFI_GSM_CONNECT_TYPE_ASK = 1;
+
+
 		/**
 		 * Whether wpa_supplicant will connect to access point automatically
 		 * @hide
