@@ -61,7 +61,8 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                     .checkService("phone")).getIccPin1RetryCount();
             if (attemptsRemaining >= 0) {
                 displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
-                        + getContext().getString(R.string.pinpuk_attempts) + attemptsRemaining;
+                        + getContext().getString(R.string.pinpuk_attempts)
+                        + attemptsRemaining + ". ";
             }
         } catch (RemoteException ex) {
             displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
