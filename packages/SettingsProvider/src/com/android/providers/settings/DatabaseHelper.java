@@ -2075,14 +2075,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadSetting(stmt, Settings.System.SHOW_DURATION,
                     FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
 
-            if (SystemProperties.getInt("ro.cmcc.test", 0) == 1) {
-                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
-                        R.integer.def_key_backlight_values_cmcc);
-            }
-            else{
-                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
-                        R.integer.def_key_backlight_values);
-            }
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
 
             loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
                     R.bool.def_proximity_sensor);
