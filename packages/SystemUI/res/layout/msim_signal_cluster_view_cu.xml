@@ -69,16 +69,7 @@
                 android:layout_height="wrap_content"
                 android:layout_width="wrap_content"
                 />
-            <ImageView
-                android:id="@+id/mobile_type_sub2"
-                android:layout_height="wrap_content"
-                android:layout_width="wrap_content"
-                />
-            <ImageView
-                android:id="@+id/mobile_inout_sub2"
-                android:layout_height="wrap_content"
-                android:layout_width="wrap_content"
-                />
+
     <!-- data connection end -->
     
     <View
@@ -114,7 +105,17 @@
         android:layout_width="1dp"
         android:id="@+id/spacer"
         />
-		 <FrameLayout
+       <ImageView
+                android:id="@+id/mobile_type_sub2"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                />
+      <ImageView
+                android:id="@+id/mobile_inout_sub2"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+             />   
+	<FrameLayout
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
         >
