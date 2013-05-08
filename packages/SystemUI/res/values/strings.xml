@@ -538,5 +538,5 @@
     <string name="screenshot_emmc_not_mount">Couldn\'t save screenshot. Internal storage is not ready.</string>
     <!-- Notification text displayed when emmc is full.  -->
     <string name="screenshot_emmc_full">Couldn\'t save screenshot. Internal storage is full.</string>
- 
+     <string name="statusbar_expanded_notification_title">Notifications</string>
 </resources>
