@@ -338,6 +338,7 @@ public class WifiP2pGroup implements Parcelable {
                 group.setPassphrase(in.readString());
                 group.setInterface(in.readString());
                 group.setNetworkId(in.readInt());
+                group.setGoOperatingFrequency(in.readInt());
                 return group;
             }
 
