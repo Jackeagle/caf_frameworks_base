@@ -41,6 +41,10 @@ bool BootSound::threadLoop()
      *
      */
     if (checkBootState()) {
+    char buf[32];
+    property_get("persist.sys.bootsong", buf, "1");
+    if (buf[0] != '1') return false;
+	
     mMediaPlayer->start();
     SLOGD("mMediaPlayer is playing");
     	}
