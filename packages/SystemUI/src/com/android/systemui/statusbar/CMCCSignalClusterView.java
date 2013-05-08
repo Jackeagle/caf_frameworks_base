@@ -152,7 +152,7 @@ public class CMCCSignalClusterView
        Log.i(TAG, "setMobileDataIndicators=simServiceState111=" +simServiceState );
        Log.i(TAG, "setMobileDataIndicators=mServiceState111=" +mServiceState );
 	 mServiceState = simServiceState;
-       isSimRoam = isRoam;
+        isSimRoam = isRoam;
 	 Log.i(TAG, "setMobileDataIndicators=mServiceState222=" +mServiceState );
         mMobileVisible = visible;
         mMobileStrengthId = convertStrengthIconIdToCMCC(strengthIcon, 0);
