@@ -4102,5 +4102,6 @@
 
     <string name="auto_power_off_title">Auto power off</string>  
     <string name="auto_power_off_msg">Shut down in <xliff:g id="seconds">%d</xliff:g> seconds.</string>
-
+    <!-- The Toast hints for GPS time sync failure -->
+    <string name="gps_time_sync_fail_str">Failed to get GPS provided time</string>
 </resources>

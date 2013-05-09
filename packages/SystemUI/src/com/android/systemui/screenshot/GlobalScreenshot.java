@@ -82,6 +82,7 @@ class SaveImageInBackgroundTask extends AsyncTask<SaveImageInBackgroundData, Voi
     private static final String SCREENSHOTS_DIR_NAME = "Screenshots";
     private static final String SCREENSHOT_FILE_NAME_TEMPLATE = "Screenshot_%s.png";
     private static final String SCREENSHOT_FILE_PATH_TEMPLATE = "%s/%s/%s";
+    private boolean SAVING_IMG_TO_EMMC = true;
 
     private int mNotificationId;
     private NotificationManager mNotificationManager;
@@ -107,6 +108,9 @@ class SaveImageInBackgroundTask extends AsyncTask<SaveImageInBackgroundData, Voi
         String imageDate = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date(mImageTime));
         String imageDir = Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_PICTURES).getAbsolutePath();
+        if(SAVING_IMG_TO_EMMC)
+            imageDir = Environment.getInternalStorageDirectory().toString();
+
         mImageFileName = String.format(SCREENSHOT_FILE_NAME_TEMPLATE, imageDate);
         mImageFilePath = String.format(SCREENSHOT_FILE_PATH_TEMPLATE, imageDir,
                 SCREENSHOTS_DIR_NAME, mImageFileName);
@@ -289,6 +293,8 @@ class GlobalScreenshot {
     private float mBgPaddingScale;
 
     private MediaActionSound mCameraSound;
+
+    private boolean SAVING_IMG_TO_EMMC = true;
 
 
     /**

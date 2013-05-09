@@ -1597,6 +1597,25 @@ public final class Settings {
          */
         public static final int WIFI_PRIORITY_TYPE_MANUAL = 1;
 
+        /**
+             * Whether connect to data network automatically
+             * @hide
+             */
+        public static final String WIFI_GSM_CONNECT_TYPE = "wifi_gsm_connect_type";
+
+        /**
+             * data network will connect automatically
+             * @hide
+             */
+        public static final int WIFI_GSM_CONNECT_TYPE_AUTO = 0;
+
+        /**
+              * user will be notified when wifi is unavailable
+              * @hide
+              */
+        public static final int WIFI_GSM_CONNECT_TYPE_ASK = 1;
+
+
 		/**
 		 * Whether wpa_supplicant will connect to access point automatically
 		 * @hide
@@ -2115,6 +2134,13 @@ public final class Settings {
          *   yyyy/mm/dd
          */
         public static final String DATE_FORMAT = "date_format";
+
+        /**
+         * Value to specify if the user prefers the date, time and time zone
+         * to be automatically fetched from the GPS. 1=yes, 0=no
+           @hide
+         */
+        public static final String AUTO_TIME_GPS = "auto_time_gps";
 
         /**
          * Whether the setup wizard has been run before (on first boot), or if

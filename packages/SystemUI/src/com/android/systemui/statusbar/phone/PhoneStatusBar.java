@@ -37,6 +37,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
+import android.content.res.Configuration;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.graphics.Canvas;
@@ -310,6 +311,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     private Switch mDataEnabled;
     private ConnectivityManager mConnService;
     private Boolean mMobileDataEnabled;
+    private TextView mDateString;
 
     private View mApnSwitchContainer;
     private View mApnSettingsView;
@@ -619,6 +621,7 @@ public class PhoneStatusBar extends BaseStatusBar {
 
         // bind data switch
         mDataSwitchContainer = (LinearLayout) mStatusBarWindow.findViewById(R.id.data_switch_container);
+	  mDateString=(TextView) mStatusBarWindow.findViewById(R.id.data_text_container);
 		
         if (FeatureQuery.FEATURE_NOTIFICATION_BAR_DATA_SWITCH) {
             mDataEnabled = (Switch) mStatusBarWindow.findViewById(R.id.data_switch);
@@ -2593,10 +2596,30 @@ public class PhoneStatusBar extends BaseStatusBar {
     void updateResources() {
         final Context context = mContext;
         final Resources res = context.getResources();
+        
 
         if (mClearButton instanceof TextView) {
             ((TextView)mClearButton).setText(context.getText(R.string.status_bar_clear_all_button));
         }
+        updateApnView();
+	 mDateString.setText(context.getText(R.string.data_usage_enable_mobile));
+	 
+	 //refresh data switch      
+        int index =((LinearLayout)mDataSwitchContainer).indexOfChild(mDataEnabled);
+        ((LinearLayout)mDataSwitchContainer).removeViewAt(index);
+        mDataEnabled = new Switch(mContext);      
+	 mDataEnabled.setId(R.id.data_switch);
+	
+    	 ((LinearLayout)mDataSwitchContainer).addView(mDataEnabled, index);   
+	 if (FeatureQuery.FEATURE_NOTIFICATION_BAR_DATA_SWITCH) {
+		 mDataEnabled = (Switch) mStatusBarWindow.findViewById(R.id.data_switch);
+		mDataEnabled.setOnCheckedChangeListener(mDataEnabledListener);
+		mMobileDataEnabled = mConnService.getMobileDataEnabled();
+		mDataEnabled.setChecked(mMobileDataEnabled);
+	} else {
+		mStatusBarWindow.findViewById(R.id.div_top).setVisibility(View.GONE);
+		mDataSwitchContainer.setVisibility(View.GONE);
+	}
 
         // Update the QuickSettings container
         if (mQS != null) mQS.updateResources();

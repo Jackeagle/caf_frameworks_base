@@ -373,7 +373,7 @@ public final class ShutdownThread extends Thread {
         
 		showShutdownAnimation();
         String shutDownFile = null;
-        if (!isSilentMode()
+        if (!isSilentMode() && !isBootSoundOff()
                 && (shutDownFile = getShutdownMusicFilePath()) != null) {
             isShutdownMusicPlaying = true;
         Log.i(TAG, "obtainMessage for shutdown music");
@@ -639,6 +639,11 @@ public final class ShutdownThread extends Thread {
         String mode = SystemProperties.get("persist.sys.silent");
         return mode != null && mode.equals("1");
     }
+    private static boolean isBootSoundOff() {
+        String mode = SystemProperties.get("persist.sys.bootsong","1");
+        return !mode.equals("1");
+    }
+
     private static void showShutdownAnimation() {
         SystemProperties.set("ctl.start", "bootanim");
     }
@@ -651,6 +656,7 @@ public final class ShutdownThread extends Thread {
             {
                 mediaPlayer.reset();
                 mediaPlayer.setDataSource(path);
+				mediaPlayer.setAudioStreamType(android.media.AudioManager.STREAM_SYSTEM);
                 mediaPlayer.prepare();
                 mediaPlayer.start();
                 mediaPlayer.setOnCompletionListener(new OnCompletionListener() {

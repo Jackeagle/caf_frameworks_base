@@ -1789,10 +1789,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private void tryFailover(int prevNetType) {
 //QUALCOMM_CMCC_START
 		if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
-		    //boolean mAutoConnect = Settings.System.getInt(mContext.getContentResolver(), 
-            //            Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO) == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO;
-            //show confirm dialog when wifi disconnected
-	        if (prevNetType == ConnectivityManager.TYPE_WIFI/* && !mAutoConnect*/) {
+		    boolean mAutoWifiGsmConnect = Settings.System.getInt(mContext.getContentResolver(), 
+                        Settings.System.WIFI_GSM_CONNECT_TYPE, Settings.System.WIFI_GSM_CONNECT_TYPE_ASK) == Settings.System.WIFI_GSM_CONNECT_TYPE_ASK;
+            //show confirm dialog when wifi disconnected and when switch Gsm->wlan need pop up dialog
+	        if (prevNetType == ConnectivityManager.TYPE_WIFI && mAutoWifiGsmConnect) {
 			    log("---------tryFailover-----------------");
 	            //modify two card nodify for wlan->TD/GSM
 //	            int num_simcard = TelephonyManager.getDefaultDataPhoneId(mContext);
@@ -1911,14 +1911,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 										net.reconnect();	 //reconnect if ppp button has already on
 									} else {
 										setMobileDataEnabled(true); 
-										net.reconnect();
+										//net.reconnect();
 									}
 
 								}
 							}
 				        } else {
 						    log(" cancel getMobileDataEnabled=" + getMobileDataEnabled());
-							setMobileDataEnabled(false);
+							if( getMobileDataEnabled()) setMobileDataEnabled(false);
 						}
 						mWifiDisconnectDlg = null;
 					}
@@ -2142,10 +2142,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         log("Policy requires " + otherNet.getNetworkInfo().getTypeName() +
                             " teardown");
                     }
-                    if (!teardown(otherNet)) {
-                        loge("Network declined teardown request");
-                        teardown(thisNet);
-                        return;
+                    if (!((FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) && (newNetType == ConnectivityManager.TYPE_WIFI))) {
+                        if (!teardown(otherNet)) {
+                            loge("Network declined teardown request");
+                            teardown(thisNet);
+                            return;
+                        }
                     }
                 } else {
                        // don't accept this one
@@ -2835,16 +2837,18 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         // differently, or not.
                         handleDisconnect(info);
                     } else if (state == NetworkInfo.State.CONNECTED) {
-                        handleConnect(info);
                         //QUALCOMM_CMCC_START
                         if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
                             if (type == ConnectivityManager.TYPE_WIFI) {
-                                log("mWifiConnected = true ");
+                                log("mWifiConnected = true " + ", getMobileDataEnabled:" + getMobileDataEnabled());
                                 mWifiConnected = true;
+                                if (getMobileDataEnabled())
+                                    setMobileDataEnabled(false);
                             }
                             hideWifiDisconnectedDlg();
                         }
                         //QUALCOMM_CMCC_END
+                        handleConnect(info);
                     }
                     if (mLockdownTracker != null) {
                         mLockdownTracker.onNetworkInfoChanged(info);

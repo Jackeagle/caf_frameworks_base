@@ -998,21 +998,21 @@ class WifiConfigStore {
 
         setVariables: {
 
-            if (config.SSID != null &&
-                    !mWifiNative.setNetworkVariable(
-                        netId,
-                        WifiConfiguration.ssidVarName,
-                        config.SSID)) {
-                loge("failed to set SSID: "+config.SSID);
-                break setVariables;
-            }
-
             if (config.BSSID != null &&
                     !mWifiNative.setNetworkVariable(
                         netId,
                         WifiConfiguration.bssidVarName,
                         config.BSSID)) {
                 loge("failed to set BSSID: "+config.BSSID);
+                break setVariables;
+            }
+			
+            if (config.SSID != null &&
+                    !mWifiNative.setNetworkVariable(
+                        netId,
+                        WifiConfiguration.ssidVarName,
+                        config.SSID)) {
+                loge("failed to set SSID: "+config.SSID);
                 break setVariables;
             }
 
@@ -1087,7 +1087,6 @@ class WifiConfigStore {
                 loge("failed to set psk");
                 break setVariables;
             }
-
             boolean hasSetKey = false;
             if (config.wepKeys != null) {
                 for (int i = 0; i < config.wepKeys.length; i++) {

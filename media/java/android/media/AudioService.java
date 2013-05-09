@@ -205,6 +205,9 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     // Maximum volume adjust steps allowed in a single batch call.
     private static final int MAX_BATCH_VOLUME_ADJUST_STEPS = 4;
 
+    private static final String PROPERTY_BOOTSONG = "persist.sys.bootsong";  
+    private static final String PROPERTY_BOOTSONG_ON_OFF = "persist.sys.bootsong.power"; 
+
     /* Sound effect file names  */
     private static final String SOUND_EFFECTS_PATH = "/media/audio/ui/";
     private static final String[] SOUND_EFFECT_FILES = new String[] {
@@ -1373,6 +1376,14 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             sendMsg(mAudioHandler, MSG_PERSIST_RINGER_MODE,
                     SENDMSG_REPLACE, 0, 0, null, PERSIST_DELAY);
         }
+
+        if(mRingerMode != AudioManager.RINGER_MODE_NORMAL) {
+            //forbid boot sound
+            SystemProperties.set(PROPERTY_BOOTSONG, "0");
+        }else{
+            //allow boot sound
+            SystemProperties.set(PROPERTY_BOOTSONG, "1");
+        }
     }
 
     private void restoreMasterVolume() {
@@ -1728,7 +1739,8 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         if (newMode == AudioSystem.MODE_RINGTONE) {
             // if not ringing silently
             int ringVolume = AudioService.this.getStreamVolume(AudioManager.STREAM_RING);
-            if (ringVolume > 0) {
+			//music need stop with slience or vibrate when incoming call
+            //if (ringVolume > 0) {
                 // request audio focus for the communication focus entry
                 requestAudioFocus(AudioManager.STREAM_RING,
                         AudioManager.AUDIOFOCUS_GAIN_TRANSIENT, cb,
@@ -1736,7 +1748,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                         IN_VOICE_COMM_FOCUS_ID /*clientId*/,
                         "system");
 
-            }
+            //}
         }
         // if entering call
         else if ((newMode == AudioSystem.MODE_IN_CALL)

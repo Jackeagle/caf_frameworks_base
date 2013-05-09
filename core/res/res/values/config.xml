@@ -571,9 +571,12 @@
 
          Must be overridden in platform specific overlays -->
     <integer-array name="config_autoBrightnessLevels">
-        <item>20</item>    
+        <item>10</item>
+        <item>40</item>
+        <item>80</item>
         <item>160</item>
         <item>320</item>
+        <item>640</item>
         <item>1280</item>
         <item>2560</item>
     </integer-array>
@@ -602,10 +605,12 @@
          This must be overridden in platform specific overlays -->
     <integer-array name="config_autoBrightnessLcdBacklightValues">
          <item>20</item>     
-         <item>45</item>
-         <item>85</item>
-         <item>125</item>
-         <item>175</item>
+         <item>40</item>
+         <item>70</item>     
+         <item>100</item>
+         <item>130</item>
+         <item>160</item>
+         <item>200</item>
          <item>255</item>
     </integer-array>
 
@@ -1053,4 +1058,10 @@
 
     <!-- Flag indicating if the speed up audio on mt call code should be executed -->
     <bool name="config_speed_up_audio_on_mt_calls">false</bool>
+
+    <integer name="config_mms_mtu_2g_size">1300</integer>
+    <integer name="config_mms_mtu_3g_size">1400</integer>
+    <integer name="config_mobile_mtu_2g_size">1410</integer>
+    <integer name="config_mobile_mtu_3g_size">1410</integer>
+    <integer name="config_mtu_default_size">1380</integer>
 </resources>

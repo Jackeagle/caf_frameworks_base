@@ -1025,6 +1025,9 @@ public class MediaScanner
                 // Set the setting to the given URI
                 Settings.System.putString(mContext.getContentResolver(), settingName,
                         ContentUris.withAppendedId(uri, rowId).toString());
+
+                Settings.System.putString(mContext.getContentResolver(), settingName + "_default",
+                        ContentUris.withAppendedId(uri, rowId).toString());
             }
         }
 

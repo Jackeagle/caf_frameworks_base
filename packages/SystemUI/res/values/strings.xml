@@ -533,5 +533,10 @@
     <string name="tasklist_killall">Kill All</string>
     <string name="tasklist_memory_usage">"Free/Total Memory:[<xliff:g id="number">%s</xliff:g>] / [<xliff:g id="name">%s</xliff:g>]"</string>
     <string name="message_keep_one_launcher">Should keep at lease one home activity!</string>
-    <!--end TaskManager-->    
+    <!--end TaskManager-->   
+    <!-- Notification text displayed without internal storage. -->
+    <string name="screenshot_emmc_not_mount">Couldn\'t save screenshot. Internal storage is not ready.</string>
+    <!-- Notification text displayed when emmc is full.  -->
+    <string name="screenshot_emmc_full">Couldn\'t save screenshot. Internal storage is full.</string>
+     <string name="statusbar_expanded_notification_title">Notifications</string>
 </resources>
