@@ -123,8 +123,8 @@ public class EmergencyButton extends Button {
                 enabled = mLockPatternUtils.isSecure();
             }
         }
-        mLockPatternUtils.updateEmergencyCallButtonState(this, phoneState, enabled,
-                KeyguardViewManager.USE_UPPER_CASE, false);
+        //mLockPatternUtils.updateEmergencyCallButtonState(this, phoneState, enabled,
+               // KeyguardViewManager.USE_UPPER_CASE, false);
     }
 
 }
