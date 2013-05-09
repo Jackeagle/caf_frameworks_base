@@ -3323,6 +3323,7 @@ package android.app {
     field public static final java.lang.String EXTRA_DOWNLOAD_ID = "extra_download_id";
     field public static final java.lang.String EXTRA_NOTIFICATION_CLICK_DOWNLOAD_IDS = "extra_click_download_ids";
     field public static final java.lang.String INTENT_EXTRAS_SORT_BY_SIZE = "android.app.DownloadManager.extra_sortBySize";
+    field public static final int PAUSED_BY_MANUAL = 5; // 0x5
     field public static final int PAUSED_QUEUED_FOR_WIFI = 3; // 0x3
     field public static final int PAUSED_UNKNOWN = 4; // 0x4
     field public static final int PAUSED_WAITING_FOR_NETWORK = 2; // 0x2
