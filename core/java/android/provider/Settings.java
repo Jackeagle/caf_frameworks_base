@@ -5711,6 +5711,19 @@ public final class Settings {
         public static final String ENABLE_FAST_POWERON = "enable_fast_poweron";
 
         /**
+         * Int value to specify if CABL is enabled.
+         * 0 = Disable  1 = Enable
+         * @hide
+         */
+        public static final String CABL_ENABLED = "cabl_enabled";
+
+        /**
+         * Int value to specify CABL levels.
+         * @hide
+         */
+        public static final String CABL_LEVELS = "cabl_levels";
+
+        /**
           * Subscription to be used for voice call on a multi sim device. The supported values
           * are 0 = SUB1, 1 = SUB2.
           * @hide
