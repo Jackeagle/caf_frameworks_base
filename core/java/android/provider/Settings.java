@@ -5774,6 +5774,18 @@ public final class Settings {
         };
 
         /**
+         * Preferred subscription icon index. 0 = @drawable/ic_sim_icon_1
+         *                                    1 = @drawable/ic_sim_icon_2
+         *                                    2 = @drawable/ic_sim_icon_c
+         *                                    3 = @drawable/ic_sim_icon_g
+         *                                    4 = @drawable/ic_sim_icon_w
+         * The default value is "0,1". And 0 for SUB1, 1 for SUB2.
+         *
+         * @hide
+         */
+        public static final String PREFERRED_SIM_ICON_INDEX = "preferred_sim_icon_index";
+
+        /**
          * display duration info after end call. 0 = Off 1 = On
          *
          * @hide
