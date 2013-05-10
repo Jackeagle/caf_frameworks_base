@@ -30,6 +30,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.location.CountryDetector;
+import android.location.Country;
 import android.net.Uri;
 import android.os.SystemProperties;
 import android.provider.Contacts;
@@ -1808,11 +1809,15 @@ public class PhoneNumberUtils
     private static boolean isLocalEmergencyNumberInternal(String number,
                                                           Context context,
                                                           boolean useExactMatch) {
-        String countryIso;
+        String countryIso = null;
+        Country country;
         CountryDetector detector = (CountryDetector) context.getSystemService(
                 Context.COUNTRY_DETECTOR);
         if (detector != null) {
-            countryIso = detector.detectCountry().getCountryIso();
+            country = detector.detectCountry();
+            if (country != null){
+               countryIso = country.getCountryIso();
+            }
         } else {
             Locale locale = context.getResources().getConfiguration().locale;
             countryIso = locale.getCountry();
