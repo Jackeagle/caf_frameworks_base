@@ -586,6 +586,11 @@ public final class Downloads {
          * connection to proceed.
          */
         public static final int STATUS_QUEUED_FOR_WIFI = 196;
+		
+		  /**
+         * this download is paused by manual
+         */
+        public static final int STATUS_PAUSED_BY_MANUAL = 197;
 
         /**
          * This download couldn't be completed due to insufficient storage
