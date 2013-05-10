@@ -122,7 +122,7 @@ public final class BluetoothDevice implements Parcelable {
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_RSSI_UPDATE =
-            "qualcomm.bluetooth.device.action.RSSI_UPDATE";
+            "android.bluetooth.device.action.RSSI_UPDATE";
     /**
      * Broadcast Action: Negotiated connection parameters update
      * for the connection between the Gatt server and the remote GATT
@@ -133,7 +133,7 @@ public final class BluetoothDevice implements Parcelable {
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_LE_CONN_PARAMS =
-            "qualcomm.bluetooth.device.action.LE_CONN_PARAMS";
+            "android.bluetooth.device.action.LE_CONN_PARAMS";
 
     /**
      * Broadcast Action: Indicates a low level (ACL) connection has been
@@ -419,7 +419,7 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public static final String ACTION_GATT =
-            "qualcomm.bluetooth.device.action.GATT";
+            "android.bluetooth.device.action.GATT";
 
     /** A bond attempt succeeded
      * @hide */
