@@ -40,12 +40,17 @@ import android.net.NetworkUtils;
 import android.net.LinkCapabilities;
 import android.net.NetworkInfo;
 import android.net.NetworkInfo.DetailedState;
+import android.net.InterfaceConfiguration;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
+import android.os.IBinder;
+import android.os.INetworkManagementService;
 import android.os.SystemProperties;
+import android.os.ServiceManager;
+import android.os.RemoteException;
 import android.util.*;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -88,6 +93,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
     private NotificationManager mNotificationManager;
     private Notification mNotification;
     private Handler mTrackerTarget;
+    private INetworkManagementService mNwService;
 
     private LinkProperties mLinkProperties;
 
@@ -96,7 +102,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
 
     /* For sending events to connectivity service handler */
     private Handler mCsHandler;
-	private Context mContext;
+    private Context mContext;
 
     public EthernetStateTracker(Context context, Handler target) {
         mNetworkInfo = new NetworkInfo(ConnectivityManager.TYPE_ETHERNET, 0, "ETH", "");
@@ -116,6 +122,8 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         mMonitor = new EthernetMonitor(this);
         mDhcpInfo = new DhcpInfoInternal();
         mEthInfo = new EthernetDevInfo();
+        IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+        mNwService = INetworkManagementService.Stub.asInterface(b);
     }
 
     /**
@@ -139,6 +147,14 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                     NetworkUtils.resetConnections(ifname, NetworkUtils.RESET_ALL_ADDRESSES);
                     if (!suspend)
                         NetworkUtils.disableInterface(ifname);
+                    IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+                    INetworkManagementService service = INetworkManagementService.Stub.asInterface(b);
+                    try {
+                        Log.d(TAG, "ethernet will clear ethernet IP");
+                        service.clearInterfaceAddresses(ifname);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to clear addresses or disable ip" + e);
+                    }
 
                     mLinkProperties.clear();
                     mEthInfo.setIpAddress("null");
@@ -164,35 +180,62 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                 "dhcp." + mInterfaceName + ".dns1",
                 "dhcp." + mInterfaceName + ".dns2"
              };
-
+         try {
+               // mNwService.setInterfaceDown(info.getIfName());
+                mNwService.setInterfaceUp(info.getIfName());
+            } catch (RemoteException re){
+                Slog.e(TAG,"Set interface up failed: " + re);
+            } catch (IllegalStateException e) {
+                Slog.e(TAG,"Set interface up fialed: " + e);
+            }
+            //bootcnt++;
             mDhcpTarget.sendEmptyMessage(EVENT_DHCP_START);
         } else {
-/* HFM
+            /*if (bootcnt == 0)
+            {
+               //mDhcpTarget.sendEmptyMessage(EVENT_DHCP_START);
+            }*/
             int event;
+            InterfaceConfiguration ifcfg = null;
+
             sDnsPropNames = new String[] {
                 "net." + mInterfaceName + ".dns1",
                 "net." + mInterfaceName + ".dns2"
              };
-            mDhcpInfo.ipAddress = lookupHost(info.getIpAddress());
-            mDhcpInfo.gateway = lookupHost(info.getRouteAddr());
-            mDhcpInfo.netmask = lookupHost(info.getNetMask());
-            mDhcpInfo.dns1 = lookupHost(info.getDnsAddr());
-            mDhcpInfo.dns2 = 0;
-
-            if (localLOGV) Slog.i(TAG, "set ip manually " + mDhcpInfo.toString());
-            NetworkUtils.removeDefaultRoute(info.getIfName());
-            if (NetworkUtils.configureInterface(info.getIfName(), mDhcpInfo)) {
-                event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
-                SystemProperties.set("net.dns1", info.getDnsAddr());
-		SystemProperties.set("net." + info.getIfName() + ".dns1", info.getDnsAddr());
-		SystemProperties.set("net." + info.getIfName() + ".dns2", "0.0.0.0");
-                if (localLOGV) Slog.v(TAG, "Static IP configuration succeeded");
+            Slog.v(TAG, "Static IP =" + info.getIpAddress());
+            mDhcpInfo.ipAddress = info.getIpAddress();
+            Slog.v(TAG, "Static dns1 =" + info.getDnsAddr());
+            if (info.getDnsAddr() != null)
+            {
+                mDhcpInfo.dns1 = info.getDnsAddr();
             } else {
-                event = EVENT_INTERFACE_CONFIGURATION_FAILED;
-                if (localLOGV) Slog.w(TAG, "Static IP configuration failed");
+                Slog.v(TAG, "use a default 8.8.8.8");
+                mDhcpInfo.dns1 = "8.8.8.8";
             }
+            Slog.v(TAG, "After Static dns1 =" + mDhcpInfo.dns1);
+           mDhcpInfo.dns2 = null;
+            try {
+                ifcfg = mNwService.getInterfaceConfig(info.getIfName());
+                //ifcfg.addr = mDhcpInfo.makeLinkAddress();
+                //ifcfg.interfaceFlags = "[up]";
+                ifcfg.setLinkAddress(mDhcpInfo.makeLinkAddress());
+                //ifcfg.mFlags = "[up]";
+                ifcfg.setFlag("up");
+                mNwService.setInterfaceConfig(info.getIfName(), ifcfg);
+                Slog.i(TAG,"Static IP configuration succeeded");
+            } catch (RemoteException re){
+                Slog.e(TAG,"Static IP configuration failed: " + re);
+            } catch (IllegalStateException e) {
+                Slog.e(TAG,"Static IP configuration fialed: " + e);
+            }
+
+            Slog.i(TAG, "set ip manually " + mDhcpInfo.toString());
+            event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
+            SystemProperties.set("net.dns1", info.getDnsAddr());
+            SystemProperties.set("net." + info.getIfName() + ".dns1", info.getDnsAddr());
+            SystemProperties.set("net." + info.getIfName() + ".dns2", "0.0.0.0");
             this.sendEmptyMessage(event);
-*/
+
         }
         return true;
     }
