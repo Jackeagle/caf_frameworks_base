@@ -5731,6 +5731,13 @@ public final class Settings {
         public static final String PROXIMITY_SENSOR = "proximity_sensor";
 
         /**
+         * Int value to specify if the fuction of display home location is enabled.
+         * 0 = Disable  1 = Enable
+         * @hide
+         */
+        public static final String DISPLAY_HOME_LOCATION = "display_home_location";
+
+        /**
           * Subscription to be used for voice call on a multi sim device. The supported values
           * are 0 = SUB1, 1 = SUB2.
           * @hide
