@@ -5724,6 +5724,13 @@ public final class Settings {
         public static final String CABL_LEVELS = "cabl_levels";
 
         /**
+         * Set the proximity sensor on or off
+         * 0 == OFF 1 == ON
+         * @hide
+         */
+        public static final String PROXIMITY_SENSOR = "proximity_sensor";
+
+        /**
           * Subscription to be used for voice call on a multi sim device. The supported values
           * are 0 = SUB1, 1 = SUB2.
           * @hide
