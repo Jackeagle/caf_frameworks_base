@@ -222,6 +222,10 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                 //ifcfg.mFlags = "[up]";
                 ifcfg.setFlag("up");
                 mNwService.setInterfaceConfig(info.getIfName(), ifcfg);
+                 mNwService.setInterfaceUp(info.getIfName());
+                //mNwService.addRoute(info.getIfName(),new RouteInfo(dest, gateway));
+                 RouteInfo ri = new RouteInfo(NetworkUtils.numericToInetAddress(info.getRouteAddr()));
+                mNwService.addRoute(info.getIfName(),ri);
                 Slog.i(TAG,"Static IP configuration succeeded");
             } catch (RemoteException re){
                 Slog.e(TAG,"Static IP configuration failed: " + re);
