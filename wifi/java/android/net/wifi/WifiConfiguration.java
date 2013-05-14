@@ -78,6 +78,16 @@ public class WifiConfiguration implements Parcelable {
     public static final String hiddenSSIDVarName = "scan_ssid";
     /** {@hide} */
     public static final int INVALID_NETWORK_ID = -1;
+// WAPI+++
+    /** {@hide} */
+    public static final String wapiAsCertFileVarName = "as_cert_file";
+    /** {@hide} */
+    public static final String wapiUserCertFileVarName = "user_cert_file";
+    /** {@hide} */
+    public static final String wapiPskVarName = "wapi_psk";
+    /** {@hide} */
+    public static final String wapiPskTypeVarName = "wapi_key_type";
+// WAPI---
 
     /** {@hide} */
     public class EnterpriseField {
@@ -143,17 +153,23 @@ public class WifiConfiguration implements Parcelable {
         /** IEEE 802.1X using EAP authentication and (optionally) dynamically
          * generated WEP keys. */
         public static final int IEEE8021X = 3;
+//wapi+++
+		/** {@hide} */
+		public static final int WAPI_PSK=4;
+		/** {@hide} */
+		public static final int WAPI_CERT=5;
+//wapi---
 
         /** WPA2 pre-shared key for use with soft access point
           * (requires {@code preSharedKey} to be specified).
           * @hide
           */
-        public static final int WPA2_PSK = 4;
+        public static final int WPA2_PSK = 6;
 
         public static final String varName = "key_mgmt";
 
         public static final String[] strings = { "NONE", "WPA_PSK", "WPA_EAP", "IEEE8021X",
-               "WPA2_PSK" };
+               "WAPI_PSK", "WAPI_CERT", "WPA2_PSK" };
     }
 
     /**
@@ -166,10 +182,14 @@ public class WifiConfiguration implements Parcelable {
         public static final int WPA = 0;
         /** WPA2/IEEE 802.11i */
         public static final int RSN = 1;
-
+// WAPI+++
+	/** WAPI */
+	/** {@hide} */
+	    public static final int WAPI = 2;
+//WAPI---
         public static final String varName = "proto";
 
-        public static final String[] strings = { "WPA", "RSN" };
+        public static final String[] strings = { "WPA", "RSN" , "WAPI" };
     }
 
     /**
@@ -204,9 +224,9 @@ public class WifiConfiguration implements Parcelable {
         public static final int CCMP = 2;
 
         public static final String varName = "pairwise";
-		
-		public static final String[] strings = { "NONE", "TKIP", "CCMP" };
-
+//WAPI++
+		public static final String[] strings = { "NONE", "TKIP", "CCMP", "SMS4" };
+//WAPI--
     }
 
     /**
@@ -232,7 +252,9 @@ public class WifiConfiguration implements Parcelable {
 
         public static final String varName = "group";
 
-		public static final String[] strings = { "WEP40", "WEP104", "TKIP", "CCMP" };
+//WAPI++
+		public static final String[] strings = { "WEP40", "WEP104", "TKIP", "CCMP", "SMS4" };
+//WAPI--
     }
 
     /** Possible status of a network configuration. */
@@ -293,6 +315,15 @@ public class WifiConfiguration implements Parcelable {
      * <code>XX:XX:XX:XX:XX:XX</code> where each <code>X</code> is a hex digit.
      */
     public String BSSID;
+
+// WAPI+++
+	 /**  WAPI */
+	 public String wapiASCert;
+	 public String wapiUserCert;
+	 public String wapiPsk;
+	 public int wapiPskType;
+//  WAPI---
+
 
     /**
      * Pre-shared key for use with WPA-PSK.
@@ -497,6 +528,12 @@ public class WifiConfiguration implements Parcelable {
         if (this.preSharedKey != null) {
             sbuf.append('*');
         }
+        //  WAPI+++
+        sbuf.append('\n');
+        if (this.wapiPsk != null) {
+            sbuf.append(" wapiPsk: ").append('*');
+        }
+       //  WAPI---
 
         for (EnterpriseField field : enterpriseFields) {
             sbuf.append('\n').append(" " + field.varName() + ": ");
@@ -576,6 +613,10 @@ public class WifiConfiguration implements Parcelable {
             return KeyMgmt.WPA_EAP;
         } else if (allowedKeyManagement.get(KeyMgmt.IEEE8021X)) {
             return KeyMgmt.IEEE8021X;
+        } else if (allowedKeyManagement.get(KeyMgmt.WAPI_PSK)) {
+            return KeyMgmt.WAPI_PSK;
+	    } else if (allowedKeyManagement.get(KeyMgmt.WAPI_CERT)) {
+            return KeyMgmt.WAPI_CERT;
         }
         return KeyMgmt.NONE;
     }
@@ -614,6 +655,10 @@ public class WifiConfiguration implements Parcelable {
             ipAssignment = source.ipAssignment;
             proxySettings = source.proxySettings;
             linkProperties = new LinkProperties(source.linkProperties);
+// WAPI +++
+            wapiASCert = source.wapiASCert;
+            wapiUserCert = source.wapiUserCert;
+// WAPI ---
         }
     }
 
@@ -625,6 +670,12 @@ public class WifiConfiguration implements Parcelable {
         dest.writeString(SSID);
         dest.writeString(BSSID);
         dest.writeString(preSharedKey);
+       // WAPI+++
+        dest.writeString(wapiASCert);
+        dest.writeString(wapiUserCert);
+        dest.writeString(wapiPsk);
+        dest.writeInt(wapiPskType);
+      //  WAPI---
         for (String wepKey : wepKeys)
             dest.writeString(wepKey);
         dest.writeInt(wepTxKeyIndex);
@@ -656,6 +707,12 @@ public class WifiConfiguration implements Parcelable {
                 config.SSID = in.readString();
                 config.BSSID = in.readString();
                 config.preSharedKey = in.readString();
+		// WAPI+++
+                config.wapiASCert = in.readString();
+                config.wapiUserCert = in.readString();
+                config.wapiPsk = in.readString();
+                config.wapiPskType = in.readInt();
+                // WAPI---
                 for (int i = 0; i < config.wepKeys.length; i++)
                     config.wepKeys[i] = in.readString();
                 config.wepTxKeyIndex = in.readInt();
