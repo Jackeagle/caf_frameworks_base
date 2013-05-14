@@ -98,6 +98,7 @@ public class EthernetManager {
 
     /**
      * Return the saved ethernet configuration
+     * This api needs to be used only when the interface is up
      * @return ethernet interface configuration on success, {@code null} on failure
      */
     public EthernetDevInfo getSavedConfig() {
