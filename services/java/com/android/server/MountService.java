@@ -141,6 +141,11 @@ class MountService extends IMountService.Stub
      */
     class VoldResponseCode {
         /*
+         * 900 series - New mass storage device detected; add to hash map
+         */
+        public static final int NewExternalDevice              = 906;
+        public static final int ExternalDeviceRemoved          = 907;
+        /*
          * 100 series - Requestion action was initiated; expect another reply
          *              before proceeding with a new command.
          */
@@ -762,7 +767,57 @@ class MountService extends IMountService.Stub
             }
             Slog.i(TAG, builder.toString());
         }
-        if (code == VoldResponseCode.VolumeStateChange) {
+
+        /*
+         * New External device detected, insert into hash maps
+         */
+        if (code == VoldResponseCode.NewExternalDevice) {
+            /*
+             * Format: "NNN Ex <mountPoint> inserted <description>
+             * <removable> <emulated> <mtpReserve> <allowMassStorage> <maxFileSize>"
+             */
+            final String path = cooked[2];
+            final String desc = cooked[4];
+            boolean primary = false;
+            boolean removable = true;
+            boolean emulated = false;
+            boolean allowMassStorage = false;
+            if(cooked[6].equals("true")) emulated = true;
+            final int mtpReserve=Integer.parseInt(cooked[7]);
+            long maxFileSize = Integer.parseInt(cooked[9]);
+
+            /*
+             * Passing owner handle as null, because secondary storage dont require to check
+             * permission for specific user
+             */
+            StorageVolume ext = new StorageVolume(new File(path), desc, primary, removable, false,
+                    mtpReserve, allowMassStorage, maxFileSize, null);
+
+            ext.setStorageId(mVolumes.size());
+            synchronized(mVolumesLock) {
+                addVolumeLocked(ext);
+            }
+            updatePublicVolumeState(ext, Environment.MEDIA_UNMOUNTED);
+
+            return true;
+        } else if(code == VoldResponseCode.ExternalDeviceRemoved) {
+            //External Device Removal is detected
+            final String path = cooked[2];
+            final StorageVolume volume;
+            /*
+             * MediaScanner will scan for the content updates, only when the device is mounted.
+             * So, while removing the external USB disk, we need to update the content of the
+             * MediaProvider. To do so, we have to send the sendStorageIntent with
+             * Action=Intent.ACTION_MEDIA_MOUNTED on Unomunt event.
+             */
+            synchronized (mVolumesLock) {
+                volume = mVolumesByPath.get(path);
+                sendStorageIntent(Intent.ACTION_MEDIA_MOUNTED, volume, UserHandle.ALL);
+                removeVolumeLocked(volume);
+            }
+
+            Slog.i(TAG, "External Device is Removed");
+        } else if (code == VoldResponseCode.VolumeStateChange) {
             /*
              * One of the volumes we're managing has changed state.
              * Format: "NNN Volume <label> <path> state changed
