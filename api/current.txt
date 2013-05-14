@@ -10824,9 +10824,13 @@ package android.media {
     field public static final int CHANNEL_OUT_QUAD = 204; // 0xcc
     field public static final int CHANNEL_OUT_STEREO = 12; // 0xc
     field public static final int CHANNEL_OUT_SURROUND = 1052; // 0x41c
+    field public static final int ENCODING_AC3 = 107; // 0x6b
     field public static final int ENCODING_DEFAULT = 1; // 0x1
+    field public static final int ENCODING_EAC3 = 108; // 0x6c
     field public static final int ENCODING_INVALID = 0; // 0x0
     field public static final int ENCODING_PCM_16BIT = 2; // 0x2
+    field public static final int ENCODING_PCM_16BIT_DIRECT = 105; // 0x69
+    field public static final int ENCODING_PCM_24BIT_DIRECT = 106; // 0x6a
     field public static final int ENCODING_PCM_8BIT = 3; // 0x3
   }
 
@@ -11013,6 +11017,7 @@ package android.media {
     method public int getSampleRate();
     method public int getState();
     method public int getStreamType();
+    method public long getTimestamp();
     method public void pause() throws java.lang.IllegalStateException;
     method public void play() throws java.lang.IllegalStateException;
     method public void release();

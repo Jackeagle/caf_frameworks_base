@@ -420,12 +420,16 @@ public class AudioTrack
             mAudioFormat = AudioFormat.ENCODING_PCM_16BIT;
             break;
         case AudioFormat.ENCODING_PCM_16BIT:
+        case AudioFormat.ENCODING_PCM_16BIT_DIRECT:
+        case AudioFormat.ENCODING_PCM_24BIT_DIRECT:
         case AudioFormat.ENCODING_PCM_8BIT:
         case AudioFormat.ENCODING_AMRNB:
         case AudioFormat.ENCODING_AMRWB:
         case AudioFormat.ENCODING_EVRC:
         case AudioFormat.ENCODING_EVRCB:
         case AudioFormat.ENCODING_EVRCWB:
+        case AudioFormat.ENCODING_AC3:
+        case AudioFormat.ENCODING_EAC3:
             mAudioFormat = audioFormat;
             break;
         default:
@@ -475,6 +479,16 @@ public class AudioTrack
     }
 
 
+    private boolean isDirectTrack() {
+        if(mAudioFormat == AudioFormat.ENCODING_PCM_16BIT_DIRECT ||
+           mAudioFormat == AudioFormat.ENCODING_PCM_24BIT_DIRECT ||
+           mAudioFormat == AudioFormat.ENCODING_AC3 ||
+           mAudioFormat == AudioFormat.ENCODING_EAC3) {
+               return true;
+           }
+           return false;
+    }
+
     // Convenience method for the contructor's audio buffer size check.
     // preconditions:
     //    mChannelCount is valid
@@ -484,8 +498,29 @@ public class AudioTrack
     private void audioBuffSizeCheck(int audioBufferSize) {
         // NB: this section is only valid with PCM data.
         //     To update when supporting compressed formats
-        int frameSizeInBytes = mChannelCount
-                * (mAudioFormat == AudioFormat.ENCODING_PCM_8BIT ? 1 : 2);
+        if (mAudioFormat == AudioFormat.ENCODING_AC3 ||
+            mAudioFormat == AudioFormat.ENCODING_EAC3) {
+            mNativeBufferSizeInBytes = audioBufferSize;
+            return;
+        }
+
+        int bytesPerSample;
+        switch (mAudioFormat) {
+            case AudioFormat.ENCODING_PCM_8BIT:
+            bytesPerSample = 1;
+            break;
+            case AudioFormat.ENCODING_PCM_16BIT:
+            case AudioFormat.ENCODING_PCM_16BIT_DIRECT:
+            bytesPerSample = 2;
+            break;
+            case AudioFormat.ENCODING_PCM_24BIT_DIRECT:
+            bytesPerSample = 3;
+            break;
+            default:
+            bytesPerSample = 2;
+         }
+
+        int frameSizeInBytes = mChannelCount * bytesPerSample;
         if ((audioBufferSize % frameSizeInBytes != 0) || (audioBufferSize < 1)) {
             throw (new IllegalArgumentException("Invalid audio buffer size."));
         }
@@ -684,12 +719,16 @@ public class AudioTrack
         }
 
         if ((audioFormat != AudioFormat.ENCODING_PCM_16BIT)
+            && (audioFormat != AudioFormat.ENCODING_PCM_16BIT_DIRECT)
+            && (audioFormat != AudioFormat.ENCODING_PCM_24BIT_DIRECT)
             && (audioFormat != AudioFormat.ENCODING_PCM_8BIT)
             && (audioFormat != AudioFormat.ENCODING_AMRNB)
             && (audioFormat != AudioFormat.ENCODING_AMRWB)
             && (audioFormat != AudioFormat.ENCODING_EVRC)
             && (audioFormat != AudioFormat.ENCODING_EVRCB)
-            && (audioFormat != AudioFormat.ENCODING_EVRCWB)) {
+            && (audioFormat != AudioFormat.ENCODING_EVRCWB)
+            && (audioFormat != AudioFormat.ENCODING_AC3)
+            && (audioFormat != AudioFormat.ENCODING_EAC3)) {
             loge("getMinBufferSize(): Invalid audio format.");
             return AudioTrack.ERROR_BAD_VALUE;
         }
@@ -743,6 +782,9 @@ public class AudioTrack
      */
     public void setPlaybackPositionUpdateListener(OnPlaybackPositionUpdateListener listener,
                                                     Handler handler) {
+
+        if (isDirectTrack())
+            return;
         synchronized (mPositionListenerLock) {
             mPositionListener = listener;
         }
@@ -800,6 +842,8 @@ public class AudioTrack
      *    {@link #ERROR_INVALID_OPERATION}
      */
     public int setPlaybackRate(int sampleRateInHz) {
+        if (isDirectTrack())
+            return ERROR_INVALID_OPERATION;
         if (mState != STATE_INITIALIZED) {
             return ERROR_INVALID_OPERATION;
         }
@@ -817,6 +861,8 @@ public class AudioTrack
      *  {@link #ERROR_INVALID_OPERATION}
      */
     public int setNotificationMarkerPosition(int markerInFrames) {
+        if (isDirectTrack())
+            return ERROR_INVALID_OPERATION;
         if (mState != STATE_INITIALIZED) {
             return ERROR_INVALID_OPERATION;
         }
@@ -830,6 +876,8 @@ public class AudioTrack
      * @return error code or success, see {@link #SUCCESS}, {@link #ERROR_INVALID_OPERATION}
      */
     public int setPositionNotificationPeriod(int periodInFrames) {
+        if (isDirectTrack())
+            return ERROR_INVALID_OPERATION;
         if (mState != STATE_INITIALIZED) {
             return ERROR_INVALID_OPERATION;
         }
@@ -844,6 +892,8 @@ public class AudioTrack
      *    {@link #ERROR_INVALID_OPERATION}
      */
     public int setPlaybackHeadPosition(int positionInFrames) {
+        if (isDirectTrack())
+            return ERROR_INVALID_OPERATION;
         synchronized(mPlayStateLock) {
             if ((mPlayState == PLAYSTATE_STOPPED) || (mPlayState == PLAYSTATE_PAUSED)) {
                 return native_set_position(positionInFrames);
@@ -863,6 +913,8 @@ public class AudioTrack
      *    {@link #ERROR_INVALID_OPERATION}
      */
     public int setLoopPoints(int startInFrames, int endInFrames, int loopCount) {
+        if (isDirectTrack())
+            return ERROR_INVALID_OPERATION;
         if (mDataLoadMode == MODE_STREAM) {
             return ERROR_INVALID_OPERATION;
         }
@@ -1066,6 +1118,8 @@ public class AudioTrack
      *    {@link #ERROR_INVALID_OPERATION}, {@link #ERROR_BAD_VALUE}
      */
     public int attachAuxEffect(int effectId) {
+        if (isDirectTrack())
+            return ERROR_INVALID_OPERATION;
         if (mState != STATE_INITIALIZED) {
             return ERROR_INVALID_OPERATION;
         }
@@ -1088,6 +1142,8 @@ public class AudioTrack
      *    {@link #ERROR_INVALID_OPERATION}
      */
     public int setAuxEffectSendLevel(float level) {
+        if (isDirectTrack())
+            return ERROR_INVALID_OPERATION;
         if (mState != STATE_INITIALIZED) {
             return ERROR_INVALID_OPERATION;
         }
@@ -1187,6 +1243,9 @@ public class AudioTrack
         }
     }
 
+    public long getTimestamp() {
+        return native_get_timestamp();
+    }
 
     //---------------------------------------------------------
     // Java methods called from the native side
@@ -1264,6 +1323,7 @@ public class AudioTrack
     private native final int native_attachAuxEffect(int effectId);
     private native final void native_setAuxEffectSendLevel(float level);
 
+    private native final long native_get_timestamp();
     //---------------------------------------------------------
     // Utility methods
     //------------------
