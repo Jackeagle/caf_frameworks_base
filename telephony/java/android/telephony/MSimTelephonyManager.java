@@ -347,6 +347,7 @@ public class MSimTelephonyManager {
      * @see #SIM_STATE_PUK_REQUIRED
      * @see #SIM_STATE_NETWORK_LOCKED
      * @see #SIM_STATE_READY
+     * @see #SIM_STATE_DEACTIVATED
      */
     public int getSimState(int slotId) {
         String prop =
@@ -365,6 +366,9 @@ public class MSimTelephonyManager {
         }
         else if ("READY".equals(prop)) {
             return TelephonyManager.SIM_STATE_READY;
+        }
+        else if ("DEACTIVATED".equals(prop)){
+            return TelephonyManager.SIM_STATE_DEACTIVATED;
         }
         else {
             return TelephonyManager.SIM_STATE_UNKNOWN;
