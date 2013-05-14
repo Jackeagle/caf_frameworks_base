@@ -1398,7 +1398,8 @@ public class MediaPlayer
         stayAwake(false);
         updateSurfaceScreenOn();
         synchronized(mContextLock) {
-           mContext = null;
+        Log.d(TAG, "mContextLock Released");
+            mContext = null;
         }
         mUri = null;
         mOnPreparedListener = null;
@@ -2038,6 +2039,114 @@ public class MediaPlayer
 
     @Override
     protected void finalize() { native_finalize(); }
+
+    private static final int PLAYER_SEEK_COMPLETE = 1;
+    private static final int PLAYER_PLAY = 2;
+    private static final int PLAYER_PAUSE = 3;
+    private static final int PLAYER_STOP = 4;
+    private static final int PLAYER_SEEK_TO = 5;
+
+
+    private class A2dpHandler extends Handler
+    {
+        private MediaPlayer mMediaPlayer;
+
+        public A2dpHandler(MediaPlayer mp, Looper looper) {
+           super(looper);
+           mMediaPlayer = mp;
+        }
+
+      @Override
+        public void handleMessage(Message msg) {
+        switch (msg.what) {
+             case PLAYER_SEEK_COMPLETE:
+               synchronized(mContextLock) {
+                     Log.d(TAG, "mContextLock Held Seek_Complete");
+                    if (mContext != null) {
+                        Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                        intent.putExtra("duration", getDuration());
+                        intent.putExtra("time", System.currentTimeMillis());
+                        intent.putExtra("position", getCurrentPosition());
+                        intent.putExtra("uripath", mUri);
+                        if (isPlaying()) {
+                            intent.putExtra("playstate", PLAYSTATUS_PLAYING);
+                        } else {
+                            intent.putExtra("playstate", PLAYSTATUS_PAUSED);
+                        }
+                        mContext.sendBroadcast(intent);
+                    }
+               }
+             break;
+             case PLAYER_PLAY:
+               synchronized(mContextLock) {
+                    Log.d(TAG, "mContextLock Held PLAYER_PLAY");
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", getCurrentPosition());
+                       Log.d(TAG, "start() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       intent.putExtra("playstate", PLAYSTATUS_PLAYING);
+                       mContext.sendBroadcast(intent);
+                   }
+              }
+             break;
+             case PLAYER_PAUSE:
+               synchronized(mContextLock) {
+                    Log.d(TAG, "mContextLock Player_Pause");
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", getCurrentPosition());
+                       Log.d(TAG, "pause() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       intent.putExtra("playstate", PLAYSTATUS_PAUSED);
+                       mContext.sendBroadcast(intent);
+                  }
+               }
+             break;
+             case PLAYER_STOP:
+               synchronized(mContextLock) {
+                    Log.d(TAG, "mContextLock Held Player_Pause");
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", getCurrentPosition());
+                       Log.d(TAG, "stop() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       intent.putExtra("playstate", PLAYSTATUS_STOPPED);
+                       mContext.sendBroadcast(intent);
+                   }
+               }
+             break;
+             case PLAYER_SEEK_TO:
+                synchronized(mContextLock) {
+                    Log.d(TAG, "mContextLock Held Seek_To");
+                   if (mContext != null) {
+                       Intent intent = new Intent(ACTION_METADATA_CHANGED);
+                       intent.putExtra("duration", getDuration());
+                       intent.putExtra("time", System.currentTimeMillis());
+                       intent.putExtra("position", msg.arg1);
+                       Log.d(TAG, "seekTo() mUri is " + mUri);
+                       intent.putExtra("uripath", mUri);
+                       if (msg.arg1 > msg.arg2) {
+                           intent.putExtra("playstate", PLAYSTATUS_SEEKFWD);
+                       } else {
+                           intent.putExtra("playstate", PLAYSTATUS_REWIND);
+                       }
+                       mContext.sendBroadcast(intent);
+                   }
+              }
+             break;
+             default:
+               Log.e(TAG, "Unknown message type " + msg.what);
+               return;
+           }
+        }
+    };
 
     /* Do not change these values without updating their counterparts
      * in include/media/mediaplayer.h!
