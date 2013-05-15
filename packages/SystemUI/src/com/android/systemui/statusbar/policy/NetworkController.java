@@ -75,7 +75,8 @@ public class NetworkController extends BroadcastReceiver {
     // telephony
     boolean mHspaDataDistinguishable;
     private TelephonyManager mPhone;
-    boolean mDataConnected;
+    boolean mDataConnected=false;
+    boolean mLastDataConnected = false;
     boolean isRoam = false;
     boolean isLastRoam =false;
 
@@ -777,16 +778,19 @@ public class NetworkController extends BroadcastReceiver {
                     break;
             }
         }
+	Log.e(TAG, "updateDataNetType  mDataTypeIconId:" + mDataTypeIconId +"mDataNetType" +mDataNetType);
 
-        if (isCdma()) {
+       /*
+		if (isCdma()) {
             if (isCdmaEri()) {
                 mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                 mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
             }
-        } else if (mPhone.isNetworkRoaming()) {
+        } 
+	else if (mPhone.isNetworkRoaming()) {
                 mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                 mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
-        }
+      }*/
     }
 
     boolean isCdmaEri() {
@@ -1260,7 +1264,7 @@ public class NetworkController extends BroadcastReceiver {
             Log.i(TAG, "refreshViews: Data not connected!! Set no data type icon / Roaming");
             mDataTypeIconId = 0;
             mQSDataTypeIconId = 0;
-            if (isCdma()) {
+           /* if (isCdma()) {
                 if (isCdmaEri()) {
                     mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                     mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
@@ -1268,7 +1272,7 @@ public class NetworkController extends BroadcastReceiver {
             } else if (mPhone.isNetworkRoaming()) {
                 mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                 mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
-            }
+            }*/
         }
 
         if (DEBUG) {
@@ -1301,6 +1305,7 @@ public class NetworkController extends BroadcastReceiver {
 
 	if(DEBUG)Log.i(TAG, "twfx refreshViews mPhoneSignalIconId 0="+mPhoneSignalIconId);
 	if(DEBUG)Log.i(TAG, "twfx refreshViews mLastServiceState="+mLastServiceState +"mServiceState=" +mServiceState);
+	if(DEBUG)Log.i(TAG, "twfx refreshViews mLastDataTypeIconId="+mLastDataTypeIconId +"mDataTypeIconId=" +mDataTypeIconId);
 
         if (mLastPhoneSignalIconId          != mPhoneSignalIconId
          || mLastDataDirectionOverlayIconId != combinedActivityIconId
@@ -1308,6 +1313,7 @@ public class NetworkController extends BroadcastReceiver {
          || mLastWifiIconId                 != mWifiIconId
          || mLastWimaxIconId                != mWimaxIconId
          || mLastDataTypeIconId             != mDataTypeIconId
+         || mLastDataConnected          != mDataConnected
          || mLastAirplaneMode               != mAirplaneMode
          || mLastSimIconId                  != mNoSimIconId
          || mLastServiceState         !=     mServiceState)
@@ -1323,6 +1329,9 @@ public class NetworkController extends BroadcastReceiver {
         }
 	    if (isLastRoam != isRoam) {
             isLastRoam = isRoam;
+        }
+        if (mLastDataConnected != mDataConnected) {
+            mLastDataConnected = mDataConnected;
         }
 
         if (mLastAirplaneMode != mAirplaneMode) {

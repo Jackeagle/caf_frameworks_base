@@ -186,7 +186,6 @@
 
     <!-- Default for Settings.System.KEY_BACKLIGHT-->
     <integer name="def_key_backlight_values">1</integer>
-    <integer name="def_key_backlight_values_cmcc">0</integer>
 
     <!-- Default for Settings.Secure.PROXIMITY_SENSOR -->
     <bool name="def_proximity_sensor">true</bool>
