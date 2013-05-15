@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009,2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009,2012-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -1744,7 +1744,15 @@ public class FmReceiver extends FmTransceiver
      return threshold;
    }
 
-
+   public boolean setPSRxRepeatCount(int count) {
+        int state = getFMState();
+        /* Check current state of FM device */
+        if (state == FMState_Turned_Off){
+            Log.d(TAG, "setRxRepeatcount failed");
+            return false;
+        }
+        return mControl.setPSRxRepeatCount(sFd, count);
+   }
    /*==============================================================
    FUNCTION:  setRdsGroupOptions
    ==============================================================*/

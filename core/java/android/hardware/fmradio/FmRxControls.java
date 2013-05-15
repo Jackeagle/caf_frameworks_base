@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -88,6 +88,7 @@ class FmRxControls
    private static final int V4L2_CID_PRIVATE_SPUR_FREQ                     = V4L2_CID_PRIVATE_BASE + 0x31;
    private static final int V4L2_CID_PRIVATE_SPUR_FREQ_RMSSI               = V4L2_CID_PRIVATE_BASE + 0x32;
    private static final int V4L2_CID_PRIVATE_SPUR_SELECTION                = V4L2_CID_PRIVATE_BASE + 0x33;
+   private static final int V4L2_CID_PRIVATE_RXREPEATCOUNT                 = V4L2_CID_PRIVATE_BASE + 0x3D;
 
    private static final int V4L2_CTRL_CLASS_USER = 0x980000;
    private static final int V4L2_CID_BASE        = V4L2_CTRL_CLASS_USER | 0x900;
@@ -547,5 +548,15 @@ class FmRxControls
 
    public int configureSpurTable(int fd) {
       return FmReceiverJNI.configureSpurTable(fd);
+   }
+
+   public boolean setPSRxRepeatCount(int fd, int count) {
+        int ret;
+        ret = FmReceiverJNI.setControlNative(fd, V4L2_CID_PRIVATE_RXREPEATCOUNT, count);
+        if (ret < 0) {
+            return false;
+        } else {
+            return true;
+        }
    }
 }
