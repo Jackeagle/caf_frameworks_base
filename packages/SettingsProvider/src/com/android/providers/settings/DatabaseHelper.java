@@ -2338,6 +2338,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     R.integer.def_power_sounds_enabled);
             loadStringSetting(stmt, Settings.Global.LOW_BATTERY_SOUND,
                     R.string.def_low_battery_sound);
+            loadStringSetting(stmt, Settings.Global.FULL_BATTERY_SOUND,
+                    R.string.def_full_battery_sound);
             loadIntegerSetting(stmt, Settings.Global.DOCK_SOUNDS_ENABLED,
                     R.integer.def_dock_sounds_enabled);
             loadStringSetting(stmt, Settings.Global.DESK_DOCK_SOUND,

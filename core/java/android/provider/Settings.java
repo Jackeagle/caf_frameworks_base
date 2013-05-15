@@ -4530,6 +4530,12 @@ public final class Settings {
         public static final String LOW_BATTERY_SOUND = "low_battery_sound";
 
         /**
+         * URI for the full battery sound file.
+         * @hide
+         */
+        public static final String FULL_BATTERY_SOUND = "full_battery_sound";
+
+        /**
          * Whether to play a sound for low-battery alerts.
          * @hide
          */
