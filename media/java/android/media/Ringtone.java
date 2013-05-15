@@ -334,6 +334,9 @@ public class Ringtone {
             // Check whether the corresponding file of Uri is exist.
             if (!hasData(c)) {
                 String defaultRingtoneFilename = SystemProperties.get("ro.config." + Settings.System.RINGTONE);
+                if (c != null) {
+                    c.close();
+                }
                 c = res.acquireProvider("media").query(MediaStore.Audio.Media.INTERNAL_CONTENT_URI,
                         new String[]{"_id"},
                         MediaStore.Audio.Media.DISPLAY_NAME + "=?",
@@ -342,12 +345,11 @@ public class Ringtone {
 
                 // Set the setting to the Uri of default ringtone.
                 if (hasData(c)) {
-                    /*c.moveToFirst();
+                    c.moveToFirst();
                     int rowId = c.getInt(0);
                     Log.e(TAG, "update Uri to new Uri " + ContentUris.withAppendedId(MediaStore.Audio.Media.INTERNAL_CONTENT_URI, rowId).toString());
                     Settings.System.putString(mContext.getContentResolver(), settingName,
-                            ContentUris.withAppendedId(MediaStore.Audio.Media.INTERNAL_CONTENT_URI, rowId).toString());*/
-                       Log.e(TAG, "do not update Uri to new Uri ");
+                            ContentUris.withAppendedId(MediaStore.Audio.Media.INTERNAL_CONTENT_URI, rowId).toString());
                          
                 }
             }
