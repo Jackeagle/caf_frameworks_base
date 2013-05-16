@@ -505,6 +505,7 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                         broadcastState(BluetoothAdapter.STATE_ON);
                         // run bluetooth now that it's turned on
                         // Note runBluetooth should be called only in adapter STATE_ON
+                        mBluetoothService.updateCacheDuringTurnOn();
                         mBluetoothService.runBluetooth();
                     }
                     break;

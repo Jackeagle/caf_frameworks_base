@@ -1110,6 +1110,13 @@ public class BluetoothService extends IBluetooth.Stub {
     }
 
     /**
+     * update the serviceChannel cache of the bonded devices
+     */
+    /*package*/ void updateCacheDuringTurnOn() {
+        mBondState.deviceUpdateCache();
+    }
+
+    /**
      * This method is called immediately before Bluetooth module is turned on after
      * the adapter became pariable.
      * It inits bond state and profile state before STATE_ON intent is broadcasted.
@@ -2002,7 +2009,7 @@ public class BluetoothService extends IBluetooth.Stub {
         String objectPath = getObjectPathFromAddress(address);
         String[] propValues =  (String [])getDevicePropertiesNative(objectPath);
         if (propValues != null) {
-            mDeviceProperties.addProperties(address, propValues, false);
+            mDeviceProperties.addProperties(address, propValues, true);
             return mDeviceProperties.getProperty(address, property);
         }
         Log.e(TAG, "getProperty: " + property + "not present:" + address);
