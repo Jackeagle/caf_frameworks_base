@@ -1386,7 +1386,7 @@ public final class PowerManagerService extends IPowerManager.Stub
                                 USER_ACTIVITY_SCREEN_BRIGHT : USER_ACTIVITY_SCREEN_DIM;
                     }
                 }
-                if (mUserActivitySummary != 0) {
+                if (mUserActivitySummary != 0 && mScreenOffTimeoutSetting !=0) {
                     Message msg = mHandler.obtainMessage(MSG_USER_ACTIVITY_TIMEOUT);
                     msg.setAsynchronous(true);
                     mHandler.sendMessageAtTime(msg, nextTimeout);
