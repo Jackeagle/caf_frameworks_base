@@ -200,7 +200,14 @@
     <string name="use_ptp_button_title">Mount as a camera (PTP)</string>
     <!-- Label for the installer CD image option in UsbPreferenceActivity. [CHAR LIMIT=50] -->
     <string name="installer_cd_button_title">Install Android File Transfer app for Mac</string>
-
+    <string name="battery_pull_out">Battery is pulled out</string>
+    <!-- Content description of the battery when it is full for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
+    <string name="battery_full_title">Charging Finished!</string>
+    <!-- Content description of the battery when it is overheat for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
+    <string name="battery_overheat_text">Battery temperature too high or too low.</string>
+    <string name="battery_charging_overheat_text">Charging paused. Battery temperature too high or too low.</string>
+    <string name="battery_overheat_title">Battery notification</string>
+    <string name="battery_charging_overheat_title">Charging notification</string>
     <!-- Content description of the back button for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_back">Back</string>
     <!-- Content description of the home button for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
@@ -533,5 +540,10 @@
     <string name="tasklist_killall">Kill All</string>
     <string name="tasklist_memory_usage">"Free/Total Memory:[<xliff:g id="number">%s</xliff:g>] / [<xliff:g id="name">%s</xliff:g>]"</string>
     <string name="message_keep_one_launcher">Should keep at lease one home activity!</string>
-    <!--end TaskManager-->    
+    <!--end TaskManager-->   
+    <!-- Notification text displayed without internal storage. -->
+    <string name="screenshot_emmc_not_mount">Couldn\'t save screenshot. Internal storage is not ready.</string>
+    <!-- Notification text displayed when emmc is full.  -->
+    <string name="screenshot_emmc_full">Couldn\'t save screenshot. Internal storage is full.</string>
+     <string name="statusbar_expanded_notification_title">Notifications</string>
 </resources>

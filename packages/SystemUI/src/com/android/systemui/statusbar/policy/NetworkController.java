@@ -75,8 +75,10 @@ public class NetworkController extends BroadcastReceiver {
     // telephony
     boolean mHspaDataDistinguishable;
     private TelephonyManager mPhone;
-    boolean mDataConnected;
+    boolean mDataConnected=false;
+    boolean mLastDataConnected = false;
     boolean isRoam = false;
+    boolean isLastRoam =false;
 
     IccCardConstants.State mSimState = IccCardConstants.State.READY;
     int mPhoneState = TelephonyManager.CALL_STATE_IDLE;
@@ -181,6 +183,7 @@ public class NetworkController extends BroadcastReceiver {
     // yuck -- stop doing this here and put it in the framework
     IBatteryStats mBatteryStats;
     ServiceState mLastServiceState;
+    Handler handlerData = null;
 
     public interface SignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
@@ -243,6 +246,8 @@ public class NetworkController extends BroadcastReceiver {
         mNetworkName = mNetworkNameDefault;
 
         createWifiHandler();
+
+       handlerData = new Handler();
 
         // broadcasts
         IntentFilter filter = new IntentFilter();
@@ -524,9 +529,16 @@ public class NetworkController extends BroadcastReceiver {
             }
             mDataState = state;
             mDataNetType = networkType;
-            updateDataNetType();
-            updateDataIcon();
-            refreshViews();
+
+
+	     handlerData.postDelayed(new Runnable() {
+                                public void run() {
+                                         updateDataNetType();
+                                         updateDataIcon();
+                                         refreshViews();
+                                        }
+                                    },1000);
+            
         }
 
         @Override
@@ -592,9 +604,9 @@ public class NetworkController extends BroadcastReceiver {
             Settings.Global.AIRPLANE_MODE_ON, 0) == 1);
     }
 
-    private final void updateTelephonySignalStrength() {
+    private final void updateTelephonySignalStrength() {	
         if (!hasService() &&
-                (mDataServiceState != ServiceState.STATE_IN_SERVICE)) {
+            (mDataServiceState != ServiceState.STATE_IN_SERVICE) && (mPhoneState==TelephonyManager.CALL_STATE_IDLE)) {
             if (DEBUG) Log.i(TAG, " No service");
             mPhoneSignalIconId = R.drawable.stat_sys_signal_null;
             mQSPhoneSignalIconId = R.drawable.ic_qs_signal_no_signal;
@@ -625,8 +637,10 @@ public class NetworkController extends BroadcastReceiver {
                 // Though mPhone is a Manager, this call is not an IPC
                 if ((isCdma() && isCdmaEri()) || mPhone.isNetworkRoaming()) {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_ROAMING[mInetCondition];
+                    isRoam=true;
                 } else {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH[mInetCondition];
+                    isRoam=false;
                 }
 
                 mPhoneSignalIconId = iconList[iconLevel];
@@ -764,16 +778,19 @@ public class NetworkController extends BroadcastReceiver {
                     break;
             }
         }
+	Log.e(TAG, "updateDataNetType  mDataTypeIconId:" + mDataTypeIconId +"mDataNetType" +mDataNetType);
 
-        if (isCdma()) {
+       /*
+		if (isCdma()) {
             if (isCdmaEri()) {
                 mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                 mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
             }
-        } else if (mPhone.isNetworkRoaming()) {
+        } 
+	else if (mPhone.isNetworkRoaming()) {
                 mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                 mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
-        }
+      }*/
     }
 
     boolean isCdmaEri() {
@@ -1247,7 +1264,7 @@ public class NetworkController extends BroadcastReceiver {
             Log.i(TAG, "refreshViews: Data not connected!! Set no data type icon / Roaming");
             mDataTypeIconId = 0;
             mQSDataTypeIconId = 0;
-            if (isCdma()) {
+           /* if (isCdma()) {
                 if (isCdmaEri()) {
                     mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                     mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
@@ -1255,7 +1272,7 @@ public class NetworkController extends BroadcastReceiver {
             } else if (mPhone.isNetworkRoaming()) {
                 mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
                 mQSDataTypeIconId = R.drawable.ic_qs_signal_r;
-            }
+            }*/
         }
 
         if (DEBUG) {
@@ -1288,12 +1305,15 @@ public class NetworkController extends BroadcastReceiver {
 
 	if(DEBUG)Log.i(TAG, "twfx refreshViews mPhoneSignalIconId 0="+mPhoneSignalIconId);
 	if(DEBUG)Log.i(TAG, "twfx refreshViews mLastServiceState="+mLastServiceState +"mServiceState=" +mServiceState);
+	if(DEBUG)Log.i(TAG, "twfx refreshViews mLastDataTypeIconId="+mLastDataTypeIconId +"mDataTypeIconId=" +mDataTypeIconId);
 
         if (mLastPhoneSignalIconId          != mPhoneSignalIconId
          || mLastDataDirectionOverlayIconId != combinedActivityIconId
+         || isLastRoam != isRoam
          || mLastWifiIconId                 != mWifiIconId
          || mLastWimaxIconId                != mWimaxIconId
          || mLastDataTypeIconId             != mDataTypeIconId
+         || mLastDataConnected          != mDataConnected
          || mLastAirplaneMode               != mAirplaneMode
          || mLastSimIconId                  != mNoSimIconId
          || mLastServiceState         !=     mServiceState)
@@ -1307,7 +1327,12 @@ public class NetworkController extends BroadcastReceiver {
                 notifySignalsChangedCallbacks(cb);
             }
         }
-	
+	    if (isLastRoam != isRoam) {
+            isLastRoam = isRoam;
+        }
+        if (mLastDataConnected != mDataConnected) {
+            mLastDataConnected = mDataConnected;
+        }
 
         if (mLastAirplaneMode != mAirplaneMode) {
             mLastAirplaneMode = mAirplaneMode;

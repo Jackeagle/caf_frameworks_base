@@ -80,6 +80,7 @@
     <!-- user interface sound effects -->
     <integer name="def_power_sounds_enabled">1</integer>
     <string name="def_low_battery_sound" translatable="false">/system/media/audio/ui/LowBattery.ogg</string>
+    <string name="def_full_battery_sound" translatable="false">/system/media/audio/ui/FullBattery.ogg</string>
     <integer name="def_dock_sounds_enabled">0</integer>
     <string name="def_desk_dock_sound" translatable="false">/system/media/audio/ui/Dock.ogg</string>
     <string name="def_desk_undock_sound" translatable="false">/system/media/audio/ui/Undock.ogg</string>
@@ -186,7 +187,6 @@
 
     <!-- Default for Settings.System.KEY_BACKLIGHT-->
     <integer name="def_key_backlight_values">1</integer>
-    <integer name="def_key_backlight_values_cmcc">0</integer>
 
     <!-- Default for Settings.Secure.PROXIMITY_SENSOR -->
     <bool name="def_proximity_sensor">true</bool>
@@ -196,4 +196,5 @@
 
     <string name="def_default_input_method">com.android.inputmethod.pinyin/.PinyinIME</string>
     <string name="def_enabled_input_methods">com.android.inputmethod.pinyin/.PinyinIME</string>
+    <bool name="def_auto_time_gps">false</bool>
 </resources>

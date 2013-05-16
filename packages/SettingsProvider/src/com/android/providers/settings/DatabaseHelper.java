@@ -2075,20 +2075,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadSetting(stmt, Settings.System.SHOW_DURATION,
                     FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
 
-            if (SystemProperties.getInt("ro.cmcc.test", 0) == 1) {
-                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
-                        R.integer.def_key_backlight_values_cmcc);
-            }
-            else{
-                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
-                        R.integer.def_key_backlight_values);
-            }
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
 
             loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
                     R.bool.def_proximity_sensor);
         
             loadBooleanSetting(stmt, Settings.System.VIBRATE_AFTER_CONNECTED,
                     R.bool.def_vibrate_after_connected);
+
+            loadBooleanSetting(stmt, Settings.System.AUTO_TIME_GPS,
+                    R.bool.def_auto_time_gps); // Sync time to GPS  
 
         } finally {
             if (stmt != null) stmt.close();
@@ -2359,6 +2356,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     R.integer.def_power_sounds_enabled);
             loadStringSetting(stmt, Settings.Global.LOW_BATTERY_SOUND,
                     R.string.def_low_battery_sound);
+            loadStringSetting(stmt, Settings.Global.FULL_BATTERY_SOUND,
+                    R.string.def_full_battery_sound);
             loadIntegerSetting(stmt, Settings.Global.DOCK_SOUNDS_ENABLED,
                     R.integer.def_dock_sounds_enabled);
             loadStringSetting(stmt, Settings.Global.DESK_DOCK_SOUND,
@@ -2374,7 +2373,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadIntegerSetting(stmt, Settings.Global.DOCK_AUDIO_MEDIA_ENABLED,
                     R.integer.def_dock_audio_media_enabled);
 
-            loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 0);
+            loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 1);
             loadSetting(stmt, Settings.Global.DEFAULT_INSTALL_LOCATION,
                     PackageHelper.APP_INSTALL_AUTO);
 

@@ -259,6 +259,7 @@ public class DownloadManager {
      */
     public final static int PAUSED_UNKNOWN = 4;
 
+    public final static int PAUSED_BY_MANUAL = 5;
     /**
      * Broadcast intent action sent by the download manager when a download completes.
      */
@@ -830,6 +831,7 @@ public class DownloadManager {
                     parts.add(statusClause("=", Downloads.Impl.STATUS_WAITING_TO_RETRY));
                     parts.add(statusClause("=", Downloads.Impl.STATUS_WAITING_FOR_NETWORK));
                     parts.add(statusClause("=", Downloads.Impl.STATUS_QUEUED_FOR_WIFI));
+					parts.add(statusClause("=", Downloads.Impl.STATUS_PAUSED_BY_MANUAL));
                 }
                 if ((mStatusFlags & STATUS_SUCCESSFUL) != 0) {
                     parts.add(statusClause("=", Downloads.Impl.STATUS_SUCCESS));
@@ -939,6 +941,32 @@ public class DownloadManager {
                 getWhereArgsForIds(ids));
     }
 
+    /**
+     * set the download status to STATUS_PAUSED_BY_MANUAL when user pause download
+     *
+     * @param ids the IDs of the downloads to be marked 'deleted'
+     * @return the number of downloads actually updated
+     * @hide
+     */
+    public int pausedDownload(long id) {
+        ContentValues values = new ContentValues();
+        values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_PAUSED_BY_MANUAL);
+
+        return mResolver.update(ContentUris.withAppendedId(mBaseUri, id), values,  null, null);
+    }
+    /**
+     * set the download status to running when user resume a paused download
+     *
+     * @param ids the IDs of the downloads to be marked 'deleted'
+     * @return the number of downloads actually updated
+     * @hide
+     */
+    public int resumeDownload(long id) {
+       ContentValues values = new ContentValues();
+       values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_RUNNING);
+
+       return mResolver.update(ContentUris.withAppendedId(mBaseUri, id), values, null, null);
+    }
     /**
      * Cancel downloads and remove them from the download manager.  Each download will be stopped if
      * it was running, and it will no longer be accessible through the download manager.
@@ -1311,6 +1339,8 @@ public class DownloadManager {
 
                 case Downloads.Impl.STATUS_QUEUED_FOR_WIFI:
                     return PAUSED_QUEUED_FOR_WIFI;
+				case Downloads.Impl.STATUS_PAUSED_BY_MANUAL:
+                    return PAUSED_BY_MANUAL;
 
                 default:
                     return PAUSED_UNKNOWN;
@@ -1367,6 +1397,7 @@ public class DownloadManager {
                 case Downloads.Impl.STATUS_WAITING_TO_RETRY:
                 case Downloads.Impl.STATUS_WAITING_FOR_NETWORK:
                 case Downloads.Impl.STATUS_QUEUED_FOR_WIFI:
+				case Downloads.Impl.STATUS_PAUSED_BY_MANUAL:
                     return STATUS_PAUSED;
 
                 case Downloads.Impl.STATUS_SUCCESS:

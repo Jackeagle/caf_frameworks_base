@@ -38,6 +38,14 @@ import android.util.TrustedTime;
 
 import com.android.internal.telephony.TelephonyIntents;
 
+// add GPS Time Sync Service
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.widget.Toast;
+import com.android.internal.R;
+import android.os.Bundle;
+import android.provider.Settings.SettingNotFoundException;
 /**
  * Monitors the network time and updates the system time if it is out of sync
  * and there hasn't been any NITZ update from the carrier recently.
@@ -56,6 +64,8 @@ public class NetworkTimeUpdateService {
     private static final int EVENT_AUTO_TIME_CHANGED = 1;
     private static final int EVENT_POLL_NETWORK_TIME = 2;
     private static final int EVENT_NETWORK_CONNECTED = 3;
+    // add GPS Time Sync Service
+    private static final int EVENT_GPS_TIME_SYNC_CHANGED = 4;
 
     /** Normal polling frequency */
     private static final long POLLING_INTERVAL_MS = 24L * 60 * 60 * 1000; // 24 hrs
@@ -81,6 +91,10 @@ public class NetworkTimeUpdateService {
     // NTP lookup is done on this thread and handler
     private Handler mHandler;
     private HandlerThread mThread;
+    // add GPS Time Sync Service
+    private Handler mGpsHandler;
+    private HandlerThread mGpsThread;
+
     private AlarmManager mAlarmManager;
     private PendingIntent mPendingPollIntent;
     private SettingsObserver mSettingsObserver;
@@ -113,6 +127,15 @@ public class NetworkTimeUpdateService {
 
         mSettingsObserver = new SettingsObserver(mHandler, EVENT_AUTO_TIME_CHANGED);
         mSettingsObserver.observe(mContext);
+        
+        // add GPS Time Sync Service
+        Log.d(TAG, "add GPS time sync handler and looper");
+        mGpsThread = new HandlerThread(TAG);
+        mGpsThread.start();
+        mGpsHandler = new MyHandler(mGpsThread.getLooper());
+        
+        mGpsTimeSyncObserver = new GpsTimeSyncObserver(mGpsHandler, EVENT_GPS_TIME_SYNC_CHANGED);
+        mGpsTimeSyncObserver.observe(mContext);
     }
 
     private void registerForTelephonyIntents() {
@@ -271,6 +294,13 @@ public class NetworkTimeUpdateService {
                 case EVENT_NETWORK_CONNECTED:
                     onPollNetworkTime(msg.what);
                     break;
+
+                // add GPS Time Sync Service
+                case EVENT_GPS_TIME_SYNC_CHANGED:
+                    boolean gpsTimeSyncStatus = getGpsTimeSyncState();;
+                    Log.d(TAG, "GPS Time sync is changed to " + gpsTimeSyncStatus);
+                    onGpsTimeChanged(gpsTimeSyncStatus);
+                    break;
             }
         }
     }
@@ -298,4 +328,112 @@ public class NetworkTimeUpdateService {
             mHandler.obtainMessage(mMsg).sendToTarget();
         }
     }
+
+    //  add GPS Time Sync Service
+    /** ================ Gps Time Sync part ================*/
+    
+    private Thread          mGpsTimerThread; //for interrupt
+    private LocationManager mLocationManager;
+    private boolean         mIsGpsTimeSyncRunning = false;
+    private GpsTimeSyncObserver   mGpsTimeSyncObserver;
+
+    private boolean getGpsTimeSyncState() {
+        try {
+            return Settings.System.getInt(mContext.getContentResolver(), Settings.System.AUTO_TIME_GPS) > 0;
+        } catch (SettingNotFoundException snfe) {
+            return false;
+        }
+    }
+    
+    private static class GpsTimeSyncObserver extends ContentObserver {
+
+        private int mMsg;
+        private Handler mHandler;
+
+        GpsTimeSyncObserver(Handler handler, int msg) {
+            super(handler);
+            mHandler = handler;
+            mMsg = msg;
+        }
+
+        void observe(Context context) {
+            ContentResolver resolver = context.getContentResolver();
+            resolver.registerContentObserver(Settings.System.getUriFor(Settings.System.AUTO_TIME_GPS),
+                    false, this);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            mHandler.obtainMessage(mMsg).sendToTarget();
+        }
+    }
+
+    public void onGpsTimeChanged(boolean enable) {
+        if(enable) {
+            startUsingGpsWithTimeout(180000,
+                mContext.getString(R.string.gps_time_sync_fail_str));
+        } else {
+            if(mGpsTimerThread != null) {
+                mGpsTimerThread.interrupt();
+            }
+        }
+    }
+    
+    public void startUsingGpsWithTimeout(final int milliseconds, final String timeoutMsg) {
+    
+        if(mIsGpsTimeSyncRunning == true) {
+            Log.d(TAG, "WARNING: Gps Time Sync is already run");
+            return;
+        } else {
+            mIsGpsTimeSyncRunning = true;
+        }
+        
+        Log.d(TAG, "start using GPS for GPS time sync timeout=" + milliseconds + " timeoutMsg=" + timeoutMsg);
+        mLocationManager = (LocationManager)mContext.getSystemService(mContext.LOCATION_SERVICE);
+        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, mLocationListener);
+        mGpsTimerThread = new Thread() {
+            public void run() {
+                boolean isTimeout = false;
+                try {
+                    Thread.sleep(milliseconds);
+                    isTimeout = true;
+                } catch (InterruptedException e) {
+                }
+                Log.d(TAG, "isTimeout=" + isTimeout);
+                if(isTimeout == true) {
+                    Message m = new Message();
+                    m.obj = timeoutMsg;
+                    mGpsToastHandler.sendMessage(m);
+                }
+                mLocationManager.removeUpdates(mLocationListener);
+                mIsGpsTimeSyncRunning = false;
+            }
+        };
+        mGpsTimerThread.start();
+    }
+
+    
+    private Handler mGpsToastHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            String timeoutMsg = (String)msg.obj;
+            Toast.makeText(mContext, timeoutMsg, Toast.LENGTH_LONG).show();
+        }
+    };
+    
+    private LocationListener mLocationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            mGpsTimerThread.interrupt();
+        }
+        @Override
+        public void onProviderDisabled(String provider) {
+        }
+        @Override
+        public void onProviderEnabled(String provider) {
+        }
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+        }
+    };
+ 
 }

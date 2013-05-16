@@ -45,6 +45,7 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
 
     protected ProgressDialog mSimUnlockProgressDialog = null;
     protected volatile boolean mSimCheckInProgress;
+	 private static final int MAX_PIN_LENGTH = 8;
 
     public KeyguardSimPinView(Context context) {
         this(context, null);
@@ -119,6 +120,25 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                 | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
 
         mPasswordEntry.requestFocus();
+      
+        mPasswordEntry.addTextChangedListener(new TextWatcher() {
+            String mystring;      
+            public void afterTextChanged(Editable s) {
+            }
+
+            public void beforeTextChanged(CharSequence s, int start,
+                    int count, int after) {
+                    mystring = s.toString();
+            }
+
+            public void onTextChanged(CharSequence s, int start,
+                    int before, int count) {
+                    if(s.toString().length() > MAX_PIN_LENGTH) {
+                        mPasswordEntry.setText(mystring);          
+                    }
+            }
+        });
+      
     }
 
     @Override

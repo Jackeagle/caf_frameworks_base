@@ -52,7 +52,7 @@ import com.android.internal.widget.LockPatternUtils;
 public class KeyguardViewManager {
     private final static boolean DEBUG = KeyguardViewMediator.DEBUG;
     private static String TAG = "KeyguardViewManager";
-    public static boolean USE_UPPER_CASE = true;
+    public static boolean USE_UPPER_CASE = false;
 
     // Timeout used for keypresses
     static final int DIGIT_PRESS_WAKE_MILLIS = 5000;

@@ -5385,8 +5385,12 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         if (clipData != null) {
             ClipData.Item clipItem = clipData.getItemAt(0);
             CharSequence pasteText = clipItem.getText();
+			Uri uri = clipItem.getUri();//when copy bookmark's url,  text is null,  so the uri is useful, yinhui add
             if (mInputConnection != null) {
+				if(pasteText!=null)
                 mInputConnection.replaceSelection(pasteText);
+				else if(uri!=null)
+					mInputConnection.replaceSelection(uri.toString());
             }
         }
     }
