@@ -221,6 +221,7 @@ public class WifiNative {
         String temp_result;
         String ID_STR = "id=";
         String first_result, last_result;
+        String first_sub, last_sub;
         String result = new String();
         int first_id, last_id;
         int lower_range, upper_range;
@@ -229,31 +230,67 @@ public class WifiNative {
 
         first_result = doStringCommand(suppl_com);
 
-        if (first_result.length() == 0)
-            return result;
+        if (TextUtils.isEmpty(first_result) || (first_result.length() == 0)) {
+
+            if (DBG) Log.d(mTAG, "The first scan result could not be found");
+
+            return null;
+        }
 
         try {
-            first_id = Integer.parseInt(first_result.substring(ID_STR.length(),
-                                                           first_result.indexOf('\n')));
+
+            try {
+
+                first_sub = first_result.substring(ID_STR.length(), first_result.indexOf('\n'));
+
+            } catch(StringIndexOutOfBoundsException e) {
+
+                if (DBG) Log.d(mTAG, "The first scan result ID is malformed");
+
+                return null;
+            }
+
+            first_id = Integer.parseInt(first_sub);
+
         } catch(NumberFormatException e) {
 
             if (DBG) Log.d(mTAG, "The first scan result does not have valid ID");
 
-            return result;
+            return null;
         }
+
 
         suppl_com = "BSS LAST MASK=0x1";
 
         last_result = doStringCommand(suppl_com);
 
+        if (TextUtils.isEmpty(last_result) || (last_result.length() == 0)) {
+
+            if (DBG) Log.d(mTAG, "The last scan result could not be found");
+
+            return null;
+        }
+
         try {
-            last_id = Integer.parseInt(last_result.substring(ID_STR.length(),
-                                                             last_result.indexOf('\n')));
+
+            try {
+
+                last_sub = last_result.substring(ID_STR.length(), last_result.indexOf('\n'));
+
+            } catch(StringIndexOutOfBoundsException e) {
+
+                if (DBG) Log.d(mTAG, "The last scan result ID is malformed");
+
+                return null;
+            }
+
+            last_id = Integer.parseInt(last_sub);
+
         } catch(NumberFormatException e) {
 
             if (DBG) Log.d(mTAG, "The last scan result does not have valid ID");
 
-            return result;
+            return null;
         }
 
         lower_range = first_id;
