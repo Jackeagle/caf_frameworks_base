@@ -67,7 +67,7 @@ import android.text.method.AllCapsTransformationMethod;
 import android.text.method.ArrowKeyMovementMethod;
 import android.text.method.DateKeyListener;
 import android.text.method.DateTimeKeyListener;
-import android.text.method.DialerKeyListener;
+import android.text.method.DialerKeyListenerNoCTS;
 import android.text.method.DigitsKeyListener;
 import android.text.method.KeyListener;
 import android.text.method.LinkMovementMethod;
@@ -134,6 +134,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.concurrent.locks.ReentrantLock;
+
 
 /**
  * Displays text to the user and optionally allows them to edit it.  A TextView
@@ -1061,7 +1062,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             singleLine = !isMultilineInputType(inputType);
         } else if (phone) {
             createEditorIfNeeded();
-            mEditor.mKeyListener = DialerKeyListener.getInstance();
+            mEditor.mKeyListener = DialerKeyListenerNoCTS.getInstance();
             mEditor.mInputType = inputType = EditorInfo.TYPE_CLASS_PHONE;
         } else if (numeric != 0) {
             createEditorIfNeeded();
@@ -4183,7 +4184,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     break;
             }
         } else if (cls == EditorInfo.TYPE_CLASS_PHONE) {
-            input = DialerKeyListener.getInstance();
+            input = DialerKeyListenerNoCTS.getInstance();
         } else {
             input = TextKeyListener.getInstance();
         }
