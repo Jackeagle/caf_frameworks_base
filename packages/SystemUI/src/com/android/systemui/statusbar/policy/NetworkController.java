@@ -515,10 +515,21 @@ public class NetworkController extends BroadcastReceiver {
                 Log.i(TAG, "onCallStateChanged state=" + state);
             }
             // In cdma, if a voice call is made, RSSI should switch to 1x.
-            if (isCdma()) {
+           /* if (isCdma()) {
                 updateTelephonySignalStrength();
                 refreshViews();
+            }*/
+            if((mSimState ==  IccCardConstants.State.ABSENT) && (state==2))
+            {
+		mNoSimIconId=0;
             }
+
+	   if ((mSimState ==  IccCardConstants.State.ABSENT) &&(state==0)) {
+		mNoSimIconId = R.drawable.stat_sys_no_sim;
+	   } 		
+             mPhoneState = state;
+	     updateTelephonySignalStrength();
+             refreshViews();
         }
 
         @Override
@@ -1303,7 +1314,7 @@ public class NetworkController extends BroadcastReceiver {
                     + " mBluetoothTetherIconId=0x" + Integer.toHexString(mBluetoothTetherIconId));
         }
 
-	if(DEBUG)Log.i(TAG, "twfx refreshViews mPhoneSignalIconId 0="+mPhoneSignalIconId);
+	if(DEBUG)Log.i(TAG, "twfx refreshViews mPhoneSignalIconId 0="+mPhoneSignalIconId +"mLastPhoneSignalIconId" +mLastPhoneSignalIconId);
 	if(DEBUG)Log.i(TAG, "twfx refreshViews mLastServiceState="+mLastServiceState +"mServiceState=" +mServiceState);
 	if(DEBUG)Log.i(TAG, "twfx refreshViews mLastDataTypeIconId="+mLastDataTypeIconId +"mDataTypeIconId=" +mDataTypeIconId);
 
