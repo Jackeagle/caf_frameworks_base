@@ -165,7 +165,7 @@ public class CMCCSignalClusterView
 
         if (noSimIcon != 0) {
             mMNoSimIconVisiable = true;
-            mSignalIconVisiable = false;
+            mSignalIconVisiable = false;	
         } else {
             mMNoSimIconVisiable = false;
             mSignalIconVisiable = true;
