@@ -1535,11 +1535,12 @@ public class KeyguardHostView extends KeyguardViewBase {
     private static final String ENABLE_MENU_KEY_FILE = "/data/local/enable_menu_key";
     private boolean shouldEnableMenuKey() {
         final Resources res = getResources();
-        final boolean configDisabled = res.getBoolean(
-                com.android.internal.R.bool.config_disableMenuKeyInLockScreen);
+        final boolean configDisabled = true;//res.getBoolean(
+               //com.android.internal.R.bool.config_disableMenuKeyInLockScreen);
         final boolean isTestHarness = ActivityManager.isRunningInTestHarness();
         final boolean fileOverride = (new File(ENABLE_MENU_KEY_FILE)).exists();
         return !configDisabled || isTestHarness || fileOverride;
+	
     }
 
 
@@ -1555,7 +1556,9 @@ public class KeyguardHostView extends KeyguardViewBase {
 
     public boolean handleMenuKey() {
         // The following enables the MENU key to work for testing automation
+        Log.e(TAG, "handleMenuKey");
         if (shouldEnableMenuKey()) {
+	Log.e(TAG, "shouldEnableMenuKey()" +shouldEnableMenuKey());
             showNextSecurityScreenOrFinish(false);
             return true;
         }
