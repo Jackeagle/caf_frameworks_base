@@ -3641,7 +3641,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                                 mKeyguardMediator.isShowingAndNotHidden() :
                                                 mKeyguardMediator.isShowing()));
 
-        if (keyCode == KeyEvent.KEYCODE_POWER) {
+	/* Make volume up and down as wakeup keys in addition to power key*/
+        if (keyCode == KeyEvent.KEYCODE_POWER || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+            || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
             policyFlags |= WindowManagerPolicy.FLAG_WAKE;
         }
         final boolean isWakeKey = (policyFlags & (WindowManagerPolicy.FLAG_WAKE
@@ -3916,8 +3918,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean isWakeKeyWhenScreenOff(int keyCode) {
         switch (keyCode) {
             // ignore volume keys unless docked
-            case KeyEvent.KEYCODE_VOLUME_UP:
-            case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_MUTE:
                 return mDockMode != Intent.EXTRA_DOCK_STATE_UNDOCKED;
 
