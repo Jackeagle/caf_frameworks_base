@@ -173,6 +173,16 @@ public class Patterns {
                 "(\\+[0-9]+[\\- \\.]*)?"                    // +<digits><sdd>*
                 + "(\\([0-9]+\\)[\\- \\.]*)?"               // (<digits>)<sdd>*
                 + "([0-9][0-9\\- \\.][0-9\\- \\.]+[0-9])"); // <digit><digit|sdd>+<digit> 
+                
+
+    /*  add for fetion process   */
+    public static final Pattern FETION
+        = Pattern.compile(
+                "(12520)"
+                + "(\\+[0-9]+[\\- \\.]*)?"
+                + "(\\([0-9]+\\)[\\- \\.]*)?"
+                + "([0-9][0-9\\- \\.][0-9\\- \\.]+[0-9])");
+
 
     /**
      *  Convenience method to take all of the non-null matching groups in a
