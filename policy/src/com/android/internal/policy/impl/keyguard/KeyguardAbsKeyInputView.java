@@ -15,6 +15,7 @@
  */
 
 package com.android.internal.policy.impl.keyguard;
+import android.view.inputmethod.InputMethodManager;
 
 import android.content.Context;
 import android.graphics.Rect;
@@ -150,8 +151,18 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
     protected void verifyPasswordAndUnlock() {
         String entry = mPasswordEntry.getText().toString();
         if (mLockPatternUtils.checkPassword(entry)) {
+	    // After unlocking ,hidden the keyboard.
+            InputMethodManager imm = (InputMethodManager) mPasswordEntry.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (null != imm && imm.isActive()) {
+                imm.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, InputMethodManager.HIDE_NOT_ALWAYS);
+            }
             mCallback.reportSuccessfulUnlockAttempt();
             mCallback.dismiss(true);
+	     imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                // Set the flag to 0, this is the default value .
+                imm.hideSoftInputFromWindow(mPasswordEntry.getWindowToken(), 0);
+            }
         } else if (entry.length() > MINIMUM_PASSWORD_LENGTH_BEFORE_REPORT ) {
             // to avoid accidental lockout, only count attempts that are long enough to be a
             // real password. This may require some tweaking.
