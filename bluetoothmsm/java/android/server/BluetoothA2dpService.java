@@ -1196,18 +1196,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 handleSinkStateChange(device, BluetoothA2dp.STATE_DISCONNECTED, state);
             } else {
                 if (state == BluetoothA2dp.STATE_PLAYING && mPlayingA2dpDevice == null) {
-                    if (tmgr.getCallState() == TelephonyManager.CALL_STATE_IDLE) {
                         mPlayingA2dpDevice = device;
                         handleSinkPlayingStateChange(device, state, BluetoothA2dp.STATE_NOT_PLAYING);
-                    } else {
-                       log("suspend Sink");
-                       // During call active a2dp device is in suspended state
-                       // so audio will not be routed to A2dp. To avoid IOP
-                       // issues send a SUSPEND on A2dp if remote device asks
-                       // for PLAY during call active state.
-                       suspendSinkNative(mBluetoothService.getObjectPathFromAddress(
-                                device.getAddress()));
-                    }
                 } else if (state == BluetoothA2dp.STATE_CONNECTED && mPlayingA2dpDevice != null) {
                     mPlayingA2dpDevice = null;
                     handleSinkPlayingStateChange(device, BluetoothA2dp.STATE_NOT_PLAYING,
