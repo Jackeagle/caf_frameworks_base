@@ -433,4 +433,13 @@
         <item>China_Telecom</item>
         <item>roamingTextSearching</item>
     </string-array>
+
+    <array name="sim_icons">
+        <item>@drawable/ic_sim_icon_1</item>
+        <item>@drawable/ic_sim_icon_2</item>
+        <item>@drawable/ic_sim_icon_c</item>
+        <item>@drawable/ic_sim_icon_g</item>
+        <item>@drawable/ic_sim_icon_w</item>
+        <item>@null</item>
+    </array>
 </resources>
