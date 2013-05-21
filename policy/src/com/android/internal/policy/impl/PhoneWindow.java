@@ -563,6 +563,12 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             return;
         }
 
+        // Make sure there is at least one visible non-action item, or we will set not prepared and return
+        if (st.menu != null && st.menu.getNonActionItems().size() <= 0) {
+            st.isPrepared = false;
+            return;
+        }
+
         int width = WRAP_CONTENT;
         if (st.decorView == null || st.refreshDecorView) {
             if (st.decorView == null) {
