@@ -1120,6 +1120,7 @@ public class DownloadManager {
         values.put(Downloads.Impl.COLUMN_CURRENT_BYTES, 0);
         values.put(Downloads.Impl.COLUMN_TOTAL_BYTES, -1);
         values.putNull(Downloads.Impl._DATA);
+        values.put(Downloads.Impl.COLUMN_MEDIA_SCANNED, 0);//scannable value yes
         values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_PENDING);
         mResolver.update(mBaseUri, values, getWhereClauseForIds(ids), getWhereArgsForIds(ids));
     }

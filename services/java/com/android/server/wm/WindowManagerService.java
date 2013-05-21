@@ -5926,7 +5926,7 @@ public class WindowManagerService extends IWindowManager.Stub
             rawss = Surface.screenshot(dw, dh, 0, maxLayer);
         }
 
-        if (rawss == null) {
+        if (rawss == null || rawss.getConfig() == null) {
             Slog.w(TAG, "Failure taking screenshot for (" + dw + "x" + dh
                     + ") to layer " + maxLayer);
             return null;
