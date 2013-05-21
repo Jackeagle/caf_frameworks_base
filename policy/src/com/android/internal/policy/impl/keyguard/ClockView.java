@@ -36,6 +36,11 @@ import java.text.DateFormatSymbols;
 import java.util.Calendar;
 import com.android.internal.R;
 
+import android.text.Spannable;
+import android.text.SpannableStringBuilder;
+import android.text.style.RelativeSizeSpan;
+
+
 /**
  * Displays the time
  */
@@ -213,7 +218,25 @@ public class ClockView extends RelativeLayout {
         mCalendar.setTimeInMillis(System.currentTimeMillis());
 
         CharSequence newTime = DateFormat.format(mFormat, mCalendar);
-        mTimeView.setText(newTime);
+       // mTimeView.setText(newTime);
+              // show AM_PM
+        String ampmString;
+        if (android.text.format.DateFormat.is24HourFormat(getContext())) {
+            ampmString = "";
+        } else {
+            if (mCalendar.get(Calendar.AM_PM) == 0) {
+                ampmString = mAmPm.mAmString;
+            } else {
+                ampmString = mAmPm.mPmString;
+            }
+        }
+
+        SpannableStringBuilder buf = new SpannableStringBuilder(newTime);
+        int before = buf.length();
+        buf.append(ampmString);
+        buf.setSpan(new RelativeSizeSpan((float) 0.3), before, buf.length(),
+                Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+        mTimeView.setText(buf);
         mAmPm.setIsMorning(mCalendar.get(Calendar.AM_PM) == 0);
     }
 
