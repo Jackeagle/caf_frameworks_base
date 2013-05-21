@@ -560,10 +560,10 @@ public class GlowPadView extends View {
     }
 
     private void vibrate() {
-        final boolean hapticEnabled = Settings.System.getIntForUser(
-                mContext.getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED, 1,
-                UserHandle.USER_CURRENT) != 0;
-        if (mVibrator != null && hapticEnabled) {
+        //final boolean hapticEnabled = Settings.System.getIntForUser(
+        //        mContext.getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED, 1,
+        //        UserHandle.USER_CURRENT) != 0;
+        if (mVibrator != null/* && hapticEnabled*/) {
             mVibrator.vibrate(mVibrationDuration);
         }
     }

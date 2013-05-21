@@ -295,50 +295,6 @@ public class MSimNetworkController extends NetworkController {
         }
     }
 
-    public void addPhoneSignalIconView(ImageView v) {
-        mSimPhoneSignalIconViews.add(v);
-    }
-
-    public void addDataDirectionIconView(ImageView v) {
-        mSimDataDirectionIconViews.add(v);
-    }
-
-    public void addDataDirectionOverlayIconView(ImageView v) {
-        mSimDataDirectionOverlayIconViews.add(v);
-    }
-
-    public void addWifiIconView(ImageView v) {
-        mSimWifiIconViews.add(v);
-    }
-    public void addWimaxIconView(ImageView v) {
-        mSimWimaxIconViews.add(v);
-    }
-
-    public void addCombinedSignalIconView(ImageView v) {
-        mSimCombinedSignalIconViews.add(v);
-    }
-
-    public void addDataTypeIconView(ImageView v) {
-        mSimDataTypeIconViews.add(v);
-    }
-
-    public void addCombinedLabelView(TextView v) {
-        mSimCombinedLabelViews.add(v);
-    }
-
-    public void addMobileLabelView(TextView v) {
-        mSimMobileLabelViews.add(v);
-    }
-
-    public void addWifiLabelView(TextView v) {
-        mSimWifiLabelViews.add(v);
-    }
-
-    public void addEmergencyLabelView(TextView v) {
-        mSimEmergencyLabelViews.add(v);
-    }
-
-
     public void addSignalCluster(MSimSignalCluster cluster, int subscription) {
         mSimSignalClusters.add(cluster);
         refreshSignalCluster(cluster, subscription);
@@ -1224,7 +1180,7 @@ public class MSimNetworkController extends NetworkController {
                 refreshSignalCluster(cluster, subscription);
             }
 		for (MSimNetworkSignalChangedCallback cb : mSimSignalsChangedCallbacks) {
-                notifySimSignalsChangedCallbacks(cb);
+               notifySimSignalsChangedCallbacks(cb);
             }
         }
 
