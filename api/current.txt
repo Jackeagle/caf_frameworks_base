@@ -13369,10 +13369,6 @@ package android.net.wifi {
     field public java.lang.String preSharedKey;
     field public int priority;
     field public int status;
-    field public java.lang.String wapiASCert;
-    field public java.lang.String wapiPsk;
-    field public int wapiPskType;
-    field public java.lang.String wapiUserCert;
     field public java.lang.String[] wepKeys;
     field public int wepTxKeyIndex;
   }
@@ -22550,6 +22546,12 @@ package android.text.method {
     method protected char[] getAcceptedChars();
     method public int getInputType();
     method public static android.text.method.DialerKeyListener getInstance();
+    field public static final char[] CHARACTERS;
+  }
+
+  public class DialerKeyListenerNoCTS extends android.text.method.DialerKeyListener {
+    ctor public DialerKeyListenerNoCTS();
+    method public static android.text.method.DialerKeyListenerNoCTS getInstance();
     field public static final char[] CHARACTERS;
   }
 
