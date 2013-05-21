@@ -5368,9 +5368,15 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
      */
     public void cutSelection() {
         copySelection();
+		//yinhui fix bug: can't delete the last character in baidu searchbox
+		if (mInputConnection != null) {
+            mInputConnection.replaceSelection("");
+        }
+		/*
         int[] handles = new int[4];
         getSelectionHandles(handles);
         mWebViewCore.sendMessage(EventHub.DELETE_TEXT, handles);
+        */
     }
 
     /**
