@@ -3323,6 +3323,7 @@ package android.app {
     field public static final java.lang.String EXTRA_DOWNLOAD_ID = "extra_download_id";
     field public static final java.lang.String EXTRA_NOTIFICATION_CLICK_DOWNLOAD_IDS = "extra_click_download_ids";
     field public static final java.lang.String INTENT_EXTRAS_SORT_BY_SIZE = "android.app.DownloadManager.extra_sortBySize";
+    field public static final int PAUSED_BY_MANUAL = 5; // 0x5
     field public static final int PAUSED_QUEUED_FOR_WIFI = 3; // 0x3
     field public static final int PAUSED_UNKNOWN = 4; // 0x4
     field public static final int PAUSED_WAITING_FOR_NETWORK = 2; // 0x2
@@ -23469,6 +23470,7 @@ package android.util {
     method public static final java.lang.String digitsAndPlusOnly(java.util.regex.Matcher);
     field public static final java.util.regex.Pattern DOMAIN_NAME;
     field public static final java.util.regex.Pattern EMAIL_ADDRESS;
+    field public static final java.util.regex.Pattern FETION;
     field public static final java.lang.String GOOD_IRI_CHAR = "a-zA-Z0-9\u00a0-\ud7ff\uf900-\ufdcf\ufdf0-\uffef";
     field public static final java.util.regex.Pattern IP_ADDRESS;
     field public static final java.util.regex.Pattern PHONE;
