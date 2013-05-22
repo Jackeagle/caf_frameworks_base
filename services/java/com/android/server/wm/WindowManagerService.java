@@ -1420,6 +1420,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     void moveInputMethodDialogsLocked(int pos) {
+        //Refresh focus after InputMethodDialogs moved.
+        mFocusMayChange = true;
         ArrayList<WindowState> dialogs = mInputMethodDialogs;
 
         // TODO(multidisplay): IMEs are only supported on the default display.
