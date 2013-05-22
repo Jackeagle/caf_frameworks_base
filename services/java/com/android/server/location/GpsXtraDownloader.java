@@ -35,6 +35,9 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
 
+import android.os.Build;
+import android.telephony.TelephonyManager;
+
 /**
  * A class for downloading GPS XTRA data.
  *
@@ -44,7 +47,7 @@ public class GpsXtraDownloader {
 
     private static final String TAG = "GpsXtraDownloader";
     static final boolean DEBUG = false;
-    
+
     private Context mContext;
     private String[] mXtraServers;
     // to load balance our server requests
@@ -101,13 +104,17 @@ public class GpsXtraDownloader {
             // break if we have tried all the servers
             if (mNextServerIndex == startIndex) break;
         }
-    
+
         return result;
     }
 
-    protected static byte[] doDownload(String url, boolean isProxySet, 
+    protected byte[] doDownload(String url, boolean isProxySet,
             String proxyHost, int proxyPort) {
+
         if (DEBUG) Log.d(TAG, "Downloading XTRA data from " + url);
+
+        TelephonyManager phone = (TelephonyManager)mContext.getSystemService(
+                                                   mContext.TELEPHONY_SERVICE);
 
         AndroidHttpClient client = null;
         try {
@@ -126,6 +133,23 @@ public class GpsXtraDownloader {
             req.addHeader(
                     "x-wap-profile",
                     "http://www.openmobilealliance.org/tech/profiles/UAPROF/ccppschema-20021212#");
+
+            String network_operator_name = phone.getNetworkOperatorName();
+            String ua = "A/" + Build.VERSION.RELEASE.replace(' ', '#') +
+                         "/" + Build.MANUFACTURER.replace(' ', '#') +
+                         "/" + Build.MODEL.replace(' ', '#') +
+                         "/" + Build.BOARD.replace(' ', '#');
+
+            if (network_operator_name != null) {
+                ua += "/" + network_operator_name.replace(' ', '#');
+            } else {
+                ua += "/-";
+            }
+
+            req.addHeader("User-Agent", ua);
+
+            Log.d(TAG, "Downloading XTRA data from " + url + ": " +
+                    "User-Agent: " + ua);
 
             HttpResponse response = client.execute(req);
             StatusLine status = response.getStatusLine();
