@@ -2388,6 +2388,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // --- New global settings start here
             loadSetting(stmt, Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION,
                     MSimConstants.DEFAULT_SUBSCRIPTION);
+            loadSetting(stmt, Settings.Global.MULTI_SIM_VOICE_CALL_SUBSCRIPTION, 2);
+            loadSetting(stmt, Settings.Global.MULTI_SIM_SMS_SUBSCRIPTION, 2);
         } finally {
             if (stmt != null) stmt.close();
         }

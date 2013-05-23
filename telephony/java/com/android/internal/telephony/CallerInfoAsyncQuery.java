@@ -106,6 +106,7 @@ public class CallerInfoAsyncQuery {
         private Context mQueryContext;
         private Uri mQueryUri;
         private CallerInfo mCallerInfo;
+        private String mNumberToQuery;
 
         /**
          * Our own query worker thread.
@@ -269,7 +270,7 @@ public class CallerInfoAsyncQuery {
                             // the CallerInfo object is totally blank here (i.e. no name
                             // *or* phoneNumber).  So we need to pass in cw.number as
                             // a fallback number.
-                            mCallerInfo.updateGeoDescription(mQueryContext, cw.number);
+                            mCallerInfo.updateGeoDescription(mQueryContext, mNumberToQuery);
                         //}
                     }
 
@@ -335,6 +336,7 @@ public class CallerInfoAsyncQuery {
         cw.cookie = cookie;
         cw.event = EVENT_NEW_QUERY;
 
+        c.mHandler.mNumberToQuery = cw.number;
         c.mHandler.startQuery(token, cw, contactRef, null, null, null, null);
 
         return c;
@@ -426,6 +428,7 @@ public class CallerInfoAsyncQuery {
             cw.event = EVENT_NEW_QUERY;
         }
 
+        c.mHandler.mNumberToQuery = cw.number;
         c.mHandler.startQuery(token,
                               cw,  // cookie
                               contactRef,  // uri
