@@ -176,7 +176,7 @@ public class MSimTelephonyManager {
             iTelephony = ITelephonyMSim.Stub.asInterface(ServiceManager
                     .getService(Context.MSIM_TELEPHONY_SERVICE));
             Bundle bundle = iTelephony.getCellLocation(subscription);
-            CellLocation cl = CellLocation.newFromBundle(bundle);
+            CellLocation cl = CellLocation.newFromBundle(bundle,subscription);
             if (cl.isEmpty())
                 return null;
             return cl;
