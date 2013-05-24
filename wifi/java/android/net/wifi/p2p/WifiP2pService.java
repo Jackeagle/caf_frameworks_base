@@ -204,6 +204,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
      */
     private boolean mDiscoveryStarted;
 
+    private boolean mIsInvite = false;
+
     private NetworkInfo mNetworkInfo;
 
     private boolean mTempoarilyDisconnectedWifi = false;
@@ -1097,6 +1099,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 case WifiMonitor.P2P_INVITATION_RECEIVED_EVENT:
                     WifiP2pGroup group = (WifiP2pGroup) message.obj;
                     WifiP2pDevice owner = group.getOwner();
+                    mIsInvite = true;
 
                     if (owner == null) {
                         if (DBG) loge("Ignored invitation from null owner");
@@ -2351,13 +2354,19 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     }
 
     private void p2pConnectWithPinDisplay(WifiP2pConfig config) {
+        boolean join =false;
         WifiP2pDevice dev = mPeers.get(config.deviceAddress);
         if (dev == null) {
             loge("target device is not found " + config.deviceAddress);
             return;
         }
 
-        String pin = mWifiNative.p2pConnect(config, dev.isGroupOwner());
+        if (mIsInvite)
+           join = true;
+        else
+           join = dev.isGroupOwner();
+
+        String pin = mWifiNative.p2pConnect(config, join);
         try {
             Integer.parseInt(pin);
             if (!sendShowPinReqToFrontApp(pin)) {
@@ -2366,6 +2375,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         } catch (NumberFormatException ignore) {
             // do nothing if p2pConnect did not return a pin
         }
+        mIsInvite = false;
+        join = false;
     }
 
     private String getPersistedDeviceName() {
