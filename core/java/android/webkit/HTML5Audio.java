@@ -258,14 +258,17 @@ class HTML5Audio extends Handler
             if (mState != ERROR && mMediaPlayer.isPlaying()) {
                 mMediaPlayer.stop();
                 mState = STOPPED;
+                pauseMediaPlayer();
+                // Do not resume playback at a later time
+                abandonAudioFocus();
             }
             break;
 
         case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
         case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-            // Lost focus for a short time, but we have to stop
-            // playback.
-            if (mState != ERROR && mMediaPlayer.isPlaying()) pause();
+            // Lost focus for a short time, but we have to stop playback
+            // Will resume playback when called back with AUDIOFOCUS_GAIN
+            if (mState != ERROR && mMediaPlayer.isPlaying()) pauseMediaPlayer();
             break;
         }
     }
@@ -298,6 +301,13 @@ class HTML5Audio extends Handler
     }
 
     private void pause() {
+        pauseMediaPlayer();
+        // Need to call abandonAudioFocus when pausing, otherwise may be automatically
+        // restarted by an AUDIOFOCUS_GAIN callback
+        abandonAudioFocus();
+    }
+
+    private void pauseMediaPlayer() {
         if (mState == STARTED) {
             if (mTimer != null) {
                 mTimer.purge();
@@ -305,6 +315,14 @@ class HTML5Audio extends Handler
             mMediaPlayer.pause();
             mState = PAUSED;
         }
+    }
+
+    // Call this to notify the AudioManager that audio playback is done
+    private void abandonAudioFocus() {
+        AudioManager audioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+        int result = audioManager.abandonAudioFocus(this);
+        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            Log.w(LOGTAG, "abandonAudioFocus request not granted");
     }
 
     private void seek(int msec) {
@@ -321,6 +339,7 @@ class HTML5Audio extends Handler
      * destroy the media player.
      */
     private void teardown() {
+        abandonAudioFocus();
         mMediaPlayer.release();
         mMediaPlayer = null;
         mState = ERROR;
