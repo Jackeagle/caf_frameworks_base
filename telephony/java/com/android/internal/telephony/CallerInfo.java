@@ -408,7 +408,7 @@ public class CallerInfo {
         try {
             String voiceMailLabel = TelephonyManager.getDefault().getVoiceMailAlphaTag();
 
-            phoneNumber = voiceMailLabel;
+            name = voiceMailLabel;
         } catch (SecurityException se) {
             // Should never happen: if this process does not have
             // permission to retrieve VM tag, it should not have
