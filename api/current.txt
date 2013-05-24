@@ -20748,6 +20748,7 @@ package android.telephony {
   public abstract class CellLocation {
     ctor public CellLocation();
     method public static android.telephony.CellLocation getEmpty();
+    method public static android.telephony.CellLocation newFromBundle(android.os.Bundle, int);
     method public static void requestLocationUpdate();
   }
 
