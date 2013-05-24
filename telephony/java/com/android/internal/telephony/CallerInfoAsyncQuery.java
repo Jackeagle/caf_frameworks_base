@@ -239,6 +239,7 @@ public class CallerInfoAsyncQuery {
                     mCallerInfo = new CallerInfo().markAsEmergency(mQueryContext);
                 } else if (cw.event == EVENT_VOICEMAIL_NUMBER) {
                     mCallerInfo = new CallerInfo().markAsVoiceMail();
+                    mCallerInfo.phoneNumber = mNumberToQuery;
                 } else {
                     mCallerInfo = CallerInfo.getCallerInfo(mQueryContext, mQueryUri, cursor);
                     if (DBG) Log.d(LOG_TAG, "==> Got mCallerInfo: " + mCallerInfo);
