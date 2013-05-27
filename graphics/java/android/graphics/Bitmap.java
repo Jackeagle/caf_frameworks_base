@@ -470,6 +470,13 @@ public final class Bitmap implements Parcelable {
         if (m == null) {
             m = new Matrix();
         }
+        
+        //add by sunzhe ,avoid to set the width and height to 0, otherwise it can cause a exception
+        if(dstWidth <= 0)
+        	dstWidth = 1;
+        if(dstHeight <= 0)
+        	dstHeight = 1;
+        //add end
 
         final int width = src.getWidth();
         final int height = src.getHeight();
