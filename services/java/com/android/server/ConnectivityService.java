@@ -2142,7 +2142,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         log("Policy requires " + otherNet.getNetworkInfo().getTypeName() +
                             " teardown");
                     }
-                    if (!((FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) && (newNetType == ConnectivityManager.TYPE_WIFI))) {
+                    if (FeatureQuery.FEATURE_CTS_TEST_SUPPORT &&(ConnectivityManager.TYPE_WIFI == newNetType)
+                        &&(ConnectivityManager.TYPE_MOBILE == mActiveDefaultNetwork)){
+                        log("not tear down mobile for cts test");
+                    }
+                    else if (!((FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) && (newNetType == ConnectivityManager.TYPE_WIFI))) {
                         if (!teardown(otherNet)) {
                             loge("Network declined teardown request");
                             teardown(thisNet);
@@ -2155,8 +2159,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                             log("Not broadcasting CONNECT_ACTION " +
                                 "to torn down network " + info.getTypeName());
                         }
-                        teardown(thisNet);
-                        return;
+                        if (!(FeatureQuery.FEATURE_CTS_TEST_SUPPORT &&(ConnectivityManager.TYPE_MOBILE == newNetType))){
+                           teardown(thisNet);
+                           return;
+                        }
                 }
             }
             synchronized (ConnectivityService.this) {
@@ -2842,8 +2848,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                             if (type == ConnectivityManager.TYPE_WIFI) {
                                 log("mWifiConnected = true " + ", getMobileDataEnabled:" + getMobileDataEnabled());
                                 mWifiConnected = true;
-                                if (getMobileDataEnabled())
-                                    setMobileDataEnabled(false);
+                                if (!FeatureQuery.FEATURE_CTS_TEST_SUPPORT){
+                                   if (getMobileDataEnabled())
+                                       setMobileDataEnabled(false);
+                               }
                             }
                             hideWifiDisconnectedDlg();
                         }
