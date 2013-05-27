@@ -300,6 +300,13 @@ interface ITelephonyMSim {
     boolean hasIccCard(int subscription);
 
     /**
+     * Return true if subscription actived.
+     * @param subscription user preferred subscription.
+     * Return true if subscription actived.
+     */
+    boolean isSubActive(int subscription);
+
+    /**
      * Return if the current radio is LTE on CDMA. This
      * is a tri-state return value as for a period of time
      * the mode may be unknown.
