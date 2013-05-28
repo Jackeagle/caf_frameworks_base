@@ -12946,12 +12946,14 @@ package android.net.ethernet {
     ctor public EthernetDevInfo();
     method public int describeContents();
     method public java.lang.String getConnectMode();
+    method public int getDhcpLeaseDuration();
     method public java.lang.String getDnsAddr();
     method public java.lang.String getIfName();
     method public java.lang.String getIpAddress();
     method public java.lang.String getNetMask();
     method public java.lang.String getRouteAddr();
     method public boolean setConnectMode(java.lang.String);
+    method public void setDhcpLeaseDuration(int);
     method public void setDnsAddr(java.lang.String);
     method public void setIfName(java.lang.String);
     method public void setIpAddress(java.lang.String);
@@ -12971,7 +12973,9 @@ package android.net.ethernet {
     method public int getTotalInterface();
     method public boolean isConfigured();
     method public void updateDevInfo(android.net.ethernet.EthernetDevInfo);
+    field public static final java.lang.String ETHERNET_CONNECTED_ACTION = "android.net.ethernet.ETHERNET_CONNECTED";
     field public static final int ETHERNET_DEVICE_SCAN_RESULT_READY = 0; // 0x0
+    field public static final java.lang.String ETHERNET_DISCONNECTED_ACTION = "android.net.ethernet.ETHERNET_DISCONNECTED";
     field public static final java.lang.String ETHERNET_STATE_CHANGED_ACTION = "android.net.ethernet.ETHERNET_STATE_CHANGED";
     field public static final int ETHERNET_STATE_DISABLED = 1; // 0x1
     field public static final int ETHERNET_STATE_ENABLED = 2; // 0x2
