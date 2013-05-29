@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import android.media.DecoderCapabilities;
 import android.media.DecoderCapabilities.VideoDecoder;
 import android.media.DecoderCapabilities.AudioDecoder;
 import android.mtp.MtpConstants;
+import android.os.SystemProperties;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -186,34 +187,23 @@ public class MediaFile {
         return false;
     }
 
+
     private static boolean isMPQTarget() {
-        int soc_id = 0;
-        String file_info_id;
+        int is_mpq = 0;
         try {
-            File socFile = new File("/sys/devices/system/soc/soc0/id");
-            if(socFile != null) {
-                FileReader inputSocFile = new FileReader(socFile);
-                if(inputSocFile != null) {
-                   BufferedReader socBufferReader = new BufferedReader(inputSocFile);
-                   if(socBufferReader != null) {
-                       file_info_id =socBufferReader.readLine();
-                       Log.w("MediaFile", "String id = " + file_info_id);
-                       soc_id = Integer.parseInt(file_info_id);
-                       socBufferReader.close();
-                   }
-                   inputSocFile.close();
-                }
+            if ("true".equals(SystemProperties.get("mpq.audio.decode", "false"))) {
+               is_mpq = 1;
             }
         } catch(Exception e) {
             Log.e("MediaFile","Exception in FileReader");
         }
-        Log.w("MediaFile", "integer id = " + soc_id);
-        if(soc_id == 130) {
+        if(is_mpq == 1) {
             Log.w("MediaFile",  "MPQ Audio Decode true");
             return true;
         }
         Log.w("MediaFile",  "MPQ Audio Decode false" );
         return false;
+
     }
 
     static {
