@@ -77,6 +77,9 @@ public class EthernetManager {
     IEthernetManager mService;
     Handler mHandler;
 
+    public static final String ETHERNET_CONNECTED_ACTION = "android.net.ethernet.ETHERNET_CONNECTED";
+    public static final String ETHERNET_DISCONNECTED_ACTION = "android.net.ethernet.ETHERNET_DISCONNECTED";
+
     public EthernetManager(IEthernetManager service, Handler handler) {
         Slog.i(TAG, "Init Ethernet Manager, service: " +service);
         mService = service;

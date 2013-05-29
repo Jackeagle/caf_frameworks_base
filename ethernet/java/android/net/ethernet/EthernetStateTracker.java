@@ -162,7 +162,8 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                     mEthInfo.setDnsAddr("null");
                     mEthInfo.setRouteAddr("null");
                     mEthInfo.setNetMask("null");
-
+                    Intent intent = new Intent(EthernetManager.ETHERNET_DISCONNECTED_ACTION);
+                    mContext.sendBroadcast(intent);
                 }
             }
         }
@@ -232,7 +233,8 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                 mEthInfo.setNetMask(info.getNetMask());
 
                 mStartingDhcp = false;
-
+                Intent intent = new Intent(EthernetManager.ETHERNET_CONNECTED_ACTION);
+                mContext.sendBroadcast(intent);
                 Slog.i(TAG,"Static IP configuration succeeded");
             } catch (RemoteException re){
                 Slog.e(TAG,"Static IP configuration failed: " + re);
@@ -465,6 +467,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                                  mLinkProperties = mDhcpInfo.makeLinkProperties();
                                  mLinkProperties.setInterfaceName(mInterfaceName);
 
+                                 mEthInfo.setDhcpLeaseDuration(mDhcpInfo.leaseDuration);
                                  mEthInfo.setIpAddress(mDhcpInfo.ipAddress);
                                  mEthInfo.setIfName("eth0");
                                  mEthInfo.setDnsAddr(mDhcpInfo.dns1);
@@ -473,6 +476,9 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                                  int addr = NetworkUtils.prefixLengthToNetmaskInt(mDhcpInfo.prefixLength);
                                  str.append(NetworkUtils.intToInetAddress(addr).getHostAddress());
                                  mEthInfo.setNetMask(str.toString());
+
+                                 Intent intent = new Intent(EthernetManager.ETHERNET_CONNECTED_ACTION);
+                                 mContext.sendBroadcast(intent);
 
                              } else {
                                  event = EVENT_INTERFACE_CONFIGURATION_FAILED;
