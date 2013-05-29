@@ -63,6 +63,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemService;
 import android.os.SystemProperties;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.Pair;
@@ -699,7 +700,7 @@ public class BluetoothService extends IBluetooth.Stub {
         // update mode
         Intent intent = new Intent(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
         intent.putExtra(BluetoothAdapter.EXTRA_SCAN_MODE, BluetoothAdapter.SCAN_MODE_NONE);
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
     }
 
     /**
@@ -3061,7 +3062,7 @@ public class BluetoothService extends IBluetooth.Stub {
         Intent intent = new Intent(BluetoothDevice.ACTION_UUID);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_UUID, uuid);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
         mUuidIntentTracker.remove(address);
     }
 
@@ -4046,7 +4047,7 @@ public class BluetoothService extends IBluetooth.Stub {
             intent.putExtra(BluetoothAdapter.EXTRA_PREVIOUS_CONNECTION_STATE,
                     convertToAdapterState(prevState));
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.ALL, BLUETOOTH_PERM);
             Log.d(TAG, "CONNECTION_STATE_CHANGE: " + device + ": "
                     + prevState + " -> " + state);
         }
@@ -4072,7 +4073,7 @@ public class BluetoothService extends IBluetooth.Stub {
             connStateIntent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             connStateIntent.putExtra(BluetoothAdapter.EXTRA_CONNECTION_STATE, state);
             connStateIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(connStateIntent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(connStateIntent, UserHandle.ALL, BLUETOOTH_PERM);
             Log.d(TAG, " Sent BluetoothAdapte.ACTION_CONNECTION_STATE_CHANGED "+
                        "with state : " + state);
         }
@@ -4445,7 +4446,7 @@ public class BluetoothService extends IBluetooth.Stub {
                 intent.putExtra(BluetoothDevice.EXTRA_UUID, uuids[i]);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT, gattPath);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT_RESULT, result);
-                mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
             }
         } else {
             Log.d(TAG, "Send intents about all services found on the remote devices");
@@ -4469,7 +4470,7 @@ public class BluetoothService extends IBluetooth.Stub {
                 intent.putExtra(BluetoothDevice.EXTRA_UUID, svcUuid);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT, gattServicePaths[i]);
                 intent.putExtra(BluetoothDevice.EXTRA_GATT_RESULT, result);
-                mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
             }
         }
     }

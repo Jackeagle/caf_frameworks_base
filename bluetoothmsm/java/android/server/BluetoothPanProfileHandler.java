@@ -34,6 +34,7 @@ import android.net.NetworkUtils;
 import android.os.IBinder;
 import android.os.INetworkManagementService;
 import android.os.ServiceManager;
+import android.os.UserHandle;
 import android.util.Log;
 
 import java.net.InetAddress;
@@ -310,7 +311,7 @@ final class BluetoothPanProfileHandler {
         intent.putExtra(BluetoothPan.EXTRA_PREVIOUS_STATE, prevState);
         intent.putExtra(BluetoothPan.EXTRA_STATE, state);
         intent.putExtra(BluetoothPan.EXTRA_LOCAL_ROLE, role);
-        mContext.sendBroadcast(intent, BluetoothService.BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BluetoothService.BLUETOOTH_PERM);
 
         debugLog("Pan Device state : device: " + device + " State:" + prevState + "->" + state);
     }

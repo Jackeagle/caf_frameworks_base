@@ -32,6 +32,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.PowerManager;
+import android.os.UserHandle;
 import android.util.Log;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
@@ -127,7 +128,7 @@ class BluetoothEventLoop {
                 intent.setClassName(ACCESS_REQUEST_PACKAGE, ACCESS_REQUEST_CLASS);
                       intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
                       BluetoothDevice.REQUEST_TYPE_SIM_ACCESS);
-                mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+                mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
                 break;
           case EVENT_DUN_USER_TIMEOUT:
                 Log.d(TAG, "DUN user Authorization timeout");
@@ -136,7 +137,7 @@ class BluetoothEventLoop {
                 intent1.setClassName(ACCESS_REQUEST_PACKAGE, ACCESS_REQUEST_CLASS);
                       intent1.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
                       BluetoothDevice. REQUEST_TYPE_DUN_ACCESS);
-                mContext.sendBroadcast(intent1, BLUETOOTH_ADMIN_PERM);
+                mContext.sendBroadcastAsUser(intent1, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
 
                 break;
             }
@@ -258,7 +259,7 @@ class BluetoothEventLoop {
                 intent.putExtra(BluetoothDevice.EXTRA_UUIDS, uuids);
             }
 
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (devType != null) {
             if (DBG) log("Device " + addr + " type: " + devType + " Broadcaster: " + broadcaster);
             if ("LE".equals(devType) && "false".equals(broadcaster)) {
@@ -270,7 +271,7 @@ class BluetoothEventLoop {
                     intent.putExtra(BluetoothDevice.EXTRA_UUIDS, uuids);
                 }
 
-                mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+                mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
             }
         } else {
             log ("ClassValue: " + classValue + " for remote device: " + address + " is null");
@@ -307,7 +308,7 @@ class BluetoothEventLoop {
     private void onDeviceDisappeared(String address) {
         Intent intent = new Intent(BluetoothDevice.ACTION_DISAPPEARED);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
     }
 
     /**
@@ -324,7 +325,7 @@ class BluetoothEventLoop {
         }
         Intent intent = new Intent(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
     }
 
     /**
@@ -405,7 +406,7 @@ class BluetoothEventLoop {
             Intent intent = new Intent(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED);
             intent.putExtra(BluetoothAdapter.EXTRA_LOCAL_NAME, propValues[1]);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (name.equals("Pairable") || name.equals("Discoverable")) {
             adapterProperties.setProperty(name, propValues[1]);
 
@@ -429,7 +430,7 @@ class BluetoothEventLoop {
                 Intent intent = new Intent(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
                 intent.putExtra(BluetoothAdapter.EXTRA_SCAN_MODE, mode);
                 intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-                mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+                mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
             }
         } else if (name.equals("Discovering")) {
             Intent intent;
@@ -441,7 +442,7 @@ class BluetoothEventLoop {
                 mBluetoothService.cancelDiscovery();
                 intent = new Intent(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
             }
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (name.equals("Devices") || name.equals("UUIDs")) {
             String value = null;
             int len = Integer.valueOf(propValues[1]);
@@ -511,7 +512,7 @@ class BluetoothEventLoop {
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
                 intent.putExtra(BluetoothDevice.EXTRA_REASON, connProp[1]);
                 intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-                mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+                mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
             }
             return;
         }
@@ -526,13 +527,13 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             intent.putExtra(BluetoothDevice.EXTRA_NAME, propValues[1]);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (name.equals("Alias")) {
             mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
             Intent intent = new Intent(BluetoothDevice.ACTION_ALIAS_CHANGED);
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (name.equals("Class")) {
             mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
             Intent intent = new Intent(BluetoothDevice.ACTION_CLASS_CHANGED);
@@ -540,13 +541,13 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_CLASS,
                     new BluetoothClass(Integer.valueOf(propValues[1])));
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (name.equals("RSSI")) {
             mBluetoothService.setRemoteDeviceProperty(address, name, propValues[1]);
             Intent intent = new Intent(BluetoothDevice.ACTION_RSSI_UPDATE);
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             intent.putExtra(BluetoothDevice.EXTRA_RSSI, propValues[1]);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (name.equals("Connected")) {
             Log.d(TAG, "Device property Connected: " + propValues[1]);
 
@@ -585,7 +586,7 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             intent.putExtra(BluetoothDevice.EXTRA_REASON, connProp[1]);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         } else if (name.equals("UUIDs")) {
             String uuid = null;
             int len = Integer.valueOf(propValues[1]);
@@ -641,7 +642,7 @@ class BluetoothEventLoop {
             Intent intent = new Intent(BluetoothDevice.ACTION_LE_CONN_PARAMS);
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             intent.putExtra(BluetoothDevice.EXTRA_CONN_INTERVAL, Integer.valueOf(propValues[1]));
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         }
     }
 
@@ -774,7 +775,7 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT,
                         BluetoothDevice.PAIRING_VARIANT_CONSENT);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
         return;
@@ -798,7 +799,7 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_KEY, passkey);
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT,
                 BluetoothDevice.PAIRING_VARIANT_PASSKEY_CONFIRMATION);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
         return;
@@ -820,7 +821,7 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT,
                 BluetoothDevice.PAIRING_VARIANT_PASSKEY);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
         return;
@@ -851,7 +852,7 @@ class BluetoothEventLoop {
             intent.putExtra("uuid", uuid);
             intent.putExtra("name", mBluetoothService.getRemoteName(address));
             intent.putExtra("address", address);
-            mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
             mHandler.sendMessageDelayed(mHandler
                    .obtainMessage(EVENT_SAP_USER_TIMEOUT),
                     USER_CONFIRM_TIMEOUT);
@@ -886,7 +887,7 @@ class BluetoothEventLoop {
             intent.putExtra("name", mBluetoothService.getRemoteName(address));
             intent.putExtra("address", address);
             intent.putExtra("uuid", uuid);
-            mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
             mHandler.sendMessageDelayed(mHandler
                  .obtainMessage(EVENT_DUN_USER_TIMEOUT),
                  USER_CONFIRM_TIMEOUT);
@@ -914,7 +915,7 @@ class BluetoothEventLoop {
         Intent intent = new Intent(BluetoothService.SAP_STATECHANGE_INTENT);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE,  mAdapter.getRemoteDevice(address));
         intent.putExtra("state", sapState);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
     }
 
     private void onDUNStateChanged(String objectPath, String state, int nativeData) {
@@ -939,7 +940,7 @@ class BluetoothEventLoop {
         Intent intent = new Intent(BluetoothService.DUN_STATECHANGE_INTENT);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE,  mAdapter.getRemoteDevice(address));
         intent.putExtra("state", DUNState);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
     }
 
     private void onRequestPinCode(String objectPath, int nativeData, boolean secure) {
@@ -995,7 +996,7 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.PAIRING_VARIANT_PIN);
         intent.putExtra(BluetoothDevice.EXTRA_SECURE_PAIRING, secure);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
         // Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
         if (mHandler.hasMessages(EVENT_PAIRING_TIMEOUT)) {
@@ -1031,7 +1032,7 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_KEY, passkey);
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT,
                         BluetoothDevice.PAIRING_VARIANT_DISPLAY_PASSKEY);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
         //Release wakelock to allow the LCD to go off after the PIN popup notification.
         mWakeLock.release();
     }
@@ -1044,7 +1045,7 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_KEY, pin);
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT,
                         BluetoothDevice.PAIRING_VARIANT_DISPLAY_PIN);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
         //Release wakelock to allow the LCD to go off after the PIN popup notifcation.
         mWakeLock.release();
     }
@@ -1064,7 +1065,7 @@ class BluetoothEventLoop {
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
         intent.putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT,
                 BluetoothDevice.PAIRING_VARIANT_OOB_CONSENT);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
     }
 
     /**
@@ -1168,7 +1169,7 @@ class BluetoothEventLoop {
      */
     private void onAgentCancel() {
         Intent intent = new Intent(BluetoothDevice.ACTION_PAIRING_CANCEL);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
 
         mHandler.sendMessageDelayed(mHandler.obtainMessage(EVENT_AGENT_CANCEL),
                    1500);

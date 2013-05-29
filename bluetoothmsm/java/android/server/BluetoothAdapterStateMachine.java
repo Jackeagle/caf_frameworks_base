@@ -27,6 +27,7 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.os.SystemService;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 import android.os.SystemProperties;
@@ -882,7 +883,7 @@ final class BluetoothAdapterStateMachine extends StateMachine {
         intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
         mPublicState = newState;
 
-        mContext.sendBroadcast(intent, BluetoothService.BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.ALL, BluetoothService.BLUETOOTH_PERM);
     }
 
     /**

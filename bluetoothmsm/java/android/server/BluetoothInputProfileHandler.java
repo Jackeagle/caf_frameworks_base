@@ -26,6 +26,7 @@ import android.bluetooth.BluetoothProfileState;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Message;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -190,7 +191,7 @@ final class BluetoothInputProfileHandler {
         intent.putExtra(BluetoothInputDevice.EXTRA_PREVIOUS_STATE, prevState);
         intent.putExtra(BluetoothInputDevice.EXTRA_STATE, state);
         intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-        mContext.sendBroadcast(intent, BluetoothService.BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BluetoothService.BLUETOOTH_PERM);
 
         debugLog("InputDevice state : device: " + device + " State:" + prevState + "->" + state);
     }
