@@ -51,6 +51,7 @@ import android.os.INetworkManagementService;
 import android.os.SystemProperties;
 import android.os.ServiceManager;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.util.*;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -463,6 +464,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                              if (localLOGV) Slog.d(TAG, "DhcpHandler: DHCP request started");
                              if (NetworkUtils.runDhcp(mInterfaceName, mDhcpInfo)) {
                                  event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
+                                 mEthInfo.setLastDhcpRequestTime(SystemClock.elapsedRealtime());
                                  if (localLOGV) Slog.d(TAG, "DhcpHandler: DHCP request succeeded: " + mDhcpInfo.toString());
                                  mLinkProperties = mDhcpInfo.makeLinkProperties();
                                  mLinkProperties.setInterfaceName(mInterfaceName);

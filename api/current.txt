@@ -12950,6 +12950,7 @@ package android.net.ethernet {
     method public java.lang.String getDnsAddr();
     method public java.lang.String getIfName();
     method public java.lang.String getIpAddress();
+    method public long getLastDhcpRequestTime();
     method public java.lang.String getNetMask();
     method public java.lang.String getRouteAddr();
     method public boolean setConnectMode(java.lang.String);
@@ -12957,6 +12958,7 @@ package android.net.ethernet {
     method public void setDnsAddr(java.lang.String);
     method public void setIfName(java.lang.String);
     method public void setIpAddress(java.lang.String);
+    method public void setLastDhcpRequestTime(long);
     method public void setNetMask(java.lang.String);
     method public void setRouteAddr(java.lang.String);
     method public void writeToParcel(android.os.Parcel, int);
