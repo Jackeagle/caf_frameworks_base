@@ -36,6 +36,7 @@
     <string name="status_bar_latest_events_title" msgid="6594767438577593172">"通知"</string>
     <string name="battery_low_title" msgid="2783104807551211639">"请连接充电器"</string>
     <string name="battery_low_subtitle" msgid="1752040062087829196">"电池电量低。"</string>
+	<string name="battery_full_title">电池已充满.</string>
     <string name="battery_low_percent_format" msgid="1077244949318261761">"还剩 <xliff:g id="NUMBER">%d%%</xliff:g>"</string>
     <string name="invalid_charger" msgid="4549105996740522523">"不支持 USB 充电功能。"\n"只能使用随附的充电器充电。"</string>
     <string name="battery_low_why" msgid="7279169609518386372">"电量使用情况"</string>
