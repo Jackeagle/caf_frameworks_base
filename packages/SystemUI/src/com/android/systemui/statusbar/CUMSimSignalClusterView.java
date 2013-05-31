@@ -387,8 +387,11 @@ public class CUMSimSignalClusterView
         if (mServiceState[subscription] == null) {
             return 0;
         }
-        int radioTechnology = mServiceState[subscription].getVoiceRadioTechnology();
-        Log.i(TAG,subscription+":VoiceRadio technology is:"+mServiceState[subscription].getVoiceRadioTechnology());
+
+        int radioTechnology = mServiceState[subscription].getRadioTechnology();
+        Log.i(TAG,subscription+":radio technology is:"+mServiceState[subscription].getRadioTechnology());
+        if(radioTechnology == 0)
+            radioTechnology = mServiceState[subscription].getVoiceRadioTechnology();
         
         switch (radioTechnology) {
         case ServiceState.RIL_RADIO_TECHNOLOGY_IS95A:
