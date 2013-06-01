@@ -154,7 +154,7 @@ public class PhoneNumberUtils
         boolean isIPPrefix = intent.getBooleanExtra(PhoneConstants.IP_CALL, false);
         if (isIPPrefix && number != null && subscription < MAX_PHONE_COUNT_DS) {
             String IPPrefix = Settings.System.getString(context.getContentResolver(),
-                    Settings.Global.IPCALL_PREFIX[subscription]);
+                    Settings.System.IPCALL_PREFIX[subscription]);
             if (!TextUtils.isEmpty(IPPrefix)) {
                 return IPPrefix + number;
             }

@@ -2630,6 +2630,120 @@ public final class Settings {
         @Deprecated
         public static final String WIFI_WATCHDOG_PING_TIMEOUT_MS =
             Secure.WIFI_WATCHDOG_PING_TIMEOUT_MS;
+
+        /**
+         * Int value to specify if CABL is enabled.
+         * 0 = Disable  1 = Enable
+         * @hide
+         */
+        public static final String CABL_ENABLED = "cabl_enabled";
+
+        /**
+         * Int value to specify CABL levels.
+         * @hide
+         */
+        public static final String CABL_LEVELS = "cabl_levels";
+
+        /**
+         * Set the proximity sensor on or off
+         * 0 == OFF 1 == ON
+         * @hide
+         */
+        public static final String PROXIMITY_SENSOR = "proximity_sensor";
+
+        /**
+         * Int value to specify if the fuction of display home location is enabled.
+         * 0 = Disable  1 = Enable
+         * @hide
+         */
+        public static final String DISPLAY_HOME_LOCATION = "display_home_location";
+
+        /**
+         * Subscription to be used for multi Sim IP Call Prefix Setting. The
+         * supported values are 0 = SUB1, 1 = SUB2.
+         *
+         * @hide
+         */
+        public static final String[] IPCALL_PREFIX = {
+                "ipcall_prefix_sub1", "ipcall_prefix_sub2"
+        };
+
+        /**
+         * Channel name for subcription one and two i.e. channele name 1,
+         * channel name 2
+         *
+         * @hide
+         */
+        public static final String[] MULTI_SIM_NAME = {
+                "perferred_name_sub1", "preferred_name_sub2"
+        };
+
+        /**
+         * Preferred subscription icon index. 0 = @drawable/ic_sim_icon_1
+         *                                    1 = @drawable/ic_sim_icon_2
+         *                                    2 = @drawable/ic_sim_icon_c
+         *                                    3 = @drawable/ic_sim_icon_g
+         *                                    4 = @drawable/ic_sim_icon_w
+         * The default value is "0,1". And 0 for SUB1, 1 for SUB2.
+         *
+         * @hide
+         */
+        public static final String PREFERRED_SIM_ICON_INDEX = "preferred_sim_icon_index";
+
+        /**
+         * display duration info after end call. 0 = Off 1 = On
+         *
+         * @hide
+         */
+        public static final String SHOW_CALL_DURATION = "show_call_duration";
+
+        /**
+         * If true, if the environment is dark, light the button back-light each
+         * time screen is touched after unlock. if the environment is bright,
+         * only light the button back-light once the phone is unlocked. If
+         * false, only light the button back-light once the
+         *
+         * @hide
+         */
+        public static final String LIGHT_SENSOR_FOR_BUTTON_LIGHT = "light_sensor_for_button_light";
+
+        /**
+         * The input of light sensor lower than this value means the environment
+         * is dark.
+         *
+         * @hide
+         */
+        public static final String LIGHT_DARK_THRESHOLD = "light_dark_threshold";
+
+        /**
+         * The input of light sensor higher than this value means the
+         * environment is bright.
+         *
+         * @hide
+         */
+        public static final String LIGHT_BRIGHT_THRESHOLD = "light_bright_threshold";
+
+        /**
+         * The brightness of button back-light.
+         *
+         * @hide
+         */
+        public static final String BUTTON_LIGHT_BRIGHTNESS = "button_light_brightness";
+
+        /**
+         * The button back light would off automatically after certain seconds
+         * for power consumption consideration.
+         *
+         * @hide
+         */
+        public static final String BUTTON_LIGHT_TIMEOUT = "button_light_timeout";
+
+        /**
+         * Whether to enable button light.
+         *
+         * @hide
+         */
+        public static final String BUTTON_LIGHT_ENABLE = "button_light_enable";
     }
 
     /**
@@ -5711,33 +5825,6 @@ public final class Settings {
         public static final String ENABLE_FAST_POWERON = "enable_fast_poweron";
 
         /**
-         * Int value to specify if CABL is enabled.
-         * 0 = Disable  1 = Enable
-         * @hide
-         */
-        public static final String CABL_ENABLED = "cabl_enabled";
-
-        /**
-         * Int value to specify CABL levels.
-         * @hide
-         */
-        public static final String CABL_LEVELS = "cabl_levels";
-
-        /**
-         * Set the proximity sensor on or off
-         * 0 == OFF 1 == ON
-         * @hide
-         */
-        public static final String PROXIMITY_SENSOR = "proximity_sensor";
-
-        /**
-         * Int value to specify if the fuction of display home location is enabled.
-         * 0 = Disable  1 = Enable
-         * @hide
-         */
-        public static final String DISPLAY_HOME_LOCATION = "display_home_location";
-
-        /**
           * Subscription to be used for voice call on a multi sim device. The supported values
           * are 0 = SUB1, 1 = SUB2.
           * @hide
@@ -5779,93 +5866,6 @@ public final class Settings {
          */
         public static final String[] MULTI_SIM_USER_PREFERRED_SUBS = {"user_preferred_sub1",
                 "user_preferred_sub2"};
-
-        /**
-         * Subscription to be used for multi Sim IP Call Prefix Setting. The
-         * supported values are 0 = SUB1, 1 = SUB2.
-         *
-         * @hide
-         */
-        public static final String[] IPCALL_PREFIX = {
-                "ipcall_prefix_sub1", "ipcall_prefix_sub2"
-        };
-
-        /**
-         * Channel name for subcription one and two i.e. channele name 1,
-         * channel name 2
-         *
-         * @hide
-         */
-        public static final String[] MULTI_SIM_NAME = {
-                "perferred_name_sub1", "preferred_name_sub2"
-        };
-
-        /**
-         * Preferred subscription icon index. 0 = @drawable/ic_sim_icon_1
-         *                                    1 = @drawable/ic_sim_icon_2
-         *                                    2 = @drawable/ic_sim_icon_c
-         *                                    3 = @drawable/ic_sim_icon_g
-         *                                    4 = @drawable/ic_sim_icon_w
-         * The default value is "0,1". And 0 for SUB1, 1 for SUB2.
-         *
-         * @hide
-         */
-        public static final String PREFERRED_SIM_ICON_INDEX = "preferred_sim_icon_index";
-
-        /**
-         * display duration info after end call. 0 = Off 1 = On
-         *
-         * @hide
-         */
-        public static final String SHOW_CALL_DURATION = "show_call_duration";
-
-        /**
-         * If true, if the environment is dark, light the button back-light each
-         * time screen is touched after unlock. if the environment is bright,
-         * only light the button back-light once the phone is unlocked. If
-         * false, only light the button back-light once the
-         *
-         * @hide
-         */
-        public static final String LIGHT_SENSOR_FOR_BUTTON_LIGHT = "light_sensor_for_button_light";
-
-        /**
-         * The input of light sensor lower than this value means the environment
-         * is dark.
-         *
-         * @hide
-         */
-        public static final String LIGHT_DARK_THRESHOLD = "light_dark_threshold";
-
-        /**
-         * The input of light sensor higher than this value means the
-         * environment is bright.
-         *
-         * @hide
-         */
-        public static final String LIGHT_BRIGHT_THRESHOLD = "light_bright_threshold";
-
-        /**
-         * The brightness of button back-light.
-         *
-         * @hide
-         */
-        public static final String BUTTON_LIGHT_BRIGHTNESS = "button_light_brightness";
-
-        /**
-         * The button back light would off automatically after certain seconds
-         * for power consumption consideration.
-         *
-         * @hide
-         */
-        public static final String BUTTON_LIGHT_TIMEOUT = "button_light_timeout";
-
-        /**
-         * Whether to enable button light.
-         *
-         * @hide
-         */
-        public static final String BUTTON_LIGHT_ENABLE = "button_light_enable";
     }
 
     /**
