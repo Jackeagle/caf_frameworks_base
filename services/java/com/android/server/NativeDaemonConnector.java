@@ -46,7 +46,7 @@ import java.util.LinkedList;
  * {@code libsysutils} FrameworkListener protocol.
  */
 final class NativeDaemonConnector implements Runnable, Handler.Callback, Watchdog.Monitor {
-    private static final boolean LOGD = true;
+    private static final boolean LOGD = false;
 
     private final String TAG;
 
