@@ -13369,6 +13369,10 @@ package android.net.wifi {
     field public java.lang.String preSharedKey;
     field public int priority;
     field public int status;
+    field public java.lang.String wapiASCert;
+    field public java.lang.String wapiPsk;
+    field public int wapiPskType;
+    field public java.lang.String wapiUserCert;
     field public java.lang.String[] wepKeys;
     field public int wepTxKeyIndex;
   }
@@ -21030,6 +21034,7 @@ package android.telephony {
     method public java.lang.String getNetworkOperator();
     method public java.lang.String getNetworkOperatorName();
     method public int getNetworkType();
+    method public int getPhoneCount();
     method public int getPhoneType();
     method public java.lang.String getSimCountryIso();
     method public java.lang.String getSimOperator();
@@ -23460,6 +23465,7 @@ package android.util {
     method public static final java.lang.String digitsAndPlusOnly(java.util.regex.Matcher);
     field public static final java.util.regex.Pattern DOMAIN_NAME;
     field public static final java.util.regex.Pattern EMAIL_ADDRESS;
+    field public static final java.util.regex.Pattern FETION;
     field public static final java.lang.String GOOD_IRI_CHAR = "a-zA-Z0-9\u00a0-\ud7ff\uf900-\ufdcf\ufdf0-\uffef";
     field public static final java.util.regex.Pattern IP_ADDRESS;
     field public static final java.util.regex.Pattern PHONE;
