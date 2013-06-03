@@ -1953,8 +1953,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int ringerModeAffectedStreams = (1 << AudioManager.STREAM_RING) |
                                             (1 << AudioManager.STREAM_NOTIFICATION) |
                                             (1 << AudioManager.STREAM_SYSTEM) |
-                                            (1 << AudioManager.STREAM_SYSTEM_ENFORCED)|
-                                            (1 << AudioManager.STREAM_ALARM);
+                                            (1 << AudioManager.STREAM_SYSTEM_ENFORCED);
             if (!mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_voice_capable)) {
                 ringerModeAffectedStreams |= (1 << AudioManager.STREAM_MUSIC);
